@@ -15,7 +15,7 @@
 
 ## 🚀 快速上手
 
-### Swift（仅 macOS）
+### Swift（需要 macOS 26 及更新系统）
 
 ```bash
 # 单张转换
