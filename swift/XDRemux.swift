@@ -1417,11 +1417,14 @@ private enum ISOHDRWriter {
             throw CLIError.unableToCreateDestination(outputURL)
         }
 
-        let requestOptions: [CFString: Any] = [
+        var requestOptions: [CFString: Any] = [
             kCGImageDestinationEncodeBaseIsSDR: true,
-            kCGImageDestinationEncodeGainMapSubsampleFactor: 1,
             kCGImageDestinationLossyCompressionQuality: 1.0
         ]
+
+        if #available(macOS 16, *) {
+            requestOptions[kCGImageDestinationEncodeGainMapSubsampleFactor] = 1
+        }
 
         var imageOptions: [CFString: Any] = [
             kCGImageDestinationEncodeRequest: kCGImageDestinationEncodeToISOGainmap,
