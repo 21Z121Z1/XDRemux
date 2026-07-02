@@ -3105,7 +3105,16 @@ private func adjustedOppoUserComment(in data: Data, compatibility: OppoCompatibi
     return nil
 }
 
-private func patchOppoUserComment(_ data: inout Data, patchedUserComment: String) -> Bool {
+private struct OppoUserCommentPatch {
+    let sourceRange: Range<Int>
+    let delta: Int
+}
+
+private func applyOppoUserCommentPatch(
+    _ data: inout Data,
+    sourceOffset: Int,
+    patchedUserComment: String
+) -> OppoUserCommentPatch? {
     for prefix in oppoTagFlagPrefixes {
         guard patchedUserComment.hasPrefix(prefix) else { continue }
         let patchedDigits = String(patchedUserComment.dropFirst(prefix.count))
@@ -3117,19 +3126,42 @@ private func patchOppoUserComment(_ data: inout Data, patchedUserComment: String
                 digitEnd += 1
             }
             let digitCount = digitEnd - range.upperBound
-            guard digitCount > 0, patchedDigits.count <= digitCount else {
+            guard digitCount > 0 else {
                 searchRange = range.upperBound..<data.endIndex
                 continue
             }
 
             var replacement = prefixData
-            replacement.append(Data(repeating: UInt8(ascii: "0"), count: digitCount - patchedDigits.count))
+            replacement.append(Data(repeating: UInt8(ascii: "0"), count: max(0, digitCount - patchedDigits.count)))
             replacement.append(Data(patchedDigits.utf8))
-            data.replaceSubrange(range.lowerBound..<digitEnd, with: replacement)
-            return true
+            let replacedRange = range.lowerBound..<digitEnd
+            data.replaceSubrange(replacedRange, with: replacement)
+            return OppoUserCommentPatch(
+                sourceRange: (sourceOffset + range.lowerBound)..<(sourceOffset + digitEnd),
+                delta: replacement.count - (digitEnd - range.lowerBound)
+            )
         }
     }
-    return false
+    return nil
+}
+
+private func adjustedExtentForOppoUserCommentPatch(
+    _ extent: (offset: Int, length: Int),
+    patch: OppoUserCommentPatch?
+) -> (offset: Int, length: Int)? {
+    guard let patch, patch.delta != 0 else { return extent }
+    let extentRange = extent.offset..<extent.offset + extent.length
+    if extentRange.upperBound <= patch.sourceRange.lowerBound {
+        return extent
+    }
+    if extentRange.lowerBound >= patch.sourceRange.upperBound {
+        return (extent.offset + patch.delta, extent.length)
+    }
+    guard extentRange.lowerBound <= patch.sourceRange.lowerBound,
+          extentRange.upperBound >= patch.sourceRange.upperBound else {
+        return nil
+    }
+    return (extent.offset, extent.length + patch.delta)
 }
 
 private func valueOrRepeated(_ values: [Double], index: Int, fallback: Double) -> Double {
@@ -3832,6 +3864,20 @@ private func writeHybridPrimaryPassthrough(
     guard keptSourceIDs.contains(sourcePrimaryID) else {
         throw CLIError.invalidContainer("hybrid graft would drop primary item")
     }
+    var sourceMdatPayload = source.subdata(in: sourceMdat.dataStart..<sourceMdat.dataEnd)
+    let userCommentPatch: OppoUserCommentPatch?
+    if let patchedUserComment {
+        guard let patch = applyOppoUserCommentPatch(
+            &sourceMdatPayload,
+            sourceOffset: sourceMdat.dataStart,
+            patchedUserComment: patchedUserComment
+        ) else {
+            throw CLIError.invalidContainer("unable to patch OPPO UserComment in hybrid output")
+        }
+        userCommentPatch = patch
+    } else {
+        userCommentPatch = nil
+    }
 
     let maxSourceID = keptSourceItems.map(\.itemID).max() ?? sourcePrimaryID
     let copiedItemCount = preservedGainTileIDs.count + 2 + (preservedXMPID == nil ? 0 : 1)
@@ -4121,9 +4167,12 @@ private func writeHybridPrimaryPassthrough(
 
     var finalIlocEntries: [ISOBMFFILocEntry] = []
     for entry in keptSourceIlocEntries {
-        let extents = entry.extents.map { extent -> (offset: Int, length: Int) in
+        let extents = try entry.extents.map { extent -> (offset: Int, length: Int) in
             if entry.constructionMethod == 0 {
-                return (extent.offset + fileDelta, extent.length)
+                guard let adjusted = adjustedExtentForOppoUserCommentPatch(extent, patch: userCommentPatch) else {
+                    throw CLIError.invalidContainer("OPPO UserComment patch crosses item extent boundary")
+                }
+                return (adjusted.offset + fileDelta, adjusted.length)
             }
             return extent
         }
@@ -4131,7 +4180,7 @@ private func writeHybridPrimaryPassthrough(
     }
     var appendedMdatPayload = Data()
     for tile in gainTilePayloads {
-        let offset = newMdatDataStart + (sourceMdat.dataEnd - sourceMdat.dataStart) + appendedMdatPayload.count
+        let offset = newMdatDataStart + sourceMdatPayload.count + appendedMdatPayload.count
         appendedMdatPayload.append(tile.payload)
         finalIlocEntries.append(ISOBMFFILocEntry(itemID: tile.newID, constructionMethod: 0, dataReferenceIndex: 0, extents: [(offset, tile.payload.count)]))
     }
@@ -4153,7 +4202,7 @@ private func writeHybridPrimaryPassthrough(
     }
     let finalMetaPart = makeBox("meta", payload: finalMetaPayload)
 
-    var mdatPayload = source.subdata(in: sourceMdat.dataStart..<sourceMdat.dataEnd)
+    var mdatPayload = sourceMdatPayload
     mdatPayload.append(appendedMdatPayload)
     let mdatPart = makeBox("mdat", payload: mdatPayload)
 
@@ -4162,11 +4211,6 @@ private func writeHybridPrimaryPassthrough(
     out.append(finalMetaPart)
     out.append(betweenMetaAndMdat)
     out.append(mdatPart)
-    if let patchedUserComment {
-        guard patchOppoUserComment(&out, patchedUserComment: patchedUserComment) else {
-            throw CLIError.invalidContainer("unable to patch OPPO UserComment in hybrid output")
-        }
-    }
     try out.write(to: outputURL)
 }
 
@@ -4243,6 +4287,20 @@ private func writePrivateJPEGPassthroughOutput(
     let oldIDATSize = idat.size - 8
     let tmapPayload = tmapPayload ?? makeAppleTmapPayload(infoFloats: infoFloats)
     let xmpPayload = makeHdrgmXMP(infoFloats: infoFloats)
+    var sourceMdatPayload = src.subdata(in: mdat.dataStart..<mdat.dataEnd)
+    let userCommentPatch: OppoUserCommentPatch?
+    if let patchedUserComment {
+        guard let patch = applyOppoUserCommentPatch(
+            &sourceMdatPayload,
+            sourceOffset: mdat.dataStart,
+            patchedUserComment: patchedUserComment
+        ) else {
+            throw CLIError.invalidContainer("unable to patch OPPO UserComment in UHDR pass-through output")
+        }
+        userCommentPatch = patch
+    } else {
+        userCommentPatch = nil
+    }
 
     var metaParts: [Data] = []
     for part in metaChildren {
@@ -4380,7 +4438,7 @@ private func writePrivateJPEGPassthroughOutput(
     let betweenMetaAndMdat = src.subdata(in: meta.boxStart + meta.size..<mdat.boxStart)
     let newMdatDataStart = ftypPart.count + metaPart.count + betweenMetaAndMdat.count + 8
     let fileDelta = newMdatDataStart - mdat.dataStart
-    let gainMapOffset = newMdatDataStart + (mdat.dataEnd - mdat.dataStart)
+    let gainMapOffset = newMdatDataStart + sourceMdatPayload.count
 
     var ilocPayload = Data([1, 0, 0, 0, 0x44, 0x00])
     appendUInt16BE(ilocEntries.count + 3, to: &ilocPayload)
@@ -4390,8 +4448,16 @@ private func writePrivateJPEGPassthroughOutput(
         appendUInt16BE(entry.dataReferenceIndex, to: &ilocPayload)
         appendUInt16BE(entry.extents.count, to: &ilocPayload)
         for extent in entry.extents {
-            appendUInt32BE(entry.constructionMethod == 0 ? extent.offset + fileDelta : extent.offset, to: &ilocPayload)
-            appendUInt32BE(extent.length, to: &ilocPayload)
+            if entry.constructionMethod == 0 {
+                guard let adjusted = adjustedExtentForOppoUserCommentPatch(extent, patch: userCommentPatch) else {
+                    throw CLIError.invalidContainer("OPPO UserComment patch crosses item extent boundary")
+                }
+                appendUInt32BE(adjusted.offset + fileDelta, to: &ilocPayload)
+                appendUInt32BE(adjusted.length, to: &ilocPayload)
+            } else {
+                appendUInt32BE(extent.offset, to: &ilocPayload)
+                appendUInt32BE(extent.length, to: &ilocPayload)
+            }
         }
     }
     appendUInt16BE(gainMapID, to: &ilocPayload); appendUInt16BE(0, to: &ilocPayload); appendUInt16BE(0, to: &ilocPayload); appendUInt16BE(1, to: &ilocPayload)
@@ -4411,7 +4477,7 @@ private func writePrivateJPEGPassthroughOutput(
     for part in finalMetaParts { finalMetaPayload.append(part) }
     let finalMetaPart = makeBox("meta", payload: finalMetaPayload)
 
-    var mdatPayload = src.subdata(in: mdat.dataStart..<mdat.dataEnd)
+    var mdatPayload = sourceMdatPayload
     mdatPayload.append(gainMapJPEG)
     let mdatPart = makeBox("mdat", payload: mdatPayload)
     var out = Data()
@@ -4419,11 +4485,6 @@ private func writePrivateJPEGPassthroughOutput(
     out.append(finalMetaPart)
     out.append(betweenMetaAndMdat)
     out.append(mdatPart)
-    if let patchedUserComment {
-        guard patchOppoUserComment(&out, patchedUserComment: patchedUserComment) else {
-            throw CLIError.invalidContainer("unable to patch OPPO UserComment in UHDR pass-through output")
-        }
-    }
     try out.write(to: outputURL)
     return (primaryID, gainMapID)
 }
