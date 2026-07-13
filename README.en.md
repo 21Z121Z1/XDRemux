@@ -53,6 +53,20 @@ final HEVC payloads are not re-encoded while depth, matte, and portrait metadata
 are authored. Orientation is derived automatically from the outer primary and
 the `src.image` dimensions and EXIF orientation.
 
+Depth camera calibration is generated per capture from OPPO EXIF. Physical
+`FocalLength` selects the active lens; the optical equivalent focal length in
+the lens model and `DigitalZoomRatio` determine the continuous crop reference,
+intrinsic matrix, and PixelSize. Because these OPPO files do not expose lens
+distortion tables, the already registered `src.image`/depth pair is currently
+described as rectified with zero distortion instead of copying an unrelated
+iPhone lens profile.
+
+The simulated portrait aperture is also matched per capture. XDRemux prefers
+the portrait-editor f-number stored in OPPO `rear.depth.config`, falls back to
+EXIF `FNumber`, and uses the `f/1.4` compatibility default only when both are
+missing. The resolved value is written to Apple's
+`depthBlurEffect:SimulatedAperture` field.
+
 Without `--apple-portrait`, no Apple portrait resources are generated and the
 original OPPO/QTI portrait tail is preserved by default. Because `rear.depth`
 uses zstd compression, Apple portrait conversion requires the `zstd` command

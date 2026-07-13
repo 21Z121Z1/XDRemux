@@ -50,6 +50,18 @@ Matte）和人脸兴趣点 Focus。用户无需手动提供这些私有字段。
 Portrait Effects Matte 和人像元数据时不会再次编码最终 Base Image/Gain Map
 载荷。图像横竖方向根据外层主图和 `src.image` 的尺寸及 EXIF 方向自动确定。
 
+Depth 相机标定按每张照片的 OPPO EXIF 自动生成：实际 `FocalLength` 用于识别
+物理镜头，镜头模型中的光学等效焦距与 `DigitalZoomRatio` 用于计算连续变焦
+裁切窗口、内参矩阵和 PixelSize。OPPO 没有在这些照片中公开畸变表，因此当前
+把已经配准的 `src.image`/Depth 组合描述为零畸变，不再复制无关的 iPhone
+镜头标定。
+
+人像虚化光圈也按每张照片自动匹配：优先读取 OPPO
+`rear.depth.config` 中保存的人像编辑 f-number，缺失时回退到 EXIF
+`FNumber`，只有两者都不可用时才使用兼容默认值 `f/1.4`。该值会写入
+Apple `depthBlurEffect:SimulatedAperture`，而不是把所有照片固定成
+`f/1.4`。
+
 不指定 `--apple-portrait` 时，不会生成 Apple 人像数据，原始 OPPO/QTI
 人像尾部默认保留。私有 `rear.depth` 使用 zstd 压缩，因此 Apple 人像转换要求
 系统的 `PATH` 中存在 `zstd` 命令。

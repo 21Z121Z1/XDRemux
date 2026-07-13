@@ -37,11 +37,55 @@ The Apple output contains:
   Focus-coordinate mapping for EXIF orientations 1-8;
 - OPPO capture EXIF/GPS plus the validated 57-field Apple interoperability
   MakerNote profile;
-- portrait rendering parameters, simulated aperture 1.4, Portrait Lighting
-  strength 0.5, and `CustomRendered=9`.
+- portrait rendering parameters, the OPPO-matched simulated aperture, Portrait
+  Lighting strength 0.5, and `CustomRendered=9`.
 
 The embedded Apple compatibility data contains metadata only, not reference
 pixels.
+
+## OPPO-derived camera calibration
+
+The disparity metadata no longer copies a fixed iPhone calibration profile.
+For each OPPO capture, XDRemux now:
+
+- reads physical `FocalLength`, 35mm-equivalent focal length,
+  `DigitalZoomRatio`, and `LensModel` from EXIF;
+- resolves the active optical anchor from the lens model (for the validated
+  Find X9 Ultra samples, `23mm` or `70mm`);
+- estimates the anchor pixel focal length from the `src.image` diagonal and
+  the 35mm-frame diagonal;
+- keeps that anchor focal length while shrinking the intrinsic reference
+  dimensions by the continuous digital zoom ratio, matching the representation
+  observed in iPhone portrait captures;
+- derives effective PixelSize from physical focal length and the same crop
+  ratio;
+- writes centered principal/distortion points and zero forward/inverse
+  distortion under the assumption that the OPPO `src.image` and decoded depth
+  plane are already registered.
+
+This is a geometrically consistent pinhole approximation, not a substitute for
+factory OPPO distortion tables. Camera2 lens intrinsic/distortion metadata or
+per-lens checkerboard calibration remains the path to exact edge geometry.
+
+## OPPO-derived simulated aperture
+
+The aperture shown by the portrait editor is not the physical capture
+aperture. OPPO stores this bokeh setting as `fNumber` in `RearDepthStruct v4`
+at byte offset 292 of `rear.depth.config`. Across the validated portrait
+samples, the decoded values (`f/3.5`, `f/4.5`, `f/5.0`, `f/5.6`, and `f/6.3`)
+also match EXIF `FNumber`.
+
+XDRemux now writes Apple's `depthBlurEffect:SimulatedAperture` using this
+precedence:
+
+1. `rear.depth.config` v4 `fNumber`;
+2. EXIF `FNumber` from the outer image or `src.image`;
+3. `f/1.4` only as the compatibility fallback when neither source is valid.
+
+The already device-consumable Apple `RenderingParameters` template remains
+unchanged. It is a 1,352-byte `REND` parameter graph containing several values
+equal to 1.4 with different semantics; replacing matching float bytes without
+a field-level schema would corrupt unrelated rendering controls.
 
 ## Encoding boundary
 
@@ -68,11 +112,51 @@ container passed the repository ISO parser and reported:
 - 57 Apple MakerNote fields, version 17, image capture type 12, feature flags 1;
 - base 48/48 and gain 12/12 tile payloads byte-identical to the first assembly.
 
-The production Swift file type-checks after the final orientation,
-color-space, and calibration metadata refinements. A fresh iOS import remains
-the final acceptance gate for the integrated output.
+The integrated output passed a real iPhone Photos import and portrait-consumer
+check before the OPPO-derived calibration change. Without `--apple-portrait`,
+the current mainline conversion path preserves the complete OPPO/QTI camera
+tail by default.
 
-The ordinary no-switch path was confirmed to run before tail preservation was
-added. The new byte-for-byte tail reattachment code type-checks; its real-file
-rerun was blocked by the current local execution quota and remains an explicit
-targeted follow-up.
+## Calibration validation
+
+Two real Find X9 Ultra portrait captures were converted after this change:
+
+- `IMG20260713083415`: physical `7.73mm`, optical anchor `23mm`, zoom
+  `2.022x`, reference `2018x1516`, `fx=fy=2712.374`, PixelSize
+  `0.001409447mm`;
+- `IMG20260713001840`: physical `20.1mm`, optical anchor `70mm`, zoom
+  `1.9824x`, reference `2066x1550`, `fx=fy=8283.523`, PixelSize
+  `0.001224023mm`.
+
+ExifTool recovered those exact per-capture values. AVDepthData returned a
+non-null `cameraCalibrationData` for both files, while ImageIO still exposed
+the ISO gain map, disparity, Portrait Effects Matte, and Focus XMP.
+
+The first calibration test exposed an independent orientation regression: the
+outer OPPO portrait (`3064x4592`, Orientation 1) and landscape-stored
+`src.image` (`4080x3064`, Orientation 6) did not have exactly swapped pixel
+dimensions, so the previous equality check incorrectly emitted Orientation 1.
+Orientation selection now compares the outer image's displayed aspect with
+each `src.image` orientation candidate. Regenerated 23mm, 47mm, and 70mm
+samples all report Orientation 6 while retaining ISO gain map, disparity, PEM,
+and Focus.
+
+The regenerated OPPO-calibrated, orientation-corrected output subsequently
+passed real iPhone Photos portrait consumption. This device result closes the
+acceptance gate for the calibration/orientation change.
+
+## Simulated-aperture validation
+
+Three regenerated captures exercise both physical-lens anchors and continuous
+zoom. The CLI decoded `rear.depth.config` v4 and ExifTool recovered the same
+Apple `SimulatedAperture` values:
+
+- `IMG20260713083412`: `f/3.5`;
+- `IMG20260713083415`: `f/4.5`;
+- `IMG20260713083419`: `f/5.0`.
+
+All three remain Orientation 6. ImageIO exposes the ISO gain map, disparity,
+and Portrait Effects Matte for each output; AVDepthData reports non-null camera
+calibration, and the Focus XMP remains present. The remaining device-level
+check is that Photos initializes its portrait aperture control to the matched
+OPPO value rather than merely preserving the metadata tag.

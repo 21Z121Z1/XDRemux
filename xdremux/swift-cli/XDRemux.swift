@@ -5564,6 +5564,26 @@ private struct PortraitFocusRegion {
     let rawHeight: Double
 }
 
+private struct PortraitCameraCalibration {
+    let physicalFocalLengthMM: Double
+    let opticalEquivalentFocalLengthMM: Double
+    let digitalZoomRatio: Double
+    let referenceWidth: Int
+    let referenceHeight: Int
+    let focalLengthPixels: Double
+    let principalPointX: Double
+    let principalPointY: Double
+    let pixelSizeMM: Double
+
+    var intrinsicMatrix: [Double] {
+        [
+            focalLengthPixels, 0, 0,
+            0, focalLengthPixels, 0,
+            principalPointX, principalPointY, 1,
+        ]
+    }
+}
+
 private enum PortraitConversionPipeline {
     static func convertIfNeeded(
         inputURL: URL,
@@ -5621,21 +5641,30 @@ private enum PortraitConversionPipeline {
         let inputProperties = inputSource.flatMap {
             CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any]
         }
+        let simulatedAperture = resolveSimulatedAperture(
+            rearDepthConfig: blocks["rear.depth.config"],
+            inputProperties: inputProperties,
+            baseProperties: baseProperties
+        )
         let inputOrientation = (inputProperties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value
         let baseOrientation = (baseProperties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value
         let inputWidth = (inputProperties?[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue
         let inputHeight = (inputProperties?[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
-        let dimensionsAreSwapped = inputWidth == baseImage.height && inputHeight == baseImage.width
-        let orientationRaw: UInt32
-        if dimensionsAreSwapped {
-            // OPPO stores some portrait src.image JPEGs in landscape pixel order while
-            // the outer HEIC is physically rotated. Prefer the JPEG's rotation instead
-            // of inheriting the outer item's misleading orientation=1.
-            orientationRaw = baseOrientation.map { (5...8).contains($0) ? $0 : 6 } ?? 6
-        } else {
-            orientationRaw = inputOrientation ?? baseOrientation ?? 1
-        }
+        let orientationRaw = resolvedBaseOrientation(
+            inputWidth: inputWidth,
+            inputHeight: inputHeight,
+            inputOrientation: inputOrientation,
+            baseWidth: baseImage.width,
+            baseHeight: baseImage.height,
+            baseOrientation: baseOrientation
+        )
         let orientation = CGImagePropertyOrientation(rawValue: orientationRaw) ?? .up
+        let cameraCalibration = try makeCameraCalibration(
+            inputProperties: inputProperties,
+            baseProperties: baseProperties,
+            baseWidth: baseImage.width,
+            baseHeight: baseImage.height
+        )
         let depthWidth = baseImage.width / 4
         let depthHeight = baseImage.height / 4
         let decodedDepth = try decompressZstd(compressedDepth)
@@ -5711,7 +5740,9 @@ private enum PortraitConversionPipeline {
             height: depthHeight,
             orientation: orientationRaw,
             far: 1.4,
-            near: 4.3
+            near: 4.3,
+            calibration: cameraCalibration,
+            simulatedAperture: simulatedAperture.value
         )
         let matteDictionary = try makePortraitEffectsMatteDictionary(
             image: baseImage,
@@ -5870,13 +5901,234 @@ private enum PortraitConversionPipeline {
         ]
     }
 
+    private static func makeCameraCalibration(
+        inputProperties: [CFString: Any]?,
+        baseProperties: [CFString: Any]?,
+        baseWidth: Int,
+        baseHeight: Int
+    ) throws -> PortraitCameraCalibration {
+        let inputExif = inputProperties?[kCGImagePropertyExifDictionary] as? NSDictionary
+        let baseExif = baseProperties?[kCGImagePropertyExifDictionary] as? NSDictionary
+
+        func number(_ key: CFString) -> Double? {
+            for dictionary in [inputExif, baseExif] {
+                if let value = dictionary?[key] as? NSNumber {
+                    let result = value.doubleValue
+                    if result.isFinite, result > 0 { return result }
+                }
+            }
+            return nil
+        }
+
+        func string(_ key: CFString) -> String? {
+            for dictionary in [inputExif, baseExif] {
+                if let value = dictionary?[key] as? String, !value.isEmpty {
+                    return value
+                }
+            }
+            return nil
+        }
+
+        guard let physicalFocalLength = number(kCGImagePropertyExifFocalLength) else {
+            throw CLIError.invalidContainer(
+                "--apple-portrait requires EXIF FocalLength to derive OPPO camera calibration"
+            )
+        }
+        guard let equivalentFocalLength = number(kCGImagePropertyExifFocalLenIn35mmFilm) else {
+            throw CLIError.invalidContainer(
+                "--apple-portrait requires EXIF FocalLengthIn35mmFormat to derive OPPO camera calibration"
+            )
+        }
+
+        let exifZoom = number(kCGImagePropertyExifDigitalZoomRatio) ?? 1.0
+        let lensModel = string(kCGImagePropertyExifLensModel)
+        let lensAnchor = lensModel.flatMap(opticalEquivalentFocalLengthFromLensModel)
+        let fallbackAnchor = equivalentFocalLength / max(exifZoom, 1.0)
+        let opticalEquivalentFocalLength = lensAnchor ?? fallbackAnchor
+        guard opticalEquivalentFocalLength.isFinite, opticalEquivalentFocalLength > 0 else {
+            throw CLIError.invalidContainer("unable to derive OPPO optical focal-length anchor")
+        }
+
+        let equivalentZoom = equivalentFocalLength / opticalEquivalentFocalLength
+        let digitalZoom: Double
+        if exifZoom.isFinite,
+           exifZoom >= 1.0,
+           abs(exifZoom - equivalentZoom) <= max(0.08, equivalentZoom * 0.05) {
+            digitalZoom = exifZoom
+        } else {
+            digitalZoom = max(1.0, equivalentZoom)
+        }
+
+        let fullFrameDiagonalMM = hypot(36.0, 24.0)
+        let referenceDiagonalPixels = hypot(Double(baseWidth), Double(baseHeight))
+        let focalLengthPixels = referenceDiagonalPixels
+            * opticalEquivalentFocalLength / fullFrameDiagonalMM
+        guard focalLengthPixels.isFinite, focalLengthPixels > 0 else {
+            throw CLIError.invalidContainer("derived OPPO pixel focal length is invalid")
+        }
+
+        func nearestEven(_ value: Double) -> Int {
+            max(2, Int((value / 2.0).rounded()) * 2)
+        }
+        let referenceWidth = nearestEven(Double(baseWidth) / digitalZoom)
+        let referenceHeight = nearestEven(Double(baseHeight) / digitalZoom)
+        let principalPointX = Double(referenceWidth) / 2.0
+        let principalPointY = Double(referenceHeight) / 2.0
+        let basePixelSizeMM = physicalFocalLength / focalLengthPixels
+        let pixelSizeMM = basePixelSizeMM / digitalZoom
+
+        let calibration = PortraitCameraCalibration(
+            physicalFocalLengthMM: physicalFocalLength,
+            opticalEquivalentFocalLengthMM: opticalEquivalentFocalLength,
+            digitalZoomRatio: digitalZoom,
+            referenceWidth: referenceWidth,
+            referenceHeight: referenceHeight,
+            focalLengthPixels: focalLengthPixels,
+            principalPointX: principalPointX,
+            principalPointY: principalPointY,
+            pixelSizeMM: pixelSizeMM
+        )
+        print(String(
+            format: "portrait calibration physical=%.3fmm optical=%.2fmm zoom=%.4fx ref=%dx%d fx=%.3f pixel=%.9fmm distortion=rectified",
+            calibration.physicalFocalLengthMM,
+            calibration.opticalEquivalentFocalLengthMM,
+            calibration.digitalZoomRatio,
+            calibration.referenceWidth,
+            calibration.referenceHeight,
+            calibration.focalLengthPixels,
+            calibration.pixelSizeMM
+        ))
+        return calibration
+    }
+
+    private static func resolveSimulatedAperture(
+        rearDepthConfig: Data?,
+        inputProperties: [CFString: Any]?,
+        baseProperties: [CFString: Any]?
+    ) -> (value: Double, source: String) {
+        // OPPO RearDepthStruct v4 stores the portrait editor's f-number at
+        // byte offset 292. This is the simulated bokeh setting, not the lens's
+        // physical capture aperture, so it maps directly to Apple's
+        // depthBlurEffect:SimulatedAperture.
+        if let config = rearDepthConfig,
+           let version = readFloat32LE(config, at: 0),
+           abs(version - 4.0) < 0.001,
+           let fNumber = readFloat32LE(config, at: 292),
+           fNumber.isFinite,
+           (1.0...32.0).contains(fNumber) {
+            let value = Double(fNumber)
+            print(String(format: "portrait aperture f/%.1f source=rear.depth.config-v%.1f", value, version))
+            return (value, "rear.depth.config")
+        }
+
+        for properties in [inputProperties, baseProperties] {
+            guard
+                let exif = properties?[kCGImagePropertyExifDictionary] as? NSDictionary,
+                let number = exif[kCGImagePropertyExifFNumber] as? NSNumber
+            else { continue }
+            let value = number.doubleValue
+            if value.isFinite, (1.0...32.0).contains(value) {
+                print(String(format: "portrait aperture f/%.1f source=EXIF", value))
+                return (value, "EXIF FNumber")
+            }
+        }
+
+        print("portrait aperture f/1.4 source=compatibility-fallback")
+        return (1.4, "compatibility fallback")
+    }
+
+    private static func readFloat32LE(_ data: Data, at offset: Int) -> Float? {
+        guard offset >= 0, offset + 4 <= data.count else { return nil }
+        let bits = UInt32(data[offset])
+            | UInt32(data[offset + 1]) << 8
+            | UInt32(data[offset + 2]) << 16
+            | UInt32(data[offset + 3]) << 24
+        return Float(bitPattern: bits)
+    }
+
+    private static func opticalEquivalentFocalLengthFromLensModel(_ lensModel: String) -> Double? {
+        let pattern = #"camera\s+([0-9]+(?:\.[0-9]+)?)mm\b"#
+        guard let expression = try? NSRegularExpression(
+            pattern: pattern,
+            options: [.caseInsensitive]
+        ) else { return nil }
+        let range = NSRange(lensModel.startIndex..<lensModel.endIndex, in: lensModel)
+        guard let match = expression.firstMatch(in: lensModel, options: [], range: range),
+              match.numberOfRanges > 1,
+              let focalRange = Range(match.range(at: 1), in: lensModel),
+              let focalLength = Double(lensModel[focalRange]),
+              focalLength.isFinite,
+              focalLength > 0 else {
+            return nil
+        }
+        return focalLength
+    }
+
+    private static func resolvedBaseOrientation(
+        inputWidth: Int?,
+        inputHeight: Int?,
+        inputOrientation: UInt32?,
+        baseWidth: Int,
+        baseHeight: Int,
+        baseOrientation: UInt32?
+    ) -> UInt32 {
+        func swapsAxes(_ orientation: UInt32) -> Bool {
+            (5...8).contains(orientation)
+        }
+
+        func displayedIsPortrait(width: Int, height: Int, orientation: UInt32) -> Bool {
+            let displayedWidth = swapsAxes(orientation) ? height : width
+            let displayedHeight = swapsAxes(orientation) ? width : height
+            return displayedHeight > displayedWidth
+        }
+
+        let normalizedInputOrientation = inputOrientation.flatMap {
+            (1...8).contains($0) ? $0 : nil
+        } ?? 1
+        let targetIsPortrait: Bool
+        if let inputWidth, let inputHeight, inputWidth != inputHeight {
+            targetIsPortrait = displayedIsPortrait(
+                width: inputWidth,
+                height: inputHeight,
+                orientation: normalizedInputOrientation
+            )
+        } else {
+            targetIsPortrait = displayedIsPortrait(
+                width: baseWidth,
+                height: baseHeight,
+                orientation: baseOrientation ?? normalizedInputOrientation
+            )
+        }
+
+        if let baseOrientation,
+           (1...8).contains(baseOrientation),
+           displayedIsPortrait(
+               width: baseWidth,
+               height: baseHeight,
+               orientation: baseOrientation
+           ) == targetIsPortrait {
+            return baseOrientation
+        }
+
+        let baseStoredIsPortrait = baseHeight > baseWidth
+        if baseStoredIsPortrait == targetIsPortrait {
+            return 1
+        }
+        // OPPO portrait src.image JPEGs observed so far use clockwise rotation.
+        // The source JPEG orientation wins whenever available; this is only the
+        // metadata-missing fallback for a stored/display aspect mismatch.
+        return 6
+    }
+
     private static func makeDepthDictionary(
         ranks: Data,
         width: Int,
         height: Int,
         orientation: UInt32,
         far: Float,
-        near: Float
+        near: Float,
+        calibration: PortraitCameraCalibration,
+        simulatedAperture: Double
     ) throws -> CFDictionary {
         let output = NSMutableDictionary()
         let description = NSMutableDictionary()
@@ -5914,15 +6166,35 @@ private enum PortraitConversionPipeline {
         try setMetadata(metadata, path: "depthData:Accuracy", value: "relative")
         try setMetadata(metadata, path: "depthData:Filtered", value: "True")
         try setMetadata(metadata, path: "depthData:DepthDataVersion", value: "65541")
-        try setMetadata(metadata, path: "depthData:IntrinsicMatrixReferenceWidth", value: "4032")
-        try setMetadata(metadata, path: "depthData:IntrinsicMatrixReferenceHeight", value: "3024")
-        try setMetadata(metadata, path: "depthData:LensDistortionCenterOffsetX", value: "2017.552734375")
-        try setMetadata(metadata, path: "depthData:LensDistortionCenterOffsetY", value: "1523.492919921875")
-        try setMetadata(metadata, path: "depthData:PixelSize", value: "0.002440")
+        try setMetadata(
+            metadata,
+            path: "depthData:IntrinsicMatrixReferenceWidth",
+            value: String(calibration.referenceWidth)
+        )
+        try setMetadata(
+            metadata,
+            path: "depthData:IntrinsicMatrixReferenceHeight",
+            value: String(calibration.referenceHeight)
+        )
+        try setMetadata(
+            metadata,
+            path: "depthData:LensDistortionCenterOffsetX",
+            value: String(format: "%.12f", calibration.principalPointX)
+        )
+        try setMetadata(
+            metadata,
+            path: "depthData:LensDistortionCenterOffsetY",
+            value: String(format: "%.12f", calibration.principalPointY)
+        )
+        try setMetadata(
+            metadata,
+            path: "depthData:PixelSize",
+            value: String(format: "%.12f", calibration.pixelSizeMM)
+        )
         try setMetadataValue(
             metadata,
             path: "depthData:IntrinsicMatrix",
-            value: [2860.37890625, 0, 0, 0, 2860.37890625, 0, 2010.31103515625, 1525.0140380859375, 1] as CFArray
+            value: calibration.intrinsicMatrix as CFArray
         )
         try setMetadataValue(
             metadata,
@@ -5932,15 +6204,19 @@ private enum PortraitConversionPipeline {
         try setMetadataValue(
             metadata,
             path: "depthData:LensDistortionCoefficients",
-            value: [0, -0.5552194714546204, 0.053949449211359024, -0.0018901334842666984, -0.000004621016614692053, 0.0000019594019704527454, -0.0000000451839099468998, 0.00000000031430857916348032] as CFArray
+            value: Array(repeating: 0.0, count: 8) as CFArray
         )
         try setMetadataValue(
             metadata,
             path: "depthData:InverseLensDistortionCoefficients",
-            value: [0, 0.5448748469352722, -0.05080728605389595, 0.0016805990599095821, 0.000007370583261945285, -0.0000017933325580088422, 0.00000003959269534448139, -0.0000000002689144740219973] as CFArray
+            value: Array(repeating: 0.0, count: 8) as CFArray
         )
         try setMetadata(metadata, path: "depthBlurEffect:RenderingParameters", value: portraitRenderingParametersBase64)
-        try setMetadata(metadata, path: "depthBlurEffect:SimulatedAperture", value: "1.400000")
+        try setMetadata(
+            metadata,
+            path: "depthBlurEffect:SimulatedAperture",
+            value: String(format: "%.6f", simulatedAperture)
+        )
         try setMetadata(metadata, path: "portraitLightingEffect:EffectStrength", value: "0.500000")
         output[kCGImageAuxiliaryDataInfoMetadata as String] = metadata
         return output as CFDictionary
