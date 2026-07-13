@@ -51,17 +51,16 @@ The `src.image` base and gain map are encoded once. The final container reuses
 those first-assembly HEVC payloads byte-for-byte after the auxiliary images are
 authored. The CLI requires `zstd` on `PATH` to decode OPPO `rear.depth`.
 
-The decoded `rear.depth` header supplies continuous source focal diagnostics
-and the per-rank disparity scale, avoiding the old fixed depth interval.
-Photos receives the canonical auxiliary camera-calibration/`REND` pair because
-the private rendering graph is lens-coupled; feeding OPPO's 70-230mm physical
-scale into that donor graph causes severe double amplification. Real OPPO lens
-and zoom identity stays in primary EXIF.
+The decoded `rear.depth` header supplies the per-rank disparity scale, avoiding
+the old fixed depth interval. The Apple auxiliary graph is selected from real
+1x, 2x/Fusion, 3x tele, or 5x tetraprism `REND`/calibration profiles. Within a
+profile, reference dimensions, principal point, distortion center, and
+PixelSize follow Apple's observed continuous-crop representation while
+intrinsic fx remains fixed. Disparity is not multiplied by focal length a
+second time. Real OPPO lens and zoom identity stays in primary EXIF.
 
-This blur-strength mapping remains experimental. Pass D uses the continuous
-geometric midpoint between the too-strong physical-calibration endpoint and
-the too-weak canonical endpoint; device testing is still required before the
-gain can be approved for merge.
+Cross-focal blur matching remains experimental until the profile-selected
+outputs pass the full Photos f/1.4/source/f/16 device matrix.
 
 The Apple simulated aperture is taken from the OPPO portrait edit state in
 `rear.depth.config` when available, then from EXIF `FNumber`; `f/1.4` is only a

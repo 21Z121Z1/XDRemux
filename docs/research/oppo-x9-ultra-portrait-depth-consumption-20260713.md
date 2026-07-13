@@ -4,9 +4,10 @@ Date: 2026-07-13
 
 ## Scope and result
 
-This note traces how the Find X9 Ultra Gallery build consumes rear portrait
-data from the HEIC private tail. It separates confirmed code paths from fields
-whose exact native semantics remain unresolved.
+This note traces both sides of the Find X9 Ultra rear-portrait contract: how
+the camera algorithm produces and serializes the private payload, and how
+Gallery consumes it for refocus/rendering. It separates confirmed code paths
+from fields whose exact native semantics remain unresolved.
 
 The main result is that OPPO does not treat `rear.depth` as one standalone
 grayscale depth map and does not render blur from a single physical camera
@@ -39,7 +40,7 @@ The static trace uses the local X9 Ultra firmware/Gallery artifacts:
 - `libAlgoProcess.so` extracted from the X9 Ultra firmware;
 - `/odm/lib64/libOPAlgoCamCaptureDualPortrait.so`;
 - `/odm/etc/camera/dualcam_capture_bokeh/render_param.json`;
-- three real decoded `rear.depth` packages, including
+- the deduplicated 80-original OPPO portrait corpus, including
   `IMG20260713001840` and `IMG20260606175915`.
 
 Relevant SHA-256 values for the inspected firmware build are:
@@ -52,8 +53,49 @@ Relevant SHA-256 values for the inspected firmware build are:
   `8281b0db899e8f952438c3a4768470c88b5a4f7039d65fd6bb3ba3c478ecca23`.
 
 Large string and disassembly dumps stay under
-`/private/tmp/oppo_depth_reverse_20260713`. They are intentionally not added
-to the repository.
+`/private/tmp/oppo_depth_reverse_20260713` and
+`/private/tmp/oppo_x9_portrait_producer_20260713`. They are intentionally not
+added to the repository.
+
+## Capture-side producer and package writer
+
+The Camera APK is not the depth generator. Its Java layer reads the completed
+`com.oplus.rear.depth` and `com.oplus.rear.depth.config` byte arrays from the
+capture result and copies them into `FileExtendedContainer`. Generation and
+serialization happen in the ODM/APS native stack.
+
+The producer-side symbols and call sites are now identified in
+`libOPAlgoCamCaptureDualPortrait.so`:
+
+- `galleryModeSetDepthInfo` at `0x7d5390` fills the `DepthInfo`/`RenderInfo`
+  header from the capture algorithm state;
+- `bokehGetGellerySaveDataLen` at `0x7e01c0` calculates the complete gallery
+  package length;
+- `bokehGetGellerySaveDataBuf` at `0x7e0970` serializes the package;
+- the final buffer is compressed with `ZSTD_compress(..., level=1)` before the
+  Camera APK receives it.
+
+The uncompressed package is written in this order:
+
+| Order | Payload | Role in the camera pipeline |
+|---:|---|---|
+| 1 | `0x300` header | `DepthInfo` (`0x118` bytes) plus `RenderInfo` at `0x180` (`0xd0` bytes) |
+| 2 | rank plane | compact relative disparity/depth rank used for Gallery refocus |
+| 3 | hair plane, when flagged | hair-aware foreground refinement |
+| 4 | portrait plane, when flagged | selected human-subject topology |
+| 5 | pet plane, when flagged | selected animal-subject topology |
+| 6 | semantic segmentation, when present | producer converts its wider labels to a stored uint8 semantic plane |
+| 7 | motion-mask block, when present | motion/occlusion reliability state and its table data |
+| 8 | spotlight block, when present | `0x38` bytes of spotlight info followed by its image |
+| 9 | rectified master and slave NV21 | stored-resolution stereo guide frames, each `w*h*3/2`; native log names them `master` and `slave` |
+| 10 | optional model-output image | a later `w*h*3/2` buffer when its header flag is set; static evidence does not identify it as a rendered-bokeh image |
+
+This closes the largest earlier uncertainty: the remaining 4-7 MiB is mostly
+rectified master/slave YUV plus semantic/motion data and, in some captures, an
+optional model-output image. It is not one hidden high-resolution metric-depth
+map. In `IMG20260506112827`, the decoded package ends exactly after the two
+1024x768 rectified NV21 frames, so that sample contains no third image. The
+outer HEIC primary is the confirmed final OPPO-rendered portrait.
 
 ## Gallery entry and backend selection
 
@@ -193,39 +235,77 @@ The portion confirmed from both real data and native pointer arithmetic is:
 | `0x024` byte | hair-mask-present flag | confirmed by native log and `SceneDetail.setHairExist` |
 | `0x025` byte | portrait-mask-present flag | high confidence from pointer slot and native `portraitmask` log |
 | `0x026` byte | pet-mask-present flag | confirmed by `SceneDetail.setPetExist` |
+| `0x027` byte | near-object flag | confirmed by producer log and focus-depth branch |
+| `0x028` float | near-object confidence | confirmed by producer log |
+| `0x02c` byte | plant-object flag | confirmed by producer log |
+| `0x02e/0x030` uint16 | `disp2depthMin` / `disp2depthMax` quantization endpoints | confirmed by producer kernel/log |
+| `0x032` byte | rank exponentiation mode | confirmed by producer conversion path |
 | `0x188/0x18c` | dimensions for a later optional auxiliary image | confirmed |
 | `0x190` byte | presence flag for that auxiliary image | confirmed |
 | `0x1b0` | scene class | confirmed by `SceneDetail.setSceneClass` call |
-| `0x1b8` | focus-distance-like float used by render setup | high confidence |
+| `0x1b4` | capture-side `object_distance` | confirmed by producer store/log; zero in all 80 saved samples |
+| `0x1b8` | AEC lux index | confirmed by producer store/log |
 | `0x1bc` | app zoom ratio / zoom bucket | confirmed by native logging and real focal groups |
 | `0x300` | first uint8 rank plane | confirmed |
 
 After the main `width * height` rank plane, the parser advances by another
-`width * height` for each enabled hair, portrait, and pet plane. It continues
-through additional optional buffers described by later header fields. One
-later path computes `width * height * 3 / 2`, proving that an optional NV21/YUV
-image can also be embedded in the decoded package.
+`width * height` for each enabled hair, portrait, and pet plane. Producer-side
+serialization proves that the later payload is then semantic segmentation,
+motion-mask state, optional spotlight data, rectified master/slave NV21 and an
+optional model-output image. Other native probability, monocular-depth, confidence,
+stripe and hollow-mask objects are generation/refinement intermediates; static
+evidence does not prove that each is serialized as a separate gallery plane.
 
-The three inspected packages decode to roughly 9.2-10.0 MB although their
-primary rank plane is only 786,432 bytes. This is direct evidence that the
-package contains much more than the rank plane. The exact names of every later
-buffer are not yet safe to claim, but native logs and symbols show consumers
-for portrait probability, semantic label, monocular depth, confidence,
-periodic/stripe mask, hollow mask, hair mask, pet mask, and guide YUV data.
-
-The expanded 80-original corpus confirms that the unresolved remainder is not
-an isolated sample artifact. After consuming rank and every flagged same-size
-hair/portrait/pet plane, each package still contains approximately
-`4.10...7.31 MiB` (median `6.19 MiB`). All 80 set the portrait-plane flag, but
+The expanded 80-original corpus confirms the size range. After consuming rank
+and every flagged same-size hair/portrait/pet plane, each package still contains
+approximately `4.10...7.31 MiB` (median `6.19 MiB`), now explained primarily by
+the rectified NV21 pair plus variable semantic/motion data and optional image
+blocks. All 80 set the portrait-plane flag, but
 only 51 have nonzero portrait content; two have a nonzero pet plane and 44 have
 a nonzero hair plane. Current XDRemux therefore uses OPPO subject topology for
 53/80 originals and Vision person segmentation for the remaining 27.
+
+The producer fields also correct two earlier assumptions:
+
+- all 80 saved packages have `exponentiation=1`, so their rank-to-relative-
+  disparity conversion is linear; a future non-1 package must use the inverse
+  nonlinear conversion rather than the current linear formula;
+- six of the 80 set the near-object flag (saved confidence `0.5`); none sets
+  the plant-object flag, so the near-object branch is real but sparse in this
+  corpus;
+- the header's `object_distance` at `0x1b4` is zero in all 80 files, while
+  `rear.depth.config.distance` is populated. The latter is therefore the only
+  useful saved distance prior in this corpus. `0x1b8` is AEC lux, not distance.
+
+The embedded producer OpenCL kernel `cvt_flt_disp_to_u8_dpt` also gives the
+exact saved-rank normalization:
+
+```text
+normalized = (65535 - internalDisp16 - disp2depthMin)
+             / (disp2depthMax - disp2depthMin + 1e-5)
+rank = 255 * normalized                 # exponentiation = 1
+rank = 255 * sqrt(normalized)           # exponentiation = 2
+```
+
+Thus the quantized internal focus disparity can be reconstructed as:
+
+```text
+normalizedFocus = (focusRank / 255) ^ exponentiation
+internalFocusDisp16 = 65535 - (disp2depthMin
+                      + normalizedFocus * (disp2depthMax - disp2depthMin))
+```
+
+This is the missing absolute quantization anchor; `depthScale` still describes
+the exported relative-disparity step. The internal value must remain a fitting
+feature until its upstream `quantScale`, offset and rectify-domain conversion
+are fully recovered—it is not yet safe to write directly as Apple disparity.
 
 Consequences:
 
 - preserving the whole `rear.depth` is required for OPPO-native re-editing;
 - the current Apple conversion consumes rank plus the confirmed same-size
-  portrait/pet/hair planes, but still leaves the later package buffers unused;
+  portrait/pet/hair planes, while intentionally omitting camera-algorithm guide
+  YUV and any optional model-output image;
 - Vision-generated PEM remains a necessary fallback for empty subject planes,
   not an exact substitute for OPPO's complete packed semantic state.
 
@@ -233,8 +313,42 @@ Consequences:
 
 The native renderer first establishes `focusDepth`. It has explicit routines
 for center point, face, portrait, portrait-without-face, pet face, histogram,
-and near-object scenes. Therefore `rear.depth.config.distance` is an input to
-scene/render setup, not a Java-side formula that directly scales every rank.
+and near-object scenes. Native logs also state that face landmarks can update
+`focusDisp`. The config fields therefore divide into distinct roles:
+
+| OPPO field | Native role | Apple-conversion use |
+|---|---|---|
+| `focusX/focusY` and valid focus rect | initial focus ROI | map to the rank plane and Apple Focus XMP |
+| face rectangles, angles and 296 keypoints | select/verify the focused face and robust focus rank | prefer face/eye-region rank when it intersects the focus ROI |
+| portrait/pet masks | choose the focused subject component | gate the focus-rank statistic and build PEM |
+| near-object flag/confidence | switch to the near-object focus-depth branch | select a near-object-specific robust-rank fallback |
+| `distance` | scene/object-distance prior | sanity-check or fit the per-profile focus scalar; do not copy it directly into Apple REND |
+| 22-point aperture/blur-strength table | coupled OPPO UI aperture and renderer-strength curve | initial aperture plus a future Apple aperture-response fit |
+| `foregroundBlurScale` | feeds foreground CoC controls | tune foreground disparity/CoC response; it is not a focus-distance field |
+| face/portrait/pet semantic data | focus selection and boundary refinement | Focus, PEM and semantic hair, with Vision only as fallback |
+
+The 80-file corpus further confirms that `focusX/focusY` are expressed in
+`src.image` raw JPEG coordinates, even though the config also declares a
+`900x1200` processing canvas. The focus coordinates reach `3040x2601`; mapping
+them through `900x1200` incorrectly clamps the focus sample to the depth edge.
+The rank plane shares the `src.image` storage direction, so the correct mapping
+is direct normalized raw-image coordinates, with EXIF orientation applied only
+for display/UI coordinates.
+
+Using that corrected mapping, the relative focus disparity
+`(255 - medianFocusRank) * depthScale` correlates with inverse
+`rear.depth.config.distance` across the corpus (`Pearson r=0.57` overall).
+Within one physical module the relation is clearer: approximately `0.69` for
+7.73 mm, `0.68` for 20.1 mm and `0.87` for 34.8 mm. This is strong enough to
+use distance as a profile-specific consistency prior, but not strong enough to
+replace the actual local rank/semantic focus selection.
+
+The reconstructed `internalFocusDisp16 / headerFx` is even more strongly
+correlated with inverse config distance for the 7.73 mm and 20.1 mm modules
+(`r=0.985` and `0.979`). The 34.8 mm/230 mm module does not follow that same
+single relation; its distance modes continue to depend on header scale and the
+6-10x native branch. This is direct evidence for a per-profile/scene fit rather
+than one global distance multiplier.
 
 The embedded OpenCL source in the X9 Ultra bokeh library shows the core
 background relation:
@@ -321,15 +435,82 @@ This explains the device comparison:
    as a fallback compatibility layer. Do not claim that either currently
    preserves all later OPPO semantic refinement data.
 
+## Mapping OPPO focus state into Apple REND
+
+The controlled Apple aperture series rules out edited aperture as the source
+of REND records `0x01c2...0x01c5`. A second controlled set (`IMG_7303...7310`)
+keeps scene and capture aperture fixed while tapping near, middle and far
+subjects at 1x, 2x and 3x. All eight originals have distinct hashes. Both the
+`0x0190...0x0193` and `0x01c2...0x01c5` families change between refocus
+captures, proving that they encode per-capture focus/scene state rather than
+edited aperture alone.
+
+Several exact profile relationships remain stable:
+
+| Apple profile | `0x01c3 / 0x01c2` | `0x01c4 / 0x01c2` | `0x01c5 / 0x01c2` |
+|---|---:|---:|---:|
+| 1x / 24 mm | `2.5` | `0.075` | not constant; a second profile/scene term remains |
+| 2x / 48 mm | `2.875` | `0.0875` | not constant; `0.835...1.051` in the refocus set |
+| 3x / 77 mm | `2.875` | `0.0875` | `0.5` |
+| 5x / 120 mm sample | `2.875` | `0.0875` | `1.5667273` in the available capture |
+
+The other dynamic family has equally strong structure:
+
+- `0x0192 = 48 * 0x0191` for all eight captures;
+- `0x0193 = 1.0 * 0x0191` at 1x;
+- `0x0193 = 0.4 * 0x0191` at 2x and 3x;
+- `0x0190` and `0x0191` both move with refocus at 1x/2x, while the two 3x
+  captures keep them at `50` and `0.25` even though `0x01c2` changes.
+
+Therefore the graph contains at least two independent per-scene controls. The
+four `0x01c2...0x01c5` floats must not be independently guessed, but fitting
+only one scalar is also insufficient at 1x/2x. OPPO's integer `distance` must
+not be copied directly into any one record. The safe implementation shape is:
+
+```text
+focusRank = nativeLikeFocusSelector(rank, focusROI, faceKeypoints,
+                                    portrait, pet, nearObject)
+focusDisparity = inverseRank(focusRank, depthScale, exponentiation)
+sceneScalar = profileFit(focusDisparity, 1/configDistance,
+                         focusBranch, nearObjectConfidence)
+blurScene = profileBlurFit(focusDisparity, 1/configDistance,
+                           focusBranch, foregroundBlurScale)
+
+rend[0x01c2] = sceneScalar
+rend[0x01c3] = profileC3 * sceneScalar
+rend[0x01c4] = profileC4 * sceneScalar
+rend[0x01c5] = profileC5(sceneScalar, secondarySceneState)
+rend[0x0190] = quantizedProfileBlurState(blurScene)
+rend[0x0191] = normalizedProfileBlurState(blurScene)
+rend[0x0192] = 48 * rend[0x0191]
+rend[0x0193] = profile0193Ratio * rend[0x0191]
+```
+
+Raw Apple focus-pixel disparity is not a cross-capture absolute anchor. In the
+1x set it remains around `0.82...0.89` while `0x01c2` spans `2.26...3.61`; in
+the 2x set neither quantity is monotonic with the other. Each frame's relative
+disparity gauge can shift, and the XMP Focus point is not necessarily the same
+semantic focus component used by the renderer. The current representative REND
+values should therefore remain until the two fits are trained from controlled
+distance/refocus captures using normalized rank, quantization endpoints,
+semantic-selected focus component and a metric-distance prior. OPPO producer
+and config data provide these inputs; the remaining inverse problem is fitting
+them into Apple's two private scene controls.
+
 ## Confirmed versus remaining unknown
 
 Confirmed:
 
+- the capture-side native package writer and Zstd compression call;
 - the X9 Ultra IPU/APS call chain;
 - complete v4 config transfer;
 - native Zstd decode location;
 - the 768-byte header and primary plane boundary;
 - hair/portrait/pet optional plane routing;
+- semantic/motion/spotlight and rectified-master/slave/bokeh NV21 serialization
+  order;
+- the meanings of saved `object_distance`, AEC lux, app zoom, near-object,
+  min/max quantization endpoints and exponentiation fields;
 - zoom-dependent nonlinear depth-to-radius logic;
 - firmware render calibration table;
 - special internal handling of f/16;
@@ -338,17 +519,22 @@ Confirmed:
 
 Still requiring a device hook or further type recovery:
 
-- authoritative C names for every field in the 768-byte package header;
-- exact boundaries/names of all later auxiliary buffers;
+- the exact native function that serializes the separate
+  `rear.depth.config` blob (its complete field contract and Java byte-array
+  transport are confirmed, but the producer symbol is not yet named);
+- authoritative C names for the still-unidentified fields in the 768-byte
+  package header and exact sub-layout of the variable motion/spotlight blocks;
 - the exact mathematical contribution of `blur_strength` inside the current
   X9 Ultra OPLUS backend after APS parsing (the fallback ArcSoft backend is
   confirmed to consume it, but its formula is not transferable);
 - every coefficient selected by zoom/scene from the native calibration state;
-- a direct numerical mapping from the OPPO curve to Apple's private REND
-  renderer.
+- a direct numerical mapping from OPPO focus state and aperture curve to
+  Apple's private per-scene REND scalar(s).
 
-The next high-value hook is at `bokehSetBokehEffectPara` after
+The next high-value OPPO hook is at `bokehSetBokehEffectPara` after
 `ZSTD_decompress`, plus `GetBlurmapEngine::convertDepthToRadius`. Logging the
-parsed pointers, selected `focusDepth`, `bgCoef`, `fgCoef`, `tblVal`, incoming
-and used f-number on one real 23x/70x/139x/230x matrix would close the remaining
-render-model gap without guessing from output images alone.
+selected focus branch, `focusDepth`, `bgCoef`, `fgCoef`, `tblVal`, incoming and
+used f-number would close the remaining OPPO renderer model. Separately, the
+Apple REND inverse needs controlled fixed-profile captures at several physical
+distances/refocus points; OPPO static analysis cannot reveal an Apple-private
+transfer function that is not present in this firmware.

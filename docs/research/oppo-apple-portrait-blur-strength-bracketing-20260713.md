@@ -2,6 +2,10 @@
 
 Date: 2026-07-13
 
+> Status: Pass D is superseded by the controlled 1x/2x/3x aperture-series and
+> 16 Pro 5x evidence below. Apple uses distinct lens-coupled REND/calibration
+> profiles; the product path no longer applies a focal-dependent renderGain.
+
 ## Outcome
 
 Real Photos editing has now bracketed the missing render scale:
@@ -11,7 +15,9 @@ Real Photos editing has now bracketed the missing render scale:
 | A | fixed `2.9/255` | physical OPPO-derived | fixed 1.4 | Much too strong; f/16 still heavily blurred |
 | B | OPPO header scale | physical OPPO-derived | OPPO XMP value | Reduced, but still too strong; 230mm has a large f/16 jump |
 | C | OPPO header scale | canonical donor pair | typed `0x012f` synchronized | Too weak; visible synthetic blur remains small even at f/1.4 |
-| D | OPPO header scale × continuous geometric-midpoint gain | canonical donor pair | typed `0x012f` synchronized | Offline gates pass; device judgment pending |
+| D | OPPO header scale × continuous geometric-midpoint gain | canonical donor pair | typed `0x012f` synchronized | Superseded; mixed one 24mm profile with all focal lengths |
+| E | OPPO header scale | matched Apple 1x/2x/3x/5x profile with unbounded reference-crop extrapolation | profile endpoints unchanged | Consumed, but incorrectly fabricates a 10x Apple auxiliary chart from the 5x profile |
+| F | OPPO header scale | nearest Apple profile, crop capped at its measured range | profile endpoints unchanged | Correct 10x architecture; device blur-strength validation pending |
 
 Pass C proves that canonicalizing the private Apple render domain removes the
 double amplification, but removes too much. It is a lower bound, not the final
@@ -24,11 +30,36 @@ product setting. Pass B is the upper bound.
 - Actual OPPO physical/equivalent focal length and digital zoom remain primary
   EXIF capture identity.
 - `depthBlurEffect:SimulatedAperture` correctly initializes the Photos control.
-- Typed REND float record `0x012f` tracks the simulated aperture in the
-  inspected native iPhone samples. Synchronizing it does not by itself restore
-  blur amplitude; it is not the missing strength control.
+- Typed REND float record `0x012f` is the profile minimum-aperture endpoint,
+  not the current edited aperture. In controlled f/1.4...f/16 series it stays
+  at 1.4 while the public/AAE aperture changes.
 - Physical OPPO calibration cannot be mixed directly with a fixed 24mm donor
   REND graph. Canonical donor calibration alone is also insufficient.
+
+## No fabricated Apple 10x profile
+
+Apple does not expose a 230mm/10x portrait REND and calibration profile. Pass E
+selected the real 5x/120mm profile but then continued shrinking its reference
+dimensions by `120/230`, producing a synthetic `2104x1576` chart with
+`PixelSize=0.000584348mm`. That is still an invented 9.6x Apple renderer even
+though its REND bytes came from a real 5x capture.
+
+Pass F separates capture identity from renderer identity:
+
+- primary EXIF remains OPPO 34.8mm / 230mm;
+- Apple auxiliary calibration and REND saturate at the validated 5x/120mm
+  chart (`4032x3024`, `PixelSize=0.001120000mm`);
+- OPPO rank deltas continue to use only the per-capture header scale;
+- OPPO config distance maps to Apple `AFMeasuredDepth`;
+- future scene-strength fitting changes disparity gauge/REND scene controls,
+  never auxiliary focal length beyond the available Apple profile.
+
+This means 10x does not require a nonexistent Apple 10x donor. It is projected
+into the Apple 5x rendering domain. The remaining task is to fit the 5x-domain
+scene response from OPPO's focus-selected disparity, config distance,
+foreground scale and aperture/blur-strength curve. A scalar or REND fit must
+be bounded and profile-local; equivalent focal length is no longer an input
+after the 5x saturation point.
 
 ## Remaining model
 

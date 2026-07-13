@@ -66,6 +66,40 @@ def extension_entries(data: bytes) -> list[dict[str, object]]:
     return entries
 
 
+def jpeg_dimensions(data: bytes) -> tuple[int, int]:
+    """Return the storage dimensions from the first JPEG in src.image."""
+    if not data.startswith(b"\xff\xd8"):
+        raise ValueError("src.image does not start with JPEG SOI")
+    cursor = 2
+    sof_markers = {
+        0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+        0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF,
+    }
+    while cursor + 4 <= len(data):
+        if data[cursor] != 0xFF:
+            cursor += 1
+            continue
+        while cursor < len(data) and data[cursor] == 0xFF:
+            cursor += 1
+        if cursor >= len(data):
+            break
+        marker = data[cursor]
+        cursor += 1
+        if marker in {0x01, 0xD8, 0xD9} or 0xD0 <= marker <= 0xD7:
+            continue
+        if cursor + 2 > len(data):
+            break
+        segment_length = int.from_bytes(data[cursor : cursor + 2], "big")
+        if segment_length < 2 or cursor + segment_length > len(data):
+            break
+        if marker in sof_markers and segment_length >= 7:
+            height = int.from_bytes(data[cursor + 3 : cursor + 5], "big")
+            width = int.from_bytes(data[cursor + 5 : cursor + 7], "big")
+            return width, height
+        cursor += segment_length
+    raise ValueError("unable to find JPEG SOF dimensions in src.image")
+
+
 def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
     file_data = path.read_bytes()
     entries = extension_entries(file_data)
@@ -74,8 +108,12 @@ def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
         (entry for entry in entries if entry.get("name") == "rear.depth.config"),
         None,
     )
-    if depth_entry is None or config_entry is None:
+    src_entry = next((entry for entry in entries if entry.get("name") == "src.image"), None)
+    if depth_entry is None or config_entry is None or src_entry is None:
         return None
+
+    src_image = file_data[src_entry["start"] : src_entry["end"]]
+    src_width, src_height = jpeg_dimensions(src_image)
 
     encoded_depth = file_data[depth_entry["start"] : depth_entry["end"]]
     decoded_depth = subprocess.check_output(
@@ -95,6 +133,11 @@ def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
     sample_scale, focal_length_depth, stereo_baseline = struct.unpack_from(
         "<fff", decoded_depth, 0x18
     )
+    near_object_flag = decoded_depth[0x27]
+    near_object_confidence = struct.unpack_from("<f", decoded_depth, 0x28)[0]
+    plant_object_flag = decoded_depth[0x2C]
+    min_disparity_u16, max_disparity_u16 = struct.unpack_from("<HH", decoded_depth, 0x2E)
+    disparity_exponentiation = decoded_depth[0x32]
     plane_size = depth_width * depth_height
     plane_cursor = 768 + plane_size
     plane_stats: dict[str, object] = {}
@@ -111,20 +154,24 @@ def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
             plane_stats[f"{name}_min"] = ""
             plane_stats[f"{name}_max"] = ""
             plane_stats[f"{name}_nonzero_fraction"] = ""
-    header_aux_1b8 = struct.unpack_from("<f", decoded_depth, 0x1B8)[0]
-    header_zoom_index = struct.unpack_from("<f", decoded_depth, 0x1BC)[0]
+    # RenderInfo begins at 0x180. Producer-side native logs and stores identify
+    # these fields as object_distance, aecLuxIdx, and appZoomRatio respectively.
+    header_object_distance = struct.unpack_from("<i", decoded_depth, 0x1B4)[0]
+    header_aec_lux_index = struct.unpack_from("<f", decoded_depth, 0x1B8)[0]
+    header_app_zoom_ratio = struct.unpack_from("<f", decoded_depth, 0x1BC)[0]
 
     ordered = sorted(ranks)
 
-    # rear.depth.config uses portrait/display coordinates (900x1200), while
-    # the decoded rank plane is landscape-stored with EXIF Orientation 6.
+    # configWidth/configHeight describe the algorithm canvas (normally
+    # 900x1200), but focusX/focusY are stored in src.image's raw JPEG pixel
+    # coordinates. The rank and subject planes use that same storage direction.
     focus_rank_x = min(
         depth_width - 1,
-        max(0, round(focus_y / config_height * depth_width)),
+        max(0, round(focus_x / src_width * depth_width)),
     )
     focus_rank_y = min(
         depth_height - 1,
-        max(0, round((config_width - focus_x) / config_width * depth_height)),
+        max(0, round(focus_y / src_height * depth_height)),
     )
     local: list[int] = []
     for y in range(max(0, focus_rank_y - 10), min(depth_height, focus_rank_y + 11)):
@@ -135,6 +182,16 @@ def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
             ]
         )
     local.sort()
+    focus_rank_median = float(statistics.median(local))
+    # The producer kernel stores an inverse normalized 16-bit disparity:
+    # rank/255 = normalized^(1/exponentiation). All current samples use 1,
+    # while a non-1 package requires undoing that power before min/max.
+    rank_power = max(1, disparity_exponentiation)
+    normalized_focus = (focus_rank_median / 255.0) ** rank_power
+    focus_internal_disparity16 = 65_535.0 - (
+        min_disparity_u16
+        + normalized_focus * (max_disparity_u16 - min_disparity_u16)
+    )
 
     return {
         "file": path.name,
@@ -148,6 +205,8 @@ def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
         "blur_strength": blur_strength,
         "config_width": config_width,
         "config_height": config_height,
+        "src_width": src_width,
+        "src_height": src_height,
         "focus_x": focus_x,
         "focus_y": focus_y,
         "focus_rank_x": focus_rank_x,
@@ -157,8 +216,15 @@ def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
         "header_sample_scale": sample_scale,
         "header_fx_depth": focal_length_depth,
         "header_baseline": stereo_baseline,
-        "header_aux_1b8": header_aux_1b8,
-        "header_zoom_index": header_zoom_index,
+        "header_near_object_flag": near_object_flag,
+        "header_near_object_confidence": near_object_confidence,
+        "header_plant_object_flag": plant_object_flag,
+        "header_min_disparity_u16": min_disparity_u16,
+        "header_max_disparity_u16": max_disparity_u16,
+        "header_disparity_exponentiation": disparity_exponentiation,
+        "header_object_distance": header_object_distance,
+        "header_aec_lux_index": header_aec_lux_index,
+        "header_app_zoom_ratio": header_app_zoom_ratio,
         **plane_stats,
         "depth_trailing_after_same_size_planes": len(decoded_depth) - plane_cursor,
         "manifest_names": ";".join(str(entry.get("name", "")) for entry in entries),
@@ -168,7 +234,7 @@ def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
         ),
         "rear_depth_compressed_bytes": int(depth_entry["length"]),
         "rear_depth_decoded_bytes": len(decoded_depth),
-        "effective_fx_src": focal_length_depth * 4096 / depth_width,
+        "effective_fx_src": focal_length_depth * src_width / depth_width,
         "rank_min": ordered[0],
         "rank_p01": percentile(ordered, 0.01),
         "rank_p10": percentile(ordered, 0.10),
@@ -181,9 +247,13 @@ def analyze(path: Path, exif: dict[str, object]) -> dict[str, object] | None:
         "rank_p99_p01": percentile(ordered, 0.99) - percentile(ordered, 0.01),
         "rank_p90_p10": percentile(ordered, 0.90) - percentile(ordered, 0.10),
         "rank_focus": ranks[focus_rank_y * depth_width + focus_rank_x],
-        "rank_focus_local_median": statistics.median(local),
+        "rank_focus_local_median": focus_rank_median,
         "rank_focus_local_p10": percentile(local, 0.10),
         "rank_focus_local_p90": percentile(local, 0.90),
+        "focus_internal_disparity16": focus_internal_disparity16,
+        "focus_internal_disparity16_over_fx": (
+            focus_internal_disparity16 / focal_length_depth
+        ),
         "rank_unique": len(set(ranks)),
         "file_sha256": hashlib.sha256(file_data).hexdigest(),
     }

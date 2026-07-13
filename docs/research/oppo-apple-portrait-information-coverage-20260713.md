@@ -53,12 +53,15 @@ bit; explicit `--apple-portrait` recovers it from the authoritative
 | private 80-byte gain info or outer `HDRToneMap` | ISO gain-map/tmap metadata | mapped |
 | rank plane | relative Float16 disparity | mapped |
 | header width/height and rank scale | disparity geometry/amplitude | mapped |
-| continuous header fx | continuous render-gain endpoint | mapped as renderer scale |
+| header min/max quantization endpoints and exponent | reconstruct OPPO internal absolute focus-disparity feature | decoded; pending Apple REND fit |
+| continuous header fx | source-depth geometry diagnostic and Apple profile/crop selection | mapped without multiplying disparity a second time |
 | physical/equivalent focal length and zoom | primary EXIF capture identity | retained |
 | portrait plane | Portrait Effects Matte topology | mapped when nonzero |
 | pet plane | merged into Portrait Effects Matte | mapped; Apple has no matching pet auxiliary type |
 | hair plane | PEM refinement plus semantic hair matte | mapped when nonzero |
-| config f-number | initial simulated aperture and typed REND record | mapped |
+| config focus point | Apple Focus XMP plus local subject-gated focus-rank anchor | mapped in raw `src.image` coordinates |
+| config distance (v4 offset 296) | Apple MakerNote `AFMeasuredDepth` (tag 56) | semantic direct transfer; matched captures preserve ordering but do not prove identical cross-device scale |
+| config f-number | initial Apple simulated aperture | mapped |
 | outer EXIF/GPS/date/orientation | primary metadata and geometry | retained |
 | face-attention/saliency analysis | Apple Focus XMP | generated fallback, not an OPPO-field translation |
 
@@ -72,28 +75,44 @@ segmentation as the PEM fallback. A nonzero hair plane exists in 44/80.
 The following gaps prevent a claim of complete OPPO-to-Apple semantic
 conversion:
 
-1. `rear.depth.config` carries focus coordinates/rectangle, distance,
-   `blurStrength`, the 22-point aperture curve, foreground blur scale, scene
-   mode, mirror/camera roll, face rectangles and 296 keypoints per face. The
-   current output uses only f-number; Focus is chosen by Vision.
-2. Every decoded depth package still has about 4.10-7.31 MiB after rank and
-   same-size hair/portrait/pet planes. Firmware evidence associates those
-   buffers with probability/semantic labels, monocular depth, confidence,
-   stripe/hollow masks and guide NV21/YUV. Their exact per-buffer layout is not
-   yet sufficiently proven to write Apple skin/teeth/glasses or improve
-   disparity safely.
+1. `rear.depth.config` carries a valid focus rect, distance, `blurStrength`,
+   the 22-point aperture curve, foreground blur scale, scene mode, face
+   rectangles and 296 keypoints per face. The current output uses the focus
+   point and f-number and maps distance to Apple's named `AFMeasuredDepth`
+   field, but it does not yet reproduce OPPO's native face/portrait/pet/
+   near-object focus-depth selector or fit the distance prior into private
+   REND scene coefficients.
+2. Producer-side firmware now explains most of the 4.10-7.31 MiB after rank
+   and same-size hair/portrait/pet planes: semantic segmentation, variable
+   motion/spotlight blocks, a rectified master/slave NV21 pair and an optional
+   model-output image. Static evidence does not identify that optional image as
+   a rendered-bokeh frame; `IMG20260506112827` contains only the rectified pair,
+   while its outer HEIC primary is the final rendered portrait. These blocks
+   are camera-algorithm inputs/outputs, not one hidden high-resolution depth
+   map. The Apple graph intentionally omits the YUV frames; semantic labels
+   remain useful only after their class IDs and confidence semantics are proved.
 3. `crop.region` occurs in 73/80 originals and `mesh.coord/config` in 12/80.
    They are not currently used for depth/matte registration. Orientation and
    current samples pass, but crop/mesh-aware registration is still a required
    adversarial test.
 4. OPPO's zoom-dependent foreground/background CoC functions, f/16 special
    handling, PSF model and independent `blur_strength` control cannot be
-   represented by merely setting Apple's displayed aperture. Pass D's
-   continuous render gain is a bracketed approximation.
-5. Physical OPPO baseline/focal calibration is intentionally not copied into
-   Apple's private REND graph because device tests proved that combination
-   double-amplifies long-focal blur. Exact physical calibration requires a
-   matching Apple renderer model that is not available.
+   represented by merely setting Apple's displayed aperture. The current path
+   instead selects a real Apple 1x/2x/3x/5x lens renderer profile and leaves
+   OPPO rank deltas in their source header scale.
+5. Two Apple `REND` families vary with focus/depth state, not edited aperture.
+   In controlled near/middle/far refocus captures, `0x01c3` and `0x01c4` remain
+   exact profile-specific multiples of `0x01c2`, but `0x01c5` retains a second
+   scene term at 1x and 2x. Separately, `0x0192 = 48 * 0x0191`, while
+   `0x0193 / 0x0191` is a profile constant (`1.0` at 1x, `0.4` at 2x/3x);
+   `0x0190/0x0191` also move with refocus at 1x/2x. The current implementation
+   uses representative profile values. Matched 2x/3x near/far pairs confirm
+   that `AFMeasuredDepth` tracks OPPO config distance, but also prove that the
+   `01c2...01c5` response reverses direction between 2x and 3x. The principal
+   fidelity gap is therefore a profile-specific fit of
+   at least two Apple scene controls from OPPO's semantic-selected focus
+   disparity, quantization endpoints, focus branch and distance prior, not
+   copying config distance into unrelated floats.
 6. Watermark/master-mode resources and the complete private OPPO re-edit graph
    are intentionally omitted from Apple portrait output. Users who need OPPO
    re-editability must select OPPO-compatible preservation instead.
@@ -118,9 +137,15 @@ Priority order:
 
 1. device-import the clean 80-file matrix and record Photos recognition,
    initial aperture, refocus and f/1.4/f/16 behavior;
-2. decode config focus/face geometry and compare it with Vision-selected Focus;
+2. implement the native-like OPPO focus selector: focus ROI, face/keypoints,
+   portrait/pet component, near-object branch, then histogram fallback;
 3. prove crop/mesh registration semantics on the 12 mesh samples;
-4. identify the later confidence/probability/semantic buffers and test whether
-   they materially improve PEM/hair or disparity boundaries;
-5. fit Apple render gain and aperture response against real device judgments,
-   stratified by focal group and distance mode.
+4. decode semantic label IDs and the variable motion/spotlight block only if
+   they materially improve PEM/hair or reject unreliable focus samples;
+5. extend the controlled Apple refocus set with measured physical distances,
+   then fit the `0x0190...0x0193` blur-state family and the
+   `0x01c2...0x01c5` scene-scalar family separately from OPPO focus disparity,
+   quantization endpoints, inverse config distance, focus branch and
+   near-object confidence;
+6. fit the separate aperture response from OPPO's 22-point
+   aperture/blur-strength curve and `foregroundBlurScale`.

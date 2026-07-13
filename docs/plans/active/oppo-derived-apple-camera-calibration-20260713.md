@@ -99,23 +99,25 @@ Therefore the next implementation must introduce an explicit render-domain
 gain between those bounds instead of selecting either calibration endpoint.
 See `docs/research/oppo-apple-portrait-blur-strength-bracketing-20260713.md`.
 
-## Pass D status
+## Lens-profile status
 
-The first continuous-gain implementation is ready for device testing:
+The continuous-gain experiment is superseded by real Apple lens profiles:
 
-```text
-renderGain = sqrt(sourceEffectiveDepthFx / canonicalEffectiveRenderFx)
-```
+- 23-41mm main path: Apple 1x profile;
+- 47-59mm main/Fusion path: Apple 2x profile;
+- OPPO 20.1mm tele path: Apple 3x profile;
+- OPPO 34.8mm/230mm path: Apple 5x/120mm tetraprism profile.
 
-It retains the canonical Apple calibration/REND pair and multiplies only the
-rank-to-disparity delta. It also incorporates the current M6 OPPO matte path,
-so the comparison is not confounded by the older Vision-only PEM fallback.
-
-For `IMG20260506112827` (230mm, f/10, config distance 442), the endpoint ratio
-is `9.4883x` and Pass-D gain is `3.0803x`. Offline checks confirm Orientation 6,
-OPPO capture EXIF, source-primary and gain-map payload preservation, disparity,
-PEM, semantic hair matte, and Focus metadata. Final Photos behavior at f/1.4,
-f/10, and f/16 remains the acceptance gate; no merge is authorized yet.
+Within a profile's measured range the reference crop and PixelSize scale with
+equivalent focal length, matching Apple's continuous digital-zoom
+representation. The chart saturates at 44/59/134/120mm for the current
+1x/2x/3x/5x evidence; in particular, 230mm does not extrapolate a synthetic
+Apple 10x chart. OPPO rank
+deltas use only the decoded header scale. Five 23/47/70/139/230mm candidates
+pass AVDepthData, disparity, PEM/hair, REND-hash, aperture, and orientation
+checks, and all five are consumed by iPhone Photos. Per-scene focus/distance
+fidelity at f/1.4, source aperture, and f/16 remains the merge gate; no merge
+is authorized yet.
 
 ## Corpus batch and product-mode status
 
@@ -131,6 +133,10 @@ large OPPO portrait tail. Both single and batch parsers reject an explicit
 attempt to enable the two output modes together.
 
 This closes batch operability, not fidelity. The 80-file audit still identifies
-unmapped config focus/blur-curve data, crop/mesh registration and 4.10-7.31 MiB
-of later semantic/confidence/YUV buffers per decoded depth package. Those gaps
-and the pending device matrix keep this plan active.
+unmapped face/keypoint/near-object focus selection, blur-curve response and
+crop/mesh registration. Producer reverse engineering now explains the former
+4.10-7.31 MiB mystery primarily as semantic/motion/spotlight data plus a
+rectified master/slave NV21 pair and an optional model-output image. The latter
+is not yet proven to be a rendered-bokeh frame; those YUV frames are
+intentionally not copied into the Apple graph. The per-scene Apple REND fit and
+pending device matrix keep this plan active.

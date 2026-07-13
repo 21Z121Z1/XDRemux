@@ -62,10 +62,10 @@ The Apple output contains:
 The embedded Apple compatibility data contains metadata only, not reference
 pixels.
 
-## OPPO-derived camera calibration
+## Lens-profile camera calibration
 
-The disparity metadata no longer copies a fixed iPhone calibration profile or
-maps every rank plane into the same fixed disparity interval.
+The disparity metadata no longer maps every rank plane into one fixed interval
+or couples every focal length to one 24mm Apple renderer profile.
 For each OPPO capture, XDRemux now:
 
 - reads physical `FocalLength`, 35mm-equivalent focal length,
@@ -77,22 +77,25 @@ For each OPPO capture, XDRemux now:
 - preserves the measured header focal length/baseline as source-depth
   diagnostics but uses header rank scale, not physical focal length, to convert
   rank differences;
-- keeps Apple's auxiliary calibration paired with the donor `REND` graph.
-  Device testing showed that injecting OPPO's 70-230mm physical focal scale
-  into a fixed 24mm rendering graph double-amplifies blur even at f/16;
+- selects a matched Apple 1x-main, 2x/Fusion, 3x-tele, or 5x-tetraprism
+  `REND`/calibration pair from controlled real captures;
+- scales that profile's reference crop, principal point, distortion center,
+  and PixelSize by `profileAnchorEquivalent / sourceEquivalent` only inside
+  the profile's measured range, while keeping the profile intrinsic fx fixed.
+  This matches 2x and 3x Apple continuous-zoom samples with median
+  reference-width error 0 and p95 error below 0.6%; beyond the measured range,
+  the private Apple chart saturates instead of fabricating a longer profile;
+- converts rank deltas only with the OPPO header scale, with no focal-dependent
+  `renderGain`;
 - retains the real OPPO physical/equivalent focal length and digital zoom in
   primary EXIF.
 
-Pass D applies a separate continuous renderer-domain gain:
-
-```text
-renderGain = sqrt(sourceEffectiveDepthFx / canonicalEffectiveRenderFx)
-```
-
-This is the geometric midpoint between the device-tested too-weak canonical
-endpoint and too-strong physical-calibration endpoint. It is continuous for
-intermediate digital focal lengths, but still awaits the complete Photos
-f/1.4/f/16 device matrix.
+Controlled 48mm and 77mm edits show similar normalized f/1.4-to-f/16 response
+despite a 1.6x intrinsic-fx change, confirming that Apple lens profiles perform
+the cross-focal normalization. The 16 Pro 120mm profile provides the terminal
+Apple render domain for OPPO 230mm. Primary EXIF still records the real 230mm
+capture, but the private auxiliary chart remains fixed at 5x rather than
+extrapolating a nonexistent Apple 10x profile.
 
 An 80-file original portrait corpus, including 19 real 230mm captures, showed
 that non-optical focal lengths already carry continuous header focal lengths.
@@ -120,12 +123,13 @@ precedence:
 3. `f/1.4` only as the compatibility fallback when neither source is valid.
 
 The already device-consumable Apple `RenderingParameters` template remains
-mostly unchanged. It is a 1,352-byte `REND` parameter graph containing several
-values equal to 1.4 with different semantics, so matching float bytes must not
-be replaced globally. One record is independently identified: float record ID
-`0x012f` is `1.4` in all rear iPhone samples and `1.95` in the f/1.9 front
-TrueDepth sample. XDRemux updates only this typed record to the resolved OPPO
-simulated aperture.
+unchanged except for selecting the matching lens profile. It is a 1,352-byte
+`REND` parameter graph containing several values equal to 1.4 with different
+semantics, so matching float bytes must not be replaced globally. Controlled
+1x/2x/3x captures with different initial editing apertures show that typed
+record `0x012f` stays at the profile's minimum-aperture endpoint rather than
+tracking the current simulated aperture. XDRemux therefore writes the OPPO
+value to `depthBlurEffect:SimulatedAperture` and does not patch `0x012f`.
 
 ## Encoding boundary
 
@@ -201,8 +205,9 @@ editing remains the acceptance gate.
 A second device pass using header-scaled disparity but physical OPPO auxiliary
 calibration still showed excessive f/16 blur, especially at 230mm. This
 isolated the remaining failure to the mismatched physical calibration plus
-fixed donor `REND`. The next matrix restores their canonical pairing and also
-synchronizes the known `REND` aperture record `0x012f` with OPPO f-number.
+fixed donor `REND`. A historical probe also synchronized `0x012f`, but the
+later controlled series proved that it is not the current-aperture field; the
+product path now leaves the selected Apple profile record unchanged.
 
 That canonical-pair pass established the opposite bound: synthetic blur became
 too weak and remained subtle even when Photos was set to f/1.4. The result

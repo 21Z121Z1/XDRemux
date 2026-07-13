@@ -5631,6 +5631,8 @@ private struct PortraitFocusRegion {
 }
 
 private struct PortraitCameraCalibration {
+    let profileName: String
+    let renderingParametersBase64: String
     let physicalFocalLengthMM: Double
     let opticalEquivalentFocalLengthMM: Double
     let digitalZoomRatio: Double
@@ -5653,6 +5655,23 @@ private struct PortraitCameraCalibration {
             principalPointX, principalPointY, 1,
         ]
     }
+}
+
+private struct PortraitAppleLensProfile {
+    let name: String
+    let anchorEquivalentFocalLengthMM: Double
+    let maximumValidatedEquivalentFocalLengthMM: Double
+    let referenceWidth: Int
+    let referenceHeight: Int
+    let focalLengthPixels: Double
+    let principalPointX: Double
+    let principalPointY: Double
+    let distortionCenterX: Double
+    let distortionCenterY: Double
+    let pixelSizeMM: Double
+    let distortionCoefficients: [Double]
+    let inverseDistortionCoefficients: [Double]
+    let renderingParametersBase64: String
 }
 
 private struct PortraitDepthHeader {
@@ -5757,7 +5776,7 @@ private enum PortraitConversionPipeline {
         }
         guard
               let srcImage = blocks["src.image"],
-              blocks["rear.depth.config"] != nil,
+              let rearDepthConfig = blocks["rear.depth.config"],
               let compressedDepth = blocks["rear.depth"] else {
             throw CLIError.invalidContainer(
                 "--apple-portrait requires OPPO portrait UserComment, src.image, and rear.depth"
@@ -5794,10 +5813,16 @@ private enum PortraitConversionPipeline {
             CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any]
         }
         let simulatedAperture = resolveSimulatedAperture(
-            rearDepthConfig: blocks["rear.depth.config"],
+            rearDepthConfig: rearDepthConfig,
             inputProperties: inputProperties,
             baseProperties: baseProperties
         )
+        let afMeasuredDepth = readUInt32LE(rearDepthConfig, at: 296).flatMap { value in
+            (1...100_000).contains(value) ? Int(value) : nil
+        }
+        if let afMeasuredDepth {
+            print("portrait AF measured depth source=rear.depth.config distance=\(afMeasuredDepth)")
+        }
         let inputOrientation = (inputProperties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value
         let baseOrientation = (baseProperties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value
         let inputWidth = (inputProperties?[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue
@@ -5817,6 +5842,20 @@ private enum PortraitConversionPipeline {
         let depthHeight = depthHeader.height
         let depthPlanes = try parseDepthPlanes(decodedDepth, header: depthHeader)
         let depthRanks = depthPlanes.ranks
+        let focus = try makeFocusRegion(
+            image: baseImage,
+            orientation: orientation,
+            orientationRaw: orientationRaw,
+            rearDepthConfig: rearDepthConfig
+        )
+        let focusRank = robustFocusRank(
+            ranks: depthRanks,
+            subject: depthPlanes.subject,
+            width: depthWidth,
+            height: depthHeight,
+            rawX: focus.rawX,
+            rawY: focus.rawY
+        )
         let effectiveDepthFocalLengthPixels = depthHeader.focalLengthPixels
             * Double(baseImage.width) / Double(depthWidth)
         let cameraCalibration = try makeCameraCalibration(
@@ -5826,38 +5865,29 @@ private enum PortraitConversionPipeline {
             baseHeight: baseImage.height,
             effectiveFocalLengthPixels: effectiveDepthFocalLengthPixels
         )
-        let disparityFar = 1.4
-        // Device tests bracketed Photos blur between the canonical donor render
-        // profile (too weak) and physical OPPO focal calibration (too strong).
-        // Use their geometric midpoint in disparity-amplitude space. Because
-        // the source depth fx varies continuously, digital zoom focal lengths
-        // get a continuous gain instead of a hand-maintained lens table.
-        let renderEndpointRatio = effectiveDepthFocalLengthPixels
-            / cameraCalibration.effectiveFocalLengthPixels
-        let renderGain = sqrt(max(1.0, renderEndpointRatio))
-        let disparityScale = depthHeader.rankDisparityScale * renderGain
+        // rear.depth stores a relative rank map. Its header gives the disparity
+        // delta per rank, so focal length must not be multiplied into the
+        // disparity range a second time. Normalize rank 255 to zero; Photos
+        // samples the disparity at the Focus XMP region as the relative anchor.
+        let disparityFar = 0.0
+        let disparityScale = depthHeader.rankDisparityScale
         let disparitySpan = 255.0 * disparityScale
         let disparityNear = disparityFar + disparitySpan
+        let focusDisparity = disparityFar + (255.0 - focusRank) * disparityScale
         print(String(
-            format: "portrait disparity header=%dx%d fxDepth=%.3f effectiveFx=%.3f rankScale=%.7f renderEndpoint=%.4fx renderGain=%.4fx renderedRankScale=%.7f baseline=%.3f range=%.6f...%.6f fullSpan=%.6f",
+            format: "portrait disparity header=%dx%d fxDepth=%.3f effectiveFx=%.3f rankScale=%.7f baseline=%.3f focusRank=%.3f focusDisparity=%.6f range=%.6f...%.6f fullSpan=%.6f",
             depthHeader.width,
             depthHeader.height,
             depthHeader.focalLengthPixels,
             effectiveDepthFocalLengthPixels,
             depthHeader.rankDisparityScale,
-            renderEndpointRatio,
-            renderGain,
-            disparityScale,
             depthHeader.stereoBaseline,
+            focusRank,
+            focusDisparity,
             disparityFar,
             disparityNear,
             disparitySpan
         ))
-        let focus = try makeFocusRegion(
-            image: baseImage,
-            orientation: orientation,
-            orientationRaw: orientationRaw
-        )
 
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
@@ -5934,6 +5964,7 @@ private enum PortraitConversionPipeline {
             baseColorSpace: baseImage.colorSpace,
             orientation: orientationRaw,
             focus: focus,
+            afMeasuredDepth: afMeasuredDepth,
             captureDate: captureDateString(sourceURL: inputURL),
             gainJPEG: gainJPEG,
             infoFloats: infoFloats,
@@ -5954,25 +5985,28 @@ private enum PortraitConversionPipeline {
     UkVORAcAAABIBQAAAQAAAGQAAgAAAAAAZQACAAIAAABmAAEAj8L1PGcAAQDNzMw9aAABAArXIz1pAAEAMzOzP2oAAQDNzEw9awABAJqZmT5sAAEAzczMP20AAQAAAABAbgACABQAAABvAAEAzcxMPXAAAQBYOTQ8cQABAArXIzxyAAEAzczMPXMAAQAK1yM9dAABAAAAgD91AAEAAABAP3YAAQBmZmY/dwABAJqZmT94AAEAAAAAQHkAAQDNzMw+egABAM3MzD17AAEAAACAP3wAAQAAAABAfQABAAAAAEF+AAEAF7fROH8AAgAyAAAAgAABAAAAgD/IAAEAPQoXP8kAAQAAAEA/ygABAPfMEjksAQEACtcjPC0BAQAXSJI5LgEBADVeuj0vAQEAMzOzPzABAQDgLRA7MQEBAFoMQzoyAQEAAACAPzMBAQAAAIA/kAECABkAAACRAQEAz3P8PZIBAQDbVr1AkwEBAM9z/D2UAQEAQmBlO5UBAQCZuxY8lgEBAGZmZj+XAQEAAACAP5gBAQAAAAAAmQEBAM3MTD7CAQEAz3N8QMMBAQBhyB1BxAEBALB4lz7FAQEADM6PQMYBAQAzM5tA8gECAAkAAADzAQIADAAAAPQBAgAJAAAA9QEBAAAAekT2AQEAmpkZPvcBAQBSuJ4++AEBAAAAAED5AQEAAMAPRfoBAQDNzEw9+wEBADMzsz78AQIAAgAAAP0BAQCamZk+/gEBAAAAoD//AQEAZmZmPwACAgAGAAAAAQIBAAAAgD8CAgEAAAAAAFgCAQAzMzNAWQIBADMzsz9aAgEAAACAQVsCAQB02qA/vAIBAAAAAAC9AgEAAAAAACADAgADAAAAIQMBAM3MTL0iAwEACtejPCMDAQDNzEy9JAMBAI/C9T2EAwEAzcxMP4UDAQAAAIA/hgMBAAAAAACHAwEAAAAAAIgDAQDNzMw+iQMBAOAtkDroAwEAmpmZPukDAQAAAKBA6gMBAJqZmT7rAwEAzcxMP+wDAQAAAAAA7QMBAAAAgD/uAwEAMzMzv+8DAQBmZmY/8AMBAI/C9TzxAwEAbxKDOvIDAQAAAAAA8wMCAIcAAAD0AwEAzczMPvUDAQAAAIA/9gMCABQAAAD3AwEAzczMPvgDAQAAAAAA+QMBAM3MTD/6AwEAAACAP/sDAQAAAAAA/AMBAM3MTD79AwEAAAAAAP4DAQAAAAAA/wMBAM3MzD8ABAIAAgAAAAEEAQAAAAAAAgQBAG8SAzoDBAEAmplZPwQEAQAAAAAABQQBAAAAgD8GBAEAzcxMPwcEAQCamZk+CAQBAAAAAEAJBAEAexQuPgoEAQAzM7M+CwQBAAAAgD8MBAEAAAAAAA0EAQCamZk+DgQBAM3MzD0PBAEAzcxMPkwEAQBmZuY+TQQBAAAAAABOBAEAAAAAAE8EAQDNzMw9UAQBAGZmZj+wBAIACQAAALEEAgAEAAAAsgQCAAwAAACzBAEAAACAP7QEAQAAAIA/tQQBANej8D62BAEAFK5HP7cEAQAAAADAuAQBAAAAAAC5BAEAAACAv7oEAQCamRk+uwQBAM3MzD28BAEAmpmZP70EAQBcj8I+vgQCAAQAAAAUBQEAAACAPhUFAQC/fV0+FgUBAArXIzwXBQEAj8L1PBgFAQAzM3M/GQUBAKabRD0aBQEAF7fRORsFAQBfKUs7HAUBAPYoHD8dBQEACtejPB4FAQAK1yM8HwUBAGZmJkAgBQEAAABAPyEFAQBsCfk6IgUBAI/C9TwjBQEAZmZmPyQFAQCamZk+JQUBAAAAwD8=
     """.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    private static func portraitRenderingParametersBase64(
-        simulatedAperture: Double
-    ) throws -> String {
-        guard var data = Data(base64Encoded: portraitRenderingParametersTemplateBase64),
+    private static let portraitRenderingParameters2xBase64 = """
+    UkVORAcAAABIBQAAAQAAAGQAAgAAAAAAZQACAAIAAABmAAEAj8L1PGcAAQDNzMw9aAABAArXIz1pAAEAMzOzP2oAAQDNzEw9awABAJqZmT5sAAEAAADAP20AAQBiEChAbgACABQAAABvAAEAzcxMPXAAAQDNzMw8cQABAArXIzxyAAEAzczMPXMAAQDNzMw9dAABAAAAgD91AAEAAABAP3YAAQBmZmY/dwABAJqZmT94AAEAAAAAQHkAAQDNzMw+egABAM3MzD17AAEAAACAP3wAAQAAAABAfQABAAAAAEF+AAEAF7fROH8AAgAyAAAAgAABAAAAgD/IAAEA7FG4PckAAQCamVk/ygABABe3UTksAQEACtcjPC0BAQAXSJI5LgEBADVeuj0vAQEAMzOzPzABAQDgLRA7MQEBAFoMQzoyAQEAAACAPzMBAQAAAIA/kAECABUAAACRAQEAd+jVPZIBAQBZbqBAkwEBAF8gKz2UAQEACtcjO5UBAQCPwvU7lgEBAGZmZj+XAQEAAACAP5gBAQAAAAAAmQEBAM3MTD7CAQEALH8ZQMMBAQDPptxAxAEBAD3lVj7FAQEAg7M3QMYBAQAAADBB8gECAAkAAADzAQIADAAAAPQBAgAJAAAA9QEBAAAAekT2AQEAAAAAAPcBAQBSuJ4++AEBAAAAAED5AQEAAACWQ/oBAQDNzEw9+wEBAM3MzD78AQIAAgAAAP0BAQAAAIA+/gEBAAAAwD//AQEAMzNzPwACAgAHAAAAAQIBAAAAgD8CAgEAAAAAAFgCAQAAAJBAWQIBADMzsz9aAgEAAACAQVsCAQAAAIA/vAIBAAAAAAC9AgEAAAAAACADAgADAAAAIQMBAM3MTL0iAwEACtejPCMDAQDNzEy9JAMBAI/C9T2EAwEAzcxMP4UDAQAAAIA/hgMBAAAAAACHAwEAAAAAAIgDAQDNzMw+iQMBAAAAAADoAwEAmpmZPukDAQAAAKBA6gMBAJqZmT7rAwEAzcxMP+wDAQAAAAAA7QMBAAAAgD/uAwEAMzMzv+8DAQBmZmY/8AMBAAAAAADxAwEAAAAAAPIDAQAAAAAA8wMCAFoAAAD0AwEAzczMPvUDAQDNzEw+9gMCABQAAAD3AwEAzczMPvgDAQAAAAAA+QMBAM3MTD/6AwEAAACAP/sDAQAAAAAA/AMBAM3MTD79AwEAAAAAAP4DAQAAAAAA/wMBAJqZmT4ABAIAAgAAAAEEAQAAAAAAAgQBAG8SAzoDBAEAAACAPwQEAQAAAAAABQQBAAAAgD8GBAEAzcxMPwcEAQCamZk+CAQBAAAAIEAJBAEAzczMPQoEAQAzM7M+CwQBAAAAgD8MBAEAAAAAAA0EAQCamZk+DgQBAM3MzD0PBAEAmpkZPkwEAQAAAAA/TQQBAAAAAABOBAEAAAAAAE8EAQDNzEw+UAQBAM3MTD+wBAIACQAAALEEAgAEAAAAsgQCAAwAAACzBAEAAACAP7QEAQAAAIA/tQQBAAAAAD+2BAEAzcxMP7cEAQAAAADAuAQBAAAAAAC5BAEAAACAv7oEAQCamRk+uwQBAM3MTD68BAEAmpmZP70EAQCamRk/vgQCAAEAAAAUBQEAzcxMPhUFAQDsUTg+FgUBAArXIz0XBQEAcT2KPhgFAQBmZmY/GQUBAI/C9TwaBQEAbxKDOhsFAQAXt9E4HAUBAM3MDD8dBQEAJUmSOx4FAQAAAIA+HwUBAGZmJkAgBQEAAABAPyEFAQBvEoM6IgUBAAAAAAAjBQEAZmZmPyQFAQDD9ag+JQUBAAAAwD8=
+    """.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    private static let portraitRenderingParameters3xBase64 = """
+    UkVORAcAAABIBQAAAQAAAGQAAgAAAAAAZQACAAIAAABmAAEAj8L1PGcAAQDn+6k9aAABAM3MTD1pAAEAMzOzP2oAAQDNzEw9awABAJqZmT5sAAEAAAAAP20AAQAAAChAbgACABQAAABvAAEAzcxMPXAAAQDNzMw8cQABAArXIzxyAAEAzczMPXMAAQDNzMw9dAABAM3MzD51AAEAAABAP3YAAQBmZmY/dwABAJqZmT94AAEAAAAAQHkAAQDNzMw+egABAM3MzD17AAEAAACAP3wAAQAAAABAfQABAAAAAEF+AAEAF7fROH8AAgAyAAAAgAABAAAAgD/IAAEAKVyPPckAAQCamVk/ygABABe3UTksAQEACtcjPC0BAQAXSJI5LgEBADVeuj0vAQEAMzOzPzABAQDgLRA7MQEBAFoMQzoyAQEAAACAPzMBAQAAAIA/kAECADIAAACRAQEAAACAPpIBAQAAAEBBkwEBAM3MzD2UAQEACtcjO5UBAQCPwvU7lgEBAGZmZj+XAQEAAACAP5gBAQAAAAAAmQEBAM3MTD7CAQEAL7DJQMMBAQCi9pBBxAEBAIcuDT/FAQEAL7BJQMYBAQAAACBB8gECAAkAAADzAQIADAAAAPQBAgAJAAAA9QEBAAAAekT2AQEAAAAAAPcBAQBSuJ4++AEBAAAAAED5AQEAAACWQ/oBAQDNzEw9+wEBAM3MzD78AQIAAgAAAP0BAQAAAIA+/gEBAAAAwD//AQEAZmZmPwACAgAHAAAAAQIBAAAAgD8CAgEAAAAAAFgCAQAAAJBAWQIBADMzsz9aAgEAAACAQVsCAQCTGIQ/vAIBAAAAAAC9AgEAAAAAACADAgADAAAAIQMBAM3MTL0iAwEACtejPCMDAQDNzEy9JAMBAI/C9T2EAwEAzcxMP4UDAQAAAIA/hgMBAAAAAACHAwEAAAAAAIgDAQDNzMw+iQMBAAAAAADoAwEAmpmZPukDAQAAAKBA6gMBAJqZmT7rAwEAzcxMP+wDAQAAAIA/7QMBAAAAgD/uAwEAMzMzv+8DAQBmZmY/8AMBAG8SgzrxAwEAAAAAAPIDAQAAAAAA8wMCAMgAAAD0AwEAzczMPvUDAQAAAIA/9gMCABQAAAD3AwEAzczMPvgDAQAAAAAA+QMBAM3MTD/6AwEAAACAP/sDAQAAAAAA/AMBAM3MTD79AwEAAAAAAP4DAQAAAAAA/wMBAJqZmT4ABAIAAgAAAAEEAQAAAAAAAgQBAG8SAzoDBAEAAACAPwQEAQAAAAAABQQBAAAAgD8GBAEAzcxMPwcEAQCamZk+CAQBAM3MDEAJBAEAzczMPQoEAQBcjwI/CwQBAAAAgD8MBAEAzcxMPg0EAQDNzEw+DgQBAM3MTD4PBAEAAAAAP0wEAQAAAAA/TQQBAAAAAABOBAEAAAAAAE8EAQDNzEw+UAQBAM3MTD+wBAIACQAAALEEAgAEAAAAsgQCAAwAAACzBAEAAACAP7QEAQAAAIA/tQQBAJqZGT+2BAEAPQpXP7cEAQAAAADAuAQBAAAAAAC5BAEAAACAv7oEAQC4HgU+uwQBAPLSTT68BAEAmpmZP70EAQAAAAAAvgQCAAAAAAAUBQEAKVyPPhUFAQApXI8+FgUBAClcDz0XBQEACtejPBgFAQAzM3M/GQUBAClcDz0aBQEApptEOxsFAQAxDMM6HAUBAM3MzD4dBQEAJUmSOx4FAQAK1yM9HwUBAAAAQEAgBQEA16MwPyEFAQAgCAI7IgUBAAAAAAAjBQEAj8I1PyQFAQDD9ag+JQUBAAAAwD8=
+    """.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    private static let portraitRenderingParameters5xBase64 = """
+    UkVORAcAAABIBQAAAQAAAGQAAgAAAAAAZQACAAIAAABmAAEAj8L1PGcAAQDn+6k9aAABAM3MTD1pAAEAMzOzP2oAAQDNzEw9awABAJqZmT5sAAEAAAAAP20AAQAAAChAbgACABQAAABvAAEAzcxMPXAAAQDNzMw8cQABAArXIzxyAAEAzczMPXMAAQDNzMw9dAABAM3MzD51AAEAAABAP3YAAQBmZmY/dwABAJqZmT94AAEAAAAAQHkAAQDNzMw+egABAM3MzD17AAEAAACAP3wAAQAAAABAfQABAAAAAEF+AAEAF7fROH8AAgAyAAAAgAABAAAAgD/IAAEAKVyPPckAAQCamVk/ygABABe3UTksAQEACtcjPC0BAQAXSJI5LgEBADVeuj0vAQEAMzOzPzABAQDgLRA7MQEBAFoMQzoyAQEAAACAPzMBAQAAAIA/kAECABAAAACRAQEA32WjPZIBAQDOGHVAkwEBAOa3Aj2UAQEACtcjO5UBAQCPwvU7lgEBAGZmZj+XAQEAAACAP5gBAQAAAAAAmQEBAM3MTD7CAQEA7Z3rP8MBAQCCWalAxAEBAIzuJD7FAQEA35I4QMYBAQAAACBB8gECAAkAAADzAQIADAAAAPQBAgAJAAAA9QEBAAAAekT2AQEAAAAAAPcBAQBSuJ4++AEBAAAAAED5AQEAAACWQ/oBAQDNzEw9+wEBAM3MzD78AQIAAgAAAP0BAQApXI8+/gEBAAAAwD//AQEAZmZmPwACAgAHAAAAAQIBAAAAgD8CAgEAAAAAAFgCAQAAAJBAWQIBADMzsz9aAgEAAACAQVsCAQC4HoU/vAIBAAAAAAC9AgEAAAAAACADAgADAAAAIQMBAM3MTL0iAwEACtejPCMDAQDNzEy9JAMBAI/C9T2EAwEAzcxMP4UDAQAAAIA/hgMBAArXIzyHAwEAAAAAAIgDAQDNzMw+iQMBAFg5NDzoAwEAmpmZPukDAQAAAKBA6gMBAJqZmT7rAwEAzcxMP+wDAQAAAIA/7QMBAAAAgD/uAwEAMzMzv+8DAQBmZmY/8AMBAFg5NDzxAwEAAAAAAPIDAQAAAAAA8wMCAMgAAAD0AwEAmpkZP/UDAQCamZk/9gMCABQAAAD3AwEAzczMPvgDAQAAAAAA+QMBAM3MTD/6AwEAAACAP/sDAQAAAAAA/AMBAM3MTD79AwEAAAAAAP4DAQAAAAAA/wMBAJqZmT4ABAIAAgAAAAEEAQAAAAAAAgQBAG8SAzoDBAEAAACAPwQEAQAAAAAABQQBAAAAgD8GBAEAexRuPwcEAQDNzMw+CAQBAGZmBkAJBAEAmpkZPgoEAQDNzAw/CwQBAAAAgD8MBAEAAACAPg0EAQDNzEw+DgQBAM3MzD0PBAEAMzOzPkwEAQAAAAA/TQQBAAAAAABOBAEAAAAAAE8EAQDNzEw+UAQBAM3MTD+wBAIACQAAALEEAgAEAAAAsgQCAAwAAACzBAEAAACAP7QEAQAAAIA/tQQBAJqZGT+2BAEAPQpXP7cEAQAAAADAuAQBAAAAAAC5BAEAAACAv7oEAQC4HgU+uwQBAPLSTT68BAEAmpmZP70EAQAAAAAAvgQCAAAAAAAUBQEAexSuPhUFAQDwp4Y+FgUBAG8SAz0XBQEACtcjPBgFAQAfhWs/GQUBAG8SAz0aBQEAbxKDOhsFAQAxDMM6HAUBADMzsz4dBQEAF7fROx4FAQCPwnU9HwUBAJqZeUAgBQEAhetRPyEFAQCmm0Q7IgUBAAAAAAAjBQEA4XoUPyQFAQDD9ag+JQUBAAAAwD8=
+    """.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    private static func validatedRenderingParametersBase64(_ encoded: String) throws -> String {
+        guard let data = Data(base64Encoded: encoded),
               data.count >= 24,
               data.prefix(4) == Data("REND".utf8) else {
             throw CLIError.invalidContainer("invalid portrait REND compatibility template")
         }
-        for offset in stride(from: 16, through: data.count - 8, by: 8) {
-            let identifier = UInt16(data[offset]) | UInt16(data[offset + 1]) << 8
-            let valueType = UInt16(data[offset + 2]) | UInt16(data[offset + 3]) << 8
-            guard identifier == 0x012f, valueType == 1 else { continue }
-            var bits = Float(simulatedAperture).bitPattern.littleEndian
-            withUnsafeBytes(of: &bits) { bytes in
-                data.replaceSubrange((offset + 4)..<(offset + 8), with: bytes)
-            }
-            return data.base64EncodedString()
-        }
-        throw CLIError.invalidContainer("portrait REND aperture field 0x012f is missing")
+        // REND is a lens-coupled compatibility profile. The current aperture is
+        // carried by depthBlurEffect:SimulatedAperture and Photos adjustment
+        // data; record 0x012f is not the per-edit aperture control.
+        return data.base64EncodedString()
     }
 
     private static func portraitUserCommentFlag(in url: URL) -> Bool {
@@ -6071,7 +6105,9 @@ private enum PortraitConversionPipeline {
         return metadata
     }
 
-    private static func portraitMakerAppleDictionary() -> [String: Any] {
+    private static func portraitMakerAppleDictionary(
+        afMeasuredDepth: Int?
+    ) -> [String: Any] {
         let makerData = Data(base64Encoded: "ywG5Ap4DpQAaADIALQA1AHEAmgDXAA4ACQAJAA4AOwDMABgBkQFqAEMANQApAB4AEgCJAHIACwAJAAkAHQBBAGoByAEfAnYASQBZAJUAnwBcAJMAFgAJAAkADAAzAEUAUAGbAdIBngCgAKMAnADKAFcAsAARAAoACQAQAE8AVwCnAdgBGQIuAuQBRAHYANMAZgB0ABwACwALACUAcABvACwCKwJuAoMCjQJZAdAAKQIIApYB7wBEABcAVQCYAJEAgwKAAskC0QLBAnwCwAEdAZQABQKCAawAjgC4ANIAvwB6AskCHAMLA90CGQKaAuIBiwAWAQ4B7AAJATMBIQH6AFkCyAI6A+sC9AH4APMBzQFfAa8AbAGeAEwBmwFyATsBDwI9AXcCHQELAQ8BiQFcAnoB+ADTAVMBgwEdAswBbQFPATwB5gEPAQoBJwFCAc0CTAG7AO0BKgHtAOsCTQJ3AegBvwE7AyQC3ABEAQ8BiQJ5AccAlQH5AJoA2wH2AGQADQILA0MDHQNlAWMBHgEHAXwBSAGsAQ0BPgHrACEACwDTAf0CSgMBA9ACYAHGAFwArABjAbQBAgE9AggBFAALAGwCMQNiA9MCugI7AZsAbADqADkByAGPAbwBfQL/Ad4AMwOaA8QDzALhAgUBmgDEAJ8A7QA7Ai8CfQEuAvMBEQE=") ?? Data()
         let captureTime = CMTime(
             value: 411_546_020_942_750,
@@ -6079,7 +6115,7 @@ private enum PortraitConversionPipeline {
             flags: .valid,
             epoch: 0
         )
-        return [
+        var dictionary: [String: Any] = [
             "1": 17, "2": makerData, "3": NSValue(time: captureTime), "4": 0,
             "5": 184, "6": 174, "7": 1,
             "8": [-0.0013844214845448732, -0.8983764052391052, -0.45038747787475586],
@@ -6099,6 +6135,128 @@ private enum PortraitConversionPipeline {
             "79": 0, "82": 0, "83": 2, "85": 0, "88": 2051,
             "96": 4037, "97": 24,
         ]
+        if let afMeasuredDepth {
+            // Apple MakerNote tag 56 is AFMeasuredDepth. Controlled matched
+            // 2x/3x captures show it tracks OPPO rear.depth.config.distance in
+            // the same scene-distance domain; keep the Apple trigger graph but
+            // replace the fixed donor value with the source capture value.
+            dictionary["56"] = afMeasuredDepth
+        }
+        return dictionary
+    }
+
+    private static func appleLensProfile(
+        physicalFocalLengthMM: Double,
+        equivalentFocalLengthMM: Double
+    ) -> PortraitAppleLensProfile {
+        if physicalFocalLengthMM <= 11 {
+            // Apple keeps its 1x main-camera profile through the intermediate
+            // crop range, then changes to the 2x/Fusion renderer near 48mm.
+            if equivalentFocalLengthMM < 45 {
+                return PortraitAppleLensProfile(
+                    name: "Apple-1x-main-24mm",
+                    anchorEquivalentFocalLengthMM: 24,
+                    maximumValidatedEquivalentFocalLengthMM: 44,
+                    referenceWidth: 4032,
+                    referenceHeight: 3024,
+                    focalLengthPixels: 2860.37890625,
+                    principalPointX: 2010.31103515625,
+                    principalPointY: 1525.0140380859375,
+                    distortionCenterX: 2017.552734375,
+                    distortionCenterY: 1523.492919921875,
+                    pixelSizeMM: 0.002440,
+                    distortionCoefficients: [
+                        0, -0.5552194714546204, 0.053949449211359024,
+                        -0.0018901334842666984, -0.000004621016614692053,
+                        0.0000019594019704527454, -0.0000000451839099468998,
+                        0.00000000031430857916348032,
+                    ],
+                    inverseDistortionCoefficients: [
+                        0, 0.5448748469352722, -0.05080728605389595,
+                        0.0016805990599095821, 0.000007370583261945285,
+                        -0.0000017933325580088422, 0.00000003959269534448139,
+                        -0.0000000002689144740219973,
+                    ],
+                    renderingParametersBase64: portraitRenderingParametersTemplateBase64
+                )
+            }
+            return PortraitAppleLensProfile(
+                name: "Apple-2x-fusion-48mm",
+                anchorEquivalentFocalLengthMM: 48,
+                maximumValidatedEquivalentFocalLengthMM: 59,
+                referenceWidth: 4032,
+                referenceHeight: 3024,
+                focalLengthPixels: 5666.13037109375,
+                principalPointX: 2001.7744140625,
+                principalPointY: 1543.74609375,
+                distortionCenterX: 2008.567138671875,
+                distortionCenterY: 1553.952880859375,
+                pixelSizeMM: 0.0012199999764561653,
+                distortionCoefficients: [
+                    0, -0.5692305564880371, 0.05308981239795685,
+                    -0.0018655891763046384, -0.000004458999683265574,
+                    0.0000019504550436977297, -0.000000044818150968239934,
+                    0.0000000003053474695313696,
+                ],
+                inverseDistortionCoefficients: [
+                    0, 0.5576314330101013, -0.04986516013741493,
+                    0.0016566345002502203, 0.0000071098988883022685,
+                    -0.0000017824544329414493, 0.000000039320074307624964,
+                    -0.00000000026318897061727853,
+                ],
+                renderingParametersBase64: portraitRenderingParameters2xBase64
+            )
+        }
+        if physicalFocalLengthMM < 28 {
+            return PortraitAppleLensProfile(
+                name: "Apple-3x-tele-77mm",
+                anchorEquivalentFocalLengthMM: 77,
+                maximumValidatedEquivalentFocalLengthMM: 134,
+                referenceWidth: 4032,
+                referenceHeight: 3024,
+                focalLengthPixels: 9169.1298828125,
+                principalPointX: 2023.2255859375,
+                principalPointY: 1536.47265625,
+                distortionCenterX: 2066.8583984375,
+                distortionCenterY: 1557.3045654296875,
+                pixelSizeMM: 0.0010000000474974513,
+                distortionCoefficients: [
+                    0, 1.3263592720031738, -0.7996886372566223,
+                    0.18687580525875092, -0.016688073053956032,
+                    -0.0014819741481915116, 0.0004676870012190193,
+                    -0.000029682618333026767,
+                ],
+                inverseDistortionCoefficients: [
+                    0, -1.3037974834442139, 0.7811512351036072,
+                    -0.17724691331386566, 0.013979822397232056,
+                    0.0017448276048526168, -0.0004529204161372036,
+                    0.00002691301233426202,
+                ],
+                renderingParametersBase64: portraitRenderingParameters3xBase64
+            )
+        }
+        return PortraitAppleLensProfile(
+            name: "Apple-5x-tetraprism-120mm",
+            anchorEquivalentFocalLengthMM: 120,
+            maximumValidatedEquivalentFocalLengthMM: 120,
+            referenceWidth: 4032,
+            referenceHeight: 3024,
+            focalLengthPixels: 14235.533203125,
+            principalPointX: 2012.30908203125,
+            principalPointY: 1589.007568359375,
+            distortionCenterX: 2027.13818359375,
+            distortionCenterY: 1567.1475830078125,
+            pixelSizeMM: 0.001120000029914081,
+            distortionCoefficients: [
+                0, -0.09882805496454239, 0.000012278825124667492,
+                0, 0, 0, 0, 0,
+            ],
+            inverseDistortionCoefficients: [
+                0, 0.10229571908712387, -0.0005449775489978492,
+                0, 0, 0, 0, 0,
+            ],
+            renderingParametersBase64: portraitRenderingParameters5xBase64
+        )
     }
 
     private static func makeCameraCalibration(
@@ -6164,21 +6322,45 @@ private enum PortraitConversionPipeline {
             throw CLIError.invalidContainer("OPPO depth-header focal length is invalid")
         }
 
-        // Apple depthBlurEffect:RenderingParameters is a private, lens-coupled
-        // renderer graph. Until that graph can be authored from OPPO's blur
-        // curves, its donor camera calibration must remain paired with it.
-        // OPPO's measured depth-header calibration is still used above to
-        // interpret rank differences; the primary EXIF retains the real lens.
-        let referenceWidth = 4032
-        let referenceHeight = 3024
-        let focalLengthPixels = 2860.37890625
+        // REND and auxiliary calibration are a lens-coupled Apple profile.
+        // Within one physical profile Apple keeps intrinsic fx approximately
+        // constant while the reference crop and PixelSize scale inversely with
+        // equivalent focal length. Reproduce that observed representation for
+        // OPPO digital focal lengths instead of multiplying disparity itself.
+        let profile = appleLensProfile(
+            physicalFocalLengthMM: physicalFocalLength,
+            equivalentFocalLengthMM: equivalentFocalLength
+        )
+        // Apple has no 10x/230mm portrait renderer profile. Keep the source
+        // focal length in primary EXIF, but never extrapolate a private Apple
+        // calibration/REND chart beyond the range measured for that profile.
+        // Longer OPPO captures remain in the nearest validated Apple render
+        // domain; disparity and scene controls carry depth, not a fabricated
+        // auxiliary focal-length multiplier.
+        let renderEquivalentFocalLength = min(
+            equivalentFocalLength,
+            profile.maximumValidatedEquivalentFocalLengthMM
+        )
+        let cropScale = profile.anchorEquivalentFocalLengthMM / renderEquivalentFocalLength
+        func roundedMultipleOf4(_ value: Double) -> Int {
+            max(4, Int((value / 4).rounded()) * 4)
+        }
+        let referenceWidth = roundedMultipleOf4(Double(profile.referenceWidth) * cropScale)
+        let referenceHeight = roundedMultipleOf4(Double(profile.referenceHeight) * cropScale)
+        let cropOffsetX = (Double(profile.referenceWidth) - Double(referenceWidth)) / 2
+        let cropOffsetY = (Double(profile.referenceHeight) - Double(referenceHeight)) / 2
+        let focalLengthPixels = profile.focalLengthPixels
         let renderEffectiveFocalLengthPixels = focalLengthPixels
             * Double(baseWidth) / Double(referenceWidth)
-        let principalPointX = 2010.31103515625
-        let principalPointY = 1525.0140380859375
-        let pixelSizeMM = 0.002440
+        let principalPointX = profile.principalPointX - cropOffsetX
+        let principalPointY = profile.principalPointY - cropOffsetY
+        let pixelSizeMM = profile.pixelSizeMM * cropScale
 
         let calibration = PortraitCameraCalibration(
+            profileName: profile.name,
+            renderingParametersBase64: try validatedRenderingParametersBase64(
+                profile.renderingParametersBase64
+            ),
             physicalFocalLengthMM: physicalFocalLength,
             opticalEquivalentFocalLengthMM: opticalEquivalentFocalLength,
             digitalZoomRatio: digitalZoom,
@@ -6188,28 +6370,22 @@ private enum PortraitConversionPipeline {
             effectiveFocalLengthPixels: renderEffectiveFocalLengthPixels,
             principalPointX: principalPointX,
             principalPointY: principalPointY,
-            distortionCenterX: 2017.552734375,
-            distortionCenterY: 1523.492919921875,
+            distortionCenterX: profile.distortionCenterX - cropOffsetX,
+            distortionCenterY: profile.distortionCenterY - cropOffsetY,
             pixelSizeMM: pixelSizeMM,
-            distortionCoefficients: [
-                0, -0.5552194714546204, 0.053949449211359024,
-                -0.0018901334842666984, -0.000004621016614692053,
-                0.0000019594019704527454, -0.0000000451839099468998,
-                0.00000000031430857916348032,
-            ],
-            inverseDistortionCoefficients: [
-                0, 0.5448748469352722, -0.05080728605389595,
-                0.0016805990599095821, 0.000007370583261945285,
-                -0.0000017933325580088422, 0.00000003959269534448139,
-                -0.0000000002689144740219973,
-            ]
+            distortionCoefficients: profile.distortionCoefficients,
+            inverseDistortionCoefficients: profile.inverseDistortionCoefficients
         )
         print(String(
-            format: "portrait render calibration=canonical-REND-pair sourcePhysical=%.3fmm sourceOptical=%.2fmm sourceZoom=%.4fx sourceDepthFx=%.3f ref=%dx%d fx=%.3f pixel=%.9fmm",
+            format: "portrait render profile=%@ sourcePhysical=%.3fmm sourceOptical=%.2fmm sourceEquivalent=%.2fmm renderEquivalent=%.2fmm sourceZoom=%.4fx sourceDepthFx=%.3f cropScale=%.5f ref=%dx%d fx=%.3f pixel=%.9fmm",
+            calibration.profileName,
             calibration.physicalFocalLengthMM,
             calibration.opticalEquivalentFocalLengthMM,
+            equivalentFocalLength,
+            renderEquivalentFocalLength,
             calibration.digitalZoomRatio,
             effectiveFocalLengthPixels,
+            cropScale,
             calibration.referenceWidth,
             calibration.referenceHeight,
             calibration.focalLengthPixels,
@@ -6578,7 +6754,7 @@ private enum PortraitConversionPipeline {
         try setMetadata(
             metadata,
             path: "depthBlurEffect:RenderingParameters",
-            value: try portraitRenderingParametersBase64(simulatedAperture: simulatedAperture)
+            value: calibration.renderingParametersBase64
         )
         try setMetadata(
             metadata,
@@ -6890,8 +7066,33 @@ private enum PortraitConversionPipeline {
     private static func makeFocusRegion(
         image: CGImage,
         orientation: CGImagePropertyOrientation,
-        orientationRaw: UInt32
+        orientationRaw: UInt32,
+        rearDepthConfig: Data?
     ) throws -> PortraitFocusRegion {
+        // RearDepthStruct stores the tap-to-focus point in src.image storage
+        // coordinates, not in its declared 900x1200 processing dimensions.
+        if let rearDepthConfig,
+           let focusX = readUInt32LE(rearDepthConfig, at: 12),
+           let focusY = readUInt32LE(rearDepthConfig, at: 16),
+           focusX < image.width,
+           focusY < image.height {
+            let rawX = Double(focusX) / Double(image.width)
+            let rawY = Double(focusY) / Double(image.height)
+            print(String(
+                format: "portrait focus source=rear.depth.config raw=(%.6f,%.6f) pixel=(%u,%u)",
+                rawX,
+                rawY,
+                focusX,
+                focusY
+            ))
+            return PortraitFocusRegion(
+                rawX: rawX,
+                rawY: rawY,
+                rawWidth: 0.12,
+                rawHeight: 0.12
+            )
+        }
+
         let attention = VNGenerateAttentionBasedSaliencyImageRequest()
         let faces = VNDetectFaceLandmarksRequest()
         try VNImageRequestHandler(cgImage: image, orientation: orientation, options: [:]).perform([attention, faces])
@@ -6940,6 +7141,49 @@ private enum PortraitConversionPipeline {
             rawWidth: raw.width,
             rawHeight: raw.height
         )
+    }
+
+    private static func robustFocusRank(
+        ranks: Data,
+        subject: Data?,
+        width: Int,
+        height: Int,
+        rawX: Double,
+        rawY: Double
+    ) -> Double {
+        let centerX = max(0, min(width - 1, Int(round(rawX * Double(width - 1)))))
+        let centerY = max(0, min(height - 1, Int(round(rawY * Double(height - 1)))))
+        let radius = 10
+        let validSubject = subject.flatMap { $0.count == ranks.count ? $0 : nil }
+        var local: [UInt8] = []
+        var subjectLocal: [UInt8] = []
+        for y in max(0, centerY - radius)...min(height - 1, centerY + radius) {
+            for x in max(0, centerX - radius)...min(width - 1, centerX + radius) {
+                let index = y * width + x
+                local.append(ranks[index])
+                if let validSubject, validSubject[index] != 0 {
+                    subjectLocal.append(ranks[index])
+                }
+            }
+        }
+        var candidates = subjectLocal.count >= 9 ? subjectLocal : local
+        candidates.sort()
+        let middle = candidates.count / 2
+        let median: Double
+        if candidates.count.isMultiple(of: 2) {
+            median = (Double(candidates[middle - 1]) + Double(candidates[middle])) / 2.0
+        } else {
+            median = Double(candidates[middle])
+        }
+        print(String(
+            format: "portrait focus rank source=%@ depth=(%d,%d) samples=%d median=%.3f",
+            subjectLocal.count >= 9 ? "subject-gated" : "local",
+            centerX,
+            centerY,
+            candidates.count,
+            median
+        ))
+        return median
     }
 
     private static func landmarkCenter(
@@ -7051,6 +7295,7 @@ private enum PortraitConversionPipeline {
         baseColorSpace: CGColorSpace?,
         orientation: UInt32,
         focus: PortraitFocusRegion,
+        afMeasuredDepth: Int?,
         captureDate: String?,
         gainJPEG: Data,
         infoFloats: [Double],
@@ -7092,7 +7337,9 @@ private enum PortraitConversionPipeline {
             throw CLIError.unableToLoadBaseImage(sourceMetadataURL)
         }
         var properties = (CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]) ?? [:]
-        properties[kCGImagePropertyMakerAppleDictionary] = portraitMakerAppleDictionary()
+        properties[kCGImagePropertyMakerAppleDictionary] = portraitMakerAppleDictionary(
+            afMeasuredDepth: afMeasuredDepth
+        )
         var exif = (properties[kCGImagePropertyExifDictionary] as? [CFString: Any]) ?? [:]
         exif[kCGImagePropertyExifCustomRendered] = 9
         exif[kCGImagePropertyExifPixelXDimension] = baseWidth
