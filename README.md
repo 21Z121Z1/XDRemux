@@ -10,61 +10,78 @@ XDRemux 可以将 OPPO、OnePlus、realme 设备拍摄的 ProXDR HEIC 照片转�
 
 如果你从 OPPO、OnePlus 或 realme 手机上拍摄了 ProXDR HEIC 照片，并希望它们在其他系统或软件里仍然以 HDR 方式显示，可以使用 XDRemux 转换。
 
-## 快速上手
+## 三种输出模式
+
+当前 Swift CLI 只有两个产品开关。两个都不指定时使用标准 ISO 默认模式。
+
+| 模式 | 开关 | 结果 |
+|---|---|---|
+| 标准 ISO（默认） | 无 | 输出 ISO 21496-1 HDR；保留源 Base Image、原始通道结构和完整 OPPO/QTI 元数据尾；源数据允许时 Gain Map 最高可达 HEVC RExt 4:4:4 |
+| OPPO 相册兼容 | `--oppo-compatible` | 将 Gain Map 写成 OPPO 相册可消费的 HEVC Main Still Picture 4:2:0，并保留 OPPO 私有元数据尾 |
+| Apple 人像 | `--apple-portrait` | 把 OPPO 人像景深、主体、宠物、头发和光圈信息转换成 Apple disparity、Portrait Effects Matte、Semantic Hair Matte、Focus 与人像元数据 |
 
 > [!IMPORTANT]
-> 省略 `--output` 或 `--output-dir` 时，工具会在原路径覆写文件。转换前请备份原始照片。
+> 省略 `--output` 或 `--output-dir` 时会覆写输入文件。转换前请备份原片。
 
-### Swift CLI
+### 默认：标准 ISO HDR
 
 ```bash
-# 单张转换
-swift xdremux/swift-cli/XDRemux.swift convert --input IMG_001.heic
+# 单张
+swift xdremux/swift-cli/XDRemux.swift convert \
+  --input IMG_001.heic \
+  --output IMG_001_iso.heic
 
-# 批量转换
-swift xdremux/swift-cli/XDRemux.swift batch --input-dir photo_dump/
-
-# 指定输出路径
-swift xdremux/swift-cli/XDRemux.swift convert --input IMG_001.heic --output out.heic
+# 批量
+swift xdremux/swift-cli/XDRemux.swift batch \
+  --input-dir photo_dump/ \
+  --output-dir iso_output/
 ```
 
-默认模式适合大多数情况。它会尽量保留原始 Base Image，只重新处理 HDR Gain Map 及其元数据。
+默认不启用 OPPO 专用兼容层。XDRemux 尽量保留原始 Base Image，只重建标准
+ISO Gain Map 图；单通道源保持单通道，未被降采样的三通道源可保留最高
+4:4:4/HEVC Range Extensions。已经是 4:2:0 的 Gain Map 不会被伪装成
+4:4:4，因为丢失的色度信息无法恢复。
 
-### 转换为 Apple 人像照片
+默认同时保留完整的 OPPO/QTI/FileExtendedContainer 元数据尾，包括水印、
+大师模式、拍摄参数、人像后期数据以及工具尚未识别的厂商字段。
 
-对于包含 OPPO 私有人像数据的照片，可以显式启用 Apple 人像转换：
+### `--oppo-compatible`：OPPO 相册兼容
+
+```bash
+swift xdremux/swift-cli/XDRemux.swift convert \
+  --oppo-compatible \
+  --input IMG_001.heic \
+  --output IMG_001_oppo.heic
+```
+
+此模式把高规格 Gain Map 转成 Main Still Picture 4:2:0，以触发 OPPO 相册的
+HDR 显示。它仍保留 OPPO 私有元数据尾，因此适合需要回到 OPPO 生态的照片。
+
+### `--apple-portrait`：转换 OPPO 人像景深
 
 ```bash
 swift xdremux/swift-cli/XDRemux.swift convert \
   --apple-portrait \
   --input IMG_001.heic \
   --output IMG_001_apple_portrait.heic
+
+# 批量时自动跳过没有完整人像资源的普通 HEIC
+swift xdremux/swift-cli/XDRemux.swift batch \
+  --apple-portrait \
+  --input-dir photo_dump/ \
+  --output-dir apple_portraits/
 ```
 
-XDRemux 会通过 `UserComment` 中的人像标志和私有尾部中的 `rear.depth`
-自动确认输入是人像照片，然后读取 `src.image` 中的 Base Image 与 Gain
-Map、转换 OPPO Depth Map，并使用 Vision 生成人像效果蒙版（Portrait Effects
-Matte）和人脸兴趣点 Focus。用户无需手动提供这些私有字段。
+XDRemux 自动读取 `src.image`、`rear.depth`、`rear.depth.config` 和 Gain Map
+参数：Base Image/Gain Map 只编码一次；rank plane 转成 Apple Float16
+disparity；OPPO portrait/pet/hair plane 转成 PEM 与 Semantic Hair Matte；
+Vision 只在主体 plane 为空时兜底，并用于选择人脸兴趣 Focus。OPPO 模拟光圈
+会写入 Apple 人像编辑元数据，图像方向由原片自动确定。
 
-`src.image` 的 Base Image 与 Gain Map 只进行第一次 HEIC 编码；写入 Depth、
-Portrait Effects Matte 和人像元数据时不会再次编码最终 Base Image/Gain Map
-载荷。图像横竖方向根据外层主图和 `src.image` 的尺寸及 EXIF 方向自动确定。
-
-Depth 相机标定按每张照片的 OPPO EXIF 自动生成：实际 `FocalLength` 用于识别
-物理镜头，镜头模型中的光学等效焦距与 `DigitalZoomRatio` 用于计算连续变焦
-裁切窗口、内参矩阵和 PixelSize。OPPO 没有在这些照片中公开畸变表，因此当前
-把已经配准的 `src.image`/Depth 组合描述为零畸变，不再复制无关的 iPhone
-镜头标定。
-
-人像虚化光圈也按每张照片自动匹配：优先读取 OPPO
-`rear.depth.config` 中保存的人像编辑 f-number，缺失时回退到 EXIF
-`FNumber`，只有两者都不可用时才使用兼容默认值 `f/1.4`。该值会写入
-Apple `depthBlurEffect:SimulatedAperture`，而不是把所有照片固定成
-`f/1.4`。
-
-不指定 `--apple-portrait` 时，不会生成 Apple 人像数据，原始 OPPO/QTI
-人像尾部默认保留。私有 `rear.depth` 使用 zstd 压缩，因此 Apple 人像转换要求
-系统的 `PATH` 中存在 `zstd` 命令。
+Apple 人像模式会省略已经完成语义迁移的大型 OPPO 人像私有尾，避免同时保存
+两套景深资源。它与 `--oppo-compatible` 互斥；同时指定会在写文件前报错。
+Apple 虚化强度映射仍在设备验证阶段，研究边界见
+`docs/research/oppo-apple-portrait-information-coverage-20260713.md`。
 
 ### Python CLI
 
@@ -77,7 +94,12 @@ python3 xdremux/python/XDRemux.py convert --input IMG_001.heic
 
 # 批量转换
 python3 xdremux/python/XDRemux.py batch --input-dir photo_dump/
+
+# OPPO 相册兼容输出（旧名 --oppo-compat 仍可用）
+python3 xdremux/python/XDRemux.py convert --oppo-compatible --input IMG_001.heic
 ```
+
+Apple 人像转换目前由 Swift CLI 提供。
 
 ### macOS App
 
@@ -92,26 +114,6 @@ apps/macos/XDRemuxApp/
 ```bash
 scripts/build_and_run.sh run
 ```
-
-## OPPO 相册兼容模式
-
-OPPO 系统相册对 HEVC RExt 4:4:4 Gain Map 的兼容性有限。启用 OPPO 相册兼容模式后，XDRemux 会将 Gain Map 改用 HEVC Main Still Picture Profile（4:2:0）编码，从而触发 OPPO 系统相册中的 HDR 显示。LHDR 在 OPPO 兼容模式下固定写出已验证的 RGB-copy 8-bit Gain Map；非 OPPO LHDR 输出仍保留原始灰度 Gain Map。
-
-Swift CLI：
-
-```bash
-swift xdremux/swift-cli/XDRemux.swift convert --input IMG_001.heic --oppo-compat
-```
-
-Python CLI：
-
-```bash
-python3 xdremux/python/XDRemux.py convert --input IMG_001.heic --oppo-compat
-```
-
-macOS App：
-
-在导出前打开 **OPPO 相册兼容模式**。
 
 ## Swift CLI 输入处理模式
 

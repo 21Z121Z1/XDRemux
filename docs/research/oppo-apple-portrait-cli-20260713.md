@@ -13,16 +13,33 @@ swift xdremux/swift-cli/XDRemux.swift convert \
   --output OUTPUT.heic
 ```
 
+The same switch is available in batch mode; non-portrait HEIC files are
+filtered before conversion:
+
+```bash
+swift xdremux/swift-cli/XDRemux.swift batch \
+  --apple-portrait \
+  --input-dir INPUT_DIR \
+  --output-dir OUTPUT_DIR
+```
+
 Without the switch, XDRemux keeps the normal gain-map conversion path and
 reattaches the original OPPO portrait private tail byte-for-byte. It does not
-generate Apple portrait resources. With the switch, conversion requires both:
+generate Apple portrait resources. With the switch, the strong match is the
+OPPO portrait bit (`65536`) plus `rear.depth + rear.depth.config + src.image`.
+An explicit conversion also accepts the same complete resource set when the
+UserComment route bit has been lost, and emits a recovery warning.
 
-- the OPPO portrait bit (`65536`) in the numeric `UserComment` value;
-- a private tail containing `rear.depth`.
+The CLI extracts `src.image`, gain metadata, and `rear.depth` from the
+manifest. When private `local.uhdr.gainmap.info` is missing but the outer HEIC
+already contains an ISO gain map, it reconstructs the same 20-float model from
+`HDRToneMap` rather than inventing defaults. `rear.depth` is zstd-decoded; the
+first uint8 rank plane begins after its 768-byte header.
 
-The CLI then extracts `src.image`, `local.uhdr.gainmap.info`, and `rear.depth`
-from the manifest. `rear.depth` is zstd-decoded; the first uint8 rank plane is
-derived at one-quarter of the stored base width and height.
+Apple portrait and OPPO-compatible preservation are mutually exclusive
+product modes. Apple output omits the large redundant OPPO portrait tail;
+explicitly enabling both modes is a parse-time error for `convert` and
+`batch`.
 
 ## Apple portrait output
 
@@ -30,7 +47,9 @@ The Apple output contains:
 
 - base and ISO gain map from the paired JPEGs in `src.image`;
 - relative Float16 disparity derived from OPPO uint8 depth ranks;
-- Vision accurate person segmentation as Portrait Effects Matte;
+- OPPO portrait/pet topology as Portrait Effects Matte, with Vision accurate
+  person segmentation only when those subject planes are empty;
+- OPPO hair merged into PEM and emitted as an independent semantic hair matte;
 - Vision face detection ranked by attention saliency, with attention-centroid
   fallback;
 - geometry-aware automatic orientation selection and displayed-to-stored
@@ -45,23 +64,41 @@ pixels.
 
 ## OPPO-derived camera calibration
 
-The disparity metadata no longer copies a fixed iPhone calibration profile.
+The disparity metadata no longer copies a fixed iPhone calibration profile or
+maps every rank plane into the same fixed disparity interval.
 For each OPPO capture, XDRemux now:
 
 - reads physical `FocalLength`, 35mm-equivalent focal length,
   `DigitalZoomRatio`, and `LensModel` from EXIF;
 - resolves the active optical anchor from the lens model (for the validated
   Find X9 Ultra samples, `23mm` or `70mm`);
-- estimates the anchor pixel focal length from the `src.image` diagonal and
-  the 35mm-frame diagonal;
-- keeps that anchor focal length while shrinking the intrinsic reference
-  dimensions by the continuous digital zoom ratio, matching the representation
-  observed in iPhone portrait captures;
-- derives effective PixelSize from physical focal length and the same crop
-  ratio;
-- writes centered principal/distortion points and zero forward/inverse
-  distortion under the assumption that the OPPO `src.image` and decoded depth
-  plane are already registered.
+- reads the per-capture effective depth focal length and rank-to-disparity
+  scale from the decoded 768-byte `rear.depth` header;
+- preserves the measured header focal length/baseline as source-depth
+  diagnostics but uses header rank scale, not physical focal length, to convert
+  rank differences;
+- keeps Apple's auxiliary calibration paired with the donor `REND` graph.
+  Device testing showed that injecting OPPO's 70-230mm physical focal scale
+  into a fixed 24mm rendering graph double-amplifies blur even at f/16;
+- retains the real OPPO physical/equivalent focal length and digital zoom in
+  primary EXIF.
+
+Pass D applies a separate continuous renderer-domain gain:
+
+```text
+renderGain = sqrt(sourceEffectiveDepthFx / canonicalEffectiveRenderFx)
+```
+
+This is the geometric midpoint between the device-tested too-weak canonical
+endpoint and too-strong physical-calibration endpoint. It is continuous for
+intermediate digital focal lengths, but still awaits the complete Photos
+f/1.4/f/16 device matrix.
+
+An 80-file original portrait corpus, including 19 real 230mm captures, showed
+that non-optical focal lengths already carry continuous header focal lengths.
+It also showed that the per-rank disparity scale changes with capture/depth
+mode, especially at 230mm. See
+`docs/research/oppo-depth-header-disparity-scale-20260713.md`.
 
 This is a geometrically consistent pinhole approximation, not a substitute for
 factory OPPO distortion tables. Camera2 lens intrinsic/distortion metadata or
@@ -83,9 +120,12 @@ precedence:
 3. `f/1.4` only as the compatibility fallback when neither source is valid.
 
 The already device-consumable Apple `RenderingParameters` template remains
-unchanged. It is a 1,352-byte `REND` parameter graph containing several values
-equal to 1.4 with different semantics; replacing matching float bytes without
-a field-level schema would corrupt unrelated rendering controls.
+mostly unchanged. It is a 1,352-byte `REND` parameter graph containing several
+values equal to 1.4 with different semantics, so matching float bytes must not
+be replaced globally. One record is independently identified: float record ID
+`0x012f` is `1.4` in all rear iPhone samples and `1.95` in the f/1.9 front
+TrueDepth sample. XDRemux updates only this typed record to the resolved OPPO
+simulated aperture.
 
 ## Encoding boundary
 
@@ -104,8 +144,8 @@ container passed the repository ISO parser and reported:
 
 - primary `4096x3072` grid with 48 HEVC tiles;
 - ISO gain-map `2048x1536` grid with 12 HEVC tiles;
-- disparity `1024x768`, `hdis`, relative/high/filtered, range
-  `1.4003906...4.3007812`;
+- historical pre-correction disparity `1024x768`, `hdis`,
+  relative/high/filtered, range `1.4003906...4.3007812`;
 - Portrait Effects Matte auxiliary item and XMP;
 - one Focus region;
 - OPPO Make/Model/ISO;
@@ -117,9 +157,18 @@ check before the OPPO-derived calibration change. Without `--apple-portrait`,
 the current mainline conversion path preserves the complete OPPO/QTI camera
 tail by default.
 
+The latest clean batch contains 80 deduplicated camera originals. Offline
+ImageIO inspection reports gain map, disparity and PEM for all 80, plus
+semantic hair for the 44 originals with a nonzero hair plane. The source set is
+483.46 MiB and Apple outputs total 98.76 MiB because the converted graph does
+not retain a second private OPPO re-edit package. See
+`docs/research/oppo-apple-portrait-information-coverage-20260713.md` for the
+mapping and remaining gaps.
+
 ## Calibration validation
 
-Two real Find X9 Ultra portrait captures were converted after this change:
+The first EXIF-only calibration pass converted two real Find X9 Ultra portrait
+captures:
 
 - `IMG20260713083415`: physical `7.73mm`, optical anchor `23mm`, zoom
   `2.022x`, reference `2018x1516`, `fx=fy=2712.374`, PixelSize
@@ -142,8 +191,26 @@ samples all report Orientation 6 while retaining ISO gain map, disparity, PEM,
 and Focus.
 
 The regenerated OPPO-calibrated, orientation-corrected output subsequently
-passed real iPhone Photos portrait consumption. This device result closes the
-acceptance gate for the calibration/orientation change.
+passed real iPhone Photos portrait consumption, but device editing exposed a
+blur-scale regression: f/16 remained far too blurred. The cause was the fixed
+`2.9/255` rank step combined with variable focal calibration. The current pass
+replaces both the EXIF-estimated focal scale and fixed disparity interval with
+the per-capture `rear.depth` header values documented above. Final device
+editing remains the acceptance gate.
+
+A second device pass using header-scaled disparity but physical OPPO auxiliary
+calibration still showed excessive f/16 blur, especially at 230mm. This
+isolated the remaining failure to the mismatched physical calibration plus
+fixed donor `REND`. The next matrix restores their canonical pairing and also
+synchronizes the known `REND` aperture record `0x012f` with OPPO f-number.
+
+That canonical-pair pass established the opposite bound: synthetic blur became
+too weak and remained subtle even when Photos was set to f/1.4. The result
+proves that the final solution needs an explicit render gain between canonical
+and physical endpoints. Record `0x012f` is useful for aperture consistency but
+is not the missing strength control. Detailed device conclusions and the next
+gain sweep are recorded in
+`docs/research/oppo-apple-portrait-blur-strength-bracketing-20260713.md`.
 
 ## Simulated-aperture validation
 
@@ -157,6 +224,7 @@ Apple `SimulatedAperture` values:
 
 All three remain Orientation 6. ImageIO exposes the ISO gain map, disparity,
 and Portrait Effects Matte for each output; AVDepthData reports non-null camera
-calibration, and the Focus XMP remains present. The remaining device-level
-check is that Photos initializes its portrait aperture control to the matched
-OPPO value rather than merely preserving the metadata tag.
+calibration, and the Focus XMP remains present. Photos was subsequently
+verified to initialize its portrait aperture control to the mapped OPPO value.
+The remaining work concerns calibrating render gain and aperture-curve shape
+across focal lengths and distances, not aperture-tag recognition.

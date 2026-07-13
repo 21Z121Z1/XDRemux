@@ -183,7 +183,7 @@ private struct ConvertCommand {
     let tmapFormat: TmapFormat
 }
 
-private enum PortraitMode {
+private enum PortraitMode: String {
     case on
     case off
 }
@@ -196,6 +196,7 @@ private struct BatchCommand {
     let debugRootURL: URL?
     let oppoCompatibility: OppoCompatibility
     let inputProcessingBranch: InputProcessingBranch
+    let portraitMode: PortraitMode
     let oppoCameraTail: OppoCameraTail
     let tmapFormat: TmapFormat
     let jobs: Int
@@ -2519,7 +2520,7 @@ private enum XDRemuxProductCore {
         outputURL: URL,
         familyPreference: Family,
         debugRootURL: URL?,
-        oppoCompatibility: OppoCompatibility = .auto,
+        oppoCompatibility: OppoCompatibility = .off,
         inputProcessingBranch: InputProcessingBranch = .hybrid,
         oppoCameraTail: OppoCameraTail = .preserve,
         tmapFormat: TmapFormat = .imageIO
@@ -2940,23 +2941,28 @@ struct LHDRToISOHDRCLI {
     private static let fileManager = FileManager.default
     private static let usage = """
     Usage:
-             XDRemux.swift convert --input <file.heic> [--output <out.heic>] [--apple-portrait] [--oppo-compatible|--no-oppo-compat] [--discard-portrait-data] [--debug-dir <dir>]
-             XDRemux.swift batch --input-dir <dir> [--output-dir <dir>] [--glob *.heic] [--jobs <n>] [--oppo-compatible|--no-oppo-compat] [--discard-portrait-data] [--checkpoint <file>] [--resume|--no-resume] [--skip-existing|--no-skip-existing] [--debug-dir <dir>]
+             XDRemux.swift convert --input <file.heic> [--output <out.heic>] [--oppo-compatible|--apple-portrait] [--discard-portrait-data] [--debug-dir <dir>]
+             XDRemux.swift batch --input-dir <dir> [--output-dir <dir>] [--glob *.heic] [--jobs <n>] [--oppo-compatible|--apple-portrait] [--discard-portrait-data] [--checkpoint <file>] [--resume|--no-resume] [--skip-existing|--no-skip-existing] [--debug-dir <dir>]
 
     Notes:
       - Product output always uses the metadata-preserving source-primary remux path.
-      - Default Gain Maps use HEVC Main Still Picture, 4:2:0, 8-bit with ImageIO 142-byte tmap metadata.
-      - --no-oppo-compat selects the metadata-preserving Hybrid 4:4:4/HEVC Range Extensions path.
-      - --oppo-compatible explicitly converts a 4:4:4/RExt Gain Map to the OPPO-compatible 4:2:0 representation.
+      - With neither product switch, output is standard ISO HDR and preserves the complete metadata tail.
+        Gain Maps retain their source channel structure and may use HEVC Range Extensions 4:4:4.
+      - --oppo-compatible converts a high-spec Gain Map to OPPO-compatible Main Still Picture 4:2:0.
+      - --no-oppo-compat is a legacy spelling for the default standard-ISO mode.
       - Existing 4:2:0 Gain Maps cannot be promoted to high-spec 4:4:4 because the discarded chroma is unrecoverable.
       - Source UserComment routing flags and, by default, the complete OPPO/QTI/FileExtendedContainer tail are preserved.
       - --discard-portrait-data removes large depth/re-edit resources while retaining watermark, master-mode, HDR, and small metadata.
       - Only the active Gain Map graph and its required container descriptions may change.
       - Batch defaults: --jobs min(cpu,4), --resume, --skip-existing.
       - A JSONL checkpoint is written under output-dir by default; it is deleted only when the batch finishes with zero failures.
-      - --apple-portrait requires UserComment portrait flags plus rear.depth, then extracts
-        src.image/gain-info/depth, generates Vision PEM and Focus, and restores the first-assembly
-        base/gain HEVC payloads without re-encoding them. Without the switch, OPPO portrait tail stays intact.
+      - --apple-portrait requires rear.depth + rear.depth.config + src.image. The UserComment
+        portrait bit is the strong route; an explicit run can recover a missing bit with a warning.
+        It maps OPPO portrait/pet/hair planes to Apple mattes, generates Focus, and restores
+        first-assembly base/gain HEVC payloads without re-encoding them.
+      - Batch --apple-portrait automatically filters non-portrait inputs instead of failing them.
+      - Apple portrait and OPPO-compatible output are mutually exclusive product modes. Apple portrait
+        output omits the redundant large OPPO portrait tail; without the switch, that tail stays intact.
       - If --output is omitted, the input file is overwritten in place.
       - If --output-dir is omitted, files are written to the input directory.
     """
@@ -3021,7 +3027,17 @@ struct LHDRToISOHDRCLI {
 
     private static func runBatch(_ cmd: BatchCommand) throws {
         try ensureDirectory(cmd.outputDirURL, fileManager: fileManager)
-        let matched = try enumerateInputs(root: cmd.inputDirURL, glob: cmd.glob)
+        let discovered = try enumerateInputs(root: cmd.inputDirURL, glob: cmd.glob)
+        let matched: [URL]
+        if cmd.portraitMode == .on {
+            matched = discovered.filter { PortraitConversionPipeline.isConvertibleInput($0) }
+            let skipped = discovered.count - matched.count
+            if skipped > 0 {
+                print("apple-portrait filter: selected \(matched.count), skipped \(skipped) non-portrait files")
+            }
+        } else {
+            matched = discovered
+        }
         guard !matched.isEmpty else {
             throw CLIError.noFilesMatched(cmd.inputDirURL, cmd.glob)
         }
@@ -3103,6 +3119,9 @@ struct LHDRToISOHDRCLI {
 
                     func isOutputValid() -> Bool {
                         guard fileManager.fileExists(atPath: item.outputURL.path) else { return false }
+                        if cmd.portraitMode == .on {
+                            return PortraitConversionPipeline.isValidOutput(item.outputURL)
+                        }
                         return isValidOutput(
                             item.outputURL,
                             oppoCameraTail: cmd.oppoCameraTail,
@@ -3149,16 +3168,28 @@ struct LHDRToISOHDRCLI {
                     }
 
                     do {
-                        _ = try XDRemuxProductCore.convert(
-                            inputURL: item.inputURL,
-                            outputURL: item.outputURL,
-                            familyPreference: cmd.family,
-                            debugRootURL: cmd.debugRootURL,
-                            oppoCompatibility: cmd.oppoCompatibility,
-                            inputProcessingBranch: cmd.inputProcessingBranch,
-                            oppoCameraTail: cmd.oppoCameraTail,
-                            tmapFormat: cmd.tmapFormat
-                        )
+                        if cmd.portraitMode == .on {
+                            guard try PortraitConversionPipeline.convertIfNeeded(
+                                inputURL: item.inputURL,
+                                outputURL: item.outputURL,
+                                mode: .on
+                            ) else {
+                                throw CLIError.invalidContainer(
+                                    "input stopped matching the OPPO portrait requirements"
+                                )
+                            }
+                        } else {
+                            _ = try XDRemuxProductCore.convert(
+                                inputURL: item.inputURL,
+                                outputURL: item.outputURL,
+                                familyPreference: cmd.family,
+                                debugRootURL: cmd.debugRootURL,
+                                oppoCompatibility: cmd.oppoCompatibility,
+                                inputProcessingBranch: cmd.inputProcessingBranch,
+                                oppoCameraTail: cmd.oppoCameraTail,
+                                tmapFormat: cmd.tmapFormat
+                            )
+                        }
                         statsLock.lock(); convertedCount += 1; statsLock.unlock()
                         record(status: .success)
                         log("converted \(item.inputURL.lastPathComponent)")
@@ -3401,6 +3432,7 @@ struct LHDRToISOHDRCLI {
             ("inputProcessing", cmd.inputProcessingBranch.rawValue),
             ("oppoCameraTail", cmd.oppoCameraTail.rawValue),
             ("oppoCompat", cmd.oppoCompatibility.rawValue),
+            ("portraitMode", cmd.portraitMode.rawValue),
             ("tmapFormat", cmd.tmapFormat.rawValue),
             ("outputDir", cmd.outputDirURL.standardizedFileURL.path)
         ]
@@ -3432,9 +3464,10 @@ struct LHDRToISOHDRCLI {
         var outputPath: String?
         var family = Family.auto
         var debugDirPath: String?
-        var oppoCompatibility: OppoCompatibility = .auto
+        var oppoCompatibility: OppoCompatibility = .off
         var inputProcessingBranch = InputProcessingBranch.hybrid
         var applePortraitEnabled = false
+        var oppoCompatibilityWasExplicit = false
         var oppoCameraTail = OppoCameraTail.preserve
         var tmapFormat = TmapFormat.imageIO
 
@@ -3492,10 +3525,13 @@ struct LHDRToISOHDRCLI {
                 } else {
                     oppoCompatibility = .on
                 }
+                oppoCompatibilityWasExplicit = true
             case "--no-oppo-compat":
                 oppoCompatibility = .off
+                oppoCompatibilityWasExplicit = true
             case "--oppo-compatible":
                 oppoCompatibility = .auto
+                oppoCompatibilityWasExplicit = true
             case "--discard-portrait-data":
                 oppoCameraTail = .preserveWithoutPortrait
             default:
@@ -3504,6 +3540,17 @@ struct LHDRToISOHDRCLI {
         }
 
         guard let inputPath else { throw CLIError.missingArgument("--input") }
+
+        if applePortraitEnabled, oppoCompatibilityWasExplicit, oppoCompatibility.wantsOppoCompat {
+            throw CLIError.invalidValue(
+                option: "--apple-portrait",
+                value: "cannot be combined with OPPO-compatible output"
+            )
+        }
+        if applePortraitEnabled {
+            oppoCompatibility = .off
+            oppoCameraTail = .preserveWithoutPortrait
+        }
 
         return ConvertCommand(
             inputURL: URL(fileURLWithPath: inputPath),
@@ -3524,8 +3571,10 @@ struct LHDRToISOHDRCLI {
         var family = Family.auto
         var glob = "*.heic"
         var debugDirPath: String?
-        var oppoCompatibility: OppoCompatibility = .auto
+        var oppoCompatibility: OppoCompatibility = .off
         var inputProcessingBranch = InputProcessingBranch.hybrid
+        var applePortraitEnabled = false
+        var oppoCompatibilityWasExplicit = false
         var oppoCameraTail = OppoCameraTail.preserve
         var tmapFormat = TmapFormat.imageIO
         var jobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
@@ -3547,6 +3596,8 @@ struct LHDRToISOHDRCLI {
             }
 
             switch option {
+            case "--apple-portrait":
+                applePortraitEnabled = true
             case "--input-dir":
                 inputDirPath = try nextValue(for: option)
             case "--output-dir":
@@ -3602,10 +3653,13 @@ struct LHDRToISOHDRCLI {
                 } else {
                     oppoCompatibility = .on
                 }
+                oppoCompatibilityWasExplicit = true
             case "--no-oppo-compat":
                 oppoCompatibility = .off
+                oppoCompatibilityWasExplicit = true
             case "--oppo-compatible":
                 oppoCompatibility = .auto
+                oppoCompatibilityWasExplicit = true
             case "--discard-portrait-data":
                 oppoCameraTail = .preserveWithoutPortrait
             default:
@@ -3615,6 +3669,17 @@ struct LHDRToISOHDRCLI {
 
         guard let inputDirPath else { throw CLIError.missingArgument("--input-dir") }
 
+        if applePortraitEnabled, oppoCompatibilityWasExplicit, oppoCompatibility.wantsOppoCompat {
+            throw CLIError.invalidValue(
+                option: "--apple-portrait",
+                value: "cannot be combined with OPPO-compatible output"
+            )
+        }
+        if applePortraitEnabled {
+            oppoCompatibility = .off
+            oppoCameraTail = .preserveWithoutPortrait
+        }
+
         return BatchCommand(
             inputDirURL: URL(fileURLWithPath: inputDirPath),
             outputDirURL: URL(fileURLWithPath: outputDirPath ?? inputDirPath),
@@ -3623,6 +3688,7 @@ struct LHDRToISOHDRCLI {
             debugRootURL: debugDirPath.map { URL(fileURLWithPath: $0) },
             oppoCompatibility: oppoCompatibility,
             inputProcessingBranch: inputProcessingBranch,
+            portraitMode: applePortraitEnabled ? .on : .off,
             oppoCameraTail: oppoCameraTail,
             tmapFormat: tmapFormat,
             jobs: jobs,
@@ -5571,9 +5637,14 @@ private struct PortraitCameraCalibration {
     let referenceWidth: Int
     let referenceHeight: Int
     let focalLengthPixels: Double
+    let effectiveFocalLengthPixels: Double
     let principalPointX: Double
     let principalPointY: Double
+    let distortionCenterX: Double
+    let distortionCenterY: Double
     let pixelSizeMM: Double
+    let distortionCoefficients: [Double]
+    let inverseDistortionCoefficients: [Double]
 
     var intrinsicMatrix: [Double] {
         [
@@ -5584,7 +5655,87 @@ private struct PortraitCameraCalibration {
     }
 }
 
+private struct PortraitDepthHeader {
+    let width: Int
+    let height: Int
+    let rankDisparityScale: Double
+    let focalLengthPixels: Double
+    let stereoBaseline: Double
+}
+
+private struct OPPODepthPlanes {
+    let ranks: Data
+    let hair: Data?
+    let portrait: Data?
+    let pet: Data?
+
+    var subject: Data? {
+        let candidates = [portrait, pet].compactMap { plane in
+            plane.flatMap { $0.contains(where: { $0 != 0 }) ? $0 : nil }
+        }
+        guard var fused = candidates.first else { return nil }
+        let pixelCount = fused.count
+        for plane in candidates.dropFirst() {
+            fused.withUnsafeMutableBytes { output in
+                plane.withUnsafeBytes { input in
+                    guard let outputBase = output.bindMemory(to: UInt8.self).baseAddress,
+                          let inputBase = input.bindMemory(to: UInt8.self).baseAddress else { return }
+                    for index in 0..<pixelCount {
+                        outputBase[index] = max(outputBase[index], inputBase[index])
+                    }
+                }
+            }
+        }
+        return fused
+    }
+
+    var validHair: Data? {
+        hair.flatMap { $0.contains(where: { $0 != 0 }) ? $0 : nil }
+    }
+}
+
 private enum PortraitConversionPipeline {
+    static func isConvertibleInput(_ inputURL: URL) -> Bool {
+        guard FileManager.default.fileExists(atPath: inputURL.path),
+              let inputData = try? Data(contentsOf: inputURL),
+              let blocks = try? LHDRExtractor.portraitBlocks(from: inputData),
+              let srcImage = blocks["src.image"],
+              blocks["rear.depth"] != nil,
+              blocks["rear.depth.config"] != nil,
+              let firstEOI = srcImage.range(of: Data([0xff, 0xd9])),
+              firstEOI.upperBound + 3 <= srcImage.count,
+              srcImage[firstEOI.upperBound..<(firstEOI.upperBound + 3)] == Data([0xff, 0xd8, 0xff]),
+              (try? resolveGainInfoFloats(
+                  privateInfo: blocks["local.uhdr.gainmap.info"],
+                  inputURL: inputURL
+              )) != nil else {
+            return false
+        }
+        return true
+    }
+
+    static func isValidOutput(_ outputURL: URL) -> Bool {
+        guard let source = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypeISOGainMap
+              ) != nil,
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypeDisparity
+              ) != nil,
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypePortraitEffectsMatte
+              ) != nil else {
+            return false
+        }
+        return true
+    }
+
     static func convertIfNeeded(
         inputURL: URL,
         outputURL: URL,
@@ -5596,11 +5747,6 @@ private enum PortraitConversionPipeline {
         }
         let inputData = try Data(contentsOf: inputURL)
         let hasPortraitUserComment = portraitUserCommentFlag(in: inputURL)
-        guard hasPortraitUserComment else {
-            throw CLIError.invalidContainer(
-                "--apple-portrait requires the OPPO portrait UserComment flag"
-            )
-        }
         let blocks: [String: Data]
         do {
             blocks = try LHDRExtractor.portraitBlocks(from: inputData)
@@ -5611,16 +5757,22 @@ private enum PortraitConversionPipeline {
         }
         guard
               let srcImage = blocks["src.image"],
-              let info = blocks["local.uhdr.gainmap.info"],
+              blocks["rear.depth.config"] != nil,
               let compressedDepth = blocks["rear.depth"] else {
             throw CLIError.invalidContainer(
-                "--apple-portrait requires OPPO portrait UserComment, src.image, "
-                    + "local.uhdr.gainmap.info, and rear.depth"
+                "--apple-portrait requires OPPO portrait UserComment, src.image, and rear.depth"
             )
         }
-        guard info.count == 80 else {
-            throw CLIError.invalidLHDR("portrait gain info must be exactly 80 bytes")
+        if !hasPortraitUserComment {
+            print(
+                "warning: portrait UserComment flag is absent; recovering from "
+                    + "rear.depth + rear.depth.config + src.image"
+            )
         }
+        let infoFloats = try resolveGainInfoFloats(
+            privateInfo: blocks["local.uhdr.gainmap.info"],
+            inputURL: inputURL
+        )
         guard let firstEOI = srcImage.range(of: Data([0xff, 0xd9])),
               firstEOI.upperBound + 3 <= srcImage.count,
               srcImage[firstEOI.upperBound..<(firstEOI.upperBound + 3)] == Data([0xff, 0xd8, 0xff]) else {
@@ -5659,24 +5811,48 @@ private enum PortraitConversionPipeline {
             baseOrientation: baseOrientation
         )
         let orientation = CGImagePropertyOrientation(rawValue: orientationRaw) ?? .up
+        let decodedDepth = try decompressZstd(compressedDepth)
+        let depthHeader = try parseDepthHeader(decodedDepth)
+        let depthWidth = depthHeader.width
+        let depthHeight = depthHeader.height
+        let depthPlanes = try parseDepthPlanes(decodedDepth, header: depthHeader)
+        let depthRanks = depthPlanes.ranks
+        let effectiveDepthFocalLengthPixels = depthHeader.focalLengthPixels
+            * Double(baseImage.width) / Double(depthWidth)
         let cameraCalibration = try makeCameraCalibration(
             inputProperties: inputProperties,
             baseProperties: baseProperties,
             baseWidth: baseImage.width,
-            baseHeight: baseImage.height
+            baseHeight: baseImage.height,
+            effectiveFocalLengthPixels: effectiveDepthFocalLengthPixels
         )
-        let depthWidth = baseImage.width / 4
-        let depthHeight = baseImage.height / 4
-        let decodedDepth = try decompressZstd(compressedDepth)
-        let depthHeaderSize = 768
-        guard decodedDepth.count >= depthHeaderSize + depthWidth * depthHeight else {
-            throw CLIError.invalidContainer(
-                "decoded rear.depth is too short for \(depthWidth)x\(depthHeight) ranks"
-            )
-        }
-        let depthRanks = decodedDepth.subdata(
-            in: depthHeaderSize..<(depthHeaderSize + depthWidth * depthHeight)
-        )
+        let disparityFar = 1.4
+        // Device tests bracketed Photos blur between the canonical donor render
+        // profile (too weak) and physical OPPO focal calibration (too strong).
+        // Use their geometric midpoint in disparity-amplitude space. Because
+        // the source depth fx varies continuously, digital zoom focal lengths
+        // get a continuous gain instead of a hand-maintained lens table.
+        let renderEndpointRatio = effectiveDepthFocalLengthPixels
+            / cameraCalibration.effectiveFocalLengthPixels
+        let renderGain = sqrt(max(1.0, renderEndpointRatio))
+        let disparityScale = depthHeader.rankDisparityScale * renderGain
+        let disparitySpan = 255.0 * disparityScale
+        let disparityNear = disparityFar + disparitySpan
+        print(String(
+            format: "portrait disparity header=%dx%d fxDepth=%.3f effectiveFx=%.3f rankScale=%.7f renderEndpoint=%.4fx renderGain=%.4fx renderedRankScale=%.7f baseline=%.3f range=%.6f...%.6f fullSpan=%.6f",
+            depthHeader.width,
+            depthHeader.height,
+            depthHeader.focalLengthPixels,
+            effectiveDepthFocalLengthPixels,
+            depthHeader.rankDisparityScale,
+            renderEndpointRatio,
+            renderGain,
+            disparityScale,
+            depthHeader.stereoBaseline,
+            disparityFar,
+            disparityNear,
+            disparitySpan
+        ))
         let focus = try makeFocusRegion(
             image: baseImage,
             orientation: orientation,
@@ -5713,7 +5889,6 @@ private enum PortraitConversionPipeline {
         guard CGImageDestinationFinalize(carrierDestination) else {
             throw CLIError.unableToFinalizeDestination(carrier)
         }
-        let infoFloats = try unpackFloatArrayLE(info, count: 20)
         _ = try writePrivateJPEGPassthroughOutput(
             inputURL: carrier,
             outputURL: privateIntermediate,
@@ -5739,15 +5914,18 @@ private enum PortraitConversionPipeline {
             width: depthWidth,
             height: depthHeight,
             orientation: orientationRaw,
-            far: 1.4,
-            near: 4.3,
+            far: Float(disparityFar),
+            near: Float(disparityNear),
             calibration: cameraCalibration,
             simulatedAperture: simulatedAperture.value
         )
-        let matteDictionary = try makePortraitEffectsMatteDictionary(
+        let mattes = try makePortraitEffectsMattes(
             image: baseImage,
             orientation: orientation,
-            orientationRaw: orientationRaw
+            orientationRaw: orientationRaw,
+            depthPlanes: depthPlanes,
+            planeWidth: depthWidth,
+            planeHeight: depthHeight
         )
         try writeBlankPortraitScaffold(
             sourceMetadataURL: inputURL,
@@ -5760,7 +5938,8 @@ private enum PortraitConversionPipeline {
             gainJPEG: gainJPEG,
             infoFloats: infoFloats,
             depthDictionary: depthDictionary,
-            matteDictionary: matteDictionary,
+            matteDictionary: mattes.portrait,
+            hairDictionary: mattes.hair,
             outputURL: scaffold
         )
         try transplantPortraitBaseAndGainPayloads(
@@ -5771,9 +5950,30 @@ private enum PortraitConversionPipeline {
         return true
     }
 
-    private static let portraitRenderingParametersBase64 = """
+    private static let portraitRenderingParametersTemplateBase64 = """
     UkVORAcAAABIBQAAAQAAAGQAAgAAAAAAZQACAAIAAABmAAEAj8L1PGcAAQDNzMw9aAABAArXIz1pAAEAMzOzP2oAAQDNzEw9awABAJqZmT5sAAEAzczMP20AAQAAAABAbgACABQAAABvAAEAzcxMPXAAAQBYOTQ8cQABAArXIzxyAAEAzczMPXMAAQAK1yM9dAABAAAAgD91AAEAAABAP3YAAQBmZmY/dwABAJqZmT94AAEAAAAAQHkAAQDNzMw+egABAM3MzD17AAEAAACAP3wAAQAAAABAfQABAAAAAEF+AAEAF7fROH8AAgAyAAAAgAABAAAAgD/IAAEAPQoXP8kAAQAAAEA/ygABAPfMEjksAQEACtcjPC0BAQAXSJI5LgEBADVeuj0vAQEAMzOzPzABAQDgLRA7MQEBAFoMQzoyAQEAAACAPzMBAQAAAIA/kAECABkAAACRAQEAz3P8PZIBAQDbVr1AkwEBAM9z/D2UAQEAQmBlO5UBAQCZuxY8lgEBAGZmZj+XAQEAAACAP5gBAQAAAAAAmQEBAM3MTD7CAQEAz3N8QMMBAQBhyB1BxAEBALB4lz7FAQEADM6PQMYBAQAzM5tA8gECAAkAAADzAQIADAAAAPQBAgAJAAAA9QEBAAAAekT2AQEAmpkZPvcBAQBSuJ4++AEBAAAAAED5AQEAAMAPRfoBAQDNzEw9+wEBADMzsz78AQIAAgAAAP0BAQCamZk+/gEBAAAAoD//AQEAZmZmPwACAgAGAAAAAQIBAAAAgD8CAgEAAAAAAFgCAQAzMzNAWQIBADMzsz9aAgEAAACAQVsCAQB02qA/vAIBAAAAAAC9AgEAAAAAACADAgADAAAAIQMBAM3MTL0iAwEACtejPCMDAQDNzEy9JAMBAI/C9T2EAwEAzcxMP4UDAQAAAIA/hgMBAAAAAACHAwEAAAAAAIgDAQDNzMw+iQMBAOAtkDroAwEAmpmZPukDAQAAAKBA6gMBAJqZmT7rAwEAzcxMP+wDAQAAAAAA7QMBAAAAgD/uAwEAMzMzv+8DAQBmZmY/8AMBAI/C9TzxAwEAbxKDOvIDAQAAAAAA8wMCAIcAAAD0AwEAzczMPvUDAQAAAIA/9gMCABQAAAD3AwEAzczMPvgDAQAAAAAA+QMBAM3MTD/6AwEAAACAP/sDAQAAAAAA/AMBAM3MTD79AwEAAAAAAP4DAQAAAAAA/wMBAM3MzD8ABAIAAgAAAAEEAQAAAAAAAgQBAG8SAzoDBAEAmplZPwQEAQAAAAAABQQBAAAAgD8GBAEAzcxMPwcEAQCamZk+CAQBAAAAAEAJBAEAexQuPgoEAQAzM7M+CwQBAAAAgD8MBAEAAAAAAA0EAQCamZk+DgQBAM3MzD0PBAEAzcxMPkwEAQBmZuY+TQQBAAAAAABOBAEAAAAAAE8EAQDNzMw9UAQBAGZmZj+wBAIACQAAALEEAgAEAAAAsgQCAAwAAACzBAEAAACAP7QEAQAAAIA/tQQBANej8D62BAEAFK5HP7cEAQAAAADAuAQBAAAAAAC5BAEAAACAv7oEAQCamRk+uwQBAM3MzD28BAEAmpmZP70EAQBcj8I+vgQCAAQAAAAUBQEAAACAPhUFAQC/fV0+FgUBAArXIzwXBQEAj8L1PBgFAQAzM3M/GQUBAKabRD0aBQEAF7fRORsFAQBfKUs7HAUBAPYoHD8dBQEACtejPB4FAQAK1yM8HwUBAGZmJkAgBQEAAABAPyEFAQBsCfk6IgUBAI/C9TwjBQEAZmZmPyQFAQCamZk+JQUBAAAAwD8=
     """.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    private static func portraitRenderingParametersBase64(
+        simulatedAperture: Double
+    ) throws -> String {
+        guard var data = Data(base64Encoded: portraitRenderingParametersTemplateBase64),
+              data.count >= 24,
+              data.prefix(4) == Data("REND".utf8) else {
+            throw CLIError.invalidContainer("invalid portrait REND compatibility template")
+        }
+        for offset in stride(from: 16, through: data.count - 8, by: 8) {
+            let identifier = UInt16(data[offset]) | UInt16(data[offset + 1]) << 8
+            let valueType = UInt16(data[offset + 2]) | UInt16(data[offset + 3]) << 8
+            guard identifier == 0x012f, valueType == 1 else { continue }
+            var bits = Float(simulatedAperture).bitPattern.littleEndian
+            withUnsafeBytes(of: &bits) { bytes in
+                data.replaceSubrange((offset + 4)..<(offset + 8), with: bytes)
+            }
+            return data.base64EncodedString()
+        }
+        throw CLIError.invalidContainer("portrait REND aperture field 0x012f is missing")
+    }
 
     private static func portraitUserCommentFlag(in url: URL) -> Bool {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -5905,7 +6105,8 @@ private enum PortraitConversionPipeline {
         inputProperties: [CFString: Any]?,
         baseProperties: [CFString: Any]?,
         baseWidth: Int,
-        baseHeight: Int
+        baseHeight: Int,
+        effectiveFocalLengthPixels: Double
     ) throws -> PortraitCameraCalibration {
         let inputExif = inputProperties?[kCGImagePropertyExifDictionary] as? NSDictionary
         let baseExif = baseProperties?[kCGImagePropertyExifDictionary] as? NSDictionary
@@ -5959,23 +6160,23 @@ private enum PortraitConversionPipeline {
             digitalZoom = max(1.0, equivalentZoom)
         }
 
-        let fullFrameDiagonalMM = hypot(36.0, 24.0)
-        let referenceDiagonalPixels = hypot(Double(baseWidth), Double(baseHeight))
-        let focalLengthPixels = referenceDiagonalPixels
-            * opticalEquivalentFocalLength / fullFrameDiagonalMM
-        guard focalLengthPixels.isFinite, focalLengthPixels > 0 else {
-            throw CLIError.invalidContainer("derived OPPO pixel focal length is invalid")
+        guard effectiveFocalLengthPixels.isFinite, effectiveFocalLengthPixels > 0 else {
+            throw CLIError.invalidContainer("OPPO depth-header focal length is invalid")
         }
 
-        func nearestEven(_ value: Double) -> Int {
-            max(2, Int((value / 2.0).rounded()) * 2)
-        }
-        let referenceWidth = nearestEven(Double(baseWidth) / digitalZoom)
-        let referenceHeight = nearestEven(Double(baseHeight) / digitalZoom)
-        let principalPointX = Double(referenceWidth) / 2.0
-        let principalPointY = Double(referenceHeight) / 2.0
-        let basePixelSizeMM = physicalFocalLength / focalLengthPixels
-        let pixelSizeMM = basePixelSizeMM / digitalZoom
+        // Apple depthBlurEffect:RenderingParameters is a private, lens-coupled
+        // renderer graph. Until that graph can be authored from OPPO's blur
+        // curves, its donor camera calibration must remain paired with it.
+        // OPPO's measured depth-header calibration is still used above to
+        // interpret rank differences; the primary EXIF retains the real lens.
+        let referenceWidth = 4032
+        let referenceHeight = 3024
+        let focalLengthPixels = 2860.37890625
+        let renderEffectiveFocalLengthPixels = focalLengthPixels
+            * Double(baseWidth) / Double(referenceWidth)
+        let principalPointX = 2010.31103515625
+        let principalPointY = 1525.0140380859375
+        let pixelSizeMM = 0.002440
 
         let calibration = PortraitCameraCalibration(
             physicalFocalLengthMM: physicalFocalLength,
@@ -5984,21 +6185,176 @@ private enum PortraitConversionPipeline {
             referenceWidth: referenceWidth,
             referenceHeight: referenceHeight,
             focalLengthPixels: focalLengthPixels,
+            effectiveFocalLengthPixels: renderEffectiveFocalLengthPixels,
             principalPointX: principalPointX,
             principalPointY: principalPointY,
-            pixelSizeMM: pixelSizeMM
+            distortionCenterX: 2017.552734375,
+            distortionCenterY: 1523.492919921875,
+            pixelSizeMM: pixelSizeMM,
+            distortionCoefficients: [
+                0, -0.5552194714546204, 0.053949449211359024,
+                -0.0018901334842666984, -0.000004621016614692053,
+                0.0000019594019704527454, -0.0000000451839099468998,
+                0.00000000031430857916348032,
+            ],
+            inverseDistortionCoefficients: [
+                0, 0.5448748469352722, -0.05080728605389595,
+                0.0016805990599095821, 0.000007370583261945285,
+                -0.0000017933325580088422, 0.00000003959269534448139,
+                -0.0000000002689144740219973,
+            ]
         )
         print(String(
-            format: "portrait calibration physical=%.3fmm optical=%.2fmm zoom=%.4fx ref=%dx%d fx=%.3f pixel=%.9fmm distortion=rectified",
+            format: "portrait render calibration=canonical-REND-pair sourcePhysical=%.3fmm sourceOptical=%.2fmm sourceZoom=%.4fx sourceDepthFx=%.3f ref=%dx%d fx=%.3f pixel=%.9fmm",
             calibration.physicalFocalLengthMM,
             calibration.opticalEquivalentFocalLengthMM,
             calibration.digitalZoomRatio,
+            effectiveFocalLengthPixels,
             calibration.referenceWidth,
             calibration.referenceHeight,
             calibration.focalLengthPixels,
             calibration.pixelSizeMM
         ))
         return calibration
+    }
+
+    private static func parseDepthHeader(_ decodedDepth: Data) throws -> PortraitDepthHeader {
+        let headerSize = 768
+        guard decodedDepth.count >= headerSize else {
+            throw CLIError.invalidContainer("decoded rear.depth is shorter than its 768-byte header")
+        }
+        guard let widthRaw = readUInt32LE(decodedDepth, at: 0),
+              let heightRaw = readUInt32LE(decodedDepth, at: 4),
+              widthRaw > 0,
+              heightRaw > 0,
+              widthRaw <= 16_384,
+              heightRaw <= 16_384 else {
+            throw CLIError.invalidContainer("decoded rear.depth header dimensions are invalid")
+        }
+        guard let rankDisparityScale = readFloat32LE(decodedDepth, at: 0x18),
+              let focalLength = readFloat32LE(decodedDepth, at: 0x1c),
+              let stereoBaseline = readFloat32LE(decodedDepth, at: 0x20),
+              rankDisparityScale.isFinite,
+              rankDisparityScale > 0,
+              focalLength.isFinite,
+              focalLength > 0,
+              stereoBaseline.isFinite,
+              stereoBaseline > 0 else {
+            throw CLIError.invalidContainer("decoded rear.depth calibration header is invalid")
+        }
+        let width = Int(widthRaw)
+        let height = Int(heightRaw)
+        guard decodedDepth.count >= headerSize + width * height else {
+            throw CLIError.invalidContainer("decoded rear.depth rank plane is truncated")
+        }
+        return PortraitDepthHeader(
+            width: width,
+            height: height,
+            rankDisparityScale: Double(rankDisparityScale),
+            focalLengthPixels: Double(focalLength),
+            stereoBaseline: Double(stereoBaseline)
+        )
+    }
+
+    private static func parseDepthPlanes(
+        _ decodedDepth: Data,
+        header: PortraitDepthHeader
+    ) throws -> OPPODepthPlanes {
+        let headerSize = 0x300
+        let planeSize = header.width * header.height
+        guard decodedDepth.count >= headerSize + planeSize else {
+            throw CLIError.invalidContainer("decoded rear.depth rank plane is truncated")
+        }
+        let ranks = decodedDepth.subdata(in: headerSize..<(headerSize + planeSize))
+        var cursor = headerSize + planeSize
+        func consumePlane(flagOffset: Int, name: String) throws -> Data? {
+            guard decodedDepth[flagOffset] != 0 else { return nil }
+            guard cursor + planeSize <= decodedDepth.count else {
+                throw CLIError.invalidContainer(
+                    "decoded rear.depth is too short for flagged \(name) plane"
+                )
+            }
+            defer { cursor += planeSize }
+            return decodedDepth.subdata(in: cursor..<(cursor + planeSize))
+        }
+        // Same-size firmware order after rank: hair, portrait, pet. Later
+        // independent-size YUV/NV21 auxiliaries are not Apple matte sources.
+        return OPPODepthPlanes(
+            ranks: ranks,
+            hair: try consumePlane(flagOffset: 0x24, name: "hair"),
+            portrait: try consumePlane(flagOffset: 0x25, name: "portrait"),
+            pet: try consumePlane(flagOffset: 0x26, name: "pet")
+        )
+    }
+
+    private static func resolveGainInfoFloats(
+        privateInfo: Data?,
+        inputURL: URL
+    ) throws -> [Double] {
+        if let privateInfo {
+            guard privateInfo.count == 80 else {
+                throw CLIError.invalidLHDR("portrait gain info must be exactly 80 bytes")
+            }
+            return try unpackFloatArrayLE(privateInfo, count: 20)
+        }
+
+        guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
+              let dictionary = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+              kCGImageAuxiliaryDataTypeISOGainMap
+              ) as? [CFString: Any],
+              let rawMetadata = dictionary[kCGImageAuxiliaryDataInfoMetadata],
+              CFGetTypeID(rawMetadata as CFTypeRef) == CGImageMetadataGetTypeID() else {
+            throw CLIError.invalidLHDR(
+                "portrait requires private gain info or an existing ISO gain-map metadata graph"
+            )
+        }
+        let metadata = unsafeBitCast(rawMetadata as AnyObject, to: CGImageMetadata.self)
+
+        func value(_ path: String) throws -> Double {
+            guard let tag = CGImageMetadataCopyTagWithPath(
+                metadata,
+                nil,
+                path as CFString
+            ), let raw = CGImageMetadataTagCopyValue(tag) else {
+                throw CLIError.invalidLHDR("ISO gain-map metadata is missing \(path)")
+            }
+            if let number = raw as? NSNumber {
+                return number.doubleValue
+            }
+            if let text = raw as? String, let parsed = Double(text) {
+                return parsed
+            }
+            throw CLIError.invalidLHDR("ISO gain-map metadata has an invalid \(path)")
+        }
+
+        var values: [Double] = []
+        let gainMapMin = try (0..<3).map {
+            try value("HDRToneMap:ChannelMetadata[\($0)].GainMapMin")
+        }
+        let gainMapMax = try (0..<3).map {
+            try value("HDRToneMap:ChannelMetadata[\($0)].GainMapMax")
+        }
+        values.append(contentsOf: gainMapMin.map { pow(2.0, $0) })
+        values.append(1.0)
+        values.append(contentsOf: gainMapMax.map { pow(2.0, $0) })
+        for field in ["Gamma", "BaseOffset", "AlternateOffset"] {
+            values.append(contentsOf: try (0..<3).map {
+                try value("HDRToneMap:ChannelMetadata[\($0)].\(field)")
+            })
+        }
+        let baseRatio = pow(2.0, try value("HDRToneMap:BaseHeadroom"))
+        let alternateRatio = pow(2.0, try value("HDRToneMap:AlternateHeadroom"))
+        values.append(baseRatio)
+        values.append(alternateRatio)
+        values.append(alternateRatio)
+        values.append(0.0)
+        guard values.count == 20, values.allSatisfy(\.isFinite) else {
+            throw CLIError.invalidLHDR("unable to reconstruct portrait gain metadata")
+        }
+        print("portrait gain info source=existing ISO HDRToneMap metadata")
+        return values
     }
 
     private static func resolveSimulatedAperture(
@@ -6044,6 +6400,14 @@ private enum PortraitConversionPipeline {
             | UInt32(data[offset + 2]) << 16
             | UInt32(data[offset + 3]) << 24
         return Float(bitPattern: bits)
+    }
+
+    private static func readUInt32LE(_ data: Data, at offset: Int) -> UInt32? {
+        guard offset >= 0, offset + 4 <= data.count else { return nil }
+        return UInt32(data[offset])
+            | UInt32(data[offset + 1]) << 8
+            | UInt32(data[offset + 2]) << 16
+            | UInt32(data[offset + 3]) << 24
     }
 
     private static func opticalEquivalentFocalLengthFromLensModel(_ lensModel: String) -> Double? {
@@ -6179,12 +6543,12 @@ private enum PortraitConversionPipeline {
         try setMetadata(
             metadata,
             path: "depthData:LensDistortionCenterOffsetX",
-            value: String(format: "%.12f", calibration.principalPointX)
+            value: String(format: "%.12f", calibration.distortionCenterX)
         )
         try setMetadata(
             metadata,
             path: "depthData:LensDistortionCenterOffsetY",
-            value: String(format: "%.12f", calibration.principalPointY)
+            value: String(format: "%.12f", calibration.distortionCenterY)
         )
         try setMetadata(
             metadata,
@@ -6204,14 +6568,18 @@ private enum PortraitConversionPipeline {
         try setMetadataValue(
             metadata,
             path: "depthData:LensDistortionCoefficients",
-            value: Array(repeating: 0.0, count: 8) as CFArray
+            value: calibration.distortionCoefficients as CFArray
         )
         try setMetadataValue(
             metadata,
             path: "depthData:InverseLensDistortionCoefficients",
-            value: Array(repeating: 0.0, count: 8) as CFArray
+            value: calibration.inverseDistortionCoefficients as CFArray
         )
-        try setMetadata(metadata, path: "depthBlurEffect:RenderingParameters", value: portraitRenderingParametersBase64)
+        try setMetadata(
+            metadata,
+            path: "depthBlurEffect:RenderingParameters",
+            value: try portraitRenderingParametersBase64(simulatedAperture: simulatedAperture)
+        )
         try setMetadata(
             metadata,
             path: "depthBlurEffect:SimulatedAperture",
@@ -6222,31 +6590,171 @@ private enum PortraitConversionPipeline {
         return output as CFDictionary
     }
 
-    private static func makePortraitEffectsMatteDictionary(
+    private static func makeL8Buffer(width: Int, height: Int) throws -> CVPixelBuffer {
+        var buffer: CVPixelBuffer?
+        let attributes: [CFString: Any] = [
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+            kCVPixelBufferMetalCompatibilityKey: true,
+        ]
+        guard CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_OneComponent8,
+            attributes as CFDictionary,
+            &buffer
+        ) == kCVReturnSuccess, let buffer else {
+            throw CLIError.invalidContainer("unable to allocate L008 matte buffer")
+        }
+        CVBufferSetAttachment(
+            buffer,
+            kCVImageBufferTransferFunctionKey,
+            kCVImageBufferTransferFunction_Linear,
+            .shouldPropagate
+        )
+        return buffer
+    }
+
+    private static func makePlaneBuffer(
+        _ plane: Data,
+        width: Int,
+        height: Int
+    ) throws -> CVPixelBuffer {
+        guard plane.count == width * height else {
+            throw CLIError.invalidContainer("OPPO matte plane size does not match its geometry")
+        }
+        let buffer = try makeL8Buffer(width: width, height: height)
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        guard let baseAddress = CVPixelBufferGetBaseAddress(buffer) else {
+            throw CLIError.invalidContainer("OPPO matte plane has no writable storage")
+        }
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+        plane.withUnsafeBytes { source in
+            guard let sourceBase = source.baseAddress else { return }
+            for row in 0..<height {
+                memcpy(
+                    baseAddress.advanced(by: row * bytesPerRow),
+                    sourceBase.advanced(by: row * width),
+                    width
+                )
+            }
+        }
+        return buffer
+    }
+
+    private static func renderL8(
+        _ image: CIImage,
+        width: Int,
+        height: Int
+    ) throws -> CVPixelBuffer {
+        let buffer = try makeL8Buffer(width: width, height: height)
+        let bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        CIContext(options: [.useSoftwareRenderer: false]).render(
+            image.cropped(to: bounds),
+            to: buffer,
+            bounds: bounds,
+            colorSpace: CGColorSpaceCreateDeviceGray()
+        )
+        return buffer
+    }
+
+    private static func maximum(_ foreground: CIImage, _ background: CIImage) -> CIImage {
+        foreground.applyingFilter(
+            "CIMaximumCompositing",
+            parameters: [kCIInputBackgroundImageKey: background]
+        )
+    }
+
+    private static func minimum(_ foreground: CIImage, _ background: CIImage) -> CIImage {
+        foreground.applyingFilter(
+            "CIMinimumCompositing",
+            parameters: [kCIInputBackgroundImageKey: background]
+        )
+    }
+
+    private static func scaled(
+        _ image: CIImage,
+        width: Int,
+        height: Int
+    ) -> CIImage {
+        image.transformed(by: CGAffineTransform(
+            scaleX: CGFloat(width) / image.extent.width,
+            y: CGFloat(height) / image.extent.height
+        ))
+    }
+
+    private static func makeRGBGuidedOPPOMatte(
+        image: CGImage,
+        subject: Data,
+        hair: Data?,
+        planeWidth: Int,
+        planeHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ) throws -> (portrait: CVPixelBuffer, hair: CVPixelBuffer?) {
+        let bounds = CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight)
+        let subjectBuffer = try makePlaneBuffer(subject, width: planeWidth, height: planeHeight)
+        let smallSubject = CIImage(cvPixelBuffer: subjectBuffer)
+        let topology = scaled(smallSubject, width: targetWidth, height: targetHeight)
+            .cropped(to: bounds)
+        let guide = scaled(CIImage(cgImage: image), width: targetWidth, height: targetHeight)
+            .cropped(to: bounds)
+
+        let guided: CIImage
+        if let filter = CIFilter(name: "CIEdgePreserveUpsampleFilter") {
+            filter.setValue(guide, forKey: kCIInputImageKey)
+            filter.setValue(smallSubject, forKey: "inputSmallImage")
+            filter.setValue(3.0, forKey: "inputSpatialSigma")
+            filter.setValue(0.15, forKey: "inputLumaSigma")
+            guided = (filter.outputImage ?? topology).cropped(to: bounds)
+        } else {
+            guided = topology
+        }
+
+        let inwardSupport = topology
+            .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: 1.5])
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 1.0])
+            .cropped(to: bounds)
+        let subjectCore = topology
+            .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: 3.0])
+            .cropped(to: bounds)
+        let guidedBoundary = minimum(guided, inwardSupport).cropped(to: bounds)
+        var fused = maximum(guidedBoundary, subjectCore).cropped(to: bounds)
+
+        var hairBuffer: CVPixelBuffer?
+        if let hair {
+            let lowResolutionHair = try makePlaneBuffer(hair, width: planeWidth, height: planeHeight)
+            let hairImage = scaled(
+                CIImage(cvPixelBuffer: lowResolutionHair),
+                width: targetWidth,
+                height: targetHeight
+            ).cropped(to: bounds)
+            fused = maximum(fused, hairImage).cropped(to: bounds)
+            hairBuffer = try renderL8(hairImage, width: targetWidth, height: targetHeight)
+        }
+        return (
+            portrait: try renderL8(fused, width: targetWidth, height: targetHeight),
+            hair: hairBuffer
+        )
+    }
+
+    private static func makeVisionFallbackMatte(
         image: CGImage,
         orientation: CGImagePropertyOrientation,
-        orientationRaw: UInt32
-    ) throws -> CFDictionary {
+        orientationRaw: UInt32,
+        targetWidth: Int,
+        targetHeight: Int,
+        hair: Data?,
+        planeWidth: Int,
+        planeHeight: Int
+    ) throws -> (portrait: CVPixelBuffer, hair: CVPixelBuffer?) {
         let request = VNGeneratePersonSegmentationRequest()
         request.qualityLevel = .accurate
         request.outputPixelFormat = kCVPixelFormatType_OneComponent8
         try VNImageRequestHandler(cgImage: image, orientation: orientation, options: [:]).perform([request])
         guard let observation = request.results?.first else {
             throw CLIError.invalidContainer("Vision returned no person segmentation mask")
-        }
-        let targetWidth = image.width / 2
-        let targetHeight = image.height / 2
-        var outputBuffer: CVPixelBuffer?
-        let attributes: [CFString: Any] = [kCVPixelBufferIOSurfacePropertiesKey: [:]]
-        guard CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            targetWidth,
-            targetHeight,
-            kCVPixelFormatType_OneComponent8,
-            attributes as CFDictionary,
-            &outputBuffer
-        ) == kCVReturnSuccess, let outputBuffer else {
-            throw CLIError.invalidContainer("unable to allocate Portrait Effects Matte buffer")
         }
         let displayMask = CIImage(cvPixelBuffer: observation.pixelBuffer)
         let storedMask: CIImage
@@ -6256,44 +6764,127 @@ private enum PortraitConversionPipeline {
         case 8: storedMask = displayMask.oriented(.right)
         default: storedMask = displayMask
         }
-        let scaled = storedMask.transformed(by: CGAffineTransform(
-            scaleX: CGFloat(targetWidth) / storedMask.extent.width,
-            y: CGFloat(targetHeight) / storedMask.extent.height
-        ))
-        CIContext().render(
-            scaled,
-            to: outputBuffer,
-            bounds: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight),
-            colorSpace: CGColorSpaceCreateDeviceGray()
-        )
-        CVPixelBufferLockBaseAddress(outputBuffer, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(outputBuffer, .readOnly) }
-        guard let baseAddress = CVPixelBufferGetBaseAddress(outputBuffer) else {
-            throw CLIError.invalidContainer("Portrait Effects Matte has no base address")
+        let bounds = CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight)
+        var fused = scaled(storedMask, width: targetWidth, height: targetHeight).cropped(to: bounds)
+        var hairBuffer: CVPixelBuffer?
+        if let hair {
+            let lowResolutionHair = try makePlaneBuffer(hair, width: planeWidth, height: planeHeight)
+            let hairImage = scaled(
+                CIImage(cvPixelBuffer: lowResolutionHair),
+                width: targetWidth,
+                height: targetHeight
+            ).cropped(to: bounds)
+            fused = maximum(fused, hairImage).cropped(to: bounds)
+            hairBuffer = try renderL8(hairImage, width: targetWidth, height: targetHeight)
         }
-        let bytesPerRow = CVPixelBufferGetBytesPerRow(outputBuffer)
-        var pixels = Data(count: targetWidth * targetHeight)
+        return (
+            portrait: try renderL8(fused, width: targetWidth, height: targetHeight),
+            hair: hairBuffer
+        )
+    }
+
+    private static func makeMatteMetadata(
+        namespace: String,
+        prefix: String,
+        versionPath: String,
+        version: String
+    ) throws -> CGImageMetadata {
+        let metadata = CGImageMetadataCreateMutable()
+        try registerMetadataNamespace(metadata, namespace: namespace, prefix: prefix)
+        try setMetadata(metadata, path: versionPath, value: version)
+        return metadata
+    }
+
+    private static func makeL8AuxiliaryDictionary(
+        buffer: CVPixelBuffer,
+        metadata: CGImageMetadata
+    ) throws -> CFDictionary {
+        let width = CVPixelBufferGetWidth(buffer)
+        let height = CVPixelBufferGetHeight(buffer)
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        guard let baseAddress = CVPixelBufferGetBaseAddress(buffer) else {
+            throw CLIError.invalidContainer("matte buffer has no readable storage")
+        }
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+        var pixels = Data(count: width * height)
         pixels.withUnsafeMutableBytes { destination in
-            for row in 0..<targetHeight {
+            guard let destinationBase = destination.baseAddress else { return }
+            for row in 0..<height {
                 memcpy(
-                    destination.baseAddress!.advanced(by: row * targetWidth),
+                    destinationBase.advanced(by: row * width),
                     baseAddress.advanced(by: row * bytesPerRow),
-                    targetWidth
+                    width
                 )
             }
         }
         let description: [CFString: Any] = [
-            kCGImagePropertyWidth: targetWidth,
-            kCGImagePropertyHeight: targetHeight,
-            kCGImagePropertyBytesPerRow: targetWidth,
+            kCGImagePropertyWidth: width,
+            kCGImagePropertyHeight: height,
+            kCGImagePropertyBytesPerRow: width,
             kCGImagePropertyPixelFormat: NSNumber(value: kCVPixelFormatType_OneComponent8),
-            kCGImagePropertyOrientation: NSNumber(value: orientationRaw),
         ]
         return [
             kCGImageAuxiliaryDataInfoData: pixels,
             kCGImageAuxiliaryDataInfoDataDescription: description,
-            kCGImageAuxiliaryDataInfoMetadata: CGImageMetadataCreateMutable(),
+            kCGImageAuxiliaryDataInfoMetadata: metadata,
         ] as CFDictionary
+    }
+
+    private static func makePortraitEffectsMattes(
+        image: CGImage,
+        orientation: CGImagePropertyOrientation,
+        orientationRaw: UInt32,
+        depthPlanes: OPPODepthPlanes,
+        planeWidth: Int,
+        planeHeight: Int
+    ) throws -> (portrait: CFDictionary, hair: CFDictionary?) {
+        let targetWidth = image.width / 2
+        let targetHeight = image.height / 2
+        let rendered: (portrait: CVPixelBuffer, hair: CVPixelBuffer?)
+        if let subject = depthPlanes.subject {
+            rendered = try makeRGBGuidedOPPOMatte(
+                image: image,
+                subject: subject,
+                hair: depthPlanes.validHair,
+                planeWidth: planeWidth,
+                planeHeight: planeHeight,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight
+            )
+        } else {
+            rendered = try makeVisionFallbackMatte(
+                image: image,
+                orientation: orientation,
+                orientationRaw: orientationRaw,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                hair: depthPlanes.validHair,
+                planeWidth: planeWidth,
+                planeHeight: planeHeight
+            )
+        }
+        let portraitMetadata = try makeMatteMetadata(
+            namespace: "http://ns.apple.com/portraitEffectsMatte/1.0/",
+            prefix: "portraitEffectsMatte",
+            versionPath: "portraitEffectsMatte:PortraitEffectsMatteVersion",
+            version: "65537"
+        )
+        let portrait = try makeL8AuxiliaryDictionary(
+            buffer: rendered.portrait,
+            metadata: portraitMetadata
+        )
+        guard let hairBuffer = rendered.hair else { return (portrait, nil) }
+        let hairMetadata = try makeMatteMetadata(
+            namespace: "http://ns.apple.com/semanticSegmentationMatte/1.0/",
+            prefix: "semanticSegmentationMatte",
+            versionPath: "semanticSegmentationMatte:SemanticSegmentationMatteVersion",
+            version: "65536"
+        )
+        return (
+            portrait,
+            try makeL8AuxiliaryDictionary(buffer: hairBuffer, metadata: hairMetadata)
+        )
     }
 
     private static func makeFocusRegion(
@@ -6465,6 +7056,7 @@ private enum PortraitConversionPipeline {
         infoFloats: [Double],
         depthDictionary: CFDictionary,
         matteDictionary: CFDictionary,
+        hairDictionary: CFDictionary?,
         outputURL: URL
     ) throws {
         let parent = outputURL.deletingLastPathComponent()
@@ -6555,6 +7147,13 @@ private enum PortraitConversionPipeline {
             kCGImageAuxiliaryDataTypePortraitEffectsMatte,
             matteDictionary
         )
+        if let hairDictionary {
+            CGImageDestinationAddAuxiliaryDataInfo(
+                scaffoldDestination,
+                kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte,
+                hairDictionary
+            )
+        }
         guard CGImageDestinationFinalize(scaffoldDestination) else {
             throw CLIError.unableToFinalizeDestination(outputURL)
         }
