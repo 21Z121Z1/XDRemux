@@ -10,4 +10,13 @@ Recommended split:
 - `tests/golden/` for expected metadata snapshots, hashes, or text outputs.
 - `tests/validation/` for scripts that inspect output files without requiring a graphical app.
 
+`tests/validation/test_agent_completion_gate.py` verifies that the agent
+completion gate rejects missing evidence and failed commands, accepts complete
+plans, and invalidates receipts after `HEAD` changes.
+
+`tests/validation/verify_swift_cli_sample.py` is a parameterized real-sample
+functional check for Swift CLI completion plans. It keeps private HEIC inputs
+outside Git while verifying conversion success and the ImageIO gain-map pixel
+format.
+
 macOS app-specific UI and ViewModel tests can remain under `apps/macos/XDRemuxApp/Tests/`. Converter correctness tests should live here so they are not coupled to the app project layout.

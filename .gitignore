@@ -22,7 +22,6 @@ xdremux_py/
 .claude/
 .sisyphus/
 .flake8
-AGENTS.md
 CLAUDE.md
 HANDOFF.md
 Makefile
@@ -37,6 +36,7 @@ test-samples/
 tmp-samples/
 tmp/
 tools/
+.codex/verification-receipts/
 
 # Recreatable
 final-output/
