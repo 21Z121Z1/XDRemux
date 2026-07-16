@@ -17,7 +17,7 @@ uses the standard ISO default.
 
 | Mode | Switch | Result |
 |---|---|---|
-| Standard ISO (default) | none | ISO 21496-1 HDR with the source Base Image, channel structure, and complete OPPO/QTI metadata tail; Gain Maps may retain HEVC RExt 4:4:4 when the source supports it |
+| Standard ISO (default) | none | ISO 21496-1 HDR with the source Base Image, channel structure, and non-HDR OPPO/QTI metadata tail; Gain Maps may retain HEVC RExt 4:4:4 when the source supports it |
 | OPPO Gallery compatible | `--oppo-compatible` | Main Still Picture 4:2:0 Gain Map for OPPO Gallery, with the OPPO private metadata tail preserved |
 | Apple portrait | `--apple-portrait` | Converts OPPO depth, subject, pet, hair, and aperture information into Apple disparity, Portrait Effects Matte, semantic hair, Focus, and portrait metadata |
 
@@ -44,9 +44,11 @@ three-channel sources can retain HEVC Range Extensions 4:4:4. An existing
 4:2:0 Gain Map is never advertised as 4:4:4 because discarded chroma cannot be
 recovered.
 
-The complete OPPO/QTI/FileExtendedContainer tail is preserved by default,
+The default preserves non-HDR OPPO/QTI/FileExtendedContainer metadata,
 including watermark, master-mode, capture, portrait-editing, and unknown
-vendor metadata.
+vendor entries. Private HDR entries under `local.uhdr.*`, `local.hdr.*`,
+`src.local.hdr.*`, and `hdr.*` are physically removed, leaving the standard
+ISO Gain Map graph as the active HDR display graph.
 
 ### `--oppo-compatible`: OPPO Gallery compatibility
 
@@ -82,10 +84,10 @@ hair; Vision is used only as the empty-subject fallback and for face-attention
 Focus. The OPPO simulated aperture and original orientation are preserved in
 the Apple portrait graph.
 
-Apple portrait mode omits the large OPPO portrait tail after semantic
-migration, avoiding two complete depth-resource sets. It is mutually exclusive
-with `--oppo-compatible`; enabling both fails before writing. Blur-strength
-mapping is still under device validation.
+Apple portrait mode omits the large OPPO portrait tail and private HDR tail
+after semantic migration, avoiding duplicate depth or HDR resource sets. It is
+mutually exclusive with `--oppo-compatible`; enabling both fails before
+writing. Blur-strength mapping is still under device validation.
 
 ### Python CLI
 

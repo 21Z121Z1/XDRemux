@@ -460,11 +460,11 @@ def write_heic_passthrough(source_path: str, output_path: str,
 
     # mdat content: use ds (data start) to handle extended-size boxes
     src_mdat_content = src[src_mdat_ds:src_mdat_off + src_mdat_sz]
-    # Preserve every byte after mdat as an opaque OPPO metadata envelope.  This
-    # includes QTI/FileExtendedContainer depth, watermark, edit, live-photo,
-    # private HDR fallback, and unknown vendor data.  The ISO graph rewrite must
-    # not infer that unparsed tail bytes are disposable.
+    # Standard ISO output keeps manifested non-HDR vendor data but removes the
+    # private HDR fallback. OPPO-compatible output preserves the complete tail.
     src_post_mdat = src[src_mdat_off + src_mdat_sz:]
+    if not oppo_compat:
+        src_post_mdat = container.filter_private_hdr_tail(src_post_mdat)
 
     # ── 2. Parse source meta structure ─────────────────────────────
     _, _, meta_body = _fullbox(src, src_meta_ds)
@@ -498,7 +498,8 @@ def write_heic_passthrough(source_path: str, output_path: str,
     source_tmap_item_ids = {iid for iid, item_type in item_types.items() if item_type == "tmap"}
     if source_tmap_item_ids:
         with open(output_path, 'wb') as f:
-            f.write(src)
+            f.write(src[:src_mdat_off + src_mdat_sz])
+            f.write(src_post_mdat)
         return
 
     original_max_item_id = max(item_types.keys())

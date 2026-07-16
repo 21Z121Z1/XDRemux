@@ -274,6 +274,7 @@ struct XDRemuxAppModelTests {
         try expect(AppStrings.statCancelled == "已取消", "cancelled statistic should be explicit")
         try expect(AppStrings.statTotal == "总计", "total statistic should use the requested term")
         try expect(AppStrings.oppoCompatLabel == "[实验性] OPPO 相册 HDR 兼容层", "OPPO setting should be clearly marked experimental")
+        try expect(AppStrings.oppoGalleryCompatibilityHelp.contains("非 HDR 厂商尾部"), "default product copy should describe the non-HDR tail policy")
         try expect(AppStrings.inputProcessingSystemHelp.contains("ImageIO"), "system mode help should explain ImageIO ownership")
         try expect(AppStrings.inputProcessingHybridHelp.contains("HEVC Rext"), "hybrid mode help should explain the gain map rewrite")
         try expect(AppStrings.inputProcessingPassthroughHelp.contains("ISOBMFF box"), "passthrough mode help should explain container rebuilding")
@@ -289,7 +290,7 @@ struct XDRemuxAppModelTests {
         try expect(config.inputProcessingBranch == .hybrid, "product output should use metadata-preserving remux")
         try expect(config.tmapFormat == .imageIO, "product output should use the device-validated 142-byte tmap")
         try expect(config.oppoCompatibility == .off, "default product output should select standard high-spec ISO encoding")
-        try expect(config.oppoCameraTail == .preserve, "product output should preserve the complete source tail")
+        try expect(config.oppoCameraTail == .preserveWithoutPrivateHDR, "default product output should preserve only the non-HDR source tail")
         try expect(!config.oppoGalleryCompatibilityEnabled, "OPPO Gallery compatibility should be opt-in")
         try expect(config.preservesPortraitEditingData, "portrait editing data should default to preserved")
     }
@@ -300,15 +301,19 @@ struct XDRemuxAppModelTests {
 
         config.oppoGalleryCompatibilityEnabled = false
         try expect(config.oppoCompatibility == .off, "disabling compatibility should select Hybrid high-spec encoding")
-        try expect(config.oppoCameraTail == .preserve, "encoding mode must not change metadata preservation")
+        try expect(config.oppoCameraTail == .preserveWithoutPrivateHDR, "standard ISO mode should remove private HDR tail entries")
 
         config.preservesPortraitEditingData = false
-        try expect(config.oppoCameraTail == .preserveWithoutPortrait, "portrait switch should select the filtered tail")
+        try expect(config.oppoCameraTail == .preserveWithoutPortraitOrPrivateHDR, "portrait filtering must not reintroduce private HDR tail entries")
         try expect(config.oppoCompatibility == .off, "portrait switch must not change Gain Map encoding")
 
         config.oppoGalleryCompatibilityEnabled = true
+        try expect(config.oppoCameraTail == .preserveWithoutPortrait, "OPPO compatibility should restore private HDR tail data without portrait resources")
         config.preservesPortraitEditingData = true
         try expect(config.oppoCompatibility == .auto, "enabling compatibility should restore automatic OPPO routing")
         try expect(config.oppoCameraTail == .preserve, "enabling portrait preservation should restore the byte-preserving tail")
+
+        config.oppoGalleryCompatibilityEnabled = false
+        try expect(config.oppoCameraTail == .preserveWithoutPrivateHDR, "leaving OPPO compatibility should restore the non-HDR default tail")
     }
 }

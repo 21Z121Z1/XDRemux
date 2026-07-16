@@ -97,9 +97,9 @@ enum AppStrings {
     static let oppoCompatTailHelp = "兼容旧命令名；行为等同于开启。相机尾部仍由下方选项控制。"
     static let oppoCompatOffHelp = "从原始高规格源生成 profile 4/4:4:4 Gain Map；已经降采样为 4:2:0 的输入不能反向升级。"
     static let oppoGalleryCompatibility = "输出 OPPO 相册兼容格式"
-    static let oppoGalleryCompatibilityHelp = "默认关闭：输出标准 ISO HDR，保留原始单通道或未降采样三通道的 4:4:4/RExt。开启时输出 Main Still Picture 4:2:0 Gain Map。元数据尾部保留策略不受影响。"
+    static let oppoGalleryCompatibilityHelp = "默认关闭：输出标准 ISO HDR，保留非 HDR 厂商尾部，并保留原始单通道或未降采样三通道的 4:4:4/RExt。开启时输出 Main Still Picture 4:2:0 Gain Map，并保留完整 OPPO 私有尾部。"
     static let preservePortraitEditingData = "保留人像后期数据"
-    static let preservePortraitEditingDataHelp = "关闭时删除 depth、src.image、mask、mesh 和 crop 等大体积后期资源；水印、大师模式、HDR 数据和其他厂商元数据继续保留。"
+    static let preservePortraitEditingDataHelp = "关闭时删除 depth、src.image、mask、mesh 和 crop 等大体积后期资源；默认模式继续排除私有 HDR 尾部，水印、大师模式和其他厂商元数据仍会保留。"
     static let oppoCameraTailLabel = "[实验性] OPPO 相机尾部"
     static let oppoCameraTailHelp = "控制是否复制 OPPO Camera FileExtendedContainer 中的水印、大师模式、人像/景深条目；这和 HDR gain map 兼容层相互独立。"
     static let oppoCameraTailOff = "关闭"
@@ -107,6 +107,7 @@ enum AppStrings {
     static let oppoCameraTailCompact = "紧凑景深"
     static let oppoCameraTailPreserve = "完整保留"
     static let oppoCameraTailPreserveWithoutPortrait = "不保留人像后期数据"
+    static let oppoCameraTailPreserveWithoutPortraitOrPrivateHDR = "不保留人像和私有 HDR 数据"
     static let oppoCameraTailPreserveWithoutPrivateUHDR = "移除私有 UHDR 数据"
     static let oppoCameraTailPreserveWithoutPrivateHDR = "移除全部私有 HDR 数据"
     static let oppoCameraTailPreserveNoUHDR = "停用私有 UHDR"
@@ -116,8 +117,9 @@ enum AppStrings {
     static let oppoCameraTailCompactHelp = "在水印基础上追加已验证的人像/景深紧凑尾部，并按真实 JSON-to-EOF span 写入 jxrs footer。"
     static let oppoCameraTailPreserveHelp = "强制使用保留源主图与非 HDR item 的混合写入路径；重建 ISO 21496-1 HDR 图后，逐字节复制源文件 mdat 之后的完整 OPPO/QTI/FileExtendedContainer 尾部，保留景深、水印、原图、编辑、实况和未知数据。"
     static let oppoCameraTailPreserveWithoutPortraitHelp = "保留水印、大师模式、HDR、UserComment 和其他厂商数据，仅移除景深、蒙版、网格和恢复原图等大体积人像后期资源。"
+    static let oppoCameraTailPreserveWithoutPortraitOrPrivateHDRHelp = "移除人像后期资源以及 local.uhdr.*、local.hdr.*、src.local.hdr.* 和 hdr.*，保留水印、大师模式和其他非 HDR 厂商数据。"
     static let oppoCameraTailPreserveWithoutPrivateUHDRHelp = "物理移除 local.uhdr.gainmap.data/info，保留人像、水印和其他非目标条目；仅用于设备验证。"
-    static let oppoCameraTailPreserveWithoutPrivateHDRHelp = "物理移除 local.uhdr.*、local.hdr.*、src.local.hdr.* 和 hdr.*，保留非 HDR 厂商数据；仅用于设备验证。"
+    static let oppoCameraTailPreserveWithoutPrivateHDRHelp = "默认策略：物理移除 local.uhdr.*、local.hdr.*、src.local.hdr.* 和 hdr.*，保留人像、水印、大师模式和其他非 HDR 厂商数据。"
     static let oppoCameraTailPreserveNoUHDRHelp = "完整保留尾长、payload、offset、大师模式和未知数据，仅把 local.uhdr.gainmap.data/info 在 manifest 中等长改名，停用私有 UHDR reader。"
     static let oppoCameraTailPreserveNoHDRHelp = "在完整保留其他业务数据的前提下，等长停用 local.uhdr.*、hdr.*、local.hdr.* 和 src.local.hdr.* manifest key。"
     static let skipExisting = "跳过已有有效输出"
@@ -183,6 +185,7 @@ extension OppoCameraTail {
         case .compact: return AppStrings.oppoCameraTailCompact
         case .preserve: return AppStrings.oppoCameraTailPreserve
         case .preserveWithoutPortrait: return AppStrings.oppoCameraTailPreserveWithoutPortrait
+        case .preserveWithoutPortraitOrPrivateHDR: return AppStrings.oppoCameraTailPreserveWithoutPortraitOrPrivateHDR
         case .preserveWithoutPrivateUHDR: return AppStrings.oppoCameraTailPreserveWithoutPrivateUHDR
         case .preserveWithoutPrivateHDR: return AppStrings.oppoCameraTailPreserveWithoutPrivateHDR
         case .preserveNoUHDR: return AppStrings.oppoCameraTailPreserveNoUHDR
@@ -197,6 +200,7 @@ extension OppoCameraTail {
         case .compact: return AppStrings.oppoCameraTailCompactHelp
         case .preserve: return AppStrings.oppoCameraTailPreserveHelp
         case .preserveWithoutPortrait: return AppStrings.oppoCameraTailPreserveWithoutPortraitHelp
+        case .preserveWithoutPortraitOrPrivateHDR: return AppStrings.oppoCameraTailPreserveWithoutPortraitOrPrivateHDRHelp
         case .preserveWithoutPrivateUHDR: return AppStrings.oppoCameraTailPreserveWithoutPrivateUHDRHelp
         case .preserveWithoutPrivateHDR: return AppStrings.oppoCameraTailPreserveWithoutPrivateHDRHelp
         case .preserveNoUHDR: return AppStrings.oppoCameraTailPreserveNoUHDRHelp

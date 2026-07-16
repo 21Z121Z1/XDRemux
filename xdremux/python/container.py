@@ -61,6 +61,74 @@ def parse_manifest(data: bytes) -> tuple[list[dict], int, int] | None:
     return entries, json_start, json_end + 1
 
 
+PRIVATE_HDR_TAIL_ENTRY_NAMES = {
+    "local.uhdr.gainmap.data",
+    "local.uhdr.gainmap.info",
+}
+
+
+def is_private_hdr_tail_entry(name: str) -> bool:
+    """Return whether a FileExtendedContainer entry is private HDR data."""
+    return (
+        name in PRIVATE_HDR_TAIL_ENTRY_NAMES
+        or name.startswith("hdr.")
+        or name.startswith("local.hdr.")
+        or name.startswith("src.local.hdr.")
+    )
+
+
+def filter_private_hdr_tail(tail: bytes) -> bytes:
+    """Remove private HDR entries while preserving every manifested non-HDR entry."""
+    if not tail:
+        return tail
+
+    parsed = parse_manifest(tail)
+    if parsed is None:
+        raise ValueError("unable to parse OPPO metadata tail for private HDR filtering")
+    entries, json_start, _ = parsed
+    if not any(is_private_hdr_tail_entry(str(entry.get("name", ""))) for entry in entries):
+        return tail
+
+    kept: list[tuple[int, dict, int, bytes]] = []
+    for index, entry in enumerate(entries):
+        name = str(entry.get("name", ""))
+        if is_private_hdr_tail_entry(name):
+            continue
+        try:
+            length = int(entry["length"])
+            source_start = json_start - int(entry["offset"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"invalid OPPO metadata tail entry: {name or '<unnamed>'}") from exc
+        source_end = source_start + length
+        if length < 0 or source_start < 0 or source_end > json_start:
+            raise ValueError(f"OPPO metadata tail entry is out of bounds: {name or '<unnamed>'}")
+        kept.append((index, entry, source_start, tail[source_start:source_end]))
+
+    if not kept:
+        return b""
+
+    payload = bytearray()
+    payload_starts: dict[int, int] = {}
+    for index, _, _, block in sorted(kept, key=lambda item: item[2]):
+        payload_starts[index] = len(payload)
+        payload.extend(block)
+
+    payload_length = len(payload)
+    records = []
+    for index, entry, _, _ in kept:
+        record = dict(entry)
+        record["offset"] = payload_length - payload_starts[index]
+        records.append(record)
+
+    manifest = json.dumps(records, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    tag = b"jxrs"
+    if len(tail) >= 9 and tail[-9] == 0:
+        candidate = tail[-8:-4]
+        if all(32 <= byte <= 126 for byte in candidate):
+            tag = candidate
+    return bytes(payload) + manifest + b"\x00" + tag + struct.pack("<I", len(manifest) + 9)
+
+
 def _score_lhdr_meta(floats: tuple) -> int:
     """Score a 36-float candidate for LHDR metadata validity."""
     score = 0

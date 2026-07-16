@@ -148,6 +148,7 @@ private enum OppoCameraTail: String {
     case compact
     case preserve
     case preserveWithoutPortrait = "preserve-without-portrait"
+    case preserveWithoutPortraitOrPrivateHDR = "preserve-without-portrait-or-private-hdr"
     case preserveWithoutPrivateUHDR = "preserve-without-private-uhdr"
     case preserveWithoutPrivateHDR = "preserve-without-private-hdr"
     case preserveNoUHDR = "preserve-no-uhdr"
@@ -2258,6 +2259,8 @@ private func shouldPreserveOppoCameraTailEntry(_ name: String, mode: OppoCameraT
             || oppoCameraCompactPortraitTailEntryNames.contains(name)
     case .preserveWithoutPortrait:
         return !oppoCameraPortraitEditingEntryNames.contains(name)
+    case .preserveWithoutPortraitOrPrivateHDR:
+        return !oppoCameraPortraitEditingEntryNames.contains(name) && !isOppoPrivateHDRTailEntry(name)
     case .preserveWithoutPrivateUHDR:
         return !oppoPrivateUHDRTailEntryNames.contains(name)
     case .preserveWithoutPrivateHDR:
@@ -2285,9 +2288,21 @@ private func shouldNeutralizeOppoCameraTailEntry(_ name: String, mode: OppoCamer
         return oppoPrivateUHDRTailEntryNames.contains(name)
     case .preserveNoHDR:
         return isOppoPrivateHDRTailEntry(name)
-    case .off, .watermark, .compact, .preserve, .preserveWithoutPortrait, .preserveWithoutPrivateUHDR, .preserveWithoutPrivateHDR:
+    case .off, .watermark, .compact, .preserve, .preserveWithoutPortrait, .preserveWithoutPortraitOrPrivateHDR, .preserveWithoutPrivateUHDR, .preserveWithoutPrivateHDR:
         return false
     }
+}
+
+private func removeExistingPostMdatTail(from outputURL: URL) throws {
+    var outputData = try Data(contentsOf: outputURL, options: [.mappedIfSafe])
+    guard let outputMdat = isobmffBoxes(in: outputData, start: 0, end: outputData.count)
+        .first(where: { $0.type == "mdat" }) else {
+        throw CLIError.invalidContainer("output mdat missing while filtering OPPO metadata tail")
+    }
+    let tailStart = outputMdat.boxStart + outputMdat.size
+    guard tailStart < outputData.count else { return }
+    outputData.removeSubrange(tailStart..<outputData.count)
+    try outputData.write(to: outputURL, options: [.atomic])
 }
 
 private func appendCompleteSourceTail(
@@ -2362,9 +2377,22 @@ private func appendOppoCameraTailIfNeeded(
     extracted: ExtractedLHDR,
     mode: OppoCameraTail
 ) throws {
+    if mode == .preserve {
+        try appendCompleteSourceTail(
+            outputURL: outputURL,
+            sourceData: sourceData,
+            manifestInfo: extracted.manifestInfo,
+            mode: mode
+        )
+        return
+    }
+
+    // Writers may copy an already-ISO input byte-for-byte, including its old
+    // vendor tail. Remove that tail before applying any filtered policy.
+    try removeExistingPostMdatTail(from: outputURL)
     guard mode != .off else { return }
 
-    if mode == .preserve || mode == .preserveNoUHDR || mode == .preserveNoHDR {
+    if mode == .preserveNoUHDR || mode == .preserveNoHDR {
         try appendCompleteSourceTail(
             outputURL: outputURL,
             sourceData: sourceData,
@@ -2442,7 +2470,7 @@ private func isValidOutput(
     switch oppoCameraTail {
     case .off:
         return true
-    case .watermark, .compact, .preserve, .preserveWithoutPortrait, .preserveWithoutPrivateUHDR, .preserveWithoutPrivateHDR, .preserveNoUHDR, .preserveNoHDR:
+    case .watermark, .compact, .preserve, .preserveWithoutPortrait, .preserveWithoutPortraitOrPrivateHDR, .preserveWithoutPrivateUHDR, .preserveWithoutPrivateHDR, .preserveNoUHDR, .preserveNoHDR:
         return hasValidCompactOppoCameraTail(outputURL, mode: oppoCameraTail)
     }
 }
@@ -2522,7 +2550,7 @@ private enum XDRemuxProductCore {
         debugRootURL: URL?,
         oppoCompatibility: OppoCompatibility = .off,
         inputProcessingBranch: InputProcessingBranch = .hybrid,
-        oppoCameraTail: OppoCameraTail = .preserve,
+        oppoCameraTail: OppoCameraTail = .preserveWithoutPrivateHDR,
         tmapFormat: TmapFormat = .imageIO
     ) throws -> SampleReport {
         guard fileManager.fileExists(atPath: inputURL.path) else {
@@ -2558,12 +2586,13 @@ private enum XDRemuxProductCore {
             }
         }
 
-        // Complete OPPO preservation requires the source-primary graft path. ImageIO's
+        // OPPO metadata preservation requires the source-primary graft path. ImageIO's
         // direct writer and the experimental passthrough writer may normalize or omit
-        // non-HDR HEIF items before the opaque camera tail is restored.
+        // non-HDR HEIF items before the selected camera tail is restored.
         let effectiveInputProcessingBranch: InputProcessingBranch = (
             oppoCameraTail == .preserve
                 || oppoCameraTail == .preserveWithoutPortrait
+                || oppoCameraTail == .preserveWithoutPortraitOrPrivateHDR
                 || oppoCameraTail == .preserveWithoutPrivateUHDR
                 || oppoCameraTail == .preserveWithoutPrivateHDR
                 || tmapFormat == .strict
@@ -2951,13 +2980,15 @@ struct LHDRToISOHDRCLI {
 
     Notes:
       - Product output always uses the metadata-preserving source-primary remux path.
-      - With neither product switch, output is standard ISO HDR and preserves the complete metadata tail.
+      - With neither product switch, output is standard ISO HDR and preserves the non-HDR metadata tail.
         Gain Maps retain their source channel structure and may use HEVC Range Extensions 4:4:4.
       - --oppo-compatible converts a high-spec Gain Map to OPPO-compatible Main Still Picture 4:2:0.
       - --no-oppo-compat is a legacy spelling for the default standard-ISO mode.
       - Existing 4:2:0 Gain Maps cannot be promoted to high-spec 4:4:4 because the discarded chroma is unrecoverable.
-      - Source UserComment routing flags and, by default, the complete OPPO/QTI/FileExtendedContainer tail are preserved.
-      - --discard-portrait-data removes large depth/re-edit resources while retaining watermark, master-mode, HDR, and small metadata.
+      - Source UserComment routing flags are preserved. Default output physically removes private HDR tail entries
+        while retaining watermark, master-mode, portrait, depth, source-image, edit, live-photo, and unknown entries.
+      - --oppo-compatible preserves the complete OPPO/QTI/FileExtendedContainer tail.
+      - --discard-portrait-data removes large depth/re-edit resources without reintroducing private HDR tail entries.
       - Only the active Gain Map graph and its required container descriptions may change.
       - Batch defaults: --jobs min(cpu,4), --resume, --skip-existing.
       - A JSONL checkpoint is written under output-dir by default; it is deleted only when the batch finishes with zero failures.
@@ -3473,7 +3504,9 @@ struct LHDRToISOHDRCLI {
         var inputProcessingBranch = InputProcessingBranch.hybrid
         var applePortraitEnabled = false
         var oppoCompatibilityWasExplicit = false
-        var oppoCameraTail = OppoCameraTail.preserve
+        var oppoCameraTail = OppoCameraTail.preserveWithoutPrivateHDR
+        var oppoCameraTailWasExplicit = false
+        var discardPortraitData = false
         var tmapFormat = TmapFormat.imageIO
 
         var index = 0
@@ -3516,6 +3549,7 @@ struct LHDRToISOHDRCLI {
                     throw CLIError.invalidValue(option: option, value: value)
                 }
                 oppoCameraTail = parsed
+                oppoCameraTailWasExplicit = true
             case "--tmap-format":
                 let value = try nextValue(for: option)
                 guard let parsed = TmapFormat(rawValue: value) else {
@@ -3538,7 +3572,7 @@ struct LHDRToISOHDRCLI {
                 oppoCompatibility = .auto
                 oppoCompatibilityWasExplicit = true
             case "--discard-portrait-data":
-                oppoCameraTail = .preserveWithoutPortrait
+                discardPortraitData = true
             default:
                 throw CLIError.unknownOption(option)
             }
@@ -3554,7 +3588,13 @@ struct LHDRToISOHDRCLI {
         }
         if applePortraitEnabled {
             oppoCompatibility = .off
-            oppoCameraTail = .preserveWithoutPortrait
+            oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
+        } else if discardPortraitData, !oppoCameraTailWasExplicit {
+            oppoCameraTail = oppoCompatibility.wantsOppoCompat
+                ? .preserveWithoutPortrait
+                : .preserveWithoutPortraitOrPrivateHDR
+        } else if !oppoCameraTailWasExplicit, oppoCompatibility.wantsOppoCompat {
+            oppoCameraTail = .preserve
         }
 
         return ConvertCommand(
@@ -3580,7 +3620,9 @@ struct LHDRToISOHDRCLI {
         var inputProcessingBranch = InputProcessingBranch.hybrid
         var applePortraitEnabled = false
         var oppoCompatibilityWasExplicit = false
-        var oppoCameraTail = OppoCameraTail.preserve
+        var oppoCameraTail = OppoCameraTail.preserveWithoutPrivateHDR
+        var oppoCameraTailWasExplicit = false
+        var discardPortraitData = false
         var tmapFormat = TmapFormat.imageIO
         var jobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
         var checkpointPath: String?
@@ -3645,6 +3687,7 @@ struct LHDRToISOHDRCLI {
                     throw CLIError.invalidValue(option: option, value: value)
                 }
                 oppoCameraTail = parsed
+                oppoCameraTailWasExplicit = true
             case "--tmap-format":
                 let value = try nextValue(for: option)
                 guard let parsed = TmapFormat(rawValue: value) else {
@@ -3666,7 +3709,7 @@ struct LHDRToISOHDRCLI {
                 oppoCompatibility = .auto
                 oppoCompatibilityWasExplicit = true
             case "--discard-portrait-data":
-                oppoCameraTail = .preserveWithoutPortrait
+                discardPortraitData = true
             default:
                 throw CLIError.unknownOption(option)
             }
@@ -3682,7 +3725,13 @@ struct LHDRToISOHDRCLI {
         }
         if applePortraitEnabled {
             oppoCompatibility = .off
-            oppoCameraTail = .preserveWithoutPortrait
+            oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
+        } else if discardPortraitData, !oppoCameraTailWasExplicit {
+            oppoCameraTail = oppoCompatibility.wantsOppoCompat
+                ? .preserveWithoutPortrait
+                : .preserveWithoutPortraitOrPrivateHDR
+        } else if !oppoCameraTailWasExplicit, oppoCompatibility.wantsOppoCompat {
+            oppoCameraTail = .preserve
         }
 
         return BatchCommand(

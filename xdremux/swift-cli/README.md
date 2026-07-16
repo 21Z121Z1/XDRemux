@@ -10,9 +10,10 @@ swift xdremux/swift-cli/XDRemux.swift convert --input IMG_001.heic
 
 ## Product modes
 
-- no switch: standard ISO output, complete metadata-tail preservation, and up
-  to HEVC RExt 4:4:4 Gain Map when the source channel structure permits;
-- `--oppo-compatible`: OPPO Gallery-compatible Main Still Picture 4:2:0;
+- no switch: standard ISO output, non-HDR metadata-tail preservation, and up to
+  HEVC RExt 4:4:4 Gain Map when the source channel structure permits;
+- `--oppo-compatible`: OPPO Gallery-compatible Main Still Picture 4:2:0 with
+  the complete OPPO private tail;
 - `--apple-portrait`: OPPO portrait resources converted to the Apple portrait
   graph, without retaining a second large OPPO portrait tail.
 
@@ -68,7 +69,7 @@ last-resort compatibility fallback. The resolved value is written as
 `depthBlurEffect:SimulatedAperture`.
 
 Without `--apple-portrait`, XDRemux uses its normal gain-map conversion path
-and reattaches the original OPPO portrait private tail byte-for-byte. It does
-not synthesize Apple depth, matte, Focus, or portrait metadata.
+and preserves the OPPO portrait tail while filtering private HDR tail entries.
+It does not synthesize Apple depth, matte, Focus, or portrait metadata.
 
 Do not place macOS app project files here; app shells belong under `apps/macos/`.

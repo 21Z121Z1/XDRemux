@@ -142,6 +142,7 @@ enum OppoCameraTail: String, CaseIterable, Codable, Sendable, Identifiable, Hash
     case compact
     case preserve
     case preserveWithoutPortrait = "preserve-without-portrait"
+    case preserveWithoutPortraitOrPrivateHDR = "preserve-without-portrait-or-private-hdr"
     case preserveWithoutPrivateUHDR = "preserve-without-private-uhdr"
     case preserveWithoutPrivateHDR = "preserve-without-private-hdr"
     case preserveNoUHDR = "preserve-no-uhdr"
@@ -155,7 +156,7 @@ struct ConversionConfig: Sendable {
     var outputDirectory: URL?
     var oppoCompatibility: OppoCompatibility = .off
     var inputProcessingBranch: InputProcessingBranch = .hybrid
-    var oppoCameraTail: OppoCameraTail = .preserve
+    var oppoCameraTail: OppoCameraTail = .preserveWithoutPrivateHDR
     var tmapFormat: TmapFormat = .imageIO
     var debugDirectory: URL?
     var fileNameSuffix: String = "_iso"
@@ -164,12 +165,24 @@ struct ConversionConfig: Sendable {
 
     var oppoGalleryCompatibilityEnabled: Bool {
         get { oppoCompatibility.wantsOppoCompat }
-        set { oppoCompatibility = newValue ? .auto : .off }
+        set {
+            oppoCompatibility = newValue ? .auto : .off
+            oppoCameraTail = preservesPortraitEditingData
+                ? (newValue ? .preserve : .preserveWithoutPrivateHDR)
+                : (newValue ? .preserveWithoutPortrait : .preserveWithoutPortraitOrPrivateHDR)
+        }
     }
 
     var preservesPortraitEditingData: Bool {
-        get { oppoCameraTail != .preserveWithoutPortrait }
-        set { oppoCameraTail = newValue ? .preserve : .preserveWithoutPortrait }
+        get {
+            oppoCameraTail != .preserveWithoutPortrait
+                && oppoCameraTail != .preserveWithoutPortraitOrPrivateHDR
+        }
+        set {
+            oppoCameraTail = newValue
+                ? (oppoCompatibility.wantsOppoCompat ? .preserve : .preserveWithoutPrivateHDR)
+                : (oppoCompatibility.wantsOppoCompat ? .preserveWithoutPortrait : .preserveWithoutPortraitOrPrivateHDR)
+        }
     }
 }
 
@@ -2215,6 +2228,8 @@ private func shouldPreserveOppoCameraTailEntry(_ name: String, mode: OppoCameraT
             || oppoCameraCompactPortraitTailEntryNames.contains(name)
     case .preserveWithoutPortrait:
         return !oppoCameraPortraitEditingEntryNames.contains(name)
+    case .preserveWithoutPortraitOrPrivateHDR:
+        return !oppoCameraPortraitEditingEntryNames.contains(name) && !isOppoPrivateHDRTailEntry(name)
     case .preserveWithoutPrivateUHDR:
         return !oppoPrivateUHDRTailEntryNames.contains(name)
     case .preserveWithoutPrivateHDR:
@@ -2242,9 +2257,21 @@ private func shouldNeutralizeOppoCameraTailEntry(_ name: String, mode: OppoCamer
         return oppoPrivateUHDRTailEntryNames.contains(name)
     case .preserveNoHDR:
         return isOppoPrivateHDRTailEntry(name)
-    case .off, .watermark, .compact, .preserve, .preserveWithoutPortrait, .preserveWithoutPrivateUHDR, .preserveWithoutPrivateHDR:
+    case .off, .watermark, .compact, .preserve, .preserveWithoutPortrait, .preserveWithoutPortraitOrPrivateHDR, .preserveWithoutPrivateUHDR, .preserveWithoutPrivateHDR:
         return false
     }
+}
+
+private func removeExistingPostMdatTail(from outputURL: URL) throws {
+    var outputData = try Data(contentsOf: outputURL, options: [.mappedIfSafe])
+    guard let outputMdat = isobmffBoxes(in: outputData, start: 0, end: outputData.count)
+        .first(where: { $0.type == "mdat" }) else {
+        throw XDRemuxError.invalidContainer("output mdat missing while filtering OPPO metadata tail")
+    }
+    let tailStart = outputMdat.boxStart + outputMdat.size
+    guard tailStart < outputData.count else { return }
+    outputData.removeSubrange(tailStart..<outputData.count)
+    try outputData.write(to: outputURL, options: [.atomic])
 }
 
 private func appendCompleteSourceTail(
@@ -2321,9 +2348,22 @@ private func appendOppoCameraTailIfNeeded(
     extracted: ExtractedLHDR,
     mode: OppoCameraTail
 ) throws {
+    if mode == .preserve {
+        try appendCompleteSourceTail(
+            outputURL: outputURL,
+            sourceData: sourceData,
+            manifestInfo: extracted.manifestInfo,
+            mode: mode
+        )
+        return
+    }
+
+    // An already-ISO source may have been copied with its original tail. Strip
+    // it before applying a filtered policy so removed HDR entries cannot linger.
+    try removeExistingPostMdatTail(from: outputURL)
     guard mode != .off else { return }
 
-    if mode == .preserve || mode == .preserveNoUHDR || mode == .preserveNoHDR {
+    if mode == .preserveNoUHDR || mode == .preserveNoHDR {
         try appendCompleteSourceTail(
             outputURL: outputURL,
             sourceData: sourceData,
@@ -2401,7 +2441,7 @@ private func hasValidOutput(
     switch oppoCameraTail {
     case .off:
         return true
-    case .watermark, .compact, .preserve, .preserveWithoutPortrait, .preserveWithoutPrivateUHDR, .preserveWithoutPrivateHDR, .preserveNoUHDR, .preserveNoHDR:
+    case .watermark, .compact, .preserve, .preserveWithoutPortrait, .preserveWithoutPortraitOrPrivateHDR, .preserveWithoutPrivateUHDR, .preserveWithoutPrivateHDR, .preserveNoUHDR, .preserveNoHDR:
         return hasValidCompactOppoCameraTail(outputURL, mode: oppoCameraTail)
     }
 }
@@ -2481,7 +2521,7 @@ private enum XDRemuxProductCore {
         debugRootURL: URL?,
         oppoCompatibility: OppoCompatibility = .off,
         inputProcessingBranch: InputProcessingBranch = .hybrid,
-        oppoCameraTail: OppoCameraTail = .preserve,
+        oppoCameraTail: OppoCameraTail = .preserveWithoutPrivateHDR,
         tmapFormat: TmapFormat = .imageIO
     ) throws -> SampleReport {
         guard fileManager.fileExists(atPath: inputURL.path) else {
@@ -2517,12 +2557,13 @@ private enum XDRemuxProductCore {
             }
         }
 
-        // Complete OPPO preservation requires the source-primary graft path. ImageIO's
+        // OPPO metadata preservation requires the source-primary graft path. ImageIO's
         // direct writer and the experimental passthrough writer may normalize or omit
-        // non-HDR HEIF items before the opaque camera tail is restored.
+        // non-HDR HEIF items before the selected camera tail is restored.
         let effectiveInputProcessingBranch: InputProcessingBranch = (
             oppoCameraTail == .preserve
                 || oppoCameraTail == .preserveWithoutPortrait
+                || oppoCameraTail == .preserveWithoutPortraitOrPrivateHDR
                 || oppoCameraTail == .preserveWithoutPrivateUHDR
                 || oppoCameraTail == .preserveWithoutPrivateHDR
                 || tmapFormat == .strict

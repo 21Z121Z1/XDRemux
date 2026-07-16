@@ -16,7 +16,7 @@ XDRemux 可以将 OPPO、OnePlus、realme 设备拍摄的 ProXDR HEIC 照片转�
 
 | 模式 | 开关 | 结果 |
 |---|---|---|
-| 标准 ISO（默认） | 无 | 输出 ISO 21496-1 HDR；保留源 Base Image、原始通道结构和完整 OPPO/QTI 元数据尾；源数据允许时 Gain Map 最高可达 HEVC RExt 4:4:4 |
+| 标准 ISO（默认） | 无 | 输出 ISO 21496-1 HDR；保留源 Base Image、原始通道结构和非 HDR 的 OPPO/QTI 元数据尾；源数据允许时 Gain Map 最高可达 HEVC RExt 4:4:4 |
 | OPPO 相册兼容 | `--oppo-compatible` | 将 Gain Map 写成 OPPO 相册可消费的 HEVC Main Still Picture 4:2:0，并保留 OPPO 私有元数据尾 |
 | Apple 人像 | `--apple-portrait` | 把 OPPO 人像景深、主体、宠物、头发和光圈信息转换成 Apple disparity、Portrait Effects Matte、Semantic Hair Matte、Focus 与人像元数据 |
 
@@ -42,8 +42,10 @@ ISO Gain Map 图；单通道源保持单通道，未被降采样的三通道源�
 4:4:4/HEVC Range Extensions。已经是 4:2:0 的 Gain Map 不会被伪装成
 4:4:4，因为丢失的色度信息无法恢复。
 
-默认同时保留完整的 OPPO/QTI/FileExtendedContainer 元数据尾，包括水印、
-大师模式、拍摄参数、人像后期数据以及工具尚未识别的厂商字段。
+默认保留 OPPO/QTI/FileExtendedContainer 中的非 HDR 元数据，包括水印、
+大师模式、拍摄参数、人像后期数据以及工具尚未识别的厂商字段；
+`local.uhdr.*`、`local.hdr.*`、`src.local.hdr.*` 和 `hdr.*` 私有 HDR
+条目会被物理移除，标准 ISO Gain Map 图仍是输出中生效的 HDR 显示图。
 
 ### `--oppo-compatible`：OPPO 相册兼容
 
@@ -78,9 +80,9 @@ disparity；OPPO portrait/pet/hair plane 转成 PEM 与 Semantic Hair Matte；
 Vision 只在主体 plane 为空时兜底，并用于选择人脸兴趣 Focus。OPPO 模拟光圈
 会写入 Apple 人像编辑元数据，图像方向由原片自动确定。
 
-Apple 人像模式会省略已经完成语义迁移的大型 OPPO 人像私有尾，避免同时保存
-两套景深资源。它与 `--oppo-compatible` 互斥；同时指定会在写文件前报错。
-Apple 虚化强度映射仍在设备验证阶段。
+Apple 人像模式会省略已经完成语义迁移的大型 OPPO 人像私有尾和私有 HDR 尾，
+避免同时保存重复的景深或 HDR 资源。它与 `--oppo-compatible` 互斥；同时指定
+会在写文件前报错。Apple 虚化强度映射仍在设备验证阶段。
 
 ### Python CLI
 
