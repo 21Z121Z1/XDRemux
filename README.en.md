@@ -21,8 +21,8 @@ Apple output. With no switches, XDRemux uses the standard ISO default.
 |---|---|---|
 | Standard ISO (default) | none | ISO 21496-1 HDR with the source Base Image, channel structure, and non-HDR OPPO/QTI metadata tail; Gain Maps may retain HEVC RExt 4:4:4 when the source supports it |
 | OPPO Gallery compatible | `--oppo-compatible` | Main Still Picture 4:2:0 Gain Map for OPPO Gallery, with the OPPO private metadata tail preserved |
-| Apple Photographic Styles | `--apple-photographic-styles` | Derives StyleEngine coefficients, Linear Thumbnail, Style Delta, per-image statistics, and native-tier semantic auxiliaries from the current input without Apple donor scene payloads |
-| Apple portrait | `--apple-portrait` | Converts OPPO depth/aperture into Apple disparity and Focus; Vision supplies high-resolution person/skin/hair/teeth/glasses while OPPO person/hair planes act as constrained topology priors |
+| Apple Photographic Styles | `--apple-photographic-styles` | Makes the photo editable with Photographic Styles in Apple Photos, including style switching and tone, color, and intensity controls; everything is generated from the current photo |
+| Apple portrait | `--apple-portrait` | Converts an OPPO portrait into a portrait that remains editable in Apple Photos, preserving depth and aperture while improving subject and hair edges |
 
 > [!IMPORTANT]
 > Omitting `--output` or `--output-dir` overwrites inputs. Back up originals
@@ -75,17 +75,16 @@ swift xdremux/swift-cli/XDRemux.swift convert \
   --output IMG_001_styles.heic
 ```
 
-Styles runs Apple LearnProcessor on the same input to produce the 51,840-byte
-Float16 StyleEngine coefficient buffer. Linear Thumbnail, statistics, and
-light maps come from the coherent Base/Gain Map bundle. The verified
-`iPhone18,1 / 23F84` profile uses a neutral 0.5 Style Delta; unknown profiles
-do not inherit that tuning.
+When enabled, XDRemux builds the data Apple Photos needs to edit Photographic
+Styles from the current photo's image, brightness, and color. The result keeps
+HDR and lets you switch styles or adjust Tone, Color, and Intensity. No image
+content or editing data is borrowed from another photo.
 
-Semantic auxiliaries follow the native tiers: sky only without a credible
-person; PEM+skin+sky for a person when Apple Portrait is disabled; no empty
-hair/teeth/glasses are added merely to complete a graph. A valid sparse Vision
-result is not removed solely because its coverage is small, while unavailable
-SPI is a capability error rather than a fake black mask.
+Supporting regions such as people, skin, and sky are added only when they are
+actually found in the photo. Missing regions are not replaced with empty masks,
+while small but valid regions are kept. If the current macOS version lacks a
+required system capability, conversion reports an error instead of creating an
+unreliable file.
 
 ### `--apple-portrait`: convert OPPO portrait depth
 
@@ -101,23 +100,23 @@ swift xdremux/swift-cli/XDRemux.swift batch \
   --output-dir apple_portraits/
 ```
 
-XDRemux reads `src.image`, `rear.depth`, `rear.depth.config`, and Gain Map
-parameters. Base and gain payloads are encoded once and rank becomes Apple
-Float16 disparity. Vision is the high-resolution producer for
-person/skin/hair/teeth/glasses. Geometry-aligned OPPO portrait/pet data may
-supplement only overlapping Vision person topology, while OPPO hair may add
-support only inside the final person matte. OPPO data is never reused as
-skin, teeth, or glasses.
+When enabled, XDRemux reads the depth and aperture already stored in the OPPO
+portrait and converts them into portrait-editing data understood by Apple
+Photos. It analyzes the current photo for the person, skin, hair, and other
+local details, and can use aligned OPPO person and hair masks to improve edges.
+Unrelated regions are not mixed together, and the original focus and simulated
+aperture are preserved where possible.
 
-With both Apple switches, one combined HEIC contains the Portrait family
-(PEM+skin+hair+teeth+glasses) plus the Styles sky matte. HDR Base/Gain Map
-payloads remain single-copy. In batch mode, a non-portrait input still emits
-a styles-only output when Portrait is unavailable.
+Both Apple switches can be enabled together. XDRemux still creates one HEIC
+that keeps HDR, Photographic Styles, and portrait editing. During batch
+conversion, an ordinary non-portrait photo is not skipped merely because it has
+no depth data; if Photographic Styles is also enabled, a styles-editable photo
+is still produced.
 
-Apple portrait mode omits the large OPPO portrait tail and private HDR tail
-after semantic migration, avoiding duplicate depth or HDR resource sets. Any
-Apple output is mutually exclusive with `--oppo-compatible`; enabling both
-fails before writing. Blur-strength mapping is still under device validation.
+Apple output is intended for Apple Photos, while `--oppo-compatible` targets
+OPPO Gallery, so they cannot be enabled together. The command fails before
+writing a file if both are requested. Portrait blur strength may still vary
+between device models and system versions.
 
 ### Python CLI
 
