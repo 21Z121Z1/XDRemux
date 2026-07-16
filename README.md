@@ -20,8 +20,8 @@ Swift CLI 提供三个可选开关。Apple 摄影风格与 Apple 人像是两个
 |---|---|---|
 | 标准 ISO（默认） | 无 | 输出 ISO 21496-1 HDR；保留源 Base Image、原始通道结构和非 HDR 的 OPPO/QTI 元数据尾；源数据允许时 Gain Map 最高可达 HEVC RExt 4:4:4 |
 | OPPO 相册兼容 | `--oppo-compatible` | 将 Gain Map 写成 OPPO 相册可消费的 HEVC Main Still Picture 4:2:0，并保留 OPPO 私有元数据尾 |
-| Apple 摄影风格 | `--apple-photographic-styles` | 从当前输入生成 StyleEngine 系数、Linear Thumbnail、Style Delta、逐图像统计及原生分层语义辅助图；不读取 Apple donor 场景 payload |
-| Apple 人像 | `--apple-portrait` | 把 OPPO 景深和光圈转换成 Apple disparity/Focus；Vision 提供高分辨率 person/skin/hair/teeth/glasses，OPPO person/hair plane 作为受约束拓扑先验 |
+| Apple 摄影风格 | `--apple-photographic-styles` | 让照片在 Apple Photos 中使用摄影风格，并可切换风格或调整色调、色彩和强度；所需数据全部从当前照片生成 |
+| Apple 人像 | `--apple-portrait` | 把 OPPO 人像照片转换成可在 Apple Photos 中继续调整景深和光圈的人像照片，并自动分析人物与头发等区域以改善虚化边缘 |
 
 > [!IMPORTANT]
 > 省略 `--output` 或 `--output-dir` 时会覆写输入文件。转换前请备份原片。
@@ -71,15 +71,13 @@ swift xdremux/swift-cli/XDRemux.swift convert \
   --output IMG_001_styles.heic
 ```
 
-Styles 使用同一输入运行 Apple LearnProcessor，生成 51,840-byte Float16
-StyleEngine coefficient buffer，并从 coherent Base/Gain Map 重建 Linear
-Thumbnail、统计和 light maps。对已验证的 `iPhone18,1 / 23F84` profile，Style
-Delta 写入中性 0.5；未知 profile 不会自动套用该 tuning。
+开启后，XDRemux 会根据当前照片的画面、亮度和色彩生成 Apple Photos 编辑摄影
+风格所需的数据。输出继续保留 HDR，并可在 Photos 中切换风格，或调整色调、
+色彩和强度。整个过程只使用正在转换的照片，不会借用其他照片的画面或编辑数据。
 
-语义辅助图遵循原生分层：无可信人物时仅写 sky；检测到人物但未开启 Apple
-人像时写 PEM+skin+sky；不会为了凑齐图谱写入空的 hair/teeth/glasses。Vision
-成功返回的稀疏 matte 不会仅因覆盖率小而被删除；SPI 不可用则明确报 capability
-error，而不会伪造黑图。
+程序会根据照片中实际出现的人物、皮肤和天空等内容按需添加辅助区域；没有检测到
+的内容不会用空蒙版凑数。面积很小但有效的区域仍会保留。如果当前 macOS 缺少
+必要的系统分析能力，转换会明确报错，而不是生成内容不可靠的文件。
 
 ### `--apple-portrait`：转换 OPPO 人像景深
 
@@ -96,20 +94,18 @@ swift xdremux/swift-cli/XDRemux.swift batch \
   --output-dir apple_portraits/
 ```
 
-XDRemux 自动读取 `src.image`、`rear.depth`、`rear.depth.config` 和 Gain Map
-参数：Base Image/Gain Map 只编码一次；rank plane 转成 Apple Float16
-disparity。Vision 是 person/skin/hair/teeth/glasses 的高分辨率 producer；OPPO
-portrait/pet plane 经过方向和几何对齐后只补充与 Vision 人物拓扑重叠的边界，
-OPPO hair 只允许在最终 person matte 内补充头发。skin、teeth、glasses 不会混入
-OPPO subject/hair 数据。OPPO 模拟光圈会写入 Apple 人像编辑元数据。
+开启后，XDRemux 会读取 OPPO 人像照片原有的景深和光圈信息，并转换成 Apple
+Photos 可以继续编辑的人像数据。程序会分析当前照片中的人物、皮肤、头发和其他
+局部特征，也会在确认位置一致时利用 OPPO 自带的人物和头发蒙版改善边缘。不同
+区域不会被随意混合，原有的对焦位置和模拟光圈也会尽量保留。
 
-同时指定两个 Apple 开关时，输出一个 combined HEIC：Portrait 写入
-PEM+skin+hair+teeth+glasses，Styles 增加 sky，HDR Base/Gain Map 仍只编码一次。
-batch 中 Portrait 不可用的普通照片会继续输出 styles-only 文件。
+两个 Apple 开关可以同时启用，最终仍只生成一个 HEIC 文件，并同时保留 HDR、
+摄影风格和人像编辑能力。批量转换时，普通非人像照片不会因为缺少景深数据而被
+跳过；如果同时开启了摄影风格，它仍会输出可编辑摄影风格的照片。
 
-Apple 人像模式会省略已经完成语义迁移的大型 OPPO 人像私有尾和私有 HDR 尾，
-避免同时保存重复的景深或 HDR 资源。任一 Apple 输出都与 `--oppo-compatible`
-互斥；同时指定会在写文件前报错。Apple 虚化强度映射仍在设备验证阶段。
+Apple 输出面向 Apple Photos，`--oppo-compatible` 则面向 OPPO 相册，两者不能
+同时启用；命令会在写文件前直接报错。不同机型和系统版本之间的人像虚化强度
+可能仍有差异。
 
 ### Python CLI
 
