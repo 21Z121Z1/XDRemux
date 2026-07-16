@@ -49,6 +49,7 @@ struct XDRemuxAppModelTests {
         try testUserFacingCopyUsesClearConversionTerms()
         try testProductPolicyDefaults()
         try testSimplifiedProductSwitches()
+        try testIndependentAppleFeatureConfiguration()
         print("XDRemuxAppModelTests passed")
     }
 
@@ -293,6 +294,8 @@ struct XDRemuxAppModelTests {
         try expect(config.oppoCameraTail == .preserveWithoutPrivateHDR, "default product output should preserve only the non-HDR source tail")
         try expect(!config.oppoGalleryCompatibilityEnabled, "OPPO Gallery compatibility should be opt-in")
         try expect(config.preservesPortraitEditingData, "portrait editing data should default to preserved")
+        try expect(!config.applePhotographicStyles, "Apple Photographic Styles should be opt-in")
+        try expect(!config.applePortrait, "Apple Portrait should be opt-in")
     }
 
     @MainActor
@@ -315,5 +318,38 @@ struct XDRemuxAppModelTests {
 
         config.oppoGalleryCompatibilityEnabled = false
         try expect(config.oppoCameraTail == .preserveWithoutPrivateHDR, "leaving OPPO compatibility should restore the non-HDR default tail")
+    }
+
+    @MainActor
+    private static func testIndependentAppleFeatureConfiguration() throws {
+        var config = ConversionConfig()
+        config.applePhotographicStyles = true
+        config.applePortrait = true
+
+        try expect(config.appleFeaturesEnabled, "either Apple capability should activate the shared writer")
+        let input = URL(fileURLWithPath: "/tmp/input.heic")
+        let output = URL(fileURLWithPath: "/tmp/output.heic")
+        let arguments = try XDRemuxCore.appleFeatureCLIArgumentsForTesting(
+            inputURL: input,
+            outputURL: output,
+            config: config
+        )
+        try expect(arguments.contains("--apple-photographic-styles"), "App must pass the canonical Styles flag")
+        try expect(arguments.contains("--apple-portrait"), "App must pass the independent Portrait flag")
+        try expect(arguments.filter { $0 == "--input" }.count == 1, "App must invoke one shared conversion")
+        try expect(arguments.filter { $0 == "--output" }.count == 1, "combined mode must produce one final HEIC")
+
+        config.applePortrait = false
+        let stylesOnly = try XDRemuxCore.appleFeatureCLIArgumentsForTesting(
+            inputURL: input,
+            outputURL: output,
+            config: config
+        )
+        try expect(stylesOnly.contains("--apple-photographic-styles"), "Styles must not depend on Portrait")
+        try expect(!stylesOnly.contains("--apple-portrait"), "Portrait must stay independently disabled")
+
+        config.applePortrait = true
+        config.oppoGalleryCompatibilityEnabled = true
+        try expect(!config.applePhotographicStyles && !config.applePortrait, "enabling OPPO compatibility must clear incompatible Apple capabilities")
     }
 }

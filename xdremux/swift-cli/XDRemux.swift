@@ -179,14 +179,202 @@ private struct ConvertCommand {
     let debugRootURL: URL?
     let oppoCompatibility: OppoCompatibility
     let inputProcessingBranch: InputProcessingBranch
-    let portraitMode: PortraitMode
+    let appleFeatures: AppleFeatureFlags
     let oppoCameraTail: OppoCameraTail
     let tmapFormat: TmapFormat
+}
+
+private struct AppleFeatureFlags: Hashable, Sendable {
+    let photographicStyles: Bool
+    let portrait: Bool
+
+    static let disabled = AppleFeatureFlags(photographicStyles: false, portrait: false)
+
+    var isEnabled: Bool { photographicStyles || portrait }
+
+    var stableDescription: String {
+        "styles=\(photographicStyles);portrait=\(portrait)"
+    }
 }
 
 private enum PortraitMode: String {
     case on
     case off
+}
+
+private enum AppleEvidenceClass: String, Codable, Sendable {
+    case verified
+    case profileExact = "profile_exact"
+    case sourceDerivedApproximation = "source_derived_approximation"
+    case privateFrameworkIdentity = "private_framework_same_scene_identity"
+    case protocolConstant = "protocol_constant"
+    case unavailable
+}
+
+private struct AppleResourceProvenance: Codable, Sendable {
+    let producer: String
+    let inputSHA256: String
+    let evidence: AppleEvidenceClass
+    let detail: String
+}
+
+private struct SemanticStatistics: Codable, Sendable {
+    let minimum: UInt8
+    let maximum: UInt8
+    let mean: Double
+    let coverage: Double
+}
+
+private struct SemanticProvenance: Codable, Sendable {
+    let requestClass: String
+    let attributeName: String
+    let revision: Int
+    let inputSHA256: String
+    let width: Int
+    let height: Int
+    let pixelFormat: String
+    let orientation: UInt32
+    let orientationTransform: String
+    let fallback: Bool
+}
+
+private struct AppleSemanticMatte: Sendable {
+    let pixels: Data
+    let width: Int
+    let height: Int
+    let bytesPerRow: Int
+    let statistics: SemanticStatistics
+    let provenance: SemanticProvenance
+
+    func thresholdPixelCount(_ threshold: UInt8 = 128) -> Int {
+        pixels.reduce(into: 0) { count, value in
+            if value >= threshold { count += 1 }
+        }
+    }
+
+    var hasCredibleForeground: Bool {
+        guard statistics.maximum >= 128 else { return false }
+        // A fixed percentage would incorrectly discard distant people, teeth,
+        // glasses, and hair. A tiny absolute floor only rejects isolated model
+        // noise while preserving genuinely sparse semantic results.
+        return thresholdPixelCount() >= 16
+    }
+}
+
+private enum AppleSemanticRole: String, CaseIterable, Codable, Sendable {
+    case person
+    case skin
+    case hair
+    case teeth
+    case glasses
+    case sky
+}
+
+private struct AppleSemanticWriteProfile: Sendable {
+    enum Kind: String, Codable, Sendable {
+        case styleSkyOnly = "style_sky_only"
+        case styleHuman = "style_human"
+        case portrait = "portrait"
+        case portraitAndStyles = "portrait_and_styles"
+    }
+
+    let kind: Kind
+    let roles: Set<AppleSemanticRole>
+
+    static let styleSkyOnly = AppleSemanticWriteProfile(
+        kind: .styleSkyOnly,
+        roles: [.sky]
+    )
+    static let styleHuman = AppleSemanticWriteProfile(
+        kind: .styleHuman,
+        roles: [.person, .skin, .sky]
+    )
+    static let portrait = AppleSemanticWriteProfile(
+        kind: .portrait,
+        roles: [.person, .skin, .hair, .teeth, .glasses]
+    )
+    static let portraitAndStyles = AppleSemanticWriteProfile(
+        kind: .portraitAndStyles,
+        roles: Set(AppleSemanticRole.allCases)
+    )
+
+    var orderedRoles: [AppleSemanticRole] {
+        AppleSemanticRole.allCases.filter(roles.contains)
+    }
+}
+
+private struct AppleSemanticSceneAnalysis: Sendable {
+    let person: AppleSemanticMatte?
+    let skin: AppleSemanticMatte?
+    let hair: AppleSemanticMatte?
+    let facialHair: AppleSemanticMatte?
+    let teeth: AppleSemanticMatte?
+    let glasses: AppleSemanticMatte?
+    let sky: AppleSemanticMatte?
+
+    var hasCrediblePerson: Bool {
+        person?.hasCredibleForeground == true
+    }
+
+    var nativeStyleWriteProfile: AppleSemanticWriteProfile {
+        hasCrediblePerson ? .styleHuman : .styleSkyOnly
+    }
+}
+
+private struct OPPOScenePackage: Sendable {
+    enum BundleSource: String, Codable, Sendable {
+        case srcImage = "src.image"
+        case outerPrimary = "outer_primary"
+    }
+
+    let inputURL: URL
+    let inputSHA256: String
+    let bundleSource: BundleSource
+    let baseImageURL: URL
+    let gainMapJPEG: Data
+    let gainMapInfo: [Double]
+    let orientation: UInt32
+    let semanticAnalysis: AppleSemanticSceneAnalysis
+    let hdrTransformDataSHA256: String?
+}
+
+private struct ApplePhotographicStylePayload: Sendable {
+    let styleData: Data
+    let stylePropertyList: Data
+    let linearThumbnailHEVC: Data
+    let linearThumbnailHVCC: Data
+    let linearThumbnailWidth: Int
+    let linearThumbnailHeight: Int
+    let styleDeltaHEVC: Data
+    let styleDeltaHVCC: Data
+    let styleDeltaTileWidth: Int
+    let styleDeltaTileHeight: Int
+    let styleDeltaGridWidth: Int
+    let styleDeltaGridHeight: Int
+    let styleDeltaRows: Int
+    let styleDeltaColumns: Int
+    let photoIdentifier: String
+    let manifestJSON: Data
+    let resourceProvenance: [String: AppleResourceProvenance]
+}
+
+private struct ApplePortraitPayload {
+    let isAvailable: Bool
+    let unavailableReason: String?
+    let disparity: CFDictionary?
+    let portraitEffectsMatte: CFDictionary?
+    let skinMatte: CFDictionary?
+    let hairMatte: CFDictionary?
+    let teethMatte: CFDictionary?
+    let glassesMatte: CFDictionary?
+}
+
+private struct AppleHEIFWritePlan {
+    let standardHDRURL: URL
+    let styles: ApplePhotographicStylePayload
+    let portrait: ApplePortraitPayload?
+    let primaryEncodedOnce: Bool
+    let gainMapEncodedOnce: Bool
 }
 
 private struct BatchCommand {
@@ -197,7 +385,7 @@ private struct BatchCommand {
     let debugRootURL: URL?
     let oppoCompatibility: OppoCompatibility
     let inputProcessingBranch: InputProcessingBranch
-    let portraitMode: PortraitMode
+    let appleFeatures: AppleFeatureFlags
     let oppoCameraTail: OppoCameraTail
     let tmapFormat: TmapFormat
     let jobs: Int
@@ -2975,8 +3163,9 @@ struct LHDRToISOHDRCLI {
     private static let fileManager = FileManager.default
     private static let usage = """
     Usage:
-             XDRemux.swift convert --input <file.heic> [--output <out.heic>] [--oppo-compatible|--apple-portrait] [--discard-portrait-data] [--debug-dir <dir>]
-             XDRemux.swift batch --input-dir <dir> [--output-dir <dir>] [--glob *.heic] [--jobs <n>] [--oppo-compatible|--apple-portrait] [--discard-portrait-data] [--checkpoint <file>] [--resume|--no-resume] [--skip-existing|--no-skip-existing] [--debug-dir <dir>]
+             XDRemux.swift convert --input <file.heic> [--output <out.heic>] [--apple-photographic-styles] [--apple-portrait] [--oppo-compatible] [--discard-portrait-data] [--debug-dir <dir>]
+             XDRemux.swift batch --input-dir <dir> [--output-dir <dir>] [--glob *.heic] [--jobs <n>] [--apple-photographic-styles] [--apple-portrait] [--oppo-compatible] [--discard-portrait-data] [--checkpoint <file>] [--resume|--no-resume] [--skip-existing|--no-skip-existing] [--debug-dir <dir>]
+             XDRemux.swift validate-apple --input <file.heic> [--expect-portrait] [--json <report.json>]
 
     Notes:
       - Product output always uses the metadata-preserving source-primary remux path.
@@ -2992,13 +3181,19 @@ struct LHDRToISOHDRCLI {
       - Only the active Gain Map graph and its required container descriptions may change.
       - Batch defaults: --jobs min(cpu,4), --resume, --skip-existing.
       - A JSONL checkpoint is written under output-dir by default; it is deleted only when the batch finishes with zero failures.
+      - --apple-photographic-styles enables donor-free Apple Photographic Styles generation.
+        --apple-styles is accepted as a short alias; manifests and documentation use the canonical name.
+        Styles-only semantics follow native role tiers: sky-only without a credible person,
+        or PEM+skin+sky when a person is present.
       - --apple-portrait requires rear.depth + rear.depth.config + src.image. The UserComment
         portrait bit is the strong route; an explicit run can recover a missing bit with a warning.
-        It maps OPPO portrait/pet/hair planes to Apple mattes, generates Focus, and restores
-        first-assembly base/gain HEVC payloads without re-encoding them.
-      - Batch --apple-portrait automatically filters non-portrait inputs instead of failing them.
-      - Apple portrait and OPPO-compatible output are mutually exclusive product modes. Apple portrait
-        output omits the redundant large OPPO portrait tail; without the switch, that tail stays intact.
+        Vision supplies high-resolution person/skin/hair/teeth/glasses mattes. Geometry-aligned
+        OPPO subject/hair planes are constrained topology priors for person/hair only. The writer
+        restores first-assembly base/gain HEVC payloads without re-encoding them.
+      - Photographic Styles and Apple Portrait are independent and may be enabled together.
+        In a combined batch, a non-portrait input still produces styles output and records Portrait unavailable.
+      - Apple feature output and OPPO-compatible output remain mutually exclusive. Apple Portrait output
+        omits the redundant large OPPO portrait tail; without that capability, the normal tail policy applies.
       - If --output is omitted, the input file is overwritten in place.
       - If --output-dir is omitted, files are written to the input directory.
     """
@@ -3017,6 +3212,8 @@ struct LHDRToISOHDRCLI {
             case "batch":
                 let cmd = try parseBatch(Array(args.dropFirst()))
                 try runBatch(cmd)
+            case "validate-apple":
+                try runAppleValidation(Array(args.dropFirst()))
             case "-h", "--help", "help":
                 print(usage)
             default:
@@ -3039,11 +3236,61 @@ struct LHDRToISOHDRCLI {
         }
     }
 
+    private static func runAppleValidation(_ rawArgs: [String]) throws {
+        var inputURL: URL?
+        var reportURL: URL?
+        var expectsPortrait = false
+        var index = 0
+        while index < rawArgs.count {
+            let option = rawArgs[index]
+            index += 1
+            func nextValue() throws -> String {
+                guard index < rawArgs.count else { throw CLIError.missingArgument(option) }
+                defer { index += 1 }
+                return rawArgs[index]
+            }
+            switch option {
+            case "--input":
+                inputURL = URL(fileURLWithPath: try nextValue()).standardizedFileURL
+            case "--expect-portrait":
+                expectsPortrait = true
+            case "--json":
+                reportURL = URL(fileURLWithPath: try nextValue()).standardizedFileURL
+            default:
+                throw CLIError.unknownOption(option)
+            }
+        }
+        guard let inputURL else { throw CLIError.missingArgument("--input") }
+        let report = try ApplePhotographicStylesPipeline.validateExistingOutput(
+            inputURL,
+            expectsPortrait: expectsPortrait
+        )
+        let data = try JSONSerialization.data(
+            withJSONObject: report,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        if let reportURL {
+            try ensureDirectory(reportURL.deletingLastPathComponent(), fileManager: fileManager)
+            try data.write(to: reportURL, options: .atomic)
+        }
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+
     private static func runConvert(_ cmd: ConvertCommand) throws {
+        if cmd.appleFeatures.photographicStyles {
+            try ApplePhotographicStylesPipeline.convert(
+                inputURL: cmd.inputURL,
+                outputURL: cmd.outputURL,
+                command: cmd
+            )
+            print("converted \(cmd.inputURL.lastPathComponent) -> \(cmd.outputURL.path) [\(cmd.appleFeatures.stableDescription)]")
+            return
+        }
         if try PortraitConversionPipeline.convertIfNeeded(
             inputURL: cmd.inputURL,
             outputURL: cmd.outputURL,
-            mode: cmd.portraitMode
+            mode: cmd.appleFeatures.portrait ? .on : .off
         ) {
             print("converted OPPO portrait \(cmd.inputURL.lastPathComponent) -> \(cmd.outputURL.path)")
             return
@@ -3064,16 +3311,7 @@ struct LHDRToISOHDRCLI {
     private static func runBatch(_ cmd: BatchCommand) throws {
         try ensureDirectory(cmd.outputDirURL, fileManager: fileManager)
         let discovered = try enumerateInputs(root: cmd.inputDirURL, glob: cmd.glob)
-        let matched: [URL]
-        if cmd.portraitMode == .on {
-            matched = discovered.filter { PortraitConversionPipeline.isConvertibleInput($0) }
-            let skipped = discovered.count - matched.count
-            if skipped > 0 {
-                print("apple-portrait filter: selected \(matched.count), skipped \(skipped) non-portrait files")
-            }
-        } else {
-            matched = discovered
-        }
+        let matched = discovered
         guard !matched.isEmpty else {
             throw CLIError.noFilesMatched(cmd.inputDirURL, cmd.glob)
         }
@@ -3155,7 +3393,14 @@ struct LHDRToISOHDRCLI {
 
                     func isOutputValid() -> Bool {
                         guard fileManager.fileExists(atPath: item.outputURL.path) else { return false }
-                        if cmd.portraitMode == .on {
+                        if cmd.appleFeatures.isEnabled {
+                            if cmd.appleFeatures.photographicStyles {
+                                return ApplePhotographicStylesPipeline.isValidOutput(
+                                    item.outputURL,
+                                    expectsPortrait: cmd.appleFeatures.portrait
+                                        && PortraitConversionPipeline.isConvertibleInput(item.inputURL)
+                                )
+                            }
                             return PortraitConversionPipeline.isValidOutput(item.outputURL)
                         }
                         return isValidOutput(
@@ -3204,15 +3449,19 @@ struct LHDRToISOHDRCLI {
                     }
 
                     do {
-                        if cmd.portraitMode == .on {
+                        if cmd.appleFeatures.photographicStyles {
+                            try ApplePhotographicStylesPipeline.convert(
+                                inputURL: item.inputURL,
+                                outputURL: item.outputURL,
+                                command: cmd
+                            )
+                        } else if cmd.appleFeatures.portrait {
                             guard try PortraitConversionPipeline.convertIfNeeded(
                                 inputURL: item.inputURL,
                                 outputURL: item.outputURL,
                                 mode: .on
                             ) else {
-                                throw CLIError.invalidContainer(
-                                    "input stopped matching the OPPO portrait requirements"
-                                )
+                                throw CLIError.invalidContainer("Apple Portrait unavailable for this input")
                             }
                         } else {
                             _ = try XDRemuxProductCore.convert(
@@ -3468,7 +3717,7 @@ struct LHDRToISOHDRCLI {
             ("inputProcessing", cmd.inputProcessingBranch.rawValue),
             ("oppoCameraTail", cmd.oppoCameraTail.rawValue),
             ("oppoCompat", cmd.oppoCompatibility.rawValue),
-            ("portraitMode", cmd.portraitMode.rawValue),
+            ("appleFeatures", cmd.appleFeatures.stableDescription),
             ("tmapFormat", cmd.tmapFormat.rawValue),
             ("outputDir", cmd.outputDirURL.standardizedFileURL.path)
         ]
@@ -3503,6 +3752,7 @@ struct LHDRToISOHDRCLI {
         var oppoCompatibility: OppoCompatibility = .off
         var inputProcessingBranch = InputProcessingBranch.hybrid
         var applePortraitEnabled = false
+        var applePhotographicStylesEnabled = false
         var oppoCompatibilityWasExplicit = false
         var oppoCameraTail = OppoCameraTail.preserveWithoutPrivateHDR
         var oppoCameraTailWasExplicit = false
@@ -3523,6 +3773,8 @@ struct LHDRToISOHDRCLI {
             }
 
             switch option {
+            case "--apple-photographic-styles", "--apple-styles":
+                applePhotographicStylesEnabled = true
             case "--apple-portrait":
                 applePortraitEnabled = true
             case "--input":
@@ -3580,15 +3832,23 @@ struct LHDRToISOHDRCLI {
 
         guard let inputPath else { throw CLIError.missingArgument("--input") }
 
-        if applePortraitEnabled, oppoCompatibilityWasExplicit, oppoCompatibility.wantsOppoCompat {
+        let appleFeatures = AppleFeatureFlags(
+            photographicStyles: applePhotographicStylesEnabled,
+            portrait: applePortraitEnabled
+        )
+        if appleFeatures.isEnabled, oppoCompatibilityWasExplicit, oppoCompatibility.wantsOppoCompat {
             throw CLIError.invalidValue(
-                option: "--apple-portrait",
+                option: applePhotographicStylesEnabled ? "--apple-photographic-styles" : "--apple-portrait",
                 value: "cannot be combined with OPPO-compatible output"
             )
         }
-        if applePortraitEnabled {
+        if appleFeatures.isEnabled {
             oppoCompatibility = .off
-            oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
+            if applePortraitEnabled {
+                oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
+            } else if !oppoCameraTailWasExplicit {
+                oppoCameraTail = .preserveWithoutPrivateHDR
+            }
         } else if discardPortraitData, !oppoCameraTailWasExplicit {
             oppoCameraTail = oppoCompatibility.wantsOppoCompat
                 ? .preserveWithoutPortrait
@@ -3604,7 +3864,7 @@ struct LHDRToISOHDRCLI {
             debugRootURL: debugDirPath.map { URL(fileURLWithPath: $0) },
             oppoCompatibility: oppoCompatibility,
             inputProcessingBranch: inputProcessingBranch,
-            portraitMode: applePortraitEnabled ? .on : .off,
+            appleFeatures: appleFeatures,
             oppoCameraTail: oppoCameraTail,
             tmapFormat: tmapFormat
         )
@@ -3619,6 +3879,7 @@ struct LHDRToISOHDRCLI {
         var oppoCompatibility: OppoCompatibility = .off
         var inputProcessingBranch = InputProcessingBranch.hybrid
         var applePortraitEnabled = false
+        var applePhotographicStylesEnabled = false
         var oppoCompatibilityWasExplicit = false
         var oppoCameraTail = OppoCameraTail.preserveWithoutPrivateHDR
         var oppoCameraTailWasExplicit = false
@@ -3643,6 +3904,8 @@ struct LHDRToISOHDRCLI {
             }
 
             switch option {
+            case "--apple-photographic-styles", "--apple-styles":
+                applePhotographicStylesEnabled = true
             case "--apple-portrait":
                 applePortraitEnabled = true
             case "--input-dir":
@@ -3717,15 +3980,23 @@ struct LHDRToISOHDRCLI {
 
         guard let inputDirPath else { throw CLIError.missingArgument("--input-dir") }
 
-        if applePortraitEnabled, oppoCompatibilityWasExplicit, oppoCompatibility.wantsOppoCompat {
+        let appleFeatures = AppleFeatureFlags(
+            photographicStyles: applePhotographicStylesEnabled,
+            portrait: applePortraitEnabled
+        )
+        if appleFeatures.isEnabled, oppoCompatibilityWasExplicit, oppoCompatibility.wantsOppoCompat {
             throw CLIError.invalidValue(
-                option: "--apple-portrait",
+                option: applePhotographicStylesEnabled ? "--apple-photographic-styles" : "--apple-portrait",
                 value: "cannot be combined with OPPO-compatible output"
             )
         }
-        if applePortraitEnabled {
+        if appleFeatures.isEnabled {
             oppoCompatibility = .off
-            oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
+            if applePortraitEnabled {
+                oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
+            } else if !oppoCameraTailWasExplicit {
+                oppoCameraTail = .preserveWithoutPrivateHDR
+            }
         } else if discardPortraitData, !oppoCameraTailWasExplicit {
             oppoCameraTail = oppoCompatibility.wantsOppoCompat
                 ? .preserveWithoutPortrait
@@ -3742,7 +4013,7 @@ struct LHDRToISOHDRCLI {
             debugRootURL: debugDirPath.map { URL(fileURLWithPath: $0) },
             oppoCompatibility: oppoCompatibility,
             inputProcessingBranch: inputProcessingBranch,
-            portraitMode: applePortraitEnabled ? .on : .off,
+            appleFeatures: appleFeatures,
             oppoCameraTail: oppoCameraTail,
             tmapFormat: tmapFormat,
             jobs: jobs,
@@ -4092,7 +4363,26 @@ private let isoDinfBox = Data([
     0x00, 0x00, 0x00, 0x0c, 0x75, 0x72, 0x6c, 0x20,
     0x00, 0x00, 0x00, 0x01,
 ])
-private let isoIrotBox = Data([0x00, 0x00, 0x00, 0x09, 0x69, 0x72, 0x6f, 0x74, 0x00])
+private func exifOrientation(at url: URL) -> UInt32 {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
+        return 1
+    }
+    return (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
+}
+
+private func isoIrotBox(exifOrientation: UInt32) -> Data {
+    // HEIF irot stores counter-clockwise quarter turns. Exif 6 is 90 degrees
+    // clockwise and therefore maps to irot=3; Exif 8 maps to irot=1.
+    let quarterTurnsCCW: UInt8
+    switch exifOrientation {
+    case 3: quarterTurnsCCW = 2
+    case 6: quarterTurnsCCW = 3
+    case 8: quarterTurnsCCW = 1
+    default: quarterTurnsCCW = 0
+    }
+    return Data([0x00, 0x00, 0x00, 0x09, 0x69, 0x72, 0x6f, 0x74, quarterTurnsCCW])
+}
 private let isoColrSRGBBox = Data([
     0x00, 0x00, 0x00, 0x13, 0x63, 0x6f, 0x6c, 0x72,
     0x6e, 0x63, 0x6c, 0x78, 0x00, 0x02, 0x00, 0x02,
@@ -4241,12 +4531,11 @@ private func parseISOBMFFIInf(_ data: Data, _ box: ISOBMFFBox) -> (version: UInt
         let v = data[child.dataStart]
         var p = child.dataStart + 4
         if v >= 2 {
-            let typeAtU16 = String(data: data.subdata(in: p + 4..<p + 8), encoding: .ascii) ?? ""
             let itemID: Int
-            if ["hvc1", "grid", "Exif", "mime", "tmap", "jpeg"].contains(typeAtU16) {
-                itemID = readUInt16BEUnchecked(data, at: p); p += 2
-            } else {
+            if v >= 3 {
                 itemID = readUInt32BEUnchecked(data, at: p); p += 4
+            } else {
+                itemID = readUInt16BEUnchecked(data, at: p); p += 2
             }
             p += 2
             let type = String(data: data.subdata(in: p..<p + 4), encoding: .isoLatin1) ?? "????"
@@ -4263,14 +4552,18 @@ private func parseISOBMFFPITM(_ data: Data, _ box: ISOBMFFBox) -> Int {
     return version == 0 ? readUInt16BEUnchecked(data, at: pos) : readUInt32BEUnchecked(data, at: pos)
 }
 
-private func parseISOBMFFIPMA(_ data: Data, _ box: ISOBMFFBox) -> (flags: Int, entries: [ISOBMFFIPMAEntry]) {
+private func parseISOBMFFIPMA(
+    _ data: Data,
+    _ box: ISOBMFFBox
+) -> (version: UInt8, flags: Int, entries: [ISOBMFFIPMAEntry]) {
+    let version = data[box.dataStart]
     let flags = (Int(data[box.dataStart + 1]) << 16) | (Int(data[box.dataStart + 2]) << 8) | Int(data[box.dataStart + 3])
     var pos = box.dataStart + 4
     let count = readUInt32BEUnchecked(data, at: pos); pos += 4
     var entries: [ISOBMFFIPMAEntry] = []
     for _ in 0..<count {
         let itemID: Int
-        if flags & 1 != 0 {
+        if version >= 1 {
             itemID = readUInt32BEUnchecked(data, at: pos); pos += 4
         } else {
             itemID = readUInt16BEUnchecked(data, at: pos); pos += 2
@@ -4286,7 +4579,7 @@ private func parseISOBMFFIPMA(_ data: Data, _ box: ISOBMFFBox) -> (flags: Int, e
         }
         entries.append(ISOBMFFIPMAEntry(itemID: itemID, associations: associations))
     }
-    return (flags, entries)
+    return (version, flags, entries)
 }
 
 private func parseISOBMFFIRefVersion(_ data: Data, _ box: ISOBMFFBox?) -> UInt8 {
@@ -4546,6 +4839,91 @@ private func makeMimeInfeBox(itemID: Int, flags: Int = 0) -> Data {
     return makeBox("infe", payload: payload)
 }
 
+private func makeURIInfeBox(
+    itemID: Int,
+    name: String,
+    uri: String,
+    flags: Int = 1
+) -> Data {
+    var payload = Data([2, UInt8((flags >> 16) & 0xff), UInt8((flags >> 8) & 0xff), UInt8(flags & 0xff)])
+    appendUInt16BE(itemID, to: &payload)
+    appendUInt16BE(0, to: &payload)
+    payload.append(Data("uri ".utf8))
+    payload.append(Data(name.utf8)); payload.append(0)
+    payload.append(Data(uri.utf8)); payload.append(0)
+    return makeBox("infe", payload: payload)
+}
+
+private func remapInfeItemID(_ rawBox: Data, to itemID: Int) throws -> Data {
+    guard rawBox.count >= 14,
+          String(data: rawBox.subdata(in: 4..<8), encoding: .ascii) == "infe" else {
+        throw CLIError.invalidContainer("cannot remap malformed infe box")
+    }
+    var output = rawBox
+    let version = output[8]
+    if version >= 3 {
+        guard output.count >= 16 else {
+            throw CLIError.invalidContainer("cannot remap truncated infe v3 box")
+        }
+        output[12] = UInt8((itemID >> 24) & 0xff)
+        output[13] = UInt8((itemID >> 16) & 0xff)
+        output[14] = UInt8((itemID >> 8) & 0xff)
+        output[15] = UInt8(itemID & 0xff)
+    } else {
+        guard itemID <= 65_535 else {
+            throw CLIError.invalidContainer("infe v2 item ID exceeds UInt16")
+        }
+        output[12] = UInt8((itemID >> 8) & 0xff)
+        output[13] = UInt8(itemID & 0xff)
+    }
+    return output
+}
+
+private func makePixiBox(bits: [UInt8]) -> Data {
+    makeBox("pixi", payload: Data([0, 0, 0, 0, UInt8(bits.count)] + bits))
+}
+
+private func makeAuxCBox(_ urn: String) -> Data {
+    var payload = Data([0, 0, 0, 0])
+    payload.append(Data(urn.utf8)); payload.append(0)
+    return makeBox("auxC", payload: payload)
+}
+
+private func makeIrotBox(_ quarterTurnsCounterclockwise: UInt8 = 0) -> Data {
+    makeBox("irot", payload: Data([quarterTurnsCounterclockwise & 0x03]))
+}
+
+private func makeICCColorBox(_ colorSpace: CGColorSpace) throws -> Data {
+    guard let profile = colorSpace.copyICCData() else {
+        throw CLIError.invalidContainer("cannot serialize Apple auxiliary ICC profile")
+    }
+    var payload = Data("prof".utf8)
+    payload.append(profile as Data)
+    return makeBox("colr", payload: payload)
+}
+
+private func makeGridPayload(
+    rows: Int,
+    columns: Int,
+    width: Int,
+    height: Int
+) throws -> Data {
+    guard (1...256).contains(rows), (1...256).contains(columns),
+          width > 0, height > 0 else {
+        throw CLIError.invalidContainer("invalid HEIF grid geometry")
+    }
+    let large = width > 65_535 || height > 65_535
+    var payload = Data([0, large ? 1 : 0, UInt8(rows - 1), UInt8(columns - 1)])
+    if large {
+        appendUInt32BE(width, to: &payload)
+        appendUInt32BE(height, to: &payload)
+    } else {
+        appendUInt16BE(width, to: &payload)
+        appendUInt16BE(height, to: &payload)
+    }
+    return payload
+}
+
 private func makeIspeBox(width: Int, height: Int) -> Data {
     var payload = Data([0, 0, 0, 0])
     appendUInt32BE(width, to: &payload)
@@ -4564,12 +4942,17 @@ private func makeIrefBox(type: String, from: Int, to: [Int], version: UInt8) -> 
     return makeBox(type, payload: payload)
 }
 
-private func makeIPMAEntry(_ itemID: Int, _ assocs: [(Int, Bool)], flags: Int) throws -> Data {
+private func makeIPMAEntry(
+    _ itemID: Int,
+    _ assocs: [(Int, Bool)],
+    flags: Int,
+    version: UInt8 = 0
+) throws -> Data {
     if flags & 1 == 0, assocs.contains(where: { $0.0 > 0x7f }) {
         throw CLIError.invalidContainer("ipma property index exceeds 7-bit association limit")
     }
     var out = Data()
-    if flags & 1 != 0 { appendUInt32BE(itemID, to: &out) } else { appendUInt16BE(itemID, to: &out) }
+    if version >= 1 { appendUInt32BE(itemID, to: &out) } else { appendUInt16BE(itemID, to: &out) }
     out.append(UInt8(assocs.count))
     for (index, essential) in assocs {
         if flags & 1 != 0 {
@@ -4696,6 +5079,7 @@ private func writeHybridPrimaryPassthrough(
 ) throws {
     let source = try Data(contentsOf: sourceURL)
     let preserved = try Data(contentsOf: preservedURL)
+    let sourceOrientation = exifOrientation(at: sourceURL)
 
     let sourceTop = isobmffBoxes(in: source, start: 0, end: source.count)
     let preservedTop = isobmffBoxes(in: preserved, start: 0, end: preserved.count)
@@ -4948,7 +5332,7 @@ private func writeHybridPrimaryPassthrough(
     if !primaryHasPropertyType("irot") {
         let irotOutputIndex = sourceProps.count + propertyIndexMap.count + 1
         propertyIndexMap[-2] = irotOutputIndex
-        ipcoPayload.append(isoIrotBox)
+        ipcoPayload.append(isoIrotBox(exifOrientation: sourceOrientation))
         primaryAssocs.append((irotOutputIndex, true))
     }
 
@@ -4961,18 +5345,18 @@ private func writeHybridPrimaryPassthrough(
         } else {
             assocs = assocPairs(entry.associations, flags: sourceIPMA.flags)
         }
-        ipmaEntries.append(try makeIPMAEntry(entry.itemID, assocs, flags: sourceIPMA.flags))
+        ipmaEntries.append(try makeIPMAEntry(entry.itemID, assocs, flags: sourceIPMA.flags, version: sourceIPMA.version))
         ipmaEntryCount += 1
     }
     if sourceIPMAByID[sourcePrimaryID] == nil {
-        ipmaEntries.append(try makeIPMAEntry(sourcePrimaryID, primaryAssocs, flags: sourceIPMA.flags))
+        ipmaEntries.append(try makeIPMAEntry(sourcePrimaryID, primaryAssocs, flags: sourceIPMA.flags, version: sourceIPMA.version))
         ipmaEntryCount += 1
     }
     for tile in gainTilePayloads {
         guard let preservedEntry = preservedIPMAByID[tile.oldID] else {
             throw CLIError.invalidContainer("preserve gain tile \(tile.oldID) has no ipma entry")
         }
-        ipmaEntries.append(try makeIPMAEntry(tile.newID, try remapPreservedAssocs(preservedEntry.associations), flags: sourceIPMA.flags))
+        ipmaEntries.append(try makeIPMAEntry(tile.newID, try remapPreservedAssocs(preservedEntry.associations), flags: sourceIPMA.flags, version: sourceIPMA.version))
         ipmaEntryCount += 1
     }
     guard let preservedGainGridIPMA = preservedIPMAByID[preservedGainGridID],
@@ -4993,7 +5377,7 @@ private func writeHybridPrimaryPassthrough(
         ipcoPayload.append(isoAuxCBox)
         gainGridAssocs.append((auxCOutputIndex, true))
     }
-    ipmaEntries.append(try makeIPMAEntry(outputGainGridID, gainGridAssocs, flags: sourceIPMA.flags))
+    ipmaEntries.append(try makeIPMAEntry(outputGainGridID, gainGridAssocs, flags: sourceIPMA.flags, version: sourceIPMA.version))
     ipmaEntryCount += 1
     let preservedTmapAssocPairs = assocPairs(preservedTmapIPMA.associations, flags: preservedIPMA.flags)
     let preservedTmapColorAssoc = preservedTmapAssocPairs.first { propertyType($0, in: preservedPropsByIndex) == "colr" }
@@ -5009,7 +5393,7 @@ private func writeHybridPrimaryPassthrough(
     } else if let preservedTmapColorAssoc {
         tmapAssocs.insert((try mapPreservedProperty(preservedTmapColorAssoc.0), preservedTmapColorAssoc.1), at: 0)
     }
-    ipmaEntries.append(try makeIPMAEntry(outputTmapID, tmapAssocs, flags: sourceIPMA.flags))
+    ipmaEntries.append(try makeIPMAEntry(outputTmapID, tmapAssocs, flags: sourceIPMA.flags, version: sourceIPMA.version))
     ipmaEntryCount += 1
 
     var ipmaPayload = source.subdata(in: sourceIPMABox.dataStart..<sourceIPMABox.dataStart + 4)
@@ -5265,6 +5649,7 @@ private func writePrivateJPEGPassthroughOutput(
     let propMask = ipma.flags & 1 != 0 ? 0x7fff : 0x7f
     let primaryAssocs = ipma.entries.first(where: { $0.itemID == primaryID })?.associations ?? []
     let primaryPropIndices = primaryAssocs.map { $0 & propMask }
+    let primaryHasIrot = primaryPropIndices.contains { ipco.types[$0] == "irot" }
     guard let primaryIspeIndex = primaryPropIndices.first(where: { ipco.types[$0] == "ispe" }),
           ipco.sizes[primaryIspeIndex] != nil else {
         throw CLIError.invalidContainer("primary item has no ispe")
@@ -5359,7 +5744,7 @@ private func writePrivateJPEGPassthroughOutput(
         case "iprp":
             var ipcoPayload = src.subdata(in: ipco.box.dataStart..<ipco.box.dataEnd)
             ipcoPayload.append(isoAuxCBox)
-            ipcoPayload.append(isoIrotBox)
+            ipcoPayload.append(isoIrotBox(exifOrientation: exifOrientation(at: inputURL)))
             ipcoPayload.append(isoColrSRGBBox)
             ipcoPayload.append(isoPixiRGB8Box)
             ipcoPayload.append(isoPixiRGB10Box)
@@ -5376,7 +5761,7 @@ private func writePrivateJPEGPassthroughOutput(
                 var associations = entry.associations
                 if entry.itemID == primaryID {
                     let rawIrot = (ipma.flags & 1 != 0 ? 0x8000 : 0x80) | irotIndex
-                    if !associations.contains(where: { ($0 & propMask) == irotIndex }) {
+                    if !primaryHasIrot {
                         associations.append(rawIrot)
                     }
                     if let primaryColrIndex,
@@ -5390,8 +5775,8 @@ private func writePrivateJPEGPassthroughOutput(
                     if ipma.flags & 1 != 0 { appendUInt16BE(assoc, to: &ipmaPayload) } else { ipmaPayload.append(UInt8(assoc)) }
                 }
             }
-            ipmaPayload.append(try makeIPMAEntry(gainMapID, [(gmIspeIndex, true), (gmPixiIndex, true), (srgbIndex, true), (irotIndex, true), (auxCIndex, true)], flags: ipma.flags))
-            ipmaPayload.append(try makeIPMAEntry(tmapID, [(primaryIspeIndex, true), (tmapPixiIndex, true), (tmapColrIndex, true)], flags: ipma.flags))
+            ipmaPayload.append(try makeIPMAEntry(gainMapID, [(gmIspeIndex, true), (gmPixiIndex, true), (srgbIndex, true), (irotIndex, true), (auxCIndex, true)], flags: ipma.flags, version: ipma.version))
+            ipmaPayload.append(try makeIPMAEntry(tmapID, [(primaryIspeIndex, true), (tmapPixiIndex, true), (tmapColrIndex, true)], flags: ipma.flags, version: ipma.version))
             let ipmaPart = makeBox("ipma", payload: ipmaPayload)
             var iprpPayload = Data()
             iprpPayload.append(ipcoPart)
@@ -5737,6 +6122,8 @@ private struct PortraitDepthHeader {
 }
 
 private struct OPPODepthPlanes {
+    let width: Int
+    let height: Int
     let ranks: Data
     let hair: Data?
     let portrait: Data?
@@ -5767,7 +6154,2672 @@ private struct OPPODepthPlanes {
     }
 }
 
+private enum AppleNativeToolchain {
+    struct Result {
+        let status: Int32
+        let stdout: Data
+        let stderr: Data
+    }
+
+    private static let compileLock = NSLock()
+
+    static func semanticExecutable() throws -> URL {
+        let source = try resourceURL(
+            subdirectory: "Native",
+            name: "apple_vision_semantic_mattes.swift"
+        )
+        return try compile(
+            source: source,
+            executableName: "apple-vision-semantic-mattes",
+            arguments: ["swiftc", source.path]
+        )
+    }
+
+    static func learnExecutable() throws -> URL {
+        let source = try resourceURL(
+            subdirectory: "Native",
+            name: "learnnode_coefficient_probe.m"
+        )
+        return try compile(
+            source: source,
+            executableName: "learnnode-coefficient-probe",
+            arguments: [
+                "clang", "-fobjc-arc", "-fblocks",
+                "-framework", "Foundation",
+                "-framework", "CoreImage",
+                "-framework", "ImageIO",
+                "-framework", "Metal",
+                "-framework", "CoreGraphics",
+                source.path,
+            ]
+        )
+    }
+
+    static func hevcEncoderExecutable() throws -> URL {
+        let source = try resourceURL(
+            subdirectory: "Native",
+            name: "apple_vt_hevc_encoder.swift"
+        )
+        return try compile(
+            source: source,
+            executableName: "apple-vt-hevc-encoder",
+            arguments: ["swiftc", "-O", source.path]
+        )
+    }
+
+    static func stylePropertiesProbeExecutable() throws -> URL {
+        let source = try resourceURL(
+            subdirectory: "Validation",
+            name: "apple_semantic_style_properties_probe.m"
+        )
+        return try compile(
+            source: source,
+            executableName: "apple-semantic-style-properties-probe",
+            arguments: [
+                "clang", "-fobjc-arc",
+                "-framework", "Foundation",
+                source.path,
+            ]
+        )
+    }
+
+    static func run(_ executableURL: URL, arguments: [String]) throws -> Result {
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        let output = Pipe()
+        let errors = Pipe()
+        process.standardOutput = output
+        process.standardError = errors
+        do {
+            try process.run()
+        } catch {
+            throw CLIError.invalidContainer(
+                "cannot launch Apple feature helper \(executableURL.lastPathComponent): \(error)"
+            )
+        }
+        let stdout = output.fileHandleForReading.readDataToEndOfFile()
+        let stderr = errors.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return Result(status: process.terminationStatus, stdout: stdout, stderr: stderr)
+    }
+
+    private static func resourceURL(subdirectory: String, name: String) throws -> URL {
+        let fileManager = FileManager.default
+        var candidates: [URL] = []
+        if let override = ProcessInfo.processInfo.environment["XDREMUX_APPLE_PLATFORM_ROOT"] {
+            candidates.append(
+                URL(fileURLWithPath: override, isDirectory: true)
+                    .appendingPathComponent(subdirectory, isDirectory: true)
+                    .appendingPathComponent(name)
+            )
+        }
+        let sourceDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        candidates.append(
+            sourceDirectory.deletingLastPathComponent()
+                .appendingPathComponent("apple-platform", isDirectory: true)
+                .appendingPathComponent(subdirectory, isDirectory: true)
+                .appendingPathComponent(name)
+        )
+        if let resources = Bundle.main.resourceURL {
+            candidates.append(
+                resources.appendingPathComponent("ApplePlatform", isDirectory: true)
+                    .appendingPathComponent(subdirectory, isDirectory: true)
+                    .appendingPathComponent(name)
+            )
+        }
+        if let match = candidates.first(where: { fileManager.fileExists(atPath: $0.path) }) {
+            return match
+        }
+        throw CLIError.invalidContainer(
+            "missing XDRemux Apple feature resource \(subdirectory)/\(name)"
+        )
+    }
+
+    private static func compile(
+        source: URL,
+        executableName: String,
+        arguments: [String]
+    ) throws -> URL {
+        let sourceData = try Data(contentsOf: source, options: [.mappedIfSafe])
+        let sourceHash = sha256Hex(sourceData)
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            throw CLIError.invalidContainer("cannot resolve the user cache directory")
+        }
+        let directory = caches
+            .appendingPathComponent("com.proxdr.XDRemux", isDirectory: true)
+            .appendingPathComponent("AppleNativeTools", isDirectory: true)
+            .appendingPathComponent(sourceHash, isDirectory: true)
+        let executable = directory.appendingPathComponent(executableName)
+
+        compileLock.lock()
+        defer { compileLock.unlock() }
+        if FileManager.default.isExecutableFile(atPath: executable.path) {
+            return executable
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let result = try run(
+            URL(fileURLWithPath: "/usr/bin/xcrun"),
+            arguments: arguments + ["-o", executable.path]
+        )
+        guard result.status == 0, FileManager.default.isExecutableFile(atPath: executable.path) else {
+            let diagnostic = String(data: result.stderr, encoding: .utf8) ?? "unknown compiler error"
+            throw CLIError.invalidContainer(
+                "cannot build \(executableName): \(diagnostic.trimmingCharacters(in: .whitespacesAndNewlines))"
+            )
+        }
+        return executable
+    }
+}
+
+private enum AppleSemanticSceneAnalyzer {
+    static func analyze(
+        imageURL: URL,
+        outputDirectory: URL,
+        orientationOverride: UInt32? = nil
+    ) throws -> AppleSemanticSceneAnalysis {
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        let executable = try AppleNativeToolchain.semanticExecutable()
+        var arguments = [imageURL.path, outputDirectory.path]
+        if let orientationOverride {
+            arguments += ["--orientation", String(orientationOverride)]
+        }
+        let result = try AppleNativeToolchain.run(executable, arguments: arguments)
+        guard result.status == 0 else {
+            let stderr = String(data: result.stderr, encoding: .utf8) ?? ""
+            let stdout = String(data: result.stdout, encoding: .utf8) ?? ""
+            throw CLIError.invalidContainer(
+                "Apple semantic capability unavailable: \([stderr, stdout].filter { !$0.isEmpty }.joined(separator: " "))"
+            )
+        }
+        try result.stdout.write(
+            to: outputDirectory.appendingPathComponent("manifest.json"),
+            options: .atomic
+        )
+        guard let object = try JSONSerialization.jsonObject(with: result.stdout) as? [String: Any],
+              object["ok"] as? Bool == true,
+              let maskRows = object["masks"] as? [[String: Any]] else {
+            throw CLIError.invalidContainer("Apple semantic helper returned an invalid manifest")
+        }
+        var mattes: [String: AppleSemanticMatte] = [:]
+        for row in maskRows {
+            guard let name = row["name"] as? String,
+                  let rawPath = row["raw_output"] as? String,
+                  let width = (row["width"] as? NSNumber)?.intValue,
+                  let height = (row["height"] as? NSNumber)?.intValue,
+                  let serializedBytesPerRow = (row["serialized_bytes_per_row"] as? NSNumber)?.intValue,
+                  let minimum = (row["minimum"] as? NSNumber)?.uint8Value,
+                  let maximum = (row["maximum"] as? NSNumber)?.uint8Value,
+                  let mean = (row["mean"] as? NSNumber)?.doubleValue,
+                  let coverage = (row["coverage"] as? NSNumber)?.doubleValue,
+                  let requestClass = row["request_class"] as? String,
+                  let revision = (row["revision"] as? NSNumber)?.intValue,
+                  let inputSHA256 = row["input_sha256"] as? String,
+                  let pixelFormat = row["pixel_format"] as? String,
+                  let orientation = (row["orientation"] as? NSNumber)?.uint32Value,
+                  let orientationTransform = row["orientation_transform"] as? String,
+                  let fallback = row["fallback"] as? Bool else {
+                throw CLIError.invalidContainer("incomplete semantic manifest row")
+            }
+            let attributeName = row["feature_name"] as? String ?? name
+            let pixels = try Data(contentsOf: URL(fileURLWithPath: rawPath))
+            guard serializedBytesPerRow == width, pixels.count == width * height else {
+                throw CLIError.invalidContainer(
+                    "\(name) semantic matte has invalid L008 geometry or data length"
+                )
+            }
+            mattes[name] = AppleSemanticMatte(
+                pixels: pixels,
+                width: width,
+                height: height,
+                bytesPerRow: serializedBytesPerRow,
+                statistics: SemanticStatistics(
+                    minimum: minimum,
+                    maximum: maximum,
+                    mean: mean,
+                    coverage: coverage
+                ),
+                provenance: SemanticProvenance(
+                    requestClass: requestClass,
+                    attributeName: attributeName,
+                    revision: revision,
+                    inputSHA256: inputSHA256,
+                    width: width,
+                    height: height,
+                    pixelFormat: pixelFormat,
+                    orientation: orientation,
+                    orientationTransform: orientationTransform,
+                    fallback: fallback
+                )
+            )
+        }
+        for required in ["portrait", "skin", "hair", "facial_hair", "teeth", "glasses", "sky"] {
+            guard mattes[required] != nil else {
+                throw CLIError.invalidContainer("Vision returned no \(required) semantic resource")
+            }
+        }
+        return AppleSemanticSceneAnalysis(
+            person: mattes["portrait"],
+            skin: mattes["skin"],
+            hair: mattes["hair"],
+            facialHair: mattes["facial_hair"],
+            teeth: mattes["teeth"],
+            glasses: mattes["glasses"],
+            sky: mattes["sky"]
+        )
+    }
+}
+
+private enum AppleSemanticScaffoldBuilder {
+    private static func makeMetadata(
+        namespace: String,
+        prefix: String,
+        versionPath: String,
+        version: String
+    ) throws -> CGImageMetadata {
+        let metadata = CGImageMetadataCreateMutable()
+        var registrationError: Unmanaged<CFError>?
+        guard CGImageMetadataRegisterNamespaceForPrefix(
+            metadata,
+            namespace as CFString,
+            prefix as CFString,
+            &registrationError
+        ) else {
+            if let registrationError { throw registrationError.takeRetainedValue() as Error }
+            throw CLIError.invalidContainer("cannot register \(prefix) metadata namespace")
+        }
+        guard CGImageMetadataSetValueWithPath(
+            metadata,
+            nil,
+            versionPath as CFString,
+            version as CFString
+        ) else {
+            throw CLIError.invalidContainer("cannot author \(prefix) metadata version")
+        }
+        return metadata
+    }
+
+    private static func fitWithin(width: Int, height: Int, maximum: Int) -> (Int, Int) {
+        let scale = min(1.0, Double(maximum) / Double(max(width, height)))
+        let fittedWidth = max(2, Int((Double(width) * scale / 2.0).rounded()) * 2)
+        let fittedHeight = max(2, Int((Double(height) * scale / 2.0).rounded()) * 2)
+        return (min(fittedWidth, maximum), min(fittedHeight, maximum))
+    }
+
+    private static func auxiliaryDictionary(
+        matte: AppleSemanticMatte,
+        width: Int,
+        height: Int,
+        metadata: CGImageMetadata
+    ) throws -> CFDictionary {
+        var sourceBuffer: CVPixelBuffer?
+        let attributes: CFDictionary = [
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+            kCVPixelBufferMetalCompatibilityKey: true,
+        ] as CFDictionary
+        guard CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            matte.width,
+            matte.height,
+            kCVPixelFormatType_OneComponent8,
+            attributes,
+            &sourceBuffer
+        ) == kCVReturnSuccess, let sourceBuffer else {
+            throw CLIError.invalidContainer("cannot allocate semantic source pixel buffer")
+        }
+        CVPixelBufferLockBaseAddress(sourceBuffer, [])
+        if let destination = CVPixelBufferGetBaseAddress(sourceBuffer) {
+            let destinationStride = CVPixelBufferGetBytesPerRow(sourceBuffer)
+            matte.pixels.withUnsafeBytes { raw in
+                guard let source = raw.baseAddress else { return }
+                for row in 0..<matte.height {
+                    memcpy(
+                        destination.advanced(by: row * destinationStride),
+                        source.advanced(by: row * matte.bytesPerRow),
+                        matte.width
+                    )
+                }
+            }
+        }
+        CVPixelBufferUnlockBaseAddress(sourceBuffer, [])
+
+        var targetBuffer: CVPixelBuffer?
+        guard CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_OneComponent8,
+            attributes,
+            &targetBuffer
+        ) == kCVReturnSuccess, let targetBuffer else {
+            throw CLIError.invalidContainer("cannot allocate semantic output pixel buffer")
+        }
+        let sourceImage = CIImage(cvPixelBuffer: sourceBuffer)
+        let normalized = sourceImage.transformed(by: CGAffineTransform(
+            translationX: -sourceImage.extent.origin.x,
+            y: -sourceImage.extent.origin.y
+        ))
+        let resized = normalized.transformed(by: CGAffineTransform(
+            scaleX: CGFloat(width) / normalized.extent.width,
+            y: CGFloat(height) / normalized.extent.height
+        )).cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
+        CIContext(options: [.cacheIntermediates: false]).render(
+            resized,
+            to: targetBuffer,
+            bounds: CGRect(x: 0, y: 0, width: width, height: height),
+            colorSpace: CGColorSpaceCreateDeviceGray()
+        )
+
+        CVPixelBufferLockBaseAddress(targetBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(targetBuffer, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(targetBuffer) else {
+            throw CLIError.invalidContainer("semantic output has no readable storage")
+        }
+        let stride = CVPixelBufferGetBytesPerRow(targetBuffer)
+        var pixels = Data(count: width * height)
+        pixels.withUnsafeMutableBytes { raw in
+            guard let destination = raw.baseAddress else { return }
+            for row in 0..<height {
+                memcpy(
+                    destination.advanced(by: row * width),
+                    base.advanced(by: row * stride),
+                    width
+                )
+            }
+        }
+        let description: [CFString: Any] = [
+            kCGImagePropertyWidth: width,
+            kCGImagePropertyHeight: height,
+            kCGImagePropertyBytesPerRow: width,
+            kCGImagePropertyPixelFormat: NSNumber(value: kCVPixelFormatType_OneComponent8),
+        ]
+        return [
+            kCGImageAuxiliaryDataInfoData: pixels,
+            kCGImageAuxiliaryDataInfoDataDescription: description,
+            kCGImageAuxiliaryDataInfoMetadata: metadata,
+        ] as CFDictionary
+    }
+
+    static func write(
+        sourceHDRURL: URL,
+        outputURL: URL,
+        analysis: AppleSemanticSceneAnalysis,
+        profile: AppleSemanticWriteProfile,
+        photoIdentifier: String,
+        preserveOriginalBaseAndGain: Bool = true
+    ) throws {
+        guard let source = CGImageSourceCreateWithURL(sourceHDRURL as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let pixelWidth = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+              let pixelHeight = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
+              let person = analysis.person,
+              let skin = analysis.skin,
+              let hair = analysis.hair,
+              let teeth = analysis.teeth,
+              let glasses = analysis.glasses,
+              let sky = analysis.sky else {
+            throw CLIError.invalidContainer("cannot author an incomplete semantic scaffold")
+        }
+        let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
+        let displayWidth = [5, 6, 7, 8].contains(orientation) ? pixelHeight : pixelWidth
+        let displayHeight = [5, 6, 7, 8].contains(orientation) ? pixelWidth : pixelHeight
+        let dimensions = fitWithin(width: displayWidth, height: displayHeight, maximum: 2016)
+        let portraitMetadata = try makeMetadata(
+            namespace: "http://ns.apple.com/portraitEffectsMatte/1.0/",
+            prefix: "portraitEffectsMatte",
+            versionPath: "portraitEffectsMatte:PortraitEffectsMatteVersion",
+            version: "65537"
+        )
+        let semanticMetadata = try makeMetadata(
+            namespace: "http://ns.apple.com/semanticSegmentationMatte/1.0/",
+            prefix: "semanticSegmentationMatte",
+            versionPath: "semanticSegmentationMatte:SemanticSegmentationMatteVersion",
+            version: "65536"
+        )
+        let allDictionaries: [(AppleSemanticRole, CFString, CFDictionary)] = [
+            (.person, kCGImageAuxiliaryDataTypePortraitEffectsMatte, try auxiliaryDictionary(
+                matte: person, width: dimensions.0, height: dimensions.1, metadata: portraitMetadata
+            )),
+            (.skin, kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte, try auxiliaryDictionary(
+                matte: skin, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
+            )),
+            (.hair, kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte, try auxiliaryDictionary(
+                matte: hair, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
+            )),
+            (.teeth, kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte, try auxiliaryDictionary(
+                matte: teeth, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
+            )),
+            (.glasses, kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte, try auxiliaryDictionary(
+                matte: glasses, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
+            )),
+            (.sky, kCGImageAuxiliaryDataTypeSemanticSegmentationSkyMatte, try auxiliaryDictionary(
+                matte: sky, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
+            )),
+        ]
+        let dictionaries = allDictionaries.filter { profile.roles.contains($0.0) }
+        guard dictionaries.count == profile.roles.count else {
+            throw CLIError.invalidContainer("semantic profile \(profile.kind.rawValue) is incomplete")
+        }
+
+        let parent = outputURL.deletingLastPathComponent()
+        let scaffoldURL = parent.appendingPathComponent(".\(outputURL.lastPathComponent).semantic-scaffold-\(UUID().uuidString).heic")
+        defer { try? FileManager.default.removeItem(at: scaffoldURL) }
+        guard let destination = CGImageDestinationCreateWithURL(
+            scaffoldURL as CFURL,
+            UTType.heic.identifier as CFString,
+            1,
+            nil
+        ) else {
+            throw CLIError.unableToCreateDestination(scaffoldURL)
+        }
+        var imageOptions: [CFString: Any] = [
+            kCGImageDestinationPreserveGainMap: true,
+            kCGImagePropertyOrientation: NSNumber(value: orientation),
+        ]
+        var makerApple: [String: Any] = [:]
+        if let existing = properties[kCGImagePropertyMakerAppleDictionary] as? NSDictionary {
+            for (key, value) in existing {
+                makerApple[String(describing: key)] = value
+            }
+        }
+        makerApple["43"] = photoIdentifier
+        makerApple["84"] = [
+            "0": 1, "1": 0, "2": 0, "3": 1,
+            "4": 1, "5": 1, "6": 4, "7": 0,
+        ]
+        imageOptions[kCGImagePropertyMakerAppleDictionary] = makerApple
+        CGImageDestinationAddImageFromSource(destination, source, 0, imageOptions as CFDictionary)
+        if let disparity = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+            source, 0, kCGImageAuxiliaryDataTypeDisparity
+        ) {
+            CGImageDestinationAddAuxiliaryDataInfo(
+                destination,
+                kCGImageAuxiliaryDataTypeDisparity,
+                disparity
+            )
+        }
+        for (_, type, dictionary) in dictionaries {
+            CGImageDestinationAddAuxiliaryDataInfo(destination, type, dictionary)
+        }
+        guard CGImageDestinationFinalize(destination) else {
+            throw CLIError.unableToFinalizeDestination(scaffoldURL)
+        }
+        if preserveOriginalBaseAndGain {
+            try transplantPortraitBaseAndGainPayloads(
+                payloadSourceURL: sourceHDRURL,
+                scaffoldURL: scaffoldURL,
+                outputURL: outputURL
+            )
+        } else {
+            try FileManager.default.copyItem(at: scaffoldURL, to: outputURL)
+        }
+    }
+}
+
+private enum ApplePhotographicStylesPipeline {
+    private struct LearnResult {
+        let styleData: Data
+        let styleDataSHA256: String
+        let applyRMSE: Double
+        let thumbnailWidth: Int
+        let thumbnailHeight: Int
+        let coefficientWidth: Int
+        let coefficientHeight: Int
+        let probe: [String: Any]
+    }
+
+    private struct LinearSceneRaster {
+        let width: Int
+        let height: Int
+        let encodedRGB8: Data
+        let toneLinearRGB: [Float]
+        let toneLuma: [Float]
+        let hdrLinearRGB: [Float]
+        let hdrLuma: [Float]
+    }
+
+    private struct EncodedHEVCResource {
+        let itemPayload: Data
+        let hvcC: Data
+        let sourcePNGURL: URL
+        let annexBSHA256: String
+        let itemPayloadSHA256: String
+        let hvcCSHA256: String
+    }
+
+    private struct GraphWriteResult {
+        let primaryItemID: Int
+        let gainMapItemID: Int
+        let toneMapItemID: Int
+        let styleDeltaItemID: Int
+        let linearThumbnailItemID: Int
+        let styleMetadataItemID: Int
+        let originalMdatPayloadSHA256: String
+        let outputOriginalMdatPrefixSHA256: String
+        let itemCount: Int
+        let propertyCount: Int
+    }
+
+    private struct Options {
+        let family: Family
+        let debugRootURL: URL?
+        let oppoCompatibility: OppoCompatibility
+        let inputProcessingBranch: InputProcessingBranch
+        let oppoCameraTail: OppoCameraTail
+        let tmapFormat: TmapFormat
+        let features: AppleFeatureFlags
+    }
+
+    static func convert(inputURL: URL, outputURL: URL, command: ConvertCommand) throws {
+        try convert(
+            inputURL: inputURL,
+            outputURL: outputURL,
+            options: Options(
+                family: command.family,
+                debugRootURL: command.debugRootURL,
+                oppoCompatibility: command.oppoCompatibility,
+                inputProcessingBranch: command.inputProcessingBranch,
+                oppoCameraTail: command.oppoCameraTail,
+                tmapFormat: command.tmapFormat,
+                features: command.appleFeatures
+            )
+        )
+    }
+
+    static func convert(inputURL: URL, outputURL: URL, command: BatchCommand) throws {
+        try convert(
+            inputURL: inputURL,
+            outputURL: outputURL,
+            options: Options(
+                family: command.family,
+                debugRootURL: command.debugRootURL,
+                oppoCompatibility: command.oppoCompatibility,
+                inputProcessingBranch: command.inputProcessingBranch,
+                oppoCameraTail: command.oppoCameraTail,
+                tmapFormat: command.tmapFormat,
+                features: command.appleFeatures
+            )
+        )
+    }
+
+    static func isValidOutput(_ outputURL: URL, expectsPortrait: Bool) -> Bool {
+        guard PortraitConversionPipeline.hasValidISOGainMap(outputURL) else { return false }
+        return (try? validatePhotographicStylesOutput(outputURL, expectsPortrait: expectsPortrait)) != nil
+    }
+
+    static func validateExistingOutput(
+        _ outputURL: URL,
+        expectsPortrait: Bool
+    ) throws -> [String: Any] {
+        try validatePhotographicStylesOutput(outputURL, expectsPortrait: expectsPortrait)
+        let contamination = try donorContaminationReport(for: outputURL)
+        return [
+            "schema": "xdremux-apple-output-validation-v1",
+            "passed": true,
+            "output": outputURL.path,
+            "outputSHA256": sha256Hex(try Data(contentsOf: outputURL, options: [.mappedIfSafe])),
+            "expectsPortrait": expectsPortrait,
+            "isoGainMap": true,
+            "semanticStyleProperties": true,
+            "styleDataLength": 51_840,
+            "donorContamination": contamination,
+        ]
+    }
+
+    private static func halfRMSE(_ left: Data, _ right: Data) throws -> Double {
+        guard left.count == right.count, left.count.isMultiple(of: 2), !left.isEmpty else {
+            throw CLIError.invalidContainer("StyleEngine behavioral readback lengths do not match")
+        }
+        var sum = 0.0
+        var count = 0
+        left.withUnsafeBytes { leftRaw in
+            right.withUnsafeBytes { rightRaw in
+                let a = leftRaw.bindMemory(to: UInt16.self)
+                let b = rightRaw.bindMemory(to: UInt16.self)
+                for index in 0..<a.count {
+                    let leftValue = Double(Float(Float16(bitPattern: UInt16(littleEndian: a[index]))))
+                    let rightValue = Double(Float(Float16(bitPattern: UInt16(littleEndian: b[index]))))
+                    guard leftValue.isFinite, rightValue.isFinite else { continue }
+                    let delta = leftValue - rightValue
+                    sum += delta * delta
+                    count += 1
+                }
+            }
+        }
+        guard count > 0 else {
+            throw CLIError.invalidContainer("StyleEngine behavioral readback contains no finite samples")
+        }
+        return sqrt(sum / Double(count))
+    }
+
+    private static func learnIdentityStyleData(
+        imageURL: URL,
+        outputDirectory: URL
+    ) throws -> LearnResult {
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        let executable = try AppleNativeToolchain.learnExecutable()
+        let result = try AppleNativeToolchain.run(
+            executable,
+            arguments: [imageURL.path, imageURL.path, outputDirectory.path]
+        )
+        let probeURL = outputDirectory.appendingPathComponent("probe.json")
+        let rawURL = outputDirectory.appendingPathComponent("learned_style.f16.bin")
+        guard result.status == 0,
+              let probeData = try? Data(contentsOf: probeURL),
+              let probe = try? JSONSerialization.jsonObject(with: probeData) as? [String: Any],
+              let raw = try? Data(contentsOf: rawURL) else {
+            let stderr = String(data: result.stderr, encoding: .utf8) ?? ""
+            throw CLIError.invalidContainer(
+                "Apple StyleEngine LearnProcessor unavailable: \(stderr.trimmingCharacters(in: .whitespacesAndNewlines))"
+            )
+        }
+        guard raw.count == 51_840 else {
+            throw CLIError.invalidContainer("StyleEngine key 1 must be exactly 51,840 bytes")
+        }
+        guard probe["hooksRestored"] as? Bool == true,
+              probe["learnError"] is NSNull,
+              probe["renderError"] is NSNull else {
+            throw CLIError.invalidContainer("StyleEngine learner did not restore hooks or reported an error")
+        }
+        guard let thumbnail = probe["thumbnailSize"] as? [String: Any],
+              let thumbnailWidth = (thumbnail["width"] as? NSNumber)?.intValue,
+              let thumbnailHeight = (thumbnail["height"] as? NSNumber)?.intValue,
+              let coefficients = probe["coefficientTextureSize"] as? [String: Any],
+              let coefficientWidth = (coefficients["width"] as? NSNumber)?.intValue,
+              let coefficientHeight = (coefficients["height"] as? NSNumber)?.intValue,
+              coefficientWidth == 160,
+              coefficientHeight == 162,
+              let inputThumbnail = probe["inputThumbnail"] as? [String: Any],
+              let inputPath = inputThumbnail["capturePath"] as? String,
+              let behavioral = probe["behavioralApply"] as? [String: Any],
+              let learned = behavioral["learned"] as? [String: Any],
+              let appliedPath = learned["capturePath"] as? String else {
+            throw CLIError.invalidContainer("StyleEngine probe omitted required geometry or readback paths")
+        }
+        let applyRMSE = try halfRMSE(
+            Data(contentsOf: URL(fileURLWithPath: inputPath)),
+            Data(contentsOf: URL(fileURLWithPath: appliedPath))
+        )
+        guard applyRMSE <= 0.005 else {
+            throw CLIError.invalidContainer(
+                "same-scene identity StyleEngine apply RMSE \(applyRMSE) exceeds 0.005"
+            )
+        }
+        return LearnResult(
+            styleData: raw,
+            styleDataSHA256: sha256Hex(raw),
+            applyRMSE: applyRMSE,
+            thumbnailWidth: thumbnailWidth,
+            thumbnailHeight: thumbnailHeight,
+            coefficientWidth: coefficientWidth,
+            coefficientHeight: coefficientHeight,
+            probe: probe
+        )
+    }
+
+    private static func sourceScale(
+        sourceURL: URL,
+        portraitWritten: Bool
+    ) throws -> ResolvedScale {
+        let sourceData = try Data(contentsOf: sourceURL, options: [.mappedIfSafe])
+        if portraitWritten,
+           let blocks = try? LHDRExtractor.portraitBlocks(from: sourceData),
+           let info = try? PortraitConversionPipeline.resolveGainInfoFloats(
+               privateInfo: blocks["local.uhdr.gainmap.info"],
+               inputURL: sourceURL
+           ) {
+            return try EDRScaleResolver.resolve(metaFloats: info, mode: .uhdr)
+        }
+        let extracted = try LHDRExtractor.extract(from: sourceData)
+        return try EDRScaleResolver.resolve(
+            metaFloats: extracted.metaFloats,
+            mode: extracted.mode
+        )
+    }
+
+    private static func fittedSize(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        maximumWidth: Int,
+        maximumHeight: Int
+    ) -> (Int, Int) {
+        let scale = min(
+            1.0,
+            Double(maximumWidth) / Double(sourceWidth),
+            Double(maximumHeight) / Double(sourceHeight)
+        )
+        let width = max(2, Int((Double(sourceWidth) * scale / 2).rounded()) * 2)
+        let height = max(2, Int((Double(sourceHeight) * scale / 2).rounded()) * 2)
+        return (min(width, maximumWidth), min(height, maximumHeight))
+    }
+
+    private static func renderedRGBAFloat(
+        image: CIImage,
+        width: Int,
+        height: Int,
+        colorSpace: CGColorSpace
+    ) -> [Float] {
+        let normalized = image.transformed(by: CGAffineTransform(
+            translationX: -image.extent.origin.x,
+            y: -image.extent.origin.y
+        ))
+        let resized = normalized.transformed(by: CGAffineTransform(
+            scaleX: CGFloat(width) / normalized.extent.width,
+            y: CGFloat(height) / normalized.extent.height
+        )).cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
+        var pixels = Array(repeating: Float(0), count: width * height * 4)
+        pixels.withUnsafeMutableBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            CIContext(options: [
+                .cacheIntermediates: false,
+                .workingColorSpace: colorSpace,
+                .outputColorSpace: colorSpace,
+            ]).render(
+                resized,
+                toBitmap: base,
+                rowBytes: width * 4 * MemoryLayout<Float>.size,
+                bounds: CGRect(x: 0, y: 0, width: width, height: height),
+                format: .RGBAf,
+                colorSpace: colorSpace
+            )
+        }
+        return pixels
+    }
+
+    private static func halfRounded(_ value: Float) -> Float {
+        Float(Float16(value))
+    }
+
+    private static func appleEncodeLinear(_ input: Float) -> Float {
+        let x = halfRounded(input)
+        let highThreshold = Float(Float16(bitPattern: 0x211f))
+        let lowThreshold = Float(Float16(bitPattern: 0xab38))
+        if x >= highThreshold {
+            let logInput = halfRounded(x + Float(Float16(bitPattern: 0x20f0)))
+            let logged = halfRounded(log2f(logInput))
+            return halfRounded(
+                halfRounded(logged * Float(Float16(bitPattern: 0x2d79)))
+                    + Float(Float16(bitPattern: 0x398c))
+            )
+        }
+        if x > lowThreshold {
+            let toe = halfRounded(x + Float(Float16(bitPattern: 0x2b38)))
+            return halfRounded(
+                halfRounded(toe * toe) * Float(Float16(bitPattern: 0x51e9))
+            )
+        }
+        return 0
+    }
+
+    private static func linearSceneRaster(
+        standardHDRURL: URL,
+        scale: ResolvedScale
+    ) throws -> LinearSceneRaster {
+        guard let primary = CIImage(
+            contentsOf: standardHDRURL,
+            options: [.applyOrientationProperty: true]
+        ), let gain = CIImage(
+            contentsOf: standardHDRURL,
+            options: [
+                .auxiliaryHDRGainMap: true,
+                .applyOrientationProperty: true,
+            ]
+        ) else {
+            throw CLIError.invalidContainer("Core Image cannot decode the coherent base/gain bundle")
+        }
+        let sourceWidth = max(1, Int(primary.extent.width.rounded()))
+        let sourceHeight = max(1, Int(primary.extent.height.rounded()))
+        let size = fittedSize(
+            sourceWidth: sourceWidth,
+            sourceHeight: sourceHeight,
+            maximumWidth: 1024,
+            maximumHeight: 1024
+        )
+        guard let linearP3 = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3),
+              let linearSRGB = CGColorSpace(name: CGColorSpace.linearSRGB) else {
+            throw CLIError.invalidContainer("required linear color spaces are unavailable")
+        }
+        let basePixels = renderedRGBAFloat(
+            image: primary,
+            width: size.0,
+            height: size.1,
+            colorSpace: linearP3
+        )
+        let gainPixels = renderedRGBAFloat(
+            image: gain,
+            width: size.0,
+            height: size.1,
+            colorSpace: linearSRGB
+        )
+        var encoded = Data(count: size.0 * size.1 * 3)
+        var toneRGB = Array(repeating: Float(0), count: size.0 * size.1 * 3)
+        var hdrRGB = Array(repeating: Float(0), count: size.0 * size.1 * 3)
+        var toneLuma = Array(repeating: Float(0), count: size.0 * size.1)
+        var hdrLuma = Array(repeating: Float(0), count: size.0 * size.1)
+        let channelCount = max(1, scale.channelCount)
+        func channel(_ values: [Double], _ index: Int, _ fallback: Double) -> Float {
+            Float(values[min(index, values.count - 1)] as Double? ?? fallback)
+        }
+        encoded.withUnsafeMutableBytes { encodedRaw in
+            guard let destination = encodedRaw.bindMemory(to: UInt8.self).baseAddress else { return }
+            for pixel in 0..<(size.0 * size.1) {
+                var baseChannels = [Float](repeating: 0, count: 3)
+                var hdrChannels = [Float](repeating: 0, count: 3)
+                for component in 0..<3 {
+                    let parameterIndex = channelCount == 1 ? 0 : component
+                    let base = basePixels[pixel * 4 + component]
+                    let code = min(max(gainPixels[pixel * 4 + component], 0), 1)
+                    let gamma = channel(scale.perChannelGamma, parameterIndex, scale.gamma)
+                    let minimum = channel(scale.perChannelGainMapMin, parameterIndex, scale.gainMapMin)
+                    let maximum = channel(scale.perChannelGainMapMax, parameterIndex, scale.gainMapMax)
+                    let baseOffset = channel(
+                        scale.perChannelBaseOffset,
+                        parameterIndex,
+                        scale.epsilonSdr
+                    )
+                    let alternateOffset = channel(
+                        scale.perChannelAlternateOffset,
+                        parameterIndex,
+                        scale.epsilonHdr
+                    )
+                    let weight = powf(code, gamma)
+                    let logGain = minimum + weight * (maximum - minimum)
+                    let reconstructed = max(base + baseOffset, 0) * exp2f(logGain) - alternateOffset
+                    baseChannels[component] = base
+                    hdrChannels[component] = reconstructed
+                    toneRGB[pixel * 3 + component] = base
+                    hdrRGB[pixel * 3 + component] = reconstructed
+                    let encodedValue = min(max(appleEncodeLinear(reconstructed), 0), 1)
+                    destination[pixel * 3 + component] = UInt8(
+                        min(255, max(0, Int((encodedValue * 255).rounded())))
+                    )
+                }
+                toneLuma[pixel] = 0.2126 * baseChannels[0]
+                    + 0.7152 * baseChannels[1]
+                    + 0.0722 * baseChannels[2]
+                hdrLuma[pixel] = 0.2126 * hdrChannels[0]
+                    + 0.7152 * hdrChannels[1]
+                    + 0.0722 * hdrChannels[2]
+            }
+        }
+        return LinearSceneRaster(
+            width: size.0,
+            height: size.1,
+            encodedRGB8: encoded,
+            toneLinearRGB: toneRGB,
+            toneLuma: toneLuma,
+            hdrLinearRGB: hdrRGB,
+            hdrLuma: hdrLuma
+        )
+    }
+
+    private static func writeRGBPNG(
+        pixels: Data,
+        width: Int,
+        height: Int,
+        outputURL: URL
+    ) throws {
+        guard pixels.count == width * height * 3,
+              let provider = CGDataProvider(data: pixels as CFData),
+              let image = CGImage(
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bitsPerPixel: 24,
+                  bytesPerRow: width * 3,
+                  space: CGColorSpaceCreateDeviceRGB(),
+                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                  provider: provider,
+                  decode: nil,
+                  shouldInterpolate: false,
+                  intent: .defaultIntent
+              ),
+              let destination = CGImageDestinationCreateWithURL(
+                  outputURL as CFURL,
+                  UTType.png.identifier as CFString,
+                  1,
+                  nil
+              ) else {
+            throw CLIError.invalidContainer("cannot create Apple auxiliary PNG writer input")
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            throw CLIError.invalidContainer("cannot finalize Apple auxiliary PNG writer input")
+        }
+    }
+
+    private static func singleIDRPayload(from annexB: Data) throws -> Data {
+        let bytes = [UInt8](annexB)
+        var starts: [(offset: Int, length: Int)] = []
+        var index = 0
+        while index + 3 < bytes.count {
+            if bytes[index...min(index + 3, bytes.count - 1)] == [0, 0, 0, 1] {
+                starts.append((index, 4)); index += 4
+            } else if bytes[index...min(index + 2, bytes.count - 1)] == [0, 0, 1] {
+                starts.append((index, 3)); index += 3
+            } else {
+                index += 1
+            }
+        }
+        for position in starts.indices {
+            let start = starts[position].offset + starts[position].length
+            let end = position + 1 < starts.count ? starts[position + 1].offset : bytes.count
+            guard start < end else { continue }
+            let type = (bytes[start] >> 1) & 0x3f
+            guard type == 19 || type == 20 else { continue }
+            var result = Data()
+            appendUInt32BE(end - start, to: &result)
+            result.append(contentsOf: bytes[start..<end])
+            return result
+        }
+        throw CLIError.invalidContainer("VideoToolbox emitted no HEVC IDR NAL")
+    }
+
+    private static func encodeHEVC(
+        rgbPNGURL: URL,
+        outputDirectory: URL,
+        stem: String,
+        quality: Double
+    ) throws -> EncodedHEVCResource {
+        let annexBURL = outputDirectory.appendingPathComponent("\(stem).hevc")
+        let hvcCURL = outputDirectory.appendingPathComponent("\(stem).hvcc")
+        let executable = try AppleNativeToolchain.hevcEncoderExecutable()
+        let result = try AppleNativeToolchain.run(
+            executable,
+            arguments: [
+                rgbPNGURL.path,
+                annexBURL.path,
+                String(format: "%.6f", quality),
+                "rgb10",
+                hvcCURL.path,
+            ]
+        )
+        guard result.status == 0 else {
+            let error = String(data: result.stderr, encoding: .utf8) ?? ""
+            throw CLIError.invalidContainer("VideoToolbox auxiliary encoding failed: \(error)")
+        }
+        let annexB = try Data(contentsOf: annexBURL)
+        let hvcC = try Data(contentsOf: hvcCURL)
+        let itemPayload = try singleIDRPayload(from: annexB)
+        return EncodedHEVCResource(
+            itemPayload: itemPayload,
+            hvcC: hvcC,
+            sourcePNGURL: rgbPNGURL,
+            annexBSHA256: sha256Hex(annexB),
+            itemPayloadSHA256: sha256Hex(itemPayload),
+            hvcCSHA256: sha256Hex(hvcC)
+        )
+    }
+
+    private static func percentile(_ source: [Float], _ percent: Double) -> Double {
+        let values = source.filter(\.isFinite).map(Double.init).sorted()
+        guard !values.isEmpty else { return 0 }
+        let position = min(max(percent, 0), 100) / 100 * Double(values.count - 1)
+        let lower = Int(floor(position))
+        let upper = Int(ceil(position))
+        guard lower != upper else { return values[lower] }
+        let fraction = position - Double(lower)
+        return values[lower] * (1 - fraction) + values[upper] * fraction
+    }
+
+    private static func distribution(_ values: [Float]) -> [String: Double] {
+        let finite = values.filter(\.isFinite)
+        guard !finite.isEmpty else {
+            return [
+                "blackPoint": 0, "highKey": 1, "p02": 0, "p10": 0,
+                "p25": 0, "p50": 0, "p75": 0, "p98": 0, "whitePoint": 0,
+            ]
+        }
+        let names = ["blackPoint", "highKey", "p02", "p10", "p25", "p50", "p75", "p98", "whitePoint"]
+        let percents = [0.5, 95, 2, 10, 25, 50, 75, 98, 99.5]
+        return Dictionary(uniqueKeysWithValues: zip(names, percents.map { percentile(finite, $0) }))
+    }
+
+    private static func maskValue(
+        _ matte: AppleSemanticMatte?,
+        x: Int,
+        y: Int,
+        rasterWidth: Int,
+        rasterHeight: Int
+    ) -> Float {
+        guard let matte, matte.width > 0, matte.height > 0 else { return 0 }
+        let sourceX = min(matte.width - 1, max(0, Int((Double(x) + 0.5) * Double(matte.width) / Double(rasterWidth))))
+        let sourceY = min(matte.height - 1, max(0, Int((Double(y) + 0.5) * Double(matte.height) / Double(rasterHeight))))
+        return Float(matte.pixels[sourceY * matte.bytesPerRow + sourceX]) / 255
+    }
+
+    private static func selectedValues(
+        _ values: [Float],
+        mask: AppleSemanticMatte?,
+        width: Int,
+        height: Int
+    ) -> [Float] {
+        guard mask != nil else { return [] }
+        var selected: [Float] = []
+        selected.reserveCapacity(values.count / 4)
+        for y in 0..<height {
+            for x in 0..<width where maskValue(
+                mask, x: x, y: y, rasterWidth: width, rasterHeight: height
+            ) >= 0.5 {
+                selected.append(values[y * width + x])
+            }
+        }
+        return selected
+    }
+
+    private static func selectedChannelValues(
+        _ values: [Float],
+        component: Int,
+        mask: AppleSemanticMatte?,
+        width: Int,
+        height: Int
+    ) -> [Float] {
+        guard mask != nil else { return [] }
+        var selected: [Float] = []
+        selected.reserveCapacity(width * height / 8)
+        for y in 0..<height {
+            for x in 0..<width where maskValue(
+                mask, x: x, y: y, rasterWidth: width, rasterHeight: height
+            ) >= 0.5 {
+                selected.append(values[(y * width + x) * 3 + component])
+            }
+        }
+        return selected
+    }
+
+    private static func protocolIdentityGTC() -> Data {
+        func sRGBEncode(_ linear: Double) -> Double {
+            linear <= 0.0031308
+                ? linear * 12.92
+                : 1.055 * pow(linear, 1 / 2.4) - 0.055
+        }
+        var samples: [UInt16] = []
+        samples.reserveCapacity(257)
+        for index in 0..<256 {
+            let encoded = min(max(sRGBEncode(Double(index) / 255), 0), 1)
+            samples.append(UInt16(min(65_534, max(0, Int((encoded * 65_534).rounded())))))
+        }
+        samples[0] = 0
+        samples[255] = 65_534
+        for index in 1..<samples.count where samples[index] < samples[index - 1] {
+            samples[index] = samples[index - 1]
+        }
+        samples.append(65_534)
+        var payload = Data()
+        var count = UInt16(257).littleEndian
+        withUnsafeBytes(of: &count) { payload.append(contentsOf: $0) }
+        for sample in samples {
+            var value = sample.littleEndian
+            withUnsafeBytes(of: &value) { payload.append(contentsOf: $0) }
+        }
+        return payload
+    }
+
+    private static func lightMap(_ luma: [Float], width: Int, height: Int) -> Data {
+        var output = Data()
+        output.reserveCapacity(32 * 32 * 2)
+        for targetY in 0..<32 {
+            let y0 = targetY * height / 32
+            let y1 = max(y0 + 1, (targetY + 1) * height / 32)
+            for targetX in 0..<32 {
+                let x0 = targetX * width / 32
+                let x1 = max(x0 + 1, (targetX + 1) * width / 32)
+                var sum = Double(0)
+                var count = 0
+                for y in y0..<min(y1, height) {
+                    for x in x0..<min(x1, width) {
+                        sum += Double(min(max(luma[y * width + x], 0), 1))
+                        count += 1
+                    }
+                }
+                let average = count == 0 ? Float(0) : Float(sum / Double(count))
+                var bits = Float16(average).bitPattern.littleEndian
+                withUnsafeBytes(of: &bits) { output.append(contentsOf: $0) }
+            }
+        }
+        return output
+    }
+
+    private static func styleStatistics(
+        raster: LinearSceneRaster,
+        semantics: AppleSemanticSceneAnalysis
+    ) -> [String: [String: Double]] {
+        let gtcLuma = raster.hdrLuma.map { value -> Float in
+            let linear = min(max(Double(value), 0), 1)
+            return Float(
+                linear <= 0.0031308
+                    ? linear * 12.92
+                    : 1.055 * pow(linear, 1 / 2.4) - 0.055
+            )
+        }
+        let personTone = selectedValues(
+            raster.toneLuma,
+            mask: semantics.person,
+            width: raster.width,
+            height: raster.height
+        )
+        let skinTone = selectedValues(
+            raster.toneLuma,
+            mask: semantics.skin,
+            width: raster.width,
+            height: raster.height
+        )
+        return [
+            "LinearGTCImage": distribution(gtcLuma),
+            "LinearImage": distribution(raster.hdrLuma),
+            "LinearImagePersonSegmentBased": distribution(selectedValues(
+                raster.hdrLuma, mask: semantics.person, width: raster.width, height: raster.height
+            )),
+            "LinearImageSkinBased": distribution(selectedValues(
+                raster.hdrLuma, mask: semantics.skin, width: raster.width, height: raster.height
+            )),
+            "ToneMappedImage": distribution(raster.toneLuma),
+            "ToneMappedImageBlueChannelSkinBased": distribution(selectedChannelValues(
+                raster.toneLinearRGB, component: 2, mask: semantics.skin,
+                width: raster.width, height: raster.height
+            )),
+            "ToneMappedImageGreenChannelSkinBased": distribution(selectedChannelValues(
+                raster.toneLinearRGB, component: 1, mask: semantics.skin,
+                width: raster.width, height: raster.height
+            )),
+            "ToneMappedImagePersonSegmentBased": distribution(personTone),
+            "ToneMappedImageRedChannelSkinBased": distribution(selectedChannelValues(
+                raster.toneLinearRGB, component: 0, mask: semantics.skin,
+                width: raster.width, height: raster.height
+            )),
+            "ToneMappedImageSkinBased": distribution(skinTone),
+        ]
+    }
+
+    private static func makeStylePropertyList(
+        learn: LearnResult,
+        raster: LinearSceneRaster,
+        semantics: AppleSemanticSceneAnalysis
+    ) throws -> (data: Data, manifest: [String: Any]) {
+        let gtc = protocolIdentityGTC()
+        guard gtc.count == 516 else {
+            throw CLIError.invalidContainer("generated GTC must be 516 bytes")
+        }
+        let toneLightMap = lightMap(raster.toneLuma, width: raster.width, height: raster.height)
+        let linearLightMap = lightMap(raster.hdrLuma, width: raster.width, height: raster.height)
+        guard toneLightMap.count == 2_048, linearLightMap.count == 2_048 else {
+            throw CLIError.invalidContainer("generated style light maps must each be 2,048 bytes")
+        }
+        let statistics = styleStatistics(raster: raster, semantics: semantics)
+        guard let linear = statistics["LinearImage"],
+              let tone = statistics["ToneMappedImage"] else {
+            throw CLIError.invalidContainer("generated style statistics are incomplete")
+        }
+        let rangeMin = linear["blackPoint"] ?? 0
+        let rangeMax = linear["whitePoint"] ?? 0
+        let robustRange = max(rangeMax - rangeMin, 1 / 4096)
+        let baseGain = min(max(0.5 / robustRange, 0.5), 2.5)
+        let baselineExposure = min(max(-log2(max(linear["p50"] ?? 0, 1 / 4096)), 4), 10.4)
+        let peopleRatio = min(max((semantics.person?.statistics.mean ?? 0) / 255, 0), 1)
+        let skinRatio = min(max((semantics.skin?.statistics.mean ?? 0) / 255, 0), 1)
+        let personMasksValidHint = semantics.hasCrediblePerson ? 1.0 : 0.0
+        let sceneType = peopleRatio >= 0.01 ? 2 : 0
+        let personP50 = statistics["ToneMappedImagePersonSegmentBased"]?["p50"] ?? 0
+        let globalP50 = tone["p50"] ?? 0
+        let faceBoost = peopleRatio >= 0.01 && personP50 > 0
+            ? min(max(sqrt(globalP50 / personP50), 1), 2.5)
+            : 1
+        let object: [String: Any] = [
+            "0": 15,
+            "1": learn.styleData,
+            "2": true,
+            "3": gtc,
+            "4": baselineExposure,
+            "5": sceneType,
+            "6": statistics,
+            "7": [
+                "PeopleRatio": peopleRatio,
+                "PersonMasksValidHint": personMasksValidHint,
+                "SkinRatio": skinRatio,
+            ],
+            "c": toneLightMap,
+            "d": linearLightMap,
+            "e": 32,
+            "f": 32,
+            "g": 0x4C303068,
+            "h": baseGain,
+            "i": [
+                "Gain": baseGain * 4,
+                "OriginalRangeMin": rangeMin,
+                "OriginalRangeMax": rangeMax,
+            ],
+            "j": faceBoost,
+            "k": false,
+        ]
+        let data = try PropertyListSerialization.data(
+            fromPropertyList: object,
+            format: .binary,
+            options: 0
+        )
+        guard data.starts(with: Data("bplist00".utf8)),
+              let readback = try PropertyListSerialization.propertyList(
+                  from: data, options: [], format: nil
+              ) as? [String: Any],
+              let styleReadback = readback["1"] as? Data,
+              styleReadback == learn.styleData else {
+            throw CLIError.invalidContainer("style plist key 1 readback differs from LearnProcessor output")
+        }
+        return (data, [
+            "schema": "xdremux-apple-photographic-style-payload-v1",
+            "styleVersion": 15,
+            "styleData": [
+                "byteCount": learn.styleData.count,
+                "sha256": learn.styleDataSHA256,
+                "evidence": AppleEvidenceClass.privateFrameworkIdentity.rawValue,
+                "applyRMSE": learn.applyRMSE,
+                "thumbnail": ["width": learn.thumbnailWidth, "height": learn.thumbnailHeight],
+                "coefficientTexture": ["width": learn.coefficientWidth, "height": learn.coefficientHeight],
+            ],
+            "gtc": ["byteCount": gtc.count, "sha256": sha256Hex(gtc), "algorithm": "protocol-neutral-linear-runtime-gtc-v1"],
+            "statistics": statistics,
+            "peopleRatio": peopleRatio,
+            "skinRatio": skinRatio,
+            "personMasksValidHint": personMasksValidHint,
+            "sceneType": sceneType,
+            "baselineExposure": baselineExposure,
+            "baseGain": baseGain,
+            "linearRange": ["minimum": rangeMin, "maximum": rangeMax],
+            "faceExposureBoost": faceBoost,
+            "lightMap": ["byteCount": toneLightMap.count, "sha256": sha256Hex(toneLightMap)],
+            "linearLightMap": ["byteCount": linearLightMap.count, "sha256": sha256Hex(linearLightMap)],
+            "stylePropertyList": ["byteCount": data.count, "sha256": sha256Hex(data), "format": "binary plist v1 CF format 200"],
+        ])
+    }
+
+    private static func validateWithSemanticStyleProperties(
+        stylePropertyList: Data,
+        expectedStyleData: Data,
+        outputDirectory: URL
+    ) throws -> [String: Any] {
+        let metadataURL = outputDirectory.appendingPathComponent("style-metadata.bplist")
+        let readbackURL = outputDirectory.appendingPathComponent("style-data-neutrino-readback.bin")
+        let probeURL = outputDirectory.appendingPathComponent("semantic-style-properties-probe.json")
+        try stylePropertyList.write(to: metadataURL, options: .atomic)
+        let executable = try AppleNativeToolchain.stylePropertiesProbeExecutable()
+        let result = try AppleNativeToolchain.run(
+            executable,
+            arguments: [metadataURL.path, readbackURL.path]
+        )
+        try result.stdout.write(to: probeURL, options: .atomic)
+        guard result.status == 0,
+              let readback = try? Data(contentsOf: readbackURL),
+              readback == expectedStyleData,
+              let object = try? JSONSerialization.jsonObject(with: result.stdout) as? [String: Any],
+              object["parseSucceeded"] as? Bool == true,
+              (object["styleDataLength"] as? NSNumber)?.intValue == 51_840 else {
+            let diagnostic = String(data: result.stderr, encoding: .utf8) ?? ""
+            throw CLIError.invalidContainer(
+                "_NUSemanticStyleProperties rejected generated metadata or changed key 1: \(diagnostic)"
+            )
+        }
+        return [
+            "parseSucceeded": true,
+            "styleDataLength": readback.count,
+            "readbackSHA256": sha256Hex(readback),
+            "matchesLearnProcessor": true,
+            "probe": probeURL.path,
+        ]
+    }
+
+    private static func buildStylePayload(
+        sourceURL: URL,
+        standardHDRURL: URL,
+        semantics: AppleSemanticSceneAnalysis,
+        portraitWritten: Bool,
+        outputDirectory: URL,
+        photoIdentifier: String
+    ) throws -> ApplePhotographicStylePayload {
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        let learnDirectory = outputDirectory.appendingPathComponent("learn")
+        let learn = try learnIdentityStyleData(imageURL: standardHDRURL, outputDirectory: learnDirectory)
+        let scale = try sourceScale(sourceURL: sourceURL, portraitWritten: portraitWritten)
+        let raster = try linearSceneRaster(standardHDRURL: standardHDRURL, scale: scale)
+        let linearPNG = outputDirectory.appendingPathComponent("linear-thumbnail.png")
+        try writeRGBPNG(
+            pixels: raster.encodedRGB8,
+            width: raster.width,
+            height: raster.height,
+            outputURL: linearPNG
+        )
+        let linearHEVC = try encodeHEVC(
+            rgbPNGURL: linearPNG,
+            outputDirectory: outputDirectory,
+            stem: "linear-thumbnail",
+            quality: 0.95
+        )
+
+        let neutralTile = Data(repeating: 128, count: 512 * 512 * 3)
+        let deltaPNG = outputDirectory.appendingPathComponent("style-delta-neutral-tile.png")
+        try writeRGBPNG(pixels: neutralTile, width: 512, height: 512, outputURL: deltaPNG)
+        let deltaHEVC = try encodeHEVC(
+            rgbPNGURL: deltaPNG,
+            outputDirectory: outputDirectory,
+            stem: "style-delta-neutral-tile",
+            quality: 1.0
+        )
+        guard let primary = CIImage(
+            contentsOf: standardHDRURL,
+            options: [.applyOrientationProperty: true]
+        ) else {
+            throw CLIError.invalidContainer("cannot derive Photographic Styles presentation geometry")
+        }
+        let sourceWidth = max(1, Int(primary.extent.width.rounded()))
+        let sourceHeight = max(1, Int(primary.extent.height.rounded()))
+        let landscape = sourceWidth >= sourceHeight
+        let deltaSize = fittedSize(
+            sourceWidth: sourceWidth,
+            sourceHeight: sourceHeight,
+            maximumWidth: landscape ? 2880 : 2560,
+            maximumHeight: landscape ? 2560 : 2880
+        )
+        let rows = landscape ? 5 : 6
+        let columns = landscape ? 6 : 5
+        let style = try makeStylePropertyList(learn: learn, raster: raster, semantics: semantics)
+        let semanticStyleValidation = try validateWithSemanticStyleProperties(
+            stylePropertyList: style.data,
+            expectedStyleData: learn.styleData,
+            outputDirectory: outputDirectory
+        )
+        let inputSHA = sha256Hex(try Data(contentsOf: sourceURL, options: [.mappedIfSafe]))
+        let provenance: [String: AppleResourceProvenance] = [
+            "styleData": AppleResourceProvenance(
+                producer: "PISemanticStyleLearnNode/NUStyleTransferLearnNode",
+                inputSHA256: inputSHA,
+                evidence: .privateFrameworkIdentity,
+                detail: "same input image supplied as source and target; behavioral apply readback RMSE gated"
+            ),
+            "linearThumbnail": AppleResourceProvenance(
+                producer: "XDRemux coherent HDR scene reconstruction + Apple encodeLinear",
+                inputSHA256: inputSHA,
+                evidence: .sourceDerivedApproximation,
+                detail: "actual ICC/orientation/gain metadata; capture-linear LTM attachments unavailable"
+            ),
+            "styleDelta": AppleResourceProvenance(
+                producer: "XDRemux iPhone18,1/23F84 zero-residual profile",
+                inputSHA256: inputSHA,
+                evidence: .profileExact,
+                detail: "pre-HEVC normalized RGB is exactly 0.5; encoder is VideoToolbox Main10 4:2:0"
+            ),
+            "metadata": AppleResourceProvenance(
+                producer: "XDRemux source scene statistics",
+                inputSHA256: inputSHA,
+                evidence: .sourceDerivedApproximation,
+                detail: "GTC, light maps, statistics, gain/range, scene type, and face boost rebuilt from this input"
+            ),
+        ]
+        var manifest = style.manifest
+        manifest["semanticStylePropertiesValidation"] = semanticStyleValidation
+        manifest["input"] = ["path": sourceURL.path, "sha256": inputSHA]
+        manifest["photoIdentifier"] = photoIdentifier
+        manifest["linearThumbnail"] = [
+            "width": raster.width, "height": raster.height,
+            "itemPayloadSHA256": linearHEVC.itemPayloadSHA256,
+            "hvcCSHA256": linearHEVC.hvcCSHA256,
+            "evidence": AppleEvidenceClass.sourceDerivedApproximation.rawValue,
+        ]
+        manifest["styleDelta"] = [
+            "profile": "iPhone18,1/23F84-zero-residual",
+            "normalizedRGB": 0.5,
+            "tile": ["width": 512, "height": 512],
+            "grid": ["width": deltaSize.0, "height": deltaSize.1, "rows": rows, "columns": columns],
+            "itemPayloadSHA256": deltaHEVC.itemPayloadSHA256,
+            "hvcCSHA256": deltaHEVC.hvcCSHA256,
+            "codecEvidenceBoundary": "profile exact before HEVC; VideoToolbox Main10 4:2:0 is behaviorally tested but not byte-identical to Apple camera 4:4:4",
+        ]
+        manifest["provenance"] = Dictionary(uniqueKeysWithValues: provenance.map { key, value in
+            (key, [
+                "producer": value.producer,
+                "inputSHA256": value.inputSHA256,
+                "evidence": value.evidence.rawValue,
+                "detail": value.detail,
+            ])
+        })
+        let manifestJSON = try JSONSerialization.data(
+            withJSONObject: manifest,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        return ApplePhotographicStylePayload(
+            styleData: learn.styleData,
+            stylePropertyList: style.data,
+            linearThumbnailHEVC: linearHEVC.itemPayload,
+            linearThumbnailHVCC: linearHEVC.hvcC,
+            linearThumbnailWidth: raster.width,
+            linearThumbnailHeight: raster.height,
+            styleDeltaHEVC: deltaHEVC.itemPayload,
+            styleDeltaHVCC: deltaHEVC.hvcC,
+            styleDeltaTileWidth: 512,
+            styleDeltaTileHeight: 512,
+            styleDeltaGridWidth: deltaSize.0,
+            styleDeltaGridHeight: deltaSize.1,
+            styleDeltaRows: rows,
+            styleDeltaColumns: columns,
+            photoIdentifier: photoIdentifier,
+            manifestJSON: manifestJSON,
+            resourceProvenance: provenance
+        )
+    }
+
+    private static func mergeSemanticAuxiliaryGraph(
+        sourceHDRURL: URL,
+        semanticScaffoldURL: URL,
+        outputURL: URL,
+        profile: AppleSemanticWriteProfile
+    ) throws {
+        struct ImportRecord {
+            let oldID: Int
+            let newID: Int
+            let info: ISOBMFFItemInfo
+            let payload: Data
+            let constructionMethod: Int
+        }
+        struct ParsedFile {
+            let data: Data
+            let top: [ISOBMFFBox]
+            let meta: ISOBMFFBox
+            let mdat: ISOBMFFBox
+            let children: [ISOBMFFBox]
+            let primaryID: Int
+            let toneMapID: Int
+            let items: [ISOBMFFItemInfo]
+            let iinfVersion: UInt8
+            let locations: [ISOBMFFILocEntry]
+            let refsVersion: UInt8
+            let refs: [ISOBMFFIRefEntry]
+            let properties: [ISOBMFFPropertyInfo]
+            let ipmaVersion: UInt8
+            let ipmaFlags: Int
+            let ipmaEntries: [ISOBMFFIPMAEntry]
+            let idat: ISOBMFFBox?
+        }
+        func parse(_ url: URL, owner: String) throws -> ParsedFile {
+            let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+            let top = isobmffBoxes(in: data, start: 0, end: data.count)
+            guard let meta = top.first(where: { $0.type == "meta" }),
+                  let mdat = top.first(where: { $0.type == "mdat" }) else {
+                throw CLIError.invalidContainer("\(owner) semantic merge input has no meta/mdat")
+            }
+            let children = isobmffBoxes(in: data, start: meta.dataStart + 4, end: meta.dataEnd)
+            func child(_ type: String) throws -> ISOBMFFBox {
+                guard let box = children.first(where: { $0.type == type }) else {
+                    throw CLIError.invalidContainer("\(owner) semantic merge input has no \(type)")
+                }
+                return box
+            }
+            let iinf = try child("iinf")
+            let iloc = try child("iloc")
+            let pitm = try child("pitm")
+            let iprp = try child("iprp")
+            let iref = children.first(where: { $0.type == "iref" })
+            let itemInfo = parseISOBMFFItemInfos(data, iinf)
+            guard let toneMapID = itemInfo.items.first(where: { $0.type == "tmap" })?.itemID,
+                  let ipmaBox = isobmffBoxes(
+                      in: data, start: iprp.dataStart, end: iprp.dataEnd
+                  ).first(where: { $0.type == "ipma" }) else {
+                throw CLIError.invalidContainer("\(owner) semantic merge item graph is incomplete")
+            }
+            let refs = parseISOBMFFIRefs(data, iref)
+            let ipma = parseISOBMFFIPMA(data, ipmaBox)
+            return ParsedFile(
+                data: data,
+                top: top,
+                meta: meta,
+                mdat: mdat,
+                children: children,
+                primaryID: parseISOBMFFPITM(data, pitm),
+                toneMapID: toneMapID,
+                items: itemInfo.items,
+                iinfVersion: itemInfo.version,
+                locations: try parseISOBMFFILoc(data, iloc),
+                refsVersion: refs.version,
+                refs: refs.refs,
+                properties: try parseISOBMFFIPCOPropertyInfos(data, iprp),
+                ipmaVersion: ipma.version,
+                ipmaFlags: ipma.flags,
+                ipmaEntries: ipma.entries,
+                idat: children.first(where: { $0.type == "idat" })
+            )
+        }
+
+        let source = try parse(sourceHDRURL, owner: "source HDR")
+        let scaffold = try parse(semanticScaffoldURL, owner: "semantic scaffold")
+        let scaffoldItemsByID = Dictionary(uniqueKeysWithValues: scaffold.items.map { ($0.itemID, $0) })
+        let scaffoldLocationsByID = Dictionary(uniqueKeysWithValues: scaffold.locations.map { ($0.itemID, $0) })
+        guard let sourceExifID = source.items.first(where: { $0.type == "Exif" })?.itemID,
+              let scaffoldExifID = scaffold.items.first(where: { $0.type == "Exif" })?.itemID,
+              let scaffoldExifLocation = scaffoldLocationsByID[scaffoldExifID] else {
+            throw CLIError.invalidContainer("semantic merge requires source and scaffold Exif items")
+        }
+        let semanticImageIDs = scaffold.refs.compactMap { ref -> Int? in
+            guard ref.type == "auxl",
+                  ref.to.contains(scaffold.primaryID),
+                  ref.to.contains(scaffold.toneMapID),
+                  scaffoldItemsByID[ref.from]?.type == "hvc1" else { return nil }
+            return ref.from
+        }
+        guard semanticImageIDs.count == profile.roles.count else {
+            throw CLIError.invalidContainer(
+                "semantic scaffold \(profile.kind.rawValue) expected \(profile.roles.count) roles, found \(semanticImageIDs.count)"
+            )
+        }
+        let semanticMetadataIDs = scaffold.refs.compactMap { ref -> Int? in
+            guard ref.type == "cdsc", ref.to.count == 1,
+                  semanticImageIDs.contains(ref.to[0]),
+                  scaffoldItemsByID[ref.from]?.type == "mime" else { return nil }
+            return ref.from
+        }
+        guard semanticMetadataIDs.count == semanticImageIDs.count else {
+            throw CLIError.invalidContainer("semantic scaffold metadata/image pairs are incomplete")
+        }
+
+        let groupIDs: [Int] = source.children
+            .filter { $0.type == "grpl" }
+            .flatMap { container in
+                isobmffBoxes(
+                    in: source.data, start: container.dataStart, end: container.dataEnd
+                ).compactMap { group -> Int? in
+                    guard group.dataEnd - group.dataStart >= 8 else { return nil }
+                    return readUInt32BEUnchecked(source.data, at: group.dataStart + 4)
+                }
+            }
+        var nextID = max(
+            source.items.map(\.itemID).max() ?? 0,
+            max(source.locations.map(\.itemID).max() ?? 0, groupIDs.max() ?? 0)
+        ) + 1
+        var itemIDMap: [Int: Int] = [:]
+        for oldID in semanticImageIDs + semanticMetadataIDs {
+            guard nextID <= 65_535 else {
+                throw CLIError.invalidContainer("semantic merge exhausted HEIF UInt16 item IDs")
+            }
+            itemIDMap[oldID] = nextID
+            nextID += 1
+        }
+        let importIDs = semanticImageIDs + semanticMetadataIDs
+        let records: [ImportRecord] = try importIDs.map { oldID in
+            guard let newID = itemIDMap[oldID],
+                  let info = scaffoldItemsByID[oldID],
+                  let location = scaffoldLocationsByID[oldID] else {
+                throw CLIError.invalidContainer("semantic import item \(oldID) is incomplete")
+            }
+            return ImportRecord(
+                oldID: oldID,
+                newID: newID,
+                info: info,
+                payload: try itemPayload(in: scaffold.data, entry: location, idat: scaffold.idat),
+                constructionMethod: info.type == "mime" ? 1 : 0
+            )
+        }
+        let scaffoldExifPayload = try itemPayload(
+            in: scaffold.data, entry: scaffoldExifLocation, idat: scaffold.idat
+        )
+
+        var ipcoPayload = Data()
+        for property in source.properties { ipcoPayload.append(property.rawBox) }
+        let scaffoldPropertiesByIndex = Dictionary(
+            uniqueKeysWithValues: scaffold.properties.map { ($0.index, $0) }
+        )
+        var propertyIndexMap: [Int: Int] = [:]
+        func mappedProperty(_ oldIndex: Int) throws -> Int {
+            if let current = propertyIndexMap[oldIndex] { return current }
+            guard let property = scaffoldPropertiesByIndex[oldIndex] else {
+                throw CLIError.invalidContainer("semantic scaffold property \(oldIndex) is missing")
+            }
+            let newIndex = source.properties.count + propertyIndexMap.count + 1
+            propertyIndexMap[oldIndex] = newIndex
+            ipcoPayload.append(property.rawBox)
+            return newIndex
+        }
+        let scaffoldIPMAByID = Dictionary(
+            uniqueKeysWithValues: scaffold.ipmaEntries.map { ($0.itemID, $0) }
+        )
+        var importedAssociations: [Int: [(Int, Bool)]] = [:]
+        for oldID in semanticImageIDs {
+            guard let entry = scaffoldIPMAByID[oldID], let newID = itemIDMap[oldID] else {
+                throw CLIError.invalidContainer("semantic image \(oldID) has no property associations")
+            }
+            importedAssociations[newID] = try assocPairs(
+                entry.associations, flags: scaffold.ipmaFlags
+            ).map { (try mappedProperty($0.0), $0.1) }
+        }
+        var ipmaEntries = Data()
+        var ipmaCount = 0
+        for entry in source.ipmaEntries {
+            ipmaEntries.append(try makeIPMAEntry(
+                entry.itemID,
+                assocPairs(entry.associations, flags: source.ipmaFlags),
+                flags: source.ipmaFlags,
+                version: source.ipmaVersion
+            ))
+            ipmaCount += 1
+        }
+        for newID in importedAssociations.keys.sorted() {
+            ipmaEntries.append(try makeIPMAEntry(
+                newID,
+                importedAssociations[newID] ?? [],
+                flags: source.ipmaFlags,
+                version: source.ipmaVersion
+            ))
+            ipmaCount += 1
+        }
+        var ipmaPayload = Data([
+            source.ipmaVersion,
+            UInt8((source.ipmaFlags >> 16) & 0xff),
+            UInt8((source.ipmaFlags >> 8) & 0xff),
+            UInt8(source.ipmaFlags & 0xff),
+        ])
+        appendUInt32BE(ipmaCount, to: &ipmaPayload)
+        ipmaPayload.append(ipmaEntries)
+        var iprpPayload = Data()
+        iprpPayload.append(makeBox("ipco", payload: ipcoPayload))
+        iprpPayload.append(makeBox("ipma", payload: ipmaPayload))
+        let outputIPRP = makeBox("iprp", payload: iprpPayload)
+
+        var rawInfes = source.items.map(\.rawInfe)
+        for record in records {
+            rawInfes.append(try remapInfeItemID(record.info.rawInfe, to: record.newID))
+        }
+        let outputIINF = makeIinfBox(version: source.iinfVersion, rawInfes: rawInfes)
+
+        var outputRefs = source.refs
+        func mappedTarget(_ oldID: Int) throws -> Int {
+            if oldID == scaffold.primaryID { return source.primaryID }
+            if oldID == scaffold.toneMapID { return source.toneMapID }
+            if let mapped = itemIDMap[oldID] { return mapped }
+            throw CLIError.invalidContainer("semantic reference target \(oldID) cannot be remapped")
+        }
+        for ref in scaffold.refs where itemIDMap[ref.from] != nil {
+            outputRefs.append(ISOBMFFIRefEntry(
+                type: ref.type,
+                from: itemIDMap[ref.from]!,
+                to: try ref.to.map(mappedTarget)
+            ))
+        }
+        if !outputRefs.contains(where: {
+            $0.type == "cdsc" && $0.from == sourceExifID
+        }) {
+            outputRefs.append(ISOBMFFIRefEntry(
+                type: "cdsc", from: sourceExifID, to: [source.primaryID, source.toneMapID]
+            ))
+        }
+        let outputIREF = makeIrefFullBox(version: source.refsVersion, refs: outputRefs)
+
+        var idatPayload = source.idat.map {
+            source.data.subdata(in: $0.dataStart..<$0.dataEnd)
+        } ?? Data()
+        var idatLocations: [Int: (offset: Int, length: Int)] = [:]
+        for record in records where record.constructionMethod == 1 {
+            let offset = idatPayload.count
+            idatPayload.append(record.payload)
+            idatLocations[record.newID] = (offset, record.payload.count)
+        }
+        let outputIDAT = makeBox("idat", payload: idatPayload)
+
+        func buildMeta(_ locations: [ISOBMFFILocEntry]) -> Data {
+            let outputILOC = makeIlocV1Box(entries: locations)
+            var metaPayload = source.data.subdata(
+                in: source.meta.dataStart..<source.meta.dataStart + 4
+            )
+            var emittedIREF = false
+            var emittedIDAT = false
+            for child in source.children {
+                switch child.type {
+                case "iinf": metaPayload.append(outputIINF)
+                case "iloc": metaPayload.append(outputILOC)
+                case "iref": metaPayload.append(outputIREF); emittedIREF = true
+                case "iprp": metaPayload.append(outputIPRP)
+                case "idat": metaPayload.append(outputIDAT); emittedIDAT = true
+                default:
+                    metaPayload.append(source.data.subdata(in: child.boxStart..<child.boxStart + child.size))
+                }
+            }
+            if !emittedIREF { metaPayload.append(outputIREF) }
+            if !emittedIDAT { metaPayload.append(outputIDAT) }
+            return makeBox("meta", payload: metaPayload)
+        }
+
+        var placeholders = source.locations.filter { $0.itemID != sourceExifID }
+        placeholders.append(ISOBMFFILocEntry(
+            itemID: sourceExifID, constructionMethod: 0, dataReferenceIndex: 0,
+            extents: [(0, scaffoldExifPayload.count)]
+        ))
+        for record in records {
+            let extent = record.constructionMethod == 1
+                ? idatLocations[record.newID]!
+                : (offset: 0, length: record.payload.count)
+            placeholders.append(ISOBMFFILocEntry(
+                itemID: record.newID,
+                constructionMethod: record.constructionMethod,
+                dataReferenceIndex: 0,
+                extents: [extent]
+            ))
+        }
+        let preliminaryMeta = buildMeta(placeholders)
+        var prefixByteCount = 0
+        for box in source.top {
+            if box.boxStart == source.mdat.boxStart { break }
+            prefixByteCount += box.boxStart == source.meta.boxStart ? preliminaryMeta.count : box.size
+        }
+        let newMdatDataStart = prefixByteCount + 8
+        let fileDelta = newMdatDataStart - source.mdat.dataStart
+        let sourceMdatPayload = source.data.subdata(in: source.mdat.dataStart..<source.mdat.dataEnd)
+        var finalLocations = source.locations.compactMap { entry -> ISOBMFFILocEntry? in
+            guard entry.itemID != sourceExifID else { return nil }
+            let extents = entry.extents.map { extent -> (offset: Int, length: Int) in
+                let shift = entry.constructionMethod == 0
+                    && extent.offset >= source.mdat.dataStart
+                    && extent.offset < source.mdat.dataEnd
+                return (extent.offset + (shift ? fileDelta : 0), extent.length)
+            }
+            return ISOBMFFILocEntry(
+                itemID: entry.itemID,
+                constructionMethod: entry.constructionMethod,
+                dataReferenceIndex: entry.dataReferenceIndex,
+                extents: extents
+            )
+        }
+        var appendedMdat = Data()
+        let newExifOffset = newMdatDataStart + sourceMdatPayload.count
+        appendedMdat.append(scaffoldExifPayload)
+        finalLocations.append(ISOBMFFILocEntry(
+            itemID: sourceExifID, constructionMethod: 0, dataReferenceIndex: 0,
+            extents: [(newExifOffset, scaffoldExifPayload.count)]
+        ))
+        for record in records {
+            if record.constructionMethod == 0 {
+                let offset = newMdatDataStart + sourceMdatPayload.count + appendedMdat.count
+                appendedMdat.append(record.payload)
+                finalLocations.append(ISOBMFFILocEntry(
+                    itemID: record.newID, constructionMethod: 0, dataReferenceIndex: 0,
+                    extents: [(offset, record.payload.count)]
+                ))
+            } else {
+                let extent = idatLocations[record.newID]!
+                finalLocations.append(ISOBMFFILocEntry(
+                    itemID: record.newID, constructionMethod: 1, dataReferenceIndex: 0,
+                    extents: [extent]
+                ))
+            }
+        }
+        let finalMeta = buildMeta(finalLocations)
+        guard finalMeta.count == preliminaryMeta.count else {
+            throw CLIError.invalidContainer("semantic merge meta layout was not size stable")
+        }
+        var finalMdatPayload = sourceMdatPayload
+        finalMdatPayload.append(appendedMdat)
+        let outputMdat = makeBox("mdat", payload: finalMdatPayload)
+        var output = Data()
+        for box in source.top {
+            if box.boxStart == source.meta.boxStart {
+                output.append(finalMeta)
+            } else if box.boxStart == source.mdat.boxStart {
+                output.append(outputMdat)
+            } else {
+                output.append(source.data.subdata(in: box.boxStart..<box.boxStart + box.size))
+            }
+        }
+        try output.write(to: outputURL, options: .atomic)
+        let written = try Data(contentsOf: outputURL, options: [.mappedIfSafe])
+        let writtenTop = isobmffBoxes(in: written, start: 0, end: written.count)
+        guard let writtenMdat = writtenTop.first(where: { $0.type == "mdat" }),
+              sha256Hex(sourceMdatPayload) == sha256Hex(written.subdata(
+                  in: writtenMdat.dataStart..<writtenMdat.dataStart + sourceMdatPayload.count
+              )),
+              let imageSource = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  imageSource, 0, kCGImageAuxiliaryDataTypeISOGainMap
+              ) != nil else {
+            throw CLIError.invalidContainer("semantic merge changed HDR data or lost its ISO Gain Map")
+        }
+        func auxiliaryType(for role: AppleSemanticRole) -> CFString {
+            switch role {
+            case .person: return kCGImageAuxiliaryDataTypePortraitEffectsMatte
+            case .skin: return kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte
+            case .hair: return kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte
+            case .teeth: return kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte
+            case .glasses: return kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte
+            case .sky: return kCGImageAuxiliaryDataTypeSemanticSegmentationSkyMatte
+            }
+        }
+        for role in profile.orderedRoles {
+            guard CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                imageSource, 0, auxiliaryType(for: role)
+            ) != nil else {
+                throw CLIError.invalidContainer(
+                    "semantic merge did not preserve expected \(role.rawValue) matte"
+                )
+            }
+        }
+    }
+
+    private static func writeIncrementalStylesGraph(
+        sourceURL: URL,
+        outputURL: URL,
+        payload: ApplePhotographicStylePayload
+    ) throws -> GraphWriteResult {
+        let source = try Data(contentsOf: sourceURL, options: [.mappedIfSafe])
+        let top = isobmffBoxes(in: source, start: 0, end: source.count)
+        guard let meta = top.first(where: { $0.type == "meta" }),
+              let mdat = top.first(where: { $0.type == "mdat" }) else {
+            throw CLIError.invalidContainer("Photographic Styles writer requires meta and mdat boxes")
+        }
+        let children = isobmffBoxes(in: source, start: meta.dataStart + 4, end: meta.dataEnd)
+        func required(_ type: String) throws -> ISOBMFFBox {
+            guard let box = children.first(where: { $0.type == type }) else {
+                throw CLIError.invalidContainer("Photographic Styles writer requires meta/\(type)")
+            }
+            return box
+        }
+        let iinf = try required("iinf")
+        let iloc = try required("iloc")
+        let pitm = try required("pitm")
+        let iprp = try required("iprp")
+        let sourceIDAT = children.first(where: { $0.type == "idat" })
+        let sourceIREF = children.first(where: { $0.type == "iref" })
+        let primaryID = parseISOBMFFPITM(source, pitm)
+        let itemInfo = parseISOBMFFItemInfos(source, iinf)
+        let ilocEntries = try parseISOBMFFILoc(source, iloc)
+        let refsInfo = parseISOBMFFIRefs(source, sourceIREF)
+        guard let tmapID = itemInfo.items.first(where: { $0.type == "tmap" })?.itemID else {
+            throw CLIError.invalidContainer("Photographic Styles writer cannot locate ISO tmap item")
+        }
+        let gainMapID = refsInfo.refs.first(where: {
+            $0.type == "dimg" && $0.from == tmapID
+        })?.to.first(where: { $0 != primaryID })
+            ?? refsInfo.refs.first(where: {
+                $0.type == "auxl" && $0.to.contains(primaryID) && $0.to.contains(tmapID)
+            })?.from
+        guard let gainMapID else {
+            throw CLIError.invalidContainer("Photographic Styles writer cannot locate HDR Gain Map item")
+        }
+        guard let ipmaBox = isobmffBoxes(
+            in: source, start: iprp.dataStart, end: iprp.dataEnd
+        ).first(where: { $0.type == "ipma" }) else {
+            throw CLIError.invalidContainer("Photographic Styles writer requires ipma")
+        }
+        let sourceIPMA = parseISOBMFFIPMA(source, ipmaBox)
+        let properties = try parseISOBMFFIPCOPropertyInfos(source, iprp)
+        let propertyByIndex = Dictionary(uniqueKeysWithValues: properties.map { ($0.index, $0) })
+        let primaryColorIndex = sourceIPMA.entries.first(where: { $0.itemID == primaryID })?
+            .associations
+            .map { assocPropertyIndex($0, flags: sourceIPMA.flags) }
+            .first(where: { propertyByIndex[$0]?.type == "colr" })
+
+        let entityGroupIDs: [Int] = children
+            .filter { $0.type == "grpl" }
+            .flatMap { groupContainer in
+                isobmffBoxes(
+                    in: source,
+                    start: groupContainer.dataStart,
+                    end: groupContainer.dataEnd
+                ).compactMap { group -> Int? in
+                    guard group.dataEnd - group.dataStart >= 8 else { return nil }
+                    return readUInt32BEUnchecked(source, at: group.dataStart + 4)
+                }
+            }
+        let existingMaximumID = max(
+            primaryID,
+            max(
+                itemInfo.items.map(\.itemID).max() ?? 0,
+                max(ilocEntries.map(\.itemID).max() ?? 0, entityGroupIDs.max() ?? 0)
+            )
+        )
+        let tileCount = payload.styleDeltaRows * payload.styleDeltaColumns
+        guard tileCount == 30, existingMaximumID + tileCount + 3 <= 65_535 else {
+            throw CLIError.invalidContainer("unsupported Style Delta grid or HEIF item ID range")
+        }
+        let deltaTileIDs = Array((existingMaximumID + 1)...(existingMaximumID + tileCount))
+        let deltaGridID = existingMaximumID + tileCount + 1
+        let linearThumbnailID = deltaGridID + 1
+        let styleMetadataID = linearThumbnailID + 1
+
+        var ipcoPayload = Data()
+        for property in properties { ipcoPayload.append(property.rawBox) }
+        func appendProperty(_ box: Data) -> Int {
+            ipcoPayload.append(box)
+            return properties.count + isobmffBoxes(
+                in: ipcoPayload, start: 0, end: ipcoPayload.count
+            ).count - properties.count
+        }
+        // appendProperty's parse count is deliberately based on full raw boxes so each
+        // resulting index remains stable even if an ICC profile is large.
+        let deltaHVCCIndex = appendProperty(makeBox("hvcC", payload: payload.styleDeltaHVCC))
+        let deltaTileISPEIndex = appendProperty(makeIspeBox(
+            width: payload.styleDeltaTileWidth,
+            height: payload.styleDeltaTileHeight
+        ))
+        let pixi10Index = appendProperty(makePixiBox(bits: [10, 10, 10]))
+        let deltaGridISPEIndex = appendProperty(makeIspeBox(
+            width: payload.styleDeltaGridWidth,
+            height: payload.styleDeltaGridHeight
+        ))
+        let deltaAuxCIndex = appendProperty(makeAuxCBox(
+            "tag:apple.com,2023:photo:aux:styledeltamap"
+        ))
+        let identityIrotIndex = appendProperty(makeIrotBox())
+        let linearHVCCIndex = appendProperty(makeBox("hvcC", payload: payload.linearThumbnailHVCC))
+        let linearISPEIndex = appendProperty(makeIspeBox(
+            width: payload.linearThumbnailWidth,
+            height: payload.linearThumbnailHeight
+        ))
+        guard let linearP3 = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3) else {
+            throw CLIError.invalidContainer("extended linear Display P3 is unavailable")
+        }
+        let linearColorIndex = appendProperty(try makeICCColorBox(linearP3))
+        let linearAuxCIndex = appendProperty(makeAuxCBox(
+            "tag:apple.com,2023:photo:aux:linearthumbnail"
+        ))
+        let deltaColorIndex = primaryColorIndex ?? linearColorIndex
+
+        let outputIPMAFlags = sourceIPMA.flags
+        var ipmaEntriesPayload = Data()
+        var ipmaEntryCount = 0
+        for entry in sourceIPMA.entries {
+            let associations = assocPairs(entry.associations, flags: sourceIPMA.flags)
+            ipmaEntriesPayload.append(try makeIPMAEntry(
+                entry.itemID,
+                associations,
+                flags: outputIPMAFlags,
+                version: sourceIPMA.version
+            ))
+            ipmaEntryCount += 1
+        }
+        for tileID in deltaTileIDs {
+            ipmaEntriesPayload.append(try makeIPMAEntry(
+                tileID,
+                [(deltaTileISPEIndex, true), (deltaColorIndex, true), (deltaHVCCIndex, true)],
+                flags: outputIPMAFlags,
+                version: sourceIPMA.version
+            ))
+            ipmaEntryCount += 1
+        }
+        ipmaEntriesPayload.append(try makeIPMAEntry(
+            deltaGridID,
+            [
+                (deltaColorIndex, true), (deltaGridISPEIndex, false), (pixi10Index, false),
+                (deltaAuxCIndex, true), (identityIrotIndex, true),
+            ],
+            flags: outputIPMAFlags,
+            version: sourceIPMA.version
+        ))
+        ipmaEntryCount += 1
+        ipmaEntriesPayload.append(try makeIPMAEntry(
+            linearThumbnailID,
+            [
+                (linearISPEIndex, true), (linearColorIndex, true), (pixi10Index, false),
+                (linearHVCCIndex, true), (linearAuxCIndex, true), (identityIrotIndex, true),
+            ],
+            flags: outputIPMAFlags,
+            version: sourceIPMA.version
+        ))
+        ipmaEntryCount += 1
+        var ipmaPayload = Data([
+            sourceIPMA.version,
+            UInt8((outputIPMAFlags >> 16) & 0xff),
+            UInt8((outputIPMAFlags >> 8) & 0xff),
+            UInt8(outputIPMAFlags & 0xff),
+        ])
+        appendUInt32BE(ipmaEntryCount, to: &ipmaPayload)
+        ipmaPayload.append(ipmaEntriesPayload)
+        var outputIPRPPayload = Data()
+        outputIPRPPayload.append(makeBox("ipco", payload: ipcoPayload))
+        outputIPRPPayload.append(makeBox("ipma", payload: ipmaPayload))
+        for child in isobmffBoxes(in: source, start: iprp.dataStart, end: iprp.dataEnd)
+            where child.type != "ipco" && child.type != "ipma" {
+            outputIPRPPayload.append(source.subdata(in: child.boxStart..<child.boxStart + child.size))
+        }
+        let outputIPRP = makeBox("iprp", payload: outputIPRPPayload)
+
+        var rawInfes = itemInfo.items.map(\.rawInfe)
+        for tileID in deltaTileIDs {
+            rawInfes.append(makeInfeBox(itemID: tileID, type: "hvc1", flags: 1))
+        }
+        rawInfes.append(makeInfeBox(itemID: deltaGridID, type: "grid", flags: 1))
+        rawInfes.append(makeInfeBox(itemID: linearThumbnailID, type: "hvc1", flags: 1))
+        rawInfes.append(makeURIInfeBox(
+            itemID: styleMetadataID,
+            name: "styleMetadata",
+            uri: "tag:apple.com,2023:photo:metadata:styles"
+        ))
+        let outputIINF = makeIinfBox(version: itemInfo.version, rawInfes: rawInfes)
+
+        var refs = refsInfo.refs
+        refs.append(ISOBMFFIRefEntry(type: "dimg", from: deltaGridID, to: deltaTileIDs))
+        refs.append(ISOBMFFIRefEntry(type: "auxl", from: deltaGridID, to: [primaryID, tmapID]))
+        refs.append(ISOBMFFIRefEntry(type: "auxl", from: linearThumbnailID, to: [primaryID, tmapID]))
+        refs.append(ISOBMFFIRefEntry(type: "cdsc", from: styleMetadataID, to: [primaryID, tmapID]))
+        let outputIREF = makeIrefFullBox(version: refsInfo.version, refs: refs)
+
+        var idatPayload = sourceIDAT.map {
+            source.subdata(in: $0.dataStart..<$0.dataEnd)
+        } ?? Data()
+        let deltaGridOffset = idatPayload.count
+        let deltaGridPayload = try makeGridPayload(
+            rows: payload.styleDeltaRows,
+            columns: payload.styleDeltaColumns,
+            width: payload.styleDeltaGridWidth,
+            height: payload.styleDeltaGridHeight
+        )
+        idatPayload.append(deltaGridPayload)
+        let styleMetadataOffset = idatPayload.count
+        idatPayload.append(payload.stylePropertyList)
+        let outputIDAT = makeBox("idat", payload: idatPayload)
+
+        func buildMeta(_ locations: [ISOBMFFILocEntry]) -> Data {
+            let outputILOC = makeIlocV1Box(entries: locations)
+            var metaPayload = source.subdata(in: meta.dataStart..<meta.dataStart + 4)
+            var emittedIREF = false
+            var emittedIDAT = false
+            for child in children {
+                switch child.type {
+                case "iinf": metaPayload.append(outputIINF)
+                case "iloc": metaPayload.append(outputILOC)
+                case "iref": metaPayload.append(outputIREF); emittedIREF = true
+                case "iprp": metaPayload.append(outputIPRP)
+                case "idat": metaPayload.append(outputIDAT); emittedIDAT = true
+                default:
+                    metaPayload.append(source.subdata(in: child.boxStart..<child.boxStart + child.size))
+                }
+            }
+            if !emittedIREF { metaPayload.append(outputIREF) }
+            if !emittedIDAT { metaPayload.append(outputIDAT) }
+            return makeBox("meta", payload: metaPayload)
+        }
+
+        var placeholders = ilocEntries
+        for tileID in deltaTileIDs {
+            placeholders.append(ISOBMFFILocEntry(
+                itemID: tileID, constructionMethod: 0, dataReferenceIndex: 0,
+                extents: [(0, payload.styleDeltaHEVC.count)]
+            ))
+        }
+        placeholders.append(ISOBMFFILocEntry(
+            itemID: deltaGridID, constructionMethod: 1, dataReferenceIndex: 0,
+            extents: [(deltaGridOffset, deltaGridPayload.count)]
+        ))
+        placeholders.append(ISOBMFFILocEntry(
+            itemID: linearThumbnailID, constructionMethod: 0, dataReferenceIndex: 0,
+            extents: [(0, payload.linearThumbnailHEVC.count)]
+        ))
+        placeholders.append(ISOBMFFILocEntry(
+            itemID: styleMetadataID, constructionMethod: 1, dataReferenceIndex: 0,
+            extents: [(styleMetadataOffset, payload.stylePropertyList.count)]
+        ))
+        let preliminaryMeta = buildMeta(placeholders)
+        var prefixByteCount = 0
+        for box in top {
+            if box.boxStart == mdat.boxStart { break }
+            prefixByteCount += box.boxStart == meta.boxStart ? preliminaryMeta.count : box.size
+        }
+        let newMdatDataStart = prefixByteCount + 8
+        let fileDelta = newMdatDataStart - mdat.dataStart
+        let sourceMdatPayload = source.subdata(in: mdat.dataStart..<mdat.dataEnd)
+        var finalLocations = ilocEntries.map { entry -> ISOBMFFILocEntry in
+            let extents = entry.extents.map { extent -> (offset: Int, length: Int) in
+                let shouldShift = entry.constructionMethod == 0
+                    && extent.offset >= mdat.dataStart
+                    && extent.offset < mdat.dataEnd
+                return (extent.offset + (shouldShift ? fileDelta : 0), extent.length)
+            }
+            return ISOBMFFILocEntry(
+                itemID: entry.itemID,
+                constructionMethod: entry.constructionMethod,
+                dataReferenceIndex: entry.dataReferenceIndex,
+                extents: extents
+            )
+        }
+        var appendedMdat = Data()
+        for tileID in deltaTileIDs {
+            let offset = newMdatDataStart + sourceMdatPayload.count + appendedMdat.count
+            appendedMdat.append(payload.styleDeltaHEVC)
+            finalLocations.append(ISOBMFFILocEntry(
+                itemID: tileID, constructionMethod: 0, dataReferenceIndex: 0,
+                extents: [(offset, payload.styleDeltaHEVC.count)]
+            ))
+        }
+        finalLocations.append(ISOBMFFILocEntry(
+            itemID: deltaGridID, constructionMethod: 1, dataReferenceIndex: 0,
+            extents: [(deltaGridOffset, deltaGridPayload.count)]
+        ))
+        let linearOffset = newMdatDataStart + sourceMdatPayload.count + appendedMdat.count
+        appendedMdat.append(payload.linearThumbnailHEVC)
+        finalLocations.append(ISOBMFFILocEntry(
+            itemID: linearThumbnailID, constructionMethod: 0, dataReferenceIndex: 0,
+            extents: [(linearOffset, payload.linearThumbnailHEVC.count)]
+        ))
+        finalLocations.append(ISOBMFFILocEntry(
+            itemID: styleMetadataID, constructionMethod: 1, dataReferenceIndex: 0,
+            extents: [(styleMetadataOffset, payload.stylePropertyList.count)]
+        ))
+        let finalMeta = buildMeta(finalLocations)
+        guard finalMeta.count == preliminaryMeta.count else {
+            throw CLIError.invalidContainer("Photographic Styles meta layout was not size stable")
+        }
+        var finalMdatPayload = sourceMdatPayload
+        finalMdatPayload.append(appendedMdat)
+        let finalMdat = makeBox("mdat", payload: finalMdatPayload)
+        var output = Data()
+        for box in top {
+            if box.boxStart == meta.boxStart {
+                output.append(finalMeta)
+            } else if box.boxStart == mdat.boxStart {
+                output.append(finalMdat)
+            } else {
+                output.append(source.subdata(in: box.boxStart..<box.boxStart + box.size))
+            }
+        }
+        try output.write(to: outputURL, options: .atomic)
+        let outputPrefix = finalMdatPayload.prefix(sourceMdatPayload.count)
+        let sourceMdatSHA = sha256Hex(sourceMdatPayload)
+        let outputPrefixSHA = sha256Hex(Data(outputPrefix))
+        guard sourceMdatSHA == outputPrefixSHA else {
+            throw CLIError.invalidContainer("base/HDR Gain Map mdat payload changed while adding Styles")
+        }
+        return GraphWriteResult(
+            primaryItemID: primaryID,
+            gainMapItemID: gainMapID,
+            toneMapItemID: tmapID,
+            styleDeltaItemID: deltaGridID,
+            linearThumbnailItemID: linearThumbnailID,
+            styleMetadataItemID: styleMetadataID,
+            originalMdatPayloadSHA256: sourceMdatSHA,
+            outputOriginalMdatPrefixSHA256: outputPrefixSHA,
+            itemCount: rawInfes.count,
+            propertyCount: isobmffBoxes(in: ipcoPayload, start: 0, end: ipcoPayload.count).count
+        )
+    }
+
+    private static func convert(inputURL: URL, outputURL: URL, options: Options) throws {
+        guard options.features.photographicStyles else {
+            throw CLIError.invalidContainer("Photographic Styles pipeline invoked without its capability flag")
+        }
+        let parent = outputURL.deletingLastPathComponent()
+        try ensureDirectory(parent, fileManager: .default)
+        let token = UUID().uuidString
+        let featureInputURL = parent.appendingPathComponent(".\(outputURL.lastPathComponent).apple-input-\(token).heic")
+        defer { try? FileManager.default.removeItem(at: featureInputURL) }
+
+        var portraitUnavailableReason: String?
+        var portraitWritten = false
+        var portraitSemanticFusion: [String: Any]?
+        let photoIdentifier = UUID().uuidString.uppercased()
+        if options.features.portrait {
+            do {
+                let outcome = try PortraitConversionPipeline.convertWithOutcome(
+                    inputURL: inputURL,
+                    outputURL: featureInputURL,
+                    mode: .on,
+                    photoIdentifier: photoIdentifier,
+                    includesPhotographicStylesSemantics: true
+                )
+                portraitWritten = outcome.written
+                portraitSemanticFusion = outcome.semanticFusion
+                if !portraitWritten {
+                    portraitUnavailableReason = "required OPPO portrait depth bundle is unavailable"
+                }
+            } catch {
+                portraitUnavailableReason = String(describing: error)
+            }
+        }
+
+        if !portraitWritten {
+            _ = try XDRemuxProductCore.convert(
+                inputURL: inputURL,
+                outputURL: featureInputURL,
+                familyPreference: options.family,
+                debugRootURL: options.debugRootURL,
+                oppoCompatibility: options.oppoCompatibility,
+                inputProcessingBranch: options.inputProcessingBranch,
+                oppoCameraTail: options.oppoCameraTail,
+                tmapFormat: options.tmapFormat
+            )
+        }
+
+        try augmentPhotographicStyles(
+            sourceURL: inputURL,
+            standardHDRURL: featureInputURL,
+            outputURL: outputURL,
+            portraitRequested: options.features.portrait,
+            portraitWritten: portraitWritten,
+            portraitUnavailableReason: portraitUnavailableReason,
+            portraitSemanticFusion: portraitSemanticFusion,
+            preferredPhotoIdentifier: photoIdentifier,
+            debugRootURL: options.debugRootURL
+        )
+    }
+
+    private static func augmentPhotographicStyles(
+        sourceURL: URL,
+        standardHDRURL: URL,
+        outputURL: URL,
+        portraitRequested: Bool,
+        portraitWritten: Bool,
+        portraitUnavailableReason: String?,
+        portraitSemanticFusion: [String: Any]?,
+        preferredPhotoIdentifier: String,
+        debugRootURL: URL?
+    ) throws {
+        let runToken = UUID().uuidString.uppercased()
+        let evidenceContainer = outputURL.deletingPathExtension()
+            .appendingPathExtension("xdremux")
+        let evidenceDirectory = evidenceContainer
+            .appendingPathComponent("runs", isDirectory: true)
+            .appendingPathComponent(runToken, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: evidenceDirectory,
+            withIntermediateDirectories: true
+        )
+        if let portraitSemanticFusion {
+            let fusionData = try JSONSerialization.data(
+                withJSONObject: portraitSemanticFusion,
+                options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            )
+            try fusionData.write(
+                to: evidenceDirectory.appendingPathComponent("portrait-semantic-fusion.json"),
+                options: .atomic
+            )
+        }
+        let semanticDirectory = evidenceDirectory.appendingPathComponent("semantics", isDirectory: true)
+        try FileManager.default.copyItem(
+            at: standardHDRURL,
+            to: evidenceDirectory.appendingPathComponent("base-hdr-before-semantics.heic")
+        )
+        let analysis = try AppleSemanticSceneAnalyzer.analyze(
+            imageURL: standardHDRURL,
+            outputDirectory: semanticDirectory
+        )
+        let existingPhotoIdentifier: String? = CGImageSourceCreateWithURL(
+            standardHDRURL as CFURL, nil
+        ).flatMap { source in
+            guard let properties = CGImageSourceCopyPropertiesAtIndex(
+                source, 0, nil
+            ) as? [CFString: Any],
+                  let dictionary = properties[
+                      kCGImagePropertyMakerAppleDictionary
+                  ] as? NSDictionary else { return nil }
+            return dictionary["43"] as? String ?? dictionary[43] as? String
+        }
+        let photoIdentifier = existingPhotoIdentifier ?? preferredPhotoIdentifier
+        let scaffoldURL = outputURL.deletingLastPathComponent().appendingPathComponent(
+            ".\(outputURL.lastPathComponent).semantic-scaffold-\(runToken).heic"
+        )
+        let semanticMergedURL = outputURL.deletingLastPathComponent().appendingPathComponent(
+            ".\(outputURL.lastPathComponent).semantic-merged-\(runToken).heic"
+        )
+        defer { try? FileManager.default.removeItem(at: scaffoldURL) }
+        defer { try? FileManager.default.removeItem(at: semanticMergedURL) }
+        let semanticWriteProfile: AppleSemanticWriteProfile = portraitWritten
+            ? .portraitAndStyles
+            : analysis.nativeStyleWriteProfile
+        let featureGraphURL: URL
+        if portraitWritten {
+            // The Portrait writer already authored the same six Vision resources and
+            // disparity. Reusing that graph prevents duplicate semantic auxiliaries.
+            featureGraphURL = standardHDRURL
+        } else {
+            try AppleSemanticScaffoldBuilder.write(
+                sourceHDRURL: standardHDRURL,
+                outputURL: scaffoldURL,
+                analysis: analysis,
+                profile: semanticWriteProfile,
+                photoIdentifier: photoIdentifier,
+                preserveOriginalBaseAndGain: false
+            )
+            try FileManager.default.copyItem(
+                at: scaffoldURL,
+                to: evidenceDirectory.appendingPathComponent("semantic-scaffold-before-styles.heic")
+            )
+            try mergeSemanticAuxiliaryGraph(
+                sourceHDRURL: standardHDRURL,
+                semanticScaffoldURL: scaffoldURL,
+                outputURL: semanticMergedURL,
+                profile: semanticWriteProfile
+            )
+            try FileManager.default.copyItem(
+                at: semanticMergedURL,
+                to: evidenceDirectory.appendingPathComponent("semantic-merged-base-gain-preserved.heic")
+            )
+            featureGraphURL = semanticMergedURL
+        }
+        let styleDirectory = evidenceDirectory.appendingPathComponent("styles", isDirectory: true)
+        let stylePayload = try buildStylePayload(
+            sourceURL: sourceURL,
+            standardHDRURL: featureGraphURL,
+            semantics: analysis,
+            portraitWritten: portraitWritten,
+            outputDirectory: styleDirectory,
+            photoIdentifier: photoIdentifier
+        )
+        let graph = try writeIncrementalStylesGraph(
+            sourceURL: featureGraphURL,
+            outputURL: outputURL,
+            payload: stylePayload
+        )
+        try validatePhotographicStylesOutput(outputURL, expectsPortrait: portraitWritten)
+
+        func matteSummary(_ matte: AppleSemanticMatte?) -> [String: Any] {
+            guard let matte else { return ["available": false] }
+            return [
+                "available": true,
+                "requestClass": matte.provenance.requestClass,
+                "attributeName": matte.provenance.attributeName,
+                "revision": matte.provenance.revision,
+                "inputSHA256": matte.provenance.inputSHA256,
+                "width": matte.width,
+                "height": matte.height,
+                "pixelFormat": matte.provenance.pixelFormat,
+                "orientation": matte.provenance.orientation,
+                "orientationTransform": matte.provenance.orientationTransform,
+                "fallback": matte.provenance.fallback,
+                "minimum": matte.statistics.minimum,
+                "maximum": matte.statistics.maximum,
+                "mean": matte.statistics.mean,
+                "coverage": matte.statistics.coverage,
+                "rawSHA256": sha256Hex(matte.pixels),
+            ]
+        }
+        let outputData = try Data(contentsOf: outputURL, options: [.mappedIfSafe])
+        let contaminationReport = try donorContaminationReport(for: outputURL)
+        let contaminationReportData = try JSONSerialization.data(
+            withJSONObject: contaminationReport,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        try contaminationReportData.write(
+            to: evidenceDirectory.appendingPathComponent("donor-contamination.json"),
+            options: .atomic
+        )
+        let graphManifest: [String: Any] = [
+            "primaryItemID": graph.primaryItemID,
+            "gainMapItemID": graph.gainMapItemID,
+            "toneMapItemID": graph.toneMapItemID,
+            "styleDeltaItemID": graph.styleDeltaItemID,
+            "linearThumbnailItemID": graph.linearThumbnailItemID,
+            "styleMetadataItemID": graph.styleMetadataItemID,
+            "itemCount": graph.itemCount,
+            "propertyCount": graph.propertyCount,
+            "primaryAndGainEncodedOnce": graph.originalMdatPayloadSHA256 == graph.outputOriginalMdatPrefixSHA256,
+            "originalMdatPayloadSHA256": graph.originalMdatPayloadSHA256,
+            "outputOriginalMdatPrefixSHA256": graph.outputOriginalMdatPrefixSHA256,
+        ]
+        let configuration: [String: Any] = [
+            "applePhotographicStyles": true,
+            "applePortraitRequested": portraitRequested,
+            "applePortraitWritten": portraitWritten,
+            "applePortraitUnavailableReason": portraitUnavailableReason.map { $0 as Any } ?? NSNull(),
+            "styleProfile": "iPhone18,1/23F84-zero-residual",
+            "debugRoot": debugRootURL.map { $0.path as Any } ?? NSNull(),
+        ]
+        let manifest: [String: Any] = [
+            "schema": "xdremux-apple-feature-conversion-v1",
+            "runIdentifier": runToken,
+            "input": [
+                "path": sourceURL.path,
+                "sha256": sha256Hex(try Data(contentsOf: sourceURL, options: [.mappedIfSafe])),
+            ],
+            "output": [
+                "path": outputURL.path,
+                "sha256": sha256Hex(outputData),
+                "byteCount": outputData.count,
+            ],
+            "configuration": configuration,
+            "photoIdentifier": photoIdentifier,
+            "semanticWriteProfile": [
+                "kind": semanticWriteProfile.kind.rawValue,
+                "roles": semanticWriteProfile.orderedRoles.map(\.rawValue),
+                "nativeEvidence": "style sky-only; style human PEM+skin+sky; portrait family PEM+skin+hair+teeth+glasses",
+            ],
+            "semantics": [
+                "person": matteSummary(analysis.person),
+                "skin": matteSummary(analysis.skin),
+                "hair": matteSummary(analysis.hair),
+                "facialHairInternalOnly": matteSummary(analysis.facialHair),
+                "teeth": matteSummary(analysis.teeth),
+                "glasses": matteSummary(analysis.glasses),
+                "sky": matteSummary(analysis.sky),
+            ],
+            "portraitSemanticFusion": portraitSemanticFusion.map { $0 as Any } ?? NSNull(),
+            "stylePayloadManifestSHA256": sha256Hex(stylePayload.manifestJSON),
+            "heifGraph": graphManifest,
+            "donorPolicy": [
+                "shellCopied": false,
+                "scenePayloadCopied": false,
+                "styleDataSource": "same-input Apple LearnProcessor",
+                "linearThumbnailSource": "same-input coherent HDR reconstruction",
+                "styleDeltaSource": "profile-scoped neutral protocol tuning",
+            ],
+            "donorContamination": contaminationReport,
+        ]
+        let manifestData = try JSONSerialization.data(
+            withJSONObject: manifest,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        try manifestData.write(
+            to: evidenceDirectory.appendingPathComponent("manifest.json"),
+            options: .atomic
+        )
+        try stylePayload.manifestJSON.write(
+            to: evidenceDirectory.appendingPathComponent("style-payload-manifest.json"),
+            options: .atomic
+        )
+        let latest: [String: Any] = [
+            "runIdentifier": runToken,
+            "manifest": evidenceDirectory.appendingPathComponent("manifest.json").path,
+            "outputSHA256": sha256Hex(outputData),
+        ]
+        try JSONSerialization.data(
+            withJSONObject: latest,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        ).write(to: evidenceContainer.appendingPathComponent("latest.json"), options: .atomic)
+    }
+
+    private static func validatePhotographicStylesOutput(
+        _ outputURL: URL,
+        expectsPortrait: Bool
+    ) throws {
+        let data = try Data(contentsOf: outputURL, options: [.mappedIfSafe])
+        let top = isobmffBoxes(in: data, start: 0, end: data.count)
+        guard let meta = top.first(where: { $0.type == "meta" }) else {
+            throw CLIError.invalidContainer("Styles validation: meta is missing")
+        }
+        let children = isobmffBoxes(in: data, start: meta.dataStart + 4, end: meta.dataEnd)
+        guard let iinf = children.first(where: { $0.type == "iinf" }),
+              let iloc = children.first(where: { $0.type == "iloc" }),
+              let pitm = children.first(where: { $0.type == "pitm" }),
+              let iref = children.first(where: { $0.type == "iref" }) else {
+            throw CLIError.invalidContainer("Styles validation: required item graph boxes are missing")
+        }
+        let idat = children.first(where: { $0.type == "idat" })
+        let primaryID = parseISOBMFFPITM(data, pitm)
+        let items = parseISOBMFFItemInfos(data, iinf).items
+        let locations = try parseISOBMFFILoc(data, iloc)
+        let locationByID = Dictionary(uniqueKeysWithValues: locations.map { ($0.itemID, $0) })
+        let refs = parseISOBMFFIRefs(data, iref).refs
+        guard let tmapID = items.first(where: { $0.type == "tmap" })?.itemID,
+              let styleMetadataID = items.first(where: { item in
+                  item.type == "uri " && item.rawInfe.range(
+                      of: Data("tag:apple.com,2023:photo:metadata:styles".utf8)
+                  ) != nil
+              })?.itemID,
+              let styleLocation = locationByID[styleMetadataID],
+              refs.contains(where: {
+                  $0.type == "cdsc" && $0.from == styleMetadataID
+                      && Set($0.to) == Set([primaryID, tmapID])
+              }) else {
+            throw CLIError.invalidContainer("Styles validation: style uri item or cdsc reference is missing")
+        }
+        let styleData = try itemPayload(in: data, entry: styleLocation, idat: idat)
+        guard styleData.starts(with: Data("bplist00".utf8)),
+              let object = try PropertyListSerialization.propertyList(
+                  from: styleData, options: [], format: nil
+              ) as? [String: Any],
+              (object["0"] as? NSNumber)?.intValue == 15,
+              let coefficients = object["1"] as? Data,
+              coefficients.count == 51_840,
+              object["2"] as? Bool == true,
+              (object["3"] as? Data)?.count == 516,
+              (object["c"] as? Data)?.count == 2_048,
+              (object["d"] as? Data)?.count == 2_048 else {
+            throw CLIError.invalidContainer("Styles validation: binary plist contract is incomplete")
+        }
+        let parserDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-style-parser-\(UUID().uuidString)", isDirectory: true)
+        try ensureDirectory(parserDirectory, fileManager: .default)
+        defer { try? FileManager.default.removeItem(at: parserDirectory) }
+        _ = try validateWithSemanticStyleProperties(
+            stylePropertyList: styleData,
+            expectedStyleData: coefficients,
+            outputDirectory: parserDirectory
+        )
+        let deltaGrid = refs.first(where: { ref in
+            ref.type == "dimg" && ref.to.count == 30
+                && items.first(where: { $0.itemID == ref.from })?.type == "grid"
+        })
+        guard let deltaGrid,
+              refs.contains(where: {
+                  $0.type == "auxl" && $0.from == deltaGrid.from
+                      && Set($0.to) == Set([primaryID, tmapID])
+              }),
+              data.range(of: Data("tag:apple.com,2023:photo:aux:styledeltamap".utf8)) != nil,
+              data.range(of: Data("tag:apple.com,2023:photo:aux:linearthumbnail".utf8)) != nil else {
+            throw CLIError.invalidContainer("Styles validation: auxiliary item graph is incomplete")
+        }
+        let linearCandidates = refs.filter { ref in
+            ref.type == "auxl" && Set(ref.to) == Set([primaryID, tmapID])
+                && items.first(where: { $0.itemID == ref.from })?.type == "hvc1"
+        }
+        guard !linearCandidates.isEmpty else {
+            throw CLIError.invalidContainer("Styles validation: Linear Thumbnail auxl is missing")
+        }
+        try verifyImageIOISOGainMap(outputURL)
+        guard let imageSource = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              CGImageSourceCreateImageAtIndex(imageSource, 0, nil) != nil,
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  imageSource, 0, kCGImageAuxiliaryDataTypeSemanticSegmentationSkyMatte
+              ) != nil else {
+            throw CLIError.invalidContainer(
+                "Styles validation: primary or native style sky matte is not decodable"
+            )
+        }
+        if expectsPortrait {
+            guard PortraitConversionPipeline.isValidOutput(outputURL) else {
+                throw CLIError.invalidContainer("Styles validation: combined Portrait resources are incomplete")
+            }
+        } else {
+            let person = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                imageSource, 0, kCGImageAuxiliaryDataTypePortraitEffectsMatte
+            )
+            let skin = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                imageSource, 0, kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte
+            )
+            let hasUnexpectedFullPortraitRole = [
+                kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte,
+                kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte,
+                kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte,
+            ].contains { type in
+                CGImageSourceCopyAuxiliaryDataInfoAtIndex(imageSource, 0, type) != nil
+            }
+            guard (person == nil) == (skin == nil), !hasUnexpectedFullPortraitRole else {
+                throw CLIError.invalidContainer(
+                    "Styles validation: styles-only semantics must be sky-only or PEM+skin+sky"
+                )
+            }
+        }
+        let contamination = try donorContaminationScan(data: data, items: items, locations: locations, idat: idat)
+        guard contamination.matches.isEmpty else {
+            throw CLIError.invalidContainer(
+                "donor contamination scanner matched: \(contamination.matches.joined(separator: ", "))"
+            )
+        }
+    }
+
+    private static func donorContaminationScan(
+        data: Data,
+        items: [ISOBMFFItemInfo],
+        locations: [ISOBMFFILocEntry],
+        idat: ISOBMFFBox?
+    ) throws -> (matches: [String], scannedItemCount: Int) {
+        let knownPayloadSHA256: Set<String> = [
+            // Persisted research-corpus donor scene resources. Constants are hashes only;
+            // the product never opens or references the donor files themselves.
+            "d3d468a711a21a591198aee1ef575309719256acf2b0d66468e621521687c551",
+            "7b78d1cd56c175d4bbc0d5cbead9108a95086e8dfd6d3021f3041b6f875ac1ec",
+            "ebe6edffebdf31be41591f6d43dad6621ae3103a229039dda2eea91607462787",
+            "24288d4bc7c68ff6d75df51948da4d2fe0fa129847b46cd171dc5d818b462ae2",
+            "732c0893d0e76e2d67cc15a56f13420ca7b4b050fa7f936e9a6f268c6dc1b983",
+            "a0907e4e23ebb919cf817e55ea845a0e2a4c5a19cd617c4adad9b8dfa0162e58",
+            "3f82ff9619e55b889bcadb78b8a5705ac87d393c5590d29ee75ebc91c1d98e6e",
+            "166af88ec34efa4a188a003201c6afacbc7725a579036e7d9ab1adc5a20b56ed",
+            "348f108bd9735c138c5047ddd11170b1fa50c92c899f196a112cf31645623fb8",
+        ]
+        var matches: [String] = []
+        let itemByID = Dictionary(uniqueKeysWithValues: items.map { ($0.itemID, $0) })
+        for location in locations {
+            let bytes = try itemPayload(in: data, entry: location, idat: idat)
+            let digest = sha256Hex(bytes)
+            if knownPayloadSHA256.contains(digest) {
+                let type = itemByID[location.itemID]?.type ?? "unknown"
+                matches.append("item \(location.itemID) \(type) sha256=\(digest)")
+            }
+            if itemByID[location.itemID]?.type == "uri ",
+               let object = try? PropertyListSerialization.propertyList(
+                   from: bytes, options: [], format: nil
+               ) as? [String: Any] {
+                for key in ["1", "3", "c", "d"] {
+                    if let blob = object[key] as? Data {
+                        let blobDigest = sha256Hex(blob)
+                        if knownPayloadSHA256.contains(blobDigest) {
+                            matches.append("style key \(key) sha256=\(blobDigest)")
+                        }
+                    }
+                }
+            }
+        }
+        for identifier in [
+            "8E9F338B-51CA-4903-888E-6CEAF5EC8C50",
+        ] where data.range(of: Data(identifier.utf8)) != nil {
+            matches.append("known donor PhotoIdentifier \(identifier)")
+        }
+        return (matches.sorted(), locations.count)
+    }
+
+    private static func donorContaminationReport(for outputURL: URL) throws -> [String: Any] {
+        let data = try Data(contentsOf: outputURL, options: [.mappedIfSafe])
+        let top = isobmffBoxes(in: data, start: 0, end: data.count)
+        guard let meta = top.first(where: { $0.type == "meta" }) else {
+            throw CLIError.invalidContainer("donor scanner cannot locate meta")
+        }
+        let children = isobmffBoxes(in: data, start: meta.dataStart + 4, end: meta.dataEnd)
+        guard let iinf = children.first(where: { $0.type == "iinf" }),
+              let iloc = children.first(where: { $0.type == "iloc" }) else {
+            throw CLIError.invalidContainer("donor scanner cannot locate item tables")
+        }
+        let result = try donorContaminationScan(
+            data: data,
+            items: parseISOBMFFItemInfos(data, iinf).items,
+            locations: parseISOBMFFILoc(data, iloc),
+            idat: children.first(where: { $0.type == "idat" })
+        )
+        return [
+            "schema": "xdremux-donor-contamination-scan-v1",
+            "passed": result.matches.isEmpty,
+            "knownPayloadSHA256Count": 9,
+            "knownPhotoIdentifierCount": 1,
+            "scannedItemCount": result.scannedItemCount,
+            "matches": result.matches,
+            "outputSHA256": sha256Hex(data),
+        ]
+    }
+}
+
 private enum PortraitConversionPipeline {
+    struct ConversionOutcome {
+        let written: Bool
+        let semanticFusion: [String: Any]?
+    }
+
     static func isConvertibleInput(_ inputURL: URL) -> Bool {
         guard FileManager.default.fileExists(atPath: inputURL.path),
               let inputData = try? Data(contentsOf: inputURL),
@@ -5803,22 +8855,67 @@ private enum PortraitConversionPipeline {
                   source,
                   0,
                   kCGImageAuxiliaryDataTypePortraitEffectsMatte
+              ) != nil,
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte
+              ) != nil,
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte
+              ) != nil,
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte
+              ) != nil,
+              CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte
               ) != nil else {
             return false
         }
         return true
     }
 
+    static func hasValidISOGainMap(_ outputURL: URL) -> Bool {
+        (try? verifyImageIOISOGainMap(outputURL)) != nil
+    }
+
     static func convertIfNeeded(
         inputURL: URL,
         outputURL: URL,
-        mode: PortraitMode
+        mode: PortraitMode,
+        photoIdentifier: String? = nil,
+        includesPhotographicStylesSemantics: Bool = false
     ) throws -> Bool {
-        guard mode != .off else { return false }
+        try convertWithOutcome(
+            inputURL: inputURL,
+            outputURL: outputURL,
+            mode: mode,
+            photoIdentifier: photoIdentifier,
+            includesPhotographicStylesSemantics: includesPhotographicStylesSemantics
+        ).written
+    }
+
+    static func convertWithOutcome(
+        inputURL: URL,
+        outputURL: URL,
+        mode: PortraitMode,
+        photoIdentifier: String? = nil,
+        includesPhotographicStylesSemantics: Bool = false
+    ) throws -> ConversionOutcome {
+        guard mode != .off else {
+            return ConversionOutcome(written: false, semanticFusion: nil)
+        }
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
             throw CLIError.inputNotFound(inputURL)
         }
         let inputData = try Data(contentsOf: inputURL)
+        let resolvedPhotoIdentifier = photoIdentifier ?? UUID().uuidString.uppercased()
         let hasPortraitUserComment = portraitUserCommentFlag(in: inputURL)
         let blocks: [String: Data]
         do {
@@ -6004,12 +9101,11 @@ private enum PortraitConversionPipeline {
             simulatedAperture: simulatedAperture.value
         )
         let mattes = try makePortraitEffectsMattes(
-            image: baseImage,
-            orientation: orientation,
+            imageURL: firstAssembly,
             orientationRaw: orientationRaw,
             depthPlanes: depthPlanes,
-            planeWidth: depthWidth,
-            planeHeight: depthHeight
+            targetWidth: baseImage.width / 2,
+            targetHeight: baseImage.height / 2
         )
         try writeBlankPortraitScaffold(
             sourceMetadataURL: inputURL,
@@ -6019,12 +9115,17 @@ private enum PortraitConversionPipeline {
             orientation: orientationRaw,
             focus: focus,
             afMeasuredDepth: afMeasuredDepth,
+            photoIdentifier: resolvedPhotoIdentifier,
             captureDate: captureDateString(sourceURL: inputURL),
             gainJPEG: gainJPEG,
             infoFloats: infoFloats,
             depthDictionary: depthDictionary,
             matteDictionary: mattes.portrait,
+            skinDictionary: mattes.skin,
             hairDictionary: mattes.hair,
+            teethDictionary: mattes.teeth,
+            glassesDictionary: mattes.glasses,
+            skyDictionary: includesPhotographicStylesSemantics ? mattes.sky : nil,
             outputURL: scaffold
         )
         try transplantPortraitBaseAndGainPayloads(
@@ -6032,7 +9133,7 @@ private enum PortraitConversionPipeline {
             scaffoldURL: scaffold,
             outputURL: outputURL
         )
-        return true
+        return ConversionOutcome(written: true, semanticFusion: mattes.fusionReport)
     }
 
     private static let portraitRenderingParametersTemplateBase64 = """
@@ -6160,7 +9261,8 @@ private enum PortraitConversionPipeline {
     }
 
     private static func portraitMakerAppleDictionary(
-        afMeasuredDepth: Int?
+        afMeasuredDepth: Int?,
+        photoIdentifier: String
     ) -> [String: Any] {
         let makerData = Data(base64Encoded: "ywG5Ap4DpQAaADIALQA1AHEAmgDXAA4ACQAJAA4AOwDMABgBkQFqAEMANQApAB4AEgCJAHIACwAJAAkAHQBBAGoByAEfAnYASQBZAJUAnwBcAJMAFgAJAAkADAAzAEUAUAGbAdIBngCgAKMAnADKAFcAsAARAAoACQAQAE8AVwCnAdgBGQIuAuQBRAHYANMAZgB0ABwACwALACUAcABvACwCKwJuAoMCjQJZAdAAKQIIApYB7wBEABcAVQCYAJEAgwKAAskC0QLBAnwCwAEdAZQABQKCAawAjgC4ANIAvwB6AskCHAMLA90CGQKaAuIBiwAWAQ4B7AAJATMBIQH6AFkCyAI6A+sC9AH4APMBzQFfAa8AbAGeAEwBmwFyATsBDwI9AXcCHQELAQ8BiQFcAnoB+ADTAVMBgwEdAswBbQFPATwB5gEPAQoBJwFCAc0CTAG7AO0BKgHtAOsCTQJ3AegBvwE7AyQC3ABEAQ8BiQJ5AccAlQH5AJoA2wH2AGQADQILA0MDHQNlAWMBHgEHAXwBSAGsAQ0BPgHrACEACwDTAf0CSgMBA9ACYAHGAFwArABjAbQBAgE9AggBFAALAGwCMQNiA9MCugI7AZsAbADqADkByAGPAbwBfQL/Ad4AMwOaA8QDzALhAgUBmgDEAJ8A7QA7Ai8CfQEuAvMBEQE=") ?? Data()
         let captureTime = CMTime(
@@ -6176,9 +9278,9 @@ private enum PortraitConversionPipeline {
             "12": [1.91015625, 0.4296875], "13": 1, "14": 0, "16": 1,
             "20": 12, "23": 8_595_224_612, "25": 139_298, "26": "q750n",
             "29": 0.012993750162422657, "31": 1,
-            "32": "6197861E-6AE0-4B35-93B3-DA292CE0554D", "33": 1.0099999904632568,
+            "32": photoIdentifier, "33": 1.0099999904632568,
             "35": [44, 268_435_504], "37": 11_538_574, "38": 3,
-            "39": 41.253238677978516, "43": "C227536D-2A43-4CA3-97CC-083900DFCD56",
+            "39": 41.253238677978516, "43": photoIdentifier,
             "45": 3800, "46": 1, "47": 111, "48": 0.4457031190395355,
             "54": 784, "55": 8, "56": 38, "57": 2, "58": 128, "59": 0,
             "60": 4, "61": 66, "63": 0,
@@ -6186,6 +9288,7 @@ private enum PortraitConversionPipeline {
             "65": 0, "66": 0, "67": 0, "68": 0, "69": 0, "70": 0,
             "72": 0, "73": 0, "74": 2, "77": 32.507781982421875,
             "78": ["1": 3, "2": [["2.1": 2001.9581298828125, "2.2": 309], ["2.1": 0, "2.2": 70]]],
+            "84": ["0": 1, "1": 0, "2": 0, "3": 1, "4": 1, "5": 1, "6": 4, "7": 0],
             "79": 0, "82": 0, "83": 2, "85": 0, "88": 2051,
             "96": 4037, "97": 24,
         ]
@@ -6510,6 +9613,8 @@ private enum PortraitConversionPipeline {
         // Same-size firmware order after rank: hair, portrait, pet. Later
         // independent-size YUV/NV21 auxiliaries are not Apple matte sources.
         return OPPODepthPlanes(
+            width: header.width,
+            height: header.height,
             ranks: ranks,
             hair: try consumePlane(flagOffset: 0x24, name: "hair"),
             portrait: try consumePlane(flagOffset: 0x25, name: "portrait"),
@@ -6517,7 +9622,7 @@ private enum PortraitConversionPipeline {
         )
     }
 
-    private static func resolveGainInfoFloats(
+    static func resolveGainInfoFloats(
         privateInfo: Data?,
         inputURL: URL
     ) throws -> [Double] {
@@ -7061,39 +10166,373 @@ private enum PortraitConversionPipeline {
         ] as CFDictionary
     }
 
-    private static func makePortraitEffectsMattes(
+    private struct PortraitMatteDictionaries {
+        let portrait: CFDictionary
+        let skin: CFDictionary
+        let hair: CFDictionary
+        let teeth: CFDictionary
+        let glasses: CFDictionary
+        let facialHair: AppleSemanticMatte
+        let sky: CFDictionary
+        let fusionReport: [String: Any]
+    }
+
+    private static func storedOrientation(
+        _ image: CIImage,
+        orientationRaw: UInt32
+    ) -> CIImage {
+        switch orientationRaw {
+        case 2: return image.oriented(.upMirrored)
+        case 3: return image.oriented(.down)
+        case 4: return image.oriented(.downMirrored)
+        case 5: return image.oriented(.leftMirrored)
+        case 6: return image.oriented(.left)
+        case 7: return image.oriented(.rightMirrored)
+        case 8: return image.oriented(.right)
+        default: return image
+        }
+    }
+
+    private static func renderSemanticMatte(
+        _ matte: AppleSemanticMatte,
+        orientationRaw: UInt32,
+        targetWidth: Int,
+        targetHeight: Int
+    ) throws -> CVPixelBuffer {
+        let sourceBuffer = try makePlaneBuffer(
+            matte.pixels,
+            width: matte.width,
+            height: matte.height
+        )
+        let stored = storedOrientation(
+            CIImage(cvPixelBuffer: sourceBuffer),
+            orientationRaw: orientationRaw
+        )
+        let targetBounds = CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight)
+        let originNormalized = stored.transformed(by: CGAffineTransform(
+            translationX: -stored.extent.origin.x,
+            y: -stored.extent.origin.y
+        ))
+        let resized = scaled(originNormalized, width: targetWidth, height: targetHeight)
+            .cropped(to: targetBounds)
+        return try renderL8(resized, width: targetWidth, height: targetHeight)
+    }
+
+    private static func pixelData(from buffer: CVPixelBuffer) throws -> Data {
+        let width = CVPixelBufferGetWidth(buffer)
+        let height = CVPixelBufferGetHeight(buffer)
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        guard let source = CVPixelBufferGetBaseAddress(buffer) else {
+            throw CLIError.invalidContainer("semantic fusion buffer has no readable storage")
+        }
+        let stride = CVPixelBufferGetBytesPerRow(buffer)
+        var pixels = Data(count: width * height)
+        pixels.withUnsafeMutableBytes { raw in
+            guard let destination = raw.baseAddress else { return }
+            for row in 0..<height {
+                memcpy(
+                    destination.advanced(by: row * width),
+                    source.advanced(by: row * stride),
+                    width
+                )
+            }
+        }
+        return pixels
+    }
+
+    private static func edgeGuidedOPPOPrior(
         image: CGImage,
-        orientation: CGImagePropertyOrientation,
+        plane: Data,
+        planeWidth: Int,
+        planeHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ) throws -> CVPixelBuffer {
+        let smallBuffer = try makePlaneBuffer(plane, width: planeWidth, height: planeHeight)
+        let small = CIImage(cvPixelBuffer: smallBuffer)
+        let bounds = CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight)
+        let guide = scaled(CIImage(cgImage: image), width: targetWidth, height: targetHeight)
+            .cropped(to: bounds)
+        let topology = scaled(small, width: targetWidth, height: targetHeight).cropped(to: bounds)
+        guard let filter = CIFilter(name: "CIEdgePreserveUpsampleFilter") else {
+            return try renderL8(topology, width: targetWidth, height: targetHeight)
+        }
+        filter.setValue(guide, forKey: kCIInputImageKey)
+        filter.setValue(small, forKey: "inputSmallImage")
+        filter.setValue(3.0, forKey: "inputSpatialSigma")
+        filter.setValue(0.15, forKey: "inputLumaSigma")
+        return try renderL8(
+            (filter.outputImage ?? topology).cropped(to: bounds),
+            width: targetWidth,
+            height: targetHeight
+        )
+    }
+
+    private static func fusionMetrics(
+        vision: Data,
+        prior: Data?,
+        final: Data,
+        accepted: Bool,
+        reason: String
+    ) -> [String: Any] {
+        func count(_ pixels: Data, threshold: UInt8 = 128) -> Int {
+            pixels.reduce(into: 0) { if $1 >= threshold { $0 += 1 } }
+        }
+        let pixelCount = max(1, vision.count)
+        let visionCount = count(vision)
+        let priorCount = prior.map { count($0) } ?? 0
+        let finalCount = count(final)
+        var intersection = 0
+        var union = 0
+        if let prior, prior.count == vision.count {
+            for index in vision.indices {
+                let left = vision[index] >= 128
+                let right = prior[index] >= 128
+                if left && right { intersection += 1 }
+                if left || right { union += 1 }
+            }
+        }
+        return [
+            "accepted": accepted,
+            "reason": reason,
+            "threshold": 128,
+            "visionCoverage": Double(visionCount) / Double(pixelCount),
+            "oppoCoverage": Double(priorCount) / Double(pixelCount),
+            "finalCoverage": Double(finalCount) / Double(pixelCount),
+            "intersectionOverUnion": union > 0 ? Double(intersection) / Double(union) : 0,
+            "addedHighConfidencePixels": max(0, finalCount - visionCount),
+            "visionSHA256": sha256Hex(vision),
+            "oppoPriorSHA256": prior.map { sha256Hex($0) } ?? NSNull(),
+            "finalSHA256": sha256Hex(final),
+        ]
+    }
+
+    private static func fusePortraitPrior(
+        vision: CVPixelBuffer,
+        prior: CVPixelBuffer?
+    ) throws -> (buffer: CVPixelBuffer, report: [String: Any]) {
+        let visionPixels = try pixelData(from: vision)
+        guard let prior else {
+            return (
+                vision,
+                fusionMetrics(
+                    vision: visionPixels,
+                    prior: nil,
+                    final: visionPixels,
+                    accepted: false,
+                    reason: "OPPO subject plane unavailable or empty; Vision-only"
+                )
+            )
+        }
+        let priorPixels = try pixelData(from: prior)
+        let overlap = zip(visionPixels, priorPixels).reduce(into: 0) { count, pair in
+            if pair.0 >= 64 && pair.1 >= 64 { count += 1 }
+        }
+        let priorSupport = priorPixels.reduce(into: 0) { if $1 >= 64 { $0 += 1 } }
+        guard overlap >= 16, priorSupport > 0 else {
+            return (
+                vision,
+                fusionMetrics(
+                    vision: visionPixels,
+                    prior: priorPixels,
+                    final: visionPixels,
+                    accepted: false,
+                    reason: "OPPO subject prior did not overlap the Vision person topology"
+                )
+            )
+        }
+        let width = CVPixelBufferGetWidth(vision)
+        let height = CVPixelBufferGetHeight(vision)
+        let radius = max(2.0, Double(min(width, height)) / 256.0)
+        let visionImage = CIImage(cvPixelBuffer: vision)
+        let priorImage = CIImage(cvPixelBuffer: prior)
+        let support = visionImage.applyingFilter(
+            "CIMorphologyMaximum",
+            parameters: [kCIInputRadiusKey: radius]
+        ).cropped(to: visionImage.extent)
+        let supplement = minimum(priorImage, support).cropped(to: visionImage.extent)
+        let fusedImage = maximum(visionImage, supplement).cropped(to: visionImage.extent)
+        let fused = try renderL8(fusedImage, width: width, height: height)
+        let finalPixels = try pixelData(from: fused)
+        return (
+            fused,
+            fusionMetrics(
+                vision: visionPixels,
+                prior: priorPixels,
+                final: finalPixels,
+                accepted: true,
+                reason: "Vision boundary with edge-guided OPPO subject topology support"
+            )
+        )
+    }
+
+    private static func fuseHairPrior(
+        vision: CVPixelBuffer,
+        prior: CVPixelBuffer?,
+        person: CVPixelBuffer
+    ) throws -> (buffer: CVPixelBuffer, report: [String: Any]) {
+        let visionPixels = try pixelData(from: vision)
+        guard let prior else {
+            return (
+                vision,
+                fusionMetrics(
+                    vision: visionPixels,
+                    prior: nil,
+                    final: visionPixels,
+                    accepted: false,
+                    reason: "OPPO hair plane unavailable or empty; Vision-only"
+                )
+            )
+        }
+        let priorPixels = try pixelData(from: prior)
+        let width = CVPixelBufferGetWidth(vision)
+        let height = CVPixelBufferGetHeight(vision)
+        let priorInsidePerson = minimum(
+            CIImage(cvPixelBuffer: prior),
+            CIImage(cvPixelBuffer: person)
+        ).cropped(to: CIImage(cvPixelBuffer: vision).extent)
+        let fusedImage = maximum(
+            CIImage(cvPixelBuffer: vision),
+            priorInsidePerson
+        ).cropped(to: CIImage(cvPixelBuffer: vision).extent)
+        let fused = try renderL8(fusedImage, width: width, height: height)
+        let finalPixels = try pixelData(from: fused)
+        let added = zip(visionPixels, finalPixels).reduce(into: 0) { count, pair in
+            if pair.0 < 128 && pair.1 >= 128 { count += 1 }
+        }
+        return (
+            fused,
+            fusionMetrics(
+                vision: visionPixels,
+                prior: priorPixels,
+                final: finalPixels,
+                accepted: added > 0,
+                reason: added > 0
+                    ? "Vision hair boundary with OPPO hair support gated by fused person matte"
+                    : "OPPO hair prior added no supported high-confidence pixels"
+            )
+        )
+    }
+
+    private static func makePortraitEffectsMattes(
+        imageURL: URL,
         orientationRaw: UInt32,
         depthPlanes: OPPODepthPlanes,
-        planeWidth: Int,
-        planeHeight: Int
-    ) throws -> (portrait: CFDictionary, hair: CFDictionary?) {
-        let targetWidth = image.width / 2
-        let targetHeight = image.height / 2
-        let rendered: (portrait: CVPixelBuffer, hair: CVPixelBuffer?)
+        targetWidth: Int,
+        targetHeight: Int
+    ) throws -> PortraitMatteDictionaries {
+        let semanticDirectory = imageURL.deletingLastPathComponent()
+            .appendingPathComponent(".xdremux-vision-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: semanticDirectory) }
+        let analysis = try AppleSemanticSceneAnalyzer.analyze(
+            imageURL: imageURL,
+            outputDirectory: semanticDirectory,
+            orientationOverride: orientationRaw
+        )
+        guard let person = analysis.person,
+              let skin = analysis.skin,
+              let hair = analysis.hair,
+              let facialHair = analysis.facialHair,
+              let teeth = analysis.teeth,
+              let glasses = analysis.glasses,
+              let sky = analysis.sky else {
+            throw CLIError.invalidContainer("Vision semantic analysis is incomplete")
+        }
+        guard analysis.hasCrediblePerson else {
+            throw CLIError.invalidContainer(
+                "Apple Portrait unavailable: Vision returned no credible person foreground"
+            )
+        }
+
         if let subject = depthPlanes.subject {
-            rendered = try makeRGBGuidedOPPOMatte(
+            let nonzero = subject.reduce(into: 0) { if $1 > 0 { $0 += 1 } }
+            print(
+                "portrait OPPO subject plane available as topology prior "
+                    + "coverage=\(Double(nonzero) / Double(max(1, subject.count)))"
+            )
+        }
+        if depthPlanes.validHair != nil {
+            print("portrait OPPO hair plane available as topology prior; Vision supplies the high-resolution boundary")
+        }
+
+        let visionPortrait = try renderSemanticMatte(
+            person,
+            orientationRaw: orientationRaw,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        )
+        let renderedSkin = try renderSemanticMatte(
+            skin,
+            orientationRaw: orientationRaw,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        )
+        let visionHair = try renderSemanticMatte(
+            hair,
+            orientationRaw: orientationRaw,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        )
+        let renderedTeeth = try renderSemanticMatte(
+            teeth,
+            orientationRaw: orientationRaw,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        )
+        let renderedGlasses = try renderSemanticMatte(
+            glasses,
+            orientationRaw: orientationRaw,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        )
+        let renderedSky = try renderSemanticMatte(
+            sky,
+            orientationRaw: orientationRaw,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        )
+        guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw CLIError.unableToLoadBaseImage(imageURL)
+        }
+        let oppoSubjectPrior = try depthPlanes.subject.map { plane in
+            try edgeGuidedOPPOPrior(
                 image: image,
-                subject: subject,
-                hair: depthPlanes.validHair,
-                planeWidth: planeWidth,
-                planeHeight: planeHeight,
+                plane: plane,
+                planeWidth: depthPlanes.width,
+                planeHeight: depthPlanes.height,
                 targetWidth: targetWidth,
                 targetHeight: targetHeight
             )
-        } else {
-            rendered = try makeVisionFallbackMatte(
+        }
+        let personFusion = try fusePortraitPrior(
+            vision: visionPortrait,
+            prior: oppoSubjectPrior
+        )
+        let oppoHairPrior = try depthPlanes.validHair.map { plane in
+            try edgeGuidedOPPOPrior(
                 image: image,
-                orientation: orientation,
-                orientationRaw: orientationRaw,
+                plane: plane,
+                planeWidth: depthPlanes.width,
+                planeHeight: depthPlanes.height,
                 targetWidth: targetWidth,
-                targetHeight: targetHeight,
-                hair: depthPlanes.validHair,
-                planeWidth: planeWidth,
-                planeHeight: planeHeight
+                targetHeight: targetHeight
             )
         }
+        let hairFusion = try fuseHairPrior(
+            vision: visionHair,
+            prior: oppoHairPrior,
+            person: personFusion.buffer
+        )
+        let fusionReport: [String: Any] = [
+            "schema": "xdremux-oppo-vision-semantic-fusion-v1",
+            "policy": "Vision high-resolution producer; OPPO subject/hair planes are edge-guided, geometry-aligned topology priors",
+            "person": personFusion.report,
+            "hair": hairFusion.report,
+            "skinTeethGlassesPolicy": "Vision-only; OPPO person/hair planes are not reused for unrelated semantics",
+            "facialHairPolicy": "internal-only; no evidenced HEIF auxiliary role",
+        ]
         let portraitMetadata = try makeMatteMetadata(
             namespace: "http://ns.apple.com/portraitEffectsMatte/1.0/",
             prefix: "portraitEffectsMatte",
@@ -7101,19 +10540,39 @@ private enum PortraitConversionPipeline {
             version: "65537"
         )
         let portrait = try makeL8AuxiliaryDictionary(
-            buffer: rendered.portrait,
+            buffer: personFusion.buffer,
             metadata: portraitMetadata
         )
-        guard let hairBuffer = rendered.hair else { return (portrait, nil) }
-        let hairMetadata = try makeMatteMetadata(
+        let semanticMetadata = try makeMatteMetadata(
             namespace: "http://ns.apple.com/semanticSegmentationMatte/1.0/",
             prefix: "semanticSegmentationMatte",
             versionPath: "semanticSegmentationMatte:SemanticSegmentationMatteVersion",
             version: "65536"
         )
-        return (
-            portrait,
-            try makeL8AuxiliaryDictionary(buffer: hairBuffer, metadata: hairMetadata)
+        return PortraitMatteDictionaries(
+            portrait: portrait,
+            skin: try makeL8AuxiliaryDictionary(
+                buffer: renderedSkin,
+                metadata: semanticMetadata
+            ),
+            hair: try makeL8AuxiliaryDictionary(
+                buffer: hairFusion.buffer,
+                metadata: semanticMetadata
+            ),
+            teeth: try makeL8AuxiliaryDictionary(
+                buffer: renderedTeeth,
+                metadata: semanticMetadata
+            ),
+            glasses: try makeL8AuxiliaryDictionary(
+                buffer: renderedGlasses,
+                metadata: semanticMetadata
+            ),
+            facialHair: facialHair,
+            sky: try makeL8AuxiliaryDictionary(
+                buffer: renderedSky,
+                metadata: semanticMetadata
+            ),
+            fusionReport: fusionReport
         )
     }
 
@@ -7350,12 +10809,17 @@ private enum PortraitConversionPipeline {
         orientation: UInt32,
         focus: PortraitFocusRegion,
         afMeasuredDepth: Int?,
+        photoIdentifier: String,
         captureDate: String?,
         gainJPEG: Data,
         infoFloats: [Double],
         depthDictionary: CFDictionary,
         matteDictionary: CFDictionary,
-        hairDictionary: CFDictionary?,
+        skinDictionary: CFDictionary,
+        hairDictionary: CFDictionary,
+        teethDictionary: CFDictionary,
+        glassesDictionary: CFDictionary,
+        skyDictionary: CFDictionary?,
         outputURL: URL
     ) throws {
         let parent = outputURL.deletingLastPathComponent()
@@ -7392,7 +10856,8 @@ private enum PortraitConversionPipeline {
         }
         var properties = (CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]) ?? [:]
         properties[kCGImagePropertyMakerAppleDictionary] = portraitMakerAppleDictionary(
-            afMeasuredDepth: afMeasuredDepth
+            afMeasuredDepth: afMeasuredDepth,
+            photoIdentifier: photoIdentifier
         )
         var exif = (properties[kCGImagePropertyExifDictionary] as? [CFString: Any]) ?? [:]
         exif[kCGImagePropertyExifCustomRendered] = 9
@@ -7448,11 +10913,33 @@ private enum PortraitConversionPipeline {
             kCGImageAuxiliaryDataTypePortraitEffectsMatte,
             matteDictionary
         )
-        if let hairDictionary {
+        // ImageIO authors this semantic family in one finalize operation so
+        // mattes that share a monochrome hvcC cannot be partially replaced.
+        CGImageDestinationAddAuxiliaryDataInfo(
+            scaffoldDestination,
+            kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte,
+            skinDictionary
+        )
+        CGImageDestinationAddAuxiliaryDataInfo(
+            scaffoldDestination,
+            kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte,
+            hairDictionary
+        )
+        CGImageDestinationAddAuxiliaryDataInfo(
+            scaffoldDestination,
+            kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte,
+            teethDictionary
+        )
+        CGImageDestinationAddAuxiliaryDataInfo(
+            scaffoldDestination,
+            kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte,
+            glassesDictionary
+        )
+        if let skyDictionary {
             CGImageDestinationAddAuxiliaryDataInfo(
                 scaffoldDestination,
-                kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte,
-                hairDictionary
+                kCGImageAuxiliaryDataTypeSemanticSegmentationSkyMatte,
+                skyDictionary
             )
         }
         guard CGImageDestinationFinalize(scaffoldDestination) else {

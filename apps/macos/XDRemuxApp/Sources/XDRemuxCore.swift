@@ -38,6 +38,8 @@ enum XDRemuxError: Error, CustomStringConvertible {
     case outputVerificationFailed(URL)
     case gainMapPixelFormatMismatch(URL, expected: UInt32, actual: UInt32?)
     case invalidContainer(String)
+    case appleFeatureRuntimeUnavailable(String)
+    case appleFeatureConversionFailed(status: Int32, log: String)
 
     var description: String {
         switch self {
@@ -95,6 +97,10 @@ enum XDRemuxError: Error, CustomStringConvertible {
             return "gain map pixel format mismatch in \(url.path): expected \(fourCCString(expected)), got \(fourCCString(actual))"
         case .invalidContainer(let message):
             return "invalid HEIC container: \(message)"
+        case .appleFeatureRuntimeUnavailable(let message):
+            return "Apple feature runtime unavailable: \(message)"
+        case .appleFeatureConversionFailed(let status, let log):
+            return "Apple feature conversion failed (exit \(status)): \(log)"
         }
     }
 }
@@ -162,11 +168,21 @@ struct ConversionConfig: Sendable {
     var fileNameSuffix: String = "_iso"
     var skipExisting: Bool = true
     var maxConcurrentJobs: Int = min(ProcessInfo.processInfo.activeProcessorCount, 4)
+    var applePhotographicStyles: Bool = false
+    var applePortrait: Bool = false
+
+    var appleFeaturesEnabled: Bool {
+        applePhotographicStyles || applePortrait
+    }
 
     var oppoGalleryCompatibilityEnabled: Bool {
         get { oppoCompatibility.wantsOppoCompat }
         set {
             oppoCompatibility = newValue ? .auto : .off
+            if newValue {
+                applePhotographicStyles = false
+                applePortrait = false
+            }
             oppoCameraTail = preservesPortraitEditingData
                 ? (newValue ? .preserve : .preserveWithoutPrivateHDR)
                 : (newValue ? .preserveWithoutPortrait : .preserveWithoutPortraitOrPrivateHDR)
@@ -183,6 +199,98 @@ struct ConversionConfig: Sendable {
                 ? (oppoCompatibility.wantsOppoCompat ? .preserve : .preserveWithoutPrivateHDR)
                 : (oppoCompatibility.wantsOppoCompat ? .preserveWithoutPortrait : .preserveWithoutPortraitOrPrivateHDR)
         }
+    }
+}
+
+private enum AppleFeatureCLIInvoker {
+    static func arguments(inputURL: URL, outputURL: URL, config: ConversionConfig) throws -> [String] {
+        guard config.appleFeaturesEnabled else { return [] }
+        guard !config.oppoCompatibility.wantsOppoCompat else {
+            throw XDRemuxError.invalidValue(
+                option: config.applePhotographicStyles ? "--apple-photographic-styles" : "--apple-portrait",
+                value: "cannot be combined with OPPO-compatible output"
+            )
+        }
+        var arguments = [
+            "convert",
+            "--input", inputURL.path,
+            "--output", outputURL.path,
+            "--family", config.family.rawValue,
+            "--input-processing", config.inputProcessingBranch.rawValue,
+            "--oppo-camera-tail", config.oppoCameraTail.rawValue,
+            "--tmap-format", config.tmapFormat.rawValue,
+        ]
+        if config.applePhotographicStyles {
+            arguments.append("--apple-photographic-styles")
+        }
+        if config.applePortrait {
+            arguments.append("--apple-portrait")
+        }
+        if let debugDirectory = config.debugDirectory {
+            arguments.append(contentsOf: ["--debug-dir", debugDirectory.path])
+        }
+        return arguments
+    }
+
+    static func convert(inputURL: URL, outputURL: URL, config: ConversionConfig) throws {
+        let executable = try executableURL()
+        let arguments = try arguments(inputURL: inputURL, outputURL: outputURL, config: config)
+        let fileManager = FileManager.default
+        let logURL = fileManager.temporaryDirectory
+            .appendingPathComponent("xdremux-app-apple-features-\(UUID().uuidString).log")
+        fileManager.createFile(atPath: logURL.path, contents: nil)
+        guard let logHandle = try? FileHandle(forWritingTo: logURL) else {
+            throw XDRemuxError.appleFeatureRuntimeUnavailable("cannot create conversion log")
+        }
+        defer {
+            try? logHandle.close()
+            try? fileManager.removeItem(at: logURL)
+        }
+
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        process.standardOutput = logHandle
+        process.standardError = logHandle
+        var environment = ProcessInfo.processInfo.environment
+        if environment["XDREMUX_APPLE_PLATFORM_ROOT"] == nil,
+           let resources = Bundle.main.resourceURL {
+            environment["XDREMUX_APPLE_PLATFORM_ROOT"] = resources
+                .appendingPathComponent("ApplePlatform", isDirectory: true).path
+        }
+        process.environment = environment
+        do {
+            try process.run()
+        } catch {
+            throw XDRemuxError.appleFeatureRuntimeUnavailable(
+                "cannot launch \(executable.path): \(error)"
+            )
+        }
+        process.waitUntilExit()
+        try? logHandle.synchronize()
+        guard process.terminationStatus == 0 else {
+            let log = (try? String(contentsOf: logURL, encoding: .utf8))?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "no diagnostic output"
+            throw XDRemuxError.appleFeatureConversionFailed(
+                status: process.terminationStatus,
+                log: log
+            )
+        }
+    }
+
+    private static func executableURL() throws -> URL {
+        let fileManager = FileManager.default
+        if let override = ProcessInfo.processInfo.environment["XDREMUX_CLI_EXECUTABLE"] {
+            let url = URL(fileURLWithPath: override)
+            if fileManager.isExecutableFile(atPath: url.path) { return url }
+        }
+        if let bundled = Bundle.main.url(forResource: "XDRemuxCLI", withExtension: nil),
+           fileManager.isExecutableFile(atPath: bundled.path) {
+            return bundled
+        }
+        throw XDRemuxError.appleFeatureRuntimeUnavailable(
+            "XDRemuxCLI is not bundled and XDREMUX_CLI_EXECUTABLE is not set"
+        )
     }
 }
 
@@ -2939,6 +3047,14 @@ private func writeImageIOPreservedGainMapPassthrough(
 
 enum XDRemuxCore {
     static func convert(inputURL: URL, outputURL: URL, config: ConversionConfig) throws {
+        if config.appleFeaturesEnabled {
+            try AppleFeatureCLIInvoker.convert(
+                inputURL: inputURL,
+                outputURL: outputURL,
+                config: config
+            )
+            return
+        }
         _ = try XDRemuxProductCore.convert(
             inputURL: inputURL,
             outputURL: outputURL,
@@ -2956,10 +3072,26 @@ enum XDRemuxCore {
     }
 
     static func isValidOutput(_ outputURL: URL, config: ConversionConfig) -> Bool {
-        hasValidOutput(
+        // Apple feature validation is owned by the shared CLI and its persisted run manifest.
+        // Until that manifest is checked here, never skip an Apple conversion based on the
+        // weaker ISO-HDR-only predicate below.
+        if config.appleFeaturesEnabled { return false }
+        return hasValidOutput(
             outputURL,
             oppoCameraTail: config.oppoCameraTail,
             oppoCompatibility: config.oppoCompatibility
+        )
+    }
+
+    static func appleFeatureCLIArgumentsForTesting(
+        inputURL: URL,
+        outputURL: URL,
+        config: ConversionConfig
+    ) throws -> [String] {
+        try AppleFeatureCLIInvoker.arguments(
+            inputURL: inputURL,
+            outputURL: outputURL,
+            config: config
         )
     }
 }

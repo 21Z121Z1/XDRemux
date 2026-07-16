@@ -14,19 +14,23 @@ swift xdremux/swift-cli/XDRemux.swift convert --input IMG_001.heic
   HEVC RExt 4:4:4 Gain Map when the source channel structure permits;
 - `--oppo-compatible`: OPPO Gallery-compatible Main Still Picture 4:2:0 with
   the complete OPPO private tail;
+- `--apple-photographic-styles`: donor-free, current-input Apple Photographic
+  Styles payload and HEIF auxiliary graph;
 - `--apple-portrait`: OPPO portrait resources converted to the Apple portrait
   graph, without retaining a second large OPPO portrait tail.
 
-`--oppo-compatible` and `--apple-portrait` are mutually exclusive. Existing
+The two Apple switches are independent and can share one final HEIC.
+`--oppo-compatible` is mutually exclusive with either Apple switch. Existing
 4:2:0 sources are never promoted to 4:4:4 because missing chroma cannot be
 recovered.
 
 ## Apple portrait conversion
 
-OPPO portrait conversion is opt-in:
+Apple features are opt-in:
 
 ```bash
 swift xdremux/swift-cli/XDRemux.swift convert \
+  --apple-photographic-styles \
   --apple-portrait \
   --input IMG_001.heic \
   --output IMG_001_apple_portrait.heic
@@ -37,16 +41,24 @@ swift xdremux/swift-cli/XDRemux.swift batch \
   --output-dir apple_portraits/
 ```
 
-The switch requires the recoverable `rear.depth + rear.depth.config +
+`--apple-portrait` requires the recoverable `rear.depth + rear.depth.config +
 src.image` resource set. The UserComment portrait bit is the strong route; an
 explicit conversion may recover a missing bit and emits a warning. XDRemux
-maps OPPO portrait/pet/hair planes to Apple mattes and uses Vision person
-segmentation only when the OPPO subject plane is empty. Face-attention Vision
-analysis supplies Focus.
+uses Vision as the high-resolution semantic producer. OPPO person/pet and hair
+planes are edge-guided topology priors: person supplementation must overlap
+Vision topology and hair supplementation is gated by the final person matte.
+Skin, teeth, and glasses remain Vision-only. Face-attention Vision supplies
+Focus.
 
-Batch mode filters non-portrait inputs. Apple portrait output is mutually
-exclusive with OPPO-compatible preservation and omits the redundant large
-OPPO portrait tail. Explicitly enabling both modes is an error.
+Portrait-only batch reports non-portrait inputs as unavailable. Combined batch
+continues those inputs as styles-only. OPPO-compatible preservation remains
+mutually exclusive with both Apple features.
+
+Styles-only semantic persistence follows native role tiers: sky-only without a
+credible person, and PEM+skin+sky with one. Portrait writes the complete
+PEM+skin+hair+teeth+glasses family atomically; combined output adds sky. Sparse
+valid results are retained, but unavailable private Vision SPI is never
+silently represented by a fake mask.
 
 The `src.image` base and gain map are encoded once. The final container reuses
 those first-assembly HEVC payloads byte-for-byte after the auxiliary images are

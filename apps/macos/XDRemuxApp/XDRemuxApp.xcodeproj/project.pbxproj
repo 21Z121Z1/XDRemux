@@ -65,6 +65,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 85CB44165E48F2F8587BA77E /* Build configuration list for PBXNativeTarget "XDRemuxApp" */;
 			buildPhases = (
+				ED34B1B73BE9899A8547BD4B /* Build Shared Apple Feature CLI */,
 				80BA6548CDA15D10C2CBFABB /* Sources */,
 				7852DCF60575A9880B4F9988 /* Resources */,
 			);
@@ -122,6 +123,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		ED34B1B73BE9899A8547BD4B /* Build Shared Apple Feature CLI */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Shared Apple Feature CLI";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nRESOURCE_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$RESOURCE_DIR\"\nxcrun swiftc -O \\\n  \"$SRCROOT/../../../xdremux/swift-cli/XDRemux.swift\" \\\n  -o \"$RESOURCE_DIR/XDRemuxCLI\"\nrm -rf \"$RESOURCE_DIR/ApplePlatform\"\nmkdir -p \"$RESOURCE_DIR/ApplePlatform\"\nditto \"$SRCROOT/../../../xdremux/apple-platform/Native\" \\\n  \"$RESOURCE_DIR/ApplePlatform/Native\"\nditto \"$SRCROOT/../../../xdremux/apple-platform/Validation\" \\\n  \"$RESOURCE_DIR/ApplePlatform/Validation\"\ntouch \"$RESOURCE_DIR/ApplePlatform/.complete\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		80BA6548CDA15D10C2CBFABB /* Sources */ = {

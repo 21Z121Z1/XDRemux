@@ -814,6 +814,28 @@ private struct SettingsView: View {
                 )
                 SettingExplanation(AppStrings.preservePortraitEditingDataHelp)
 
+                Toggle(
+                    AppStrings.applePhotographicStyles,
+                    isOn: $viewModel.config.applePhotographicStyles
+                )
+                .disabled(viewModel.config.oppoGalleryCompatibilityEnabled)
+                SettingExplanation(
+                    viewModel.config.oppoGalleryCompatibilityEnabled
+                        ? AppStrings.appleFeaturesOppoIncompatibleHelp
+                        : AppStrings.applePhotographicStylesHelp
+                )
+
+                Toggle(
+                    AppStrings.applePortrait,
+                    isOn: $viewModel.config.applePortrait
+                )
+                .disabled(viewModel.config.oppoGalleryCompatibilityEnabled)
+                SettingExplanation(
+                    viewModel.config.oppoGalleryCompatibilityEnabled
+                        ? AppStrings.appleFeaturesOppoIncompatibleHelp
+                        : AppStrings.applePortraitHelp
+                )
+
                 Toggle(AppStrings.skipExisting, isOn: $viewModel.config.skipExisting)
                     .onChange(of: viewModel.config.skipExisting) {
                         viewModel.refreshOutputURLsForPendingItems()

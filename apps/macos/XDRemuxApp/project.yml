@@ -17,3 +17,20 @@ targets:
       INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
       INFOPLIST_KEY_NSPrincipalClass: NSApplication
       GENERATE_INFOPLIST_FILE: YES
+    preBuildScripts:
+      - name: Build Shared Apple Feature CLI
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          RESOURCE_DIR="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          mkdir -p "$RESOURCE_DIR"
+          xcrun swiftc -O \
+            "$SRCROOT/../../../xdremux/swift-cli/XDRemux.swift" \
+            -o "$RESOURCE_DIR/XDRemuxCLI"
+          rm -rf "$RESOURCE_DIR/ApplePlatform"
+          mkdir -p "$RESOURCE_DIR/ApplePlatform"
+          ditto "$SRCROOT/../../../xdremux/apple-platform/Native" \
+            "$RESOURCE_DIR/ApplePlatform/Native"
+          ditto "$SRCROOT/../../../xdremux/apple-platform/Validation" \
+            "$RESOURCE_DIR/ApplePlatform/Validation"
+          touch "$RESOURCE_DIR/ApplePlatform/.complete"
