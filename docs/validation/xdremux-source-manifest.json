@@ -2,7 +2,7 @@
   "files": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "0193c9832db84dd248ed6983a4a6f94bcc1ed720cd4c233aea09524d48e0177b"
+      "sha256": "753fcb1bb924a34585f16d76ef3c8c8a7aab1b8686a70d1b5361f13be07991a4"
     },
     {
       "path": ".gitignore",
@@ -202,7 +202,7 @@
     },
     {
       "path": "Tests/test_swift_app_architecture.py",
-      "sha256": "c6a912fab6e772da4c3775e117e97ef2eb579e73e7c3a0470611980aee92663e"
+      "sha256": "077bb5d4af264564e6901c4c4c5d3ab8d679a1d28fee728aed1a3663a4cbe0aa"
     },
     {
       "path": "Tests/test_swift_apple_semantic_policy.py",
@@ -418,6 +418,6 @@
     }
   ],
   "schema_version": 1,
-  "source_commit": "a0269aa604a760b7dd21dc9deb305706af7eb82f",
-  "source_ref": "a0269aa"
+  "source_commit": "a7325914140374b4c64a72933debfbdae97626b9",
+  "source_ref": "a732591"
 }

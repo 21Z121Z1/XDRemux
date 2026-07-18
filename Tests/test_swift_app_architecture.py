@@ -53,13 +53,17 @@ class SwiftAppArchitectureTests(unittest.TestCase):
         self.assertIn("XDREMUX_LANGUAGE: en", CI_WORKFLOW)
         self.assertIn("--format jsonl", CI_WORKFLOW)
         self.assertIn("$GITHUB_STEP_SUMMARY", CI_WORKFLOW)
-        self.assertIn("actions/upload-artifact@v4", CI_WORKFLOW)
+        self.assertIn("actions/upload-artifact@v7", CI_WORKFLOW)
         self.assertIn("if: failure()", CI_WORKFLOW)
         self.assertNotIn("--verbose", CI_WORKFLOW)
 
     def test_ci_only_uses_runner_context_after_jobs_are_created(self) -> None:
         workflow_scope = CI_WORKFLOW.split("jobs:", maxsplit=1)[0]
         self.assertNotIn("${{ runner.", workflow_scope)
+
+    def test_ci_uses_the_latest_macos_runner_for_liquid_glass(self) -> None:
+        self.assertIn("runs-on: macos-latest", CI_WORKFLOW)
+        self.assertNotIn("runs-on: macos-15", CI_WORKFLOW)
 
 
 if __name__ == "__main__":
