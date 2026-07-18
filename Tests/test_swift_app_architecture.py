@@ -57,6 +57,10 @@ class SwiftAppArchitectureTests(unittest.TestCase):
         self.assertIn("if: failure()", CI_WORKFLOW)
         self.assertNotIn("--verbose", CI_WORKFLOW)
 
+    def test_ci_only_uses_runner_context_after_jobs_are_created(self) -> None:
+        workflow_scope = CI_WORKFLOW.split("jobs:", maxsplit=1)[0]
+        self.assertNotIn("${{ runner.", workflow_scope)
+
 
 if __name__ == "__main__":
     unittest.main()

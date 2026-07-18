@@ -7,7 +7,6 @@ on:
 
 env:
   XDREMUX_LANGUAGE: en
-  XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremuxapp-derived
 
 jobs:
   macos:
@@ -38,6 +37,8 @@ jobs:
 
       - name: "[3/5] Build macOS App"
         shell: bash
+        env:
+          XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremuxapp-derived
         run: |
           echo "::group::macOS App build"
           scripts/build_and_run.sh build
