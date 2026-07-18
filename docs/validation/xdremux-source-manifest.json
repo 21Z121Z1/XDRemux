@@ -298,7 +298,7 @@
     },
     {
       "path": "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift",
-      "sha256": "77616fc8b16cfc12d220fbd97316b409d6a9c974efdf9398fc4632a0d29444e8"
+      "sha256": "1e5af4889900121854aa5d7f0f9c15094d1cec014c8e7697f739255b047b6680"
     },
     {
       "path": "apps/macos/XDRemuxApp/Tests/XDRemuxAppConversionSmoke.swift",
@@ -306,7 +306,7 @@
     },
     {
       "path": "apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift",
-      "sha256": "15cb62dac1fe08df9e9445d36bfb31e4148dc255d38387377071d076eedd0f33"
+      "sha256": "1e0ec816045c5b88b3be0005cc0ee1dd6b08baa9687fe8ec51210fde4302a866"
     },
     {
       "path": "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj",
@@ -418,6 +418,6 @@
     }
   ],
   "schema_version": 1,
-  "source_commit": "a7325914140374b4c64a72933debfbdae97626b9",
-  "source_ref": "a732591"
+  "source_commit": "0fa557811984200efbddd6a9effdf38223fd5ee8",
+  "source_ref": "0fa5578"
 }
