@@ -1,0 +1,155 @@
+name: XDRemux CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  XDREMUX_LANGUAGE: en
+  XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremuxapp-derived
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "[1/5] Build Swift package"
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          echo "::group::Swift package build"
+          swift build 2>&1 | tee artifacts/swift-build.log
+          echo "::endgroup::"
+          echo "SWIFT_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
+
+      - name: "[2/5] Run unit tests"
+        shell: bash
+        run: |
+          echo "::group::Swift package tests"
+          swift test 2>&1 | tee artifacts/swift-test.log
+          echo "::endgroup::"
+          echo "::group::Architecture policy tests"
+          python3 -m unittest Tests.test_swift_app_architecture 2>&1 | tee artifacts/architecture-tests.log
+          echo "::endgroup::"
+          echo "UNIT_TEST_RESULT=Passed" >> "$GITHUB_ENV"
+
+      - name: "[3/5] Build macOS App"
+        shell: bash
+        run: |
+          echo "::group::macOS App build"
+          scripts/build_and_run.sh build
+          xcodebuild \
+            -quiet \
+            -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \
+            -scheme XDRemuxAppModelTests \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/xdremux-app-model-tests" \
+            build
+          "$RUNNER_TEMP/xdremux-app-model-tests/Build/Products/Debug/XDRemuxAppModelTests"
+          echo "::endgroup::"
+          echo "MACOS_APP_RESULT=Passed" >> "$GITHUB_ENV"
+
+      - name: Prepare private fixtures
+        shell: bash
+        env:
+          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_FIXTURE_ARCHIVE_URL }}
+        run: |
+          if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
+            echo "FIXTURE_ROOT=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
+          curl --fail --location --silent --show-error "$FIXTURE_ARCHIVE_URL" --output "$RUNNER_TEMP/xdremux-fixtures.zip"
+          ditto -x -k "$RUNNER_TEMP/xdremux-fixtures.zip" "$RUNNER_TEMP/xdremux-fixtures"
+          echo "FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
+
+      - name: "[4/5] Run fixture conversions"
+        shell: bash
+        run: |
+          mkdir -p artifacts/fixtures artifacts/diagnostics
+          if [[ -z "${FIXTURE_ROOT:-}" ]]; then
+            echo "STANDARD_FIXTURE_RESULT=Not configured" >> "$GITHUB_ENV"
+            echo "OPPO_FIXTURE_RESULT=Not configured" >> "$GITHUB_ENV"
+            echo "APPLE_STYLES_RESULT=Not configured" >> "$GITHUB_ENV"
+            echo "APPLE_PORTRAIT_RESULT=Not configured" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          export XDREMUX_HELPER_DIRECTORY="$PWD/.build/debug"
+          echo "::group::Fixture conversions (JSONL)"
+          .build/debug/xdremux convert --language en --format jsonl \
+            --input "$FIXTURE_ROOT/standard.heic" --output artifacts/fixtures/standard.heic \
+            > artifacts/fixtures/standard.jsonl 2> artifacts/fixtures/standard.stderr
+          echo "STANDARD_FIXTURE_RESULT=Passed" >> "$GITHUB_ENV"
+          .build/debug/xdremux convert --language en --format jsonl --oppo-compatible \
+            --input "$FIXTURE_ROOT/oppo.heic" --output artifacts/fixtures/oppo.heic \
+            > artifacts/fixtures/oppo.jsonl 2> artifacts/fixtures/oppo.stderr
+          echo "OPPO_FIXTURE_RESULT=Passed" >> "$GITHUB_ENV"
+          .build/debug/xdremux-dev convert --language en --format jsonl --apple-photographic-styles \
+            --diagnostics-dir artifacts/diagnostics/apple-styles \
+            --input "$FIXTURE_ROOT/apple-styles.heic" --output artifacts/fixtures/apple-styles.heic \
+            > artifacts/fixtures/apple-styles.jsonl 2> artifacts/fixtures/apple-styles.stderr
+          echo "APPLE_STYLES_RESULT=Passed" >> "$GITHUB_ENV"
+          .build/debug/xdremux-dev convert --language en --format jsonl --apple-portrait \
+            --diagnostics-dir artifacts/diagnostics/apple-portrait \
+            --input "$FIXTURE_ROOT/apple-portrait.heic" --output artifacts/fixtures/apple-portrait.heic \
+            > artifacts/fixtures/apple-portrait.jsonl 2> artifacts/fixtures/apple-portrait.stderr
+          echo "APPLE_PORTRAIT_RESULT=Passed" >> "$GITHUB_ENV"
+          echo "::endgroup::"
+
+      - name: "[5/5] Validate output containers"
+        shell: bash
+        run: |
+          if [[ -z "${FIXTURE_ROOT:-}" ]]; then
+            echo "CONTAINER_VALIDATION_RESULT=Not configured" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          export XDREMUX_HELPER_DIRECTORY="$PWD/.build/debug"
+          echo "::group::Container validation"
+          python3 Tests/validation/verify_swift_cli_sample.py \
+            --validate-only --input artifacts/fixtures/standard.heic --expected-pixel-format 444f
+          python3 Tests/validation/verify_swift_cli_sample.py \
+            --validate-only --input artifacts/fixtures/oppo.heic --expected-pixel-format 420f
+          .build/debug/xdremux-dev validate-apple --input artifacts/fixtures/apple-styles.heic \
+            > artifacts/fixtures/apple-styles-validation.json
+          .build/debug/xdremux-dev validate-portrait --input artifacts/fixtures/apple-portrait.heic \
+            > artifacts/fixtures/apple-portrait-validation.json
+          echo "::endgroup::"
+          echo "CONTAINER_VALIDATION_RESULT=Passed" >> "$GITHUB_ENV"
+
+      - name: Annotate failure
+        if: failure()
+        shell: bash
+        run: echo "::error file=.github/workflows/ci.yml::XDRemux CI failed; download the diagnostic artifact for complete logs"
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdremux-ci-diagnostics
+          if-no-files-found: ignore
+          path: |
+            artifacts/
+            ${{ runner.temp }}/xdremuxapp-derived/Logs/XDRemux/build.log
+            ${{ runner.temp }}/xdremuxapp-derived/Logs/XDRemux/*.xcresult
+            ${{ runner.temp }}/xdremux-app-model-tests/Logs/Test/*.xcresult
+
+      - name: Write CI summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## XDRemux CI"
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| Swift package build | ${SWIFT_BUILD_RESULT:-Failed} |"
+            echo "| Unit tests | ${UNIT_TEST_RESULT:-Not run} |"
+            echo "| macOS App build | ${MACOS_APP_RESULT:-Not run} |"
+            echo "| Standard ISO fixture | ${STANDARD_FIXTURE_RESULT:-Not run} |"
+            echo "| OPPO compatibility fixture | ${OPPO_FIXTURE_RESULT:-Not run} |"
+            echo "| Apple styles fixture | ${APPLE_STYLES_RESULT:-Not run} |"
+            echo "| Apple portrait fixture | ${APPLE_PORTRAIT_RESULT:-Not run} |"
+            echo "| Output container validation | ${CONTAINER_VALIDATION_RESULT:-Not run} |"
+          } >> "$GITHUB_STEP_SUMMARY"

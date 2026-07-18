@@ -1,6 +1,9 @@
 name: XDRemuxApp
 options:
   bundleIdPrefix: com.proxdr
+packages:
+  XDRemux:
+    path: ../../..
 targets:
   XDRemuxApp:
     type: application
@@ -9,6 +12,32 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+    dependencies:
+      - package: XDRemux
+        product: XDRemuxCore
+      - package: XDRemux
+        product: XDRemuxAppleFeatures
+      - package: XDRemux
+        product: XDRemuxSemanticHelper
+        embed: true
+        link: false
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      - package: XDRemux
+        product: XDRemuxHEVCEncoderHelper
+        embed: true
+        link: false
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      - package: XDRemux
+        product: XDRemuxStyleValidationHelper
+        embed: true
+        link: false
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     settings:
       CODE_SIGN_STYLE: Automatic
       CODE_SIGN_IDENTITY: "-"
@@ -17,20 +46,42 @@ targets:
       INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
       INFOPLIST_KEY_NSPrincipalClass: NSApplication
       GENERATE_INFOPLIST_FILE: YES
-    preBuildScripts:
-      - name: Build Shared Apple Feature CLI
-        basedOnDependencyAnalysis: false
-        script: |
-          set -euo pipefail
-          RESOURCE_DIR="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
-          mkdir -p "$RESOURCE_DIR"
-          xcrun swiftc -O \
-            "$SRCROOT/../../../xdremux/swift-cli/XDRemux.swift" \
-            -o "$RESOURCE_DIR/XDRemuxCLI"
-          rm -rf "$RESOURCE_DIR/ApplePlatform"
-          mkdir -p "$RESOURCE_DIR/ApplePlatform"
-          ditto "$SRCROOT/../../../xdremux/apple-platform/Native" \
-            "$RESOURCE_DIR/ApplePlatform/Native"
-          ditto "$SRCROOT/../../../xdremux/apple-platform/Validation" \
-            "$RESOURCE_DIR/ApplePlatform/Validation"
-          touch "$RESOURCE_DIR/ApplePlatform/.complete"
+  XDRemuxAppModelTests:
+    type: tool
+    platform: macOS
+    deploymentTarget: 15.0
+    sources:
+      - path: Sources/AppStrings.swift
+      - path: Sources/XDRemuxViewModel.swift
+      - path: Tests/XDRemuxAppModelTests.swift
+    dependencies:
+      - package: XDRemux
+        product: XDRemuxCore
+      - package: XDRemux
+        product: XDRemuxAppleFeatures
+    settings:
+      CODE_SIGN_STYLE: Automatic
+      CODE_SIGN_IDENTITY: "-"
+  XDRemuxAppConversionSmoke:
+    type: tool
+    platform: macOS
+    deploymentTarget: 15.0
+    sources:
+      - path: Tests/XDRemuxAppConversionSmoke.swift
+    dependencies:
+      - package: XDRemux
+        product: XDRemuxCore
+      - package: XDRemux
+        product: XDRemuxAppleFeatures
+      - package: XDRemux
+        product: XDRemuxSemanticHelper
+        link: false
+      - package: XDRemux
+        product: XDRemuxHEVCEncoderHelper
+        link: false
+      - package: XDRemux
+        product: XDRemuxStyleValidationHelper
+        link: false
+    settings:
+      CODE_SIGN_STYLE: Automatic
+      CODE_SIGN_IDENTITY: "-"

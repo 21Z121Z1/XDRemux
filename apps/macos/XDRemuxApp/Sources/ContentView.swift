@@ -1,4 +1,5 @@
 import SwiftUI
+import XDRemuxCore
 import UniformTypeIdentifiers
 import Observation
 import AppKit
@@ -216,6 +217,9 @@ struct ContentView: View {
     }
 
     private var stateDetail: String {
+        if let phase = viewModel.currentPhase, !viewModel.currentFileName.isEmpty {
+            return "\(viewModel.currentFileName) · \(phase.appTitle)"
+        }
         if !viewModel.currentFileName.isEmpty {
             return viewModel.currentFileName
         }
@@ -496,6 +500,13 @@ private struct QueueDetailView: View {
                             Text(errorMessage)
                                 .font(.callout)
                                 .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        ForEach(Array(item.warnings.enumerated()), id: \.offset) { _, warning in
+                            Label(warning.appMessage, systemImage: "exclamationmark.triangle.fill")
+                                .font(.callout)
+                                .foregroundStyle(.orange)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
 

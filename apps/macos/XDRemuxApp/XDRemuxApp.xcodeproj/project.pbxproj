@@ -7,31 +7,104 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0F43851D4B592404CEAC2195 /* XDRemuxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02861545396D149E80797322 /* XDRemuxViewModel.swift */; };
+		1CF8A98D8BACB4AAB6485CB0 /* XDRemuxHEVCEncoderHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_9CE1B880-E2DC-4B7E-90DB-1F37292C272D" /* XDRemuxHEVCEncoderHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		20CB6606A9C36623960C0DB2 /* XDRemuxStyleValidationHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_82570E30-2001-4D6B-BDD4-566D07D12749" /* XDRemuxStyleValidationHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		21B7085DAE31930AF49F62AC /* XDRemuxSemanticHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_8AC6ACFA-76F9-4EE2-A175-DCFE65C8EEB3" /* XDRemuxSemanticHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		31A8AD6AA40C358D2256BAE5 /* XDRemuxAppleFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 6161D9D9DDB6EF3D09CB1565 /* XDRemuxAppleFeatures */; };
 		4647AC898D992E985AED2E10 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78B033306E4AE0A568C34EBB /* VisualEffectView.swift */; };
 		64707094865385A92093E856 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B735B3E26375EEF954008A /* ContentView.swift */; };
+		6CFF6C897EE95ADA2AD61994 /* XDRemuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A425FEE6F8B9E96D90D2BC /* XDRemuxCore */; };
 		6FB05CECE182A7A46CEB0EAB /* XDRemuxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02861545396D149E80797322 /* XDRemuxViewModel.swift */; };
 		730715CA1E3ED4981267A175 /* XDRemuxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F286B32FD9F916FBCC95124 /* XDRemuxApp.swift */; };
+		91B25CCEC94C36E1AD7C7ADF /* XDRemuxAppleFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 5387D4A93C45E1A2DD45B6EC /* XDRemuxAppleFeatures */; };
+		A5D5F7315B5BAB773495946F /* XDRemuxAppConversionSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1F041FB2225C19F92B5072 /* XDRemuxAppConversionSmoke.swift */; };
+		A93949EEDCA56F8FE29266E3 /* XDRemuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1D61EF06B4A13105FB0521 /* XDRemuxCore */; };
 		AA8B69637B6501859D143F53 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C71CCE0438700ED958A717D9 /* Assets.xcassets */; };
-		B66A0608AE01B0872E60A8B5 /* XDRemuxCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6145D033286A8F0E09BD373D /* XDRemuxCore.swift */; };
+		D9CEF12592FDD344F3F41A43 /* XDRemuxAppleFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = F48590AC451F7304EEB000A2 /* XDRemuxAppleFeatures */; };
+		E099FE876A4F0E60B9D321F9 /* XDRemuxAppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D38BBBE639FE49CE3858D2 /* XDRemuxAppModelTests.swift */; };
 		E1116493F99381D29CD7E8D7 /* AppStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C894071433802A3CCD2584E /* AppStrings.swift */; };
+		F5F31309C8B9E1444AFC858E /* XDRemuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3F104D52F84F7132F954DC08 /* XDRemuxCore */; };
+		FBAE381A260B401C292D7ABC /* AppStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C894071433802A3CCD2584E /* AppStrings.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		47F4E802BB2EB3CFE6CE301A /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				21B7085DAE31930AF49F62AC /* XDRemuxSemanticHelper in Embed Dependencies */,
+				1CF8A98D8BACB4AAB6485CB0 /* XDRemuxHEVCEncoderHelper in Embed Dependencies */,
+				20CB6606A9C36623960C0DB2 /* XDRemuxStyleValidationHelper in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		02861545396D149E80797322 /* XDRemuxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxViewModel.swift; sourceTree = "<group>"; };
+		24D38BBBE639FE49CE3858D2 /* XDRemuxAppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxAppModelTests.swift; sourceTree = "<group>"; };
 		33E42AF90B0C23E087B64A36 /* XDRemuxApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XDRemuxApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		385EDD63795756F2E8F07D00 /* proxdrtest */ = {isa = PBXFileReference; lastKnownFileType = folder; name = proxdrtest; path = ../../..; sourceTree = SOURCE_ROOT; };
+		4C1F041FB2225C19F92B5072 /* XDRemuxAppConversionSmoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxAppConversionSmoke.swift; sourceTree = "<group>"; };
 		4C894071433802A3CCD2584E /* AppStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStrings.swift; sourceTree = "<group>"; };
-		6145D033286A8F0E09BD373D /* XDRemuxCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxCore.swift; sourceTree = "<group>"; };
 		67B735B3E26375EEF954008A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		78B033306E4AE0A568C34EBB /* VisualEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectView.swift; sourceTree = "<group>"; };
+		8E527F1F8D6D31E4D93147BD /* XDRemuxAppModelTests */ = {isa = PBXFileReference; includeInIndex = 0; path = XDRemuxAppModelTests; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F286B32FD9F916FBCC95124 /* XDRemuxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxApp.swift; sourceTree = "<group>"; };
 		C71CCE0438700ED958A717D9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D91FEFE1496703DB6B56AFC8 /* XDRemuxAppConversionSmoke */ = {isa = PBXFileReference; includeInIndex = 0; path = XDRemuxAppConversionSmoke; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		1B32BFE09B4822CD2A4A358C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5F31309C8B9E1444AFC858E /* XDRemuxCore in Frameworks */,
+				D9CEF12592FDD344F3F41A43 /* XDRemuxAppleFeatures in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		730CDBE8CE4E43B9FCB15ACE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A93949EEDCA56F8FE29266E3 /* XDRemuxCore in Frameworks */,
+				91B25CCEC94C36E1AD7C7ADF /* XDRemuxAppleFeatures in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7D64FFF3FA8351B5E9B98B9E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6CFF6C897EE95ADA2AD61994 /* XDRemuxCore in Frameworks */,
+				31A8AD6AA40C358D2256BAE5 /* XDRemuxAppleFeatures in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		1DF0B83CD6A4294749BA3C29 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				4C1F041FB2225C19F92B5072 /* XDRemuxAppConversionSmoke.swift */,
+				24D38BBBE639FE49CE3858D2 /* XDRemuxAppModelTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
 		47AC7D1C26659BEDC0B30E28 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				33E42AF90B0C23E087B64A36 /* XDRemuxApp.app */,
+				D91FEFE1496703DB6B56AFC8 /* XDRemuxAppConversionSmoke */,
+				8E527F1F8D6D31E4D93147BD /* XDRemuxAppModelTests */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -40,9 +113,19 @@
 			isa = PBXGroup;
 			children = (
 				C71CCE0438700ED958A717D9 /* Assets.xcassets */,
+				B7A0A209B126F278B11B4134 /* Packages */,
 				E7A4CA36C47CDA7399DC9F7B /* Sources */,
+				1DF0B83CD6A4294749BA3C29 /* Tests */,
 				47AC7D1C26659BEDC0B30E28 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		B7A0A209B126F278B11B4134 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				385EDD63795756F2E8F07D00 /* proxdrtest */,
+			);
+			name = Packages;
 			sourceTree = "<group>";
 		};
 		E7A4CA36C47CDA7399DC9F7B /* Sources */ = {
@@ -52,7 +135,6 @@
 				67B735B3E26375EEF954008A /* ContentView.swift */,
 				78B033306E4AE0A568C34EBB /* VisualEffectView.swift */,
 				8F286B32FD9F916FBCC95124 /* XDRemuxApp.swift */,
-				6145D033286A8F0E09BD373D /* XDRemuxCore.swift */,
 				02861545396D149E80797322 /* XDRemuxViewModel.swift */,
 			);
 			path = Sources;
@@ -61,24 +143,73 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		AF3D641BAED6AD7AF7BA4842 /* XDRemuxApp */ = {
+		50AFEF514F42441C1F5CA065 /* XDRemuxAppModelTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 85CB44165E48F2F8587BA77E /* Build configuration list for PBXNativeTarget "XDRemuxApp" */;
+			buildConfigurationList = 9E7AA06415D18C7009F3CBDF /* Build configuration list for PBXNativeTarget "XDRemuxAppModelTests" */;
 			buildPhases = (
-				ED34B1B73BE9899A8547BD4B /* Build Shared Apple Feature CLI */,
-				80BA6548CDA15D10C2CBFABB /* Sources */,
-				7852DCF60575A9880B4F9988 /* Resources */,
+				C920CDAC59EE4DB9E6637158 /* Sources */,
+				7D64FFF3FA8351B5E9B98B9E /* Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
+			name = XDRemuxAppModelTests;
+			packageProductDependencies = (
+				55A425FEE6F8B9E96D90D2BC /* XDRemuxCore */,
+				6161D9D9DDB6EF3D09CB1565 /* XDRemuxAppleFeatures */,
+			);
+			productName = XDRemuxAppModelTests;
+			productReference = 8E527F1F8D6D31E4D93147BD /* XDRemuxAppModelTests */;
+			productType = "com.apple.product-type.tool";
+		};
+		AF3D641BAED6AD7AF7BA4842 /* XDRemuxApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 85CB44165E48F2F8587BA77E /* Build configuration list for PBXNativeTarget "XDRemuxApp" */;
+			buildPhases = (
+				80BA6548CDA15D10C2CBFABB /* Sources */,
+				7852DCF60575A9880B4F9988 /* Resources */,
+				1B32BFE09B4822CD2A4A358C /* Frameworks */,
+				47F4E802BB2EB3CFE6CE301A /* Embed Dependencies */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E2D0C67C8CB8B89500812EA5 /* PBXTargetDependency */,
+				5C051BD98A47F4E73285CED8 /* PBXTargetDependency */,
+				FFCECC2B20A04029EA9FCB54 /* PBXTargetDependency */,
+			);
 			name = XDRemuxApp;
 			packageProductDependencies = (
+				3F104D52F84F7132F954DC08 /* XDRemuxCore */,
+				F48590AC451F7304EEB000A2 /* XDRemuxAppleFeatures */,
 			);
 			productName = XDRemuxApp;
 			productReference = 33E42AF90B0C23E087B64A36 /* XDRemuxApp.app */;
 			productType = "com.apple.product-type.application";
+		};
+		EDD9D32390AF7FF03419EF01 /* XDRemuxAppConversionSmoke */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4EF20FFDEA8D4E0811426AE /* Build configuration list for PBXNativeTarget "XDRemuxAppConversionSmoke" */;
+			buildPhases = (
+				D36C54929D96C4B67FEEED6D /* Sources */,
+				730CDBE8CE4E43B9FCB15ACE /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				50911CC3D02C68EEB18447B4 /* PBXTargetDependency */,
+				2053B60DF1C42CA69A4E01D4 /* PBXTargetDependency */,
+				5BF604292132FCA053020930 /* PBXTargetDependency */,
+			);
+			name = XDRemuxAppConversionSmoke;
+			packageProductDependencies = (
+				5A1D61EF06B4A13105FB0521 /* XDRemuxCore */,
+				5387D4A93C45E1A2DD45B6EC /* XDRemuxAppleFeatures */,
+			);
+			productName = XDRemuxAppConversionSmoke;
+			productReference = D91FEFE1496703DB6B56AFC8 /* XDRemuxAppConversionSmoke */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -89,7 +220,13 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					50AFEF514F42441C1F5CA065 = {
+						ProvisioningStyle = Automatic;
+					};
 					AF3D641BAED6AD7AF7BA4842 = {
+						ProvisioningStyle = Automatic;
+					};
+					EDD9D32390AF7FF03419EF01 = {
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -104,11 +241,16 @@
 			);
 			mainGroup = 9FDEBE29B674DC40978103CC;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8C62C6224FAFB1642DF7DFC9 /* XCLocalSwiftPackageReference "../../.." */,
+			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				AF3D641BAED6AD7AF7BA4842 /* XDRemuxApp */,
+				EDD9D32390AF7FF03419EF01 /* XDRemuxAppConversionSmoke */,
+				50AFEF514F42441C1F5CA065 /* XDRemuxAppModelTests */,
 			);
 		};
 /* End PBXProject section */
@@ -124,28 +266,6 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		ED34B1B73BE9899A8547BD4B /* Build Shared Apple Feature CLI */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Build Shared Apple Feature CLI";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nRESOURCE_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$RESOURCE_DIR\"\nxcrun swiftc -O \\\n  \"$SRCROOT/../../../xdremux/swift-cli/XDRemux.swift\" \\\n  -o \"$RESOURCE_DIR/XDRemuxCLI\"\nrm -rf \"$RESOURCE_DIR/ApplePlatform\"\nmkdir -p \"$RESOURCE_DIR/ApplePlatform\"\nditto \"$SRCROOT/../../../xdremux/apple-platform/Native\" \\\n  \"$RESOURCE_DIR/ApplePlatform/Native\"\nditto \"$SRCROOT/../../../xdremux/apple-platform/Validation\" \\\n  \"$RESOURCE_DIR/ApplePlatform/Validation\"\ntouch \"$RESOURCE_DIR/ApplePlatform/.complete\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
-
 /* Begin PBXSourcesBuildPhase section */
 		80BA6548CDA15D10C2CBFABB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -155,12 +275,56 @@
 				64707094865385A92093E856 /* ContentView.swift in Sources */,
 				4647AC898D992E985AED2E10 /* VisualEffectView.swift in Sources */,
 				730715CA1E3ED4981267A175 /* XDRemuxApp.swift in Sources */,
-				B66A0608AE01B0872E60A8B5 /* XDRemuxCore.swift in Sources */,
 				6FB05CECE182A7A46CEB0EAB /* XDRemuxViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C920CDAC59EE4DB9E6637158 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FBAE381A260B401C292D7ABC /* AppStrings.swift in Sources */,
+				E099FE876A4F0E60B9D321F9 /* XDRemuxAppModelTests.swift in Sources */,
+				0F43851D4B592404CEAC2195 /* XDRemuxViewModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D36C54929D96C4B67FEEED6D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5D5F7315B5BAB773495946F /* XDRemuxAppConversionSmoke.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2053B60DF1C42CA69A4E01D4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = "TEMP_AE618021-E837-420B-869B-36A87A86BA00" /* XDRemuxHEVCEncoderHelper */;
+		};
+		50911CC3D02C68EEB18447B4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = "TEMP_CCC408BB-4FD5-49E2-B62A-94A58EB55738" /* XDRemuxSemanticHelper */;
+		};
+		5BF604292132FCA053020930 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = "TEMP_690876D7-4697-4174-86A7-522C24C34EF6" /* XDRemuxStyleValidationHelper */;
+		};
+		5C051BD98A47F4E73285CED8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = "TEMP_9CE1B880-E2DC-4B7E-90DB-1F37292C272D" /* XDRemuxHEVCEncoderHelper */;
+		};
+		E2D0C67C8CB8B89500812EA5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = "TEMP_8AC6ACFA-76F9-4EE2-A175-DCFE65C8EEB3" /* XDRemuxSemanticHelper */;
+		};
+		FFCECC2B20A04029EA9FCB54 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = "TEMP_82570E30-2001-4D6B-BDD4-566D07D12749" /* XDRemuxStyleValidationHelper */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		0842F78FE9009FC6A0F20304 /* Debug */ = {
@@ -180,6 +344,22 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxApp;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		25519BD28AB27D8EDD9F3B68 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppModelTests;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -267,6 +447,22 @@
 			};
 			name = Debug;
 		};
+		31FAB81F83E9413C6AF6C056 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppModelTests;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
 		5052B9F40473E2D5C1607B4F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -322,6 +518,38 @@
 			};
 			name = Release;
 		};
+		70CAD3FF2F9EA351ABCAECB0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppConversionSmoke;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		BDE0A282D57E3D8FDCB623CA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.proxdr.XDRemuxAppConversionSmoke;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -343,7 +571,83 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		9E7AA06415D18C7009F3CBDF /* Build configuration list for PBXNativeTarget "XDRemuxAppModelTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25519BD28AB27D8EDD9F3B68 /* Debug */,
+				31FAB81F83E9413C6AF6C056 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C4EF20FFDEA8D4E0811426AE /* Build configuration list for PBXNativeTarget "XDRemuxAppConversionSmoke" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70CAD3FF2F9EA351ABCAECB0 /* Debug */,
+				BDE0A282D57E3D8FDCB623CA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		8C62C6224FAFB1642DF7DFC9 /* XCLocalSwiftPackageReference "../../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3F104D52F84F7132F954DC08 /* XDRemuxCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxCore;
+		};
+		5387D4A93C45E1A2DD45B6EC /* XDRemuxAppleFeatures */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxAppleFeatures;
+		};
+		55A425FEE6F8B9E96D90D2BC /* XDRemuxCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxCore;
+		};
+		5A1D61EF06B4A13105FB0521 /* XDRemuxCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxCore;
+		};
+		6161D9D9DDB6EF3D09CB1565 /* XDRemuxAppleFeatures */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxAppleFeatures;
+		};
+		F48590AC451F7304EEB000A2 /* XDRemuxAppleFeatures */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxAppleFeatures;
+		};
+		"TEMP_690876D7-4697-4174-86A7-522C24C34EF6" /* XDRemuxStyleValidationHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxStyleValidationHelper;
+		};
+		"TEMP_82570E30-2001-4D6B-BDD4-566D07D12749" /* XDRemuxStyleValidationHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxStyleValidationHelper;
+		};
+		"TEMP_8AC6ACFA-76F9-4EE2-A175-DCFE65C8EEB3" /* XDRemuxSemanticHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxSemanticHelper;
+		};
+		"TEMP_9CE1B880-E2DC-4B7E-90DB-1F37292C272D" /* XDRemuxHEVCEncoderHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxHEVCEncoderHelper;
+		};
+		"TEMP_AE618021-E837-420B-869B-36A87A86BA00" /* XDRemuxHEVCEncoderHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxHEVCEncoderHelper;
+		};
+		"TEMP_CCC408BB-4FD5-49E2-B62A-94A58EB55738" /* XDRemuxSemanticHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxSemanticHelper;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9A7F749F21AB507A46FB89D2 /* Project object */;
 }

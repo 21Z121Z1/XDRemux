@@ -1,0 +1,423 @@
+{
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "397512b9df7f5c2170e9908b163f5258d612df677d679c93eed6202fe59a3bfc"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "72763b3a8df0f327786537ffd07876c0c2b2b6909a2ab45ce3031d17425eb4e6"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "9061fb785fa824c833d6bca146d5f1947c85b4cb9cc4bbff6d0351823abfd0b0"
+    },
+    {
+      "path": "Package.swift",
+      "sha256": "00987d9699baead01cced05480fedb1557d18a9ef86fc096414772f88e5eb429"
+    },
+    {
+      "path": "README.en.md",
+      "sha256": "e2524b1ac6c3798e556a0efdcb9551041b737b6f9ee77984c5882cd73ec0f56f"
+    },
+    {
+      "path": "README.md",
+      "sha256": "e7e6639a8593e0995079302b3538294fce2f567b48d5823370b33f505959c426"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/AppleFeatureConversionEngine.swift",
+      "sha256": "16fb2302b442a5d5d16d14fb3883bfccb57e3d9f1dc02f78c6e7c246bd7c16b3"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/PhotographicStyles/ApplePhotographicStylesPipeline.swift",
+      "sha256": "3f0932e824da198a97677479dd3d81f558dc0650cf1c70d8700a3d90b975aae8"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/Portrait/PortraitConversionPipeline.swift",
+      "sha256": "024396d804f8a81cf78a492dc1475ba6dbc86206cc3b4dfd1a7b465edf5e00d1"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/Portrait/PortraitModels.swift",
+      "sha256": "e72668a5a1d42f3cb06ac9679a379493b75ac42b97ba1c9d4b05a1387157cea7"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Native/learnnode_coefficient_probe.m",
+      "sha256": "cc8b0ed0d824ed4998f5193269e7ed75dbd5333b9c032907c872e9332a28f8ae"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Validation/apple_auxiliary_matte_probe.m",
+      "sha256": "77412c3c9cdd01e9ac36351fb5c0ccf98d98837610c681158ffca70668c4c03b"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Validation/patch_heif_exif_orientation.swift",
+      "sha256": "fb74059704615b9c13c6a47c1140ecfb6d6fbbc2e2c5451644ad9bbedb2d06fc"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleFeatureModels.swift",
+      "sha256": "e93891f20e4d15a0058772cc3de83bc2e86f9011d5ed4987bdb6b3a3048382ef"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleNativeToolchain.swift",
+      "sha256": "d52f46c5005e50f5909935ca8dc234cc5ef39e3b2fa2efac6c8b6dcf1bca8b14"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleSemanticScaffoldBuilder.swift",
+      "sha256": "d2c33b90c44aac6dea04133a446c4fe98874184b3a283ee84aa77de1d0d2f6fb"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleSemanticSceneAnalyzer.swift",
+      "sha256": "e74c5086c3718e770cd7820334837d604c8bec16442f0ae718ae2139f634d080"
+    },
+    {
+      "path": "Sources/XDRemuxCLI/Commands/BatchCoordinator.swift",
+      "sha256": "d619e924104f7a1964c81163d6bbff40729353fe7415f554699b461f2d30b025"
+    },
+    {
+      "path": "Sources/XDRemuxCLI/Commands/XDRemuxCommand.swift",
+      "sha256": "9fb0b301cab13d67a7befa76d4c6c10ff1db7bdde7554f0454c3989571717efe"
+    },
+    {
+      "path": "Sources/XDRemuxCLI/Localization/Localizer.swift",
+      "sha256": "ec4a05473d03915981a404455676e239c3f02ab2bc2215a7fa09f7dc4cfc9c65"
+    },
+    {
+      "path": "Sources/XDRemuxCLI/Output/CLIOutput.swift",
+      "sha256": "3c42dea7e27a8c738000ad8ca92825000c7bfb5f4f2b280ee6be01a51bb4b891"
+    },
+    {
+      "path": "Sources/XDRemuxCLI/Parsing/CommandModels.swift",
+      "sha256": "39fcf8a2da0bb9413b09b2b9b6ac561e1ef34154431f6e871880315a087c1860"
+    },
+    {
+      "path": "Sources/XDRemuxCLI/Parsing/ConversionArgumentParser.swift",
+      "sha256": "cd3278a4881730f240a8dc25b2a88c29c68247ff00e8a958addae9cc9261a203"
+    },
+    {
+      "path": "Sources/XDRemuxCLI/Resources/en.lproj/Localizable.strings",
+      "sha256": "4da70cc60d5b905d7a1d208cdbc24949d36316243f6a7beb171787263be6bd06"
+    },
+    {
+      "path": "Sources/XDRemuxCLI/Resources/zh-Hans.lproj/Localizable.strings",
+      "sha256": "e8e3c91c75c611948c2153d37c5ed3490cb19961f86660c5cef90e54f9dc5d3a"
+    },
+    {
+      "path": "Sources/XDRemuxCore/Batch/BatchModels.swift",
+      "sha256": "6ab9c8371c5e70994e1acfe43fd6b551e8f14b5be9ba18771458fb43efdaf6a0"
+    },
+    {
+      "path": "Sources/XDRemuxCore/Conversion/ConversionEngine.swift",
+      "sha256": "aa1c60a76c10267d48389e3e03a7bbd21ceb27dcf893782c44c814d66a847414"
+    },
+    {
+      "path": "Sources/XDRemuxCore/Conversion/Events.swift",
+      "sha256": "80afb71306829773a454a0604b5c864495bfc7f04a3f2bff3b2e64419ecc8445"
+    },
+    {
+      "path": "Sources/XDRemuxCore/Conversion/Models.swift",
+      "sha256": "4b57adf0d36a51ac8ea1533f76cdac95b20cef0cee27f49b3d1db9b9cba119d7"
+    },
+    {
+      "path": "Sources/XDRemuxCore/HDR/HDRPipeline.swift",
+      "sha256": "55f7ca32837f4feddbcc705a297858152b29341eb9e89e71ce9131446d215641"
+    },
+    {
+      "path": "Sources/XDRemuxCore/HDR/NumericUtilities.swift",
+      "sha256": "5583fded09cb8faeb18cba6f4f6a5c04d99b99e3e2c5efaf503dc0ed0b8a9ee7"
+    },
+    {
+      "path": "Sources/XDRemuxCore/HEIF/ISOBMFF.swift",
+      "sha256": "ba35a36faed0afb02ce4b673444856d17baf8ab3efb837670ffe291322265cf9"
+    },
+    {
+      "path": "Sources/XDRemuxCore/HEIF/OutputValidation.swift",
+      "sha256": "ac66b5e22b73c311b05f57354c1ccc3c95c44e0b18050a08ba3b8d50e40f4c7b"
+    },
+    {
+      "path": "Sources/XDRemuxCore/Metadata/OppoMetadata.swift",
+      "sha256": "4cb250fd588ea49aeacdd1b0405a656b6b8a0a3b692fdc3bb3f57e999a8a943d"
+    },
+    {
+      "path": "Sources/XDRemuxDevExecutable/main.swift",
+      "sha256": "d2daadc3ec57362ebea4fee4a9a6b5a80bfb75c7eb1b16c962741c855442bb40"
+    },
+    {
+      "path": "Sources/XDRemuxExecutable/main.swift",
+      "sha256": "811bb8392593fab3e1803b312d5627e2ab3a637702083f3c533625e5260349e6"
+    },
+    {
+      "path": "Sources/XDRemuxHEVCEncoderHelper/main.swift",
+      "sha256": "3335012bb5ab8f455a7e2593cc49056ba1486c0d5c4110df3411b49d8b404e50"
+    },
+    {
+      "path": "Sources/XDRemuxSemanticHelper/main.swift",
+      "sha256": "05cf43bf6c3b4d619a25bcf6896c6b9b24cba1f800de413c1c2ffdbec275cc8d"
+    },
+    {
+      "path": "Sources/XDRemuxStyleValidationHelper/main.m",
+      "sha256": "d32e643f15470311f37b1c8cc81a689ff9f645c104cbcb37b99312b96239e2a4"
+    },
+    {
+      "path": "Tests/README.md",
+      "sha256": "3e0eaf82e8770bd9e7e7eee60d6655d3bf23dcf51e532db91386d4fe8c6661db"
+    },
+    {
+      "path": "Tests/XDRemuxAppleFeaturesTests/AppleFeatureContractTests.swift",
+      "sha256": "5229c6316e5bb8d1eeda59078d9b65bab7de2350f8f137d100e4fc7651f80424"
+    },
+    {
+      "path": "Tests/XDRemuxCLITests/BatchCoordinatorTests.swift",
+      "sha256": "f62349cdb1135ae3b4bbba897049e0e88bb2972827be740d93ce118cf66d6ff4"
+    },
+    {
+      "path": "Tests/XDRemuxCLITests/ConversionArgumentParserTests.swift",
+      "sha256": "0ff1f8f0cfd8c64f7c5e729fcb1ead18a8389991535399349e22ebb3a5bf58c4"
+    },
+    {
+      "path": "Tests/XDRemuxCLITests/LocalizationTests.swift",
+      "sha256": "4b1e73893d890efe5fd54a3c32abbe937c04e38803569f15c0ee687dc40fa06b"
+    },
+    {
+      "path": "Tests/XDRemuxCLITests/OutputRendererTests.swift",
+      "sha256": "fb1562e5e478cc4d515510d018bdf26da3482cec93e40197b5a3da3cf84383b0"
+    },
+    {
+      "path": "Tests/XDRemuxCoreTests/CoreContractTests.swift",
+      "sha256": "0f6122c293e02a7b9a87a109edf436499a812b13443940bfaf4aad5ab3fc123e"
+    },
+    {
+      "path": "Tests/test_apple_vt_hevc_encoder.py",
+      "sha256": "737770906411c78953f2c876ff1ae54f3245b6f2753e97a7f74e4c93bf7e52ad"
+    },
+    {
+      "path": "Tests/test_build_and_run_script.py",
+      "sha256": "40f45008beab755339de0be38d860d949c5a836c5041ad522534154e52e09d2e"
+    },
+    {
+      "path": "Tests/test_portrait_translation_core.py",
+      "sha256": "f7690abd63e4df49bd754be6d73baedc315b346960210cf703a820bb5791c4cb"
+    },
+    {
+      "path": "Tests/test_python_tail_policy.py",
+      "sha256": "b4322ae8be23a71797ee229ae4e132ab5c306e4dfa4fd819a42ffea381de6c61"
+    },
+    {
+      "path": "Tests/test_swift_app_architecture.py",
+      "sha256": "54295960a327aface7ffe0b9cc92b70ea9137e3acaa8f71e12bdd42fe75537c7"
+    },
+    {
+      "path": "Tests/test_swift_apple_semantic_policy.py",
+      "sha256": "f0d052e561366611df958215126dfe080a3c2d22c8e901f600048ec98bcd11f8"
+    },
+    {
+      "path": "Tests/test_swift_apple_styles_writer_policy.py",
+      "sha256": "f607894335123e2ed6c9852e353a99b704a2520ceb7dfdb7d1bdd21b9c2edfac"
+    },
+    {
+      "path": "Tests/test_swift_artifact_lifecycle.py",
+      "sha256": "c2fef874502a003c00256f9e29ec22f999942362f200825fcb87e891b5ec5918"
+    },
+    {
+      "path": "Tests/validation/test_agent_completion_gate.py",
+      "sha256": "424e7b46067af5ecd837db279d9b30dadc9adf4c15d4c5255e92457edf86cdb3"
+    },
+    {
+      "path": "Tests/validation/verify_apple_feature_artifact_lifecycle.py",
+      "sha256": "52310b973f71ee156cd6e2c924f6f9af3e80842dad01bfa98feea3a0e49726e5"
+    },
+    {
+      "path": "Tests/validation/verify_cli_sigint_cursor.py",
+      "sha256": "ebc357520030bfca0513adf174a3bd7503d7154b2c7552b660509ca58f4408a0"
+    },
+    {
+      "path": "Tests/validation/verify_swift_cli_sample.py",
+      "sha256": "e3111d64356638c5e0cfb4b316d68e640edae54dbe752bf2a07c693990e7513b"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "sha256": "13b1c7461192863c9f3ab3ceab313acd6f6531898360983495bf13d48dfc967f"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_128x128.png",
+      "sha256": "436ff2a51f54addec9c2626263d9925b15eb0edcb9765de185d3cac8094ad825"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png",
+      "sha256": "6aaaeb2ca68e08d9ab80c0e9900de893a7f0895bddf3df0a53e0b7d8f2012570"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_16x16.png",
+      "sha256": "43020622758c5edbcf7e71cbc8f48d32664b39d321dbf3c44e428268c0e81c71"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png",
+      "sha256": "d3c7249d28ee3625803465cc61685ba742f985b849fc78b197525329839cd9dd"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_256x256.png",
+      "sha256": "6aaaeb2ca68e08d9ab80c0e9900de893a7f0895bddf3df0a53e0b7d8f2012570"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png",
+      "sha256": "42ffed75b367a5091141a82d1f7b35f2331e99993f691aa3b2a831898e191beb"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_32x32.png",
+      "sha256": "d3c7249d28ee3625803465cc61685ba742f985b849fc78b197525329839cd9dd"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png",
+      "sha256": "20ec09319ce268d589016e18845e9eb43d076f85282dcace0ab7986fe358cd6e"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_512x512.png",
+      "sha256": "42ffed75b367a5091141a82d1f7b35f2331e99993f691aa3b2a831898e191beb"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png",
+      "sha256": "96a070ae53e945c1bae1b8bf88fcb1c89cc20c4fbf21b376f3fe9527dab211e9"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Assets.xcassets/Contents.json",
+      "sha256": "f5fb0e1f3a8142892ed092efb5955c1c2cc537003a89ad7bbdb9dade7fe8985f"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Sources/AppStrings.swift",
+      "sha256": "5cea168a70ef92ec0a4b3d1395105ede265c47c140e9617776fc3fc918016cf5"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Sources/ContentView.swift",
+      "sha256": "bb2f0966816bf8c0090311550e1b3941ef5b9c0a18cda71e33bdb19a944ee950"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Sources/VisualEffectView.swift",
+      "sha256": "f580a6905cb34bbd1f1fa115b785271e4b89dfd4835c905eb0ec1359776f63dd"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Sources/XDRemuxApp.swift",
+      "sha256": "7cfd2ca89dfa0c72e4eadae7d08af8e528dee54f9c6d173716be70c17fab78bc"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift",
+      "sha256": "77616fc8b16cfc12d220fbd97316b409d6a9c974efdf9398fc4632a0d29444e8"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Tests/XDRemuxAppConversionSmoke.swift",
+      "sha256": "69c474618d56a77cb48f97132b961532b7f2ce34eae8d8eda72b7f8a27b3b330"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift",
+      "sha256": "15cb62dac1fe08df9e9445d36bfb31e4148dc255d38387377071d076eedd0f33"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj",
+      "sha256": "81b42af36c12b618de7f6c0a8d16cc48e6d488922774e523537c08ab006f1c7d"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
+      "sha256": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+    },
+    {
+      "path": "apps/macos/XDRemuxApp/project.yml",
+      "sha256": "236f9553a6a78060e5f11225705225d6fa7dcf715b35f4e0f74261a3cca86750"
+    },
+    {
+      "path": "docs/quality/evals.md",
+      "sha256": "c59852ec58374d82e8078e05be2340f7f22a6cdf676bfe4c4d334f080dd2e2b6"
+    },
+    {
+      "path": "docs/quality/logging.md",
+      "sha256": "0f83f631f74de6b0eba8be8c97ae31b07ff7cac4dbb1d4d10c5ba2445476f962"
+    },
+    {
+      "path": "docs/quality/testing.md",
+      "sha256": "73a1669437e5a970ad8fbe71b15f62a128cfc5d344a4b713a60841302e21f445"
+    },
+    {
+      "path": "docs/validation/README.md",
+      "sha256": "7cf71fc3ad7d5ad839d3d223adebd5f1673490d9afdcdbfcc1840f8333038cd4"
+    },
+    {
+      "path": "docs/xdremux/README.md",
+      "sha256": "d1bdf9e8f456843bf64236c579d59ea88fa00dc4c32e96ef51bc85fbf180086e"
+    },
+    {
+      "path": "docs/xdremux/iso-conformance-audit-20260511.md",
+      "sha256": "eacd870f5ac2c78dda2818e60df2cb26501ae4f7c5d254b86ce26319307e7966"
+    },
+    {
+      "path": "fixtures/README.md",
+      "sha256": "1d846ac4cfaaeb46148832d8519e6ae00ef41e02929828c8a310fe9c80144c4f"
+    },
+    {
+      "path": "scripts/README.md",
+      "sha256": "895649f7983f59ea6011f2aec8f6241e0a2808d5476193ec29e137ca43b8f027"
+    },
+    {
+      "path": "scripts/agent_completion_gate.py",
+      "sha256": "7536cadb04eeb194cba7b155f211c2a1c8e546e73c940dbca7ed31a434a267e3"
+    },
+    {
+      "path": "scripts/build_and_run.sh",
+      "sha256": "29a2f9fbb8dded5c2beaf25e81c8801f1a3cf13868d91e671ab89d582092b129"
+    },
+    {
+      "path": "xdremux/README.md",
+      "sha256": "ad562cb3ba224e3b9c6cb75de67a4a004f17da73ec4d74edc3ce588f02ea1459"
+    },
+    {
+      "path": "xdremux/python/XDRemux.py",
+      "sha256": "8a7245dfe306193d274ef51403c07f3d9f0354d4ebb2379fd1efad363a937b80"
+    },
+    {
+      "path": "xdremux/python/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "xdremux/python/container.py",
+      "sha256": "4d3a9028daf520e7ea3a50ea48a2ccdf2553c3c2517c22e3d4042c555b8a26e5"
+    },
+    {
+      "path": "xdremux/python/edr.py",
+      "sha256": "3a8ca27c8aed687db2dd27f599df5677a89d89d7e2f02808f8f2d84b920d68c1"
+    },
+    {
+      "path": "xdremux/python/gainmap.py",
+      "sha256": "3768e142a589fef47bb7c019c9ec32540778e562e02fa1f307464231f69b55bf"
+    },
+    {
+      "path": "xdremux/python/heif_io.py",
+      "sha256": "ebd16290f8f7b7d7f6b0aa014a8fba390655db458035fd608822437406199a05"
+    },
+    {
+      "path": "xdremux/python/iso21496.py",
+      "sha256": "50c1326014e71c638358a76b4018de90654cd5ce6d244d494612a83dcb3befe7"
+    },
+    {
+      "path": "xdremux/python/isobmff_patch.py",
+      "sha256": "379edd2ab9a3e6d18d6664782ad2877101a9efaf14876352478dd1c88a465e9b"
+    },
+    {
+      "path": "xdremux/python/requirements.txt",
+      "sha256": "c665dd9225b8e86b0f7acd1777555857e5c72c5711361b81dbca085990405f50"
+    },
+    {
+      "path": "xdremux/swift-cli/README.md",
+      "sha256": "326d441e12c5f89dc982558743e92e40024e881e22f3035799715d91a70ceb9a"
+    },
+    {
+      "path": "xdremux/swift-cli/XDRemux.swift",
+      "sha256": "e1d386475991da2a036d2f2d25ab8e72e464453eba9f51c0351e5a7c28d0e186"
+    },
+    {
+      "path": "xdremux/swift/ApplePortraitDepth.swift",
+      "sha256": "6e1883150524a300e2db941da5311005767902d8cd43e4dd6cbd8b36aef69122"
+    },
+    {
+      "path": "xdremux/swift/VisionSaliencyFocus.swift",
+      "sha256": "7ddac39c0cc01c507e1b46edd33e49f271b197d78a9231fe016e142b25d2771e"
+    }
+  ],
+  "schema_version": 1,
+  "source_commit": "dc7bb3f5c1174c92917102bc5877601ad34242c8",
+  "source_ref": "dc7bb3f"
+}

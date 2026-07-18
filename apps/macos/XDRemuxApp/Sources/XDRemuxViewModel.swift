@@ -4,6 +4,8 @@ import Observation
 import ImageIO
 import UniformTypeIdentifiers
 import AppKit
+import XDRemuxCore
+import XDRemuxAppleFeatures
 
 enum AppState: Equatable {
     case idle
@@ -93,6 +95,7 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
     var errorMessage: String?
     var startedAt: Date?
     var finishedAt: Date?
+    var warnings: [ConversionWarning]
 
     init(
         id: UUID = UUID(),
@@ -102,7 +105,8 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
         outputPlanStatus: OutputPlanStatus = .ready,
         errorMessage: String? = nil,
         startedAt: Date? = nil,
-        finishedAt: Date? = nil
+        finishedAt: Date? = nil,
+        warnings: [ConversionWarning] = []
     ) {
         self.id = id
         self.inputURL = inputURL
@@ -112,6 +116,7 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
         self.errorMessage = errorMessage
         self.startedAt = startedAt
         self.finishedAt = finishedAt
+        self.warnings = warnings
     }
 
     var isSuccessful: Bool {
@@ -129,6 +134,7 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
 final class XDRemuxViewModel {
     var state: AppState = .idle
     var currentFileName: String = ""
+    var currentPhase: ConversionPhase?
     var config = ConversionConfig()
     var queue: [ConversionQueueItem] = []
     var currentConcurrency: Int = 0
@@ -194,6 +200,7 @@ final class XDRemuxViewModel {
 
     private var processTask: Task<Void, Never>?
     private var importTask: Task<Void, Never>?
+    private var activeCancellation: ConversionCancellation?
 
     func addFiles(from urls: [URL]) {
         guard canEditQueue else { return }
@@ -243,6 +250,7 @@ final class XDRemuxViewModel {
         retryFailed()
         resetCancelledToPending()
         processTask?.cancel()
+        activeCancellation?.cancel()
         processTask = Task { [weak self] in
             await self?.runQueue()
         }
@@ -252,8 +260,10 @@ final class XDRemuxViewModel {
         guard state == .processing || state == .scanning else { return }
         importTask?.cancel()
         processTask?.cancel()
+        activeCancellation?.cancel()
         markPendingAsCancelled()
         state = .cancelled
+        currentPhase = nil
         currentFileName = runningCount > 0 ? "正在等待当前文件结束..." : AppStrings.statCancelled
     }
 
@@ -343,6 +353,15 @@ final class XDRemuxViewModel {
         applyThumbnailFailure(id: id, inputURL: inputURL, message: message)
     }
 
+    func applyConversionEventForTesting(_ event: ConversionEvent, to id: UUID) {
+        apply(event, to: id)
+    }
+
+    func installCancellationForTesting(_ cancellation: ConversionCancellation) {
+        activeCancellation = cancellation
+        state = .processing
+    }
+
     nonisolated static func prepareOutputForConversionForTesting(
         inputURL: URL,
         outputURL: URL,
@@ -401,6 +420,7 @@ final class XDRemuxViewModel {
     private func runQueue() async {
         state = .processing
         currentFileName = "准备转换 ProXDR HEIC..."
+        currentPhase = nil
         refreshOutputURLsAndPlansForEditableItems()
         _ = markOutputCollisions()
 
@@ -416,7 +436,10 @@ final class XDRemuxViewModel {
             return
         }
 
-        let runConfig = config
+        let cancellation = ConversionCancellation()
+        activeCancellation = cancellation
+        var runConfig = config
+        runConfig.cancellation = cancellation
         let fileSizes = runnableItems.map { Self.fileSize($0.inputURL) }
         let concurrencyLimit = Self.effectiveConcurrency(
             configuredLimit: runConfig.maxConcurrentJobs,
@@ -440,8 +463,13 @@ final class XDRemuxViewModel {
                 }
                 currentFileName = item.inputURL.lastPathComponent
                 active += 1
+                let eventHandler: ConversionEventHandler = { [weak self] event in
+                    Task { @MainActor [weak self] in
+                        self?.apply(event, to: item.id)
+                    }
+                }
                 group.addTask {
-                    Self.convertOne(item, config: runConfig)
+                    Self.convertOne(item, config: runConfig, eventHandler: eventHandler)
                 }
             }
 
@@ -465,6 +493,8 @@ final class XDRemuxViewModel {
         }
 
         currentConcurrency = 0
+        activeCancellation = nil
+        currentPhase = nil
         processTask = nil
 
         if Task.isCancelled {
@@ -484,6 +514,29 @@ final class XDRemuxViewModel {
         queue[index].errorMessage = result.errorMessage
         queue[index].finishedAt = result.finishedAt
         currentFileName = queue[index].inputURL.lastPathComponent
+    }
+
+    private func apply(_ event: ConversionEvent, to id: UUID) {
+        guard let index = queue.firstIndex(where: { $0.id == id }) else { return }
+        switch event {
+        case .started(let input, _):
+            currentFileName = input.lastPathComponent
+        case .phaseChanged(let phase):
+            currentPhase = phase
+            currentFileName = queue[index].inputURL.lastPathComponent
+        case .progress:
+            break
+        case .warning(let warning):
+            if !queue[index].warnings.contains(warning) {
+                queue[index].warnings.append(warning)
+            }
+        case .completed:
+            break
+        case .failed(let failure):
+            queue[index].errorMessage = failure.diagnostics
+        case .diagnostic:
+            break
+        }
     }
 
     @discardableResult
@@ -538,14 +591,19 @@ final class XDRemuxViewModel {
         let finishedAt: Date
     }
 
-    nonisolated private static func convertOne(_ item: WorkItem, config: ConversionConfig) -> QueueWorkResult {
+    nonisolated private static func convertOne(
+        _ item: WorkItem,
+        config: ConversionConfig,
+        eventHandler: @escaping ConversionEventHandler
+    ) -> QueueWorkResult {
         autoreleasepool {
             if Task.isCancelled {
                 return QueueWorkResult(id: item.id, status: .cancelled, errorMessage: nil, finishedAt: Date())
             }
 
             do {
-                if config.skipExisting, XDRemuxCore.isValidOutput(item.outputURL, config: config) {
+                if config.skipExisting,
+                   AppleFeatureConversionEngine.isValidOutput(item.outputURL, configuration: config) {
                     return QueueWorkResult(id: item.id, status: .skippedExisting, errorMessage: nil, finishedAt: Date())
                 }
                 let disposition = try prepareOutputForConversion(
@@ -556,8 +614,22 @@ final class XDRemuxViewModel {
                 if disposition == .skippedExistingValidOutput {
                     return QueueWorkResult(id: item.id, status: .skippedExisting, errorMessage: nil, finishedAt: Date())
                 }
-                try XDRemuxCore.convert(inputURL: item.inputURL, outputURL: item.outputURL, config: config)
+                var requestConfig = config
+                let downstream = config.eventHandler
+                requestConfig.eventHandler = { event in
+                    downstream?(event)
+                    eventHandler(event)
+                }
+                _ = try AppleFeatureConversionEngine.convert(
+                    ConversionRequest(
+                        input: InputSource(url: item.inputURL),
+                        output: OutputDestination(url: item.outputURL),
+                        configuration: requestConfig
+                    )
+                )
                 return QueueWorkResult(id: item.id, status: .converted, errorMessage: nil, finishedAt: Date())
+            } catch is CancellationError {
+                return QueueWorkResult(id: item.id, status: .cancelled, errorMessage: nil, finishedAt: Date())
             } catch {
                 return QueueWorkResult(
                     id: item.id,
@@ -629,7 +701,8 @@ final class XDRemuxViewModel {
             return .ready
         }
 
-        if config.skipExisting, XDRemuxCore.isValidOutput(outputURL, config: config) {
+        if config.skipExisting,
+           AppleFeatureConversionEngine.isValidOutput(outputURL, configuration: config) {
             return .skipsExistingValidOutput
         }
         return .willOverwriteExisting
@@ -660,7 +733,8 @@ final class XDRemuxViewModel {
         guard fileManager.fileExists(atPath: outputURL.path) else {
             return .ready
         }
-        if config.skipExisting, XDRemuxCore.isValidOutput(outputURL, config: config) {
+        if config.skipExisting,
+           AppleFeatureConversionEngine.isValidOutput(outputURL, configuration: config) {
             return .skippedExistingValidOutput
         }
         try fileManager.removeItem(at: outputURL)

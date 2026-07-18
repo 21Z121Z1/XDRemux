@@ -1,0 +1,75 @@
+"help.title" = "XDRemux";
+"help.usage" = "用法";
+"help.commands" = "命令";
+"help.command.convert" = "  convert  转换单张 ProXDR 照片";
+"help.command.batch" = "  batch    转换目录树";
+"help.options" = "产品选项：\n  --input <文件>  --output <文件>\n  --input-dir <目录>  --output-dir <目录>  --glob <模式>\n  --jobs <数量>  --overwrite\n  --oppo-compatible  --apple-photographic-styles  --apple-portrait\n  --discard-portrait-data";
+"help.developer" = "开发者选项：\n  --family <auto|x6|x7>\n  --input-processing <system|system-decoded|hybrid|passthrough>\n  --oppo-compat [模式]  --oppo-camera-tail <模式>\n  --tmap-format <strict|imageio>  --diagnostics-dir <目录>\n开发者命令：validate-apple、validate-portrait、portrait-self-test";
+"help.output" = "输出选项：\n  --quiet  --verbose  --debug\n  --format <text|json|jsonl>";
+"help.language" = "语言：\n  --language <auto|zh-Hans|en>\n  环境变量：XDREMUX_LANGUAGE";
+
+"label.input" = "输入";
+"label.output" = "输出";
+"label.mode" = "模式";
+"label.current" = "当前";
+"label.converted" = "已转换";
+"label.skipped" = "已跳过";
+"label.failed" = "失败";
+"label.active" = "处理中";
+
+"mode.standard" = "标准 ISO HDR";
+"mode.oppo" = "OPPO 相册兼容";
+"mode.styles" = "Apple 摄影风格";
+"mode.portrait" = "Apple 人像";
+"mode.combined" = "Apple 摄影风格 + 人像";
+
+"phase.reading_source" = "读取原片";
+"phase.extracting_gain_map" = "提取 Gain Map";
+"phase.reconstructing_hdr" = "重建 HDR";
+"phase.generating_photographic_styles" = "生成 Apple 摄影风格";
+"phase.generating_portrait_resources" = "生成人像资源";
+"phase.writing_container" = "写入 HDR 容器";
+"phase.verifying_output" = "验证输出";
+
+"status.single_completed" = "转换完成：%@";
+"status.single_skipped" = "已跳过有效输出：%@";
+"status.batch_started" = "转换 %d 个文件，使用 %d 个并发任务";
+"status.batch_progress" = "已完成 %d/%d · 转换 %d · 跳过 %d · 失败 %d · 处理中 %d";
+"status.batch_completed" = "处理完成：转换 %d · 跳过 %d · 失败 %d";
+"status.file_completed" = "已转换 %@";
+"status.file_skipped" = "已跳过 %@";
+"status.file_failed" = "%@ 转换失败：%@";
+"status.warning_plain" = "警告：%@";
+"status.warning" = "警告 [%@]：%@";
+"status.error" = "%@ 转换失败：%@";
+"status.recovery" = "建议：%@";
+"status.failure_report" = "失败报告：%@";
+
+"argument.missing" = "缺少必需选项 %@。";
+"argument.unknown" = "未知选项 %@。";
+"argument.invalid" = "%@ 的值无效：%@。";
+"argument.invalid_command" = "未知命令 %@。";
+"argument.incompatible" = "%@ 不能与 %@ 同时使用。";
+
+"error.source_not_found" = "找不到输入文件。";
+"error.source_not_supported" = "不支持这张输入照片。";
+"error.source_gain_map_missing" = "输入照片没有可用的 HDR Gain Map。";
+"error.source_gain_map_corrupt" = "输入照片的 HDR Gain Map 不完整或已损坏。";
+"error.portrait_data_unavailable" = "这张照片没有可用的人像景深数据。";
+"error.apple_runtime_unavailable" = "当前系统无法使用所需的 Apple 照片处理服务。";
+"error.output_not_writable" = "无法写入输出文件。";
+"error.output_verification_failed" = "输出文件未通过验证。";
+"error.internal_container_error" = "照片容器不受支持，无法完成转换。";
+"error.invalid_arguments" = "命令参数无效。";
+"error.batch_incomplete" = "部分文件未能完成转换。";
+
+"recovery.check_source" = "检查输入路径和文件权限。";
+"recovery.use_supported_source" = "请使用原始 ProXDR 照片后重试。";
+"recovery.use_portrait_source" = "请使用保留原始景深数据的 OPPO 人像照片。";
+"recovery.check_apple_runtime" = "请在受支持的 macOS 版本上重试。";
+"recovery.check_output" = "选择可写的输出位置，或使用 --overwrite。";
+"recovery.retry" = "请重试；需要技术诊断时使用 --debug。";
+
+"warning.portrait_flag_recovered" = "照片缺少人像标记，但已从原始景深资源恢复。";
+"warning.portrait_unavailable" = "这张照片无法生成人像数据，其他已请求的输出仍会保留。";
+"warning.private_bridge_fallback" = "首选 Apple 写入路径不可用，已使用兼容回退路径。";

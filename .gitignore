@@ -22,8 +22,8 @@ xdremux_py/
 .codex/
 .claude/
 .sisyphus/
+.superpowers/
 .flake8
-AGENTS.md
 CLAUDE.md
 HANDOFF.md
 Makefile
@@ -31,8 +31,8 @@ docs/
 skills/
 **/MIGRATION_PLAN.md
 scripts/agent_completion_gate.py
-tests/validation/test_agent_completion_gate.py
-tests/validation/verify_swift_cli_sample.py
+Tests/validation/test_agent_completion_gate.py
+Tests/validation/verify_swift_cli_sample.py
 apk_analysis_results/
 evals/
 handoff_package/
@@ -44,6 +44,9 @@ test-samples/
 tmp-samples/
 tmp/
 tools/
+.codex/verification-receipts/
+artifacts/
+lhdr_test_sapmple/
 
 # Recreatable
 final-output/
