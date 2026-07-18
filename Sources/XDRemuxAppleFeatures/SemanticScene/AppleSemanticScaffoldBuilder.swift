@@ -147,13 +147,7 @@ package enum AppleSemanticScaffoldBuilder {
         guard let source = CGImageSourceCreateWithURL(sourceHDRURL as CFURL, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let pixelWidth = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
-              let pixelHeight = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
-              let person = analysis.person,
-              let skin = analysis.skin,
-              let hair = analysis.hair,
-              let teeth = analysis.teeth,
-              let glasses = analysis.glasses,
-              let sky = analysis.sky else {
+              let pixelHeight = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue else {
             throw CLIError.invalidContainer("cannot author an incomplete semantic scaffold")
         }
         let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
@@ -172,27 +166,42 @@ package enum AppleSemanticScaffoldBuilder {
             versionPath: "semanticSegmentationMatte:SemanticSegmentationMatteVersion",
             version: "65536"
         )
-        let allDictionaries: [(AppleSemanticRole, CFString, CFDictionary)] = [
-            (.person, kCGImageAuxiliaryDataTypePortraitEffectsMatte, try auxiliaryDictionary(
-                matte: person, width: dimensions.0, height: dimensions.1, metadata: portraitMetadata
-            )),
-            (.skin, kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte, try auxiliaryDictionary(
-                matte: skin, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
-            )),
-            (.hair, kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte, try auxiliaryDictionary(
-                matte: hair, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
-            )),
-            (.teeth, kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte, try auxiliaryDictionary(
-                matte: teeth, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
-            )),
-            (.glasses, kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte, try auxiliaryDictionary(
-                matte: glasses, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
-            )),
-            (.sky, kCGImageAuxiliaryDataTypeSemanticSegmentationSkyMatte, try auxiliaryDictionary(
-                matte: sky, width: dimensions.0, height: dimensions.1, metadata: semanticMetadata
-            )),
-        ]
-        let dictionaries = allDictionaries.filter { profile.roles.contains($0.0) }
+        var dictionaries: [(AppleSemanticRole, CFString, CFDictionary)] = []
+        for role in profile.orderedRoles {
+            let matte: AppleSemanticMatte?
+            let type: CFString
+            switch role {
+            case .person:
+                matte = analysis.person
+                type = kCGImageAuxiliaryDataTypePortraitEffectsMatte
+            case .skin:
+                matte = analysis.skin
+                type = kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte
+            case .hair:
+                matte = analysis.hair
+                type = kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte
+            case .teeth:
+                matte = analysis.teeth
+                type = kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte
+            case .glasses:
+                matte = analysis.glasses
+                type = kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte
+            case .sky:
+                matte = analysis.sky
+                type = kCGImageAuxiliaryDataTypeSemanticSegmentationSkyMatte
+            }
+            guard let matte else {
+                throw CLIError.invalidContainer(
+                    "semantic profile \(profile.kind.rawValue) is missing \(role.rawValue)"
+                )
+            }
+            dictionaries.append((role, type, try auxiliaryDictionary(
+                matte: matte,
+                width: dimensions.0,
+                height: dimensions.1,
+                metadata: role == .person ? portraitMetadata : semanticMetadata
+            )))
+        }
         guard dictionaries.count == profile.roles.count else {
             throw CLIError.invalidContainer("semantic profile \(profile.kind.rawValue) is incomplete")
         }
@@ -227,6 +236,10 @@ package enum AppleSemanticScaffoldBuilder {
             "4": 1, "5": 1, "6": 4, "7": 0,
         ]
         imageOptions[kCGImagePropertyMakerAppleDictionary] = makerApple
+        try AppleEncodingAudit.writeAuxiliaryReferencesIfRequested(
+            prefix: "semantic-scaffold",
+            entries: dictionaries.map { (name: $0.0.rawValue, dictionary: $0.2) }
+        )
         CGImageDestinationAddImageFromSource(destination, source, 0, imageOptions as CFDictionary)
         if let disparity = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
             source, 0, kCGImageAuxiliaryDataTypeDisparity

@@ -14,6 +14,7 @@ package enum PortraitConversionPipeline {
     struct ConversionOutcome {
         let written: Bool
         let semanticFusion: [String: Any]?
+        let semanticAnalysis: AppleSemanticSceneAnalysis?
         let manifestURL: URL?
     }
 
@@ -457,6 +458,8 @@ package enum PortraitConversionPipeline {
         mode: PortraitMode,
         photoIdentifier: String? = nil,
         includesPhotographicStylesSemantics: Bool = false,
+        semanticOutputDirectory: URL? = nil,
+        writeSemanticPNGEvidence: Bool = false,
         eventHandler: ConversionEventHandler? = nil
     ) throws -> Bool {
         try convertWithOutcome(
@@ -465,6 +468,8 @@ package enum PortraitConversionPipeline {
             mode: mode,
             photoIdentifier: photoIdentifier,
             includesPhotographicStylesSemantics: includesPhotographicStylesSemantics,
+            semanticOutputDirectory: semanticOutputDirectory,
+            writeSemanticPNGEvidence: writeSemanticPNGEvidence,
             eventHandler: eventHandler
         ).written
     }
@@ -475,11 +480,19 @@ package enum PortraitConversionPipeline {
         mode: PortraitMode,
         photoIdentifier: String? = nil,
         includesPhotographicStylesSemantics: Bool = false,
+        semanticOutputDirectory: URL? = nil,
+        writeSemanticPNGEvidence: Bool = false,
         eventHandler: ConversionEventHandler? = nil
     ) throws -> ConversionOutcome {
         guard mode != .off else {
-            return ConversionOutcome(written: false, semanticFusion: nil, manifestURL: nil)
+            return ConversionOutcome(
+                written: false,
+                semanticFusion: nil,
+                semanticAnalysis: nil,
+                manifestURL: nil
+            )
         }
+        let conversionStartedAt = CFAbsoluteTimeGetCurrent()
         eventHandler?(.phaseChanged(.readingSource))
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
             throw CLIError.inputNotFound(inputURL)
@@ -522,7 +535,7 @@ package enum PortraitConversionPipeline {
             throw CLIError.invalidContainer("portrait src.image does not contain adjacent base/gain JPEGs")
         }
         let baseJPEG = srcImage.subdata(in: 0..<firstEOI.upperBound)
-        let gainJPEG = srcImage.subdata(in: firstEOI.upperBound..<srcImage.count)
+        let srcImageGainJPEG = srcImage.subdata(in: firstEOI.upperBound..<srcImage.count)
         guard let baseSource = CGImageSourceCreateWithData(baseJPEG as CFData, nil),
               let baseImage = CGImageSourceCreateImageAtIndex(
                   baseSource,
@@ -563,6 +576,9 @@ package enum PortraitConversionPipeline {
         let baseOrientation = (baseProperties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value
         let inputWidth = (inputProperties?[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue
         let inputHeight = (inputProperties?[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
+        let gainJPEG = srcImageGainJPEG
+        let gainSize = try jpegImageSize(gainJPEG)
+        print("portrait Gain Map source=src.image geometry=\(gainSize.0)x\(gainSize.1)")
         let orientationRaw = resolvedBaseOrientation(
             inputWidth: inputWidth,
             inputHeight: inputHeight,
@@ -661,8 +677,10 @@ package enum PortraitConversionPipeline {
         let firstAssembly = siblingScratchURL(for: outputURL, label: "portrait-first", pathExtension: "heic")
         let scaffold = siblingScratchURL(for: outputURL, label: "portrait-scaffold", pathExtension: "heic")
         defer {
-            for url in [carrier, firstAssembly, scaffold] {
-                try? FileManager.default.removeItem(at: url)
+            if ProcessInfo.processInfo.environment["XDREMUX_KEEP_PORTRAIT_SCRATCH"] != "1" {
+                for url in [carrier, firstAssembly, scaffold] {
+                    try? FileManager.default.removeItem(at: url)
+                }
             }
         }
 
@@ -674,24 +692,68 @@ package enum PortraitConversionPipeline {
         ) else {
             throw CLIError.unableToCreateDestination(carrier)
         }
+        let portraitBaseQuality = EncodingQualityPolicy.value(
+            environmentKey: "XDREMUX_PORTRAIT_BASE_QUALITY",
+            defaultValue: 0.9
+        )
         CGImageDestinationAddImageFromSource(
             carrierDestination,
             baseSource,
             0,
-            [kCGImageDestinationLossyCompressionQuality: 1.0] as CFDictionary
+            // Quality 1.0 makes ImageIO choose a 4:4:4 RExt Base that its own
+            // ISO Gain Map reader rejects. The 0.9 Main Still Picture tier is
+            // the measured size/quality knee across low, medium, and high-detail
+            // portrait sources.
+            [kCGImageDestinationLossyCompressionQuality: portraitBaseQuality] as CFDictionary
         )
         guard CGImageDestinationFinalize(carrierDestination) else {
             throw CLIError.unableToFinalizeDestination(carrier)
         }
-        try writeISOBridge(
-            baseImageURL: carrier,
-            baseJPEG: baseJPEG,
-            sourceURL: inputURL,
-            infoFloats: infoFloats,
-            gainMapJPEG: gainJPEG,
-            outputURL: firstAssembly,
-            eventHandler: eventHandler
-        )
+
+        let encodedGainMap: DirectTiledHEVCGainMap?
+        do {
+            if ProcessInfo.processInfo.environment["XDREMUX_DISABLE_DIRECT_GAIN"] == "1" {
+                throw CLIError.invalidContainer("direct Gain Map encoding disabled by environment")
+            }
+            let direct = try encodeTiledGainMap(
+                gainMapJPEG: gainJPEG,
+                scratchBaseURL: outputURL
+            )
+            try writeDirectTiledGainMapGraph(
+                baseImageURL: carrier,
+                outputURL: firstAssembly,
+                infoFloats: infoFloats,
+                gainMapJPEG: gainJPEG,
+                encodedGainMap: direct
+            )
+            encodedGainMap = direct
+            let gainQuality = EncodingQualityPolicy.value(
+                environmentKey: "XDREMUX_GAIN_MAP_QUALITY",
+                defaultValue: 0.9
+            )
+            print(
+                "portrait Gain Map encoder=private-vt-tile base=single-imageio-encode "
+                    + "baseQuality=\(String(format: "%.2f", portraitBaseQuality)) "
+                    + "gainQuality=\(String(format: "%.2f", gainQuality)) "
+                    + "tile=\(direct.tileWidth)x\(direct.tileHeight) "
+                    + "tiles=\(direct.tilePayloads.count)"
+            )
+        } catch {
+            // The private tile ABI is an optimization boundary, not a product
+            // requirement. Keep the established ImageIO bridge available for
+            // unsupported geometry, OS drift, and JPEG-only portrait inputs.
+            print("warning: direct portrait Gain Map encoding unavailable; using ImageIO bridge: \(error)")
+            try writeISOBridge(
+                baseImageURL: carrier,
+                baseJPEG: baseJPEG,
+                sourceURL: inputURL,
+                infoFloats: infoFloats,
+                gainMapJPEG: gainJPEG,
+                outputURL: firstAssembly,
+                eventHandler: eventHandler
+            )
+            encodedGainMap = nil
+        }
 
         guard let firstSource = CGImageSourceCreateWithURL(firstAssembly as CFURL, nil),
               CGImageSourceCopyAuxiliaryDataInfoAtIndex(
@@ -719,6 +781,9 @@ package enum PortraitConversionPipeline {
             depthPlanes: depthPlanes,
             targetWidth: baseImage.width / 2,
             targetHeight: baseImage.height / 2,
+            semanticOutputDirectory: semanticOutputDirectory,
+            includesPhotographicStylesSemantics: includesPhotographicStylesSemantics,
+            writeSemanticPNGEvidence: writeSemanticPNGEvidence,
             eventHandler: eventHandler
         )
         try writeBlankPortraitScaffold(
@@ -733,6 +798,7 @@ package enum PortraitConversionPipeline {
             captureDate: captureDateString(sourceURL: inputURL),
             gainJPEG: gainJPEG,
             infoFloats: infoFloats,
+            encodedGainMap: encodedGainMap,
             depthDictionary: depthDictionary,
             matteDictionary: mattes.portrait,
             skinDictionary: mattes.skin,
@@ -807,10 +873,66 @@ package enum PortraitConversionPipeline {
         manifestEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try manifestEncoder.encode(manifest).write(to: manifestURL, options: .atomic)
         eventHandler?(.diagnostic("portrait manifest=\(manifestURL.path)"))
+        eventHandler?(.diagnostic(String(
+            format: "portrait pipeline elapsed=%.3fs",
+            CFAbsoluteTimeGetCurrent() - conversionStartedAt
+        )))
         return ConversionOutcome(
             written: true,
             semanticFusion: mattes.fusionReport,
+            semanticAnalysis: mattes.semanticAnalysis,
             manifestURL: manifestURL
+        )
+    }
+
+    private static func encodeTiledGainMap(
+        gainMapJPEG: Data,
+        scratchBaseURL: URL
+    ) throws -> DirectTiledHEVCGainMap {
+        let size = try jpegImageSize(gainMapJPEG)
+        return try DirectTiledHEVCGainMapEncoder.encode(
+            imageData: gainMapJPEG,
+            width: size.0,
+            height: size.1,
+            channelCount: 3,
+            scratchBaseURL: scratchBaseURL
+        )
+    }
+
+    private static func writeDirectTiledGainMapGraph(
+        baseImageURL: URL,
+        outputURL: URL,
+        infoFloats: [Double],
+        gainMapJPEG: Data,
+        encodedGainMap: DirectTiledHEVCGainMap
+    ) throws {
+        let jpegGraphURL = siblingScratchURL(
+            for: outputURL,
+            label: "portrait-direct-jpeg-graph",
+            pathExtension: "heic"
+        )
+        defer {
+            if ProcessInfo.processInfo.environment["XDREMUX_KEEP_PORTRAIT_SCRATCH"] != "1" {
+                try? FileManager.default.removeItem(at: jpegGraphURL)
+            }
+        }
+        _ = try writePrivateJPEGPassthroughOutput(
+            inputURL: baseImageURL,
+            outputURL: jpegGraphURL,
+            infoFloats: infoFloats,
+            gainMapJPEG: gainMapJPEG,
+            tmapColorBox: isoColrBT2020PQBox
+        )
+        try replacePrivateJPEGGainMapWithHEVCTiles(
+            inputURL: jpegGraphURL,
+            outputURL: outputURL,
+            gainMapWidth: encodedGainMap.width,
+            gainMapHeight: encodedGainMap.height,
+            tileWidth: encodedGainMap.tileWidth,
+            tileHeight: encodedGainMap.tileHeight,
+            tilePayloads: encodedGainMap.tilePayloads,
+            tileSizes: encodedGainMap.tileSizes,
+            hvcC: encodedGainMap.hvcC
         )
     }
 
@@ -2438,9 +2560,9 @@ package enum PortraitConversionPipeline {
         let hair: CFDictionary
         let teeth: CFDictionary
         let glasses: CFDictionary
-        let facialHair: AppleSemanticMatte
-        let sky: CFDictionary
+        let sky: CFDictionary?
         let fusionReport: [String: Any]
+        let semanticAnalysis: AppleSemanticSceneAnalysis
     }
 
     private static func storedOrientation(
@@ -2687,24 +2809,36 @@ package enum PortraitConversionPipeline {
         depthPlanes: OPPODepthPlanes,
         targetWidth: Int,
         targetHeight: Int,
+        semanticOutputDirectory: URL? = nil,
+        includesPhotographicStylesSemantics: Bool,
+        writeSemanticPNGEvidence: Bool,
         eventHandler: ConversionEventHandler?
     ) throws -> PortraitMatteDictionaries {
-        let semanticDirectory = imageURL.deletingLastPathComponent()
-            .appendingPathComponent(".xdremux-vision-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: semanticDirectory) }
+        let ownsSemanticDirectory = semanticOutputDirectory == nil
+        let semanticDirectory = semanticOutputDirectory
+            ?? imageURL.deletingLastPathComponent()
+                .appendingPathComponent(".xdremux-vision-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            if ownsSemanticDirectory {
+                try? FileManager.default.removeItem(at: semanticDirectory)
+            }
+        }
         let analysis = try AppleSemanticSceneAnalyzer.analyze(
             imageURL: imageURL,
             outputDirectory: semanticDirectory,
-            orientationOverride: orientationRaw
+            orientationOverride: orientationRaw,
+            profile: includesPhotographicStylesSemantics ? .portraitAndStyles : .portrait,
+            writePNGEvidence: writeSemanticPNGEvidence
         )
         guard let person = analysis.person,
               let skin = analysis.skin,
               let hair = analysis.hair,
-              let facialHair = analysis.facialHair,
               let teeth = analysis.teeth,
-              let glasses = analysis.glasses,
-              let sky = analysis.sky else {
+              let glasses = analysis.glasses else {
             throw CLIError.invalidContainer("Vision semantic analysis is incomplete")
+        }
+        if includesPhotographicStylesSemantics, analysis.sky == nil {
+            throw CLIError.invalidContainer("Vision semantic analysis is missing the Styles sky matte")
         }
         guard analysis.hasCrediblePerson else {
             throw CLIError.invalidContainer(
@@ -2755,12 +2889,14 @@ package enum PortraitConversionPipeline {
             targetWidth: targetWidth,
             targetHeight: targetHeight
         )
-        let renderedSky = try renderSemanticMatte(
-            sky,
-            orientationRaw: orientationRaw,
-            targetWidth: targetWidth,
-            targetHeight: targetHeight
-        )
+        let renderedSky = try analysis.sky.map { sky in
+            try renderSemanticMatte(
+                sky,
+                orientationRaw: orientationRaw,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight
+            )
+        }
         guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw CLIError.unableToLoadBaseImage(imageURL)
@@ -2800,7 +2936,7 @@ package enum PortraitConversionPipeline {
             "person": personFusion.report,
             "hair": hairFusion.report,
             "skinTeethGlassesPolicy": "Vision-only; OPPO person/hair planes are not reused for unrelated semantics",
-            "facialHairPolicy": "internal-only; no evidenced HEIF auxiliary role",
+            "facialHairPolicy": "not requested; no production consumer or evidenced HEIF auxiliary role",
         ]
         let portraitMetadata = try makeMatteMetadata(
             namespace: "http://ns.apple.com/portraitEffectsMatte/1.0/",
@@ -2836,12 +2972,11 @@ package enum PortraitConversionPipeline {
                 buffer: renderedGlasses,
                 metadata: semanticMetadata
             ),
-            facialHair: facialHair,
-            sky: try makeL8AuxiliaryDictionary(
-                buffer: renderedSky,
-                metadata: semanticMetadata
-            ),
-            fusionReport: fusionReport
+            sky: try renderedSky.map {
+                try makeL8AuxiliaryDictionary(buffer: $0, metadata: semanticMetadata)
+            },
+            fusionReport: fusionReport,
+            semanticAnalysis: analysis
         )
     }
 
@@ -3340,6 +3475,7 @@ package enum PortraitConversionPipeline {
         captureDate: String?,
         gainJPEG: Data,
         infoFloats: [Double],
+        encodedGainMap: DirectTiledHEVCGainMap?,
         depthDictionary: CFDictionary,
         matteDictionary: CFDictionary,
         skinDictionary: CFDictionary,
@@ -3401,15 +3537,38 @@ package enum PortraitConversionPipeline {
         guard CGImageDestinationFinalize(destination) else {
             throw CLIError.unableToFinalizeDestination(gainCarrierURL)
         }
-        try writeISOBridge(
-            baseImageURL: gainCarrierURL,
-            baseJPEG: nil,
-            sourceURL: sourceMetadataURL,
-            infoFloats: infoFloats,
-            gainMapJPEG: gainJPEG,
-            outputURL: gainISOURL,
-            eventHandler: eventHandler
-        )
+        if let encodedGainMap {
+            do {
+                try writeDirectTiledGainMapGraph(
+                    baseImageURL: gainCarrierURL,
+                    outputURL: gainISOURL,
+                    infoFloats: infoFloats,
+                    gainMapJPEG: gainJPEG,
+                    encodedGainMap: encodedGainMap
+                )
+            } catch {
+                print("warning: direct Gain Map scaffold injection failed; using ImageIO bridge: \(error)")
+                try writeISOBridge(
+                    baseImageURL: gainCarrierURL,
+                    baseJPEG: nil,
+                    sourceURL: sourceMetadataURL,
+                    infoFloats: infoFloats,
+                    gainMapJPEG: gainJPEG,
+                    outputURL: gainISOURL,
+                    eventHandler: eventHandler
+                )
+            }
+        } else {
+            try writeISOBridge(
+                baseImageURL: gainCarrierURL,
+                baseJPEG: nil,
+                sourceURL: sourceMetadataURL,
+                infoFloats: infoFloats,
+                gainMapJPEG: gainJPEG,
+                outputURL: gainISOURL,
+                eventHandler: eventHandler
+            )
+        }
         guard let gainCarrier = CGImageSourceCreateWithURL(gainISOURL as CFURL, nil),
               let scaffoldDestination = CGImageDestinationCreateWithURL(
                   outputURL as CFURL,
@@ -3426,6 +3585,21 @@ package enum PortraitConversionPipeline {
         if requiresJPEGBridgeQuality {
             scaffoldImageOptions[kCGImageDestinationLossyCompressionQuality] = 1.0
         }
+        var auditEntries: [(name: String, dictionary: CFDictionary)] = [
+            ("disparity", depthDictionary),
+            ("portrait", matteDictionary),
+            ("skin", skinDictionary),
+            ("hair", hairDictionary),
+            ("teeth", teethDictionary),
+            ("glasses", glassesDictionary),
+        ]
+        if let skyDictionary {
+            auditEntries.append(("sky", skyDictionary))
+        }
+        try AppleEncodingAudit.writeAuxiliaryReferencesIfRequested(
+            prefix: "portrait",
+            entries: auditEntries
+        )
         CGImageDestinationAddImageFromSource(
             scaffoldDestination,
             gainCarrier,

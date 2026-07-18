@@ -48,6 +48,80 @@ final class CoreContractTests: XCTestCase {
         XCTAssertLessThan(scratch.lastPathComponent.utf8.count, 255)
     }
 
+    func testAppleTmapPayloadUsesImageIOCanonicalRationals() {
+        let ratio = 4.926108360290527
+        let floats = [
+            1.0, 1.0, 1.0, 1.0,
+            ratio, ratio, ratio,
+            1.0, 1.0, 1.0,
+            0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0,
+            1.0, ratio, ratio, 0.0,
+        ]
+        XCTAssertEqual(
+            makeAppleTmapPayload(infoFloats: floats).map { String(format: "%02x", $0) }.joined(),
+            "000000000040000000000000000100933a9300400000000000000000000100933a9300400000000000010000000100000000000000010000000000000001"
+        )
+    }
+
+    func testEncodingQualityPolicyAcceptsOnlyFiniteUnitIntervalValues() {
+        XCTAssertEqual(
+            EncodingQualityPolicy.value(
+                environmentKey: "QUALITY",
+                defaultValue: 0.8,
+                environment: ["QUALITY": "0.925"]
+            ),
+            0.925
+        )
+        for invalid in ["-0.1", "0", "1.1", "nan", "inf", "not-a-number"] {
+            XCTAssertEqual(
+                EncodingQualityPolicy.value(
+                    environmentKey: "QUALITY",
+                    defaultValue: 0.8,
+                    environment: ["QUALITY": invalid]
+                ),
+                0.8
+            )
+        }
+    }
+
+    func testEncodingQualityPolicyAcceptsOnlyAllowedIntegerValues() {
+        XCTAssertEqual(
+            EncodingQualityPolicy.integer(
+                environmentKey: "TILE",
+                defaultValue: 512,
+                allowedValues: [256, 512, 1024],
+                environment: ["TILE": "1024"]
+            ),
+            1024
+        )
+        for invalid in ["128", "768", "not-a-number"] {
+            XCTAssertEqual(
+                EncodingQualityPolicy.integer(
+                    environmentKey: "TILE",
+                    defaultValue: 512,
+                    allowedValues: [256, 512, 1024],
+                    environment: ["TILE": invalid]
+                ),
+                512
+            )
+        }
+    }
+
+    func testTmapGeometryUsesDisplayDimensionsForQuarterTurnOrientation() throws {
+        let primary = makeIspeBox(width: 4080, height: 3064)
+        let quarterTurn = Data([0, 0, 0, 9, 0x69, 0x72, 0x6f, 0x74, 1])
+        XCTAssertEqual(
+            try makeImageIOCanonicalTmapIspeBox(primaryIspe: primary, irot: quarterTurn),
+            makeIspeBox(width: 3064, height: 4080)
+        )
+        let upright = Data([0, 0, 0, 9, 0x69, 0x72, 0x6f, 0x74, 0])
+        XCTAssertEqual(
+            try makeImageIOCanonicalTmapIspeBox(primaryIspe: primary, irot: upright),
+            primary
+        )
+    }
+
     func testInvalidIntermediateDoesNotCreateOutput() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("xdremux-core-test-\(UUID().uuidString)", isDirectory: true)

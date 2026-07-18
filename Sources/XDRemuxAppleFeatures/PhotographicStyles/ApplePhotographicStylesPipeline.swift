@@ -25,7 +25,6 @@ package enum ApplePhotographicStylesPipeline {
         let encodedRGB8: Data
         let toneLinearRGB: [Float]
         let toneLuma: [Float]
-        let hdrLinearRGB: [Float]
         let hdrLuma: [Float]
     }
 
@@ -92,18 +91,20 @@ package enum ApplePhotographicStylesPipeline {
         _ outputURL: URL,
         expectsPortrait: Bool
     ) throws -> [String: Any] {
-        try validatePhotographicStylesOutput(outputURL, expectsPortrait: expectsPortrait)
-        let contamination = try donorContaminationReport(for: outputURL)
+        let validation = try validatePhotographicStylesOutput(
+            outputURL,
+            expectsPortrait: expectsPortrait
+        )
         return [
             "schema": "xdremux-apple-output-validation-v1",
             "passed": true,
             "output": outputURL.path,
-            "outputSHA256": sha256Hex(try Data(contentsOf: outputURL, options: [.mappedIfSafe])),
+            "outputSHA256": sha256Hex(validation.outputData),
             "expectsPortrait": expectsPortrait,
             "isoGainMap": true,
             "semanticStyleProperties": true,
             "styleDataLength": 51_840,
-            "donorContamination": contamination,
+            "donorContamination": validation.contaminationReport,
         ]
     }
 
@@ -284,7 +285,6 @@ package enum ApplePhotographicStylesPipeline {
         )
         var encoded = Data(count: size.0 * size.1 * 3)
         var toneRGB = Array(repeating: Float(0), count: size.0 * size.1 * 3)
-        var hdrRGB = Array(repeating: Float(0), count: size.0 * size.1 * 3)
         var toneLuma = Array(repeating: Float(0), count: size.0 * size.1)
         var hdrLuma = Array(repeating: Float(0), count: size.0 * size.1)
         let channelCount = max(1, scale.channelCount)
@@ -319,7 +319,6 @@ package enum ApplePhotographicStylesPipeline {
                     baseChannels[component] = base
                     hdrChannels[component] = reconstructed
                     toneRGB[pixel * 3 + component] = base
-                    hdrRGB[pixel * 3 + component] = reconstructed
                     let encodedValue = min(max(appleEncodeLinear(reconstructed), 0), 1)
                     destination[pixel * 3 + component] = UInt8(
                         min(255, max(0, Int((encodedValue * 255).rounded())))
@@ -339,7 +338,6 @@ package enum ApplePhotographicStylesPipeline {
             encodedRGB8: encoded,
             toneLinearRGB: toneRGB,
             toneLuma: toneLuma,
-            hdrLinearRGB: hdrRGB,
             hdrLuma: hdrLuma
         )
     }
@@ -442,8 +440,8 @@ package enum ApplePhotographicStylesPipeline {
         )
     }
 
-    private static func percentile(_ source: [Float], _ percent: Double) -> Double {
-        let values = source.filter(\.isFinite).map(Double.init).sorted()
+    private static func percentile(_ sortedValues: [Double], _ percent: Double) -> Double {
+        let values = sortedValues
         guard !values.isEmpty else { return 0 }
         let position = min(max(percent, 0), 100) / 100 * Double(values.count - 1)
         let lower = Int(floor(position))
@@ -453,9 +451,9 @@ package enum ApplePhotographicStylesPipeline {
         return values[lower] * (1 - fraction) + values[upper] * fraction
     }
 
-    private static func distribution(_ values: [Float]) -> [String: Double] {
-        let finite = values.filter(\.isFinite)
-        guard !finite.isEmpty else {
+    package static func distribution(_ values: [Float]) -> [String: Double] {
+        let sorted = values.lazy.filter(\.isFinite).map(Double.init).sorted()
+        guard !sorted.isEmpty else {
             return [
                 "blackPoint": 0, "highKey": 1, "p02": 0, "p10": 0,
                 "p25": 0, "p50": 0, "p75": 0, "p98": 0, "whitePoint": 0,
@@ -463,7 +461,7 @@ package enum ApplePhotographicStylesPipeline {
         }
         let names = ["blackPoint", "highKey", "p02", "p10", "p25", "p50", "p75", "p98", "whitePoint"]
         let percents = [0.5, 95, 2, 10, 25, 50, 75, 98, 99.5]
-        return Dictionary(uniqueKeysWithValues: zip(names, percents.map { percentile(finite, $0) }))
+        return Dictionary(uniqueKeysWithValues: zip(names, percents.map { percentile(sorted, $0) }))
     }
 
     private static func maskValue(
@@ -479,43 +477,59 @@ package enum ApplePhotographicStylesPipeline {
         return Float(matte.pixels[sourceY * matte.bytesPerRow + sourceX]) / 255
     }
 
-    private static func selectedValues(
-        _ values: [Float],
-        mask: AppleSemanticMatte?,
+    package static func selectedStyleSamples(
+        toneLuma: [Float],
+        hdrLuma: [Float],
+        toneLinearRGB: [Float],
         width: Int,
-        height: Int
-    ) -> [Float] {
-        guard mask != nil else { return [] }
-        var selected: [Float] = []
-        selected.reserveCapacity(values.count / 4)
+        height: Int,
+        person: AppleSemanticMatte?,
+        skin: AppleSemanticMatte?
+    ) -> [String: [Float]] {
+        var personTone: [Float] = []
+        var personHDR: [Float] = []
+        var skinTone: [Float] = []
+        var skinHDR: [Float] = []
+        var skinRed: [Float] = []
+        var skinGreen: [Float] = []
+        var skinBlue: [Float] = []
+        let reserve = width * height / 4
+        personTone.reserveCapacity(reserve)
+        personHDR.reserveCapacity(reserve)
+        skinTone.reserveCapacity(reserve)
+        skinHDR.reserveCapacity(reserve)
+        skinRed.reserveCapacity(reserve / 2)
+        skinGreen.reserveCapacity(reserve / 2)
+        skinBlue.reserveCapacity(reserve / 2)
         for y in 0..<height {
-            for x in 0..<width where maskValue(
-                mask, x: x, y: y, rasterWidth: width, rasterHeight: height
-            ) >= 0.5 {
-                selected.append(values[y * width + x])
+            for x in 0..<width {
+                let pixel = y * width + x
+                if maskValue(
+                    person, x: x, y: y, rasterWidth: width, rasterHeight: height
+                ) >= 0.5 {
+                    personTone.append(toneLuma[pixel])
+                    personHDR.append(hdrLuma[pixel])
+                }
+                if maskValue(
+                    skin, x: x, y: y, rasterWidth: width, rasterHeight: height
+                ) >= 0.5 {
+                    skinTone.append(toneLuma[pixel])
+                    skinHDR.append(hdrLuma[pixel])
+                    skinRed.append(toneLinearRGB[pixel * 3])
+                    skinGreen.append(toneLinearRGB[pixel * 3 + 1])
+                    skinBlue.append(toneLinearRGB[pixel * 3 + 2])
+                }
             }
         }
-        return selected
-    }
-
-    private static func selectedChannelValues(
-        _ values: [Float],
-        component: Int,
-        mask: AppleSemanticMatte?,
-        width: Int,
-        height: Int
-    ) -> [Float] {
-        guard mask != nil else { return [] }
-        var selected: [Float] = []
-        selected.reserveCapacity(width * height / 8)
-        for y in 0..<height {
-            for x in 0..<width where maskValue(
-                mask, x: x, y: y, rasterWidth: width, rasterHeight: height
-            ) >= 0.5 {
-                selected.append(values[(y * width + x) * 3 + component])
-            }
-        }
-        return selected
+        return [
+            "personTone": personTone,
+            "personHDR": personHDR,
+            "skinTone": skinTone,
+            "skinHDR": skinHDR,
+            "skinRed": skinRed,
+            "skinGreen": skinGreen,
+            "skinBlue": skinBlue,
+        ]
     }
 
     private static func protocolIdentityGTC() -> Data {
@@ -631,42 +645,26 @@ package enum ApplePhotographicStylesPipeline {
                     : 1.055 * pow(linear, 1 / 2.4) - 0.055
             )
         }
-        let personTone = selectedValues(
-            raster.toneLuma,
-            mask: semantics.person,
+        let samples = selectedStyleSamples(
+            toneLuma: raster.toneLuma,
+            hdrLuma: raster.hdrLuma,
+            toneLinearRGB: raster.toneLinearRGB,
             width: raster.width,
-            height: raster.height
-        )
-        let skinTone = selectedValues(
-            raster.toneLuma,
-            mask: semantics.skin,
-            width: raster.width,
-            height: raster.height
+            height: raster.height,
+            person: semantics.person,
+            skin: semantics.skin
         )
         return [
             "LinearGTCImage": distribution(gtcLuma),
             "LinearImage": distribution(raster.hdrLuma),
-            "LinearImagePersonSegmentBased": distribution(selectedValues(
-                raster.hdrLuma, mask: semantics.person, width: raster.width, height: raster.height
-            )),
-            "LinearImageSkinBased": distribution(selectedValues(
-                raster.hdrLuma, mask: semantics.skin, width: raster.width, height: raster.height
-            )),
+            "LinearImagePersonSegmentBased": distribution(samples["personHDR"] ?? []),
+            "LinearImageSkinBased": distribution(samples["skinHDR"] ?? []),
             "ToneMappedImage": distribution(raster.toneLuma),
-            "ToneMappedImageBlueChannelSkinBased": distribution(selectedChannelValues(
-                raster.toneLinearRGB, component: 2, mask: semantics.skin,
-                width: raster.width, height: raster.height
-            )),
-            "ToneMappedImageGreenChannelSkinBased": distribution(selectedChannelValues(
-                raster.toneLinearRGB, component: 1, mask: semantics.skin,
-                width: raster.width, height: raster.height
-            )),
-            "ToneMappedImagePersonSegmentBased": distribution(personTone),
-            "ToneMappedImageRedChannelSkinBased": distribution(selectedChannelValues(
-                raster.toneLinearRGB, component: 0, mask: semantics.skin,
-                width: raster.width, height: raster.height
-            )),
-            "ToneMappedImageSkinBased": distribution(skinTone),
+            "ToneMappedImageBlueChannelSkinBased": distribution(samples["skinBlue"] ?? []),
+            "ToneMappedImageGreenChannelSkinBased": distribution(samples["skinGreen"] ?? []),
+            "ToneMappedImagePersonSegmentBased": distribution(samples["personTone"] ?? []),
+            "ToneMappedImageRedChannelSkinBased": distribution(samples["skinRed"] ?? []),
+            "ToneMappedImageSkinBased": distribution(samples["skinTone"] ?? []),
         ]
     }
 
@@ -838,11 +836,13 @@ package enum ApplePhotographicStylesPipeline {
         outputDirectory: URL,
         photoIdentifier: String
     ) throws -> ApplePhotographicStylePayload {
+        let payloadStartedAt = CFAbsoluteTimeGetCurrent()
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
         let styleDataDirectory = outputDirectory.appendingPathComponent("style-data")
         let styleData = try completeIdentityStyleData(outputDirectory: styleDataDirectory)
         let scale = try sourceScale(sourceURL: sourceURL, portraitWritten: portraitWritten)
         let raster = try linearSceneRaster(standardHDRURL: standardHDRURL, scale: scale)
+        let rasterCompletedAt = CFAbsoluteTimeGetCurrent()
         let linearPNG = outputDirectory.appendingPathComponent("linear-thumbnail.png")
         try writeRGBPNG(
             pixels: raster.encodedRGB8,
@@ -850,22 +850,32 @@ package enum ApplePhotographicStylesPipeline {
             height: raster.height,
             outputURL: linearPNG
         )
+        let linearQuality = EncodingQualityPolicy.value(
+            environmentKey: "XDREMUX_STYLES_LINEAR_QUALITY",
+            defaultValue: 0.85
+        )
         let linearHEVC = try encodeHEVC(
             rgbPNGURL: linearPNG,
             outputDirectory: outputDirectory,
             stem: "linear-thumbnail",
-            quality: 0.95
+            quality: linearQuality
         )
+        let linearHEVCCompletedAt = CFAbsoluteTimeGetCurrent()
 
         let neutralTile = Data(repeating: 128, count: 512 * 512 * 3)
         let deltaPNG = outputDirectory.appendingPathComponent("style-delta-neutral-tile.png")
         try writeRGBPNG(pixels: neutralTile, width: 512, height: 512, outputURL: deltaPNG)
+        let deltaQuality = EncodingQualityPolicy.value(
+            environmentKey: "XDREMUX_STYLES_DELTA_QUALITY",
+            defaultValue: 0.3
+        )
         let deltaHEVC = try encodeHEVC(
             rgbPNGURL: deltaPNG,
             outputDirectory: outputDirectory,
             stem: "style-delta-neutral-tile",
-            quality: 1.0
+            quality: deltaQuality
         )
+        let deltaHEVCCompletedAt = CFAbsoluteTimeGetCurrent()
         guard let primary = CIImage(
             contentsOf: standardHDRURL,
             options: [.applyOrientationProperty: true]
@@ -894,6 +904,22 @@ package enum ApplePhotographicStylesPipeline {
             expectedStyleData: styleData.styleData,
             outputDirectory: outputDirectory
         )
+        let payloadCompletedAt = CFAbsoluteTimeGetCurrent()
+        let payloadTimings: [String: Double] = [
+            "setupAndRaster": rasterCompletedAt - payloadStartedAt,
+            "linearHEVC": linearHEVCCompletedAt - rasterCompletedAt,
+            "deltaHEVC": deltaHEVCCompletedAt - linearHEVCCompletedAt,
+            "metadataAndValidation": payloadCompletedAt - deltaHEVCCompletedAt,
+            "total": payloadCompletedAt - payloadStartedAt,
+        ]
+        print(String(
+            format: "styles payload setup+raster=%.3fs linearHEVC=%.3fs deltaHEVC=%.3fs metadata+validation=%.3fs total=%.3fs",
+            payloadTimings["setupAndRaster"] ?? 0,
+            payloadTimings["linearHEVC"] ?? 0,
+            payloadTimings["deltaHEVC"] ?? 0,
+            payloadTimings["metadataAndValidation"] ?? 0,
+            payloadTimings["total"] ?? 0
+        ))
         let inputSHA = sha256Hex(try Data(contentsOf: sourceURL, options: [.mappedIfSafe]))
         let provenance: [String: AppleResourceProvenance] = [
             "styleData": AppleResourceProvenance(
@@ -923,10 +949,12 @@ package enum ApplePhotographicStylesPipeline {
         ]
         var manifest = style.manifest
         manifest["semanticStylePropertiesValidation"] = semanticStyleValidation
+        manifest["timingsSeconds"] = payloadTimings
         manifest["input"] = ["path": sourceURL.path, "sha256": inputSHA]
         manifest["photoIdentifier"] = photoIdentifier
         manifest["linearThumbnail"] = [
             "width": raster.width, "height": raster.height,
+            "encodingQuality": linearQuality,
             "itemPayloadSHA256": linearHEVC.itemPayloadSHA256,
             "hvcCSHA256": linearHEVC.hvcCSHA256,
             "evidence": AppleEvidenceClass.sourceDerivedApproximation.rawValue,
@@ -939,6 +967,7 @@ package enum ApplePhotographicStylesPipeline {
         manifest["styleDelta"] = [
             "profile": "iPhone18,1/23F84-zero-residual",
             "normalizedRGB": 0.5,
+            "encodingQuality": deltaQuality,
             "tile": ["width": 512, "height": 512],
             "grid": ["width": deltaSize.0, "height": deltaSize.1, "rows": rows, "columns": columns],
             "itemPayloadSHA256": deltaHEVC.itemPayloadSHA256,
@@ -1718,11 +1747,18 @@ package enum ApplePhotographicStylesPipeline {
             label: "apple-input",
             pathExtension: "heic"
         )
+        let sharedSemanticDirectory = outputURL.deletingLastPathComponent()
+            .appendingPathComponent(
+                ".\(outputURL.lastPathComponent).shared-semantics-\(UUID().uuidString)",
+                isDirectory: true
+            )
         defer { try? FileManager.default.removeItem(at: featureInputURL) }
+        defer { try? FileManager.default.removeItem(at: sharedSemanticDirectory) }
 
         var portraitUnavailableReason: String?
         var portraitWritten = false
         var portraitSemanticFusion: [String: Any]?
+        var portraitSemanticAnalysis: AppleSemanticSceneAnalysis?
         var portraitManifestURL: URL?
         let photoIdentifier = UUID().uuidString.uppercased()
         if options.features.portrait {
@@ -1733,12 +1769,15 @@ package enum ApplePhotographicStylesPipeline {
                     mode: .on,
                     photoIdentifier: photoIdentifier,
                     includesPhotographicStylesSemantics: true,
+                    semanticOutputDirectory: sharedSemanticDirectory,
+                    writeSemanticPNGEvidence: options.debugRootURL != nil,
                     eventHandler: AppleFeatureEventForwarder.preparationHandler(
                         options.eventHandler
                     )
                 )
                 portraitWritten = outcome.written
                 portraitSemanticFusion = outcome.semanticFusion
+                portraitSemanticAnalysis = outcome.semanticAnalysis
                 portraitManifestURL = outcome.manifestURL
                 if !portraitWritten {
                     portraitUnavailableReason = "required OPPO portrait depth bundle is unavailable"
@@ -1789,6 +1828,8 @@ package enum ApplePhotographicStylesPipeline {
             portraitWritten: portraitWritten,
             portraitUnavailableReason: portraitUnavailableReason,
             portraitSemanticFusion: portraitSemanticFusion,
+            portraitSemanticAnalysis: portraitSemanticAnalysis,
+            portraitSemanticEvidenceDirectory: portraitWritten ? sharedSemanticDirectory : nil,
             preferredPhotoIdentifier: photoIdentifier,
             debugRootURL: options.debugRootURL
         )
@@ -1810,9 +1851,12 @@ package enum ApplePhotographicStylesPipeline {
         portraitWritten: Bool,
         portraitUnavailableReason: String?,
         portraitSemanticFusion: [String: Any]?,
+        portraitSemanticAnalysis: AppleSemanticSceneAnalysis?,
+        portraitSemanticEvidenceDirectory: URL?,
         preferredPhotoIdentifier: String,
         debugRootURL: URL?
     ) throws {
+        let augmentStartedAt = CFAbsoluteTimeGetCurrent()
         let runToken = UUID().uuidString.uppercased()
         let persistEvidence = debugRootURL != nil
         let evidenceContainer: URL
@@ -1851,10 +1895,28 @@ package enum ApplePhotographicStylesPipeline {
             at: standardHDRURL,
             to: evidenceDirectory.appendingPathComponent("base-hdr-before-semantics.heic")
         )
-        let analysis = try AppleSemanticSceneAnalyzer.analyze(
-            imageURL: standardHDRURL,
-            outputDirectory: semanticDirectory
-        )
+        let analysis: AppleSemanticSceneAnalysis
+        let semanticAnalysisSource: String
+        if portraitWritten,
+           let portraitSemanticAnalysis,
+           let portraitSemanticEvidenceDirectory {
+            try AppleSemanticSceneAnalyzer.copyEvidence(
+                from: portraitSemanticEvidenceDirectory,
+                to: semanticDirectory
+            )
+            analysis = portraitSemanticAnalysis
+            semanticAnalysisSource = "portrait_shared"
+            print("Vision semantic analysis source=portrait-shared; skipped duplicate Styles analysis")
+        } else {
+            analysis = try AppleSemanticSceneAnalyzer.analyze(
+                imageURL: standardHDRURL,
+                outputDirectory: semanticDirectory,
+                profile: .styleHuman,
+                writePNGEvidence: persistEvidence
+            )
+            semanticAnalysisSource = "styles"
+        }
+        let semanticStageSeconds = CFAbsoluteTimeGetCurrent() - augmentStartedAt
         let existingPhotoIdentifier: String? = CGImageSourceCreateWithURL(
             standardHDRURL as CFURL, nil
         ).flatMap { source in
@@ -1909,6 +1971,7 @@ package enum ApplePhotographicStylesPipeline {
             featureGraphURL = semanticMergedURL
         }
         let styleDirectory = evidenceDirectory.appendingPathComponent("styles", isDirectory: true)
+        let stylePayloadStartedAt = CFAbsoluteTimeGetCurrent()
         let stylePayload = try buildStylePayload(
             sourceURL: sourceURL,
             standardHDRURL: featureGraphURL,
@@ -1917,12 +1980,28 @@ package enum ApplePhotographicStylesPipeline {
             outputDirectory: styleDirectory,
             photoIdentifier: photoIdentifier
         )
+        let stylePayloadSeconds = CFAbsoluteTimeGetCurrent() - stylePayloadStartedAt
+        let graphStartedAt = CFAbsoluteTimeGetCurrent()
         let graph = try writeIncrementalStylesGraph(
             sourceURL: featureGraphURL,
             outputURL: outputURL,
             payload: stylePayload
         )
-        try validatePhotographicStylesOutput(outputURL, expectsPortrait: portraitWritten)
+        let validation = try validatePhotographicStylesOutput(
+            outputURL,
+            expectsPortrait: portraitWritten,
+            prevalidatedStylePropertyList: stylePayload.stylePropertyList
+        )
+        let graphAndValidationSeconds = CFAbsoluteTimeGetCurrent() - graphStartedAt
+        let totalSeconds = CFAbsoluteTimeGetCurrent() - augmentStartedAt
+        print(String(
+            format: "styles pipeline semanticSource=%@ semantic=%.3fs payload=%.3fs graph+validation=%.3fs total=%.3fs",
+            semanticAnalysisSource,
+            semanticStageSeconds,
+            stylePayloadSeconds,
+            graphAndValidationSeconds,
+            totalSeconds
+        ))
 
         func matteSummary(_ matte: AppleSemanticMatte?) -> [String: Any] {
             guard let matte else { return ["available": false] }
@@ -1945,8 +2024,8 @@ package enum ApplePhotographicStylesPipeline {
                 "rawSHA256": sha256Hex(matte.pixels),
             ]
         }
-        let outputData = try Data(contentsOf: outputURL, options: [.mappedIfSafe])
-        let contaminationReport = try donorContaminationReport(for: outputURL)
+        let outputData = validation.outputData
+        let contaminationReport = validation.contaminationReport
         let contaminationReportData = try JSONSerialization.data(
             withJSONObject: contaminationReport,
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -1995,11 +2074,17 @@ package enum ApplePhotographicStylesPipeline {
                 "roles": semanticWriteProfile.orderedRoles.map(\.rawValue),
                 "nativeEvidence": "style sky-only; style human PEM+skin+sky; portrait family PEM+skin+hair+teeth+glasses",
             ],
+            "semanticAnalysisSource": semanticAnalysisSource,
+            "timingsSeconds": [
+                "semantic": semanticStageSeconds,
+                "stylePayload": stylePayloadSeconds,
+                "graphAndValidation": graphAndValidationSeconds,
+                "total": totalSeconds,
+            ],
             "semantics": [
                 "person": matteSummary(analysis.person),
                 "skin": matteSummary(analysis.skin),
                 "hair": matteSummary(analysis.hair),
-                "facialHairInternalOnly": matteSummary(analysis.facialHair),
                 "teeth": matteSummary(analysis.teeth),
                 "glasses": matteSummary(analysis.glasses),
                 "sky": matteSummary(analysis.sky),
@@ -2041,10 +2126,16 @@ package enum ApplePhotographicStylesPipeline {
         }
     }
 
+    private struct StylesValidationResult {
+        let outputData: Data
+        let contaminationReport: [String: Any]
+    }
+
     private static func validatePhotographicStylesOutput(
         _ outputURL: URL,
-        expectsPortrait: Bool
-    ) throws {
+        expectsPortrait: Bool,
+        prevalidatedStylePropertyList: Data? = nil
+    ) throws -> StylesValidationResult {
         let data = try Data(contentsOf: outputURL, options: [.mappedIfSafe])
         let top = isobmffBoxes(in: data, start: 0, end: data.count)
         guard let meta = top.first(where: { $0.type == "meta" }) else {
@@ -2090,15 +2181,17 @@ package enum ApplePhotographicStylesPipeline {
               (object["d"] as? Data)?.count == 2_048 else {
             throw CLIError.invalidContainer("Styles validation: binary plist contract is incomplete")
         }
-        let parserDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("xdremux-style-parser-\(UUID().uuidString)", isDirectory: true)
-        try ensureDirectory(parserDirectory, fileManager: .default)
-        defer { try? FileManager.default.removeItem(at: parserDirectory) }
-        _ = try validateWithSemanticStyleProperties(
-            stylePropertyList: styleData,
-            expectedStyleData: coefficients,
-            outputDirectory: parserDirectory
-        )
+        if prevalidatedStylePropertyList != styleData {
+            let parserDirectory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("xdremux-style-parser-\(UUID().uuidString)", isDirectory: true)
+            try ensureDirectory(parserDirectory, fileManager: .default)
+            defer { try? FileManager.default.removeItem(at: parserDirectory) }
+            _ = try validateWithSemanticStyleProperties(
+                stylePropertyList: styleData,
+                expectedStyleData: coefficients,
+                outputDirectory: parserDirectory
+            )
+        }
         let deltaGrid = refs.first(where: { ref in
             ref.type == "dimg" && ref.to.count == 30
                 && items.first(where: { $0.itemID == ref.from })?.type == "grid"
@@ -2159,6 +2252,14 @@ package enum ApplePhotographicStylesPipeline {
                 "donor contamination scanner matched: \(contamination.matches.joined(separator: ", "))"
             )
         }
+        return StylesValidationResult(
+            outputData: data,
+            contaminationReport: donorContaminationReport(
+                data: data,
+                matches: contamination.matches,
+                scannedItemCount: contamination.scannedItemCount
+            )
+        )
     }
 
     private static func donorContaminationScan(
@@ -2228,13 +2329,25 @@ package enum ApplePhotographicStylesPipeline {
             locations: parseISOBMFFILoc(data, iloc),
             idat: children.first(where: { $0.type == "idat" })
         )
-        return [
+        return donorContaminationReport(
+            data: data,
+            matches: result.matches,
+            scannedItemCount: result.scannedItemCount
+        )
+    }
+
+    private static func donorContaminationReport(
+        data: Data,
+        matches: [String],
+        scannedItemCount: Int
+    ) -> [String: Any] {
+        [
             "schema": "xdremux-donor-contamination-scan-v1",
-            "passed": result.matches.isEmpty,
+            "passed": matches.isEmpty,
             "knownPayloadSHA256Count": 9,
             "knownPhotoIdentifierCount": 1,
-            "scannedItemCount": result.scannedItemCount,
-            "matches": result.matches,
+            "scannedItemCount": scannedItemCount,
+            "matches": matches,
             "outputSHA256": sha256Hex(data),
         ]
     }

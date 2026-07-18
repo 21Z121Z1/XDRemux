@@ -11,6 +11,10 @@ Good validation documents should distinguish:
 
 Keep actual test executables under `Tests/` or `scripts/`; keep the rationale, acceptance criteria, and runbooks here.
 
+Current encoding audit:
+
+- [Active encoding quality and size Pareto audit (2026-07-18)](encoding-quality-pareto-20260718.md)
+
 ## Agent completion gate
 
 Agents must use `scripts/agent_completion_gate.py` before declaring a committed

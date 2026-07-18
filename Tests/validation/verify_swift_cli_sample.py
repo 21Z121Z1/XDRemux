@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -46,14 +47,20 @@ print("gain-map pixel format: \(actual)")
 '''
 
 
-def run(command: list[str], *, cwd: Path) -> None:
+def run(
+    command: list[str],
+    *,
+    cwd: Path,
+    echo_output: bool = True,
+) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(command, cwd=cwd, text=True, capture_output=True, check=False)
-    if result.stdout:
+    if (echo_output or result.returncode != 0) and result.stdout:
         print(result.stdout, end="")
-    if result.stderr:
+    if (echo_output or result.returncode != 0) and result.stderr:
         print(result.stderr, end="", file=sys.stderr)
     if result.returncode != 0:
         raise SystemExit(result.returncode)
+    return result
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -62,6 +69,17 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--expected-pixel-format", required=True, choices=("444f", "420f", "420v", "x420", "L008"))
     parser.add_argument("--binary", type=Path, help="reuse an already built xdremux executable")
     parser.add_argument("--oppo-compatible", action="store_true")
+    parser.add_argument("--apple-portrait", action="store_true")
+    parser.add_argument(
+        "--expect-direct-gain",
+        action="store_true",
+        help="require the one-pass direct Gain Map encoder diagnostic",
+    )
+    parser.add_argument(
+        "--require-compressed-primary-preserved",
+        action="store_true",
+        help="assert ordinary conversion kept the source Base payload byte-identical",
+    )
     parser.add_argument("--in-place", action="store_true", help="convert a temporary copy in place")
     parser.add_argument("--validate-only", action="store_true", help="validate --input without converting it")
     return parser.parse_args()
@@ -113,11 +131,61 @@ def main() -> int:
             ]
         if arguments.oppo_compatible:
             command.append("--oppo-compatible")
-        run(command, cwd=repo)
+        if arguments.apple_portrait:
+            command.append("--apple-portrait")
+        if arguments.expect_direct_gain:
+            command.append("--debug")
+        conversion = run(command, cwd=repo)
+        if arguments.expect_direct_gain:
+            expected_diagnostic = (
+                "portrait Gain Map encoder=private-vt-tile base=single-imageio-encode"
+                if arguments.apple_portrait
+                else "[direct-gain] preserved compressed Base; encoded"
+            )
+            diagnostic_stream = conversion.stdout + conversion.stderr
+            if diagnostic_stream.count(expected_diagnostic) != 1:
+                print(
+                    f"expected exactly one direct Gain Map diagnostic: {expected_diagnostic}",
+                    file=sys.stderr,
+                )
+                return 1
         run(
             ["swift", "-e", PIXEL_FORMAT_INSPECTOR, str(output), arguments.expected_pixel_format],
             cwd=repo,
         )
+        if arguments.apple_portrait:
+            run([str(binary), "validate-portrait", "--input", str(output)], cwd=repo)
+        if arguments.require_compressed_primary_preserved:
+            if arguments.apple_portrait:
+                print(
+                    "compressed-primary preservation compares ordinary inputs only",
+                    file=sys.stderr,
+                )
+                return 2
+            comparison = run(
+                [
+                    sys.executable,
+                    "scripts/compare_oppo_heif_mutation.py",
+                    "--json",
+                    str(input_path),
+                    str(output),
+                ],
+                cwd=repo,
+                echo_output=False,
+            )
+            invariants = json.loads(comparison.stdout)["invariants"]
+            required = (
+                "primary_payloads_equal",
+                "all_non_hdr_item_payloads_equal",
+                "non_hdr_tail_entries_equal",
+            )
+            failed = [name for name in required if invariants.get(name) is not True]
+            if failed:
+                print(
+                    "compressed Base preservation failed: " + ", ".join(failed),
+                    file=sys.stderr,
+                )
+                return 1
     return 0
 
 

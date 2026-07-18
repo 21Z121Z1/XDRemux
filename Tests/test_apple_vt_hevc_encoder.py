@@ -125,6 +125,40 @@ class AppleVT444EncoderTests(unittest.TestCase):
             self.assertEqual(configuration[1] & 0x1F, 4, "tile encoder did not emit RExt profile")
             self.assertGreater(annex_b.stat().st_size, 0)
 
+    def test_tile_modes_pad_partial_geometry_without_partial_tile_abi(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="xdremux-vttile-partial-") as temporary:
+            directory = Path(temporary)
+            source_pgm = directory / "source.pgm"
+            source_png = directory / "source.png"
+            annex_b = directory / "tile.hevc"
+            hvcc = directory / "tile.hvcc"
+
+            width = 513
+            height = 515
+            pixels = bytes((x + y) % 256 for y in range(height) for x in range(width))
+            source_pgm.write_bytes(f"P5\n{width} {height}\n255\n".encode("ascii") + pixels)
+
+            subprocess.run(
+                ["sips", "-s", "format", "png", str(source_pgm), "--out", str(source_png)],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                [str(ENCODER), str(source_png), str(annex_b), "0.9", "mono8tile", str(hvcc)],
+                check=True,
+                capture_output=True,
+            )
+
+            configuration = hvcc.read_bytes()
+            self.assertGreater(len(configuration), 23)
+            self.assertEqual(configuration[1] & 0x1F, 4, "monochrome tile encoder did not emit RExt")
+            self.assertEqual(configuration[16] & 0x03, 0, "monochrome tile hvcC has chroma")
+
+            data = annex_b.read_bytes()
+            starts = [index for index in range(len(data) - 4) if data[index : index + 4] == b"\0\0\0\1"]
+            idr_count = sum(1 for index in starts if ((data[index + 4] >> 1) & 0x3F) in (19, 20))
+            self.assertEqual(idr_count, 4, "513x515 input was not padded to a 2x2 full-tile grid")
+
 
 if __name__ == "__main__":
     unittest.main()

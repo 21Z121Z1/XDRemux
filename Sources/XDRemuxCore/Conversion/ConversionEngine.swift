@@ -442,12 +442,77 @@ package enum DirectPassthroughGainMapWriter {
         try verifyImageIOISOGainMap(outputURL)
     }
 
-    private static func privateGainMapInfoFloats(for productInput: XDRemuxProductCore.ProductInput) -> [Double] {
-        if productInput.extracted.mode == .uhdr {
-            return productInput.extracted.metaFloats
-        }
-        return makePrivateGainMapInfoFloats(scale: productInput.scale)
+}
+
+private func privateGainMapInfoFloats(
+    for productInput: XDRemuxProductCore.ProductInput
+) -> [Double] {
+    if productInput.extracted.mode == .uhdr {
+        return productInput.extracted.metaFloats
     }
+    return makePrivateGainMapInfoFloats(scale: productInput.scale)
+}
+
+private func writeDirectNativeGainMapPreservingPrimary(
+    inputURL: URL,
+    outputURL: URL,
+    sourceData: Data,
+    productInput: XDRemuxProductCore.ProductInput,
+    eventHandler: ConversionEventHandler?
+) throws {
+    let parent = outputURL.deletingLastPathComponent()
+    let stem = outputURL.deletingPathExtension().lastPathComponent
+    let jpegGraphURL = parent.appendingPathComponent(
+        ".\(stem).direct-jpeg-graph-\(UUID().uuidString).heic"
+    )
+    defer { try? FileManager.default.removeItem(at: jpegGraphURL) }
+
+    let encoded: DirectTiledHEVCGainMap
+    switch productInput.extracted.mode {
+    case .uhdr:
+        let size = try jpegImageSize(productInput.extracted.maskJPEGData)
+        encoded = try DirectTiledHEVCGainMapEncoder.encode(
+            imageData: productInput.extracted.maskJPEGData,
+            width: size.0,
+            height: size.1,
+            channelCount: 3,
+            scratchBaseURL: outputURL
+        )
+    case .lhdr:
+        encoded = try DirectTiledHEVCGainMapEncoder.encode(
+            raster: productInput.gainMapRaster,
+            scratchBaseURL: outputURL
+        )
+    }
+    _ = try writePrivateJPEGPassthroughOutput(
+        inputURL: inputURL,
+        outputURL: jpegGraphURL,
+        infoFloats: privateGainMapInfoFloats(for: productInput),
+        gainMapJPEG: productInput.extracted.maskJPEGData,
+        patchedUserComment: adjustedOppoUserComment(in: sourceData, compatibility: .off)
+    )
+    try replacePrivateJPEGGainMapWithHEVCTiles(
+        inputURL: jpegGraphURL,
+        outputURL: outputURL,
+        gainMapWidth: encoded.width,
+        gainMapHeight: encoded.height,
+        tileWidth: encoded.tileWidth,
+        tileHeight: encoded.tileHeight,
+        tilePayloads: encoded.tilePayloads,
+        tileSizes: encoded.tileSizes,
+        hvcC: encoded.hvcC,
+        channelCount: encoded.channelCount
+    )
+    try verifyImageIOISOGainMap(outputURL)
+    let gainQuality = EncodingQualityPolicy.value(
+        environmentKey: "XDREMUX_GAIN_MAP_QUALITY",
+        defaultValue: 0.9
+    )
+    eventHandler?(.diagnostic(
+        "[direct-gain] preserved compressed Base; encoded \(encoded.tilePayloads.count) Gain Map tiles once "
+            + "quality=\(String(format: "%.2f", gainQuality)) "
+            + "tile=\(encoded.tileWidth)x\(encoded.tileHeight)"
+    ))
 }
 
 func writeImageIOPreservedGainMapPassthrough(
@@ -460,6 +525,27 @@ func writeImageIOPreservedGainMapPassthrough(
     strictISO21496: Bool = false,
     eventHandler: ConversionEventHandler? = nil
 ) throws {
+    if ProcessInfo.processInfo.environment["XDREMUX_DISABLE_DIRECT_GAIN"] != "1",
+       !oppoCompatibility.wantsOppoCompat,
+       !strictISO21496,
+       !gainMapEncodingMatchesTarget(at: inputURL, compatibility: oppoCompatibility) {
+        do {
+            try writeDirectNativeGainMapPreservingPrimary(
+                inputURL: inputURL,
+                outputURL: outputURL,
+                sourceData: sourceData,
+                productInput: productInput,
+                eventHandler: eventHandler
+            )
+            return
+        } catch {
+            eventHandler?(.diagnostic(
+                "[direct-gain] unavailable; falling back to ImageIO preserve path: \(error)"
+            ))
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+    }
+
     let parent = outputURL.deletingLastPathComponent()
     let stem = outputURL.deletingPathExtension().lastPathComponent
     let privateIntermediateURL = parent.appendingPathComponent(".\(stem).\(temporaryLabel)-private-\(UUID().uuidString).heic")

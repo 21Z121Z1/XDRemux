@@ -70,6 +70,15 @@ class SwiftAppleStylesWriterPolicyTests(unittest.TestCase):
         self.assertIn('"domain": "raw-normalized-parameter-code-value"', SWIFT)
         self.assertIn('"colorManagementApplied": false', SWIFT)
 
+    def test_each_statistics_distribution_sorts_pixels_once(self) -> None:
+        percentile_section = SWIFT.split("private static func percentile", 1)[1].split(
+            "private static func maskValue", 1
+        )[0]
+        self.assertIn("let sorted = values.lazy.filter", percentile_section)
+        self.assertIn("percentile(sorted, $0)", percentile_section)
+        self.assertNotIn("percentile(finite, $0)", percentile_section)
+        self.assertEqual(percentile_section.count(".sorted()"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

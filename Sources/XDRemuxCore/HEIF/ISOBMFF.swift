@@ -533,6 +533,24 @@ package func makeIspeBox(width: Int, height: Int) -> Data {
     return makeBox("ispe", payload: payload)
 }
 
+package func makeImageIOCanonicalTmapIspeBox(
+    primaryIspe: Data,
+    irot: Data
+) throws -> Data {
+    guard primaryIspe.count >= 20,
+          String(data: primaryIspe.subdata(in: 4..<8), encoding: .ascii) == "ispe",
+          irot.count >= 9,
+          String(data: irot.subdata(in: 4..<8), encoding: .ascii) == "irot" else {
+        throw CLIError.invalidContainer("cannot derive oriented tmap geometry")
+    }
+    let width = readUInt32BEUnchecked(primaryIspe, at: 12)
+    let height = readUInt32BEUnchecked(primaryIspe, at: 16)
+    let quarterTurns = Int(irot[8] & 0x03)
+    return quarterTurns.isMultiple(of: 2)
+        ? makeIspeBox(width: width, height: height)
+        : makeIspeBox(width: height, height: width)
+}
+
 package func makeIrefBox(type: String, from: Int, to: [Int], version: UInt8) -> Data {
     let idSize = version >= 1 ? 4 : 2
     var payload = Data()
@@ -616,21 +634,34 @@ package func makeImageIONativeTmapPayload(infoFloats f: [Double]) -> Data {
 }
 
 package func makeAppleTmapPayload(infoFloats f: [Double]) -> Data {
-    func fixed(_ value: Double) -> Int32 {
-        Int32((value * 100_000.0).rounded())
+    func appendImageIORational(_ value: Double, to data: inout Data) {
+        // ImageIO canonicalizes exact integers and otherwise serializes this
+        // compact Apple tmap form with a 22-bit fixed-point denominator. The
+        // numeric value alone is insufficient: ImageIO rejects an otherwise
+        // equivalent 100000-based representation when reading ISO Gain Maps.
+        let rounded = value.rounded()
+        if abs(value - rounded) < 1e-12 {
+            appendInt32BE(Int32(rounded), to: &data)
+            appendInt32BE(1, to: &data)
+            return
+        }
+        let denominator: Int32 = 1 << 22
+        let imageIOValue = (value * 100_000.0).rounded() / 100_000.0
+        appendInt32BE(Int32((imageIOValue * Double(denominator)).rounded()), to: &data)
+        appendInt32BE(denominator, to: &data)
     }
     let values: [Double] = [
-        max(log2(max(f[16], 1.0)), 0.0), 1.0,
-        log2(max(f[17], 1.0)), 1.0,
-        max(log2(max(f[0], 1.0)), 0.0), 1.0,
-        log2(max(f[4], 1.0)), 1.0,
-        f[7], 1.0,
-        f[10], 1.0,
-        f[13], 1.0,
+        max(log2(max(f[16], 1.0)), 0.0),
+        log2(max(f[17], 1.0)),
+        max(log2(max(f[0], 1.0)), 0.0),
+        log2(max(f[4], 1.0)),
+        f[7],
+        f[10],
+        f[13],
     ]
     var out = Data([0, 0, 0, 0, 0, 0x40])
     for value in values {
-        appendInt32BE(fixed(value), to: &out)
+        appendImageIORational(value, to: &out)
     }
     return out
 }
@@ -1482,6 +1513,494 @@ package func writePrivateJPEGPassthroughOutput(
     out.append(mdatPart)
     try out.write(to: outputURL)
     return (primaryID, gainMapID)
+}
+
+/// Replaces the JPEG Gain Map appended by `writePrivateJPEGPassthroughOutput`
+/// with an HEVC tiled grid while retaining every pre-existing source item and
+/// compressed primary payload byte. The caller supplies already encoded HEVC
+/// samples; this function only authors the corresponding HEIF item graph.
+package func replacePrivateJPEGGainMapWithHEVCTiles(
+    inputURL: URL,
+    outputURL: URL,
+    gainMapWidth: Int,
+    gainMapHeight: Int,
+    tileWidth: Int,
+    tileHeight: Int,
+    tilePayloads: [Data],
+    tileSizes: [(width: Int, height: Int)],
+    hvcC: Data,
+    channelCount: Int = 3
+) throws {
+    guard gainMapWidth > 0, gainMapHeight > 0,
+          tileWidth > 0, tileHeight > 0,
+          channelCount == 1 || channelCount == 3 else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map has unsupported tile geometry")
+    }
+    let columns = (gainMapWidth + tileWidth - 1) / tileWidth
+    let rows = (gainMapHeight + tileHeight - 1) / tileHeight
+    guard tilePayloads.count == rows * columns,
+          tileSizes.count == tilePayloads.count,
+          !tilePayloads.isEmpty,
+          tilePayloads.allSatisfy({ !$0.isEmpty }) else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map tile count does not match its geometry")
+    }
+    for row in 0..<rows {
+        for column in 0..<columns {
+            let index = row * columns + column
+            let expected = (
+                min(tileWidth, gainMapWidth - column * tileWidth),
+                min(tileHeight, gainMapHeight - row * tileHeight)
+            )
+            let isLogicalEdgeSize = tileSizes[index].width == expected.0
+                && tileSizes[index].height == expected.1
+            let isPaddedFullTile = tileSizes[index].width == tileWidth
+                && tileSizes[index].height == tileHeight
+            guard isLogicalEdgeSize || isPaddedFullTile else {
+                throw CLIError.invalidContainer("direct HEVC Gain Map edge tile geometry is inconsistent")
+            }
+        }
+    }
+    guard hvcC.count > 18,
+          hvcC[0] == 1,
+          hvcC[1] & 0x1f == 4,
+          hvcC[16] & 0x03 == (channelCount == 1 ? 0 : 3),
+          (hvcC[17] & 0x07) + 8 == 8,
+          (hvcC[18] & 0x07) + 8 == 8 else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map codec does not match its channel layout")
+    }
+
+    let source = try Data(contentsOf: inputURL)
+    let top = isobmffBoxes(in: source, start: 0, end: source.count)
+    guard let ftyp = top.first(where: { $0.type == "ftyp" }),
+          let meta = top.first(where: { $0.type == "meta" }),
+          let mdat = top.first(where: { $0.type == "mdat" }) else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map replacement requires ftyp/meta/mdat")
+    }
+    let metaChildren = isobmffBoxes(in: source, start: meta.dataStart + 4, end: meta.dataEnd)
+    func child(_ type: String) throws -> ISOBMFFBox {
+        guard let box = metaChildren.first(where: { $0.type == type }) else {
+            throw CLIError.invalidContainer("direct HEVC Gain Map source meta/\(type) missing")
+        }
+        return box
+    }
+
+    let iinf = try child("iinf")
+    let iloc = try child("iloc")
+    let pitm = try child("pitm")
+    let iprp = try child("iprp")
+    let idat = try child("idat")
+    let iref = try child("iref")
+    let primaryID = parseISOBMFFPITM(source, pitm)
+    let itemInfo = parseISOBMFFItemInfos(source, iinf)
+    let itemByID = Dictionary(uniqueKeysWithValues: itemInfo.items.map { ($0.itemID, $0) })
+    let refsInfo = parseISOBMFFIRefs(source, iref)
+    guard let tmapID = itemInfo.items.first(where: { item in
+        item.type == "tmap" && refsInfo.refs.contains(where: {
+            $0.type == "dimg" && $0.from == item.itemID && $0.to.contains(primaryID)
+        })
+    })?.itemID,
+    let gainMapID = refsInfo.refs.first(where: {
+        $0.type == "dimg" && $0.from == tmapID
+    })?.to.first(where: {
+        $0 != primaryID && itemByID[$0]?.type == "jpeg"
+    }) else {
+        throw CLIError.invalidContainer("private JPEG Gain Map graph is missing")
+    }
+
+    let ilocEntries = try parseISOBMFFILoc(source, iloc)
+    let ilocByID = Dictionary(uniqueKeysWithValues: ilocEntries.map { ($0.itemID, $0) })
+    guard let jpegEntry = ilocByID[gainMapID],
+          jpegEntry.constructionMethod == 0,
+          jpegEntry.extents.count == 1 else {
+        throw CLIError.invalidContainer("private JPEG Gain Map does not have one file extent")
+    }
+    let jpegExtent = jpegEntry.extents[0]
+    guard jpegExtent.offset >= mdat.dataStart,
+          jpegExtent.offset + jpegExtent.length == mdat.dataEnd else {
+        throw CLIError.invalidContainer("private JPEG Gain Map is not the final mdat payload")
+    }
+
+    let properties = try parseISOBMFFIPCOPropertyInfos(source, iprp)
+    guard let ipmaBox = isobmffBoxes(in: source, start: iprp.dataStart, end: iprp.dataEnd)
+        .first(where: { $0.type == "ipma" }) else {
+        throw CLIError.invalidContainer("private JPEG Gain Map source ipco/ipma missing")
+    }
+    let ipma = parseISOBMFFIPMA(source, ipmaBox)
+
+    let appendedGraphIDs = Set([gainMapID, tmapID] + itemInfo.items.compactMap { item in
+        guard item.type == "mime",
+              refsInfo.refs.contains(where: {
+                  $0.type == "cdsc" && $0.from == item.itemID && $0.to.contains(tmapID)
+              }) else { return nil }
+        return item.itemID
+    })
+    guard let originalMaximumItemID = itemInfo.items
+        .filter({ !appendedGraphIDs.contains($0.itemID) })
+        .map(\.itemID)
+        .max() else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map source has no original items")
+    }
+    let tileIDs = (1...tilePayloads.count).map { originalMaximumItemID + $0 }
+    let outputGainMapID = originalMaximumItemID + tilePayloads.count + 1
+    let outputTmapID = outputGainMapID + 1
+    let xmpID = appendedGraphIDs.first(where: { $0 != gainMapID && $0 != tmapID })
+    guard outputTmapID < 0xffff else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map requires 16-bit item IDs")
+    }
+    let remappedItemIDs = [gainMapID: outputGainMapID, tmapID: outputTmapID]
+    func outputItemID(_ itemID: Int) -> Int { remappedItemIDs[itemID] ?? itemID }
+    let propertyByIndex = Dictionary(uniqueKeysWithValues: properties.map { ($0.index, $0) })
+    var uniqueTileSizes: [(width: Int, height: Int)] = []
+    for size in tileSizes where !uniqueTileSizes.contains(where: {
+        $0.width == size.width && $0.height == size.height
+    }) {
+        uniqueTileSizes.append(size)
+    }
+    let originalIPMAEntries = ipma.entries.filter { !appendedGraphIDs.contains($0.itemID) }
+    let originalPropertyIndices = Set(originalIPMAEntries.flatMap { entry in
+        entry.associations.map { assocPropertyIndex($0, flags: ipma.flags) }
+    })
+    let originalProperties = properties.filter { originalPropertyIndices.contains($0.index) }
+    let originalNonCodecProperties = originalProperties.filter { $0.type != "hvcC" }
+    let originalCodecProperties = originalProperties.filter { $0.type == "hvcC" }
+    guard !originalCodecProperties.isEmpty else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map source Base has no hvcC")
+    }
+
+    var ipcoPayload = Data()
+    var remappedPropertyIndices: [Int: Int] = [:]
+    var nextPropertyIndex = 1
+    for property in originalNonCodecProperties {
+        remappedPropertyIndices[property.index] = nextPropertyIndex
+        ipcoPayload.append(property.rawBox)
+        nextPropertyIndex += 1
+    }
+    func appendProperty(_ rawBox: Data) -> Int {
+        let index = nextPropertyIndex
+        ipcoPayload.append(rawBox)
+        nextPropertyIndex += 1
+        return index
+    }
+    let gainColrIndex = appendProperty(
+        channelCount == 1 ? isoColrSRGBBox : isoColrUnspecifiedBT601Box
+    )
+    let gainGridIspeIndex = appendProperty(makeIspeBox(width: gainMapWidth, height: gainMapHeight))
+    let tmapAssociationIndices = ipma.entries.first(where: { $0.itemID == tmapID })?
+        .associations
+        .map { assocPropertyIndex($0, flags: ipma.flags) } ?? []
+    guard let tmapColorProperty = tmapAssociationIndices
+        .compactMap({ propertyByIndex[$0] })
+        .first(where: { $0.type == "colr" }),
+          let tmapPixiProperty = tmapAssociationIndices
+        .compactMap({ propertyByIndex[$0] })
+        .first(where: { $0.type == "pixi" }) else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map tmap properties are incomplete")
+    }
+    let tmapColorIndex = appendProperty(tmapColorProperty.rawBox)
+    let tmapPixiIndex = appendProperty(tmapPixiProperty.rawBox)
+    let gainPixiIndex: Int
+    if channelCount == 1 {
+        gainPixiIndex = appendProperty(isoPixiMono8Box)
+    } else {
+        let gainPixiOldIndex = originalNonCodecProperties.first(where: {
+            $0.rawBox == isoPixiRGB8Box
+        })?.index
+        if let gainPixiOldIndex, let mapped = remappedPropertyIndices[gainPixiOldIndex] {
+            gainPixiIndex = mapped
+        } else {
+            gainPixiIndex = appendProperty(isoPixiRGB8Box)
+        }
+    }
+
+    var tileIspeIndexByKey: [String: Int] = [:]
+    for size in uniqueTileSizes {
+        let rawIspe = makeIspeBox(width: size.width, height: size.height)
+        if let existing = originalNonCodecProperties.first(where: { $0.rawBox == rawIspe }),
+           let mapped = remappedPropertyIndices[existing.index] {
+            tileIspeIndexByKey["\(size.width)x\(size.height)"] = mapped
+        } else {
+            tileIspeIndexByKey["\(size.width)x\(size.height)"] = appendProperty(rawIspe)
+        }
+    }
+    let primaryAssociationIndices = ipma.entries.first(where: { $0.itemID == primaryID })?
+        .associations
+        .map { assocPropertyIndex($0, flags: ipma.flags) } ?? []
+    guard let primaryIspeOldIndex = primaryAssociationIndices.first(where: {
+        propertyByIndex[$0]?.type == "ispe"
+    }),
+          let primaryIspeProperty = propertyByIndex[primaryIspeOldIndex],
+          let primaryIspeIndex = remappedPropertyIndices[primaryIspeOldIndex],
+          let irotOldIndex = primaryAssociationIndices.first(where: {
+              propertyByIndex[$0]?.type == "irot"
+          }) ?? originalNonCodecProperties.first(where: { $0.type == "irot" })?.index,
+          let irotProperty = propertyByIndex[irotOldIndex],
+          let irotIndex = remappedPropertyIndices[irotOldIndex] else {
+        throw CLIError.invalidContainer("direct HEVC Gain Map Base properties lack ispe/irot")
+    }
+    let tmapIspeBox = try makeImageIOCanonicalTmapIspeBox(
+        primaryIspe: primaryIspeProperty.rawBox,
+        irot: irotProperty.rawBox
+    )
+    let tmapIspeIndex: Int
+    if tmapIspeBox == primaryIspeProperty.rawBox {
+        tmapIspeIndex = primaryIspeIndex
+    } else {
+        tmapIspeIndex = appendProperty(tmapIspeBox)
+    }
+    for property in originalCodecProperties {
+        remappedPropertyIndices[property.index] = nextPropertyIndex
+        ipcoPayload.append(property.rawBox)
+        nextPropertyIndex += 1
+    }
+    let tileHvcCIndex = appendProperty(makeBox("hvcC", payload: hvcC))
+
+    func mappedOriginalAssociations(_ entry: ISOBMFFIPMAEntry) throws -> [(Int, Bool)] {
+        try entry.associations.map { association in
+            let oldIndex = assocPropertyIndex(association, flags: ipma.flags)
+            guard let newIndex = remappedPropertyIndices[oldIndex] else {
+                throw CLIError.invalidContainer("direct HEVC Gain Map cannot remap Base property \(oldIndex)")
+            }
+            return (newIndex, assocIsEssential(association, flags: ipma.flags))
+        }
+    }
+    var ipmaEntries = Data()
+    var ipmaCount = 0
+    for entry in originalIPMAEntries {
+        ipmaEntries.append(try makeIPMAEntry(
+            entry.itemID,
+            mappedOriginalAssociations(entry),
+            flags: ipma.flags,
+            version: ipma.version
+        ))
+        ipmaCount += 1
+    }
+    for (tileID, size) in zip(tileIDs, tileSizes) {
+        guard let tileIspeIndex = tileIspeIndexByKey["\(size.width)x\(size.height)"] else {
+            throw CLIError.invalidContainer("direct HEVC Gain Map tile ispe mapping is missing")
+        }
+        ipmaEntries.append(try makeIPMAEntry(
+            tileID,
+            [(tileIspeIndex, true), (gainColrIndex, true), (tileHvcCIndex, true)],
+            flags: ipma.flags,
+            version: ipma.version
+        ))
+        ipmaCount += 1
+    }
+    ipmaEntries.append(try makeIPMAEntry(
+        outputGainMapID,
+        [(gainColrIndex, true), (gainGridIspeIndex, false), (gainPixiIndex, false), (irotIndex, true)],
+        flags: ipma.flags,
+        version: ipma.version
+    ))
+    ipmaCount += 1
+    ipmaEntries.append(try makeIPMAEntry(
+        outputTmapID,
+        [(tmapColorIndex, true), (tmapIspeIndex, false), (tmapPixiIndex, false), (irotIndex, true)],
+        flags: ipma.flags,
+        version: ipma.version
+    ))
+    ipmaCount += 1
+    var ipmaPayload = source.subdata(in: ipmaBox.dataStart..<ipmaBox.dataStart + 4)
+    appendUInt32BE(ipmaCount, to: &ipmaPayload)
+    ipmaPayload.append(ipmaEntries)
+    var iprpPayload = Data()
+    iprpPayload.append(makeBox("ipco", payload: ipcoPayload))
+    iprpPayload.append(makeBox("ipma", payload: ipmaPayload))
+    let iprpPart = makeBox("iprp", payload: iprpPayload)
+
+    var rawInfes = itemInfo.items
+        .filter { !appendedGraphIDs.contains($0.itemID) }
+        .map(\.rawInfe)
+    for tileID in tileIDs {
+        rawInfes.append(makeInfeBox(itemID: tileID, type: "hvc1", flags: 1))
+    }
+    rawInfes.append(makeInfeBox(
+        itemID: outputGainMapID,
+        type: "grid",
+        flags: itemByID[gainMapID]?.flags ?? 1
+    ))
+    rawInfes.append(makeInfeBox(
+        itemID: outputTmapID,
+        type: "tmap",
+        flags: itemByID[tmapID]?.flags ?? 0
+    ))
+    let iinfPart = makeIinfBox(version: itemInfo.version, rawInfes: rawInfes)
+
+    guard let tmapEntry = ilocByID[tmapID],
+          tmapEntry.constructionMethod == 1,
+          tmapEntry.extents.count == 1 else {
+        throw CLIError.invalidContainer("private JPEG Gain Map tmap does not have one idat extent")
+    }
+    let oldTmapExtent = tmapEntry.extents[0]
+    let sourceIDATPayload = source.subdata(in: idat.dataStart..<idat.dataEnd)
+    guard oldTmapExtent.offset >= 0,
+          oldTmapExtent.offset + oldTmapExtent.length <= sourceIDATPayload.count else {
+        throw CLIError.invalidContainer("private JPEG Gain Map tmap extent is outside idat")
+    }
+    let retainedIDATPayload = sourceIDATPayload.prefix(oldTmapExtent.offset)
+    let tmapPayload = sourceIDATPayload.subdata(
+        in: oldTmapExtent.offset..<(oldTmapExtent.offset + oldTmapExtent.length)
+    )
+    let gridPayload = try makeGridPayload(
+        rows: rows,
+        columns: columns,
+        width: gainMapWidth,
+        height: gainMapHeight
+    )
+    let gridIDATOffset = retainedIDATPayload.count
+    let tmapIDATOffset = gridIDATOffset + gridPayload.count
+    let idatPart = makeBox("idat", payload: Data(retainedIDATPayload) + gridPayload + tmapPayload)
+
+    var outputRefs = refsInfo.refs.compactMap { ref -> ISOBMFFIRefEntry? in
+        guard !(ref.type == "dimg" && ref.from == gainMapID),
+              !(ref.type == "dimg" && ref.from == tmapID),
+              ref.type != "auxl",
+              ref.from != xmpID else { return nil }
+        let mappedFrom = outputItemID(ref.from)
+        var mappedTargets = ref.to.map(outputItemID)
+        if ref.type == "cdsc",
+           itemByID[ref.from]?.type == "Exif",
+           ref.to.contains(primaryID),
+           !ref.to.contains(tmapID) {
+            mappedTargets.append(outputTmapID)
+        }
+        return ISOBMFFIRefEntry(type: ref.type, from: mappedFrom, to: mappedTargets)
+    }
+    outputRefs.append(ISOBMFFIRefEntry(type: "dimg", from: outputGainMapID, to: tileIDs))
+    outputRefs.append(ISOBMFFIRefEntry(
+        type: "dimg",
+        from: outputTmapID,
+        to: [primaryID, outputGainMapID]
+    ))
+    let irefVersion: UInt8 = (outputRefs.flatMap { [$0.from] + $0.to }.max() ?? 0) > 0xffff
+        ? 1
+        : refsInfo.version
+    let irefPart = makeIrefFullBox(version: irefVersion, refs: outputRefs)
+
+    var placeholderLocations = ilocEntries
+        .filter { !appendedGraphIDs.contains($0.itemID) || $0.itemID == tmapID }
+        .map { entry in
+            ISOBMFFILocEntry(
+                itemID: outputItemID(entry.itemID),
+                constructionMethod: entry.constructionMethod,
+                dataReferenceIndex: entry.dataReferenceIndex,
+                extents: entry.itemID == tmapID
+                    ? [(offset: tmapIDATOffset, length: tmapPayload.count)]
+                    : entry.extents.map { (offset: 0, length: $0.length) }
+            )
+        }
+    placeholderLocations.append(ISOBMFFILocEntry(
+        itemID: outputGainMapID,
+        constructionMethod: 1,
+        dataReferenceIndex: 0,
+        extents: [(gridIDATOffset, gridPayload.count)]
+    ))
+    for (tileID, payload) in zip(tileIDs, tilePayloads) {
+        placeholderLocations.append(ISOBMFFILocEntry(
+            itemID: tileID,
+            constructionMethod: 0,
+            dataReferenceIndex: 0,
+            extents: [(0, payload.count)]
+        ))
+    }
+    placeholderLocations.sort { $0.itemID < $1.itemID }
+
+    var altrPayload = Data([0, 0, 0, 0])
+    appendUInt32BE(outputTmapID + 1, to: &altrPayload)
+    appendUInt32BE(2, to: &altrPayload)
+    appendUInt32BE(outputTmapID, to: &altrPayload)
+    appendUInt32BE(primaryID, to: &altrPayload)
+    let grplPart = makeBox("grpl", payload: makeBox("altr", payload: altrPayload))
+
+    var metaParts: [Data] = []
+    for part in metaChildren {
+        switch part.type {
+        case "iinf": metaParts.append(iinfPart)
+        case "iloc": metaParts.append(makeIlocV1Box(entries: placeholderLocations))
+        case "iprp": metaParts.append(iprpPart)
+        case "iref": metaParts.append(irefPart)
+        case "idat": metaParts.append(idatPart)
+        case "grpl": metaParts.append(grplPart)
+        default: metaParts.append(source.subdata(in: part.boxStart..<part.boxStart + part.size))
+        }
+    }
+
+    let sourceBrandOrder = stride(from: ftyp.dataStart + 8, to: ftyp.dataEnd, by: 4).compactMap {
+        position -> String? in
+        guard position + 4 <= ftyp.dataEnd else { return nil }
+        return String(data: source.subdata(in: position..<position + 4), encoding: .ascii)
+    }
+    let preferredBrands = ["mif1", "tmap", "MiHE", "miaf", "MiHB", "heic"]
+    var orderedBrands = preferredBrands
+    for brand in sourceBrandOrder where !orderedBrands.contains(brand) {
+        orderedBrands.append(brand)
+    }
+    var ftypPayload = source.subdata(in: ftyp.dataStart..<ftyp.dataStart + 8)
+    for brand in orderedBrands {
+        ftypPayload.append(Data(brand.utf8))
+    }
+    let ftypPart = makeBox("ftyp", payload: ftypPayload)
+    var preliminaryMetaPayload = source.subdata(in: meta.dataStart..<meta.dataStart + 4)
+    for part in metaParts { preliminaryMetaPayload.append(part) }
+    let preliminaryMetaPart = makeBox("meta", payload: preliminaryMetaPayload)
+    let betweenMetaAndMdat = source.subdata(in: meta.boxStart + meta.size..<mdat.boxStart)
+    let newMdatDataStart = ftypPart.count + preliminaryMetaPart.count + betweenMetaAndMdat.count + 8
+    let fileDelta = newMdatDataStart - mdat.dataStart
+
+    var finalLocations: [ISOBMFFILocEntry] = []
+    for entry in ilocEntries where !appendedGraphIDs.contains(entry.itemID) || entry.itemID == tmapID {
+        finalLocations.append(ISOBMFFILocEntry(
+            itemID: outputItemID(entry.itemID),
+            constructionMethod: entry.constructionMethod,
+            dataReferenceIndex: entry.dataReferenceIndex,
+            extents: entry.itemID == tmapID
+                ? [(offset: tmapIDATOffset, length: tmapPayload.count)]
+                : entry.extents.map { extent in
+                if entry.constructionMethod == 0 {
+                    return (extent.offset + fileDelta, extent.length)
+                }
+                return extent
+            }
+        ))
+    }
+    finalLocations.append(ISOBMFFILocEntry(
+        itemID: outputGainMapID,
+        constructionMethod: 1,
+        dataReferenceIndex: 0,
+        extents: [(gridIDATOffset, gridPayload.count)]
+    ))
+    let sourceMdatPayload = source.subdata(in: mdat.dataStart..<jpegExtent.offset)
+    var appendedTiles = Data()
+    for (tileID, payload) in zip(tileIDs, tilePayloads) {
+        let offset = newMdatDataStart + sourceMdatPayload.count + appendedTiles.count
+        appendedTiles.append(payload)
+        finalLocations.append(ISOBMFFILocEntry(
+            itemID: tileID,
+            constructionMethod: 0,
+            dataReferenceIndex: 0,
+            extents: [(offset, payload.count)]
+        ))
+    }
+    finalLocations.sort { $0.itemID < $1.itemID }
+    let finalIlocPart = makeIlocV1Box(entries: finalLocations)
+    let finalMetaParts = metaParts.map { part -> Data in
+        guard part.count >= 8,
+              String(data: part.subdata(in: 4..<8), encoding: .ascii) == "iloc" else {
+            return part
+        }
+        return finalIlocPart
+    }
+    var finalMetaPayload = source.subdata(in: meta.dataStart..<meta.dataStart + 4)
+    for part in finalMetaParts { finalMetaPayload.append(part) }
+    let finalMetaPart = makeBox("meta", payload: finalMetaPayload)
+    let finalMdatPart = makeBox("mdat", payload: sourceMdatPayload + appendedTiles)
+
+    var output = Data()
+    output.append(ftypPart)
+    output.append(finalMetaPart)
+    output.append(betweenMetaAndMdat)
+    output.append(finalMdatPart)
+    try output.write(to: outputURL, options: .atomic)
 }
 
 package func makePrivateGainMapInfoFloats(scale: ResolvedScale) -> [Double] {

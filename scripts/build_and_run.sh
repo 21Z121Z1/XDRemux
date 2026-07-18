@@ -5,13 +5,10 @@ APP_NAME="XDRemuxApp"
 BUNDLE_ID="com.proxdr.XDRemuxApp"
 PROJECT_PATH="apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj"
 SCHEME="XDRemuxApp"
-CONFIGURATION="Debug"
+CONFIGURATION="Release"
 DERIVED_DATA="${XDREMUX_DERIVED_DATA:-/tmp/xdremuxapp-derived}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_BUNDLE="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"
-APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-HELPER_DIRECTORY="$APP_BUNDLE/Contents/Helpers"
 LOG_DIRECTORY="$DERIVED_DATA/Logs/XDRemux"
 BUILD_LOG="$LOG_DIRECTORY/build.log"
 RESULT_BUNDLE="$LOG_DIRECTORY/build-$(date +%Y%m%d-%H%M%S).xcresult"
@@ -56,6 +53,13 @@ while (($# > 0)); do
   esac
   shift
 done
+
+if [[ "$MODE" == "debug" ]]; then
+  CONFIGURATION="Debug"
+fi
+APP_BUNDLE="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"
+APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+HELPER_DIRECTORY="$APP_BUNDLE/Contents/Helpers"
 
 cd "$ROOT_DIR"
 

@@ -111,7 +111,6 @@ package struct AppleSemanticSceneAnalysis: Sendable {
     let person: AppleSemanticMatte?
     let skin: AppleSemanticMatte?
     let hair: AppleSemanticMatte?
-    let facialHair: AppleSemanticMatte?
     let teeth: AppleSemanticMatte?
     let glasses: AppleSemanticMatte?
     let sky: AppleSemanticMatte?

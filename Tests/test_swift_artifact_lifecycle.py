@@ -37,6 +37,22 @@ class SwiftArtifactLifecycleTests(unittest.TestCase):
         self.assertLess(creation, cleanup)
         self.assertLess(cleanup, phase_two)
 
+    def test_styles_final_validation_reuses_accepted_artifacts(self) -> None:
+        self.assertIn("private struct StylesValidationResult", STYLES_SWIFT)
+        self.assertIn("prevalidatedStylePropertyList: stylePayload.stylePropertyList", STYLES_SWIFT)
+        self.assertIn("if prevalidatedStylePropertyList != styleData", STYLES_SWIFT)
+        self.assertIn("let outputData = validation.outputData", STYLES_SWIFT)
+        self.assertIn("let contaminationReport = validation.contaminationReport", STYLES_SWIFT)
+        validation = STYLES_SWIFT.split(
+            "private static func validatePhotographicStylesOutput", 1
+        )[1].split("private static func donorContaminationScan", 1)[0]
+        self.assertIn("donorContaminationScan", validation)
+        self.assertIn("guard contamination.matches.isEmpty", validation)
+
+    def test_styles_raster_does_not_retain_unused_hdr_rgb_plane(self) -> None:
+        self.assertNotIn("hdrLinearRGB", STYLES_SWIFT)
+        self.assertNotIn("var hdrRGB =", STYLES_SWIFT)
+
 
 if __name__ == "__main__":
     unittest.main()

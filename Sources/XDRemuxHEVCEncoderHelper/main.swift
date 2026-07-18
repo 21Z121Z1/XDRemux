@@ -19,6 +19,7 @@ enum PixelMode: String {
     case rgb4448
     case rgb4448tile
     case mono8
+    case mono8tile
 }
 
 struct SourceFrame {
@@ -121,10 +122,15 @@ func loadImage(_ path: String) -> CGImage {
     return image
 }
 
-func makePixelBuffer(from image: CGImage, mode: PixelMode) -> CVPixelBuffer {
-    let width = image.width
-    let height = image.height
-    let pixelFormat = mode == .mono8
+func makePixelBuffer(
+    from image: CGImage,
+    mode: PixelMode,
+    targetWidth: Int? = nil,
+    targetHeight: Int? = nil
+) -> CVPixelBuffer {
+    let width = targetWidth ?? image.width
+    let height = targetHeight ?? image.height
+    let pixelFormat = mode == .mono8 || mode == .mono8tile
         ? kCVPixelFormatType_OneComponent8
         : kCVPixelFormatType_32BGRA
     let attrs: CFDictionary = [
@@ -155,10 +161,10 @@ func makePixelBuffer(from image: CGImage, mode: PixelMode) -> CVPixelBuffer {
         fail("Pixel buffer has no base address")
     }
     let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
-    let colorSpace = mode == .mono8
+    let colorSpace = mode == .mono8 || mode == .mono8tile
         ? CGColorSpaceCreateDeviceGray()
         : CGColorSpaceCreateDeviceRGB()
-    let bitmapInfo = mode == .mono8
+    let bitmapInfo = mode == .mono8 || mode == .mono8tile
         ? CGBitmapInfo(rawValue: 0)
         : CGBitmapInfo(
             rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue
@@ -176,14 +182,36 @@ func makePixelBuffer(from image: CGImage, mode: PixelMode) -> CVPixelBuffer {
         fail("Could not create CGContext for pixel buffer")
     }
     context.clear(CGRect(x: 0, y: 0, width: width, height: height))
-    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    // HEIF grids crop padded tiles from the top-left raster origin. Quartz bitmap
+    // contexts use a bottom-left drawing origin, so bottom-aligning a short final
+    // tile puts the padding at the top and shifts the decoded image downward.
+    // Move the source up by the vertical padding so the cropped grid starts at
+    // the first source row; horizontal origins already agree.
+    context.draw(
+        image,
+        in: CGRect(
+            x: 0,
+            y: height - image.height,
+            width: image.width,
+            height: image.height
+        )
+    )
     return buffer
 }
 
-func makeYUV444Frame(from image: CGImage) -> SourceFrame {
-    let source = makePixelBuffer(from: image, mode: .rgb10)
-    let width = image.width
-    let height = image.height
+func makeYUV444Frame(
+    from image: CGImage,
+    padToTileGrid: Bool = false,
+    tileSize: Int = 512
+) -> SourceFrame {
+    let width = padToTileGrid ? ((image.width + tileSize - 1) / tileSize) * tileSize : image.width
+    let height = padToTileGrid ? ((image.height + tileSize - 1) / tileSize) * tileSize : image.height
+    let source = makePixelBuffer(
+        from: image,
+        mode: .rgb10,
+        targetWidth: width,
+        targetHeight: height
+    )
     let attrs: CFDictionary = [
         kCVPixelBufferIOSurfacePropertiesKey: [:]
     ] as CFDictionary
@@ -202,59 +230,54 @@ func makeYUV444Frame(from image: CGImage) -> SourceFrame {
     guard let destination = pixelBuffer else {
         fail("8-bit YUV444 CVPixelBufferCreate returned nil")
     }
-    CVPixelBufferLockBaseAddress(source, .readOnly)
-    CVPixelBufferLockBaseAddress(destination, [])
-    defer {
-        CVPixelBufferUnlockBaseAddress(destination, [])
-        CVPixelBufferUnlockBaseAddress(source, .readOnly)
-    }
-    guard let sourceBase = CVPixelBufferGetBaseAddress(source),
-          CVPixelBufferGetPlaneCount(destination) == 2,
-          let lumaBase = CVPixelBufferGetBaseAddressOfPlane(destination, 0),
-          let chromaBase = CVPixelBufferGetBaseAddressOfPlane(destination, 1) else {
-        fail("8-bit YUV444 pixel buffer does not expose writable planes")
-    }
-    let sourceStride = CVPixelBufferGetBytesPerRow(source)
-    let lumaStride = CVPixelBufferGetBytesPerRowOfPlane(destination, 0)
-    let chromaStride = CVPixelBufferGetBytesPerRowOfPlane(destination, 1)
-    let sourceBytes = sourceBase.assumingMemoryBound(to: UInt8.self)
-    let lumaBytes = lumaBase.assumingMemoryBound(to: UInt8.self)
-    let chromaBytes = chromaBase.assumingMemoryBound(to: UInt8.self)
-
-    func clampCode(_ value: Double, minimum: Int = 0) -> UInt8 {
-        UInt8(min(255, max(minimum, Int(value.rounded()))))
-    }
-    for y in 0..<height {
-        let sourceRow = sourceBytes.advanced(by: y * sourceStride)
-        let lumaRow = lumaBytes.advanced(by: y * lumaStride)
-        let chromaRow = chromaBytes.advanced(by: y * chromaStride)
-        for x in 0..<width {
-            let pixel = sourceRow.advanced(by: x * 4)
-            let blue = Double(pixel[0]) / 255.0
-            let green = Double(pixel[1]) / 255.0
-            let red = Double(pixel[2]) / 255.0
-            let luma = 0.299 * red + 0.587 * green + 0.114 * blue
-            let cb = (blue - luma) / 1.772 * 255.0 + 128.0
-            let cr = (red - luma) / 1.402 * 255.0 + 128.0
-            lumaRow[x] = clampCode(luma * 255.0)
-            chromaRow[x * 2] = clampCode(cb)
-            chromaRow[x * 2 + 1] = clampCode(cr)
-        }
-    }
     CVBufferSetAttachment(
         destination,
         kCVImageBufferYCbCrMatrixKey,
         kCVImageBufferYCbCrMatrix_ITU_R_601_4,
         .shouldPropagate
     )
+    var transferSession: VTPixelTransferSession?
+    check(
+        VTPixelTransferSessionCreate(
+            allocator: kCFAllocatorDefault,
+            pixelTransferSessionOut: &transferSession
+        ),
+        "VTPixelTransferSessionCreate failed"
+    )
+    guard let transferSession else {
+        fail("VTPixelTransferSessionCreate returned nil")
+    }
+    check(
+        VTPixelTransferSessionTransferImage(transferSession, from: source, to: destination),
+        "BGRA to YUV444 pixel transfer failed"
+    )
+    VTPixelTransferSessionInvalidate(transferSession)
     return SourceFrame(pixelBuffer: destination, width: width, height: height)
 }
 
-func makeSourceFrame(path: String, mode: PixelMode) -> SourceFrame {
-    if mode == .rgb4448 || mode == .rgb4448tile {
-        return makeYUV444Frame(from: loadImage(path))
-    }
+func makeSourceFrame(path: String, mode: PixelMode, tileSize: Int = 512) -> SourceFrame {
     let image = loadImage(path)
+    if mode == .rgb4448 || mode == .rgb4448tile {
+        return makeYUV444Frame(
+            from: image,
+            padToTileGrid: mode == .rgb4448tile,
+            tileSize: tileSize
+        )
+    }
+    if mode == .mono8tile {
+        let width = ((image.width + tileSize - 1) / tileSize) * tileSize
+        let height = ((image.height + tileSize - 1) / tileSize) * tileSize
+        return SourceFrame(
+            pixelBuffer: makePixelBuffer(
+                from: image,
+                mode: mode,
+                targetWidth: width,
+                targetHeight: height
+            ),
+            width: width,
+            height: height
+        )
+    }
     return SourceFrame(
         pixelBuffer: makePixelBuffer(from: image, mode: mode),
         width: image.width,
@@ -442,15 +465,16 @@ let tileCallback: VTTileCompressionOutputCallback = {
     }
 }
 
-func encodeWithTileSession(source: SourceFrame, quality: Double) -> TileEncoderState {
-    let tileWidth = 512
-    let tileHeight = 512
-    guard source.width.isMultiple(of: tileWidth),
-          source.height.isMultiple(of: tileHeight) else {
-        fail("rgb4448tile currently requires dimensions divisible by 512")
-    }
-    let columns = source.width / tileWidth
-    let rows = source.height / tileHeight
+func encodeWithTileSession(
+    source: SourceFrame,
+    quality: Double,
+    mode: PixelMode,
+    tileSize: Int
+) -> TileEncoderState {
+    let tileWidth = tileSize
+    let tileHeight = tileSize
+    let columns = (source.width + tileWidth - 1) / tileWidth
+    let rows = (source.height + tileHeight - 1) / tileHeight
     let state = TileEncoderState(tileCount: columns * rows)
     let create = videoToolboxSymbol(
         "VTTileCompressionSessionCreate",
@@ -500,31 +524,43 @@ func encodeWithTileSession(source: SourceFrame, quality: Double) -> TileEncoderS
     guard let session else {
         fail("VTTileCompressionSessionCreate returned nil")
     }
-    let properties: CFDictionary = [
-        kVTCompressionPropertyKey_ProfileLevel: dynamicallyLoadedProfile(
-            "kVTProfileLevel_HEVC_Main444_AutoLevel"
-        ),
+    let profile: CFString = mode == .mono8tile
+        ? kVTProfileLevel_HEVC_Monochrome_AutoLevel
+        : dynamicallyLoadedProfile("kVTProfileLevel_HEVC_Main444_AutoLevel")
+    var propertyValues: [CFString: Any] = [
+        kVTCompressionPropertyKey_ProfileLevel: profile,
         kVTCompressionPropertyKey_Quality: quality,
         kVTCompressionPropertyKey_AllowTemporalCompression: false,
         kVTCompressionPropertyKey_AllowFrameReordering: false,
-        "QuantizationScalingMatrixPreset": 1,
-        "SourceFrameCount": columns * rows,
-        "AllowPixelTransfer": true,
-    ] as CFDictionary
-    check(setProperties(session, properties), "setting tile compression properties failed")
-    check(prepare(session, 0, nil), "VTTileCompressionSessionPrepareToEncodeTiles failed")
+        "SourceFrameCount" as CFString: columns * rows,
+        "AllowPixelTransfer" as CFString: true,
+        kVTCompressionPropertyKey_YCbCrMatrix: kCVImageBufferYCbCrMatrix_ITU_R_601_4,
+    ]
+    if mode == .rgb4448tile {
+        propertyValues["QuantizationScalingMatrixPreset" as CFString] = 1
+    }
+    check(
+        setProperties(session, propertyValues as CFDictionary),
+        "setting tile compression properties failed"
+    )
+    check(
+        prepare(session, 0, nil),
+        "VTTileCompressionSessionPrepareToEncodeTiles failed"
+    )
     let frameProperties = [:] as CFDictionary
     for row in 0..<rows {
         for column in 0..<columns {
             let index = row * columns + column
             let tileRefcon = UnsafeMutableRawPointer(bitPattern: index + 1)
+            let originX = column * tileWidth
+            let originY = row * tileHeight
             check(
                 encodeTile(
                     session,
                     source.pixelBuffer,
                     CMVideoDimensions(
-                        width: Int32(column * tileWidth),
-                        height: Int32(row * tileHeight)
+                        width: Int32(originX),
+                        height: Int32(originY)
                     ),
                     CMVideoDimensions(width: Int32(tileWidth), height: Int32(tileHeight)),
                     frameProperties,
@@ -602,10 +638,10 @@ let callback: VTCompressionOutputCallback = { refcon, _, status, _, sampleBuffer
 }
 
 let args = CommandLine.arguments
-if args.count < 3 || args.count > 6 {
+if args.count < 3 || args.count > 7 {
     fail(
         "usage: XDRemuxHEVCEncoderHelper input output.hevc "
-            + "[quality] [rgb10|rgb4448|rgb4448tile|mono8] [output.hvcc]"
+            + "[quality] [rgb10|rgb4448|rgb4448tile|mono8|mono8tile] [output.hvcc] [tile-size]"
     )
 }
 
@@ -622,18 +658,32 @@ if args.count >= 4 {
 let mode: PixelMode
 if args.count >= 5 {
     guard let parsedMode = PixelMode(rawValue: args[4]) else {
-        fail("pixel mode must be rgb10, rgb4448, rgb4448tile, or mono8")
+        fail("pixel mode must be rgb10, rgb4448, rgb4448tile, mono8, or mono8tile")
     }
     mode = parsedMode
 } else {
     mode = .rgb10
 }
 let hvccOutputPath = args.count >= 6 ? args[5] : nil
+let tileSize: Int
+if args.count >= 7 {
+    guard let parsedTileSize = Int(args[6]), [256, 512, 1024].contains(parsedTileSize) else {
+        fail("tile size must be 256, 512, or 1024")
+    }
+    tileSize = parsedTileSize
+} else {
+    tileSize = 512
+}
 
-let source = makeSourceFrame(path: args[1], mode: mode)
+let source = makeSourceFrame(path: args[1], mode: mode, tileSize: tileSize)
 let pixelBuffer = source.pixelBuffer
-if mode == .rgb4448tile {
-    let tileState = encodeWithTileSession(source: source, quality: quality)
+if mode == .rgb4448tile || mode == .mono8tile {
+    let tileState = encodeWithTileSession(
+        source: source,
+        quality: quality,
+        mode: mode,
+        tileSize: tileSize
+    )
     var annexB = tileState.parameterSets
     for sample in tileState.samples {
         annexB.append(sample!)
@@ -682,7 +732,7 @@ guard let session else {
 
 let profile: CFString
 switch mode {
-case .mono8:
+case .mono8, .mono8tile:
     profile = kVTProfileLevel_HEVC_Monochrome_AutoLevel
 case .rgb4448, .rgb4448tile:
     profile = dynamicallyLoadedProfile("kVTProfileLevel_HEVC_Main444_AutoLevel")

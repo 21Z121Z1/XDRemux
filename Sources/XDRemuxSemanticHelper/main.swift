@@ -38,7 +38,8 @@ func writeMask(
     inputSHA256: String,
     orientation: CGImagePropertyOrientation,
     outputDirectory: URL,
-    context: CIContext
+    context: CIContext?,
+    writePNG: Bool
 ) throws -> [String: Any] {
     let pixelBuffer = observation.pixelBuffer
     guard CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8 else {
@@ -49,13 +50,22 @@ func writeMask(
         )
     }
     let outputURL = outputDirectory.appendingPathComponent("\(name).png")
-    try context.writePNGRepresentation(
-        of: CIImage(cvPixelBuffer: pixelBuffer),
-        to: outputURL,
-        format: .L8,
-        colorSpace: CGColorSpaceCreateDeviceGray(),
-        options: [:]
-    )
+    if writePNG {
+        guard let context else {
+            throw NSError(
+                domain: "XDRemuxAppleSemanticAnalysis",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "PNG evidence context is unavailable"]
+            )
+        }
+        try context.writePNGRepresentation(
+            of: CIImage(cvPixelBuffer: pixelBuffer),
+            to: outputURL,
+            format: .L8,
+            colorSpace: CGColorSpaceCreateDeviceGray(),
+            options: [:]
+        )
+    }
     CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
     defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
     guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else {
@@ -92,7 +102,7 @@ func writeMask(
     let rawURL = outputDirectory.appendingPathComponent("\(name).l8")
     try raw.write(to: rawURL, options: .atomic)
     let count = max(1, width * height)
-    return [
+    var manifest: [String: Any] = [
         "name": name,
         "feature_name": observation.featureName ?? NSNull(),
         "request_class": requestClass,
@@ -104,7 +114,6 @@ func writeMask(
         "source_bytes_per_row": bytesPerRow,
         "serialized_bytes_per_row": width,
         "raw_output": rawURL.path,
-        "output": outputURL.path,
         "minimum": minimum,
         "maximum": maximum,
         "mean": Double(sum) / Double(count),
@@ -113,6 +122,10 @@ func writeMask(
         "orientation_transform": orientationTransform(orientation),
         "fallback": false,
     ]
+    if writePNG {
+        manifest["output"] = outputURL.path
+    }
+    return manifest
 }
 
 func orientationTransform(_ orientation: CGImagePropertyOrientation) -> String {
@@ -128,9 +141,8 @@ func orientationTransform(_ orientation: CGImagePropertyOrientation) -> String {
     }
 }
 
-guard CommandLine.arguments.count == 3
-        || (CommandLine.arguments.count == 5 && CommandLine.arguments[3] == "--orientation") else {
-    fail("usage: XDRemuxSemanticHelper <input-image> <output-directory> [--orientation 1...8]")
+guard CommandLine.arguments.count >= 3 else {
+    fail("usage: XDRemuxSemanticHelper <input-image> <output-directory> [--orientation 1...8] [--roles role,...] [--raw-only]")
 }
 
 let inputURL = URL(fileURLWithPath: CommandLine.arguments[1])
@@ -148,81 +160,87 @@ guard let imageSource = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
 }
 let sourceProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
 let metadataOrientationRaw = (sourceProperties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
-let orientationRaw: UInt32
-if CommandLine.arguments.count == 5,
-   let override = UInt32(CommandLine.arguments[4]),
-   (1...8).contains(override) {
-    orientationRaw = override
-} else {
-    orientationRaw = metadataOrientationRaw
+let supportedRoles: Set<String> = ["portrait", "skin", "hair", "teeth", "glasses", "sky"]
+var selectedRoles = supportedRoles
+var orientationRaw = metadataOrientationRaw
+var writePNG = true
+var argumentIndex = 3
+while argumentIndex < CommandLine.arguments.count {
+    switch CommandLine.arguments[argumentIndex] {
+    case "--orientation":
+        guard argumentIndex + 1 < CommandLine.arguments.count,
+              let override = UInt32(CommandLine.arguments[argumentIndex + 1]),
+              (1...8).contains(override) else {
+            fail("--orientation must be an integer from 1 through 8")
+        }
+        orientationRaw = override
+        argumentIndex += 2
+    case "--roles":
+        guard argumentIndex + 1 < CommandLine.arguments.count else {
+            fail("--roles requires a comma-separated value")
+        }
+        selectedRoles = Set(CommandLine.arguments[argumentIndex + 1].split(separator: ",").map(String.init))
+        guard !selectedRoles.isEmpty, selectedRoles.isSubset(of: supportedRoles) else {
+            fail("--roles contains an unsupported or empty semantic role")
+        }
+        argumentIndex += 2
+    case "--raw-only":
+        writePNG = false
+        argumentIndex += 1
+    default:
+        fail("unknown option: \(CommandLine.arguments[argumentIndex])")
+    }
 }
 let orientation = CGImagePropertyOrientation(rawValue: orientationRaw) ?? .up
 
-guard let humanAttributesClass =
-    NSClassFromString("VNGenerateHumanAttributesSegmentationRequest") as? VNRequest.Type else {
+let needsHumanAttributes = !selectedRoles.isDisjoint(with: ["skin", "hair", "teeth"])
+let humanAttributesRequest: VNRequest? = needsHumanAttributes
+    ? (NSClassFromString("VNGenerateHumanAttributesSegmentationRequest") as? VNRequest.Type)?.init()
+    : nil
+if needsHumanAttributes && humanAttributesRequest == nil {
     fail("VNGenerateHumanAttributesSegmentationRequest is unavailable on this OS")
 }
-guard let skyClass = NSClassFromString("VNGenerateSkySegmentationRequest") as? VNRequest.Type else {
+let personRequest: VNGeneratePersonSegmentationRequest? = selectedRoles.contains("portrait")
+    ? VNGeneratePersonSegmentationRequest()
+    : nil
+personRequest?.qualityLevel = .accurate
+personRequest?.outputPixelFormat = kCVPixelFormatType_OneComponent8
+let skyRequest: VNRequest? = selectedRoles.contains("sky")
+    ? (NSClassFromString("VNGenerateSkySegmentationRequest") as? VNRequest.Type)?.init()
+    : nil
+if selectedRoles.contains("sky") && skyRequest == nil {
     fail("VNGenerateSkySegmentationRequest is unavailable on this OS")
 }
-guard let glassesClass = NSClassFromString("VNGenerateGlassesSegmentationRequest") as? VNRequest.Type else {
+let glassesRequest: VNRequest? = selectedRoles.contains("glasses")
+    ? (NSClassFromString("VNGenerateGlassesSegmentationRequest") as? VNRequest.Type)?.init()
+    : nil
+if selectedRoles.contains("glasses") && glassesRequest == nil {
     fail("VNGenerateGlassesSegmentationRequest is unavailable on this OS")
 }
-
-let humanAttributesRequest = humanAttributesClass.init()
-let personRequest = VNGeneratePersonSegmentationRequest()
-personRequest.qualityLevel = .accurate
-personRequest.outputPixelFormat = kCVPixelFormatType_OneComponent8
-let faceRequest = VNDetectFaceRectanglesRequest()
-let skyRequest = skyClass.init()
-let glassesRequest = glassesClass.init()
 let handler = VNImageRequestHandler(cgImage: sourceImage, orientation: orientation, options: [:])
+let requests = [humanAttributesRequest, personRequest, skyRequest, glassesRequest].compactMap { $0 }
 
 do {
-    try handler.perform([humanAttributesRequest, personRequest, faceRequest, skyRequest, glassesRequest])
+    try handler.perform(requests)
 } catch {
     fail("Vision semantic segmentation failed: \(error)")
 }
 
-let humanAttributeObservations = humanAttributesRequest.results?
+let humanAttributeObservations = humanAttributesRequest?.results?
     .compactMap({ $0 as? VNPixelBufferObservation }) ?? []
 let humanAttributesByName = Dictionary(
     uniqueKeysWithValues: humanAttributeObservations.compactMap { observation in
         observation.featureName.map { ($0, observation) }
     }
 )
-guard let skinObservation = humanAttributesByName["human_attribute_skin"] else {
-    fail("Vision human-attributes request returned no skin observation")
-}
-guard let personObservation = personRequest.results?.first else {
-    fail("Vision person segmentation returned no observation")
-}
-guard let skyObservation = skyRequest.results?.first as? VNPixelBufferObservation else {
-    fail("Vision sky segmentation returned no observation")
-}
-guard let glassesObservation = glassesRequest.results?.first as? VNPixelBufferObservation else {
-    fail("Vision glasses segmentation returned no observation")
-}
-
-let context = CIContext(options: [.cacheIntermediates: false])
+let context = writePNG ? CIContext(options: [.cacheIntermediates: false]) : nil
 do {
-    var masks = [
-        try writeMask(
-            skinObservation,
-            name: "skin",
-            requestClass: "VNGenerateHumanAttributesSegmentationRequest",
-            revision: humanAttributesRequest.revision,
-            inputSHA256: inputSHA256,
-            orientation: orientation,
-            outputDirectory: outputDirectory,
-            context: context
-        ),
-    ]
+    var masks: [[String: Any]] = []
     for (featureName, outputName) in [
+        ("human_attribute_skin", "skin"),
         ("human_attribute_hair", "hair"),
-        ("human_attribute_facial_hair", "facial_hair"),
         ("human_attribute_teeth", "teeth"),
-    ] {
+    ] where selectedRoles.contains(outputName) {
         guard let observation = humanAttributesByName[featureName] else {
             fail("Vision human-attributes request returned no \(featureName) observation")
         }
@@ -231,50 +249,72 @@ do {
                 observation,
                 name: outputName,
                 requestClass: "VNGenerateHumanAttributesSegmentationRequest",
-                revision: humanAttributesRequest.revision,
+                revision: humanAttributesRequest?.revision ?? 0,
                 inputSHA256: inputSHA256,
                 orientation: orientation,
                 outputDirectory: outputDirectory,
-                context: context
+                context: context,
+                writePNG: writePNG
             )
         )
     }
-    masks.append(
-        try writeMask(
-            glassesObservation,
-            name: "glasses",
-            requestClass: "VNGenerateGlassesSegmentationRequest",
-            revision: glassesRequest.revision,
-            inputSHA256: inputSHA256,
-            orientation: orientation,
-            outputDirectory: outputDirectory,
-            context: context
+    if selectedRoles.contains("glasses"),
+       let glassesRequest,
+       let glassesObservation = glassesRequest.results?.first as? VNPixelBufferObservation {
+        masks.append(
+            try writeMask(
+                glassesObservation,
+                name: "glasses",
+                requestClass: "VNGenerateGlassesSegmentationRequest",
+                revision: glassesRequest.revision,
+                inputSHA256: inputSHA256,
+                orientation: orientation,
+                outputDirectory: outputDirectory,
+                context: context,
+                writePNG: writePNG
+            )
         )
-    )
-    masks.append(
-        try writeMask(
-            personObservation,
-            name: "portrait",
-            requestClass: "VNGeneratePersonSegmentationRequest",
-            revision: personRequest.revision,
-            inputSHA256: inputSHA256,
-            orientation: orientation,
-            outputDirectory: outputDirectory,
-            context: context
+    } else if selectedRoles.contains("glasses") {
+        fail("Vision glasses segmentation returned no observation")
+    }
+    if selectedRoles.contains("portrait"),
+       let personRequest,
+       let personObservation = personRequest.results?.first {
+        masks.append(
+            try writeMask(
+                personObservation,
+                name: "portrait",
+                requestClass: "VNGeneratePersonSegmentationRequest",
+                revision: personRequest.revision,
+                inputSHA256: inputSHA256,
+                orientation: orientation,
+                outputDirectory: outputDirectory,
+                context: context,
+                writePNG: writePNG
+            )
         )
-    )
-    masks.append(
-        try writeMask(
-            skyObservation,
-            name: "sky",
-            requestClass: "VNGenerateSkySegmentationRequest",
-            revision: skyRequest.revision,
-            inputSHA256: inputSHA256,
-            orientation: orientation,
-            outputDirectory: outputDirectory,
-            context: context
+    } else if selectedRoles.contains("portrait") {
+        fail("Vision person segmentation returned no observation")
+    }
+    if selectedRoles.contains("sky"),
+       let skyRequest,
+       let skyObservation = skyRequest.results?.first as? VNPixelBufferObservation {
+        masks.append(
+            try writeMask(
+                skyObservation,
+                name: "sky",
+                requestClass: "VNGenerateSkySegmentationRequest",
+                revision: skyRequest.revision,
+                inputSHA256: inputSHA256,
+                orientation: orientation,
+                outputDirectory: outputDirectory,
+                context: context,
+                writePNG: writePNG
+            )
         )
-    )
+    } else if selectedRoles.contains("sky") {
+        fail("Vision sky segmentation returned no observation")
+    }
     emit([
         "ok": true,
         "input": inputURL.path,
@@ -282,31 +322,25 @@ do {
         "orientation": orientationRaw,
         "orientation_transform": orientationTransform(orientation),
         "masks": masks,
-        "human_attribute_feature_names": humanAttributesRequest.results?
+        "request_count": requests.count,
+        "selected_roles": selectedRoles.sorted(),
+        "png_evidence": writePNG,
+        "human_attribute_feature_names": humanAttributesRequest?.results?
             .compactMap({ ($0 as? VNPixelBufferObservation)?.featureName }) ?? [],
         "face_detection": [
-            "count": faceRequest.results?.count ?? 0,
-            "bounding_boxes": faceRequest.results?.map { observation in
-                [
-                    "x": observation.boundingBox.origin.x,
-                    "y": observation.boundingBox.origin.y,
-                    "width": observation.boundingBox.size.width,
-                    "height": observation.boundingBox.size.height,
-                    "confidence": observation.confidence,
-                ]
-            } ?? [],
+            "status": "not_requested",
+            "reason": "no production consumer",
         ],
         "api_status": [
             "person": "public Vision API",
             "skin": "private Vision SPI resolved at runtime",
             "hair": "private Vision SPI resolved at runtime",
-            "facial_hair": "private Vision SPI resolved at runtime",
             "teeth": "private Vision SPI resolved at runtime",
             "glasses": "private Vision SPI resolved at runtime",
             "sky": "private Vision SPI resolved at runtime",
         ],
-        "claim_boundary": "The helper exports Vision's named masks and public face detections; it does not claim equivalence to Apple's camera-time matte tuning.",
+        "claim_boundary": "The helper exports selected Vision masks and does not claim equivalence to Apple's camera-time matte tuning.",
     ])
 } catch {
-    fail("cannot write Vision semantic matte PNGs: \(error)")
+    fail("cannot serialize Vision semantic mattes: \(error)")
 }

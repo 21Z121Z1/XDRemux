@@ -52,6 +52,70 @@ class SwiftAppleSemanticPolicyTests(unittest.TestCase):
         )
         self.assertIn('"PersonMasksValidHint": personMasksValidHint', SWIFT)
 
+    def test_combined_portrait_and_styles_reuse_one_vision_analysis(self) -> None:
+        styles_source = (
+            ROOT
+            / "Sources"
+            / "XDRemuxAppleFeatures"
+            / "PhotographicStyles"
+            / "ApplePhotographicStylesPipeline.swift"
+        ).read_text()
+        portrait_source = (
+            ROOT
+            / "Sources"
+            / "XDRemuxAppleFeatures"
+            / "Portrait"
+            / "PortraitConversionPipeline.swift"
+        ).read_text()
+
+        self.assertIn("semanticOutputDirectory: sharedSemanticDirectory", styles_source)
+        self.assertIn("portraitSemanticAnalysis = outcome.semanticAnalysis", styles_source)
+        self.assertIn("analysis = portraitSemanticAnalysis", styles_source)
+        self.assertIn('semanticAnalysisSource = "portrait_shared"', styles_source)
+        self.assertIn("skipped duplicate Styles analysis", styles_source)
+        self.assertIn('"timingsSeconds": [', styles_source)
+        self.assertIn("Vision semantic request batch profile=%@ requests=%d masks=%d", SWIFT)
+        self.assertIn("semanticAnalysis: mattes.semanticAnalysis", portrait_source)
+        self.assertEqual(styles_source.count("AppleSemanticSceneAnalyzer.analyze("), 1)
+
+    def test_semantic_helper_does_not_run_unused_face_detection(self) -> None:
+        helper_source = (
+            ROOT
+            / "Sources"
+            / "XDRemuxSemanticHelper"
+            / "main.swift"
+        ).read_text()
+
+        self.assertNotIn("VNDetectFaceRectanglesRequest", helper_source)
+        self.assertNotIn('("human_attribute_facial_hair", "facial_hair")', helper_source)
+        self.assertIn('case "--roles":', helper_source)
+        self.assertIn('case "--raw-only":', helper_source)
+        self.assertIn("try handler.perform(requests)", helper_source)
+        self.assertIn('"request_count": requests.count', helper_source)
+        self.assertIn('selectedRoles.contains("glasses")', helper_source)
+        self.assertIn('selectedRoles.contains("sky")', helper_source)
+        self.assertIn('"status": "not_requested"', helper_source)
+        self.assertIn('"reason": "no production consumer"', helper_source)
+
+    def test_semantic_helper_uses_prebuilt_executable(self) -> None:
+        toolchain = (
+            ROOT
+            / "Sources"
+            / "XDRemuxAppleFeatures"
+            / "SemanticScene"
+            / "AppleNativeToolchain.swift"
+        ).read_text()
+
+        self.assertIn('try executable(named: "XDRemuxSemanticHelper")', toolchain)
+        self.assertIn('ProcessInfo.processInfo.environment["XDREMUX_HELPER_DIRECTORY"]', toolchain)
+        self.assertIn('Bundle.main.bundleURL.pathExtension == "app"', toolchain)
+        self.assertNotIn('arguments: ["swiftc"', toolchain)
+
+    def test_normal_app_workflow_uses_release_except_lldb(self) -> None:
+        script = (ROOT / "scripts" / "build_and_run.sh").read_text()
+        self.assertIn('CONFIGURATION="Release"', script)
+        self.assertIn('if [[ "$MODE" == "debug" ]]; then\n  CONFIGURATION="Debug"', script)
+
 
 if __name__ == "__main__":
     unittest.main()
