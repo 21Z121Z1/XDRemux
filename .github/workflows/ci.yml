@@ -3,7 +3,23 @@ name: XDRemux CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "Tests/test_public_documentation.py"
+      - "docs/validation/xdremux-source-manifest.json"
+      - "AGENTS.md"
+      - "scripts/agent_completion_gate.py"
+      - "Tests/validation/test_agent_completion_gate.py"
+      - ".github/workflows/**"
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "Tests/test_public_documentation.py"
+      - "docs/validation/xdremux-source-manifest.json"
+      - "AGENTS.md"
+      - "scripts/agent_completion_gate.py"
+      - "Tests/validation/test_agent_completion_gate.py"
+      - ".github/workflows/**"
 
 env:
   XDREMUX_LANGUAGE: en

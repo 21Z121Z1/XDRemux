@@ -145,6 +145,8 @@ scripts/build_and_run.sh clean
 
 所有完成声明都需要与最终提交绑定的 completion gate receipt，但 gate 必须按变更范围选择证据。
 
+新 plan 应声明 `change_impact`（`documentation`、`non_output`、`output` 或 `release`）和 `impact_rationale`，说明输出文件为什么会或不会变化。
+
 - 文档变更：链接、命令示例、文档结构和公开 projection 检查。
 - CLI 解析变更：对应参数与输出回归测试。
 - 转换核心变更：单元测试加真实功能或集成验证。
@@ -155,7 +157,7 @@ scripts/build_and_run.sh clean
 
 ```bash
 python3 scripts/agent_completion_gate.py run \
-  --base origin/main \
+  --base <verified-base> \
   --plan /tmp/xdremux-agent-verification.json
 
 python3 scripts/agent_completion_gate.py verify \

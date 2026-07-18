@@ -21,6 +21,9 @@ PUBLIC_DOCUMENTS = ROOT_READMES + [
     ROOT / "xdremux" / "swift-cli" / "README.md",
 ]
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+MAIN_CI = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+DOCS_CI = (ROOT / ".github" / "workflows" / "docs.yml").read_text(encoding="utf-8")
+POLICY_CI = (ROOT / ".github" / "workflows" / "policy.yml").read_text(encoding="utf-8")
 
 
 class PublicDocumentationTests(unittest.TestCase):
@@ -122,6 +125,35 @@ class PublicDocumentationTests(unittest.TestCase):
                 except ValueError:
                     self.fail(f"{document}: link escapes repository: {target}")
                 self.assertTrue(resolved.exists(), f"{document}: missing link target {target}")
+
+    def test_docs_only_changes_use_the_lightweight_workflow(self) -> None:
+        ignored_by_main = (
+            '"**/*.md"',
+            '"Tests/test_public_documentation.py"',
+            '"docs/validation/xdremux-source-manifest.json"',
+        )
+        for path in ignored_by_main:
+            self.assertIn(path, MAIN_CI)
+            self.assertIn(path, DOCS_CI)
+        self.assertIn("runs-on: ubuntu-latest", DOCS_CI)
+        self.assertIn("python3 -m unittest Tests.test_public_documentation", DOCS_CI)
+        self.assertNotIn("swift build", DOCS_CI)
+        self.assertNotIn("xcodebuild", DOCS_CI)
+
+    def test_policy_changes_use_the_lightweight_policy_workflow(self) -> None:
+        policy_paths = (
+            '"AGENTS.md"',
+            '"scripts/agent_completion_gate.py"',
+            '"Tests/validation/test_agent_completion_gate.py"',
+            '".github/workflows/**"',
+        )
+        for path in policy_paths:
+            self.assertIn(path, MAIN_CI)
+            self.assertIn(path, POLICY_CI)
+        self.assertIn("python3 -m unittest Tests.validation.test_agent_completion_gate", POLICY_CI)
+        self.assertIn("python3 -m unittest Tests.test_public_documentation", POLICY_CI)
+        self.assertNotIn("swift build", POLICY_CI)
+        self.assertNotIn("xcodebuild", POLICY_CI)
 
 
 if __name__ == "__main__":

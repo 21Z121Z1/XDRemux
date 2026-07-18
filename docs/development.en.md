@@ -145,6 +145,8 @@ The default path uses quiet `xcodebuild`. Complete `build.log` and `.xcresult` d
 
 Every completion claim requires a completion-gate receipt bound to the final commit, but the gate must select evidence appropriate to the change.
 
+New plans should declare `change_impact` (`documentation`, `non_output`, `output`, or `release`) and an `impact_rationale` explaining why generated files can or cannot change.
+
 - Documentation changes: links, command examples, document structure, and public projection checks.
 - CLI parsing changes: matching argument and output regressions.
 - Conversion-core changes: unit tests plus real functional or integration evidence.
@@ -155,7 +157,7 @@ The existence of the completion gate does not justify running the real-photo mat
 
 ```bash
 python3 scripts/agent_completion_gate.py run \
-  --base origin/main \
+  --base <verified-base> \
   --plan /tmp/xdremux-agent-verification.json
 
 python3 scripts/agent_completion_gate.py verify \

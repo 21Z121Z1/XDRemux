@@ -17,11 +17,33 @@ from typing import Any
 SCHEMA_VERSION = 1
 CHECK_KINDS = {"static", "regression", "functional", "integration", "device"}
 FUNCTIONAL_KINDS = {"functional", "integration", "device"}
+CHANGE_IMPACTS = {"auto", "documentation", "non_output", "output", "release"}
 PRODUCTION_PREFIXES = (
+    "Sources/",
     "xdremux/",
     "apps/macos/XDRemuxApp/Sources/",
 )
+OUTPUT_SENSITIVE_PREFIXES = (
+    "Sources/XDRemuxCore/Conversion/",
+    "Sources/XDRemuxCore/Batch/",
+    "Sources/XDRemuxCore/HDR/",
+    "Sources/XDRemuxCore/HEIF/",
+    "Sources/XDRemuxCore/Metadata/",
+    "Sources/XDRemuxAppleFeatures/",
+    "Sources/XDRemuxHEVCEncoderHelper/",
+    "Sources/XDRemuxSemanticHelper/",
+    "Sources/XDRemuxStyleValidationHelper/",
+    "Sources/XDRemuxCLI/Commands/",
+    "Sources/XDRemuxCLI/Parsing/",
+    "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift",
+    "xdremux/python/",
+)
 SOURCE_SUFFIXES = {".swift", ".py", ".sh", ".c", ".cc", ".cpp", ".h", ".m", ".mm"}
+DOCUMENTATION_SUFFIXES = {".md", ".markdown", ".png", ".jpg", ".jpeg", ".gif", ".webp"}
+DOCUMENTATION_SUPPORT_FILES = {
+    "Tests/test_public_documentation.py",
+    "config/xdremux-public-manifest.json",
+}
 OUTPUT_TAIL_LIMIT = 16_000
 
 
@@ -98,6 +120,16 @@ def load_plan(path: Path) -> dict[str, Any]:
         raise GateConfigurationError(f"verification plan schema_version must be {SCHEMA_VERSION}")
     if not isinstance(plan.get("scope"), str) or not plan["scope"].strip():
         raise GateConfigurationError("verification plan requires a non-empty scope")
+    change_impact = plan.get("change_impact", "auto")
+    if change_impact not in CHANGE_IMPACTS:
+        raise GateConfigurationError(
+            "verification plan change_impact must be auto, documentation, non_output, output, or release"
+        )
+    impact_rationale = plan.get("impact_rationale", "")
+    if not isinstance(impact_rationale, str):
+        raise GateConfigurationError("verification plan impact_rationale must be a string")
+    if change_impact != "auto" and not impact_rationale.strip():
+        raise GateConfigurationError("explicit change_impact requires a non-empty impact_rationale")
     checks = plan.get("checks")
     if not isinstance(checks, list) or not checks:
         raise GateConfigurationError("verification plan requires at least one check")
@@ -133,18 +165,51 @@ def load_plan(path: Path) -> dict[str, Any]:
     return plan
 
 
-def enforce_evidence_policy(plan: dict[str, Any], files: list[str]) -> dict[str, bool]:
+def is_documentation_path(path: str) -> bool:
+    return Path(path).suffix.lower() in DOCUMENTATION_SUFFIXES or path in DOCUMENTATION_SUPPORT_FILES
+
+
+def enforce_evidence_policy(plan: dict[str, Any], files: list[str]) -> dict[str, Any]:
     kinds = {check["kind"] for check in plan["checks"]}
     production_changed = any(path.startswith(PRODUCTION_PREFIXES) for path in files)
+    output_sensitive_changed = any(path.startswith(OUTPUT_SENSITIVE_PREFIXES) for path in files)
     source_changed = any(Path(path).suffix in SOURCE_SUFFIXES for path in files)
+    documentation_only = all(is_documentation_path(path) for path in files)
+    declared_impact = plan.get("change_impact", "auto")
+    if declared_impact == "documentation" and not documentation_only:
+        non_documentation = [path for path in files if not is_documentation_path(path)]
+        raise GateConfigurationError(
+            "documentation impact includes non-documentation paths: " + ", ".join(non_documentation)
+        )
+    resolved_impact = (
+        "documentation"
+        if declared_impact == "auto" and documentation_only
+        else "legacy"
+        if declared_impact == "auto"
+        else declared_impact
+    )
     if source_changed and "regression" not in kinds:
         raise GateConfigurationError("source changes require at least one regression check")
-    if production_changed and not kinds.intersection(FUNCTIONAL_KINDS):
+    if resolved_impact == "output" and not kinds.intersection(FUNCTIONAL_KINDS):
         raise GateConfigurationError(
-            "production changes require at least one functional, integration, or device check"
+            "output-impacting changes require at least one functional, integration, or device check"
+        )
+    if resolved_impact == "release":
+        if "regression" not in kinds or "functional" not in kinds or "integration" not in kinds:
+            raise GateConfigurationError(
+                "release changes require regression, functional, and integration checks"
+            )
+    if resolved_impact == "legacy" and production_changed and not kinds.intersection(FUNCTIONAL_KINDS):
+        raise GateConfigurationError(
+            "auto-classified production changes require functional evidence; declare non_output with a rationale when output files cannot change"
         )
     return {
+        "declared_impact": declared_impact,
+        "resolved_impact": resolved_impact,
+        "impact_rationale": plan.get("impact_rationale", ""),
+        "documentation_only": documentation_only,
         "production_changed": production_changed,
+        "output_sensitive_changed": output_sensitive_changed,
         "source_changed": source_changed,
     }
 

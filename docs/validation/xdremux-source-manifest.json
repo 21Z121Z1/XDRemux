@@ -2,7 +2,15 @@
   "files": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "753fcb1bb924a34585f16d76ef3c8c8a7aab1b8686a70d1b5361f13be07991a4"
+      "sha256": "e40359ed926a0f8f319dd507e795ad76b58487d5ba4674383a7be1988c856620"
+    },
+    {
+      "path": ".github/workflows/docs.yml",
+      "sha256": "9d54986f5892b912f8a02b82bbc011ef791da9408b41fe3dd917afe4b027f39e"
+    },
+    {
+      "path": ".github/workflows/policy.yml",
+      "sha256": "27ce5c99be9c7b844b3e0ae57a4e682d26259a3ed574c9d2a776e3b418585767"
     },
     {
       "path": ".gitignore",
@@ -10,7 +18,7 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "9061fb785fa824c833d6bca146d5f1947c85b4cb9cc4bbff6d0351823abfd0b0"
+      "sha256": "21a5fe3cfe2a6ef1cb924810c791552425fba6561ca05a0542b3425443bb3a85"
     },
     {
       "path": "Package.swift",
@@ -198,7 +206,7 @@
     },
     {
       "path": "Tests/test_public_documentation.py",
-      "sha256": "f1eaa1de10ce207e5201cbc2b360c104dcb7709b82011d5edee913a3dbad8c8e"
+      "sha256": "c272e4d35284c4a006590cacc442c25f8c07fb31972284a5743085e46d9cf5a3"
     },
     {
       "path": "Tests/test_python_tail_policy.py",
@@ -222,7 +230,7 @@
     },
     {
       "path": "Tests/validation/test_agent_completion_gate.py",
-      "sha256": "424e7b46067af5ecd837db279d9b30dadc9adf4c15d4c5255e92457edf86cdb3"
+      "sha256": "969d849973263a89a7fee5d556c4e4af93fe917e17fba775d3e18be534233204"
     },
     {
       "path": "Tests/validation/verify_apple_feature_artifact_lifecycle.py",
@@ -350,11 +358,11 @@
     },
     {
       "path": "docs/development.en.md",
-      "sha256": "0ee1599f372052c71659fc022e6d0789d1a8b87ff372e661218e73f2eaa235fe"
+      "sha256": "c000aa35013dbf67c0f24dd1eaf546b46786cfc3b2ce577f08fffd6cb5d44c8e"
     },
     {
       "path": "docs/development.md",
-      "sha256": "bf6ae875d2063508fc87494ed212b7c71551f5e83be625c4c519a8ae4a161c81"
+      "sha256": "7d96c07d7a8e1ca7cf1133c4ab63401c70bf34f5ae911bb204b527259398c9b0"
     },
     {
       "path": "docs/quality/evals.md",
@@ -378,7 +386,7 @@
     },
     {
       "path": "docs/validation/README.md",
-      "sha256": "7cf71fc3ad7d5ad839d3d223adebd5f1673490d9afdcdbfcc1840f8333038cd4"
+      "sha256": "5440c1c6581009a8d90329385a242e718cedd79e500480f5e5a43aa98a87d806"
     },
     {
       "path": "docs/xdremux/README.en.md",
@@ -402,7 +410,7 @@
     },
     {
       "path": "scripts/agent_completion_gate.py",
-      "sha256": "7536cadb04eeb194cba7b155f211c2a1c8e546e73c940dbca7ed31a434a267e3"
+      "sha256": "260a1eee372b01af2be3cea56aca38cb39578ffb609af86972c7027a8e4b637f"
     },
     {
       "path": "scripts/build_and_run.sh",
@@ -466,6 +474,6 @@
     }
   ],
   "schema_version": 1,
-  "source_commit": "48555759ac408663e3547e69d8478bfcb3b74cb5",
-  "source_ref": "4855575"
+  "source_commit": "8ea42929d279c6e8cacd6cd36d3065d407f28e6c",
+  "source_ref": "8ea4292"
 }

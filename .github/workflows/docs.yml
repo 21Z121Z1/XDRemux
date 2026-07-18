@@ -1,0 +1,40 @@
+name: XDRemux Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.md"
+      - "Tests/test_public_documentation.py"
+      - "docs/validation/xdremux-source-manifest.json"
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "Tests/test_public_documentation.py"
+      - "docs/validation/xdremux-source-manifest.json"
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate public documentation
+        run: python3 -m unittest Tests.test_public_documentation
+
+      - name: Write documentation summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## XDRemux Documentation"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            if [[ "${{ job.status }}" == "success" ]]; then
+              echo "| Public documentation | Passed |"
+            else
+              echo "| Public documentation | Failed |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
