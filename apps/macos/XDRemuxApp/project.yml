@@ -38,6 +38,13 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      - package: XDRemux
+        product: XDRemuxStyleScenePayloadHelper
+        embed: true
+        link: false
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     settings:
       CODE_SIGN_STYLE: Automatic
       CODE_SIGN_IDENTITY: "-"
@@ -81,6 +88,9 @@ targets:
         link: false
       - package: XDRemux
         product: XDRemuxStyleValidationHelper
+        link: false
+      - package: XDRemux
+        product: XDRemuxStyleScenePayloadHelper
         link: false
     settings:
       CODE_SIGN_STYLE: Automatic

@@ -35,6 +35,8 @@ swift run xdremux convert \
 
 XDRemux 根据当前照片生成 Apple Photos 所需的语义区域和摄影风格资源。只有实际检测到的有效区域会写入输出；面积较小但有效的区域仍会保留。
 
+公开版本只提供一条 constrained-solver 摄影风格路径。它会把当前照片的 Base、RGB Gain、方向、GTC 和相关元数据组织成 per-photo SceneBundle，但 final-HEIC 缺少 capture-time pre-LTM 输入，因此输出 manifest 仍保持 `productionEligible=false`。
+
 该模式继续保留标准 HDR 输出。它不能与 `--oppo-compatible` 同时启用。
 
 ## Apple 人像
@@ -88,7 +90,7 @@ swift run xdremux convert \
 - 标准 HDR Gain Map 和 Apple auxiliary 引用可以解析。
 - 摄影风格和人像资源可以通过仓库 validator。
 - App 与 CLI 对同一转换请求生成相同输出。
-- 已有真实样本通过有限的 macOS Photos 编辑、重新对焦和保存重开检查。
+- 当前可复现证据限于离线容器、ImageIO、helper 和 App bundle 检查；没有把真实 Photos 保存重开结果作为公开产品通过项。
 
 这些结果不代表所有设备、焦段、系统版本或 Apple Photos 版本都已验收。离线结构验证也不等同于 iPhone、Mac 或 OPPO 相册中的真实显示效果。
 

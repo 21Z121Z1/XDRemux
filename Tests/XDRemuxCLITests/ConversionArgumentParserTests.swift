@@ -81,6 +81,22 @@ final class ConversionArgumentParserTests: XCTestCase {
         )
     }
 
+    func testAppleStylesUseOneFixedConstrainedSolverPathForConvertAndBatch() throws {
+        let convert = try parseApple(["--apple-photographic-styles"])
+        let batch = try ConversionArgumentParser.parseBatch([
+            "--input-dir", "/tmp/input",
+            "--apple-photographic-styles",
+        ])
+
+        XCTAssertEqual(convert.conversion.appleFeatures, AppleFeatureOptions(photographicStyles: true))
+        XCTAssertEqual(batch.conversion.appleFeatures, AppleFeatureOptions(photographicStyles: true))
+
+        XCTAssertThrowsError(try ConversionArgumentParser.parseConvert([
+            "--input", "/tmp/input.heic",
+            "--apple-style-data-producer", "learn-node",
+        ]))
+    }
+
     func testProductionRejectsInternalOptionsAndDeveloperAcceptsThem() throws {
         let internalOptions = [
             "--family", "x7",

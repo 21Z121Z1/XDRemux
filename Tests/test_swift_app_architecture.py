@@ -37,8 +37,11 @@ class SwiftAppArchitectureTests(unittest.TestCase):
         self.assertIn("XDRemuxSemanticHelper", PACKAGE)
         self.assertIn("XDRemuxHEVCEncoderHelper", PACKAGE)
         self.assertIn("XDRemuxStyleValidationHelper", PACKAGE)
+        self.assertIn("XDRemuxStyleScenePayloadHelper", PACKAGE)
+        self.assertNotIn("XDRemuxLearnNodeHelper", PACKAGE)
         self.assertNotIn("ApplePlatform", PROJECT)
-        self.assertEqual(PROJECT.count("subpath: Contents/Helpers"), 3)
+        self.assertNotIn("XDRemuxLearnNodeHelper", PROJECT)
+        self.assertEqual(PROJECT.count("subpath: Contents/Helpers"), 4)
 
     def test_build_script_has_quiet_and_diagnostic_modes(self) -> None:
         for command in ("run", "build", "debug", "logs", "verify", "clean"):

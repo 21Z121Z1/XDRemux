@@ -47,6 +47,10 @@ class SwiftAppleSemanticPolicyTests(unittest.TestCase):
 
     def test_person_mask_validity_hint_tracks_real_content(self) -> None:
         self.assertIn(
+            "let personMasksValidHint = semantics.hasCrediblePerson ? 1.0 : -1.0",
+            SWIFT,
+        )
+        self.assertNotIn(
             "let personMasksValidHint = semantics.hasCrediblePerson ? 1.0 : 0.0",
             SWIFT,
         )

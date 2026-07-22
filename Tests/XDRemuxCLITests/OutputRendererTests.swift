@@ -122,6 +122,45 @@ final class OutputRendererTests: XCTestCase {
         XCTAssertTrue(developerCapture.stdout.contains("validate-apple"))
     }
 
+    func testPublicHelpAndRemovedProducerOptionAreBilingual() {
+        for (language, title, unknownOption) in [
+            ("en", "Product options:", "Unknown option"),
+            ("zh-Hans", "产品选项：", "未知选项"),
+        ] {
+            let help = OutputCapture()
+            XCTAssertEqual(XDRemuxCommand.run(
+                arguments: ["--help", "--language", language],
+                mode: .production,
+                environment: [:],
+                preferredLanguages: [],
+                isTTY: false,
+                stdout: help.stdoutWriter,
+                stderr: help.stderrWriter
+            ), 0)
+            XCTAssertTrue(help.stdout.contains(title))
+            XCTAssertTrue(help.stdout.contains("constrained"))
+            XCTAssertFalse(help.stdout.contains("learn-node"))
+            XCTAssertFalse(help.stdout.contains("identity-fallback"))
+            XCTAssertFalse(help.stdout.contains("apple-style-data-producer"))
+
+            let failure = OutputCapture()
+            XCTAssertEqual(XDRemuxCommand.run(
+                arguments: [
+                    "convert", "--input", "/tmp/input.heic",
+                    "--apple-style-data-producer", "learn-node",
+                    "--language", language,
+                ],
+                mode: .production,
+                environment: [:],
+                preferredLanguages: [],
+                isTTY: false,
+                stdout: failure.stdoutWriter,
+                stderr: failure.stderrWriter
+            ), 2)
+            XCTAssertTrue(failure.stderr.contains(unknownOption))
+        }
+    }
+
     func testFailureTemporarilyClearsAndRestoresTTYProgress() {
         let capture = OutputCapture()
         let reporter = makeReporter(capture: capture, isTTY: true)

@@ -4,6 +4,379 @@ import XDRemuxCore
 @testable import XDRemuxAppleFeatures
 
 final class AppleFeatureContractTests: XCTestCase {
+    func testStyleDataIdentityLayoutIsFiniteAndByteStable() throws {
+        let identity = try AppleStyleDataLayout.completeIdentity()
+        let report = try AppleStyleDataLayout.validate(identity)
+
+        XCTAssertEqual(identity.count, 51_840)
+        XCTAssertEqual(sha256Hex(identity), AppleStyleDataLayout.identitySHA256)
+        XCTAssertEqual(report["valueCount"] as? Int, 25_920)
+        XCTAssertEqual(report["completeIdentity"] as? Bool, true)
+        XCTAssertEqual(report["identityResidualRMSE"] as? Double, 0)
+    }
+
+    func testStyleDataLayoutRejectsMalformedAndNonfiniteBuffers() throws {
+        XCTAssertThrowsError(try AppleStyleDataLayout.validate(Data(count: 51_838)))
+
+        var nonfinite = try AppleStyleDataLayout.completeIdentity()
+        nonfinite[0] = 0x00
+        nonfinite[1] = 0x7c
+        XCTAssertThrowsError(try AppleStyleDataLayout.validate(nonfinite))
+    }
+
+    func testStylePolynomialBasisUsesVerifiedTenTermOrder() throws {
+        let basis = try AppleStyleDataLayout.basis(red: 2, green: 3, blue: 5)
+        XCTAssertEqual(basis, [1, 2, 3, 5, 4, 6, 10, 9, 15, 25])
+        XCTAssertThrowsError(
+            try AppleStyleDataLayout.basis(red: .nan, green: 0, blue: 0)
+        )
+    }
+
+    func testPhotoDerivedLightMapClampsOnlyAtNativeSerializationBoundary() throws {
+        let source = Array(repeating: Float(-1), count: 16 * 32)
+            + Array(repeating: Float(2), count: 16 * 32)
+        let map = try ApplePhotographicStylesPipeline.lightMap(
+            source,
+            width: 32,
+            height: 32,
+            valueScale: 1,
+            outputMinimum: 0.040740966796875,
+            outputMaximum: 0.75830078125,
+            storageOrientation: 1
+        )
+        let values = stride(from: 0, to: map.count, by: 2).map { offset -> Float in
+            let bits = UInt16(map[offset]) | UInt16(map[offset + 1]) << 8
+            return Float(Float16(bitPattern: bits))
+        }
+
+        XCTAssertEqual(map.count, 2_048)
+        XCTAssertEqual(values.min(), Float(Float16(0.040740966796875)))
+        XCTAssertEqual(values.max(), Float(Float16(0.75830078125)))
+        XCTAssertThrowsError(try ApplePhotographicStylesPipeline.lightMap(
+            [0], width: 2, height: 2, valueScale: 1, storageOrientation: 1
+        ))
+    }
+
+    func testNeutralStyleDeltaProtocolResourceIsByteStable() throws {
+        let hashes = try ApplePhotographicStylesPipeline
+            .neutralStyleDeltaProtocolResourceHashes()
+        XCTAssertEqual(
+            hashes["annexB"],
+            "d02017d9f516dbe7ef156bb92000311180cd4a1ff0aab1b3753bc2cc71ca8846"
+        )
+        XCTAssertEqual(
+            hashes["itemPayload"],
+            "14b04fcde02476f24f83a893d245b4d06728954e8ad004f416b6e3a956eba216"
+        )
+        XCTAssertEqual(
+            hashes["hvcC"],
+            "35ecc004d07192f4e9c8a44c0a9edb598599b7a6d0c59b8165a5fb433f5746a5"
+        )
+    }
+
+    func testAppleNativeHelperTimeoutTerminatesTheChild() throws {
+        let result = try AppleNativeToolchain.run(
+            URL(fileURLWithPath: "/bin/sleep"),
+            arguments: ["2"],
+            timeout: 0.05
+        )
+        XCTAssertTrue(result.timedOut)
+        XCTAssertNotEqual(result.status, 0)
+    }
+
+    func testConstrainedStyleDataRepeatsOneQuantizedBlockAcrossAllPlanesAndNodes() throws {
+        let parameters = [0.01, -0.02, 0.03, 0.04, -0.05, 0.06]
+        let styleData = try ConstrainedPolynomialStyleDataProducer.styleData(
+            parameters: parameters
+        )
+        let blockByteCount = AppleStyleDataLayout.blockValueCount * 2
+        let firstBlock = styleData.prefix(blockByteCount)
+
+        XCTAssertEqual(styleData.count, AppleStyleDataLayout.byteCount)
+        for blockIndex in 0..<AppleStyleDataLayout.tileCount {
+            let lower = blockIndex * blockByteCount
+            XCTAssertEqual(
+                styleData.subdata(in: lower..<(lower + blockByteCount)),
+                Data(firstBlock)
+            )
+        }
+        XCTAssertNotEqual(sha256Hex(styleData), AppleStyleDataLayout.identitySHA256)
+        XCTAssertEqual(try AppleStyleDataLayout.validate(styleData)["finite"] as? Bool, true)
+    }
+
+    func testConstrainedStyleDataRejectsMalformedOrNonfiniteParameters() {
+        XCTAssertThrowsError(
+            try ConstrainedPolynomialStyleDataProducer.styleData(parameters: [0])
+        )
+        XCTAssertThrowsError(
+            try ConstrainedPolynomialStyleDataProducer.styleData(
+                parameters: [.nan, 0, 0, 0, 0, 0]
+            )
+        )
+        XCTAssertThrowsError(
+            try ConstrainedPolynomialStyleDataProducer.styleData(
+                parameters: [1, 0, 0, 0, 0, 0]
+            )
+        )
+    }
+
+    func testDifferentConstrainedInputsProduceDifferentKeyOneHashes() throws {
+        let first = try ConstrainedPolynomialStyleDataProducer.styleData(
+            parameters: [0.01, 0, 0, 0, 0, 0]
+        )
+        let second = try ConstrainedPolynomialStyleDataProducer.styleData(
+            parameters: [0, 0.01, 0, 0, 0, 0]
+        )
+        XCTAssertNotEqual(sha256Hex(first), sha256Hex(second))
+    }
+
+    func testConstrainedGlobalPolynomialRecoversT0ThroughT5Terms() throws {
+        let values: [Float] = [0.10, 0.25, 0.40, 0.55, 0.70, 0.85]
+        var source: [Float] = []
+        for red in values {
+            for green in values {
+                for blue in values {
+                    source.append(contentsOf: [red * 255, green * 255, blue * 255])
+                }
+            }
+        }
+        let epsilon: Float = 1.0 / 32.0
+        let teachers: [(name: String, coefficientIndex: Int?, target: ([Float]) -> [Float])] = [
+            ("T0", nil, { $0 }),
+            ("T1 R->R", 3, { input in
+                Self.polynomialTeacher(input, output: 0, epsilon: epsilon) { red, _, _ in red }
+            }),
+            ("T2 G->R", 6, { input in
+                Self.polynomialTeacher(input, output: 0, epsilon: epsilon) { _, green, _ in green }
+            }),
+            ("T3 constant->R", 0, { input in
+                Self.polynomialTeacher(input, output: 0, epsilon: epsilon) { _, _, _ in 1 }
+            }),
+            ("T4 R2->R", 12, { input in
+                Self.polynomialTeacher(input, output: 0, epsilon: epsilon) { red, _, _ in red * red }
+            }),
+            ("T5 RG->B", 17, { input in
+                Self.polynomialTeacher(input, output: 2, epsilon: epsilon) { red, green, _ in red * green }
+            }),
+        ]
+
+        for teacher in teachers {
+            let coefficients = try ConstrainedPolynomialStyleDataProducer
+                .fitGlobalPolynomial(
+                    sourceRGB8: source,
+                    targetRGB8: teacher.target(source)
+                )
+            if let expected = teacher.coefficientIndex {
+                XCTAssertEqual(
+                    coefficients[expected],
+                    Double(epsilon),
+                    accuracy: 0.003,
+                    teacher.name
+                )
+                let sameOutputLeakage = coefficients.indices
+                    .filter { $0 % 3 == expected % 3 && $0 != expected }
+                    .map { abs(coefficients[$0]) }
+                    .max() ?? 0
+                XCTAssertLessThan(sameOutputLeakage, 0.003, teacher.name)
+            } else {
+                XCTAssertLessThan(coefficients.map(abs).max() ?? 0, 1e-9, teacher.name)
+            }
+        }
+    }
+
+    func testConfiguredConstrainedSolverFixtureImprovesSceneMatch() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let fixturePath = environment["XDREMUX_STYLE_SOLVER_FIXTURE"],
+              let propertyListPath = environment["XDREMUX_STYLE_SOLVER_IDENTITY_PLIST"],
+              let outputPath = environment["XDREMUX_STYLE_SOLVER_OUTPUT"] else {
+            throw XCTSkip("configured private constrained-solver fixture is unavailable")
+        }
+        let fixtureURL = URL(fileURLWithPath: fixturePath)
+        let propertyListURL = URL(fileURLWithPath: propertyListPath)
+        let outputURL = URL(fileURLWithPath: outputPath, isDirectory: true)
+        try? FileManager.default.removeItem(at: outputURL)
+
+        let startedAt = Date()
+        let result = try ConstrainedPolynomialStyleDataProducer().makeStyleData(
+            preliminaryHEICURL: fixtureURL,
+            identityStylePropertyList: try Data(contentsOf: propertyListURL),
+            outputDirectory: outputURL
+        )
+        let identity = try XCTUnwrap(result.reconstructionMetrics["identity"] as? [String: Any])
+        let selected = try XCTUnwrap(result.reconstructionMetrics["selected"] as? [String: Any])
+        let identityRMSE = try XCTUnwrap(identity["rmse8"] as? Double)
+        let selectedRMSE = try XCTUnwrap(selected["rmse8"] as? Double)
+
+        XCTAssertTrue(result.sceneMatched)
+        XCTAssertTrue(result.key1IncrementEligible)
+        XCTAssertFalse(result.productionEligible)
+        XCTAssertLessThan(selectedRMSE, identityRMSE)
+        if let maximumText = environment["XDREMUX_STYLE_SOLVER_MAX_RMSE8"],
+           let maximum = Double(maximumText) {
+            XCTAssertLessThanOrEqual(selectedRMSE, maximum)
+        }
+        if let expectedSHA256 = environment["XDREMUX_STYLE_SOLVER_EXPECTED_SHA256"] {
+            XCTAssertEqual(result.styleDataSHA256, expectedSHA256)
+        }
+        let report: [String: Any] = [
+            "fixture": fixtureURL.path,
+            "styleDataSHA256": result.styleDataSHA256,
+            "identityRMSE8": identityRMSE,
+            "selectedRMSE8": selectedRMSE,
+            "rmseImprovementFraction": 1 - selectedRMSE / identityRMSE,
+            "elapsedSeconds": Date().timeIntervalSince(startedAt),
+        ]
+        let reportData = try JSONSerialization.data(
+            withJSONObject: report,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        print(String(decoding: reportData, as: UTF8.self))
+    }
+
+    func testNativeIncrementResponseMetricSubtractsIdentityResponse() throws {
+        let candidateMinus: [Float] = [0, 10, 20, 30]
+        let candidatePlus: [Float] = [2, 14, 26, 42]
+        let identityMinus: [Float] = [0, 8, 18, 30]
+        let identityPlus: [Float] = [1, 11, 23, 39]
+        let rmse = try ConstrainedPolynomialStyleDataProducer.incrementalResponseRMSE8(
+            candidateMinus: candidateMinus,
+            candidatePlus: candidatePlus,
+            identityMinus: identityMinus,
+            identityPlus: identityPlus
+        )
+        // Candidate response is [2,4,6,12], identity response is [1,3,5,9].
+        XCTAssertEqual(rmse, sqrt(3.0), accuracy: 0.000_001)
+        XCTAssertThrowsError(
+            try ConstrainedPolynomialStyleDataProducer.incrementalResponseRMSE8(
+                candidateMinus: [.nan],
+                candidatePlus: [0],
+                identityMinus: [0],
+                identityPlus: [0]
+            )
+        )
+    }
+
+    func testNativeIncrementCurvatureMetricSubtractsIdentityCurvature() throws {
+        let rmse = try ConstrainedPolynomialStyleDataProducer.incrementalCurvatureRMSE8(
+            candidateMinus: [0, 4, 8],
+            candidateMidpoint: [2, 7, 12],
+            candidatePlus: [6, 14, 22],
+            identityMinus: [0, 3, 7],
+            identityMidpoint: [1, 5, 10],
+            identityPlus: [3, 9, 17]
+        )
+        // Candidate curvature is [2,4,6], identity curvature is [1,2,4].
+        XCTAssertEqual(rmse, sqrt(3.0), accuracy: 0.000_001)
+        XCTAssertThrowsError(
+            try ConstrainedPolynomialStyleDataProducer.incrementalCurvatureRMSE8(
+                candidateMinus: [0],
+                candidateMidpoint: [.infinity],
+                candidatePlus: [0],
+                identityMinus: [0],
+                identityMidpoint: [0],
+                identityPlus: [0]
+            )
+        )
+    }
+
+    func testNativeResponseDirectionRejectsReversedToneAndColor() {
+        XCTAssertTrue(
+            ConstrainedPolynomialStyleDataProducer.responseDirectionPassed(
+                name: "tone",
+                meanLumaDelta8: 1,
+                meanChromaDelta8: -1
+            )
+        )
+        XCTAssertFalse(
+            ConstrainedPolynomialStyleDataProducer.responseDirectionPassed(
+                name: "tone",
+                meanLumaDelta8: -1,
+                meanChromaDelta8: 1
+            )
+        )
+        XCTAssertTrue(
+            ConstrainedPolynomialStyleDataProducer.responseDirectionPassed(
+                name: "color",
+                meanLumaDelta8: -1,
+                meanChromaDelta8: 1
+            )
+        )
+        XCTAssertFalse(
+            ConstrainedPolynomialStyleDataProducer.responseDirectionPassed(
+                name: "color",
+                meanLumaDelta8: 1,
+                meanChromaDelta8: -1
+            )
+        )
+        XCTAssertTrue(
+            ConstrainedPolynomialStyleDataProducer.responseDirectionPassed(
+                name: "combined",
+                meanLumaDelta8: 1,
+                meanChromaDelta8: 1
+            )
+        )
+        XCTAssertFalse(
+            ConstrainedPolynomialStyleDataProducer.responseDirectionPassed(
+                name: "combined",
+                meanLumaDelta8: 1,
+                meanChromaDelta8: -1
+            )
+        )
+        XCTAssertFalse(
+            ConstrainedPolynomialStyleDataProducer.responseDirectionPassed(
+                name: "tone",
+                meanLumaDelta8: .nan,
+                meanChromaDelta8: 1
+            )
+        )
+    }
+
+    private static func polynomialTeacher(
+        _ input: [Float],
+        output: Int,
+        epsilon: Float,
+        term: (Float, Float, Float) -> Float
+    ) -> [Float] {
+        var target = input
+        for offset in stride(from: 0, to: input.count, by: 3) {
+            let red = input[offset] / 255
+            let green = input[offset + 1] / 255
+            let blue = input[offset + 2] / 255
+            target[offset + output] += epsilon * term(red, green, blue) * 255
+        }
+        return target
+    }
+
+    func testSolverIdentityBaselineIsInternalAndNotProductionEligible() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-style-baseline-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let source = directory.appendingPathComponent("source.bin")
+        let target = directory.appendingPathComponent("target.bin")
+        try Data("source".utf8).write(to: source)
+        try Data("target".utf8).write(to: target)
+
+        let result = try SolverIdentityBaselineProducer().makeStyleData(
+            request: AppleStyleDataRequest(
+                sourceURL: source,
+                renderedTargetURL: target,
+                outputDirectory: directory.appendingPathComponent("output"),
+                sourceDomain: "test source",
+                targetDomain: "test target"
+            )
+        )
+
+        XCTAssertEqual(result.styleDataSHA256, AppleStyleDataLayout.identitySHA256)
+        XCTAssertFalse(result.identityFallback)
+        XCTAssertFalse(result.sceneMatched)
+        XCTAssertFalse(result.productionEligible)
+        XCTAssertNil(result.fallbackKind)
+        XCTAssertFalse(result.warnings.isEmpty)
+        XCTAssertEqual(result.manifest["sceneMatched"] as? Bool, false)
+        XCTAssertEqual(result.manifest["productionEligible"] as? Bool, false)
+    }
+
     func testPortraitCoreSelfTestRemainsByteStable() throws {
         let report = try AppleFeatureConversionEngine.portraitSelfTestReport()
 
@@ -116,6 +489,10 @@ final class AppleFeatureContractTests: XCTestCase {
         XCTAssertEqual(
             try AppleNativeToolchain.stylePropertiesProbeExecutable().lastPathComponent,
             "XDRemuxStyleValidationHelper"
+        )
+        XCTAssertEqual(
+            try AppleNativeToolchain.styleScenePayloadExecutable().lastPathComponent,
+            "XDRemuxStyleScenePayloadHelper"
         )
     }
 

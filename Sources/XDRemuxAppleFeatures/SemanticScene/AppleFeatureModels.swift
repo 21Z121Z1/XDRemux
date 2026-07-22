@@ -11,6 +11,9 @@ package enum AppleEvidenceClass: String, Codable, Sendable {
     case profileExact = "profile_exact"
     case sourceDerivedApproximation = "source_derived_approximation"
     case privateFrameworkIdentity = "private_framework_same_scene_identity"
+    case privateFrameworkNearIdentityFallback = "private_framework_same_scene_near_identity"
+    case privateFrameworkLearned = "private_framework_learned_scene_match"
+    case completeNeutrinoConstrainedSolver = "complete_neutrino_constrained_scene_match"
     case protocolConstant = "protocol_constant"
     case unavailable
 }

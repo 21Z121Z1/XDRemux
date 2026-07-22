@@ -22,15 +22,15 @@
     },
     {
       "path": "Package.swift",
-      "sha256": "00987d9699baead01cced05480fedb1557d18a9ef86fc096414772f88e5eb429"
+      "sha256": "adc4a9f9a485b1b925946235e42cc037202a4f69f854e623a87878af3136dbb3"
     },
     {
       "path": "README.en.md",
-      "sha256": "baf9519b994b1a5d10420b6a6ebcfc042c1a1fbd6f9b7c62dd0d1c854a6eea95"
+      "sha256": "06ab94726ac610f43b6038087d3c0f5e07698ec4dfdec999df1313fb0d7b0b41"
     },
     {
       "path": "README.md",
-      "sha256": "3ff5d4e4eb32c8699c3bcfb189275920e5d511fe8f1771aa84098a2fa822df51"
+      "sha256": "101e13e4c9d122efcf8ae9d6f1bd1d745287b616feb9e45ef7410ab9b0745335"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/AppleFeatureConversionEngine.swift",
@@ -42,7 +42,15 @@
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/PhotographicStyles/ApplePhotographicStylesPipeline.swift",
-      "sha256": "15e435c44043533563514cff26356622fe712f0dfb2108b252c7be874bfb4fb2"
+      "sha256": "9bb3bb4e219552c2162c34598609e57d16d461799a92c0d8baa74338602b0478"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/PhotographicStyles/AppleStyleDataProducer.swift",
+      "sha256": "ebf02d488a2d85dee7434ae39beaf7ac51705d2ade49281155c8e52090b9bc67"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/PhotographicStyles/ConstrainedPolynomialStyleDataProducer.swift",
+      "sha256": "8c6261184ffa5495d0aeae1fdf37c4f72af7ff2649d3ca85e161c86ebd5ab5df"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/Portrait/PortraitConversionPipeline.swift",
@@ -51,10 +59,6 @@
     {
       "path": "Sources/XDRemuxAppleFeatures/Portrait/PortraitModels.swift",
       "sha256": "e72668a5a1d42f3cb06ac9679a379493b75ac42b97ba1c9d4b05a1387157cea7"
-    },
-    {
-      "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Native/learnnode_coefficient_probe.m",
-      "sha256": "cc8b0ed0d824ed4998f5193269e7ed75dbd5333b9c032907c872e9332a28f8ae"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Validation/apple_auxiliary_matte_probe.m",
@@ -66,11 +70,11 @@
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleFeatureModels.swift",
-      "sha256": "98ba611fbe31f03b1db50d53a583575f783e9767a32c08f081541a54727551f7"
+      "sha256": "a0fc14b0e0a4ed3d137a712e5344eea718c2fbb60a3ee9eb1ab6ae5cb32c4bee"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleNativeToolchain.swift",
-      "sha256": "d52f46c5005e50f5909935ca8dc234cc5ef39e3b2fa2efac6c8b6dcf1bca8b14"
+      "sha256": "0e8c7749da7677950e6c410e1cf22758fe3fd40d1e4b693edc553d90aa1397a3"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleSemanticScaffoldBuilder.swift",
@@ -86,11 +90,11 @@
     },
     {
       "path": "Sources/XDRemuxCLI/Commands/XDRemuxCommand.swift",
-      "sha256": "9fb0b301cab13d67a7befa76d4c6c10ff1db7bdde7554f0454c3989571717efe"
+      "sha256": "103c90fd0d16981f74724184f53ee9a7a9353f7f154fb3938722625f5cadc27b"
     },
     {
       "path": "Sources/XDRemuxCLI/Localization/Localizer.swift",
-      "sha256": "ec4a05473d03915981a404455676e239c3f02ab2bc2215a7fa09f7dc4cfc9c65"
+      "sha256": "710087380d7a259c15b571c35ca76127d440e5a9c6e392afc4305bafd8e3df07"
     },
     {
       "path": "Sources/XDRemuxCLI/Output/CLIOutput.swift",
@@ -106,11 +110,11 @@
     },
     {
       "path": "Sources/XDRemuxCLI/Resources/en.lproj/Localizable.strings",
-      "sha256": "4da70cc60d5b905d7a1d208cdbc24949d36316243f6a7beb171787263be6bd06"
+      "sha256": "e039a9e1257b2f0007fe8aca72672273de4bb0e2c55cc7013ebb355d89d609e2"
     },
     {
       "path": "Sources/XDRemuxCLI/Resources/zh-Hans.lproj/Localizable.strings",
-      "sha256": "e8e3c91c75c611948c2153d37c5ed3490cb19961f86660c5cef90e54f9dc5d3a"
+      "sha256": "eb32a2766e72f199fe3466eb6f64e34b34d4c90710646cb1f032a44bfbc91868"
     },
     {
       "path": "Sources/XDRemuxCore/Batch/BatchModels.swift",
@@ -173,6 +177,14 @@
       "sha256": "16c3c682f1f7644c8ebb1bd01bf2f172d4bd384056f502c98bd4d76a0e08a51c"
     },
     {
+      "path": "Sources/XDRemuxStyleScenePayloadHelper/StyleRenderer.m",
+      "sha256": "1cd0da24e1cce8bc08ccb13b1c2fcd34bf34babf8bdf54c3e8c5b3a808334b06"
+    },
+    {
+      "path": "Sources/XDRemuxStyleScenePayloadHelper/main.m",
+      "sha256": "cc9d205cc8ca7f473ed3fa226e4a935dcf63ca6d4fd47b831f27551bc051946e"
+    },
+    {
       "path": "Sources/XDRemuxStyleValidationHelper/main.m",
       "sha256": "d32e643f15470311f37b1c8cc81a689ff9f645c104cbcb37b99312b96239e2a4"
     },
@@ -182,7 +194,7 @@
     },
     {
       "path": "Tests/XDRemuxAppleFeaturesTests/AppleFeatureContractTests.swift",
-      "sha256": "ee4b3138aea1b51cfdc2409742145a1f2dd0b7f99efe7f6cf10fb95ec7c95367"
+      "sha256": "432e81815fdf1ec1421dc57b5d41043e4b951c7708b84a7a19dfffca8a598648"
     },
     {
       "path": "Tests/XDRemuxCLITests/BatchCoordinatorTests.swift",
@@ -190,7 +202,7 @@
     },
     {
       "path": "Tests/XDRemuxCLITests/ConversionArgumentParserTests.swift",
-      "sha256": "0ff1f8f0cfd8c64f7c5e729fcb1ead18a8389991535399349e22ebb3a5bf58c4"
+      "sha256": "dcecca762c72545d8a2036b89e22ab6a0b149e0197271033a02bdaf50888c1bb"
     },
     {
       "path": "Tests/XDRemuxCLITests/LocalizationTests.swift",
@@ -198,7 +210,7 @@
     },
     {
       "path": "Tests/XDRemuxCLITests/OutputRendererTests.swift",
-      "sha256": "fb1562e5e478cc4d515510d018bdf26da3482cec93e40197b5a3da3cf84383b0"
+      "sha256": "43afb2940c342eaa547c0e4516b5f7172e35f1760b575bfe5706af7c002459cc"
     },
     {
       "path": "Tests/XDRemuxCoreTests/CoreContractTests.swift",
@@ -226,19 +238,19 @@
     },
     {
       "path": "Tests/test_swift_app_architecture.py",
-      "sha256": "077bb5d4af264564e6901c4c4c5d3ab8d679a1d28fee728aed1a3663a4cbe0aa"
+      "sha256": "1c8a8a39a4296f94e764356ad58cb3e22c70b8ff1052628dfaa9264985c8a069"
     },
     {
       "path": "Tests/test_swift_apple_semantic_policy.py",
-      "sha256": "7b30c6e9d76876b0a4d6f4589da529c9b4ab97dd61d4295b8ee68965263c04bd"
+      "sha256": "a8890f773b0157ae7a86a757d080b7ff9e551337940f71fbefdc44914c389181"
     },
     {
       "path": "Tests/test_swift_apple_styles_writer_policy.py",
-      "sha256": "5b3131b7928f672277385baaafe4fa2d157fa69fefdc1392e2f5b804d27ae72d"
+      "sha256": "71bbd438f4995373dfff54f67b07f56574a34cb356b9687cd1891711203c6c39"
     },
     {
       "path": "Tests/test_swift_artifact_lifecycle.py",
-      "sha256": "e9ba1aa63086283f31cbbba256b251bb092865957c244af44c579f486aa11c8f"
+      "sha256": "84a4c01b96bafcb71ad097a0ced9b2af1a03d4a9dc7f63c7720c06748e694373"
     },
     {
       "path": "Tests/validation/test_agent_completion_gate.py",
@@ -334,7 +346,7 @@
     },
     {
       "path": "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj",
-      "sha256": "81b42af36c12b618de7f6c0a8d16cc48e6d488922774e523537c08ab006f1c7d"
+      "sha256": "d5054173af833784fb4e09af8c150dc4c2037401f6e5da4e47336526a00b8974"
     },
     {
       "path": "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
@@ -342,7 +354,7 @@
     },
     {
       "path": "apps/macos/XDRemuxApp/project.yml",
-      "sha256": "236f9553a6a78060e5f11225705225d6fa7dcf715b35f4e0f74261a3cca86750"
+      "sha256": "eee02e08d3f9f1a080ba14da29407af66d304a967a6523ac3214aa799bddc656"
     },
     {
       "path": "docs/README.en.md",
@@ -354,11 +366,11 @@
     },
     {
       "path": "docs/apple-features.en.md",
-      "sha256": "ec19fa8195916af742d74fbe533e6e21e7517c367cb968509075bd23246cf575"
+      "sha256": "b741c833459d4c2f3a4f1495c350f0f775f9b43ebf94dbb5b16a8ca2dc241fa4"
     },
     {
       "path": "docs/apple-features.md",
-      "sha256": "73cfe8862b62e7626ee5af962dc2ee3fdc25ba0b1ebb76ada1e5403dc94f9b1f"
+      "sha256": "403288c9b2bf44efa10a2adc78035aa39d5865cc2a3c547b6067a461d7324d74"
     },
     {
       "path": "docs/cli.en.md",
@@ -430,7 +442,7 @@
     },
     {
       "path": "scripts/build_and_run.sh",
-      "sha256": "e040f780af34ee264fe8117d30e792fbed5b11ed2eef1086604ba988535310f6"
+      "sha256": "0c6d70090c90a988eb73328dbe64b1038acf8662a6ca8117f4f06c5e50f430b0"
     },
     {
       "path": "scripts/compare_oppo_heif_mutation.py",
@@ -498,6 +510,6 @@
     }
   ],
   "schema_version": 1,
-  "source_commit": "888521def507220e891dce85731f9431feddb486",
-  "source_ref": "888521def507220e891dce85731f9431feddb486"
+  "source_commit": "5e008838b29a15c81ba6dae1db8f1ec3fd18c984",
+  "source_ref": "5e008838b29a15c81ba6dae1db8f1ec3fd18c984"
 }

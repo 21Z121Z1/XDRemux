@@ -11,21 +11,54 @@ import Vision
 import XDRemuxCore
 
 package enum ApplePhotographicStylesPipeline {
-    private struct StyleDataResult {
-        let styleData: Data
-        let styleDataSHA256: String
-        let polynomialCount: Int
-        let blockValueCount: Int
-        let tileCount: Int
+    private enum ResearchSemanticGraphMode: String {
+        case zeroPerson = "zero-person"
+        case zeroSkin = "zero-skin"
+        case zeroHuman = "zero-human"
+        case skyOnly = "sky-only"
     }
 
-    private struct LinearSceneRaster {
+    private struct ResearchSemanticGraphOverride {
+        let mode: ResearchSemanticGraphMode
+        let analysis: AppleSemanticSceneAnalysis
+        let writeProfile: AppleSemanticWriteProfile
+    }
+
+    private struct PhotoDerivedStyleSceneBundle {
         let width: Int
         let height: Int
-        let encodedRGB8: Data
-        let toneLinearRGB: [Float]
-        let toneLuma: [Float]
-        let hdrLuma: [Float]
+        let codedLinearEncodedRGB8: Data
+        let toneRGBAHalf: Data
+        let rendererLinearRGBA16: Data
+        let styleEngineWidth: Int
+        let styleEngineHeight: Int
+        let styleEngineToneRGBAHalf: Data
+        let styleEngineRendererLinearRGBA16: Data
+        let baseLinearP3RGB: [Float]
+        let hdrLinearP3RGB: [Float]
+        let logGainRGB: [Float]
+        let baseLuminance: [Float]
+        let hdrLuminance: [Float]
+        let codedLinearLuminance: [Float]
+        let rendererLinearLuminance: [Float]
+        let gtcMappedLuminance: [Float]
+        let globalToneCurve: Data
+        let globalToneCurveLinearSamples: [Float]
+        let globalToneCurveFitRMSE: Double
+        let globalToneCurvePopulatedBins: Int
+        let globalToneCurveSourceFeature: Float
+        let globalToneCurveClampedSourceFeature: Float
+        let contentHeadroom: Float
+        let baselineExposure: Float
+        let baselineExposureUnclamped: Float
+        let baselineHighlightCompressionRatio: Float
+        let linearBaseGain: Float
+        let linearEncodingGain: Float
+        let rendererLinearRangeMin: Float
+        let rendererLinearRangeMax: Float
+        let researchLinearInputScale: Float
+        let researchScalarOverrides: [String: Float]
+        let gainMapMaximumStops: Float
     }
 
     private struct EncodedHEVCResource {
@@ -48,6 +81,89 @@ package enum ApplePhotographicStylesPipeline {
         let outputOriginalMdatPrefixSHA256: String
         let itemCount: Int
         let propertyCount: Int
+    }
+
+    private static func zeroedSemanticMatte(
+        _ matte: AppleSemanticMatte?
+    ) -> AppleSemanticMatte? {
+        guard let matte else { return nil }
+        return AppleSemanticMatte(
+            pixels: Data(repeating: 0, count: matte.width * matte.height),
+            width: matte.width,
+            height: matte.height,
+            bytesPerRow: matte.width,
+            statistics: SemanticStatistics(
+                minimum: 0,
+                maximum: 0,
+                mean: 0,
+                coverage: 0
+            ),
+            provenance: matte.provenance
+        )
+    }
+
+    private static func researchSemanticGraphOverride(
+        analysis: AppleSemanticSceneAnalysis,
+        normalWriteProfile: AppleSemanticWriteProfile,
+        portraitWritten: Bool
+    ) throws -> ResearchSemanticGraphOverride? {
+        guard let rawValue = ProcessInfo.processInfo.environment[
+            "XDREMUX_RESEARCH_STYLES_SEMANTIC_GRAPH_MODE"
+        ], !rawValue.isEmpty else {
+            return nil
+        }
+        guard let mode = ResearchSemanticGraphMode(rawValue: rawValue.lowercased()) else {
+            throw CLIError.invalidContainer(
+                "unknown XDREMUX_RESEARCH_STYLES_SEMANTIC_GRAPH_MODE: \(rawValue)"
+            )
+        }
+        guard !portraitWritten else {
+            throw CLIError.invalidContainer(
+                "research semantic graph overrides are styles-only and cannot rewrite a combined Portrait graph"
+            )
+        }
+        let graphAnalysis: AppleSemanticSceneAnalysis
+        let graphProfile: AppleSemanticWriteProfile
+        switch mode {
+        case .zeroPerson:
+            graphAnalysis = AppleSemanticSceneAnalysis(
+                person: zeroedSemanticMatte(analysis.person),
+                skin: analysis.skin,
+                hair: analysis.hair,
+                teeth: analysis.teeth,
+                glasses: analysis.glasses,
+                sky: analysis.sky
+            )
+            graphProfile = normalWriteProfile
+        case .zeroSkin:
+            graphAnalysis = AppleSemanticSceneAnalysis(
+                person: analysis.person,
+                skin: zeroedSemanticMatte(analysis.skin),
+                hair: analysis.hair,
+                teeth: analysis.teeth,
+                glasses: analysis.glasses,
+                sky: analysis.sky
+            )
+            graphProfile = normalWriteProfile
+        case .zeroHuman:
+            graphAnalysis = AppleSemanticSceneAnalysis(
+                person: zeroedSemanticMatte(analysis.person),
+                skin: zeroedSemanticMatte(analysis.skin),
+                hair: analysis.hair,
+                teeth: analysis.teeth,
+                glasses: analysis.glasses,
+                sky: analysis.sky
+            )
+            graphProfile = normalWriteProfile
+        case .skyOnly:
+            graphAnalysis = analysis
+            graphProfile = .styleSkyOnly
+        }
+        return ResearchSemanticGraphOverride(
+            mode: mode,
+            analysis: graphAnalysis,
+            writeProfile: graphProfile
+        )
     }
 
     private struct Options {
@@ -106,46 +222,6 @@ package enum ApplePhotographicStylesPipeline {
             "styleDataLength": 51_840,
             "donorContamination": validation.contaminationReport,
         ]
-    }
-
-    private static func completeIdentityStyleData(
-        outputDirectory: URL
-    ) throws -> StyleDataResult {
-        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
-        let polynomialCount = 10
-        let channelCount = 3
-        let blockValueCount = polynomialCount * channelCount
-        let tileCount = 12 * 9 * 8
-        let identityIndices = Set([3, 7, 11])
-        var block = Data()
-        block.reserveCapacity(blockValueCount * 2)
-        for index in 0..<blockValueCount {
-            var bits = Float16(identityIndices.contains(index) ? 1 : 0).bitPattern.littleEndian
-            withUnsafeBytes(of: &bits) { block.append(contentsOf: $0) }
-        }
-        var styleData = Data()
-        styleData.reserveCapacity(block.count * tileCount)
-        for _ in 0..<tileCount {
-            styleData.append(block)
-        }
-        let digest = sha256Hex(styleData)
-        let expectedDigest = "43e0ae73508cc10684d4be708fa1d19f3b55b8de15cb8e3544ef16300db91dbe"
-        guard styleData.count == 51_840, digest == expectedDigest else {
-            throw CLIError.invalidContainer(
-                "generated complete identity key 1 does not match the verified CMImaging coefficient layout"
-            )
-        }
-        try styleData.write(
-            to: outputDirectory.appendingPathComponent("complete-identity-style-data.f16.bin"),
-            options: .atomic
-        )
-        return StyleDataResult(
-            styleData: styleData,
-            styleDataSHA256: digest,
-            polynomialCount: polynomialCount,
-            blockValueCount: blockValueCount,
-            tileCount: tileCount
-        )
     }
 
     private static func sourceScale(
@@ -243,10 +319,406 @@ package enum ApplePhotographicStylesPipeline {
         return 0
     }
 
-    private static func linearSceneRaster(
+    private static func sRGBEncode(_ linear: Double) -> Double {
+        linear <= 0.0031308
+            ? linear * 12.92
+            : 1.055 * pow(linear, 1 / 2.4) - 0.055
+    }
+
+    // Native 23F84 producer evidence proves key 4 is 4 * LTMDigitalGain, but
+    // that capture metadata is not retained in arbitrary third-party HEICs.
+    // The corpus calibration below is deliberately small and auditable: it
+    // normalizes the same-photo HDR/Base p98 compression ratio and preserves
+    // the native 1/65 quantization. It is a behavioral proxy, not a claim that
+    // OPPO metadata contains Apple's LTMDigitalGain.
+    private static let baselineHighlightCompressionCalibration = Float(0.40126406)
+    // The two-feature native-corpus proxy is materially more stable than the
+    // Gain Map maximum alone (8-scene leave-one-out RMSE 0.04026 vs 0.06807).
+    // Including same-photo HDR/Base highlight compression also prevents a
+    // family of OPPO files with identical Gain Map metadata maxima from
+    // collapsing to one scene-independent h/i value.
+    private static let linearBaseGainIntercept = Float(1.51271843)
+    private static let linearBaseGainPerGainMapStop = Float(0.15670632)
+    private static let linearBaseGainPerHighlightCompression = Float(0.14766724)
+    // All 8/8 native reference payloads use positive Float16 c/d samples with
+    // these protocol-domain floors and ceilings.  Preserve the unbounded
+    // SceneBundle values through resampling, then clamp only at this verified
+    // serialized-resource boundary.
+    private static let toneLightMapMinimum = Float(0.040740966796875)
+    private static let toneLightMapMaximum = Float(0.76123046875)
+    private static let linearLightMapMinimum = Float(0.040740966796875)
+    private static let linearLightMapMaximum = Float(0.75830078125)
+
+    private static func photoDerivedLinearMetadata(
+        baseLuminance: [Float],
+        hdrLuminance: [Float],
+        gainMapMaximumStops: Float
+    ) throws -> (
+        baselineExposure: Float,
+        baselineExposureUnclamped: Float,
+        highlightCompressionRatio: Float,
+        baseGain: Float,
+        encodingGain: Float
+    ) {
+        let baseP98 = Float(distribution(baseLuminance)["p98"] ?? 0)
+        let hdrP98 = Float(distribution(hdrLuminance)["p98"] ?? 0)
+        guard baseP98.isFinite, hdrP98.isFinite, baseP98 > 1 / 4096, hdrP98 > 0 else {
+            throw CLIError.invalidContainer(
+                "cannot derive per-photo Styles exposure metadata from finite HDR/Base highlights"
+            )
+        }
+        let highlightCompressionRatio = hdrP98 / baseP98
+        let baselineUnclamped = highlightCompressionRatio
+            / baselineHighlightCompressionCalibration
+        let baselineClamped = min(max(baselineUnclamped, 4), 10.4)
+        let baselineExposure = (baselineClamped * 65).rounded() / 65
+        let baseGain = min(max(
+            linearBaseGainIntercept
+                + linearBaseGainPerGainMapStop * gainMapMaximumStops
+                + linearBaseGainPerHighlightCompression * highlightCompressionRatio,
+            0.5
+        ), 2.5)
+        return (
+            baselineExposure,
+            baselineUnclamped,
+            highlightCompressionRatio,
+            baseGain,
+            4 * baseGain
+        )
+    }
+
+    private static func monotonicGlobalToneCurve(
+        inputLuminance: [Float],
+        outputLuminance: [Float],
+        researchIdentityBlend: Float = 0
+    ) -> (
+        data: Data,
+        linearSamples: [Float],
+        rmse: Double,
+        populatedBins: Int,
+        sourceFeature: Float,
+        clampedSourceFeature: Float
+    ) {
+        precondition(inputLuminance.count == outputLuminance.count)
+        let sampleCount = 256
+        // Key 3 is sampled over a normalized 0...1 texture coordinate.  A
+        // direct fit between absolute coded-linear HDR and Base luminance
+        // confounds exposure normalization with curve shape: on the 019f8511
+        // counterexample it reached 0.934 by input 0.40, while all 84 native
+        // curves remain in a compact, near-identity family.  Normalize both
+        // same-photo domains by their robust white before fitting so key 3
+        // represents only the per-photo global tone shape.  Absolute range is
+        // carried separately by key 4 and i.Gain.
+        let inputWhite = max(Float(distribution(inputLuminance)["highKey"] ?? 0), 1 / 4096)
+        let outputWhite = max(Float(distribution(outputLuminance)["highKey"] ?? 0), 1 / 4096)
+        var sums = Array(repeating: Double(0), count: sampleCount)
+        var counts = Array(repeating: Double(0), count: sampleCount)
+        for (input, output) in zip(inputLuminance, outputLuminance) {
+            guard input.isFinite, output.isFinite else { continue }
+            let x = min(max(Double(input / inputWhite), 0), 1)
+            let y = min(max(Double(output / outputWhite), 0), 1)
+            let index = min(sampleCount - 1, max(0, Int((x * 255).rounded())))
+            sums[index] += y
+            counts[index] += 1
+        }
+        let populated = counts.reduce(into: 0) { result, value in
+            if value > 0 { result += 1 }
+        }
+        var values = Array(repeating: Double(0), count: sampleCount)
+        let populatedIndices = counts.indices.filter { counts[$0] > 0 }
+        if populatedIndices.isEmpty {
+            values = (0..<sampleCount).map { Double($0) / 255 }
+        } else {
+            for index in 0..<sampleCount {
+                if counts[index] > 0 {
+                    values[index] = sums[index] / counts[index]
+                    continue
+                }
+                let lower = populatedIndices.last(where: { $0 < index })
+                let upper = populatedIndices.first(where: { $0 > index })
+                switch (lower, upper) {
+                case let (.some(left), .some(right)):
+                    let fraction = Double(index - left) / Double(right - left)
+                    let leftValue = sums[left] / counts[left]
+                    let rightValue = sums[right] / counts[right]
+                    values[index] = leftValue * (1 - fraction) + rightValue * fraction
+                case let (.some(left), .none):
+                    values[index] = sums[left] / counts[left]
+                case let (.none, .some(right)):
+                    values[index] = sums[right] / counts[right]
+                case (.none, .none):
+                    values[index] = Double(index) / 255
+                }
+            }
+        }
+
+        struct IsotonicBlock {
+            var lower: Int
+            var upper: Int
+            var weight: Double
+            var weightedValue: Double
+
+            var mean: Double { weightedValue / max(weight, .leastNonzeroMagnitude) }
+        }
+        let observationCount = max(counts.reduce(0, +), 1)
+        counts[0] += observationCount
+        sums[0] += 0
+        values[0] = 0
+        counts[sampleCount - 1] += observationCount
+        sums[sampleCount - 1] += observationCount
+        values[sampleCount - 1] = 1
+        var blocks: [IsotonicBlock] = []
+        blocks.reserveCapacity(sampleCount)
+        for index in 0..<sampleCount {
+            let weight = max(counts[index], 1 / 1024)
+            let value = counts[index] > 0 ? sums[index] / counts[index] : values[index]
+            blocks.append(IsotonicBlock(
+                lower: index,
+                upper: index,
+                weight: weight,
+                weightedValue: weight * min(max(value, 0), 1)
+            ))
+            while blocks.count >= 2,
+                  blocks[blocks.count - 2].mean > blocks[blocks.count - 1].mean {
+                let right = blocks.removeLast()
+                var left = blocks.removeLast()
+                left.upper = right.upper
+                left.weight += right.weight
+                left.weightedValue += right.weightedValue
+                blocks.append(left)
+            }
+        }
+        var sourceShape = Array(repeating: Float(0), count: sampleCount)
+        for block in blocks {
+            let value = Float(min(max(block.mean, 0), 1))
+            for index in block.lower...block.upper {
+                sourceShape[index] = value
+            }
+        }
+        sourceShape[0] = 0
+        sourceShape[sampleCount - 1] = 1
+        for index in 1..<sampleCount where sourceShape[index] < sourceShape[index - 1] {
+            sourceShape[index] = sourceShape[index - 1]
+        }
+
+        // The Apple camera GTC is an upstream ISP product and is not retained
+        // in an arbitrary OPPO HEIC.  Direct absolute HDR->Base regression was
+        // falsified by the 019f8511 response counterexample.  The bounded
+        // system-identification model below instead maps one robust,
+        // same-photo shape observation into the compact native curve family.
+        //
+        // Calibration: 84 native GTCs decoded using the 23F84 consumer's
+        // 256-sample contract; the applicable h>=1 regime contains 71 photos.
+        // The source feature is the p95-normalized paired HDR/Base curve at
+        // index 8.  Ten endpoint-preserving polynomial coefficients were fit
+        // against that feature.  Leave-one-out curve RMSE is 0.002697 mean,
+        // 0.007052 p95, and 0.015014 maximum.  The model produces a unique
+        // curve for every distinct source feature and contains no donor curve
+        // selection or scene-dependent identity fallback.
+        let sourceFeature = sourceShape[8]
+        let clampedSourceFeature = min(max(sourceFeature, 0.036004916), 0.083503760)
+        let intercept: [Float] = [
+            -0.084157526, -0.470446978, 0.214894906, -0.094378520,
+            -1.243283963, 1.129283384, 1.872334583, -2.067420023,
+            -1.213296907, 1.064446621,
+        ]
+        let slope: [Float] = [
+            -0.102652002, -0.406791328, -0.148726014, 0.719434204,
+            -1.434380301, -2.721594413, 3.446946499, 4.109380580,
+            -3.075442484, -2.993801587,
+        ]
+        let coefficients = zip(intercept, slope).map {
+            $0.0 + clampedSourceFeature * $0.1
+        }
+        var fitted = Array(repeating: Float(0), count: sampleCount)
+        for index in 0..<sampleCount {
+            let x = Float(index) / Float(sampleCount - 1)
+            let t = 1 - 2 * x
+            let endpointBasis = x * (1 - x)
+            var tPower = Float(1)
+            var value = x
+            for coefficient in coefficients {
+                value += coefficient * endpointBasis * tPower
+                tPower *= t
+            }
+            fitted[index] = min(max(value, 0), 1)
+            if index > 0 {
+                fitted[index] = max(fitted[index], fitted[index - 1])
+            }
+        }
+        fitted[0] = 0
+        fitted[sampleCount - 1] = 1
+        if researchIdentityBlend > 0 {
+            for index in 1..<(sampleCount - 1) {
+                let identity = Float(index) / Float(sampleCount - 1)
+                fitted[index] = fitted[index] * (1 - researchIdentityBlend)
+                    + identity * researchIdentityBlend
+            }
+        }
+
+        var squaredError = Double(0)
+        var finiteCount = 0
+        for (input, output) in zip(inputLuminance, outputLuminance) {
+            guard input.isFinite, output.isFinite else { continue }
+            let position = min(max(Double(input / inputWhite), 0), 1) * 255
+            let lower = min(255, max(0, Int(floor(position))))
+            let upper = min(255, lower + 1)
+            let fraction = position - Double(lower)
+            let predicted = Double(sourceShape[lower]) * (1 - fraction)
+                + Double(sourceShape[upper]) * fraction
+            let error = predicted - min(max(Double(output / outputWhite), 0), 1)
+            squaredError += error * error
+            finiteCount += 1
+        }
+
+        var payload = Data()
+        var countWord = UInt16(257).littleEndian
+        withUnsafeBytes(of: &countWord) { payload.append(contentsOf: $0) }
+        for linear in fitted {
+            let encoded = min(max(sRGBEncode(Double(linear)), 0), 1)
+            var value = UInt16(
+                min(65_534, max(0, Int((encoded * 65_534).rounded())))
+            ).littleEndian
+            withUnsafeBytes(of: &value) { payload.append(contentsOf: $0) }
+        }
+        var terminal = UInt16(65_534).littleEndian
+        withUnsafeBytes(of: &terminal) { payload.append(contentsOf: $0) }
+        return (
+            payload,
+            fitted,
+            finiteCount > 0 ? sqrt(squaredError / Double(finiteCount)) : .infinity,
+            populated,
+            sourceFeature,
+            clampedSourceFeature
+        )
+    }
+
+    private static func applyGlobalToneCurve(
+        _ luminance: [Float],
+        samples: [Float]
+    ) -> [Float] {
+        luminance.map { value in
+            let position = min(max(value, 0), 1) * 255
+            let lower = min(255, max(0, Int(floor(position))))
+            let upper = min(255, lower + 1)
+            let fraction = position - Float(lower)
+            return samples[lower] * (1 - fraction) + samples[upper] * fraction
+        }
+    }
+
+    private static func styleEngineDimensions(width: Int, height: Int) -> (Int, Int) {
+        if width > height {
+            return fittedSize(
+                sourceWidth: width,
+                sourceHeight: height,
+                maximumWidth: 256,
+                maximumHeight: 192
+            )
+        }
+        if height > width {
+            return fittedSize(
+                sourceWidth: width,
+                sourceHeight: height,
+                maximumWidth: 192,
+                maximumHeight: 256
+            )
+        }
+        return fittedSize(
+            sourceWidth: width,
+            sourceHeight: height,
+            maximumWidth: 256,
+            maximumHeight: 256
+        )
+    }
+
+    private static func areaResampledRGBAHalf(
+        rgb: [Float],
+        width: Int,
+        height: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ) -> Data {
+        var result = Data(count: targetWidth * targetHeight * 8)
+        result.withUnsafeMutableBytes { raw in
+            guard let destination = raw.bindMemory(to: UInt16.self).baseAddress else { return }
+            for targetY in 0..<targetHeight {
+                let y0 = targetY * height / targetHeight
+                let y1 = max(y0 + 1, (targetY + 1) * height / targetHeight)
+                for targetX in 0..<targetWidth {
+                    let x0 = targetX * width / targetWidth
+                    let x1 = max(x0 + 1, (targetX + 1) * width / targetWidth)
+                    let count = Float(max(1, (x1 - x0) * (y1 - y0)))
+                    var sums = [Float](repeating: 0, count: 3)
+                    for y in y0..<min(y1, height) {
+                        for x in x0..<min(x1, width) {
+                            let source = (y * width + x) * 3
+                            sums[0] += rgb[source]
+                            sums[1] += rgb[source + 1]
+                            sums[2] += rgb[source + 2]
+                        }
+                    }
+                    let target = (targetY * targetWidth + targetX) * 4
+                    for component in 0..<3 {
+                        let value = sums[component] / count
+                        destination[target + component] = Float16(
+                            value.isFinite ? value : 0
+                        ).bitPattern.littleEndian
+                    }
+                    destination[target + 3] = Float16(1).bitPattern.littleEndian
+                }
+            }
+        }
+        return result
+    }
+
+    private static func areaResampledRGBA16UNorm(
+        rgb: [Float],
+        normalizationGain: Float,
+        width: Int,
+        height: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ) -> Data {
+        var result = Data(count: targetWidth * targetHeight * 8)
+        result.withUnsafeMutableBytes { raw in
+            guard let destination = raw.bindMemory(to: UInt16.self).baseAddress else { return }
+            for targetY in 0..<targetHeight {
+                let y0 = targetY * height / targetHeight
+                let y1 = max(y0 + 1, (targetY + 1) * height / targetHeight)
+                for targetX in 0..<targetWidth {
+                    let x0 = targetX * width / targetWidth
+                    let x1 = max(x0 + 1, (targetX + 1) * width / targetWidth)
+                    let count = Float(max(1, (x1 - x0) * (y1 - y0)))
+                    var sums = [Float](repeating: 0, count: 3)
+                    for y in y0..<min(y1, height) {
+                        for x in x0..<min(x1, width) {
+                            let source = (y * width + x) * 3
+                            sums[0] += rgb[source]
+                            sums[1] += rgb[source + 1]
+                            sums[2] += rgb[source + 2]
+                        }
+                    }
+                    let target = (targetY * targetWidth + targetX) * 4
+                    for component in 0..<3 {
+                        let value = min(
+                            max((sums[component] / count) / normalizationGain, 0),
+                            1
+                        )
+                        destination[target + component] = UInt16(
+                            min(65_535, max(0, Int((value * 65_535).rounded())))
+                        ).littleEndian
+                    }
+                    destination[target + 3] = UInt16.max.littleEndian
+                }
+            }
+        }
+        return result
+    }
+
+    private static func photoDerivedStyleSceneBundle(
         standardHDRURL: URL,
         scale: ResolvedScale
-    ) throws -> LinearSceneRaster {
+    ) throws -> PhotoDerivedStyleSceneBundle {
         guard let primary = CIImage(
             contentsOf: standardHDRURL,
             options: [.applyOrientationProperty: true]
@@ -283,62 +755,227 @@ package enum ApplePhotographicStylesPipeline {
             height: size.1,
             colorSpace: nil
         )
-        var encoded = Data(count: size.0 * size.1 * 3)
-        var toneRGB = Array(repeating: Float(0), count: size.0 * size.1 * 3)
-        var toneLuma = Array(repeating: Float(0), count: size.0 * size.1)
-        var hdrLuma = Array(repeating: Float(0), count: size.0 * size.1)
+        let pixelCount = size.0 * size.1
+        var baseRGB = Array(repeating: Float(0), count: pixelCount * 3)
+        var hdrRGB = Array(repeating: Float(0), count: pixelCount * 3)
+        var logGainRGB = Array(repeating: Float(0), count: pixelCount * 3)
+        var baseLuminance = Array(repeating: Float(0), count: pixelCount)
+        var hdrLuminance = Array(repeating: Float(0), count: pixelCount)
         let channelCount = max(1, scale.channelCount)
         func channel(_ values: [Double], _ index: Int, _ fallback: Double) -> Float {
             Float(values[min(index, values.count - 1)] as Double? ?? fallback)
         }
+        for pixel in 0..<pixelCount {
+            var baseChannels = [Float](repeating: 0, count: 3)
+            var hdrChannels = [Float](repeating: 0, count: 3)
+            for component in 0..<3 {
+                let parameterIndex = channelCount == 1 ? 0 : component
+                let base = basePixels[pixel * 4 + component]
+                let code = min(max(gainPixels[pixel * 4 + component], 0), 1)
+                let gamma = channel(scale.perChannelGamma, parameterIndex, scale.gamma)
+                let minimum = channel(scale.perChannelGainMapMin, parameterIndex, scale.gainMapMin)
+                let maximum = channel(scale.perChannelGainMapMax, parameterIndex, scale.gainMapMax)
+                let baseOffset = channel(
+                    scale.perChannelBaseOffset,
+                    parameterIndex,
+                    scale.epsilonSdr
+                )
+                let alternateOffset = channel(
+                    scale.perChannelAlternateOffset,
+                    parameterIndex,
+                    scale.epsilonHdr
+                )
+                let weight = powf(code, gamma)
+                let logGain = minimum + weight * (maximum - minimum)
+                let reconstructed = max(base + baseOffset, 0) * exp2f(logGain)
+                    - alternateOffset
+                baseChannels[component] = base
+                hdrChannels[component] = reconstructed
+                baseRGB[pixel * 3 + component] = base
+                hdrRGB[pixel * 3 + component] = reconstructed
+                logGainRGB[pixel * 3 + component] = logGain
+            }
+            // Display P3 RGB to XYZ D65 Y. These are not the Rec.709/sRGB
+            // coefficients previously (and incorrectly) used for P3 pixels.
+            baseLuminance[pixel] = 0.22897456 * baseChannels[0]
+                + 0.69173852 * baseChannels[1]
+                + 0.07928691 * baseChannels[2]
+            hdrLuminance[pixel] = 0.22897456 * hdrChannels[0]
+                + 0.69173852 * hdrChannels[1]
+                + 0.07928691 * hdrChannels[2]
+        }
+        let gainMapMaximumStops = Float(max(
+            scale.gainMapMax,
+            scale.perChannelGainMapMax.max() ?? scale.gainMapMax
+        ))
+        let linearMetadata = try photoDerivedLinearMetadata(
+            baseLuminance: baseLuminance,
+            hdrLuminance: hdrLuminance,
+            gainMapMaximumStops: gainMapMaximumStops
+        )
+        func researchOverride(
+            _ name: String,
+            range: ClosedRange<Float>
+        ) throws -> Float? {
+            guard let raw = ProcessInfo.processInfo.environment[name] else { return nil }
+            guard let parsed = Float(raw), parsed.isFinite, range.contains(parsed) else {
+                throw CLIError.invalidContainer(
+                    "\(name) must be finite in \(range.lowerBound)...\(range.upperBound)"
+                )
+            }
+            return parsed
+        }
+        let baselineExposureOverride = try researchOverride(
+            "XDREMUX_RESEARCH_STYLES_BASELINE_EXPOSURE",
+            range: 2...12
+        )
+        let baseGainOverride = try researchOverride(
+            "XDREMUX_RESEARCH_STYLES_BASE_GAIN",
+            range: 0.5...3
+        )
+        let gtcIdentityBlendOverride = try researchOverride(
+            "XDREMUX_RESEARCH_STYLES_GTC_IDENTITY_BLEND",
+            range: 0...1
+        )
+        let baselineExposure = baselineExposureOverride
+            ?? linearMetadata.baselineExposure
+        let baseGain = baseGainOverride ?? linearMetadata.baseGain
+        let encodingGain = 4 * baseGain
+        var researchScalarOverrides: [String: Float] = [:]
+        if let baselineExposureOverride {
+            researchScalarOverrides["baselineExposure"] = baselineExposureOverride
+        }
+        if let baseGainOverride {
+            researchScalarOverrides["baseGain"] = baseGainOverride
+        }
+        if let gtcIdentityBlendOverride {
+            researchScalarOverrides["gtcIdentityBlend"] = gtcIdentityBlendOverride
+        }
+        let researchLinearInputScale: Float
+        if let rawScale = ProcessInfo.processInfo.environment[
+            "XDREMUX_RESEARCH_STYLES_LINEAR_INPUT_SCALE"
+        ] {
+            guard let parsedScale = Float(rawScale),
+                  parsedScale.isFinite,
+                  (0.125...16).contains(parsedScale) else {
+                throw CLIError.invalidContainer(
+                    "XDREMUX_RESEARCH_STYLES_LINEAR_INPUT_SCALE must be finite in 0.125...16"
+                )
+            }
+            researchLinearInputScale = parsedScale
+        } else {
+            researchLinearInputScale = 1
+        }
+        let codedLinearLuminance = hdrLuminance.map { $0 / baselineExposure }
+        // The private renderer consumes the normalized Linear Thumbnail input
+        // domain, while inputLinearMetadata.Gain carries the inverse scale
+        // needed to encode the paired output resource.  A bounded 2D response
+        // ablation (Linear scale x GTC) rejected the pre-encoding 0.448 range:
+        // with native-family GTC it created two early Tone reversals and a
+        // skin/background direction split.  The default therefore remains the
+        // gain-normalized domain; the explicitly named research-only scale is
+        // used for a bounded intermediate response sweep and disqualifies the
+        // resulting HEIC from production admission.
+        let rendererLinearLuminance = codedLinearLuminance.map {
+            ($0 / encodingGain) * researchLinearInputScale
+        }
+        let gtc = monotonicGlobalToneCurve(
+            inputLuminance: codedLinearLuminance,
+            outputLuminance: baseLuminance,
+            researchIdentityBlend: gtcIdentityBlendOverride ?? 0
+        )
+        let gtcMappedLuminance = applyGlobalToneCurve(
+            codedLinearLuminance,
+            samples: gtc.linearSamples
+        )
+        var encoded = Data(count: pixelCount * 3)
+        var toneRGBAHalf = Data(count: pixelCount * 8)
+        var rendererLinearRGBA16 = Data(count: pixelCount * 8)
+        var rendererLinearMinimum = Float.infinity
+        var rendererLinearMaximum = -Float.infinity
         encoded.withUnsafeMutableBytes { encodedRaw in
-            guard let destination = encodedRaw.bindMemory(to: UInt8.self).baseAddress else { return }
-            for pixel in 0..<(size.0 * size.1) {
-                var baseChannels = [Float](repeating: 0, count: 3)
-                var hdrChannels = [Float](repeating: 0, count: 3)
-                for component in 0..<3 {
-                    let parameterIndex = channelCount == 1 ? 0 : component
-                    let base = basePixels[pixel * 4 + component]
-                    let code = min(max(gainPixels[pixel * 4 + component], 0), 1)
-                    let gamma = channel(scale.perChannelGamma, parameterIndex, scale.gamma)
-                    let minimum = channel(scale.perChannelGainMapMin, parameterIndex, scale.gainMapMin)
-                    let maximum = channel(scale.perChannelGainMapMax, parameterIndex, scale.gainMapMax)
-                    let baseOffset = channel(
-                        scale.perChannelBaseOffset,
-                        parameterIndex,
-                        scale.epsilonSdr
-                    )
-                    let alternateOffset = channel(
-                        scale.perChannelAlternateOffset,
-                        parameterIndex,
-                        scale.epsilonHdr
-                    )
-                    let weight = powf(code, gamma)
-                    let logGain = minimum + weight * (maximum - minimum)
-                    let reconstructed = max(base + baseOffset, 0) * exp2f(logGain) - alternateOffset
-                    baseChannels[component] = base
-                    hdrChannels[component] = reconstructed
-                    toneRGB[pixel * 3 + component] = base
-                    let encodedValue = min(max(appleEncodeLinear(reconstructed), 0), 1)
-                    destination[pixel * 3 + component] = UInt8(
-                        min(255, max(0, Int((encodedValue * 255).rounded())))
-                    )
+            toneRGBAHalf.withUnsafeMutableBytes { toneRaw in
+                rendererLinearRGBA16.withUnsafeMutableBytes { linearRaw in
+                    guard let encodedDestination = encodedRaw.bindMemory(to: UInt8.self).baseAddress,
+                          let tone = toneRaw.bindMemory(to: UInt16.self).baseAddress,
+                          let linear = linearRaw.bindMemory(to: UInt16.self).baseAddress else { return }
+                    for pixel in 0..<pixelCount {
+                        for component in 0..<3 {
+                            let baseValue = baseRGB[pixel * 3 + component]
+                            let codedLinear = hdrRGB[pixel * 3 + component]
+                                / baselineExposure
+                            let rendererLinear = (codedLinear / encodingGain)
+                                * researchLinearInputScale
+                            let serializedRendererLinear = min(max(rendererLinear, 0), 1)
+                            let encodedValue = min(max(appleEncodeLinear(codedLinear), 0), 1)
+                            encodedDestination[pixel * 3 + component] = UInt8(
+                                min(255, max(0, Int((encodedValue * 255).rounded())))
+                            )
+                            tone[pixel * 4 + component] = Float16(baseValue).bitPattern.littleEndian
+                            linear[pixel * 4 + component] = UInt16(
+                                min(65_535, max(0, Int((serializedRendererLinear * 65_535).rounded())))
+                            ).littleEndian
+                            rendererLinearMinimum = min(rendererLinearMinimum, rendererLinear)
+                            rendererLinearMaximum = max(rendererLinearMaximum, rendererLinear)
+                        }
+                        tone[pixel * 4 + 3] = Float16(1).bitPattern.littleEndian
+                        linear[pixel * 4 + 3] = UInt16.max.littleEndian
+                    }
                 }
-                toneLuma[pixel] = 0.2126 * baseChannels[0]
-                    + 0.7152 * baseChannels[1]
-                    + 0.0722 * baseChannels[2]
-                hdrLuma[pixel] = 0.2126 * hdrChannels[0]
-                    + 0.7152 * hdrChannels[1]
-                    + 0.0722 * hdrChannels[2]
             }
         }
-        return LinearSceneRaster(
+        let styleEngineSize = styleEngineDimensions(width: size.0, height: size.1)
+        let styleEngineToneRGBAHalf = areaResampledRGBAHalf(
+            rgb: baseRGB,
             width: size.0,
             height: size.1,
-            encodedRGB8: encoded,
-            toneLinearRGB: toneRGB,
-            toneLuma: toneLuma,
-            hdrLuma: hdrLuma
+            targetWidth: styleEngineSize.0,
+            targetHeight: styleEngineSize.1
+        )
+        let styleEngineRendererLinearRGBA16 = areaResampledRGBA16UNorm(
+            rgb: hdrRGB,
+            normalizationGain: (baselineExposure * encodingGain)
+                / researchLinearInputScale,
+            width: size.0,
+            height: size.1,
+            targetWidth: styleEngineSize.0,
+            targetHeight: styleEngineSize.1
+        )
+        return PhotoDerivedStyleSceneBundle(
+            width: size.0,
+            height: size.1,
+            codedLinearEncodedRGB8: encoded,
+            toneRGBAHalf: toneRGBAHalf,
+            rendererLinearRGBA16: rendererLinearRGBA16,
+            styleEngineWidth: styleEngineSize.0,
+            styleEngineHeight: styleEngineSize.1,
+            styleEngineToneRGBAHalf: styleEngineToneRGBAHalf,
+            styleEngineRendererLinearRGBA16: styleEngineRendererLinearRGBA16,
+            baseLinearP3RGB: baseRGB,
+            hdrLinearP3RGB: hdrRGB,
+            logGainRGB: logGainRGB,
+            baseLuminance: baseLuminance,
+            hdrLuminance: hdrLuminance,
+            codedLinearLuminance: codedLinearLuminance,
+            rendererLinearLuminance: rendererLinearLuminance,
+            gtcMappedLuminance: gtcMappedLuminance,
+            globalToneCurve: gtc.data,
+            globalToneCurveLinearSamples: gtc.linearSamples,
+            globalToneCurveFitRMSE: gtc.rmse,
+            globalToneCurvePopulatedBins: gtc.populatedBins,
+            globalToneCurveSourceFeature: gtc.sourceFeature,
+            globalToneCurveClampedSourceFeature: gtc.clampedSourceFeature,
+            contentHeadroom: max(1, hdrLuminance.max() ?? 1),
+            baselineExposure: baselineExposure,
+            baselineExposureUnclamped: linearMetadata.baselineExposureUnclamped,
+            baselineHighlightCompressionRatio: linearMetadata.highlightCompressionRatio,
+            linearBaseGain: baseGain,
+            linearEncodingGain: encodingGain,
+            rendererLinearRangeMin: rendererLinearMinimum.isFinite ? rendererLinearMinimum : 0,
+            rendererLinearRangeMax: rendererLinearMaximum.isFinite ? rendererLinearMaximum : 0,
+            researchLinearInputScale: researchLinearInputScale,
+            researchScalarOverrides: researchScalarOverrides,
+            gainMapMaximumStops: gainMapMaximumStops
         )
     }
 
@@ -346,7 +983,8 @@ package enum ApplePhotographicStylesPipeline {
         pixels: Data,
         width: Int,
         height: Int,
-        outputURL: URL
+        outputURL: URL,
+        colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB()
     ) throws {
         guard pixels.count == width * height * 3,
               let provider = CGDataProvider(data: pixels as CFData),
@@ -356,7 +994,7 @@ package enum ApplePhotographicStylesPipeline {
                   bitsPerComponent: 8,
                   bitsPerPixel: 24,
                   bytesPerRow: width * 3,
-                  space: CGColorSpaceCreateDeviceRGB(),
+                  space: colorSpace,
                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
                   provider: provider,
                   decode: nil,
@@ -421,11 +1059,15 @@ package enum ApplePhotographicStylesPipeline {
                 String(format: "%.6f", quality),
                 "rgb10",
                 hvcCURL.path,
-            ]
+            ],
+            timeout: 120
         )
-        guard result.status == 0 else {
+        guard !result.timedOut, result.status == 0 else {
             let error = String(data: result.stderr, encoding: .utf8) ?? ""
-            throw CLIError.invalidContainer("VideoToolbox auxiliary encoding failed: \(error)")
+            let timeout = result.timedOut ? "helper exceeded 120 seconds; " : ""
+            throw CLIError.invalidContainer(
+                "VideoToolbox auxiliary encoding failed: \(timeout)\(error)"
+            )
         }
         let annexB = try Data(contentsOf: annexBURL)
         let hvcC = try Data(contentsOf: hvcCURL)
@@ -438,6 +1080,62 @@ package enum ApplePhotographicStylesPipeline {
             itemPayloadSHA256: sha256Hex(itemPayload),
             hvcCSHA256: sha256Hex(hvcC)
         )
+    }
+
+    private static let neutralStyleDeltaAnnexBBase64 =
+        "AAAAAUABDAH//wIgAAADALAAAAMAAAMAWhcCQAAAAAFCAQECIAAAAwCwAAADAAADAFqgBAIAgE2IF7kWVTUBAQYAgAAAAAFEAcBhYYKZIAAAAAFOAQUyR1ZK3FxMQz+U78URPNFDqAEAAAMAAwMAAAMAAQIADX//CwAAAwAAAwAACTgMA4kkAQ3/////gAAAAAEoAa+ECZVTMO7uzMzQ9ZgeLxZ1R1aDVgAB05uHr95rEzAAB4S4kDhbGcAAAAMBS2qCe6vPUAAAJCPAB5gdpAAAAwGoNAPFcBgAACpegAVc0/AAAOQeCCHz4AAEO1AKH14AABnCgAqiAAADADpXDf6vAACtUg/LMwAA2MQTG4YAA7CwFfqGAARh0BYf2AALhUAAAAMAAAS8"
+    private static let neutralStyleDeltaHVCCBase64 =
+        "AQIgAAAAsAAAAAAAWvAA/P36+gAACwOgAAEAGEABDAH//wIgAAADALAAAAMAAAMAWhcCQKEAAQAjQgEBAiAAAAMAsAAAAwAAAwBaoAQCAIBNiBe5FlU1AQEGAICiAAEACEQBwGFhgpkg"
+    private static let neutralStyleDeltaAnnexBSHA256 =
+        "d02017d9f516dbe7ef156bb92000311180cd4a1ff0aab1b3753bc2cc71ca8846"
+    private static let neutralStyleDeltaItemSHA256 =
+        "14b04fcde02476f24f83a893d245b4d06728954e8ad004f416b6e3a956eba216"
+    private static let neutralStyleDeltaHVCCSHA256 =
+        "35ecc004d07192f4e9c8a44c0a9edb598599b7a6d0c59b8165a5fb433f5746a5"
+
+    private static func defaultNeutralStyleDeltaHEVC(
+        sourcePNGURL: URL,
+        outputDirectory: URL
+    ) throws -> EncodedHEVCResource {
+        guard let annexB = Data(base64Encoded: neutralStyleDeltaAnnexBBase64),
+              let hvcC = Data(base64Encoded: neutralStyleDeltaHVCCBase64) else {
+            throw CLIError.invalidContainer("bundled neutral Style Delta HEVC is malformed")
+        }
+        let itemPayload = try singleIDRPayload(from: annexB)
+        guard sha256Hex(annexB) == neutralStyleDeltaAnnexBSHA256,
+              sha256Hex(itemPayload) == neutralStyleDeltaItemSHA256,
+              sha256Hex(hvcC) == neutralStyleDeltaHVCCSHA256 else {
+            throw CLIError.invalidContainer("bundled neutral Style Delta HEVC failed integrity validation")
+        }
+        try annexB.write(
+            to: outputDirectory.appendingPathComponent("style-delta-neutral-tile.hevc"),
+            options: .atomic
+        )
+        try hvcC.write(
+            to: outputDirectory.appendingPathComponent("style-delta-neutral-tile.hvcc"),
+            options: .atomic
+        )
+        return EncodedHEVCResource(
+            itemPayload: itemPayload,
+            hvcC: hvcC,
+            sourcePNGURL: sourcePNGURL,
+            annexBSHA256: neutralStyleDeltaAnnexBSHA256,
+            itemPayloadSHA256: neutralStyleDeltaItemSHA256,
+            hvcCSHA256: neutralStyleDeltaHVCCSHA256
+        )
+    }
+
+    package static func neutralStyleDeltaProtocolResourceHashes() throws -> [String: String] {
+        guard let annexB = Data(base64Encoded: neutralStyleDeltaAnnexBBase64),
+              let hvcC = Data(base64Encoded: neutralStyleDeltaHVCCBase64) else {
+            throw CLIError.invalidContainer("bundled neutral Style Delta HEVC is malformed")
+        }
+        let itemPayload = try singleIDRPayload(from: annexB)
+        return [
+            "annexB": sha256Hex(annexB),
+            "itemPayload": sha256Hex(itemPayload),
+            "hvcC": sha256Hex(hvcC),
+        ]
     }
 
     private static func percentile(_ sortedValues: [Double], _ percent: Double) -> Double {
@@ -596,13 +1294,22 @@ package enum ApplePhotographicStylesPipeline {
         return output
     }
 
-    private static func lightMap(
+    package static func lightMap(
         _ luma: [Float],
         width: Int,
         height: Int,
         valueScale: Float,
+        valueOffset: Float = 0,
+        outputMinimum: Float = 0,
+        outputMaximum: Float = 1,
         storageOrientation: UInt32
     ) throws -> Data {
+        guard width > 0, height > 0, luma.count == width * height,
+              valueScale.isFinite, valueOffset.isFinite,
+              outputMinimum.isFinite, outputMaximum.isFinite,
+              outputMinimum <= outputMaximum else {
+            throw CLIError.invalidContainer("invalid source-derived style light-map contract")
+        }
         var presentationOrder = Data()
         presentationOrder.reserveCapacity(32 * 32 * 2)
         for targetY in 0..<32 {
@@ -615,12 +1322,17 @@ package enum ApplePhotographicStylesPipeline {
                 var count = 0
                 for y in y0..<min(y1, height) {
                     for x in x0..<min(x1, width) {
-                        sum += Double(min(max(luma[y * width + x], 0), 1))
+                        let value = luma[y * width + x]
+                        guard value.isFinite else { continue }
+                        sum += Double(value)
                         count += 1
                     }
                 }
                 let average = count == 0 ? Float(0) : Float(sum / Double(count))
-                let scaled = min(max(average * valueScale, 0), 1)
+                let scaled = min(
+                    max(average * valueScale + valueOffset, outputMinimum),
+                    outputMaximum
+                )
                 var bits = Float16(scaled).bitPattern.littleEndian
                 withUnsafeBytes(of: &bits) { presentationOrder.append(contentsOf: $0) }
             }
@@ -634,32 +1346,24 @@ package enum ApplePhotographicStylesPipeline {
     }
 
     private static func styleStatistics(
-        raster: LinearSceneRaster,
+        bundle: PhotoDerivedStyleSceneBundle,
         semantics: AppleSemanticSceneAnalysis
     ) -> [String: [String: Double]] {
-        let gtcLuma = raster.hdrLuma.map { value -> Float in
-            let linear = min(max(Double(value), 0), 1)
-            return Float(
-                linear <= 0.0031308
-                    ? linear * 12.92
-                    : 1.055 * pow(linear, 1 / 2.4) - 0.055
-            )
-        }
         let samples = selectedStyleSamples(
-            toneLuma: raster.toneLuma,
-            hdrLuma: raster.hdrLuma,
-            toneLinearRGB: raster.toneLinearRGB,
-            width: raster.width,
-            height: raster.height,
+            toneLuma: bundle.baseLuminance,
+            hdrLuma: bundle.rendererLinearLuminance,
+            toneLinearRGB: bundle.baseLinearP3RGB,
+            width: bundle.width,
+            height: bundle.height,
             person: semantics.person,
             skin: semantics.skin
         )
         return [
-            "LinearGTCImage": distribution(gtcLuma),
-            "LinearImage": distribution(raster.hdrLuma),
+            "LinearGTCImage": distribution(bundle.gtcMappedLuminance),
+            "LinearImage": distribution(bundle.rendererLinearLuminance),
             "LinearImagePersonSegmentBased": distribution(samples["personHDR"] ?? []),
             "LinearImageSkinBased": distribution(samples["skinHDR"] ?? []),
-            "ToneMappedImage": distribution(raster.toneLuma),
+            "ToneMappedImage": distribution(bundle.baseLuminance),
             "ToneMappedImageBlueChannelSkinBased": distribution(samples["skinBlue"] ?? []),
             "ToneMappedImageGreenChannelSkinBased": distribution(samples["skinGreen"] ?? []),
             "ToneMappedImagePersonSegmentBased": distribution(samples["personTone"] ?? []),
@@ -668,50 +1372,632 @@ package enum ApplePhotographicStylesPipeline {
         ]
     }
 
-    private static func makeStylePropertyList(
-        styleData: StyleDataResult,
-        raster: LinearSceneRaster,
-        semantics: AppleSemanticSceneAnalysis,
+    private struct PhotoDerivedLocalScenePayload {
+        let toneLightMap: Data
+        let linearLightMap: Data
+        let codedLinearMetadata: [String: Double]
+        let nativeCodedLinearRGB8: Data?
+        let statistics: [String: [String: Double]]?
+        let extendedStatistics: [String: Double]?
+        let producerManifest: [String: Any]
+    }
+
+    private static func rgb8FromNativeCodedLinearRGBAHalf(
+        _ rgba: Data,
+        width: Int,
+        height: Int
+    ) throws -> (pixels: Data, minimum: Float, maximum: Float) {
+        guard width > 0, height > 0, rgba.count == width * height * 8 else {
+            throw CLIError.invalidContainer(
+                "native coded-linear raster does not match its declared dimensions"
+            )
+        }
+        var output = Data(count: width * height * 3)
+        var minimum = Float.infinity
+        var maximum = -Float.infinity
+        var finite = true
+        output.withUnsafeMutableBytes { outputRaw in
+            rgba.withUnsafeBytes { inputRaw in
+                guard let destination = outputRaw.bindMemory(to: UInt8.self).baseAddress,
+                      let source = inputRaw.bindMemory(to: UInt16.self).baseAddress else {
+                    finite = false
+                    return
+                }
+                for pixel in 0..<(width * height) {
+                    for component in 0..<3 {
+                        let bits = UInt16(littleEndian: source[pixel * 4 + component])
+                        let value = Float(Float16(bitPattern: bits))
+                        guard value.isFinite else {
+                            finite = false
+                            continue
+                        }
+                        minimum = min(minimum, value)
+                        maximum = max(maximum, value)
+                        destination[pixel * 3 + component] = UInt8(
+                            min(255, max(0, Int((min(max(value, 0), 1) * 255).rounded())))
+                        )
+                    }
+                }
+            }
+        }
+        guard finite, minimum.isFinite, maximum.isFinite else {
+            throw CLIError.invalidContainer("native coded-linear raster contains non-finite samples")
+        }
+        return (output, minimum, maximum)
+    }
+
+    private static func rasterizedMask(
+        _ matte: AppleSemanticMatte?,
+        width: Int,
+        height: Int
+    ) -> Data? {
+        guard matte != nil else { return nil }
+        var result = Data(count: width * height)
+        result.withUnsafeMutableBytes { raw in
+            guard let destination = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+            for y in 0..<height {
+                for x in 0..<width {
+                    destination[y * width + x] = UInt8(
+                        min(255, max(0, Int((maskValue(
+                            matte,
+                            x: x,
+                            y: y,
+                            rasterWidth: width,
+                            rasterHeight: height
+                        ) * 255).rounded())))
+                    )
+                }
+            }
+        }
+        return result
+    }
+
+    private static func behaviorEquivalentPhotoDerivedScenePayload(
+        bundle: PhotoDerivedStyleSceneBundle,
         storageOrientation: UInt32
-    ) throws -> (data: Data, manifest: [String: Any]) {
-        let gtc = protocolIdentityGTC()
-        guard gtc.count == 516 else {
-            throw CLIError.invalidContainer("generated GTC must be 516 bytes")
-        }
-        let statistics = styleStatistics(raster: raster, semantics: semantics)
-        guard let linear = statistics["LinearImage"],
-              statistics["ToneMappedImage"] != nil else {
-            throw CLIError.invalidContainer("generated style statistics are incomplete")
-        }
-        let rangeMin = linear["blackPoint"] ?? 0
-        let rangeMax = linear["whitePoint"] ?? 0
-        let robustRange = max(rangeMax - rangeMin, 1 / 4096)
-        let baseGain = min(max(0.5 / robustRange, 0.5), 2.5)
+    ) throws -> PhotoDerivedLocalScenePayload {
+        // Eight native samples establish that serialized c/d are positive
+        // light maps, not signed residual planes. c tracks tone-mapped Base;
+        // d tracks the coded-linear image after GTC. The signed local decision
+        // is retained by their relationship. Coefficients below are the
+        // aggregate native-corpus affine calibration and are intentionally
+        // reported as behavior-equivalent rather than camera-producer exact.
+        let toneScale = Float(0.71372382)
+        let toneOffset = Float(0.02554340)
+        let linearScale = Float(0.93942103)
+        let linearOffset = Float(0.06494295)
         let toneLightMap = try lightMap(
-            raster.toneLuma,
-            width: raster.width,
-            height: raster.height,
-            valueScale: 1,
+            bundle.baseLuminance,
+            width: bundle.width,
+            height: bundle.height,
+            valueScale: toneScale,
+            valueOffset: toneOffset,
+            outputMinimum: toneLightMapMinimum,
+            outputMaximum: toneLightMapMaximum,
             storageOrientation: storageOrientation
         )
         let linearLightMap = try lightMap(
-            raster.hdrLuma,
-            width: raster.width,
-            height: raster.height,
-            valueScale: 1,
+            bundle.gtcMappedLuminance,
+            width: bundle.width,
+            height: bundle.height,
+            valueScale: linearScale,
+            valueOffset: linearOffset,
+            outputMinimum: linearLightMapMinimum,
+            outputMaximum: linearLightMapMaximum,
             storageOrientation: storageOrientation
         )
+        let signedRelation = zip(bundle.baseLuminance, bundle.gtcMappedLuminance).map {
+            $0.0 - $0.1
+        }
+        let rangeMin = Double(bundle.rendererLinearRangeMin)
+        let rangeMax = max(rangeMin, Double(bundle.rendererLinearRangeMax))
+        return PhotoDerivedLocalScenePayload(
+            toneLightMap: toneLightMap,
+            linearLightMap: linearLightMap,
+            codedLinearMetadata: [
+                "Gain": Double(bundle.linearEncodingGain),
+                "OriginalRangeMin": rangeMin,
+                "OriginalRangeMax": rangeMax,
+            ],
+            nativeCodedLinearRGB8: nil,
+            statistics: nil,
+            extendedStatistics: nil,
+            producerManifest: [
+                "mode": "source-derived-behavior-equivalent-v1",
+                "status": "success",
+                "nativeProducerExact": false,
+                "fallbackKind": "explicit-cpu-behavioral-proxy",
+                "consumerExactForProvidedLinearInput": false,
+                "cameraProducerExact": false,
+                "captureTimePreLTMInputAvailable": false,
+                "behaviorEquivalentLinearInputValidated": false,
+                "inputDomain": "single SceneDomainBundle in extended-linear Display-P3",
+                "toneMapModel": [
+                    "source": "tone-mapped Base luminance",
+                    "scale": toneScale,
+                    "offset": toneOffset,
+                    "serializedMinimum": toneLightMapMinimum,
+                    "serializedMaximum": toneLightMapMaximum,
+                    "nativeCorpusAggregateCorrelation": 0.96750403,
+                    "nativeCorpusAggregateRMSE": 0.04013455,
+                ],
+                "linearMapModel": [
+                    "source": "GTC(coded-linear luminance)",
+                    "scale": linearScale,
+                    "offset": linearOffset,
+                    "serializedMinimum": linearLightMapMinimum,
+                    "serializedMaximum": linearLightMapMaximum,
+                    "nativeCorpusAggregateCorrelation": 0.94580707,
+                    "nativeCorpusAggregateRMSE": 0.06546827,
+                ],
+                "signedLocalRelation": distribution(signedRelation),
+                "negativeSerializedSamplesAllowed": false,
+                "coordinateOrder": "primary-item-storage",
+                "claimBoundary": "the final HEIC does not retain Apple's capture-time pre-LTM thumbnail; this explicit CPU path is a final-HEIC proxy and has not passed the native full-response envelope",
+            ]
+        )
+    }
+
+    private static func nativePhotoDerivedScenePayload(
+        bundle: PhotoDerivedStyleSceneBundle,
+        semantics: AppleSemanticSceneAnalysis,
+        sceneType: Int,
+        faceExposureBoost: Double,
+        storageOrientation: UInt32,
+        outputDirectory: URL
+    ) throws -> PhotoDerivedLocalScenePayload {
+        let fileManager = FileManager.default
+        let temporaryDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent("xdremux-style-scene-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fileManager.removeItem(at: temporaryDirectory) }
+        try fileManager.createDirectory(
+            at: temporaryDirectory,
+            withIntermediateDirectories: true
+        )
+        let toneURL = temporaryDirectory.appendingPathComponent("tone.rgba16f")
+        let thumbnailURL = temporaryDirectory.appendingPathComponent(
+            "style-engine-thumbnail.rgba16f"
+        )
+        let linearURL = temporaryDirectory.appendingPathComponent("linear.rgba16unorm")
+        let gtcURL = temporaryDirectory.appendingPathComponent("global-tone-curve.bin")
+        try bundle.toneRGBAHalf.write(to: toneURL, options: .atomic)
+        try bundle.styleEngineToneRGBAHalf.write(to: thumbnailURL, options: .atomic)
+        try bundle.rendererLinearRGBA16.write(to: linearURL, options: .atomic)
+        try bundle.globalToneCurve.write(to: gtcURL, options: .atomic)
+
+        var request: [String: Any] = [
+            "schema": "xdremux-native-photo-derived-style-scene-request-v1",
+            "width": bundle.width,
+            "height": bundle.height,
+            "toneRGBAHalfPath": toneURL.path,
+            "thumbnailWidth": bundle.styleEngineWidth,
+            "thumbnailHeight": bundle.styleEngineHeight,
+            "thumbnailRGBAHalfPath": thumbnailURL.path,
+            "normalizedLinearRGBA16Path": linearURL.path,
+            "globalToneCurvePath": gtcURL.path,
+            "outputDirectory": temporaryDirectory.path,
+            "encodingGain": bundle.linearEncodingGain,
+            "ltmRelativeBrightness": 1.0,
+            "hrGainDownRatioQ12": Int(
+                (Double(bundle.linearEncodingGain) * 4096).rounded()
+            ),
+            "brightnessValue": 0.0,
+            "sceneType": sceneType,
+            "personMasksValidHint": semantics.hasCrediblePerson ? 1.0 : -1.0,
+            "faceBasedGlobalExposureBoostRatio": faceExposureBoost,
+            "processingType": 5,
+        ]
+        for (key, matte) in [
+            ("personMaskPath", semantics.person),
+            ("skinMaskPath", semantics.skin),
+            ("skyMaskPath", semantics.sky),
+        ] {
+            guard let data = rasterizedMask(
+                matte,
+                width: bundle.width,
+                height: bundle.height
+            ) else {
+                continue
+            }
+            let url = temporaryDirectory.appendingPathComponent("\(key).l008")
+            try data.write(to: url, options: .atomic)
+            request[key] = url.path
+        }
+        let requestURL = temporaryDirectory.appendingPathComponent("request.json")
+        let requestJSON = try JSONSerialization.data(
+            withJSONObject: request,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        try requestJSON.write(to: requestURL, options: .atomic)
+        let executable = try AppleNativeToolchain.styleScenePayloadExecutable()
+        let result = try AppleNativeToolchain.run(
+            executable,
+            arguments: ["--produce-photo-derived-scene", requestURL.path],
+            timeout: 30
+        )
+        let persistentReportURL = outputDirectory.appendingPathComponent(
+            "native-photo-derived-scene-payload.json"
+        )
+        try result.stdout.write(to: persistentReportURL, options: .atomic)
+        guard !result.timedOut,
+              result.status == 0,
+              let report = try JSONSerialization.jsonObject(with: result.stdout) as? [String: Any],
+              report["status"] as? String == "success",
+              let outputs = report["outputs"] as? [String: Any],
+              let toneMapPath = outputs["smallLightMapPath"] as? String,
+              let linearMapPath = outputs["smallLinearLightMapPath"] as? String,
+              let codedLinearPath = outputs["codedLinearPath"] as? String,
+              let rawStatistics = report["statistics"] as? [String: Any],
+              let rawExtendedStatistics = report["extendedStatistics"] as? [String: Any],
+              let codedMetadataNumbers = report["codedLinearMetadata"] as? [String: NSNumber] else {
+            let diagnostic = String(data: result.stderr, encoding: .utf8) ?? ""
+            throw CLIError.invalidContainer(
+                "native photo-derived style scene producer failed: \(diagnostic)"
+            )
+        }
+        let presentationToneMap = try Data(contentsOf: URL(fileURLWithPath: toneMapPath))
+        let presentationLinearMap = try Data(contentsOf: URL(fileURLWithPath: linearMapPath))
+        let codedLinearRGBAHalf = try Data(
+            contentsOf: URL(fileURLWithPath: codedLinearPath),
+            options: [.mappedIfSafe]
+        )
+        let nativeCodedLinear = try rgb8FromNativeCodedLinearRGBAHalf(
+            codedLinearRGBAHalf,
+            width: bundle.width,
+            height: bundle.height
+        )
+        guard presentationToneMap.count == 2_048,
+              presentationLinearMap.count == 2_048 else {
+            throw CLIError.invalidContainer(
+                "native photo-derived style scene producer returned non-32x32 light maps"
+            )
+        }
+        let toneMap = try storageOrderedLightMap(
+            presentationToneMap,
+            width: 32,
+            height: 32,
+            orientation: storageOrientation
+        )
+        let linearMap = try storageOrderedLightMap(
+            presentationLinearMap,
+            width: 32,
+            height: 32,
+            orientation: storageOrientation
+        )
+        let codedMetadata = Dictionary(uniqueKeysWithValues: codedMetadataNumbers.map {
+            ($0.key, $0.value.doubleValue)
+        })
+        let requiredStatisticNames = Set([
+            "LinearGTCImage",
+            "LinearImage",
+            "LinearImagePersonSegmentBased",
+            "LinearImageSkinBased",
+            "ToneMappedImage",
+            "ToneMappedImageBlueChannelSkinBased",
+            "ToneMappedImageGreenChannelSkinBased",
+            "ToneMappedImagePersonSegmentBased",
+            "ToneMappedImageRedChannelSkinBased",
+            "ToneMappedImageSkinBased",
+        ])
+        let requiredStatisticFields = Set([
+            "blackPoint", "highKey", "p02", "p10", "p25",
+            "p50", "p75", "p98", "whitePoint",
+        ])
+        var nativeStatistics: [String: [String: Double]] = [:]
+        for (name, rawDistribution) in rawStatistics {
+            guard let numbers = rawDistribution as? [String: NSNumber] else {
+                throw CLIError.invalidContainer(
+                    "native photo-derived style scene producer returned malformed statistics"
+                )
+            }
+            let distribution = Dictionary(uniqueKeysWithValues: numbers.map {
+                ($0.key, $0.value.doubleValue)
+            })
+            guard Set(distribution.keys) == requiredStatisticFields,
+                  distribution.values.allSatisfy(\.isFinite) else {
+                throw CLIError.invalidContainer(
+                    "native photo-derived style scene producer returned incomplete statistics"
+                )
+            }
+            nativeStatistics[name] = distribution
+        }
+        guard Set(nativeStatistics.keys) == requiredStatisticNames else {
+            throw CLIError.invalidContainer(
+                "native photo-derived style scene producer omitted required statistics"
+            )
+        }
+        let nativeExtendedStatistics: [String: Double] = Dictionary(
+            uniqueKeysWithValues: rawExtendedStatistics.compactMap { element in
+                let (key, value) = element
+                guard let number = value as? NSNumber,
+                      number.doubleValue.isFinite else { return nil }
+                return (key, number.doubleValue)
+            }
+        )
+        guard let nativePeopleRatio = nativeExtendedStatistics["PeopleRatio"],
+              let nativeSkinRatio = nativeExtendedStatistics["SkinRatio"],
+              (0...1).contains(nativePeopleRatio),
+              (0...1).contains(nativeSkinRatio) else {
+            throw CLIError.invalidContainer(
+                "native photo-derived style scene producer omitted semantic ratios"
+            )
+        }
+        guard let nativeGain = codedMetadata["Gain"],
+              abs(nativeGain - Double(bundle.linearEncodingGain)) <= 1 / 256 else {
+            throw CLIError.invalidContainer(
+                "native Linear Thumbnail gain does not match the SceneBundle normalization gain"
+            )
+        }
+        return PhotoDerivedLocalScenePayload(
+            toneLightMap: toneMap,
+            linearLightMap: linearMap,
+            codedLinearMetadata: codedMetadata,
+            nativeCodedLinearRGB8: nativeCodedLinear.pixels,
+            statistics: nativeStatistics,
+            extendedStatistics: nativeExtendedStatistics,
+            producerManifest: [
+                "mode": "native-cmimaging-final-heic-proxy-v1",
+                "status": report["status"] ?? "unknown",
+                "nativeProducerExact": false,
+                "consumerExactForProvidedLinearInput": true,
+                "cameraProducerExact": false,
+                "captureTimePreLTMInputAvailable": false,
+                "behaviorEquivalentLinearInputValidated": false,
+                "fallbackKind": "missing-capture-time-pre-ltm-input",
+                "negativeSerializedSamplesAllowed": false,
+                "coordinateOrder": "primary-item-storage",
+                "class": "CMISmartStylePixelBufferRendererV1",
+                "processingType": 5,
+                "providedLinearInput": "same-photo reconstructed HDR / (source-derived key4 * source-derived i.Gain)",
+                "appleCaptureInput": "SmartStyleV1 smartStyleCreateLinearThumbnail output: capture-time pre-LTM RGB in valid bounds, with post-LTM seam fill outside bounds",
+                "claimBoundary": "the private consumer is exact for the supplied buffer, but the supplied final-HEIC proxy is not the Apple camera producer input",
+                "boundedProxyValidation": [
+                    "nativeReferencePhoto": "IMG_2903",
+                    "directToneChecks": 472,
+                    "nativeControlFailures": 1,
+                    "finalBaseProxyFailures": 96,
+                    "finalHDROverKey4ProxyFailures": 67,
+                    "bestTestedHDROverKey4HSquaredProxyFailures": 13,
+                    "heldOutGlobalAffineProxyFailures": 17,
+                    "crossPhotoAffineLOORMSEMean": 0.01731073,
+                    "conclusion": "no tested final-HEIC proxy is admitted as capture-linear behavior-equivalent",
+                ],
+                "reportSHA256": sha256Hex(result.stdout),
+                "codedLinearMetadata": codedMetadata,
+                "codedLinearOutput": [
+                    "width": bundle.width,
+                    "height": bundle.height,
+                    "rgba16fSHA256": sha256Hex(codedLinearRGBAHalf),
+                    "rgb8SHA256": sha256Hex(nativeCodedLinear.pixels),
+                    "minimum": nativeCodedLinear.minimum,
+                    "maximum": nativeCodedLinear.maximum,
+                    "encoding": "CMISmartStylePixelBufferRendererV1 outputCodedLinearPixelBuffer; direct finite [0,1] quantization for HEVC input",
+                ],
+                "statisticsSource": "CMISmartStylePixelBufferRendererV1.outputImageStatistics",
+                "extendedStatisticsSource": "CMISmartStylePixelBufferRendererV1.outputImageStatisticsExtended",
+            ]
+        )
+    }
+
+    private static func photoDerivedLocalScenePayload(
+        bundle: PhotoDerivedStyleSceneBundle,
+        semantics: AppleSemanticSceneAnalysis,
+        sceneType: Int,
+        faceExposureBoost: Double,
+        storageOrientation: UInt32,
+        outputDirectory: URL
+    ) throws -> PhotoDerivedLocalScenePayload {
+        let requested = ProcessInfo.processInfo.environment[
+            "XDREMUX_STYLES_SCENE_PRODUCER"
+        ]?.lowercased() ?? "native-cmimaging"
+        switch requested {
+        case "source-derived-behavior-equivalent-v1", "behavior-equivalent", "cpu":
+            return try behaviorEquivalentPhotoDerivedScenePayload(
+                bundle: bundle,
+                storageOrientation: storageOrientation
+            )
+        case "native-cmimaging", "native":
+            // The private consumer is exact for the provided buffer, but the
+            // final-HEIC-derived buffer is explicitly a research candidate:
+            // Apple's capture-time pre-LTM input is unavailable. Failure is
+            // fatal; there is no silent CPU fallback after native was selected.
+            return try nativePhotoDerivedScenePayload(
+                bundle: bundle,
+                semantics: semantics,
+                sceneType: sceneType,
+                faceExposureBoost: faceExposureBoost,
+                storageOrientation: storageOrientation,
+                outputDirectory: outputDirectory
+            )
+        default:
+            throw CLIError.invalidContainer(
+                "unknown XDREMUX_STYLES_SCENE_PRODUCER mode: \(requested)"
+            )
+        }
+    }
+
+    private struct PhotoDerivedSceneClassification {
+        let sceneType: Int
+        let sceneDependentFallback: Bool
+        let evidence: [String: Any]
+    }
+
+    private static func photoDerivedSceneClassification(
+        imageURL: URL
+    ) throws -> PhotoDerivedSceneClassification {
+        let request = VNClassifyImageRequest()
+        let handler = VNImageRequestHandler(url: imageURL)
+        try handler.perform([request])
+        let observations = request.results ?? []
+        let confidenceByIdentifier = Dictionary(
+            observations.map { ($0.identifier.lowercased(), Double($0.confidence)) },
+            uniquingKeysWith: max
+        )
+        func maximum(_ identifiers: [String]) -> Double {
+            identifiers.map { confidenceByIdentifier[$0] ?? 0 }.max() ?? 0
+        }
+        let food = maximum(["food", "meal", "dish"])
+        let sunset = maximum(["sunset", "sunrise", "dusk"])
+        let indoor = maximum(["indoor", "interior", "room"])
+        let outdoor = maximum(["outdoor"])
+
+        // iPhone 18,1 camera firmware classifies in this priority order with
+        // private confidence cutoffs: food > sunset > indoor > outdoor. The
+        // method leaves the zero-initialized sceneType unchanged when none of
+        // the four branches fires, so 0 is the native default category rather
+        // than an XDRemux identity placeholder. Public Vision scores are not
+        // on the private SmartCam calibration; the proxy thresholds below are
+        // deliberately recorded as behavioral and are not camera-equivalent.
+        let sceneType: Int
+        let selectedClass: String
+        let nativeDefaultApplied: Bool
+        if food >= 0.08 {
+            sceneType = 1
+            selectedClass = "food"
+            nativeDefaultApplied = false
+        } else if sunset >= 0.08 {
+            sceneType = 3
+            selectedClass = "sunset"
+            nativeDefaultApplied = false
+        } else if indoor >= 0.15 {
+            sceneType = 0
+            selectedClass = "indoor"
+            nativeDefaultApplied = false
+        } else if outdoor >= 0.15 {
+            sceneType = 2
+            selectedClass = "outdoor"
+            nativeDefaultApplied = false
+        } else {
+            sceneType = 0
+            selectedClass = "native-default"
+            nativeDefaultApplied = true
+        }
+        return PhotoDerivedSceneClassification(
+            sceneType: sceneType,
+            sceneDependentFallback: false,
+            evidence: [
+                "algorithm": "VNClassifyImageRequest behavioral proxy following iPhone18,1 scene-type priority",
+                "producerEvidence": [
+                    "foodThreshold": 0.77,
+                    "sunsetThreshold": 0.88,
+                    "indoorThreshold": 0.4,
+                    "outdoorThreshold": 0.58,
+                    "priority": ["food", "sunset", "indoor", "outdoor"],
+                    "source": "-[BWStillImageCaptureMetadata calculateSemanticStyleSceneType] iPhone18,1/23F84",
+                ],
+                "proxyThresholds": [
+                    "food": 0.08,
+                    "sunset": 0.08,
+                    "indoor": 0.15,
+                    "outdoor": 0.15,
+                ],
+                "scores": [
+                    "food": food,
+                    "sunset": sunset,
+                    "indoor": indoor,
+                    "outdoor": outdoor,
+                ],
+                "selectedClass": selectedClass,
+                "sceneType": sceneType,
+                "nativeDefaultSceneType": 0,
+                "nativeDefaultApplied": nativeDefaultApplied,
+                "sceneDependentFallback": false,
+                "cameraProducerExact": false,
+                "proxyCalibration": "heuristic; not numerically calibrated to private SmartCam scores",
+                "claimBoundary": "source-derived behavioral classifier; not Apple camera classifier numerical equivalence",
+            ]
+        )
+    }
+
+    private static func photoDerivedFaceExposureBoost(
+        statistics: [String: [String: Double]],
+        semantics: AppleSemanticSceneAnalysis
+    ) -> (value: Double, evidence: [String: Any]) {
+        let globalMedian = statistics["ToneMappedImage"]?["p50"] ?? 0
+        let personMedian = statistics["ToneMappedImagePersonSegmentBased"]?["p50"] ?? 0
+        let peopleRatio = min(max((semantics.person?.statistics.mean ?? 0) / 255, 0), 1)
+        let value: Double
+        if semantics.hasCrediblePerson, personMedian > 0, globalMedian > 0 {
+            value = min(max(sqrt(globalMedian / personMedian), 1), 2.5)
+        } else {
+            value = 1
+        }
+        return (value, [
+            "algorithm": "clamp(sqrt(global tone p50 / person tone p50), 1.0, 2.5)",
+            "value": value,
+            "globalToneP50": globalMedian,
+            "personToneP50": personMedian,
+            "peopleRatio": peopleRatio,
+            "sourceDependent": true,
+            "claimBoundary": "source-derived exposure proxy within the native observed range; camera face-AE numerical equivalence is not claimed",
+        ])
+    }
+
+    private static func makeStylePropertyList(
+        styleData: AppleStyleDataResult,
+        bundle: PhotoDerivedStyleSceneBundle,
+        semantics: AppleSemanticSceneAnalysis,
+        sceneClassification: PhotoDerivedSceneClassification,
+        storageOrientation: UInt32,
+        outputDirectory: URL
+    ) throws -> (
+        data: Data,
+        manifest: [String: Any],
+        nativeCodedLinearRGB8: Data?
+    ) {
+        let gtc = bundle.globalToneCurve
+        guard gtc.count == 516 else {
+            throw CLIError.invalidContainer("generated GTC must be 516 bytes")
+        }
+        let preliminaryStatistics = styleStatistics(bundle: bundle, semantics: semantics)
+        guard preliminaryStatistics["LinearImage"] != nil,
+              preliminaryStatistics["ToneMappedImage"] != nil else {
+            throw CLIError.invalidContainer("generated style statistics are incomplete")
+        }
+        let faceBoost = photoDerivedFaceExposureBoost(
+            statistics: preliminaryStatistics,
+            semantics: semantics
+        )
+        let localScene = try photoDerivedLocalScenePayload(
+            bundle: bundle,
+            semantics: semantics,
+            sceneType: sceneClassification.sceneType,
+            faceExposureBoost: faceBoost.value,
+            storageOrientation: storageOrientation,
+            outputDirectory: outputDirectory
+        )
+        let toneLightMap = localScene.toneLightMap
+        let linearLightMap = localScene.linearLightMap
+        let statistics = localScene.statistics ?? preliminaryStatistics
         guard toneLightMap.count == 2_048, linearLightMap.count == 2_048 else {
             throw CLIError.invalidContainer("generated style light maps must each be 2,048 bytes")
         }
-        let baselineExposure = min(max(-log2(max(linear["p50"] ?? 0, 1 / 4096)), 4), 10.4)
-        let peopleRatio = min(max((semantics.person?.statistics.mean ?? 0) / 255, 0), 1)
-        let skinRatio = min(max((semantics.skin?.statistics.mean ?? 0) / 255, 0), 1)
-        let personMasksValidHint = semantics.hasCrediblePerson ? 1.0 : 0.0
-        // Native sceneType and face boost are real producer fields, but neither
-        // is derivable from the current coverage/exposure heuristics.
-        let sceneType = 0
-        let faceBoost = 1.0
+        let baselineExposure = Double(bundle.baselineExposure)
+        let peopleRatio = min(max(
+            localScene.extendedStatistics?["PeopleRatio"]
+                ?? (semantics.person?.statistics.mean ?? 0) / 255,
+            0
+        ), 1)
+        let skinRatio = min(max(
+            localScene.extendedStatistics?["SkinRatio"]
+                ?? (semantics.skin?.statistics.mean ?? 0) / 255,
+            0
+        ), 1)
+        let personMasksValidHint = semantics.hasCrediblePerson ? 1.0 : -1.0
+        let sceneType = sceneClassification.sceneType
+        let baseGain = Double(bundle.linearBaseGain)
+        guard let rangeMin = localScene.codedLinearMetadata["OriginalRangeMin"],
+              let rangeMax = localScene.codedLinearMetadata["OriginalRangeMax"],
+              let encodingGain = localScene.codedLinearMetadata["Gain"] else {
+            throw CLIError.invalidContainer(
+                "photo-derived scene producer omitted required Linear Thumbnail metadata"
+            )
+        }
+        guard abs(encodingGain - 4 * baseGain) <= 1 / 256 else {
+            throw CLIError.invalidContainer(
+                "photo-derived Linear Thumbnail metadata violates i.Gain = 4h"
+            )
+        }
         let object: [String: Any] = [
             "0": 15,
             "1": styleData.styleData,
@@ -732,11 +2018,11 @@ package enum ApplePhotographicStylesPipeline {
             "g": 0x4C303068,
             "h": baseGain,
             "i": [
-                "Gain": baseGain * 4,
+                "Gain": encodingGain,
                 "OriginalRangeMin": rangeMin,
                 "OriginalRangeMax": rangeMax,
             ],
-            "j": faceBoost,
+            "j": faceBoost.value,
             "k": false,
         ]
         let data = try PropertyListSerialization.data(
@@ -750,47 +2036,132 @@ package enum ApplePhotographicStylesPipeline {
               ) as? [String: Any],
               let styleReadback = readback["1"] as? Data,
               styleReadback == styleData.styleData else {
-            throw CLIError.invalidContainer("style plist key 1 readback differs from generated identity data")
+            throw CLIError.invalidContainer("style plist key 1 readback differs from generated style data")
         }
+        var styleDataManifest = styleData.manifest
+        styleDataManifest["evidence"] = styleData.evidence.rawValue
         return (data, [
-            "schema": "xdremux-apple-photographic-style-payload-v1",
+            "schema": "xdremux-apple-photographic-style-payload-v2",
             "styleVersion": 15,
-            "styleData": [
-                "byteCount": styleData.styleData.count,
-                "sha256": styleData.styleDataSHA256,
-                "evidence": AppleEvidenceClass.privateFrameworkIdentity.rawValue,
-                "producer": "deterministic-complete-identity-v1",
-                "polynomialCount": styleData.polynomialCount,
-                "blockValueCount": styleData.blockValueCount,
-                "tileCount": styleData.tileCount,
+            "styleData": styleDataManifest,
+            "sceneDomainBundle": [
+                "schema": "xdremux-photo-derived-style-scene-bundle-v1",
+                "workingColorSpace": "extended-linear-Display-P3",
+                "baseDomain": "ICC-managed primary image converted once to linear Display-P3",
+                "gainMapDomain": "unmanaged normalized per-channel code values decoded once with source metadata",
+                "hdrDomain": "per-channel reconstructed linear Display-P3",
+                "luminanceCoefficients": [0.22897456, 0.69173852, 0.07928691],
+                "workingDimensions": ["width": bundle.width, "height": bundle.height],
+                "styleEngineDimensions": [
+                    "width": bundle.styleEngineWidth,
+                    "height": bundle.styleEngineHeight,
+                ],
+                "presentationOrientationApplied": true,
+                "storageOrientation": storageOrientation,
+                "baselineExposure": bundle.baselineExposure,
+                "baselineExposureUnclamped": bundle.baselineExposureUnclamped,
+                "baselineHighlightCompressionRatio": bundle.baselineHighlightCompressionRatio,
+                "baselineHighlightCompressionCalibration": baselineHighlightCompressionCalibration,
+                "gainMapMaximumStops": bundle.gainMapMaximumStops,
+                "linearBaseGain": bundle.linearBaseGain,
+                "linearEncodingGain": bundle.linearEncodingGain,
+                "contentHeadroom": bundle.contentHeadroom,
+                "rendererInputLinearDomain": "reconstructed HDR / (key4 baseline exposure * i.Gain); i.Gain carries the paired inverse encoding scale",
+                "rendererInputLinearRange": [
+                    "minimum": bundle.rendererLinearRangeMin,
+                    "maximum": bundle.rendererLinearRangeMax,
+                ],
+                "researchLinearInputScale": bundle.researchLinearInputScale,
+                "researchScalarOverrides": bundle.researchScalarOverrides,
+                "researchOverrideActive": bundle.researchLinearInputScale != 1
+                    || !bundle.researchScalarOverrides.isEmpty,
+                "negativeLogGainPreserved": (bundle.logGainRGB.min() ?? 0) < 0,
+                "logGainRange": [
+                    "minimum": bundle.logGainRGB.min() ?? 0,
+                    "maximum": bundle.logGainRGB.max() ?? 0,
+                ],
+                "resourceDecodeCount": 1,
             ],
-            "gtc": ["byteCount": gtc.count, "sha256": sha256Hex(gtc), "algorithm": "protocol-neutral-linear-runtime-gtc-v1"],
+            "gtc": [
+                "byteCount": gtc.count,
+                "sha256": sha256Hex(gtc),
+                "algorithm": "per-photo-native-family-gtc-v1",
+                "inputDomain": "paired reconstructed HDR and Base luminance, each normalized by its same-photo p95",
+                "outputDomain": "native 256-sample normalized global-tone-shape family",
+                "sourceShapeFeature": bundle.globalToneCurveSourceFeature,
+                "clampedSourceShapeFeature": bundle.globalToneCurveClampedSourceFeature,
+                "sourceShapeFeatureIndex": 8,
+                "sourceShapeFeatureNativeP01P99": [0.036004916, 0.083503760],
+                "sourceShapeFitRMSE": bundle.globalToneCurveFitRMSE,
+                "populatedBins": bundle.globalToneCurvePopulatedBins,
+                "nativeCalibration": [
+                    "sampleCount": 84,
+                    "applicableHAtLeastOneSampleCount": 71,
+                    "basis": "x + sum(coefficient[k] * x * (1 - x) * (1 - 2x)^k), k=0...9",
+                    "leaveOneOutCurveRMSEMean": 0.002697,
+                    "leaveOneOutCurveRMSEP95": 0.007052,
+                    "leaveOneOutCurveRMSEMaximum": 0.015014,
+                    "claimBoundary": "behavior-equivalent native-family calibration; Apple ISP GTC producer equivalence is not claimed",
+                ],
+                "monotonic": true,
+                "fixedProtocolConstant": false,
+                "sourceDependent": true,
+            ],
             "statistics": statistics,
+            "statisticsProducer": localScene.statistics == nil
+                ? "explicit CPU behavioral proxy"
+                : "CMISmartStylePixelBufferRendererV1",
             "peopleRatio": peopleRatio,
             "skinRatio": skinRatio,
             "personMasksValidHint": personMasksValidHint,
             "sceneType": sceneType,
-            "sceneTypeFallback": "neutral-until-native-producer-semantics-are-recovered",
+            "sceneClassification": sceneClassification.evidence,
             "baselineExposure": baselineExposure,
+            "baselineExposureProducer": [
+                "nativeFormula": "4 * LTMDigitalGain",
+                "sourceFieldAvailable": false,
+                "behaviorEquivalentFormula": "quantize_1_over_65((HDR_p98 / Base_p98) / 0.40126406)",
+                "unclamped": bundle.baselineExposureUnclamped,
+                "clamped": bundle.baselineExposure,
+                "sourceDependent": true,
+            ],
             "baseGain": baseGain,
+            "linearEncodingGain": encodingGain,
+            "linearMetadataProducer": [
+                "nativeEncodingFormula": "(HRGainDownRatio / 4096) / LTMRelativeBrightness",
+                "nativeBaseGainFormula": "i.Gain / 4",
+                "sourceFieldsAvailable": false,
+                "behaviorEquivalentBaseGainFormula": "clamp(1.51271843 + 0.15670632 * GainMapMaxStops + 0.14766724 * (HDR_p98 / Base_p98), 0.5, 2.5)",
+                "nativeEightSceneFitRMSE": 0.0261,
+                "nativeEightSceneLOORMSE": 0.0403,
+                "sourceDependent": true,
+                "cameraProducerExact": false,
+            ],
             "linearRange": ["minimum": rangeMin, "maximum": rangeMax],
-            "faceExposureBoost": faceBoost,
+            "faceExposureBoost": faceBoost.evidence,
+            "localSceneProducer": localScene.producerManifest,
             "lightMap": [
                 "byteCount": toneLightMap.count,
                 "sha256": sha256Hex(toneLightMap),
                 "coordinateOrder": "primary-item-storage",
                 "sourceOrientation": storageOrientation,
+                "producer": localScene.producerManifest["mode"] ?? "unknown",
+                "inputDomain": "linear Display-P3 Base plus per-photo GTC and semantic masks",
+                "fixedProtocolConstant": false,
             ],
             "linearLightMap": [
                 "byteCount": linearLightMap.count,
                 "sha256": sha256Hex(linearLightMap),
                 "coordinateOrder": "primary-item-storage",
                 "sourceOrientation": storageOrientation,
-                "linearBaseGainApplied": false,
+                "producer": localScene.producerManifest["mode"] ?? "unknown",
+                "inputDomain": "GTC(coded-linear Display-P3 HDR)",
+                "linearBaseGainApplied": true,
+                "linearEncodingGain": encodingGain,
+                "fixedProtocolConstant": false,
             ],
-            "faceExposureBoostFallback": "neutral-until-native-producer-semantics-are-recovered",
             "stylePropertyList": ["byteCount": data.count, "sha256": sha256Hex(data), "format": "binary plist v1 CF format 200"],
-        ])
+        ], localScene.nativeCodedLinearRGB8)
     }
 
     private static func validateWithSemanticStyleProperties(
@@ -805,10 +2176,12 @@ package enum ApplePhotographicStylesPipeline {
         let executable = try AppleNativeToolchain.stylePropertiesProbeExecutable()
         let result = try AppleNativeToolchain.run(
             executable,
-            arguments: [metadataURL.path, readbackURL.path]
+            arguments: [metadataURL.path, readbackURL.path],
+            timeout: 30
         )
         try result.stdout.write(to: probeURL, options: .atomic)
-        guard result.status == 0,
+        guard !result.timedOut,
+              result.status == 0,
               let readback = try? Data(contentsOf: readbackURL),
               readback == expectedStyleData,
               let object = try? JSONSerialization.jsonObject(with: result.stdout) as? [String: Any],
@@ -838,16 +2211,43 @@ package enum ApplePhotographicStylesPipeline {
     ) throws -> ApplePhotographicStylePayload {
         let payloadStartedAt = CFAbsoluteTimeGetCurrent()
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
-        let styleDataDirectory = outputDirectory.appendingPathComponent("style-data")
-        let styleData = try completeIdentityStyleData(outputDirectory: styleDataDirectory)
         let scale = try sourceScale(sourceURL: sourceURL, portraitWritten: portraitWritten)
-        let raster = try linearSceneRaster(standardHDRURL: standardHDRURL, scale: scale)
+        let bundle = try photoDerivedStyleSceneBundle(
+            standardHDRURL: standardHDRURL,
+            scale: scale
+        )
+        let sceneClassification = try photoDerivedSceneClassification(
+            imageURL: standardHDRURL
+        )
         let rasterCompletedAt = CFAbsoluteTimeGetCurrent()
+        let styleDataDirectory = outputDirectory.appendingPathComponent("style-data")
+        let producer = SolverIdentityBaselineProducer()
+        let styleData = try producer.makeStyleData(
+            request: AppleStyleDataRequest(
+                sourceURL: standardHDRURL,
+                renderedTargetURL: standardHDRURL,
+                outputDirectory: styleDataDirectory,
+                sourceDomain: "internal constrained-solver baseline",
+                targetDomain: "internal constrained-solver baseline"
+            )
+        )
+        let styleDataCompletedAt = CFAbsoluteTimeGetCurrent()
+        let style = try makeStylePropertyList(
+            styleData: styleData,
+            bundle: bundle,
+            semantics: semantics,
+            sceneClassification: sceneClassification,
+            storageOrientation: exifOrientation(at: standardHDRURL),
+            outputDirectory: outputDirectory
+        )
+        let scenePayloadCompletedAt = CFAbsoluteTimeGetCurrent()
+        let linearThumbnailPixels = style.nativeCodedLinearRGB8
+            ?? bundle.codedLinearEncodedRGB8
         let linearPNG = outputDirectory.appendingPathComponent("linear-thumbnail.png")
         try writeRGBPNG(
-            pixels: raster.encodedRGB8,
-            width: raster.width,
-            height: raster.height,
+            pixels: linearThumbnailPixels,
+            width: bundle.width,
+            height: bundle.height,
             outputURL: linearPNG
         )
         let linearQuality = EncodingQualityPolicy.value(
@@ -862,19 +2262,63 @@ package enum ApplePhotographicStylesPipeline {
         )
         let linearHEVCCompletedAt = CFAbsoluteTimeGetCurrent()
 
-        let neutralTile = Data(repeating: 128, count: 512 * 512 * 3)
+        let researchStyleDeltaRGB = ProcessInfo.processInfo.environment[
+            "XDREMUX_RESEARCH_STYLES_DELTA_RGB_CODES"
+        ]
+        let styleDeltaRGBCodes: [UInt8]
+        if let researchStyleDeltaRGB {
+            let components = researchStyleDeltaRGB.split(separator: ",")
+            guard components.count == 3 else {
+                throw CLIError.invalidContainer(
+                    "XDREMUX_RESEARCH_STYLES_DELTA_RGB_CODES requires R,G,B UInt8 codes"
+                )
+            }
+            styleDeltaRGBCodes = try components.map { component in
+                guard let value = UInt8(component.trimmingCharacters(in: .whitespaces)) else {
+                    throw CLIError.invalidContainer(
+                        "XDREMUX_RESEARCH_STYLES_DELTA_RGB_CODES contains a non-UInt8 component"
+                    )
+                }
+                return value
+            }
+        } else {
+            styleDeltaRGBCodes = [128, 128, 128]
+        }
+        var neutralTile = Data(count: 512 * 512 * 3)
+        neutralTile.withUnsafeMutableBytes { raw in
+            guard let bytes = raw.bindMemory(to: UInt8.self).baseAddress else { return }
+            for pixel in 0..<(512 * 512) {
+                bytes[pixel * 3] = styleDeltaRGBCodes[0]
+                bytes[pixel * 3 + 1] = styleDeltaRGBCodes[1]
+                bytes[pixel * 3 + 2] = styleDeltaRGBCodes[2]
+            }
+        }
+        let researchStyleDeltaOverride = researchStyleDeltaRGB != nil
         let deltaPNG = outputDirectory.appendingPathComponent("style-delta-neutral-tile.png")
         try writeRGBPNG(pixels: neutralTile, width: 512, height: 512, outputURL: deltaPNG)
         let deltaQuality = EncodingQualityPolicy.value(
             environmentKey: "XDREMUX_STYLES_DELTA_QUALITY",
             defaultValue: 0.3
         )
-        let deltaHEVC = try encodeHEVC(
-            rgbPNGURL: deltaPNG,
-            outputDirectory: outputDirectory,
-            stem: "style-delta-neutral-tile",
-            quality: deltaQuality
-        )
+        let deltaHEVC: EncodedHEVCResource
+        let deltaResourceSource: String
+        if abs(deltaQuality - 0.3) <= 1e-12, !researchStyleDeltaOverride {
+            deltaHEVC = try defaultNeutralStyleDeltaHEVC(
+                sourcePNGURL: deltaPNG,
+                outputDirectory: outputDirectory
+            )
+            deltaResourceSource = "bundled-verified-protocol-constant"
+        } else {
+            deltaHEVC = try encodeHEVC(
+                rgbPNGURL: deltaPNG,
+                outputDirectory: outputDirectory,
+                stem: "style-delta-neutral-tile",
+                quality: deltaQuality
+            )
+            deltaResourceSource = researchStyleDeltaOverride
+                ? "runtime-videotoolbox-research-rgb-basis"
+                : "runtime-videotoolbox-custom-quality"
+        }
         let deltaHEVCCompletedAt = CFAbsoluteTimeGetCurrent()
         guard let primary = CIImage(
             contentsOf: standardHDRURL,
@@ -893,12 +2337,6 @@ package enum ApplePhotographicStylesPipeline {
         )
         let rows = landscape ? 5 : 6
         let columns = landscape ? 6 : 5
-        let style = try makeStylePropertyList(
-            styleData: styleData,
-            raster: raster,
-            semantics: semantics,
-            storageOrientation: exifOrientation(at: standardHDRURL)
-        )
         let semanticStyleValidation = try validateWithSemanticStyleProperties(
             stylePropertyList: style.data,
             expectedStyleData: styleData.styleData,
@@ -907,14 +2345,18 @@ package enum ApplePhotographicStylesPipeline {
         let payloadCompletedAt = CFAbsoluteTimeGetCurrent()
         let payloadTimings: [String: Double] = [
             "setupAndRaster": rasterCompletedAt - payloadStartedAt,
-            "linearHEVC": linearHEVCCompletedAt - rasterCompletedAt,
+            "styleDataLearning": styleDataCompletedAt - rasterCompletedAt,
+            "scenePayload": scenePayloadCompletedAt - styleDataCompletedAt,
+            "linearHEVC": linearHEVCCompletedAt - scenePayloadCompletedAt,
             "deltaHEVC": deltaHEVCCompletedAt - linearHEVCCompletedAt,
             "metadataAndValidation": payloadCompletedAt - deltaHEVCCompletedAt,
             "total": payloadCompletedAt - payloadStartedAt,
         ]
         print(String(
-            format: "styles payload setup+raster=%.3fs linearHEVC=%.3fs deltaHEVC=%.3fs metadata+validation=%.3fs total=%.3fs",
+            format: "styles payload setup+raster=%.3fs styleData=%.3fs scenePayload=%.3fs linearHEVC=%.3fs deltaHEVC=%.3fs metadata+validation=%.3fs total=%.3fs",
             payloadTimings["setupAndRaster"] ?? 0,
+            payloadTimings["styleDataLearning"] ?? 0,
+            payloadTimings["scenePayload"] ?? 0,
             payloadTimings["linearHEVC"] ?? 0,
             payloadTimings["deltaHEVC"] ?? 0,
             payloadTimings["metadataAndValidation"] ?? 0,
@@ -923,16 +2365,20 @@ package enum ApplePhotographicStylesPipeline {
         let inputSHA = sha256Hex(try Data(contentsOf: sourceURL, options: [.mappedIfSafe]))
         let provenance: [String: AppleResourceProvenance] = [
             "styleData": AppleResourceProvenance(
-                producer: "XDRemux deterministic complete StyleEngine identity",
+                producer: "XDRemux \(styleData.producerVersion)",
                 inputSHA256: inputSHA,
-                evidence: .privateFrameworkIdentity,
-                detail: "864 repeated 30-Float16 identity blocks; SHA-256 matched to local CMImaging identity creator"
+                evidence: styleData.evidence,
+                detail: "scene-matched constrained-solver producer; full consumer reconstruction and real Photos gates remain separate"
             ),
             "linearThumbnail": AppleResourceProvenance(
-                producer: "XDRemux coherent HDR scene reconstruction + Apple encodeLinear",
+                producer: style.nativeCodedLinearRGB8 == nil
+                    ? "XDRemux coherent HDR scene reconstruction + per-photo exposure normalization + Apple encodeLinear"
+                    : "CMISmartStylePixelBufferRendererV1 over a final-HEIC linear-input proxy",
                 inputSHA256: inputSHA,
                 evidence: .sourceDerivedApproximation,
-                detail: "Display P3 Base plus unmanaged normalized Gain Map code values and source gain metadata; capture-linear LTM attachments unavailable"
+                detail: style.nativeCodedLinearRGB8 == nil
+                    ? "same-input Display P3 RGB Gain reconstruction; coded linear is HDR/key4, capture linear is coded/i.Gain, and i.Gain=4h; explicit CPU diagnostic path"
+                    : "CMImaging consumes the supplied same-photo bundle coherently, but firmware proves Apple Camera supplies a capture-time pre-LTM thumbnail that an arbitrary final HEIC does not retain; camera-producer equivalence is not claimed"
             ),
             "styleDelta": AppleResourceProvenance(
                 producer: "XDRemux iPhone18,1/23F84 zero-residual profile",
@@ -941,10 +2387,10 @@ package enum ApplePhotographicStylesPipeline {
                 detail: "pre-HEVC normalized RGB is exactly 0.5; encoder is VideoToolbox Main10 4:2:0"
             ),
             "metadata": AppleResourceProvenance(
-                producer: "XDRemux conservative source-derived metadata",
+                producer: "XDRemux unified SceneBundle plus explicit source-derived local-scene producer",
                 inputSHA256: inputSHA,
                 evidence: .sourceDerivedApproximation,
-                detail: "source statistics retained; unsupported sceneType and face boost use explicit neutral fallbacks"
+                detail: "photo-derived coded-linear-to-Base GTC, statistics, scene classification, face-exposure proxy, positive paired c/d, and jointly normalized h/i; no donor or scene-dependent identity payload"
             ),
         ]
         var manifest = style.manifest
@@ -953,7 +2399,7 @@ package enum ApplePhotographicStylesPipeline {
         manifest["input"] = ["path": sourceURL.path, "sha256": inputSHA]
         manifest["photoIdentifier"] = photoIdentifier
         manifest["linearThumbnail"] = [
-            "width": raster.width, "height": raster.height,
+            "width": bundle.width, "height": bundle.height,
             "encodingQuality": linearQuality,
             "itemPayloadSHA256": linearHEVC.itemPayloadSHA256,
             "hvcCSHA256": linearHEVC.hvcCSHA256,
@@ -963,15 +2409,37 @@ package enum ApplePhotographicStylesPipeline {
                 "colorManagementApplied": false,
                 "transferFunctionApplied": false,
             ],
+            "inputDomain": "final-HEIC proxy supplied to CMImaging = reconstructed HDR / (per-photo key4 baseline exposure * i.Gain)",
+            "appleCameraInputDomain": "capture-time pre-LTM linear RGB plus post-LTM seam-fill inputs; unavailable in an arbitrary final HEIC",
+            "captureTimePreLTMInputAvailable": false,
+            "behaviorEquivalentLinearInputValidated": false,
+            "pairedBaselineExposure": bundle.baselineExposure,
+            "pairedLinearBaseGain": bundle.linearBaseGain,
+            "pairedLinearEncodingGain": bundle.linearEncodingGain,
+            "rendererInputLinearRange": [
+                "minimum": bundle.rendererLinearRangeMin,
+                "maximum": bundle.rendererLinearRangeMax,
+            ],
+            "producer": style.nativeCodedLinearRGB8 == nil
+                ? "explicit CPU behavioral proxy"
+                : "CMISmartStylePixelBufferRendererV1 output for a final-HEIC proxy input",
+            "appleEncodeLinearAppliedAfterGainRestoration": style.nativeCodedLinearRGB8 == nil,
         ]
+        let normalizedStyleDeltaRGB: Any = researchStyleDeltaOverride
+            ? styleDeltaRGBCodes.map { Double($0) / 255 }
+            : 0.5
         manifest["styleDelta"] = [
             "profile": "iPhone18,1/23F84-zero-residual",
-            "normalizedRGB": 0.5,
+            "normalizedRGB": normalizedStyleDeltaRGB,
+            "preHEVCRGBCodes": styleDeltaRGBCodes,
+            "researchOverrideActive": researchStyleDeltaOverride,
             "encodingQuality": deltaQuality,
             "tile": ["width": 512, "height": 512],
             "grid": ["width": deltaSize.0, "height": deltaSize.1, "rows": rows, "columns": columns],
             "itemPayloadSHA256": deltaHEVC.itemPayloadSHA256,
             "hvcCSHA256": deltaHEVC.hvcCSHA256,
+            "encodedResourceSource": deltaResourceSource,
+            "fixedProtocolConstant": !researchStyleDeltaOverride,
             "codecEvidenceBoundary": "profile exact before HEVC; VideoToolbox Main10 4:2:0 is behaviorally tested but not byte-identical to Apple camera 4:4:4",
         ]
         manifest["provenance"] = Dictionary(uniqueKeysWithValues: provenance.map { key, value in
@@ -991,8 +2459,8 @@ package enum ApplePhotographicStylesPipeline {
             stylePropertyList: style.data,
             linearThumbnailHEVC: linearHEVC.itemPayload,
             linearThumbnailHVCC: linearHEVC.hvcC,
-            linearThumbnailWidth: raster.width,
-            linearThumbnailHeight: raster.height,
+            linearThumbnailWidth: bundle.width,
+            linearThumbnailHeight: bundle.height,
             styleDeltaHEVC: deltaHEVC.itemPayload,
             styleDeltaHVCC: deltaHEVC.hvcC,
             styleDeltaTileWidth: 512,
@@ -1002,6 +2470,117 @@ package enum ApplePhotographicStylesPipeline {
             styleDeltaRows: rows,
             styleDeltaColumns: columns,
             photoIdentifier: photoIdentifier,
+            manifestJSON: manifestJSON,
+            resourceProvenance: provenance
+        )
+    }
+
+    private static func replacingStyleData(
+        in preliminary: ApplePhotographicStylePayload,
+        with styleData: AppleStyleDataResult,
+        sourceURL: URL,
+        outputDirectory: URL
+    ) throws -> ApplePhotographicStylePayload {
+        guard preliminary.styleData == (try AppleStyleDataLayout.completeIdentity()) else {
+            throw CLIError.invalidContainer(
+                "constrained-solver preliminary payload is not complete identity"
+            )
+        }
+        _ = try AppleStyleDataLayout.validate(styleData.styleData)
+        guard var propertyList = try PropertyListSerialization.propertyList(
+            from: preliminary.stylePropertyList,
+            options: [],
+            format: nil
+        ) as? [String: Any] else {
+            throw CLIError.invalidContainer(
+                "constrained-solver preliminary style property list is malformed"
+            )
+        }
+        propertyList["1"] = styleData.styleData
+        let finalPropertyList = try PropertyListSerialization.data(
+            fromPropertyList: propertyList,
+            format: .binary,
+            options: 0
+        )
+        guard let readback = try PropertyListSerialization.propertyList(
+            from: finalPropertyList,
+            options: [],
+            format: nil
+        ) as? [String: Any],
+              readback["1"] as? Data == styleData.styleData else {
+            throw CLIError.invalidContainer(
+                "constrained-solver final style property list changed key 1"
+            )
+        }
+        let validationDirectory = outputDirectory
+            .appendingPathComponent("selected-style-validation", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: validationDirectory,
+            withIntermediateDirectories: true
+        )
+        let semanticStyleValidation = try validateWithSemanticStyleProperties(
+            stylePropertyList: finalPropertyList,
+            expectedStyleData: styleData.styleData,
+            outputDirectory: validationDirectory
+        )
+
+        guard var manifest = try JSONSerialization.jsonObject(
+            with: preliminary.manifestJSON
+        ) as? [String: Any] else {
+            throw CLIError.invalidContainer(
+                "constrained-solver preliminary style manifest is malformed"
+            )
+        }
+        var styleDataManifest = styleData.manifest
+        styleDataManifest["evidence"] = styleData.evidence.rawValue
+        manifest["styleData"] = styleDataManifest
+        manifest["stylePropertyList"] = [
+            "byteCount": finalPropertyList.count,
+            "sha256": sha256Hex(finalPropertyList),
+            "format": "binary plist v1 CF format 200",
+        ]
+        manifest["semanticStylePropertiesValidation"] = semanticStyleValidation
+
+        let inputSHA = sha256Hex(
+            try Data(contentsOf: sourceURL, options: [.mappedIfSafe])
+        )
+        var provenance = preliminary.resourceProvenance
+        provenance["styleData"] = AppleResourceProvenance(
+            producer: "XDRemux \(styleData.producerVersion)",
+            inputSHA256: inputSHA,
+            evidence: styleData.evidence,
+            detail: "photo-specific bounded polynomial selected by neutral reconstruction through the complete Neutrino composition; no identity fallback"
+        )
+        manifest["provenance"] = Dictionary(
+            uniqueKeysWithValues: provenance.map { key, value in
+                (key, [
+                    "producer": value.producer,
+                    "inputSHA256": value.inputSHA256,
+                    "evidence": value.evidence.rawValue,
+                    "detail": value.detail,
+                ])
+            }
+        )
+        let manifestJSON = try JSONSerialization.data(
+            withJSONObject: manifest,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        return ApplePhotographicStylePayload(
+            styleData: styleData.styleData,
+            stylePropertyList: finalPropertyList,
+            linearThumbnailHEVC: preliminary.linearThumbnailHEVC,
+            linearThumbnailHVCC: preliminary.linearThumbnailHVCC,
+            linearThumbnailWidth: preliminary.linearThumbnailWidth,
+            linearThumbnailHeight: preliminary.linearThumbnailHeight,
+            styleDeltaHEVC: preliminary.styleDeltaHEVC,
+            styleDeltaHVCC: preliminary.styleDeltaHVCC,
+            styleDeltaTileWidth: preliminary.styleDeltaTileWidth,
+            styleDeltaTileHeight: preliminary.styleDeltaTileHeight,
+            styleDeltaGridWidth: preliminary.styleDeltaGridWidth,
+            styleDeltaGridHeight: preliminary.styleDeltaGridHeight,
+            styleDeltaRows: preliminary.styleDeltaRows,
+            styleDeltaColumns: preliminary.styleDeltaColumns,
+            photoIdentifier: preliminary.photoIdentifier,
             manifestJSON: manifestJSON,
             resourceProvenance: provenance
         )
@@ -1508,14 +3087,22 @@ package enum ApplePhotographicStylesPipeline {
             width: payload.linearThumbnailWidth,
             height: payload.linearThumbnailHeight
         ))
-        guard let linearP3 = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3) else {
-            throw CLIError.invalidContainer("extended linear Display P3 is unavailable")
-        }
-        let linearColorIndex = appendProperty(try makeICCColorBox(linearP3))
         let linearAuxCIndex = appendProperty(makeAuxCBox(
             "tag:apple.com,2023:photo:aux:linearthumbnail"
         ))
-        let deltaColorIndex = primaryColorIndex ?? linearColorIndex
+        // Apple native Linear Thumbnail items are intentionally unassociated with
+        // a `colr` property. The Style Delta grid still needs a color property;
+        // reuse the primary association when available and synthesize its ICC
+        // fallback only for source graphs that have no primary color property.
+        let deltaColorIndex: Int
+        if let primaryColorIndex {
+            deltaColorIndex = primaryColorIndex
+        } else {
+            guard let linearP3 = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3) else {
+                throw CLIError.invalidContainer("extended linear Display P3 is unavailable")
+            }
+            deltaColorIndex = appendProperty(try makeICCColorBox(linearP3))
+        }
 
         let outputIPMAFlags = sourceIPMA.flags
         var ipmaEntriesPayload = Data()
@@ -1552,7 +3139,7 @@ package enum ApplePhotographicStylesPipeline {
         ipmaEntriesPayload.append(try makeIPMAEntry(
             linearThumbnailID,
             [
-                (linearISPEIndex, true), (linearColorIndex, true), (pixi10Index, false),
+                (linearISPEIndex, true), (pixi10Index, false),
                 (linearHVCCIndex, true), (linearAuxCIndex, true), (identityIrotIndex, true),
             ],
             flags: outputIPMAFlags,
@@ -1937,9 +3524,17 @@ package enum ApplePhotographicStylesPipeline {
         )
         defer { try? FileManager.default.removeItem(at: scaffoldURL) }
         defer { try? FileManager.default.removeItem(at: semanticMergedURL) }
-        let semanticWriteProfile: AppleSemanticWriteProfile = portraitWritten
+        let normalSemanticWriteProfile: AppleSemanticWriteProfile = portraitWritten
             ? .portraitAndStyles
             : analysis.nativeStyleWriteProfile
+        let researchSemanticOverride = try researchSemanticGraphOverride(
+            analysis: analysis,
+            normalWriteProfile: normalSemanticWriteProfile,
+            portraitWritten: portraitWritten
+        )
+        let graphSemanticAnalysis = researchSemanticOverride?.analysis ?? analysis
+        let semanticWriteProfile = researchSemanticOverride?.writeProfile
+            ?? normalSemanticWriteProfile
         let featureGraphURL: URL
         if portraitWritten {
             // The Portrait writer already authored the same six Vision resources and
@@ -1949,7 +3544,7 @@ package enum ApplePhotographicStylesPipeline {
             try AppleSemanticScaffoldBuilder.write(
                 sourceHDRURL: standardHDRURL,
                 outputURL: scaffoldURL,
-                analysis: analysis,
+                analysis: graphSemanticAnalysis,
                 profile: semanticWriteProfile,
                 photoIdentifier: photoIdentifier,
                 preserveOriginalBaseAndGain: false
@@ -1972,13 +3567,53 @@ package enum ApplePhotographicStylesPipeline {
         }
         let styleDirectory = evidenceDirectory.appendingPathComponent("styles", isDirectory: true)
         let stylePayloadStartedAt = CFAbsoluteTimeGetCurrent()
-        let stylePayload = try buildStylePayload(
+        let stylePayload: ApplePhotographicStylePayload
+        let preliminaryPayload = try buildStylePayload(
             sourceURL: sourceURL,
             standardHDRURL: featureGraphURL,
             semantics: analysis,
             portraitWritten: portraitWritten,
-            outputDirectory: styleDirectory,
+            outputDirectory: styleDirectory
+                .appendingPathComponent("preliminary-identity", isDirectory: true),
             photoIdentifier: photoIdentifier
+        )
+            let preliminaryURL = evidenceDirectory.appendingPathComponent(
+                "constrained-solver-preliminary-identity.heic"
+            )
+            _ = try writeIncrementalStylesGraph(
+                sourceURL: featureGraphURL,
+                outputURL: preliminaryURL,
+                payload: preliminaryPayload
+            )
+            _ = try validatePhotographicStylesOutput(
+                preliminaryURL,
+                expectsPortrait: portraitWritten,
+                prevalidatedStylePropertyList: preliminaryPayload.stylePropertyList
+            )
+            let solverDirectory = styleDirectory.appendingPathComponent(
+                "constrained-solver",
+                isDirectory: true
+            )
+            let selectedStyleData = try ConstrainedPolynomialStyleDataProducer()
+                .makeStyleData(
+                    preliminaryHEICURL: preliminaryURL,
+                    identityStylePropertyList: preliminaryPayload.stylePropertyList,
+                    outputDirectory: solverDirectory
+                )
+        stylePayload = try replacingStyleData(
+            in: preliminaryPayload,
+            with: selectedStyleData,
+            sourceURL: sourceURL,
+            outputDirectory: solverDirectory
+        )
+        // Keep one producer-independent final metadata path in every run.
+        // The constrained solver validates inside styles/constrained-solver;
+        // without this canonical copy, downstream evidence auditors saw only
+        // the preliminary identity path and could not inspect the selected
+        // key-1 payload after an otherwise successful conversion.
+        try stylePayload.stylePropertyList.write(
+            to: styleDirectory.appendingPathComponent("style-metadata.bplist"),
+            options: .atomic
         )
         let stylePayloadSeconds = CFAbsoluteTimeGetCurrent() - stylePayloadStartedAt
         let graphStartedAt = CFAbsoluteTimeGetCurrent()
@@ -2026,6 +3661,74 @@ package enum ApplePhotographicStylesPipeline {
         }
         let outputData = validation.outputData
         let contaminationReport = validation.contaminationReport
+        let inputData = try Data(contentsOf: sourceURL, options: [.mappedIfSafe])
+        let inputSHA256 = sha256Hex(inputData)
+        guard let stylePayloadManifest = try JSONSerialization.jsonObject(
+            with: stylePayload.manifestJSON
+        ) as? [String: Any],
+              let styleDataManifest = stylePayloadManifest["styleData"] as? [String: Any],
+              let reconstruction = styleDataManifest["reconstructionMetrics"] as? [String: Any],
+              let sceneDomainManifest =
+                stylePayloadManifest["sceneDomainBundle"] as? [String: Any],
+              let sceneClassificationManifest =
+                stylePayloadManifest["sceneClassification"] as? [String: Any],
+              let styleDeltaManifest = stylePayloadManifest["styleDelta"] as? [String: Any],
+              let localSceneManifest = stylePayloadManifest["localSceneProducer"] as? [String: Any] else {
+            throw CLIError.invalidContainer(
+                "Styles acceptance cannot audit the generated scene-payload manifest"
+            )
+        }
+        let neutralGatePassed = styleDataManifest["sceneMatched"] as? Bool == true
+            && reconstruction["status"] as? String == "neutral_scene_matched"
+        let key1EnvelopePassed = (
+            reconstruction["responseEnvelope"] as? [String: Any]
+        )?["passed"] as? Bool == true
+        let key1IncrementGatePassed = styleDataManifest["key1IncrementEligible"] as? Bool == true
+            && key1EnvelopePassed
+        let captureLinearInputGatePassed =
+            localSceneManifest["captureTimePreLTMInputAvailable"] as? Bool == true
+            || localSceneManifest["behaviorEquivalentLinearInputValidated"] as? Bool == true
+        let noSceneDependentFallbackResources = styleDataManifest["identityFallback"] as? Bool == false
+            && styleDataManifest["fallbackKind"] is NSNull
+            && sceneClassificationManifest["sceneDependentFallback"] as? Bool == false
+            && sceneDomainManifest["researchOverrideActive"] as? Bool == false
+            && researchSemanticOverride == nil
+            && styleDeltaManifest["fixedProtocolConstant"] as? Bool == true
+            && localSceneManifest["status"] as? String == "success"
+            && localSceneManifest["mode"] as? String != "fallback"
+            && localSceneManifest["fallbackKind"] is NSNull
+            && captureLinearInputGatePassed
+        let counterexampleSHA256 =
+            "80c91c715d89fa636b782301235e3c24f5cf54eb12431d9d95721abe33638beb"
+        let acceptanceChecklist: [String: Any] = [
+            "schema": "xdremux-apple-styles-production-acceptance-v1",
+            "outputSHA256": sha256Hex(outputData),
+            "neutralGatePassed": neutralGatePassed,
+            "key1IncrementResponseGatePassed": key1IncrementGatePassed,
+            "captureLinearInputGatePassed": captureLinearInputGatePassed,
+            "fullSceneResponseGatePassed": false,
+            "counterexampleGatePassed": false,
+            "noSceneDependentFallbackResources": noSceneDependentFallbackResources,
+            "structuralValidationPassed": true,
+            "photosAcceptancePassed": false,
+            "productionCandidateGenerated": neutralGatePassed
+                && key1IncrementGatePassed
+                && noSceneDependentFallbackResources,
+            "productionEligible": false,
+            "pendingExternalReceipts": [
+                "capture-time pre-LTM input or a held-out full-response-equivalent final-HEIC proxy",
+                "direct full-scene native-envelope response gate",
+                "fixed IMG20260717130755 counterexample gate",
+                "real Photos import, edit, save, exit, and reopen acceptance",
+            ],
+            "counterexample": [
+                "fixtureSHA256": counterexampleSHA256,
+                "thisInputIsCounterexample": inputSHA256 == counterexampleSHA256,
+                "status": "pending-direct-full-scene-receipt",
+            ],
+            "eligibilityFormula": "neutral && captureLinearInput && fullScene && key1Increment && counterexample && noSceneDependentFallback && structural && photosAcceptance",
+            "claimBoundary": "firmware proves Apple Camera uses a capture-time pre-LTM thumbnail absent from arbitrary final HEICs; writer-time key 1 and structural checks cannot substitute for that input, direct full-scene response, or real Photos persistence",
+        ]
         let contaminationReportData = try JSONSerialization.data(
             withJSONObject: contaminationReport,
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -2053,6 +3756,8 @@ package enum ApplePhotographicStylesPipeline {
             "applePortraitWritten": portraitWritten,
             "applePortraitUnavailableReason": portraitUnavailableReason.map { $0 as Any } ?? NSNull(),
             "styleProfile": "iPhone18,1/23F84-zero-residual",
+            "styleDataProducer": "constrained-solver",
+            "researchSemanticGraphMode": researchSemanticOverride?.mode.rawValue as Any? ?? NSNull(),
             "debugRoot": debugRootURL.map { $0.path as Any } ?? NSNull(),
         ]
         let manifest: [String: Any] = [
@@ -2060,7 +3765,7 @@ package enum ApplePhotographicStylesPipeline {
             "runIdentifier": runToken,
             "input": [
                 "path": sourceURL.path,
-                "sha256": sha256Hex(try Data(contentsOf: sourceURL, options: [.mappedIfSafe])),
+                "sha256": inputSHA256,
             ],
             "output": [
                 "path": outputURL.path,
@@ -2073,6 +3778,7 @@ package enum ApplePhotographicStylesPipeline {
                 "kind": semanticWriteProfile.kind.rawValue,
                 "roles": semanticWriteProfile.orderedRoles.map(\.rawValue),
                 "nativeEvidence": "style sky-only; style human PEM+skin+sky; portrait family PEM+skin+hair+teeth+glasses",
+                "researchOverride": researchSemanticOverride?.mode.rawValue as Any? ?? NSNull(),
             ],
             "semanticAnalysisSource": semanticAnalysisSource,
             "timingsSeconds": [
@@ -2095,11 +3801,13 @@ package enum ApplePhotographicStylesPipeline {
             "donorPolicy": [
                 "shellCopied": false,
                 "scenePayloadCopied": false,
-                "styleDataSource": "deterministic complete identity derived from verified CMImaging layout",
-                "linearThumbnailSource": "same-input coherent HDR reconstruction",
+                "styleDataSource": stylePayload.resourceProvenance["styleData"]?.producer
+                    ?? "unknown",
+                "linearThumbnailSource": "same-input final-HEIC behavior proxy; Apple capture-time pre-LTM source unavailable",
                 "styleDeltaSource": "profile-scoped neutral protocol tuning",
             ],
             "donorContamination": contaminationReport,
+            "productionAcceptance": acceptanceChecklist,
         ]
         let manifestData = try JSONSerialization.data(
             withJSONObject: manifest,
@@ -2111,6 +3819,13 @@ package enum ApplePhotographicStylesPipeline {
         )
         try stylePayload.manifestJSON.write(
             to: evidenceDirectory.appendingPathComponent("style-payload-manifest.json"),
+            options: .atomic
+        )
+        try JSONSerialization.data(
+            withJSONObject: acceptanceChecklist,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        ).write(
+            to: evidenceDirectory.appendingPathComponent("production-acceptance.json"),
             options: .atomic
         )
         let latest: [String: Any] = [

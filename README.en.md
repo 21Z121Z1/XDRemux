@@ -93,6 +93,7 @@ Apple Portrait requires recoverable depth data in the source photo. Enabling the
 ## Known limitations
 
 - Apple Photographic Styles and Apple Portrait remain experimental and may vary across devices and macOS or iOS releases.
+- The public Photographic Styles path uses one fixed constrained solver; the current final-HEIC scene input remains a research candidate and its manifest stays `productionEligible=false`.
 - Editing and saving a converted photo in OPPO Gallery may remove its HDR Gain Map or HDR metadata.
 - Offline container validation does not replace real Apple Photos or OPPO Gallery display and save/reopen testing.
 - The project is currently distributed as source and does not provide a signed universal installer.

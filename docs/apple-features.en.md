@@ -35,6 +35,8 @@ swift run xdremux convert \
 
 XDRemux derives the semantic regions and Photographic Styles resources required by Apple Photos from the current image. Only valid detected regions are written; small but valid regions are retained.
 
+The public build exposes one fixed constrained-solver Styles path. It organizes the current photo's Base, RGB Gain, orientation, GTC, and related metadata into a per-photo SceneBundle, but a final HEIC does not retain the capture-time pre-LTM input, so the output manifest remains `productionEligible=false`.
+
 This mode continues to produce standard HDR output. It cannot be combined with `--oppo-compatible`.
 
 ## Apple Portrait
@@ -88,7 +90,7 @@ The implementation currently covers these offline checks:
 - Standard HDR Gain Map and Apple auxiliary references can be parsed.
 - Photographic Styles and Portrait resources pass the repository validators.
 - The App and CLI produce identical output for the same conversion request.
-- Existing real samples have passed limited macOS Photos editing, refocus, and save/reopen checks.
+- The reproducible public evidence is limited to offline container, ImageIO, helper, and App-bundle checks; real Photos save/reopen behavior is not claimed as accepted.
 
 These results do not qualify every device, focal length, operating-system release, or Apple Photos version. Offline structural validation is not equivalent to real display behavior on an iPhone, Mac, or in OPPO Gallery.
 

@@ -49,9 +49,19 @@ class SwiftArtifactLifecycleTests(unittest.TestCase):
         self.assertIn("donorContaminationScan", validation)
         self.assertIn("guard contamination.matches.isEmpty", validation)
 
-    def test_styles_raster_does_not_retain_unused_hdr_rgb_plane(self) -> None:
-        self.assertNotIn("hdrLinearRGB", STYLES_SWIFT)
-        self.assertNotIn("var hdrRGB =", STYLES_SWIFT)
+    def test_styles_scene_bundle_retains_one_shared_hdr_rgb_plane(self) -> None:
+        scene_bundle = STYLES_SWIFT.split(
+            "private struct PhotoDerivedStyleSceneBundle", 1
+        )[1].split("private struct StyleSceneResourcePayload", 1)[0]
+        scene_builder = STYLES_SWIFT.split(
+            "private static func photoDerivedStyleSceneBundle", 1
+        )[1].split("private static func", 1)[0]
+
+        self.assertIn("let hdrLinearP3RGB: [Float]", scene_bundle)
+        self.assertIn("let logGainRGB: [Float]", scene_bundle)
+        self.assertEqual(scene_builder.count("var hdrRGB ="), 1)
+        self.assertIn("hdrLinearP3RGB: hdrRGB", scene_builder)
+        self.assertIn('"resourceDecodeCount": 1', STYLES_SWIFT)
 
 
 if __name__ == "__main__":

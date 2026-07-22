@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import XDRemuxCore
 
 package enum AppleNativeToolchain {
@@ -6,6 +7,7 @@ package enum AppleNativeToolchain {
         let status: Int32
         let stdout: Data
         let stderr: Data
+        let timedOut: Bool
     }
 
     private static let cancellationKey = "com.proxdr.XDRemux.AppleNativeToolchain.cancellation"
@@ -39,6 +41,10 @@ package enum AppleNativeToolchain {
         try executable(named: "XDRemuxHEVCEncoderHelper")
     }
 
+    static func styleScenePayloadExecutable() throws -> URL {
+        try executable(named: "XDRemuxStyleScenePayloadHelper")
+    }
+
     static func stylePropertiesProbeExecutable() throws -> URL {
         try executable(named: "XDRemuxStyleValidationHelper")
     }
@@ -69,22 +75,26 @@ package enum AppleNativeToolchain {
         let stdout = DataReader(output.fileHandleForReading)
         let stderr = DataReader(errors.fileHandleForReading)
         let deadline = Date().addingTimeInterval(timeout)
+        var timedOut = false
         while process.isRunning {
             if effectiveCancellation?.isCancelled == true {
                 process.terminate()
+                if process.isRunning {
+                    Darwin.kill(process.processIdentifier, SIGKILL)
+                }
                 process.waitUntilExit()
                 stdout.wait()
                 stderr.wait()
                 throw CancellationError()
             }
             if Date() >= deadline {
+                timedOut = true
                 process.terminate()
+                if process.isRunning {
+                    Darwin.kill(process.processIdentifier, SIGKILL)
+                }
                 process.waitUntilExit()
-                stdout.wait()
-                stderr.wait()
-                throw CLIError.appleFeatureRuntimeUnavailable(
-                    "helper \(executableURL.lastPathComponent) timed out after \(Int(timeout)) seconds"
-                )
+                break
             }
             Thread.sleep(forTimeInterval: 0.02)
         }
@@ -93,7 +103,8 @@ package enum AppleNativeToolchain {
         return Result(
             status: process.terminationStatus,
             stdout: stdout.data,
-            stderr: stderr.data
+            stderr: stderr.data,
+            timedOut: timedOut
         )
     }
 

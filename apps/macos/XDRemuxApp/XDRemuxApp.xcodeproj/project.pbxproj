@@ -8,11 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		0F43851D4B592404CEAC2195 /* XDRemuxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02861545396D149E80797322 /* XDRemuxViewModel.swift */; };
-		1CF8A98D8BACB4AAB6485CB0 /* XDRemuxHEVCEncoderHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_9CE1B880-E2DC-4B7E-90DB-1F37292C272D" /* XDRemuxHEVCEncoderHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		20CB6606A9C36623960C0DB2 /* XDRemuxStyleValidationHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_82570E30-2001-4D6B-BDD4-566D07D12749" /* XDRemuxStyleValidationHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		21B7085DAE31930AF49F62AC /* XDRemuxSemanticHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_8AC6ACFA-76F9-4EE2-A175-DCFE65C8EEB3" /* XDRemuxSemanticHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		1CF8A98D8BACB4AAB6485CB0 /* XDRemuxHEVCEncoderHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_630DD111-FC0E-4741-A457-5C494F81799B" /* XDRemuxHEVCEncoderHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		20CB6606A9C36623960C0DB2 /* XDRemuxStyleValidationHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_AC8DD52F-0C55-4875-968D-1EA41EC49C4C" /* XDRemuxStyleValidationHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		21B7085DAE31930AF49F62AC /* XDRemuxSemanticHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_F7A3FBC4-FDAA-46E9-852B-FFC6402470D3" /* XDRemuxSemanticHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		31A8AD6AA40C358D2256BAE5 /* XDRemuxAppleFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 6161D9D9DDB6EF3D09CB1565 /* XDRemuxAppleFeatures */; };
 		4647AC898D992E985AED2E10 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78B033306E4AE0A568C34EBB /* VisualEffectView.swift */; };
+		4806E44A77CF01BA8921EA6A /* XDRemuxStyleScenePayloadHelper in Embed Dependencies */ = {isa = PBXBuildFile; productRef = "TEMP_B7AF69CB-C49C-4688-B130-6A73380B838B" /* XDRemuxStyleScenePayloadHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		64707094865385A92093E856 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B735B3E26375EEF954008A /* ContentView.swift */; };
 		6CFF6C897EE95ADA2AD61994 /* XDRemuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A425FEE6F8B9E96D90D2BC /* XDRemuxCore */; };
 		6FB05CECE182A7A46CEB0EAB /* XDRemuxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02861545396D149E80797322 /* XDRemuxViewModel.swift */; };
@@ -38,6 +39,7 @@
 				21B7085DAE31930AF49F62AC /* XDRemuxSemanticHelper in Embed Dependencies */,
 				1CF8A98D8BACB4AAB6485CB0 /* XDRemuxHEVCEncoderHelper in Embed Dependencies */,
 				20CB6606A9C36623960C0DB2 /* XDRemuxStyleValidationHelper in Embed Dependencies */,
+				4806E44A77CF01BA8921EA6A /* XDRemuxStyleScenePayloadHelper in Embed Dependencies */,
 			);
 			name = "Embed Dependencies";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -47,8 +49,8 @@
 /* Begin PBXFileReference section */
 		02861545396D149E80797322 /* XDRemuxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxViewModel.swift; sourceTree = "<group>"; };
 		24D38BBBE639FE49CE3858D2 /* XDRemuxAppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxAppModelTests.swift; sourceTree = "<group>"; };
+		2857A6BEAFED7C01002222B8 /* proxdrtest-integration-709 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "proxdrtest-integration-709"; path = ../../..; sourceTree = SOURCE_ROOT; };
 		33E42AF90B0C23E087B64A36 /* XDRemuxApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XDRemuxApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		385EDD63795756F2E8F07D00 /* proxdrtest */ = {isa = PBXFileReference; lastKnownFileType = folder; name = proxdrtest; path = ../../..; sourceTree = SOURCE_ROOT; };
 		4C1F041FB2225C19F92B5072 /* XDRemuxAppConversionSmoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxAppConversionSmoke.swift; sourceTree = "<group>"; };
 		4C894071433802A3CCD2584E /* AppStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStrings.swift; sourceTree = "<group>"; };
 		67B735B3E26375EEF954008A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -123,7 +125,7 @@
 		B7A0A209B126F278B11B4134 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				385EDD63795756F2E8F07D00 /* proxdrtest */,
+				2857A6BEAFED7C01002222B8 /* proxdrtest-integration-709 */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -178,6 +180,7 @@
 				E2D0C67C8CB8B89500812EA5 /* PBXTargetDependency */,
 				5C051BD98A47F4E73285CED8 /* PBXTargetDependency */,
 				FFCECC2B20A04029EA9FCB54 /* PBXTargetDependency */,
+				D294478BCEF90FB2104A352F /* PBXTargetDependency */,
 			);
 			name = XDRemuxApp;
 			packageProductDependencies = (
@@ -201,6 +204,7 @@
 				50911CC3D02C68EEB18447B4 /* PBXTargetDependency */,
 				2053B60DF1C42CA69A4E01D4 /* PBXTargetDependency */,
 				5BF604292132FCA053020930 /* PBXTargetDependency */,
+				78B6AC1C2C197B0ABB4A1D8C /* PBXTargetDependency */,
 			);
 			name = XDRemuxAppConversionSmoke;
 			packageProductDependencies = (
@@ -302,27 +306,35 @@
 /* Begin PBXTargetDependency section */
 		2053B60DF1C42CA69A4E01D4 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			productRef = "TEMP_AE618021-E837-420B-869B-36A87A86BA00" /* XDRemuxHEVCEncoderHelper */;
+			productRef = "TEMP_5B89AB92-1849-411E-90D0-E335B1C85F84" /* XDRemuxHEVCEncoderHelper */;
 		};
 		50911CC3D02C68EEB18447B4 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			productRef = "TEMP_CCC408BB-4FD5-49E2-B62A-94A58EB55738" /* XDRemuxSemanticHelper */;
+			productRef = "TEMP_354750C8-F060-4DC4-AE44-FC5E49219036" /* XDRemuxSemanticHelper */;
 		};
 		5BF604292132FCA053020930 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			productRef = "TEMP_690876D7-4697-4174-86A7-522C24C34EF6" /* XDRemuxStyleValidationHelper */;
+			productRef = "TEMP_75287AE3-8B66-4A8E-8841-BA831A36C3D7" /* XDRemuxStyleValidationHelper */;
 		};
 		5C051BD98A47F4E73285CED8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			productRef = "TEMP_9CE1B880-E2DC-4B7E-90DB-1F37292C272D" /* XDRemuxHEVCEncoderHelper */;
+			productRef = "TEMP_630DD111-FC0E-4741-A457-5C494F81799B" /* XDRemuxHEVCEncoderHelper */;
+		};
+		78B6AC1C2C197B0ABB4A1D8C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = "TEMP_A35DE6FB-7A63-4801-8C7C-67EAB5C1F13E" /* XDRemuxStyleScenePayloadHelper */;
+		};
+		D294478BCEF90FB2104A352F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = "TEMP_B7AF69CB-C49C-4688-B130-6A73380B838B" /* XDRemuxStyleScenePayloadHelper */;
 		};
 		E2D0C67C8CB8B89500812EA5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			productRef = "TEMP_8AC6ACFA-76F9-4EE2-A175-DCFE65C8EEB3" /* XDRemuxSemanticHelper */;
+			productRef = "TEMP_F7A3FBC4-FDAA-46E9-852B-FFC6402470D3" /* XDRemuxSemanticHelper */;
 		};
 		FFCECC2B20A04029EA9FCB54 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			productRef = "TEMP_82570E30-2001-4D6B-BDD4-566D07D12749" /* XDRemuxStyleValidationHelper */;
+			productRef = "TEMP_AC8DD52F-0C55-4875-968D-1EA41EC49C4C" /* XDRemuxStyleValidationHelper */;
 		};
 /* End PBXTargetDependency section */
 
@@ -623,27 +635,35 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = XDRemuxAppleFeatures;
 		};
-		"TEMP_690876D7-4697-4174-86A7-522C24C34EF6" /* XDRemuxStyleValidationHelper */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XDRemuxStyleValidationHelper;
-		};
-		"TEMP_82570E30-2001-4D6B-BDD4-566D07D12749" /* XDRemuxStyleValidationHelper */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XDRemuxStyleValidationHelper;
-		};
-		"TEMP_8AC6ACFA-76F9-4EE2-A175-DCFE65C8EEB3" /* XDRemuxSemanticHelper */ = {
+		"TEMP_354750C8-F060-4DC4-AE44-FC5E49219036" /* XDRemuxSemanticHelper */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = XDRemuxSemanticHelper;
 		};
-		"TEMP_9CE1B880-E2DC-4B7E-90DB-1F37292C272D" /* XDRemuxHEVCEncoderHelper */ = {
+		"TEMP_5B89AB92-1849-411E-90D0-E335B1C85F84" /* XDRemuxHEVCEncoderHelper */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = XDRemuxHEVCEncoderHelper;
 		};
-		"TEMP_AE618021-E837-420B-869B-36A87A86BA00" /* XDRemuxHEVCEncoderHelper */ = {
+		"TEMP_630DD111-FC0E-4741-A457-5C494F81799B" /* XDRemuxHEVCEncoderHelper */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = XDRemuxHEVCEncoderHelper;
 		};
-		"TEMP_CCC408BB-4FD5-49E2-B62A-94A58EB55738" /* XDRemuxSemanticHelper */ = {
+		"TEMP_75287AE3-8B66-4A8E-8841-BA831A36C3D7" /* XDRemuxStyleValidationHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxStyleValidationHelper;
+		};
+		"TEMP_A35DE6FB-7A63-4801-8C7C-67EAB5C1F13E" /* XDRemuxStyleScenePayloadHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxStyleScenePayloadHelper;
+		};
+		"TEMP_AC8DD52F-0C55-4875-968D-1EA41EC49C4C" /* XDRemuxStyleValidationHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxStyleValidationHelper;
+		};
+		"TEMP_B7AF69CB-C49C-4688-B130-6A73380B838B" /* XDRemuxStyleScenePayloadHelper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XDRemuxStyleScenePayloadHelper;
+		};
+		"TEMP_F7A3FBC4-FDAA-46E9-852B-FFC6402470D3" /* XDRemuxSemanticHelper */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = XDRemuxSemanticHelper;
 		};

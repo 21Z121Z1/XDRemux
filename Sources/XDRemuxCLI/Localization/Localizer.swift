@@ -8,6 +8,7 @@ extension MessageKey {
     static let helpConvert = MessageKey(rawValue: "help.command.convert")
     static let helpBatch = MessageKey(rawValue: "help.command.batch")
     static let helpOptions = MessageKey(rawValue: "help.options")
+    static let helpStylesNotice = MessageKey(rawValue: "help.styles_notice")
     static let helpDeveloper = MessageKey(rawValue: "help.developer")
     static let helpOutput = MessageKey(rawValue: "help.output")
     static let helpLanguage = MessageKey(rawValue: "help.language")

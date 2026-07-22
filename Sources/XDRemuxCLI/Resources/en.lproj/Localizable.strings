@@ -4,6 +4,7 @@
 "help.command.convert" = "  convert  Convert one ProXDR photo";
 "help.command.batch" = "  batch    Convert a directory tree";
 "help.options" = "Product options:\n  --input <file>  --output <file>\n  --input-dir <dir>  --output-dir <dir>  --glob <pattern>\n  --jobs <n>  --overwrite\n  --oppo-compatible  --apple-photographic-styles  --apple-portrait\n  --discard-portrait-data";
+"help.styles_notice" = "Apple Styles uses one fixed constrained-solver path. The current final-HEIC scene path is a research candidate; its manifest remains production-ineligible until capture-input and real Photos gates pass.";
 "help.developer" = "Developer options:\n  --family <auto|x6|x7>\n  --input-processing <system|system-decoded|hybrid|passthrough>\n  --oppo-compat [mode]  --oppo-camera-tail <mode>\n  --tmap-format <strict|imageio>  --diagnostics-dir <dir>\nDeveloper commands: validate-apple, validate-portrait, portrait-self-test";
 "help.output" = "Output options:\n  --quiet  --verbose  --debug\n  --format <text|json|jsonl>";
 "help.language" = "Language:\n  --language <auto|zh-Hans|en>\n  Environment: XDREMUX_LANGUAGE";

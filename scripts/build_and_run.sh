@@ -12,7 +12,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIRECTORY="$DERIVED_DATA/Logs/XDRemux"
 BUILD_LOG="$LOG_DIRECTORY/build.log"
 RESULT_BUNDLE="$LOG_DIRECTORY/build-$(date +%Y%m%d-%H%M%S).xcresult"
-HELPERS=(XDRemuxSemanticHelper XDRemuxHEVCEncoderHelper XDRemuxStyleValidationHelper)
+HELPERS=(XDRemuxSemanticHelper XDRemuxHEVCEncoderHelper XDRemuxStyleValidationHelper XDRemuxStyleScenePayloadHelper)
 
 MODE="run"
 VERBOSE=0
@@ -81,10 +81,6 @@ show_build_failure() {
 
 build_app() {
   mkdir -p "$LOG_DIRECTORY"
-  local obsolete_source_resources="$APP_BUNDLE/Contents/Resources/ApplePlatform"
-  if [[ -d "$obsolete_source_resources" ]]; then
-    rm -rf "$obsolete_source_resources"
-  fi
   local command=(
     xcodebuild
     -project "$PROJECT_PATH"

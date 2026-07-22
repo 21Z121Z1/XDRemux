@@ -15,7 +15,8 @@ let package = Package(
         .executable(name: "xdremux-dev", targets: ["XDRemuxDevExecutable"]),
         .executable(name: "XDRemuxSemanticHelper", targets: ["XDRemuxSemanticHelper"]),
         .executable(name: "XDRemuxHEVCEncoderHelper", targets: ["XDRemuxHEVCEncoderHelper"]),
-        .executable(name: "XDRemuxStyleValidationHelper", targets: ["XDRemuxStyleValidationHelper"])
+        .executable(name: "XDRemuxStyleValidationHelper", targets: ["XDRemuxStyleValidationHelper"]),
+        .executable(name: "XDRemuxStyleScenePayloadHelper", targets: ["XDRemuxStyleScenePayloadHelper"])
     ],
     targets: [
         .target(
@@ -44,6 +45,23 @@ let package = Package(
             ],
             linkerSettings: [
                 .linkedFramework("Foundation")
+            ]
+        ),
+        .executableTarget(
+            name: "XDRemuxStyleScenePayloadHelper",
+            path: "Sources/XDRemuxStyleScenePayloadHelper",
+            cSettings: [
+                .unsafeFlags(["-fobjc-arc", "-fblocks"])
+            ],
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("Foundation"),
+                .linkedFramework("CoreImage"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("CoreVideo"),
+                .linkedFramework("ImageIO"),
+                .linkedFramework("Metal"),
+                .linkedLibrary("z")
             ]
         ),
         .target(

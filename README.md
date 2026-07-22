@@ -93,6 +93,7 @@ Apple 人像要求输入照片包含可恢复的景深数据。普通照片不�
 ## 已知限制
 
 - Apple 摄影风格和 Apple 人像仍属实验功能，结果可能随设备和 macOS/iOS 版本变化。
+- Apple 摄影风格公开版固定使用 constrained-solver；当前 final-HEIC 场景输入仍是研究候选，输出 manifest 保持 `productionEligible=false`。
 - 转换后的照片在 OPPO 相册中再次编辑并保存后，HDR Gain Map 或 HDR 元数据可能丢失。
 - 离线容器验证不能替代 Apple Photos 或 OPPO 相册的实机显示与保存重开验证。
 - 项目目前以源码方式发布，尚未提供签名的通用安装包。

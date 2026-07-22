@@ -417,6 +417,7 @@ public enum XDRemuxCommand {
             "oppo_camera_tail=\(options.oppoCameraTail.rawValue)",
             "tmap_format=\(options.tmapFormat.rawValue)",
             "apple_features=\(options.appleFeatures.stableDescription)",
+            "apple_style_data_producer=constrained-solver",
             "diagnostics_dir=\(options.diagnosticsDirectoryURL?.path ?? "none")",
         ].joined(separator: " ")
     }
@@ -447,6 +448,7 @@ public enum XDRemuxCommand {
             localizer.text(.helpBatch),
             "",
             localizer.text(.helpOptions),
+            localizer.text(.helpStylesNotice),
             "",
             localizer.text(.helpOutput),
             "",

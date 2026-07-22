@@ -4,6 +4,7 @@
 "help.command.convert" = "  convert  转换单张 ProXDR 照片";
 "help.command.batch" = "  batch    转换目录树";
 "help.options" = "产品选项：\n  --input <文件>  --output <文件>\n  --input-dir <目录>  --output-dir <目录>  --glob <模式>\n  --jobs <数量>  --overwrite\n  --oppo-compatible  --apple-photographic-styles  --apple-portrait\n  --discard-portrait-data";
+"help.styles_notice" = "Apple 摄影风格固定使用 constrained-solver 路径。当前 final-HEIC 场景路径仍是研究候选；在 capture input 和真实 Photos 验证通过前，manifest 保持 production-ineligible。";
 "help.developer" = "开发者选项：\n  --family <auto|x6|x7>\n  --input-processing <system|system-decoded|hybrid|passthrough>\n  --oppo-compat [模式]  --oppo-camera-tail <模式>\n  --tmap-format <strict|imageio>  --diagnostics-dir <目录>\n开发者命令：validate-apple、validate-portrait、portrait-self-test";
 "help.output" = "输出选项：\n  --quiet  --verbose  --debug\n  --format <text|json|jsonl>";
 "help.language" = "语言：\n  --language <auto|zh-Hans|en>\n  环境变量：XDREMUX_LANGUAGE";
