@@ -17,34 +17,6 @@ targets:
         product: XDRemuxCore
       - package: XDRemux
         product: XDRemuxAppleFeatures
-      - package: XDRemux
-        product: XDRemuxSemanticHelper
-        embed: true
-        link: false
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
-      - package: XDRemux
-        product: XDRemuxHEVCEncoderHelper
-        embed: true
-        link: false
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
-      - package: XDRemux
-        product: XDRemuxStyleValidationHelper
-        embed: true
-        link: false
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
-      - package: XDRemux
-        product: XDRemuxStyleScenePayloadHelper
-        embed: true
-        link: false
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
     settings:
       CODE_SIGN_STYLE: Automatic
       CODE_SIGN_IDENTITY: "-"
@@ -53,45 +25,3 @@ targets:
       INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
       INFOPLIST_KEY_NSPrincipalClass: NSApplication
       GENERATE_INFOPLIST_FILE: YES
-  XDRemuxAppModelTests:
-    type: tool
-    platform: macOS
-    deploymentTarget: 15.0
-    sources:
-      - path: Sources/AppStrings.swift
-      - path: Sources/XDRemuxViewModel.swift
-      - path: Tests/XDRemuxAppModelTests.swift
-    dependencies:
-      - package: XDRemux
-        product: XDRemuxCore
-      - package: XDRemux
-        product: XDRemuxAppleFeatures
-    settings:
-      CODE_SIGN_STYLE: Automatic
-      CODE_SIGN_IDENTITY: "-"
-  XDRemuxAppConversionSmoke:
-    type: tool
-    platform: macOS
-    deploymentTarget: 15.0
-    sources:
-      - path: Tests/XDRemuxAppConversionSmoke.swift
-    dependencies:
-      - package: XDRemux
-        product: XDRemuxCore
-      - package: XDRemux
-        product: XDRemuxAppleFeatures
-      - package: XDRemux
-        product: XDRemuxSemanticHelper
-        link: false
-      - package: XDRemux
-        product: XDRemuxHEVCEncoderHelper
-        link: false
-      - package: XDRemux
-        product: XDRemuxStyleValidationHelper
-        link: false
-      - package: XDRemux
-        product: XDRemuxStyleScenePayloadHelper
-        link: false
-    settings:
-      CODE_SIGN_STYLE: Automatic
-      CODE_SIGN_IDENTITY: "-"

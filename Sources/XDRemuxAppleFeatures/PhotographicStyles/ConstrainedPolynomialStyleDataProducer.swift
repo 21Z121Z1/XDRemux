@@ -140,7 +140,7 @@ package struct ConstrainedPolynomialStyleDataProducer {
             at: outputDirectory,
             withIntermediateDirectories: true
         )
-        let executable = try AppleNativeToolchain.styleScenePayloadExecutable()
+        let executable = try AppleNativeToolchain.learnExecutable()
         let identityCoefficients = Array(
             repeating: 0.0,
             count: AppleStyleDataLayout.blockValueCount

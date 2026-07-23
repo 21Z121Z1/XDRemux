@@ -18,11 +18,8 @@ package enum XDRemuxProductCore {
         inputProcessingBranch: InputProcessingBranch = .hybrid,
         oppoCameraTail: OppoCameraTail = .preserveWithoutPrivateHDR,
         tmapFormat: TmapFormat = .imageIO,
-        eventHandler: ConversionEventHandler? = nil,
-        cancellation: ConversionCancellation? = nil
+        eventHandler: ConversionEventHandler? = nil
     ) throws -> SampleReport {
-        try cancellation?.checkCancellation()
-        eventHandler?(.phaseChanged(.readingSource))
         guard fileManager.fileExists(atPath: inputURL.path) else {
             throw CLIError.inputNotFound(inputURL)
         }
@@ -37,14 +34,11 @@ package enum XDRemuxProductCore {
             throw CLIError.unableToRead(inputURL)
         }
 
-        try cancellation?.checkCancellation()
-        eventHandler?(.phaseChanged(.extractingGainMap))
         try rejectLossyGainMapPromotion(inputURL: inputURL, compatibility: oppoCompatibility)
         let productInput = try prepareProductInput(
             inputURL: inputURL,
             sourceData: sourceData,
-            familyPreference: familyPreference,
-            eventHandler: eventHandler
+            familyPreference: familyPreference
         )
         let debugDirURL = try writeDiagnosticsIfRequested(
             debugRootURL: debugRootURL,
@@ -72,8 +66,6 @@ package enum XDRemuxProductCore {
         )
             ? .hybrid
             : inputProcessingBranch
-        try cancellation?.checkCancellation()
-        eventHandler?(.phaseChanged(.writingContainer))
         try ProductGainMapWriter.write(
             inputURL: inputURL,
             outputURL: actualOutputURL,
@@ -95,8 +87,6 @@ package enum XDRemuxProductCore {
             extracted: productInput.extracted,
             mode: oppoCameraTail
         )
-        try cancellation?.checkCancellation()
-        eventHandler?(.phaseChanged(.verifyingOutput))
         guard gainMapEncodingMatchesTarget(at: actualOutputURL, compatibility: oppoCompatibility) else {
             throw CLIError.invalidContainer("output Gain Map encoding does not match the selected compatibility target")
         }
@@ -129,11 +119,9 @@ package enum XDRemuxProductCore {
     private static func prepareProductInput(
         inputURL: URL,
         sourceData: Data,
-        familyPreference: Family,
-        eventHandler: ConversionEventHandler?
+        familyPreference: Family
     ) throws -> ProductInput {
         let extracted = try LHDRExtractor.extract(from: sourceData)
-        eventHandler?(.phaseChanged(.reconstructingHDR))
         let detectedFamily = detectFamily(from: extracted)
         let effectiveFamily = familyPreference == .auto ? detectedFamily : familyPreference
         let scale = try EDRScaleResolver.resolve(metaFloats: extracted.metaFloats, mode: extracted.mode)
@@ -252,39 +240,26 @@ package enum XDRemuxProductCore {
 public enum ConversionEngine {
     public static func convert(_ request: ConversionRequest) throws -> ConversionResult {
         let config = request.configuration
-        let eventHandler = config.eventHandler
-        eventHandler?(.started(input: request.input.url, output: request.output.url))
-        do {
-            guard !config.appleFeaturesEnabled else {
-                throw XDRemuxError.invalidValue(
-                    option: config.applePhotographicStyles
-                        ? "--apple-photographic-styles"
-                        : "--apple-portrait",
-                    value: "Apple features must be converted by XDRemuxAppleFeatures"
-                )
-            }
-            try config.cancellation?.checkCancellation()
-            _ = try XDRemuxProductCore.convert(
-                inputURL: request.input.url,
-                outputURL: request.output.url,
-                familyPreference: config.family,
-                debugRootURL: config.debugDirectory,
-                oppoCompatibility: config.oppoCompatibility,
-                inputProcessingBranch: config.inputProcessingBranch,
-                oppoCameraTail: config.oppoCameraTail,
-                tmapFormat: config.tmapFormat,
-                eventHandler: eventHandler,
-                cancellation: config.cancellation
+        guard !config.appleFeaturesEnabled else {
+            throw XDRemuxError.invalidValue(
+                option: config.applePhotographicStyles
+                    ? "--apple-photographic-styles"
+                    : "--apple-portrait",
+                value: "Apple features must be converted by XDRemuxAppleFeatures"
             )
-            let result = ConversionResult(input: request.input, output: request.output)
-            eventHandler?(.completed(result))
-            return result
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            eventHandler?(.failed(ConversionFailure.classify(error)))
-            throw error
         }
+        _ = try XDRemuxProductCore.convert(
+            inputURL: request.input.url,
+            outputURL: request.output.url,
+            familyPreference: config.family,
+            debugRootURL: config.debugDirectory,
+            oppoCompatibility: config.oppoCompatibility,
+            inputProcessingBranch: config.inputProcessingBranch,
+            oppoCameraTail: config.oppoCameraTail,
+            tmapFormat: config.tmapFormat,
+            eventHandler: config.eventHandler
+        )
+        return ConversionResult(input: request.input, output: request.output)
     }
 
     public static func convert(

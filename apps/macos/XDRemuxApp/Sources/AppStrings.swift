@@ -1,5 +1,4 @@
 import Foundation
-import XDRemuxCore
 
 enum AppStrings {
     static let addHEIC = "添加 HEIC"
@@ -47,16 +46,6 @@ enum AppStrings {
     static let conversionFinished = "转换完成"
     static let conversionFinishedWithFailures = "转换完成，存在失败"
     static let waitingForInput = "等待输入"
-    static let phaseReadingSource = "读取源文件"
-    static let phaseExtractingGainMap = "提取增益图"
-    static let phaseReconstructingHDR = "重建 HDR"
-    static let phaseGeneratingPhotographicStyles = "生成摄影风格资源"
-    static let phaseGeneratingPortraitResources = "生成人像资源"
-    static let phaseWritingContainer = "写入容器"
-    static let phaseVerifyingOutput = "验证输出"
-    static let warningPortraitFlagRecovered = "已从照片景深资源恢复人像标记。"
-    static let warningPortraitUnavailable = "当前照片无法生成人像资源，其他已启用输出仍会继续。"
-    static let warningPrivateBridgeFallback = "Apple 私有处理路径不可用，已使用兼容路径继续。"
 
     static let selectHEICPanelMessage = "选择要加入队列的 ProXDR HEIC 文件或文件夹"
     static let select = "选择"
@@ -150,30 +139,6 @@ enum AppStrings {
     static let doNotWriteDebugFiles = "不写调试文件"
     static let chooseDirectory = "选择目录"
     static let clear = "清除"
-}
-
-extension ConversionPhase {
-    var appTitle: String {
-        switch self {
-        case .readingSource: return AppStrings.phaseReadingSource
-        case .extractingGainMap: return AppStrings.phaseExtractingGainMap
-        case .reconstructingHDR: return AppStrings.phaseReconstructingHDR
-        case .generatingPhotographicStyles: return AppStrings.phaseGeneratingPhotographicStyles
-        case .generatingPortraitResources: return AppStrings.phaseGeneratingPortraitResources
-        case .writingContainer: return AppStrings.phaseWritingContainer
-        case .verifyingOutput: return AppStrings.phaseVerifyingOutput
-        }
-    }
-}
-
-extension ConversionWarning {
-    var appMessage: String {
-        switch code {
-        case .portraitFlagRecovered: return AppStrings.warningPortraitFlagRecovered
-        case .portraitUnavailable: return AppStrings.warningPortraitUnavailable
-        case .privateBridgeFallback: return AppStrings.warningPrivateBridgeFallback
-        }
-    }
 }
 extension OppoCompatibility {
     var appTitle: String {

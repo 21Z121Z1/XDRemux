@@ -6,7 +6,9 @@ public struct BatchConfiguration: Sendable {
     public var outputDirectory: URL
     public var glob: String
     public var jobs: Int
-    public var overwrite: Bool
+    public var checkpointURL: URL?
+    public var resume: Bool
+    public var skipExisting: Bool
 
     public init(
         conversion: ConversionConfiguration = ConversionConfiguration(),
@@ -14,14 +16,18 @@ public struct BatchConfiguration: Sendable {
         outputDirectory: URL,
         glob: String = "*.heic",
         jobs: Int = min(ProcessInfo.processInfo.activeProcessorCount, 4),
-        overwrite: Bool = false
+        checkpointURL: URL? = nil,
+        resume: Bool = true,
+        skipExisting: Bool = true
     ) {
         self.conversion = conversion
         self.inputDirectory = inputDirectory
         self.outputDirectory = outputDirectory
         self.glob = glob
         self.jobs = jobs
-        self.overwrite = overwrite
+        self.checkpointURL = checkpointURL
+        self.resume = resume
+        self.skipExisting = skipExisting
     }
 }
 
@@ -30,19 +36,16 @@ public struct BatchResult: Sendable {
     public let skippedExistingCount: Int
     public let failureCount: Int
     public let outputDirectory: URL
-    public let failureReportURL: URL?
 
     public init(
         convertedCount: Int,
         skippedExistingCount: Int,
         failureCount: Int,
-        outputDirectory: URL,
-        failureReportURL: URL? = nil
+        outputDirectory: URL
     ) {
         self.convertedCount = convertedCount
         self.skippedExistingCount = skippedExistingCount
         self.failureCount = failureCount
         self.outputDirectory = outputDirectory
-        self.failureReportURL = failureReportURL
     }
 }

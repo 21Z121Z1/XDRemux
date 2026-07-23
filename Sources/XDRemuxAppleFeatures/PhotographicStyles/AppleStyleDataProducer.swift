@@ -34,8 +34,9 @@ package struct AppleStyleDataResult {
         sceneMatched && !identityFallback && fallbackKind == nil
     }
 
-    // Key 1 admission is necessary but cannot establish full-scene or Photos
-    // equivalence. Keep the public result fail-closed until those gates pass.
+    // key 1 admission cannot establish the correctness of the shared scene
+    // payload.  A final HEIC becomes production-eligible only through the
+    // separate full-scene + counterexample + structural + Photos receipt.
     var productionEligible: Bool { false }
 
     var manifest: [String: Any] {
@@ -159,10 +160,7 @@ package enum AppleStyleDataLayout {
     }
 }
 
-// The constrained solver needs a complete identity input for its preliminary
-// consumer validation. This baseline is internal and never exposed as a mode
-// or emitted as a fallback producer.
-package struct SolverIdentityBaselineProducer: AppleStyleDataProducing {
+package struct IdentityStyleDataProducer: AppleStyleDataProducing {
     package func makeStyleData(
         request: AppleStyleDataRequest
     ) throws -> AppleStyleDataResult {
@@ -171,18 +169,17 @@ package struct SolverIdentityBaselineProducer: AppleStyleDataProducing {
             withIntermediateDirectories: true
         )
         let styleData = try AppleStyleDataLayout.completeIdentity()
-        try styleData.write(
-            to: request.outputDirectory.appendingPathComponent("solver-identity-baseline.f16.bin"),
-            options: .atomic
-        )
+        let output = request.outputDirectory
+            .appendingPathComponent("identity-fallback-style-data.f16.bin")
+        try styleData.write(to: output, options: .atomic)
         return AppleStyleDataResult(
             styleData: styleData,
             styleDataSHA256: sha256Hex(styleData),
             polynomialCount: AppleStyleDataLayout.polynomialCount,
             blockValueCount: AppleStyleDataLayout.blockValueCount,
             tileCount: AppleStyleDataLayout.tileCount,
-            producer: "solverIdentityBaseline",
-            producerVersion: "solver-identity-baseline-v1",
+            producer: "identityFallback",
+            producerVersion: "identity-fallback-v1",
             sourceSHA256: sha256Hex(
                 try Data(contentsOf: request.sourceURL, options: [.mappedIfSafe])
             ),
@@ -192,18 +189,216 @@ package struct SolverIdentityBaselineProducer: AppleStyleDataProducing {
             sourceDomain: request.sourceDomain,
             targetDomain: request.targetDomain,
             learnBufferKind: nil,
-            solverKind: "constrained-solver-preliminary-baseline",
+            solverKind: nil,
             evidence: .privateFrameworkIdentity,
             sceneMatched: false,
-            identityFallback: false,
-            fallbackKind: nil,
+            identityFallback: true,
+            fallbackKind: "complete-identity",
             reconstructionMetrics: [
-                "status": "internal_solver_baseline",
+                "status": "not_learned",
                 "layout": try AppleStyleDataLayout.validate(styleData),
             ],
             warnings: [
-                "Internal constrained-solver baseline; not a user-selectable producer."
+                "Explicit identity fallback selected; key 1 is not scene-matched."
             ]
         )
+    }
+}
+
+package struct AppleLearnNodeStyleDataProducer: AppleStyleDataProducing {
+    private static let producerVersion = "apple-learnnode-base-to-base-diagnostic-v3"
+
+    package func makeStyleData(
+        request: AppleStyleDataRequest
+    ) throws -> AppleStyleDataResult {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: request.outputDirectory,
+            withIntermediateDirectories: true
+        )
+        let helperOutput = request.outputDirectory
+            .appendingPathComponent("learnnode", isDirectory: true)
+        try fileManager.createDirectory(at: helperOutput, withIntermediateDirectories: true)
+        let executable = try AppleNativeToolchain.learnExecutable()
+        let process = try AppleNativeToolchain.run(
+            executable,
+            arguments: [
+                request.sourceURL.path,
+                request.renderedTargetURL.path,
+                helperOutput.path,
+            ],
+            timeout: 180
+        )
+        guard !process.timedOut, process.status == 0 else {
+            let stderr = String(data: process.stderr, encoding: .utf8) ?? ""
+            throw CLIError.invalidContainer(
+                "Apple LearnNode style-data producer failed: "
+                    + (process.timedOut ? "helper exceeded 180 seconds; " : "")
+                    + stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
+        let rawURL = helperOutput.appendingPathComponent("learned_style.f16.bin")
+        let probeURL = helperOutput.appendingPathComponent("probe.json")
+        guard fileManager.fileExists(atPath: rawURL.path),
+              fileManager.fileExists(atPath: probeURL.path) else {
+            throw CLIError.invalidContainer(
+                "Apple LearnNode did not emit style data and probe diagnostics"
+            )
+        }
+        let styleData = try Data(contentsOf: rawURL, options: [.mappedIfSafe])
+        let layout = try AppleStyleDataLayout.validate(styleData)
+        let probe = try Self.probeObject(at: probeURL)
+        try Self.validateProbe(probe)
+        let metrics = try Self.reconstructionMetrics(
+            helperOutput: helperOutput,
+            probe: probe,
+            layout: layout
+        )
+        let identityRMSE = metrics["identityBaselineRMSE"] as? Double ?? 0
+        let learnedRMSE = metrics["learnedApplyRMSE"] as? Double ?? .infinity
+        if identityRMSE <= 0.000_1 {
+            guard learnedRMSE <= 0.000_1 else {
+                throw CLIError.invalidContainer(
+                    String(
+                        format: "Apple LearnNode changed an already-matched target (identity %.8f, learned %.8f)",
+                        identityRMSE,
+                        learnedRMSE
+                    )
+                )
+            }
+        } else if learnedRMSE >= identityRMSE * 0.98 {
+            throw CLIError.invalidContainer(
+                String(
+                    format: "Apple LearnNode candidate did not improve target reconstruction (identity %.8f, learned %.8f)",
+                    identityRMSE,
+                    learnedRMSE
+                )
+            )
+        }
+        guard layout["completeIdentity"] as? Bool != true else {
+            throw CLIError.invalidContainer(
+                "Apple LearnNode returned complete identity instead of photo-specific style data"
+            )
+        }
+        let output = request.outputDirectory
+            .appendingPathComponent("learnnode-near-identity-fallback.f16.bin")
+        try styleData.write(to: output, options: .atomic)
+        return AppleStyleDataResult(
+            styleData: styleData,
+            styleDataSHA256: sha256Hex(styleData),
+            polynomialCount: AppleStyleDataLayout.polynomialCount,
+            blockValueCount: AppleStyleDataLayout.blockValueCount,
+            tileCount: AppleStyleDataLayout.tileCount,
+            producer: "learnNodeNeutralDiagnostic",
+            producerVersion: Self.producerVersion,
+            sourceSHA256: sha256Hex(
+                try Data(contentsOf: request.sourceURL, options: [.mappedIfSafe])
+            ),
+            targetSHA256: sha256Hex(
+                try Data(contentsOf: request.renderedTargetURL, options: [.mappedIfSafe])
+            ),
+            sourceDomain: request.sourceDomain,
+            targetDomain: request.targetDomain,
+            learnBufferKind: "learned CIImage raw 160x162 kCIFormatRh Float16",
+            solverKind: nil,
+            evidence: .privateFrameworkNearIdentityFallback,
+            sceneMatched: false,
+            identityFallback: false,
+            fallbackKind: "base-to-base-near-identity",
+            reconstructionMetrics: metrics,
+            warnings: [
+                "Diagnostic Base-to-Base LearnNode output selected. This is a content-dependent near-identity fallback, not a scene-matched reverse style transform."
+            ]
+        )
+    }
+
+    private static func probeObject(at url: URL) throws -> [String: Any] {
+        let data = try Data(contentsOf: url)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CLIError.invalidContainer("Apple LearnNode probe JSON is malformed")
+        }
+        return object
+    }
+
+    private static func validateProbe(_ probe: [String: Any]) throws {
+        guard probe["mode"] as? String == "direct",
+              probe["hooksRestored"] as? Bool == true,
+              let direction = probe["learnDirection"] as? [String: Any],
+              direction["swapped"] as? Bool == false,
+              let output = probe["rawOutput"] as? [String: Any],
+              (output["length"] as? NSNumber)?.intValue == AppleStyleDataLayout.byteCount,
+              output["format"] as? String == "kCIFormatRh" else {
+            throw CLIError.invalidContainer(
+                "Apple LearnNode probe did not return the verified normal raw Float16 contract"
+            )
+        }
+    }
+
+    private static func reconstructionMetrics(
+        helperOutput: URL,
+        probe: [String: Any],
+        layout: [String: Any]
+    ) throws -> [String: Any] {
+        let source = try halfRGB(
+            at: helperOutput.appendingPathComponent("input_thumbnail.rgba16f.bin")
+        )
+        let target = try halfRGB(
+            at: helperOutput.appendingPathComponent("target_thumbnail.rgba16f.bin")
+        )
+        let applied = try halfRGB(
+            at: helperOutput.appendingPathComponent("learned_applied_thumbnail.rgba16f.bin")
+        )
+        guard source.count == target.count, target.count == applied.count else {
+            throw CLIError.invalidContainer(
+                "Apple LearnNode reconstruction captures have different dimensions"
+            )
+        }
+        let identityRMSE = rmse(source, target)
+        let learnedRMSE = rmse(applied, target)
+        let improvement = identityRMSE == 0 ? 0 : 1 - learnedRMSE / identityRMSE
+        return [
+            "status": "measured",
+            "evidence": "private _NUStyleTransferApplyProcessor diagnostic",
+            "identityBaselineRMSE": identityRMSE,
+            "learnedApplyRMSE": learnedRMSE,
+            "rmseImprovementFraction": improvement,
+            "sampleCount": source.count / 3,
+            "styleDataLayout": layout,
+            "probeSchema": probe["schema"] as? String ?? "unknown",
+        ]
+    }
+
+    private static func halfRGB(at url: URL) throws -> [Float] {
+        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        guard data.count > 0, data.count.isMultiple(of: 8) else {
+            throw CLIError.invalidContainer(
+                "Apple LearnNode RGBA16F capture has invalid length \(data.count)"
+            )
+        }
+        var result: [Float] = []
+        result.reserveCapacity(data.count / 8 * 3)
+        for pixelOffset in stride(from: 0, to: data.count, by: 8) {
+            for channelOffset in stride(from: 0, through: 4, by: 2) {
+                let offset = pixelOffset + channelOffset
+                let bits = UInt16(data[offset]) | (UInt16(data[offset + 1]) << 8)
+                let value = Float(Float16(bitPattern: bits))
+                guard value.isFinite else {
+                    throw CLIError.invalidContainer(
+                        "Apple LearnNode RGBA16F capture contains NaN or Inf"
+                    )
+                }
+                result.append(value)
+            }
+        }
+        return result
+    }
+
+    private static func rmse(_ left: [Float], _ right: [Float]) -> Double {
+        var squaredError = 0.0
+        for index in left.indices {
+            let difference = Double(left[index] - right[index])
+            squaredError += difference * difference
+        }
+        return sqrt(squaredError / Double(left.count))
     }
 }

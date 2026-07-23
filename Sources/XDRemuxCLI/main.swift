@@ -1,0 +1,3 @@
+import XDRemuxAppleFeatures
+
+XDRemuxCommand.main()

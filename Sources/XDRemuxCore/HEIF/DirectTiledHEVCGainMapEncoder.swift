@@ -21,6 +21,8 @@ package enum DirectTiledHEVCGainMapEncoder {
         let stderr: Data
     }
 
+    private static let compileLock = NSLock()
+
     package static func helperExecutable() throws -> URL {
         try encoderExecutable()
     }
@@ -189,30 +191,67 @@ package enum DirectTiledHEVCGainMapEncoder {
     }
 
     private static func encoderExecutable() throws -> URL {
-        let fileManager = FileManager.default
-        var candidates: [URL] = []
-        let name = "XDRemuxHEVCEncoderHelper"
-        if let override = ProcessInfo.processInfo.environment["XDREMUX_HELPER_DIRECTORY"] {
-            candidates.append(
-                URL(fileURLWithPath: override, isDirectory: true).appendingPathComponent(name)
+        let source = try resourceURL(name: "apple_vt_hevc_encoder.swift")
+        let sourceData = try Data(contentsOf: source, options: [.mappedIfSafe])
+        var cacheIdentity = sourceData
+        cacheIdentity.append(contentsOf: "swiftc\u{0}-O\u{0}<source>".utf8)
+        let sourceHash = sha256Hex(cacheIdentity)
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            throw CLIError.invalidContainer("cannot resolve the user cache directory")
+        }
+        let directory = caches
+            .appendingPathComponent("com.proxdr.XDRemux", isDirectory: true)
+            .appendingPathComponent("AppleNativeTools", isDirectory: true)
+            .appendingPathComponent(sourceHash, isDirectory: true)
+        let executable = directory.appendingPathComponent("apple-vt-hevc-encoder")
+
+        compileLock.lock()
+        defer { compileLock.unlock() }
+        if FileManager.default.isExecutableFile(atPath: executable.path) {
+            return executable
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let result = try run(
+            URL(fileURLWithPath: "/usr/bin/xcrun"),
+            arguments: ["swiftc", "-O", source.path, "-o", executable.path]
+        )
+        guard result.status == 0, FileManager.default.isExecutableFile(atPath: executable.path) else {
+            let diagnostic = String(data: result.stderr, encoding: .utf8) ?? "unknown compiler error"
+            throw CLIError.invalidContainer(
+                "cannot build apple-vt-hevc-encoder: "
+                    + diagnostic.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }
-        if Bundle.main.bundleURL.pathExtension == "app" {
+        return executable
+    }
+
+    private static func resourceURL(name: String) throws -> URL {
+        let fileManager = FileManager.default
+        var candidates: [URL] = []
+        if let override = ProcessInfo.processInfo.environment["XDREMUX_CORE_NATIVE_ROOT"] {
+            candidates.append(URL(fileURLWithPath: override, isDirectory: true).appendingPathComponent(name))
+        }
+        if let override = ProcessInfo.processInfo.environment["XDREMUX_APPLE_PLATFORM_ROOT"] {
             candidates.append(
-                Bundle.main.bundleURL
-                    .appendingPathComponent("Contents/Helpers", isDirectory: true)
+                URL(fileURLWithPath: override, isDirectory: true)
+                    .appendingPathComponent("Native", isDirectory: true)
                     .appendingPathComponent(name)
             )
         }
-        if let executableDirectory = Bundle.main.executableURL?.deletingLastPathComponent() {
-            candidates.append(executableDirectory.appendingPathComponent(name))
+        if let resources = Bundle.module.resourceURL {
+            candidates.append(
+                resources.appendingPathComponent("Native", isDirectory: true).appendingPathComponent(name)
+            )
         }
-        if let match = candidates.first(where: { fileManager.isExecutableFile(atPath: $0.path) }) {
+        if let resources = Bundle.main.resourceURL {
+            candidates.append(
+                resources.appendingPathComponent("Native", isDirectory: true).appendingPathComponent(name)
+            )
+        }
+        if let match = candidates.first(where: { fileManager.fileExists(atPath: $0.path) }) {
             return match
         }
-        throw CLIError.appleFeatureRuntimeUnavailable(
-            "missing prebuilt helper \(name); searched \(candidates.map(\.path).joined(separator: ", "))"
-        )
+        throw CLIError.invalidContainer("missing XDRemux native Gain Map encoder resource \(name)")
     }
 
     private static func run(_ executableURL: URL, arguments: [String]) throws -> ProcessResult {

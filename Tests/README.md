@@ -12,9 +12,8 @@ swift test
 Swift target coverage is split into:
 
 - `XDRemuxCoreTests/` for conversion models, HEIF bounds, validation, and file lifecycle.
-- `XDRemuxAppleFeaturesTests/` for Apple feature contracts, event forwarding, and byte-stable self-tests.
-- `XDRemuxCLITests/` for public/developer parsing, localization, TTY/JSON rendering,
-  batch reruns, atomic installation, relative output paths, and stable schemas.
+- `XDRemuxAppleFeaturesTests/` for Apple feature contracts and byte-stable self-tests.
+- `XDRemuxCLITests/` for shared convert/batch parsing, modes, defaults, and errors.
 
 Run the existing Python regressions with:
 
@@ -38,14 +37,6 @@ plans, and invalidates receipts after `HEAD` changes.
 functional check for Swift CLI completion plans. It keeps private HEIC inputs
 outside Git while verifying conversion success and the ImageIO gain-map pixel
 format.
-
-`Tests/validation/verify_cli_sigint_cursor.py` runs the CLI with stderr attached
-to a PTY, sends SIGINT after progress starts, and verifies that the cursor-show
-sequence is emitted before termination.
-
-Apple validation harnesses build or accept an `xdremux-dev` binary because
-validators and `--diagnostics-dir` are intentionally absent from the public
-CLI.
 
 macOS app-specific UI and ViewModel tests can remain under `apps/macos/XDRemuxApp/Tests/`. Converter correctness tests should live here so they are not coupled to the app project layout.
 

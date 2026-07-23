@@ -18,6 +18,23 @@ package enum PortraitConversionPipeline {
         let manifestURL: URL?
     }
 
+    private struct PortraitSourceGainMap {
+        let pixelFormat: UInt32
+        let width: Int
+        let height: Int
+    }
+
+    private struct ParsedPortraitSourceImage {
+        let baseJPEG: Data
+        let gainMapJPEG: Data
+        let gainMap: PortraitSourceGainMap
+    }
+
+    static func isSupportedPortraitSourceGainMapPixelFormat(_ pixelFormat: UInt32) -> Bool {
+        pixelFormat == pixelFormatFourCC("444f")
+            || pixelFormat == pixelFormatFourCC("L008")
+    }
+
     static func isConvertibleInput(_ inputURL: URL) -> Bool {
         guard FileManager.default.fileExists(atPath: inputURL.path),
               let inputData = try? Data(contentsOf: inputURL),
@@ -25,12 +42,11 @@ package enum PortraitConversionPipeline {
               let srcImage = blocks["src.image"],
               blocks["rear.depth"] != nil,
               blocks["rear.depth.config"] != nil,
-              let firstEOI = srcImage.range(of: Data([0xff, 0xd9])),
-              firstEOI.upperBound + 3 <= srcImage.count,
-              srcImage[firstEOI.upperBound..<(firstEOI.upperBound + 3)] == Data([0xff, 0xd8, 0xff]),
-              (try? resolveGainInfoFloats(
+              (try? parsePortraitSourceImage(srcImage)) != nil,
+              (try? resolvePortraitGainInfoFloats(
                   privateInfo: blocks["local.uhdr.gainmap.info"],
-                  inputURL: inputURL
+                  inputURL: inputURL,
+                  sourceImageData: srcImage
               )) != nil else {
             return false
         }
@@ -77,6 +93,130 @@ package enum PortraitConversionPipeline {
             return false
         }
         return true
+    }
+
+    private static func parsePortraitSourceImage(_ sourceImage: Data) throws -> ParsedPortraitSourceImage {
+        guard sourceImage.starts(with: Data([0xff, 0xd8])),
+              let firstEOI = sourceImage.range(of: Data([0xff, 0xd9])),
+              firstEOI.upperBound + 3 <= sourceImage.count,
+              sourceImage[firstEOI.upperBound..<(firstEOI.upperBound + 3)] == Data([0xff, 0xd8, 0xff]) else {
+            throw CLIError.invalidContainer("portrait src.image does not contain adjacent base/gain JPEGs")
+        }
+        let baseJPEG = sourceImage.subdata(in: 0..<firstEOI.upperBound)
+        let gainMapJPEG = sourceImage.subdata(in: firstEOI.upperBound..<sourceImage.count)
+        guard let baseSource = CGImageSourceCreateWithData(baseJPEG as CFData, nil),
+              CGImageSourceCreateImageAtIndex(baseSource, 0, nil) != nil,
+              let gainSource = CGImageSourceCreateWithData(gainMapJPEG as CFData, nil),
+              CGImageSourceCreateImageAtIndex(gainSource, 0, nil) != nil else {
+            throw CLIError.invalidContainer("portrait src.image base/gain JPEG cannot be decoded")
+        }
+        let gainMap = try portraitSourceGainMap(from: sourceImage)
+        let gainSize = try jpegImageSize(gainMapJPEG)
+        guard gainMap.width == gainSize.0, gainMap.height == gainSize.1 else {
+            throw CLIError.invalidContainer("portrait src.image Gain Map geometry does not match its JPEG")
+        }
+        return ParsedPortraitSourceImage(
+            baseJPEG: baseJPEG,
+            gainMapJPEG: gainMapJPEG,
+            gainMap: gainMap
+        )
+    }
+
+    private static func portraitSourceGainMap(from sourceData: Data) throws -> PortraitSourceGainMap {
+        try withPortraitSourceURL(sourceData) { sourceURL in
+            guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
+                  let auxiliary = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                      source,
+                      0,
+                      kCGImageAuxiliaryDataTypeISOGainMap
+                  ) as? [CFString: Any],
+                  let description = auxiliary[kCGImageAuxiliaryDataInfoDataDescription] as? [CFString: Any],
+                  let pixelFormat = portraitPixelFormat(description[kCGImagePropertyPixelFormat]),
+                  let width = (description[kCGImagePropertyWidth] as? NSNumber)?.intValue,
+                  let height = (description[kCGImagePropertyHeight] as? NSNumber)?.intValue,
+                  width > 0,
+                  height > 0 else {
+                throw CLIError.invalidContainer(
+                    "portrait src.image is not an ImageIO-readable ISO Gain Map"
+                )
+            }
+            guard isSupportedPortraitSourceGainMapPixelFormat(pixelFormat) else {
+                throw CLIError.invalidContainer(
+                    "portrait src.image has unsupported Gain Map pixel format (\(portraitFourCC(pixelFormat)))"
+                )
+            }
+            return PortraitSourceGainMap(pixelFormat: pixelFormat, width: width, height: height)
+        }
+    }
+
+    private static func withPortraitSourceURL<T>(
+        _ sourceData: Data,
+        body: (URL) throws -> T
+    ) throws -> T {
+        let sourceURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-portrait-src-\(UUID().uuidString).jpg")
+        defer { try? FileManager.default.removeItem(at: sourceURL) }
+        try sourceData.write(to: sourceURL, options: .atomic)
+        return try body(sourceURL)
+    }
+
+    private static func resolvePortraitGainInfoFloats(
+        privateInfo: Data?,
+        inputURL: URL,
+        sourceImageData: Data
+    ) throws -> [Double] {
+        if privateInfo != nil {
+            return try resolveGainInfoFloats(privateInfo: privateInfo, inputURL: inputURL)
+        }
+        return try withPortraitSourceURL(sourceImageData) { sourceURL in
+            try resolveGainInfoFloats(privateInfo: nil, inputURL: sourceURL)
+        }
+    }
+
+    private static func portraitPixelFormat(_ value: Any?) -> UInt32? {
+        if let number = value as? NSNumber {
+            return number.uint32Value
+        }
+        if let string = value as? String, string.utf8.count == 4 {
+            return pixelFormatFourCC(string)
+        }
+        return nil
+    }
+
+    private static func portraitFourCC(_ value: UInt32) -> String {
+        String(bytes: [
+            UInt8((value >> 24) & 0xff),
+            UInt8((value >> 16) & 0xff),
+            UInt8((value >> 8) & 0xff),
+            UInt8(value & 0xff),
+        ], encoding: .ascii) ?? String(format: "0x%08x", value)
+    }
+
+    private static func verifyPortraitGainMapOutput(
+        _ outputURL: URL,
+        expectedGainMap: PortraitSourceGainMap
+    ) throws {
+        guard let source = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              let auxiliary = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypeISOGainMap
+              ) as? [CFString: Any],
+              let description = auxiliary[kCGImageAuxiliaryDataInfoDataDescription] as? [CFString: Any],
+              let actualPixelFormat = portraitPixelFormat(description[kCGImagePropertyPixelFormat]),
+              let width = (description[kCGImagePropertyWidth] as? NSNumber)?.intValue,
+              let height = (description[kCGImagePropertyHeight] as? NSNumber)?.intValue else {
+            throw CLIError.outputVerificationFailed(outputURL)
+        }
+        guard actualPixelFormat == expectedGainMap.pixelFormat else {
+            throw CLIError.invalidContainer(
+                "Portrait ImageIO bridge changed Gain Map pixel format from "
+                    + "\(portraitFourCC(expectedGainMap.pixelFormat)) to \(portraitFourCC(actualPixelFormat))"
+            )
+        }
+        guard width == expectedGainMap.width, height == expectedGainMap.height else {
+            throw CLIError.invalidContainer("Portrait ImageIO bridge changed Gain Map geometry")
+        }
     }
 
     static func validationReport(_ outputURL: URL) throws -> [String: Any] {
@@ -493,12 +633,10 @@ package enum PortraitConversionPipeline {
             )
         }
         let conversionStartedAt = CFAbsoluteTimeGetCurrent()
-        eventHandler?(.phaseChanged(.readingSource))
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
             throw CLIError.inputNotFound(inputURL)
         }
         let inputData = try Data(contentsOf: inputURL)
-        eventHandler?(.phaseChanged(.extractingGainMap))
         let resolvedPhotoIdentifier = photoIdentifier ?? UUID().uuidString.uppercased()
         let hasPortraitUserComment = portraitUserCommentFlag(in: inputURL)
         let blocks: [String: Data]
@@ -518,24 +656,19 @@ package enum PortraitConversionPipeline {
             )
         }
         if !hasPortraitUserComment {
-            eventHandler?(.warning(ConversionWarning(
-                code: .portraitFlagRecovered,
-                messageKey: .warningPortraitFlagRecovered,
-                diagnostics: "portrait UserComment flag is absent; recovering from rear.depth + rear.depth.config + src.image"
-            )))
+            print(
+                "warning: portrait UserComment flag is absent; recovering from "
+                    + "rear.depth + rear.depth.config + src.image"
+            )
         }
-        let infoFloats = try resolveGainInfoFloats(
+        let infoFloats = try resolvePortraitGainInfoFloats(
             privateInfo: blocks["local.uhdr.gainmap.info"],
             inputURL: inputURL,
-            eventHandler: eventHandler
+            sourceImageData: srcImage
         )
-        guard let firstEOI = srcImage.range(of: Data([0xff, 0xd9])),
-              firstEOI.upperBound + 3 <= srcImage.count,
-              srcImage[firstEOI.upperBound..<(firstEOI.upperBound + 3)] == Data([0xff, 0xd8, 0xff]) else {
-            throw CLIError.invalidContainer("portrait src.image does not contain adjacent base/gain JPEGs")
-        }
-        let baseJPEG = srcImage.subdata(in: 0..<firstEOI.upperBound)
-        let srcImageGainJPEG = srcImage.subdata(in: firstEOI.upperBound..<srcImage.count)
+        let parsedSourceImage = try parsePortraitSourceImage(srcImage)
+        let baseJPEG = parsedSourceImage.baseJPEG
+        let srcImageGainJPEG = parsedSourceImage.gainMapJPEG
         guard let baseSource = CGImageSourceCreateWithData(baseJPEG as CFData, nil),
               let baseImage = CGImageSourceCreateImageAtIndex(
                   baseSource,
@@ -553,24 +686,17 @@ package enum PortraitConversionPipeline {
         let simulatedAperture: (value: Double, source: String)
         if let fNumber = portraitConfig.currentFNumber {
             simulatedAperture = (fNumber, "rear.depth.config")
-            eventHandler?(.diagnostic(String(
-                format: "portrait aperture f/%.1f source=rear.depth.config-v%.1f",
-                fNumber,
-                portraitConfig.version
-            )))
+            print(String(format: "portrait aperture f/%.1f source=rear.depth.config-v%.1f", fNumber, portraitConfig.version))
         } else {
             simulatedAperture = resolveSimulatedAperture(
                 rearDepthConfig: nil,
                 inputProperties: inputProperties,
-                baseProperties: baseProperties,
-                eventHandler: eventHandler
+                baseProperties: baseProperties
             )
         }
         let afMeasuredDepth = portraitConfig.objectDistance
         if let afMeasuredDepth {
-            eventHandler?(.diagnostic(
-                "portrait AF measured depth source=rear.depth.config distance=\(afMeasuredDepth)"
-            ))
+            print("portrait AF measured depth source=rear.depth.config distance=\(afMeasuredDepth)")
         }
         let inputOrientation = (inputProperties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value
         let baseOrientation = (baseProperties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value
@@ -594,14 +720,11 @@ package enum PortraitConversionPipeline {
         let depthHeight = depthHeader.height
         let depthPlanes = try parseDepthPlanes(decodedDepth, header: depthHeader)
         let depthRanks = depthPlanes.ranks
-        eventHandler?(.phaseChanged(.reconstructingHDR))
-        eventHandler?(.phaseChanged(.generatingPortraitResources))
         let focus = try makeFocusRegion(
             image: baseImage,
             orientation: orientation,
             orientationRaw: orientationRaw,
-            config: portraitConfig,
-            eventHandler: eventHandler
+            config: portraitConfig
         )
         let focusSelection = selectPortraitFocus(
             ranks: depthRanks,
@@ -612,8 +735,7 @@ package enum PortraitConversionPipeline {
             sourceHeight: baseImage.height,
             width: depthWidth,
             height: depthHeight,
-            focus: focus,
-            eventHandler: eventHandler
+            focus: focus
         )
         let focusRank = focusSelection.selectedRank
         let effectiveDepthFocalLengthPixels = depthHeader.focalLengthPixels
@@ -623,8 +745,7 @@ package enum PortraitConversionPipeline {
             baseProperties: baseProperties,
             baseWidth: baseImage.width,
             baseHeight: baseImage.height,
-            effectiveFocalLengthPixels: effectiveDepthFocalLengthPixels,
-            eventHandler: eventHandler
+            effectiveFocalLengthPixels: effectiveDepthFocalLengthPixels
         )
         // The auxiliary is explicitly tagged relative. Its zero offset is
         // therefore a gauge choice, while the nonlinear distance between ranks
@@ -639,7 +760,7 @@ package enum PortraitConversionPipeline {
             Double(depthHeader.disparityExponentiation)
         )
         let focusDisparity = disparityFar + (1.0 - normalizedFocusRank) * disparitySpan
-        eventHandler?(.diagnostic(String(
+        print(String(
             format: "portrait disparity header=%dx%d fxDepth=%.3f effectiveFx=%.3f rankScale=%.7f baseline=%.3f focusRank=%.3f focusDisparity=%.6f range=%.6f...%.6f fullSpan=%.6f",
             depthHeader.width,
             depthHeader.height,
@@ -652,7 +773,7 @@ package enum PortraitConversionPipeline {
             disparityFar,
             disparityNear,
             disparitySpan
-        )))
+        ))
         let blurResponse = try makeBlurResponse(config: portraitConfig, header: depthHeader)
         let rend = try makeSourceDerivedREND(
             templateBase64: cameraCalibration.renderingParametersBase64,
@@ -665,12 +786,11 @@ package enum PortraitConversionPipeline {
             blurResponse: blurResponse,
             gainInfoFloats: infoFloats
         )
-        eventHandler?(.diagnostic(
+        print(
             "portrait REND source=per-photo-source-derived sha256=\(sha256Hex(rend.rawData)) "
                 + "dynamic=\(rend.dynamicRecords.keys.sorted().joined(separator: ","))"
-        ))
+        )
 
-        eventHandler?(.phaseChanged(.writingContainer))
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         let carrier = siblingScratchURL(for: outputURL, label: "portrait-carrier", pathExtension: "heic")
@@ -710,50 +830,13 @@ package enum PortraitConversionPipeline {
             throw CLIError.unableToFinalizeDestination(carrier)
         }
 
-        let encodedGainMap: DirectTiledHEVCGainMap?
-        do {
-            if ProcessInfo.processInfo.environment["XDREMUX_DISABLE_DIRECT_GAIN"] == "1" {
-                throw CLIError.invalidContainer("direct Gain Map encoding disabled by environment")
-            }
-            let direct = try encodeTiledGainMap(
-                gainMapJPEG: gainJPEG,
-                scratchBaseURL: outputURL
-            )
-            try writeDirectTiledGainMapGraph(
-                baseImageURL: carrier,
-                outputURL: firstAssembly,
-                infoFloats: infoFloats,
-                gainMapJPEG: gainJPEG,
-                encodedGainMap: direct
-            )
-            encodedGainMap = direct
-            let gainQuality = EncodingQualityPolicy.value(
-                environmentKey: "XDREMUX_GAIN_MAP_QUALITY",
-                defaultValue: 0.9
-            )
-            print(
-                "portrait Gain Map encoder=private-vt-tile base=single-imageio-encode "
-                    + "baseQuality=\(String(format: "%.2f", portraitBaseQuality)) "
-                    + "gainQuality=\(String(format: "%.2f", gainQuality)) "
-                    + "tile=\(direct.tileWidth)x\(direct.tileHeight) "
-                    + "tiles=\(direct.tilePayloads.count)"
-            )
-        } catch {
-            // The private tile ABI is an optimization boundary, not a product
-            // requirement. Keep the established ImageIO bridge available for
-            // unsupported geometry, OS drift, and JPEG-only portrait inputs.
-            print("warning: direct portrait Gain Map encoding unavailable; using ImageIO bridge: \(error)")
-            try writeISOBridge(
-                baseImageURL: carrier,
-                baseJPEG: baseJPEG,
-                sourceURL: inputURL,
-                infoFloats: infoFloats,
-                gainMapJPEG: gainJPEG,
-                outputURL: firstAssembly,
-                eventHandler: eventHandler
-            )
-            encodedGainMap = nil
-        }
+        try writeSrcImagePreserveBridge(
+            sourceImageData: srcImage,
+            metadataSourceURL: carrier,
+            outputURL: firstAssembly,
+            expectedGainMap: parsedSourceImage.gainMap,
+            eventHandler: eventHandler
+        )
 
         guard let firstSource = CGImageSourceCreateWithURL(firstAssembly as CFURL, nil),
               CGImageSourceCopyAuxiliaryDataInfoAtIndex(
@@ -783,8 +866,7 @@ package enum PortraitConversionPipeline {
             targetHeight: baseImage.height / 2,
             semanticOutputDirectory: semanticOutputDirectory,
             includesPhotographicStylesSemantics: includesPhotographicStylesSemantics,
-            writeSemanticPNGEvidence: writeSemanticPNGEvidence,
-            eventHandler: eventHandler
+            writeSemanticPNGEvidence: writeSemanticPNGEvidence
         )
         try writeBlankPortraitScaffold(
             sourceMetadataURL: inputURL,
@@ -796,9 +878,8 @@ package enum PortraitConversionPipeline {
             afMeasuredDepth: afMeasuredDepth,
             photoIdentifier: resolvedPhotoIdentifier,
             captureDate: captureDateString(sourceURL: inputURL),
-            gainJPEG: gainJPEG,
-            infoFloats: infoFloats,
-            encodedGainMap: encodedGainMap,
+            sourceImageData: srcImage,
+            sourceGainMap: parsedSourceImage.gainMap,
             depthDictionary: depthDictionary,
             matteDictionary: mattes.portrait,
             skinDictionary: mattes.skin,
@@ -806,7 +887,6 @@ package enum PortraitConversionPipeline {
             teethDictionary: mattes.teeth,
             glassesDictionary: mattes.glasses,
             skyDictionary: includesPhotographicStylesSemantics ? mattes.sky : nil,
-            requiresJPEGBridgeQuality: ["jpg", "jpeg"].contains(inputURL.pathExtension.lowercased()),
             outputURL: scaffold,
             eventHandler: eventHandler
         )
@@ -815,7 +895,10 @@ package enum PortraitConversionPipeline {
             scaffoldURL: scaffold,
             outputURL: outputURL
         )
-        eventHandler?(.phaseChanged(.verifyingOutput))
+        try verifyPortraitGainMapOutput(
+            outputURL,
+            expectedGainMap: parsedSourceImage.gainMap
+        )
         let sourceEquivalentFocalLength = cameraCalibration.opticalEquivalentFocalLengthMM
             * cameraCalibration.digitalZoomRatio
         let profileSaturated = sourceEquivalentFocalLength
@@ -872,11 +955,11 @@ package enum PortraitConversionPipeline {
         let manifestEncoder = JSONEncoder()
         manifestEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try manifestEncoder.encode(manifest).write(to: manifestURL, options: .atomic)
-        eventHandler?(.diagnostic("portrait manifest=\(manifestURL.path)"))
-        eventHandler?(.diagnostic(String(
+        print("portrait manifest=\(manifestURL.path)")
+        print(String(
             format: "portrait pipeline elapsed=%.3fs",
             CFAbsoluteTimeGetCurrent() - conversionStartedAt
-        )))
+        ))
         return ConversionOutcome(
             written: true,
             semanticFusion: mattes.fusionReport,
@@ -885,227 +968,53 @@ package enum PortraitConversionPipeline {
         )
     }
 
-    private static func encodeTiledGainMap(
-        gainMapJPEG: Data,
-        scratchBaseURL: URL
-    ) throws -> DirectTiledHEVCGainMap {
-        let size = try jpegImageSize(gainMapJPEG)
-        return try DirectTiledHEVCGainMapEncoder.encode(
-            imageData: gainMapJPEG,
-            width: size.0,
-            height: size.1,
-            channelCount: 3,
-            scratchBaseURL: scratchBaseURL
-        )
-    }
-
-    private static func writeDirectTiledGainMapGraph(
-        baseImageURL: URL,
+    private static func writeSrcImagePreserveBridge(
+        sourceImageData: Data,
+        metadataSourceURL: URL?,
         outputURL: URL,
-        infoFloats: [Double],
-        gainMapJPEG: Data,
-        encodedGainMap: DirectTiledHEVCGainMap
-    ) throws {
-        let jpegGraphURL = siblingScratchURL(
-            for: outputURL,
-            label: "portrait-direct-jpeg-graph",
-            pathExtension: "heic"
-        )
-        defer {
-            if ProcessInfo.processInfo.environment["XDREMUX_KEEP_PORTRAIT_SCRATCH"] != "1" {
-                try? FileManager.default.removeItem(at: jpegGraphURL)
-            }
-        }
-        _ = try writePrivateJPEGPassthroughOutput(
-            inputURL: baseImageURL,
-            outputURL: jpegGraphURL,
-            infoFloats: infoFloats,
-            gainMapJPEG: gainMapJPEG,
-            tmapColorBox: isoColrBT2020PQBox
-        )
-        try replacePrivateJPEGGainMapWithHEVCTiles(
-            inputURL: jpegGraphURL,
-            outputURL: outputURL,
-            gainMapWidth: encodedGainMap.width,
-            gainMapHeight: encodedGainMap.height,
-            tileWidth: encodedGainMap.tileWidth,
-            tileHeight: encodedGainMap.tileHeight,
-            tilePayloads: encodedGainMap.tilePayloads,
-            tileSizes: encodedGainMap.tileSizes,
-            hvcC: encodedGainMap.hvcC
-        )
-    }
-
-    private static func writeISOBridge(
-        baseImageURL: URL,
-        baseJPEG: Data? = nil,
-        sourceURL: URL,
-        infoFloats: [Double],
-        gainMapJPEG: Data,
-        outputURL: URL,
+        expectedGainMap: PortraitSourceGainMap,
         eventHandler: ConversionEventHandler? = nil
     ) throws {
-        let sourceExtension = sourceURL.pathExtension.lowercased()
-        if sourceExtension != "jpg" && sourceExtension != "jpeg" {
-            let privateURL = siblingScratchURL(
-                for: outputURL,
-                label: "portrait-private",
-                pathExtension: "heic"
-            )
-            defer { try? FileManager.default.removeItem(at: privateURL) }
-            do {
-                _ = try writePrivateJPEGPassthroughOutput(
-                    inputURL: baseImageURL,
-                    outputURL: privateURL,
-                    infoFloats: infoFloats,
-                    gainMapJPEG: gainMapJPEG
-                )
-                try ISOHDRWriter.writeWithPreserveReencode(
-                    intermediateURL: privateURL,
-                    outputURL: outputURL,
-                    eventHandler: eventHandler
-                )
-                return
-            } catch {
-                // Some source JPEG/gain pairs are rejected by ImageIO's private
-                // HEIC bridge. Retry through the explicit UltraHDR JPEG graph;
-                // the caller still validates 4:4:4 and payload geometry.
-                try? FileManager.default.removeItem(at: outputURL)
-                eventHandler?(.warning(ConversionWarning(
-                    code: .privateBridgeFallback,
-                    messageKey: .warningPrivateBridgeFallback,
-                    diagnostics: "private portrait Gain Map bridge failed; retrying explicit UltraHDR bridge: \(error)"
-                )))
-            }
-        }
-        let bridgeJPEG = siblingScratchURL(
-            for: outputURL,
-            label: "src-image-uhdr",
-            pathExtension: "jpg"
-        )
-        defer { try? FileManager.default.removeItem(at: bridgeJPEG) }
-        try writeSrcImageUltraHDRBridge(
-            baseImageURL: baseImageURL,
-            baseJPEG: baseJPEG,
-            gainMapJPEG: gainMapJPEG,
-            infoFloats: infoFloats,
-            outputURL: bridgeJPEG
-        )
-        try ISOHDRWriter.writeWithPreserveReencode(
-            intermediateURL: bridgeJPEG,
-            outputURL: outputURL,
-            lossyCompressionQuality: 1.0,
-            eventHandler: eventHandler
-        )
-    }
-
-    private static func writeSrcImageUltraHDRBridge(
-        baseImageURL: URL,
-        baseJPEG: Data?,
-        gainMapJPEG: Data,
-        infoFloats: [Double],
-        outputURL: URL
-    ) throws {
-        guard infoFloats.count >= 18 else {
-            throw CLIError.invalidLHDR("portrait Gain Map metadata requires 18 values")
-        }
-        func channelsMatch(_ start: Int) -> Bool {
-            let reference = infoFloats[start]
-            return infoFloats[(start + 1)...(start + 2)].allSatisfy {
-                abs($0 - reference) <= max(1e-7, abs(reference) * 1e-6)
-            }
-        }
-        guard [0, 4, 7, 10, 13].allSatisfy(channelsMatch) else {
-            throw CLIError.invalidLHDR(
-                "JPEG src.image bridge currently requires shared RGB Gain Map parameters"
-            )
-        }
-        let parent = outputURL.deletingLastPathComponent()
-        let token = UUID().uuidString
-        let baseURL = parent.appendingPathComponent(".src-image-base-\(token).jpg")
-        let gainURL = parent.appendingPathComponent(".src-image-gain-\(token).jpg")
-        let metadataURL = parent.appendingPathComponent(".src-image-gain-\(token).cfg")
-        defer {
-            for url in [baseURL, gainURL, metadataURL] {
-                try? FileManager.default.removeItem(at: url)
-            }
-        }
-
-        if let baseJPEG {
-            try baseJPEG.write(to: baseURL, options: .atomic)
-        } else {
-            guard let source = CGImageSourceCreateWithURL(baseImageURL as CFURL, nil),
+        try withPortraitSourceURL(sourceImageData) { sourceURL in
+            guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
                   let destination = CGImageDestinationCreateWithURL(
-                      baseURL as CFURL,
-                      UTType.jpeg.identifier as CFString,
+                      outputURL as CFURL,
+                      UTType.heic.identifier as CFString,
                       1,
                       nil
                   ) else {
-                throw CLIError.unableToCreateDestination(baseURL)
+                throw CLIError.unableToCreateDestination(outputURL)
             }
-            var options = (CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]) ?? [:]
-            options[kCGImageDestinationLossyCompressionQuality] = 1.0
-            CGImageDestinationAddImageFromSource(destination, source, 0, options as CFDictionary)
-            guard CGImageDestinationFinalize(destination) else {
-                throw CLIError.unableToFinalizeDestination(baseURL)
-            }
-        }
-        try gainMapJPEG.write(to: gainURL, options: .atomic)
 
-        func configValue(_ value: Double) throws -> String {
-            guard value.isFinite else {
-                throw CLIError.invalidLHDR("portrait Gain Map metadata contains a non-finite value")
-            }
-            return String(format: "%.9g", value)
-        }
-        let config = try [
-            "--maxContentBoost \(configValue(infoFloats[4]))",
-            "--minContentBoost \(configValue(infoFloats[0]))",
-            "--gamma \(configValue(infoFloats[7]))",
-            "--offsetSdr \(configValue(infoFloats[10]))",
-            "--offsetHdr \(configValue(infoFloats[13]))",
-            "--hdrCapacityMin \(configValue(infoFloats[16]))",
-            "--hdrCapacityMax \(configValue(infoFloats[17]))",
-            "--useBaseColorSpace 1",
-            "",
-        ].joined(separator: "\n")
-        try Data(config.utf8).write(to: metadataURL, options: .atomic)
-
-        let result = try AppleNativeToolchain.run(
-            URL(fileURLWithPath: "/usr/bin/env"),
-            arguments: [
-                "ultrahdr_app", "-m", "0",
-                "-i", baseURL.path,
-                "-g", gainURL.path,
-                "-f", metadataURL.path,
-                "-z", outputURL.path,
+            var imageOptions: [CFString: Any] = [
+                kCGImageDestinationPreserveGainMap: true,
             ]
-        )
-        guard result.status == 0 else {
-            let detail = String(data: result.stderr + result.stdout, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let suffix = detail.flatMap { $0.isEmpty ? nil : ": \($0)" } ?? ""
-            throw CLIError.invalidContainer(
-                "JPEG Apple Portrait src.image bridge requires ultrahdr_app on PATH"
-                    + suffix
+            if let metadataSourceURL,
+               let metadataSource = CGImageSourceCreateWithURL(metadataSourceURL as CFURL, nil) {
+                if let properties = CGImageSourceCopyPropertiesAtIndex(metadataSource, 0, nil) as? [CFString: Any] {
+                    for (key, value) in properties {
+                        imageOptions[key] = value
+                    }
+                }
+                if let metadata = CGImageSourceCopyMetadataAtIndex(metadataSource, 0, nil) {
+                    imageOptions[kCGImageDestinationMergeMetadata] = metadata
+                }
+            }
+            CGImageDestinationAddImageFromSource(
+                destination,
+                source,
+                0,
+                imageOptions as CFDictionary
             )
+            guard CGImageDestinationFinalize(destination) else {
+                throw CLIError.unableToFinalizeDestination(outputURL)
+            }
+            try verifyPortraitGainMapOutput(outputURL, expectedGainMap: expectedGainMap)
         }
-        guard let source = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
-              let auxiliary = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
-                  source,
-                  0,
-                  kCGImageAuxiliaryDataTypeISOGainMap
-              ) as? [CFString: Any],
-              let description = auxiliary[kCGImageAuxiliaryDataInfoDataDescription] as? [CFString: Any],
-              isoGainMapPixelFormat(at: outputURL) == pixelFormatFourCC("444f") else {
-            throw CLIError.invalidContainer("src.image Ultra HDR bridge did not preserve its RGB 4:4:4 Gain Map")
-        }
-        let expectedGainSize = try jpegImageSize(gainMapJPEG)
-        let width = (description[kCGImagePropertyWidth] as? NSNumber)?.intValue
-        let height = (description[kCGImagePropertyHeight] as? NSNumber)?.intValue
-        guard width == expectedGainSize.0, height == expectedGainSize.1 else {
-            throw CLIError.invalidContainer("src.image Ultra HDR bridge changed Gain Map orientation")
-        }
+        eventHandler?(.diagnostic(
+            "[portrait] ImageIO preserved src.image Gain Map (\(portraitFourCC(expectedGainMap.pixelFormat))) "
+                + "\(expectedGainMap.width)x\(expectedGainMap.height)"
+        ))
     }
 
     // These blobs contain only profile-invariant records. All records emitted
@@ -1395,8 +1304,7 @@ package enum PortraitConversionPipeline {
         baseProperties: [CFString: Any]?,
         baseWidth: Int,
         baseHeight: Int,
-        effectiveFocalLengthPixels: Double,
-        eventHandler: ConversionEventHandler?
+        effectiveFocalLengthPixels: Double
     ) throws -> PortraitCameraCalibration {
         let inputExif = inputProperties?[kCGImagePropertyExifDictionary] as? NSDictionary
         let baseExif = baseProperties?[kCGImagePropertyExifDictionary] as? NSDictionary
@@ -1510,7 +1418,7 @@ package enum PortraitConversionPipeline {
             distortionCoefficients: profile.distortionCoefficients,
             inverseDistortionCoefficients: profile.inverseDistortionCoefficients
         )
-        eventHandler?(.diagnostic(String(
+        print(String(
             format: "portrait render profile=%@ sourcePhysical=%.3fmm sourceOptical=%.2fmm sourceEquivalent=%.2fmm renderEquivalent=%.2fmm sourceZoom=%.4fx sourceDepthFx=%.3f cropScale=%.5f ref=%dx%d fx=%.3f pixel=%.9fmm",
             calibration.profileName,
             calibration.physicalFocalLengthMM,
@@ -1524,7 +1432,7 @@ package enum PortraitConversionPipeline {
             calibration.referenceHeight,
             calibration.focalLengthPixels,
             calibration.pixelSizeMM
-        )))
+        ))
         return calibration
     }
 
@@ -1796,8 +1704,7 @@ package enum PortraitConversionPipeline {
 
     static func resolveGainInfoFloats(
         privateInfo: Data?,
-        inputURL: URL,
-        eventHandler: ConversionEventHandler? = nil
+        inputURL: URL
     ) throws -> [Double] {
         if let privateInfo {
             guard privateInfo.count == 80 else {
@@ -1882,15 +1789,14 @@ package enum PortraitConversionPipeline {
         guard values.count == 20, values.allSatisfy(\.isFinite) else {
             throw CLIError.invalidLHDR("unable to reconstruct portrait gain metadata")
         }
-        eventHandler?(.diagnostic("portrait gain info source=existing ISO HDRToneMap metadata"))
+        print("portrait gain info source=existing ISO HDRToneMap metadata")
         return values
     }
 
     private static func resolveSimulatedAperture(
         rearDepthConfig: Data?,
         inputProperties: [CFString: Any]?,
-        baseProperties: [CFString: Any]?,
-        eventHandler: ConversionEventHandler?
+        baseProperties: [CFString: Any]?
     ) -> (value: Double, source: String) {
         // OPPO RearDepthStruct v4 stores the portrait editor's f-number at
         // byte offset 292. This is the simulated bokeh setting, not the lens's
@@ -1903,11 +1809,7 @@ package enum PortraitConversionPipeline {
            fNumber.isFinite,
            (1.0...32.0).contains(fNumber) {
             let value = Double(fNumber)
-            eventHandler?(.diagnostic(String(
-                format: "portrait aperture f/%.1f source=rear.depth.config-v%.1f",
-                value,
-                version
-            )))
+            print(String(format: "portrait aperture f/%.1f source=rear.depth.config-v%.1f", value, version))
             return (value, "rear.depth.config")
         }
 
@@ -1918,12 +1820,12 @@ package enum PortraitConversionPipeline {
             else { continue }
             let value = number.doubleValue
             if value.isFinite, (1.0...32.0).contains(value) {
-                eventHandler?(.diagnostic(String(format: "portrait aperture f/%.1f source=EXIF", value)))
+                print(String(format: "portrait aperture f/%.1f source=EXIF", value))
                 return (value, "EXIF FNumber")
             }
         }
 
-        eventHandler?(.diagnostic("portrait aperture f/1.4 source=compatibility-fallback"))
+        print("portrait aperture f/1.4 source=compatibility-fallback")
         return (1.4, "compatibility fallback")
     }
 
@@ -2811,8 +2713,7 @@ package enum PortraitConversionPipeline {
         targetHeight: Int,
         semanticOutputDirectory: URL? = nil,
         includesPhotographicStylesSemantics: Bool,
-        writeSemanticPNGEvidence: Bool,
-        eventHandler: ConversionEventHandler?
+        writeSemanticPNGEvidence: Bool
     ) throws -> PortraitMatteDictionaries {
         let ownsSemanticDirectory = semanticOutputDirectory == nil
         let semanticDirectory = semanticOutputDirectory
@@ -2848,15 +2749,13 @@ package enum PortraitConversionPipeline {
 
         if let subject = depthPlanes.subject {
             let nonzero = subject.reduce(into: 0) { if $1 > 0 { $0 += 1 } }
-            eventHandler?(.diagnostic(
+            print(
                 "portrait OPPO subject plane available as topology prior "
                     + "coverage=\(Double(nonzero) / Double(max(1, subject.count)))"
-            ))
+            )
         }
         if depthPlanes.validHair != nil {
-            eventHandler?(.diagnostic(
-                "portrait OPPO hair plane available as topology prior; Vision supplies the high-resolution boundary"
-            ))
+            print("portrait OPPO hair plane available as topology prior; Vision supplies the high-resolution boundary")
         }
 
         let visionPortrait = try renderSemanticMatte(
@@ -2984,8 +2883,7 @@ package enum PortraitConversionPipeline {
         image: CGImage,
         orientation: CGImagePropertyOrientation,
         orientationRaw: UInt32,
-        config: OPPOPortraitConfig?,
-        eventHandler: ConversionEventHandler?
+        config: OPPOPortraitConfig?
     ) throws -> PortraitFocusRegion {
         // RearDepthStruct stores the tap-to-focus point in src.image storage
         // coordinates, not in its declared 900x1200 processing dimensions.
@@ -3005,13 +2903,13 @@ package enum PortraitConversionPipeline {
             let rawHeight = rectangle.flatMap { values in
                 values.count == 4 ? Double(abs(values[3] - values[1])) / Double(image.height) : nil
             } ?? 0.12
-            eventHandler?(.diagnostic(String(
+            print(String(
                 format: "portrait focus source=rear.depth.config raw=(%.6f,%.6f) pixel=(%d,%d)",
                 rawX,
                 rawY,
                 focusX,
                 focusY
-            )))
+            ))
             return PortraitFocusRegion(
                 rawX: rawX,
                 rawY: rawY,
@@ -3147,8 +3045,7 @@ package enum PortraitConversionPipeline {
         sourceHeight: Int,
         width: Int,
         height: Int,
-        focus: PortraitFocusRegion,
-        eventHandler: ConversionEventHandler?
+        focus: PortraitFocusRegion
     ) -> OPPOPortraitFocusSelection {
         // The producer stores both focusRect and face rectangles as LTWH in
         // raw src.image JPEG coordinates. Treating the last two integers as
@@ -3332,7 +3229,7 @@ package enum PortraitConversionPipeline {
         let statisticEvidence: PortraitEvidence = branch == .centerRegion || exactFullImageHistogram
             ? .oppoProducerExact
             : .compatibilityFallback
-        eventHandler?(.diagnostic(String(
+        print(String(
             format: "portrait focus branch=%@ depthROI=(%d,%d)-(%d,%d) samples=%d rejected=%d rank=%.3f confidence=%.3f",
             branch.rawValue,
             minX,
@@ -3343,7 +3240,7 @@ package enum PortraitConversionPipeline {
             rejected,
             selectedRank,
             confidence
-        )))
+        ))
         return OPPOPortraitFocusSelection(
             branch: branch,
             branchEvidence: .oppoProducerExact,
@@ -3473,9 +3370,8 @@ package enum PortraitConversionPipeline {
         afMeasuredDepth: Int?,
         photoIdentifier: String,
         captureDate: String?,
-        gainJPEG: Data,
-        infoFloats: [Double],
-        encodedGainMap: DirectTiledHEVCGainMap?,
+        sourceImageData: Data,
+        sourceGainMap: PortraitSourceGainMap,
         depthDictionary: CFDictionary,
         matteDictionary: CFDictionary,
         skinDictionary: CFDictionary,
@@ -3483,7 +3379,6 @@ package enum PortraitConversionPipeline {
         teethDictionary: CFDictionary,
         glassesDictionary: CFDictionary,
         skyDictionary: CFDictionary?,
-        requiresJPEGBridgeQuality: Bool,
         outputURL: URL,
         eventHandler: ConversionEventHandler? = nil
     ) throws {
@@ -3537,38 +3432,13 @@ package enum PortraitConversionPipeline {
         guard CGImageDestinationFinalize(destination) else {
             throw CLIError.unableToFinalizeDestination(gainCarrierURL)
         }
-        if let encodedGainMap {
-            do {
-                try writeDirectTiledGainMapGraph(
-                    baseImageURL: gainCarrierURL,
-                    outputURL: gainISOURL,
-                    infoFloats: infoFloats,
-                    gainMapJPEG: gainJPEG,
-                    encodedGainMap: encodedGainMap
-                )
-            } catch {
-                print("warning: direct Gain Map scaffold injection failed; using ImageIO bridge: \(error)")
-                try writeISOBridge(
-                    baseImageURL: gainCarrierURL,
-                    baseJPEG: nil,
-                    sourceURL: sourceMetadataURL,
-                    infoFloats: infoFloats,
-                    gainMapJPEG: gainJPEG,
-                    outputURL: gainISOURL,
-                    eventHandler: eventHandler
-                )
-            }
-        } else {
-            try writeISOBridge(
-                baseImageURL: gainCarrierURL,
-                baseJPEG: nil,
-                sourceURL: sourceMetadataURL,
-                infoFloats: infoFloats,
-                gainMapJPEG: gainJPEG,
-                outputURL: gainISOURL,
-                eventHandler: eventHandler
-            )
-        }
+        try writeSrcImagePreserveBridge(
+            sourceImageData: sourceImageData,
+            metadataSourceURL: gainCarrierURL,
+            outputURL: gainISOURL,
+            expectedGainMap: sourceGainMap,
+            eventHandler: eventHandler
+        )
         guard let gainCarrier = CGImageSourceCreateWithURL(gainISOURL as CFURL, nil),
               let scaffoldDestination = CGImageDestinationCreateWithURL(
                   outputURL as CFURL,
@@ -3578,13 +3448,10 @@ package enum PortraitConversionPipeline {
               ) else {
             throw CLIError.unableToFinalizeDestination(gainCarrierURL)
         }
-        var scaffoldImageOptions: [CFString: Any] = [
+        let scaffoldImageOptions: [CFString: Any] = [
             kCGImageDestinationPreserveGainMap: true,
             kCGImagePropertyOrientation: NSNumber(value: orientation),
         ]
-        if requiresJPEGBridgeQuality {
-            scaffoldImageOptions[kCGImageDestinationLossyCompressionQuality] = 1.0
-        }
         var auditEntries: [(name: String, dictionary: CFDictionary)] = [
             ("disparity", depthDictionary),
             ("portrait", matteDictionary),

@@ -2,136 +2,129 @@ import Foundation
 import XDRemuxCore
 
 struct CommonConversionArguments {
-    var conversion = ConversionOptions()
-    var output = OutputOptions()
-    private var selectedVerbosity: OutputVerbosity?
-    private var applePortraitEnabled = false
-    private var applePhotographicStylesEnabled = false
-    private var oppoCompatibilityWasExplicit = false
-    private var oppoCameraTailWasExplicit = false
-    private var discardPortraitData = false
+    var family = Family.auto
+    var debugDirectoryPath: String?
+    var oppoCompatibility: OppoCompatibility = .off
+    var inputProcessingBranch = InputProcessingBranch.hybrid
+    var applePortraitEnabled = false
+    var applePhotographicStylesEnabled = false
+    var appleStylesRawDNGPath: String?
+    var appleStyleDataProducer = AppleStyleDataProducerMode.unspecified
+    var appleStyleDataProducerWasExplicit = false
+    var oppoCompatibilityWasExplicit = false
+    var oppoCameraTail = OppoCameraTail.preserveWithoutPrivateHDR
+    var oppoCameraTailWasExplicit = false
+    var discardPortraitData = false
+    var tmapFormat = TmapFormat.imageIO
 
     mutating func consume(
         _ option: String,
-        cursor: inout ConversionArgumentParser.ArgumentCursor,
-        mode: CLIProductMode
+        cursor: inout ConversionArgumentParser.ArgumentCursor
     ) throws -> Bool {
         switch option {
-        case "--apple-photographic-styles":
+        case "--apple-photographic-styles", "--apple-styles":
             applePhotographicStylesEnabled = true
+        case "--apple-style-data-producer":
+            let value = try cursor.nextValue(for: option)
+            guard let parsed = AppleStyleDataProducerMode(rawValue: value),
+                  parsed != .unspecified else {
+                throw CLIError.invalidValue(option: option, value: value)
+            }
+            appleStyleDataProducer = parsed
+            appleStyleDataProducerWasExplicit = true
         case "--apple-portrait":
             applePortraitEnabled = true
-        case "--oppo-compatible":
-            conversion.oppoCompatibility = .auto
-            oppoCompatibilityWasExplicit = true
-        case "--discard-portrait-data":
-            discardPortraitData = true
-        case "--overwrite":
-            conversion.overwrite = true
-        case "--quiet":
-            try setVerbosity(.quiet, option: option)
-        case "--verbose":
-            try setVerbosity(.verbose, option: option)
-        case "--debug":
-            try setVerbosity(.debug, option: option)
-        case "--format":
-            let value = try cursor.nextValue(for: option)
-            guard let format = OutputFormat(rawValue: value) else {
-                throw CLIError.invalidValue(option: option, value: value)
-            }
-            output.format = format
-        case "--language":
-            let value = try cursor.nextValue(for: option)
-            guard let language = OutputLanguage(rawValue: value) else {
-                throw CLIError.invalidValue(option: option, value: value)
-            }
-            output.language = language
-        case "--apple-styles" where mode.allowsInternalOptions:
-            applePhotographicStylesEnabled = true
-        case "--family" where mode.allowsInternalOptions:
+        case "--apple-styles-raw-dng":
+            appleStylesRawDNGPath = try cursor.nextValue(for: option)
+        case "--family":
             let value = try cursor.nextValue(for: option)
             guard let parsed = Family(rawValue: value) else {
                 throw CLIError.invalidValue(option: option, value: value)
             }
-            conversion.family = parsed
-        case "--input-processing" where mode.allowsInternalOptions:
+            family = parsed
+        case "--input-processing":
             let value = try cursor.nextValue(for: option)
             guard let parsed = InputProcessingBranch(rawValue: value) else {
                 throw CLIError.invalidValue(option: option, value: value)
             }
-            conversion.inputProcessingBranch = parsed
-        case "--diagnostics-dir" where mode.allowsInternalOptions,
-             "--debug-dir" where mode.allowsInternalOptions:
-            conversion.diagnosticsDirectoryURL = URL(
-                fileURLWithPath: try cursor.nextValue(for: option),
-                isDirectory: true
-            )
-        case "--oppo-camera-tail" where mode.allowsInternalOptions:
+            inputProcessingBranch = parsed
+        case "--debug-dir":
+            debugDirectoryPath = try cursor.nextValue(for: option)
+        case "--oppo-camera-tail":
             let value = try cursor.nextValue(for: option)
             guard let parsed = OppoCameraTail(rawValue: value) else {
                 throw CLIError.invalidValue(option: option, value: value)
             }
-            conversion.oppoCameraTail = parsed
+            oppoCameraTail = parsed
             oppoCameraTailWasExplicit = true
-        case "--tmap-format" where mode.allowsInternalOptions:
+        case "--tmap-format":
             let value = try cursor.nextValue(for: option)
             guard let parsed = TmapFormat(rawValue: value) else {
                 throw CLIError.invalidValue(option: option, value: value)
             }
-            conversion.tmapFormat = parsed
-        case "--oppo-compat" where mode.allowsInternalOptions:
-            conversion.oppoCompatibility = cursor.consumeOptionalOppoCompatibility() ?? .on
+            tmapFormat = parsed
+        case "--oppo-compat":
+            oppoCompatibility = cursor.consumeOptionalOppoCompatibility() ?? .on
             oppoCompatibilityWasExplicit = true
-        case "--no-oppo-compat" where mode.allowsInternalOptions:
-            conversion.oppoCompatibility = .off
+        case "--no-oppo-compat":
+            oppoCompatibility = .off
             oppoCompatibilityWasExplicit = true
+        case "--oppo-compatible":
+            oppoCompatibility = .auto
+            oppoCompatibilityWasExplicit = true
+        case "--discard-portrait-data":
+            discardPortraitData = true
         default:
             return false
         }
         return true
     }
 
-    mutating func resolve() throws {
+    mutating func resolve() throws -> AppleFeatureOptions {
         let appleFeatures = AppleFeatureOptions(
             photographicStyles: applePhotographicStylesEnabled,
             portrait: applePortraitEnabled
         )
+        if appleStyleDataProducerWasExplicit, !applePhotographicStylesEnabled {
+            throw CLIError.invalidValue(
+                option: "--apple-style-data-producer",
+                value: "requires --apple-photographic-styles"
+            )
+        }
+        if appleStylesRawDNGPath != nil, !applePhotographicStylesEnabled {
+            throw CLIError.invalidValue(
+                option: "--apple-styles-raw-dng",
+                value: "requires --apple-photographic-styles"
+            )
+        }
+        if applePhotographicStylesEnabled, !appleStyleDataProducerWasExplicit {
+            appleStyleDataProducer = .constrainedSolver
+        }
         if appleFeatures.isEnabled,
            oppoCompatibilityWasExplicit,
-           conversion.oppoCompatibility.wantsOppoCompat {
+           oppoCompatibility.wantsOppoCompat {
             throw CLIError.invalidValue(
                 option: applePhotographicStylesEnabled
                     ? "--apple-photographic-styles"
                     : "--apple-portrait",
-                value: "cannot be combined with --oppo-compatible"
+                value: "cannot be combined with OPPO-compatible output"
             )
         }
-        conversion.appleFeatures = appleFeatures
         if appleFeatures.isEnabled {
-            conversion.oppoCompatibility = .off
+            oppoCompatibility = .off
             if applePortraitEnabled {
-                conversion.oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
+                oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
             } else if !oppoCameraTailWasExplicit {
-                conversion.oppoCameraTail = .preserveWithoutPrivateHDR
+                oppoCameraTail = .preserveWithoutPrivateHDR
             }
         } else if discardPortraitData, !oppoCameraTailWasExplicit {
-            conversion.oppoCameraTail = conversion.oppoCompatibility.wantsOppoCompat
+            oppoCameraTail = oppoCompatibility.wantsOppoCompat
                 ? .preserveWithoutPortrait
                 : .preserveWithoutPortraitOrPrivateHDR
-        } else if !oppoCameraTailWasExplicit, conversion.oppoCompatibility.wantsOppoCompat {
-            conversion.oppoCameraTail = .preserve
+        } else if !oppoCameraTailWasExplicit, oppoCompatibility.wantsOppoCompat {
+            oppoCameraTail = .preserve
         }
-    }
-
-    private mutating func setVerbosity(_ verbosity: OutputVerbosity, option: String) throws {
-        if let selectedVerbosity, selectedVerbosity != verbosity {
-            throw CLIError.invalidValue(
-                option: option,
-                value: "cannot be combined with --\(selectedVerbosity.rawValue)"
-            )
-        }
-        selectedVerbosity = verbosity
-        output.verbosity = verbosity
+        return appleFeatures
     }
 }
 
@@ -164,77 +157,103 @@ enum ConversionArgumentParser {
         }
     }
 
-    static func parseConvert(
-        _ rawArguments: [String],
-        mode: CLIProductMode = .production
-    ) throws -> ConvertCommand {
+    static func parseConvert(_ rawArguments: [String]) throws -> ConvertCommand {
         var cursor = ArgumentCursor(arguments: rawArguments)
         var common = CommonConversionArguments()
         var inputPath: String?
         var outputPath: String?
 
         while let option = cursor.nextOption() {
-            if try common.consume(option, cursor: &cursor, mode: mode) { continue }
+            if try common.consume(option, cursor: &cursor) { continue }
             switch option {
-            case "--input": inputPath = try cursor.nextValue(for: option)
-            case "--output": outputPath = try cursor.nextValue(for: option)
-            default: throw CLIError.unknownOption(option)
+            case "--input":
+                inputPath = try cursor.nextValue(for: option)
+            case "--output":
+                outputPath = try cursor.nextValue(for: option)
+            default:
+                throw CLIError.unknownOption(option)
             }
         }
 
         guard let inputPath else { throw CLIError.missingArgument("--input") }
-        try common.resolve()
+        let appleFeatures = try common.resolve()
         return ConvertCommand(
             inputURL: URL(fileURLWithPath: inputPath),
             outputURL: URL(fileURLWithPath: outputPath ?? inputPath),
-            outputWasExplicit: outputPath != nil,
-            conversion: common.conversion,
-            output: common.output
+            family: common.family,
+            debugRootURL: common.debugDirectoryPath.map { URL(fileURLWithPath: $0) },
+            oppoCompatibility: common.oppoCompatibility,
+            inputProcessingBranch: common.inputProcessingBranch,
+            appleFeatures: appleFeatures,
+            appleStylesRawDNGURL: common.appleStylesRawDNGPath.map { URL(fileURLWithPath: $0) },
+            appleStyleDataProducer: common.appleStyleDataProducer,
+            oppoCameraTail: common.oppoCameraTail,
+            tmapFormat: common.tmapFormat
         )
     }
 
-    static func parseBatch(
-        _ rawArguments: [String],
-        mode: CLIProductMode = .production
-    ) throws -> BatchCommand {
+    static func parseBatch(_ rawArguments: [String]) throws -> BatchCommand {
         var cursor = ArgumentCursor(arguments: rawArguments)
         var common = CommonConversionArguments()
         var inputDirectoryPath: String?
         var outputDirectoryPath: String?
         var glob = "*.heic"
         var jobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
+        var checkpointPath: String?
+        var resume = true
+        var skipExisting = true
 
         while let option = cursor.nextOption() {
-            if try common.consume(option, cursor: &cursor, mode: mode) { continue }
+            if try common.consume(option, cursor: &cursor) { continue }
             switch option {
-            case "--input-dir": inputDirectoryPath = try cursor.nextValue(for: option)
-            case "--output-dir": outputDirectoryPath = try cursor.nextValue(for: option)
-            case "--glob": glob = try cursor.nextValue(for: option)
+            case "--input-dir":
+                inputDirectoryPath = try cursor.nextValue(for: option)
+            case "--output-dir":
+                outputDirectoryPath = try cursor.nextValue(for: option)
+            case "--glob":
+                glob = try cursor.nextValue(for: option)
             case "--jobs":
                 let value = try cursor.nextValue(for: option)
                 guard let parsed = Int(value), parsed > 0 else {
                     throw CLIError.invalidValue(option: option, value: value)
                 }
                 jobs = parsed
-            default: throw CLIError.unknownOption(option)
+            case "--checkpoint":
+                checkpointPath = try cursor.nextValue(for: option)
+            case "--resume":
+                resume = true
+            case "--no-resume":
+                resume = false
+            case "--skip-existing":
+                skipExisting = true
+            case "--no-skip-existing":
+                skipExisting = false
+            default:
+                throw CLIError.unknownOption(option)
             }
         }
 
         guard let inputDirectoryPath else {
             throw CLIError.missingArgument("--input-dir")
         }
-        try common.resolve()
-        let inputDirectoryURL = URL(fileURLWithPath: inputDirectoryPath, isDirectory: true)
+        let appleFeatures = try common.resolve()
         return BatchCommand(
-            inputDirURL: inputDirectoryURL,
-            outputDirURL: URL(
-                fileURLWithPath: outputDirectoryPath ?? inputDirectoryPath,
-                isDirectory: true
-            ),
+            inputDirURL: URL(fileURLWithPath: inputDirectoryPath),
+            outputDirURL: URL(fileURLWithPath: outputDirectoryPath ?? inputDirectoryPath),
+            family: common.family,
             glob: glob,
+            debugRootURL: common.debugDirectoryPath.map { URL(fileURLWithPath: $0) },
+            oppoCompatibility: common.oppoCompatibility,
+            inputProcessingBranch: common.inputProcessingBranch,
+            appleFeatures: appleFeatures,
+            appleStylesRawDNGURL: common.appleStylesRawDNGPath.map { URL(fileURLWithPath: $0) },
+            appleStyleDataProducer: common.appleStyleDataProducer,
+            oppoCameraTail: common.oppoCameraTail,
+            tmapFormat: common.tmapFormat,
             jobs: jobs,
-            conversion: common.conversion,
-            output: common.output
+            checkpointURL: checkpointPath.map { URL(fileURLWithPath: $0) },
+            resume: resume,
+            skipExisting: skipExisting
         )
     }
 }

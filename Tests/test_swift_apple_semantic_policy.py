@@ -86,8 +86,11 @@ class SwiftAppleSemanticPolicyTests(unittest.TestCase):
         helper_source = (
             ROOT
             / "Sources"
-            / "XDRemuxSemanticHelper"
-            / "main.swift"
+            / "XDRemuxAppleFeatures"
+            / "Resources"
+            / "ApplePlatform"
+            / "Native"
+            / "apple_vision_semantic_mattes.swift"
         ).read_text()
 
         self.assertNotIn("VNDetectFaceRectanglesRequest", helper_source)
@@ -101,7 +104,7 @@ class SwiftAppleSemanticPolicyTests(unittest.TestCase):
         self.assertIn('"status": "not_requested"', helper_source)
         self.assertIn('"reason": "no production consumer"', helper_source)
 
-    def test_semantic_helper_uses_prebuilt_executable(self) -> None:
+    def test_semantic_helper_uses_optimized_cache_identity(self) -> None:
         toolchain = (
             ROOT
             / "Sources"
@@ -110,15 +113,14 @@ class SwiftAppleSemanticPolicyTests(unittest.TestCase):
             / "AppleNativeToolchain.swift"
         ).read_text()
 
-        self.assertIn('try executable(named: "XDRemuxSemanticHelper")', toolchain)
-        self.assertIn('ProcessInfo.processInfo.environment["XDREMUX_HELPER_DIRECTORY"]', toolchain)
-        self.assertIn('Bundle.main.bundleURL.pathExtension == "app"', toolchain)
-        self.assertNotIn('arguments: ["swiftc"', toolchain)
+        self.assertIn('arguments: ["swiftc", "-O", source.path]', toolchain)
+        self.assertIn('argument == source.path ? "<source>" : argument', toolchain)
+        self.assertIn("cacheIdentity.append(contentsOf: normalizedArguments.utf8)", toolchain)
 
     def test_normal_app_workflow_uses_release_except_lldb(self) -> None:
         script = (ROOT / "scripts" / "build_and_run.sh").read_text()
-        self.assertIn('CONFIGURATION="Release"', script)
-        self.assertIn('if [[ "$MODE" == "debug" ]]; then\n  CONFIGURATION="Debug"', script)
+        self.assertIn('--debug|debug)\n    CONFIGURATION="Debug"', script)
+        self.assertIn('run|--logs|logs|--telemetry|telemetry|--verify|verify)\n    CONFIGURATION="Release"', script)
 
 
 if __name__ == "__main__":

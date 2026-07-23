@@ -27,7 +27,7 @@ worktree to a clean state:
 
 ```bash
 python3 scripts/agent_completion_gate.py run \
-  --base <verified-base> \
+  --base origin/main \
   --plan /tmp/xdremux-agent-verification.json
 
 python3 scripts/agent_completion_gate.py verify \
@@ -40,8 +40,6 @@ The verification plan uses this schema:
 {
   "schema_version": 1,
   "scope": "Fix default Swift CLI conversion for an existing ISO gain-map input",
-  "change_impact": "output",
-  "impact_rationale": "Changes the default conversion request and generated HEIF output",
   "checks": [
     {
       "name": "swift-cli-typecheck",
@@ -80,32 +78,6 @@ The verification plan uses this schema:
 }
 ```
 
-New plans should declare one of these impact levels:
-
-| `change_impact` | Use when | Minimum evidence |
-| --- | --- | --- |
-| `documentation` | Only README, docs, documentation assets, or the public-doc harness changes | Link/structure/static checks; public projection when applicable |
-| `non_output` | Runtime or tooling changes are proven not to change conversion requests or generated files | Targeted regression and only the build/integration checks for affected entry points |
-| `output` | Algorithms, defaults, writer behavior, metadata, request mapping, or validation can alter generated files | Regression plus real functional, integration, or device evidence |
-| `release` | Release/preflight or broad product acceptance | Regression, functional, and integration matrix; device evidence for device claims |
-
-`impact_rationale` is required for every explicit impact. It should say why
-output files can or cannot change. `auto` is accepted only for compatibility
-with older plans and applies the conservative legacy policy.
-
-Examples:
-
-- README wording: `documentation`; run documentation tests, link checks, and
-  projection dry-run. Do not run photo conversion or App signing.
-- CLI progress rendering: `non_output`; run renderer, TTY, localization, and
-  CLI smoke tests. Do not run fixture conversion when requests and files cannot
-  change.
-- SwiftUI layout: `non_output`; build the App and run affected model/view
-  tests. Do not run the HDR matrix.
-- HEIF box order or Gain Map encoding: `output`; run focused unit tests and a
-  real output comparison.
-- Release candidate: `release`; run the complete required matrix.
-
 `command` is an argument array and is executed without implicit shell parsing.
 If shell composition is genuinely required, make it explicit with
 `["/bin/zsh", "-lc", "..."]`. An optional `env` object may provide per-check
@@ -117,10 +89,9 @@ temporary output (or temporary in-place copy), and asks ImageIO to assert the
 expected gain-map pixel format. Private samples remain outside Git.
 
 Kinds are `static`, `regression`, `functional`, `integration`, and `device`.
-All listed checks are mandatory. Source changes require a `regression` check.
-Explicit `output` changes additionally require functional, integration, or
-device evidence. Explicit `non_output` changes do not require real-photo
-evidence. The gate also requires:
+All listed checks are mandatory. Source changes require a `regression` check;
+changes under `xdremux/` or the macOS app `Sources/` additionally require a
+`functional`, `integration`, or `device` check. The gate also requires:
 
 - a non-empty diff against the selected base;
 - `git diff --check` success;
@@ -128,23 +99,7 @@ evidence. The gate also requires:
 - an unchanged `HEAD` while checks run;
 - zero exit status from every declared check.
 
-## Selecting the base
-
-The receipt covers the diff from `--base` to the exact committed `HEAD`.
-
-- Use the target branch merge base, commonly `origin/main`, for the first
-  commit in a change series.
-- A follow-up commit may use its direct parent when that parent already passed
-  and had its receipt independently verified. This prevents a narrow docs or
-  cleanup commit from re-running already accepted product evidence.
-- Do not select an arbitrary recent commit merely to hide affected files. The
-  base must represent previously accepted state.
-
-The receipt records the resolved base commit and changed-file set, so reviewers
-can audit incremental verification.
-
-Receipts record impact classification, commands, durations, exit status,
-bounded output tails, the
+Receipts record commands, durations, exit status, bounded output tails, the
 base/head commits, and changed paths. A later commit or tracked edit makes the
 receipt unverifiable. Missing device access is not a pass: either restrict the
 claim to offline behavior or report the device-dependent acceptance as blocked.

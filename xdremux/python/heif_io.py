@@ -284,6 +284,97 @@ def _normalize_gainmap_image(gainmap) -> Image.Image:
     raise ValueError(f"Unsupported gainmap type or shape: {type(gainmap)}")
 
 
+_EXIF_ORIENTATION_TAG = 0x0112
+_GAINMAP_ORIENTATION_TRANSPOSE = {
+    2: Image.Transpose.FLIP_LEFT_RIGHT,
+    3: Image.Transpose.ROTATE_180,
+    4: Image.Transpose.FLIP_TOP_BOTTOM,
+    5: Image.Transpose.TRANSPOSE,
+    # EXIF 6 is the common portrait-camera case: rotate 90 degrees clockwise.
+    6: Image.Transpose.ROTATE_270,
+    7: Image.Transpose.TRANSVERSE,
+    8: Image.Transpose.ROTATE_90,
+}
+
+
+def _base_exif_orientation(base_image: Image.Image) -> int:
+    """Read the primary image's storage-to-presentation EXIF transform."""
+    try:
+        orientation = int(base_image.getexif().get(_EXIF_ORIENTATION_TAG, 1))
+    except (AttributeError, TypeError, ValueError):
+        orientation = 1
+    if orientation not in range(1, 9):
+        raise ValueError(f"unsupported primary EXIF orientation: {orientation}")
+    return orientation
+
+
+def _align_gainmap_to_base(
+    base_image: Image.Image,
+    gainmap: Image.Image,
+) -> tuple[Image.Image, dict[str, object]]:
+    """Put a storage-coordinate Gain Map into the primary's output geometry.
+
+    The primary item may be physically rotated by Pillow-Heif according to its
+    EXIF orientation, while the secondary item has no independent EXIF item.
+    A same-capture MPF Gain Map therefore needs the same physical transform.
+    Half-resolution geometry lets us distinguish a raw storage map from one
+    that a caller already transformed, avoiding a second rotation.
+    """
+    orientation = _base_exif_orientation(base_image)
+    base_width, base_height = base_image.size
+    input_width, input_height = gainmap.size
+    report: dict[str, object] = {
+        "exifOrientation": orientation,
+        "baseStorageSize": [base_width, base_height],
+        "gainMapInputSize": [input_width, input_height],
+        "coordinateContract": "primary storage -> encoded presentation",
+    }
+    if orientation == 1:
+        report.update({
+            "transform": "identity",
+            "gainMapOutputSize": [input_width, input_height],
+        })
+        return gainmap, report
+
+    storage_size = (base_width // 2, base_height // 2)
+    presentation_size = (
+        (base_height, base_width)
+        if orientation in {5, 6, 7, 8}
+        else (base_width, base_height)
+    )
+    presentation_gain_size = (presentation_size[0] // 2, presentation_size[1] // 2)
+
+    if orientation in {5, 6, 7, 8} and (input_width, input_height) == presentation_gain_size:
+        report.update({
+            "transform": "already-presentation",
+            "gainMapOutputSize": [input_width, input_height],
+        })
+        return gainmap, report
+
+    if (input_width, input_height) != storage_size:
+        raise ValueError(
+            "cannot establish gain-map orientation contract: "
+            f"primary storage={base_image.size}, EXIF={orientation}, "
+            f"gain map={gainmap.size}, expected storage={storage_size} "
+            f"or presentation={presentation_gain_size}"
+        )
+
+    transpose = _GAINMAP_ORIENTATION_TRANSPOSE.get(orientation)
+    if transpose is None:
+        raise ValueError(f"missing gain-map transpose for EXIF orientation {orientation}")
+    aligned = gainmap.transpose(transpose)
+    if aligned.size != presentation_gain_size:
+        raise ValueError(
+            "gain-map orientation transform produced unexpected geometry: "
+            f"got {aligned.size}, expected {presentation_gain_size}"
+        )
+    report.update({
+        "transform": f"storage-to-presentation-exif-{orientation}",
+        "gainMapOutputSize": [aligned.width, aligned.height],
+    })
+    return aligned, report
+
+
 def _oppo_compatible_gainmap_image(gm_img: Image.Image, lhdr) -> Image.Image:
     """Return the device-validated LHDR OPPO gain-map shape."""
     if lhdr is not None and getattr(lhdr, "mode", None) == "lhdr":
@@ -379,6 +470,7 @@ def write_heic(output_path: str, base_image: Image.Image,
             base_image.info["icc_profile"] = icc_profile
 
     gm_img = _normalize_gainmap_image(gainmap)
+    gm_img, _ = _align_gainmap_to_base(base_image, gm_img)
     if oppo_compat:
         gm_img = _oppo_compatible_gainmap_image(gm_img, lhdr)
 

@@ -6,8 +6,6 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-extern int xdremux_style_renderer_main(int argc, const char *argv[]);
-
 @interface XDRemuxTracingMetadataDictionary : NSDictionary
 @property(nonatomic, strong) NSDictionary *backing;
 @property(nonatomic, strong) NSMutableArray<NSString *> *requestedKeys;
@@ -1200,11 +1198,6 @@ static NSDictionary *RunLinearMetadataProbe(
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        if (argc >= 2 &&
-            (strcmp(argv[1], "--render-style") == 0 ||
-             strcmp(argv[1], "--render-style-batch") == 0)) {
-            return xdremux_style_renderer_main(argc, argv);
-        }
         if ((argc == 5 || argc == 7 || argc == 8) &&
             strcmp(argv[1], "--linear-metadata") == 0) {
             NSString *frameworkPath =

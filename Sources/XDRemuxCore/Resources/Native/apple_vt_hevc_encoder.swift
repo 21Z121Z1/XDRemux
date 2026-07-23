@@ -92,21 +92,6 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
-func emitSuccess(mode: PixelMode, annexBPath: String, hvcCPath: String?) {
-    let object: [String: Any] = [
-        "schema": "xdremux-hevc-encoder-helper-v1",
-        "event": "completed",
-        "mode": mode.rawValue,
-        "annex_b": annexBPath,
-        "hvcc": hvcCPath ?? NSNull(),
-    ]
-    guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else {
-        fail("cannot encode helper result")
-    }
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data([0x0a]))
-}
-
 func check(_ status: OSStatus, _ message: String) {
     if status != noErr {
         fail("\(message): OSStatus \(status)")
@@ -640,7 +625,7 @@ let callback: VTCompressionOutputCallback = { refcon, _, status, _, sampleBuffer
 let args = CommandLine.arguments
 if args.count < 3 || args.count > 7 {
     fail(
-        "usage: XDRemuxHEVCEncoderHelper input output.hevc "
+        "usage: apple_vt_hevc_encoder.swift input output.hevc "
             + "[quality] [rgb10|rgb4448|rgb4448tile|mono8|mono8tile] [output.hvcc] [tile-size]"
     )
 }
@@ -698,7 +683,6 @@ if mode == .rgb4448tile || mode == .mono8tile {
         }
         try tileState.hvcc.write(to: URL(fileURLWithPath: hvccOutputPath))
     }
-    emitSuccess(mode: mode, annexBPath: args[2], hvcCPath: hvccOutputPath)
     exit(0)
 }
 let state = EncoderState()
@@ -792,4 +776,3 @@ if let hvccOutputPath {
     }
     try state.hvcc.write(to: URL(fileURLWithPath: hvccOutputPath))
 }
-emitSuccess(mode: mode, annexBPath: args[2], hvcCPath: hvccOutputPath)

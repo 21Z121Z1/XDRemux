@@ -9,9 +9,7 @@ import ImageIO
 import Vision
 
 func emit(_ object: [String: Any]) {
-    var payload = object
-    payload["schema"] = "xdremux-semantic-helper-v1"
-    let data = try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+    let data = try! JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     print(String(data: data, encoding: .utf8)!)
 }
 
@@ -142,7 +140,7 @@ func orientationTransform(_ orientation: CGImagePropertyOrientation) -> String {
 }
 
 guard CommandLine.arguments.count >= 3 else {
-    fail("usage: XDRemuxSemanticHelper <input-image> <output-directory> [--orientation 1...8] [--roles role,...] [--raw-only]")
+    fail("usage: apple_vision_semantic_mattes.swift <input-image> <output-directory> [--orientation 1...8] [--roles role,...] [--raw-only]")
 }
 
 let inputURL = URL(fileURLWithPath: CommandLine.arguments[1])

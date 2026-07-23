@@ -1,68 +1,36 @@
 import Foundation
 import XDRemuxCore
 
-enum AppleFeatureEventForwarder {
-    static func preparationHandler(
-        _ downstream: ConversionEventHandler?
-    ) -> ConversionEventHandler? {
-        guard let downstream else { return nil }
-        return { event in
-            if case .phaseChanged(let phase) = event,
-               phase == .readingSource
-                || phase == .writingContainer
-                || phase == .verifyingOutput {
-                return
-            }
-            downstream(event)
-        }
-    }
-}
-
 public enum AppleFeatureConversionEngine {
     public static func convert(_ request: ConversionRequest) throws -> ConversionResult {
         let configuration = request.configuration
         guard configuration.appleFeaturesEnabled else {
             return try ConversionEngine.convert(request)
         }
-        let eventHandler = configuration.eventHandler
-        eventHandler?(.started(input: request.input.url, output: request.output.url))
-        do {
-            try configuration.cancellation?.checkCancellation()
-            guard !configuration.oppoCompatibility.wantsOppoCompat else {
-                throw XDRemuxError.invalidValue(
-                    option: configuration.applePhotographicStyles
-                        ? "--apple-photographic-styles"
-                        : "--apple-portrait",
-                    value: "cannot be combined with OPPO-compatible output"
-                )
-            }
-
-            try AppleNativeToolchain.withCancellation(configuration.cancellation) {
-                if configuration.applePhotographicStyles {
-                    try ApplePhotographicStylesPipeline.convert(
-                        inputURL: request.input.url,
-                        outputURL: request.output.url,
-                        configuration: configuration
-                    )
-                } else {
-                    _ = try PortraitConversionPipeline.convertIfNeeded(
-                        inputURL: request.input.url,
-                        outputURL: request.output.url,
-                        mode: configuration.applePortrait ? .on : .off,
-                        eventHandler: eventHandler
-                    )
-                }
-            }
-            try configuration.cancellation?.checkCancellation()
-            let result = ConversionResult(input: request.input, output: request.output)
-            eventHandler?(.completed(result))
-            return result
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            eventHandler?(.failed(ConversionFailure.classify(error)))
-            throw error
+        guard !configuration.oppoCompatibility.wantsOppoCompat else {
+            throw XDRemuxError.invalidValue(
+                option: configuration.applePhotographicStyles
+                    ? "--apple-photographic-styles"
+                    : "--apple-portrait",
+                value: "cannot be combined with OPPO-compatible output"
+            )
         }
+
+        if configuration.applePhotographicStyles {
+            try ApplePhotographicStylesPipeline.convert(
+                inputURL: request.input.url,
+                outputURL: request.output.url,
+                configuration: configuration
+            )
+        } else {
+            _ = try PortraitConversionPipeline.convertIfNeeded(
+                inputURL: request.input.url,
+                outputURL: request.output.url,
+                mode: configuration.applePortrait ? .on : .off,
+                eventHandler: configuration.eventHandler
+            )
+        }
+        return ConversionResult(input: request.input, output: request.output)
     }
 
     public static func convert(
@@ -92,16 +60,6 @@ public enum AppleFeatureConversionEngine {
         return options.portrait
             ? PortraitConversionPipeline.isValidOutput(outputURL)
             : ConversionEngine.isValidISOGainMapOutput(outputURL)
-    }
-
-    public static func isValidOutput(
-        _ outputURL: URL,
-        configuration: ConversionConfiguration
-    ) -> Bool {
-        if configuration.appleFeaturesEnabled {
-            return isValidOutput(outputURL, options: configuration.appleFeatureOptions)
-        }
-        return ConversionEngine.isValidOutput(outputURL, config: configuration)
     }
 
     public static func validationReport(

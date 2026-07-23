@@ -25,7 +25,8 @@ def run(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
-    parser.add_argument("--binary", type=Path, help="reuse an already built xdremux-dev executable")
+    parser.add_argument("--cli", type=Path, default=Path("xdremux/swift-cli/XDRemux.swift"))
+    parser.add_argument("--binary", type=Path, help="reuse an already compiled production CLI")
     return parser.parse_args()
 
 
@@ -46,7 +47,7 @@ def conversion_command(
         "--apple-photographic-styles",
     ]
     if debug_root is not None:
-        command.extend(["--diagnostics-dir", str(debug_root)])
+        command.extend(["--debug-dir", str(debug_root)])
     return command
 
 
@@ -71,8 +72,12 @@ def main() -> int:
     args = parse_arguments()
     repo = Path.cwd().resolve()
     input_path = args.input.expanduser().resolve()
+    cli_path = args.cli.resolve()
     if not input_path.is_file():
         print(f"input sample not found: {input_path}", file=sys.stderr)
+        return 2
+    if not cli_path.is_file():
+        print(f"Swift CLI not found: {cli_path}", file=sys.stderr)
         return 2
 
     with tempfile.TemporaryDirectory(prefix="xdremux-artifact-lifecycle-") as directory:
@@ -85,8 +90,8 @@ def main() -> int:
                 print(f"Swift CLI binary not found: {binary}", file=sys.stderr)
                 return 2
         else:
-            run(["swift", "build", "--product", "xdremux-dev"], cwd=repo)
-            binary = repo / ".build" / "debug" / "xdremux-dev"
+            binary = temporary / "xdremux"
+            run(["swiftc", str(cli_path), "-o", str(binary)], cwd=repo)
 
         default_output = output_directory / "default.heic"
         temporary_evidence_before = set(

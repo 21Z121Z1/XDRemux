@@ -4,24 +4,23 @@ import XDRemuxCore
 @testable import XDRemuxCLI
 
 final class ConversionArgumentParserTests: XCTestCase {
-    func testSingleFileDefaultsPreserveProductConfiguration() throws {
+    func testSingleFileDefaultsPreserveLegacyConfiguration() throws {
         let command = try ConversionArgumentParser.parseConvert([
             "--input", "/tmp/input.heic",
         ])
 
         XCTAssertEqual(command.inputURL.path, "/tmp/input.heic")
         XCTAssertEqual(command.outputURL, command.inputURL)
-        XCTAssertFalse(command.outputWasExplicit)
-        XCTAssertEqual(command.conversion.family, .auto)
-        XCTAssertEqual(command.conversion.inputProcessingBranch, .hybrid)
-        XCTAssertEqual(command.conversion.oppoCompatibility, .off)
-        XCTAssertEqual(command.conversion.oppoCameraTail, .preserveWithoutPrivateHDR)
-        XCTAssertEqual(command.conversion.tmapFormat, .imageIO)
-        XCTAssertEqual(command.conversion.appleFeatures, .disabled)
-        XCTAssertFalse(command.conversion.overwrite)
+        XCTAssertEqual(command.family, .auto)
+        XCTAssertEqual(command.inputProcessingBranch, .hybrid)
+        XCTAssertEqual(command.oppoCompatibility, .off)
+        XCTAssertEqual(command.oppoCameraTail, .preserveWithoutPrivateHDR)
+        XCTAssertEqual(command.tmapFormat, .imageIO)
+        XCTAssertEqual(command.appleFeatures, .disabled)
+        XCTAssertEqual(command.appleStyleDataProducer, .unspecified)
     }
 
-    func testBatchDefaultsNoLongerExposeCheckpointState() throws {
+    func testBatchDefaultsPreserveCheckpointContract() throws {
         let command = try ConversionArgumentParser.parseBatch([
             "--input-dir", "/tmp/input",
         ])
@@ -29,13 +28,9 @@ final class ConversionArgumentParserTests: XCTestCase {
         XCTAssertEqual(command.outputDirURL, command.inputDirURL)
         XCTAssertEqual(command.glob, "*.heic")
         XCTAssertEqual(command.jobs, min(ProcessInfo.processInfo.activeProcessorCount, 4))
-        XCTAssertFalse(command.conversion.overwrite)
-        XCTAssertThrowsError(try ConversionArgumentParser.parseBatch([
-            "--input-dir", "/tmp/input", "--checkpoint", "/tmp/checkpoint.jsonl",
-        ]))
-        XCTAssertThrowsError(try ConversionArgumentParser.parseBatch([
-            "--input-dir", "/tmp/input", "--resume",
-        ]))
+        XCTAssertNil(command.checkpointURL)
+        XCTAssertTrue(command.resume)
+        XCTAssertTrue(command.skipExisting)
     }
 
     func testStandardAndOppoModesKeepTheirTailPolicies() throws {
@@ -47,10 +42,10 @@ final class ConversionArgumentParserTests: XCTestCase {
             "--oppo-compatible",
         ])
 
-        XCTAssertEqual(standard.conversion.oppoCompatibility, .off)
-        XCTAssertEqual(standard.conversion.oppoCameraTail, .preserveWithoutPrivateHDR)
-        XCTAssertEqual(oppo.conversion.oppoCompatibility, .auto)
-        XCTAssertEqual(oppo.conversion.oppoCameraTail, .preserve)
+        XCTAssertEqual(standard.oppoCompatibility, .off)
+        XCTAssertEqual(standard.oppoCameraTail, .preserveWithoutPrivateHDR)
+        XCTAssertEqual(oppo.oppoCompatibility, .auto)
+        XCTAssertEqual(oppo.oppoCameraTail, .preserve)
     }
 
     func testAppleModesAreIndependentAndComposable() throws {
@@ -58,97 +53,106 @@ final class ConversionArgumentParserTests: XCTestCase {
         let portrait = try parseApple(["--apple-portrait"])
         let combined = try parseApple(["--apple-photographic-styles", "--apple-portrait"])
 
+        XCTAssertEqual(styles.appleFeatures, AppleFeatureOptions(photographicStyles: true))
+        XCTAssertEqual(styles.appleStyleDataProducer, .constrainedSolver)
+        XCTAssertEqual(styles.oppoCameraTail, .preserveWithoutPrivateHDR)
+        XCTAssertEqual(portrait.appleFeatures, AppleFeatureOptions(portrait: true))
+        XCTAssertEqual(portrait.oppoCameraTail, .preserveWithoutPortraitOrPrivateHDR)
         XCTAssertEqual(
-            styles.conversion.appleFeatures,
-            AppleFeatureOptions(photographicStyles: true)
-        )
-        XCTAssertEqual(styles.conversion.oppoCameraTail, .preserveWithoutPrivateHDR)
-        XCTAssertEqual(
-            portrait.conversion.appleFeatures,
-            AppleFeatureOptions(portrait: true)
-        )
-        XCTAssertEqual(
-            portrait.conversion.oppoCameraTail,
-            .preserveWithoutPortraitOrPrivateHDR
-        )
-        XCTAssertEqual(
-            combined.conversion.appleFeatures,
+            combined.appleFeatures,
             AppleFeatureOptions(photographicStyles: true, portrait: true)
         )
-        XCTAssertEqual(
-            combined.conversion.oppoCameraTail,
-            .preserveWithoutPortraitOrPrivateHDR
-        )
+        XCTAssertEqual(combined.oppoCameraTail, .preserveWithoutPortraitOrPrivateHDR)
     }
 
-    func testAppleStylesUseOneFixedConstrainedSolverPathForConvertAndBatch() throws {
-        let convert = try parseApple(["--apple-photographic-styles"])
-        let batch = try ConversionArgumentParser.parseBatch([
+    func testPhotographicStylesDefaultToConstrainedSolverAndFallbacksRemainExplicit() throws {
+        let defaulted = try parseApple(["--apple-photographic-styles"])
+        XCTAssertEqual(defaulted.appleStyleDataProducer, .constrainedSolver)
+        XCTAssertEqual(
+            defaulted.configuration.appleStyleDataProducer,
+            .constrainedSolver
+        )
+
+        let batchDefaulted = try ConversionArgumentParser.parseBatch([
             "--input-dir", "/tmp/input",
             "--apple-photographic-styles",
         ])
+        XCTAssertEqual(batchDefaulted.appleStyleDataProducer, .constrainedSolver)
+        XCTAssertEqual(
+            batchDefaulted.conversionConfiguration.appleStyleDataProducer,
+            .constrainedSolver
+        )
 
-        XCTAssertEqual(convert.conversion.appleFeatures, AppleFeatureOptions(photographicStyles: true))
-        XCTAssertEqual(batch.conversion.appleFeatures, AppleFeatureOptions(photographicStyles: true))
+        let diagnostic = try parseApple([
+            "--apple-photographic-styles",
+            "--apple-style-data-producer", "learn-node",
+        ])
+        XCTAssertEqual(diagnostic.appleStyleDataProducer, .learnNodeDiagnostic)
+
+        let identity = try parseApple([
+            "--apple-photographic-styles",
+            "--apple-style-data-producer", "identity-fallback",
+        ])
+        XCTAssertEqual(identity.appleStyleDataProducer, .identityFallback)
+
+        let batchIdentity = try ConversionArgumentParser.parseBatch([
+            "--input-dir", "/tmp/input",
+            "--apple-photographic-styles",
+            "--apple-style-data-producer", "identity-fallback",
+        ])
+        XCTAssertEqual(batchIdentity.appleStyleDataProducer, .identityFallback)
+
+        XCTAssertThrowsError(
+            try ConversionArgumentParser.parseConvert([
+                "--input", "/tmp/input.heic",
+                "--apple-style-data-producer", "identity-fallback",
+            ])
+        )
+    }
+
+    func testRawDNGOptionIsOptionalAndOnlyAppliesToPhotographicStyles() throws {
+        let command = try ConversionArgumentParser.parseConvert([
+            "--input", "/tmp/input.heic",
+            "--apple-photographic-styles",
+            "--apple-styles-raw-dng", "/tmp/IMG.dng",
+        ])
+        XCTAssertEqual(command.appleStylesRawDNGURL?.path, "/tmp/IMG.dng")
+        XCTAssertEqual(command.configuration.appleStylesRawDNGURL?.path, "/tmp/IMG.dng")
 
         XCTAssertThrowsError(try ConversionArgumentParser.parseConvert([
             "--input", "/tmp/input.heic",
-            "--apple-style-data-producer", "learn-node",
-        ]))
+            "--apple-styles-raw-dng", "/tmp/IMG.dng",
+        ])) { error in
+            XCTAssertEqual(
+                String(describing: error),
+                "invalid value for --apple-styles-raw-dng: requires --apple-photographic-styles"
+            )
+        }
     }
 
-    func testProductionRejectsInternalOptionsAndDeveloperAcceptsThem() throws {
-        let internalOptions = [
+    func testConvertAndBatchShareCommonOptionSemantics() throws {
+        let common = [
             "--family", "x7",
             "--input-processing", "passthrough",
-            "--oppo-compat", "auto",
             "--oppo-camera-tail", "watermark",
             "--tmap-format", "strict",
-            "--diagnostics-dir", "/tmp/debug",
+            "--debug-dir", "/tmp/debug",
         ]
-        let internalOptionCases = [
-            ["--family", "x7"],
-            ["--input-processing", "passthrough"],
-            ["--oppo-compat", "auto"],
-            ["--oppo-camera-tail", "watermark"],
-            ["--tmap-format", "strict"],
-            ["--diagnostics-dir", "/tmp/debug"],
-        ]
-        for arguments in internalOptionCases {
-            XCTAssertThrowsError(try ConversionArgumentParser.parseConvert(
-                ["--input", "/tmp/input.heic"] + arguments,
-                mode: .production
-            )) { error in
-                XCTAssertEqual(
-                    String(describing: error),
-                    "unknown option: \(arguments[0])"
-                )
-            }
-        }
-
         let convert = try ConversionArgumentParser.parseConvert(
-            ["--input", "/tmp/input.heic"] + internalOptions,
-            mode: .developer
+            ["--input", "/tmp/input.heic"] + common
         )
         let batch = try ConversionArgumentParser.parseBatch(
-            ["--input-dir", "/tmp/input"] + internalOptions,
-            mode: .developer
+            ["--input-dir", "/tmp/input"] + common
         )
 
-        XCTAssertEqual(convert.conversion.family, batch.conversion.family)
-        XCTAssertEqual(
-            convert.conversion.inputProcessingBranch,
-            batch.conversion.inputProcessingBranch
-        )
-        XCTAssertEqual(convert.conversion.oppoCameraTail, batch.conversion.oppoCameraTail)
-        XCTAssertEqual(convert.conversion.tmapFormat, batch.conversion.tmapFormat)
-        XCTAssertEqual(
-            convert.conversion.diagnosticsDirectoryURL,
-            batch.conversion.diagnosticsDirectoryURL
-        )
+        XCTAssertEqual(convert.family, batch.family)
+        XCTAssertEqual(convert.inputProcessingBranch, batch.inputProcessingBranch)
+        XCTAssertEqual(convert.oppoCameraTail, batch.oppoCameraTail)
+        XCTAssertEqual(convert.tmapFormat, batch.tmapFormat)
+        XCTAssertEqual(convert.debugRootURL, batch.debugRootURL)
     }
 
-    func testAppleAndOppoConflictFailsDuringParsing() {
+    func testAppleAndOppoConflictPreservesLegacyError() {
         XCTAssertThrowsError(
             try ConversionArgumentParser.parseConvert([
                 "--input", "/tmp/input.heic",
@@ -158,29 +162,12 @@ final class ConversionArgumentParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 String(describing: error),
-                "invalid value for --apple-portrait: cannot be combined with --oppo-compatible"
+                "invalid value for --apple-portrait: cannot be combined with OPPO-compatible output"
             )
         }
     }
 
-    func testOutputModesAndLanguageAreParsedOnceForBothCommands() throws {
-        let options = ["--verbose", "--format", "jsonl", "--language", "zh-Hans"]
-        let convert = try ConversionArgumentParser.parseConvert(
-            ["--input", "/tmp/input.heic"] + options
-        )
-        let batch = try ConversionArgumentParser.parseBatch(
-            ["--input-dir", "/tmp/input"] + options
-        )
-
-        XCTAssertEqual(convert.output.verbosity, .verbose)
-        XCTAssertEqual(convert.output.format, .jsonl)
-        XCTAssertEqual(convert.output.language, .simplifiedChinese)
-        XCTAssertEqual(convert.output.verbosity, batch.output.verbosity)
-        XCTAssertEqual(convert.output.format, batch.output.format)
-        XCTAssertEqual(convert.output.language, batch.output.language)
-    }
-
-    func testMutuallyExclusiveVerbosityAndInvalidArgumentsKeepErrorTypes() {
+    func testMissingUnknownAndInvalidArgumentsKeepErrorTypes() {
         XCTAssertThrowsError(try ConversionArgumentParser.parseConvert([])) { error in
             XCTAssertEqual(String(describing: error), "missing required argument: --input")
         }
@@ -194,11 +181,6 @@ final class ConversionArgumentParserTests: XCTestCase {
         ) { error in
             XCTAssertEqual(String(describing: error), "invalid value for --jobs: 0")
         }
-        XCTAssertThrowsError(
-            try ConversionArgumentParser.parseConvert([
-                "--input", "a.heic", "--quiet", "--verbose",
-            ])
-        )
     }
 
     private func parseApple(_ options: [String]) throws -> ConvertCommand {

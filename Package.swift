@@ -11,76 +11,34 @@ let package = Package(
     products: [
         .library(name: "XDRemuxCore", targets: ["XDRemuxCore"]),
         .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"]),
-        .executable(name: "xdremux", targets: ["XDRemuxExecutable"]),
-        .executable(name: "xdremux-dev", targets: ["XDRemuxDevExecutable"]),
-        .executable(name: "XDRemuxSemanticHelper", targets: ["XDRemuxSemanticHelper"]),
-        .executable(name: "XDRemuxHEVCEncoderHelper", targets: ["XDRemuxHEVCEncoderHelper"]),
-        .executable(name: "XDRemuxStyleValidationHelper", targets: ["XDRemuxStyleValidationHelper"]),
-        .executable(name: "XDRemuxStyleScenePayloadHelper", targets: ["XDRemuxStyleScenePayloadHelper"])
+        .executable(name: "xdremux", targets: ["XDRemuxCLI"]),
+        .executable(name: "coreimage-raw-diagnostics", targets: ["CoreImageRAWDiagnostics"])
     ],
     targets: [
         .target(
             name: "XDRemuxCore",
-            path: "Sources/XDRemuxCore"
+            path: "Sources/XDRemuxCore",
+            resources: [
+                .copy("Resources/Native")
+            ]
         ),
         .target(
             name: "XDRemuxAppleFeatures",
             dependencies: ["XDRemuxCore"],
             path: "Sources/XDRemuxAppleFeatures",
-            exclude: ["Resources"]
-        ),
-        .executableTarget(
-            name: "XDRemuxSemanticHelper",
-            path: "Sources/XDRemuxSemanticHelper"
-        ),
-        .executableTarget(
-            name: "XDRemuxHEVCEncoderHelper",
-            path: "Sources/XDRemuxHEVCEncoderHelper"
-        ),
-        .executableTarget(
-            name: "XDRemuxStyleValidationHelper",
-            path: "Sources/XDRemuxStyleValidationHelper",
-            cSettings: [
-                .unsafeFlags(["-fobjc-arc"])
-            ],
-            linkerSettings: [
-                .linkedFramework("Foundation")
+            resources: [
+                .copy("Resources/ApplePlatform")
             ]
         ),
         .executableTarget(
-            name: "XDRemuxStyleScenePayloadHelper",
-            path: "Sources/XDRemuxStyleScenePayloadHelper",
-            cSettings: [
-                .unsafeFlags(["-fobjc-arc", "-fblocks"])
-            ],
-            linkerSettings: [
-                .linkedFramework("AppKit"),
-                .linkedFramework("Foundation"),
-                .linkedFramework("CoreImage"),
-                .linkedFramework("CoreGraphics"),
-                .linkedFramework("CoreVideo"),
-                .linkedFramework("ImageIO"),
-                .linkedFramework("Metal"),
-                .linkedLibrary("z")
-            ]
-        ),
-        .target(
             name: "XDRemuxCLI",
             dependencies: ["XDRemuxCore", "XDRemuxAppleFeatures"],
-            path: "Sources/XDRemuxCLI",
-            resources: [
-                .process("Resources")
-            ]
+            path: "Sources/XDRemuxCLI"
         ),
         .executableTarget(
-            name: "XDRemuxExecutable",
-            dependencies: ["XDRemuxCLI"],
-            path: "Sources/XDRemuxExecutable"
-        ),
-        .executableTarget(
-            name: "XDRemuxDevExecutable",
-            dependencies: ["XDRemuxCLI"],
-            path: "Sources/XDRemuxDevExecutable"
+            name: "CoreImageRAWDiagnostics",
+            dependencies: ["XDRemuxCore"],
+            path: "Sources/CoreImageRAWDiagnostics"
         ),
         .testTarget(
             name: "XDRemuxCoreTests",

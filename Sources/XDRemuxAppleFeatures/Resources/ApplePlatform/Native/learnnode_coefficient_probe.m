@@ -276,7 +276,7 @@ static NSDictionary *BufferSummary(id<MTLBuffer> buffer) {
         @"hasContents": @(buffer.contents != NULL),
         @"label": buffer.label ?: [NSNull null],
     } mutableCopy];
-    if ([NSProcessInfo processInfo].environment[@"XDREMUX_STYLE_RENDERER_BUFFER_NUMERICS"].boolValue &&
+    if ([NSProcessInfo processInfo].environment[@"LEARNNODE_BUFFER_NUMERICS"].boolValue &&
         buffer.contents && buffer.length > 0 && buffer.length <= 2 * 1024 * 1024 &&
         buffer.length % sizeof(float) == 0) {
         const float *values = buffer.contents;
@@ -442,7 +442,7 @@ static NSArray<NSDictionary *> *WriteCapturedCMIResources(
                           mipmapLevel:0];
                 } @catch (NSException *exception) {
                     data = nil;
-                    captureError = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+                    captureError = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                                         code:6
                                                     userInfo:@{
                         NSLocalizedDescriptionKey: exception.reason ?: exception.name,
@@ -822,7 +822,7 @@ static void EnsureSmartStyleCodedLinearOutput(id renderer) {
     descriptor.storageMode = MTLStorageModeShared;
     descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
     id<MTLTexture> output = [commandQueue.device newTextureWithDescriptor:descriptor];
-    output.label = @"XDRemuxStyleRenderer coded linear output";
+    output.label = @"LearnNodeCoefficientProbe coded linear output";
     if (output &&
         [renderer respondsToSelector:NSSelectorFromString(@"setOutputCodedLinearTexture:")]) {
         SendObject(
@@ -1040,13 +1040,13 @@ static BOOL RecordingUsingSharedRenderer(
 static int RecordingSmartStyleStatus(id renderer, SEL selector) {
     NSString *selectorName = NSStringFromSelector(selector);
     NSString *processingTypeOverride = [NSProcessInfo processInfo]
-        .environment[@"XDREMUX_STYLE_RENDERER_SMARTSTYLE_PROCESSING_TYPE_OVERRIDE"];
+        .environment[@"LEARNNODE_SMARTSTYLE_PROCESSING_TYPE_OVERRIDE"];
     if ([selectorName isEqualToString:@"process"] &&
         processingTypeOverride.length &&
         (processingTypeOverride.intValue & 0x4) != 0) {
         EnsureSmartStyleCodedLinearOutput(renderer);
         NSString *gainOverride = [NSProcessInfo processInfo]
-            .environment[@"XDREMUX_STYLE_RENDERER_SMARTSTYLE_LINEAR_ENCODING_GAIN_OVERRIDE"];
+            .environment[@"LEARNNODE_SMARTSTYLE_LINEAR_ENCODING_GAIN_OVERRIDE"];
         SEL gainSelector = NSSelectorFromString(@"setInputLinearEncodingGain:");
         if (gainOverride.length && [renderer respondsToSelector:gainSelector]) {
             SendFloatValue(renderer, gainSelector, gainOverride.floatValue);
@@ -1080,7 +1080,7 @@ static int RecordingSmartStyleStatus(id renderer, SEL selector) {
 static int RecordingSmartStylePrepare(id renderer, SEL selector, unsigned int processingType) {
     NSString *selectorName = NSStringFromSelector(selector);
     NSString *overrideValue = [NSProcessInfo processInfo]
-        .environment[@"XDREMUX_STYLE_RENDERER_SMARTSTYLE_PROCESSING_TYPE_OVERRIDE"];
+        .environment[@"LEARNNODE_SMARTSTYLE_PROCESSING_TYPE_OVERRIDE"];
     unsigned int effectiveProcessingType = overrideValue.length
         ? (unsigned int)overrideValue.integerValue
         : processingType;
@@ -1316,7 +1316,7 @@ static BOOL RenderHalfRGBA(
              colorSpace:NULL];
     } @catch (NSException *exception) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:3
                                      userInfo:@{
                 NSLocalizedDescriptionKey: exception.reason ?: exception.name,
@@ -1415,7 +1415,7 @@ static NSDictionary *CompositionSelfTest(void) {
         ![perturbedComposed isEqualToData:learned];
     BOOL passed = identityIsByteIdentical && perturbationChangesBytes;
     return @{
-        @"schema": @"xdremux-style-renderer-key1-composition-self-test-v1",
+        @"schema": @"learnnode-key1-composition-self-test-v1",
         @"passed": @(passed),
         @"identityIsByteIdentical": @(identityIsByteIdentical),
         @"perturbationChangesBytes": @(perturbationChangesBytes),
@@ -1486,7 +1486,7 @@ static CIImage *SemanticTarget(
             };
         } else {
             if (error) {
-                *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+                *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                              code:4
                                          userInfo:@{
                     NSLocalizedDescriptionKey: @"failed to derive style settings from MakerApple 84",
@@ -1499,7 +1499,7 @@ static CIImage *SemanticTarget(
     CIImage *linearThumbnail = LoadImage(linearThumbnailPath, NO);
     if (!linearThumbnail) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:5
                                      userInfo:@{
                 NSLocalizedDescriptionKey: @"failed to load linear thumbnail",
@@ -1540,11 +1540,11 @@ static CIImage *SemanticTarget(
         };
     }
     styleSettings = effectiveStyleSettings;
-    NSString *inverseOverride = environment[@"XDREMUX_STYLE_RENDERER_APPLY_INVERSE_CURVE"];
+    NSString *inverseOverride = environment[@"LEARNNODE_APPLY_INVERSE_CURVE"];
     if (inverseOverride) {
         applyInverseCurve = inverseOverride.boolValue;
     }
-    BOOL useStyleEngine = [environment[@"XDREMUX_STYLE_RENDERER_USE_STYLE_ENGINE"] boolValue];
+    BOOL useStyleEngine = [environment[@"LEARNNODE_USE_STYLE_ENGINE"] boolValue];
     double linearGain = [SendId(properties, NSSelectorFromString(@"linearGain")) doubleValue];
     double linearRangeMin = [SendId(
         properties,
@@ -1636,11 +1636,11 @@ static CIImage *SemanticTarget(
             @"styleSettingOverrides": JSONSafe(styleSettingOverrides),
             @"applyInverseCurveToLinearThumbnail": @(applyInverseCurve),
             @"applyInverseCurveSource": inverseOverride
-                ? @"XDREMUX_STYLE_RENDERER_APPLY_INVERSE_CURVE"
+                ? @"LEARNNODE_APPLY_INVERSE_CURVE"
                 : @"static still-image version-minor gate",
             @"useStyleEngine": @(useStyleEngine),
-            @"useStyleEngineSource": environment[@"XDREMUX_STYLE_RENDERER_USE_STYLE_ENGINE"]
-                ? @"XDREMUX_STYLE_RENDERER_USE_STYLE_ENGINE"
+            @"useStyleEngineSource": environment[@"LEARNNODE_USE_STYLE_ENGINE"]
+                ? @"LEARNNODE_USE_STYLE_ENGINE"
                 : @"absent adjustment setting defaults false",
             @"linearGain": @(linearGain),
             @"linearRangeMin": @(linearRangeMin),
@@ -1703,7 +1703,7 @@ static NSData *RawDeflate(NSData *input, NSError **error) {
     );
     if (status != Z_OK) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:30
                                      userInfo:@{NSLocalizedDescriptionKey: @"raw deflate initialization failed"}];
         }
@@ -1718,7 +1718,7 @@ static NSData *RawDeflate(NSData *input, NSError **error) {
     if (status != Z_STREAM_END) {
         deflateEnd(&stream);
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:31
                                      userInfo:@{NSLocalizedDescriptionKey: @"raw deflate failed"}];
         }
@@ -1766,7 +1766,7 @@ static BOOL WritePNG(CGImageRef image, NSString *path, NSError **error) {
     );
     if (!destination) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:32
                                      userInfo:@{NSLocalizedDescriptionKey: @"cannot create render PNG destination"}];
         }
@@ -1776,7 +1776,7 @@ static BOOL WritePNG(CGImageRef image, NSString *path, NSError **error) {
     BOOL written = CGImageDestinationFinalize(destination);
     CFRelease(destination);
     if (!written && error) {
-        *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+        *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                      code:33
                                  userInfo:@{NSLocalizedDescriptionKey: @"cannot finalize render PNG"}];
     }
@@ -1965,7 +1965,7 @@ static NSDictionary *RunNeutrinoStyleRenderBatch(NSString *planPath) {
             @"passed": @NO,
             @"failureCount": @1,
             @"renders": @[],
-            @"error": JSONSafe(error ?: [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            @"error": JSONSafe(error ?: [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                                                   code:40
                                                               userInfo:@{
                 NSLocalizedDescriptionKey: @"invalid render batch plan",
@@ -2062,7 +2062,7 @@ static CVPixelBufferRef CreateHalfRGBAPixelBuffer(
     );
     if (status != kCVReturnSuccess || !buffer) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:20
                                      userInfo:@{
                 NSLocalizedDescriptionKey: [NSString stringWithFormat:
@@ -2110,7 +2110,7 @@ static CVPixelBufferRef CreateHalfRGBAPixelBuffer(
              colorSpace:NULL];
     } @catch (NSException *exception) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:21
                                      userInfo:@{
                 NSLocalizedDescriptionKey: exception.reason ?: exception.name,
@@ -2132,7 +2132,7 @@ static NSData *CopyOneComponentFloat32PixelBuffer(
     CVReturn status = CVPixelBufferLockBaseAddress(buffer, kCVPixelBufferLock_ReadOnly);
     if (status != kCVReturnSuccess) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:22
                                      userInfo:@{
                 NSLocalizedDescriptionKey: [NSString stringWithFormat:
@@ -2151,7 +2151,7 @@ static NSData *CopyOneComponentFloat32PixelBuffer(
     if (!source) {
         data = nil;
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:23
                                      userInfo:@{
                 NSLocalizedDescriptionKey: @"coefficient pixel buffer has no base address",
@@ -2171,7 +2171,7 @@ static NSData *CopyOneComponentFloat32PixelBuffer(
 static NSData *Float32CoefficientsToFloat16(NSData *float32Data, NSError **error) {
     if (float32Data.length % sizeof(float) != 0) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:24
                                      userInfo:@{
                 NSLocalizedDescriptionKey: @"Float32 coefficient byte count is not aligned",
@@ -2186,7 +2186,7 @@ static NSData *Float32CoefficientsToFloat16(NSData *float32Data, NSError **error
     for (NSUInteger index = 0; index < count; index++) {
         if (!isfinite(source[index])) {
             if (error) {
-                *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+                *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                              code:25
                                          userInfo:@{
                     NSLocalizedDescriptionKey: [NSString stringWithFormat:
@@ -2215,7 +2215,7 @@ static NSDictionary *RunSmartStyleUtilityLearn(
     }
     NSUInteger useCase = 1;
     NSString *useCaseValue = [NSProcessInfo processInfo]
-        .environment[@"XDREMUX_STYLE_RENDERER_SMART_STYLE_USE_CASE"];
+        .environment[@"LEARNNODE_SMART_STYLE_USE_CASE"];
     if (useCaseValue.length) {
         useCase = (NSUInteger)useCaseValue.integerValue;
     }
@@ -2388,7 +2388,7 @@ static NSDictionary *ReadSemanticStyleSettings(NSString *imagePath, NSError **er
     }
     if (!properties) {
         if (error) {
-            *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+            *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                          code:40
                                      userInfo:@{
                 NSLocalizedDescriptionKey: @"failed to read image properties",
@@ -2408,7 +2408,7 @@ static NSDictionary *ReadSemanticStyleSettings(NSString *imagePath, NSError **er
         ? settingsFromMakerNote(maker84)
         : nil;
     if (![settings isKindOfClass:[NSDictionary class]] && error) {
-        *error = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+        *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                      code:41
                                  userInfo:@{
             NSLocalizedDescriptionKey: @"failed to derive style settings from MakerApple 84",
@@ -2417,7 +2417,7 @@ static NSDictionary *ReadSemanticStyleSettings(NSString *imagePath, NSError **er
     return [settings isKindOfClass:[NSDictionary class]] ? settings : nil;
 }
 
-int xdremux_style_renderer_main(int argc, const char *argv[]) {
+int main(int argc, const char *argv[]) {
     @autoreleasepool {
         BOOL styleSettingsMode = argc == 3 &&
             strcmp(argv[1], "--style-settings") == 0;
@@ -2570,7 +2570,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
         }
         if (!input || !target) {
             NSDictionary *failure = @{
-                @"schema": @"xdremux-style-renderer-v2",
+                @"schema": @"learnnode-coefficient-probe-v2",
                 @"mode": semanticMode ? @"semantic" : @"direct",
                 @"input": inputPath,
                 @"target": targetPath,
@@ -2606,7 +2606,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
         );
         if (!baseConfiguration || !baseTuning) {
             NSDictionary *failure = @{
-                @"schema": @"xdremux-style-renderer-v1",
+                @"schema": @"learnnode-coefficient-probe-v1",
                 @"error": @"failed to locate configuration or tuning dictionary",
                 @"settings": JSONSafe(settings),
             };
@@ -2678,7 +2678,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
         NSError *inputThumbnailError = nil;
         NSError *targetThumbnailError = nil;
         BOOL inputsArePrecomputedThumbnails = [NSProcessInfo processInfo]
-            .environment[@"XDREMUX_STYLE_RENDERER_INPUTS_ARE_PRECOMPUTED_THUMBNAILS"].boolValue;
+            .environment[@"LEARNNODE_INPUTS_ARE_PRECOMPUTED_THUMBNAILS"].boolValue;
         BOOL inputMatchesThumbnailSize =
             llround(input.extent.size.width) == thumbnailTargetSize.first &&
             llround(input.extent.size.height) == thumbnailTargetSize.second;
@@ -2688,7 +2688,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
         if (inputsArePrecomputedThumbnails &&
             (!inputMatchesThumbnailSize || !targetMatchesThumbnailSize)) {
             NSDictionary *failure = @{
-                @"schema": @"xdremux-style-renderer-v2",
+                @"schema": @"learnnode-coefficient-probe-v2",
                 @"mode": semanticMode ? @"semantic" : @"direct",
                 @"error": @"precomputed thumbnails do not match configured thumbnail size",
                 @"thumbnailSize": @{
@@ -2728,7 +2728,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
             );
         if (!inputThumbnail || !targetThumbnail) {
             NSDictionary *failure = @{
-                @"schema": @"xdremux-style-renderer-v2",
+                @"schema": @"learnnode-coefficient-probe-v2",
                 @"mode": semanticMode ? @"semantic" : @"direct",
                 @"inputThumbnailError": JSONSafe(inputThumbnailError),
                 @"targetThumbnailError": JSONSafe(targetThumbnailError),
@@ -2809,7 +2809,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
         NSMutableData *raw = nil;
         BOOL hooksRestored = NO;
         BOOL swapLearnDirection = [NSProcessInfo processInfo]
-            .environment[@"XDREMUX_STYLE_RENDERER_SWAP_INPUT_TARGET"].boolValue;
+            .environment[@"LEARNNODE_SWAP_INPUT_TARGET"].boolValue;
         CIImage *learnSourceThumbnail = swapLearnDirection
             ? targetThumbnail
             : inputThumbnail;
@@ -2823,7 +2823,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
         }];
         NSDictionary *smartStyleUtility = nil;
         if ([NSProcessInfo processInfo]
-                .environment[@"XDREMUX_STYLE_RENDERER_USE_SMART_STYLE_UTILITIES"].boolValue) {
+                .environment[@"LEARNNODE_USE_SMART_STYLE_UTILITIES"].boolValue) {
             smartStyleUtility = RunSmartStyleUtilityLearn(
                 context,
                 [device newCommandQueue],
@@ -2862,7 +2862,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
                         });
                     }
                 } @catch (NSException *exception) {
-                    renderError = [NSError errorWithDomain:@"XDRemuxStyleRenderer"
+                    renderError = [NSError errorWithDomain:@"LearnNodeCoefficientProbe"
                                                        code:2
                                                    userInfo:@{
                         NSLocalizedDescriptionKey: exception.reason ?: exception.name,
@@ -2936,7 +2936,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
         NSUInteger expectedCoefficientBytes = coefficientRowBytes *
             (NSUInteger)llround(coefficientSize.height);
         BOOL composeNativeKey1Correction = [NSProcessInfo processInfo]
-            .environment[@"XDREMUX_STYLE_RENDERER_COMPOSE_NATIVE_KEY1_CORRECTION"].boolValue;
+            .environment[@"LEARNNODE_COMPOSE_NATIVE_KEY1_CORRECTION"].boolValue;
         NSDictionary *compositionSummary = nil;
         NSMutableData *composedRaw = composeNativeKey1Correction &&
             raw.length == expectedCoefficientBytes &&
@@ -3041,7 +3041,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
             &composedAppliedCaptureError
         );
         NSDictionary *result = @{
-            @"schema": @"xdremux-style-renderer-v2",
+            @"schema": @"learnnode-coefficient-probe-v2",
             @"mode": semanticMode ? @"semantic" : @"direct",
             @"input": inputPath,
             @"target": targetPath,
@@ -3067,8 +3067,8 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
                     ? @"input thumbnail"
                     : @"semantic target thumbnail",
                 @"sourceEnvironment": [NSProcessInfo processInfo]
-                    .environment[@"XDREMUX_STYLE_RENDERER_SWAP_INPUT_TARGET"]
-                        ? @"XDREMUX_STYLE_RENDERER_SWAP_INPUT_TARGET"
+                    .environment[@"LEARNNODE_SWAP_INPUT_TARGET"]
+                        ? @"LEARNNODE_SWAP_INPUT_TARGET"
                         : @"default",
             },
             @"smartStyleUtility": smartStyleUtility ?: (id)[NSNull null],
@@ -3080,7 +3080,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
             },
             @"thumbnailInputPolicy": @{
                 @"precomputed": @(inputsArePrecomputedThumbnails),
-                @"environment": @"XDREMUX_STYLE_RENDERER_INPUTS_ARE_PRECOMPUTED_THUMBNAILS",
+                @"environment": @"LEARNNODE_INPUTS_ARE_PRECOMPUTED_THUMBNAILS",
                 @"inputMatchesConfiguredSize": @(inputMatchesThumbnailSize),
                 @"targetMatchesConfiguredSize": @(targetMatchesThumbnailSize),
             },
@@ -3150,7 +3150,7 @@ int xdremux_style_renderer_main(int argc, const char *argv[]) {
                 },
                 @"composedLearnedWithNativeKey1Correction": @{
                     @"requested": @(composeNativeKey1Correction),
-                    @"environment": @"XDREMUX_STYLE_RENDERER_COMPOSE_NATIVE_KEY1_CORRECTION",
+                    @"environment": @"LEARNNODE_COMPOSE_NATIVE_KEY1_CORRECTION",
                     @"summary": compositionSummary ?: (id)[NSNull null],
                     @"coefficientImageCreated": @(composedLearnedImage != nil),
                     @"coefficientCapturePath": composedRawWritten

@@ -1,8 +1,20 @@
 import Foundation
+import CoreImage
 import XCTest
 @testable import XDRemuxCore
 
 final class CoreContractTests: XCTestCase {
+    func testPhotographicStylesResolveUnspecifiedProducerToProductionSolver() {
+        XCTAssertEqual(
+            AppleStyleDataProducerMode.unspecified.resolvedForPhotographicStyles,
+            .constrainedSolver
+        )
+        XCTAssertEqual(
+            AppleStyleDataProducerMode.identityFallback.resolvedForPhotographicStyles,
+            .identityFallback
+        )
+    }
+
     func testConversionDefaultsMatchLegacyCLI() {
         let configuration = ConversionConfiguration()
 
@@ -14,6 +26,41 @@ final class CoreContractTests: XCTestCase {
         XCTAssertEqual(configuration.fileNameSuffix, "_iso")
         XCTAssertTrue(configuration.skipExisting)
         XCTAssertFalse(configuration.appleFeaturesEnabled)
+        XCTAssertEqual(configuration.appleStyleDataProducer, .unspecified)
+        XCTAssertNil(configuration.appleStylesRawDNGURL)
+    }
+
+    func testCoreImageRAWOrientationReorderKeepsStableDimensions() throws {
+        var source = Data(count: 2 * 1 * 8)
+        source.withUnsafeMutableBytes { raw in
+            let values = raw.bindMemory(to: UInt16.self)
+            values[0] = 1; values[1] = 2; values[2] = 3; values[3] = 4
+            values[4] = 5; values[5] = 6; values[6] = 7; values[7] = 8
+        }
+        let oriented = try CoreImageRAW.orientedRGBA16(source, width: 2, height: 1, orientation: 6)
+        XCTAssertEqual(oriented.width, 1)
+        XCTAssertEqual(oriented.height, 2)
+        XCTAssertEqual(oriented.data.count, source.count)
+    }
+
+    func testCoreImageRAWInvalidDNGFailsClosedAndCacheIdentityBindsInputs() throws {
+        let invalidURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-invalid-raw-\(UUID().uuidString).dng")
+        defer { try? FileManager.default.removeItem(at: invalidURL) }
+        try Data("not a DNG".utf8).write(to: invalidURL, options: .atomic)
+        XCTAssertThrowsError(
+            try CoreImageRAW.decode(dngURL: invalidURL, targetWidth: 8, targetHeight: 8)
+        )
+
+        let first = CoreImageRAW.cacheKey(dngSHA256: "dng-a", embeddedPreviewSHA256: "preview-a")
+        XCTAssertNotEqual(
+            first,
+            CoreImageRAW.cacheKey(dngSHA256: "dng-b", embeddedPreviewSHA256: "preview-a")
+        )
+        XCTAssertNotEqual(
+            first,
+            CoreImageRAW.cacheKey(dngSHA256: "dng-a", embeddedPreviewSHA256: "preview-b")
+        )
     }
 
     func testOutputTargetResolvesReplacementAndExplicitFile() {
@@ -150,77 +197,5 @@ final class CoreContractTests: XCTestCase {
             XDRemuxError.invalidValue(option: "--jobs", value: "0").description,
             "invalid value for --jobs: 0"
         )
-    }
-
-    func testMissingInputEmitsStructuredEventsInOrder() {
-        let recorder = EventRecorder()
-        let input = URL(fileURLWithPath: "/tmp/xdremux-core-does-not-exist.heic")
-        let output = URL(fileURLWithPath: "/tmp/xdremux-core-output.heic")
-        let configuration = ConversionConfiguration(eventHandler: { event in
-            switch event {
-            case .started: recorder.append("started")
-            case .phaseChanged(let phase): recorder.append(phase.rawValue)
-            case .failed(let failure): recorder.append("failed:\(failure.code.rawValue)")
-            default: break
-            }
-        })
-
-        XCTAssertThrowsError(try ConversionEngine.convert(
-            inputURL: input,
-            outputURL: output,
-            config: configuration
-        ))
-        XCTAssertEqual(recorder.values, ["started", "reading_source", "failed:source_not_found"])
-    }
-
-    func testFailureCodesRemainStableEnglishIdentifiers() {
-        XCTAssertEqual(FailureCode.sourceNotFound.rawValue, "source_not_found")
-        XCTAssertEqual(FailureCode.sourceGainMapMissing.rawValue, "source_gain_map_missing")
-        XCTAssertEqual(FailureCode.outputVerificationFailed.rawValue, "output_verification_failed")
-        XCTAssertEqual(FailureCode.internalContainerError.rawValue, "internal_container_error")
-        XCTAssertEqual(WarningCode.portraitUnavailable.rawValue, "portrait_unavailable")
-    }
-
-    func testCancellationDoesNotEmitFailureEvent() {
-        let recorder = EventRecorder()
-        let cancellation = ConversionCancellation()
-        cancellation.cancel()
-        let input = URL(fileURLWithPath: "/tmp/xdremux-cancelled-input.heic")
-        let configuration = ConversionConfiguration(
-            eventHandler: { event in
-                switch event {
-                case .started: recorder.append("started")
-                case .failed: recorder.append("failed")
-                default: break
-                }
-            },
-            cancellation: cancellation
-        )
-
-        XCTAssertThrowsError(try ConversionEngine.convert(
-            inputURL: input,
-            outputURL: input,
-            config: configuration
-        )) { error in
-            XCTAssertTrue(error is CancellationError)
-        }
-        XCTAssertEqual(recorder.values, ["started"])
-    }
-}
-
-private final class EventRecorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [String] = []
-
-    func append(_ value: String) {
-        lock.lock()
-        storage.append(value)
-        lock.unlock()
-    }
-
-    var values: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage
     }
 }

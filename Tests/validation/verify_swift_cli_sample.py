@@ -67,7 +67,8 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--expected-pixel-format", required=True, choices=("444f", "420f", "420v", "x420", "L008"))
-    parser.add_argument("--binary", type=Path, help="reuse an already built xdremux executable")
+    parser.add_argument("--cli", type=Path, default=Path("xdremux/swift-cli/XDRemux.swift"))
+    parser.add_argument("--binary", type=Path, help="reuse an already compiled Swift CLI")
     parser.add_argument("--oppo-compatible", action="store_true")
     parser.add_argument("--apple-portrait", action="store_true")
     parser.add_argument(
@@ -81,7 +82,6 @@ def parse_arguments() -> argparse.Namespace:
         help="assert ordinary conversion kept the source Base payload byte-identical",
     )
     parser.add_argument("--in-place", action="store_true", help="convert a temporary copy in place")
-    parser.add_argument("--validate-only", action="store_true", help="validate --input without converting it")
     return parser.parse_args()
 
 
@@ -89,16 +89,13 @@ def main() -> int:
     arguments = parse_arguments()
     repo = Path.cwd().resolve()
     input_path = arguments.input.expanduser().resolve()
+    cli_path = arguments.cli.resolve()
     if not input_path.is_file():
         print(f"input sample not found: {input_path}", file=sys.stderr)
         return 2
-
-    if arguments.validate_only:
-        run(
-            ["swift", "-e", PIXEL_FORMAT_INSPECTOR, str(input_path), arguments.expected_pixel_format],
-            cwd=repo,
-        )
-        return 0
+    if not cli_path.is_file():
+        print(f"Swift CLI not found: {cli_path}", file=sys.stderr)
+        return 2
 
     with tempfile.TemporaryDirectory(prefix="xdremux-swift-sample-") as directory:
         temporary = Path(directory)
@@ -108,8 +105,8 @@ def main() -> int:
                 print(f"Swift CLI binary not found: {binary}", file=sys.stderr)
                 return 2
         else:
-            run(["swift", "build", "--product", "xdremux"], cwd=repo)
-            binary = repo / ".build" / "debug" / "xdremux"
+            binary = temporary / "xdremux"
+            run(["swiftc", str(cli_path), "-o", str(binary)], cwd=repo)
 
         if arguments.in_place:
             output = temporary / input_path.name
@@ -124,17 +121,11 @@ def main() -> int:
                 str(input_path),
                 "--output",
                 str(output),
-                "--language",
-                "en",
-                "--format",
-                "jsonl",
             ]
         if arguments.oppo_compatible:
             command.append("--oppo-compatible")
         if arguments.apple_portrait:
             command.append("--apple-portrait")
-        if arguments.expect_direct_gain:
-            command.append("--debug")
         conversion = run(command, cwd=repo)
         if arguments.expect_direct_gain:
             expected_diagnostic = (

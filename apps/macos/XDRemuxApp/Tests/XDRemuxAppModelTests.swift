@@ -1,6 +1,4 @@
 import Foundation
-import XDRemuxCore
-import XDRemuxAppleFeatures
 
 enum TestFailure: Error, CustomStringConvertible {
     case assertion(String)
@@ -52,8 +50,6 @@ struct XDRemuxAppModelTests {
         try testProductPolicyDefaults()
         try testSimplifiedProductSwitches()
         try testIndependentAppleFeatureConfiguration()
-        try testStructuredEventsMapToAppState()
-        try testAppCancellationCancelsSharedRequest()
         print("XDRemuxAppModelTests passed")
     }
 
@@ -204,22 +200,13 @@ struct XDRemuxAppModelTests {
 
         let small = viewModel.effectiveConcurrencyForTesting(
             fileSizes: [10 * 1024 * 1024, 12 * 1024 * 1024],
-            physicalMemory: 64 * 1024 * 1024 * 1024,
-            processorCount: 8
+            physicalMemory: 64 * 1024 * 1024 * 1024
         )
         try expect(small == 4, "small files should keep the configured concurrency")
 
-        let cpuLimited = viewModel.effectiveConcurrencyForTesting(
-            fileSizes: [10 * 1024 * 1024, 12 * 1024 * 1024],
-            physicalMemory: 64 * 1024 * 1024 * 1024,
-            processorCount: 2
-        )
-        try expect(cpuLimited == 2, "concurrency should respect the available processor count")
-
         let large = viewModel.effectiveConcurrencyForTesting(
             fileSizes: [20 * 1024 * 1024 * 1024],
-            physicalMemory: 16 * 1024 * 1024 * 1024,
-            processorCount: 8
+            physicalMemory: 16 * 1024 * 1024 * 1024
         )
         try expect(large == 1, "oversized inputs should drop concurrency to one")
     }
@@ -342,10 +329,10 @@ struct XDRemuxAppModelTests {
         try expect(config.appleFeaturesEnabled, "either Apple capability should activate the shared writer")
         let input = URL(fileURLWithPath: "/tmp/input.heic")
         let output = URL(fileURLWithPath: "/tmp/output.heic")
-        let request = ConversionRequest(
-            input: InputSource(url: input),
-            output: OutputDestination(url: output),
-            configuration: config
+        let request = AppConversionEngine.requestForTesting(
+            inputURL: input,
+            outputURL: output,
+            config: config
         )
         try expect(request.configuration.applePhotographicStyles, "App must preserve the Styles capability")
         try expect(request.configuration.applePortrait, "App must preserve the independent Portrait capability")
@@ -353,10 +340,10 @@ struct XDRemuxAppModelTests {
         try expect(request.output.url == output, "combined mode must produce one final HEIC")
 
         config.applePortrait = false
-        let stylesOnly = ConversionRequest(
-            input: InputSource(url: input),
-            output: OutputDestination(url: output),
-            configuration: config
+        let stylesOnly = AppConversionEngine.requestForTesting(
+            inputURL: input,
+            outputURL: output,
+            config: config
         )
         try expect(stylesOnly.configuration.applePhotographicStyles, "Styles must not depend on Portrait")
         try expect(!stylesOnly.configuration.applePortrait, "Portrait must stay independently disabled")
@@ -364,44 +351,5 @@ struct XDRemuxAppModelTests {
         config.applePortrait = true
         config.oppoGalleryCompatibilityEnabled = true
         try expect(!config.applePhotographicStyles && !config.applePortrait, "enabling OPPO compatibility must clear incompatible Apple capabilities")
-    }
-
-    @MainActor
-    private static func testStructuredEventsMapToAppState() throws {
-        let id = UUID()
-        let input = URL(fileURLWithPath: "/tmp/input.heic")
-        let viewModel = XDRemuxViewModel()
-        viewModel.queue = [
-            ConversionQueueItem(
-                id: id,
-                inputURL: input,
-                outputURL: URL(fileURLWithPath: "/tmp/output.heic"),
-                status: .running
-            )
-        ]
-        viewModel.applyConversionEventForTesting(.phaseChanged(.writingContainer), to: id)
-        viewModel.applyConversionEventForTesting(
-            .warning(ConversionWarning(
-                code: .portraitUnavailable,
-                messageKey: .warningPortraitUnavailable,
-                diagnostics: "portrait unavailable"
-            )),
-            to: id
-        )
-
-        try expect(viewModel.currentPhase == .writingContainer, "App should expose the shared conversion phase")
-        try expect(viewModel.currentFileName == input.lastPathComponent, "App should map events to the active file")
-        try expect(viewModel.queue[0].warnings.count == 1, "App should retain structured warnings on the queue row")
-    }
-
-    @MainActor
-    private static func testAppCancellationCancelsSharedRequest() throws {
-        let cancellation = ConversionCancellation()
-        let viewModel = XDRemuxViewModel()
-        viewModel.installCancellationForTesting(cancellation)
-        viewModel.cancelTask()
-
-        try expect(cancellation.isCancelled, "App cancellation should reach the shared conversion request")
-        try expect(viewModel.state == .cancelled, "App should enter cancelled state immediately")
     }
 }

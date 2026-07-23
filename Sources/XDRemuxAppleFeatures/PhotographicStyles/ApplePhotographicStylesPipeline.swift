@@ -59,6 +59,8 @@ package enum ApplePhotographicStylesPipeline {
         let researchLinearInputScale: Float
         let researchScalarOverrides: [String: Float]
         let gainMapMaximumStops: Float
+        let rawLinearThumbnailInputRGBA16: Data?
+        let rawProvenance: [String: Any]
     }
 
     private struct EncodedHEVCResource {
@@ -174,6 +176,8 @@ package enum ApplePhotographicStylesPipeline {
         let oppoCameraTail: OppoCameraTail
         let tmapFormat: TmapFormat
         let features: AppleFeatureFlags
+        let rawDNGURL: URL?
+        let styleDataProducer: AppleStyleDataProducerMode
         let eventHandler: ConversionEventHandler?
     }
 
@@ -193,6 +197,9 @@ package enum ApplePhotographicStylesPipeline {
                 oppoCameraTail: configuration.oppoCameraTail,
                 tmapFormat: configuration.tmapFormat,
                 features: configuration.appleFeatureOptions,
+                rawDNGURL: configuration.appleStylesRawDNGURL,
+                styleDataProducer: configuration.appleStyleDataProducer
+                    .resolvedForPhotographicStyles,
                 eventHandler: configuration.eventHandler
             )
         )
@@ -237,11 +244,247 @@ package enum ApplePhotographicStylesPipeline {
            ) {
             return try EDRScaleResolver.resolve(metaFloats: info, mode: .uhdr)
         }
-        let extracted = try LHDRExtractor.extract(from: sourceData)
-        return try EDRScaleResolver.resolve(
-            metaFloats: extracted.metaFloats,
-            mode: extracted.mode
+        do {
+            let extracted = try LHDRExtractor.extract(from: sourceData)
+            return try EDRScaleResolver.resolve(
+                metaFloats: extracted.metaFloats,
+                mode: extracted.mode
+            )
+        } catch {
+            // Existing ISO Gain Map HEIC research fixtures do not have the
+            // Local HDR/QTI extension, but their HDRToneMap metadata carries
+            // the same per-channel scale needed by the scene bundle.
+            let info = try PortraitConversionPipeline.resolveGainInfoFloats(
+                privateInfo: nil,
+                inputURL: sourceURL
+            )
+            return try EDRScaleResolver.resolve(metaFloats: info, mode: .uhdr)
+        }
+    }
+
+    private static func rawEmbeddedPreviewSceneInput(
+        rawDNGURL: URL,
+        sourceURL: URL,
+        outputURL: URL
+    ) throws -> [String: Any] {
+        let preview = try CoreImageRAW.extractEmbeddedPreview(from: rawDNGURL)
+        guard let source = CGImageSourceCreateWithData(preview.data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(
+                  source,
+                  0,
+                  nil
+              ) as? [CFString: Any],
+              let sourceAuxiliary = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  source,
+                  0,
+                  kCGImageAuxiliaryDataTypeISOGainMap
+              ) as? [CFString: Any],
+              let metadata = sourceAuxiliary[kCGImageAuxiliaryDataInfoMetadata],
+              let gainImage = CIImage(
+                  data: preview.data,
+                  options: [
+                      .auxiliaryHDRGainMap: true,
+                      .applyOrientationProperty: false,
+                      .colorSpace: NSNull(),
+                  ]
+              ) else {
+            throw CLIError.invalidContainer(
+                "RAW embedded PreviewImage does not contain an ImageIO-readable ISO Gain Map"
+            )
+        }
+
+        let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue
+            ?? preview.dngOrientation
+        guard (1...8).contains(orientation) else {
+            throw CLIError.invalidContainer(
+                "RAW embedded PreviewImage has unsupported EXIF orientation (orientation)"
+            )
+        }
+        let sourceWidth = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue
+            ?? preview.width
+        let sourceHeight = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue
+            ?? preview.height
+        let gainStorageWidth = Int(gainImage.extent.width.rounded())
+        let gainStorageHeight = Int(gainImage.extent.height.rounded())
+        guard sourceWidth == gainStorageWidth * 2,
+              sourceHeight == gainStorageHeight * 2 else {
+            throw CLIError.invalidContainer(
+                "RAW embedded ISO Gain Map is not half-resolution in primary storage geometry: "
+                    + "primary=(sourceWidth)x(sourceHeight) gain=(gainStorageWidth)x(gainStorageHeight)"
+            )
+        }
+
+        let orientedGain = gainImage.oriented(forExifOrientation: Int32(orientation))
+        let extent = orientedGain.extent
+        let gainWidth = Int(extent.width.rounded())
+        let gainHeight = Int(extent.height.rounded())
+        let expectedPresentationSize = [5, 6, 7, 8].contains(orientation)
+            ? [sourceHeight / 2, sourceWidth / 2]
+            : [sourceWidth / 2, sourceHeight / 2]
+        guard [gainWidth, gainHeight] == expectedPresentationSize else {
+            throw CLIError.invalidContainer(
+                "RAW embedded ISO Gain Map orientation produced unexpected geometry: "
+                    + "got=(gainWidth)x(gainHeight) expected=(expectedPresentationSize[0])x(expectedPresentationSize[1])"
+            )
+        }
+
+        guard let sourceImage = CIImage(
+            contentsOf: sourceURL,
+            options: [.applyOrientationProperty: true]
+        ) else {
+            throw CLIError.invalidContainer(
+                "RAW embedded PreviewImage cannot be paired because the source image is unreadable"
+            )
+        }
+        let sourceImageWidth = max(1, Int(sourceImage.extent.width.rounded()))
+        let sourceImageHeight = max(1, Int(sourceImage.extent.height.rounded()))
+        let sourcePairSize = fittedSize(
+            sourceWidth: sourceImageWidth,
+            sourceHeight: sourceImageHeight,
+            maximumWidth: 1024,
+            maximumHeight: 1024
         )
+        let sourcePair = try CoreImageRAW.validateEmbeddedPreview(
+            preview,
+            against: sourceImage,
+            targetWidth: sourcePairSize.0,
+            targetHeight: sourcePairSize.1
+        )
+        guard sourcePair.validated else {
+            throw CLIError.invalidContainer(
+                "RAW embedded PreviewImage does not match the source image: "
+                    + "directCorrelation=\(sourcePair.correlation) "
+                    + "toneInvariantCorrelation=\(sourcePair.toneInvariantCorrelation)"
+            )
+        }
+
+        let bytesPerRow = gainWidth * 4
+        var gainData = Data(count: bytesPerRow * gainHeight)
+        let context = CIContext(options: [
+            .cacheIntermediates: false,
+            .useSoftwareRenderer: true,
+            .workingColorSpace: NSNull(),
+            .outputColorSpace: NSNull(),
+        ])
+        gainData.withUnsafeMutableBytes { raw in
+            guard let baseAddress = raw.baseAddress else { return }
+            context.render(
+                orientedGain,
+                toBitmap: baseAddress,
+                rowBytes: bytesPerRow,
+                bounds: extent,
+                format: .BGRA8,
+                colorSpace: nil
+            )
+        }
+
+        let fourCC: UInt32 = "BGRA".utf8.reduce(0) { ($0 << 8) | UInt32($1) }
+        let description: [CFString: Any] = [
+            kCGImagePropertyWidth: gainWidth,
+            kCGImagePropertyHeight: gainHeight,
+            kCGImagePropertyBytesPerRow: bytesPerRow,
+            kCGImagePropertyPixelFormat: fourCC,
+        ]
+        let auxiliary: [CFString: Any] = [
+            kCGImageAuxiliaryDataInfoData: gainData,
+            kCGImageAuxiliaryDataInfoDataDescription: description as CFDictionary,
+            kCGImageAuxiliaryDataInfoMetadata: metadata,
+        ]
+
+        guard let displayP3 = CGColorSpace(name: CGColorSpace.displayP3),
+              let baseImage = CIImage(
+                  data: preview.data,
+                  options: [
+                      .applyOrientationProperty: true,
+                      .colorSpace: displayP3,
+                  ]
+              ) else {
+            throw CLIError.invalidContainer(
+                "RAW embedded PreviewImage cannot be materialized in Display P3 presentation coordinates"
+            )
+        }
+        let baseContext = CIContext(options: [
+            .cacheIntermediates: false,
+            .useSoftwareRenderer: true,
+            .workingColorSpace: displayP3,
+            .outputColorSpace: displayP3,
+        ])
+        guard let orientedBase = baseContext.createCGImage(baseImage, from: baseImage.extent) else {
+            throw CLIError.invalidContainer(
+                "RAW embedded PreviewImage presentation base could not be rasterized"
+            )
+        }
+
+        try? FileManager.default.removeItem(at: outputURL)
+        guard let destination = CGImageDestinationCreateWithURL(
+            outputURL as CFURL,
+            UTType.heic.identifier as CFString,
+            1,
+            nil
+        ) else {
+            throw CLIError.unableToCreateDestination(outputURL)
+        }
+        var imageOptions = properties
+        imageOptions[kCGImagePropertyOrientation] = 1
+        if var tiff = imageOptions[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
+            tiff[kCGImagePropertyTIFFOrientation] = 1
+            imageOptions[kCGImagePropertyTIFFDictionary] = tiff as CFDictionary
+        }
+        imageOptions[kCGImageDestinationEncodeRequest] = kCGImageDestinationEncodeToISOGainmap
+        imageOptions[kCGImageDestinationEncodeRequestOptions] = [
+            kCGImageDestinationEncodeBaseIsSDR: true,
+            kCGImageDestinationLossyCompressionQuality: 1.0,
+        ] as CFDictionary
+        CGImageDestinationAddImage(destination, orientedBase, imageOptions as CFDictionary)
+        CGImageDestinationAddAuxiliaryDataInfo(
+            destination,
+            kCGImageAuxiliaryDataTypeISOGainMap,
+            auxiliary as CFDictionary
+        )
+        guard CGImageDestinationFinalize(destination) else {
+            throw CLIError.unableToFinalizeDestination(outputURL)
+        }
+
+        guard let verificationSource = CGImageSourceCreateWithURL(outputURL as CFURL, nil),
+              let verificationProperties = CGImageSourceCopyPropertiesAtIndex(
+                  verificationSource,
+                  0,
+                  nil
+              ) as? [CFString: Any],
+              let verificationAuxiliary = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+                  verificationSource,
+                  0,
+                  kCGImageAuxiliaryDataTypeISOGainMap
+              ) as? [CFString: Any],
+              let verificationDescription = verificationAuxiliary[
+                  kCGImageAuxiliaryDataInfoDataDescription
+              ] as? [CFString: Any],
+              let verificationWidth = (verificationDescription[kCGImagePropertyWidth] as? NSNumber)?.intValue,
+              let verificationHeight = (verificationDescription[kCGImagePropertyHeight] as? NSNumber)?.intValue,
+              verificationWidth == gainWidth,
+              verificationHeight == gainHeight else {
+            throw CLIError.invalidContainer(
+                "RAW-derived HEIC lost or changed the oriented ISO Gain Map"
+            )
+        }
+
+        return [
+            "source": "DNG PreviewImage MPF ISO Gain Map",
+            "dngSHA256": sha256Hex(try Data(contentsOf: rawDNGURL, options: [.mappedIfSafe])),
+            "embeddedPreviewSHA256": preview.sha256,
+            "exifOrientation": orientation,
+            "primaryStorageSize": [sourceWidth, sourceHeight],
+            "gainMapStorageSize": [gainStorageWidth, gainStorageHeight],
+            "gainMapPresentationSize": [gainWidth, gainHeight],
+            "transform": orientation == 1
+                ? "identity"
+                : "storage-to-presentation-exif-" + String(orientation),
+            "pixelFormat": fourCC,
+            "outputPath": outputURL.path,
+            "sourcePairValidation": sourcePair.dictionary,
+            "outputOrientation": (verificationProperties[kCGImagePropertyOrientation] as? NSNumber)?.intValue
+                ?? NSNull(),
+        ]
     }
 
     private static func fittedSize(
@@ -717,7 +960,8 @@ package enum ApplePhotographicStylesPipeline {
 
     private static func photoDerivedStyleSceneBundle(
         standardHDRURL: URL,
-        scale: ResolvedScale
+        scale: ResolvedScale,
+        rawDNGURL: URL?
     ) throws -> PhotoDerivedStyleSceneBundle {
         guard let primary = CIImage(
             contentsOf: standardHDRURL,
@@ -941,6 +1185,82 @@ package enum ApplePhotographicStylesPipeline {
             targetWidth: styleEngineSize.0,
             targetHeight: styleEngineSize.1
         )
+        var rawLinearThumbnailInputRGBA16: Data?
+        var rawProvenance: [String: Any] = [
+            "linearThumbnailSource": "final-HEIC-proxy",
+            "dngDecodeMode": "not-used",
+            "rawIsProcessedRemosaic": false,
+            "sceneLinearConfidence": "unavailable",
+            "remosaicAwareReconstruction": false,
+            "cameraProducerExact": false,
+            "consumerExactForProvidedLinearInput": false,
+            "behaviorEquivalentLinearInputValidated": false,
+            "productionEligible": false,
+            "fallbackReason": rawDNGURL == nil ? "raw-dng-not-provided" : "raw-dng-not-evaluated",
+        ]
+        if let rawDNGURL {
+            do {
+                let storageOrientation = Int(exifOrientation(at: rawDNGURL))
+                let rawStorageSize = [5, 6, 7, 8].contains(storageOrientation)
+                    ? (size.1, size.0)
+                    : size
+                let decoded = try CoreImageRAW.decode(
+                    dngURL: rawDNGURL,
+                    targetWidth: rawStorageSize.0,
+                    targetHeight: rawStorageSize.1
+                )
+                let sourcePair = try CoreImageRAW.validateEmbeddedPreview(
+                    decoded.embeddedPreview,
+                    against: primary,
+                    targetWidth: size.0,
+                    targetHeight: size.1
+                )
+                let internalPairValidated = decoded.pairValidation?.validated == true
+                let pairValidated = internalPairValidated && sourcePair.validated
+                let calibrationValidated = decoded.calibrationConfidence >= 0.35
+                var enrichedProvenance = decoded.provenance.merging([
+                    "rawPreviewReferencePairValidated": sourcePair.validated,
+                    "rawPreviewReferencePair": sourcePair.dictionary,
+                ]) { _, new in new }
+                guard pairValidated, calibrationValidated, decoded.rawStatistics.finite else {
+                    enrichedProvenance["fallbackReason"] = !internalPairValidated
+                        ? "embedded-preview-internal-pair-failed"
+                        : (!sourcePair.validated
+                            ? "embedded-preview-does-not-match-source-image"
+                            : "raw-calibration-confidence-insufficient")
+                    rawProvenance = enrichedProvenance
+                    throw CLIError.invalidContainer("RAW-assisted preview pairing or calibration confidence was insufficient")
+                }
+                let oriented = try CoreImageRAW.orientedRGBA16(
+                    decoded.normalizedRGBA16,
+                    width: decoded.width,
+                    height: decoded.height,
+                    orientation: storageOrientation
+                )
+                guard oriented.width == size.0, oriented.height == size.1 else {
+                    rawProvenance = enrichedProvenance.merging([
+                        "fallbackReason": "raw-orientation-size-mismatch",
+                    ]) { _, new in new }
+                    throw CLIError.invalidContainer("RAW-assisted orientation did not match the SceneBundle dimensions")
+                }
+                rawLinearThumbnailInputRGBA16 = oriented.data
+                rawProvenance = enrichedProvenance.merging([
+                    "rawDNGOrientation": storageOrientation,
+                    "rawPresentationSize": [oriented.width, oriented.height],
+                    "fallbackReason": NSNull(),
+                ]) { _, new in new }
+            } catch {
+                if rawLinearThumbnailInputRGBA16 == nil {
+                    if rawProvenance["fallbackReason"] as? String == "raw-dng-not-evaluated" {
+                        rawProvenance["fallbackReason"] = String(describing: error)
+                    }
+                }
+                // An explicitly supplied DNG is a selected scene input, not an
+                // optional hint. Keep this path fail-closed instead of emitting
+                // a structurally valid but unrelated final-HEIC proxy.
+                throw error
+            }
+        }
         return PhotoDerivedStyleSceneBundle(
             width: size.0,
             height: size.1,
@@ -975,7 +1295,9 @@ package enum ApplePhotographicStylesPipeline {
             rendererLinearRangeMax: rendererLinearMaximum.isFinite ? rendererLinearMaximum : 0,
             researchLinearInputScale: researchLinearInputScale,
             researchScalarOverrides: researchScalarOverrides,
-            gainMapMaximumStops: gainMapMaximumStops
+            gainMapMaximumStops: gainMapMaximumStops,
+            rawLinearThumbnailInputRGBA16: rawLinearThumbnailInputRGBA16,
+            rawProvenance: rawProvenance
         )
     }
 
@@ -1544,7 +1866,8 @@ package enum ApplePhotographicStylesPipeline {
         sceneType: Int,
         faceExposureBoost: Double,
         storageOrientation: UInt32,
-        outputDirectory: URL
+        outputDirectory: URL,
+        useRawInput: Bool = true
     ) throws -> PhotoDerivedLocalScenePayload {
         let fileManager = FileManager.default
         let temporaryDirectory = fileManager.temporaryDirectory
@@ -1562,7 +1885,15 @@ package enum ApplePhotographicStylesPipeline {
         let gtcURL = temporaryDirectory.appendingPathComponent("global-tone-curve.bin")
         try bundle.toneRGBAHalf.write(to: toneURL, options: .atomic)
         try bundle.styleEngineToneRGBAHalf.write(to: thumbnailURL, options: .atomic)
-        try bundle.rendererLinearRGBA16.write(to: linearURL, options: .atomic)
+        let rawInput = useRawInput ? bundle.rawLinearThumbnailInputRGBA16 : nil
+        let rawProvenance = useRawInput
+            ? bundle.rawProvenance
+            : bundle.rawProvenance.merging([
+                "fallbackReason": "private-consumer-raw-input-failed",
+            ]) { _, new in new }
+        let linearInputRGBA16 = rawInput
+            ?? bundle.rendererLinearRGBA16
+        try linearInputRGBA16.write(to: linearURL, options: .atomic)
         try bundle.globalToneCurve.write(to: gtcURL, options: .atomic)
 
         var request: [String: Any] = [
@@ -1586,6 +1917,10 @@ package enum ApplePhotographicStylesPipeline {
             "personMasksValidHint": semantics.hasCrediblePerson ? 1.0 : -1.0,
             "faceBasedGlobalExposureBoostRatio": faceExposureBoost,
             "processingType": 5,
+            "linearThumbnailInputSource": rawInput == nil
+                ? "final-HEIC-proxy"
+                : "CIRAWNeutral-processed-linear-RGB-candidate",
+            "rawProvenance": rawProvenance,
         ]
         for (key, matte) in [
             ("personMaskPath", semantics.person),
@@ -1630,6 +1965,12 @@ package enum ApplePhotographicStylesPipeline {
               let rawStatistics = report["statistics"] as? [String: Any],
               let rawExtendedStatistics = report["extendedStatistics"] as? [String: Any],
               let codedMetadataNumbers = report["codedLinearMetadata"] as? [String: NSNumber] else {
+            if useRawInput, bundle.rawLinearThumbnailInputRGBA16 != nil {
+                let diagnostic = String(data: result.stderr, encoding: .utf8) ?? ""
+                throw CLIError.invalidContainer(
+                    "native photo-derived scene producer rejected the supplied RAW input: \(diagnostic)"
+                )
+            }
             let diagnostic = String(data: result.stderr, encoding: .utf8) ?? ""
             throw CLIError.invalidContainer(
                 "native photo-derived style scene producer failed: \(diagnostic)"
@@ -1736,21 +2077,28 @@ package enum ApplePhotographicStylesPipeline {
             statistics: nativeStatistics,
             extendedStatistics: nativeExtendedStatistics,
             producerManifest: [
-                "mode": "native-cmimaging-final-heic-proxy-v1",
+                "mode": rawInput == nil
+                    ? "native-cmimaging-final-heic-proxy-v1"
+                    : "native-cmimaging-coreimage-raw-v1",
                 "status": report["status"] ?? "unknown",
                 "nativeProducerExact": false,
-                "consumerExactForProvidedLinearInput": true,
+                "consumerExactForProvidedLinearInput": rawInput == nil,
                 "cameraProducerExact": false,
                 "captureTimePreLTMInputAvailable": false,
                 "behaviorEquivalentLinearInputValidated": false,
-                "fallbackKind": "missing-capture-time-pre-ltm-input",
+                "fallbackKind": rawInput == nil
+                    ? "missing-capture-time-pre-ltm-input"
+                    : NSNull(),
                 "negativeSerializedSamplesAllowed": false,
                 "coordinateOrder": "primary-item-storage",
                 "class": "CMISmartStylePixelBufferRendererV1",
                 "processingType": 5,
-                "providedLinearInput": "same-photo reconstructed HDR / (source-derived key4 * source-derived i.Gain)",
+                "providedLinearInput": rawInput == nil
+                    ? "same-photo reconstructed HDR / (source-derived key4 * source-derived i.Gain)"
+                    : "CIRAWFilter neutral processed-linear RGB, preview-paired and exposure-calibrated",
                 "appleCaptureInput": "SmartStyleV1 smartStyleCreateLinearThumbnail output: capture-time pre-LTM RGB in valid bounds, with post-LTM seam fill outside bounds",
                 "claimBoundary": "the private consumer is exact for the supplied buffer, but the supplied final-HEIC proxy is not the Apple camera producer input",
+                "rawProvenance": rawProvenance,
                 "boundedProxyValidation": [
                     "nativeReferencePhoto": "IMG_2903",
                     "directToneChecks": 472,
@@ -1943,6 +2291,8 @@ package enum ApplePhotographicStylesPipeline {
     ) throws -> (
         data: Data,
         manifest: [String: Any],
+        linearThumbnailSource: String,
+        rawProvenance: [String: Any],
         nativeCodedLinearRGB8: Data?
     ) {
         let gtc = bundle.globalToneCurve
@@ -1966,6 +2316,17 @@ package enum ApplePhotographicStylesPipeline {
             storageOrientation: storageOrientation,
             outputDirectory: outputDirectory
         )
+        let rawInputUsed = localScene.producerManifest["mode"] as? String
+            == "native-cmimaging-coreimage-raw-v1"
+        let linearThumbnailSource = rawInputUsed
+            ? "CIRAWNeutral-processed-linear-RGB-candidate"
+            : "final-HEIC-proxy"
+        var effectiveRawProvenance = bundle.rawProvenance
+        if let producerRawProvenance = localScene.producerManifest["rawProvenance"] as? [String: Any] {
+            effectiveRawProvenance = producerRawProvenance
+        } else if !rawInputUsed, bundle.rawLinearThumbnailInputRGBA16 != nil {
+            effectiveRawProvenance["fallbackReason"] = "selected-scene-producer-did-not-use-raw-input"
+        }
         let toneLightMap = localScene.toneLightMap
         let linearLightMap = localScene.linearLightMap
         let statistics = localScene.statistics ?? preliminaryStatistics
@@ -2040,7 +2401,9 @@ package enum ApplePhotographicStylesPipeline {
         }
         var styleDataManifest = styleData.manifest
         styleDataManifest["evidence"] = styleData.evidence.rawValue
-        return (data, [
+        return (
+            data: data,
+            manifest: [
             "schema": "xdremux-apple-photographic-style-payload-v2",
             "styleVersion": 15,
             "styleData": styleDataManifest,
@@ -2081,6 +2444,8 @@ package enum ApplePhotographicStylesPipeline {
                     "maximum": bundle.logGainRGB.max() ?? 0,
                 ],
                 "resourceDecodeCount": 1,
+                "linearThumbnailSource": linearThumbnailSource,
+                "rawAssistedLinearThumbnail": effectiveRawProvenance,
             ],
             "gtc": [
                 "byteCount": gtc.count,
@@ -2161,7 +2526,11 @@ package enum ApplePhotographicStylesPipeline {
                 "fixedProtocolConstant": false,
             ],
             "stylePropertyList": ["byteCount": data.count, "sha256": sha256Hex(data), "format": "binary plist v1 CF format 200"],
-        ], localScene.nativeCodedLinearRGB8)
+            ],
+            linearThumbnailSource: linearThumbnailSource,
+            rawProvenance: effectiveRawProvenance,
+            nativeCodedLinearRGB8: localScene.nativeCodedLinearRGB8
+        )
     }
 
     private static func validateWithSemanticStyleProperties(
@@ -2204,31 +2573,54 @@ package enum ApplePhotographicStylesPipeline {
     private static func buildStylePayload(
         sourceURL: URL,
         standardHDRURL: URL,
+        rawDNGURL: URL?,
         semantics: AppleSemanticSceneAnalysis,
         portraitWritten: Bool,
         outputDirectory: URL,
-        photoIdentifier: String
+        photoIdentifier: String,
+        producerMode: AppleStyleDataProducerMode
     ) throws -> ApplePhotographicStylePayload {
         let payloadStartedAt = CFAbsoluteTimeGetCurrent()
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
         let scale = try sourceScale(sourceURL: sourceURL, portraitWritten: portraitWritten)
         let bundle = try photoDerivedStyleSceneBundle(
             standardHDRURL: standardHDRURL,
-            scale: scale
+            scale: scale,
+            rawDNGURL: rawDNGURL
         )
         let sceneClassification = try photoDerivedSceneClassification(
             imageURL: standardHDRURL
         )
         let rasterCompletedAt = CFAbsoluteTimeGetCurrent()
         let styleDataDirectory = outputDirectory.appendingPathComponent("style-data")
-        let producer = SolverIdentityBaselineProducer()
+        let producer: any AppleStyleDataProducing
+        let sourceDomain: String
+        let targetDomain: String
+        switch producerMode {
+        case .unspecified:
+            throw CLIError.invalidContainer(
+                "Apple Photographic Styles writer received an unresolved style-data producer"
+            )
+        case .learnNodeDiagnostic:
+            producer = AppleLearnNodeStyleDataProducer()
+            sourceDomain = "current rendered Base appearance; diagnostic same-image Learn source"
+            targetDomain = "same current rendered Base appearance; diagnostic same-image Learn target"
+        case .identityFallback:
+            producer = IdentityStyleDataProducer()
+            sourceDomain = "not used by explicit complete-identity fallback"
+            targetDomain = "not used by explicit complete-identity fallback"
+        case .constrainedSolver:
+            throw CLIError.invalidContainer(
+                "constrained-solver requires the two-stage complete-Neutrino graph path"
+            )
+        }
         let styleData = try producer.makeStyleData(
             request: AppleStyleDataRequest(
                 sourceURL: standardHDRURL,
                 renderedTargetURL: standardHDRURL,
                 outputDirectory: styleDataDirectory,
-                sourceDomain: "internal constrained-solver baseline",
-                targetDomain: "internal constrained-solver baseline"
+                sourceDomain: sourceDomain,
+                targetDomain: targetDomain
             )
         )
         let styleDataCompletedAt = CFAbsoluteTimeGetCurrent()
@@ -2368,17 +2760,25 @@ package enum ApplePhotographicStylesPipeline {
                 producer: "XDRemux \(styleData.producerVersion)",
                 inputSHA256: inputSHA,
                 evidence: styleData.evidence,
-                detail: "scene-matched constrained-solver producer; full consumer reconstruction and real Photos gates remain separate"
+                detail: styleData.sceneMatched
+                    ? "scene-matched producer; full consumer reconstruction gate passed"
+                    : (styleData.identityFallback
+                        ? "explicit identity fallback; scene matching was not attempted"
+                        : "explicit Base-to-Base LearnNode near-identity fallback; internal Apply passed but the full consumer domain is not closed")
             ),
             "linearThumbnail": AppleResourceProvenance(
-                producer: style.nativeCodedLinearRGB8 == nil
+                producer: style.linearThumbnailSource == "CIRAWNeutral-processed-linear-RGB-candidate"
+                    ? "CMISmartStylePixelBufferRendererV1 over CIRAWFilter neutral processed-linear RGB"
+                    : (style.nativeCodedLinearRGB8 == nil
                     ? "XDRemux coherent HDR scene reconstruction + per-photo exposure normalization + Apple encodeLinear"
-                    : "CMISmartStylePixelBufferRendererV1 over a final-HEIC linear-input proxy",
+                    : "CMISmartStylePixelBufferRendererV1 over a final-HEIC linear-input proxy"),
                 inputSHA256: inputSHA,
                 evidence: .sourceDerivedApproximation,
-                detail: style.nativeCodedLinearRGB8 == nil
+                detail: style.linearThumbnailSource == "CIRAWNeutral-processed-linear-RGB-candidate"
+                    ? "private consumer invoked with a same-photo CIRAWFilter processed-linear candidate; complete native response validation is still pending"
+                    : (style.nativeCodedLinearRGB8 == nil
                     ? "same-input Display P3 RGB Gain reconstruction; coded linear is HDR/key4, capture linear is coded/i.Gain, and i.Gain=4h; explicit CPU diagnostic path"
-                    : "CMImaging consumes the supplied same-photo bundle coherently, but firmware proves Apple Camera supplies a capture-time pre-LTM thumbnail that an arbitrary final HEIC does not retain; camera-producer equivalence is not claimed"
+                    : "CMImaging consumes the supplied same-photo bundle coherently, but firmware proves Apple Camera supplies a capture-time pre-LTM thumbnail that an arbitrary final HEIC does not retain; camera-producer equivalence is not claimed"),
             ),
             "styleDelta": AppleResourceProvenance(
                 producer: "XDRemux iPhone18,1/23F84 zero-residual profile",
@@ -2409,7 +2809,9 @@ package enum ApplePhotographicStylesPipeline {
                 "colorManagementApplied": false,
                 "transferFunctionApplied": false,
             ],
-            "inputDomain": "final-HEIC proxy supplied to CMImaging = reconstructed HDR / (per-photo key4 baseline exposure * i.Gain)",
+            "inputDomain": style.linearThumbnailSource == "CIRAWNeutral-processed-linear-RGB-candidate"
+                ? "CIRAWFilter neutral processed-linear RGB, preview-paired and exposure/WB-calibrated, supplied to CMImaging"
+                : "final-HEIC proxy supplied to CMImaging = reconstructed HDR / (per-photo key4 baseline exposure * i.Gain)",
             "appleCameraInputDomain": "capture-time pre-LTM linear RGB plus post-LTM seam-fill inputs; unavailable in an arbitrary final HEIC",
             "captureTimePreLTMInputAvailable": false,
             "behaviorEquivalentLinearInputValidated": false,
@@ -2420,10 +2822,17 @@ package enum ApplePhotographicStylesPipeline {
                 "minimum": bundle.rendererLinearRangeMin,
                 "maximum": bundle.rendererLinearRangeMax,
             ],
-            "producer": style.nativeCodedLinearRGB8 == nil
-                ? "explicit CPU behavioral proxy"
-                : "CMISmartStylePixelBufferRendererV1 output for a final-HEIC proxy input",
-            "appleEncodeLinearAppliedAfterGainRestoration": style.nativeCodedLinearRGB8 == nil,
+            "producer": style.linearThumbnailSource == "CIRAWNeutral-processed-linear-RGB-candidate"
+                ? "CMISmartStylePixelBufferRendererV1 output for a CIRAWFilter processed-linear candidate"
+                : (style.nativeCodedLinearRGB8 == nil
+                    ? "explicit CPU behavioral proxy"
+                    : "CMISmartStylePixelBufferRendererV1 output for a final-HEIC proxy input"),
+            "rawAssistedProvenance": style.rawProvenance,
+            "consumerExactForProvidedLinearInput": style.linearThumbnailSource == "final-HEIC-proxy"
+                ? (style.nativeCodedLinearRGB8 != nil)
+                : false,
+            "appleEncodeLinearAppliedAfterGainRestoration": style.linearThumbnailSource == "final-HEIC-proxy"
+                && style.nativeCodedLinearRGB8 == nil,
         ]
         let normalizedStyleDeltaRGB: Any = researchStyleDeltaOverride
             ? styleDeltaRGBCodes.map { Double($0) / 255 }
@@ -3326,7 +3735,6 @@ package enum ApplePhotographicStylesPipeline {
         guard options.features.photographicStyles else {
             throw CLIError.invalidContainer("Photographic Styles pipeline invoked without its capability flag")
         }
-        options.eventHandler?(.phaseChanged(.readingSource))
         let parent = outputURL.deletingLastPathComponent()
         try ensureDirectory(parent, fileManager: .default)
         let featureInputURL = siblingScratchURL(
@@ -3358,9 +3766,7 @@ package enum ApplePhotographicStylesPipeline {
                     includesPhotographicStylesSemantics: true,
                     semanticOutputDirectory: sharedSemanticDirectory,
                     writeSemanticPNGEvidence: options.debugRootURL != nil,
-                    eventHandler: AppleFeatureEventForwarder.preparationHandler(
-                        options.eventHandler
-                    )
+                    eventHandler: options.eventHandler
                 )
                 portraitWritten = outcome.written
                 portraitSemanticFusion = outcome.semanticFusion
@@ -3381,52 +3787,80 @@ package enum ApplePhotographicStylesPipeline {
             }
         }
 
-        if let portraitUnavailableReason {
-            options.eventHandler?(.warning(ConversionWarning(
-                code: .portraitUnavailable,
-                messageKey: .warningPortraitUnavailable,
-                diagnostics: portraitUnavailableReason
-            )))
-        }
-
         if !portraitWritten {
-            _ = try XDRemuxProductCore.convert(
-                inputURL: inputURL,
-                outputURL: featureInputURL,
-                familyPreference: options.family,
-                debugRootURL: options.debugRootURL,
-                oppoCompatibility: options.oppoCompatibility,
-                inputProcessingBranch: options.inputProcessingBranch,
-                oppoCameraTail: options.oppoCameraTail,
-                tmapFormat: options.tmapFormat,
-                eventHandler: AppleFeatureEventForwarder.preparationHandler(
-                    options.eventHandler
+            var rawSceneInputManifest: [String: Any]?
+            if let rawDNGURL = options.rawDNGURL {
+                rawSceneInputManifest = try rawEmbeddedPreviewSceneInput(
+                    rawDNGURL: rawDNGURL,
+                    sourceURL: inputURL,
+                    outputURL: featureInputURL
                 )
+                print(
+                    "styles input=RAW embedded PreviewImage MPF; "
+                        + "Gain Map transform=\(rawSceneInputManifest?["transform"] ?? "unknown")"
+                )
+            } else {
+                rawSceneInputManifest = nil
+            }
+            let existingISOInput = rawSceneInputManifest == nil
+                && !options.features.portrait
+                && PortraitConversionPipeline.hasValidISOGainMap(inputURL)
+            if existingISOInput {
+                try FileManager.default.copyItem(at: inputURL, to: featureInputURL)
+                print("styles input=existing ImageIO-readable ISO Gain Map HEIC; Local HDR conversion bypassed")
+            } else if rawSceneInputManifest == nil {
+                _ = try XDRemuxProductCore.convert(
+                    inputURL: inputURL,
+                    outputURL: featureInputURL,
+                    familyPreference: options.family,
+                    debugRootURL: options.debugRootURL,
+                    oppoCompatibility: options.oppoCompatibility,
+                    inputProcessingBranch: options.inputProcessingBranch,
+                    oppoCameraTail: options.oppoCameraTail,
+                    tmapFormat: options.tmapFormat,
+                    eventHandler: options.eventHandler
+                )
+            }
+            try augmentPhotographicStyles(
+                sourceURL: inputURL,
+                standardHDRURL: featureInputURL,
+                outputURL: outputURL,
+                portraitRequested: options.features.portrait,
+                portraitWritten: portraitWritten,
+                portraitUnavailableReason: portraitUnavailableReason,
+                portraitSemanticFusion: portraitSemanticFusion,
+                portraitSemanticAnalysis: portraitSemanticAnalysis,
+                portraitSemanticEvidenceDirectory: portraitWritten ? sharedSemanticDirectory : nil,
+                preferredPhotoIdentifier: photoIdentifier,
+                styleDataProducer: options.styleDataProducer,
+                rawDNGURL: options.rawDNGURL,
+                rawSceneInputManifest: rawSceneInputManifest,
+                debugRootURL: options.debugRootURL
+            )
+        } else {
+            try augmentPhotographicStyles(
+                sourceURL: inputURL,
+                standardHDRURL: featureInputURL,
+                outputURL: outputURL,
+                portraitRequested: options.features.portrait,
+                portraitWritten: portraitWritten,
+                portraitUnavailableReason: portraitUnavailableReason,
+                portraitSemanticFusion: portraitSemanticFusion,
+                portraitSemanticAnalysis: portraitSemanticAnalysis,
+                portraitSemanticEvidenceDirectory: portraitWritten ? sharedSemanticDirectory : nil,
+                preferredPhotoIdentifier: photoIdentifier,
+                styleDataProducer: options.styleDataProducer,
+                rawDNGURL: options.rawDNGURL,
+                rawSceneInputManifest: nil,
+                debugRootURL: options.debugRootURL
             )
         }
-
-        options.eventHandler?(.phaseChanged(.generatingPhotographicStyles))
-        options.eventHandler?(.phaseChanged(.writingContainer))
-        try augmentPhotographicStyles(
-            sourceURL: inputURL,
-            standardHDRURL: featureInputURL,
-            outputURL: outputURL,
-            portraitRequested: options.features.portrait,
-            portraitWritten: portraitWritten,
-            portraitUnavailableReason: portraitUnavailableReason,
-            portraitSemanticFusion: portraitSemanticFusion,
-            portraitSemanticAnalysis: portraitSemanticAnalysis,
-            portraitSemanticEvidenceDirectory: portraitWritten ? sharedSemanticDirectory : nil,
-            preferredPhotoIdentifier: photoIdentifier,
-            debugRootURL: options.debugRootURL
-        )
-        options.eventHandler?(.phaseChanged(.verifyingOutput))
         if let portraitManifestURL, FileManager.default.fileExists(atPath: portraitManifestURL.path) {
             let destination = outputURL.deletingPathExtension()
                 .appendingPathExtension("portrait-manifest.json")
             try? FileManager.default.removeItem(at: destination)
             try FileManager.default.moveItem(at: portraitManifestURL, to: destination)
-            options.eventHandler?(.diagnostic("portrait manifest=\(destination.path)"))
+            print("portrait manifest=\(destination.path)")
         }
     }
 
@@ -3441,6 +3875,9 @@ package enum ApplePhotographicStylesPipeline {
         portraitSemanticAnalysis: AppleSemanticSceneAnalysis?,
         portraitSemanticEvidenceDirectory: URL?,
         preferredPhotoIdentifier: String,
+        styleDataProducer: AppleStyleDataProducerMode,
+        rawDNGURL: URL?,
+        rawSceneInputManifest: [String: Any]?,
         debugRootURL: URL?
     ) throws {
         let augmentStartedAt = CFAbsoluteTimeGetCurrent()
@@ -3467,6 +3904,16 @@ package enum ApplePhotographicStylesPipeline {
             at: evidenceDirectory,
             withIntermediateDirectories: true
         )
+        if let rawSceneInputManifest {
+            let rawSceneInputData = try JSONSerialization.data(
+                withJSONObject: rawSceneInputManifest,
+                options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            )
+            try rawSceneInputData.write(
+                to: evidenceDirectory.appendingPathComponent("raw-scene-input.json"),
+                options: .atomic
+            )
+        }
         if let portraitSemanticFusion {
             let fusionData = try JSONSerialization.data(
                 withJSONObject: portraitSemanticFusion,
@@ -3568,15 +4015,18 @@ package enum ApplePhotographicStylesPipeline {
         let styleDirectory = evidenceDirectory.appendingPathComponent("styles", isDirectory: true)
         let stylePayloadStartedAt = CFAbsoluteTimeGetCurrent()
         let stylePayload: ApplePhotographicStylePayload
-        let preliminaryPayload = try buildStylePayload(
-            sourceURL: sourceURL,
-            standardHDRURL: featureGraphURL,
-            semantics: analysis,
-            portraitWritten: portraitWritten,
-            outputDirectory: styleDirectory
-                .appendingPathComponent("preliminary-identity", isDirectory: true),
-            photoIdentifier: photoIdentifier
-        )
+        if styleDataProducer == .constrainedSolver {
+            let preliminaryPayload = try buildStylePayload(
+                sourceURL: sourceURL,
+                standardHDRURL: featureGraphURL,
+                rawDNGURL: rawDNGURL,
+                semantics: analysis,
+                portraitWritten: portraitWritten,
+                outputDirectory: styleDirectory
+                    .appendingPathComponent("preliminary-identity", isDirectory: true),
+                photoIdentifier: photoIdentifier,
+                producerMode: .identityFallback
+            )
             let preliminaryURL = evidenceDirectory.appendingPathComponent(
                 "constrained-solver-preliminary-identity.heic"
             )
@@ -3600,12 +4050,24 @@ package enum ApplePhotographicStylesPipeline {
                     identityStylePropertyList: preliminaryPayload.stylePropertyList,
                     outputDirectory: solverDirectory
                 )
-        stylePayload = try replacingStyleData(
-            in: preliminaryPayload,
-            with: selectedStyleData,
-            sourceURL: sourceURL,
-            outputDirectory: solverDirectory
-        )
+            stylePayload = try replacingStyleData(
+                in: preliminaryPayload,
+                with: selectedStyleData,
+                sourceURL: sourceURL,
+                outputDirectory: solverDirectory
+            )
+        } else {
+            stylePayload = try buildStylePayload(
+                sourceURL: sourceURL,
+                standardHDRURL: featureGraphURL,
+                rawDNGURL: rawDNGURL,
+                semantics: analysis,
+                portraitWritten: portraitWritten,
+                outputDirectory: styleDirectory,
+                photoIdentifier: photoIdentifier,
+                producerMode: styleDataProducer
+            )
+        }
         // Keep one producer-independent final metadata path in every run.
         // The constrained solver validates inside styles/constrained-solver;
         // without this canonical copy, downstream evidence auditors saw only
@@ -3756,7 +4218,9 @@ package enum ApplePhotographicStylesPipeline {
             "applePortraitWritten": portraitWritten,
             "applePortraitUnavailableReason": portraitUnavailableReason.map { $0 as Any } ?? NSNull(),
             "styleProfile": "iPhone18,1/23F84-zero-residual",
-            "styleDataProducer": "constrained-solver",
+            "styleDataProducer": styleDataProducer.rawValue,
+            "rawDNGURL": rawDNGURL.map { $0.path as Any } ?? NSNull(),
+            "rawSceneInput": rawSceneInputManifest ?? NSNull(),
             "researchSemanticGraphMode": researchSemanticOverride?.mode.rawValue as Any? ?? NSNull(),
             "debugRoot": debugRootURL.map { $0.path as Any } ?? NSNull(),
         ]
@@ -3803,7 +4267,9 @@ package enum ApplePhotographicStylesPipeline {
                 "scenePayloadCopied": false,
                 "styleDataSource": stylePayload.resourceProvenance["styleData"]?.producer
                     ?? "unknown",
-                "linearThumbnailSource": "same-input final-HEIC behavior proxy; Apple capture-time pre-LTM source unavailable",
+                "linearThumbnailSource": stylePayload.resourceProvenance["linearThumbnail"]?.detail
+                    ?? "same-input final-HEIC behavior proxy; Apple capture-time pre-LTM source unavailable",
+                "rawAssisted": rawDNGURL != nil,
                 "styleDeltaSource": "profile-scoped neutral protocol tuning",
             ],
             "donorContamination": contaminationReport,

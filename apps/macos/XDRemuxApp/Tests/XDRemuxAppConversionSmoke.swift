@@ -1,6 +1,4 @@
 import Foundation
-import XDRemuxCore
-import XDRemuxAppleFeatures
 
 enum ConversionSmokeError: Error, CustomStringConvertible {
     case usage
@@ -76,13 +74,7 @@ struct XDRemuxAppConversionSmoke {
             }
         }
 
-        _ = try AppleFeatureConversionEngine.convert(
-            ConversionRequest(
-                input: InputSource(url: inputURL),
-                output: OutputDestination(url: outputURL),
-                configuration: config
-            )
-        )
+        try AppConversionEngine.convert(inputURL: inputURL, outputURL: outputURL, config: config)
         print(outputURL.path)
     }
 }

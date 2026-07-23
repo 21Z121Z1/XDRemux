@@ -4,11 +4,13 @@ import platform
 import re
 import struct
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SWIFT_SOURCE = ROOT / "xdremux" / "swift-cli" / "XDRemux.swift"
 PORTRAIT_SOURCE = (
     ROOT
     / "Sources"
@@ -46,20 +48,22 @@ class PortraitTranslationCoreTests(unittest.TestCase):
 
     @unittest.skipUnless(platform.system() == "Darwin", "Swift/ImageIO CLI is macOS-only")
     def test_swift_rend_parser_and_per_scene_builder(self) -> None:
-        subprocess.run(
-            ["swift", "build", "--product", "xdremux-dev"],
-            cwd=ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        completed = subprocess.run(
-            [str(ROOT / ".build" / "debug" / "xdremux-dev"), "portrait-self-test"],
-            cwd=ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        with tempfile.TemporaryDirectory(prefix="xdremux-portrait-test-") as directory:
+            executable = Path(directory) / "XDRemux"
+            subprocess.run(
+                ["xcrun", "swiftc", "-O", str(SWIFT_SOURCE), "-o", str(executable)],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            completed = subprocess.run(
+                [str(executable), "portrait-self-test"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
         report = json.loads(completed.stdout)
         self.assertTrue(report["passed"])
         self.assertTrue(report["byteStableRoundTrip"])

@@ -19,6 +19,11 @@ public enum XDRemuxError: Error, CustomStringConvertible {
     case inputNotFound(URL)
     case noFilesMatched(URL, String)
     case unableToRead(URL)
+    case unableToReadCheckpoint(URL)
+    case unableToWriteCheckpoint(URL)
+    case invalidCheckpoint(URL, String)
+    case checkpointConfigMismatch(URL, expected: String, actual: String)
+    case batchFailed(failures: Int, checkpoint: URL)
     case unableToCreateDirectory(URL)
     case outputParentIsNotDirectory(URL)
     case outputPathCollision(output: URL, firstInput: URL, secondInput: URL)
@@ -55,6 +60,16 @@ public enum XDRemuxError: Error, CustomStringConvertible {
             return "no files matched \(glob) under \(url.path)"
         case .unableToRead(let url):
             return "unable to read file: \(url.path)"
+        case .unableToReadCheckpoint(let url):
+            return "unable to read checkpoint: \(url.path)"
+        case .unableToWriteCheckpoint(let url):
+            return "unable to write checkpoint: \(url.path)"
+        case .invalidCheckpoint(let url, let message):
+            return "invalid checkpoint \(url.path): \(message)"
+        case .checkpointConfigMismatch(let url, let expected, let actual):
+            return "checkpoint config mismatch in \(url.path): expected \(expected), got \(actual) (use --no-resume or a different --checkpoint)"
+        case .batchFailed(let failures, let checkpoint):
+            return "batch failed for \(failures) file(s); checkpoint kept at \(checkpoint.path)"
         case .unableToCreateDirectory(let url):
             return "unable to create directory: \(url.path)"
         case .outputParentIsNotDirectory(let url):
@@ -177,6 +192,23 @@ public struct AppleFeatureOptions: Hashable, Sendable {
     }
 }
 
+public enum AppleStyleDataProducerMode: String, CaseIterable, Sendable, Hashable {
+    case unspecified
+    case constrainedSolver = "constrained-solver"
+    case learnNodeDiagnostic = "learn-node"
+    case identityFallback = "identity-fallback"
+
+    public var resolvedForPhotographicStyles: Self {
+        self == .unspecified ? .constrainedSolver : self
+    }
+}
+
+public enum ConversionEvent: Equatable, Sendable {
+    case diagnostic(String)
+}
+
+public typealias ConversionEventHandler = @Sendable (ConversionEvent) -> Void
+
 public struct ConversionConfiguration: Sendable {
     public var family: Family
     public var outputDirectory: URL?
@@ -190,8 +222,9 @@ public struct ConversionConfiguration: Sendable {
     public var maxConcurrentJobs: Int
     public var applePhotographicStyles: Bool
     public var applePortrait: Bool
+    public var appleStylesRawDNGURL: URL?
+    public var appleStyleDataProducer: AppleStyleDataProducerMode
     public var eventHandler: ConversionEventHandler?
-    public var cancellation: ConversionCancellation?
 
     public init(
         family: Family = .auto,
@@ -206,8 +239,9 @@ public struct ConversionConfiguration: Sendable {
         maxConcurrentJobs: Int = min(ProcessInfo.processInfo.activeProcessorCount, 4),
         applePhotographicStyles: Bool = false,
         applePortrait: Bool = false,
-        eventHandler: ConversionEventHandler? = nil,
-        cancellation: ConversionCancellation? = nil
+        appleStylesRawDNGURL: URL? = nil,
+        appleStyleDataProducer: AppleStyleDataProducerMode = .unspecified,
+        eventHandler: ConversionEventHandler? = nil
     ) {
         self.family = family
         self.outputDirectory = outputDirectory
@@ -221,8 +255,9 @@ public struct ConversionConfiguration: Sendable {
         self.maxConcurrentJobs = maxConcurrentJobs
         self.applePhotographicStyles = applePhotographicStyles
         self.applePortrait = applePortrait
+        self.appleStylesRawDNGURL = appleStylesRawDNGURL
+        self.appleStyleDataProducer = appleStyleDataProducer
         self.eventHandler = eventHandler
-        self.cancellation = cancellation
     }
 
     public var appleFeatureOptions: AppleFeatureOptions {

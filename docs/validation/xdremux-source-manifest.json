@@ -1,40 +1,32 @@
 {
   "files": [
     {
-      "path": ".github/workflows/ci.yml",
-      "sha256": "e40359ed926a0f8f319dd507e795ad76b58487d5ba4674383a7be1988c856620"
-    },
-    {
-      "path": ".github/workflows/docs.yml",
-      "sha256": "9d54986f5892b912f8a02b82bbc011ef791da9408b41fe3dd917afe4b027f39e"
-    },
-    {
-      "path": ".github/workflows/policy.yml",
-      "sha256": "27ce5c99be9c7b844b3e0ae57a4e682d26259a3ed574c9d2a776e3b418585767"
-    },
-    {
       "path": ".gitignore",
       "sha256": "72763b3a8df0f327786537ffd07876c0c2b2b6909a2ab45ce3031d17425eb4e6"
     },
     {
       "path": "AGENTS.md",
-      "sha256": "21a5fe3cfe2a6ef1cb924810c791552425fba6561ca05a0542b3425443bb3a85"
+      "sha256": "9061fb785fa824c833d6bca146d5f1947c85b4cb9cc4bbff6d0351823abfd0b0"
     },
     {
       "path": "Package.swift",
-      "sha256": "adc4a9f9a485b1b925946235e42cc037202a4f69f854e623a87878af3136dbb3"
+      "sha256": "c86b6f958d27e067f16067f122ab75a4359e3492ea8401297ae8ee2816a946c6"
     },
     {
       "path": "README.en.md",
-      "sha256": "06ab94726ac610f43b6038087d3c0f5e07698ec4dfdec999df1313fb0d7b0b41"
+      "sha256": "f815fde251bca43c222a412770b77a329330a6a9f9ed3afa788574f76545688f"
     },
     {
       "path": "README.md",
-      "sha256": "101e13e4c9d122efcf8ae9d6f1bd1d745287b616feb9e45ef7410ab9b0745335"
+      "sha256": "cf02269972a3d64307a6ef168e1f66d59036aea69cb390208cb3d4e652697ec0"
+    },
+    {
+      "path": "Sources/CoreImageRAWDiagnostics/main.swift",
+      "sha256": "e5e7ba9e5200417485bea524a9432e7bcfded75ebbfeb3eeee2bcbaa1fa88d53"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/AppleFeatureConversionEngine.swift",
-      "sha256": "16fb2302b442a5d5d16d14fb3883bfccb57e3d9f1dc02f78c6e7c246bd7c16b3"
+      "sha256": "79dcec7feb34ff8d51b1f25814c07442838659eb9a4c000bf6fb61f592cb3120"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/Encoding/AppleEncodingAudit.swift",
@@ -42,27 +34,43 @@
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/PhotographicStyles/ApplePhotographicStylesPipeline.swift",
-      "sha256": "9bb3bb4e219552c2162c34598609e57d16d461799a92c0d8baa74338602b0478"
+      "sha256": "cd4edb839e4bbeee7b828792988056f861f10cb23e6dd99aff023c6896354516"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/PhotographicStyles/AppleStyleDataProducer.swift",
-      "sha256": "ebf02d488a2d85dee7434ae39beaf7ac51705d2ade49281155c8e52090b9bc67"
+      "sha256": "a17b9ceead99877fc4c4dd53502992ec2f04a23c34941a468ff5805f418793cd"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/PhotographicStyles/ConstrainedPolynomialStyleDataProducer.swift",
-      "sha256": "8c6261184ffa5495d0aeae1fdf37c4f72af7ff2649d3ca85e161c86ebd5ab5df"
+      "sha256": "f9f20dd7738f67c9316718f437a932b789d092399bbefbb8af14327f0f2e8be2"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/Portrait/PortraitConversionPipeline.swift",
-      "sha256": "4ddcf6f334d4b59497cd2c997cc9359c2d753934a8dee9d701bdd15325fd3786"
+      "sha256": "8ce98ca26c63d49ada0ff5790b076580ddbbaef4fe573e1c4fd827cf76ddfaf0"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/Portrait/PortraitModels.swift",
       "sha256": "e72668a5a1d42f3cb06ac9679a379493b75ac42b97ba1c9d4b05a1387157cea7"
     },
     {
+      "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Native/apple_style_scene_payload_probe.m",
+      "sha256": "ed5a79ef9ab23753ec26ab871856cde3f190a81bebc83ae2c42cd7f154dec33a"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Native/apple_vision_semantic_mattes.swift",
+      "sha256": "6bf698f038ebc9131f18d6f6c65f6c5b48b4bf041d5ffbb4e398ff539a4b8997"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Native/learnnode_coefficient_probe.m",
+      "sha256": "3f805a964ace044ee5272389c0f5a6eedd41b9bec17e23ebc2c378667c2bb660"
+    },
+    {
       "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Validation/apple_auxiliary_matte_probe.m",
       "sha256": "77412c3c9cdd01e9ac36351fb5c0ccf98d98837610c681158ffca70668c4c03b"
+    },
+    {
+      "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Validation/apple_semantic_style_properties_probe.m",
+      "sha256": "d32e643f15470311f37b1c8cc81a689ff9f645c104cbcb37b99312b96239e2a4"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Validation/patch_heif_exif_orientation.swift",
@@ -74,7 +82,7 @@
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleNativeToolchain.swift",
-      "sha256": "0e8c7749da7677950e6c410e1cf22758fe3fd40d1e4b693edc553d90aa1397a3"
+      "sha256": "55789b2312dc58411982f6a77d603ef3631157c05caa3b601e826cf1fc278831"
     },
     {
       "path": "Sources/XDRemuxAppleFeatures/SemanticScene/AppleSemanticScaffoldBuilder.swift",
@@ -85,52 +93,36 @@
       "sha256": "337244548726b492c5b18e73bbcb15867a82e19b2289dda995c19f8dfa0bba39"
     },
     {
-      "path": "Sources/XDRemuxCLI/Commands/BatchCoordinator.swift",
-      "sha256": "d619e924104f7a1964c81163d6bbff40729353fe7415f554699b461f2d30b025"
+      "path": "Sources/XDRemuxCLI/Commands/CLIOutput.swift",
+      "sha256": "fb26e55ba5a61599f1f4feffc1adb71f65e7c037c6777c66c5deeb2e3b2ab0dd"
     },
     {
       "path": "Sources/XDRemuxCLI/Commands/XDRemuxCommand.swift",
-      "sha256": "103c90fd0d16981f74724184f53ee9a7a9353f7f154fb3938722625f5cadc27b"
-    },
-    {
-      "path": "Sources/XDRemuxCLI/Localization/Localizer.swift",
-      "sha256": "710087380d7a259c15b571c35ca76127d440e5a9c6e392afc4305bafd8e3df07"
-    },
-    {
-      "path": "Sources/XDRemuxCLI/Output/CLIOutput.swift",
-      "sha256": "3c42dea7e27a8c738000ad8ca92825000c7bfb5f4f2b280ee6be01a51bb4b891"
+      "sha256": "c20187e827fb338beb74d3f2e58d9d67ed715b861a5d5cc2171a990281cd7f1f"
     },
     {
       "path": "Sources/XDRemuxCLI/Parsing/CommandModels.swift",
-      "sha256": "39fcf8a2da0bb9413b09b2b9b6ac561e1ef34154431f6e871880315a087c1860"
+      "sha256": "a569d9b2028e81c6239982fccb53675a776aa2fcdd6d1b38d949d631b6f4dcf8"
     },
     {
       "path": "Sources/XDRemuxCLI/Parsing/ConversionArgumentParser.swift",
-      "sha256": "cd3278a4881730f240a8dc25b2a88c29c68247ff00e8a958addae9cc9261a203"
+      "sha256": "d16c10b7e617ee135fc5cec713621062e83a8e78114c2d45cf8ea7e0ad5d1a92"
     },
     {
-      "path": "Sources/XDRemuxCLI/Resources/en.lproj/Localizable.strings",
-      "sha256": "e039a9e1257b2f0007fe8aca72672273de4bb0e2c55cc7013ebb355d89d609e2"
-    },
-    {
-      "path": "Sources/XDRemuxCLI/Resources/zh-Hans.lproj/Localizable.strings",
-      "sha256": "eb32a2766e72f199fe3466eb6f64e34b34d4c90710646cb1f032a44bfbc91868"
+      "path": "Sources/XDRemuxCLI/main.swift",
+      "sha256": "d3645bf19ebe18f22dd7bc2674853435a2ccad957cec4606637b5e54668aaecc"
     },
     {
       "path": "Sources/XDRemuxCore/Batch/BatchModels.swift",
-      "sha256": "6ab9c8371c5e70994e1acfe43fd6b551e8f14b5be9ba18771458fb43efdaf6a0"
+      "sha256": "3a000cdcef11416ec3f731d2842cd4af636dbcc8a46dc0803dc6c330f6cebd43"
     },
     {
       "path": "Sources/XDRemuxCore/Conversion/ConversionEngine.swift",
-      "sha256": "2c91c0b5d51d3d6a5d68335aa759b1ba37c31908d158260a971886a401870125"
-    },
-    {
-      "path": "Sources/XDRemuxCore/Conversion/Events.swift",
-      "sha256": "80afb71306829773a454a0604b5c864495bfc7f04a3f2bff3b2e64419ecc8445"
+      "sha256": "30143152a1e6ed2f89d24344a41cd3142be2a446fd61470930e8a383cbcb6139"
     },
     {
       "path": "Sources/XDRemuxCore/Conversion/Models.swift",
-      "sha256": "4b57adf0d36a51ac8ea1533f76cdac95b20cef0cee27f49b3d1db9b9cba119d7"
+      "sha256": "a1e55c4486b43231bdc4b2b7e15ee0e6183117a0d9ae47159c9de4808e345d4f"
     },
     {
       "path": "Sources/XDRemuxCore/HDR/HDRPipeline.swift",
@@ -142,7 +134,7 @@
     },
     {
       "path": "Sources/XDRemuxCore/HEIF/DirectTiledHEVCGainMapEncoder.swift",
-      "sha256": "742ea1bd9c45b0f2b236698e8d309eb5e2a42356e58134dfa75cef8a1b2aa19d"
+      "sha256": "31dde8bc5f8ec87ed3538991a011f685ec7a0a7753f5499c244ce2660137ac1c"
     },
     {
       "path": "Sources/XDRemuxCore/HEIF/EncodingQualityPolicy.swift",
@@ -161,92 +153,36 @@
       "sha256": "2b6dea0f69e5538bb52fd060d9d6f4d9c9173b451f570be73db907d97621a053"
     },
     {
-      "path": "Sources/XDRemuxDevExecutable/main.swift",
-      "sha256": "d2daadc3ec57362ebea4fee4a9a6b5a80bfb75c7eb1b16c962741c855442bb40"
+      "path": "Sources/XDRemuxCore/RAW/CoreImageRAW.swift",
+      "sha256": "bb7aa88885e1b89381b678d80b99cb355f9a086a2a52cb7ee08b964fdb0957fd"
     },
     {
-      "path": "Sources/XDRemuxExecutable/main.swift",
-      "sha256": "811bb8392593fab3e1803b312d5627e2ab3a637702083f3c533625e5260349e6"
-    },
-    {
-      "path": "Sources/XDRemuxHEVCEncoderHelper/main.swift",
-      "sha256": "8a7c037e1f39be122cbcc5c26a0aa10bb323b953a865d710db06fd2e3db643d1"
-    },
-    {
-      "path": "Sources/XDRemuxSemanticHelper/main.swift",
-      "sha256": "16c3c682f1f7644c8ebb1bd01bf2f172d4bd384056f502c98bd4d76a0e08a51c"
-    },
-    {
-      "path": "Sources/XDRemuxStyleScenePayloadHelper/StyleRenderer.m",
-      "sha256": "1cd0da24e1cce8bc08ccb13b1c2fcd34bf34babf8bdf54c3e8c5b3a808334b06"
-    },
-    {
-      "path": "Sources/XDRemuxStyleScenePayloadHelper/main.m",
-      "sha256": "cc9d205cc8ca7f473ed3fa226e4a935dcf63ca6d4fd47b831f27551bc051946e"
-    },
-    {
-      "path": "Sources/XDRemuxStyleValidationHelper/main.m",
-      "sha256": "d32e643f15470311f37b1c8cc81a689ff9f645c104cbcb37b99312b96239e2a4"
+      "path": "Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift",
+      "sha256": "b4d0d99920debd99a4a80abcf8f96c71ef6d043a25ac0b099c9a75751e052955"
     },
     {
       "path": "Tests/README.md",
-      "sha256": "3e0eaf82e8770bd9e7e7eee60d6655d3bf23dcf51e532db91386d4fe8c6661db"
+      "sha256": "b134407c4b08b5001613b8b54ac5aed98fa18d8b77815ffa95b2ef1d4a040c9f"
     },
     {
       "path": "Tests/XDRemuxAppleFeaturesTests/AppleFeatureContractTests.swift",
-      "sha256": "432e81815fdf1ec1421dc57b5d41043e4b951c7708b84a7a19dfffca8a598648"
-    },
-    {
-      "path": "Tests/XDRemuxCLITests/BatchCoordinatorTests.swift",
-      "sha256": "f62349cdb1135ae3b4bbba897049e0e88bb2972827be740d93ce118cf66d6ff4"
+      "sha256": "dce7e11271399c8d5a65ee1e245ab4fc0e6cc4ea15324b2f8c66ccf3295bb338"
     },
     {
       "path": "Tests/XDRemuxCLITests/ConversionArgumentParserTests.swift",
-      "sha256": "dcecca762c72545d8a2036b89e22ab6a0b149e0197271033a02bdaf50888c1bb"
-    },
-    {
-      "path": "Tests/XDRemuxCLITests/LocalizationTests.swift",
-      "sha256": "4b1e73893d890efe5fd54a3c32abbe937c04e38803569f15c0ee687dc40fa06b"
-    },
-    {
-      "path": "Tests/XDRemuxCLITests/OutputRendererTests.swift",
-      "sha256": "43afb2940c342eaa547c0e4516b5f7172e35f1760b575bfe5706af7c002459cc"
-    },
-    {
-      "path": "Tests/XDRemuxCoreTests/CoreContractTests.swift",
-      "sha256": "8337dd8b555849e33dd657a5fbf4598fd1377e67bbd8d21cd0a81b4727e7fd98"
-    },
-    {
-      "path": "Tests/test_apple_vt_hevc_encoder.py",
-      "sha256": "d7fff1d0d5b301de3676f5c8daebd52ab17a69a0115e561406190b18e725fa77"
-    },
-    {
-      "path": "Tests/test_build_and_run_script.py",
-      "sha256": "40f45008beab755339de0be38d860d949c5a836c5041ad522534154e52e09d2e"
+      "sha256": "fefe8a497eecac7cf8d48026278a4f6e66a9452d81e59550ba619ab32ffec3e0"
     },
     {
       "path": "Tests/test_portrait_translation_core.py",
-      "sha256": "f7690abd63e4df49bd754be6d73baedc315b346960210cf703a820bb5791c4cb"
-    },
-    {
-      "path": "Tests/test_public_documentation.py",
-      "sha256": "c272e4d35284c4a006590cacc442c25f8c07fb31972284a5743085e46d9cf5a3"
+      "sha256": "507e33f351bfbc014d427ac0263baf0b537118dde0c257db6d41fc2e28cbf392"
     },
     {
       "path": "Tests/test_python_tail_policy.py",
       "sha256": "b4322ae8be23a71797ee229ae4e132ab5c306e4dfa4fd819a42ffea381de6c61"
     },
     {
-      "path": "Tests/test_swift_app_architecture.py",
-      "sha256": "1c8a8a39a4296f94e764356ad58cb3e22c70b8ff1052628dfaa9264985c8a069"
-    },
-    {
       "path": "Tests/test_swift_apple_semantic_policy.py",
-      "sha256": "a8890f773b0157ae7a86a757d080b7ff9e551337940f71fbefdc44914c389181"
-    },
-    {
-      "path": "Tests/test_swift_apple_styles_writer_policy.py",
-      "sha256": "71bbd438f4995373dfff54f67b07f56574a34cb356b9687cd1891711203c6c39"
+      "sha256": "2043827824c6d6aa1045f549bb62d214a6c382558eeb441815698c9db0c87a63"
     },
     {
       "path": "Tests/test_swift_artifact_lifecycle.py",
@@ -254,19 +190,15 @@
     },
     {
       "path": "Tests/validation/test_agent_completion_gate.py",
-      "sha256": "969d849973263a89a7fee5d556c4e4af93fe917e17fba775d3e18be534233204"
+      "sha256": "424e7b46067af5ecd837db279d9b30dadc9adf4c15d4c5255e92457edf86cdb3"
     },
     {
       "path": "Tests/validation/verify_apple_feature_artifact_lifecycle.py",
-      "sha256": "52310b973f71ee156cd6e2c924f6f9af3e80842dad01bfa98feea3a0e49726e5"
-    },
-    {
-      "path": "Tests/validation/verify_cli_sigint_cursor.py",
-      "sha256": "ebc357520030bfca0513adf174a3bd7503d7154b2c7552b660509ca58f4408a0"
+      "sha256": "cc19ab03ef704240f04022e2b3cf0e9284535762509de4569198a1a176ddcef5"
     },
     {
       "path": "Tests/validation/verify_swift_cli_sample.py",
-      "sha256": "fff68df543b0aef25341756af4dd50374c5814b3c13ffa1f0aa46f1362f6d76f"
+      "sha256": "6a8c86cb25296f5dc04f79a349d802f1346370d318b4ad81a07adb68fdcafb8f"
     },
     {
       "path": "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/Contents.json",
@@ -318,11 +250,11 @@
     },
     {
       "path": "apps/macos/XDRemuxApp/Sources/AppStrings.swift",
-      "sha256": "5cea168a70ef92ec0a4b3d1395105ede265c47c140e9617776fc3fc918016cf5"
+      "sha256": "1637138fb2adab7b569ebdaf62a29889d65be0d885ab6482a79887c06cc1250e"
     },
     {
       "path": "apps/macos/XDRemuxApp/Sources/ContentView.swift",
-      "sha256": "bb2f0966816bf8c0090311550e1b3941ef5b9c0a18cda71e33bdb19a944ee950"
+      "sha256": "4a6f781cd2ffc8756702efbeb59d4e0bb91761124e13804539a4bbe9adf20eae"
     },
     {
       "path": "apps/macos/XDRemuxApp/Sources/VisualEffectView.swift",
@@ -333,20 +265,24 @@
       "sha256": "7cfd2ca89dfa0c72e4eadae7d08af8e528dee54f9c6d173716be70c17fab78bc"
     },
     {
+      "path": "apps/macos/XDRemuxApp/Sources/XDRemuxCore.swift",
+      "sha256": "b64e19e8ead3919759b6b28f6f08a95a60663eec05fff2aca4c26eea108cb366"
+    },
+    {
       "path": "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift",
-      "sha256": "1e5af4889900121854aa5d7f0f9c15094d1cec014c8e7697f739255b047b6680"
+      "sha256": "6482721eb63f440cca4d003c0865ca1a1c7af1cc7ebeabe82c2752c0d47b530c"
     },
     {
       "path": "apps/macos/XDRemuxApp/Tests/XDRemuxAppConversionSmoke.swift",
-      "sha256": "69c474618d56a77cb48f97132b961532b7f2ce34eae8d8eda72b7f8a27b3b330"
+      "sha256": "5d85ad0ec6300cc911f20a74717110ca96dd21d0cd2cd653c5e1f94d17a4e5b1"
     },
     {
       "path": "apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift",
-      "sha256": "1e0ec816045c5b88b3be0005cc0ee1dd6b08baa9687fe8ec51210fde4302a866"
+      "sha256": "751a50fbb4241b4c6790c7671ba2da286478d046fd20b844fcb4fcd9b5afad2d"
     },
     {
       "path": "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj",
-      "sha256": "d5054173af833784fb4e09af8c150dc4c2037401f6e5da4e47336526a00b8974"
+      "sha256": "405174054819e4baf42ad4f3ca441e53ca8183dec3b749b1129173ac2a0b179f"
     },
     {
       "path": "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
@@ -354,39 +290,7 @@
     },
     {
       "path": "apps/macos/XDRemuxApp/project.yml",
-      "sha256": "eee02e08d3f9f1a080ba14da29407af66d304a967a6523ac3214aa799bddc656"
-    },
-    {
-      "path": "docs/README.en.md",
-      "sha256": "3d5c368780d4d22c209c9791b89a2b021f09a01071dfb680d228f7c0ac776414"
-    },
-    {
-      "path": "docs/README.md",
-      "sha256": "dc09d0283d4a441034d72d4e4df0365e6820b0956f5cbdece509272ca4169f15"
-    },
-    {
-      "path": "docs/apple-features.en.md",
-      "sha256": "b741c833459d4c2f3a4f1495c350f0f775f9b43ebf94dbb5b16a8ca2dc241fa4"
-    },
-    {
-      "path": "docs/apple-features.md",
-      "sha256": "403288c9b2bf44efa10a2adc78035aa39d5865cc2a3c547b6067a461d7324d74"
-    },
-    {
-      "path": "docs/cli.en.md",
-      "sha256": "9df98bdd1440e70d1d9d2f250ecb9718124cb0de09797ca82c5670c4a4ae3a1e"
-    },
-    {
-      "path": "docs/cli.md",
-      "sha256": "21930c65223e2b18a33fb3b956129107143e165f76aff3d0cc7123a506db3cba"
-    },
-    {
-      "path": "docs/development.en.md",
-      "sha256": "c000aa35013dbf67c0f24dd1eaf546b46786cfc3b2ce577f08fffd6cb5d44c8e"
-    },
-    {
-      "path": "docs/development.md",
-      "sha256": "7d96c07d7a8e1ca7cf1133c4ab63401c70bf34f5ae911bb204b527259398c9b0"
+      "sha256": "7e7468de0eb7620b81cdc0e8877b5dc2f0e849002c06c87c741be0b971f7c565"
     },
     {
       "path": "docs/quality/evals.md",
@@ -401,60 +305,28 @@
       "sha256": "73a1669437e5a970ad8fbe71b15f62a128cfc5d344a4b713a60841302e21f445"
     },
     {
-      "path": "docs/supported-devices.en.md",
-      "sha256": "aebecd266a58faea944405db82ff1f407d453291a379f1f976d2460f46daa094"
-    },
-    {
-      "path": "docs/supported-devices.md",
-      "sha256": "81e9a4763a0f95a56ecd81a8efbb3148c435361a46c9dee41705bd8edc1c1dc2"
-    },
-    {
       "path": "docs/validation/README.md",
-      "sha256": "23ee574b2250f104b230aa7407c2c601e29d9ca427b31b4dbf5f59861f5911da"
+      "sha256": "5706697eba6f750bd0db9ad53b88d87012ea6adef6a3b988994b448c657e03cf"
     },
     {
       "path": "docs/validation/encoding-quality-pareto-20260718.md",
       "sha256": "8c8cca2490e79d09b1b536b749115078560265d079333dd7837f614cbeb2c419"
     },
     {
-      "path": "docs/xdremux/README.en.md",
-      "sha256": "a23a7f2780f6ab6a0f5ee2a8cad127731e378b132f1030fe55a554dc998fd0f9"
-    },
-    {
       "path": "docs/xdremux/README.md",
-      "sha256": "31c27fc80d4e6b7c0cf6ca256e4f79b887d2d31582cb06b3fd2ae58f833e8bfc"
+      "sha256": "d1bdf9e8f456843bf64236c579d59ea88fa00dc4c32e96ef51bc85fbf180086e"
     },
     {
       "path": "docs/xdremux/iso-conformance-audit-20260511.md",
       "sha256": "eacd870f5ac2c78dda2818e60df2cb26501ae4f7c5d254b86ce26319307e7966"
     },
     {
-      "path": "fixtures/README.md",
-      "sha256": "1d846ac4cfaaeb46148832d8519e6ae00ef41e02929828c8a310fe9c80144c4f"
-    },
-    {
-      "path": "scripts/README.md",
-      "sha256": "895649f7983f59ea6011f2aec8f6241e0a2808d5476193ec29e137ca43b8f027"
-    },
-    {
       "path": "scripts/agent_completion_gate.py",
-      "sha256": "260a1eee372b01af2be3cea56aca38cb39578ffb609af86972c7027a8e4b637f"
-    },
-    {
-      "path": "scripts/build_and_run.sh",
-      "sha256": "0c6d70090c90a988eb73328dbe64b1038acf8662a6ca8117f4f06c5e50f430b0"
-    },
-    {
-      "path": "scripts/compare_oppo_heif_mutation.py",
-      "sha256": "9a1aded60358370a61efdb644a2d478e05bffb032e911efa1cf80a3d366a8f12"
-    },
-    {
-      "path": "scripts/inspect_oppo_heif.py",
-      "sha256": "6b0b5391cbfa3843dd78a08393376b09bf8eec6672a5995d1ef2fac4a9f66f87"
+      "sha256": "7536cadb04eeb194cba7b155f211c2a1c8e546e73c940dbca7ed31a434a267e3"
     },
     {
       "path": "xdremux/README.md",
-      "sha256": "ad562cb3ba224e3b9c6cb75de67a4a004f17da73ec4d74edc3ce588f02ea1459"
+      "sha256": "9821118dcd19ced168027b6a38753fa1eb3c2fbb297a2eda23e93c90a0cfc183"
     },
     {
       "path": "xdremux/python/XDRemux.py",
@@ -478,7 +350,7 @@
     },
     {
       "path": "xdremux/python/heif_io.py",
-      "sha256": "ebd16290f8f7b7d7f6b0aa014a8fba390655db458035fd608822437406199a05"
+      "sha256": "c36e9d2d00deb2ad775f2c8f1d1df705316f5133b442d73223a17aa758d150fb"
     },
     {
       "path": "xdremux/python/iso21496.py",
@@ -494,7 +366,7 @@
     },
     {
       "path": "xdremux/swift-cli/README.md",
-      "sha256": "6c7352c1461d7aba1622ef1ba98a9641ae99f8d4a0ab4396bd327c4d683fb168"
+      "sha256": "2c6c30aa2e3118bc6b3099af2c75c7b9b021e3d00811eeca10795bee1768a827"
     },
     {
       "path": "xdremux/swift-cli/XDRemux.swift",
@@ -510,6 +382,6 @@
     }
   ],
   "schema_version": 1,
-  "source_commit": "5e008838b29a15c81ba6dae1db8f1ec3fd18c984",
-  "source_ref": "5e008838b29a15c81ba6dae1db8f1ec3fd18c984"
+  "source_commit": "82c022b6e894333a989e7965c1b4008b0617e478",
+  "source_ref": "82c022b6e894333a989e7965c1b4008b0617e478"
 }
