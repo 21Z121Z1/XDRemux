@@ -129,6 +129,8 @@ enum AppStrings {
     static let oppoCameraTailPreserveNoHDRHelp = "在完整保留其他业务数据的前提下，等长停用 local.uhdr.*、hdr.*、local.hdr.* 和 src.local.hdr.* manifest key。"
     static let skipExisting = "跳过已有有效输出"
     static let skipExistingHelp = "目标文件已经满足当前 ISO gain map 与 OPPO 相机尾部设置时不重复转换。"
+    static let categorizeOutput = "按拍摄模式分类输出"
+    static let categorizeOutputHelp = "根据源照片的 OPPO UserComment，将转换结果写入普通拍照、大师模式、专业模式、人像等子目录；无法可靠识别的文件保留在输出根目录。"
     static let concurrentJobs = "并发任务"
     static let outputFileSuffix = "输出文件后缀"
     static let outputFileSuffixHelp = "未设置输出目录时，在原目录用这个后缀生成新文件。"

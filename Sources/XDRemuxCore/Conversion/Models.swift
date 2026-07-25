@@ -24,6 +24,7 @@ public enum XDRemuxError: Error, CustomStringConvertible {
     case invalidCheckpoint(URL, String)
     case checkpointConfigMismatch(URL, expected: String, actual: String)
     case batchFailed(failures: Int, checkpoint: URL)
+    case categorizationFailed(failures: Int)
     case unableToCreateDirectory(URL)
     case outputParentIsNotDirectory(URL)
     case outputPathCollision(output: URL, firstInput: URL, secondInput: URL)
@@ -70,6 +71,8 @@ public enum XDRemuxError: Error, CustomStringConvertible {
             return "checkpoint config mismatch in \(url.path): expected \(expected), got \(actual) (use --no-resume or a different --checkpoint)"
         case .batchFailed(let failures, let checkpoint):
             return "batch failed for \(failures) file(s); checkpoint kept at \(checkpoint.path)"
+        case .categorizationFailed(let failures):
+            return "categorize failed for \(failures) file(s)"
         case .unableToCreateDirectory(let url):
             return "unable to create directory: \(url.path)"
         case .outputParentIsNotDirectory(let url):
@@ -220,6 +223,7 @@ public struct ConversionConfiguration: Sendable {
     public var fileNameSuffix: String
     public var skipExisting: Bool
     public var maxConcurrentJobs: Int
+    public var categorizeOutputByCaptureMode: Bool
     public var applePhotographicStyles: Bool
     public var applePortrait: Bool
     public var appleStylesRawDNGURL: URL?
@@ -237,6 +241,7 @@ public struct ConversionConfiguration: Sendable {
         fileNameSuffix: String = "_iso",
         skipExisting: Bool = true,
         maxConcurrentJobs: Int = min(ProcessInfo.processInfo.activeProcessorCount, 4),
+        categorizeOutputByCaptureMode: Bool = false,
         applePhotographicStyles: Bool = false,
         applePortrait: Bool = false,
         appleStylesRawDNGURL: URL? = nil,
@@ -253,6 +258,7 @@ public struct ConversionConfiguration: Sendable {
         self.fileNameSuffix = fileNameSuffix
         self.skipExisting = skipExisting
         self.maxConcurrentJobs = maxConcurrentJobs
+        self.categorizeOutputByCaptureMode = categorizeOutputByCaptureMode
         self.applePhotographicStyles = applePhotographicStyles
         self.applePortrait = applePortrait
         self.appleStylesRawDNGURL = appleStylesRawDNGURL

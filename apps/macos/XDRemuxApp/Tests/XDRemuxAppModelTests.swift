@@ -37,6 +37,10 @@ struct XDRemuxAppModelTests {
     @MainActor
     static func main() async throws {
         try await testImportDiscoversHEICFilesAndDeduplicates()
+        try await testConversionCategorizationMapsModeAndRootDirectories()
+        try await testCategorizationPreviewCopyAndDuplicateRerun()
+        try await testCategorizationDefaultsToEachSourceDirectory()
+        try await testCategorizationCancellationKeepsCancelledState()
         try await testImportedRowsStartWithEmptyThumbnailState()
         try await testOutputCollisionsAreMarkedBeforeConversion()
         try await testOutputPlanFlagsInvalidExistingOutputAsOverwriteRisk()
@@ -51,6 +55,114 @@ struct XDRemuxAppModelTests {
         try testSimplifiedProductSwitches()
         try testIndependentAppleFeatureConfiguration()
         print("XDRemuxAppModelTests passed")
+    }
+
+    @MainActor
+    private static func waitForCategorization(
+        _ viewModel: PhotoCategorizationViewModel,
+        timeout: Duration = .seconds(5)
+    ) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while viewModel.isBusy, clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try expect(!viewModel.isBusy, "categorization operation timed out")
+    }
+
+    @MainActor
+    private static func testConversionCategorizationMapsModeAndRootDirectories() async throws {
+        let root = try makeTempDirectory("conversion-categorize")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let output = root.appendingPathComponent("output", isDirectory: true)
+        let portrait = root.appendingPathComponent("portrait.heic")
+        let unknown = root.appendingPathComponent("unknown.heic")
+        try Data("header-oplus_18-tail".utf8).write(to: portrait)
+        try Data("header-oplus_17179869184-tail".utf8).write(to: unknown)
+
+        let viewModel = XDRemuxViewModel()
+        viewModel.config.outputDirectory = output
+        viewModel.config.categorizeOutputByCaptureMode = true
+        _ = await viewModel.importFiles(from: [portrait, unknown])
+
+        let byName = Dictionary(uniqueKeysWithValues: viewModel.queue.map { ($0.inputURL.lastPathComponent, $0) })
+        try expect(byName["portrait.heic"]?.captureMode == .portrait, "conversion queue should expose the parsed capture mode")
+        try expect(byName["portrait.heic"]?.outputURL == output.appendingPathComponent("人像/portrait.heic"), "categorized conversion should use the mode directory")
+        try expect(byName["unknown.heic"]?.classificationStatus == .unknownFlags, "unknown flags should remain visible in the queue")
+        try expect(byName["unknown.heic"]?.outputURL == output.appendingPathComponent("unknown.heic"), "unclassified conversion should stay at the output root")
+    }
+
+    @MainActor
+    private static func testCategorizationPreviewCopyAndDuplicateRerun() async throws {
+        let root = try makeTempDirectory("standalone-categorize")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let input = root.appendingPathComponent("input", isDirectory: true)
+        let output = input.appendingPathComponent("output", isDirectory: true)
+        try FileManager.default.createDirectory(at: input, withIntermediateDirectories: true)
+        try Data("header-oplus_18-tail".utf8).write(to: input.appendingPathComponent("portrait.heic"))
+        try Data("no user comment".utf8).write(to: input.appendingPathComponent("plain.jpg"))
+
+        let viewModel = PhotoCategorizationViewModel()
+        viewModel.addInputs([input])
+        viewModel.outputDirectory = output
+        viewModel.scan()
+        try await waitForCategorization(viewModel)
+
+        try expect(viewModel.state == .ready, "scan should produce a ready preview")
+        try expect(viewModel.items.count == 2, "preview should include both supported files")
+        try expect(viewModel.categorizedCount == 1 && viewModel.rootCount == 1, "preview counts should separate categorized and root items")
+        try expect(viewModel.modeSummary.contains("人像 1"), "preview should summarize counts by capture mode")
+        try expect(viewModel.items.contains { $0.destinationURL == output.appendingPathComponent("人像/portrait.heic") }, "preview should show the mode destination")
+        try expect(viewModel.items.contains { $0.destinationURL == output.appendingPathComponent("plain.jpg") }, "preview should show the root destination")
+
+        viewModel.copyPlannedFiles()
+        try await waitForCategorization(viewModel)
+        try expect(viewModel.state == .completed, "copy should complete")
+        try expect(FileManager.default.fileExists(atPath: output.appendingPathComponent("人像/portrait.heic").path), "copy should create the categorized file")
+        try expect(FileManager.default.fileExists(atPath: output.appendingPathComponent("plain.jpg").path), "copy should create the root file")
+
+        viewModel.scan()
+        try await waitForCategorization(viewModel)
+        try expect(viewModel.duplicateCount == 2, "a repeated scan should plan both files as duplicates")
+    }
+
+    @MainActor
+    private static func testCategorizationCancellationKeepsCancelledState() async throws {
+        let root = try makeTempDirectory("categorize-cancel")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let input = root.appendingPathComponent("source.heic")
+        try Data("oplus_18".utf8).write(to: input)
+
+        let viewModel = PhotoCategorizationViewModel()
+        viewModel.addInputs([input])
+        viewModel.outputDirectory = root.appendingPathComponent("output", isDirectory: true)
+        viewModel.scan()
+        viewModel.cancel()
+        try await Task.sleep(for: .milliseconds(50))
+        try expect(viewModel.state == .cancelled, "cancel should leave scanning in the cancelled state")
+    }
+
+    @MainActor
+    private static func testCategorizationDefaultsToEachSourceDirectory() async throws {
+        let root = try makeTempDirectory("categorize-source-roots")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let firstDirectory = root.appendingPathComponent("first", isDirectory: true)
+        let secondDirectory = root.appendingPathComponent("second", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondDirectory, withIntermediateDirectories: true)
+        let first = firstDirectory.appendingPathComponent("a.heic")
+        let second = secondDirectory.appendingPathComponent("b.heic")
+        try Data("oplus_18".utf8).write(to: first)
+        try Data("oplus_256".utf8).write(to: second)
+
+        let viewModel = PhotoCategorizationViewModel()
+        viewModel.addInputs([first, second])
+        viewModel.scan()
+        try await waitForCategorization(viewModel)
+
+        let destinations = Set(viewModel.items.map(\.destinationURL))
+        try expect(destinations.contains(firstDirectory.appendingPathComponent("人像/a.heic")), "first input should use its own parent as the classification root")
+        try expect(destinations.contains(secondDirectory.appendingPathComponent("专业模式/b.heic")), "second input should use its own parent as the classification root")
     }
 
     @MainActor

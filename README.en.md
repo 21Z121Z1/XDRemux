@@ -14,6 +14,7 @@ It reads the private HDR Gain Map and related metadata from a photo and repackag
 | OPPO Gallery compatibility | `--oppo-compatible` | Generates a 4:2:0 Gain Map that is easier for OPPO Gallery to recognize |
 | Apple Photographic Styles | `--apple-photographic-styles` | Makes the Photographic Styles editing interface available in Apple Photos |
 | Apple Portrait | `--apple-portrait` | Converts OPPO portrait mode data into portrait mode data supported by Apple Photos |
+| Shooting-mode categorization | `categorize` / `batch --categorize` | Organizes originals or converted results using the shooting mode in UserComment |
 
 Apple Photographic Styles and Apple Portrait can be enabled together and written into the same HEIC. Apple-related output options cannot be used together with `--oppo-compatible`.
 
@@ -190,6 +191,35 @@ For more checkpoint, overwrite, and diagnostic options, run:
 swift run xdremux --help
 ```
 
+## Categorize by shooting mode
+
+Standalone categorization recursively scans HEIC, HEIF, and JPEG files. It only copies photos and never modifies or deletes the sources:
+
+```bash
+swift run xdremux categorize \
+  --input photo_dump/ \
+  --input another_photo.heic \
+  --output-dir categorized/ \
+  --jobs 4
+```
+
+Add `--dry-run` to preview the plan without writing files. Folder names are fixed in Chinese: 普通拍照, 大师模式, RICOH GR, 专业模式, 人像, 夜景, 全景, 延时摄影, 超清, 证件照, 贴纸, 超级文本, 合影, 双重曝光, and 美颜.
+
+Photos with a missing or malformed UserComment, read failures, or only unknown flags with no confirmed primary mode remain in the output root. Malformed comments and read failures are still copied, but the command exits nonzero; missing UserComment and unknown primary modes are not errors. Normal photos and photos containing only known supplemental flags such as HDR, filters, or watermarks go to `普通拍照/`. Identical same-name files are skipped; different same-name files receive stable names such as `filename (2).heic`.
+
+Batch conversion can write converted results directly into shooting-mode folders:
+
+```bash
+swift run xdremux batch \
+  --input-dir photo_dump/ \
+  --output-dir converted/ \
+  --categorize
+```
+
+`convert` does not accept `--categorize`; the switch applies only to `batch`.
+
+Categorization reads EXIF/UserComment from local files only. It does not claim or emulate OPPO Gallery recognition on a device.
+
 ## Validate output
 
 Validate Apple Photographic Styles or combined output:
@@ -217,7 +247,7 @@ Offline validation only proves that the file structure satisfies the current val
 
 ## Python CLI
 
-The Python CLI provides standard HDR and OPPO Gallery-compatible conversion. It does not include Apple Photographic Styles or Apple Portrait features.
+The Python CLI provides standard HDR and OPPO Gallery-compatible conversion plus the same shooting-mode categorization as Swift. It does not include Apple Photographic Styles or Apple Portrait features.
 
 Install the dependencies:
 
@@ -237,6 +267,21 @@ Convert a directory:
 ```bash
 python3 xdremux/python/XDRemux.py batch \
   --input-dir photo_dump/
+```
+
+Standalone categorization and categorized batch output:
+
+```bash
+python3 xdremux/python/XDRemux.py categorize \
+  --input photo_dump/ \
+  --input another_photo.heic \
+  --output-dir categorized/ \
+  --dry-run
+
+python3 xdremux/python/XDRemux.py batch \
+  --input-dir photo_dump/ \
+  --output-dir converted/ \
+  --categorize
 ```
 
 Create OPPO Gallery-compatible output:
@@ -260,6 +305,8 @@ Build and run it locally:
 ```bash
 scripts/build_and_run.sh run
 ```
+
+Use the segmented control at the top of the App to switch between conversion and shooting-mode categorization. The categorization view accepts multiple files and directories, previews mode counts and destination paths, supports copy and cancel, and can reveal results in Finder. Without a shared output directory, each photo's parent directory is its categorization root. The conversion setting for categorized output writes converted files into the same Chinese mode folders.
 
 ## Use as a Swift Package
 

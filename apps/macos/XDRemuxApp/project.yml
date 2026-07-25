@@ -25,3 +25,43 @@ targets:
       INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
       INFOPLIST_KEY_NSPrincipalClass: NSApplication
       GENERATE_INFOPLIST_FILE: YES
+  XDRemuxAppModelTests:
+    type: tool
+    platform: macOS
+    deploymentTarget: 15.0
+    sources:
+      - path: Sources
+        excludes:
+          - ContentView.swift
+          - PhotoCategorizationView.swift
+          - VisualEffectView.swift
+          - XDRemuxApp.swift
+      - path: Tests/XDRemuxAppModelTests.swift
+    dependencies:
+      - package: XDRemux
+        product: XDRemuxCore
+      - package: XDRemux
+        product: XDRemuxAppleFeatures
+    settings:
+      CODE_SIGN_IDENTITY: "-"
+  XDRemuxAppConversionSmoke:
+    type: tool
+    platform: macOS
+    deploymentTarget: 15.0
+    sources:
+      - path: Sources
+        excludes:
+          - ContentView.swift
+          - PhotoCategorizationView.swift
+          - PhotoCategorizationViewModel.swift
+          - VisualEffectView.swift
+          - XDRemuxApp.swift
+          - XDRemuxViewModel.swift
+      - path: Tests/XDRemuxAppConversionSmoke.swift
+    dependencies:
+      - package: XDRemux
+        product: XDRemuxCore
+      - package: XDRemux
+        product: XDRemuxAppleFeatures
+    settings:
+      CODE_SIGN_IDENTITY: "-"

@@ -4,6 +4,111 @@ import XCTest
 @testable import XDRemuxCore
 
 final class CoreContractTests: XCTestCase {
+    func testOppoCaptureModeContractMatrix() throws {
+        struct ContractCase: Decodable {
+            let userComment: String?
+            let mode: String?
+            let folder: String?
+            let status: String
+
+            enum CodingKeys: String, CodingKey {
+                case userComment = "user_comment"
+                case mode, folder, status
+            }
+        }
+        let fixtureURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("fixtures/oppo_capture_mode_cases.json")
+        let cases = try JSONDecoder().decode([ContractCase].self, from: Data(contentsOf: fixtureURL))
+        for item in cases {
+            let classification = PhotoCategorizationEngine.classify(userComment: item.userComment)
+            XCTAssertEqual(classification.mode?.rawValue, item.mode, "comment: \(item.userComment ?? "nil")")
+            XCTAssertEqual(classification.mode?.folderName, item.folder)
+            XCTAssertEqual(classification.status.rawValue, item.status)
+        }
+    }
+
+    func testPhotoCategorizationPlansFoldersRootAndStableDuplicates() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-categorize-\(UUID().uuidString)", isDirectory: true)
+        let input = root.appendingPathComponent("input", isDirectory: true)
+        let nested = input.appendingPathComponent("nested", isDirectory: true)
+        let output = input.appendingPathComponent("categorized", isDirectory: true)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let portrait = input.appendingPathComponent("same.heic")
+        let secondPortrait = nested.appendingPathComponent("same.heic")
+        let unclassified = input.appendingPathComponent("plain.jpg")
+        try Data("header-oplus_18-tail".utf8).write(to: portrait)
+        try Data("different-oplus_18-tail".utf8).write(to: secondPortrait)
+        try Data("no user comment".utf8).write(to: unclassified)
+
+        let plan = try PhotoCategorizationEngine.makePlan(inputs: [input], outputDirectory: output)
+        XCTAssertEqual(plan.items.count, 3)
+        XCTAssertEqual(plan.items[0].destinationURL.deletingLastPathComponent().lastPathComponent, "人像")
+        XCTAssertEqual(plan.items[1].destinationURL.lastPathComponent, "plain.jpg")
+        XCTAssertEqual(plan.items[1].destinationURL.deletingLastPathComponent(), output)
+        XCTAssertEqual(plan.items[2].destinationURL.lastPathComponent, "same (2).heic")
+
+        let result = PhotoCategorizationEngine.execute(plan, jobs: 2)
+        XCTAssertEqual(result.copiedCount, 3)
+        let repeated = try PhotoCategorizationEngine.makePlan(inputs: [input], outputDirectory: output)
+        XCTAssertEqual(repeated.items.count, 3)
+        XCTAssertTrue(repeated.items.allSatisfy { $0.disposition == .duplicate })
+    }
+
+    func testPhotoCategorizationReadsTIFFUserCommentBytes() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-categorize-tiff-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("comment.jpg")
+        try makeTIFFUserComment("Oplus_4096").write(to: source)
+
+        let classification = PhotoCategorizationEngine.classify(at: source)
+        XCTAssertEqual(classification.mode, .enhancedText)
+        XCTAssertEqual(classification.status, .categorized)
+    }
+
+    func testCategorizationResultCountsMalformedCommentsAsIssuesAfterCopy() {
+        let source = URL(fileURLWithPath: "/tmp/malformed.jpg")
+        let classification = PhotoCategorizationEngine.classify(userComment: "not-an-oppo-comment")
+        let item = PhotoCategorizationItem(
+            sourceURL: source,
+            destinationURL: URL(fileURLWithPath: "/tmp/output/malformed.jpg"),
+            classification: classification,
+            disposition: .copied
+        )
+        let result = PhotoCategorizationResult(items: [item])
+
+        XCTAssertEqual(result.rootCount, 1)
+        XCTAssertEqual(result.copiedCount, 1)
+        XCTAssertEqual(result.issueCount, 1)
+    }
+
+    func testSourceDirectoryCategorizationExcludesCreatedModeTrees() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-categorize-source-root-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("portrait.heic")
+        try Data("oplus_18".utf8).write(to: source)
+
+        let initial = try PhotoCategorizationEngine.makePlan(inputs: [root], outputDirectory: nil)
+        XCTAssertEqual(initial.items.first?.destinationURL.lastPathComponent, "portrait.heic")
+        XCTAssertEqual(
+            initial.items.first?.destinationURL.deletingLastPathComponent().lastPathComponent,
+            "人像"
+        )
+        XCTAssertEqual(PhotoCategorizationEngine.execute(initial).copiedCount, 1)
+
+        let repeated = try PhotoCategorizationEngine.makePlan(inputs: [root], outputDirectory: nil)
+        XCTAssertEqual(repeated.items.count, 1)
+        XCTAssertEqual(repeated.items.first?.disposition, .duplicate)
+        XCTAssertFalse(repeated.items.contains { $0.destinationURL.path.contains("人像/人像") })
+    }
     func testPhotographicStylesResolveUnspecifiedProducerToProductionSolver() {
         XCTAssertEqual(
             AppleStyleDataProducerMode.unspecified.resolvedForPhotographicStyles,
@@ -197,5 +302,24 @@ final class CoreContractTests: XCTestCase {
             XDRemuxError.invalidValue(option: "--jobs", value: "0").description,
             "invalid value for --jobs: 0"
         )
+    }
+
+    private func makeTIFFUserComment(_ comment: String) -> Data {
+        let payload = Data("ASCII\0\0\0\(comment)".utf8)
+        var data = Data([0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00])
+        data.append(contentsOf: [0x01, 0x00])
+        data.append(contentsOf: [0x69, 0x87, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x00])
+        data.append(contentsOf: [0x00, 0x00, 0x00, 0x00])
+        data.append(contentsOf: [0x01, 0x00])
+        data.append(contentsOf: [0x86, 0x92, 0x07, 0x00])
+        let count = UInt32(payload.count)
+        data.append(contentsOf: [
+            UInt8(count & 0xff), UInt8((count >> 8) & 0xff),
+            UInt8((count >> 16) & 0xff), UInt8((count >> 24) & 0xff),
+            0x2c, 0x00, 0x00, 0x00,
+        ])
+        data.append(contentsOf: [0x00, 0x00, 0x00, 0x00])
+        data.append(payload)
+        return data
     }
 }

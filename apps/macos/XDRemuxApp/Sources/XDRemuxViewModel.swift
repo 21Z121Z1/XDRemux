@@ -4,6 +4,7 @@ import Observation
 import ImageIO
 import UniformTypeIdentifiers
 import AppKit
+import XDRemuxCore
 
 enum AppState: Equatable {
     case idle
@@ -93,6 +94,8 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
     var errorMessage: String?
     var startedAt: Date?
     var finishedAt: Date?
+    var captureMode: OppoCaptureMode?
+    var classificationStatus: OppoPhotoClassificationStatus
 
     init(
         id: UUID = UUID(),
@@ -102,7 +105,9 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
         outputPlanStatus: OutputPlanStatus = .ready,
         errorMessage: String? = nil,
         startedAt: Date? = nil,
-        finishedAt: Date? = nil
+        finishedAt: Date? = nil,
+        captureMode: OppoCaptureMode? = nil,
+        classificationStatus: OppoPhotoClassificationStatus = .missingUserComment
     ) {
         self.id = id
         self.inputURL = inputURL
@@ -112,6 +117,8 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
         self.errorMessage = errorMessage
         self.startedAt = startedAt
         self.finishedAt = finishedAt
+        self.captureMode = captureMode
+        self.classificationStatus = classificationStatus
     }
 
     var isSuccessful: Bool {
@@ -121,6 +128,18 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
     var duration: TimeInterval? {
         guard let startedAt, let finishedAt else { return nil }
         return finishedAt.timeIntervalSince(startedAt)
+    }
+}
+
+extension OppoPhotoClassificationStatus {
+    var appDisplayName: String {
+        switch self {
+        case .categorized: return "已识别"
+        case .missingUserComment: return "缺少 UserComment"
+        case .malformedUserComment: return "UserComment 格式错误"
+        case .unknownFlags: return "含未知拍摄标记"
+        case .unreadableImage: return "照片读取失败"
+        }
     }
 }
 
@@ -209,8 +228,10 @@ final class XDRemuxViewModel {
         state = .scanning
         currentFileName = "正在扫描 HEIC 文件..."
 
-        let heicURLs = await Task.detached(priority: .userInitiated) {
-            Self.collectHEICURLs(from: urls)
+        let classifiedURLs = await Task.detached(priority: .userInitiated) {
+            Self.collectHEICURLs(from: urls).map { url in
+                (url, PhotoCategorizationEngine.classify(at: url))
+            }
         }.value
 
         if Task.isCancelled {
@@ -220,14 +241,20 @@ final class XDRemuxViewModel {
         }
 
         let existingInputs = Set(queue.map { Self.pathKey($0.inputURL) })
-        let newItems = heicURLs
-            .filter { !existingInputs.contains(Self.pathKey($0)) }
-            .map {
-                let outputURL = Self.makeOutputURL(for: $0, config: config)
+        let newItems = classifiedURLs
+            .filter { !existingInputs.contains(Self.pathKey($0.0)) }
+            .map { inputURL, classification in
+                let outputURL = Self.makeOutputURL(
+                    for: inputURL,
+                    config: config,
+                    captureMode: classification.mode
+                )
                 return ConversionQueueItem(
-                    inputURL: $0,
+                    inputURL: inputURL,
                     outputURL: outputURL,
-                    outputPlanStatus: Self.outputPlanStatus(inputURL: $0, outputURL: outputURL, config: config)
+                    outputPlanStatus: Self.outputPlanStatus(inputURL: inputURL, outputURL: outputURL, config: config),
+                    captureMode: classification.mode,
+                    classificationStatus: classification.status
                 )
             }
 
@@ -292,7 +319,7 @@ final class XDRemuxViewModel {
             queue[index].errorMessage = nil
             queue[index].startedAt = nil
             queue[index].finishedAt = nil
-            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config)
+            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode)
             queue[index].outputPlanStatus = Self.outputPlanStatus(inputURL: queue[index].inputURL, outputURL: queue[index].outputURL, config: config)
         }
         refreshOutputURLsAndPlansForEditableItems()
@@ -360,7 +387,7 @@ final class XDRemuxViewModel {
 
     private func refreshOutputURLsAndPlansForEditableItems() {
         for index in queue.indices where queue[index].status == .pending || queue[index].status == .failed || queue[index].status == .cancelled {
-            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config)
+            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode)
             queue[index].outputPlanStatus = Self.outputPlanStatus(
                 inputURL: queue[index].inputURL,
                 outputURL: queue[index].outputURL,
@@ -519,7 +546,7 @@ final class XDRemuxViewModel {
             queue[index].errorMessage = nil
             queue[index].startedAt = nil
             queue[index].finishedAt = nil
-            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config)
+            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode)
             queue[index].outputPlanStatus = Self.outputPlanStatus(inputURL: queue[index].inputURL, outputURL: queue[index].outputURL, config: config)
         }
         refreshOutputURLsAndPlansForEditableItems()
@@ -595,14 +622,25 @@ final class XDRemuxViewModel {
         return heicURLs.sorted { $0.path < $1.path }
     }
 
-    nonisolated private static func makeOutputURL(for inputURL: URL, config: ConversionConfig) -> URL {
+    nonisolated private static func makeOutputURL(
+        for inputURL: URL,
+        config: ConversionConfig,
+        captureMode: OppoCaptureMode?
+    ) -> URL {
+        let category = config.categorizeOutputByCaptureMode ? captureMode?.folderName : nil
         if let outputDirectory = config.outputDirectory {
-            return outputDirectory.appendingPathComponent(inputURL.lastPathComponent)
+            let directory = category.map {
+                outputDirectory.appendingPathComponent($0, isDirectory: true)
+            } ?? outputDirectory
+            return directory.appendingPathComponent(inputURL.lastPathComponent)
         }
 
         let suffix = config.fileNameSuffix.isEmpty ? "_iso" : config.fileNameSuffix
         let stem = inputURL.deletingPathExtension().lastPathComponent
-        return inputURL.deletingLastPathComponent().appendingPathComponent("\(stem)\(suffix).heic")
+        let parent = category.map {
+            inputURL.deletingLastPathComponent().appendingPathComponent($0, isDirectory: true)
+        } ?? inputURL.deletingLastPathComponent()
+        return parent.appendingPathComponent("\(stem)\(suffix).heic")
     }
 
     nonisolated private static func pathKey(_ url: URL) -> String {

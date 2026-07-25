@@ -6,11 +6,13 @@ with pillow-heif + Pillow + numpy.
 
 Usage:
     xdremux.py convert --input <file.heic> [--output <out.heic>] [--debug-dir <dir>] [--oppo-compatible]
-    xdremux.py batch --input-dir <dir> [--output-dir <dir>] [--glob <pattern>] [--oppo-compatible]
+    xdremux.py batch --input-dir <dir> [--output-dir <dir>] [--glob <pattern>] [--oppo-compatible] [--categorize]
+    xdremux.py categorize --input <file-or-dir> [--input <file-or-dir> ...] --output-dir <dir> [--jobs <n>] [--dry-run]
 """
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -18,7 +20,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     __package__ = "xdremux.python"
 
-from . import container, edr, iso21496
+from . import categorize, container, edr, iso21496
 
 
 def cmd_convert(args: argparse.Namespace) -> int:
@@ -157,9 +159,14 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
     glob_pattern = args.glob or "*.heic"
     files = sorted(input_dir.glob(glob_pattern))
+    categorized_outputs = (
+        categorize.batch_destinations(files, output_dir)
+        if getattr(args, "categorize_output", False)
+        else {}
+    )
     converted, failed = 0, 0
     for f in files:
-        out = output_dir / f.name
+        out = categorized_outputs.get(f, output_dir / f.name)
         args2 = argparse.Namespace(input=str(f), output=str(out),
                                     debug_dir=args.debug_dir,
                                     oppo_compat=args.oppo_compat,
@@ -172,6 +179,39 @@ def cmd_batch(args: argparse.Namespace) -> int:
             failed += 1
 
     print(f"batch complete: {converted} converted, {failed} failed")
+    return 0 if failed == 0 else 1
+
+
+def cmd_categorize(args: argparse.Namespace) -> int:
+    """Copy photos into shooting-mode directories without modifying sources."""
+    try:
+        plan = categorize.make_plan([Path(value) for value in args.input], Path(args.output_dir))
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    results = categorize.execute_plan(plan, jobs=args.jobs, dry_run=args.dry_run)
+    for item in results:
+        mode = (
+            item.classification.mode.folder_name
+            if item.classification.mode
+            else f"根目录 ({item.classification.status})"
+        )
+        detail = f" error={item.error}" if item.error else ""
+        print(f"{item.disposition} [{mode}] {item.source} -> {item.destination}{detail}")
+    copied = sum(item.disposition == "copied" for item in results)
+    dry_run = sum(item.disposition == "dry-run" for item in results)
+    duplicate = sum(item.disposition == "duplicate" for item in results)
+    categorized = sum(item.classification.mode is not None for item in results)
+    root = len(results) - categorized
+    failed = sum(
+        item.disposition == "failed"
+        or item.classification.status in {"malformed-user-comment", "unreadable-image"}
+        for item in results
+    )
+    print(
+        f"categorize complete: {categorized} categorized, {root} kept at root, "
+        f"{copied} copied, {dry_run} dry-run, {duplicate} duplicate, {failed} failed"
+    )
     return 0 if failed == 0 else 1
 
 
@@ -209,6 +249,15 @@ def build_parser() -> argparse.ArgumentParser:
                    help=argparse.SUPPRESS)
     b.add_argument("--reencode", action="store_true", dest="reencode",
                    help="Decode and re-encode the base image instead of preserving source HEVC")
+    b.add_argument("--categorize", action="store_true", dest="categorize_output",
+                   help="Write outputs under Chinese shooting-mode directories")
+
+    category = sub.add_parser("categorize")
+    category.add_argument("--input", action="append", required=True,
+                          help="Input photo or directory; may be repeated")
+    category.add_argument("--output-dir", required=True)
+    category.add_argument("--jobs", type=int, default=min(os.cpu_count() or 1, 4))
+    category.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -219,6 +268,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_convert(args)
     elif args.command == "batch":
         return cmd_batch(args)
+    elif args.command == "categorize":
+        if args.jobs < 1:
+            parser.error("--jobs must be greater than zero")
+        return cmd_categorize(args)
     else:
         parser.print_help()
         return 1

@@ -14,6 +14,7 @@ XDRemux 将 OPPO、OnePlus 和 realme 设备拍摄的 ProXDR 照片转换为兼�
 | OPPO 相册兼容 | `--oppo-compatible` | 生成更适合 OPPO 相册识别的 4:2:0 Gain Map |
 | Apple 摄影风格 | `--apple-photographic-styles` | 让照片在 Apple Photos 中显示摄影风格编辑界面 |
 | Apple 人像 | `--apple-portrait` | 将 OPPO 人像模式数据转换为 Apple Photos 支持的人像模式数据 |
+| 拍摄模式分类 | `categorize` / `batch --categorize` | 按 UserComment 中的拍摄模式整理原片或转换结果 |
 
 Apple 摄影风格和 Apple 人像可以同时启用，并写入同一个 HEIC。Apple 相关的输出选项与 `--oppo-compatible` 不能同时使用。
 
@@ -190,6 +191,35 @@ swift run xdremux batch \
 swift run xdremux --help
 ```
 
+## 按拍摄模式分类
+
+独立分类会递归扫描 HEIC、HEIF 和 JPEG，只复制照片，不修改或删除源文件：
+
+```bash
+swift run xdremux categorize \
+  --input photo_dump/ \
+  --input another_photo.heic \
+  --output-dir categorized/ \
+  --jobs 4
+```
+
+使用 `--dry-run` 可以只查看规划结果。分类目录使用固定中文名称：普通拍照、大师模式、RICOH GR、专业模式、人像、夜景、全景、延时摄影、超清、证件照、贴纸、超级文本、合影、双重曝光和美颜。
+
+缺少 UserComment、格式错误、读取失败，或只有未知标记且无法确定主模式的照片会保留在目标根目录。格式错误或读取失败仍会复制文件，但命令返回非零；缺少 UserComment 或未知主模式不视为错误。普通拍照以及只有 HDR、滤镜、水印等已知附加标记的照片会进入 `普通拍照/`。同名同内容文件会跳过；同名但内容不同的文件会稳定命名为 `文件名 (2).heic` 等。
+
+批量转换时可直接按拍摄模式写入转换结果：
+
+```bash
+swift run xdremux batch \
+  --input-dir photo_dump/ \
+  --output-dir converted/ \
+  --categorize
+```
+
+`convert` 不接受 `--categorize`；该开关只用于 `batch`。
+
+分类只读取本地文件中的 EXIF/UserComment，不声明或模拟 OPPO 相册在设备端的识别行为。
+
 ## 验证输出
 
 验证 Apple 摄影风格或组合输出：
@@ -217,7 +247,7 @@ Apple 人像转换可能还会在输出旁生成 `*.portrait-manifest.json`，�
 
 ## Python CLI
 
-Python CLI 提供标准 HDR 和 OPPO 相册兼容转换，不包含 Apple 摄影风格和 Apple 人像功能。
+Python CLI 提供标准 HDR、OPPO 相册兼容转换和与 Swift 一致的拍摄模式分类，不包含 Apple 摄影风格和 Apple 人像功能。
 
 安装依赖：
 
@@ -237,6 +267,21 @@ python3 xdremux/python/XDRemux.py convert \
 ```bash
 python3 xdremux/python/XDRemux.py batch \
   --input-dir photo_dump/
+```
+
+独立分类与分类输出：
+
+```bash
+python3 xdremux/python/XDRemux.py categorize \
+  --input photo_dump/ \
+  --input another_photo.heic \
+  --output-dir categorized/ \
+  --dry-run
+
+python3 xdremux/python/XDRemux.py batch \
+  --input-dir photo_dump/ \
+  --output-dir converted/ \
+  --categorize
 ```
 
 OPPO 相册兼容输出：
@@ -260,6 +305,8 @@ apps/macos/XDRemuxApp/
 ```bash
 scripts/build_and_run.sh run
 ```
+
+App 顶部可在“转换”和“按模式分类”之间切换。分类页支持一次添加多个文件或目录、扫描预览模式数量和目标路径、复制、取消，以及在 Finder 中显示结果；不选择统一目标目录时，每张照片以自身所在目录为分类根。转换设置中的“按拍摄模式分类输出”开关会把转换结果写入相同的中文模式目录。
 
 ## 作为 Swift Package 使用
 

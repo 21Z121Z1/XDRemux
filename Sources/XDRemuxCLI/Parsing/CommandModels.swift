@@ -48,6 +48,7 @@ struct BatchCommand {
     let checkpointURL: URL?
     let resume: Bool
     let skipExisting: Bool
+    let categorizeOutput: Bool
 
     var conversionConfiguration: ConversionConfiguration {
         ConversionConfiguration(
@@ -59,6 +60,7 @@ struct BatchCommand {
             debugDirectory: debugRootURL,
             skipExisting: skipExisting,
             maxConcurrentJobs: jobs,
+            categorizeOutputByCaptureMode: categorizeOutput,
             applePhotographicStyles: appleFeatures.photographicStyles,
             applePortrait: appleFeatures.portrait,
             appleStylesRawDNGURL: appleStylesRawDNGURL,
@@ -66,4 +68,11 @@ struct BatchCommand {
             eventHandler: CLIOutput.conversionEventHandler
         )
     }
+}
+
+struct CategorizeCommand {
+    let inputURLs: [URL]
+    let outputDirURL: URL
+    let jobs: Int
+    let dryRun: Bool
 }

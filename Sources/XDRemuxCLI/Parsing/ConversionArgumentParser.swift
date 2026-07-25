@@ -202,6 +202,7 @@ enum ConversionArgumentParser {
         var checkpointPath: String?
         var resume = true
         var skipExisting = true
+        var categorizeOutput = false
 
         while let option = cursor.nextOption() {
             if try common.consume(option, cursor: &cursor) { continue }
@@ -228,6 +229,8 @@ enum ConversionArgumentParser {
                 skipExisting = true
             case "--no-skip-existing":
                 skipExisting = false
+            case "--categorize":
+                categorizeOutput = true
             default:
                 throw CLIError.unknownOption(option)
             }
@@ -253,7 +256,44 @@ enum ConversionArgumentParser {
             jobs: jobs,
             checkpointURL: checkpointPath.map { URL(fileURLWithPath: $0) },
             resume: resume,
-            skipExisting: skipExisting
+            skipExisting: skipExisting,
+            categorizeOutput: categorizeOutput
+        )
+    }
+
+    static func parseCategorize(_ rawArguments: [String]) throws -> CategorizeCommand {
+        var cursor = ArgumentCursor(arguments: rawArguments)
+        var inputPaths: [String] = []
+        var outputDirectoryPath: String?
+        var jobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
+        var dryRun = false
+
+        while let option = cursor.nextOption() {
+            switch option {
+            case "--input":
+                inputPaths.append(try cursor.nextValue(for: option))
+            case "--output-dir":
+                outputDirectoryPath = try cursor.nextValue(for: option)
+            case "--jobs":
+                let value = try cursor.nextValue(for: option)
+                guard let parsed = Int(value), parsed > 0 else {
+                    throw CLIError.invalidValue(option: option, value: value)
+                }
+                jobs = parsed
+            case "--dry-run":
+                dryRun = true
+            default:
+                throw CLIError.unknownOption(option)
+            }
+        }
+
+        guard !inputPaths.isEmpty else { throw CLIError.missingArgument("--input") }
+        guard let outputDirectoryPath else { throw CLIError.missingArgument("--output-dir") }
+        return CategorizeCommand(
+            inputURLs: inputPaths.map { URL(fileURLWithPath: $0) },
+            outputDirURL: URL(fileURLWithPath: outputDirectoryPath),
+            jobs: jobs,
+            dryRun: dryRun
         )
     }
 }

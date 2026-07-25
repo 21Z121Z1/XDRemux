@@ -3,68 +3,99 @@ import UniformTypeIdentifiers
 import Observation
 import AppKit
 
+private enum WorkspaceMode: String, CaseIterable, Identifiable {
+    case convert = "转换"
+    case categorize = "按模式分类"
+
+    var id: String { rawValue }
+}
+
 struct ContentView: View {
     @State private var viewModel = XDRemuxViewModel()
+    @State private var categorizationViewModel = PhotoCategorizationViewModel()
+    @State private var workspaceMode = WorkspaceMode.convert
     @State private var isTargeted = false
     @State private var isSettingsPresented = false
     @State private var selectedQueueItemID: UUID?
     @State private var queueFilter = ""
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 440)
-        } detail: {
-            workbench
+        Group {
+            if workspaceMode == .convert {
+                conversionWorkspace
+            } else {
+                PhotoCategorizationView(viewModel: categorizationViewModel)
+            }
         }
         .navigationTitle("XDRemux")
         .frame(minWidth: 1040, minHeight: 680)
-        .searchable(text: $queueFilter, prompt: "搜索队列")
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: selectFiles) {
-                    Label(AppStrings.addHEIC, systemImage: "plus")
+            ToolbarItem(placement: .navigation) {
+                Picker("工作模式", selection: $workspaceMode) {
+                    ForEach(WorkspaceMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
                 }
-                .disabled(!viewModel.canEditQueue)
-                .help(AppStrings.addHEICHelp)
+                .pickerStyle(.segmented)
+                .frame(width: 220)
+            }
 
-                Button {
-                    viewModel.startConversion()
-                } label: {
-                    Label(AppStrings.startConversion, systemImage: "play.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!viewModel.canStart)
-                .keyboardShortcut(.defaultAction)
+            if workspaceMode == .convert {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button(action: selectFiles) {
+                        Label(AppStrings.addHEIC, systemImage: "plus")
+                    }
+                    .disabled(!viewModel.canEditQueue)
+                    .help(AppStrings.addHEICHelp)
 
-                Button {
-                    viewModel.cancelTask()
-                } label: {
-                    Label(AppStrings.cancel, systemImage: "stop.fill")
-                }
-                .disabled(viewModel.state != .processing && viewModel.state != .scanning)
-                .keyboardShortcut(.cancelAction)
+                    Button {
+                        viewModel.startConversion()
+                    } label: {
+                        Label(AppStrings.startConversion, systemImage: "play.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!viewModel.canStart)
+                    .keyboardShortcut(.defaultAction)
 
-                Button {
-                    isSettingsPresented = true
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                }
-                .help(AppStrings.conversionSettings)
+                    Button {
+                        viewModel.cancelTask()
+                    } label: {
+                        Label(AppStrings.cancel, systemImage: "stop.fill")
+                    }
+                    .disabled(viewModel.state != .processing && viewModel.state != .scanning)
+                    .keyboardShortcut(.cancelAction)
 
-                Button {
-                    viewModel.clearQueue()
-                } label: {
-                    Image(systemName: "trash")
+                    Button {
+                        isSettingsPresented = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                    .help(AppStrings.conversionSettings)
+
+                    Button {
+                        viewModel.clearQueue()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(!viewModel.canEditQueue || viewModel.queue.isEmpty)
+                    .help(AppStrings.clearQueue)
                 }
-                .disabled(!viewModel.canEditQueue || viewModel.queue.isEmpty)
-                .help(AppStrings.clearQueue)
             }
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(viewModel: viewModel)
                 .presentationSizing(.fitted)
         }
+    }
+
+    private var conversionWorkspace: some View {
+        NavigationSplitView {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 440)
+        } detail: {
+            workbench
+        }
+        .searchable(text: $queueFilter, prompt: "搜索队列")
         .dropDestination(for: URL.self) { items, _ in
             guard !items.isEmpty else { return false }
             viewModel.addFiles(from: items)
@@ -184,6 +215,8 @@ struct ContentView: View {
             item.inputURL.lastPathComponent.localizedCaseInsensitiveContains(term) ||
             item.inputURL.path.localizedCaseInsensitiveContains(term) ||
             item.outputURL.path.localizedCaseInsensitiveContains(term) ||
+            (item.captureMode?.folderName.localizedCaseInsensitiveContains(term) ?? false) ||
+            item.classificationStatus.appDisplayName.localizedCaseInsensitiveContains(term) ||
             item.status.displayName.localizedCaseInsensitiveContains(term) ||
             item.outputPlanStatus.displayName.localizedCaseInsensitiveContains(term)
         }
@@ -332,6 +365,13 @@ private struct QueueSidebarRow: View {
                 HStack(spacing: 6) {
                     Text(item.status.displayName)
                         .foregroundStyle(item.status.iconColor)
+                    if let mode = item.captureMode {
+                        Text(mode.folderName)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(item.classificationStatus.appDisplayName)
+                            .foregroundStyle(.secondary)
+                    }
                     if item.outputPlanStatus != .ready {
                         Text(item.outputPlanStatus.displayName)
                             .foregroundStyle(item.outputPlanStatus.iconColor)
@@ -841,6 +881,15 @@ private struct SettingsView: View {
                         viewModel.refreshOutputURLsForPendingItems()
                     }
                 SettingExplanation(AppStrings.skipExistingHelp)
+
+                Toggle(
+                    AppStrings.categorizeOutput,
+                    isOn: $viewModel.config.categorizeOutputByCaptureMode
+                )
+                .onChange(of: viewModel.config.categorizeOutputByCaptureMode) {
+                    viewModel.refreshOutputURLsForPendingItems()
+                }
+                SettingExplanation(AppStrings.categorizeOutputHelp)
 
                 Stepper(value: $viewModel.config.maxConcurrentJobs, in: 1...maxJobs) {
                     LabeledContent(AppStrings.concurrentJobs) {
