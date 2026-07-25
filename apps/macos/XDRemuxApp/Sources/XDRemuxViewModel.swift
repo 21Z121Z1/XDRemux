@@ -416,12 +416,16 @@ final class XDRemuxViewModel {
         return markOutputCollisions()
     }
 
-    func effectiveConcurrencyForTesting(fileSizes: [UInt64], physicalMemory: UInt64) -> Int {
+    func effectiveConcurrencyForTesting(
+        fileSizes: [UInt64],
+        physicalMemory: UInt64,
+        processorCount: Int = ProcessInfo.processInfo.activeProcessorCount
+    ) -> Int {
         Self.effectiveConcurrency(
             configuredLimit: config.maxConcurrentJobs,
             fileSizes: fileSizes,
             physicalMemory: physicalMemory,
-            processorCount: ProcessInfo.processInfo.activeProcessorCount
+            processorCount: processorCount
         )
     }
 

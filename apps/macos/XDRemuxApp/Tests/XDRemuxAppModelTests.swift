@@ -312,13 +312,22 @@ struct XDRemuxAppModelTests {
 
         let small = viewModel.effectiveConcurrencyForTesting(
             fileSizes: [10 * 1024 * 1024, 12 * 1024 * 1024],
-            physicalMemory: 64 * 1024 * 1024 * 1024
+            physicalMemory: 64 * 1024 * 1024 * 1024,
+            processorCount: 8
         )
         try expect(small == 4, "small files should keep the configured concurrency")
 
+        let cpuCapped = viewModel.effectiveConcurrencyForTesting(
+            fileSizes: [10 * 1024 * 1024],
+            physicalMemory: 64 * 1024 * 1024 * 1024,
+            processorCount: 2
+        )
+        try expect(cpuCapped == 2, "concurrency should respect the available processor count")
+
         let large = viewModel.effectiveConcurrencyForTesting(
             fileSizes: [20 * 1024 * 1024 * 1024],
-            physicalMemory: 16 * 1024 * 1024 * 1024
+            physicalMemory: 16 * 1024 * 1024 * 1024,
+            processorCount: 8
         )
         try expect(large == 1, "oversized inputs should drop concurrency to one")
     }
