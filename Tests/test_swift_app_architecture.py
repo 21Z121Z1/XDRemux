@@ -44,7 +44,9 @@ class SwiftAppArchitectureTests(unittest.TestCase):
 
     def test_ci_runs_architecture_and_app_model_checks(self) -> None:
         self.assertIn("python3 -m unittest Tests.test_swift_app_architecture", CI_WORKFLOW)
+        self.assertIn("-scheme XDRemuxApp", CI_WORKFLOW)
         self.assertIn("-scheme XDRemuxAppModelTests", CI_WORKFLOW)
+        self.assertIn("CODE_SIGNING_ALLOWED=NO", CI_WORKFLOW)
         self.assertIn("XDRemuxAppModelTests\"", CI_WORKFLOW)
         self.assertIn("actions/upload-artifact@v7", CI_WORKFLOW)
 

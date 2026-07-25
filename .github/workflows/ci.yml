@@ -57,7 +57,14 @@ jobs:
           XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremuxapp-derived
         run: |
           echo "::group::macOS App build"
-          scripts/build_and_run.sh build
+          xcodebuild \
+            -quiet \
+            -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \
+            -scheme XDRemuxApp \
+            -configuration Debug \
+            -derivedDataPath "$XDREMUX_DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
           xcodebuild \
             -quiet \
             -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \
