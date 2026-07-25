@@ -1,0 +1,23 @@
+[
+  {"name":"normal-zero","user_comment":"oplus_0","mode":"normal","folder":"普通拍照","status":"categorized"},
+  {"name":"normal-local-hdr","user_comment":"Oplus_262144","mode":"normal","folder":"普通拍照","status":"categorized"},
+  {"name":"normal-known-uint64-additional-bit","user_comment":"oplus_4611686018427387904","mode":"normal","folder":"普通拍照","status":"categorized"},
+  {"name":"master-over-professional","user_comment":"oplus_4294967552","mode":"master","folder":"大师模式","status":"categorized"},
+  {"name":"ricoh-gr","user_comment":"oplus_2147483648","mode":"ricoh-gr","folder":"RICOH GR","status":"categorized"},
+  {"name":"professional","user_comment":"oplus_256","mode":"professional","folder":"专业模式","status":"categorized"},
+  {"name":"portrait-over-beauty","user_comment":"oplus_18","mode":"portrait","folder":"人像","status":"categorized"},
+  {"name":"night","user_comment":"oplus_2048","mode":"night","folder":"夜景","status":"categorized"},
+  {"name":"panorama-oppo-prefix","user_comment":"Oppo_4","mode":"panorama","folder":"全景","status":"categorized"},
+  {"name":"time-lapse","user_comment":"oplus_8","mode":"time-lapse","folder":"延时摄影","status":"categorized"},
+  {"name":"ultra-high-resolution","user_comment":"oplus_8192","mode":"ultra-high-resolution","folder":"超清","status":"categorized"},
+  {"name":"id-photo","user_comment":"oplus_16384","mode":"id-photo","folder":"证件照","status":"categorized"},
+  {"name":"sticker","user_comment":"oplus_512","mode":"sticker","folder":"贴纸","status":"categorized"},
+  {"name":"enhanced-text-ascii","user_comment":"ASCIIOplus_4096","mode":"enhanced-text","folder":"超级文本","status":"categorized"},
+  {"name":"group-photo-json","user_comment":"{\"oplustag\":4194304}","mode":"group-photo","folder":"合影","status":"categorized"},
+  {"name":"double-exposure","user_comment":"oplus_32768","mode":"double-exposure","folder":"双重曝光","status":"categorized"},
+  {"name":"beauty","user_comment":"oplus_2","mode":"beauty","folder":"美颜","status":"categorized"},
+  {"name":"missing","user_comment":null,"mode":null,"folder":null,"status":"missing-user-comment"},
+  {"name":"malformed","user_comment":"not-an-oppo-comment","mode":null,"folder":null,"status":"malformed-user-comment"},
+  {"name":"unknown","user_comment":"oplus_17179869184","mode":null,"folder":null,"status":"unknown-flags"},
+  {"name":"unknown-above-int64","user_comment":"oplus_9223372036854775808","mode":null,"folder":null,"status":"unknown-flags"}
+]

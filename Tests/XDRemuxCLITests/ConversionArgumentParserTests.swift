@@ -31,6 +31,31 @@ final class ConversionArgumentParserTests: XCTestCase {
         XCTAssertNil(command.checkpointURL)
         XCTAssertTrue(command.resume)
         XCTAssertTrue(command.skipExisting)
+        XCTAssertFalse(command.categorizeOutput)
+    }
+
+    func testCategorizeCommandAndBatchSwitch() throws {
+        let categorize = try ConversionArgumentParser.parseCategorize([
+            "--input", "/tmp/a.heic",
+            "--input", "/tmp/photos",
+            "--output-dir", "/tmp/output",
+            "--jobs", "2",
+            "--dry-run",
+        ])
+        XCTAssertEqual(categorize.inputURLs.map(\.path), ["/tmp/a.heic", "/tmp/photos"])
+        XCTAssertEqual(categorize.outputDirURL.path, "/tmp/output")
+        XCTAssertEqual(categorize.jobs, 2)
+        XCTAssertTrue(categorize.dryRun)
+
+        let batch = try ConversionArgumentParser.parseBatch([
+            "--input-dir", "/tmp/input",
+            "--categorize",
+        ])
+        XCTAssertTrue(batch.categorizeOutput)
+        XCTAssertThrowsError(try ConversionArgumentParser.parseConvert([
+            "--input", "/tmp/input.heic",
+            "--categorize",
+        ]))
     }
 
     func testStandardAndOppoModesKeepTheirTailPolicies() throws {

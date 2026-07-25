@@ -8,7 +8,8 @@ enum XDRemuxCommand {
     private static let usage = """
     Usage:
          XDRemux.swift convert --input <file.heic|portrait.jpg> [--output <out.heic>] [--apple-photographic-styles] [--apple-styles-raw-dng <file.dng>] [--apple-style-data-producer constrained-solver|learn-node|identity-fallback] [--apple-portrait] [--oppo-compatible] [--discard-portrait-data] [--debug-dir <dir>]
-         XDRemux.swift batch --input-dir <dir> [--output-dir <dir>] [--glob *.heic] [--jobs <n>] [--apple-photographic-styles] [--apple-styles-raw-dng <file.dng>] [--apple-style-data-producer constrained-solver|learn-node|identity-fallback] [--apple-portrait] [--oppo-compatible] [--discard-portrait-data] [--checkpoint <file>] [--resume|--no-resume] [--skip-existing|--no-skip-existing] [--debug-dir <dir>]
+         XDRemux.swift batch --input-dir <dir> [--output-dir <dir>] [--glob *.heic] [--jobs <n>] [--categorize] [--apple-photographic-styles] [--apple-styles-raw-dng <file.dng>] [--apple-style-data-producer constrained-solver|learn-node|identity-fallback] [--apple-portrait] [--oppo-compatible] [--discard-portrait-data] [--checkpoint <file>] [--resume|--no-resume] [--skip-existing|--no-skip-existing] [--debug-dir <dir>]
+         XDRemux.swift categorize --input <file-or-dir> [--input <file-or-dir> ...] --output-dir <dir> [--jobs <n>] [--dry-run]
              XDRemux.swift validate-apple --input <file.heic> [--expect-portrait] [--json <report.json>]
              XDRemux.swift validate-portrait --input <file.heic> [--json <report.json>]
              XDRemux.swift portrait-self-test
@@ -26,6 +27,8 @@ enum XDRemuxCommand {
       - --discard-portrait-data removes large depth/re-edit resources without reintroducing private HDR tail entries.
       - Only the active Gain Map graph and its required container descriptions may change.
       - Batch defaults: --jobs min(cpu,4), --resume, --skip-existing.
+      - batch --categorize writes results under Chinese shooting-mode directories.
+      - categorize copies HEIC, HEIF, and JPEG files without modifying the inputs.
       - A JSONL checkpoint is written under output-dir by default; it is deleted only when the batch finishes with zero failures.
       - --apple-photographic-styles enables donor-free Apple Photographic Styles generation.
         --apple-styles is accepted as a short alias; manifests and documentation use the canonical name.
@@ -74,6 +77,9 @@ enum XDRemuxCommand {
             case "batch":
                 let cmd = try ConversionArgumentParser.parseBatch(Array(args.dropFirst()))
                 try runBatch(cmd)
+            case "categorize":
+                let cmd = try ConversionArgumentParser.parseCategorize(Array(args.dropFirst()))
+                try runCategorize(cmd)
             case "validate-apple":
                 try runAppleValidation(Array(args.dropFirst()))
             case "validate-portrait":
@@ -229,9 +235,23 @@ enum XDRemuxCommand {
         let checkpointURL = resolvedCheckpointURL(cmd: cmd, configHash: configHash)
 
         // Precompute outputs and fail fast on collisions.
+        var reservedOutputPaths = Set<String>()
         let workItems = matched.map { inputURL -> BatchWorkItem in
             let stem = inputURL.deletingPathExtension().lastPathComponent
-            let outputURL = cmd.outputDirURL.appendingPathComponent("\(stem).heic")
+            let directory: URL
+            if cmd.categorizeOutput,
+               let folderName = PhotoCategorizationEngine.categorizedDirectory(for: inputURL) {
+                directory = cmd.outputDirURL.appendingPathComponent(folderName, isDirectory: true)
+            } else {
+                directory = cmd.outputDirURL
+            }
+            var sequence = 1
+            var outputURL = directory.appendingPathComponent("\(stem).heic")
+            while reservedOutputPaths.contains(outputURL.standardizedFileURL.path) {
+                sequence += 1
+                outputURL = directory.appendingPathComponent("\(stem) (\(sequence)).heic")
+            }
+            reservedOutputPaths.insert(outputURL.standardizedFileURL.path)
             return BatchWorkItem(inputURL: inputURL, outputURL: outputURL)
         }
         try assertNoOutputCollisions(workItems)
@@ -362,6 +382,7 @@ enum XDRemuxCommand {
                     }
 
                     do {
+                        try ensureDirectory(item.outputURL.deletingLastPathComponent(), fileManager: fileManager)
                         if cmd.appleFeatures.photographicStyles {
                             try AppleFeatureConversionEngine.convert(
                                 inputURL: item.inputURL,
@@ -402,6 +423,35 @@ enum XDRemuxCommand {
         } else {
             log("checkpoint kept (failures present): \(checkpointURL.path)")
             throw CLIError.batchFailed(failures: failureCount, checkpoint: checkpointURL)
+        }
+    }
+
+    private static func runCategorize(_ cmd: CategorizeCommand) throws {
+        let plan = try PhotoCategorizationEngine.makePlan(
+            inputs: cmd.inputURLs,
+            outputDirectory: cmd.outputDirURL,
+            fileManager: fileManager
+        )
+        let result = PhotoCategorizationEngine.execute(
+            plan,
+            jobs: cmd.jobs,
+            dryRun: cmd.dryRun,
+            fileManager: fileManager
+        )
+        for item in result.items {
+            let mode = item.classification.mode?.folderName
+                ?? "根目录 (\(item.classification.status.rawValue))"
+            let detail = item.errorDescription.map { " error=\($0)" } ?? ""
+            print("\(item.disposition.rawValue) [\(mode)] \(item.sourceURL.path) -> \(item.destinationURL.path)\(detail)")
+        }
+        print(
+            "categorize complete: \(result.categorizedCount) categorized, "
+                + "\(result.rootCount) kept at root, \(result.copiedCount) copied, "
+                + "\(result.dryRunCount) dry-run, \(result.duplicateCount) duplicate, "
+                + "\(result.issueCount) failed"
+        )
+        if result.issueCount > 0 {
+            throw CLIError.categorizationFailed(failures: result.issueCount)
         }
     }
 
@@ -646,7 +696,8 @@ enum XDRemuxCommand {
             ("appleFeatures", cmd.appleFeatures.stableDescription),
             ("appleStyleDataProducer", cmd.appleStyleDataProducer.rawValue),
             ("tmapFormat", cmd.tmapFormat.rawValue),
-            ("outputDir", cmd.outputDirURL.standardizedFileURL.path)
+            ("outputDir", cmd.outputDirURL.standardizedFileURL.path),
+            ("categorizeOutput", cmd.categorizeOutput ? "true" : "false")
         ]
         let stable = entries.sorted(by: { $0.0 < $1.0 }).map { "\($0.0)=\($0.1)" }.joined(separator: "\n")
         return sha256Hex(Data(stable.utf8))

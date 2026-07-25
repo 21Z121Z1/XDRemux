@@ -109,7 +109,12 @@ package func oppoUserComment(in data: Data) -> String? {
           let value = exif[kCGImagePropertyExifUserComment] else {
         return nil
     }
-    return value as? String
+    if let string = value as? String { return string }
+    if let bytes = value as? Data {
+        let payload = bytes.count >= 8 ? bytes.dropFirst(8) : bytes[...]
+        return String(data: payload, encoding: .utf8)?.trimmingCharacters(in: .controlCharacters)
+    }
+    return nil
 }
 
 package func oppoTagFlags(from userComment: String) -> (prefix: String, digitCount: Int, flags: Int)? {
