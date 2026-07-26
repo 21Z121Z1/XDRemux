@@ -34,7 +34,35 @@ EXIF_USER_COMMENT_ASCII_PREFIX = b"ASCII\x00\x00\x00"
 def _read_be(data: bytes | bytearray, offset: int, size: int) -> tuple[int, int]:
     if size == 0:
         return 0, offset
-    return int.from_bytes(data[offset:offset + size], "big"), offset + size
+    chunk = data[offset:offset + size]
+    if len(chunk) != size:
+        raise ValueError(
+            f"truncated ISOBMFF structure: needed {size} bytes at offset {offset}, "
+            f"got {len(chunk)}"
+        )
+    return int.from_bytes(chunk, "big"), offset + size
+
+
+def atomic_write_bytes(path: str, payload: bytes) -> None:
+    """Write `payload` to `path` via a same-directory temp file + os.replace.
+
+    In-place conversion overwrites the user's original photo; a direct
+    open(path, 'wb') truncates it before the new bytes are durable, so a
+    crash or full disk destroys the only copy. os.replace keeps either the
+    complete old file or the complete new file at all times.
+    """
+    directory = os.path.dirname(os.path.abspath(path)) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".xdremux-", suffix=".tmp", dir=directory)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _parse_iloc_entries(data: bytes | bytearray, iloc_ds: int) -> list[dict]:
@@ -86,7 +114,9 @@ def _parse_ipma_entries(data: bytes | bytearray, ipma_ds: int) -> tuple[int, int
     count = struct.unpack_from(">I", data, ipma_body)[0]
     pos = ipma_body + 4
     entries = []
-    item_id_size = 4 if (ipma_f & 1) else 2
+    # ISO/IEC 14496-12: item_ID width follows the box *version* (v0 = u16,
+    # v1+ = u32); flags bit 0 only widens the property association field.
+    item_id_size = 4 if ipma_v >= 1 else 2
     assoc_size = 2 if (ipma_f & 1) else 1
     for _ in range(count):
         item_id, pos = _read_be(data, pos, item_id_size)
@@ -492,21 +522,31 @@ def write_heic(output_path: str, base_image: Image.Image,
             else:
                 _inject_exif_user_comment(heif, patched_comment)
 
-    heif.save(output_path, **save_kwargs)
-
-    # Binary-patch for ISO 21496-1 compliance
+    # Encode + patch a same-directory temp file, then atomically replace the
+    # destination: a failed encode or ISO patch must never leave a truncated
+    # or non-compliant file at output_path (which may be the user's original,
+    # and whose whole purpose is ISO 21496-1 compliance).
+    directory = os.path.dirname(os.path.abspath(output_path)) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".xdremux-", suffix=".heic", dir=directory)
+    os.close(fd)
     try:
+        heif.save(tmp_path, **save_kwargs)
         from .isobmff_patch import patch_heic_for_iso21496
         patched = patch_heic_for_iso21496(
-            output_path,
+            tmp_path,
             iso_meta=iso_meta,
             replace_primary_colr=replace_primary_colr,
             oppo_compat=oppo_compat,
         )
         if not patched:
             print("note: auxC already present or patching skipped", file=sys.stderr)
-    except Exception as e:
-        print(f"warning: auxC patching failed: {e}", file=sys.stderr)
+        os.replace(tmp_path, output_path)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def write_heic_passthrough(source_path: str, output_path: str,
@@ -589,9 +629,7 @@ def write_heic_passthrough(source_path: str, output_path: str,
     item_types, iinf_v = _parse_all_items(src, child['iinf']['ds'], child['iinf']['de'])
     source_tmap_item_ids = {iid for iid, item_type in item_types.items() if item_type == "tmap"}
     if source_tmap_item_ids:
-        with open(output_path, 'wb') as f:
-            f.write(src[:src_mdat_off + src_mdat_sz])
-            f.write(src_post_mdat)
+        atomic_write_bytes(output_path, src[:src_mdat_off + src_mdat_sz] + src_post_mdat)
         return
 
     original_max_item_id = max(item_types.keys())
@@ -1168,8 +1206,7 @@ def write_heic_passthrough(source_path: str, output_path: str,
     out += gm_mdat_data
     out += src_post_mdat
 
-    with open(output_path, 'wb') as f:
-        f.write(out)
+    atomic_write_bytes(output_path, bytes(out))
 
 
 def _patch_oppo_tagflags_bytes(data: bytes) -> tuple[bytes, str | None]:

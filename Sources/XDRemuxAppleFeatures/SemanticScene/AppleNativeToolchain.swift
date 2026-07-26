@@ -11,6 +11,7 @@ package enum AppleNativeToolchain {
     }
 
     private static let compileLock = NSLock()
+    private static let compileTimeout: TimeInterval = 300
 
     static func semanticExecutable() throws -> URL {
         let source = try resourceURL(
@@ -215,16 +216,37 @@ package enum AppleNativeToolchain {
             return executable
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // `compileLock` only serializes this process. The cache directory is
+        // shared across every XDRemux process on the machine, so compile to a
+        // private staging path and publish it with an atomic rename — otherwise
+        // a concurrent run can exec a half-written binary.
+        let staging = directory.appendingPathComponent("\(executableName).\(UUID().uuidString)")
+        var published = false
+        defer {
+            if !published { try? FileManager.default.removeItem(at: staging) }
+        }
         let result = try run(
             URL(fileURLWithPath: "/usr/bin/xcrun"),
-            arguments: arguments + ["-o", executable.path]
+            arguments: arguments + ["-o", staging.path],
+            timeout: compileTimeout
         )
-        guard result.status == 0, FileManager.default.isExecutableFile(atPath: executable.path) else {
+        guard !result.timedOut else {
+            throw CLIError.invalidContainer(
+                "cannot build \(executableName): compiler exceeded \(Int(compileTimeout)) seconds"
+            )
+        }
+        guard result.status == 0, FileManager.default.isExecutableFile(atPath: staging.path) else {
             let diagnostic = String(data: result.stderr, encoding: .utf8) ?? "unknown compiler error"
             throw CLIError.invalidContainer(
                 "cannot build \(executableName): \(diagnostic.trimmingCharacters(in: .whitespacesAndNewlines))"
             )
         }
+        guard rename(staging.path, executable.path) == 0 else {
+            throw CLIError.invalidContainer(
+                "cannot publish \(executableName) into the tool cache: \(String(cString: strerror(errno)))"
+            )
+        }
+        published = true
         return executable
     }
 }

@@ -643,7 +643,7 @@ package enum PortraitConversionPipeline {
         do {
             blocks = try LHDRExtractor.portraitBlocks(from: inputData)
         } catch {
-            throw CLIError.invalidContainer(
+            throw CLIError.portraitPrerequisitesMissing(
                 "--apple-portrait requires an OPPO private tail containing rear.depth"
             )
         }
@@ -651,7 +651,7 @@ package enum PortraitConversionPipeline {
               let srcImage = blocks["src.image"],
               let rearDepthConfig = blocks["rear.depth.config"],
               let compressedDepth = blocks["rear.depth"] else {
-            throw CLIError.invalidContainer(
+            throw CLIError.portraitPrerequisitesMissing(
                 "--apple-portrait requires OPPO portrait UserComment, src.image, and rear.depth"
             )
         }
@@ -1059,29 +1059,54 @@ package enum PortraitConversionPipeline {
         return value & 65_536 != 0
     }
 
+    private static let zstdTimeout: TimeInterval = 120
+
+    /// A GUI launch inherits a minimal PATH that omits both Homebrew prefixes,
+    /// so the well-known install locations are probed before PATH itself.
+    private static func locateZstd() -> URL? {
+        let fileManager = FileManager.default
+        let wellKnown = ["/usr/bin/zstd", "/opt/homebrew/bin/zstd", "/usr/local/bin/zstd"]
+        for candidate in wellKnown where fileManager.isExecutableFile(atPath: candidate) {
+            return URL(fileURLWithPath: candidate)
+        }
+        let path = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        for directory in path.split(separator: ":") where !directory.isEmpty {
+            let candidate = URL(fileURLWithPath: String(directory), isDirectory: true)
+                .appendingPathComponent("zstd")
+            if fileManager.isExecutableFile(atPath: candidate.path) { return candidate }
+        }
+        return nil
+    }
+
     private static func decompressZstd(_ data: Data) throws -> Data {
+        guard let zstd = locateZstd() else {
+            throw CLIError.invalidContainer(
+                "--apple-portrait requires the zstd command-line tool; install it with "
+                    + "`brew install zstd`"
+            )
+        }
         let directory = FileManager.default.temporaryDirectory
         let input = directory.appendingPathComponent("xdremux-depth-\(UUID().uuidString).zst")
         defer { try? FileManager.default.removeItem(at: input) }
         try data.write(to: input, options: .atomic)
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["zstd", "-d", "-q", "-c", input.path]
-        let output = Pipe()
-        let errors = Pipe()
-        process.standardOutput = output
-        process.standardError = errors
-        do { try process.run() } catch {
-            throw CLIError.invalidContainer("--apple-portrait requires the zstd command-line tool")
+        let result = try AppleNativeToolchain.run(
+            zstd,
+            arguments: ["-d", "-q", "-c", input.path],
+            timeout: zstdTimeout
+        )
+        guard !result.timedOut else {
+            throw CLIError.invalidContainer(
+                "zstd depth decompression timed out after \(Int(zstdTimeout))s"
+            )
         }
-        let decoded = output.fileHandleForReading.readDataToEndOfFile()
-        let errorData = errors.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let message = String(data: errorData, encoding: .utf8) ?? "zstd failed"
-            throw CLIError.invalidContainer(message.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard result.status == 0 else {
+            let message = String(data: result.stderr, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            throw CLIError.invalidContainer(
+                message.isEmpty ? "zstd depth decompression failed (exit \(result.status))" : message
+            )
         }
-        return decoded
+        return result.stdout
     }
 
     private static func registerMetadataNamespace(
@@ -3560,7 +3585,7 @@ package func transplantPortraitBaseAndGainPayloads(
               let iprp = children.first(where: { $0.type == "iprp" }) else {
             throw CLIError.invalidContainer("\(owner) item graph is incomplete")
         }
-        let primary = parseISOBMFFPITM(data, pitm)
+        let primary = try parseISOBMFFPITM(data, pitm)
         let infos = parseISOBMFFItemInfos(data, iinf).items
         guard let tmap = infos.first(where: { $0.type == "tmap" })?.itemID else {
             throw CLIError.invalidContainer("\(owner) has no tmap")
@@ -3584,7 +3609,7 @@ package func transplantPortraitBaseAndGainPayloads(
         guard let ipmaBox = isobmffBoxes(in: data, start: iprp.dataStart, end: iprp.dataEnd).first(where: { $0.type == "ipma" }) else {
             throw CLIError.invalidContainer("\(owner) has no ipma")
         }
-        let ipma = parseISOBMFFIPMA(data, ipmaBox)
+        let ipma = try parseISOBMFFIPMA(data, ipmaBox)
         var hvcCPropertyByItem: [Int: ISOBMFFPropertyInfo] = [:]
         for entry in ipma.entries {
             for association in entry.associations {

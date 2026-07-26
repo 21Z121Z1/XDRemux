@@ -54,8 +54,17 @@ def _boxes(d, start, end):
         sz = struct.unpack_from('>I', d, o)[0]
         tp = d[o+4:o+8].decode('latin-1', errors='replace')
         o2 = o + 8; hs = 8
-        if sz == 1: sz = struct.unpack_from('>Q', d, o2)[0]; o2 += 8; hs = 16
-        elif sz == 0: sz = end - o
+        if sz == 1:
+            if o2 + 8 > end:
+                raise ValueError(f"truncated largesize box header at offset {o}")
+            sz = struct.unpack_from('>Q', d, o2)[0]; o2 += 8; hs = 16
+        elif sz == 0:
+            sz = end - o
+        if sz < hs:
+            # A declared size smaller than the header cannot advance the
+            # cursor; without this check a crafted size==1/largesize==0 box
+            # loops forever.
+            raise ValueError(f"invalid ISOBMFF box size {sz} at offset {o}")
         be = min(o + sz, end)
         yield tp, o+hs, be, o, sz
         o = be
@@ -438,10 +447,10 @@ assert len(SWIFT_PQ_ICC_PROFILE) == 564
 def _parse_all_items(data, iinf_ds, iinf_de):
     """Parse iinf and return dict of {item_id: item_type}.
 
-    Pillow-heif uses v=2 with u16 item_id (non-standard).
-    ISO standard uses v=2+ with u32 item_id.
-    Detection: check which offset (ds+8 for u16, ds+10 for u32) contains
-    a valid ASCII FourCC for item_type.
+    Per ISO/IEC 14496-12, infe v2 carries a u16 item_ID and v3 a u32.
+    Some writers have been observed to disagree, so the u16/u32 split is
+    detected empirically: check which offset (ds+8 for u16, ds+10 for u32)
+    contains a valid ASCII FourCC for item_type.
     """
     iinf_v = data[iinf_ds]
     ec_size = 4 if iinf_v >= 1 else 2
@@ -456,7 +465,7 @@ def _parse_all_items(data, iinf_ds, iinf_de):
         try:
             s = b.decode('ascii')
             return all(c.isalnum() or c in ' _-.!' for c in s)
-        except:
+        except UnicodeDecodeError:
             return False
 
     for tp, ds, de, bs, bsz in _boxes(data, infe_start, iinf_de):
@@ -665,6 +674,20 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
         parsed_entries.append({'iid': iid, 'cm': cm, 'dri': dri,
                                'bo': bo, 'extents': extents})
 
+    # The size-delta bookkeeping below assumes the pillow-heif output shape:
+    # iloc v0 (no construction_method/index fields) with one extent per item.
+    # Reject anything else loudly instead of writing a silently corrupt meta.
+    if iloc_v_orig != 0 or isz_orig:
+        raise ValueError(
+            f"ISO patcher supports iloc version 0 sources only (got v{iloc_v_orig})"
+        )
+    for entry in parsed_entries:
+        if len(entry['extents']) != 1:
+            raise ValueError(
+                "ISO patcher supports single-extent iloc entries only "
+                f"(item {entry['iid']} has {len(entry['extents'])})"
+            )
+
     # Target format: v1, osz=4, lsz=4, bosz=0, isz=0
     iloc_v = 1
     target_osz = 4
@@ -679,14 +702,16 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
     entry_size_v1 = 2 + 2 + 2 + 0 + 2 + (target_osz + target_lsz)  # per extent
     # We'll compute actual size when building entries
 
-    # ipma geometry
+    # ipma geometry.
+    # ISO/IEC 14496-12: item_ID width follows the box *version* (v0 = u16,
+    # v1+ = u32); flags bit 0 only widens the property association field.
     ipma_v, ipma_f, ipma_body = _fullbox(data, ipma['ds'])
     pidx_mask = 0x7FFF if (ipma_f & 1) else 0x7F
+    ipma_iid_size = 4 if ipma_v >= 1 else 2
     ipma_entry_cnt = struct.unpack_from('>I', data, ipma_body)[0]
     ipma_pos = ipma_body + 4
     for _ in range(ipma_entry_cnt):
-        if ipma_f & 1: ipma_pos += 4
-        else: ipma_pos += 2
+        ipma_pos += ipma_iid_size
         ac = data[ipma_pos]; ipma_pos += 1
         for _ in range(ac):
             ipma_pos += 2 if (ipma_f & 1) else 1
@@ -715,7 +740,7 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
     primary_colr_idx_pre = None
     scan_pos = ipma_body + 4
     for _ in range(ipma_entry_cnt):
-        if ipma_f & 1:
+        if ipma_iid_size == 4:
             scan_iid = struct.unpack_from('>I', data, scan_pos)[0]; scan_pos += 4
         else:
             scan_iid = struct.unpack_from('>H', data, scan_pos)[0]; scan_pos += 2
@@ -741,6 +766,11 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
     hdr_pixi_prop_idx = prop_count + 4
     base_clli_prop_idx = prop_count + 5
     tmap_clli_prop_idx = prop_count + 6
+    if (ipma_f & 1) == 0 and tmap_clli_prop_idx > 0x7F:
+        raise ValueError(
+            "ISO patcher cannot address property indices above 127 while the "
+            "source ipma uses flags=0 (7-bit association fields)"
+        )
 
     # Parse all ipma entries to modify gain map entry (add auxC)
     gainmap_ispe_idx = None
@@ -750,7 +780,7 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
     orig_ipma_entry_cnt = ipma_entry_cnt  # capture before Phase A modifies data
     ipma_pos2 = ipma_body + 4
     for _ in range(orig_ipma_entry_cnt):
-        if ipma_f & 1:
+        if ipma_iid_size == 4:
             iid = struct.unpack_from('>I', data, ipma_pos2)[0]; ipma_pos2 += 4
         else:
             iid = struct.unpack_from('>H', data, ipma_pos2)[0]; ipma_pos2 += 2
@@ -780,7 +810,7 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
                     break
         # Rebuild entry bytes
         entry = bytearray()
-        if ipma_f & 1:
+        if ipma_iid_size == 4:
             entry += struct.pack('>I', iid)
         else:
             entry += struct.pack('>H', iid)
@@ -812,7 +842,7 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
         ipma_entry_bytes.append(bytes(entry))
     def _encode_ipma_entry(iid, assocs):
         entry = bytearray()
-        if ipma_f & 1:
+        if ipma_iid_size == 4:
             entry += struct.pack('>I', iid)
         else:
             entry += struct.pack('>H', iid)
@@ -904,6 +934,12 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
     existing_cdsc_refs = []  # [(from_id, [to_ids])]
     if 'iref' in child:
         iref_v = data[child['iref']['ds']]
+        if iref_v >= 1:
+            # All sub-box IDs below (and every reference this patcher emits)
+            # use 16-bit item IDs; a v1 iref carries 32-bit IDs.
+            raise ValueError(
+                f"ISO patcher supports iref version 0 sources only (got v{iref_v})"
+            )
         iref_body = child['iref']['ds'] + 4  # skip version(1)+flags(3)
         rpos = iref_body
         while rpos < child['iref']['de'] - 7:
@@ -1379,8 +1415,8 @@ def patch_heic_for_iso21496(path: str, gainmap_item_id: int = None,
     # Everything after meta — copy as-is (tmap config is in idat, not mdat)
     out += data[meta_de:]
 
-    with open(path, 'wb') as f:
-        f.write(out)
+    from .heif_io import atomic_write_bytes
+    atomic_write_bytes(path, bytes(out))
 
     return True
 

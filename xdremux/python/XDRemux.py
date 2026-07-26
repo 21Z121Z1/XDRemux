@@ -14,6 +14,10 @@ import argparse
 import json
 import os
 import sys
+
+if sys.version_info < (3, 11):
+    sys.exit("error: XDRemux requires Python 3.11 or newer")
+
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -42,12 +46,16 @@ def cmd_convert(args: argparse.Namespace) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 1
 
-    if lhdr.mode == "uhdr":
-        iso_meta = iso21496.build_iso21496_metadata_from_uhdr(lhdr.meta_floats)
-        edr_scale = iso_meta.get("scale", 1.0)
-    else:
-        edr_scale = edr.edr_scale_calculator(list(lhdr.meta_floats))
-        iso_meta = iso21496.build_iso21496_metadata(edr_scale)
+    try:
+        if lhdr.mode == "uhdr":
+            iso_meta = iso21496.build_iso21496_metadata_from_uhdr(lhdr.meta_floats)
+            edr_scale = iso_meta.get("scale", 1.0)
+        else:
+            edr_scale = edr.edr_scale_calculator(list(lhdr.meta_floats))
+            iso_meta = iso21496.build_iso21496_metadata(edr_scale)
+    except (ValueError, OverflowError) as e:
+        print(f"error: invalid HDR metadata in {input_path.name}: {e}", file=sys.stderr)
+        return 1
 
     print(f"  mode: {lhdr.mode}")
     print(f"  edr_scale: {edr_scale:.4f}")
@@ -92,12 +100,15 @@ def cmd_convert(args: argparse.Namespace) -> int:
                     gm_img = Image.open(io.BytesIO(gm_data))
                 except Exception:
                     pass
+            if gm_img is None:
+                print("error: UHDR gain map JPEG is missing or undecodable", file=sys.stderr)
+                return 1
         else:
             mask_data = lhdr.mask_data
             if mask_data is None:
                 print("error: no mask data found", file=sys.stderr)
                 return 1
-            mask_np = np.array(Image.open(io.BytesIO(mask_data)))
+            mask_np = np.array(Image.open(io.BytesIO(mask_data)).convert("L"))
             gm_img = gainmap.reconstruct(mask_np, edr_scale, lhdr.meta_floats[0])
 
         if passthrough:
@@ -132,13 +143,18 @@ def cmd_convert(args: argparse.Namespace) -> int:
             }
             (debug_dir / "meta.json").write_text(json.dumps(debug, indent=2))
 
-    except ImportError:
-        print("Metadata extraction only (install pillow-heif + Pillow + numpy for full conversion)")
+    except ImportError as e:
         print(json.dumps({
             "mode": lhdr.mode,
             "edr_scale": edr_scale,
             "gainMapMax": iso_meta["gainMapMax"][0],
         }, indent=2))
+        print(
+            f"error: conversion requires pillow-heif + Pillow + numpy ({e}); "
+            "no output was written",
+            file=sys.stderr,
+        )
+        return 1
 
     verb = "overwritten" if output_path == input_path else f"-> {output_path}"
     print(f"converted {input_path.name} {verb}")

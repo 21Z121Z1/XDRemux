@@ -37,9 +37,26 @@ package func appendInt32BE(_ value: Int32, to data: inout Data) {
 package func makeBox(_ type: String, payload: Data) -> Data {
     var out = Data()
     appendUInt32BE(payload.count + 8, to: &out)
-    out.append(type.data(using: .ascii)!)
+    // Box types are decoded from source bytes as ISO Latin-1 (see
+    // isobmffBoxes); encoding back as ASCII would force-unwrap nil for any
+    // preserved vendor 4CC with a byte >= 0x80. Latin-1 round-trips exactly.
+    out.append(type.data(using: .isoLatin1) ?? Data("????".utf8))
     out.append(payload)
     return out
+}
+
+/// Throws when fewer than `count` bytes remain before `end` — the shared
+/// guard for parsers that walk file-supplied structures. Field counts inside
+/// iloc/ipma/iinf come from the input file; without this, a truncated or
+/// malicious box drives Data subscripts past the end and crashes the process
+/// instead of failing with `invalidContainer`.
+@inline(__always)
+package func requireBytes(_ pos: Int, _ count: Int, end: Int, in boxType: String) throws {
+    guard pos >= 0, count >= 0, pos <= end, end - pos >= count else {
+        throw CLIError.invalidContainer(
+            "truncated \(boxType) box: need \(count) bytes at offset \(pos), box ends at \(end)"
+        )
+    }
 }
 
 package func isobmffBoxes(in data: Data, start: Int, end: Int) -> [ISOBMFFBox] {
@@ -52,7 +69,10 @@ package func isobmffBoxes(in data: Data, start: Int, end: Int) -> [ISOBMFFBox] {
         var header = 8
         if size == 1 {
             if pos + 16 > end { break }
-            size = Int(UInt64(readUInt32BEUnchecked(data, at: pos + 8)) << 32 | UInt64(readUInt32BEUnchecked(data, at: pos + 12)))
+            let large = UInt64(readUInt32BEUnchecked(data, at: pos + 8)) << 32
+                | UInt64(readUInt32BEUnchecked(data, at: pos + 12))
+            guard let converted = Int(exactly: large) else { break }
+            size = converted
             header = 16
         } else if size == 0 {
             size = end - pos
@@ -65,6 +85,8 @@ package func isobmffBoxes(in data: Data, start: Int, end: Int) -> [ISOBMFFBox] {
 }
 
 package func parseISOBMFFILoc(_ data: Data, _ box: ISOBMFFBox) throws -> [ISOBMFFILocEntry] {
+    let end = box.dataEnd
+    try requireBytes(box.dataStart, 6, end: end, in: "iloc")
     let version = data[box.dataStart]
     var pos = box.dataStart + 4
     let sizes0 = data[pos]; pos += 1
@@ -75,69 +97,91 @@ package func parseISOBMFFILoc(_ data: Data, _ box: ISOBMFFBox) throws -> [ISOBMF
     let indexSize = version == 1 || version == 2 ? Int(sizes1 & 0x0f) : 0
     let count: Int
     if version >= 2 {
+        try requireBytes(pos, 4, end: end, in: "iloc")
         count = readUInt32BEUnchecked(data, at: pos); pos += 4
     } else {
+        try requireBytes(pos, 2, end: end, in: "iloc")
         count = readUInt16BEUnchecked(data, at: pos); pos += 2
     }
 
-    func read(_ size: Int, _ pos: inout Int) -> Int {
-        var value = 0
+    func read(_ size: Int, _ pos: inout Int) throws -> Int {
+        try requireBytes(pos, size, end: end, in: "iloc")
+        var value: UInt64 = 0
         for _ in 0..<size {
-            value = (value << 8) | Int(data[pos])
+            value = (value << 8) | UInt64(data[pos])
             pos += 1
         }
-        return value
+        guard let converted = Int(exactly: value) else {
+            throw CLIError.invalidContainer("iloc field value \(value) exceeds supported range")
+        }
+        return converted
     }
 
     var entries: [ISOBMFFILocEntry] = []
     for _ in 0..<count {
         let itemID: Int
         if version >= 2 {
+            try requireBytes(pos, 4, end: end, in: "iloc")
             itemID = readUInt32BEUnchecked(data, at: pos); pos += 4
         } else {
+            try requireBytes(pos, 2, end: end, in: "iloc")
             itemID = readUInt16BEUnchecked(data, at: pos); pos += 2
         }
         var constructionMethod = 0
         if version == 1 || version == 2 {
+            try requireBytes(pos, 2, end: end, in: "iloc")
             constructionMethod = readUInt16BEUnchecked(data, at: pos) & 0x0f
             pos += 2
         }
+        try requireBytes(pos, 2, end: end, in: "iloc")
         let dataReferenceIndex = readUInt16BEUnchecked(data, at: pos); pos += 2
-        let baseOffset = read(baseOffsetSize, &pos)
+        let baseOffset = try read(baseOffsetSize, &pos)
+        try requireBytes(pos, 2, end: end, in: "iloc")
         let extentCount = readUInt16BEUnchecked(data, at: pos); pos += 2
         var extents: [(offset: Int, length: Int)] = []
         for _ in 0..<extentCount {
-            if indexSize > 0 { _ = read(indexSize, &pos) }
-            let offset = read(offsetSize, &pos)
-            let length = read(lengthSize, &pos)
-            extents.append((baseOffset + offset, length))
+            if indexSize > 0 { _ = try read(indexSize, &pos) }
+            let offset = try read(offsetSize, &pos)
+            let length = try read(lengthSize, &pos)
+            let (absolute, overflow) = baseOffset.addingReportingOverflow(offset)
+            guard !overflow else {
+                throw CLIError.invalidContainer("iloc extent offset overflows for item \(itemID)")
+            }
+            extents.append((absolute, length))
         }
         entries.append(ISOBMFFILocEntry(itemID: itemID, constructionMethod: constructionMethod, dataReferenceIndex: dataReferenceIndex, extents: extents))
     }
     return entries
 }
 
-package func parseISOBMFFIInf(_ data: Data, _ box: ISOBMFFBox) -> (version: UInt8, entries: [Int: String], rawInfe: [Int: Data]) {
+package func parseISOBMFFIInf(_ data: Data, _ box: ISOBMFFBox) throws -> (version: UInt8, entries: [Int: String], rawInfe: [Int: Data]) {
+    let end = box.dataEnd
+    try requireBytes(box.dataStart, 6, end: end, in: "iinf")
     let version = data[box.dataStart]
     var pos = box.dataStart + 4
     if version >= 1 {
+        try requireBytes(pos, 4, end: end, in: "iinf")
         pos += 4
     } else {
         pos += 2
     }
     var entries: [Int: String] = [:]
     var raw: [Int: Data] = [:]
-    for child in isobmffBoxes(in: data, start: pos, end: box.dataEnd) where child.type == "infe" {
+    for child in isobmffBoxes(in: data, start: pos, end: end) where child.type == "infe" {
+        try requireBytes(child.dataStart, 4, end: child.dataEnd, in: "infe")
         let v = data[child.dataStart]
         var p = child.dataStart + 4
         if v >= 2 {
             let itemID: Int
             if v >= 3 {
+                try requireBytes(p, 4, end: child.dataEnd, in: "infe")
                 itemID = readUInt32BEUnchecked(data, at: p); p += 4
             } else {
+                try requireBytes(p, 2, end: child.dataEnd, in: "infe")
                 itemID = readUInt16BEUnchecked(data, at: p); p += 2
             }
             p += 2
+            try requireBytes(p, 4, end: child.dataEnd, in: "infe")
             let type = String(data: data.subdata(in: p..<p + 4), encoding: .isoLatin1) ?? "????"
             entries[itemID] = type
             raw[itemID] = data.subdata(in: child.boxStart..<child.boxStart + child.size)
@@ -146,16 +190,24 @@ package func parseISOBMFFIInf(_ data: Data, _ box: ISOBMFFBox) -> (version: UInt
     return (version, entries, raw)
 }
 
-package func parseISOBMFFPITM(_ data: Data, _ box: ISOBMFFBox) -> Int {
+package func parseISOBMFFPITM(_ data: Data, _ box: ISOBMFFBox) throws -> Int {
+    try requireBytes(box.dataStart, 4, end: box.dataEnd, in: "pitm")
     let version = data[box.dataStart]
     let pos = box.dataStart + 4
-    return version == 0 ? readUInt16BEUnchecked(data, at: pos) : readUInt32BEUnchecked(data, at: pos)
+    if version == 0 {
+        try requireBytes(pos, 2, end: box.dataEnd, in: "pitm")
+        return readUInt16BEUnchecked(data, at: pos)
+    }
+    try requireBytes(pos, 4, end: box.dataEnd, in: "pitm")
+    return readUInt32BEUnchecked(data, at: pos)
 }
 
 package func parseISOBMFFIPMA(
     _ data: Data,
     _ box: ISOBMFFBox
-) -> (version: UInt8, flags: Int, entries: [ISOBMFFIPMAEntry]) {
+) throws -> (version: UInt8, flags: Int, entries: [ISOBMFFIPMAEntry]) {
+    let end = box.dataEnd
+    try requireBytes(box.dataStart, 8, end: end, in: "ipma")
     let version = data[box.dataStart]
     let flags = (Int(data[box.dataStart + 1]) << 16) | (Int(data[box.dataStart + 2]) << 8) | Int(data[box.dataStart + 3])
     var pos = box.dataStart + 4
@@ -164,16 +216,21 @@ package func parseISOBMFFIPMA(
     for _ in 0..<count {
         let itemID: Int
         if version >= 1 {
+            try requireBytes(pos, 4, end: end, in: "ipma")
             itemID = readUInt32BEUnchecked(data, at: pos); pos += 4
         } else {
+            try requireBytes(pos, 2, end: end, in: "ipma")
             itemID = readUInt16BEUnchecked(data, at: pos); pos += 2
         }
+        try requireBytes(pos, 1, end: end, in: "ipma")
         let associationCount = Int(data[pos]); pos += 1
         var associations: [Int] = []
         for _ in 0..<associationCount {
             if flags & 1 != 0 {
+                try requireBytes(pos, 2, end: end, in: "ipma")
                 associations.append(readUInt16BEUnchecked(data, at: pos)); pos += 2
             } else {
+                try requireBytes(pos, 1, end: end, in: "ipma")
                 associations.append(Int(data[pos])); pos += 1
             }
         }
@@ -639,15 +696,24 @@ package func makeAppleTmapPayload(infoFloats f: [Double]) -> Data {
         // compact Apple tmap form with a 22-bit fixed-point denominator. The
         // numeric value alone is insufficient: ImageIO rejects an otherwise
         // equivalent 100000-based representation when reading ISO Gain Maps.
+        guard value.isFinite else {
+            // Extraction sanitizes metadata, so this is a second line of
+            // defense: Int32(NaN) would trap the whole process.
+            appendInt32BE(0, to: &data)
+            appendInt32BE(1, to: &data)
+            return
+        }
         let rounded = value.rounded()
-        if abs(value - rounded) < 1e-12 {
-            appendInt32BE(Int32(rounded), to: &data)
+        if abs(value - rounded) < 1e-12, let exact = Int32(exactly: rounded) {
+            appendInt32BE(exact, to: &data)
             appendInt32BE(1, to: &data)
             return
         }
         let denominator: Int32 = 1 << 22
         let imageIOValue = (value * 100_000.0).rounded() / 100_000.0
-        appendInt32BE(Int32((imageIOValue * Double(denominator)).rounded()), to: &data)
+        let numerator = (imageIOValue * Double(denominator)).rounded()
+        let clamped = min(max(numerator, Double(Int32.min)), Double(Int32.max))
+        appendInt32BE(Int32(clamped), to: &data)
         appendInt32BE(denominator, to: &data)
     }
     let values: [Double] = [
@@ -744,16 +810,16 @@ package func writeHybridPrimaryPassthrough(
     let sourceIprp = try sourceChild("iprp")
     let sourceIDAT = sourceMetaChildren.first(where: { $0.type == "idat" })
     let sourceIref = sourceMetaChildren.first(where: { $0.type == "iref" })
-    let sourcePrimaryID = parseISOBMFFPITM(source, sourcePitm)
+    let sourcePrimaryID = try parseISOBMFFPITM(source, sourcePitm)
     let sourceItemInfo = parseISOBMFFItemInfos(source, sourceIinf)
     let sourceIlocEntries = try parseISOBMFFILoc(source, sourceIloc)
     let sourceRefsInfo = parseISOBMFFIRefs(source, sourceIref)
     let sourceProps = try parseISOBMFFIPCOPropertyInfos(source, sourceIprp)
-    let sourcePropsByIndex = Dictionary(uniqueKeysWithValues: sourceProps.map { ($0.index, $0) })
+    let sourcePropsByIndex = Dictionary(sourceProps.map { ($0.index, $0) }, uniquingKeysWith: { first, _ in first })
     guard let sourceIPMABox = isobmffBoxes(in: source, start: sourceIprp.dataStart, end: sourceIprp.dataEnd).first(where: { $0.type == "ipma" }) else {
         throw CLIError.invalidContainer("source ipma missing")
     }
-    let sourceIPMA = parseISOBMFFIPMA(source, sourceIPMABox)
+    let sourceIPMA = try parseISOBMFFIPMA(source, sourceIPMABox)
 
     let preservedIinf = try preservedChild("iinf")
     let preservedIloc = try preservedChild("iloc")
@@ -761,23 +827,24 @@ package func writeHybridPrimaryPassthrough(
     let preservedIprp = try preservedChild("iprp")
     let preservedIDAT = preservedMetaChildren.first(where: { $0.type == "idat" })
     let preservedIref = preservedMetaChildren.first(where: { $0.type == "iref" })
-    let preservedPrimaryID = parseISOBMFFPITM(preserved, preservedPitm)
+    let preservedPrimaryID = try parseISOBMFFPITM(preserved, preservedPitm)
     let preservedItemInfo = parseISOBMFFItemInfos(preserved, preservedIinf)
-    let preservedItemsByID = Dictionary(uniqueKeysWithValues: preservedItemInfo.items.map { ($0.itemID, $0) })
+    let preservedItemsByID = Dictionary(preservedItemInfo.items.map { ($0.itemID, $0) }, uniquingKeysWith: { first, _ in first })
     let preservedIlocEntries = try parseISOBMFFILoc(preserved, preservedIloc)
-    let preservedIlocByID = Dictionary(uniqueKeysWithValues: preservedIlocEntries.map { ($0.itemID, $0) })
+    let preservedIlocByID = Dictionary(preservedIlocEntries.map { ($0.itemID, $0) }, uniquingKeysWith: { first, _ in first })
     let preservedRefsInfo = parseISOBMFFIRefs(preserved, preservedIref)
     let preservedProps = try parseISOBMFFIPCOPropertyInfos(preserved, preservedIprp)
-    let preservedPropsByIndex = Dictionary(uniqueKeysWithValues: preservedProps.map { ($0.index, $0) })
+    let preservedPropsByIndex = Dictionary(preservedProps.map { ($0.index, $0) }, uniquingKeysWith: { first, _ in first })
     guard let preservedIPMABox = isobmffBoxes(in: preserved, start: preservedIprp.dataStart, end: preservedIprp.dataEnd).first(where: { $0.type == "ipma" }) else {
         throw CLIError.invalidContainer("preserve ipma missing")
     }
-    let preservedIPMA = parseISOBMFFIPMA(preserved, preservedIPMABox)
+    let preservedIPMA = try parseISOBMFFIPMA(preserved, preservedIPMABox)
 
     let preservedDimgRefs = Dictionary(
-        uniqueKeysWithValues: preservedRefsInfo.refs
+        preservedRefsInfo.refs
             .filter { $0.type == "dimg" }
-            .map { ($0.from, $0.to) }
+            .map { ($0.from, $0.to) },
+        uniquingKeysWith: { first, _ in first }
     )
     guard let preservedTmapID = preservedItemInfo.items.first(where: { $0.type == "tmap" })?.itemID,
           let tmapTargets = preservedDimgRefs[preservedTmapID] else {
@@ -935,8 +1002,8 @@ package func writeHybridPrimaryPassthrough(
         props[assoc.0]?.type
     }
 
-    let sourceIPMAByID = Dictionary(uniqueKeysWithValues: sourceIPMA.entries.map { ($0.itemID, $0) })
-    let preservedIPMAByID = Dictionary(uniqueKeysWithValues: preservedIPMA.entries.map { ($0.itemID, $0) })
+    let sourceIPMAByID = Dictionary(sourceIPMA.entries.map { ($0.itemID, $0) }, uniquingKeysWith: { first, _ in first })
+    let preservedIPMAByID = Dictionary(preservedIPMA.entries.map { ($0.itemID, $0) }, uniquingKeysWith: { first, _ in first })
     let sourcePrimaryColorAssoc = assocPairs(sourceIPMAByID[sourcePrimaryID]?.associations ?? [], flags: sourceIPMA.flags)
         .first { propertyType($0, in: sourcePropsByIndex) == "colr" }
     var primaryAssocs = assocPairs(sourceIPMAByID[sourcePrimaryID]?.associations ?? [], flags: sourceIPMA.flags)
@@ -1271,14 +1338,14 @@ package func writePrivateJPEGPassthroughOutput(
     let iprp = try child("iprp")
     let idat = try child("idat")
     let iref = metaChildren.first(where: { $0.type == "iref" })
-    let primaryID = parseISOBMFFPITM(src, pitm)
-    let iinfData = parseISOBMFFIInf(src, iinf)
+    let primaryID = try parseISOBMFFPITM(src, pitm)
+    let iinfData = try parseISOBMFFIInf(src, iinf)
     let ilocEntries = try parseISOBMFFILoc(src, iloc)
     let ipco = try parseISOBMFFIPCOProps(src, iprp)
     guard let ipmaBox = isobmffBoxes(in: src, start: iprp.dataStart, end: iprp.dataEnd).first(where: { $0.type == "ipma" }) else {
         throw CLIError.invalidContainer("ipma missing")
     }
-    let ipma = parseISOBMFFIPMA(src, ipmaBox)
+    let ipma = try parseISOBMFFIPMA(src, ipmaBox)
     let propMask = ipma.flags & 1 != 0 ? 0x7fff : 0x7f
     let primaryAssocs = ipma.entries.first(where: { $0.itemID == primaryID })?.associations ?? []
     let primaryPropIndices = primaryAssocs.map { $0 & propMask }
@@ -1326,6 +1393,14 @@ package func writePrivateJPEGPassthroughOutput(
         userCommentPatch = patch
     } else {
         userCommentPatch = nil
+    }
+
+    var preservedGroupPayload = Data()
+    var sourceGroupIDs: [Int] = []
+    for groupBox in metaChildren where groupBox.type == "grpl" {
+        let preserved = preservedEntityGroupChildren(in: src, grpl: groupBox, dropping: [])
+        preservedGroupPayload.append(preserved.payload)
+        sourceGroupIDs.append(contentsOf: preserved.groupIDs)
     }
 
     var metaParts: [Data] = []
@@ -1427,6 +1502,11 @@ package func writePrivateJPEGPassthroughOutput(
             payload.append(tmapPayload)
             payload.append(xmpPayload)
             metaParts.append(makeBox("idat", payload: payload))
+        case "grpl":
+            // Source entity groups are merged into the single grpl emitted
+            // below; copying the box here as well would produce a duplicate
+            // GroupsListBox (ISO 14496-12 allows at most one per meta).
+            continue
         default:
             metaParts.append(src.subdata(in: part.boxStart..<part.boxStart + part.size))
         }
@@ -1440,9 +1520,9 @@ package func writePrivateJPEGPassthroughOutput(
         metaParts.append(makeBox("iref", payload: payload))
     }
 
-    var grplPayload = Data()
+    var grplPayload = preservedGroupPayload
     var altrPayload = Data([0, 0, 0, 0])
-    appendUInt32BE(max(tmapID, xmpID) + 1, to: &altrPayload)
+    appendUInt32BE(max(max(tmapID, xmpID), sourceGroupIDs.max() ?? 0) + 1, to: &altrPayload)
     appendUInt32BE(2, to: &altrPayload)
     appendUInt32BE(tmapID, to: &altrPayload)
     appendUInt32BE(primaryID, to: &altrPayload)
@@ -1590,9 +1670,9 @@ package func replacePrivateJPEGGainMapWithHEVCTiles(
     let iprp = try child("iprp")
     let idat = try child("idat")
     let iref = try child("iref")
-    let primaryID = parseISOBMFFPITM(source, pitm)
+    let primaryID = try parseISOBMFFPITM(source, pitm)
     let itemInfo = parseISOBMFFItemInfos(source, iinf)
-    let itemByID = Dictionary(uniqueKeysWithValues: itemInfo.items.map { ($0.itemID, $0) })
+    let itemByID = Dictionary(itemInfo.items.map { ($0.itemID, $0) }, uniquingKeysWith: { first, _ in first })
     let refsInfo = parseISOBMFFIRefs(source, iref)
     guard let tmapID = itemInfo.items.first(where: { item in
         item.type == "tmap" && refsInfo.refs.contains(where: {
@@ -1608,7 +1688,7 @@ package func replacePrivateJPEGGainMapWithHEVCTiles(
     }
 
     let ilocEntries = try parseISOBMFFILoc(source, iloc)
-    let ilocByID = Dictionary(uniqueKeysWithValues: ilocEntries.map { ($0.itemID, $0) })
+    let ilocByID = Dictionary(ilocEntries.map { ($0.itemID, $0) }, uniquingKeysWith: { first, _ in first })
     guard let jpegEntry = ilocByID[gainMapID],
           jpegEntry.constructionMethod == 0,
           jpegEntry.extents.count == 1 else {
@@ -1625,7 +1705,7 @@ package func replacePrivateJPEGGainMapWithHEVCTiles(
         .first(where: { $0.type == "ipma" }) else {
         throw CLIError.invalidContainer("private JPEG Gain Map source ipco/ipma missing")
     }
-    let ipma = parseISOBMFFIPMA(source, ipmaBox)
+    let ipma = try parseISOBMFFIPMA(source, ipmaBox)
 
     let appendedGraphIDs = Set([gainMapID, tmapID] + itemInfo.items.compactMap { item in
         guard item.type == "mime",
@@ -1649,7 +1729,7 @@ package func replacePrivateJPEGGainMapWithHEVCTiles(
     }
     let remappedItemIDs = [gainMapID: outputGainMapID, tmapID: outputTmapID]
     func outputItemID(_ itemID: Int) -> Int { remappedItemIDs[itemID] ?? itemID }
-    let propertyByIndex = Dictionary(uniqueKeysWithValues: properties.map { ($0.index, $0) })
+    let propertyByIndex = Dictionary(properties.map { ($0.index, $0) }, uniquingKeysWith: { first, _ in first })
     var uniqueTileSizes: [(width: Int, height: Int)] = []
     for size in tileSizes where !uniqueTileSizes.contains(where: {
         $0.width == size.width && $0.height == size.height

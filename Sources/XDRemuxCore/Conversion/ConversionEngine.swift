@@ -589,6 +589,10 @@ func writeImageIOPreservedGainMapPassthrough(
         patchedUserComment: patchedUserComment,
         preserveTmapColor: oppoCompatibility.wantsOppoCompat,
         strictISO21496Tmap: strictISO21496,
-        fallbackXMPPayload: makeHdrgmXMP(infoFloats: productInput.extracted.metaFloats)
+        // makeHdrgmXMP expects the 20-float UHDR info layout; for LHDR inputs
+        // extracted.metaFloats is the 36-float local.hdr.meta.data block
+        // (f[0] = version, f[17] = histogram accumulator, ...), which would
+        // serialize garbage hdrgm values into the fallback XMP.
+        fallbackXMPPayload: makeHdrgmXMP(infoFloats: privateGainMapInfoFloats(for: productInput))
     )
 }

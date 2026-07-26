@@ -18,6 +18,7 @@ SCHEMA_VERSION = 1
 CHECK_KINDS = {"static", "regression", "functional", "integration", "device"}
 FUNCTIONAL_KINDS = {"functional", "integration", "device"}
 PRODUCTION_PREFIXES = (
+    "Sources/",
     "xdremux/",
     "apps/macos/XDRemuxApp/Sources/",
 )
@@ -76,7 +77,9 @@ def changed_files(repo: Path, base_commit: str, head_commit: str) -> list[str]:
         repo,
         "diff",
         "--name-only",
-        "--diff-filter=ACMRTUXB",
+        # Deletions are production changes too: removing a source file needs the
+        # same functional evidence as editing one.
+        "--diff-filter=ACDMRTUXB",
         f"{merge_base}...{head_commit}",
     )
     return [line for line in output.splitlines() if line]

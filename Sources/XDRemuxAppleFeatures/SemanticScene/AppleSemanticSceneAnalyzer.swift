@@ -2,6 +2,8 @@ import Foundation
 import XDRemuxCore
 
 package enum AppleSemanticSceneAnalyzer {
+    private static let semanticHelperTimeout: TimeInterval = 300
+
     static func copyEvidence(from sourceDirectory: URL, to outputDirectory: URL) throws {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: sourceDirectory.path) else {
@@ -56,12 +58,23 @@ package enum AppleSemanticSceneAnalyzer {
         if !writePNGEvidence {
             arguments.append("--raw-only")
         }
-        let result = try AppleNativeToolchain.run(executable, arguments: arguments)
-        guard result.status == 0 else {
+        // Every other native helper is bounded; a hung Vision request must not
+        // wedge a batch run forever. Full-resolution matte generation is the
+        // heaviest of them, hence the wider budget.
+        let result = try AppleNativeToolchain.run(
+            executable,
+            arguments: arguments,
+            timeout: semanticHelperTimeout
+        )
+        guard !result.timedOut, result.status == 0 else {
             let stderr = String(data: result.stderr, encoding: .utf8) ?? ""
             let stdout = String(data: result.stdout, encoding: .utf8) ?? ""
+            let timeout = result.timedOut
+                ? "helper exceeded \(Int(semanticHelperTimeout)) seconds; "
+                : ""
             throw CLIError.invalidContainer(
-                "Apple semantic capability unavailable: \([stderr, stdout].filter { !$0.isEmpty }.joined(separator: " "))"
+                "Apple semantic capability unavailable: \(timeout)"
+                    + [stderr, stdout].filter { !$0.isEmpty }.joined(separator: " ")
             )
         }
         try result.stdout.write(
