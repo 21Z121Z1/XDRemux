@@ -2,39 +2,31 @@
 
 [English](development.en.md) | 简体中文
 
-本文档面向需要构建 App、集成 Swift Package、运行 validator 或修改转换器的开发者。普通转换用法见 [CLI 参考](cli.md)。
+面向要改转换器、集成 Swift Package 或构建 macOS App 的人。日常转换用法见 [CLI 参考](cli.md)。
 
-## 开发环境
+## 环境
 
-- macOS 15 或更高版本。
-- Swift 6 工具链。
-- 构建使用 Apple 最新 SwiftUI API 的 macOS App 时，建议使用当前 Xcode。
-- Apple 人像开发需要 `zstd`；JPEG 人像桥接需要 `ultrahdr_app`。
+- macOS 15 或更高版本
+- Swift 6 工具链
+- 构建 macOS App 需要 Xcode
+- Apple 人像功能需要 `zstd`（`brew install zstd`）
 
 ## Swift Package 产品
 
-| Product | 类型 | 用途 |
+| 产品 | 类型 | 用途 |
 | --- | --- | --- |
-| `XDRemuxCore` | Library | 转换模型、HDR、HEIF、Metadata、Batch 和输出验证 |
-| `XDRemuxAppleFeatures` | Library | Apple 语义分析、摄影风格和人像功能 |
-| `xdremux` | Executable | 正式用户 CLI |
-| `xdremux-dev` | Executable | 实验参数、validator 和诊断命令 |
-| `XDRemuxSemanticHelper` | Executable | 隔离的 Apple 语义分析 |
-| `XDRemuxHEVCEncoderHelper` | Executable | 隔离的 VideoToolbox HEVC 编码 |
-| `XDRemuxStyleValidationHelper` | Executable | 隔离的 Apple 摄影风格属性验证 |
-
-基础命令：
+| `XDRemuxCore` | Library | 转换核心：HDR、HEIF、元数据、批量、输出校验 |
+| `XDRemuxAppleFeatures` | Library | Apple 语义分析、摄影风格和人像 |
+| `xdremux` | Executable | 命令行工具 |
+| `coreimage-raw-diagnostics` | Executable | RAW 相关的 CoreImage 诊断工具 |
 
 ```bash
 swift build
 swift test
 swift run xdremux --help
-swift run xdremux-dev --help
 ```
 
-使用 Apple 功能时不要只构建单个 CLI product；完整 `swift build` 会同时生成所需 helper。
-
-## Swift Package 集成
+## 集成到自己的项目
 
 ```swift
 dependencies: [
@@ -42,7 +34,7 @@ dependencies: [
 ]
 ```
 
-按需要依赖 `XDRemuxCore` 或 `XDRemuxAppleFeatures`。基础转换入口：
+按需依赖 `XDRemuxCore` 或 `XDRemuxAppleFeatures`：
 
 ```swift
 import XDRemuxCore
@@ -50,118 +42,99 @@ import XDRemuxCore
 let input = InputSource(url: inputURL)
 var configuration = ConversionConfiguration()
 configuration.eventHandler = { event in
-    // 将结构化事件映射到调用方的日志或 UI。
+    // 把结构化事件接到调用方的日志或界面上。
 }
 
-let cancellation = ConversionCancellation()
-configuration.cancellation = cancellation
-
-let request = ConversionRequest(
-    input: input,
-    output: OutputTarget.file(outputURL).destination(for: input),
-    configuration: configuration
+let result = try ConversionEngine.convert(
+    ConversionRequest(
+        input: input,
+        output: OutputTarget.file(outputURL).destination(for: input),
+        configuration: configuration
+    )
 )
-let result = try ConversionEngine.convert(request)
 ```
 
-Apple 功能通过 `configuration.appleFeatureOptions` 配置，并调用 `AppleFeatureConversionEngine.convert(_:)`。
+Apple 功能通过 `configuration.appleFeatureOptions` 配置，入口是 `AppleFeatureConversionEngine`。
 
-`XDRemuxCore` 不负责终端、ANSI、本地化、SwiftUI 或 GitHub Actions 输出。调用方通过 `ConversionEvent` 获取阶段、warning、completed 和 failed 事件，并通过 `ConversionCancellation` 取消任务。
+`XDRemuxCore` 不碰终端、ANSI、本地化、SwiftUI 和 CI 输出 —— 调用方通过 `ConversionEvent` 拿阶段、warning 和结果。
 
-在发布稳定 tag 前，外部项目跟随 `main` 需要自行承担 API 变化；发布 tag 后应改用语义版本范围。
+目前还没有发布稳定 tag，跟 `main` 意味着 API 可能变。
 
-## 预构建 helper
+## 运行时编译的 helper
 
-Apple 私有或需要进程隔离的流程使用正式 executable target。helper 在构建时生成，App 将其放入 `Contents/Helpers`；运行时不会搜索源码、计算 source hash、调用 `xcrun`、`swiftc` 或 `clang`。
+Apple 功能里的 Vision 分析、HEVC 编码和风格属性探测跑在独立进程里。这些 helper 的源码放在包资源里，**第一次用到时才编译**：`AppleNativeToolchain` 按源码内容算哈希，调 `/usr/bin/xcrun` 编译到用户缓存目录，之后同一份源码直接复用缓存。
 
-当前协议标识：
+这带来两个后果：
 
-- `xdremux-semantic-helper-v1`
-- `xdremux-hevc-encoder-helper-v1`
-- `xdremux-apple-semantic-style-properties-probe-v1`
+- 首次运行 Apple 功能会有一次编译等待，之后就没有了。
+- 缓存目录是全机共享的，所以编译产物用临时文件加原子改名发布，多个 XDRemux 进程同时首次运行不会读到写了一半的二进制。
 
-helper stdout 只输出版本化机器协议，stderr 只输出诊断。App 和 CLI 使用同一个 locator，并支持超时和取消。
-
-## 开发者 CLI
-
-内部选项只在 `xdremux-dev` 提供：
-
-```bash
-swift run xdremux-dev convert \
-  --input IMG_001.heic \
-  --family x7 \
-  --input-processing hybrid \
-  --oppo-compat auto \
-  --oppo-camera-tail preserve \
-  --tmap-format imageio \
-  --diagnostics-dir diagnostics/
-```
-
-保留的内部参数包括 `--family`、`--input-processing`、`--oppo-compat`、`--oppo-camera-tail`、`--tmap-format` 和 `--diagnostics-dir`。正式 `xdremux` 会拒绝这些参数。
-
-验证命令：
-
-```bash
-swift run xdremux-dev validate-apple --input output.heic
-swift run xdremux-dev validate-portrait --input output.heic --json validation.json
-swift run xdremux-dev portrait-self-test
-```
+所有 helper 调用都有超时；stdout 只走版本化的机器协议，诊断走 stderr。
 
 ## macOS App
 
-App 位于 `apps/macos/XDRemuxApp/`，直接链接共享 Swift Package，不通过完整 CLI 执行转换。
+App 在 `apps/macos/XDRemuxApp/`，直接链接 Swift Package，不通过子进程调 CLI（`Tests/test_swift_app_architecture.py` 会强制这一点）。
 
 ```bash
-scripts/build_and_run.sh build
-scripts/build_and_run.sh run
-scripts/build_and_run.sh verify
-scripts/build_and_run.sh debug
-scripts/build_and_run.sh logs
-scripts/build_and_run.sh logs --all
-scripts/build_and_run.sh clean
+scripts/build_and_run.sh run      # 构建并启动
+scripts/build_and_run.sh build    # 只构建
+scripts/build_and_run.sh debug    # Debug 配置构建
+scripts/build_and_run.sh verify   # swift build + swift test + Python 套件
+scripts/build_and_run.sh logs     # 显示上次构建日志
+scripts/build_and_run.sh clean    # 清掉 DerivedData
 ```
 
-`build` 只构建；`run` 构建并启动；`verify` 还检查 bundle、helper 签名和进程；`debug` 使用 LLDB。`logs` 只显示 `com.proxdr.XDRemuxApp` subsystem，`logs --all` 才显示该进程的完整系统日志。
-
-默认使用 quiet `xcodebuild`。完整 `build.log` 和 `.xcresult` 保存在 XDRemux 自己的 DerivedData 中，`--verbose` 才实时输出完整构建日志。
+除显式 `debug` 外一律 Release 构建 —— 摄影风格求解很吃 CPU，调试构建慢好几倍。
 
 ## 仓库结构
 
 | 路径 | 用途 |
 | --- | --- |
 | `Package.swift` | SwiftPM 产品和 target 定义 |
-| `Sources/XDRemuxCore/` | 平台无关转换核心 |
+| `Sources/XDRemuxCore/` | 转换核心 |
 | `Sources/XDRemuxAppleFeatures/` | Apple 专用功能 |
-| `Sources/XDRemuxCLI/` | CLI 解析、本地化和输出 |
-| `Sources/XDRemuxExecutable/` | 正式 CLI 入口 |
-| `Sources/XDRemuxDevExecutable/` | 开发者 CLI 入口 |
-| `Sources/XDRemux*Helper/` | 构建时生成的隔离 helper |
+| `Sources/XDRemuxCLI/` | 命令行解析与入口 |
+| `Sources/CoreImageRAWDiagnostics/` | RAW 诊断工具 |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI App |
-| `Tests/` | Swift、Python 和验证测试 |
-| `scripts/` | 构建、验证和 projection 工具 |
-| `docs/` | 用户文档、工程文档、验证和研究资料 |
+| `xdremux/python/` | 跨平台 Python CLI |
+| `xdremux/swift-cli/` | 兼容旧脚本的入口，转发到 `xdremux` |
+| `Tests/` | Swift 测试、Python 策略套件和验证 harness |
+| `scripts/` | 构建与验收脚本 |
+
+## 调试用环境变量
+
+正常使用都不需要设置。
+
+| 变量 | 作用 |
+| --- | --- |
+| `XDREMUX_DISABLE_DIRECT_GAIN=1` | 关掉一次性直接编码 Gain Map 的快路径 |
+| `XDREMUX_KEEP_GAIN_SCRATCH=1` | 保留 Gain Map 中间产物 |
+| `XDREMUX_KEEP_PORTRAIT_SCRATCH=1` | 保留人像转换中间产物 |
+| `XDREMUX_ENCODING_AUDIT_DIR=<目录>` | 把编码审计数据写到指定目录 |
+| `XDREMUX_STYLE_RENDER_JOBS=<n>` | 限制摄影风格渲染并发数 |
+
+摄影风格还有若干 `XDREMUX_RESEARCH_*` 和 `XDREMUX_STYLES_*` 研究开关，会在输出 manifest 里标记为研究模式并排除生产判定，见 [Apple 功能文档](apple-features.md)。
 
 ## 验收规则
 
-所有完成声明都需要与最终提交绑定的 completion gate receipt，但 gate 必须按变更范围选择证据。
-
-新 plan 应声明 `change_impact`（`documentation`、`non_output`、`output` 或 `release`）和 `impact_rationale`，说明输出文件为什么会或不会变化。
-
-- 文档变更：链接、命令示例、文档结构和公开 projection 检查。
-- CLI 解析变更：对应参数与输出回归测试。
-- 转换核心变更：单元测试加真实功能或集成验证。
-- App/helper 变更：构建、签名、运行或设备证据。
-- 发布或跨模块变更：完整矩阵。
-
-不要因为 completion gate 存在就对每次 README 修改运行真实照片矩阵。先完成并提交同一批相关改动，再为最终 `HEAD` 运行一次 targeted plan：
+声明改动完成之前，要为最终提交跑一次 completion gate：
 
 ```bash
 python3 scripts/agent_completion_gate.py run \
-  --base <verified-base> \
+  --base origin/main \
   --plan /tmp/xdremux-agent-verification.json
 
 python3 scripts/agent_completion_gate.py verify \
   .codex/verification-receipts/$(git rev-parse HEAD).json
 ```
 
-详细 schema 与证据要求见[验证说明](validation/README.md)。
+receipt 绑定当前 HEAD、base、改动文件集合和干净的工作区，之后任何提交或改动都会让它失效。
+
+按改动范围选证据，不要每改一行文档就跑整套真实照片矩阵：
+
+- 只改文档：链接、命令示例和文档策略检查。
+- 改 CLI 解析：对应的参数和输出回归。
+- 改转换核心：单元测试加上真实样本的功能验证。
+- 改 App 或 helper：构建、运行或设备证据。
+
+计划文件的 schema 和证据要求见[验证说明](validation/README.md)，可复用的 harness 在 `Tests/validation/`。

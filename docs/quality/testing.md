@@ -1,32 +1,30 @@
 # 测试规范
 
-用途: 规定仓库的最小验证链路和通过标准。
+规定这个仓库里一次改动至少要过哪些检查。怎么跑测试见 [Tests/README.md](../../Tests/README.md)，验收流程见[验证说明](../validation/README.md)。
 
-## 测试金字塔 (当前)
-1. 结构检查: `make lint`
-2. 回归检查: `make test`
-3. 冒烟检查: `make smoke`
-4. 全链路收口: `make verify`
+## 四层检查
 
-## 命令与覆盖范围
-
-| 命令 | 覆盖内容 | 阻断级别 |
+| 层 | 跑什么 | 覆盖 |
 | --- | --- | --- |
-| `make lint` | Python 语法、目录边界、工作流文档完整性、可选 flake8 | Hard fail |
-| `make test` | `evals/` 回归 + `oracle-dump/tests` 单元测试 | Hard fail |
-| `make smoke` | 关键目录与核心文件存在性、基础入口可执行 | Hard fail |
-| `make verify` | 上述全部 + `scripts/check_architecture.py` | Hard fail |
+| 单元与契约 | `swift test` | 转换模型、HEIF 边界、错误文案、CLI 参数解析、Apple 功能契约 |
+| 策略 | `python3 -m unittest discover -s Tests` | 架构边界、文档一致性、分类行为、Python 尾部策略 |
+| 真实样本 | `Tests/validation/` 下的 harness | 拿真实 OPPO 照片跑完整转换并断言结果 |
+| 验收 | `scripts/agent_completion_gate.py` | 把上面选出的检查绑定到具体提交，产出 receipt |
+
+策略测试是纯静态的 —— 它们读源码和文档做断言，不跑转换。**不要把静态检查当成功能证据。**
 
 ## 通过标准
-仅当 `make verify` 返回 0，才允许视为本次改动完成。
+
+`swift test` 和 Python 套件必须全绿。涉及转换行为的改动，还必须有至少一条真实样本证据 —— 类型检查通过不算。
 
 ## 新增测试要求
-1. 修 bug 必须新增至少一个回归断言。
-2. 新增脚本至少提供一个失败路径测试。
-3. 无法自动化的验证，必须登记技术债并说明阻塞条件。
+
+1. 修 bug 必须补一条回归断言，且这条断言在修复前应该是失败的。
+2. 改了用户能看见的文案（错误信息、help、命令输出），要有断言把它钉住。
+3. 无法自动化的验证，在提交说明里写清楚验证不了的是什么、为什么。
 
 ## 已知空白
-- 设备依赖的动态探针链路未纳入默认 CI。
-- fixture 覆盖仍有限，需要持续补样本。
 
-关联文档: `docs/quality/evals.md`, `docs/runbooks/local-dev.md`。
+- 私有真实样本不在仓库里。CI 的 fixture 环节要配 `XDREMUX_FIXTURE_ARCHIVE_URL` secret 才会跑，没配就跳过。
+- 没有真机 Photos 的自动化验收。Apple 摄影风格和人像的"导入、编辑、保存、重开"这一轮仍然只能手动做。
+- OPPO 相册的实际显示行为无法在 CI 里验证。
