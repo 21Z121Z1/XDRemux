@@ -1794,6 +1794,13 @@ static NSDictionary *RunNeutrinoStyleRender(
     NSUInteger maximumDimension,
     NSString *cast
 ) {
+    __block CFAbsoluteTime stageStartedAt = CFAbsoluteTimeGetCurrent();
+    NSMutableDictionary *stageMilliseconds = [NSMutableDictionary dictionary];
+    void (^recordStage)(NSString *) = ^(NSString *stage) {
+        CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+        stageMilliseconds[stage] = @((now - stageStartedAt) * 1000.0);
+        stageStartedAt = now;
+    };
     NSArray<NSString *> *frameworks = @[
         @"/System/Library/PrivateFrameworks/NeutrinoCore.framework/NeutrinoCore",
         @"/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",
@@ -1807,6 +1814,7 @@ static NSDictionary *RunNeutrinoStyleRender(
         frameworksLoaded = frameworksLoaded && loaded;
         [loadResults addObject:@{ @"path": path, @"loaded": @(loaded) }];
     }
+    recordStage(@"frameworksMs");
     NSMutableDictionary *result = [@{
         @"schema": @"xdremux-neutrino-style-render-v1",
         @"photo": photoPath,
@@ -1843,6 +1851,7 @@ static NSDictionary *RunNeutrinoStyleRender(
         WriteJSON(result, manifestPath, NULL);
         return result;
     }
+    recordStage(@"imagePropertiesMs");
 
     NSDictionary *recipe = @{
         @"metadata": @{
@@ -1908,6 +1917,7 @@ static NSDictionary *RunNeutrinoStyleRender(
         WriteJSON(result, manifestPath, NULL);
         return result;
     }
+    recordStage(@"rendererSetupMs");
 
     double scale = maximumDimension > 0
         ? fmin(1.0, (double)maximumDimension / fmax((double)width, (double)height))
@@ -1932,8 +1942,10 @@ static NSDictionary *RunNeutrinoStyleRender(
         [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
                                 beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
     }
+    recordStage(@"renderMs");
     CGImageRef rendered = CopyCGImageFromObject(completionImage);
     BOOL written = rendered && WritePNG(rendered, outputPath, &error);
+    recordStage(@"pngMs");
     if (rendered) {
         result[@"render"] = @{
             @"width": @(CGImageGetWidth(rendered)),
@@ -1945,6 +1957,7 @@ static NSDictionary *RunNeutrinoStyleRender(
     }
     result[@"status"] = written ? @"written" : (completed ? @"write_failed" : @"timeout");
     result[@"error"] = JSONSafe(error);
+    result[@"stageMilliseconds"] = stageMilliseconds;
     WriteJSON(result, manifestPath, NULL);
     return result;
 }
