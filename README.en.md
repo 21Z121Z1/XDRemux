@@ -2,9 +2,9 @@
 
 English | [简体中文](README.md)
 
-Convert ProXDR photos from OPPO, OnePlus, and realme phones into standard HDR HEIC that any ISO/TS 21496-1 viewer can display.
+Convert ProXDR photos from OPPO, OnePlus, and realme phones into the standard HDR photo format (ISO/TS 21496-1), so they display properly on iPhone, on Mac, and anywhere else that supports it.
 
-On these phones the HDR information lives in a vendor-private block, so a ProXDR photo looks like an ordinary SDR image anywhere outside the stock gallery. XDRemux reads the private gain map and metadata and repackages them as a standard ISO/TS 21496-1 structure. The primary image payload is preserved byte for byte; only the gain map and the container structures it depends on are rebuilt.
+ProXDR keeps its HDR information in the manufacturer's private data, so anywhere outside the stock gallery you get an ordinary photo with the highlights flattened. XDRemux translates it into the standard format without re-encoding a single byte of the picture.
 
 ## Quick start
 
@@ -41,13 +41,13 @@ Convert a whole directory:
 | Apple Photos portrait depth editing | `--apple-portrait` |
 | Files sorted by shooting mode | `categorize` or `batch --categorize` |
 
-The default mode preserves the original primary image and the non-HDR vendor metadata, rebuilding only the gain map structure. A source gain map that is full-resolution 4:4:4 stays 4:4:4; `--oppo-compatible` downsamples it to the 4:2:0 form OPPO Gallery needs, which cannot be undone.
+By default only the HDR data is rewritten (the industry calls it a gain map: it records how much brighter each pixel should get). The picture, the watermark, the master-mode settings all stay exactly as they were. HDR precision is preserved too; `--oppo-compatible` has to drop it a notch before OPPO Gallery will read it, and there is no way back.
 
 Every option, default, and exit code is in the [CLI reference](docs/cli.en.md), or run `swift run xdremux --help`.
 
 ## Sorting by shooting mode
 
-Reads the shooting mode from the EXIF UserComment and copies photos into Chinese-named folders (`人像`, `夜景`, `大师模式`, and so on). It only copies — sources are never modified or deleted:
+Reads the shooting mode recorded in each photo and copies it into the matching Chinese-named folder (`人像` portrait, `夜景` night, `大师模式` master mode, and so on). It only copies — sources are never modified or deleted:
 
 ```bash
 swift run xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run
@@ -63,12 +63,12 @@ Photos whose mode cannot be read stay in the output root and are not counted as 
 
 ## Apple Photographic Styles and portrait
 
-XDRemux generates the Photographic Styles and portrait editing data Apple Photos expects from the photo itself, with no Apple donor photo involved. The portrait feature needs a source photo carrying the complete OPPO depth bundle (`rear.depth`, `rear.depth.config`, `src.image`). Both features can be enabled together and written into one HEIC; both are mutually exclusive with `--oppo-compatible`.
+Make a converted photo support Photographic Styles and portrait depth editing in Apple Photos. All of that data is computed from your own photo — no separate iPhone photo to copy from. Portrait needs a source shot in portrait mode with its depth data still intact; photos edited afterwards may have lost it. Both features can be enabled together, and neither can be combined with `--oppo-compatible`.
 
 > [!IMPORTANT]
-> Neither feature has passed production acceptance. The reproducible evidence today covers offline container structure, ImageIO, and the repository validators — it does **not** include importing into Photos on a real device, editing, saving, quitting, and reopening. See the [Apple features guide](docs/apple-features.en.md) for exactly what has and has not been proven.
+> Neither feature has passed production acceptance. The checking reaches the file-structure level only: the file opens, the data is there. What has **not** been verified is whether it survives being imported into Photos on a real device, edited, saved, and reopened. See the [Apple features guide](docs/apple-features.en.md).
 
-Solving for Photographic Styles is compute-heavy. Use a release build for batches; it is several times faster than the default debug build:
+Generating Photographic Styles data is CPU-heavy. Use a release build for batches; it is several times faster than the default debug build:
 
 ```bash
 swift build -c release
@@ -118,10 +118,10 @@ The Apple features live in the `XDRemuxAppleFeatures` product, behind `AppleFeat
 | Document | Covers |
 | --- | --- |
 | [CLI reference](docs/cli.en.md) | Every command, option, default, and exit code |
-| [Apple features](docs/apple-features.en.md) | What Styles and portrait can do, and their verification status |
+| [Apple features](docs/apple-features.en.md) | What Styles and portrait can do, and how far they have been verified |
 | [Supported devices](docs/supported-devices.en.md) | Phones known to shoot ProXDR |
 | [Development guide](docs/development.en.md) | Module layout, Swift package integration, build workflows |
-| [Technical implementation](docs/xdremux/README.en.md) | HDR, HEIF, and ISO container behaviour |
+| [Technical implementation](docs/xdremux/README.en.md) | HDR, HEIF file structure, and how the ISO standard is implemented |
 
 ## Known limitations
 
