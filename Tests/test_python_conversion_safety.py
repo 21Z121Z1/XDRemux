@@ -13,7 +13,7 @@ from unittest import mock
 
 import numpy as np
 
-from xdremux.python import gainmap, heif_io, isobmff_patch
+from xdremux_py import gainmap, heif_io, isobmff_patch
 
 
 class GainMapEdgeCaseTests(unittest.TestCase):

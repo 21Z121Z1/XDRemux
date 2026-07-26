@@ -88,9 +88,11 @@ scripts/build_and_run.sh run
 跨平台，只做 HDR 转换，没有 Apple 功能。需要 Python 3.11 或更高版本。
 
 ```bash
-pip install -r xdremux/python/requirements.txt
-python3 xdremux/python/XDRemux.py convert --input IMG_001.heic --output IMG_001_hdr.heic
+pip install -e .
+xdremux-py convert --input IMG_001.heic --output IMG_001_hdr.heic
 ```
+
+不安装也可以，从仓库根目录用 `python3 xdremux/python/XDRemux.py` 或 `python3 -m xdremux_py` 调用同一套命令。
 
 ## 作为 Swift Package 使用
 

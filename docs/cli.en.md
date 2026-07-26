@@ -146,9 +146,13 @@ The CLI prints human-readable text: progress on stdout, errors on stderr. There 
 The Python version does HDR conversion only — no Apple Photographic Styles and no Apple portrait.
 
 ```bash
-pip install -r xdremux/python/requirements.txt
-python3 -m xdremux.python.XDRemux convert --input IMG_001.heic
-python3 -m xdremux.python.XDRemux convert --oppo-compatible --input IMG_001.heic
+pip install -e .
+xdremux-py convert --input IMG_001.heic
+xdremux-py convert --oppo-compatible --input IMG_001.heic
 ```
+
+Without installing, run the same commands from the repository root with `python3 -m xdremux_py` or `python3 xdremux/python/XDRemux.py`.
+
+The implementation is the `xdremux_py/` package at the repository root: `cli.py` handles arguments and output, `pipeline.py` performs conversion, and `commands.py` holds the parsed command models. `xdremux/python/XDRemux.py` is a compatibility entry point that forwards to the package.
 
 It needs Python 3.11 or newer. Prefer the Swift CLI for new work and automation.

@@ -6,7 +6,9 @@ This directory contains compatibility and non-SwiftPM converter entry points.
   `swift run xdremux ...`.
 - `swift-cli/` preserves the legacy `swift <file>` entry point and forwards to
   the root package executable.
-- `python/` is the cross-platform Python CLI path.
+- `python/XDRemux.py` preserves the legacy script path and forwards to the
+  cross-platform Python package `xdremux_py/` in the repository root, which
+  installs as the `xdremux-py` command.
 
 Both current CLIs support standalone shooting-mode categorization with
 `categorize --input ... --output-dir ...`. Their `batch` commands use the

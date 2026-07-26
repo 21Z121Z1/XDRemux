@@ -88,9 +88,11 @@ The app covers both conversion and shooting-mode sorting, with drag-and-drop, pr
 Cross-platform, HDR conversion only — no Apple features. Requires Python 3.11 or newer.
 
 ```bash
-pip install -r xdremux/python/requirements.txt
-python3 xdremux/python/XDRemux.py convert --input IMG_001.heic --output IMG_001_hdr.heic
+pip install -e .
+xdremux-py convert --input IMG_001.heic --output IMG_001_hdr.heic
 ```
+
+You can skip installing and run the same commands from the repository root with `python3 xdremux/python/XDRemux.py` or `python3 -m xdremux_py`.
 
 ## Using it as a Swift package
 

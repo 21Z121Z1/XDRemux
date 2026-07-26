@@ -19,6 +19,7 @@ class CategorizationDocumentationTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         paths = (
             root / "Sources/XDRemuxCLI/Commands/XDRemuxCommand.swift",
+            root / "xdremux_py/cli.py",
             root / "xdremux/python/XDRemux.py",
             root / "xdremux/README.md",
         )
