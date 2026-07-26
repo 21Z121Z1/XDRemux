@@ -37,6 +37,15 @@ XDRemux derives the semantic regions and Photographic Styles resources required 
 
 The public build exposes one fixed constrained-solver Styles path. It organizes the current photo's Base, RGB Gain, orientation, GTC, and related metadata into a per-photo SceneBundle, but a final HEIC does not retain the capture-time pre-LTM input, so the output manifest remains `productionEligible=false`.
 
+The constrained solver also measures the photo's Tone@Color100 editor response (the ROI prefers the skin matte and falls back to warm-pixel candidates on photos without people). When the same-photo identity control's OKLab hue or R/G response falls outside the native-sample envelope, the response constraints join the solve objective and acceptance requires the result to never be worse than identity; already-compliant photos take a fast path that only verifies the selected result once and escalates into the full response objective if a regression is detected. The envelope, verdicts, and ROI details are recorded in the solver output directory's `solver-result.json` under the `responseObjective` key.
+
+Research environment variables (none are needed by default):
+
+- `XDREMUX_STYLE_RESPONSE_OBJECTIVE=off` restores the pure neutral-reconstruction objective (v5 behavior, bit-identical results).
+- `XDREMUX_STYLES_LINEAR_THUMBNAIL_MODE=seam-min-ratio` selects the research Linear Thumbnail seam variant; it marks `researchOverrideActive` and disqualifies the output from production admission.
+
+The Styles solver is compute-intensive; for batch conversions build with `swift build -c release` and run `.build/release/xdremux`.
+
 This mode continues to produce standard HDR output. It cannot be combined with `--oppo-compatible`.
 
 ## Apple Portrait

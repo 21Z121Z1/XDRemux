@@ -37,6 +37,15 @@ XDRemux 根据当前照片生成 Apple Photos 所需的语义区域和摄影风�
 
 公开版本只提供一条 constrained-solver 摄影风格路径。它会把当前照片的 Base、RGB Gain、方向、GTC 和相关元数据组织成 per-photo SceneBundle，但 final-HEIC 缺少 capture-time pre-LTM 输入，因此输出 manifest 仍保持 `productionEligible=false`。
 
+constrained-solver 还会测量照片在编辑器中的 Tone@Color100 响应（ROI 优先使用皮肤区域，无人像时退化为暖色候选区）。当同照片 identity 对照的 OKLab hue 或 R/G 响应超出原生样本包络时，响应约束会进入求解目标，且验收要求结果不劣于 identity；本就合规的照片走快路径，只在选出结果后验证一次，若检出回归会自动升级为完整响应目标重解。响应包络、判定结果和 ROI 信息都会写入 solver 输出目录的 `solver-result.json`（`responseObjective` 字段）。
+
+研究性环境变量（默认都不需要设置）：
+
+- `XDREMUX_STYLE_RESPONSE_OBJECTIVE=off` 恢复纯中性重建目标（v5 行为，结果与旧版逐位一致）。
+- `XDREMUX_STYLES_LINEAR_THUMBNAIL_MODE=seam-min-ratio` 选择研究性 Linear Thumbnail seam 变体；该变体会标记 `researchOverrideActive` 并排除生产判定。
+
+摄影风格求解为计算密集路径，批量转换建议 release 构建（`swift build -c release` 后运行 `.build/release/xdremux`）。
+
 该模式继续保留标准 HDR 输出。它不能与 `--oppo-compatible` 同时启用。
 
 ## Apple 人像

@@ -100,6 +100,11 @@ The output photo can support the following in Apple Photos:
 - Adjusting Color
 - Adjusting style intensity
 
+Generation now aligns the photo's Tone/Color editor response with the envelope measured from native iPhone samples: when a photo's response falls outside that envelope, the solver corrects it as part of the fit and guarantees the result is never worse than before; photos that are already compliant take a fast path with a single verification pass and almost no extra cost.
+
+> [!TIP]
+> The Photographic Styles solver is compute-intensive. For batch work, build once with `swift build -c release` and run `.build/release/xdremux`; it is several times faster than the default debug build.
+
 ## Apple Portrait mode
 
 Convert one photo:

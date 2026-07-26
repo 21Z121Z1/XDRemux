@@ -503,6 +503,43 @@ package enum ApplePhotographicStylesPipeline {
         return (min(width, maximumWidth), min(height, maximumHeight))
     }
 
+    // CIContext construction sets up a Metal pipeline each time; contexts are
+    // cached per exact option set (working/output color space), which does not
+    // change render results.
+    private static let renderedRGBAFloatContextLock = NSLock()
+    private static var renderedRGBAFloatContexts: [String: CIContext] = [:]
+
+    private static func renderedRGBAFloatContext(colorSpace: CGColorSpace?) -> CIContext {
+        let contextColorSpace: Any = colorSpace ?? NSNull()
+        let key: String
+        switch (colorSpace, colorSpace?.name) {
+        case (nil, _):
+            key = "<nil>"
+        case (_, .some(let name)):
+            key = name as String
+        case (.some, nil):
+            // Unnamed (e.g. ICC-based) spaces cannot be keyed reliably; render
+            // with a fresh context exactly as before.
+            return CIContext(options: [
+                .cacheIntermediates: false,
+                .workingColorSpace: contextColorSpace,
+                .outputColorSpace: contextColorSpace,
+            ])
+        }
+        renderedRGBAFloatContextLock.lock()
+        defer { renderedRGBAFloatContextLock.unlock() }
+        if let cached = renderedRGBAFloatContexts[key] {
+            return cached
+        }
+        let context = CIContext(options: [
+            .cacheIntermediates: false,
+            .workingColorSpace: contextColorSpace,
+            .outputColorSpace: contextColorSpace,
+        ])
+        renderedRGBAFloatContexts[key] = context
+        return context
+    }
+
     private static func renderedRGBAFloat(
         image: CIImage,
         width: Int,
@@ -518,14 +555,9 @@ package enum ApplePhotographicStylesPipeline {
             y: CGFloat(height) / normalized.extent.height
         )).cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
         var pixels = Array(repeating: Float(0), count: width * height * 4)
-        let contextColorSpace: Any = colorSpace ?? NSNull()
         pixels.withUnsafeMutableBytes { raw in
             guard let base = raw.baseAddress else { return }
-            CIContext(options: [
-                .cacheIntermediates: false,
-                .workingColorSpace: contextColorSpace,
-                .outputColorSpace: contextColorSpace,
-            ]).render(
+            renderedRGBAFloatContext(colorSpace: colorSpace).render(
                 resized,
                 toBitmap: base,
                 rowBytes: width * 4 * MemoryLayout<Float>.size,
@@ -539,6 +571,23 @@ package enum ApplePhotographicStylesPipeline {
 
     private static func halfRounded(_ value: Float) -> Float {
         Float(Float16(value))
+    }
+
+    // appleEncodeLinear quantizes its input to Float16 first, so the result is
+    // a pure function of the 16-bit pattern; tabulating all 65536 entries with
+    // the original function keeps every output bit-identical.
+    private static let appleEncodeLinearTable: [Float] = {
+        var table = [Float](repeating: 0, count: 65_536)
+        for pattern in 0..<65_536 {
+            table[pattern] = appleEncodeLinear(
+                Float(Float16(bitPattern: UInt16(pattern)))
+            )
+        }
+        return table
+    }()
+
+    private static func appleEncodeLinearTabulated(_ input: Float) -> Float {
+        appleEncodeLinearTable[Int(Float16(input).bitPattern)]
     }
 
     private static func appleEncodeLinear(_ input: Float) -> Float {
@@ -1009,26 +1058,40 @@ package enum ApplePhotographicStylesPipeline {
         func channel(_ values: [Double], _ index: Int, _ fallback: Double) -> Float {
             Float(values[min(index, values.count - 1)] as Double? ?? fallback)
         }
+        // All five decode parameters depend only on the component index, so
+        // they are resolved once instead of per pixel.
+        var gammaByComponent = [Float](repeating: 0, count: 3)
+        var minimumByComponent = [Float](repeating: 0, count: 3)
+        var maximumByComponent = [Float](repeating: 0, count: 3)
+        var baseOffsetByComponent = [Float](repeating: 0, count: 3)
+        var alternateOffsetByComponent = [Float](repeating: 0, count: 3)
+        for component in 0..<3 {
+            let parameterIndex = channelCount == 1 ? 0 : component
+            gammaByComponent[component] = channel(scale.perChannelGamma, parameterIndex, scale.gamma)
+            minimumByComponent[component] = channel(scale.perChannelGainMapMin, parameterIndex, scale.gainMapMin)
+            maximumByComponent[component] = channel(scale.perChannelGainMapMax, parameterIndex, scale.gainMapMax)
+            baseOffsetByComponent[component] = channel(
+                scale.perChannelBaseOffset,
+                parameterIndex,
+                scale.epsilonSdr
+            )
+            alternateOffsetByComponent[component] = channel(
+                scale.perChannelAlternateOffset,
+                parameterIndex,
+                scale.epsilonHdr
+            )
+        }
+        var baseChannels = [Float](repeating: 0, count: 3)
+        var hdrChannels = [Float](repeating: 0, count: 3)
         for pixel in 0..<pixelCount {
-            var baseChannels = [Float](repeating: 0, count: 3)
-            var hdrChannels = [Float](repeating: 0, count: 3)
             for component in 0..<3 {
-                let parameterIndex = channelCount == 1 ? 0 : component
                 let base = basePixels[pixel * 4 + component]
                 let code = min(max(gainPixels[pixel * 4 + component], 0), 1)
-                let gamma = channel(scale.perChannelGamma, parameterIndex, scale.gamma)
-                let minimum = channel(scale.perChannelGainMapMin, parameterIndex, scale.gainMapMin)
-                let maximum = channel(scale.perChannelGainMapMax, parameterIndex, scale.gainMapMax)
-                let baseOffset = channel(
-                    scale.perChannelBaseOffset,
-                    parameterIndex,
-                    scale.epsilonSdr
-                )
-                let alternateOffset = channel(
-                    scale.perChannelAlternateOffset,
-                    parameterIndex,
-                    scale.epsilonHdr
-                )
+                let gamma = gammaByComponent[component]
+                let minimum = minimumByComponent[component]
+                let maximum = maximumByComponent[component]
+                let baseOffset = baseOffsetByComponent[component]
+                let alternateOffset = alternateOffsetByComponent[component]
                 let weight = powf(code, gamma)
                 let logGain = minimum + weight * (maximum - minimum)
                 let reconstructed = max(base + baseOffset, 0) * exp2f(logGain)
@@ -1110,7 +1173,44 @@ package enum ApplePhotographicStylesPipeline {
         } else {
             researchLinearInputScale = 1
         }
-        let codedLinearLuminance = hdrLuminance.map { $0 / baselineExposure }
+        // Stage C1: Linear Thumbnail proxy variant.  "gain-normalized" is the
+        // existing default; "seam-min-ratio" implements the 23F84
+        // smartStyleCreateLinearThumbnail seam semantics
+        // post-LTM RGB * min(Ypre/Ypost, 1) as a behavior-equivalent proxy.
+        // Plan: docs/plans/active/
+        // apple-styles-editor-response-optimization-20260726.md section 4.
+        let linearThumbnailMode = ProcessInfo.processInfo.environment[
+            "XDREMUX_STYLES_LINEAR_THUMBNAIL_MODE"
+        ] ?? "gain-normalized"
+        guard ["gain-normalized", "seam-min-ratio"].contains(linearThumbnailMode) else {
+            throw CLIError.invalidContainer(
+                "XDREMUX_STYLES_LINEAR_THUMBNAIL_MODE must be gain-normalized or seam-min-ratio"
+            )
+        }
+        let seamThumbnail = linearThumbnailMode == "seam-min-ratio"
+        if seamThumbnail {
+            researchScalarOverrides["linearThumbnailModeSeam"] = 1
+        }
+        var seamCodedLinearRGB: [Float]?
+        let codedLinearLuminance: [Float]
+        if seamThumbnail {
+            var seamRGB = Array(repeating: Float(0), count: pixelCount * 3)
+            var seamLuminance = Array(repeating: Float(0), count: pixelCount)
+            for pixel in 0..<pixelCount {
+                let preLuminance = hdrLuminance[pixel] / baselineExposure
+                let postLuminance = baseLuminance[pixel]
+                let ratio = min(preLuminance / max(postLuminance, 1.0 / 65_536), 1)
+                for component in 0..<3 {
+                    seamRGB[pixel * 3 + component] =
+                        baseRGB[pixel * 3 + component] * ratio
+                }
+                seamLuminance[pixel] = postLuminance * ratio
+            }
+            seamCodedLinearRGB = seamRGB
+            codedLinearLuminance = seamLuminance
+        } else {
+            codedLinearLuminance = hdrLuminance.map { $0 / baselineExposure }
+        }
         // The private renderer consumes the normalized Linear Thumbnail input
         // domain, while inputLinearMetadata.Gain carries the inverse scale
         // needed to encode the paired output resource.  A bounded 2D response
@@ -1146,12 +1246,13 @@ package enum ApplePhotographicStylesPipeline {
                     for pixel in 0..<pixelCount {
                         for component in 0..<3 {
                             let baseValue = baseRGB[pixel * 3 + component]
-                            let codedLinear = hdrRGB[pixel * 3 + component]
-                                / baselineExposure
+                            let codedLinear = seamCodedLinearRGB
+                                .map { $0[pixel * 3 + component] }
+                                ?? (hdrRGB[pixel * 3 + component] / baselineExposure)
                             let rendererLinear = (codedLinear / encodingGain)
                                 * researchLinearInputScale
                             let serializedRendererLinear = min(max(rendererLinear, 0), 1)
-                            let encodedValue = min(max(appleEncodeLinear(codedLinear), 0), 1)
+                            let encodedValue = min(max(appleEncodeLinearTabulated(codedLinear), 0), 1)
                             encodedDestination[pixel * 3 + component] = UInt8(
                                 min(255, max(0, Int((encodedValue * 255).rounded())))
                             )
@@ -1176,18 +1277,31 @@ package enum ApplePhotographicStylesPipeline {
             targetWidth: styleEngineSize.0,
             targetHeight: styleEngineSize.1
         )
-        let styleEngineRendererLinearRGBA16 = areaResampledRGBA16UNorm(
-            rgb: hdrRGB,
-            normalizationGain: (baselineExposure * encodingGain)
-                / researchLinearInputScale,
-            width: size.0,
-            height: size.1,
-            targetWidth: styleEngineSize.0,
-            targetHeight: styleEngineSize.1
-        )
+        let styleEngineRendererLinearRGBA16: Data
+        if let seamCodedLinearRGB {
+            styleEngineRendererLinearRGBA16 = areaResampledRGBA16UNorm(
+                rgb: seamCodedLinearRGB,
+                normalizationGain: encodingGain / researchLinearInputScale,
+                width: size.0,
+                height: size.1,
+                targetWidth: styleEngineSize.0,
+                targetHeight: styleEngineSize.1
+            )
+        } else {
+            styleEngineRendererLinearRGBA16 = areaResampledRGBA16UNorm(
+                rgb: hdrRGB,
+                normalizationGain: (baselineExposure * encodingGain)
+                    / researchLinearInputScale,
+                width: size.0,
+                height: size.1,
+                targetWidth: styleEngineSize.0,
+                targetHeight: styleEngineSize.1
+            )
+        }
         var rawLinearThumbnailInputRGBA16: Data?
         var rawProvenance: [String: Any] = [
             "linearThumbnailSource": "final-HEIC-proxy",
+            "linearThumbnailVariant": linearThumbnailMode,
             "dngDecodeMode": "not-used",
             "rawIsProcessedRemosaic": false,
             "sceneLinearConfidence": "unavailable",
@@ -1342,9 +1456,10 @@ package enum ApplePhotographicStylesPipeline {
         var starts: [(offset: Int, length: Int)] = []
         var index = 0
         while index + 3 < bytes.count {
-            if bytes[index...min(index + 3, bytes.count - 1)] == [0, 0, 0, 1] {
+            if bytes[index] == 0, bytes[index + 1] == 0,
+               bytes[index + 2] == 0, bytes[index + 3] == 1 {
                 starts.append((index, 4)); index += 4
-            } else if bytes[index...min(index + 2, bytes.count - 1)] == [0, 0, 1] {
+            } else if bytes[index] == 0, bytes[index + 1] == 0, bytes[index + 2] == 1 {
                 starts.append((index, 3)); index += 3
             } else {
                 index += 1
@@ -1495,6 +1610,36 @@ package enum ApplePhotographicStylesPipeline {
         let sourceX = min(matte.width - 1, max(0, Int((Double(x) + 0.5) * Double(matte.width) / Double(rasterWidth))))
         let sourceY = min(matte.height - 1, max(0, Int((Double(y) + 0.5) * Double(matte.height) / Double(rasterHeight))))
         return Float(matte.pixels[sourceY * matte.bytesPerRow + sourceX]) / 255
+    }
+
+    // Stage A (response-v6): rasterize the skin matte onto a fixed normalized
+    // presentation-space grid for the constrained solver's editor-response
+    // objective.  maskValue keeps this consistent with every other semantic
+    // sampling site in this pipeline.
+    package static func solverSkinMask(
+        _ matte: AppleSemanticMatte?,
+        side: Int = 512
+    ) -> ConstrainedPolynomialStyleDataProducer.ResponseSkinMask? {
+        guard let matte, matte.statistics.coverage > 0, side > 0 else { return nil }
+        var samples = [UInt8](repeating: 0, count: side * side)
+        var positive = 0
+        for y in 0..<side {
+            for x in 0..<side {
+                let value = maskValue(
+                    matte, x: x, y: y, rasterWidth: side, rasterHeight: side
+                )
+                if value >= 0.5 {
+                    samples[y * side + x] = 255
+                    positive += 1
+                }
+            }
+        }
+        guard positive > 0 else { return nil }
+        return ConstrainedPolynomialStyleDataProducer.ResponseSkinMask(
+            width: side,
+            height: side,
+            samples: samples
+        )
     }
 
     package static func selectedStyleSamples(
@@ -4048,7 +4193,8 @@ package enum ApplePhotographicStylesPipeline {
                 .makeStyleData(
                     preliminaryHEICURL: preliminaryURL,
                     identityStylePropertyList: preliminaryPayload.stylePropertyList,
-                    outputDirectory: solverDirectory
+                    outputDirectory: solverDirectory,
+                    skinMask: solverSkinMask(analysis.skin)
                 )
             stylePayload = try replacingStyleData(
                 in: preliminaryPayload,

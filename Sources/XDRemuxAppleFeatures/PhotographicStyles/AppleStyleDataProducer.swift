@@ -94,7 +94,7 @@ package enum AppleStyleDataLayout {
         ]
     }
 
-    static func completeIdentity() throws -> Data {
+    private static let completeIdentityResult: Result<Data, Error> = Result {
         var block = Data()
         block.reserveCapacity(blockValueCount * 2)
         for index in 0..<blockValueCount {
@@ -114,6 +114,10 @@ package enum AppleStyleDataLayout {
             )
         }
         return result
+    }
+
+    static func completeIdentity() throws -> Data {
+        try completeIdentityResult.get()
     }
 
     static func validate(_ data: Data) throws -> [String: Any] {
