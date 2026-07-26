@@ -1,5 +1,7 @@
 # 输出规范
 
+[English](logging.en.md) | 简体中文
+
 规定 XDRemux 往终端写什么、写到哪里。用户视角的命令输出见 [CLI 参考](../cli.md)。
 
 ## 现状

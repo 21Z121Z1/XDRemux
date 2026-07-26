@@ -1,5 +1,7 @@
 # 测试规范
 
+[English](testing.en.md) | 简体中文
+
 规定这个仓库里一次改动至少要过哪些检查。怎么跑测试见 [Tests/README.md](../../Tests/README.md)，验收流程见[验证说明](../validation/README.md)。
 
 ## 四层检查

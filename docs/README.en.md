@@ -14,9 +14,9 @@ For what the project is and how to get started, see the [root README](../README.
 
 - [Development and builds](development.en.md) — module layout, Swift package integration, build workflows
 - [Validation guide](validation/README.md) — the acceptance flow and plan format
-- [Testing policy](quality/testing.md) — the checks a change has to pass (Chinese)
-- [Regression and real-sample verification](quality/evals.md) — the reusable harnesses (Chinese)
-- [Output policy](quality/logging.md) — rules for command output and error text (Chinese)
+- [Testing policy](quality/testing.en.md) — the checks a change has to pass
+- [Regression and real-sample verification](quality/evals.en.md) — the reusable harnesses
+- [Output policy](quality/logging.en.md) — rules for command output and error text
 
 ## Technical implementation
 

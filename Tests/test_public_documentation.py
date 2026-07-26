@@ -8,6 +8,8 @@ ROOT_READMES = (ROOT / "README.md", ROOT / "README.en.md")
 PUBLIC_DOCUMENTS = ROOT_READMES + tuple(
     ROOT / relative
     for relative in (
+        "docs/README.md",
+        "docs/README.en.md",
         "docs/cli.md",
         "docs/cli.en.md",
         "docs/apple-features.md",
@@ -16,8 +18,33 @@ PUBLIC_DOCUMENTS = ROOT_READMES + tuple(
         "docs/development.en.md",
         "docs/supported-devices.md",
         "docs/supported-devices.en.md",
+        "docs/quality/testing.md",
+        "docs/quality/testing.en.md",
+        "docs/quality/evals.md",
+        "docs/quality/evals.en.md",
+        "docs/quality/logging.md",
+        "docs/quality/logging.en.md",
+        "docs/validation/README.md",
+        "docs/xdremux/README.md",
+        "docs/xdremux/README.en.md",
+        "Tests/README.md",
         "xdremux/README.md",
+        "xdremux/swift-cli/README.md",
     )
+)
+# Documents published in both languages. Each pair must exist and cross-link,
+# so a new document cannot ship in one language only.
+BILINGUAL_STEMS = (
+    "README",
+    "docs/README",
+    "docs/cli",
+    "docs/apple-features",
+    "docs/development",
+    "docs/supported-devices",
+    "docs/quality/testing",
+    "docs/quality/evals",
+    "docs/quality/logging",
+    "docs/xdremux/README",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
@@ -53,6 +80,25 @@ class PublicDocumentationTests(unittest.TestCase):
                 except ValueError:
                     self.fail(f"{document}: link escapes repository: {target}")
                 self.assertTrue(resolved.exists(), f"{document}: missing link target {target}")
+
+    def test_bilingual_documents_exist_in_both_languages_and_cross_link(self) -> None:
+        for stem in BILINGUAL_STEMS:
+            chinese = ROOT / f"{stem}.md"
+            english = ROOT / f"{stem}.en.md"
+            self.assertTrue(chinese.is_file(), f"missing Chinese document: {stem}.md")
+            self.assertTrue(english.is_file(), f"missing English document: {stem}.en.md")
+
+            name = Path(stem).name
+            self.assertIn(
+                f"({name}.en.md)",
+                chinese.read_text(encoding="utf-8"),
+                f"{stem}.md does not link to its English version",
+            )
+            self.assertIn(
+                f"({name}.md)",
+                english.read_text(encoding="utf-8"),
+                f"{stem}.en.md does not link to its Chinese version",
+            )
 
     def test_documentation_workflows_reference_present_test_modules(self) -> None:
         workflows = (

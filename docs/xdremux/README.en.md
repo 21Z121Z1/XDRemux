@@ -1,3 +1,5 @@
+English | [简体中文](README.md)
+
 # XDRemux Technical Implementation Index
 
 This directory contains public, relatively stable documentation for HDR, HEIF, and ISO container behavior. Start with the [project README](../../README.en.md) or [CLI reference](../cli.en.md) for normal use.
@@ -11,6 +13,6 @@ This directory contains public, relatively stable documentation for HDR, HEIF, a
 
 ## Documentation boundary
 
-Public technical documentation describes current implementation constraints and repeatable validation. Dated single-sample experiments, firmware fields, reverse-engineering work, open hypotheses, and temporary UI acceptance logs belong under `docs/research/` or `docs/experiments/`; they are not current product commitments.
+Public technical documentation describes current implementation constraints and repeatable validation. Dated single-sample experiments, firmware fields, reverse-engineering work, open hypotheses, and temporary UI acceptance logs are research material kept outside this repository; they are not current product commitments.
 
 When a research result becomes stable product behavior, encode it in code and regression tests first, then summarize the user-facing or developer-facing conclusion in the appropriate document. Do not append raw research logs to the README.
