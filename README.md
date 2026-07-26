@@ -254,10 +254,10 @@ Apple 人像转换可能还会在输出旁生成 `*.portrait-manifest.json`，�
 
 Python CLI 提供标准 HDR、OPPO 相册兼容转换和与 Swift 一致的拍摄模式分类，不包含 Apple 摄影风格和 Apple 人像功能。
 
-安装依赖：
+需要 Python 3.11 或更高版本。安装依赖：
 
 ```bash
-pip install pillow-heif Pillow numpy
+pip install -r xdremux/python/requirements.txt
 ```
 
 单张转换：

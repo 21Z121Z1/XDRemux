@@ -2,7 +2,7 @@
 
 English | [简体中文](cli.md)
 
-This document covers the public `xdremux` command. Experimental controls, validators, and internal diagnostics are documented in the [development guide](development.en.md).
+This document covers the `xdremux` command-line tool. `xdremux --help` prints the same material.
 
 ## Build and run
 
@@ -11,157 +11,144 @@ swift build
 swift run xdremux --help
 ```
 
-The legacy script entry point remains available while existing automation migrates:
+You can also invoke the built binary directly:
 
 ```bash
-swift xdremux/swift-cli/XDRemux.swift convert --input IMG_001.heic
+.build/debug/xdremux convert --input IMG_001.heic
 ```
-
-Both entry points invoke the same package executable and have the same commands, defaults, and exit codes.
 
 ## Commands
 
-```text
-xdremux convert --input <file> [--output <file>] [options]
-xdremux batch --input-dir <directory> [--output-dir <directory>] [options]
+| Command | What it does |
+| --- | --- |
+| `convert` | Convert one photo |
+| `batch` | Convert a directory recursively |
+| `categorize` | Sort files by shooting mode without converting anything |
+| `validate-apple` | Inspect a file's Apple Photographic Styles output; prints JSON to stdout |
+| `validate-portrait` | Inspect a file's Apple portrait output; prints JSON to stdout |
+| `portrait-self-test` | Run the portrait pipeline self-test; prints JSON to stdout |
+
+```bash
+xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
+xdremux batch --input-dir ~/Pictures/ProXDR --output-dir ~/Pictures/HDR
+xdremux categorize --input ~/Pictures/ProXDR --output-dir ~/Pictures/Sorted
 ```
 
-`convert` processes one file. `batch` recursively processes a directory and preserves relative input paths under the output directory.
+## Where the results go
 
-## Public options
+- `convert` **overwrites the input file** when `--output` is omitted.
+- `batch` writes back into the input directory when `--output-dir` is omitted.
+- `batch --categorize` files results under Chinese shooting-mode folders (`人像`, `夜景`, `大师模式`, …). Photos whose mode cannot be read stay in the output root.
+- `categorize` only copies HEIC/HEIF/JPEG files into those folders. It never modifies or converts anything.
 
-| Option | Scope | Description |
+## Options
+
+### Conversion options (`convert` and `batch`)
+
+| Option | Default | Description |
 | --- | --- | --- |
-| `--input <file>` | `convert` | Input photo |
-| `--output <file>` | `convert` | Output photo; omitting it overwrites the input |
-| `--input-dir <directory>` | `batch` | Input directory |
-| `--output-dir <directory>` | `batch` | Output directory; omitting it writes in place |
-| `--glob <pattern>` | `batch` | File matching pattern |
-| `--jobs <count>` | `batch` | Maximum concurrent conversions |
-| `--overwrite` | Both | Regenerate even when an existing output is valid |
-| `--discard-portrait-data` | Both | Do not preserve original vendor portrait-editing data |
-| `--oppo-compatible` | Both | Produce OPPO Gallery-compatible output |
-| `--apple-photographic-styles` | Both | Generate Apple Photographic Styles resources |
-| `--apple-portrait` | Both | Generate Apple Portrait resources |
-| `--quiet` | Both | Show only errors and the final result |
-| `--verbose` | Both | Add per-file results, major paths, and skip reasons |
-| `--debug` | Both | Add internal configuration, temporary paths, and full diagnostics |
-| `--format text\|json\|jsonl` | Both | Select human-readable or machine output |
-| `--language auto\|zh-Hans\|en` | Both | Select the language for human-readable text |
+| `--input <file>` | required for `convert` | Input photo, HEIC or portrait JPEG |
+| `--output <file>` | overwrite the input | Output photo |
+| `--oppo-compatible` | off | Write a 4:2:0 gain map OPPO Gallery can display and keep the complete OPPO private tail. Without it the output is standard ISO HDR and the gain map keeps its source channel structure, which may be 4:4:4. A gain map that is already 4:2:0 cannot be upgraded — the discarded chroma is unrecoverable. |
+| `--discard-portrait-data` | off | Drop bulky depth and re-edit resources. Watermark, master-mode, and other non-HDR vendor data are still kept. |
+| `--oppo-camera-tail <mode>` | `preserve-without-private-hdr` | Which parts of the OPPO camera tail to keep; see the table below. |
+| `--family auto\|x6\|x7` | `auto` | Which ProXDR layout the source uses |
+| `--debug-dir <dir>` | not written | Keep this run's intermediate artifacts for inspection |
 
-Apple Photographic Styles and Apple Portrait can be combined. `--oppo-compatible` conflicts with either Apple mode and is rejected before conversion begins.
+### Batch options (`batch`)
 
-## Output modes
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input-dir <dir>` | required | Input directory, scanned recursively |
+| `--output-dir <dir>` | the input directory | Output directory |
+| `--glob <pattern>` | `*.heic` | Which files to pick up |
+| `--jobs <n>` | `min(cpu, 4)` | How many files to convert at once |
+| `--categorize` | off | File results under shooting-mode folders |
+| `--resume` / `--no-resume` | `--resume` | Continue from the previous run's progress |
+| `--skip-existing` / `--no-skip-existing` | `--skip-existing` | Skip a file whose output already matches the current settings |
+| `--checkpoint <file>` | a hidden JSONL file under the output directory | Where progress is recorded |
 
-Default text mode shows the task overview, current progress, warnings, failures, and the final summary. Successful batch jobs do not print one new line per file.
+### Categorize options (`categorize`)
 
-| Mode | Output |
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input <file-or-dir>` | required, repeatable | What to sort |
+| `--output-dir <dir>` | required | Root of the sorted folders |
+| `--jobs <n>` | `min(cpu, 4)` | Concurrency |
+| `--dry-run` | off | Print the plan without copying anything |
+
+### Apple features (macOS only, research features)
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--apple-photographic-styles` | off | Generate Apple Photographic Styles data from the photo itself, with no Apple donor photo. `--apple-styles` is a legacy spelling. |
+| `--apple-portrait` | off | Generate Apple portrait data. Needs a photo that carries `rear.depth`, `rear.depth.config`, and `src.image`. |
+| `--apple-styles-raw-dng <file>` | none | Pair one matching OPPO RAW MAX DNG with the input. A mismatched or differently oriented DNG is rejected rather than used. |
+| `--apple-style-data-producer <mode>` | `constrained-solver` | One of `constrained-solver`, `learn-node`, `identity-fallback`. The last two are diagnostic controls. |
+
+The two features are independent and can be enabled together; in a combined run a non-portrait photo still gets styles output. Apple output and `--oppo-compatible` are mutually exclusive.
+
+These features are **not accepted as production Photos output**. See the [Apple features guide](apple-features.en.md) for exactly what has and has not been proven.
+
+### Diagnostic options
+
+Needed only when investigating a problem; ordinary use can ignore them.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input-processing system\|system-decoded\|hybrid\|passthrough` | `hybrid` | How the base image and gain map are rebuilt |
+| `--tmap-format imageio\|strict` | `imageio` | `strict` writes the 145-byte ISO form, which breaks Gallery Exif parsing and editing on Find X9 Ultra |
+| `--oppo-compat <mode>` | `off` | Finer-grained control over the HDR routing flags: `auto`, `iso`, `iso-no-local`, `iso-graph`, `on`, `tail`, `off`. `--no-oppo-compat` means `off`. |
+
+### `--oppo-camera-tail` values
+
+| Value | Description |
 | --- | --- |
-| Default | Overview, progress, warnings, failures, and summary |
-| `--quiet` | Errors and final result |
-| `--verbose` | Default output plus per-file completion, skip reasons, and warning codes |
-| `--debug` | Verbose output plus internal configuration, helper activity, temporary paths, and underlying errors |
+| `off` | Append no OPPO camera tail at all |
+| `watermark` | Keep only watermark, master-mode presets, and capture parameters |
+| `compact` | Watermark plus a compact portrait/depth tail |
+| `preserve` | Copy the complete tail byte for byte |
+| `preserve-without-portrait` | Keep everything except depth, masks, meshes, and the restore-original image |
+| `preserve-without-portrait-or-private-hdr` | The same, plus removing every private HDR entry |
+| `preserve-without-private-uhdr` | Physically remove only `local.uhdr.gainmap.data/info` |
+| `preserve-without-private-hdr` | **Default**: physically remove every private HDR entry, keeping portrait, watermark, master mode, and the rest |
+| `preserve-no-uhdr` | Keep every byte; disable private UHDR by renaming its manifest keys in place |
+| `preserve-no-hdr` | Keep every byte; disable every private HDR manifest key in place |
 
-`--quiet`, `--verbose`, and `--debug` are mutually exclusive.
+## Output and exit codes
 
-## stdout, stderr, and terminals
-
-- `--help` writes to stdout.
-- Human-readable progress, warnings, errors, and summaries write to stderr.
-- `--format json` and `--format jsonl` machine data write to stdout.
-- Interactive stderr terminals use one in-place progress region.
-- Pipes, redirection, and CI automatically use plain line output without ANSI control sequences.
-
-Default batch output does not print every successful file. Warnings and failures temporarily clear the dynamic progress region, print the message, and then restore progress.
-
-## JSON and JSONL
-
-`--format json` emits one JSON document containing an `events` array. `--format jsonl` emits one independent JSON object per line.
-
-Every machine record contains `schema_version: 1`. Field names, event names, phase names, warning codes, and error codes are stable English identifiers. Only `message` may be localized.
-
-```json
-{"schema_version":1,"event":"conversion_failed","error_code":"source_gain_map_missing","input":"IMG_001.heic","message":"The source photo does not contain a usable HDR Gain Map."}
-```
-
-Current event names are:
-
-- `conversion_started`
-- `conversion_progress`
-- `conversion_warning`
-- `conversion_completed`
-- `conversion_skipped`
-- `conversion_failed`
-- `batch_started`
-- `batch_progress`
-- `batch_completed`
-
-## Stable error codes
-
-| Error code | Meaning |
-| --- | --- |
-| `source_not_found` | The input path does not exist |
-| `source_not_supported` | The source photo is unsupported |
-| `source_gain_map_missing` | No usable HDR Gain Map is present |
-| `source_gain_map_corrupt` | The Gain Map is incomplete or damaged |
-| `portrait_data_unavailable` | Required portrait resources are unavailable |
-| `apple_runtime_unavailable` | Required Apple processing is unavailable on this system |
-| `output_not_writable` | The output cannot be created or replaced |
-| `output_verification_failed` | The written output failed validation |
-| `internal_container_error` | The container has an unsupported internal condition |
-| `invalid_arguments` | The command or arguments are invalid |
-| `batch_incomplete` | A batch completed with failures |
-
-Default text shows only a user-readable reason and recovery suggestion. `--verbose` adds the error code; `--debug` adds container diagnostics and the complete underlying error chain.
-
-## Language selection
-
-Language resolution order:
-
-1. `--language`
-2. `XDREMUX_LANGUAGE`
-3. System preferred languages
-4. English fallback
-
-Simplified Chinese identifiers are `zh-Hans` and `zh-CN`. English identifiers are `en`, `en-US`, and `en-GB`. Other languages currently fall back to English.
-
-JSON fields, event names, error codes, option names, environment variables, filenames, and exit codes are never localized.
-
-## Batch reruns and failure reports
-
-Batch output preserves each input path relative to `--input-dir`, so equal filenames in separate albums remain distinct.
-
-On rerun:
-
-1. Existing outputs that pass lightweight validation are skipped.
-2. Invalid or incomplete outputs are regenerated.
-3. `--overwrite` always regenerates.
-4. Each file is written to a sibling temporary file and atomically installed after validation.
-5. One file failure does not stop remaining work.
-
-Failures are written to `<output-dir>/xdremux-failures.json`. A later clean run removes an obsolete report. Batch recovery does not use checkpoint journals, configuration hashes, or mtime state machines.
-
-## Exit codes
+The CLI prints human-readable text: progress on stdout, errors on stderr. There is no JSON event stream, and no `--quiet`, `--verbose`, `--format`, or `--language` option.
 
 | Exit code | Meaning |
 | --- | --- |
 | `0` | Success |
-| `1` | Internal container error |
-| `2` | Invalid command or arguments |
-| `3` | Missing, unsupported, or invalid input |
-| `4` | Output or Apple runtime failure |
-| `5` | Batch completed with one or more failures |
-| `130` | Interrupted with Ctrl+C |
+| `1` | Any error — bad arguments, unsupported input, a failed conversion, or a batch with failures |
+
+## Re-running a batch
+
+`batch` writes a hidden JSONL progress file under the output directory and deletes it only when the whole batch finishes with no failures. Running the same command again:
+
+1. Skips outputs that already match the current settings (`--skip-existing`, on by default).
+2. Retries the files that failed (`--resume`, on by default).
+3. Does not re-scan the shooting-mode folders `--categorize` wrote, so repeated runs are idempotent.
+
+## Common errors
+
+| Message | What it means |
+| --- | --- |
+| `not a ProXDR photo` | The photo carries no OPPO Local HDR data. It may be an ordinary HEIC, or ProXDR was off when it was taken. |
+| `already converted` | The file already carries an ISO 21496-1 gain map; converting it again would change nothing. |
+| `not an OPPO portrait photo` | The depth data `--apple-portrait` needs is not in this photo. |
+| `N file(s) failed to convert` | The batch had failures. Running the same command again retries only those files. |
 
 ## Python CLI
 
-The Python CLI retains the original HDR conversion path. It does not provide Apple Photographic Styles or Apple Portrait.
+The Python version does HDR conversion only — no Apple Photographic Styles and no Apple portrait.
 
 ```bash
-pip install pillow-heif Pillow numpy
-python3 xdremux/python/XDRemux.py convert --input IMG_001.heic
-python3 xdremux/python/XDRemux.py batch --input-dir photo_dump/
-python3 xdremux/python/XDRemux.py convert --oppo-compatible --input IMG_001.heic
+pip install -r xdremux/python/requirements.txt
+python3 -m xdremux.python.XDRemux convert --input IMG_001.heic
+python3 -m xdremux.python.XDRemux convert --oppo-compatible --input IMG_001.heic
 ```
 
-The Swift CLI is the preferred entry point for new features and automation.
+It needs Python 3.11 or newer. Prefer the Swift CLI for new work and automation.

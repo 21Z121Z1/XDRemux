@@ -28,6 +28,14 @@ public enum XDRemuxError: Error, CustomStringConvertible {
     case unableToCreateDirectory(URL)
     case outputParentIsNotDirectory(URL)
     case outputPathCollision(output: URL, firstInput: URL, secondInput: URL)
+    /// The file carries no OPPO/OnePlus/realme Local HDR payload. `detail`
+    /// holds the internal reason for bug reports; the message leads with the
+    /// two explanations that actually apply — wrong photo, or already done.
+    case notAProXDRPhoto(URL, detail: String)
+    /// The file already carries an ISO 21496-1 gain map, so there is nothing
+    /// left to remux. Distinct from `notAProXDRPhoto` because the right
+    /// response is "you are finished", not "you picked the wrong file".
+    case alreadyConverted(URL)
     case qtiMarkerNotFound
     case manifestNotFound
     case invalidLHDR(String)
@@ -48,6 +56,21 @@ public enum XDRemuxError: Error, CustomStringConvertible {
     case appleFeatureRuntimeUnavailable(String)
     case appleFeatureConversionFailed(status: Int32, log: String)
 
+    /// One short line naming what went wrong, without the explanatory paragraph
+    /// `description` adds and without repeating a path the caller already
+    /// printed. List output uses this so one failure stays one readable line.
+    public var headline: String {
+        switch self {
+        case .notAProXDRPhoto:
+            return "not a ProXDR photo"
+        case .alreadyConverted:
+            return "already converted"
+        default:
+            return description.split(whereSeparator: \.isNewline).first.map(String.init)
+                ?? description
+        }
+    }
+
     public var description: String {
         switch self {
         case .usage(let message):
@@ -63,7 +86,7 @@ public enum XDRemuxError: Error, CustomStringConvertible {
         case .inputNotFound(let url):
             return "input not found: \(url.path)"
         case .noFilesMatched(let url, let glob):
-            return "no files matched \(glob) under \(url.path)"
+            return "no files matched \(glob) under \(url.path) (the search includes subfolders; check --glob)"
         case .unableToRead(let url):
             return "unable to read file: \(url.path)"
         case .unableToReadCheckpoint(let url):
@@ -75,25 +98,35 @@ public enum XDRemuxError: Error, CustomStringConvertible {
         case .checkpointConfigMismatch(let url, let expected, let actual):
             return "checkpoint config mismatch in \(url.path): expected \(expected), got \(actual) (use --no-resume or a different --checkpoint)"
         case .batchFailed(let failures, let checkpoint):
-            return "batch failed for \(failures) file(s); checkpoint kept at \(checkpoint.path)"
+            return "\(failures) file(s) failed to convert; run the same command again to retry "
+                + "only those files (checkpoint: \(checkpoint.path))"
         case .categorizationFailed(let failures):
-            return "categorize failed for \(failures) file(s)"
+            return "\(failures) file(s) could not be categorized; they were left where they were"
         case .unableToCreateDirectory(let url):
             return "unable to create directory: \(url.path)"
         case .outputParentIsNotDirectory(let url):
             return "output parent is not a directory: \(url.path)"
         case .outputPathCollision(let output, let firstInput, let secondInput):
             return "output path collision \(output.path) (two inputs map to the same output): \(firstInput.path) and \(secondInput.path)"
+        case .notAProXDRPhoto(let url, let detail):
+            return "not a ProXDR photo: \(url.path)\n"
+                + "  XDRemux converts OPPO, OnePlus, and realme photos shot with ProXDR on. "
+                + "This file carries no Local HDR data, so there is nothing to convert.\n"
+                + "  detail: \(detail)"
+        case .alreadyConverted(let url):
+            return "already converted: \(url.path)\n"
+                + "  This file already carries an ISO 21496-1 gain map. "
+                + "Converting it again would not change anything."
         case .qtiMarkerNotFound:
-            return "QTI extension marker not found (unsupported input: expected a Local HDR (LHDR/UHDR) HEIC with embedded QTI extension payload; file may already be ISO gain-map or plain HEIC)"
+            return "no OPPO Local HDR payload found (no QTI extension marker)"
         case .manifestNotFound:
-            return "Local HDR manifest not found (unsupported input: missing embedded JSON manifest)"
+            return "no OPPO Local HDR payload found (the embedded data index is missing)"
         case .invalidLHDR(let message):
-            return "invalid LHDR payload: \(message)"
+            return "the photo's ProXDR HDR data is damaged or unreadable: \(message)"
         case .unableToDecodeMask(let url):
-            return "unable to decode LHDR mask JPEG: \(url.path)"
+            return "cannot decode the ProXDR gain-map image inside: \(url.path)"
         case .unableToLoadBaseImage(let url):
-            return "unable to decode SDR base image: \(url.path)"
+            return "cannot decode the photo's SDR base image: \(url.path)"
         case .unableToCreateDestination(let url):
             return "unable to create HEIC destination: \(url.path)"
         case .unableToFinalizeDestination(let url):
@@ -103,13 +136,13 @@ public enum XDRemuxError: Error, CustomStringConvertible {
         case .unableToWriteDebugAsset(let url):
             return "unable to write debug artifact: \(url.path)"
         case .outputVerificationFailed(let url):
-            return "output verification failed (no ISO gain-map auxiliary data found): \(url.path)"
+            return "the converted file has no ISO gain map, so it was rejected: \(url.path)"
         case .gainMapPixelFormatMismatch(let url, let expected, let actual):
             return "gain map pixel format mismatch in \(url.path): expected \(fourCCString(expected)), got \(fourCCString(actual))"
         case .invalidContainer(let message):
             return "invalid HEIC container: \(message)"
         case .portraitPrerequisitesMissing(let message):
-            return "invalid HEIC container: \(message)"
+            return "not an OPPO portrait photo: \(message)"
         case .appleFeatureRuntimeUnavailable(let message):
             return "Apple feature runtime unavailable: \(message)"
         case .appleFeatureConversionFailed(let status, let log):

@@ -254,10 +254,10 @@ Offline validation only proves that the file structure satisfies the current val
 
 The Python CLI provides standard HDR and OPPO Gallery-compatible conversion plus the same shooting-mode categorization as Swift. It does not include Apple Photographic Styles or Apple Portrait features.
 
-Install the dependencies:
+Requires Python 3.11 or newer. Install the dependencies:
 
 ```bash
-pip install pillow-heif Pillow numpy
+pip install -r xdremux/python/requirements.txt
 ```
 
 Convert one photo:

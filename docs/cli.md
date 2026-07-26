@@ -2,7 +2,7 @@
 
 [English](cli.en.md) | 简体中文
 
-本文档说明正式用户命令 `xdremux`。实验参数、validator 和内部诊断命令见[开发文档](development.md)。
+本文档说明 `xdremux` 命令行工具。运行 `xdremux --help` 可以看到同样的内容。
 
 ## 构建与运行
 
@@ -11,157 +11,144 @@ swift build
 swift run xdremux --help
 ```
 
-仓库仍保留旧脚本入口，便于已有自动化逐步迁移：
+也可以直接用构建产物：
 
 ```bash
-swift xdremux/swift-cli/XDRemux.swift convert --input IMG_001.heic
+.build/debug/xdremux convert --input IMG_001.heic
 ```
-
-新旧入口调用同一个 package executable，命令、默认值和退出码相同。
 
 ## 命令
 
-```text
-xdremux convert --input <文件> [--output <文件>] [选项]
-xdremux batch --input-dir <目录> [--output-dir <目录>] [选项]
+| 命令 | 作用 |
+| --- | --- |
+| `convert` | 转换单张照片 |
+| `batch` | 递归转换一个目录 |
+| `categorize` | 只按拍摄模式归类文件，不做任何转换 |
+| `validate-apple` | 检查一个文件的 Apple 摄影风格输出，向 stdout 打印 JSON |
+| `validate-portrait` | 检查一个文件的 Apple 人像输出，向 stdout 打印 JSON |
+| `portrait-self-test` | 运行人像流水线自检，向 stdout 打印 JSON |
+
+```bash
+xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
+xdremux batch --input-dir ~/Pictures/ProXDR --output-dir ~/Pictures/HDR
+xdremux categorize --input ~/Pictures/ProXDR --output-dir ~/Pictures/分类
 ```
 
-`convert` 转换单个文件。`batch` 递归处理目录，并在指定输出目录中保留输入的相对目录结构。
+## 结果写到哪里
 
-## 公开参数
+- `convert` 省略 `--output` 时**原地覆盖输入文件**。
+- `batch` 省略 `--output-dir` 时写回输入目录。
+- `batch --categorize` 把结果放进中文拍摄模式子目录（`人像`、`夜景`、`大师模式` 等）。读不出模式的照片留在输出根目录。
+- `categorize` 只复制 HEIC/HEIF/JPEG 文件到这些目录，不修改也不转换任何东西。
 
-| 参数 | 适用范围 | 说明 |
+## 参数
+
+### 转换参数（`convert` 与 `batch` 通用）
+
+| 参数 | 默认值 | 说明 |
 | --- | --- | --- |
-| `--input <文件>` | `convert` | 输入照片 |
-| `--output <文件>` | `convert` | 输出照片；省略时覆写输入 |
-| `--input-dir <目录>` | `batch` | 输入目录 |
-| `--output-dir <目录>` | `batch` | 输出目录；省略时在输入目录中原位写入 |
-| `--glob <模式>` | `batch` | 文件匹配模式 |
-| `--jobs <数量>` | `batch` | 最大并发任务数 |
-| `--overwrite` | 两者 | 即使已有输出有效也重新生成 |
-| `--discard-portrait-data` | 两者 | 不保留原始厂商人像编辑数据 |
-| `--oppo-compatible` | 两者 | 生成 OPPO 相册兼容输出 |
-| `--apple-photographic-styles` | 两者 | 生成 Apple 摄影风格资源 |
-| `--apple-portrait` | 两者 | 生成 Apple 人像资源 |
-| `--quiet` | 两者 | 只显示错误和最终结果 |
-| `--verbose` | 两者 | 增加逐文件结果、主要路径和跳过原因 |
-| `--debug` | 两者 | 增加内部配置、临时路径和完整诊断 |
-| `--format text\|json\|jsonl` | 两者 | 选择人类文本或机器输出 |
-| `--language auto\|zh-Hans\|en` | 两者 | 选择人类文本语言 |
+| `--input <文件>` | 必填（`convert`） | 输入照片，可以是 HEIC 或人像 JPEG |
+| `--output <文件>` | 覆盖输入 | 输出照片 |
+| `--oppo-compatible` | 关闭 | 输出 OPPO 相册能显示的 4:2:0 Gain Map，并保留完整 OPPO 私有尾部。不加这个参数时输出标准 ISO HDR，Gain Map 保持源通道结构（可能是 4:4:4）。已经是 4:2:0 的 Gain Map 无法升级回 4:4:4，丢掉的色度找不回来。 |
+| `--discard-portrait-data` | 关闭 | 删除体积大的景深和后期编辑资源。水印、大师模式和其他非 HDR 厂商数据仍然保留。 |
+| `--oppo-camera-tail <模式>` | `preserve-without-private-hdr` | 保留 OPPO 相机尾部的哪些部分，取值见下方。 |
+| `--family auto\|x6\|x7` | `auto` | 源文件使用哪种 ProXDR 数据布局 |
+| `--debug-dir <目录>` | 不写 | 保留本次运行的中间产物供检查 |
 
-Apple 摄影风格和 Apple 人像可以组合。`--oppo-compatible` 与任一 Apple 模式互斥，CLI 会在开始转换前返回参数错误。
+### 批量参数（`batch`）
 
-## 输出模式
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--input-dir <目录>` | 必填 | 输入目录，递归扫描 |
+| `--output-dir <目录>` | 输入目录 | 输出目录 |
+| `--glob <模式>` | `*.heic` | 挑选哪些文件 |
+| `--jobs <数量>` | `min(cpu, 4)` | 同时转换几个文件 |
+| `--categorize` | 关闭 | 按拍摄模式分目录写出 |
+| `--resume` / `--no-resume` | `--resume` | 是否续跑上次的进度 |
+| `--skip-existing` / `--no-skip-existing` | `--skip-existing` | 输出已经符合当前设置时是否跳过 |
+| `--checkpoint <文件>` | 输出目录下的隐藏 JSONL | 进度记录位置 |
 
-默认文本模式显示任务概况、当前进度、警告、失败和最终总结。批量成功时不会为每个文件新增一行。
+### 归类参数（`categorize`）
 
-| 模式 | 输出内容 |
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--input <文件或目录>` | 必填，可重复 | 要归类的文件或目录 |
+| `--output-dir <目录>` | 必填 | 分类根目录 |
+| `--jobs <数量>` | `min(cpu, 4)` | 并发数 |
+| `--dry-run` | 关闭 | 只打印计划，不复制文件 |
+
+### Apple 功能（仅 macOS，研究性功能）
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--apple-photographic-styles` | 关闭 | 从照片自身生成 Apple 摄影风格数据，不读取任何 Apple donor 照片。`--apple-styles` 是旧写法。 |
+| `--apple-portrait` | 关闭 | 生成 Apple 人像数据。需要照片本身带 `rear.depth`、`rear.depth.config` 和 `src.image`。 |
+| `--apple-styles-raw-dng <文件>` | 无 | 配一张对应的 OPPO RAW MAX DNG。不匹配或方向不同的 DNG 会被拒绝，而不是将就使用。 |
+| `--apple-style-data-producer <模式>` | `constrained-solver` | 可选 `constrained-solver`、`learn-node`、`identity-fallback`。后两者是诊断用对照。 |
+
+两个功能相互独立，可以同时开启；组合运行时，非人像照片仍会得到摄影风格输出。Apple 输出与 `--oppo-compatible` 互斥。
+
+这些功能**尚未达到可用于正式 Photos 输出的验收标准**。具体哪些结论已经验证、哪些还没有，见 [Apple 功能文档](apple-features.md)。
+
+### 诊断参数
+
+只在排查问题时才需要，正常使用可以忽略。
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--input-processing system\|system-decoded\|hybrid\|passthrough` | `hybrid` | base image 和 gain map 的重建方式 |
+| `--tmap-format imageio\|strict` | `imageio` | `strict` 写 145 字节 ISO 形式，实测会让 Find X9 Ultra 相册的 Exif 解析和编辑异常 |
+| `--oppo-compat <模式>` | `off` | 更细粒度的 HDR 路由位控制：`auto`、`iso`、`iso-no-local`、`iso-graph`、`on`、`tail`、`off`。`--no-oppo-compat` 等同 `off`。 |
+
+### `--oppo-camera-tail` 取值
+
+| 取值 | 说明 |
 | --- | --- |
-| 默认 | 概况、进度、警告、失败、总结 |
-| `--quiet` | 错误和最终结果 |
-| `--verbose` | 默认内容，加逐文件完成、跳过原因和警告代码 |
-| `--debug` | verbose 内容，加内部配置、helper 活动、临时路径和底层错误链 |
+| `off` | 不追加任何 OPPO 相机私有尾部 |
+| `watermark` | 只保留水印、大师模式预设和拍摄参数 |
+| `compact` | 在水印基础上追加紧凑的人像/景深尾部 |
+| `preserve` | 逐字节保留完整尾部 |
+| `preserve-without-portrait` | 保留其他数据，只移除景深、蒙版、网格和恢复原图 |
+| `preserve-without-portrait-or-private-hdr` | 同上，再移除全部私有 HDR 条目 |
+| `preserve-without-private-uhdr` | 只物理移除 `local.uhdr.gainmap.data/info` |
+| `preserve-without-private-hdr` | **默认**：物理移除全部私有 HDR 条目，保留人像、水印、大师模式等 |
+| `preserve-no-uhdr` | 保留全部字节，只在 manifest 中等长改名停用私有 UHDR |
+| `preserve-no-hdr` | 保留全部字节，等长停用全部私有 HDR key |
 
-`--quiet`、`--verbose` 和 `--debug` 互斥。
+## 输出与退出码
 
-## stdout、stderr 与终端行为
-
-- `--help` 写入 stdout。
-- 人类可读的进度、警告、错误和总结写入 stderr。
-- `--format json` 和 `--format jsonl` 的机器数据写入 stdout。
-- stderr 连接交互式终端时使用单个原地进度区域。
-- 管道、重定向和 CI 自动使用无 ANSI 控制字符的逐行输出。
-
-批量默认输出不会为每个成功文件打印一行。警告和失败会暂时清除动态进度区域，打印消息后再恢复。
-
-## JSON 与 JSONL
-
-`--format json` 输出一个包含 `events` 数组的 JSON 文档。`--format jsonl` 每行输出一个独立 JSON 对象。
-
-所有机器记录都包含 `schema_version: 1`。字段名、事件名、阶段名、warning code 和 error code 始终使用稳定英文；只有 `message` 可能本地化。
-
-```json
-{"schema_version":1,"event":"conversion_failed","error_code":"source_gain_map_missing","input":"IMG_001.heic","message":"输入照片没有可用的 HDR Gain Map。"}
-```
-
-当前事件名包括：
-
-- `conversion_started`
-- `conversion_progress`
-- `conversion_warning`
-- `conversion_completed`
-- `conversion_skipped`
-- `conversion_failed`
-- `batch_started`
-- `batch_progress`
-- `batch_completed`
-
-## 稳定错误代码
-
-| 错误代码 | 含义 |
-| --- | --- |
-| `source_not_found` | 输入路径不存在 |
-| `source_not_supported` | 不支持的输入照片 |
-| `source_gain_map_missing` | 没有可用的 HDR Gain Map |
-| `source_gain_map_corrupt` | Gain Map 不完整或损坏 |
-| `portrait_data_unavailable` | 缺少 Apple 人像所需资源 |
-| `apple_runtime_unavailable` | 当前系统缺少 Apple 处理能力 |
-| `output_not_writable` | 无法创建或替换输出 |
-| `output_verification_failed` | 写入后的输出未通过验证 |
-| `internal_container_error` | 不支持的内部容器状态 |
-| `invalid_arguments` | 命令或参数无效 |
-| `batch_incomplete` | 批量任务存在失败项 |
-
-默认文本只显示用户可理解的原因和恢复建议。`--verbose` 增加错误代码，`--debug` 才显示底层容器诊断和完整错误链。
-
-## 语言
-
-语言选择顺序：
-
-1. `--language`
-2. `XDREMUX_LANGUAGE`
-3. 系统首选语言
-4. 英文回退
-
-支持简体中文标识 `zh-Hans`、`zh-CN`，以及英文标识 `en`、`en-US`、`en-GB`。其他语言暂时回退英文。
-
-JSON 字段、事件名、错误代码、参数名、环境变量、文件名和退出码不会本地化。
-
-## 批量重跑与失败报告
-
-批量输出保留输入相对 `--input-dir` 的目录结构，因此不同相册中的同名文件不会互相覆盖。
-
-重新运行时：
-
-1. 已有且通过轻量验证的输出直接跳过。
-2. 无效或不完整输出重新转换。
-3. `--overwrite` 强制重新转换。
-4. 每个文件先写入同目录临时文件，验证后再原子安装。
-5. 单文件失败不终止剩余任务。
-
-失败项写入 `<output-dir>/xdremux-failures.json`。干净重跑成功后，旧失败报告会被删除。批量恢复不使用 checkpoint journal、配置 hash 或 mtime 状态机。
-
-## 退出码
+CLI 输出人类可读的文本：进度写 stdout，错误写 stderr。目前没有 JSON 事件流，也没有 `--quiet`、`--verbose`、`--format`、`--language` 这些参数。
 
 | 退出码 | 含义 |
 | --- | --- |
 | `0` | 成功 |
-| `1` | 内部容器错误 |
-| `2` | 命令或参数错误 |
-| `3` | 输入缺失、不支持或无效 |
-| `4` | 输出或 Apple runtime 错误 |
-| `5` | 批量完成，但存在失败项 |
-| `130` | 被 Ctrl+C 中断 |
+| `1` | 任何错误（参数错误、输入不支持、转换失败、批量存在失败项） |
+
+## 批量重跑
+
+`batch` 会在输出目录下写一个隐藏的 JSONL 进度文件，只有整批零失败时才删除。重新运行同一条命令时：
+
+1. 已经符合当前设置的输出直接跳过（`--skip-existing`，默认开启）。
+2. 之前失败的文件重新尝试（`--resume`，默认开启）。
+3. `--categorize` 写出的拍摄模式目录不会被当成新输入重新扫描，所以重复运行是幂等的。
+
+## 常见错误
+
+| 提示 | 含义 |
+| --- | --- |
+| `not a ProXDR photo` | 这张照片没有 OPPO Local HDR 数据。可能是普通 HEIC，或者拍摄时没开 ProXDR。 |
+| `already converted` | 这个文件已经带 ISO 21496-1 Gain Map，再转一次不会有任何变化。 |
+| `not an OPPO portrait photo` | `--apple-portrait` 需要的景深数据不在这张照片里。 |
+| `N file(s) failed to convert` | 批量存在失败项。再跑一次同样的命令只会重试失败的那些。 |
 
 ## Python CLI
 
-Python CLI 保留原有 HDR 转换能力，不提供 Apple 摄影风格或 Apple 人像功能。
+Python 版本只做 HDR 转换，没有 Apple 摄影风格和 Apple 人像功能。
 
 ```bash
-pip install pillow-heif Pillow numpy
-python3 xdremux/python/XDRemux.py convert --input IMG_001.heic
-python3 xdremux/python/XDRemux.py batch --input-dir photo_dump/
-python3 xdremux/python/XDRemux.py convert --oppo-compatible --input IMG_001.heic
+pip install -r xdremux/python/requirements.txt
+python3 -m xdremux.python.XDRemux convert --input IMG_001.heic
+python3 -m xdremux.python.XDRemux convert --oppo-compatible --input IMG_001.heic
 ```
 
-正式 Swift CLI 是新功能和自动化集成的首选入口。
+需要 Python 3.11 或更高版本。新功能和自动化集成优先用 Swift CLI。
