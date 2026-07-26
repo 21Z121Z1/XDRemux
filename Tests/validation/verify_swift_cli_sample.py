@@ -82,7 +82,33 @@ def parse_arguments() -> argparse.Namespace:
         help="assert ordinary conversion kept the source Base payload byte-identical",
     )
     parser.add_argument("--in-place", action="store_true", help="convert a temporary copy in place")
-    return parser.parse_args()
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="inspect --input as an already-converted output instead of converting it",
+    )
+    arguments = parser.parse_args()
+    if arguments.validate_only:
+        incompatible = [
+            name
+            for name, enabled in (
+                ("--in-place", arguments.in_place),
+                ("--oppo-compatible", arguments.oppo_compatible),
+                ("--apple-portrait", arguments.apple_portrait),
+                ("--expect-direct-gain", arguments.expect_direct_gain),
+                (
+                    "--require-compressed-primary-preserved",
+                    arguments.require_compressed_primary_preserved,
+                ),
+            )
+            if enabled
+        ]
+        if incompatible:
+            parser.error(
+                "--validate-only performs no conversion and cannot be combined with "
+                + ", ".join(incompatible)
+            )
+    return arguments
 
 
 def main() -> int:
@@ -93,7 +119,23 @@ def main() -> int:
     if not input_path.is_file():
         print(f"input sample not found: {input_path}", file=sys.stderr)
         return 2
-    if not cli_path.is_file():
+
+    if arguments.validate_only:
+        # The sample is already a conversion output; only assert its gain-map
+        # pixel format. No CLI is needed, so none is resolved or compiled.
+        run(
+            [
+                "swift",
+                "-e",
+                PIXEL_FORMAT_INSPECTOR,
+                str(input_path),
+                arguments.expected_pixel_format,
+            ],
+            cwd=repo,
+        )
+        return 0
+
+    if not arguments.binary and not cli_path.is_file():
         print(f"Swift CLI not found: {cli_path}", file=sys.stderr)
         return 2
 

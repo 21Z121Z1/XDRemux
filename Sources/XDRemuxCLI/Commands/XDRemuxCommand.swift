@@ -221,7 +221,12 @@ enum XDRemuxCommand {
 
     private static func runBatch(_ cmd: BatchCommand) throws {
         try ensureDirectory(cmd.outputDirURL, fileManager: fileManager)
-        let discovered = try enumerateInputs(root: cmd.inputDirURL, glob: cmd.glob)
+        let discovered = try enumerateInputs(
+            root: cmd.inputDirURL,
+            glob: cmd.glob,
+            excluding: cmd.outputDirURL,
+            categorized: cmd.categorizeOutput
+        )
         let matched = discovered
         guard !matched.isEmpty else {
             throw CLIError.noFilesMatched(cmd.inputDirURL, cmd.glob)
@@ -722,7 +727,12 @@ enum XDRemuxCommand {
         }
     }
 
-    private static func enumerateInputs(root: URL, glob: String) throws -> [URL] {
+    static func enumerateInputs(
+        root: URL,
+        glob: String,
+        excluding outputDirectory: URL?,
+        categorized: Bool
+    ) throws -> [URL] {
         guard fileManager.fileExists(atPath: root.path) else {
             throw CLIError.inputNotFound(root)
         }
@@ -730,15 +740,43 @@ enum XDRemuxCommand {
         let regex = try globToRegex(glob)
         guard let enumerator = fileManager.enumerator(
             at: root,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else {
             throw CLIError.inputNotFound(root)
         }
 
+        let rootPath = root.standardizedFileURL.path
+        let outputPath = outputDirectory?.standardizedFileURL.path
+        // Only skip the output tree when it is nested *inside* the scanned root.
+        // When it is the root itself (in-place batch) skipping it would discard
+        // every input.
+        let excludedTree = outputPath.flatMap {
+            $0 != rootPath && $0.hasPrefix(rootPath + "/") ? $0 : nil
+        }
+        // A categorized run files its results under per-capture-mode folders of
+        // the output directory. Those folders only ever hold XDRemux output, so
+        // skipping them keeps a repeated batch over the same directory
+        // idempotent instead of re-converting yesterday's results.
+        let categorizedParent = categorized ? (outputPath ?? rootPath) : nil
+        let captureModeFolders = Set(OppoCaptureMode.allCases.map(\.folderName))
+
         var matched: [URL] = []
         for case let fileURL as URL in enumerator {
-            let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
+            let path = fileURL.standardizedFileURL.path
+            let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+            let isDirectory = values.isDirectory == true
+
+            if let excludedTree, path == excludedTree || path.hasPrefix(excludedTree + "/") {
+                if isDirectory { enumerator.skipDescendants() }
+                continue
+            }
+            if isDirectory, let categorizedParent,
+               fileURL.deletingLastPathComponent().standardizedFileURL.path == categorizedParent,
+               captureModeFolders.contains(fileURL.lastPathComponent) {
+                enumerator.skipDescendants()
+                continue
+            }
             guard values.isRegularFile == true else { continue }
 
             let relative = fileURL.path.replacingOccurrences(of: root.path + "/", with: "")

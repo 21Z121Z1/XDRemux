@@ -40,6 +40,11 @@ public enum XDRemuxError: Error, CustomStringConvertible {
     case outputVerificationFailed(URL)
     case gainMapPixelFormatMismatch(URL, expected: UInt32, actual: UInt32?)
     case invalidContainer(String)
+    /// The input simply is not an OPPO portrait: the private tail lacks the
+    /// depth bundle Apple Portrait needs. Distinct from `invalidContainer` so a
+    /// combined Styles+Portrait run can degrade to styles-only for this case
+    /// alone and still surface every genuine portrait failure.
+    case portraitPrerequisitesMissing(String)
     case appleFeatureRuntimeUnavailable(String)
     case appleFeatureConversionFailed(status: Int32, log: String)
 
@@ -102,6 +107,8 @@ public enum XDRemuxError: Error, CustomStringConvertible {
         case .gainMapPixelFormatMismatch(let url, let expected, let actual):
             return "gain map pixel format mismatch in \(url.path): expected \(fourCCString(expected)), got \(fourCCString(actual))"
         case .invalidContainer(let message):
+            return "invalid HEIC container: \(message)"
+        case .portraitPrerequisitesMissing(let message):
             return "invalid HEIC container: \(message)"
         case .appleFeatureRuntimeUnavailable(let message):
             return "Apple feature runtime unavailable: \(message)"

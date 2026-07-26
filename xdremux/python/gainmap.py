@@ -29,7 +29,12 @@ def _get_knee_point(edr: float) -> float:
     div1 = _f32(1.0 / p1)
     x_norm = _f32(_f32(_f32(0.9800000190734863) - t) / k)
     p2 = _f32(math.pow(x_norm, inv_gamma))
-    y = _f32(_f32(_f32(p2 * _f32(1.003937005996704)) - div1) / _f32(1.0 - div1))
+    try:
+        y = _f32(_f32(_f32(p2 * _f32(1.003937005996704)) - div1) / _f32(1.0 - div1))
+    except ZeroDivisionError:
+        # scale == 1.0 makes div1 == 1.0; C float math yields ±inf here and
+        # falls into the non-finite branch below. Match that behavior.
+        return float("nan")
     if not math.isfinite(y) or y <= 0.0:
         return float("nan")
 
@@ -75,6 +80,11 @@ def reconstruct(mask: np.ndarray, edr_scale: float,
         knee = 0.0
     else:
         knee = _get_knee_point(edr_scale)
+    if not math.isfinite(knee):
+        # No usable knee point (edr_scale ~= 1.0): the photo carries no HDR
+        # gain, so the reconstructed gain map is uniformly zero. Returning
+        # explicitly avoids NaN flowing into integer LUT indices below.
+        return np.zeros(mask.shape, dtype=np.uint8)
     knee_range = 1.0 - knee if knee < 1.0 else 0.001
 
     def lut3_fn(x):

@@ -45,7 +45,7 @@ struct XDRemuxAppModelTests {
         try await testOutputCollisionsAreMarkedBeforeConversion()
         try await testOutputPlanFlagsInvalidExistingOutputAsOverwriteRisk()
         try await testOutputParentFileBlocksConversionBeforeWorkStarts()
-        try testPreparingOutputRemovesInvalidExistingFileBeforeConversion()
+        try testPreparingOutputKeepsInvalidExistingFileUntilConversionSucceeds()
         try testThumbnailRendererProducesBoundedPNGData()
         try testEffectiveConcurrencyRespectsMemoryAndUserLimit()
         try testClearCompletedAndRetryFailedKeepQueuePredictable()
@@ -277,7 +277,7 @@ struct XDRemuxAppModelTests {
     }
 
     @MainActor
-    private static func testPreparingOutputRemovesInvalidExistingFileBeforeConversion() throws {
+    private static func testPreparingOutputKeepsInvalidExistingFileUntilConversionSucceeds() throws {
         let root = try makeTempDirectory("prepare-output")
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
 
@@ -292,8 +292,14 @@ struct XDRemuxAppModelTests {
             skipExisting: true
         )
 
-        try expect(disposition == .removedExistingInvalidOutput, "invalid existing output should be removed before conversion")
-        try expect(!FileManager.default.fileExists(atPath: output.path), "invalid existing output file should be gone")
+        try expect(
+            disposition == .replacesExistingInvalidOutput,
+            "invalid existing output should be scheduled for replacement"
+        )
+        try expect(
+            FileManager.default.fileExists(atPath: output.path),
+            "invalid existing output must survive preparation so a failed conversion cannot destroy it"
+        )
     }
 
     @MainActor

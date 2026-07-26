@@ -62,7 +62,9 @@ enum OutputPlanStatus: String, Sendable, Equatable {
 enum OutputPreparationDisposition: String, Sendable, Equatable {
     case ready
     case skippedExistingValidOutput
-    case removedExistingInvalidOutput
+    /// An unusable output is already at the destination. It is replaced only
+    /// once a fresh conversion has succeeded, never deleted up front.
+    case replacesExistingInvalidOutput
 }
 
 enum ThumbnailStatus: Equatable {
@@ -213,6 +215,9 @@ final class XDRemuxViewModel {
 
     private var processTask: Task<Void, Never>?
     private var importTask: Task<Void, Never>?
+    /// Bumped by every import. A scan that resumes after being superseded uses
+    /// it to detect that the state it would publish is no longer the truth.
+    private var importGeneration = 0
 
     func addFiles(from urls: [URL]) {
         guard canEditQueue else { return }
@@ -225,6 +230,8 @@ final class XDRemuxViewModel {
     @discardableResult
     func importFiles(from urls: [URL]) async -> Int {
         guard canEditQueue else { return 0 }
+        importGeneration &+= 1
+        let generation = importGeneration
         state = .scanning
         currentFileName = "正在扫描 HEIC 文件..."
 
@@ -233,6 +240,10 @@ final class XDRemuxViewModel {
                 (url, PhotoCategorizationEngine.classify(at: url))
             }
         }.value
+
+        // A newer import already owns the UI; publishing this one's queue items
+        // or terminal state here would clobber the scan the user is watching.
+        guard generation == importGeneration else { return 0 }
 
         if Task.isCancelled {
             state = queue.isEmpty ? .idle : .cancelled
@@ -587,7 +598,15 @@ final class XDRemuxViewModel {
                 if disposition == .skippedExistingValidOutput {
                     return QueueWorkResult(id: item.id, status: .skippedExisting, errorMessage: nil, finishedAt: Date())
                 }
-                try AppConversionEngine.convert(inputURL: item.inputURL, outputURL: item.outputURL, config: config)
+                if disposition == .replacesExistingInvalidOutput {
+                    try convertReplacingExistingOutput(
+                        inputURL: item.inputURL,
+                        outputURL: item.outputURL,
+                        config: config
+                    )
+                } else {
+                    try AppConversionEngine.convert(inputURL: item.inputURL, outputURL: item.outputURL, config: config)
+                }
                 return QueueWorkResult(id: item.id, status: .converted, errorMessage: nil, finishedAt: Date())
             } catch {
                 return QueueWorkResult(
@@ -705,8 +724,22 @@ final class XDRemuxViewModel {
         if config.skipExisting, AppConversionEngine.isValidOutput(outputURL, config: config) {
             return .skippedExistingValidOutput
         }
-        try fileManager.removeItem(at: outputURL)
-        return .removedExistingInvalidOutput
+        return .replacesExistingInvalidOutput
+    }
+
+    /// Converts into a sibling staging file and publishes it only on success, so
+    /// a failed run leaves whatever was already at `outputURL` untouched.
+    nonisolated private static func convertReplacingExistingOutput(
+        inputURL: URL,
+        outputURL: URL,
+        config: ConversionConfig
+    ) throws {
+        let staging = outputURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".xdremux-\(UUID().uuidString).heic")
+        defer { try? FileManager.default.removeItem(at: staging) }
+        try AppConversionEngine.convert(inputURL: inputURL, outputURL: staging, config: config)
+        _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: staging)
     }
 
     private func applyThumbnailData(id: UUID, inputURL: URL, data: Data) {

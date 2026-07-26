@@ -1,3 +1,4 @@
 pillow-heif>=0.15.0
 Pillow>=11.0.0
 numpy>=2.0.0
+piexif>=1.1.3

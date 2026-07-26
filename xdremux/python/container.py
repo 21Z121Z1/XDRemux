@@ -201,7 +201,8 @@ def _find_jpeg_in_data(data: bytes, target_length: int | None = None) -> bytes |
 
 def extract_lhdr(path: str) -> ExtractedLHDR:
     """Extract LHDR or UHDR metadata and mask/gainmap from a HEIC file."""
-    data = open(path, "rb").read()
+    with open(path, "rb") as handle:
+        data = handle.read()
 
     # Try QTI marker first
     try:
@@ -247,7 +248,13 @@ def extract_lhdr(path: str) -> ExtractedLHDR:
             json_start = manifest[1]
             info_start = json_start - info_entry["offset"]
             info_bytes = ext[info_start:info_start + info_entry["length"]]
-            info_floats = struct.unpack("<20f", info_bytes)
+            if info_start < 0 or len(info_bytes) < 80:
+                raise ValueError(
+                    "UHDR manifest entry local.uhdr.gainmap.info points outside "
+                    f"the extension region (offset={info_entry['offset']}, "
+                    f"length={info_entry['length']})"
+                )
+            info_floats = struct.unpack("<20f", info_bytes[:80])
 
             data_start = json_start - data_entry["offset"]
             gainmap_bytes = ext[data_start:data_start + data_entry["length"]]

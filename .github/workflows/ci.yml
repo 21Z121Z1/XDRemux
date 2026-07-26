@@ -21,9 +21,6 @@ on:
       - "Tests/validation/test_agent_completion_gate.py"
       - ".github/workflows/**"
 
-env:
-  XDREMUX_LANGUAGE: en
-
 jobs:
   macos:
     runs-on: macos-latest
@@ -101,25 +98,24 @@ jobs:
             echo "APPLE_PORTRAIT_RESULT=Not configured" >> "$GITHUB_ENV"
             exit 0
           fi
-          export XDREMUX_HELPER_DIRECTORY="$PWD/.build/debug"
-          echo "::group::Fixture conversions (JSONL)"
-          .build/debug/xdremux convert --language en --format jsonl \
+          echo "::group::Fixture conversions"
+          .build/debug/xdremux convert \
             --input "$FIXTURE_ROOT/standard.heic" --output artifacts/fixtures/standard.heic \
-            > artifacts/fixtures/standard.jsonl 2> artifacts/fixtures/standard.stderr
+            > artifacts/fixtures/standard.log 2> artifacts/fixtures/standard.stderr
           echo "STANDARD_FIXTURE_RESULT=Passed" >> "$GITHUB_ENV"
-          .build/debug/xdremux convert --language en --format jsonl --oppo-compatible \
+          .build/debug/xdremux convert --oppo-compatible \
             --input "$FIXTURE_ROOT/oppo.heic" --output artifacts/fixtures/oppo.heic \
-            > artifacts/fixtures/oppo.jsonl 2> artifacts/fixtures/oppo.stderr
+            > artifacts/fixtures/oppo.log 2> artifacts/fixtures/oppo.stderr
           echo "OPPO_FIXTURE_RESULT=Passed" >> "$GITHUB_ENV"
-          .build/debug/xdremux-dev convert --language en --format jsonl --apple-photographic-styles \
-            --diagnostics-dir artifacts/diagnostics/apple-styles \
+          .build/debug/xdremux convert --apple-photographic-styles \
+            --debug-dir artifacts/diagnostics/apple-styles \
             --input "$FIXTURE_ROOT/apple-styles.heic" --output artifacts/fixtures/apple-styles.heic \
-            > artifacts/fixtures/apple-styles.jsonl 2> artifacts/fixtures/apple-styles.stderr
+            > artifacts/fixtures/apple-styles.log 2> artifacts/fixtures/apple-styles.stderr
           echo "APPLE_STYLES_RESULT=Passed" >> "$GITHUB_ENV"
-          .build/debug/xdremux-dev convert --language en --format jsonl --apple-portrait \
-            --diagnostics-dir artifacts/diagnostics/apple-portrait \
+          .build/debug/xdremux convert --apple-portrait \
+            --debug-dir artifacts/diagnostics/apple-portrait \
             --input "$FIXTURE_ROOT/apple-portrait.heic" --output artifacts/fixtures/apple-portrait.heic \
-            > artifacts/fixtures/apple-portrait.jsonl 2> artifacts/fixtures/apple-portrait.stderr
+            > artifacts/fixtures/apple-portrait.log 2> artifacts/fixtures/apple-portrait.stderr
           echo "APPLE_PORTRAIT_RESULT=Passed" >> "$GITHUB_ENV"
           echo "::endgroup::"
 
@@ -130,15 +126,14 @@ jobs:
             echo "CONTAINER_VALIDATION_RESULT=Not configured" >> "$GITHUB_ENV"
             exit 0
           fi
-          export XDREMUX_HELPER_DIRECTORY="$PWD/.build/debug"
           echo "::group::Container validation"
           python3 Tests/validation/verify_swift_cli_sample.py \
             --validate-only --input artifacts/fixtures/standard.heic --expected-pixel-format 444f
           python3 Tests/validation/verify_swift_cli_sample.py \
             --validate-only --input artifacts/fixtures/oppo.heic --expected-pixel-format 420f
-          .build/debug/xdremux-dev validate-apple --input artifacts/fixtures/apple-styles.heic \
+          .build/debug/xdremux validate-apple --input artifacts/fixtures/apple-styles.heic \
             > artifacts/fixtures/apple-styles-validation.json
-          .build/debug/xdremux-dev validate-portrait --input artifacts/fixtures/apple-portrait.heic \
+          .build/debug/xdremux validate-portrait --input artifacts/fixtures/apple-portrait.heic \
             > artifacts/fixtures/apple-portrait-validation.json
           echo "::endgroup::"
           echo "CONTAINER_VALIDATION_RESULT=Passed" >> "$GITHUB_ENV"

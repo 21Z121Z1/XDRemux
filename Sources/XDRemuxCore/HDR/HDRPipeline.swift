@@ -519,8 +519,12 @@ package enum LHDRExtractor {
 
             var metaFloats = (try? unpackFloatArrayLE(metaBytes, count: 20)) ?? Array(repeating: 0.0, count: 20)
 
-            // Check for valid Identity or Swapped manifest
-            if metaFloats.allSatisfy({ $0 == 0.0 }) || abs(metaFloats[0] - 1.0) > 0.1 {
+            // Check for valid Identity or Swapped manifest. Non-finite floats
+            // must fall back too: NaN passes the abs() comparison below and
+            // would later trap in Int32 rational serialization.
+            if metaFloats.allSatisfy({ $0 == 0.0 })
+                || metaFloats.contains(where: { !$0.isFinite })
+                || abs(metaFloats[0] - 1.0) > 0.1 {
                 metaFloats = [
                     1.0, 1.0, 1.0,             // ratioMin
                     1.0,                       // padding
@@ -531,7 +535,6 @@ package enum LHDRExtractor {
                     1.0,                       // displayRatioSdr
                     4.926,                     // displayRatioHdr
                     4.926,                     // scale
-                    0.0,                       // baseImageType
                     0.0                        // type
                 ]
                 var repacked = Data()
@@ -1174,7 +1177,9 @@ package enum EDRScaleResolver {
         let f24 = f[24]
         let f29 = max(f[29], 1.0)
         let f32 = f[32]
-        let cfg = Int(f[34]) == 1
+        // Equivalent to Int(f[34]) == 1 for all finite values, but NaN/Inf
+        // metadata cannot trap the integer conversion.
+        let cfg = f[34] >= 1.0 && f[34] < 2.0
 
         // Branch: f23 <= 0.99 || f0 < 3.0 → SIGMOID PATH
         if f23 <= 0.99 || f[0] < 3.0 {
@@ -1303,7 +1308,7 @@ package enum EDRScaleResolver {
         let preCorrectionEDR = scale.edrScale
         let finalEDR = scale.edrScale
         let faceCorrectionApplied = f.count > 24 ? f[24] > 0.0 : false
-        let sqrtCorrectionApplied = f.count > 34 ? (Int(f[34]) == 1 || (f[24] > 0.0)) : false
+        let sqrtCorrectionApplied = f.count > 34 ? ((f[34] >= 1.0 && f[34] < 2.0) || (f[24] > 0.0)) : false
 
         return CalibrationTrace(
             familyDetected: familyDetected.rawValue,

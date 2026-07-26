@@ -297,7 +297,7 @@ package enum ApplePhotographicStylesPipeline {
             ?? preview.dngOrientation
         guard (1...8).contains(orientation) else {
             throw CLIError.invalidContainer(
-                "RAW embedded PreviewImage has unsupported EXIF orientation (orientation)"
+                "RAW embedded PreviewImage has unsupported EXIF orientation \(orientation)"
             )
         }
         let sourceWidth = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue
@@ -310,7 +310,7 @@ package enum ApplePhotographicStylesPipeline {
               sourceHeight == gainStorageHeight * 2 else {
             throw CLIError.invalidContainer(
                 "RAW embedded ISO Gain Map is not half-resolution in primary storage geometry: "
-                    + "primary=(sourceWidth)x(sourceHeight) gain=(gainStorageWidth)x(gainStorageHeight)"
+                    + "primary=\(sourceWidth)x\(sourceHeight) gain=\(gainStorageWidth)x\(gainStorageHeight)"
             )
         }
 
@@ -324,7 +324,8 @@ package enum ApplePhotographicStylesPipeline {
         guard [gainWidth, gainHeight] == expectedPresentationSize else {
             throw CLIError.invalidContainer(
                 "RAW embedded ISO Gain Map orientation produced unexpected geometry: "
-                    + "got=(gainWidth)x(gainHeight) expected=(expectedPresentationSize[0])x(expectedPresentationSize[1])"
+                    + "got=\(gainWidth)x\(gainHeight) "
+                    + "expected=\(expectedPresentationSize[0])x\(expectedPresentationSize[1])"
             )
         }
 
@@ -3199,14 +3200,14 @@ package enum ApplePhotographicStylesPipeline {
                 throw CLIError.invalidContainer("\(owner) semantic merge item graph is incomplete")
             }
             let refs = parseISOBMFFIRefs(data, iref)
-            let ipma = parseISOBMFFIPMA(data, ipmaBox)
+            let ipma = try parseISOBMFFIPMA(data, ipmaBox)
             return ParsedFile(
                 data: data,
                 top: top,
                 meta: meta,
                 mdat: mdat,
                 children: children,
-                primaryID: parseISOBMFFPITM(data, pitm),
+                primaryID: try parseISOBMFFPITM(data, pitm),
                 toneMapID: toneMapID,
                 items: itemInfo.items,
                 iinfVersion: itemInfo.version,
@@ -3555,7 +3556,7 @@ package enum ApplePhotographicStylesPipeline {
         let iprp = try required("iprp")
         let sourceIDAT = children.first(where: { $0.type == "idat" })
         let sourceIREF = children.first(where: { $0.type == "iref" })
-        let primaryID = parseISOBMFFPITM(source, pitm)
+        let primaryID = try parseISOBMFFPITM(source, pitm)
         let itemInfo = parseISOBMFFItemInfos(source, iinf)
         let ilocEntries = try parseISOBMFFILoc(source, iloc)
         let refsInfo = parseISOBMFFIRefs(source, sourceIREF)
@@ -3576,7 +3577,7 @@ package enum ApplePhotographicStylesPipeline {
         ).first(where: { $0.type == "ipma" }) else {
             throw CLIError.invalidContainer("Photographic Styles writer requires ipma")
         }
-        let sourceIPMA = parseISOBMFFIPMA(source, ipmaBox)
+        let sourceIPMA = try parseISOBMFFIPMA(source, ipmaBox)
         let properties = try parseISOBMFFIPCOPropertyInfos(source, iprp)
         let propertyByIndex = Dictionary(uniqueKeysWithValues: properties.map { ($0.index, $0) })
         let primaryColorIndex = sourceIPMA.entries.first(where: { $0.itemID == primaryID })?
@@ -3920,7 +3921,7 @@ package enum ApplePhotographicStylesPipeline {
                 if !portraitWritten {
                     portraitUnavailableReason = "required OPPO portrait depth bundle is unavailable"
                 }
-            } catch {
+            } catch let error as CLIError {
                 let sourceExtension = inputURL.pathExtension.lowercased()
                 if sourceExtension == "jpg" || sourceExtension == "jpeg" {
                     // JPEG enters this product path only through the validated
@@ -3928,7 +3929,11 @@ package enum ApplePhotographicStylesPipeline {
                     // HEIC converter after that bridge fails.
                     throw error
                 }
-                portraitUnavailableReason = String(describing: error)
+                // Degrading to styles-only is correct only when the input is not
+                // a portrait at all. Any other portrait failure is a real defect
+                // and must not be laundered into an "unavailable" note.
+                guard case .portraitPrerequisitesMissing(let reason) = error else { throw error }
+                portraitUnavailableReason = reason
             }
         }
 
@@ -4037,9 +4042,20 @@ package enum ApplePhotographicStylesPipeline {
             evidenceContainer = FileManager.default.temporaryDirectory
                 .appendingPathComponent("xdremux-photographic-styles-\(runToken)", isDirectory: true)
         }
+        // Scratch evidence is disposable only when the run succeeds. On failure it
+        // is the sole record of what the pipeline produced, so keep it and say
+        // where it is instead of deleting the one artifact worth inspecting.
+        var succeeded = false
         defer {
-            if !persistEvidence {
+            if persistEvidence {
+                // Caller asked for a durable --debug-dir; nothing to clean up.
+            } else if succeeded {
                 try? FileManager.default.removeItem(at: evidenceContainer)
+            } else if FileManager.default.fileExists(atPath: evidenceContainer.path) {
+                FileHandle.standardError.write(Data(
+                    ("note: Photographic Styles evidence retained for diagnosis at "
+                        + "\(evidenceContainer.path)\n").utf8
+                ))
             }
         }
         let evidenceDirectory = evidenceContainer
@@ -4451,6 +4467,7 @@ package enum ApplePhotographicStylesPipeline {
                 options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             ).write(to: evidenceContainer.appendingPathComponent("latest.json"), options: .atomic)
         }
+        succeeded = true
     }
 
     private struct StylesValidationResult {
@@ -4476,7 +4493,7 @@ package enum ApplePhotographicStylesPipeline {
             throw CLIError.invalidContainer("Styles validation: required item graph boxes are missing")
         }
         let idat = children.first(where: { $0.type == "idat" })
-        let primaryID = parseISOBMFFPITM(data, pitm)
+        let primaryID = try parseISOBMFFPITM(data, pitm)
         let items = parseISOBMFFItemInfos(data, iinf).items
         let locations = try parseISOBMFFILoc(data, iloc)
         let locationByID = Dictionary(uniqueKeysWithValues: locations.map { ($0.itemID, $0) })

@@ -160,12 +160,16 @@ package func appendCompleteSourceTail(
             throw CLIError.invalidContainer("OPPO manifest is outside preserved tail")
         }
         for entry in manifestInfo.entries where shouldNeutralizeOppoCameraTailEntry(entry.name, mode: mode) {
-            let nameBytes = Data(entry.name.utf8)
+            // Match the quoted JSON token, not bare name bytes: entry names
+            // nest ("local.hdr.linear.mask" is a substring of
+            // "src.local.hdr.linear.mask"), so an unquoted search can patch a
+            // byte inside the wrong entry and then fail on the real one.
+            let nameBytes = Data("\"\(entry.name)\"".utf8)
             guard let range = tail.range(of: nameBytes, options: [], in: jsonStart..<jsonEnd),
-                  !range.isEmpty else {
+                  range.count > 2 else {
                 throw CLIError.invalidContainer("unable to neutralize OPPO tail entry \(entry.name)")
             }
-            tail[range.lowerBound] = UInt8(ascii: "x")
+            tail[range.lowerBound + 1] = UInt8(ascii: "x")
         }
     }
 

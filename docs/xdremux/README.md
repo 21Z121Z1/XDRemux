@@ -1,13 +1,18 @@
-# XDRemux 文档
+简体中文 | [English](README.en.md)
 
-用途: 聚合 XDRemux 转换器、ISO/HEIF 合规、Apple ImageIO 兼容和 passthrough 相关文档。
+# XDRemux 技术实现索引
 
-## 当前优先读取
-1. [ISO compliance report v2](iso-compliance-report-v2-20260514.md): 最新完整审计。v2 修正了 v1 中 passthrough base `colr`/`irot` 误报，当前无 SHALL 失败。
-2. [ISO conformance audit 2026-05-11](iso-conformance-audit-20260511.md): 早期审计和 Apple 62B tmap 兼容策略说明。
-3. [ISOBMFF patcher progress](isobmff-patcher-progress-20260507.md): Python patcher 让 CoreImage Headroom 可识别的闭环记录。
-4. [Passthrough plan](passthrough-plan.md): Python passthrough 设计背景。
+本目录收录 HDR、HEIF 与 ISO 容器行为的公开且相对稳定的文档。日常使用请先看[项目 README](../../README.md)或 [CLI 参考](../cli.md)。
 
-## 过期或低优先级
-- `docs/archive/xdremux/iso-compliance-report-v1-20260513.md` 已被 v2 覆盖，只保留用于对比修复前后的误报。
-- `iso-conformance-audit-20260511.md` 中的待办项已部分被 v2 和 eval 覆盖；不要直接拿它判断当前状态。
+## 当前公开文档
+
+- [ISO 合规审计](iso-conformance-audit-20260511.md)：ISO 21496-1、HEIF item 与引用关系、tmap 行为，以及 Apple ImageIO 兼容性。
+- [验证指南](../validation/README.md)：结构性、渲染器、回归与真机证据之间的边界。
+- [Apple 功能](../apple-features.md)：Styles 与 Portrait 的用户能力、输入要求和验收范围。
+- [开发指南](../development.md)：模块边界、helper、Swift Package API 与构建流程。
+
+## 文档边界
+
+公开技术文档描述当前的实现约束和可重复的验证方式。带日期的单样本实验、固件字段、逆向工作、未定假设和临时 UI 验收记录属于 `docs/research/` 或 `docs/experiments/`，不构成产品承诺。
+
+研究结论稳定为产品行为后，先落到代码和回归测试里，再把面向用户或面向开发者的结论写进对应文档。不要把原始研究日志直接追加到 README。

@@ -21,8 +21,11 @@ class SwiftArtifactLifecycleTests(unittest.TestCase):
         self.assertIn("let persistEvidence = debugRootURL != nil", function)
         self.assertIn("FileManager.default.temporaryDirectory", function)
         self.assertIn("defer {", function)
-        self.assertIn("if !persistEvidence", function)
+        # Scratch evidence is discarded on success and kept on failure, where it
+        # is the only record of what the pipeline produced.
+        self.assertIn("} else if succeeded {", function)
         self.assertIn("try? FileManager.default.removeItem(at: evidenceContainer)", function)
+        self.assertIn("succeeded = true", function)
         self.assertNotIn('appendingPathExtension("xdremux")', function)
         self.assertIn("if persistEvidence {", function)
         self.assertIn('evidenceContainer.appendingPathComponent("latest.json")', function)
