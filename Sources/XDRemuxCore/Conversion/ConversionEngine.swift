@@ -121,7 +121,16 @@ package enum XDRemuxProductCore {
         sourceData: Data,
         familyPreference: Family
     ) throws -> ProductInput {
-        let extracted = try LHDRExtractor.extract(from: sourceData)
+        let extracted: ExtractedLHDR
+        do {
+            extracted = try LHDRExtractor.extract(from: sourceData)
+        } catch {
+            // The extractor reports which private OPPO block it could not find,
+            // which is meaningless to someone who simply pointed the tool at the
+            // wrong file — or at a file it already converted. Name those two
+            // cases instead and keep the internal reason as detail.
+            throw unsupportedProductInputError(inputURL, underlying: error)
+        }
         let detectedFamily = detectFamily(from: extracted)
         let effectiveFamily = familyPreference == .auto ? detectedFamily : familyPreference
         let scale = try EDRScaleResolver.resolve(metaFloats: extracted.metaFloats, mode: extracted.mode)
@@ -148,6 +157,15 @@ package enum XDRemuxProductCore {
             params: gainMap.params,
             style: makeHDRToneMapStyle(from: scale)
         )
+    }
+
+    /// Turns "I could not find block X" into the reason the user cares about.
+    private static func unsupportedProductInputError(_ inputURL: URL, underlying: Error) -> Error {
+        if isoGainMapPixelFormat(at: inputURL) != nil {
+            return CLIError.alreadyConverted(inputURL)
+        }
+        let detail = (underlying as? CLIError)?.description ?? String(describing: underlying)
+        return CLIError.notAProXDRPhoto(inputURL, detail: detail)
     }
 
     private static func detectFamily(from extracted: ExtractedLHDR) -> Family {

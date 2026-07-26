@@ -1,38 +1,37 @@
-# Eval 与回归机制
+# 回归与真实样本验证
 
-用途: 定义 agent 可消费的最小评估系统, 避免“改完只靠人眼看一遍”。
+[English](evals.en.md) | 简体中文
 
-## 评估对象
-1. Repo-level 回归: `evals/fixtures/repo_regression_cases.json`
-2. 工作流结构回归: `scripts/check_workflows.py`
-3. 架构边界回归: `scripts/check_architecture.py`
-4. Harness 状态回归: ADB `device/offline/unauthorized` 输出解析
-5. Repo policy 回归: `evals/repo_policy_eval.py`, 保护 canonical evidence 可见性与 eval 自包含性
-6. Swift XDRemux 回归: `evals/swift_xdremux_eval.py`, 覆盖 typecheck、UHDR smoke 与 batch failure exit
-7. ImageIO-native tmap 回归: `evals/imageio_tmap_eval.py`, 区分 142B 兼容载荷与 strict ISO tmap
-8. 单元回归: `oracle-dump/tests`
+避免"改完只靠人眼看一遍"。这里列的是仓库里可复用的验证 harness 和它们各自能证明什么。规范见[测试规范](testing.md)。
 
-说明: 在 Codex 的 `CODEX_SANDBOX=seatbelt` 嵌套环境里, Python 子进程再启动 Swift/ImageIO 可能无法完成 UHDR runtime smoke。该场景由 `evals/swift_xdremux_eval.py` 识别为环境 skip, 需要用同一条 `swift ... XDRemux.swift convert` 命令从 shell 直接验证 ImageIO 行为。
+## 可复用 harness
 
-## 执行入口
-- `make test`: 运行 repo-level + oracle-dump pytest
-- `make verify`: lint + test + smoke + 架构边界
+都在 `Tests/validation/`，都能直接作为 completion gate 计划里的一条 check。
 
-## 通过标准
-- `make verify` 返回码为 0
-- 无新的架构越界
-- 无 workflow 结构缺失
+| Harness | 证明什么 |
+| --- | --- |
+| `verify_swift_cli_sample.py` | 拿一张真实照片跑完整转换，用 ImageIO 断言输出的 Gain Map 像素格式。`--require-compressed-primary-preserved` 额外断言主图字节没被动过；`--validate-only` 只检查已有输出，不转换 |
+| `verify_error_messages.sh` | 走真实二进制检查 help 文本和错误文案：重复转换、非 ProXDR 输入、批量失败行的长度 |
+| `verify_batch_categorize_idempotence.sh` | 同一个目录连跑两次 `batch --categorize`，第二次必须全部跳过而不是重新扫描自己的输出 |
+| `verify_validate_only_harness.sh` | `--validate-only` 在匹配、不匹配和误用三种情况下的行为 |
+| `verify_categorization_cross_implementation.py` | Swift 和 Python 两版分类结果一致 |
+| `verify_categorized_batch_outputs.py` | 分类批量输出的目录结构 |
+| `verify_apple_feature_artifact_lifecycle.py` | Apple 功能的中间产物按预期清理或保留 |
+| `verify_macos_app_model_tests.sh` | 构建并运行 macOS App 的模型测试 |
+
+## 挑哪一条
+
+- 改了 Gain Map 编码或容器写入 → `verify_swift_cli_sample.py`，带上期望的像素格式。
+- 改了用户能看见的文字 → `verify_error_messages.sh`。
+- 改了批量枚举或续跑逻辑 → `verify_batch_categorize_idempotence.sh`。
+- 改了分类判定 → 两个 categorization harness。
+- 改了 App 的 ViewModel → `verify_macos_app_model_tests.sh`。
+
+真实样本不在仓库里，路径要在计划文件里显式给绝对路径。
 
 ## 已知空白
-1. 设备依赖流程 (ADB/Frida) 仍为手动 gate
-2. 真实样本 fixture 密度不足, 目前以仓库结构回归为主
-3. API36 framework/native 绝对等价仍需外部证据
-4. ImageIO-native 142B `tmap` 是兼容性证据, 不是 strict ISO 145B payload 通过证据
-5. Homebrew Python 3.14 在当前机器上可能卡在 Pillow/bz2 导入；`evals/test_eval.py` 已将 image-stack 相关回归隔离到有超时的 worker, 本机完整回归建议使用健康 Python runtime 或 `.venv`
 
-## TODO 路线
-1. 扩充 `evals/fixtures/` golden 样本
-2. 将关键 failure mode 映射为独立 case ID
-3. 对动态探针链路补充可复现 mock 合同测试
-
-关联文档: `docs/quality/testing.md`, `docs/debt/tech-debt-tracker.md`。
+1. 没有 golden 输出比对 —— 目前断言的是结构性质（像素格式、字节保留、退出码），不是逐位相同的输出哈希。
+2. 真实样本密度不够，覆盖的机型和拍摄模式有限。
+3. Apple 摄影风格的"是否真的能在 Photos 里编辑"没有自动化证据，只有容器结构层面的检查。
+4. OPPO 相册的显示行为需要真机，不在任何自动化链路里。

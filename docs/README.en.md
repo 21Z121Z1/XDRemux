@@ -1,23 +1,26 @@
 # XDRemux Documentation
 
-English | [简体中文](../README.md)
+English | [简体中文](README.md)
 
-## User documentation
+For what the project is and how to get started, see the [root README](../README.en.md).
 
-- [Complete CLI reference](cli.en.md)
-- [Apple Photographic Styles and Portrait](apple-features.en.md)
-- [Supported devices](supported-devices.en.md)
+## Using it
 
-## Development documentation
+- [CLI reference](cli.en.md) — every command, option, default, and exit code
+- [Apple Photographic Styles and portrait](apple-features.en.md) — what they do, and how far they are verified
+- [Supported devices](supported-devices.en.md) — phones known to shoot ProXDR
 
-- [Development, builds, and Swift Package integration](development.en.md)
-- [Validation guide](validation/README.md)
-- [Testing policy](quality/testing.md)
-- [Logging policy](quality/logging.md)
+## Developing
+
+- [Development and builds](development.en.md) — module layout, Swift package integration, build workflows
+- [Validation guide](validation/README.md) — the acceptance flow and plan format
+- [Testing policy](quality/testing.en.md) — the checks a change has to pass
+- [Regression and real-sample verification](quality/evals.en.md) — the reusable harnesses
+- [Output policy](quality/logging.en.md) — rules for command output and error text
 
 ## Technical implementation
 
-- [XDRemux technical documentation index](xdremux/README.en.md)
+- [Technical index](xdremux/README.en.md)
 - [ISO container audit](xdremux/iso-conformance-audit-20260511.md)
 
-The product README documents current user-facing commitments. Per-sample experiments, firmware fields, reverse-engineering evidence, and dated acceptance logs are research material rather than product documentation or product promises.
+These documents describe current behaviour and current commitments. Dated single-sample experiments, firmware fields, and reverse-engineering evidence are research material, not product promises.

@@ -1,386 +1,131 @@
 # XDRemux
 
-[English Version](README.en.md) | 中文版
+简体中文 | [English](README.en.md)
 
-XDRemux 将 OPPO、OnePlus 和 realme 设备拍摄的 ProXDR 照片转换为兼容性更好的 HDR HEIC。
+把 OPPO、OnePlus、realme 的 ProXDR 照片转成通用的 HDR 照片格式（ISO/TS 21496-1），让 iPhone、Mac 和其他支持这个标准的地方都能正常显示。
 
-它会读取照片中的私有 HDR Gain Map 和相关元数据，重新封装为符合 ISO/TS 21496-1 的 HDR HEIC。Swift 版本还可以选择生成适用于 Apple Photos 的摄影风格或人像编辑数据。
+ProXDR 的 HDR 信息存在厂商私有数据里，换个相册打开就是一张亮部被压平的普通照片。XDRemux 把它翻译成通用格式，画面数据一个字节都不动。
 
-## 主要功能
+## 快速开始
 
-| 模式 | 开关 | 用途 |
-| --- | --- | --- |
-| 标准 ISO HDR | 默认 | 转换为 ISO/TS 21496-1 HDR HEIC，适合跨平台查看 |
-| OPPO 相册兼容 | `--oppo-compatible` | 生成更适合 OPPO 相册识别的 4:2:0 Gain Map |
-| Apple 摄影风格 | `--apple-photographic-styles` | 让照片在 Apple Photos 中显示摄影风格编辑界面 |
-| Apple 人像 | `--apple-portrait` | 将 OPPO 人像模式数据转换为 Apple Photos 支持的人像模式数据 |
-| 拍摄模式分类 | `categorize` / `batch --categorize` | 按 UserComment 中的拍摄模式整理原片或转换结果 |
-
-Apple 摄影风格和 Apple 人像可以同时启用，并写入同一个 HEIC。Apple 相关的输出选项与 `--oppo-compatible` 不能同时使用。
-
-> [!NOTE]
-> Apple 摄影风格和 Apple 人像目前属于实验性兼容功能。不同照片、设备型号和系统版本的结果可能存在差异。
-
-## 运行要求
-
-Swift 版本需要：
-
-- macOS 15 或更高版本
-- Swift 6
-- 支持的 OPPO、OnePlus、realme 设备拍摄的 ProXDR HEIC 照片
-
-克隆仓库后进入项目目录：
+需要 macOS 15 或更高版本，以及 Swift 6。
 
 ```bash
 git clone https://github.com/21Z121Z1/XDRemux.git
 cd XDRemux
+swift build
 ```
 
-查看完整命令行帮助：
+转换单张：
 
 ```bash
-swift run xdremux --help
+.build/debug/xdremux convert --input IMG_001.heic --output IMG_001_hdr.heic
 ```
+
+批量转换一个目录：
+
+```bash
+.build/debug/xdremux batch --input-dir photo_dump/ --output-dir converted/
+```
+
+> [!WARNING]
+> `convert` 省略 `--output`、`batch` 省略 `--output-dir` 时会**直接覆盖原文件**。请先备份原片。
+
+## 能输出什么
+
+| 想要的结果 | 加什么参数 |
+| --- | --- |
+| 标准 ISO HDR | 默认，不加参数 |
+| OPPO 相册也能识别的 HDR | `--oppo-compatible` |
+| Apple Photos 摄影风格编辑 | `--apple-photographic-styles` |
+| Apple Photos 人像景深编辑 | `--apple-portrait` |
+| 按拍摄模式归档 | `categorize` 或 `batch --categorize` |
+
+默认只重写 HDR 那部分数据（业内叫 Gain Map，记录每个像素该提亮多少），画面、水印、大师模式这些一律原样保留。HDR 精度也保持原样；`--oppo-compatible` 必须把它降一档 OPPO 相册才认，降完回不去。
+
+全部参数、默认值和退出码见 [CLI 参考](docs/cli.md)，或直接跑 `swift run xdremux --help`。
+
+## 按拍摄模式归档
+
+读出照片里记录的拍摄模式，把照片复制进对应的中文目录（`人像`、`夜景`、`大师模式` 等）。只复制，不修改也不删除源文件：
+
+```bash
+swift run xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run
+```
+
+`--dry-run` 只打印计划。给 `batch` 加 `--categorize` 可以让转换结果直接写进这些目录。Python 版本行为一致：
+
+```bash
+python3 xdremux/python/XDRemux.py categorize --input photo_dump/ --output-dir categorized/
+```
+
+读不出拍摄模式的照片会留在输出根目录，不算失败。
+
+## Apple 摄影风格与人像
+
+让转换后的照片在 Apple Photos 里支持摄影风格和人像景深编辑。这些数据都由你这张照片本身算出来，不用另找一张 iPhone 照片当模板。人像功能要求源照片用人像模式拍摄、景深数据还在 —— 后期编辑过的可能已经丢了。两个功能可以同时开，但都不能和 `--oppo-compatible` 一起用。
 
 > [!IMPORTANT]
-> 单张转换省略 `--output` 时会覆写输入文件。批量转换省略 `--output-dir` 时会把结果写入输入目录。请先备份原片。
+> 这两个功能**尚未通过正式验收**。检查只做到文件结构这一层：能打开、数据在。**没有**验证过导进真机 Photos 之后编辑、保存、再打开还撑不撑得住。详见 [Apple 功能文档](docs/apple-features.md)。
 
-## 标准 ISO HDR
-
-不添加功能开关时，XDRemux 使用标准 ISO HDR 模式。
-
-单张转换：
+生成摄影风格数据很吃 CPU。批量处理请用 release 构建，比默认的调试构建快数倍：
 
 ```bash
-swift run xdremux convert \
-  --input IMG_001.heic \
-  --output IMG_001_iso.heic
-```
-
-批量转换：
-
-```bash
-swift run xdremux batch \
-  --input-dir photo_dump/ \
-  --output-dir iso_output/
-```
-
-此模式会尽量保留原始 Base Image 和非 HDR 厂商元数据，只重建标准 Gain Map 结构。
-
-源 Gain Map 为单通道时继续保持单通道；源文件包含未降采样的三通道 4:4:4 Gain Map 时，可以保留其原始通道结构。
-
-## OPPO 相册兼容模式
-
-```bash
-swift run xdremux convert \
-  --oppo-compatible \
-  --input IMG_001.heic \
-  --output IMG_001_oppo.heic
-```
-
-此模式会将高规格 Gain Map 转换为 HEVC Main Still Picture 4:2:0，并尽可能保留 OPPO 相册可能需要的私有元数据。
-
-该模式适合需要将照片重新导入 OPPO 相册的情况。它不适合与 Apple 摄影风格或 Apple 人像同时使用。
-
-## Apple 摄影风格
-
-```bash
-swift run xdremux convert \
-  --apple-photographic-styles \
-  --input IMG_001.heic \
-  --output IMG_001_styles.heic
-```
-
-XDRemux 会根据当前照片的画面、亮度、色彩和语义区域生成摄影风格所需的数据。
-
-输出照片可在 Apple Photos 中支持：
-
-- 切换摄影风格
-- 调整色调 Tone
-- 调整色彩 Color
-- 调整风格强度
-
-生成过程会把照片在编辑器中的 Tone/Color 联动响应与原生 iPhone 样本包络对齐：当检测到超出包络的响应时，求解会一并修正，并保证结果不劣于修正前；本就合规的照片只做一次快速验证，几乎不增加耗时。
-
-> [!TIP]
-> 摄影风格求解是计算密集功能。批量处理建议使用 release 构建：先 `swift build -c release`，再运行 `.build/release/xdremux`，速度可比默认调试构建快数倍。
-
-## Apple 人像模式
-
-单张转换：
-
-```bash
-swift run xdremux convert \
-  --apple-portrait \
-  --input IMG_001.heic \
-  --output IMG_001_apple_portrait.heic
-```
-
-批量转换：
-
-```bash
-swift run xdremux batch \
-  --apple-portrait \
-  --input-dir photo_dump/ \
-  --output-dir apple_portraits/
-```
-
-Apple 人像模式的转换要求输入照片包含一组完整且相互匹配的 OPPO 人像模式信息：
-
-- ISO/TS 21496-1 Gain Map
-- `rear.depth`
-- `rear.depth.config`
-- 完整的 `src.image`
-
-XDRemux 会转换原有景深、焦点和模拟光圈信息，并分析人物、皮肤、头发等区域以改善虚化边缘。能够保留的编辑能力取决于源文件实际包含的数据。
-
-Apple 人像输入的 `src.image` Gain Map 必须能由 macOS ImageIO 正确读取。目前支持 RGB 4:4:4 和灰度 Gain Map；缺失、损坏或不符合要求的 Gain Map 会使转换直接失败。
-
-### JPEG 人像输入
-
-部分 OPPO 人像以 JPEG 作为外层容器。JPEG 输入仅在启用 `--apple-portrait` 时接受，最终输出仍会被转换为 HEIC。
-
-批量处理 JPEG 人像时需要显式指定匹配规则：
-
-```bash
-swift run xdremux batch \
-  --apple-portrait \
-  --glob '*.jpg' \
-  --input-dir photo_dump/ \
-  --output-dir apple_portraits/
-```
-
-没有启用 Apple 人像时，标准 ISO、OPPO 相册兼容和单独的摄影风格模式仍只接受 HEIC 输入。
-
-## 同时写入摄影风格和人像
-
-```bash
-swift run xdremux convert \
-  --apple-photographic-styles \
-  --apple-portrait \
-  --input IMG_001.heic \
-  --output IMG_001_apple.heic
-```
-
-最终只会生成一个 HEIC，并同时尝试保留：
-
-- HDR 显示
-- Apple 摄影风格编辑
-- Apple 人像景深编辑
-
-批量转换时，如果某张普通照片没有完整人像数据，但启用了摄影风格，XDRemux 仍可为该照片生成摄影风格输出。
-
-## 批量转换
-
-默认批量行为包括：
-
-- 同时使用最多 4 个并发任务
-- 自动记录转换进度
-- 中断后继续处理
-- 跳过已经存在且验证有效的输出
-- 失败的文件在下次运行时重新尝试
-
-常用示例：
-
-```bash
-swift run xdremux batch \
-  --input-dir photo_dump/ \
-  --output-dir converted/ \
-  --glob '*.heic' \
-  --jobs 4
-```
-
-更多断点续传、覆盖和诊断参数请查看：
-
-```bash
-swift run xdremux --help
-```
-
-## 按拍摄模式分类
-
-独立分类会递归扫描 HEIC、HEIF 和 JPEG，只复制照片，不修改或删除源文件：
-
-```bash
-swift run xdremux categorize \
-  --input photo_dump/ \
-  --input another_photo.heic \
-  --output-dir categorized/ \
-  --jobs 4
-```
-
-使用 `--dry-run` 可以只查看规划结果。分类目录使用固定中文名称：普通拍照、大师模式、RICOH GR、专业模式、人像、夜景、全景、延时摄影、超清、证件照、贴纸、超级文本、合影、双重曝光和美颜。
-
-缺少 UserComment、格式错误、读取失败，或只有未知标记且无法确定主模式的照片会保留在目标根目录。格式错误或读取失败仍会复制文件，但命令返回非零；缺少 UserComment 或未知主模式不视为错误。普通拍照以及只有 HDR、滤镜、水印等已知附加标记的照片会进入 `普通拍照/`。同名同内容文件会跳过；同名但内容不同的文件会稳定命名为 `文件名 (2).heic` 等。
-
-批量转换时可直接按拍摄模式写入转换结果：
-
-```bash
-swift run xdremux batch \
-  --input-dir photo_dump/ \
-  --output-dir converted/ \
-  --categorize
-```
-
-`convert` 不接受 `--categorize`；该开关只用于 `batch`。
-
-分类只读取本地文件中的 EXIF/UserComment，不声明或模拟 OPPO 相册在设备端的识别行为。
-
-## 验证输出
-
-验证 Apple 摄影风格或组合输出：
-
-```bash
-swift run xdremux validate-apple \
-  --input IMG_001_apple.heic \
-  --expect-portrait \
-  --json IMG_001_apple.validation.json
-```
-
-只验证 Apple 人像结构：
-
-```bash
-swift run xdremux validate-portrait \
-  --input IMG_001_apple_portrait.heic \
-  --json IMG_001_apple_portrait.validation.json
-```
-
-验证器会检查 HEIC auxiliary image、Focus XMP 和相关元数据结构。
-
-Apple 人像转换可能还会在输出旁生成 `*.portrait-manifest.json`，用于记录输入资源、转换结果和兼容性诊断。该 JSON 文件不需要随照片导入 Apple Photos。
-
-离线验证只能证明文件结构符合当前检查规则，不能替代 Apple Photos 中的导入、重新对焦、保存和重新打开测试。
-
-## Python CLI
-
-Python CLI 提供标准 HDR、OPPO 相册兼容转换和与 Swift 一致的拍摄模式分类，不包含 Apple 摄影风格和 Apple 人像功能。
-
-安装依赖：
-
-```bash
-pip install pillow-heif Pillow numpy
-```
-
-单张转换：
-
-```bash
-python3 xdremux/python/XDRemux.py convert \
-  --input IMG_001.heic
-```
-
-批量转换：
-
-```bash
-python3 xdremux/python/XDRemux.py batch \
-  --input-dir photo_dump/
-```
-
-独立分类与分类输出：
-
-```bash
-python3 xdremux/python/XDRemux.py categorize \
-  --input photo_dump/ \
-  --input another_photo.heic \
-  --output-dir categorized/ \
-  --dry-run
-
-python3 xdremux/python/XDRemux.py batch \
-  --input-dir photo_dump/ \
-  --output-dir converted/ \
-  --categorize
-```
-
-OPPO 相册兼容输出：
-
-```bash
-python3 xdremux/python/XDRemux.py convert \
-  --oppo-compatible \
-  --input IMG_001.heic
+swift build -c release
+.build/release/xdremux batch --apple-photographic-styles --input-dir photo_dump/ --output-dir styled/
 ```
 
 ## macOS App
-
-macOS App 源码位于：
-
-```text
-apps/macos/XDRemuxApp/
-```
-
-本地构建并运行：
 
 ```bash
 scripts/build_and_run.sh run
 ```
 
-App 顶部可在“转换”和“按模式分类”之间切换。分类页支持一次添加多个文件或目录、扫描预览模式数量和目标路径、复制、取消，以及在 Finder 中显示结果；不选择统一目标目录时，每张照片以自身所在目录为分类根。转换设置中的“按拍摄模式分类输出”开关会把转换结果写入相同的中文模式目录。
+图形界面覆盖转换和按模式分类两条流程，支持拖入文件或目录、预览、并发设置、断点续传和在访达中显示结果。
+
+## Python CLI
+
+跨平台，只做 HDR 转换，没有 Apple 功能。需要 Python 3.11 或更高版本。
+
+```bash
+pip install -r xdremux/python/requirements.txt
+python3 xdremux/python/XDRemux.py convert --input IMG_001.heic --output IMG_001_hdr.heic
+```
 
 ## 作为 Swift Package 使用
 
-其他 SwiftPM 项目可以直接依赖本仓库：
-
 ```swift
-dependencies: [
-    .package(
-        url: "https://github.com/21Z121Z1/XDRemux.git",
-        branch: "main"
-    )
-]
+.package(url: "https://github.com/21Z121Z1/XDRemux.git", branch: "main")
 ```
-
-基础 HDR 转换使用 `XDRemuxCore`：
 
 ```swift
 import XDRemuxCore
 
 let input = InputSource(url: inputURL)
-let request = ConversionRequest(
-    input: input,
-    output: OutputTarget.file(outputURL).destination(for: input),
-    configuration: ConversionConfiguration()
+let result = try ConversionEngine.convert(
+    ConversionRequest(
+        input: input,
+        output: OutputTarget.file(outputURL).destination(for: input),
+        configuration: ConversionConfiguration()
+    )
 )
-
-let result = try ConversionEngine.convert(request)
 ```
 
-需要 Apple 摄影风格或 Apple 人像时，添加 `XDRemuxAppleFeatures` 产品并使用 `AppleFeatureConversionEngine`。
+Apple 功能在 `XDRemuxAppleFeatures` 产品里，入口是 `AppleFeatureConversionEngine`。详见[开发文档](docs/development.md)。
 
-## 开发
+## 文档
 
-构建：
-
-```bash
-swift build
-```
-
-运行测试：
-
-```bash
-swift test
-```
-
-主要目录：
-
-| 路径 | 用途 |
+| 文档 | 内容 |
 | --- | --- |
-| `Sources/XDRemuxCore/` | HDR、HEIF、元数据和批量转换核心 |
-| `Sources/XDRemuxAppleFeatures/` | Apple 摄影风格和人像功能 |
-| `Sources/XDRemuxCLI/` | Swift 命令行入口 |
-| `xdremux/python/` | Python CLI |
-| `apps/macos/XDRemuxApp/` | macOS App |
-| `Tests/` | 自动化测试 |
-| `scripts/` | 构建和验证脚本 |
-
-## 设备与文件兼容性
-
-XDRemux 面向能够拍摄 ProXDR 照片的 OPPO、OnePlus 和 realme 设备。
-
-项目不依赖固定的机型白名单，而是检查输入文件中实际存在的 Gain Map 和厂商元数据。相同机型在不同固件版本下也可能生成不同结构；不符合当前输入要求的文件会明确报错。
-
-并非所有系统相册或第三方软件都支持 ISO/TS 21496-1、4:4:4 Gain Map、Apple 摄影风格或 Apple 人像数据。
+| [CLI 参考](docs/cli.md) | 全部命令、参数、默认值、退出码 |
+| [Apple 功能](docs/apple-features.md) | 摄影风格和人像能做什么、验证到了什么程度 |
+| [支持设备](docs/supported-devices.md) | 已知能拍 ProXDR 的机型 |
+| [开发文档](docs/development.md) | 模块结构、Swift Package 集成、构建流程 |
+| [技术实现](docs/xdremux/README.md) | HDR、HEIF 文件结构和 ISO 标准的实现细节 |
 
 ## 已知限制
 
-- 在 OPPO 相册中重新编辑并保存转换后的照片，可能导致标准 HDR Gain Map 或 HDR 元数据丢失。
-- 转换过程可能覆写输入文件，请保留未经修改的原片。
-- 不同应用对 HDR 峰值亮度、色彩管理和 Gain Map 的解释可能不同。
-
-本项目用于技术研究。转换结果不应作为原始照片的唯一副本。
+- 转换后的照片如果在 OPPO 相册里重新编辑并保存，HDR 数据可能会被抹掉。
+- 各家应用对 HDR 亮度和色彩的处理方式不一样，同一张照片在不同地方看起来可能有差别。
+- 设备在支持列表里，不代表它拍的每张照片都能转。实际取决于拍摄模式、固件版本和这张照片被编辑过没有。
+- 本项目用于技术研究。转换结果不要作为原始照片的唯一副本。

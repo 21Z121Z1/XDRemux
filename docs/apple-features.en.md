@@ -2,27 +2,25 @@
 
 English | [简体中文](apple-features.md)
 
-In addition to standard HDR output, XDRemux can generate Photographic Styles or portrait-editing resources for Apple Photos. Both features are opt-in and remain experimental.
+Beyond the standard HDR output, XDRemux can generate the data that makes a photo editable in Apple Photos. Both features are off by default and both are experimental.
 
-## Feature scope
-
-| Feature | User result |
+| Feature | What you get |
 | --- | --- |
-| Apple Photographic Styles | Switch Photographic Styles and adjust tone, color, and intensity in Apple Photos |
-| Apple Portrait | Adjust simulated aperture and, when supported, select a new focus point in Apple Photos |
-| Combined mode | Keep HDR, Photographic Styles, and portrait editing in one final HEIC |
+| Apple Photographic Styles | Switch styles in Apple Photos and adjust tone, colour, and intensity |
+| Apple portrait | Adjust the blur in Apple Photos, and refocus where the data allows |
+| Both together | HDR, style editing, and portrait editing preserved in one file |
 
-These features process only the current input photo. They do not copy image or editing resources from another photo.
+Everything is computed from your own photo. Nothing is copied from another picture — not the image, not the editing parameters.
 
 ## Requirements
 
-- macOS 15 or later.
-- From a source checkout, run one complete `swift build` without restricting the product.
-- Apple Portrait requires `zstd` on `PATH`.
-- JPEG portrait bridging also requires `ultrahdr_app` on `PATH`.
-- The current system must provide the required Apple image-analysis services.
+- macOS 15 or newer
+- Run a full `swift build` once when working from source
+- `zstd` for Apple portrait (`brew install zstd`)
+- `ultrahdr_app` as well, for JPEG portraits
+- The system must provide Apple's image-analysis capability
 
-If a required system capability is unavailable, conversion returns an explicit error instead of writing fabricated empty resources.
+When a capability is missing the conversion fails with a clear error rather than writing an empty placeholder.
 
 ## Apple Photographic Styles
 
@@ -33,22 +31,15 @@ swift run xdremux convert \
   --output IMG_001_styles.heic
 ```
 
-XDRemux derives the semantic regions and Photographic Styles resources required by Apple Photos from the current image. Only valid detected regions are written; small but valid regions are retained.
+XDRemux analyses the photo's content, brightness, colour, and regions such as people and sky, and generates the data Photographic Styles needs. Only regions actually detected are written.
 
-The public build exposes one fixed constrained-solver Styles path. It organizes the current photo's Base, RGB Gain, orientation, GTC, and related metadata into a per-photo SceneBundle, but a final HEIC does not retain the capture-time pre-LTM input, so the output manifest remains `productionEligible=false`.
+The resulting style parameters are checked against how a native iPhone photo responds in the editor. If this photo's response falls outside the range of the native samples, that gets folded into what the solver is optimizing for, and the result is required to be no worse than before the correction. Photos that are already in range take a fast path with a single check at the end.
 
-The constrained solver also measures the photo's Tone@Color100 editor response (the ROI prefers the skin matte and falls back to warm-pixel candidates on photos without people). When the same-photo identity control's OKLab hue or R/G response falls outside the native-sample envelope, the response constraints join the solve objective and acceptance requires the result to never be worse than identity; already-compliant photos take a fast path that only verifies the selected result once and escalates into the full response objective if a regression is detected. The envelope, verdicts, and ROI details are recorded in the solver output directory's `solver-result.json` under the `responseObjective` key.
+This mode keeps the standard HDR output. It cannot be combined with `--oppo-compatible`.
 
-Research environment variables (none are needed by default):
+Solving is CPU-heavy. For batches, use a release build: `swift build -c release`, then run `.build/release/xdremux`.
 
-- `XDREMUX_STYLE_RESPONSE_OBJECTIVE=off` restores the pure neutral-reconstruction objective (v5 behavior, bit-identical results).
-- `XDREMUX_STYLES_LINEAR_THUMBNAIL_MODE=seam-min-ratio` selects the research Linear Thumbnail seam variant; it marks `researchOverrideActive` and disqualifies the output from production admission.
-
-The Styles solver is compute-intensive; for batch conversions build with `swift build -c release` and run `.build/release/xdremux`.
-
-This mode continues to produce standard HDR output. It cannot be combined with `--oppo-compatible`.
-
-## Apple Portrait
+## Apple portrait
 
 ```bash
 swift run xdremux convert \
@@ -57,15 +48,15 @@ swift run xdremux convert \
   --output IMG_001_portrait.heic
 ```
 
-The source must contain recoverable vendor depth, focus, and unblurred-image resources. XDRemux converts them into portrait resources that Apple Photos can continue editing while preserving the saved focus and simulated aperture when possible.
+The source photo must have been shot in portrait mode, with its depth data, focus information, and un-blurred original still present in the file. XDRemux converts those into the form Apple Photos can keep editing, preserving the original focus point and blur strength as far as possible.
 
-Portrait conversion is unavailable for an ordinary non-portrait photo without the required depth resources. Portrait-only batches report such an input as failed. In a combined Styles and Portrait batch, the same input may continue as Styles-only with a warning.
+Ordinary non-portrait photos do not carry that data, so portrait conversion is unavailable for them. A portrait-only batch records them as failures; if Photographic Styles is also enabled, such a photo falls back to styles-only output.
 
-Every successful portrait output also writes `<output>.portrait-manifest.json`, which records input capabilities, conversion choices, warnings, and reviewable validation information.
+Each successful portrait conversion also writes `<output>.portrait-manifest.json` next to the result, recording what the input carried, what the conversion chose, and any warnings. That file does not need to be imported into Apple Photos.
 
-## JPEG portrait bridge
+## JPEG portraits
 
-Apple Portrait also accepts OPPO HDR JPEG inputs that contain a standard HDR Gain Map and complete vendor portrait resources. Select JPEG explicitly in batch mode:
+Some OPPO portrait photos are JPEG on the outside. Those are accepted only with `--apple-portrait`, and the output is still HEIC. Batches need it spelled out:
 
 ```bash
 swift run xdremux batch \
@@ -75,11 +66,9 @@ swift run xdremux batch \
   --output-dir apple_portraits/
 ```
 
-JPEG input is accepted only with `--apple-portrait`, optionally together with Photographic Styles. Standard HDR, Styles-only, and OPPO-compatible modes continue to use HEIC input.
+Every other mode — standard HDR, styles alone, OPPO-compatible — still takes HEIC only.
 
-## Combination and conflicts
-
-Photographic Styles and Portrait can be enabled together:
+## Enabling both
 
 ```bash
 swift run xdremux convert \
@@ -89,18 +78,23 @@ swift run xdremux convert \
   --output IMG_001_apple.heic
 ```
 
-Combined mode writes one final HEIC. `--oppo-compatible` targets OPPO Gallery while Apple modes target Apple Photos, so they cannot be combined. The CLI rejects the conflicting options before writing output.
+This produces a single file. `--oppo-compatible` targets OPPO Gallery and the Apple modes target Apple Photos; they cannot be combined, and the CLI rejects that combination before writing anything.
 
-## Current validation status
+## How far this has been verified
 
-The implementation currently covers these offline checks:
+What has been checked:
 
-- Output containers can be reopened.
-- Standard HDR Gain Map and Apple auxiliary references can be parsed.
-- Photographic Styles and Portrait resources pass the repository validators.
-- The App and CLI produce identical output for the same conversion request.
-- The reproducible public evidence is limited to offline container, ImageIO, helper, and App-bundle checks; real Photos save/reopen behavior is not claimed as accepted.
+- The output file reopens.
+- The HDR data and the references to the Apple auxiliary resources parse correctly.
+- The styles and portrait resources pass the repository's own checking tools.
+- The app and the CLI produce the same result for the same request.
 
-These results do not qualify every device, focal length, operating-system release, or Apple Photos version. Offline structural validation is not equivalent to real display behavior on an iPhone, Mac, or in OPPO Gallery.
+What has **not**: importing the file into Apple Photos on a real device, editing it, saving, quitting, and reopening it to confirm the editing still works. That round trip is manual today and is not claimed as a public pass.
 
-See the [technical implementation index](xdremux/README.md), [ISO container audit](xdremux/iso-conformance-audit-20260511.md), and [validation guide](validation/README.md). Per-sample logs, firmware fields, and reverse-engineering evidence remain research material rather than product commitments.
+That is why the output manifest for these features always records them as not production-ready. Structural checks offline are also not the same as how the photo actually looks on an iPhone, on a Mac, or in OPPO Gallery, and nothing here claims coverage across every model, focal length, or OS version.
+
+## Research switches
+
+Several `XDREMUX_RESEARCH_*` and `XDREMUX_STYLES_*` environment variables select experimental solver paths. **None of them need to be set.** Setting one marks the output manifest as a research run and excludes it from production judgement. They are listed in the [development guide](development.en.md).
+
+Implementation and acceptance material: the [technical index](xdremux/README.en.md), the [ISO container audit](xdremux/iso-conformance-audit-20260511.md), and the [validation guide](validation/README.md).

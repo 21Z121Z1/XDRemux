@@ -9,7 +9,7 @@ enum AppStrings {
     static let clearQueue = "清空队列"
     static let emptyQueueTitle = "拖入或添加 ProXDR HEIC 文件"
     static let queueNotImported = "未导入文件"
-    static let retryFailed = "重试失败"
+    static let retryFailed = "重试失败项"
     static let removeCompleted = "移除已完成"
     static let revealOutputsInFinder = "在访达中显示输出"
     static let revealInputInFinder = "在访达中显示源文件"
@@ -44,7 +44,7 @@ enum AppStrings {
     static let scanning = "正在扫描"
     static let converting = "正在转换"
     static let conversionFinished = "转换完成"
-    static let conversionFinishedWithFailures = "转换完成，存在失败"
+    static let conversionFinishedWithFailures = "转换结束，部分文件失败"
     static let waitingForInput = "等待输入"
 
     static let selectHEICPanelMessage = "选择要加入队列的 ProXDR HEIC 文件或文件夹"
@@ -141,6 +141,51 @@ enum AppStrings {
     static let doNotWriteDebugFiles = "不写调试文件"
     static let chooseDirectory = "选择目录"
     static let clear = "清除"
+
+    /// Reasons a single file can fail, in the language the rest of the window
+    /// uses. `XDRemuxError.description` stays English because `XDRemuxCore` is a
+    /// public Swift Package; localization belongs here, at the presentation
+    /// layer, not in the shared module's error type.
+    static func failureReason(for error: XDRemuxError) -> String {
+        switch error {
+        case .notAProXDRPhoto:
+            return "这不是 ProXDR 照片：文件里没有 Local HDR 数据，可能是普通 HEIC，或者拍摄时没开 ProXDR。"
+        case .alreadyConverted:
+            return "已经转换过了：文件已带 ISO 21496-1 Gain Map，再转一次不会有任何变化。"
+        case .portraitPrerequisitesMissing:
+            return "这不是 OPPO 人像照片：缺少 Apple 人像功能需要的景深数据。"
+        case .qtiMarkerNotFound, .manifestNotFound:
+            return "文件里没有 OPPO Local HDR 数据。"
+        case .invalidLHDR:
+            return "照片的 ProXDR HDR 数据已损坏或无法读取。"
+        case .unableToDecodeMask:
+            return "无法解码照片内的 ProXDR 增益图。"
+        case .unableToLoadBaseImage:
+            return "无法解码照片的 SDR 主图。"
+        case .inputNotFound:
+            return "找不到源文件，可能已被移动或删除。"
+        case .unableToRead:
+            return "无法读取源文件，请检查文件权限。"
+        case .unableToCreateDirectory, .outputParentIsNotDirectory:
+            return "无法创建输出目录，请换一个位置。"
+        case .unableToCreateDestination, .unableToFinalizeDestination:
+            return "无法写入输出文件，请检查磁盘空间和写入权限。"
+        case .outputPathCollision:
+            return "两个源文件会写到同一个输出路径，请改用不同的输出目录或后缀。"
+        case .outputVerificationFailed:
+            return "转换结果没有 ISO Gain Map，已被拒绝，原文件未改动。"
+        case .gainMapPixelFormatMismatch:
+            return "转换结果的 Gain Map 像素格式不符合预期。"
+        case .invalidContainer:
+            return "HEIC 容器结构无法解析。"
+        case .appleFeatureRuntimeUnavailable:
+            return "当前 macOS 缺少 Apple 功能需要的运行时组件。"
+        case .appleFeatureConversionFailed:
+            return "Apple 功能转换失败。"
+        default:
+            return error.description
+        }
+    }
 }
 extension OppoCompatibility {
     var appTitle: String {

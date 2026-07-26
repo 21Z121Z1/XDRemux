@@ -6,61 +6,80 @@ import XDRemuxAppleFeatures
 enum XDRemuxCommand {
     private static let fileManager = FileManager.default
     private static let usage = """
-    Usage:
-         XDRemux.swift convert --input <file.heic|portrait.jpg> [--output <out.heic>] [--apple-photographic-styles] [--apple-styles-raw-dng <file.dng>] [--apple-style-data-producer constrained-solver|learn-node|identity-fallback] [--apple-portrait] [--oppo-compatible] [--discard-portrait-data] [--debug-dir <dir>]
-         XDRemux.swift batch --input-dir <dir> [--output-dir <dir>] [--glob *.heic] [--jobs <n>] [--categorize] [--apple-photographic-styles] [--apple-styles-raw-dng <file.dng>] [--apple-style-data-producer constrained-solver|learn-node|identity-fallback] [--apple-portrait] [--oppo-compatible] [--discard-portrait-data] [--checkpoint <file>] [--resume|--no-resume] [--skip-existing|--no-skip-existing] [--debug-dir <dir>]
-         XDRemux.swift categorize --input <file-or-dir> [--input <file-or-dir> ...] --output-dir <dir> [--jobs <n>] [--dry-run]
-             XDRemux.swift validate-apple --input <file.heic> [--expect-portrait] [--json <report.json>]
-             XDRemux.swift validate-portrait --input <file.heic> [--json <report.json>]
-             XDRemux.swift portrait-self-test
+    xdremux — convert OPPO, OnePlus, and realme ProXDR photos into standard ISO 21496-1 HDR HEIC.
 
-    Notes:
-      - Product output always uses the metadata-preserving source-primary remux path.
-      - With neither product switch, output is standard ISO HDR and preserves the non-HDR metadata tail.
-        Gain Maps retain their source channel structure and may use HEVC Range Extensions 4:4:4.
-      - --oppo-compatible converts a high-spec Gain Map to OPPO-compatible Main Still Picture 4:2:0.
-      - --no-oppo-compat is a legacy spelling for the default standard-ISO mode.
-      - Existing 4:2:0 Gain Maps cannot be promoted to high-spec 4:4:4 because the discarded chroma is unrecoverable.
-      - Source UserComment routing flags are preserved. Default output physically removes private HDR tail entries
-        while retaining watermark, master-mode, portrait, depth, source-image, edit, live-photo, and unknown entries.
-      - --oppo-compatible preserves the complete OPPO/QTI/FileExtendedContainer tail.
-      - --discard-portrait-data removes large depth/re-edit resources without reintroducing private HDR tail entries.
-      - Only the active Gain Map graph and its required container descriptions may change.
-      - Batch defaults: --jobs min(cpu,4), --resume, --skip-existing.
-      - batch --categorize writes results under Chinese shooting-mode directories.
-      - categorize copies HEIC, HEIF, and JPEG files without modifying the inputs.
-      - A JSONL checkpoint is written under output-dir by default; it is deleted only when the batch finishes with zero failures.
-      - --apple-photographic-styles enables donor-free Apple Photographic Styles generation.
-        --apple-styles is accepted as a short alias; manifests and documentation use the canonical name.
-      - --apple-styles-raw-dng supplies one matching OPPO RAW MAX DNG. Its embedded PreviewImage is
-        paired against the input before use; source mismatch, MPF Gain Map extraction, or geometry
-        failures are fatal instead of silently reusing an unrelated or differently oriented proxy.
-        The current final-HEIC scene path is a research candidate: Apple Camera's capture-time
-        pre-LTM Linear Thumbnail input is unavailable, so its manifest remains production-ineligible
-        until a held-out response-equivalent proxy and real Photos persistence both pass.
-        constrained-solver is the default key-1 producer and measures a bounded full-Neutrino neutral
-        reconstruction; it fails instead of falling back when it cannot improve identity. A writer-time
-        key-1 pass is necessary but never claims full Photos production acceptance. identity-fallback
-        writes complete identity only when selected explicitly and records that no scene matching was
-        performed. learn-node is an explicit diagnostic Base-to-Base
-        near-identity control; it is not a scene-matched linear/HDR-to-current-render producer.
-        Styles-only semantics follow native role tiers: sky-only without a credible person,
-        or PEM+skin+sky when a person is present.
-      - --apple-portrait requires rear.depth + rear.depth.config + src.image. The UserComment
-        portrait bit is the strong route; an explicit run can recover a missing bit with a warning.
-        The complete embedded src.image must be ImageIO-readable and contain an RGB 444f or
-        grayscale L008 Gain Map; the source channel structure is preserved. The outer portrait
-        container may be HEIC or JPEG. Styles-only and ordinary conversion remain HEIC-only.
-        Vision supplies high-resolution person/skin/hair/teeth/glasses mattes. Geometry-aligned
-        OPPO subject/hair planes are constrained topology priors for person/hair only. ImageIO
-        converts the complete src.image Base/Gain pair with PreserveGainMap before the portrait
-        auxiliary images are attached.
-      - Photographic Styles and Apple Portrait are independent and may be enabled together.
-        In a combined batch, a non-portrait input still produces styles output and records Portrait unavailable.
-      - Apple feature output and OPPO-compatible output remain mutually exclusive. Apple Portrait output
-        omits the redundant large OPPO portrait tail; without that capability, the normal tail policy applies.
-      - If --output is omitted, the input file is overwritten in place.
-      - If --output-dir is omitted, files are written to the input directory.
+    USAGE
+      xdremux convert           --input <file.heic|portrait.jpg> [--output <file.heic>] [options]
+      xdremux batch             --input-dir <dir> [--output-dir <dir>] [options]
+      xdremux categorize        --input <file-or-dir> [--input ...] --output-dir <dir> [--jobs <n>] [--dry-run]
+      xdremux validate-apple    --input <file.heic> [--expect-portrait] [--json <report.json>]
+      xdremux validate-portrait --input <file.heic> [--json <report.json>]
+      xdremux portrait-self-test
+
+    WHERE THE RESULTS GO
+      --output omitted        the input file is overwritten in place
+      --output-dir omitted    results are written into the input directory
+      batch --categorize      results are filed under Chinese shooting-mode folders (人像, 夜景, ...);
+                              photos whose mode cannot be read stay in the output root
+      categorize              only sorts HEIC/HEIF/JPEG files into those folders; it never
+                              converts or modifies them
+
+    CONVERSION OPTIONS (convert and batch)
+      --oppo-compatible       Write a 4:2:0 gain map OPPO Gallery can display and keep the complete
+                              OPPO private tail. Without it the output is standard ISO HDR and the
+                              gain map keeps its source channel structure, which may be 4:4:4.
+                              A gain map that is already 4:2:0 cannot be upgraded — the discarded
+                              chroma is unrecoverable.
+      --discard-portrait-data Drop bulky depth and re-edit resources. Watermark, master-mode, and
+                              other non-HDR vendor data are still kept.
+      --oppo-camera-tail <m>  Which parts of the OPPO camera tail to keep. Default
+                              preserve-without-private-hdr. Values: off, watermark, compact,
+                              preserve, preserve-without-portrait,
+                              preserve-without-portrait-or-private-hdr, preserve-without-private-uhdr,
+                              preserve-without-private-hdr, preserve-no-uhdr, preserve-no-hdr.
+      --family auto|x6|x7     Which ProXDR layout the source uses. Default auto.
+      --debug-dir <dir>       Keep this run's intermediate artifacts for inspection.
+
+    BATCH OPTIONS
+      --glob <pattern>        Which files to pick up. Default *.heic.
+      --jobs <n>              How many files to convert at once. Default min(cpu, 4).
+      --resume | --no-resume  Default --resume.
+      --skip-existing | --no-skip-existing
+                              Skip a file whose output already matches the current settings.
+                              Default --skip-existing.
+      --checkpoint <file>     Where to keep progress. Default a hidden JSONL file under the output
+                              directory, deleted once the batch finishes with no failures. Rerun the
+                              same command to retry only the files that failed.
+
+    APPLE FEATURES (macOS only, research features)
+      --apple-photographic-styles   Generate Apple Photographic Styles data from the photo itself,
+                                    with no Apple donor photo. --apple-styles is a legacy spelling.
+      --apple-portrait              Generate Apple portrait data. Needs an OPPO portrait photo that
+                                    carries rear.depth, rear.depth.config, and src.image.
+      --apple-styles-raw-dng <f>    Pair one matching OPPO RAW MAX DNG with the input. A mismatched
+                                    or differently oriented DNG is rejected rather than used.
+      --apple-style-data-producer constrained-solver|learn-node|identity-fallback
+                                    Default constrained-solver. learn-node and identity-fallback are
+                                    diagnostic controls.
+      The two features are independent and can be enabled together; in a combined run a non-portrait
+      photo still gets styles output. Apple output and --oppo-compatible are mutually exclusive.
+      These features are not accepted as production Photos output — see docs/apple-features.md for
+      exactly what has and has not been proven.
+
+    DIAGNOSTIC OPTIONS
+      --input-processing system|system-decoded|hybrid|passthrough
+                              How the base image and gain map are rebuilt. Default hybrid.
+      --tmap-format imageio|strict
+                              Default imageio. strict writes the 145-byte ISO form, which breaks
+                              Gallery Exif parsing and editing on Find X9 Ultra.
+      --oppo-compat <mode>    Finer-grained control over the HDR routing flags: auto, iso,
+                              iso-no-local, iso-graph, on, tail, off. --no-oppo-compat means off.
+
+    WHAT IS PRESERVED
+      Only the HDR gain-map graph and the container descriptions it depends on are ever rewritten.
+      By default the private HDR entries are removed from the vendor tail and everything else is
+      kept: watermark, master mode, portrait, depth, source image, edits, live photo, and entries
+      XDRemux does not recognize.
     """
 
     static func main() {
@@ -219,6 +238,16 @@ enum XDRemuxCommand {
         print("converted \(cmd.inputURL.lastPathComponent) -> \(cmd.outputURL.path)")
     }
 
+    /// Reduces an error to the one line that belongs in a per-file list entry.
+    private static func singleLine(_ error: Error) -> String {
+        if let cli = error as? CLIError { return cli.headline }
+        return String(describing: error)
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
     private static func runBatch(_ cmd: BatchCommand) throws {
         try ensureDirectory(cmd.outputDirURL, fileManager: fileManager)
         let discovered = try enumerateInputs(
@@ -354,7 +383,7 @@ enum XDRemuxCommand {
                             if isOutputValid() {
                                 statsLock.lock(); skippedExistingCount += 1; statsLock.unlock()
                                 record(status: .skippedExisting)
-                                log("skipped-existing \(item.inputURL.lastPathComponent)")
+                                log("skipped \(item.inputURL.lastPathComponent) (output already up to date)")
                                 return
                             }
                         }
@@ -374,7 +403,7 @@ enum XDRemuxCommand {
                             if isOutputValid() {
                                 statsLock.lock(); skippedExistingCount += 1; statsLock.unlock()
                                 record(status: .skippedExisting)
-                                log("skipped-existing \(item.inputURL.lastPathComponent)")
+                                log("skipped \(item.inputURL.lastPathComponent) (output already up to date)")
                                 return
                             }
                         }
@@ -413,7 +442,9 @@ enum XDRemuxCommand {
                     } catch {
                         statsLock.lock(); failureCount += 1; statsLock.unlock()
                         record(status: .failure, error: String(describing: error))
-                        log("failed \(item.inputURL.lastPathComponent): \(error)")
+                        // A batch listing stays one line per file; the richer
+                        // multi-line form belongs to single-file `convert`.
+                        log("failed \(item.inputURL.lastPathComponent): \(singleLine(error))")
                     }
                 }
             }
@@ -422,11 +453,14 @@ enum XDRemuxCommand {
         queue.waitUntilAllOperationsAreFinished()
         try checkpointWriter.close()
 
-        log("batch complete: converted \(convertedCount) files, skipped-existing \(skippedExistingCount) files, failed \(failureCount) files into \(cmd.outputDirURL.path)")
+        log(
+            "batch complete: \(convertedCount) converted, \(skippedExistingCount) skipped, "
+                + "\(failureCount) failed -> \(cmd.outputDirURL.path)"
+        )
         if failureCount == 0 {
             try? fileManager.removeItem(at: checkpointURL)
         } else {
-            log("checkpoint kept (failures present): \(checkpointURL.path)")
+            log("run the same command again to retry only the \(failureCount) failed file(s)")
             throw CLIError.batchFailed(failures: failureCount, checkpoint: checkpointURL)
         }
     }

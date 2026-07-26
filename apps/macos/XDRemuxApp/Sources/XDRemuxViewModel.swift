@@ -822,7 +822,7 @@ final class XDRemuxViewModel {
 
     nonisolated private static func describe(_ error: Error) -> String {
         if let error = error as? XDRemuxError {
-            return error.description
+            return AppStrings.failureReason(for: error)
         }
         return String(describing: error)
     }

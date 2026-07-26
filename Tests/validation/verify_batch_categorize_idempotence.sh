@@ -37,7 +37,7 @@ EXPECTED="$#"
 echo "== run 1 =="
 FIRST="$("$CLI" batch --input-dir "$WORK" --output-dir "$WORK" --categorize 2>&1)"
 echo "$FIRST"
-if ! grep -q "converted $EXPECTED files, skipped-existing 0 files, failed 0 files" <<<"$FIRST"; then
+if ! grep -q "batch complete: $EXPECTED converted, 0 skipped, 0 failed" <<<"$FIRST"; then
   echo "run 1 did not convert all $EXPECTED inputs cleanly" >&2
   exit 1
 fi
@@ -53,7 +53,7 @@ if ((SECOND_STATUS != 0)); then
   echo "run 2 exited $SECOND_STATUS; a repeated categorized batch must succeed" >&2
   exit 1
 fi
-if ! grep -q "converted 0 files, skipped-existing $EXPECTED files, failed 0 files" <<<"$SECOND"; then
+if ! grep -q "batch complete: 0 converted, $EXPECTED skipped, 0 failed" <<<"$SECOND"; then
   echo "run 2 must skip the $EXPECTED existing outputs and fail nothing" >&2
   exit 1
 fi
