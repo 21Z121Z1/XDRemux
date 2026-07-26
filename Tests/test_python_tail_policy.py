@@ -2,7 +2,7 @@ import json
 import struct
 import unittest
 
-from xdremux.python import container
+from xdremux_py import container
 
 
 def build_tail(entries: list[tuple[str, bytes]], tag: bytes = b"jxrs") -> bytes:

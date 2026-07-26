@@ -158,10 +158,20 @@ Failures are written to `<output-dir>/xdremux-failures.json`. A later clean run 
 The Python CLI retains the original HDR conversion path. It does not provide Apple Photographic Styles or Apple Portrait.
 
 ```bash
+pip install -e .
+xdremux-py convert --input IMG_001.heic
+xdremux-py batch --input-dir photo_dump/
+xdremux-py convert --oppo-compatible --input IMG_001.heic
+```
+
+Without installing, run the same commands through the script entry point from the repository root:
+
+```bash
 pip install pillow-heif Pillow numpy
 python3 xdremux/python/XDRemux.py convert --input IMG_001.heic
-python3 xdremux/python/XDRemux.py batch --input-dir photo_dump/
-python3 xdremux/python/XDRemux.py convert --oppo-compatible --input IMG_001.heic
+python3 -m xdremux_py batch --input-dir photo_dump/
 ```
+
+The implementation is the `xdremux_py/` package at the repository root: `cli.py` handles arguments and output, `pipeline.py` performs conversion, and `commands.py` holds the parsed command models. `xdremux/python/XDRemux.py` is a compatibility entry point that forwards to the package.
 
 The Swift CLI is the preferred entry point for new features and automation.

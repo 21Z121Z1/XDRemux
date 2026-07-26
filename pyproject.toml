@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xdremux-py"
+description = "Convert OPPO/OnePlus/realme ProXDR photos to ISO 21496-1 HDR HEIC"
+readme = "README.md"
+requires-python = ">=3.10"
+dynamic = ["version"]
+keywords = ["heic", "hdr", "gain-map", "iso21496", "proxdr", "oppo"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+]
+dependencies = [
+    "pillow-heif>=0.15.0",
+    "Pillow>=11.0.0",
+    "numpy>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/21Z121Z1/XDRemux"
+Documentation = "https://github.com/21Z121Z1/XDRemux/blob/main/docs/cli.md"
+
+# The Swift package product already owns the `xdremux` command name, so the
+# Python front end installs as `xdremux-py`.
+[project.scripts]
+xdremux-py = "xdremux_py.cli:main"
+
+[project.entry-points."pipx.run"]
+xdremux-py = "xdremux_py.cli:main"
+
+[tool.hatch.version]
+path = "xdremux_py/__init__.py"
+
+# Flat layout on purpose: CI and the validation scripts run from the repository
+# root without installing anything, which a src/ layout would break.
+[tool.hatch.build.targets.wheel]
+packages = ["xdremux_py"]
+
+# Anchored patterns: an unanchored "README.md" would also pull in Tests/README.md
+# and xdremux/README.md. docs/ is VCS-ignored and cannot be packaged.
+[tool.hatch.build.targets.sdist]
+include = [
+    "/xdremux_py",
+    "/xdremux/python/XDRemux.py",
+    "/README.md",
+    "/README.en.md",
+]

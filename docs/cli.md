@@ -158,10 +158,20 @@ JSON 字段、事件名、错误代码、参数名、环境变量、文件名和
 Python CLI 保留原有 HDR 转换能力，不提供 Apple 摄影风格或 Apple 人像功能。
 
 ```bash
+pip install -e .
+xdremux-py convert --input IMG_001.heic
+xdremux-py batch --input-dir photo_dump/
+xdremux-py convert --oppo-compatible --input IMG_001.heic
+```
+
+不安装时，从仓库根目录用脚本入口调用同一套命令：
+
+```bash
 pip install pillow-heif Pillow numpy
 python3 xdremux/python/XDRemux.py convert --input IMG_001.heic
-python3 xdremux/python/XDRemux.py batch --input-dir photo_dump/
-python3 xdremux/python/XDRemux.py convert --oppo-compatible --input IMG_001.heic
+python3 -m xdremux_py batch --input-dir photo_dump/
 ```
+
+实现位于根目录的 `xdremux_py/` 包：`cli.py` 负责参数与输出，`pipeline.py` 负责转换，`commands.py` 是解析后的命令模型。`xdremux/python/XDRemux.py` 是转发到该包的兼容入口。
 
 正式 Swift CLI 是新功能和自动化集成的首选入口。

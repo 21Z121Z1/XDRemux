@@ -254,11 +254,19 @@ Apple 人像转换可能还会在输出旁生成 `*.portrait-manifest.json`，�
 
 Python CLI 提供标准 HDR、OPPO 相册兼容转换和与 Swift 一致的拍摄模式分类，不包含 Apple 摄影风格和 Apple 人像功能。
 
-安装依赖：
+安装（同时安装依赖并注册 `xdremux-py` 命令）：
+
+```bash
+pip install -e .
+```
+
+也可以只安装依赖，从仓库根目录直接运行脚本入口：
 
 ```bash
 pip install pillow-heif Pillow numpy
 ```
+
+下面的示例使用脚本入口。安装后可将 `python3 xdremux/python/XDRemux.py` 替换为 `xdremux-py` 或 `python3 -m xdremux_py`，命令、默认值和退出码完全相同。
 
 单张转换：
 
@@ -364,7 +372,8 @@ swift test
 | `Sources/XDRemuxCore/` | HDR、HEIF、元数据和批量转换核心 |
 | `Sources/XDRemuxAppleFeatures/` | Apple 摄影风格和人像功能 |
 | `Sources/XDRemuxCLI/` | Swift 命令行入口 |
-| `xdremux/python/` | Python CLI |
+| `xdremux_py/` | Python CLI（`xdremux-py`） |
+| `xdremux/python/` | Python CLI 兼容入口 |
 | `apps/macos/XDRemuxApp/` | macOS App |
 | `Tests/` | 自动化测试 |
 | `scripts/` | 构建和验证脚本 |

@@ -6,13 +6,13 @@ from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
 
-from xdremux.python import categorize
-from xdremux.python import XDRemux
+from xdremux_py import categorize
+from xdremux_py import cli
 
 
 class PhotoCategorizationTests(unittest.TestCase):
     def test_python_cli_uses_categorize_for_command_and_batch_switch(self) -> None:
-        parser = XDRemux.build_parser()
+        parser = cli.build_parser()
         standalone = parser.parse_args([
             "categorize", "--input", "/tmp/a.heic", "--input", "/tmp/photos",
             "--output-dir", "/tmp/output", "--jobs", "2", "--dry-run",
@@ -80,7 +80,7 @@ class PhotoCategorizationTests(unittest.TestCase):
             exif = struct.pack("<H", 1) + struct.pack("<HHII", 0x9286, 7, len(payload), 44) + struct.pack("<I", 0)
             source.write_bytes(header + ifd0 + exif + payload)
 
-            result = XDRemux.main([
+            result = cli.main([
                 "categorize", "--input", str(source), "--output-dir", str(output),
             ])
 

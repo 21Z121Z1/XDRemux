@@ -10,7 +10,6 @@ DerivedData/
 .swiftpm/
 Package.resolved
 __pycache__/
-xdremux_py/
 
 # Large binaries
 *.apk

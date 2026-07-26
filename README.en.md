@@ -254,11 +254,19 @@ Offline validation only proves that the file structure satisfies the current val
 
 The Python CLI provides standard HDR and OPPO Gallery-compatible conversion plus the same shooting-mode categorization as Swift. It does not include Apple Photographic Styles or Apple Portrait features.
 
-Install the dependencies:
+Install it, which also installs the dependencies and registers the `xdremux-py` command:
+
+```bash
+pip install -e .
+```
+
+Or install only the dependencies and run the script entry point from the repository root:
 
 ```bash
 pip install pillow-heif Pillow numpy
 ```
+
+The examples below use the script entry point. After installing you can replace `python3 xdremux/python/XDRemux.py` with `xdremux-py` or `python3 -m xdremux_py`; the commands, defaults, and exit codes are identical.
 
 Convert one photo:
 
@@ -364,7 +372,8 @@ Main directories:
 | `Sources/XDRemuxCore/` | HDR, HEIF, metadata, and batch-conversion core |
 | `Sources/XDRemuxAppleFeatures/` | Apple Photographic Styles and Portrait features |
 | `Sources/XDRemuxCLI/` | Swift command-line entry point |
-| `xdremux/python/` | Python CLI |
+| `xdremux_py/` | Python CLI (`xdremux-py`) |
+| `xdremux/python/` | Python CLI compatibility entry point |
 | `apps/macos/XDRemuxApp/` | macOS App |
 | `Tests/` | Automated tests |
 | `scripts/` | Build and validation scripts |
