@@ -23,7 +23,7 @@ def main() -> int:
 
     repo = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(repo))
-    from xdremux.python import categorize
+    from xdremux_py import categorize
 
     source = Path(args.input).resolve()
     source_comment = categorize.extract_user_comment(source)

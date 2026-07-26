@@ -146,9 +146,13 @@ CLI 输出人类可读的文本：进度写 stdout，错误写 stderr。目前�
 Python 版本只做 HDR 转换，没有 Apple 摄影风格和 Apple 人像功能。
 
 ```bash
-pip install -r xdremux/python/requirements.txt
-python3 -m xdremux.python.XDRemux convert --input IMG_001.heic
-python3 -m xdremux.python.XDRemux convert --oppo-compatible --input IMG_001.heic
+pip install -e .
+xdremux-py convert --input IMG_001.heic
+xdremux-py convert --oppo-compatible --input IMG_001.heic
 ```
+
+不安装时，从仓库根目录用 `python3 -m xdremux_py` 或 `python3 xdremux/python/XDRemux.py` 调用同一套命令。
+
+实现位于根目录的 `xdremux_py/` 包：`cli.py` 负责参数与输出，`pipeline.py` 负责转换，`commands.py` 是解析后的命令模型。`xdremux/python/XDRemux.py` 是转发到该包的兼容入口。
 
 需要 Python 3.11 或更高版本。新功能和自动化集成优先用 Swift CLI。
