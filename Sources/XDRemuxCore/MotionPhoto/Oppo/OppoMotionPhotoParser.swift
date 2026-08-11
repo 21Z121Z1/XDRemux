@@ -2,8 +2,17 @@ import Foundation
 
 public enum OppoMotionPhotoParser {
     public static func parse(url: URL) throws -> MotionPhotoAsset? {
-        guard let base = try AndroidMotionPhotoParser.parse(url: url) else { return nil }
-        return try enrichIfPresent(base)
+        do {
+            if let base = try AndroidMotionPhotoParser.parse(url: url) {
+                return try enrichIfPresent(base)
+            }
+        } catch {
+            if let fallback = try OppoMotionPhotoFallbackParser.parse(url: url) {
+                return fallback
+            }
+            throw error
+        }
+        return try OppoMotionPhotoFallbackParser.parse(url: url)
     }
 
     public static func enrichIfPresent(_ asset: MotionPhotoAsset) throws -> MotionPhotoAsset {
@@ -28,6 +37,8 @@ public enum OppoMotionPhotoParser {
             streamCount: max(1, offsets.count)
         )
 
+        // LivePhotoToolbox selected the XMP presentation timestamp first, then coverFramePts from
+        // LPEX. Keep that behavior while retaining both values for diagnostics.
         if asset.presentationTimestampUs == nil, let cover = enriched.coverFramePtsUs {
             return asset.enrichingWithOppoMetadata(
                 enriched,
