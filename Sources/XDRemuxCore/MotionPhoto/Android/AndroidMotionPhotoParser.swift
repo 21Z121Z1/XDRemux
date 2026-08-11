@@ -1,5 +1,4 @@
 import Foundation
-import FoundationXML
 
 public enum AndroidMotionPhotoParser {
     private static let maxXMPScanBytes = 4 * 1024 * 1024
@@ -43,7 +42,13 @@ public enum AndroidMotionPhotoParser {
 
         try validateDirectory(items)
         let ranges = try deriveRanges(items: items, fileSize: fileSize)
-        try validateISOBaseMediaPayload(url: url, range: ranges.video)
+        guard try ISOBaseMediaStreamScanner.isFTYPBoxStart(
+            in: url,
+            offset: ranges.video.lowerBound,
+            upperBound: ranges.video.upperBound
+        ) else {
+            throw MotionPhotoParsingError.invalidVideoPayload
+        }
 
         return MotionPhotoAsset(
             sourceURL: url,
@@ -61,31 +66,29 @@ public enum AndroidMotionPhotoParser {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         let prefix = try handle.read(upToCount: Int(scanLength)) ?? Data()
-
-        let openingCandidates = [Data("<x:xmpmeta".utf8), Data("<xmpmeta".utf8)]
-        let closingCandidates = [Data("</x:xmpmeta>".utf8), Data("</xmpmeta>".utf8)]
-
-        guard let start = openingCandidates.compactMap({ prefix.range(of: $0)?.lowerBound }).min() else {
+        let openings = [Data("<x:xmpmeta".utf8), Data("<xmpmeta".utf8)]
+        let closings = [Data("</x:xmpmeta>".utf8), Data("</xmpmeta>".utf8)]
+        guard let start = openings.compactMap({ prefix.range(of: $0)?.lowerBound }).min() else {
             return nil
         }
-
-        var matchingEnd: Data.Index?
-        for closing in closingCandidates {
-            if let range = prefix.range(of: closing, options: [], in: start..<prefix.endIndex) {
-                let end = range.upperBound
-                matchingEnd = matchingEnd.map { min($0, end) } ?? end
+        var endIndex: Data.Index?
+        for closing in closings {
+            if let range = prefix.range(of: closing, in: start..<prefix.endIndex) {
+                endIndex = endIndex.map { min($0, range.upperBound) } ?? range.upperBound
             }
         }
-
-        guard let end = matchingEnd else {
+        guard let endIndex else {
             if fileSize > scanLength { throw MotionPhotoParsingError.xmpTooLarge }
             throw MotionPhotoParsingError.malformedXMP
         }
-        return prefix.subdata(in: start..<end)
+        return prefix.subdata(in: start..<endIndex)
     }
 
     private static func parseXMP(_ data: Data) throws -> ParsedXMP {
-        let delegate = XMPDelegate(maxItems: maxDirectoryItems, maxStringLength: maxMetadataStringLength)
+        let delegate = XMPDelegate(
+            maxItems: maxDirectoryItems,
+            maxStringLength: maxMetadataStringLength
+        )
         let parser = XMLParser(data: data)
         parser.shouldProcessNamespaces = false
         parser.shouldReportNamespacePrefixes = true
@@ -105,15 +108,20 @@ public enum AndroidMotionPhotoParser {
         guard items.allSatisfy({ $0.length >= 0 && $0.padding >= 0 }) else {
             throw MotionPhotoParsingError.invalidItemLength
         }
-
-        let primaryIndices = items.indices.filter { items[$0].semantic.caseInsensitiveCompare("Primary") == .orderedSame }
-        guard primaryIndices == [0] else { throw MotionPhotoParsingError.invalidPrimaryItem }
-
-        let motionIndices = items.indices.filter { items[$0].semantic.caseInsensitiveCompare("MotionPhoto") == .orderedSame }
+        guard items[0].semantic.caseInsensitiveCompare("Primary") == .orderedSame,
+              items.dropFirst().allSatisfy({ $0.semantic.caseInsensitiveCompare("Primary") != .orderedSame }),
+              items[0].length == 0 else {
+            throw MotionPhotoParsingError.invalidPrimaryItem
+        }
+        guard items.dropFirst().allSatisfy({ $0.padding == 0 }) else {
+            throw MotionPhotoParsingError.invalidItemLength
+        }
+        let motionIndices = items.indices.filter {
+            items[$0].semantic.caseInsensitiveCompare("MotionPhoto") == .orderedSame
+        }
         guard motionIndices.count == 1, motionIndices[0] == items.count - 1 else {
             throw MotionPhotoParsingError.invalidMotionPhotoItem
         }
-
         let motion = items[motionIndices[0]]
         let supportedMime = motion.mime.caseInsensitiveCompare("video/mp4") == .orderedSame
             || motion.mime.caseInsensitiveCompare("video/quicktime") == .orderedSame
@@ -128,7 +136,6 @@ public enum AndroidMotionPhotoParser {
     ) throws -> (still: MotionPhotoByteRange, video: MotionPhotoByteRange) {
         var itemStart = fileSize
         var itemEnd = fileSize
-        var photoStart: Int64?
         var photoEnd: Int64?
         var videoStart: Int64?
         var videoEnd: Int64?
@@ -136,64 +143,39 @@ public enum AndroidMotionPhotoParser {
         for index in items.indices.reversed() {
             let item = items[index]
             itemEnd = itemStart
-
             if index == 0 {
                 let (paddedEnd, overflow) = itemEnd.subtractingReportingOverflow(item.padding)
-                guard !overflow, paddedEnd >= 0 else { throw MotionPhotoParsingError.arithmeticOverflow }
+                guard !overflow, paddedEnd >= 0 else {
+                    throw MotionPhotoParsingError.arithmeticOverflow
+                }
                 itemStart = 0
                 itemEnd = paddedEnd
+                photoEnd = itemEnd
             } else {
                 let (candidate, overflow) = itemStart.subtractingReportingOverflow(item.length)
-                guard !overflow, candidate >= 0 else { throw MotionPhotoParsingError.arithmeticOverflow }
+                guard !overflow, candidate >= 0 else {
+                    throw MotionPhotoParsingError.arithmeticOverflow
+                }
                 itemStart = candidate
             }
-
             let isVideo = item.mime.caseInsensitiveCompare("video/mp4") == .orderedSame
                 || item.mime.caseInsensitiveCompare("video/quicktime") == .orderedSame
             if isVideo, itemStart != itemEnd {
                 videoStart = itemStart
                 videoEnd = itemEnd
             }
-            if index == 0 {
-                photoStart = itemStart
-                photoEnd = itemEnd
-            }
         }
 
-        guard let photoStart, let photoEnd, let videoStart, let videoEnd else {
+        guard let photoEnd, let videoStart, let videoEnd,
+              photoEnd <= fileSize,
+              videoEnd == fileSize,
+              photoEnd <= videoStart else {
             throw MotionPhotoParsingError.invalidByteRange
         }
-        guard photoEnd <= fileSize, videoEnd == fileSize, photoEnd <= videoStart else {
-            throw MotionPhotoParsingError.invalidByteRange
-        }
-
         return (
-            try MotionPhotoByteRange(lowerBound: photoStart, upperBound: photoEnd),
+            try MotionPhotoByteRange(lowerBound: 0, upperBound: photoEnd),
             try MotionPhotoByteRange(lowerBound: videoStart, upperBound: videoEnd)
         )
-    }
-
-    private static func validateISOBaseMediaPayload(url: URL, range: MotionPhotoByteRange) throws {
-        guard range.length >= 12 else { throw MotionPhotoParsingError.invalidVideoPayload }
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        try handle.seek(toOffset: UInt64(range.lowerBound))
-        let header = try handle.read(upToCount: 16) ?? Data()
-        guard header.count >= 8 else { throw MotionPhotoParsingError.invalidVideoPayload }
-
-        let size = header.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
-        let type = String(bytes: header[4..<8], encoding: .ascii)
-        guard type == "ftyp" else { throw MotionPhotoParsingError.invalidVideoPayload }
-        guard size == 1 || (size >= 8 && Int64(size) <= range.length) else {
-            throw MotionPhotoParsingError.invalidVideoPayload
-        }
-        if size == 1 {
-            guard header.count >= 16 else { throw MotionPhotoParsingError.invalidVideoPayload }
-            let largeSize = header[8..<16].reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
-            guard largeSize >= 16, largeSize <= UInt64(range.length) else {
-                throw MotionPhotoParsingError.invalidVideoPayload
-            }
-        }
     }
 }
 
@@ -226,54 +208,37 @@ private final class XMPDelegate: NSObject, XMLParserDelegate {
     ) {
         guard error == nil else { parser.abortParsing(); return }
         let name = qName ?? elementName
-
-        if name == "rdf:Description" || elementName == "rdf:Description" {
-            do {
-                try parseDescription(attributeDict)
-            } catch let parsingError as MotionPhotoParsingError {
-                error = parsingError
-                parser.abortParsing()
-            } catch {
-                self.error = .malformedXMP
-                parser.abortParsing()
-            }
+        if name == "rdf:Description" {
+            parseDescription(attributeDict)
             return
         }
-
-        if name == "Container:Directory" || elementName == "Container:Directory" {
+        if name == "Container:Directory" {
             directoryPrefix = "Container"
             return
         }
-        if name == "GContainer:Directory" || elementName == "GContainer:Directory" {
+        if name == "GContainer:Directory" {
             directoryPrefix = "GContainer"
             return
         }
-
-        guard let directoryPrefix else { return }
-        let itemElement = "\(directoryPrefix):Item"
-        guard name == itemElement || elementName == itemElement else { return }
-
+        guard let directoryPrefix,
+              name == "\(directoryPrefix):Item" else { return }
         guard result.items.count < maxItems else {
             error = .invalidDirectory
             parser.abortParsing()
             return
         }
-
-        let attributePrefix = directoryPrefix == "Container" ? "Item" : "GContainerItem"
-        guard let mime = bounded(attributeDict["\(attributePrefix):Mime"]),
-              let semantic = bounded(attributeDict["\(attributePrefix):Semantic"]) else {
+        let prefix = directoryPrefix == "Container" ? "Item" : "GContainerItem"
+        guard let mime = bounded(attributeDict["\(prefix):Mime"]),
+              let semantic = bounded(attributeDict["\(prefix):Semantic"]),
+              let length = nonnegative(attributeDict["\(prefix):Length"], defaultValue: 0),
+              let padding = nonnegative(attributeDict["\(prefix):Padding"], defaultValue: 0) else {
             error = .invalidDirectory
             parser.abortParsing()
             return
         }
-        let length = parseNonnegativeInt64(attributeDict["\(attributePrefix):Length"], defaultValue: 0)
-        let padding = parseNonnegativeInt64(attributeDict["\(attributePrefix):Padding"], defaultValue: 0)
-        guard let length, let padding else {
-            error = .invalidItemLength
-            parser.abortParsing()
-            return
-        }
-        result.items.append(MotionPhotoItem(mime: mime, semantic: semantic, length: length, padding: padding))
+        result.items.append(
+            MotionPhotoItem(mime: mime, semantic: semantic, length: length, padding: padding)
+        )
     }
 
     func parser(
@@ -283,8 +248,7 @@ private final class XMPDelegate: NSObject, XMLParserDelegate {
         qualifiedName qName: String?
     ) {
         let name = qName ?? elementName
-        if name == "Container:Directory" || name == "GContainer:Directory"
-            || elementName == "Container:Directory" || elementName == "GContainer:Directory" {
+        if name == "Container:Directory" || name == "GContainer:Directory" {
             directoryPrefix = nil
         }
     }
@@ -303,33 +267,33 @@ private final class XMPDelegate: NSObject, XMLParserDelegate {
         return nil
     }
 
-    private func parseDescription(_ attributes: [String: String]) throws {
+    private func parseDescription(_ attributes: [String: String]) {
         let motionNames = ["Camera:MotionPhoto", "GCamera:MotionPhoto"]
-        let microVideoNames = ["Camera:MicroVideo", "GCamera:MicroVideo"]
-        let versionNames = ["Camera:MotionPhotoVersion", "GCamera:MotionPhotoVersion"]
-        let timestampNames = [
-            "Camera:MotionPhotoPresentationTimestampUs",
-            "GCamera:MotionPhotoPresentationTimestampUs",
-            "Camera:MicroVideoPresentationTimestampUs",
-            "GCamera:MicroVideoPresentationTimestampUs",
-        ]
-        let offsetNames = ["Camera:MicroVideoOffset", "GCamera:MicroVideoOffset"]
-
+        let legacyNames = ["Camera:MicroVideo", "GCamera:MicroVideo"]
         if let flag = firstInt(attributes, names: motionNames) {
             result.motionPhotoEnabled = flag == 1
-        } else if let flag = firstInt(attributes, names: microVideoNames) {
+        } else if let flag = firstInt(attributes, names: legacyNames) {
             result.motionPhotoEnabled = flag == 1
         }
-
-        if let version = firstInt(attributes, names: versionNames) {
-            result.version = version
+        result.version = firstInt(
+            attributes,
+            names: ["Camera:MotionPhotoVersion", "GCamera:MotionPhotoVersion"]
+        )
+        if let value = firstInt64(
+            attributes,
+            names: [
+                "Camera:MotionPhotoPresentationTimestampUs",
+                "GCamera:MotionPhotoPresentationTimestampUs",
+                "Camera:MicroVideoPresentationTimestampUs",
+                "GCamera:MicroVideoPresentationTimestampUs",
+            ]
+        ) {
+            result.presentationTimestampUs = value == -1 ? nil : value
         }
-        if let timestamp = firstInt64(attributes, names: timestampNames) {
-            result.presentationTimestampUs = timestamp == -1 ? nil : timestamp
-        }
-        if let offset = firstInt64(attributes, names: offsetNames) {
-            result.legacyMicroVideoOffset = offset
-        }
+        result.legacyMicroVideoOffset = firstInt64(
+            attributes,
+            names: ["Camera:MicroVideoOffset", "GCamera:MicroVideoOffset"]
+        )
     }
 
     private func bounded(_ value: String?) -> String? {
@@ -337,28 +301,24 @@ private final class XMPDelegate: NSObject, XMLParserDelegate {
         return value
     }
 
-    private func parseNonnegativeInt64(_ value: String?, defaultValue: Int64) -> Int64? {
+    private func nonnegative(_ value: String?, defaultValue: Int64) -> Int64? {
         guard let value else { return defaultValue }
         guard value.utf8.count <= 32, let parsed = Int64(value), parsed >= 0 else { return nil }
         return parsed
     }
 
     private func firstInt(_ attributes: [String: String], names: [String]) -> Int? {
-        for name in names {
-            if let raw = attributes[name] {
-                guard raw.utf8.count <= 32 else { return nil }
-                return Int(raw)
-            }
+        for name in names where attributes[name] != nil {
+            guard let raw = attributes[name], raw.utf8.count <= 32 else { return nil }
+            return Int(raw)
         }
         return nil
     }
 
     private func firstInt64(_ attributes: [String: String], names: [String]) -> Int64? {
-        for name in names {
-            if let raw = attributes[name] {
-                guard raw.utf8.count <= 32 else { return nil }
-                return Int64(raw)
-            }
+        for name in names where attributes[name] != nil {
+            guard let raw = attributes[name], raw.utf8.count <= 32 else { return nil }
+            return Int64(raw)
         }
         return nil
     }
