@@ -19,10 +19,9 @@ enum MotionPhotoCLIIntegration {
         }
     }
 
-    /// Called after XDRemuxCommand.main() returns successfully. Mixed HEIC + Motion Photo batches
-    /// deliberately defer the Motion Photo outputs until this point: otherwise the unchanged HEIC
-    /// batch enumerator could discover the freshly generated Live Photo HEICs and try to convert
-    /// them again as ProXDR inputs when input-dir == output-dir.
+    /// Called after XDRemuxCommand.main() returns successfully. JPEG-only mixed batches can defer
+    /// Motion Photo outputs until the existing HEIC batch completes, preventing those newly created
+    /// Live Photo HEICs from being discovered as ProXDR inputs in the same invocation.
     static func finishPendingBatchIfNeeded() throws {
         guard let pending = pendingBatchStore.take() else { return }
         try runMotionBatch(command: pending.command, workItems: pending.workItems)
@@ -39,7 +38,8 @@ enum MotionPhotoCLIIntegration {
     private static func handleConvert(_ rawArguments: [String]) throws -> Bool {
         guard let inputPath = optionValue("--input", in: rawArguments) else { return false }
         let inputURL = URL(fileURLWithPath: inputPath).standardizedFileURL
-        guard isJPEG(inputURL), AppleLivePhotoConversionEngine.isMotionPhotoInput(inputURL) else {
+        guard isSupportedMotionPhotoSourceExtension(inputURL),
+              AppleLivePhotoConversionEngine.isMotionPhotoInput(inputURL) else {
             return false
         }
 
@@ -61,6 +61,13 @@ enum MotionPhotoCLIIntegration {
         let outputImageURL: URL
         if outputWasExplicit {
             outputImageURL = command.outputURL.standardizedFileURL
+        } else if isHEIC(inputURL) {
+            // A HEIF Motion Photo is already named .heic/.heif. Never overwrite the source just to
+            // obtain the Apple paired representation; the suffix makes the one-to-two conversion
+            // explicit while preserving the original Android file.
+            outputImageURL = inputURL.deletingPathExtension()
+                .appendingPathExtension("live")
+                .appendingPathExtension("heic")
         } else {
             outputImageURL = inputURL.deletingPathExtension().appendingPathExtension("heic")
         }
@@ -81,11 +88,11 @@ enum MotionPhotoCLIIntegration {
     }
 
     /// Plans the Motion Photo portion of a default batch. Explicit --glob retains the old contract.
-    /// On the first mixed run there are no Live Photo HEIC outputs yet, so the unchanged HEIC batch
-    /// can run first and the Motion Photo pass is deferred. On subsequent runs, valid HEIC+MOV Live
-    /// Photo pairs are classified as outputs rather than HEIC inputs; the remaining real HEIC inputs
-    /// are handled here before the Motion Photo pass so the old `*.heic` enumerator can never ingest
-    /// a previously generated Live Photo still.
+    ///
+    /// JPEG Motion Photos can coexist with the unchanged legacy HEIC pass by deferring their output
+    /// until that pass completes. HEIF Motion Photos are themselves `.heic` inputs, so any batch
+    /// containing one must classify HEIC files first; otherwise the legacy `*.heic` enumerator would
+    /// feed the Android Motion Photo container into the ProXDR pipeline.
     private static func prepareDefaultBatch(_ rawArguments: [String]) throws -> Bool {
         guard !rawArguments.contains("--glob") else { return false }
 
@@ -97,8 +104,7 @@ enum MotionPhotoCLIIntegration {
             under: command.inputDirURL,
             excluding: command.outputDirURL
         )
-        let motionInputs = jpegCandidates.filter(AppleLivePhotoConversionEngine.isMotionPhotoInput)
-        guard !motionInputs.isEmpty else { return false }
+        let jpegMotionInputs = jpegCandidates.filter(AppleLivePhotoConversionEngine.isMotionPhotoInput)
 
         let allHEICInputs = try discoverHEICs(
             under: command.inputDirURL,
@@ -108,9 +114,16 @@ enum MotionPhotoCLIIntegration {
         let existingLivePhotoPaths = Set(
             existingLivePhotoStills.map { $0.standardizedFileURL.path }
         )
-        let sourceHEICInputs = allHEICInputs.filter {
+        let unpairedHEICInputs = allHEICInputs.filter {
             !existingLivePhotoPaths.contains($0.standardizedFileURL.path)
         }
+        let heifMotionInputs = unpairedHEICInputs.filter(AppleLivePhotoConversionEngine.isMotionPhotoInput)
+        let heifMotionPaths = Set(heifMotionInputs.map { $0.standardizedFileURL.path })
+        let sourceHEICInputs = unpairedHEICInputs.filter {
+            !heifMotionPaths.contains($0.standardizedFileURL.path)
+        }
+        let motionInputs = jpegMotionInputs + heifMotionInputs
+        guard !motionInputs.isEmpty else { return false }
 
         let workItems = makeWorkItems(
             inputs: motionInputs,
@@ -123,16 +136,16 @@ enum MotionPhotoCLIIntegration {
             return true
         }
 
-        if existingLivePhotoStills.isEmpty {
-            // First mixed run: no Motion Photo output exists yet, so the unchanged HEIC batch can
-            // safely enumerate now. Motion outputs are emitted only after it succeeds.
+        if heifMotionInputs.isEmpty, existingLivePhotoStills.isEmpty {
+            // First JPEG-only mixed run: no Motion Photo HEIC source/output exists, so the unchanged
+            // HEIC batch can enumerate safely. Motion outputs are emitted only after it succeeds.
             pendingBatchStore.set(PendingBatch(command: command, workItems: workItems))
             return false
         }
 
-        // Repeated mixed run (or a directory that already contains unrelated valid Live Photos):
-        // do not invoke the legacy glob-based batch enumerator, because it cannot distinguish those
-        // paired HEIC stills from source ProXDR HEICs. Convert only the classified source HEIC set.
+        // HEIF Motion Photo source or an already generated Live Photo pair is present. Do not invoke
+        // the legacy glob-based batch enumerator because it cannot distinguish those paired/source
+        // Motion Photo HEICs from ProXDR HEIC inputs. Convert only the classified source HEIC set.
         try runClassifiedHEICBatch(command: command, inputs: sourceHEICInputs)
         try runMotionBatch(command: command, workItems: workItems)
         return true
@@ -201,9 +214,6 @@ enum MotionPhotoCLIIntegration {
                 + "\(failures.count) failed"
         )
         if !failures.isEmpty {
-            // Successful files will be skipped by output validation on the next invocation, so a
-            // rerun naturally retries only unresolved inputs even though this compatibility path
-            // does not share the legacy one-output checkpoint file.
             throw ClassifiedHEICBatchError(failures: failures.count)
         }
     }
@@ -392,24 +402,24 @@ enum MotionPhotoCLIIntegration {
     ) -> [MotionBatchWorkItem] {
         var reserved = Set<String>()
 
-        // Predict exactly the output names the unchanged/classified HEIC batch pass will reserve,
-        // including duplicate stems, before assigning Live Photo outputs.
         for item in makeHEICWorkItems(inputs: heicInputs, command: command) {
             reserved.insert(item.outputURL.standardizedFileURL.path)
         }
 
         return inputs.sorted { $0.path < $1.path }.map { input in
             let directory = categorizedOutputDirectory(for: input, command: command)
-            let stem = input.deletingPathExtension().lastPathComponent
+            let sourceStem = input.deletingPathExtension().lastPathComponent
+            let outputStem = isHEIC(input) ? "\(sourceStem).live" : sourceStem
             var sequence = 1
-            var output = directory.appendingPathComponent(stem).appendingPathExtension("heic")
+            var output = directory.appendingPathComponent(outputStem).appendingPathExtension("heic")
             while reserved.contains(output.standardizedFileURL.path)
                 || reserved.contains(
                     AppleLivePhotoConversionEngine.companionVideoURL(for: output)
                         .standardizedFileURL.path
-                ) {
+                )
+                || output.standardizedFileURL.path == input.standardizedFileURL.path {
                 sequence += 1
-                output = directory.appendingPathComponent("\(stem) (\(sequence))").appendingPathExtension("heic")
+                output = directory.appendingPathComponent("\(outputStem) (\(sequence))").appendingPathExtension("heic")
             }
             reserved.insert(output.standardizedFileURL.path)
             reserved.insert(
@@ -438,10 +448,7 @@ enum MotionPhotoCLIIntegration {
     }
 
     private static func discoverHEICs(under root: URL, excluding outputRoot: URL) throws -> [URL] {
-        try discover(under: root, excluding: outputRoot) { url in
-            let ext = url.pathExtension.lowercased()
-            return ext == "heic" || ext == "heif"
-        }
+        try discover(under: root, excluding: outputRoot) { isHEIC($0) }
     }
 
     private static func discover(
@@ -479,9 +486,18 @@ enum MotionPhotoCLIIntegration {
         return results
     }
 
+    private static func isSupportedMotionPhotoSourceExtension(_ url: URL) -> Bool {
+        isJPEG(url) || isHEIC(url)
+    }
+
     private static func isJPEG(_ url: URL) -> Bool {
         let ext = url.pathExtension.lowercased()
         return ext == "jpg" || ext == "jpeg"
+    }
+
+    private static func isHEIC(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return ext == "heic" || ext == "heif"
     }
 
     private static func validateLivePhotoOutputExtension(_ outputURL: URL) throws {
