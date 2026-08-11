@@ -5,16 +5,27 @@ import XDRemuxAppleFeatures
 /// Narrow CLI integration for Motion Photo inputs. Existing HEIC/ProXDR command behavior remains
 /// owned by XDRemuxCommand; this layer only intercepts inputs that normalize as Motion Photos.
 enum MotionPhotoCLIIntegration {
+    private static let pendingBatchStore = PendingBatchStore()
+
     static func handleIfNeeded(_ arguments: [String]) throws -> Bool {
         guard let command = arguments.first else { return false }
         switch command {
         case "convert":
             return try handleConvert(Array(arguments.dropFirst()))
         case "batch":
-            return try handleDefaultBatchPrepass(Array(arguments.dropFirst()))
+            return try prepareDefaultBatch(Array(arguments.dropFirst()))
         default:
             return false
         }
+    }
+
+    /// Called after XDRemuxCommand.main() returns successfully. Mixed HEIC + Motion Photo batches
+    /// deliberately defer the Motion Photo outputs until this point: otherwise the unchanged HEIC
+    /// batch enumerator could discover the freshly generated Live Photo HEICs and try to convert
+    /// them again as ProXDR inputs when input-dir == output-dir.
+    static func finishPendingBatchIfNeeded() throws {
+        guard let pending = pendingBatchStore.take() else { return }
+        try runMotionBatch(command: pending.command, workItems: pending.workItems)
     }
 
     static func printFailure(_ error: Error) {
@@ -69,23 +80,15 @@ enum MotionPhotoCLIIntegration {
         return true
     }
 
-    /// The existing batch implementation intentionally keeps its HEIC-centric behavior. For the
-    /// default batch command we run a Motion Photo classification/conversion pass first, then return
-    /// false when HEIC inputs remain so XDRemuxCommand can process them exactly as before.
-    /// Ordinary JPEGs are ignored by this automatic pass.
-    private static func handleDefaultBatchPrepass(_ rawArguments: [String]) throws -> Bool {
-        // Explicit --glob retains the existing batch contract. Automatic JPEG discovery is only
-        // enabled for the default batch mode so old scripts using custom globs remain unchanged.
+    /// Plans the Motion Photo portion of a default batch. Explicit --glob retains the old contract.
+    /// If there are no existing HEIC inputs, the Motion Photo batch can run immediately. For a mixed
+    /// batch it is queued and runs only after the unchanged HEIC batch pass succeeds.
+    private static func prepareDefaultBatch(_ rawArguments: [String]) throws -> Bool {
         guard !rawArguments.contains("--glob") else { return false }
 
         let command = try ConversionArgumentParser.parseBatch(rawArguments)
-        guard !command.appleFeatures.isEnabled else {
-            // Portrait/style batch semantics remain entirely with XDRemuxCommand.
-            return false
-        }
-        guard !command.oppoCompatibility.wantsOppoCompat else {
-            return false
-        }
+        guard !command.appleFeatures.isEnabled else { return false }
+        guard !command.oppoCompatibility.wantsOppoCompat else { return false }
 
         let jpegCandidates = try discoverJPEGs(
             under: command.inputDirURL,
@@ -104,6 +107,19 @@ enum MotionPhotoCLIIntegration {
             command: command
         )
 
+        if heicInputs.isEmpty {
+            try runMotionBatch(command: command, workItems: workItems)
+            return true
+        }
+
+        pendingBatchStore.set(PendingBatch(command: command, workItems: workItems))
+        return false
+    }
+
+    private static func runMotionBatch(
+        command: BatchCommand,
+        workItems: [MotionBatchWorkItem]
+    ) throws {
         let checkpointURL = MotionPhotoBatchCheckpoint.resolvedURL(for: command)
         if !command.resume {
             try MotionPhotoBatchCheckpoint.reset(url: checkpointURL)
@@ -218,11 +234,27 @@ enum MotionPhotoCLIIntegration {
                 checkpoint: checkpointURL
             )
         }
+    }
 
-        // If HEIC inputs exist, let the original batch implementation continue with its unchanged
-        // checkpoint/resume behavior. If this directory only contained Motion Photos, the batch is
-        // complete and must not fall through to the old "no *.heic matched" error.
-        return heicInputs.isEmpty
+    private struct PendingBatch {
+        let command: BatchCommand
+        let workItems: [MotionBatchWorkItem]
+    }
+
+    private final class PendingBatchStore: @unchecked Sendable {
+        private let lock = NSLock()
+        private var pending: PendingBatch?
+
+        func set(_ value: PendingBatch) {
+            lock.lock(); defer { lock.unlock() }
+            pending = value
+        }
+
+        func take() -> PendingBatch? {
+            lock.lock(); defer { lock.unlock() }
+            defer { pending = nil }
+            return pending
+        }
     }
 
     private struct MotionBatchWorkItem {
@@ -237,17 +269,9 @@ enum MotionPhotoCLIIntegration {
     ) -> [MotionBatchWorkItem] {
         var reserved = Set<String>()
 
-        // Reserve the outputs the unchanged HEIC batch pass will choose, preventing a Motion Photo
-        // with the same stem from being overwritten when that pass runs afterward.
-        for input in heicInputs {
-            let directory = categorizedOutputDirectory(for: input, command: command)
-            reserved.insert(
-                directory.appendingPathComponent(input.deletingPathExtension().lastPathComponent)
-                    .appendingPathExtension("heic").standardizedFileURL.path
-            )
-        }
-
-        return inputs.sorted { $0.path < $1.path }.map { input in
+        // Predict exactly the output names the unchanged HEIC batch pass will reserve, including
+        // duplicate stems, before assigning Live Photo outputs.
+        for input in heicInputs.sorted(by: { $0.path < $1.path }) {
             let directory = categorizedOutputDirectory(for: input, command: command)
             let stem = input.deletingPathExtension().lastPathComponent
             var sequence = 1
@@ -257,7 +281,25 @@ enum MotionPhotoCLIIntegration {
                 output = directory.appendingPathComponent("\(stem) (\(sequence))").appendingPathExtension("heic")
             }
             reserved.insert(output.standardizedFileURL.path)
-            reserved.insert(AppleLivePhotoConversionEngine.companionVideoURL(for: output).standardizedFileURL.path)
+        }
+
+        return inputs.sorted { $0.path < $1.path }.map { input in
+            let directory = categorizedOutputDirectory(for: input, command: command)
+            let stem = input.deletingPathExtension().lastPathComponent
+            var sequence = 1
+            var output = directory.appendingPathComponent(stem).appendingPathExtension("heic")
+            while reserved.contains(output.standardizedFileURL.path)
+                || reserved.contains(
+                    AppleLivePhotoConversionEngine.companionVideoURL(for: output)
+                        .standardizedFileURL.path
+                ) {
+                sequence += 1
+                output = directory.appendingPathComponent("\(stem) (\(sequence))").appendingPathExtension("heic")
+            }
+            reserved.insert(output.standardizedFileURL.path)
+            reserved.insert(
+                AppleLivePhotoConversionEngine.companionVideoURL(for: output).standardizedFileURL.path
+            )
             return MotionBatchWorkItem(inputURL: input, outputImageURL: output)
         }
     }
