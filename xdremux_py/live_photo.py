@@ -18,7 +18,11 @@ from .live_photo_mov import (
     validate_live_photo_movie,
     write_live_photo_movie,
 )
-from .live_photo_still import LivePhotoStillError, read_apple_content_identifier, write_live_photo_still
+from .live_photo_still_portable import (
+    LivePhotoStillError,
+    read_apple_content_identifier,
+    write_live_photo_still,
+)
 from .motion_photo import MotionPhotoError, copy_range, parse_motion_photo, primary_video_range
 from .motion_video import MotionVideoError, strip_trailing_vendor_data
 
