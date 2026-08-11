@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 @preconcurrency import AVFoundation
 import CoreMedia
+import ImageIO
 import Photos
 import XDRemuxCore
 
@@ -24,6 +25,8 @@ public enum AppleLivePhotoValidator {
         videoURL: URL,
         expectedAssetIdentifier: String? = nil,
         expectedStillImageTime: CMTime? = nil,
+        sourceStillURL: URL? = nil,
+        sourceVideoURL: URL? = nil,
         sourceHadAudio: Bool? = nil,
         sourceHadGainMap: Bool? = nil,
         expectsOppoTransform: Bool = false,
@@ -42,6 +45,9 @@ public enum AppleLivePhotoValidator {
         if let expectedAssetIdentifier, imageIdentifier != expectedAssetIdentifier {
             throw AppleLivePhotoError.pairValidationFailed("HEIC asset identifier does not match the requested identifier")
         }
+        if let sourceStillURL {
+            try validateStillGeometry(source: sourceStillURL, output: imageURL)
+        }
 
         let asset = AVURLAsset(url: videoURL)
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
@@ -51,6 +57,9 @@ public enum AppleLivePhotoValidator {
         let duration = try await asset.load(.duration)
         guard duration.isNumeric, duration > .zero else {
             throw AppleLivePhotoError.pairValidationFailed("MOV duration is invalid")
+        }
+        if let sourceVideoURL {
+            try await validateCompressedPassthrough(sourceURL: sourceVideoURL, outputAsset: asset)
         }
 
         guard let videoIdentifier = await AppleLivePhotoVideoWriter.contentIdentifier(in: videoURL),
@@ -136,6 +145,69 @@ public enum AppleLivePhotoValidator {
         var stillImageTimes: [CMTime] = []
         var hasTransform = false
         var hasTransformReferenceDimensions = false
+    }
+
+    private struct StillGeometry: Equatable {
+        let width: Int
+        let height: Int
+        let orientation: Int
+    }
+
+    private static func validateStillGeometry(source: URL, output: URL) throws {
+        guard let sourceGeometry = stillGeometry(source),
+              let outputGeometry = stillGeometry(output) else {
+            throw AppleLivePhotoError.pairValidationFailed("could not read source/output still geometry")
+        }
+        guard sourceGeometry == outputGeometry else {
+            throw AppleLivePhotoError.pairValidationFailed(
+                "HEIC still geometry/orientation changed from \(sourceGeometry) to \(outputGeometry)"
+            )
+        }
+    }
+
+    private static func stillGeometry(_ url: URL) -> StillGeometry? {
+        guard let source = CGImageSourceCreateWithURL(
+            url as CFURL,
+            [kCGImageSourceShouldCache: false] as CFDictionary
+        ),
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+        let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+        let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue else {
+            return nil
+        }
+        let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        return StillGeometry(width: width, height: height, orientation: orientation)
+    }
+
+    private static func validateCompressedPassthrough(
+        sourceURL: URL,
+        outputAsset: AVAsset
+    ) async throws {
+        let sourceAsset = AVURLAsset(url: sourceURL)
+        let sourceVideo = try await mediaSubtypes(asset: sourceAsset, mediaType: .video)
+        let outputVideo = try await mediaSubtypes(asset: outputAsset, mediaType: .video)
+        guard sourceVideo == outputVideo else {
+            throw AppleLivePhotoError.pairValidationFailed(
+                "video codec/layout changed during passthrough: \(sourceVideo) -> \(outputVideo)"
+            )
+        }
+        let sourceAudio = try await mediaSubtypes(asset: sourceAsset, mediaType: .audio)
+        let outputAudio = try await mediaSubtypes(asset: outputAsset, mediaType: .audio)
+        guard sourceAudio == outputAudio else {
+            throw AppleLivePhotoError.pairValidationFailed(
+                "audio codec/layout changed during passthrough: \(sourceAudio) -> \(outputAudio)"
+            )
+        }
+    }
+
+    private static func mediaSubtypes(asset: AVAsset, mediaType: AVMediaType) async throws -> [FourCharCode] {
+        let tracks = try await asset.loadTracks(withMediaType: mediaType)
+        var result: [FourCharCode] = []
+        for track in tracks {
+            let descriptions = try await track.load(.formatDescriptions)
+            result.append(contentsOf: descriptions.map(CMFormatDescriptionGetMediaSubType))
+        }
+        return result
     }
 
     private static func readTimedMetadata(from asset: AVAsset) async throws -> TimedMetadataSummary {
