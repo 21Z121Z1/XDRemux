@@ -49,4 +49,27 @@ public enum ISOBaseMediaStreamScanner {
 
         return offsets.sorted()
     }
+
+    public static func isFTYPBoxStart(
+        in url: URL,
+        offset: Int64,
+        upperBound: Int64
+    ) throws -> Bool {
+        guard offset >= 0, upperBound - offset >= 12 else { return false }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        try handle.seek(toOffset: UInt64(offset))
+        let header = try handle.read(upToCount: 16) ?? Data()
+        guard header.count >= 8,
+              String(bytes: header[4..<8], encoding: .ascii) == "ftyp" else {
+            return false
+        }
+        let size = header.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+        if size == 1 {
+            guard header.count >= 16 else { return false }
+            let largeSize = header[8..<16].reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+            return largeSize >= 16 && largeSize <= UInt64(upperBound - offset)
+        }
+        return size >= 8 && Int64(size) <= upperBound - offset
+    }
 }
