@@ -3,6 +3,7 @@ import Foundation
 /// Source format used to derive a normalized Motion Photo asset.
 public enum MotionPhotoSourceKind: String, Sendable, Equatable {
     case androidMotionPhotoV1
+    case androidHeifMotionPhotoV1
     case legacyMicroVideoV1b
     case oppoLivePhoto
 }
