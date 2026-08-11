@@ -24,55 +24,31 @@ public enum OppoMotionPhotoFallbackParser {
 
         let declaredLength = xmp.flatMap(extractVideoLength)
         let presentation = xmp.flatMap(extractPresentationTimestamp)
-        let videoRange: MotionPhotoByteRange
-        var streamCount = 1
-
-        if let declaredLength, declaredLength > 0, declaredLength <= fileSize {
-            let start = fileSize - declaredLength
-            guard try ISOBaseMediaStreamScanner.isFTYPBoxStart(
-                in: url,
-                offset: start,
-                upperBound: fileSize
-            ) else {
-                return nil
-            }
-            videoRange = try MotionPhotoByteRange(lowerBound: start, upperBound: fileSize)
-            streamCount = max(
-                1,
-                try ISOBaseMediaStreamScanner.ftypBoxOffsets(in: url, range: videoRange).count
-            )
-        } else {
-            let tailStart = max(0, fileSize - maxTailScanBytes)
-            let scanRange = try MotionPhotoByteRange(lowerBound: tailStart, upperBound: fileSize)
-            let offsets = try ISOBaseMediaStreamScanner.ftypBoxOffsets(in: url, range: scanRange)
-            guard let last = offsets.last else { return nil }
-            if let lpex, lpex.version >= 1, offsets.count >= 2 {
-                videoRange = try MotionPhotoByteRange(
-                    lowerBound: offsets[offsets.count - 2],
-                    upperBound: fileSize
-                )
-                streamCount = 2
-            } else {
-                videoRange = try MotionPhotoByteRange(lowerBound: last, upperBound: fileSize)
-                streamCount = 1
-            }
-        }
+        let resolved = try resolveVideoRange(
+            url: url,
+            fileSize: fileSize,
+            declaredLength: declaredLength,
+            lpex: lpex
+        )
+        guard let resolved else { return nil }
+        let videoRange = resolved.range
+        let streamCount = resolved.streamCount
 
         let stillRange = try MotionPhotoByteRange(lowerBound: 0, upperBound: videoRange.lowerBound)
-        var metadata = lpex ?? OppoMotionPhotoMetadata()
-        metadata = OppoMotionPhotoMetadata(
-            coverFramePtsUs: metadata.coverFramePtsUs,
-            version: metadata.version,
-            matrixCount: metadata.matrixCount,
-            photoCropMatrix: metadata.photoCropMatrix,
-            photoEisMatrix: metadata.photoEisMatrix,
-            matrices: metadata.matrices,
-            videoWidth: metadata.videoWidth,
-            videoHeight: metadata.videoHeight,
-            originPhotoWidth: metadata.originPhotoWidth,
-            originPhotoHeight: metadata.originPhotoHeight,
-            eisCropFactor: metadata.eisCropFactor,
-            photoCropFactor: metadata.photoCropFactor,
+        let rawMetadata = lpex ?? OppoMotionPhotoMetadata()
+        let metadata = OppoMotionPhotoMetadata(
+            coverFramePtsUs: rawMetadata.coverFramePtsUs,
+            version: rawMetadata.version,
+            matrixCount: rawMetadata.matrixCount,
+            photoCropMatrix: rawMetadata.photoCropMatrix,
+            photoEisMatrix: rawMetadata.photoEisMatrix,
+            matrices: rawMetadata.matrices,
+            videoWidth: rawMetadata.videoWidth,
+            videoHeight: rawMetadata.videoHeight,
+            originPhotoWidth: rawMetadata.originPhotoWidth,
+            originPhotoHeight: rawMetadata.originPhotoHeight,
+            eisCropFactor: rawMetadata.eisCropFactor,
+            photoCropFactor: rawMetadata.photoCropFactor,
             streamCount: streamCount
         )
         let selectedPresentation = presentation ?? metadata.coverFramePtsUs
@@ -100,6 +76,51 @@ public enum OppoMotionPhotoFallbackParser {
         )
     }
 
+    private static func resolveVideoRange(
+        url: URL,
+        fileSize: Int64,
+        declaredLength: Int64?,
+        lpex: OppoMotionPhotoMetadata?
+    ) throws -> (range: MotionPhotoByteRange, streamCount: Int)? {
+        // Prefer the vendor-declared length when it resolves exactly to a valid BMFF stream start.
+        // Old OPPO files in the wild can retain stale length metadata after edits, so a bad declared
+        // length is a reason to use the bounded ftyp recovery scan, not a reason to reject an
+        // otherwise OPPO-signed file immediately.
+        if let declaredLength, declaredLength > 0, declaredLength <= fileSize {
+            let start = fileSize - declaredLength
+            if try ISOBaseMediaStreamScanner.isFTYPBoxStart(
+                in: url,
+                offset: start,
+                upperBound: fileSize
+            ) {
+                let range = try MotionPhotoByteRange(lowerBound: start, upperBound: fileSize)
+                let count = max(
+                    1,
+                    try ISOBaseMediaStreamScanner.ftypBoxOffsets(in: url, range: range).count
+                )
+                return (range, count)
+            }
+        }
+
+        let tailStart = max(0, fileSize - maxTailScanBytes)
+        let scanRange = try MotionPhotoByteRange(lowerBound: tailStart, upperBound: fileSize)
+        let offsets = try ISOBaseMediaStreamScanner.ftypBoxOffsets(in: url, range: scanRange)
+        guard let last = offsets.last else { return nil }
+        if let lpex, lpex.version >= 1, offsets.count >= 2 {
+            return (
+                try MotionPhotoByteRange(
+                    lowerBound: offsets[offsets.count - 2],
+                    upperBound: fileSize
+                ),
+                2
+            )
+        }
+        return (
+            try MotionPhotoByteRange(lowerBound: last, upperBound: fileSize),
+            1
+        )
+    }
+
     private static func readPrefix(url: URL, count: Int64) throws -> Data {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
@@ -107,58 +128,89 @@ public enum OppoMotionPhotoFallbackParser {
     }
 
     private static func extractXMPString(from data: Data) -> String? {
-        guard let start = data.range(of: Data("<x:xmpmeta".utf8))?.lowerBound,
-              let endRange = data.range(
-                of: Data("</x:xmpmeta>".utf8),
-                in: start..<data.endIndex
-              ) else { return nil }
-        return String(data: data.subdata(in: start..<endRange.upperBound), encoding: .utf8)
+        let openingCandidates = [Data("<x:xmpmeta".utf8), Data("<xmpmeta".utf8)]
+        let closingCandidates = [Data("</x:xmpmeta>".utf8), Data("</xmpmeta>".utf8)]
+        guard let start = openingCandidates.compactMap({ data.range(of: $0)?.lowerBound }).min() else {
+            return nil
+        }
+        var end: Data.Index?
+        for closing in closingCandidates {
+            if let range = data.range(of: closing, in: start..<data.endIndex) {
+                end = end.map { min($0, range.upperBound) } ?? range.upperBound
+            }
+        }
+        guard let end else { return nil }
+        return String(data: data.subdata(in: start..<end), encoding: .utf8)
     }
 
     private static func extractVideoLength(from xmp: String) -> Int64? {
-        var values: [Int64] = []
-        let patterns = [
-            #"Item:Length\s*=\s*["'](\d+)["']"#,
-            #"OpCamera:VideoLength\s*=\s*["'](\d+)["']"#,
-            #"GCamera:VideoLength\s*=\s*["'](\d+)["']"#,
-            #"<OpCamera:VideoLength>\s*(\d+)\s*</OpCamera:VideoLength>"#,
-            #"<GCamera:VideoLength>\s*(\d+)\s*</GCamera:VideoLength>"#,
+        // Preserve LivePhotoToolbox's successful heuristic for non-standard OPPO files: choose the
+        // largest plausible Item:Length first, then fall back to explicit VideoLength tags. This is
+        // only used after standards-compliant Container:Directory parsing has already failed.
+        var genericLengths: [Int64] = []
+        let genericPatterns = [
+            #"Item:Length\s*=\s*["']?(\d+)"#,
+            #"Item:Length\s*>(\d+)"#,
+            #"Length\s*=\s*["']?(\d+)"#,
         ]
-        for pattern in patterns {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
-            let range = NSRange(xmp.startIndex..<xmp.endIndex, in: xmp)
-            for match in regex.matches(in: xmp, range: range) where match.numberOfRanges >= 2 {
-                if let swiftRange = Range(match.range(at: 1), in: xmp),
-                   let value = Int64(xmp[swiftRange]), value > 0 {
-                    values.append(value)
-                }
+        for pattern in genericPatterns {
+            genericLengths.append(contentsOf: integerMatches(pattern: pattern, in: xmp))
+        }
+        if let maxLength = genericLengths.max(), maxLength > 100_000 {
+            return maxLength
+        }
+
+        let tags = ["OpCamera:VideoLength", "GCamera:VideoLength", "VideoLength"]
+        for tag in tags {
+            if let value = extractXMPValue(from: xmp, tagName: tag),
+               let length = Int64(value), length > 100_000 {
+                return length
             }
         }
-        return values.max()
+        return nil
     }
 
     private static func extractPresentationTimestamp(from xmp: String) -> Int64? {
-        let names = [
-            "Camera:MotionPhotoPresentationTimestampUs",
+        let tags = [
             "GCamera:MotionPhotoPresentationTimestampUs",
             "MotionPhotoPresentationTimestampUs",
             "GCamera:MicroVideoPresentationTimestampUs",
         ]
-        for name in names {
-            let escaped = NSRegularExpression.escapedPattern(for: name)
-            let patterns = [
-                "\(escaped)\\s*=\\s*[\"'](-?\\d+)[\"']",
-                "<\(escaped)>\\s*(-?\\d+)\\s*</\(escaped)>",
-            ]
-            for pattern in patterns {
-                guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
-                let range = NSRange(xmp.startIndex..<xmp.endIndex, in: xmp)
-                guard let match = regex.firstMatch(in: xmp, range: range),
-                      match.numberOfRanges >= 2,
-                      let swiftRange = Range(match.range(at: 1), in: xmp),
-                      let value = Int64(xmp[swiftRange]) else { continue }
-                return value == -1 ? nil : value
+        for tag in tags {
+            if let value = extractXMPValue(from: xmp, tagName: tag),
+               let timestamp = Int64(value) {
+                return timestamp == -1 ? nil : timestamp
             }
+        }
+        return nil
+    }
+
+    private static func integerMatches(pattern: String, in string: String) -> [Int64] {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(string.startIndex..<string.endIndex, in: string)
+        return regex.matches(in: string, range: range).compactMap { match in
+            guard match.numberOfRanges >= 2,
+                  let valueRange = Range(match.range(at: 1), in: string),
+                  let value = Int64(string[valueRange]), value > 0 else {
+                return nil
+            }
+            return value
+        }
+    }
+
+    private static func extractXMPValue(from xmp: String, tagName: String) -> String? {
+        let escaped = NSRegularExpression.escapedPattern(for: tagName)
+        let patterns = [
+            "<\(escaped)>([^<]+)</\(escaped)>",
+            "\(escaped)=[\"']([^\"']+)[\"']",
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            let range = NSRange(xmp.startIndex..<xmp.endIndex, in: xmp)
+            guard let match = regex.firstMatch(in: xmp, range: range),
+                  match.numberOfRanges >= 2,
+                  let valueRange = Range(match.range(at: 1), in: xmp) else { continue }
+            return String(xmp[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return nil
     }
