@@ -9,18 +9,32 @@ import XCTest
 @testable import XDRemuxAppleFeatures
 
 final class LivePhotoWriterIntegrationTests: XCTestCase {
-    func testSyntheticPairLoadsInPhotoKitAndPreservesCompressedVideo() async throws {
+    func testSyntheticH264PairLoadsInPhotoKitAndPreservesCompressedVideo() async throws {
+        try await assertSyntheticPair(codec: .h264, filename: "h264.mp4")
+    }
+
+    func testSyntheticHEVCPairLoadsInPhotoKitAndPreservesCompressedVideo() async throws {
+        try await assertSyntheticPair(codec: .hevc, filename: "hevc.mp4")
+    }
+
+    private func assertSyntheticPair(codec: AVVideoCodecType, filename: String) async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("xdremux-livephoto-integration-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let sourceJPEG = directory.appendingPathComponent("source.jpg")
-        let sourceMP4 = directory.appendingPathComponent("source.mp4")
+        let sourceMP4 = directory.appendingPathComponent(filename)
         let outputHEIC = directory.appendingPathComponent("output.heic")
         let outputMOV = directory.appendingPathComponent("output.mov")
         try createJPEG(at: sourceJPEG, width: 64, height: 48)
-        try await createH264Video(at: sourceMP4, width: 64, height: 48, frameCount: 8)
+        try await createCompressedVideo(
+            at: sourceMP4,
+            codec: codec,
+            width: 64,
+            height: 48,
+            frameCount: 8
+        )
 
         let identifier = UUID().uuidString
         let stillTime = CMTime(value: 2, timescale: 30)
@@ -82,8 +96,9 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         XCTAssertTrue(CGImageDestinationFinalize(destination))
     }
 
-    private func createH264Video(
+    private func createCompressedVideo(
         at url: URL,
+        codec: AVVideoCodecType,
         width: Int,
         height: Int,
         frameCount: Int
@@ -92,7 +107,7 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         let input = AVAssetWriterInput(
             mediaType: .video,
             outputSettings: [
-                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoCodecKey: codec,
                 AVVideoWidthKey: width,
                 AVVideoHeightKey: height,
             ]
@@ -107,12 +122,14 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
             ]
         )
         guard writer.canAdd(input) else {
-            XCTFail("H.264 writer input unavailable")
-            return
+            throw XCTSkip("\(codec.rawValue) encoder is unavailable on this macOS runner")
         }
         writer.add(input)
         guard writer.startWriting() else {
-            throw writer.error ?? AppleLivePhotoError.videoWriteFailed("synthetic H.264 writer did not start")
+            if codec == .hevc {
+                throw XCTSkip("HEVC encoder could not start on this macOS runner: \(writer.error?.localizedDescription ?? "unknown error")")
+            }
+            throw writer.error ?? AppleLivePhotoError.videoWriteFailed("synthetic compressed writer did not start")
         }
         writer.startSession(atSourceTime: .zero)
 
@@ -151,7 +168,10 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         input.markAsFinished()
         await writer.finishWriting()
         guard writer.status == .completed else {
-            throw writer.error ?? AppleLivePhotoError.videoWriteFailed("synthetic H.264 writer failed")
+            if codec == .hevc {
+                throw XCTSkip("HEVC encoder failed on this macOS runner: \(writer.error?.localizedDescription ?? "unknown error")")
+            }
+            throw writer.error ?? AppleLivePhotoError.videoWriteFailed("synthetic compressed writer failed")
         }
     }
 }
