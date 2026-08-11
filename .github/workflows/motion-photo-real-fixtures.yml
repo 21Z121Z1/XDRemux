@@ -1,0 +1,68 @@
+name: Motion Photo Real Fixtures
+
+on:
+  pull_request:
+    paths:
+      - "Sources/XDRemuxCore/MotionPhoto/**"
+      - "Sources/XDRemuxAppleFeatures/LivePhoto/**"
+      - "Sources/XDRemuxCLI/Commands/MotionPhoto*.swift"
+      - "Tests/**/*MotionPhoto*.swift"
+      - "Tests/**/*LivePhoto*.swift"
+      - ".github/workflows/motion-photo-real-fixtures.yml"
+
+jobs:
+  real-oppo-fixtures:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve private fixture archive
+        shell: bash
+        env:
+          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_FIXTURE_ARCHIVE_URL }}
+        run: |
+          mkdir -p artifacts
+          if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
+            echo "not-configured" > artifacts/motion-photo-real-fixture-status.txt
+            echo "FIXTURE_ROOT=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
+          curl --fail --location --silent --show-error \
+            "$FIXTURE_ARCHIVE_URL" \
+            --output "$RUNNER_TEMP/xdremux-fixtures.zip"
+          ditto -x -k \
+            "$RUNNER_TEMP/xdremux-fixtures.zip" \
+            "$RUNNER_TEMP/xdremux-fixtures"
+          echo "FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
+
+      - name: Characterize and convert real OPPO Motion Photos
+        shell: bash
+        run: |
+          if [[ -z "${FIXTURE_ROOT:-}" ]]; then
+            exit 0
+          fi
+          C15="$(find "$FIXTURE_ROOT" -type f -name 'IMG20250425184722.jpg' -print -quit)"
+          C16="$(find "$FIXTURE_ROOT" -type f -name 'IMG20250901181353.jpg' -print -quit)"
+          {
+            if [[ -n "$C15" ]]; then echo "coloros15=present"; else echo "coloros15=absent"; fi
+            if [[ -n "$C16" ]]; then echo "coloros16=present"; else echo "coloros16=absent"; fi
+          } > artifacts/motion-photo-real-fixture-status.txt
+          if [[ -z "$C15" && -z "$C16" ]]; then
+            exit 0
+          fi
+          XDREMUX_MOTION_PHOTO_FIXTURE_ROOT="$FIXTURE_ROOT" \
+            swift test --filter RealMotionPhotoFixtureTests \
+            2>&1 | tee artifacts/motion-photo-real-fixtures.log
+          echo "tests=passed" >> artifacts/motion-photo-real-fixture-status.txt
+
+      - name: Upload real-fixture status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: motion-photo-real-fixture-status
+          if-no-files-found: error
+          path: |
+            artifacts/motion-photo-real-fixture-status.txt
+            artifacts/motion-photo-real-fixtures.log
