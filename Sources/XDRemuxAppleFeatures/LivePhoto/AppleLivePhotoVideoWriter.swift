@@ -47,6 +47,10 @@ public enum AppleLivePhotoVideoWriter {
             throw AppleLivePhotoError.cannotCreateVideoWriter
         }
 
+        // nil output settings are intentional. AVFoundation documents nil reader settings as
+        // "samples in their original stored format" and nil writer settings as passthrough without
+        // re-encoding. The pair validator independently hashes the encoded storage samples before
+        // and after remuxing so this contract is also verified at runtime.
         let videoOutput = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: nil)
         videoOutput.alwaysCopiesSampleData = false
         guard reader.canAdd(videoOutput) else { throw AppleLivePhotoError.cannotCreateVideoReader }
@@ -178,7 +182,15 @@ public enum AppleLivePhotoVideoWriter {
         return item
     }
 
-    private struct TimedMetadataSetup {
+    /// AVFoundation owns these callback objects and serializes access through the queues passed to
+    /// requestMediaDataWhenReady. Swift 6 does not annotate every legacy AVFoundation class as
+    /// Sendable, so this small wrapper makes the queue confinement explicit instead of spreading
+    /// unchecked annotations through the writer implementation.
+    private struct UnsafeTransfer<Value>: @unchecked Sendable {
+        let value: Value
+    }
+
+    private struct TimedMetadataSetup: @unchecked Sendable {
         let input: AVAssetWriterInput
         let adaptor: AVAssetWriterInputMetadataAdaptor
     }
@@ -296,7 +308,15 @@ public enum AppleLivePhotoVideoWriter {
     ) {
         group.enter()
         let state = TrackCopyState()
+        let inputTransfer = UnsafeTransfer(value: input)
+        let outputTransfer = UnsafeTransfer(value: output)
+        let readerTransfer = UnsafeTransfer(value: reader)
+        let writerTransfer = UnsafeTransfer(value: writer)
         input.requestMediaDataWhenReady(on: DispatchQueue(label: queueLabel, autoreleaseFrequency: .workItem)) {
+            let input = inputTransfer.value
+            let output = outputTransfer.value
+            let reader = readerTransfer.value
+            let writer = writerTransfer.value
             guard !state.finished else { return }
             while input.isReadyForMoreMediaData, !state.finished {
                 autoreleasepool {
@@ -356,7 +376,12 @@ private final class LockedFailure: @unchecked Sendable {
 }
 
 private final class TrackCopyState: @unchecked Sendable {
-    var finished = false
+    private let lock = NSLock()
+    private var storedFinished = false
+    var finished: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return storedFinished }
+        set { lock.lock(); defer { lock.unlock() }; storedFinished = newValue }
+    }
 }
 
 private final class OneShotState: @unchecked Sendable {
