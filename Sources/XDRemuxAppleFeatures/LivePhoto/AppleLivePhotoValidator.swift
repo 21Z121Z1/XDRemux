@@ -98,7 +98,7 @@ public enum AppleLivePhotoValidator {
         }
 
         if requirePhotoKitLoad {
-            try await validateWithPhotoKit(imageURL: imageURL, videoURL: videoURL)
+            try validateWithPhotoKit(imageURL: imageURL, videoURL: videoURL)
         }
 
         return AppleLivePhotoValidationReport(
@@ -127,7 +127,7 @@ public enum AppleLivePhotoValidator {
             }
             semaphore.signal()
         }
-        semaphore.wait()
+        guard semaphore.wait(timeout: .now() + 30) == .success else { return false }
         return box.value
     }
 
@@ -181,27 +181,31 @@ public enum AppleLivePhotoValidator {
         return nil
     }
 
-    private static func validateWithPhotoKit(imageURL: URL, videoURL: URL) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            let state = PhotoKitContinuationState()
-            PHLivePhoto.request(
-                withResourceFileURLs: [imageURL, videoURL],
-                placeholderImage: nil,
-                targetSize: .zero,
-                contentMode: .aspectFit
-            ) { livePhoto, info in
-                if (info[PHLivePhotoInfoIsDegradedKey] as? Bool) == true { return }
-                guard state.beginIfNeeded() else { return }
-                if livePhoto != nil {
-                    continuation.resume()
-                } else {
-                    let error = info[PHLivePhotoInfoErrorKey] as? Error
-                    continuation.resume(throwing: AppleLivePhotoError.pairValidationFailed(
-                        error?.localizedDescription ?? "PhotoKit could not construct PHLivePhoto from the resource pair"
-                    ))
-                }
+    private static func validateWithPhotoKit(imageURL: URL, videoURL: URL) throws {
+        let semaphore = DispatchSemaphore(value: 0)
+        let box = PhotoKitValidationBox()
+        PHLivePhoto.request(
+            withResourceFileURLs: [imageURL, videoURL],
+            placeholderImage: nil,
+            targetSize: .zero,
+            contentMode: .aspectFit
+        ) { livePhoto, info in
+            if (info[PHLivePhotoInfoIsDegradedKey] as? Bool) == true { return }
+            if livePhoto != nil {
+                box.set(.success(()))
+            } else {
+                let underlying = info[PHLivePhotoInfoErrorKey] as? Error
+                box.set(.failure(AppleLivePhotoError.pairValidationFailed(
+                    underlying?.localizedDescription
+                        ?? "PhotoKit could not construct PHLivePhoto from the resource pair"
+                )))
             }
+            semaphore.signal()
         }
+        guard semaphore.wait(timeout: .now() + 30) == .success else {
+            throw AppleLivePhotoError.pairValidationFailed("PhotoKit validation timed out")
+        }
+        try box.result.get()
     }
 }
 
@@ -212,13 +216,16 @@ private final class ValidationResultBox: @unchecked Sendable {
     func set(_ value: Bool) { lock.lock(); defer { lock.unlock() }; stored = value }
 }
 
-private final class PhotoKitContinuationState: @unchecked Sendable {
+private final class PhotoKitValidationBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var resumed = false
-    func beginIfNeeded() -> Bool {
+    private var stored: Result<Void, Error>?
+    var result: Result<Void, Error> {
         lock.lock(); defer { lock.unlock() }
-        guard !resumed else { return false }
-        resumed = true
-        return true
+        return stored ?? .failure(AppleLivePhotoError.pairValidationFailed("PhotoKit validation produced no final result"))
+    }
+    func set(_ value: Result<Void, Error>) {
+        lock.lock(); defer { lock.unlock() }
+        guard stored == nil else { return }
+        stored = value
     }
 }
