@@ -58,10 +58,8 @@ final class RealMotionPhotoFixtureTests: XCTestCase {
             AppleLivePhotoStillWriter.assetIdentifier(in: result.imageURL),
             result.assetIdentifier
         )
-        XCTAssertEqual(
-            await AppleLivePhotoVideoWriter.contentIdentifier(in: result.videoURL),
-            result.assetIdentifier
-        )
+        let videoIdentifier = await AppleLivePhotoVideoWriter.contentIdentifier(in: result.videoURL)
+        XCTAssertEqual(videoIdentifier, result.assetIdentifier)
     }
 
     private func requireFixture(named filename: String) throws -> URL {
