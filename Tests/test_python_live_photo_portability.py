@@ -39,11 +39,11 @@ class PythonLivePhotoPortabilityTests(unittest.TestCase):
         self.assertEqual(violations, [])
 
     def test_decodes_libultrahdr_common_denominator_iso_metadata(self):
-        # ISO 21496 fraction serialization used by AOSP libultrahdr:
-        # minVersion, writerVersion, flags(common denominator + base colourspace), denominator,
-        # base/alternate headroom, then per-channel min/max/gamma/baseOffset/alternateOffset.
+        # AOSP libultrahdr low bits: bit 0 multi-channel, bit 1 base colourspace,
+        # bit 2 backward direction, bit 3 common denominator. This fixture is
+        # one-channel + base colourspace + common denominator = 0b00001010.
         payload = (
-            struct.pack(">HHB", 0, 0, 0x48)
+            struct.pack(">HHB", 0, 0, 0x0A)
             + struct.pack(">III", 1000, 0, 2500)
             + struct.pack(">iiIii", -500, 3000, 1000, 16, 32)
         )
@@ -59,7 +59,7 @@ class PythonLivePhotoPortabilityTests(unittest.TestCase):
 
     def test_finds_iso_metadata_in_jpeg_app2(self):
         payload = (
-            struct.pack(">HHB", 0, 0, 0x48)
+            struct.pack(">HHB", 0, 0, 0x0A)
             + struct.pack(">III", 100, 0, 200)
             + struct.pack(">iiIii", 0, 200, 100, 0, 0)
         )
