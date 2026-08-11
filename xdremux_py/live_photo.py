@@ -20,6 +20,7 @@ from .live_photo_mov import (
 )
 from .live_photo_still import LivePhotoStillError, read_apple_content_identifier, write_live_photo_still
 from .motion_photo import MotionPhotoError, copy_range, parse_motion_photo, primary_video_range
+from .motion_video import MotionVideoError, strip_trailing_vendor_data
 
 
 class LivePhotoConversionError(ValueError):
@@ -139,8 +140,9 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
         video_source = scratch / "motion.mp4"
         copy_range(input_path, primary_video_range(asset), video_source)
         try:
+            removed_vendor_bytes = strip_trailing_vendor_data(video_source)
             still_time = resolve_still_time(video_source, asset.presentation_timestamp_us)
-        except LivePhotoMovieError as exc:
+        except (LivePhotoMovieError, MotionVideoError) as exc:
             raise LivePhotoConversionError(str(exc)) from exc
 
         temp_image = scratch / "pair.heic"
@@ -177,6 +179,10 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
             )
         if metadata is not None and metadata.stream_count >= 2:
             diagnostics.append("OPPO dual-stream input detected; selected Stream 1 for Apple paired video")
+        if removed_vendor_bytes:
+            diagnostics.append(
+                f"removed {removed_vendor_bytes} trailing OPPO vendor bytes after the complete Stream 1 BMFF container"
+            )
         if asset.source_kind == "androidHeifMotionPhotoV1":
             diagnostics.append("HEIF mpvd video extracted without trailing vendor boxes")
 
