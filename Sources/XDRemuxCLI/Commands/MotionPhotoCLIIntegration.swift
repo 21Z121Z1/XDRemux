@@ -104,6 +104,16 @@ enum MotionPhotoCLIIntegration {
             command: command
         )
 
+        let checkpointURL = MotionPhotoBatchCheckpoint.resolvedURL(for: command)
+        if !command.resume {
+            try MotionPhotoBatchCheckpoint.reset(url: checkpointURL)
+        }
+        let checkpointState = command.resume
+            ? try MotionPhotoBatchCheckpoint.load(url: checkpointURL)
+            : [:]
+        let checkpointWriter = try MotionPhotoBatchCheckpoint.Writer(url: checkpointURL)
+        defer { try? checkpointWriter.close() }
+
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = max(1, command.jobs)
         queue.qualityOfService = .userInitiated
@@ -115,40 +125,97 @@ enum MotionPhotoCLIIntegration {
         for item in workItems {
             queue.addOperation {
                 autoreleasepool {
-                    if command.skipExisting,
-                       AppleLivePhotoValidator.isValidPair(
-                           imageURL: item.outputImageURL,
-                           videoURL: AppleLivePhotoConversionEngine.companionVideoURL(for: item.outputImageURL)
-                       ) {
+                    let outputVideoURL = AppleLivePhotoConversionEngine.companionVideoURL(
+                        for: item.outputImageURL
+                    )
+                    let inputKey = item.inputURL.standardizedFileURL.path
+                    let signature = try? MotionPhotoBatchCheckpoint.signature(for: item.inputURL)
+                    let prior = checkpointState[inputKey]
+
+                    func record(
+                        _ status: MotionPhotoBatchCheckpoint.Status,
+                        error: String? = nil
+                    ) {
+                        do {
+                            try checkpointWriter.append(
+                                inputURL: item.inputURL,
+                                outputImageURL: item.outputImageURL,
+                                outputVideoURL: outputVideoURL,
+                                status: status,
+                                signature: signature,
+                                error: error
+                            )
+                        } catch {
+                            printSynchronized("Motion Photo checkpoint write failed: \(singleLine(error))")
+                        }
+                    }
+
+                    func pairIsValid() -> Bool {
+                        AppleLivePhotoValidator.isValidPair(
+                            imageURL: item.outputImageURL,
+                            videoURL: outputVideoURL
+                        )
+                    }
+
+                    let signatureMatches = prior?.matchesSignature(signature) == true
+                    if command.resume,
+                       let prior,
+                       signatureMatches,
+                       prior.matchesOutputs(
+                            imageURL: item.outputImageURL,
+                            videoURL: outputVideoURL
+                       ),
+                       (prior.status == .success || prior.status == .skippedExisting),
+                       pairIsValid() {
                         lock.lock(); skipped += 1; lock.unlock()
-                        printSynchronized("skipped \(item.inputURL.lastPathComponent) (Live Photo pair already valid)")
+                        record(.skippedExisting)
+                        printSynchronized("skipped \(item.inputURL.lastPathComponent) (Live Photo pair already up to date)")
                         return
                     }
+
+                    if command.skipExisting {
+                        let mustRetryFailure = command.resume
+                            && signatureMatches
+                            && prior?.status == .failure
+                        let inputChanged = prior != nil && !signatureMatches
+                        if !mustRetryFailure, !inputChanged, pairIsValid() {
+                            lock.lock(); skipped += 1; lock.unlock()
+                            record(.skippedExisting)
+                            printSynchronized("skipped \(item.inputURL.lastPathComponent) (Live Photo pair already valid)")
+                            return
+                        }
+                    }
+
                     do {
                         _ = try AppleLivePhotoConversionEngine.convert(
                             inputURL: item.inputURL,
                             outputImageURL: item.outputImageURL
                         )
                         lock.lock(); converted += 1; lock.unlock()
+                        record(.success)
                         printSynchronized("converted Motion Photo \(item.inputURL.lastPathComponent)")
                     } catch {
                         lock.lock(); failures.append((item.inputURL, error)); lock.unlock()
+                        record(.failure, error: String(describing: error))
                         printSynchronized("failed \(item.inputURL.lastPathComponent): \(singleLine(error))")
                     }
                 }
             }
         }
         queue.waitUntilAllOperationsAreFinished()
+        try checkpointWriter.close()
 
         print(
             "Motion Photo batch pass: \(converted) converted, \(skipped) skipped, "
                 + "\(failures.count) failed"
         )
-        if !failures.isEmpty {
+        if failures.isEmpty {
+            try? FileManager.default.removeItem(at: checkpointURL)
+        } else {
+            print("run the same command again to retry only the \(failures.count) failed Motion Photo file(s)")
             throw CLIError.batchFailed(
                 failures: failures.count,
-                checkpoint: command.checkpointURL
-                    ?? command.outputDirURL.appendingPathComponent(".xdremux-motion-photo-retry")
+                checkpoint: checkpointURL
             )
         }
 
