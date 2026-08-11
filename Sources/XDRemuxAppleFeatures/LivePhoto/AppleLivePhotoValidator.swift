@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 @preconcurrency import AVFoundation
 import CoreMedia
 import Photos
