@@ -35,16 +35,24 @@ final class MotionPhotoParserTests: XCTestCase {
         XCTAssertEqual(asset.videoResourceRange.length, Int64(video.count))
     }
 
-    func testKeepsZeroLengthGainMapInsidePrimaryStaticResource() throws {
+    func testKeepsPositiveLengthUltraHDRGainMapInsideStaticResource() throws {
         let video = fakeMP4()
-        let xmp = motionPhotoXMP(videoLength: video.count, timestampUs: nil, includeGainMap: true)
-        let still = Data([0xFF, 0xD8]) + Data(xmp.utf8) + Data([0xFF, 0xD9]) + Data(repeating: 0xAB, count: 64)
-        let url = try writeTemporary(still + video)
+        let gainMap = Data(repeating: 0xAB, count: 64)
+        let xmp = motionPhotoXMP(
+            videoLength: video.count,
+            timestampUs: nil,
+            gainMapLength: gainMap.count
+        )
+        let primaryJPEG = Data([0xFF, 0xD8]) + Data(xmp.utf8) + Data([0xFF, 0xD9])
+        let stillContainer = primaryJPEG + gainMap
+        let url = try writeTemporary(stillContainer + video)
         defer { try? FileManager.default.removeItem(at: url) }
 
         let asset = try XCTUnwrap(AndroidMotionPhotoParser.parse(url: url))
         XCTAssertEqual(asset.items.map(\.semantic), ["Primary", "GainMap", "MotionPhoto"])
-        XCTAssertEqual(asset.stillResourceRange.upperBound, Int64(still.count))
+        XCTAssertEqual(asset.items[1].length, Int64(gainMap.count))
+        XCTAssertEqual(asset.stillResourceRange.upperBound, Int64(stillContainer.count))
+        XCTAssertEqual(asset.videoResourceRange.lowerBound, Int64(stillContainer.count))
         XCTAssertNil(asset.presentationTimestampUs)
     }
 
@@ -116,14 +124,14 @@ final class MotionPhotoParserTests: XCTestCase {
         videoLength: Int,
         timestampUs: Int64?,
         version: Int? = 1,
-        includeGainMap: Bool = false,
+        gainMapLength: Int? = nil,
         trailingAuxItem: Bool = false
     ) -> String {
         motionPhotoXMP(
             videoLengthLiteral: String(videoLength),
             timestampUs: timestampUs,
             version: version,
-            includeGainMap: includeGainMap,
+            gainMapLength: gainMapLength,
             trailingAuxItem: trailingAuxItem
         )
     }
@@ -132,14 +140,14 @@ final class MotionPhotoParserTests: XCTestCase {
         videoLengthLiteral: String,
         timestampUs: Int64?,
         version: Int? = 1,
-        includeGainMap: Bool = false,
+        gainMapLength: Int? = nil,
         trailingAuxItem: Bool = false
     ) -> String {
         let versionAttribute = version.map { " Camera:MotionPhotoVersion=\"\($0)\"" } ?? ""
         let timestampAttribute = timestampUs.map { " Camera:MotionPhotoPresentationTimestampUs=\"\($0)\"" } ?? ""
-        let gainMap = includeGainMap
-            ? "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"image/jpeg\" Item:Semantic=\"GainMap\" Item:Length=\"0\" Item:Padding=\"0\"/></rdf:li>"
-            : ""
+        let gainMap = gainMapLength.map {
+            "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"image/jpeg\" Item:Semantic=\"GainMap\" Item:Length=\"\($0)\" Item:Padding=\"0\"/></rdf:li>"
+        } ?? ""
         let trailing = trailingAuxItem
             ? "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"application/octet-stream\" Item:Semantic=\"Auxiliary\" Item:Length=\"0\" Item:Padding=\"0\"/></rdf:li>"
             : ""
