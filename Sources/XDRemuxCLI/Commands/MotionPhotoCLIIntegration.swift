@@ -221,6 +221,8 @@ enum MotionPhotoCLIIntegration {
     ) throws -> [URL] {
         let root = root.standardizedFileURL
         let outputRoot = outputRoot.standardizedFileURL
+        let shouldExcludeOutputSubtree = outputRoot.path != root.path
+            && outputRoot.path.hasPrefix(root.path + "/")
         let manager = FileManager.default
         let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey]
         guard let enumerator = manager.enumerator(
@@ -232,7 +234,9 @@ enum MotionPhotoCLIIntegration {
         var results: [URL] = []
         for case let url as URL in enumerator {
             let standardized = url.standardizedFileURL
-            if standardized.path == outputRoot.path || standardized.path.hasPrefix(outputRoot.path + "/") {
+            if shouldExcludeOutputSubtree,
+               (standardized.path == outputRoot.path
+                    || standardized.path.hasPrefix(outputRoot.path + "/")) {
                 if (try? standardized.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
                     enumerator.skipDescendants()
                 }
