@@ -23,7 +23,6 @@ public enum AppleLivePhotoConversionEngine {
         imageURL.deletingPathExtension().appendingPathExtension("mov")
     }
 
-    /// Synchronous entry point for the existing CLI and batch architecture.
     public static func convert(
         inputURL: URL,
         outputImageURL: URL,
@@ -130,6 +129,8 @@ public enum AppleLivePhotoConversionEngine {
             videoURL: temporaryVideoURL,
             expectedAssetIdentifier: assetIdentifier,
             expectedStillImageTime: timeline.stillImageTime,
+            sourceStillURL: stillSourceURL,
+            sourceVideoURL: videoSourceURL,
             sourceHadAudio: sourceHadAudio,
             sourceHadGainMap: sourceHadGainMap,
             expectsOppoTransform: expectedTransform,
