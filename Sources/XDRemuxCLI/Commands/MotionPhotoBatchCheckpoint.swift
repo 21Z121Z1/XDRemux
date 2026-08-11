@@ -39,9 +39,15 @@ enum MotionPhotoBatchCheckpoint {
     }
 
     struct Header: Codable {
-        let kind = "header"
-        let schemaVersion = 1
+        let kind: String
+        let schemaVersion: Int
         let createdAt: String
+
+        init(createdAt: String) {
+            self.kind = "header"
+            self.schemaVersion = 1
+            self.createdAt = createdAt
+        }
     }
 
     static func resolvedURL(for command: BatchCommand) -> URL {
