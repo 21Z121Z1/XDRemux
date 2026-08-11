@@ -79,10 +79,24 @@ public enum AppleLivePhotoValidator {
             throw AppleLivePhotoError.pairValidationFailed("still-image-time lies outside the MOV timeline")
         }
         if let expectedStillImageTime {
-            let delta = abs(CMTimeGetSeconds(stillImageTime) - CMTimeGetSeconds(expectedStillImageTime))
-            guard delta <= 0.001 else {
+            // AVAssetWriter stores timed metadata on the MOV metadata track's integer timebase.
+            // Real camera timestamps can have microsecond or video-track precision, so the exact
+            // source PTS is not always representable after muxing. Validate at the precision of the
+            // stored metadata timestamp rather than using an arbitrary fixed 1 ms threshold.
+            let storedScale = stillImageTime.timescale
+            guard storedScale > 0 else {
+                throw AppleLivePhotoError.pairValidationFailed("still-image-time has an invalid timescale")
+            }
+            let quantizedExpected = CMTimeConvertScale(
+                expectedStillImageTime,
+                timescale: storedScale,
+                method: .roundHalfAwayFromZero
+            )
+            let delta = abs(CMTimeGetSeconds(stillImageTime) - CMTimeGetSeconds(quantizedExpected))
+            let oneStoredTick = 1.0 / Double(storedScale)
+            guard delta <= oneStoredTick + 1e-9 else {
                 throw AppleLivePhotoError.pairValidationFailed(
-                    "still-image-time differs from the resolved source timestamp by \(delta) seconds"
+                    "still-image-time differs from the resolved source timestamp beyond one stored metadata tick: delta=\(delta) s, timescale=\(storedScale)"
                 )
             }
         }
