@@ -46,29 +46,50 @@ public struct MotionPhotoByteRange: Sendable, Equatable {
     public var length: Int64 { upperBound - lowerBound }
 }
 
-/// Vendor metadata is intentionally separated from the generic Android container description.
+/// OPPO vendor extension data. Generic Android parsing does not depend on any of these fields.
 public struct OppoMotionPhotoMetadata: Sendable, Equatable {
     public let coverFramePtsUs: Int64?
-    public let colorOSVersion: Int?
+    public let version: Int
+    public let matrixCount: Int
+    public let photoCropMatrix: [Double]?
+    public let photoEisMatrix: [Double]?
+    public let matrices: [String: [Double]]
+    public let videoWidth: Int?
+    public let videoHeight: Int?
+    public let originPhotoWidth: Int?
+    public let originPhotoHeight: Int?
+    public let eisCropFactor: [Double]?
+    public let photoCropFactor: Double?
     public let streamCount: Int
-    public let transformMatrix: [Double]?
-    public let referenceWidth: Double?
-    public let referenceHeight: Double?
 
     public init(
         coverFramePtsUs: Int64? = nil,
-        colorOSVersion: Int? = nil,
-        streamCount: Int = 1,
-        transformMatrix: [Double]? = nil,
-        referenceWidth: Double? = nil,
-        referenceHeight: Double? = nil
+        version: Int = 0,
+        matrixCount: Int = 0,
+        photoCropMatrix: [Double]? = nil,
+        photoEisMatrix: [Double]? = nil,
+        matrices: [String: [Double]] = [:],
+        videoWidth: Int? = nil,
+        videoHeight: Int? = nil,
+        originPhotoWidth: Int? = nil,
+        originPhotoHeight: Int? = nil,
+        eisCropFactor: [Double]? = nil,
+        photoCropFactor: Double? = nil,
+        streamCount: Int = 1
     ) {
         self.coverFramePtsUs = coverFramePtsUs
-        self.colorOSVersion = colorOSVersion
-        self.streamCount = streamCount
-        self.transformMatrix = transformMatrix
-        self.referenceWidth = referenceWidth
-        self.referenceHeight = referenceHeight
+        self.version = version
+        self.matrixCount = matrixCount
+        self.photoCropMatrix = photoCropMatrix
+        self.photoEisMatrix = photoEisMatrix
+        self.matrices = matrices
+        self.videoWidth = videoWidth
+        self.videoHeight = videoHeight
+        self.originPhotoWidth = originPhotoWidth
+        self.originPhotoHeight = originPhotoHeight
+        self.eisCropFactor = eisCropFactor
+        self.photoCropFactor = photoCropFactor
+        self.streamCount = max(1, streamCount)
     }
 }
 
@@ -133,6 +154,7 @@ public enum MotionPhotoParsingError: Error, LocalizedError, Equatable {
     case arithmeticOverflow
     case invalidByteRange
     case invalidVideoPayload
+    case payloadTooLarge
 
     public var errorDescription: String? {
         switch self {
@@ -159,6 +181,8 @@ public enum MotionPhotoParsingError: Error, LocalizedError, Equatable {
             return "Motion Photo contains an invalid byte range."
         case .invalidVideoPayload:
             return "Motion Photo video payload is not a valid ISO BMFF stream."
+        case .payloadTooLarge:
+            return "Motion Photo payload exceeds the configured extraction limit."
         }
     }
 }
