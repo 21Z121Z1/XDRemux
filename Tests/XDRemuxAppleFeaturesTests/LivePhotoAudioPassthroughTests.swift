@@ -24,8 +24,10 @@ final class LivePhotoAudioPassthroughTests: XCTestCase {
         try await createH264AACVideo(at: sourceMP4)
 
         let sourceAsset = AVURLAsset(url: sourceMP4)
-        XCTAssertEqual(try await sourceAsset.loadTracks(withMediaType: .video).count, 1)
-        XCTAssertEqual(try await sourceAsset.loadTracks(withMediaType: .audio).count, 1)
+        let sourceVideoTracks = try await sourceAsset.loadTracks(withMediaType: .video)
+        let sourceAudioTracks = try await sourceAsset.loadTracks(withMediaType: .audio)
+        XCTAssertEqual(sourceVideoTracks.count, 1)
+        XCTAssertEqual(sourceAudioTracks.count, 1)
 
         let identifier = UUID().uuidString
         let stillTime = CMTime(value: 3, timescale: 30)
