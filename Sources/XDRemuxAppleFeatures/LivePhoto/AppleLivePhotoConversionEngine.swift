@@ -15,7 +15,9 @@ public struct LivePhotoConversionResult: Sendable {
 public enum AppleLivePhotoConversionEngine {
     public static func isMotionPhotoInput(_ inputURL: URL) -> Bool {
         let ext = inputURL.pathExtension.lowercased()
-        guard ext == "jpg" || ext == "jpeg" else { return false }
+        guard ext == "jpg" || ext == "jpeg" || ext == "heic" || ext == "heif" else {
+            return false
+        }
         return (try? OppoMotionPhotoParser.parse(url: inputURL)) != nil
     }
 
@@ -53,12 +55,12 @@ public enum AppleLivePhotoConversionEngine {
         requirePhotoKitValidation: Bool = true
     ) async throws -> LivePhotoConversionResult {
         guard let asset = try OppoMotionPhotoParser.parse(url: inputURL) else {
-            throw AppleLivePhotoError.transactionFailed("input is not a supported JPEG Motion Photo")
+            throw AppleLivePhotoError.transactionFailed("input is not a supported Motion Photo")
         }
         let inputPath = inputURL.standardizedFileURL.path
         let outputPath = outputImageURL.standardizedFileURL.path
         guard inputPath != outputPath else {
-            throw AppleLivePhotoError.transactionFailed("Motion Photo conversion never overwrites the source JPEG in place")
+            throw AppleLivePhotoError.transactionFailed("Motion Photo conversion never overwrites the source image in place")
         }
         let ext = outputImageURL.pathExtension.lowercased()
         guard ext == "heic" || ext == "heif" else {
@@ -76,7 +78,8 @@ public enum AppleLivePhotoConversionEngine {
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
 
-        let stillSourceURL = scratch.appendingPathComponent("still.jpg")
+        let stillExtension = asset.sourceKind == .androidHeifMotionPhotoV1 ? "heic" : "jpg"
+        let stillSourceURL = scratch.appendingPathComponent("still.\(stillExtension)")
         let videoSourceURL = scratch.appendingPathComponent("motion.mp4")
         try MotionPhotoPayloadExtractor.copy(
             range: asset.stillResourceRange,
@@ -155,6 +158,9 @@ public enum AppleLivePhotoConversionEngine {
         if let metadata = asset.vendorMetadata, metadata.streamCount >= 2 {
             diagnostics.append("OPPO dual-stream input detected; selected Stream 1 for Apple paired video.")
         }
+        if asset.sourceKind == .androidHeifMotionPhotoV1 {
+            diagnostics.append("HEIF Motion Photo mpvd payload extracted without trailing vendor boxes.")
+        }
 
         return LivePhotoConversionResult(
             imageURL: outputImageURL,
@@ -181,7 +187,6 @@ public enum AppleLivePhotoConversionEngine {
         let hadImage = fileManager.fileExists(atPath: finalImageURL.path)
         let hadVideo = fileManager.fileExists(atPath: finalVideoURL.path)
         var newImageInstalled = false
-        var newVideoInstalled = false
 
         do {
             if hadImage { try fileManager.moveItem(at: finalImageURL, to: imageBackup) }
@@ -189,12 +194,13 @@ public enum AppleLivePhotoConversionEngine {
             try fileManager.moveItem(at: temporaryImageURL, to: finalImageURL)
             newImageInstalled = true
             try fileManager.moveItem(at: temporaryVideoURL, to: finalVideoURL)
-            newVideoInstalled = true
             if hadImage { try? fileManager.removeItem(at: imageBackup) }
             if hadVideo { try? fileManager.removeItem(at: videoBackup) }
         } catch {
             if newImageInstalled { try? fileManager.removeItem(at: finalImageURL) }
-            if newVideoInstalled { try? fileManager.removeItem(at: finalVideoURL) }
+            // A throwing move of the temporary video cannot have installed it successfully, and
+            // there are no throwing operations after the successful video move. Therefore no
+            // separate newVideoInstalled state is needed here.
             if hadImage, fileManager.fileExists(atPath: imageBackup.path) {
                 try? fileManager.moveItem(at: imageBackup, to: finalImageURL)
             }
