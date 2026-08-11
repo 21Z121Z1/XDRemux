@@ -81,8 +81,10 @@ def decode_iso21496_payload(data: bytes) -> dict:
             f"unsupported ISO 21496-1 minimum version {minimum_version}"
         )
     flags = take(">B")
-    channel_count = 3 if flags & 0x80 else 1
-    use_base_color_space = bool(flags & 0x40)
+    # AOSP libultrahdr serializes these as the low flag bits: bit 0 = multichannel,
+    # bit 1 = use base colour space, bit 2 = backward direction, bit 3 = common denominator.
+    channel_count = 3 if flags & 0x01 else 1
+    use_base_color_space = bool(flags & 0x02)
     backward_direction = bool(flags & 0x04)
     common_denominator = bool(flags & 0x08)
 
