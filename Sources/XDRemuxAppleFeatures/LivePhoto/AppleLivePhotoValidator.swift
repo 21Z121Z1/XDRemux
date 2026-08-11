@@ -57,7 +57,7 @@ public enum AppleLivePhotoValidator {
             throw AppleLivePhotoError.pairValidationFailed("HEIC and MOV content identifiers do not match")
         }
 
-        let timed = try readTimedMetadata(from: asset)
+        let timed = try await readTimedMetadata(from: asset)
         guard timed.stillImageTimes.count == 1 else {
             throw AppleLivePhotoError.pairValidationFailed(
                 "MOV must contain exactly one still-image-time sample; found \(timed.stillImageTimes.count)"
@@ -137,42 +137,36 @@ public enum AppleLivePhotoValidator {
         var hasTransformReferenceDimensions = false
     }
 
-    private static func readTimedMetadata(from asset: AVAsset) throws -> TimedMetadataSummary {
-        let semaphore = DispatchSemaphore(value: 0)
-        let box = TimedMetadataResultBox()
-        Task.detached {
-            do {
-                let metadataTracks = try await asset.loadTracks(withMediaType: .metadata)
-                var summary = TimedMetadataSummary()
-                for track in metadataTracks {
-                    let reader = try AVAssetReader(asset: asset)
-                    let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
-                    output.alwaysCopiesSampleData = false
-                    guard reader.canAdd(output) else { continue }
-                    reader.add(output)
-                    let adaptor = AVAssetReaderOutputMetadataAdaptor(assetReaderTrackOutput: output)
-                    guard reader.startReading() else { continue }
-                    while let group = adaptor.nextTimedMetadataGroup() {
-                        for item in group.items {
-                            let key = metadataKey(item)
-                            if key == stillImageTimeKey {
-                                summary.stillImageTimes.append(group.timeRange.start)
-                            } else if key == transformKey {
-                                summary.hasTransform = true
-                            } else if key == transformReferenceDimensionsKey {
-                                summary.hasTransformReferenceDimensions = true
-                            }
-                        }
+    private static func readTimedMetadata(from asset: AVAsset) async throws -> TimedMetadataSummary {
+        let metadataTracks = try await asset.loadTracks(withMediaType: .metadata)
+        var summary = TimedMetadataSummary()
+        for track in metadataTracks {
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            output.alwaysCopiesSampleData = false
+            guard reader.canAdd(output) else { continue }
+            reader.add(output)
+            let adaptor = AVAssetReaderOutputMetadataAdaptor(assetReaderTrackOutput: output)
+            guard reader.startReading() else { continue }
+            while let group = adaptor.nextTimedMetadataGroup() {
+                for item in group.items {
+                    let key = metadataKey(item)
+                    if key == stillImageTimeKey {
+                        summary.stillImageTimes.append(group.timeRange.start)
+                    } else if key == transformKey {
+                        summary.hasTransform = true
+                    } else if key == transformReferenceDimensionsKey {
+                        summary.hasTransformReferenceDimensions = true
                     }
                 }
-                box.set(.success(summary))
-            } catch {
-                box.set(.failure(error))
             }
-            semaphore.signal()
+            if reader.status == .failed {
+                throw AppleLivePhotoError.pairValidationFailed(
+                    reader.error?.localizedDescription ?? "timed metadata track could not be read"
+                )
+            }
         }
-        semaphore.wait()
-        return try box.result.get()
+        return summary
     }
 
     private static func metadataKey(_ item: AVMetadataItem) -> String? {
@@ -216,18 +210,6 @@ private final class ValidationResultBox: @unchecked Sendable {
     private var stored = false
     var value: Bool { lock.lock(); defer { lock.unlock() }; return stored }
     func set(_ value: Bool) { lock.lock(); defer { lock.unlock() }; stored = value }
-}
-
-private final class TimedMetadataResultBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored: Result<AppleLivePhotoValidator.TimedMetadataSummary, Error>?
-    var result: Result<AppleLivePhotoValidator.TimedMetadataSummary, Error> {
-        lock.lock(); defer { lock.unlock() }
-        return stored ?? .failure(AppleLivePhotoError.pairValidationFailed("timed metadata validation did not complete"))
-    }
-    func set(_ value: Result<AppleLivePhotoValidator.TimedMetadataSummary, Error>) {
-        lock.lock(); defer { lock.unlock() }; stored = value
-    }
 }
 
 private final class PhotoKitContinuationState: @unchecked Sendable {
