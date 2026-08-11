@@ -25,8 +25,10 @@ public enum AndroidMotionPhotoParser {
             guard description.version == 1 else {
                 throw MotionPhotoParsingError.unsupportedVersion(description.version)
             }
-            sourceKind = .androidMotionPhotoV1
             items = description.items
+            sourceKind = ISOBMFFMotionPhotoRangeResolver.isHEIFMime(items[0].mime)
+                ? .androidHeifMotionPhotoV1
+                : .androidMotionPhotoV1
             timestampSource = description.presentationTimestampUs == nil ? nil : .androidXMP
         } else if let legacyOffset = description.legacyMicroVideoOffset {
             guard legacyOffset > 0 else { throw MotionPhotoParsingError.invalidItemLength }
@@ -41,13 +43,22 @@ public enum AndroidMotionPhotoParser {
         }
 
         try validateDirectory(items)
-        let ranges = try deriveRanges(items: items, fileSize: fileSize)
-        guard try ISOBaseMediaStreamScanner.isFTYPBoxStart(
-            in: url,
-            offset: ranges.video.lowerBound,
-            upperBound: ranges.video.upperBound
-        ) else {
-            throw MotionPhotoParsingError.invalidVideoPayload
+        let ranges: (still: MotionPhotoByteRange, video: MotionPhotoByteRange)
+        if sourceKind == .androidHeifMotionPhotoV1 {
+            ranges = try ISOBMFFMotionPhotoRangeResolver.resolve(
+                url: url,
+                items: items,
+                fileSize: fileSize
+            )
+        } else {
+            ranges = try deriveJPEGStyleRanges(items: items, fileSize: fileSize)
+            guard try ISOBaseMediaStreamScanner.isFTYPBoxStart(
+                in: url,
+                offset: ranges.video.lowerBound,
+                upperBound: ranges.video.upperBound
+            ) else {
+                throw MotionPhotoParsingError.invalidVideoPayload
+            }
         }
 
         return MotionPhotoAsset(
@@ -85,9 +96,8 @@ public enum AndroidMotionPhotoParser {
     }
 
     private static func parseXMP(_ data: Data) throws -> ParsedXMP {
-        // Motion Photo metadata does not require DTDs or custom entities. Rejecting declarations
-        // before invoking XMLParser gives us an explicit XXE/DTD safety boundary in addition to
-        // disabling external entity resolution below.
+        // Motion Photo metadata does not require DTDs or custom entities. Reject declarations
+        // before invoking XMLParser, in addition to disabling external entity resolution below.
         if data.range(of: Data("<!DOCTYPE".utf8)) != nil
             || data.range(of: Data("<!ENTITY".utf8)) != nil {
             throw MotionPhotoParsingError.malformedXMP
@@ -138,7 +148,7 @@ public enum AndroidMotionPhotoParser {
         }
     }
 
-    private static func deriveRanges(
+    private static func deriveJPEGStyleRanges(
         items: [MotionPhotoItem],
         fileSize: Int64
     ) throws -> (still: MotionPhotoByteRange, video: MotionPhotoByteRange) {
@@ -181,10 +191,10 @@ public enum AndroidMotionPhotoParser {
             throw MotionPhotoParsingError.invalidByteRange
         }
 
-        // For conversion we need the complete still-image container, not only the Primary item.
-        // In Ultra HDR JPEG Motion Photos the positive-length GainMap secondary resource lives
-        // between the primary JPEG encoding and the final MotionPhoto video. Supplying 0..<videoStart
-        // to ImageIO preserves that gain-map resource while still excluding the appended MP4.
+        // For JPEG conversion we need the complete still-image resource, not only the Primary item.
+        // Ultra HDR Motion Photos can carry a positive-length GainMap secondary JPEG between the
+        // primary encoding and the trailing MotionPhoto video. Supplying 0..<videoStart to ImageIO
+        // preserves that resource while excluding only the appended MP4.
         return (
             try MotionPhotoByteRange(lowerBound: 0, upperBound: videoStart),
             try MotionPhotoByteRange(lowerBound: videoStart, upperBound: videoEnd)
