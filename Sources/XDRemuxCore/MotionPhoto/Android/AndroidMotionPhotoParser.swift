@@ -85,6 +85,14 @@ public enum AndroidMotionPhotoParser {
     }
 
     private static func parseXMP(_ data: Data) throws -> ParsedXMP {
+        // Motion Photo metadata does not require DTDs or custom entities. Rejecting declarations
+        // before invoking XMLParser gives us an explicit XXE/DTD safety boundary in addition to
+        // disabling external entity resolution below.
+        if data.range(of: Data("<!DOCTYPE".utf8)) != nil
+            || data.range(of: Data("<!ENTITY".utf8)) != nil {
+            throw MotionPhotoParsingError.malformedXMP
+        }
+
         let delegate = XMPDelegate(
             maxItems: maxDirectoryItems,
             maxStringLength: maxMetadataStringLength
