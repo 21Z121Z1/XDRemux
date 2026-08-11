@@ -1,6 +1,8 @@
 import Foundation
 
 public enum OppoMotionPhotoParser {
+    private static let maxVendorTailScanBytes: Int64 = 512 * 1024 * 1024
+
     public static func parse(url: URL) throws -> MotionPhotoAsset? {
         do {
             if let base = try AndroidMotionPhotoParser.parse(url: url) {
@@ -17,10 +19,39 @@ public enum OppoMotionPhotoParser {
 
     public static func enrichIfPresent(_ asset: MotionPhotoAsset) throws -> MotionPhotoAsset {
         guard let metadata = try OppoLpexParser.parse(from: asset.sourceURL) else { return asset }
-        let offsets = try ISOBaseMediaStreamScanner.ftypBoxOffsets(
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: asset.sourceURL.path)
+        guard let sizeNumber = attributes[.size] as? NSNumber else { return asset }
+        let fileSize = sizeNumber.int64Value
+        let scanStart = max(0, fileSize - maxVendorTailScanBytes)
+        let scanRange = try MotionPhotoByteRange(lowerBound: scanStart, upperBound: fileSize)
+        let allTailOffsets = try ISOBaseMediaStreamScanner.ftypBoxOffsets(
             in: asset.sourceURL,
-            range: asset.videoResourceRange
+            range: scanRange
         )
+
+        // ColorOS 16 OPPO Live Photos can carry two concatenated BMFF streams while the Android
+        // directory / VideoLength metadata describes only the final stream. In that case treating
+        // the directory's videoStart as authoritative incorrectly leaves Stream 1 attached to the
+        // still image and later chooses Stream 2. LPEX version >= 1 is the vendor signal used by the
+        // original toolbox; the last two validated ftyp starts therefore define Stream 1 + Stream 2.
+        let correctedStillRange: MotionPhotoByteRange
+        let correctedVideoRange: MotionPhotoByteRange
+        let streamCount: Int
+        if metadata.version >= 1, allTailOffsets.count >= 2 {
+            let stream1Start = allTailOffsets[allTailOffsets.count - 2]
+            correctedStillRange = try MotionPhotoByteRange(lowerBound: 0, upperBound: stream1Start)
+            correctedVideoRange = try MotionPhotoByteRange(lowerBound: stream1Start, upperBound: fileSize)
+            streamCount = 2
+        } else {
+            correctedStillRange = asset.stillResourceRange
+            correctedVideoRange = asset.videoResourceRange
+            let offsetsInsideDeclaredRange = allTailOffsets.filter {
+                $0 >= asset.videoResourceRange.lowerBound && $0 < asset.videoResourceRange.upperBound
+            }
+            streamCount = max(1, offsetsInsideDeclaredRange.count)
+        }
+
         let enriched = OppoMotionPhotoMetadata(
             coverFramePtsUs: metadata.coverFramePtsUs,
             version: metadata.version,
@@ -34,18 +65,23 @@ public enum OppoMotionPhotoParser {
             originPhotoHeight: metadata.originPhotoHeight,
             eisCropFactor: metadata.eisCropFactor,
             photoCropFactor: metadata.photoCropFactor,
-            streamCount: max(1, offsets.count)
+            streamCount: streamCount
         )
 
-        // LivePhotoToolbox selected the XMP presentation timestamp first, then coverFramePts from
-        // LPEX. Keep that behavior while retaining both values for diagnostics.
-        if asset.presentationTimestampUs == nil, let cover = enriched.coverFramePtsUs {
-            return asset.enrichingWithOppoMetadata(
-                enriched,
-                presentationTimestampUs: cover,
-                presentationSource: .oppoCoverFrame
-            )
-        }
-        return asset.enrichingWithOppoMetadata(enriched)
+        let selectedPresentation = asset.presentationTimestampUs ?? enriched.coverFramePtsUs
+        let selectedSource: MotionPhotoPresentationSource? = asset.presentationTimestampUs != nil
+            ? asset.presentationSource
+            : (enriched.coverFramePtsUs != nil ? .oppoCoverFrame : nil)
+
+        return MotionPhotoAsset(
+            sourceURL: asset.sourceURL,
+            sourceKind: .oppoLivePhoto,
+            items: asset.items,
+            stillResourceRange: correctedStillRange,
+            videoResourceRange: correctedVideoRange,
+            presentationTimestampUs: selectedPresentation,
+            presentationSource: selectedSource,
+            vendorMetadata: enriched
+        )
     }
 }
