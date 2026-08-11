@@ -17,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
 from xdremux_py.live_photo import convert_motion_photo, validate_pair
 from xdremux_py.live_photo_mov import media_payload_sha256
 from xdremux_py.motion_photo import copy_range, parse_motion_photo, primary_video_range
+from xdremux_py.motion_video import strip_trailing_vendor_data
 
 
 @dataclass(frozen=True)
@@ -109,6 +110,7 @@ def main() -> int:
 
         extracted = output_root / f"source-{index:02d}.mp4"
         copy_range(source, primary, extracted)
+        removed_vendor_bytes = strip_trailing_vendor_data(extracted)
         source_media = media_payload_sha256(extracted)
         if not source_media:
             raise RuntimeError(f"fixture has no media-data payload: {spec.filename}")
@@ -134,10 +136,11 @@ def main() -> int:
             "contentIdentifier": result.content_identifier,
             "stillImageTimeSeconds": result.still_time_seconds,
             "expectsGainMap": spec.expects_gain_map,
+            "removedTrailingVendorBytes": removed_vendor_bytes,
         })
         print(
             f"PASS {spec.filename}: {result.source_kind}, gainmap={result.source_had_gain_map}, "
-            f"still={result.still_time_seconds:.6f}s"
+            f"still={result.still_time_seconds:.6f}s, trailing_vendor_bytes={removed_vendor_bytes}"
         )
 
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
