@@ -87,6 +87,29 @@ jobs:
           ditto -x -k "$RUNNER_TEMP/xdremux-fixtures.zip" "$RUNNER_TEMP/xdremux-fixtures"
           echo "FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
 
+      - name: Run private Motion Photo fixtures
+        shell: bash
+        run: |
+          if [[ -z "${FIXTURE_ROOT:-}" ]]; then
+            echo "MOTION_PHOTO_REAL_RESULT=Not configured" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          C15="$(find "$FIXTURE_ROOT" -type f -name 'IMG20250425184722.jpg' -print -quit)"
+          C16="$(find "$FIXTURE_ROOT" -type f -name 'IMG20250901181353.jpg' -print -quit)"
+          if [[ -z "$C15" && -z "$C16" ]]; then
+            echo "MOTION_PHOTO_REAL_RESULT=Fixtures not present" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "::group::Real OPPO Motion Photo characterization and conversion"
+          XDREMUX_MOTION_PHOTO_FIXTURE_ROOT="$FIXTURE_ROOT" \
+            swift test --filter RealMotionPhotoFixtureTests 2>&1 | tee artifacts/motion-photo-real-fixtures.log
+          echo "::endgroup::"
+          if [[ -n "$C15" && -n "$C16" ]]; then
+            echo "MOTION_PHOTO_REAL_RESULT=Passed (ColorOS 15 + 16)" >> "$GITHUB_ENV"
+          else
+            echo "MOTION_PHOTO_REAL_RESULT=Passed available fixture; one generation absent" >> "$GITHUB_ENV"
+          fi
+
       - name: "[4/5] Run fixture conversions"
         shell: bash
         run: |
@@ -166,6 +189,7 @@ jobs:
             echo "| Swift package build | ${SWIFT_BUILD_RESULT:-Failed} |"
             echo "| Unit tests | ${UNIT_TEST_RESULT:-Not run} |"
             echo "| macOS App build | ${MACOS_APP_RESULT:-Not run} |"
+            echo "| Real OPPO Motion Photo fixtures | ${MOTION_PHOTO_REAL_RESULT:-Not run} |"
             echo "| Standard ISO fixture | ${STANDARD_FIXTURE_RESULT:-Not run} |"
             echo "| OPPO compatibility fixture | ${OPPO_FIXTURE_RESULT:-Not run} |"
             echo "| Apple styles fixture | ${APPLE_STYLES_RESULT:-Not run} |"
