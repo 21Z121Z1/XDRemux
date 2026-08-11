@@ -10,6 +10,10 @@ on:
       - "Tests/XDRemuxAppleFeaturesTests/PythonLivePhotoOutputGateTests.swift"
       - ".github/workflows/python-motion-photo-real-fixtures.yml"
 
+concurrency:
+  group: python-motion-photo-live-photo-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pure-python-live-photo:
     runs-on: macos-latest
