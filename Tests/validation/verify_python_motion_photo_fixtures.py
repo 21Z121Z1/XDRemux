@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from xdremux_py.live_photo import convert_motion_photo, validate_pair
 from xdremux_py.live_photo_mov import media_payload_sha256
+from xdremux_py.live_photo_still_portable import _jpeg_end
 from xdremux_py.motion_photo import copy_range, parse_motion_photo, primary_video_range
 from xdremux_py.motion_video import strip_trailing_vendor_data
 
@@ -74,18 +75,39 @@ def index_fixtures(root: Path) -> dict[str, Path]:
     return found
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--fixture-root", type=Path, required=True)
-    parser.add_argument("--output-root", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, required=True)
-    args = parser.parse_args()
-    output_root = args.output_root.resolve()
-    output_root.mkdir(parents=True, exist_ok=True)
-    sources = index_fixtures(args.fixture_root.resolve())
-    manifest_entries: list[dict[str, object]] = []
+def _safe_geometry(source: Path, asset) -> str:
+    """Emit offsets/metadata marker positions only; never print image bytes."""
+    items = ",".join(
+        f"{item.semantic}:{item.mime}:len={item.length}:pad={item.padding}"
+        for item in asset.items
+    )
+    if source.suffix.lower() not in {".jpg", ".jpeg"}:
+        return f"items=[{items}]"
+    with source.open("rb") as stream:
+        static = stream.read(asset.still_range.end)
+    primary_end = _jpeg_end(static, 0)
+    soi_offsets: list[int] = []
+    cursor = primary_end
+    while len(soi_offsets) < 8:
+        found = static.find(b"\xff\xd8", cursor)
+        if found < 0:
+            break
+        soi_offsets.append(found)
+        cursor = found + 2
+    markers = {
+        "hdrgm": static.find(b"hdrgm"),
+        "iso21496": static.find(b"urn:iso:std:iso:ts:21496:-1"),
+        "mpf": static.find(b"MPF\x00"),
+    }
+    return (
+        f"items=[{items}] primary_eoi={primary_end} static_end={asset.still_range.end} "
+        f"secondary_soi={soi_offsets} markers={markers}"
+    )
 
-    for index, spec in enumerate(FIXTURES, start=1):
+
+def _characterize_all(sources: dict[str, Path]):
+    characterized = {}
+    for spec in FIXTURES:
         source = sources[spec.filename]
         before = sha256(source)
         if before != spec.sha256:
@@ -107,7 +129,25 @@ def main() -> int:
         primary = primary_video_range(asset)
         if primary.start != spec.video_start or primary.end != (spec.primary_video_end or spec.video_end):
             raise RuntimeError(f"primary video stream range drift for {spec.filename}: {primary}")
+        print(f"GEOMETRY {spec.filename}: {_safe_geometry(source, asset)}", flush=True)
+        characterized[spec.filename] = (source, before, asset, primary)
+    return characterized
 
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fixture-root", type=Path, required=True)
+    parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    args = parser.parse_args()
+    output_root = args.output_root.resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    sources = index_fixtures(args.fixture_root.resolve())
+    characterized = _characterize_all(sources)
+    manifest_entries: list[dict[str, object]] = []
+
+    for index, spec in enumerate(FIXTURES, start=1):
+        source, before, asset, primary = characterized[spec.filename]
         extracted = output_root / f"source-{index:02d}.mp4"
         copy_range(source, primary, extracted)
         removed_vendor_bytes = strip_trailing_vendor_data(extracted)
@@ -140,7 +180,8 @@ def main() -> int:
         })
         print(
             f"PASS {spec.filename}: {result.source_kind}, gainmap={result.source_had_gain_map}, "
-            f"still={result.still_time_seconds:.6f}s, trailing_vendor_bytes={removed_vendor_bytes}"
+            f"still={result.still_time_seconds:.6f}s, trailing_vendor_bytes={removed_vendor_bytes}",
+            flush=True,
         )
 
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
