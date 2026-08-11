@@ -81,8 +81,11 @@ enum MotionPhotoCLIIntegration {
     }
 
     /// Plans the Motion Photo portion of a default batch. Explicit --glob retains the old contract.
-    /// If there are no existing HEIC inputs, the Motion Photo batch can run immediately. For a mixed
-    /// batch it is queued and runs only after the unchanged HEIC batch pass succeeds.
+    /// On the first mixed run there are no Live Photo HEIC outputs yet, so the unchanged HEIC batch
+    /// can run first and the Motion Photo pass is deferred. On subsequent runs, valid HEIC+MOV Live
+    /// Photo pairs are classified as outputs rather than HEIC inputs; the remaining real HEIC inputs
+    /// are handled here before the Motion Photo pass so the old `*.heic` enumerator can never ingest
+    /// a previously generated Live Photo still.
     private static func prepareDefaultBatch(_ rawArguments: [String]) throws -> Bool {
         guard !rawArguments.contains("--glob") else { return false }
 
@@ -97,23 +100,112 @@ enum MotionPhotoCLIIntegration {
         let motionInputs = jpegCandidates.filter(AppleLivePhotoConversionEngine.isMotionPhotoInput)
         guard !motionInputs.isEmpty else { return false }
 
-        let heicInputs = try discoverHEICs(
+        let allHEICInputs = try discoverHEICs(
             under: command.inputDirURL,
             excluding: command.outputDirURL
         )
+        let existingLivePhotoStills = allHEICInputs.filter(isExistingLivePhotoStill)
+        let existingLivePhotoPaths = Set(
+            existingLivePhotoStills.map { $0.standardizedFileURL.path }
+        )
+        let sourceHEICInputs = allHEICInputs.filter {
+            !existingLivePhotoPaths.contains($0.standardizedFileURL.path)
+        }
+
         let workItems = makeWorkItems(
             inputs: motionInputs,
-            heicInputs: heicInputs,
+            heicInputs: sourceHEICInputs,
             command: command
         )
 
-        if heicInputs.isEmpty {
+        if sourceHEICInputs.isEmpty {
             try runMotionBatch(command: command, workItems: workItems)
             return true
         }
 
-        pendingBatchStore.set(PendingBatch(command: command, workItems: workItems))
-        return false
+        if existingLivePhotoStills.isEmpty {
+            // First mixed run: no Motion Photo output exists yet, so the unchanged HEIC batch can
+            // safely enumerate now. Motion outputs are emitted only after it succeeds.
+            pendingBatchStore.set(PendingBatch(command: command, workItems: workItems))
+            return false
+        }
+
+        // Repeated mixed run (or a directory that already contains unrelated valid Live Photos):
+        // do not invoke the legacy glob-based batch enumerator, because it cannot distinguish those
+        // paired HEIC stills from source ProXDR HEICs. Convert only the classified source HEIC set.
+        try runClassifiedHEICBatch(command: command, inputs: sourceHEICInputs)
+        try runMotionBatch(command: command, workItems: workItems)
+        return true
+    }
+
+    private static func runClassifiedHEICBatch(
+        command: BatchCommand,
+        inputs: [URL]
+    ) throws {
+        let workItems = makeHEICWorkItems(inputs: inputs, command: command)
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = max(1, command.jobs)
+        queue.qualityOfService = .userInitiated
+
+        let lock = NSLock()
+        var converted = 0
+        var skipped = 0
+        var failures: [(URL, Error)] = []
+
+        for item in workItems {
+            queue.addOperation {
+                autoreleasepool {
+                    func outputIsValid() -> Bool {
+                        guard FileManager.default.fileExists(atPath: item.outputURL.path) else {
+                            return false
+                        }
+                        return ConversionEngine.isValidOutput(
+                            item.outputURL,
+                            config: command.conversionConfiguration
+                        )
+                    }
+
+                    if command.skipExisting, outputIsValid() {
+                        lock.lock(); skipped += 1; lock.unlock()
+                        printSynchronized("skipped \(item.inputURL.lastPathComponent) (HEIC output already up to date)")
+                        return
+                    }
+
+                    do {
+                        try FileManager.default.createDirectory(
+                            at: item.outputURL.deletingLastPathComponent(),
+                            withIntermediateDirectories: true
+                        )
+                        if item.outputURL.standardizedFileURL.path != item.inputURL.standardizedFileURL.path,
+                           FileManager.default.fileExists(atPath: item.outputURL.path) {
+                            try FileManager.default.removeItem(at: item.outputURL)
+                        }
+                        try ConversionEngine.convert(
+                            inputURL: item.inputURL,
+                            outputURL: item.outputURL,
+                            config: command.conversionConfiguration
+                        )
+                        lock.lock(); converted += 1; lock.unlock()
+                        printSynchronized("converted \(item.inputURL.lastPathComponent)")
+                    } catch {
+                        lock.lock(); failures.append((item.inputURL, error)); lock.unlock()
+                        printSynchronized("failed \(item.inputURL.lastPathComponent): \(singleLine(error))")
+                    }
+                }
+            }
+        }
+        queue.waitUntilAllOperationsAreFinished()
+
+        print(
+            "classified HEIC batch pass: \(converted) converted, \(skipped) skipped, "
+                + "\(failures.count) failed"
+        )
+        if !failures.isEmpty {
+            // Successful files will be skipped by output validation on the next invocation, so a
+            // rerun naturally retries only unresolved inputs even though this compatibility path
+            // does not share the legacy one-output checkpoint file.
+            throw ClassifiedHEICBatchError(failures: failures.count)
+        }
     }
 
     private static func runMotionBatch(
@@ -241,6 +333,18 @@ enum MotionPhotoCLIIntegration {
         let workItems: [MotionBatchWorkItem]
     }
 
+    private struct HEICWorkItem {
+        let inputURL: URL
+        let outputURL: URL
+    }
+
+    private struct ClassifiedHEICBatchError: LocalizedError {
+        let failures: Int
+        var errorDescription: String? {
+            "classified HEIC batch pass failed for \(failures) file(s); rerun the same command to retry unresolved inputs"
+        }
+    }
+
     private final class PendingBatchStore: @unchecked Sendable {
         private let lock = NSLock()
         private var pending: PendingBatch?
@@ -262,16 +366,12 @@ enum MotionPhotoCLIIntegration {
         let outputImageURL: URL
     }
 
-    private static func makeWorkItems(
+    private static func makeHEICWorkItems(
         inputs: [URL],
-        heicInputs: [URL],
         command: BatchCommand
-    ) -> [MotionBatchWorkItem] {
+    ) -> [HEICWorkItem] {
         var reserved = Set<String>()
-
-        // Predict exactly the output names the unchanged HEIC batch pass will reserve, including
-        // duplicate stems, before assigning Live Photo outputs.
-        for input in heicInputs.sorted(by: { $0.path < $1.path }) {
+        return inputs.sorted { $0.path < $1.path }.map { input in
             let directory = categorizedOutputDirectory(for: input, command: command)
             let stem = input.deletingPathExtension().lastPathComponent
             var sequence = 1
@@ -281,6 +381,21 @@ enum MotionPhotoCLIIntegration {
                 output = directory.appendingPathComponent("\(stem) (\(sequence))").appendingPathExtension("heic")
             }
             reserved.insert(output.standardizedFileURL.path)
+            return HEICWorkItem(inputURL: input, outputURL: output)
+        }
+    }
+
+    private static func makeWorkItems(
+        inputs: [URL],
+        heicInputs: [URL],
+        command: BatchCommand
+    ) -> [MotionBatchWorkItem] {
+        var reserved = Set<String>()
+
+        // Predict exactly the output names the unchanged/classified HEIC batch pass will reserve,
+        // including duplicate stems, before assigning Live Photo outputs.
+        for item in makeHEICWorkItems(inputs: heicInputs, command: command) {
+            reserved.insert(item.outputURL.standardizedFileURL.path)
         }
 
         return inputs.sorted { $0.path < $1.path }.map { input in
@@ -310,6 +425,12 @@ enum MotionPhotoCLIIntegration {
             return command.outputDirURL.appendingPathComponent(folder, isDirectory: true)
         }
         return command.outputDirURL
+    }
+
+    private static func isExistingLivePhotoStill(_ imageURL: URL) -> Bool {
+        let companion = AppleLivePhotoConversionEngine.companionVideoURL(for: imageURL)
+        guard FileManager.default.fileExists(atPath: companion.path) else { return false }
+        return AppleLivePhotoValidator.isValidPair(imageURL: imageURL, videoURL: companion)
     }
 
     private static func discoverJPEGs(under root: URL, excluding outputRoot: URL) throws -> [URL] {
