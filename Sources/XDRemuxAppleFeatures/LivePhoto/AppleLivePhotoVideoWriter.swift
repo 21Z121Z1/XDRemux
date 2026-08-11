@@ -72,14 +72,13 @@ public enum AppleLivePhotoVideoWriter {
                 sourceFormatHint: audioFormats.first
             )
             input.expectsMediaDataInRealTime = false
-            if reader.canAdd(output), writer.canAdd(input) {
-                reader.add(output)
-                writer.add(input)
-                audioOutput = output
-                audioInput = input
-            } else {
+            guard reader.canAdd(output), writer.canAdd(input) else {
                 throw AppleLivePhotoError.unsupportedVideoCodec("audio passthrough")
             }
+            reader.add(output)
+            writer.add(input)
+            audioOutput = output
+            audioInput = input
         }
 
         writer.metadata = [contentIdentifierMetadata(assetIdentifier)]
@@ -99,6 +98,7 @@ public enum AppleLivePhotoVideoWriter {
             throw AppleLivePhotoError.cannotStartVideoWriter(writer.error?.localizedDescription ?? "unknown error")
         }
         guard reader.startReading() else {
+            writer.cancelWriting()
             throw AppleLivePhotoError.cannotStartVideoReader(reader.error?.localizedDescription ?? "unknown error")
         }
         writer.startSession(atSourceTime: .zero)
@@ -135,7 +135,7 @@ public enum AppleLivePhotoVideoWriter {
             failure: failure
         )
 
-        try await waitForGroup(group)
+        await waitForGroup(group)
         if let error = failure.error {
             reader.cancelReading()
             writer.cancelWriting()
@@ -171,10 +171,11 @@ public enum AppleLivePhotoVideoWriter {
 
     private static func contentIdentifierMetadata(_ assetIdentifier: String) -> AVMetadataItem {
         let item = AVMutableMetadataItem()
-        item.identifier = .quickTimeMetadataContentIdentifier
+        item.key = contentIdentifierKey as NSString
+        item.keySpace = AVMetadataKeySpace(rawValue: quickTimeKeySpace)
         item.value = assetIdentifier as NSString
         item.dataType = kCMMetadataBaseDataType_UTF8 as String
-        return item.copy() as! AVMetadataItem
+        return item
     }
 
     private struct TimedMetadataSetup {
@@ -242,7 +243,7 @@ public enum AppleLivePhotoVideoWriter {
         group.enter()
         let state = OneShotState()
         setup.input.requestMediaDataWhenReady(on: DispatchQueue(label: "xdremux.livephoto.metadata")) {
-            guard state.beginIfNeeded(), setup.input.isReadyForMoreMediaData else { return }
+            guard setup.input.isReadyForMoreMediaData, state.beginIfNeeded() else { return }
             var items: [AVMetadataItem] = []
 
             let still = AVMutableMetadataItem()
@@ -324,7 +325,7 @@ public enum AppleLivePhotoVideoWriter {
         }
     }
 
-    private static func waitForGroup(_ group: DispatchGroup) async throws {
+    private static func waitForGroup(_ group: DispatchGroup) async {
         await withCheckedContinuation { continuation in
             group.notify(queue: .global(qos: .userInitiated)) {
                 continuation.resume()
@@ -344,9 +345,13 @@ public enum AppleLivePhotoVideoWriter {
 private final class LockedFailure: @unchecked Sendable {
     private let lock = NSLock()
     private var stored: Error?
-    var error: Error? { lock.withLock { stored } }
+    var error: Error? {
+        lock.lock(); defer { lock.unlock() }
+        return stored
+    }
     func set(_ error: Error) {
-        lock.withLock { if stored == nil { stored = error } }
+        lock.lock(); defer { lock.unlock() }
+        if stored == nil { stored = error }
     }
 }
 
@@ -358,17 +363,9 @@ private final class OneShotState: @unchecked Sendable {
     private let lock = NSLock()
     private var started = false
     func beginIfNeeded() -> Bool {
-        lock.withLock {
-            guard !started else { return false }
-            started = true
-            return true
-        }
-    }
-}
-
-private extension NSLock {
-    func withLock<T>(_ body: () -> T) -> T {
-        lock(); defer { unlock() }
-        return body()
+        lock.lock(); defer { lock.unlock() }
+        guard !started else { return false }
+        started = true
+        return true
     }
 }
