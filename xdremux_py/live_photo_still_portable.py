@@ -1,13 +1,15 @@
 """Standards-complete pure-Python Live Photo still entry point.
 
-Android Motion Photo directories may declare a GainMap item with Length=0. Per
-the Motion Photo specification that means the GainMap resource is shared with
-the preceding Primary item. For JPEG Ultra HDR this is the normal JPEG/R MPF
-layout: the primary SDR JPEG and a secondary gain-map JPEG live in one resource.
+Android Motion Photo directories do not give the Primary JPEG a byte length.
+The primary resource must be determined by parsing the JPEG itself; secondary
+resources are then walked forward in directory order. This matters for Ultra HDR
+Motion Photos because deriving every resource backwards from EOF can locate the
+trailing MotionPhoto video correctly while assigning the wrong bytes to an
+intermediate GainMap item.
 
-This module resolves both positive-length GainMap resources and the shared
-JPEG/R form, then feeds the existing XDRemux ISO 21496 HEIC writer. It uses no
-Apple platform API.
+This module therefore parses the primary JPEG to EOI, walks secondary resources
+forward, supports zero-length shared resources, and feeds the existing XDRemux
+ISO 21496 HEIC writer. It uses no Apple platform API.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from PIL import Image, ImageOps
 
 from . import heif_io
 from . import live_photo_still as base_writer
-from .motion_photo import MotionPhotoAsset, MotionPhotoError, jpeg_resource_ranges
+from .motion_photo import ByteRange, MotionPhotoAsset
 from .ultrahdr_iso import ISO21496JPEGMetadataError, parse_iso21496_jpeg_metadata
 
 
@@ -88,66 +90,106 @@ def _gain_metadata(gain_jpeg: bytes) -> dict:
     except ISO21496JPEGMetadataError as exc:
         raise LivePhotoStillError(str(exc)) from exc
     if metadata is None:
-        raise LivePhotoStillError("Ultra HDR gain-map JPEG has neither hdrgm XMP nor ISO 21496-1 APP2 metadata")
+        raise LivePhotoStillError(
+            "Ultra HDR gain-map JPEG has neither hdrgm XMP nor ISO 21496-1 APP2 metadata"
+        )
     return metadata
 
 
-def _embedded_gainmap_jpeg(static_bytes: bytes) -> tuple[bytes, dict]:
-    """Locate JPEG/R's secondary gain-map JPEG after the primary JPEG EOI.
-
-    MPF is the normative locator, but selecting the first *validated* JPEG after
-    the primary EOI is equivalent for the JPEG/R layout and avoids trusting a
-    potentially malformed MPF offset. A candidate is accepted only if it has
-    valid gain-map metadata, so EXIF thumbnails or arbitrary vendor JPEGs cannot
-    be mistaken for the gain map.
-    """
-    primary_end = _jpeg_end(static_bytes, 0)
-    search = primary_end
-    while search < len(static_bytes):
-        candidate = static_bytes.find(b"\xff\xd8", search)
+def _validated_gain_jpeg(data: bytes) -> tuple[bytes, dict] | None:
+    """Return the first actual gain-map JPEG in one physical resource."""
+    search = 0
+    while search < len(data):
+        candidate = data.find(b"\xff\xd8", search)
         if candidate < 0:
-            break
+            return None
         try:
-            end = _jpeg_end(static_bytes, candidate)
-            gain_jpeg = static_bytes[candidate:end]
+            end = _jpeg_end(data, candidate)
+            gain_jpeg = data[candidate:end]
             metadata = _gain_metadata(gain_jpeg)
             with Image.open(io.BytesIO(gain_jpeg)) as image:
                 image.load()
                 if image.width <= 0 or image.height <= 0:
-                    raise LivePhotoStillError("invalid JPEG/R gain-map dimensions")
+                    raise LivePhotoStillError("invalid gain-map dimensions")
             return gain_jpeg, metadata
         except (LivePhotoStillError, OSError):
             search = candidate + 2
-    raise LivePhotoStillError("shared Ultra HDR GainMap item has no valid secondary JPEG/R gain map")
+    return None
 
 
-def _declared_gainmap_bytes(asset: MotionPhotoAsset) -> bytes | None:
-    try:
-        ranges = jpeg_resource_ranges(asset.items, asset.source.stat().st_size)
-    except MotionPhotoError:
-        return None
-    for item, byte_range in zip(asset.items, ranges):
-        if item.semantic.lower() != "gainmap" or item.length <= 0:
+def _forward_secondary_ranges(asset: MotionPhotoAsset) -> tuple[tuple[object, ByteRange | None], ...]:
+    """Resolve JPEG Motion Photo resources in their normative forward order.
+
+    The Primary length is determined by parsing the primary JPEG. A secondary
+    item with Length=0 shares the immediately preceding physical resource and
+    consumes no bytes. The MotionPhoto item is cross-checked against the already
+    validated video start from the generic parser.
+    """
+    if not asset.items or asset.items[0].semantic.lower() != "primary":
+        raise LivePhotoStillError("Motion Photo directory does not begin with Primary")
+    static_bytes = base_writer._read_range(asset.source, asset.still_range)
+    primary_end = _jpeg_end(static_bytes, 0)
+    primary_padding = asset.items[0].padding
+    cursor = primary_end + primary_padding
+    if cursor > asset.still_range.end:
+        raise LivePhotoStillError("Primary JPEG plus padding exceeds static resource")
+
+    result: list[tuple[object, ByteRange | None]] = []
+    previous_physical = ByteRange(0, primary_end)
+    for item in asset.items[1:]:
+        semantic = item.semantic.lower()
+        if semantic == "motionphoto":
+            if cursor != asset.video_range.start:
+                raise LivePhotoStillError(
+                    "Motion Photo secondary resource lengths do not reach the declared video start "
+                    f"({cursor} != {asset.video_range.start})"
+                )
+            result.append((item, asset.video_range))
+            break
+        if item.length == 0:
+            result.append((item, None))
             continue
-        if byte_range.end > asset.still_range.end:
-            raise LivePhotoStillError("GainMap resource overlaps Motion Photo video")
-        data = base_writer._read_range(asset.source, byte_range)
-        if data.startswith(b"\xff\xd8"):
-            return data
-        # Some vendors prefix a positive-length shared container resource. Accept a nested JPEG
-        # only after validating its own gain-map metadata.
-        cursor = 0
-        while True:
-            cursor = data.find(b"\xff\xd8", cursor)
-            if cursor < 0:
-                break
-            try:
-                end = _jpeg_end(data, cursor)
-                candidate = data[cursor:end]
-                _gain_metadata(candidate)
-                return candidate
-            except LivePhotoStillError:
-                cursor += 2
+        end = cursor + item.length
+        if end < cursor or end > asset.still_range.end:
+            raise LivePhotoStillError("secondary Motion Photo resource exceeds static image range")
+        byte_range = ByteRange(cursor, end)
+        result.append((item, byte_range))
+        previous_physical = byte_range
+        cursor = end + item.padding
+        if cursor > asset.still_range.end:
+            raise LivePhotoStillError("secondary Motion Photo padding exceeds static image range")
+
+    if not any(item.semantic.lower() == "motionphoto" for item in asset.items):
+        raise LivePhotoStillError("Motion Photo directory has no MotionPhoto item")
+    return tuple(result)
+
+
+def _embedded_gainmap_jpeg(static_bytes: bytes) -> tuple[bytes, dict]:
+    """Locate a validated secondary gain JPEG in a shared JPEG/R resource."""
+    primary_end = _jpeg_end(static_bytes, 0)
+    validated = _validated_gain_jpeg(static_bytes[primary_end:])
+    if validated is None:
+        raise LivePhotoStillError("shared Ultra HDR GainMap item has no valid secondary JPEG/R gain map")
+    return validated
+
+
+def _declared_gainmap(asset: MotionPhotoAsset) -> tuple[bytes, dict] | None:
+    static_bytes = base_writer._read_range(asset.source, asset.still_range)
+    for item, byte_range in _forward_secondary_ranges(asset):
+        if item.semantic.lower() != "gainmap":
+            continue
+        if byte_range is None:
+            # Length=0 explicitly shares an earlier physical resource. For JPEG Ultra HDR the
+            # complete static resource is JPEG/R; search only after the primary JPEG EOI and accept
+            # a candidate only when its own gain-map metadata validates.
+            return _embedded_gainmap_jpeg(static_bytes)
+        resource = base_writer._read_range(asset.source, byte_range)
+        validated = _validated_gain_jpeg(resource)
+        if validated is None:
+            raise LivePhotoStillError(
+                "declared Ultra HDR GainMap resource contains no validated gain-map JPEG"
+            )
+        return validated
     return None
 
 
@@ -190,21 +232,11 @@ def _write_motion_photo_jpeg(
     gain_items = [item for item in asset.items if item.semantic.lower() == "gainmap"]
     if not gain_items:
         return base_writer.write_live_photo_still(asset, output, content_identifier)
-
-    declared = _declared_gainmap_bytes(asset)
-    if declared is not None:
-        return _write_ultrahdr(asset, output, content_identifier, declared, _gain_metadata(declared))
-
-    # A zero-length secondary item is explicitly a shared resource in Motion Photo 1.0. For an
-    # Ultra HDR JPEG the shared Primary resource is JPEG/R and contains the secondary gain JPEG.
-    if any(item.length == 0 for item in gain_items):
-        static_bytes = base_writer._read_range(asset.source, asset.still_range)
-        gain_jpeg, metadata = _embedded_gainmap_jpeg(static_bytes)
-        return _write_ultrahdr(asset, output, content_identifier, gain_jpeg, metadata)
-
-    # Positive-length GainMap metadata exists but did not resolve to a valid gain JPEG. Do not drop
-    # HDR silently by falling back to an SDR still.
-    raise LivePhotoStillError("declared Ultra HDR GainMap resource is not a valid gain-map JPEG")
+    declared = _declared_gainmap(asset)
+    if declared is None:
+        raise LivePhotoStillError("Motion Photo declares GainMap semantics but no GainMap resource")
+    gain_jpeg, metadata = declared
+    return _write_ultrahdr(asset, output, content_identifier, gain_jpeg, metadata)
 
 
 def write_live_photo_still(
