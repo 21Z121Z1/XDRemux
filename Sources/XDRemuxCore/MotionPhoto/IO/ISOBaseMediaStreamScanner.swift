@@ -15,7 +15,7 @@ public enum ISOBaseMediaStreamScanner {
         var remaining = range.length
         var absoluteChunkStart = range.lowerBound
         var carry = Data()
-        var offsets = Set<Int64>()
+        var roughOffsets = Set<Int64>()
 
         while remaining > 0 {
             let count = Int(min(Int64(bufferSize), remaining))
@@ -30,24 +30,29 @@ public enum ISOBaseMediaStreamScanner {
                 let typeIndex = found.lowerBound
                 if typeIndex >= window.index(window.startIndex, offsetBy: 4) {
                     let sizeStart = window.index(typeIndex, offsetBy: -4)
-                    let sizeBytes = window[sizeStart..<typeIndex]
-                    let size = sizeBytes.reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
                     let boxStart = windowStart + Int64(window.distance(from: window.startIndex, to: sizeStart))
-                    if boxStart >= range.lowerBound,
-                       boxStart < range.upperBound,
-                       (size == 1 || size >= 8) {
-                        offsets.insert(boxStart)
+                    if boxStart >= range.lowerBound, boxStart < range.upperBound {
+                        roughOffsets.insert(boxStart)
                     }
                 }
                 search = found.upperBound
             }
 
-            carry = window.suffix(min(16, window.count))
+            // Four bytes before a candidate plus the largest ftyp header fields we validate must be
+            // available across a chunk boundary. A 32-byte overlap is deliberately conservative.
+            carry = window.suffix(min(32, window.count))
             remaining -= Int64(chunk.count)
             absoluteChunkStart += Int64(chunk.count)
         }
 
-        return offsets.sorted()
+        var validated: [Int64] = []
+        validated.reserveCapacity(roughOffsets.count)
+        for offset in roughOffsets.sorted() {
+            if try isFTYPBoxStart(in: url, offset: offset, upperBound: range.upperBound) {
+                validated.append(offset)
+            }
+        }
+        return validated
     }
 
     public static func isFTYPBoxStart(
@@ -55,21 +60,41 @@ public enum ISOBaseMediaStreamScanner {
         offset: Int64,
         upperBound: Int64
     ) throws -> Bool {
-        guard offset >= 0, upperBound - offset >= 12 else { return false }
+        guard offset >= 0, upperBound > offset else { return false }
+        let available = upperBound - offset
+        // ISO BMFF FileTypeBox is at least: size(4) + type(4) + major_brand(4) + minor_version(4).
+        guard available >= 16 else { return false }
+
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         try handle.seek(toOffset: UInt64(offset))
-        let header = try handle.read(upToCount: 16) ?? Data()
-        guard header.count >= 8,
+        let header = try handle.read(upToCount: 24) ?? Data()
+        guard header.count >= 16,
               String(bytes: header[4..<8], encoding: .ascii) == "ftyp" else {
             return false
         }
-        let size = header.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
-        if size == 1 {
-            guard header.count >= 16 else { return false }
+
+        let size32 = header.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+        let majorBrandRange: Range<Data.Index>
+        if size32 == 1 {
+            // Large-size box adds an 8-byte largesize field before major_brand.
+            guard available >= 24, header.count >= 24 else { return false }
             let largeSize = header[8..<16].reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
-            return largeSize >= 16 && largeSize <= UInt64(upperBound - offset)
+            guard largeSize >= 24, largeSize <= UInt64(available) else { return false }
+            majorBrandRange = 16..<20
+        } else {
+            guard size32 >= 16, Int64(size32) <= available else { return false }
+            majorBrandRange = 8..<12
         }
-        return size >= 8 && Int64(size) <= upperBound - offset
+
+        // A valid brand is a printable four-character code (spaces are valid, e.g. QuickTime's
+        // `qt  `). This removes the common false-positive case of the byte sequence "ftyp" inside
+        // arbitrary media payloads without assuming a fixed brand allow-list.
+        let majorBrand = header[majorBrandRange]
+        guard majorBrand.count == 4,
+              majorBrand.allSatisfy({ $0 >= 0x20 && $0 <= 0x7e }) else {
+            return false
+        }
+        return true
     }
 }
