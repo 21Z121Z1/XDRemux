@@ -136,7 +136,7 @@ public enum AndroidMotionPhotoParser {
     ) throws -> (still: MotionPhotoByteRange, video: MotionPhotoByteRange) {
         var itemStart = fileSize
         var itemEnd = fileSize
-        var photoEnd: Int64?
+        var primaryEncodingEnd: Int64?
         var videoStart: Int64?
         var videoEnd: Int64?
 
@@ -144,13 +144,13 @@ public enum AndroidMotionPhotoParser {
             let item = items[index]
             itemEnd = itemStart
             if index == 0 {
-                let (paddedEnd, overflow) = itemEnd.subtractingReportingOverflow(item.padding)
-                guard !overflow, paddedEnd >= 0 else {
+                let (unpaddedEnd, overflow) = itemEnd.subtractingReportingOverflow(item.padding)
+                guard !overflow, unpaddedEnd >= 0 else {
                     throw MotionPhotoParsingError.arithmeticOverflow
                 }
                 itemStart = 0
-                itemEnd = paddedEnd
-                photoEnd = itemEnd
+                itemEnd = unpaddedEnd
+                primaryEncodingEnd = itemEnd
             } else {
                 let (candidate, overflow) = itemStart.subtractingReportingOverflow(item.length)
                 guard !overflow, candidate >= 0 else {
@@ -166,14 +166,19 @@ public enum AndroidMotionPhotoParser {
             }
         }
 
-        guard let photoEnd, let videoStart, let videoEnd,
-              photoEnd <= fileSize,
-              videoEnd == fileSize,
-              photoEnd <= videoStart else {
+        guard let primaryEncodingEnd, let videoStart, let videoEnd,
+              primaryEncodingEnd <= videoStart,
+              videoStart >= 0,
+              videoEnd == fileSize else {
             throw MotionPhotoParsingError.invalidByteRange
         }
+
+        // For conversion we need the complete still-image container, not only the Primary item.
+        // In Ultra HDR JPEG Motion Photos the positive-length GainMap secondary resource lives
+        // between the primary JPEG encoding and the final MotionPhoto video. Supplying 0..<videoStart
+        // to ImageIO preserves that gain-map resource while still excluding the appended MP4.
         return (
-            try MotionPhotoByteRange(lowerBound: 0, upperBound: photoEnd),
+            try MotionPhotoByteRange(lowerBound: 0, upperBound: videoStart),
             try MotionPhotoByteRange(lowerBound: videoStart, upperBound: videoEnd)
         )
     }
