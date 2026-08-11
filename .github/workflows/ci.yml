@@ -73,10 +73,13 @@ jobs:
           echo "::endgroup::"
           echo "MACOS_APP_RESULT=Passed" >> "$GITHUB_ENV"
 
+      # This bundle is the pre-existing ProXDR / Apple feature regression fixture set. Keep it
+      # separate from XDREMUX_FIXTURE_ARCHIVE_URL, which is reserved for the dedicated real
+      # Samsung/Xiaomi/OPPO/vivo Motion Photo gate.
       - name: Prepare private fixtures
         shell: bash
         env:
-          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_FIXTURE_ARCHIVE_URL }}
+          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_REGRESSION_FIXTURE_ARCHIVE_URL }}
         run: |
           if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
             echo "FIXTURE_ROOT=" >> "$GITHUB_ENV"
