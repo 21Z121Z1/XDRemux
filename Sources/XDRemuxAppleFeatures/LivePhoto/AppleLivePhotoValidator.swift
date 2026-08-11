@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 @preconcurrency import AVFoundation
 import CoreMedia
+import CryptoKit
 import ImageIO
 import Photos
 import XDRemuxCore
@@ -153,6 +154,13 @@ public enum AppleLivePhotoValidator {
         let orientation: Int
     }
 
+    private struct CompressedTrackFingerprint: Equatable {
+        let mediaSubtype: FourCharCode
+        let byteCount: Int64
+        let sampleBufferCount: Int
+        let sha256: String
+    }
+
     private static func validateStillGeometry(source: URL, output: URL) throws {
         guard let sourceGeometry = stillGeometry(source),
               let outputGeometry = stillGeometry(output) else {
@@ -184,30 +192,115 @@ public enum AppleLivePhotoValidator {
         outputAsset: AVAsset
     ) async throws {
         let sourceAsset = AVURLAsset(url: sourceURL)
-        let sourceVideo = try await mediaSubtypes(asset: sourceAsset, mediaType: .video)
-        let outputVideo = try await mediaSubtypes(asset: outputAsset, mediaType: .video)
+        let sourceVideo = try await compressedFingerprints(asset: sourceAsset, mediaType: .video)
+        let outputVideo = try await compressedFingerprints(asset: outputAsset, mediaType: .video)
         guard sourceVideo == outputVideo else {
             throw AppleLivePhotoError.pairValidationFailed(
-                "video codec/layout changed during passthrough: \(sourceVideo) -> \(outputVideo)"
+                "compressed video payload changed during passthrough: \(fingerprintSummary(sourceVideo)) -> \(fingerprintSummary(outputVideo))"
             )
         }
-        let sourceAudio = try await mediaSubtypes(asset: sourceAsset, mediaType: .audio)
-        let outputAudio = try await mediaSubtypes(asset: outputAsset, mediaType: .audio)
+
+        let sourceAudio = try await compressedFingerprints(asset: sourceAsset, mediaType: .audio)
+        let outputAudio = try await compressedFingerprints(asset: outputAsset, mediaType: .audio)
         guard sourceAudio == outputAudio else {
             throw AppleLivePhotoError.pairValidationFailed(
-                "audio codec/layout changed during passthrough: \(sourceAudio) -> \(outputAudio)"
+                "compressed audio payload changed during passthrough: \(fingerprintSummary(sourceAudio)) -> \(fingerprintSummary(outputAudio))"
             )
         }
     }
 
-    private static func mediaSubtypes(asset: AVAsset, mediaType: AVMediaType) async throws -> [FourCharCode] {
+    /// Fingerprints the compressed sample payload rather than decoded frames. Equality proves that
+    /// AVAssetReader/Writer remuxing did not silently transcode H.264/HEVC/AAC content. Sample-buffer
+    /// boundaries are included because the writer receives those same buffers in passthrough mode.
+    private static func compressedFingerprints(
+        asset: AVAsset,
+        mediaType: AVMediaType
+    ) async throws -> [CompressedTrackFingerprint] {
         let tracks = try await asset.loadTracks(withMediaType: mediaType)
-        var result: [FourCharCode] = []
+        var fingerprints: [CompressedTrackFingerprint] = []
+        fingerprints.reserveCapacity(tracks.count)
+
         for track in tracks {
             let descriptions = try await track.load(.formatDescriptions)
-            result.append(contentsOf: descriptions.map(CMFormatDescriptionGetMediaSubType))
+            guard let description = descriptions.first else {
+                throw AppleLivePhotoError.pairValidationFailed("media track has no format description")
+            }
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            output.alwaysCopiesSampleData = false
+            guard reader.canAdd(output) else {
+                throw AppleLivePhotoError.pairValidationFailed("cannot read compressed media track")
+            }
+            reader.add(output)
+            guard reader.startReading() else {
+                throw AppleLivePhotoError.pairValidationFailed(
+                    reader.error?.localizedDescription ?? "compressed media reader failed to start"
+                )
+            }
+
+            var hasher = SHA256()
+            var byteCount: Int64 = 0
+            var sampleBufferCount = 0
+            while let sample = output.copyNextSampleBuffer() {
+                guard let block = CMSampleBufferGetDataBuffer(sample) else {
+                    throw AppleLivePhotoError.pairValidationFailed("compressed sample has no data buffer")
+                }
+                let length = CMBlockBufferGetDataLength(block)
+                guard length >= 0 else {
+                    throw AppleLivePhotoError.pairValidationFailed("compressed sample has an invalid data length")
+                }
+                var data = Data(count: length)
+                let copyStatus = data.withUnsafeMutableBytes { rawBuffer -> OSStatus in
+                    guard let base = rawBuffer.baseAddress else { return kCMBlockBufferBadOffsetParameterErr }
+                    return CMBlockBufferCopyDataBytes(
+                        block,
+                        atOffset: 0,
+                        dataLength: length,
+                        destination: base
+                    )
+                }
+                guard copyStatus == kCMBlockBufferNoErr else {
+                    throw AppleLivePhotoError.pairValidationFailed(
+                        "could not read compressed sample bytes (\(copyStatus))"
+                    )
+                }
+                var lengthBE = UInt64(length).bigEndian
+                withUnsafeBytes(of: &lengthBE) { hasher.update(bufferPointer: $0) }
+                hasher.update(data: data)
+                byteCount += Int64(length)
+                sampleBufferCount += 1
+            }
+            guard reader.status == .completed else {
+                throw AppleLivePhotoError.pairValidationFailed(
+                    reader.error?.localizedDescription ?? "compressed media reader did not complete"
+                )
+            }
+            fingerprints.append(
+                CompressedTrackFingerprint(
+                    mediaSubtype: CMFormatDescriptionGetMediaSubType(description),
+                    byteCount: byteCount,
+                    sampleBufferCount: sampleBufferCount,
+                    sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined()
+                )
+            )
         }
-        return result
+        return fingerprints
+    }
+
+    private static func fingerprintSummary(_ fingerprints: [CompressedTrackFingerprint]) -> String {
+        fingerprints.map {
+            "\(fourCC($0.mediaSubtype))/\($0.sampleBufferCount)/\($0.byteCount)/\($0.sha256.prefix(12))"
+        }.joined(separator: ",")
+    }
+
+    private static func fourCC(_ code: FourCharCode) -> String {
+        let bytes: [UInt8] = [
+            UInt8((code >> 24) & 0xff),
+            UInt8((code >> 16) & 0xff),
+            UInt8((code >> 8) & 0xff),
+            UInt8(code & 0xff),
+        ]
+        return String(bytes: bytes, encoding: .macOSRoman) ?? String(format: "0x%08x", code)
     }
 
     private static func readTimedMetadata(from asset: AVAsset) async throws -> TimedMetadataSummary {
