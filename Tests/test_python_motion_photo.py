@@ -17,6 +17,7 @@ from xdremux_py.live_photo_mov import (
 )
 from xdremux_py.live_photo_still import build_apple_makernote, parse_ultrahdr_metadata
 from xdremux_py.motion_photo import ByteRange, parse_android_motion_photo
+from xdremux_py.motion_video import strip_trailing_vendor_data
 
 
 def _fake_video() -> bytes:
@@ -107,6 +108,17 @@ class PythonMotionPhotoTests(unittest.TestCase):
             self.assertAlmostEqual(read_still_time(output) or -1, 0.1, places=3)
             self.assertEqual(media_payload_sha256(output), source_hashes)
             validate_live_photo_movie(output, "ABC-123", resolved)
+
+    def test_trailing_vendor_bytes_are_removed_only_after_complete_bmff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "oppo-stream1.mp4"
+            media = _fake_video()
+            vendor = b"\x00\x00\x00\x20\x9a\x99\x99?opaque-coloros-tail"
+            path.write_bytes(media + vendor)
+            removed = strip_trailing_vendor_data(path)
+            self.assertEqual(removed, len(vendor))
+            self.assertEqual(path.read_bytes(), media)
+            self.assertTrue(media_payload_sha256(path))
 
     def test_ultrahdr_rdf_sequence_metadata_is_parsed(self):
         xmp = b'''<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/"><rdf:RDF><rdf:Description><hdrgm:GainMapMin><rdf:Seq><rdf:li>0</rdf:li><rdf:li>0.1</rdf:li><rdf:li>0.2</rdf:li></rdf:Seq></hdrgm:GainMapMin><hdrgm:GainMapMax>2.0 2.1 2.2</hdrgm:GainMapMax><hdrgm:Gamma>1</hdrgm:Gamma><hdrgm:HDRCapacityMax>2.2</hdrgm:HDRCapacityMax></rdf:Description></rdf:RDF></x:xmpmeta>'''
