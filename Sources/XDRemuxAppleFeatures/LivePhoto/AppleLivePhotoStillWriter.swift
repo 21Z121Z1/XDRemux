@@ -40,7 +40,7 @@ public enum AppleLivePhotoStillWriter {
         }
 
         var properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] ?? [:]
-        var makerApple = properties[kCGImagePropertyMakerAppleDictionary as String] as? [String: Any] ?? [:]
+        var makerApple = properties[kCGImagePropertyMakerAppleDictionary as String] as? [AnyHashable: Any] ?? [:]
         makerApple[makerNoteAssetIdentifierKey] = assetIdentifier
         properties[kCGImagePropertyMakerAppleDictionary as String] = makerApple
 
@@ -68,11 +68,11 @@ public enum AppleLivePhotoStillWriter {
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, options),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
-              let makerApple = properties[kCGImagePropertyMakerAppleDictionary as String] as? [String: Any] else {
+              let makerApple = properties[kCGImagePropertyMakerAppleDictionary as String] as? [AnyHashable: Any] else {
             return nil
         }
         if let value = makerApple[makerNoteAssetIdentifierKey] as? String { return value }
-        if let value = makerApple[Int(makerNoteAssetIdentifierKey) ?? 17] as? String { return value }
+        if let value = makerApple[NSNumber(value: 17)] as? String { return value }
         return nil
     }
 
