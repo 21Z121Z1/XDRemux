@@ -18,6 +18,15 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         try await assertSyntheticPair(codec: .hevc, filename: "hevc.mp4")
     }
 
+    func testHighPrecisionStillImageTimeValidatesAtStoredMetadataPrecision() async throws {
+        try await assertSyntheticPair(
+            codec: .h264,
+            filename: "high-precision.mp4",
+            stillTime: CMTime(value: 3_038, timescale: 30_000),
+            requireExactStoredTime: false
+        )
+    }
+
     func testColorOS16AlignmentMetadataStillLoadsInPhotoKit() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("xdremux-livephoto-oppo-transform-\(UUID().uuidString)", isDirectory: true)
@@ -79,7 +88,12 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         XCTAssertTrue(report.hasTransformReferenceDimensions)
     }
 
-    private func assertSyntheticPair(codec: AVVideoCodecType, filename: String) async throws {
+    private func assertSyntheticPair(
+        codec: AVVideoCodecType,
+        filename: String,
+        stillTime: CMTime = CMTime(value: 2, timescale: 30),
+        requireExactStoredTime: Bool = true
+    ) async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("xdremux-livephoto-integration-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -99,7 +113,6 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         )
 
         let identifier = UUID().uuidString
-        let stillTime = CMTime(value: 2, timescale: 30)
         try AppleLivePhotoStillWriter.write(
             stillInputURL: sourceJPEG,
             outputURL: outputHEIC,
@@ -124,7 +137,19 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
             requirePhotoKitLoad: true
         )
         XCTAssertEqual(report.assetIdentifier, identifier)
-        XCTAssertEqual(CMTimeCompare(report.stillImageTime, stillTime), 0)
+        if requireExactStoredTime {
+            XCTAssertEqual(CMTimeCompare(report.stillImageTime, stillTime), 0)
+        } else {
+            XCTAssertGreaterThan(report.stillImageTime.timescale, 0)
+            let delta = abs(
+                CMTimeGetSeconds(report.stillImageTime)
+                    - CMTimeGetSeconds(stillTime)
+            )
+            XCTAssertLessThanOrEqual(
+                delta,
+                1.0 / Double(report.stillImageTime.timescale) + 1e-9
+            )
+        }
         XCTAssertFalse(report.hasAudio)
     }
 
