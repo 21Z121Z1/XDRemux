@@ -157,7 +157,7 @@ public enum AppleLivePhotoValidator {
     private struct CompressedTrackFingerprint: Equatable {
         let mediaSubtype: FourCharCode
         let byteCount: Int64
-        let sampleBufferCount: Int
+        let sampleCount: Int64
         let sha256: String
     }
 
@@ -209,9 +209,10 @@ public enum AppleLivePhotoValidator {
         }
     }
 
-    /// Fingerprints the compressed sample payload rather than decoded frames. Equality proves that
-    /// AVAssetReader/Writer remuxing did not silently transcode H.264/HEVC/AAC content. Sample-buffer
-    /// boundaries are included because the writer receives those same buffers in passthrough mode.
+    /// Hashes exact compressed sample bytes directly from each track's storage ranges. This avoids
+    /// relying on CMSampleBufferGetDataBuffer, which may legitimately be nil for samples represented
+    /// by another backing object. AVSampleCursor exposes the encoded sample's storage URL, offset and
+    /// length, so equality across MP4 -> MOV proves remuxing without a decode/re-encode step.
     private static func compressedFingerprints(
         asset: AVAsset,
         mediaType: AVMediaType
@@ -221,65 +222,67 @@ public enum AppleLivePhotoValidator {
         fingerprints.reserveCapacity(tracks.count)
 
         for track in tracks {
+            guard let cursor = track.makeSampleCursorAtFirstSampleInDecodeOrder() else {
+                throw AppleLivePhotoError.pairValidationFailed("media track cannot provide a sample cursor")
+            }
             let descriptions = try await track.load(.formatDescriptions)
             guard let description = descriptions.first else {
                 throw AppleLivePhotoError.pairValidationFailed("media track has no format description")
             }
-            let reader = try AVAssetReader(asset: asset)
-            let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
-            output.alwaysCopiesSampleData = false
-            guard reader.canAdd(output) else {
-                throw AppleLivePhotoError.pairValidationFailed("cannot read compressed media track")
-            }
-            reader.add(output)
-            guard reader.startReading() else {
-                throw AppleLivePhotoError.pairValidationFailed(
-                    reader.error?.localizedDescription ?? "compressed media reader failed to start"
-                )
-            }
 
             var hasher = SHA256()
             var byteCount: Int64 = 0
-            var sampleBufferCount = 0
-            while let sample = output.copyNextSampleBuffer() {
-                guard let block = CMSampleBufferGetDataBuffer(sample) else {
-                    throw AppleLivePhotoError.pairValidationFailed("compressed sample has no data buffer")
-                }
-                let length = CMBlockBufferGetDataLength(block)
-                guard length >= 0 else {
-                    throw AppleLivePhotoError.pairValidationFailed("compressed sample has an invalid data length")
-                }
-                var data = Data(count: length)
-                let copyStatus = data.withUnsafeMutableBytes { rawBuffer -> OSStatus in
-                    guard let base = rawBuffer.baseAddress else { return kCMBlockBufferBadOffsetParameterErr }
-                    return CMBlockBufferCopyDataBytes(
-                        block,
-                        atOffset: 0,
-                        dataLength: length,
-                        destination: base
-                    )
-                }
-                guard copyStatus == kCMBlockBufferNoErr else {
+            var sampleCount: Int64 = 0
+            var handles: [URL: FileHandle] = [:]
+            defer {
+                for handle in handles.values { try? handle.close() }
+            }
+
+            while true {
+                let range = cursor.currentSampleStorageRange
+                guard range.offset >= 0, range.length > 0 else {
                     throw AppleLivePhotoError.pairValidationFailed(
-                        "could not read compressed sample bytes (\(copyStatus))"
+                        "compressed media sample is not stored contiguously"
                     )
                 }
-                var lengthBE = UInt64(length).bigEndian
-                withUnsafeBytes(of: &lengthBE) { hasher.update(bufferPointer: $0) }
-                hasher.update(data: data)
-                byteCount += Int64(length)
-                sampleBufferCount += 1
+                guard let storageURL = cursor.currentChunkStorageURL else {
+                    throw AppleLivePhotoError.pairValidationFailed(
+                        "compressed media sample has no storage URL"
+                    )
+                }
+                let standardizedURL = storageURL.standardizedFileURL
+                let handle: FileHandle
+                if let existing = handles[standardizedURL] {
+                    handle = existing
+                } else {
+                    let created = try FileHandle(forReadingFrom: standardizedURL)
+                    handles[standardizedURL] = created
+                    handle = created
+                }
+                try handle.seek(toOffset: UInt64(range.offset))
+
+                var remaining = range.length
+                while remaining > 0 {
+                    let request = Int(min(remaining, 1 << 20))
+                    guard let chunk = try handle.read(upToCount: request), !chunk.isEmpty else {
+                        throw AppleLivePhotoError.pairValidationFailed(
+                            "compressed media sample storage is truncated"
+                        )
+                    }
+                    hasher.update(data: chunk)
+                    byteCount += Int64(chunk.count)
+                    remaining -= Int64(chunk.count)
+                }
+                sampleCount += 1
+
+                if cursor.stepInDecodeOrder(byCount: 1) != 1 { break }
             }
-            guard reader.status == .completed else {
-                throw AppleLivePhotoError.pairValidationFailed(
-                    reader.error?.localizedDescription ?? "compressed media reader did not complete"
-                )
-            }
+
             fingerprints.append(
                 CompressedTrackFingerprint(
                     mediaSubtype: CMFormatDescriptionGetMediaSubType(description),
                     byteCount: byteCount,
-                    sampleBufferCount: sampleBufferCount,
+                    sampleCount: sampleCount,
                     sha256: hasher.finalize().map { String(format: "%02x", $0) }.joined()
                 )
             )
@@ -289,7 +292,7 @@ public enum AppleLivePhotoValidator {
 
     private static func fingerprintSummary(_ fingerprints: [CompressedTrackFingerprint]) -> String {
         fingerprints.map {
-            "\(fourCC($0.mediaSubtype))/\($0.sampleBufferCount)/\($0.byteCount)/\($0.sha256.prefix(12))"
+            "\(fourCC($0.mediaSubtype))/\($0.sampleCount)/\($0.byteCount)/\($0.sha256.prefix(12))"
         }.joined(separator: ",")
     }
 
