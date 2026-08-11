@@ -82,10 +82,29 @@ public enum OppoMotionPhotoFallbackParser {
         declaredLength: Int64?,
         lpex: OppoMotionPhotoMetadata?
     ) throws -> (range: MotionPhotoByteRange, streamCount: Int)? {
-        // Prefer the vendor-declared length when it resolves exactly to a valid BMFF stream start.
-        // Old OPPO files in the wild can retain stale length metadata after edits, so a bad declared
-        // length is a reason to use the bounded ftyp recovery scan, not a reason to reject an
-        // otherwise OPPO-signed file immediately.
+        let tailStart = max(0, fileSize - maxTailScanBytes)
+        let scanRange = try MotionPhotoByteRange(lowerBound: tailStart, upperBound: fileSize)
+
+        // ColorOS 16 uses an LPEX v1+ layout with two concatenated BMFF streams. Its VideoLength
+        // can legitimately point only to the final (Stream 2) payload, so accepting that length
+        // before looking at topology would discard Stream 1. Resolve the two-stream layout first.
+        if let lpex, lpex.version >= 1 {
+            let offsets = try ISOBaseMediaStreamScanner.ftypBoxOffsets(in: url, range: scanRange)
+            if offsets.count >= 2 {
+                return (
+                    try MotionPhotoByteRange(
+                        lowerBound: offsets[offsets.count - 2],
+                        upperBound: fileSize
+                    ),
+                    2
+                )
+            }
+        }
+
+        // Prefer the vendor-declared length for single-stream files when it resolves exactly to a
+        // valid BMFF stream start. Old OPPO files can retain stale length metadata after edits, so
+        // a bad declared length falls through to the bounded recovery scan instead of rejecting the
+        // otherwise OPPO-signed input.
         if let declaredLength, declaredLength > 0, declaredLength <= fileSize {
             let start = fileSize - declaredLength
             if try ISOBaseMediaStreamScanner.isFTYPBoxStart(
@@ -102,19 +121,8 @@ public enum OppoMotionPhotoFallbackParser {
             }
         }
 
-        let tailStart = max(0, fileSize - maxTailScanBytes)
-        let scanRange = try MotionPhotoByteRange(lowerBound: tailStart, upperBound: fileSize)
         let offsets = try ISOBaseMediaStreamScanner.ftypBoxOffsets(in: url, range: scanRange)
         guard let last = offsets.last else { return nil }
-        if let lpex, lpex.version >= 1, offsets.count >= 2 {
-            return (
-                try MotionPhotoByteRange(
-                    lowerBound: offsets[offsets.count - 2],
-                    upperBound: fileSize
-                ),
-                2
-            )
-        }
         return (
             try MotionPhotoByteRange(lowerBound: last, upperBound: fileSize),
             1
