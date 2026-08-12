@@ -281,10 +281,10 @@ enum LivePhotoPairTransaction {
             throw AppleLivePhotoError.transactionFailed("could not open Live Photo transaction lock")
         }
         defer { Darwin.close(descriptor) }
-        guard Darwin.flock(descriptor, LOCK_EX) == 0 else {
+        guard Darwin.lockf(descriptor, F_LOCK, 0) == 0 else {
             throw AppleLivePhotoError.transactionFailed("could not acquire Live Photo transaction lock")
         }
-        defer { _ = Darwin.flock(descriptor, LOCK_UN) }
+        defer { _ = Darwin.lockf(descriptor, F_ULOCK, 0) }
         return try body()
     }
 }
