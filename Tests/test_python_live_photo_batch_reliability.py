@@ -12,6 +12,7 @@ from xdremux_py.live_photo_batch import (
     planned_output_image,
     provenance_allows_reuse,
     source_signature,
+    state_path,
 )
 
 
@@ -69,9 +70,9 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
             image = planned_output_image(source, root, output)
             video = image.with_suffix(".mov")
             signature = source_signature(source)
-            state_path = output / ".state.jsonl"
+            checkpoint = output / ".state.jsonl"
 
-            with StateWriter(state_path) as writer:
+            with StateWriter(checkpoint) as writer:
                 writer.append(
                     source=source,
                     input_root=root,
@@ -82,7 +83,7 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
                     asset_identifier="ASSET-1",
                 )
 
-            prior = load_state(state_path)[str(source.resolve())]
+            prior = load_state(checkpoint)[str(source.resolve())]
             self.assertTrue(
                 provenance_allows_reuse(
                     prior,
@@ -124,9 +125,9 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
             signature = source_signature(source)
             image = planned_output_image(source, root, output)
             video = image.with_suffix(".mov")
-            state_path = output / ".state.jsonl"
+            checkpoint = output / ".state.jsonl"
 
-            with StateWriter(state_path) as writer:
+            with StateWriter(checkpoint) as writer:
                 writer.append(
                     source=source,
                     input_root=root,
@@ -137,7 +138,7 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
                     asset_identifier="ASSET-1",
                 )
 
-            records = [json.loads(line) for line in state_path.read_text(encoding="utf-8").splitlines()]
+            records = [json.loads(line) for line in checkpoint.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(records[0]["schemaVersion"], 2)
             item = records[1]
             self.assertEqual(item["inputPath"], str(source.resolve()))
@@ -147,17 +148,26 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
             self.assertNotIn("input_path", item)
             self.assertNotIn("input_sha256", item)
 
+    def test_custom_checkpoint_path_matches_swift_motion_photo_suffix_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "output"
+            requested = Path(tmp) / "state.jsonl"
+            self.assertEqual(
+                state_path(output, requested),
+                requested.parent / "state.jsonl.motion-photo",
+            )
+
     def test_schema_one_style_entry_without_digest_is_not_trusted(self):
         with tempfile.TemporaryDirectory() as tmp:
-            state_path = Path(tmp) / "state.jsonl"
-            state_path.write_text(
+            checkpoint = Path(tmp) / "state.jsonl"
+            checkpoint.write_text(
                 '{"kind":"header","schema_version":1}\n'
                 '{"kind":"item","input_path":"/tmp/a.jpg","output_image_path":"/tmp/a.heic",'
                 '"output_video_path":"/tmp/a.mov","status":"success","input_size":1,'
                 '"input_mtime_ns":1,"error":null}\n',
                 encoding="utf-8",
             )
-            self.assertEqual(load_state(state_path), {})
+            self.assertEqual(load_state(checkpoint), {})
 
 
 if __name__ == "__main__":
