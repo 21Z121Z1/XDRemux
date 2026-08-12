@@ -2,9 +2,9 @@
 
 A Live Photo is a HEIC/HEIF still plus a MOV resource. No filesystem primitive can
 atomically rename both files together, so this module uses a small, durable journal
-and same-directory renames. The durable ``committed`` marker is written before backup
-cleanup so another crash during cleanup can never cause a later rollback to mix old
-and new resources.
+and same-directory renames. The journal wire schema and POSIX record lock intentionally
+match the Swift implementation so either runtime can recover the other's interrupted
+transaction.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import json
 import os
 import uuid
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable, Iterator
 
@@ -49,6 +49,49 @@ class TransactionManifest:
     had_image: bool
     had_video: bool
 
+    def to_wire(self) -> dict[str, object]:
+        """Canonical camelCase schema shared with Swift LivePhotoPairTransaction.Manifest."""
+        return {
+            "schemaVersion": self.schema_version,
+            "transactionID": self.transaction_id,
+            "state": self.state,
+            "finalImage": self.final_image,
+            "finalVideo": self.final_video,
+            "temporaryImage": self.temporary_image,
+            "temporaryVideo": self.temporary_video,
+            "backupImage": self.backup_image,
+            "backupVideo": self.backup_video,
+            "hadImage": self.had_image,
+            "hadVideo": self.had_video,
+        }
+
+    @classmethod
+    def from_wire(cls, raw: dict[str, object]) -> "TransactionManifest":
+        """Read canonical Swift/Python schema and the short-lived Python snake_case schema."""
+        def required(camel: str, snake: str):
+            if camel in raw:
+                return raw[camel]
+            if snake in raw:
+                return raw[snake]
+            raise ValueError(f"missing Live Photo transaction field: {camel}")
+
+        try:
+            return cls(
+                schema_version=int(required("schemaVersion", "schema_version")),
+                transaction_id=str(required("transactionID", "transaction_id")),
+                state=str(required("state", "state")),
+                final_image=str(required("finalImage", "final_image")),
+                final_video=str(required("finalVideo", "final_video")),
+                temporary_image=str(required("temporaryImage", "temporary_image")),
+                temporary_video=str(required("temporaryVideo", "temporary_video")),
+                backup_image=str(required("backupImage", "backup_image")),
+                backup_video=str(required("backupVideo", "backup_video")),
+                had_image=bool(required("hadImage", "had_image")),
+                had_video=bool(required("hadVideo", "had_video")),
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"invalid Live Photo transaction manifest: {exc}") from exc
+
 
 _STATE_ORDER = {
     "prepared": 0,
@@ -60,7 +103,6 @@ _STATE_ORDER = {
 
 
 def _safe_child(directory: Path, name: str) -> Path:
-    """Resolve a journal basename without allowing path traversal."""
     candidate = Path(name)
     if not name or candidate.name != name or candidate.is_absolute() or name in {".", ".."}:
         raise ValueError(f"unsafe Live Photo transaction path: {name!r}")
@@ -92,13 +134,15 @@ def _fsync_directory(directory: Path) -> None:
 
 @contextmanager
 def _directory_lock(directory: Path) -> Iterator[None]:
-    """Serialize recovery/commit across XDRemux processes for one output directory."""
+    """Serialize recovery/commit across Python and Swift XDRemux processes."""
     directory.mkdir(parents=True, exist_ok=True)
     lock_path = directory / LOCK_FILE
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
     try:
         if fcntl is not None:
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            # Swift uses POSIX lockf(). Python lockf() is the same fcntl record-lock family; using
+            # flock() here would not be guaranteed to interoperate with it on every Unix platform.
+            fcntl.lockf(fd, fcntl.LOCK_EX)
         elif msvcrt is not None:  # pragma: no cover - Windows-only path
             if os.fstat(fd).st_size == 0:
                 os.write(fd, b"\0")
@@ -107,7 +151,7 @@ def _directory_lock(directory: Path) -> Iterator[None]:
         yield
     finally:
         if fcntl is not None:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            fcntl.lockf(fd, fcntl.LOCK_UN)
         elif msvcrt is not None:  # pragma: no cover - Windows-only path
             os.lseek(fd, 0, os.SEEK_SET)
             try:
@@ -132,7 +176,7 @@ def _write_manifest(directory: Path, manifest: TransactionManifest) -> Path:
     journal_dir.mkdir(parents=True, exist_ok=True)
     destination = _journal_path(directory, manifest.transaction_id)
     temporary = journal_dir / f".{manifest.transaction_id}.{uuid.uuid4().hex}.tmp"
-    payload = (json.dumps(asdict(manifest), sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    payload = (json.dumps(manifest.to_wire(), sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     try:
         with temporary.open("xb") as handle:
             handle.write(payload)
@@ -150,7 +194,9 @@ def _write_manifest(directory: Path, manifest: TransactionManifest) -> Path:
 
 def _load_manifest(path: Path) -> TransactionManifest:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    manifest = TransactionManifest(**raw)
+    if not isinstance(raw, dict):
+        raise ValueError("Live Photo transaction manifest must be an object")
+    manifest = TransactionManifest.from_wire(raw)
     if manifest.schema_version != SCHEMA_VERSION:
         raise ValueError(f"unsupported Live Photo transaction schema: {manifest.schema_version}")
     if manifest.state not in _STATE_ORDER:
@@ -179,7 +225,6 @@ def _rollback(directory: Path, manifest: TransactionManifest, journal_path: Path
         _remove_if_exists(final_image)
         os.replace(image_backup, final_image)
     elif not manifest.had_image and not temp_image.exists() and final_image.exists():
-        # The temporary still disappeared, so it may have been installed before the state update.
         _remove_if_exists(final_image)
 
     if video_backup.exists():
@@ -198,7 +243,6 @@ def _rollback(directory: Path, manifest: TransactionManifest, journal_path: Path
 
 
 def _cleanup_committed(directory: Path, manifest: TransactionManifest, journal_path: Path) -> None:
-    """Complete post-commit cleanup; this is idempotent and never rolls the pair back."""
     _remove_if_exists(_safe_child(directory, manifest.backup_image))
     _remove_if_exists(_safe_child(directory, manifest.backup_video))
     _remove_if_exists(_safe_child(directory, manifest.temporary_image))
@@ -241,7 +285,6 @@ def _recover_locked(directory: Path, pair_validator: PairValidator | None) -> No
 
 
 def recover_transactions(directory: Path, pair_validator: PairValidator | None = None) -> None:
-    """Recover every interrupted XDRemux Live Photo transaction in ``directory``."""
     directory = Path(directory)
     if not directory.exists():
         return
@@ -257,11 +300,7 @@ def commit_pair(
     *,
     pair_validator: PairValidator | None = None,
 ) -> None:
-    """Install a validated Live Photo pair with durable crash recovery.
-
-    All four resources must live in the same directory. This intentionally prevents a system
-    temporary directory from being renamed onto another filesystem/volume.
-    """
+    """Install a validated Live Photo pair with durable crash recovery."""
     temporary_image = Path(temporary_image)
     temporary_video = Path(temporary_video)
     final_image = Path(final_image)
@@ -309,26 +348,19 @@ def commit_pair(
             os.replace(temporary_video, final_video)
             manifest = replace(manifest, state="pair_installed")
             journal_path = _write_manifest(directory, manifest)
-            # Make both installed directory entries durable before publishing the committed marker.
             _fsync_directory(directory)
 
             if pair_validator is not None and not pair_validator(final_image, final_video):
                 raise ValueError("installed Live Photo pair failed final validation")
 
-            # This is the transaction commit point. Once durable state says committed, recovery must
-            # only clean backups; it must never attempt rollback even if cleanup was interrupted.
             manifest, journal_path = _mark_committed(directory, manifest)
             _cleanup_committed(directory, manifest, journal_path)
         except BaseException:
-            # Before the committed marker, Python exceptions, KeyboardInterrupt and SystemExit get
-            # an immediate rollback. After it, rollback would be incorrect; finish cleanup instead.
             try:
                 if manifest.state == "committed":
                     _cleanup_committed(directory, manifest, journal_path)
                 else:
                     _rollback(directory, manifest, journal_path)
             except Exception:
-                # Keep the original exception. Any surviving journal is intentionally left for the
-                # next recovery pass if cleanup/rollback itself could not finish.
                 pass
             raise
