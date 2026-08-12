@@ -16,6 +16,7 @@ enum LivePhotoPairTransaction {
         case originalsBackedUp = "originals_backed_up"
         case imageInstalled = "image_installed"
         case pairInstalled = "pair_installed"
+        case committed
     }
 
     struct Manifest: Codable {
@@ -119,24 +120,34 @@ enum LivePhotoPairTransaction {
                 try FileManager.default.moveItem(at: temporaryVideo, to: finalVideo)
                 manifest.state = .pairInstalled
                 journalURL = try writeManifest(manifest, in: directory)
+                // Ensure the installed resource names are durable before publishing the commit point.
+                try synchronizeDirectory(directory)
 
                 // AppleLivePhotoConversionEngine fully validates the temporary pair before commit.
                 // A same-directory rename does not mutate file contents. Keep this transaction layer
-                // synchronous: invoking AppleLivePhotoValidator.isValidPair here would nest an async
-                // AVFoundation validation behind a blocking semaphore while the transaction lock is
-                // held. Callers that have a genuinely synchronous validator can still supply one.
+                // synchronous: callers may provide a genuinely synchronous validator when useful.
                 if let validatePair, !validatePair(finalImage, finalVideo) {
                     throw AppleLivePhotoError.transactionFailed(
                         "installed Live Photo pair failed final validation"
                     )
                 }
-                try finalize(manifest, journalURL: journalURL, in: directory)
+
+                // This durable marker is the commit point. Backup cleanup happens only afterwards.
+                // If cleanup itself is interrupted, recovery must continue cleanup and never roll
+                // one resource back independently of the other.
+                manifest.state = .committed
+                journalURL = try writeManifest(manifest, in: directory)
+                try cleanupCommitted(manifest, journalURL: journalURL, in: directory)
             } catch {
                 do {
-                    try rollback(manifest, journalURL: journalURL, in: directory)
+                    if manifest.state == .committed {
+                        try cleanupCommitted(manifest, journalURL: journalURL, in: directory)
+                    } else {
+                        try rollback(manifest, journalURL: journalURL, in: directory)
+                    }
                 } catch {
-                    // Keep the durable journal when rollback itself cannot finish. The next run can
-                    // retry recovery from filesystem truth plus the last persisted state.
+                    // Keep the durable journal when cleanup/rollback itself cannot finish. The next
+                    // run can retry from the last persisted transaction state.
                 }
                 throw error
             }
@@ -159,12 +170,18 @@ enum LivePhotoPairTransaction {
 
         for journalURL in journals {
             let data = try Data(contentsOf: journalURL)
-            let manifest = try JSONDecoder().decode(Manifest.self, from: data)
+            var manifest = try JSONDecoder().decode(Manifest.self, from: data)
             guard manifest.schemaVersion == schemaVersion else {
                 throw AppleLivePhotoError.transactionFailed(
                     "unsupported Live Photo transaction schema \(manifest.schemaVersion)"
                 )
             }
+
+            if manifest.state == .committed {
+                try cleanupCommitted(manifest, journalURL: journalURL, in: directory)
+                continue
+            }
+
             let finalImage = try safeChild(manifest.finalImage, of: directory)
             let finalVideo = try safeChild(manifest.finalVideo, of: directory)
             if manifest.state == .pairInstalled,
@@ -172,13 +189,14 @@ enum LivePhotoPairTransaction {
                FileManager.default.fileExists(atPath: finalVideo.path),
                let validatePair,
                validatePair(finalImage, finalVideo) {
-                try finalize(manifest, journalURL: journalURL, in: directory)
+                manifest.state = .committed
+                let committedJournalURL = try writeManifest(manifest, in: directory)
+                try cleanupCommitted(manifest, journalURL: committedJournalURL, in: directory)
                 continue
             }
 
             // No synchronous validator means fail closed. A pair-installed journal is still an
-            // uncommitted transaction until the journal is removed; restoring the prior pair is the
-            // conservative atomicity rule and avoids accepting an unverified cross-resource state.
+            // uncommitted transaction until the committed marker is durable.
             try rollback(manifest, journalURL: journalURL, in: directory)
         }
     }
@@ -219,19 +237,25 @@ enum LivePhotoPairTransaction {
         try removeIfPresent(temporaryVideo)
         try removeIfPresent(imageBackup)
         try removeIfPresent(videoBackup)
+        try synchronizeDirectory(directory)
         try removeIfPresent(journalURL)
+        try synchronizeDirectory(journalURL.deletingLastPathComponent())
     }
 
-    private static func finalize(
+    private static func cleanupCommitted(
         _ manifest: Manifest,
         journalURL: URL,
         in directory: URL
     ) throws {
+        // Cleanup is idempotent. The committed journal is deliberately removed last so any crash
+        // in the middle can only re-enter cleanup; it can never trigger rollback of half the pair.
         try removeIfPresent(try safeChild(manifest.backupImage, of: directory))
         try removeIfPresent(try safeChild(manifest.backupVideo, of: directory))
         try removeIfPresent(try safeChild(manifest.temporaryImage, of: directory))
         try removeIfPresent(try safeChild(manifest.temporaryVideo, of: directory))
+        try synchronizeDirectory(directory)
         try removeIfPresent(journalURL)
+        try synchronizeDirectory(journalURL.deletingLastPathComponent())
     }
 
     @discardableResult
@@ -246,6 +270,7 @@ enum LivePhotoPairTransaction {
         // manifest transition itself never depends on a cross-volume rename.
         try data.write(to: journalURL, options: [.atomic])
         try synchronizeFile(journalURL)
+        try synchronizeDirectory(journalDirectory)
         return journalURL
     }
 
@@ -270,6 +295,19 @@ enum LivePhotoPairTransaction {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         try handle.synchronize()
+    }
+
+    private static func synchronizeDirectory(_ url: URL) throws {
+        let descriptor = url.path.withCString { path in
+            Darwin.open(path, O_RDONLY)
+        }
+        guard descriptor >= 0 else {
+            throw AppleLivePhotoError.transactionFailed("could not open Live Photo transaction directory for sync")
+        }
+        defer { Darwin.close(descriptor) }
+        guard Darwin.fsync(descriptor) == 0 else {
+            throw AppleLivePhotoError.transactionFailed("could not synchronize Live Photo transaction directory")
+        }
     }
 
     private static func withDirectoryLock<T>(
