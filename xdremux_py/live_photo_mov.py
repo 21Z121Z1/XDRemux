@@ -28,6 +28,7 @@ STILL_IMAGE_KEY = b"com.apple.quicktime.still-image-time"
 TRANSFORM_KEY = b"com.apple.quicktime.live-photo-still-image-transform"
 REFERENCE_DIMENSIONS_KEY = b"com.apple.quicktime.live-photo-still-image-transform-reference-dimensions"
 COPY_CHUNK_SIZE = 1 << 20
+LEGACY_COLOROS16_EIS_COMPENSATION_SCALE = 0.90
 
 
 class LivePhotoMovieError(ValueError):
@@ -273,11 +274,50 @@ def _multiply3(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, ...]:
     return tuple(sum(a[r*3+k] * b[k*3+c] for k in range(3)) for r in range(3) for c in range(3))
 
 
+def _normalized_axis_scale(value: float) -> float | None:
+    if not math.isfinite(value) or value <= 0:
+        return None
+    scale = 1.0 / value if value > 1 else value
+    if not math.isfinite(scale) or scale <= 0 or scale > 1:
+        return None
+    return scale
+
+
+def _normalized_scale(factors: tuple[float, ...] | None) -> tuple[float, float] | None:
+    if not factors:
+        return None
+    raw_x = factors[0]
+    raw_y = factors[1] if len(factors) >= 2 else raw_x
+    x = _normalized_axis_scale(raw_x)
+    y = _normalized_axis_scale(raw_y)
+    if x is None or y is None:
+        return None
+    return x, y
+
+
+def _coloros16_eis_compensation_scale(metadata: OppoMetadata) -> tuple[float, float]:
+    return (
+        _normalized_scale(metadata.photo_eis_crop_factor)
+        or _normalized_scale(metadata.eis_crop_factor)
+        or (LEGACY_COLOROS16_EIS_COMPENSATION_SCALE, LEGACY_COLOROS16_EIS_COMPENSATION_SCALE)
+    )
+
+
+def _normalize_homography(matrix: tuple[float, ...]) -> tuple[float, ...] | None:
+    if len(matrix) != 9 or any(not math.isfinite(value) for value in matrix):
+        return None
+    denominator = matrix[8]
+    if abs(denominator) <= 1e-12:
+        return None
+    return tuple(value / denominator for value in matrix)
+
+
 def oppo_transform(metadata: OppoMetadata | None) -> tuple[float, ...] | None:
     if metadata is None:
         return None
     if metadata.version >= 1:
-        result = (0.90, 0.0, 0.0, 0.0, 0.90, 0.0, 0.0, 0.0, 1.0)
+        scale_x, scale_y = _coloros16_eis_compensation_scale(metadata)
+        result = (scale_x, 0.0, 0.0, 0.0, scale_y, 0.0, 0.0, 0.0, 1.0)
         if metadata.photo_crop_matrix and (inverse := _invert3(metadata.photo_crop_matrix)):
             result = _multiply3(result, inverse)
         if metadata.photo_eis_matrix and (inverse := _invert3(metadata.photo_eis_matrix)):
@@ -287,8 +327,11 @@ def oppo_transform(metadata: OppoMetadata | None) -> tuple[float, ...] | None:
             return None
         _, matrix = min(metadata.matrices, key=lambda pair: abs(pair[0] - metadata.cover_frame_pts_us))
         result = _invert3(matrix) or matrix
+    normalized = _normalize_homography(result)
+    if normalized is None:
+        return None
     identity = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-    return None if all(abs(x-y) <= 1e-6 for x, y in zip(result, identity)) else result
+    return None if all(abs(x-y) <= 1e-6 for x, y in zip(normalized, identity)) else normalized
 
 
 def _metadata_key_atom(local_id: int, name: bytes, type_code: int) -> bytes:
