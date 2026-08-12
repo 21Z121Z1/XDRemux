@@ -38,6 +38,24 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
             self.assertTrue(a_output.name.startswith("IMG~"))
             self.assertTrue(b_output.name.startswith("IMG~"))
 
+    def test_same_relative_path_in_different_input_roots_cannot_alias_shared_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            first_root = base / "root-one"
+            second_root = base / "root-two"
+            output = base / "shared-output"
+            first = first_root / "A" / "IMG.jpg"
+            second = second_root / "A" / "IMG.jpg"
+            first.parent.mkdir(parents=True)
+            second.parent.mkdir(parents=True)
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+
+            self.assertNotEqual(
+                planned_output_image(first, first_root, output),
+                planned_output_image(second, second_root, output),
+            )
+
     def test_heif_motion_photo_uses_live_namespace_and_stable_token(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "input"
