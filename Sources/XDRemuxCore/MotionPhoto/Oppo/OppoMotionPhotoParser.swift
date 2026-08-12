@@ -63,6 +63,7 @@ public enum OppoMotionPhotoParser {
             videoHeight: metadata.videoHeight,
             originPhotoWidth: metadata.originPhotoWidth,
             originPhotoHeight: metadata.originPhotoHeight,
+            photoEisCropFactor: metadata.photoEisCropFactor,
             eisCropFactor: metadata.eisCropFactor,
             photoCropFactor: metadata.photoCropFactor,
             streamCount: streamCount
