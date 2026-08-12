@@ -128,6 +128,7 @@ jobs:
         with:
           name: python-motion-photo-live-photo-evidence
           if-no-files-found: error
+          retention-days: 14
           path: |
             artifacts/python-live-photo-runner.txt
             artifacts/python-motion-photo-real-fixtures.log
