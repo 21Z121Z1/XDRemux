@@ -37,7 +37,7 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         let sourceMP4 = directory.appendingPathComponent("source.mp4")
         let outputHEIC = directory.appendingPathComponent("output.heic")
         let outputMOV = directory.appendingPathComponent("output.mov")
-        try createJPEG(at: sourceJPEG, width: 64, height: 48)
+        try createJPEG(at: sourceJPEG, width: 80, height: 60)
         try await createCompressedVideo(
             at: sourceMP4,
             codec: .hevc,
@@ -69,7 +69,8 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
             outputURL: outputMOV,
             assetIdentifier: identifier,
             stillImageTime: stillTime,
-            oppoMetadata: metadata
+            oppoMetadata: metadata,
+            stillImageReferenceDimensions: [80, 60]
         )
 
         let report = try await AppleLivePhotoValidator.validate(
@@ -86,6 +87,10 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         )
         XCTAssertTrue(report.hasTransform)
         XCTAssertTrue(report.hasTransformReferenceDimensions)
+
+        let dimensions = try await readTransformReferenceDimensions(from: outputMOV)
+        XCTAssertEqual(dimensions?.width ?? -1, 80, accuracy: 1e-6)
+        XCTAssertEqual(dimensions?.height ?? -1, 60, accuracy: 1e-6)
     }
 
     private func assertSyntheticPair(
@@ -151,6 +156,39 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
             )
         }
         XCTAssertFalse(report.hasAudio)
+    }
+
+    private func readTransformReferenceDimensions(from videoURL: URL) async throws -> CGSize? {
+        let asset = AVURLAsset(url: videoURL)
+        let metadataTracks = try await asset.loadTracks(withMediaType: .metadata)
+        for track in metadataTracks {
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            guard reader.canAdd(output) else { continue }
+            reader.add(output)
+            let adaptor = AVAssetReaderOutputMetadataAdaptor(assetReaderTrackOutput: output)
+            guard reader.startReading() else { continue }
+
+            while let group = adaptor.nextTimedMetadataGroup() {
+                for item in group.items {
+                    let key: String?
+                    if let string = item.key as? String {
+                        key = string
+                    } else if let string = item.key as? NSString {
+                        key = string as String
+                    } else {
+                        key = item.identifier?.rawValue.split(separator: "/").last.map(String.init)
+                    }
+                    guard key == "com.apple.quicktime.live-photo-still-image-transform-reference-dimensions" else {
+                        continue
+                    }
+                    if let value = item.value as? NSValue {
+                        return value.sizeValue
+                    }
+                }
+            }
+        }
+        return nil
     }
 
     private func createJPEG(at url: URL, width: Int, height: Int) throws {
