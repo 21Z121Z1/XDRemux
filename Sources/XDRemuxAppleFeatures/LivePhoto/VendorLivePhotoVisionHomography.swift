@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import ImageIO
 import Vision
 
 /// Public Vision primitive used by vendor-specific Motion Photo geometry analyzers.
