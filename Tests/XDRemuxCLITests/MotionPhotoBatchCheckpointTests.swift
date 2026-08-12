@@ -19,10 +19,12 @@ final class MotionPhotoBatchCheckpointTests: XCTestCase {
         let writer = try MotionPhotoBatchCheckpoint.Writer(url: checkpoint)
         try writer.append(
             inputURL: input,
+            inputRootURL: directory,
             outputImageURL: image,
             outputVideoURL: video,
             status: .success,
-            signature: signature
+            signature: signature,
+            assetIdentifier: "ASSET-1"
         )
         try writer.close()
 
@@ -31,6 +33,8 @@ final class MotionPhotoBatchCheckpointTests: XCTestCase {
         XCTAssertEqual(item.status, .success)
         XCTAssertTrue(item.matchesSignature(signature))
         XCTAssertTrue(item.matchesOutputs(imageURL: image, videoURL: video))
+        XCTAssertEqual(item.assetIdentifier, "ASSET-1")
+        XCTAssertEqual(item.sourceRelativePath, "source.jpg")
     }
 
     func testChangedInputSignatureDoesNotResumeAsDone() throws {
@@ -52,7 +56,8 @@ final class MotionPhotoBatchCheckpointTests: XCTestCase {
             outputImageURL: image,
             outputVideoURL: video,
             status: .success,
-            signature: before
+            signature: before,
+            assetIdentifier: "ASSET-1"
         )
         try writer.close()
 
@@ -61,5 +66,26 @@ final class MotionPhotoBatchCheckpointTests: XCTestCase {
         let state = try MotionPhotoBatchCheckpoint.load(url: checkpoint)
         let item = try XCTUnwrap(state[input.standardizedFileURL.path])
         XCTAssertFalse(item.matchesSignature(after))
+    }
+
+    func testDigestDetectsSameSizeContentChangeEvenWhenMtimeIsRestored() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-motion-checkpoint-digest-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let input = directory.appendingPathComponent("source.jpg")
+        try Data("AAAA".utf8).write(to: input)
+        let before = try MotionPhotoBatchCheckpoint.signature(for: input)
+        let attributes = try FileManager.default.attributesOfItem(atPath: input.path)
+        let modificationDate = try XCTUnwrap(attributes[.modificationDate] as? Date)
+
+        try Data("BBBB".utf8).write(to: input)
+        try FileManager.default.setAttributes([.modificationDate: modificationDate], ofItemAtPath: input.path)
+        let after = try MotionPhotoBatchCheckpoint.signature(for: input)
+
+        XCTAssertEqual(before.size, after.size)
+        XCTAssertNotEqual(before.sha256, after.sha256)
+        XCTAssertNotEqual(before, after)
     }
 }
