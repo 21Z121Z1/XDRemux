@@ -65,6 +65,7 @@ class OppoMetadata:
     video_height: int | None = None
     origin_photo_width: int | None = None
     origin_photo_height: int | None = None
+    photo_eis_crop_factor: tuple[float, ...] | None = None
     eis_crop_factor: tuple[float, ...] | None = None
     photo_crop_factor: float | None = None
     stream_count: int = 1
@@ -523,6 +524,7 @@ def _parse_lpex_object(raw: bytes) -> OppoMetadata | None:
         video_height=vh,
         origin_photo_width=ow,
         origin_photo_height=oh,
+        photo_eis_crop_factor=_number_tuple(obj.get("photoEisCropFactor"), 8),
         eis_crop_factor=_number_tuple(obj.get("eisCropFactor"), 8),
         photo_crop_factor=photo_crop_factor,
         stream_count=1,
