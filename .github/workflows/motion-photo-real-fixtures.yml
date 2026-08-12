@@ -90,11 +90,9 @@ jobs:
       - name: Build importable ColorOS 16 and Samsung Live Photo pairs
         shell: bash
         run: |
-          swift build -c release --product xdremux
-          XDREMUX_BIN=".build/release/xdremux" \
-            bash scripts/build_live_photo_device_validation.sh \
-              "$FIXTURE_ROOT" \
-              artifacts/live-photo-device-validation
+          bash scripts/build_live_photo_device_validation.sh \
+            "$FIXTURE_ROOT" \
+            artifacts/live-photo-device-validation
 
       - name: Run historical OPPO characterization when present
         shell: bash
