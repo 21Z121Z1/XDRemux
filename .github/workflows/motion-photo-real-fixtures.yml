@@ -2,6 +2,18 @@ name: Motion Photo Real Fixture Gate
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - "feature/vendor-live-photo-geometry"
+    paths:
+      - "Sources/XDRemuxCore/MotionPhoto/**"
+      - "Sources/XDRemuxAppleFeatures/LivePhoto/**"
+      - "Sources/XDRemuxCLI/Commands/MotionPhoto*.swift"
+      - "Tests/**/*MotionPhoto*.swift"
+      - "Tests/**/*LivePhoto*.swift"
+      - "fixtures/**"
+      - "scripts/build_live_photo_device_validation.sh"
+      - ".github/workflows/motion-photo-real-fixtures.yml"
   pull_request:
     paths:
       - "Sources/XDRemuxCore/MotionPhoto/**"
