@@ -157,7 +157,13 @@ def validate_unique_plan(outputs: list[tuple[Path, Path]]) -> None:
 
 
 def state_path(output_dir: Path, requested: Path | None = None) -> Path:
-    return Path(requested) if requested is not None else Path(output_dir) / DEFAULT_STATE_NAME
+    if requested is not None:
+        requested = Path(requested)
+        # Swift keeps the Motion Photo state separate from the legacy ProXDR batch checkpoint by
+        # appending this suffix to a user-specified checkpoint path. Mirror that contract exactly so
+        # either runtime can resume the other's batch state.
+        return requested.parent / f"{requested.name}.motion-photo"
+    return Path(output_dir) / DEFAULT_STATE_NAME
 
 
 def load_state(path: Path) -> dict[str, BatchStateItem]:
