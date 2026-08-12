@@ -27,6 +27,6 @@
 
 ## 已知空白
 
-- 私有真实样本不在仓库里。CI 的 fixture 环节要配 `XDREMUX_FIXTURE_ARCHIVE_URL` secret 才会跑，没配就跳过。
+- 严格的 Samsung / Xiaomi / OPPO / vivo Motion Photo 真实样本已经版本化在 `fixtures/`，对应 CI 不再依赖私有压缩包或仓库 Secret。其他旧的 ProXDR / Apple 功能回归样本仍是独立的一套，可能继续保持私有。
 - 没有真机 Photos 的自动化验收。Apple 摄影风格和人像的"导入、编辑、保存、重开"这一轮仍然只能手动做。
 - OPPO 相册的实际显示行为无法在 CI 里验证。

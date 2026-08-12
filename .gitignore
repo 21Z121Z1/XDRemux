@@ -17,6 +17,9 @@ __pycache__/
 *.tar.gz
 *.zip
 
+# Real Motion Photo fixtures are intentionally versioned for CI.
+!fixtures/*.heic
+
 # Local agent / project scaffolding (not for tracking)
 .codex/
 .claude/

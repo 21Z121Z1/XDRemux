@@ -9,6 +9,7 @@ on:
       - "Tests/test_python_live_photo_portability.py"
       - "Tests/validation/verify_python_motion_photo_fixtures.py"
       - "Tests/XDRemuxAppleFeaturesTests/PythonLivePhotoOutputGateTests.swift"
+      - "fixtures/**"
       - ".github/workflows/python-motion-photo-real-fixtures.yml"
 
 concurrency:
@@ -45,26 +46,11 @@ jobs:
         run: |
           python -m unittest discover -s Tests -p 'test_*.py' -v
 
-      - name: Resolve private fixture archive
-        shell: bash
-        env:
-          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_FIXTURE_ARCHIVE_URL }}
-        run: |
-          if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
-            echo "::error::XDREMUX_FIXTURE_ARCHIVE_URL is required for the strict Python gate"
-            exit 1
-          fi
-          mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
-          curl --fail --location --silent --show-error \
-            "$FIXTURE_ARCHIVE_URL" \
-            --output "$RUNNER_TEMP/xdremux-fixtures.zip"
-          unzip -q "$RUNNER_TEMP/xdremux-fixtures.zip" -d "$RUNNER_TEMP/xdremux-fixtures"
-
-      - name: Convert all real fixtures on Linux with pure Python
+      - name: Convert all repository fixtures on Linux with pure Python
         shell: bash
         run: |
           python Tests/validation/verify_python_motion_photo_fixtures.py \
-            --fixture-root "$RUNNER_TEMP/xdremux-fixtures" \
+            --fixture-root "$GITHUB_WORKSPACE/fixtures" \
             --output-root "$RUNNER_TEMP/xdremux-python-live-photo-output" \
             --manifest "$RUNNER_TEMP/xdremux-python-live-photo-manifest.json"
 
@@ -75,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Record runner
+      - name: Record runner and configure paths
         shell: bash
         run: |
           mkdir -p artifacts
@@ -85,6 +71,9 @@ jobs:
             echo "arch=$(uname -m)"
             echo "conversion_runtime=pure Python; Apple frameworks are validation-only"
           } | tee artifacts/python-live-photo-runner.txt
+          echo "FIXTURE_ROOT=$GITHUB_WORKSPACE/fixtures" >> "$GITHUB_ENV"
+          echo "PYTHON_OUTPUT_ROOT=$RUNNER_TEMP/xdremux-python-live-photo-output" >> "$GITHUB_ENV"
+          echo "PYTHON_MANIFEST=$RUNNER_TEMP/xdremux-python-live-photo-manifest.json" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v6
         with:
@@ -97,25 +86,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .
 
-      - name: Resolve private fixture archive
-        shell: bash
-        env:
-          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_FIXTURE_ARCHIVE_URL }}
-        run: |
-          if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
-            echo "::error::XDREMUX_FIXTURE_ARCHIVE_URL is required for the strict Python gate"
-            exit 1
-          fi
-          mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
-          curl --fail --location --silent --show-error \
-            "$FIXTURE_ARCHIVE_URL" \
-            --output "$RUNNER_TEMP/xdremux-fixtures.zip"
-          ditto -x -k "$RUNNER_TEMP/xdremux-fixtures.zip" "$RUNNER_TEMP/xdremux-fixtures"
-          echo "FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
-          echo "PYTHON_OUTPUT_ROOT=$RUNNER_TEMP/xdremux-python-live-photo-output" >> "$GITHUB_ENV"
-          echo "PYTHON_MANIFEST=$RUNNER_TEMP/xdremux-python-live-photo-manifest.json" >> "$GITHUB_ENV"
-
-      - name: Convert all real fixtures with pure Python
+      - name: Convert all repository fixtures with pure Python
         shell: bash
         run: |
           echo "::group::Pure Python Samsung / Xiaomi / OPPO / vivo conversion"
@@ -129,11 +100,10 @@ jobs:
 
       - name: Validate Python outputs with macOS PhotoKit
         shell: bash
-        env:
-          XDREMUX_PYTHON_LIVE_PHOTO_MANIFEST: ${{ env.PYTHON_MANIFEST }}
         run: |
           echo "::group::Apple compatibility oracle"
-          swift test --filter PythonLivePhotoOutputGateTests \
+          XDREMUX_PYTHON_LIVE_PHOTO_MANIFEST="$PYTHON_MANIFEST" \
+            swift test --filter PythonLivePhotoOutputGateTests \
             2>&1 | tee artifacts/python-live-photo-photokit.log
           echo "::endgroup::"
 

@@ -9,12 +9,15 @@ on:
       - "Sources/XDRemuxCLI/Commands/MotionPhoto*.swift"
       - "Tests/**/*MotionPhoto*.swift"
       - "Tests/**/*LivePhoto*.swift"
+      - "fixtures/**"
       - ".github/workflows/motion-photo-real-fixtures.yml"
 
 jobs:
   real-motion-photo-fixtures:
     runs-on: macos-latest
     timeout-minutes: 60
+    env:
+      FIXTURE_ROOT: ${{ github.workspace }}/fixtures
     steps:
       - uses: actions/checkout@v7
 
@@ -28,58 +31,36 @@ jobs:
             echo "arch=$(uname -m)"
           } | tee artifacts/motion-photo-runner.txt
 
-      - name: Resolve private fixture archive
+      - name: Verify repository fixture inventory
         shell: bash
-        env:
-          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_FIXTURE_ARCHIVE_URL }}
         run: |
-          if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
-            echo "missing XDREMUX_FIXTURE_ARCHIVE_URL" | tee artifacts/motion-photo-real-fixture-status.txt
-            echo "::error::Motion Photo real-fixture gate cannot run without the private fixture archive URL"
-            exit 1
-          fi
-          mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
-          curl --fail --location --silent --show-error \
-            "$FIXTURE_ARCHIVE_URL" \
-            --output "$RUNNER_TEMP/xdremux-fixtures.zip"
-          ditto -x -k \
-            "$RUNNER_TEMP/xdremux-fixtures.zip" \
-            "$RUNNER_TEMP/xdremux-fixtures"
-          echo "FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
 
-      - name: Verify supplied fixture inventory
-        shell: bash
-        run: |
-          expected=(
-            'IMG20250502131605.jpg'
-            'IMG20250502131608.jpg'
-            'IMG20250819170327.jpg'
-            'IMG20260710191114_ColorOS_16.jpg'
-            'IMG20260801190843_ColorOS_16.jpg'
-            'MVIMG_20260419_151324_2_3..jpg'
-            '20260312_135625..jpg'
-            '20260312_135627..jpg'
-            '20260312_135609..heic'
-            'R002_20260312_135609..heic'
-            '20260312_135610..heic'
-            'R003_20260312_135610..heic'
-            'IMG_20260620_160335..jpg'
-            'IMG_20260620_160410..jpg'
-          )
-          : > artifacts/motion-photo-real-fixture-status.txt
-          missing=0
-          for name in "${expected[@]}"; do
-            if find "$FIXTURE_ROOT" -type f -name "$name" -print -quit | grep -q .; then
-              echo "$name=present" >> artifacts/motion-photo-real-fixture-status.txt
-            else
-              echo "$name=MISSING" >> artifacts/motion-photo-real-fixture-status.txt
-              missing=1
-            fi
-          done
-          if [[ "$missing" -ne 0 ]]; then
-            echo "::error::Private fixture archive is incomplete"
-            exit 1
-          fi
+          root = Path("fixtures")
+          expected = []
+          for line in (root / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
+              if not line.strip():
+                  continue
+              digest, name = line.split(maxsplit=1)
+              expected.append((digest, name.strip()))
+          if len(expected) != 14:
+              raise SystemExit(f"expected 14 fixture identities, found {len(expected)}")
+
+          status = Path("artifacts/motion-photo-real-fixture-status.txt")
+          with status.open("w", encoding="utf-8") as stream:
+              for digest, name in expected:
+                  path = root / name
+                  if not path.is_file():
+                      stream.write(f"{name}=MISSING\n")
+                      raise SystemExit(f"repository fixture is missing: {name}")
+                  actual = sha256(path.read_bytes()).hexdigest()
+                  if actual != digest:
+                      stream.write(f"{name}=SHA256_MISMATCH\n")
+                      raise SystemExit(f"repository fixture SHA-256 mismatch: {name}: {actual}")
+                  stream.write(f"{name}=present\n")
+          PY
 
       - name: Characterize and convert every supplied Motion Photo
         shell: bash

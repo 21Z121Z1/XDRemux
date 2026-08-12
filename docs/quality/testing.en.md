@@ -27,6 +27,6 @@ The policy tests are purely static — they read source and documentation and as
 
 ## Known gaps
 
-- The private real samples are not in the repository. The CI fixture stage runs only when the `XDREMUX_FIXTURE_ARCHIVE_URL` secret is configured, and is skipped otherwise.
+- The strict Samsung/Xiaomi/OPPO/vivo Motion Photo fixtures are versioned under `fixtures/`, so those CI gates do not require a private archive or repository secret. Other legacy ProXDR / Apple-feature regression samples remain separate and may still be private.
 - There is no automated acceptance against Photos on a real device. The import-edit-save-reopen round trip for Apple Photographic Styles and portrait is still manual.
 - How a photo actually displays in OPPO Gallery cannot be verified in CI.
