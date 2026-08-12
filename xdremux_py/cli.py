@@ -112,27 +112,17 @@ def cmd_convert(command: ConvertCommand) -> int:
     return _convert_one(command.input_path, command.output_path, command.configuration)
 
 
-def _default_batch_candidates(input_dir: Path, output_dir: Path) -> list[Path]:
-    """Recursively snapshot batch inputs while excluding hidden and separate output subtrees."""
+def _default_batch_candidates(input_dir: Path) -> list[Path]:
+    """Preserve the legacy non-recursive Python batch discovery contract."""
     allowed = {".heic", ".heif", ".jpg", ".jpeg"}
-    input_root = input_dir.resolve()
-    output_root = output_dir.resolve()
-    exclude_output_subtree = output_root != input_root and output_root.is_relative_to(input_root)
-    candidates: list[Path] = []
-    for path in input_dir.rglob("*"):
-        if not path.is_file() or path.suffix.lower() not in allowed:
-            continue
-        resolved = path.resolve()
-        if exclude_output_subtree and resolved.is_relative_to(output_root):
-            continue
-        try:
-            relative_parts = resolved.relative_to(input_root).parts
-        except ValueError:
-            relative_parts = resolved.parts
-        if any(part.startswith(".") for part in relative_parts):
-            continue
-        candidates.append(path)
-    return sorted(candidates, key=lambda value: str(value.resolve()))
+    return sorted(
+        (
+            path
+            for path in input_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in allowed
+        ),
+        key=lambda value: str(value.resolve()),
+    )
 
 
 def _motion_output_directory(source: Path, command: BatchCommand) -> Path:
@@ -171,7 +161,7 @@ def cmd_batch(command: BatchCommand) -> int:
             key=lambda value: str(value.resolve()),
         )
         if command.glob_explicit
-        else _default_batch_candidates(command.input_dir, command.output_dir)
+        else _default_batch_candidates(command.input_dir)
     )
 
     # Classification and destination planning are completed before the first write. Batch membership
@@ -267,7 +257,6 @@ def cmd_batch(command: BatchCommand) -> int:
                         signature=signature,
                         asset_identifier=prior.asset_identifier,
                     )
-                    state[input_key] = load_state(checkpoint).get(input_key, prior)
                     print(f"skipped existing Live Photo pair {output_image.name} + {output_video.name} (provenance matched)")
                     continue
 
@@ -391,7 +380,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument(
         "--glob",
         help=(
-            f"Explicit file match pattern. Without --glob, recursively discover HEIC/HEIF and classify "
+            f"Explicit file match pattern. Without --glob, discover HEIC/HEIF and classify "
             f"JPEG/JPG Motion Photos (legacy ProXDR pattern was {DEFAULT_BATCH_GLOB})"
         ),
     )
