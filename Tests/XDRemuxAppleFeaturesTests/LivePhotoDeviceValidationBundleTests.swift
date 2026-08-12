@@ -30,6 +30,7 @@ final class LivePhotoDeviceValidationBundleTests: XCTestCase {
             requirePhotoKitValidation: false
         )
         let expectedVideoURL = AppleLivePhotoConversionEngine.companionVideoURL(for: outputImageURL)
+        let videoAssetIdentifier = await AppleLivePhotoVideoWriter.contentIdentifier(in: result.videoURL)
 
         XCTAssertEqual(result.imageURL.standardizedFileURL, outputImageURL)
         XCTAssertEqual(result.videoURL.standardizedFileURL, expectedVideoURL.standardizedFileURL)
@@ -48,7 +49,7 @@ final class LivePhotoDeviceValidationBundleTests: XCTestCase {
             "published still lost the conversion asset identifier"
         )
         XCTAssertEqual(
-            await AppleLivePhotoVideoWriter.contentIdentifier(in: result.videoURL),
+            videoAssetIdentifier,
             result.assetIdentifier,
             "published MOV lost the conversion asset identifier"
         )
