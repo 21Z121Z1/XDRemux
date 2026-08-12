@@ -37,6 +37,59 @@ final class MotionPhotoBatchCheckpointTests: XCTestCase {
         XCTAssertEqual(item.sourceRelativePath, "source.jpg")
     }
 
+    func testCanonicalPythonWireRecordLoadsInSwift() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-motion-checkpoint-python-wire-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let input = directory.appendingPathComponent("source.jpg")
+        let image = directory.appendingPathComponent("source.heic")
+        let video = directory.appendingPathComponent("source.mov")
+        let checkpoint = directory.appendingPathComponent("checkpoint.jsonl")
+        let digest = String(repeating: "ab", count: 32)
+        let record: [String: Any] = [
+            "kind": "item",
+            "inputPath": input.standardizedFileURL.path,
+            "sourceRelativePath": "source.jpg",
+            "outputImagePath": image.standardizedFileURL.path,
+            "outputVideoPath": video.standardizedFileURL.path,
+            "status": "success",
+            "inputSize": 123,
+            "inputMtimeNs": 456,
+            "inputSHA256": digest,
+            "assetIdentifier": "ASSET-PYTHON",
+            "error": NSNull(),
+        ]
+        let data = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
+        try data.write(to: checkpoint)
+        let handle = try FileHandle(forWritingTo: checkpoint)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data([0x0a]))
+        try handle.close()
+
+        let state = try MotionPhotoBatchCheckpoint.load(url: checkpoint)
+        let item = try XCTUnwrap(state[input.standardizedFileURL.path])
+        XCTAssertEqual(item.inputSHA256, digest)
+        XCTAssertEqual(item.assetIdentifier, "ASSET-PYTHON")
+        XCTAssertTrue(item.matchesOutputs(imageURL: image, videoURL: video))
+    }
+
+    func testMalformedForeignRecordIsIgnoredFailClosed() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-motion-checkpoint-malformed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let checkpoint = directory.appendingPathComponent("checkpoint.jsonl")
+        let input = directory.appendingPathComponent("source.jpg").standardizedFileURL.path
+        let contents = """
+        {"kind":"item","inputPath":"\(input)","unexpected":true}
+        {"kind":"item"
+        """
+        try Data(contents.utf8).write(to: checkpoint)
+        XCTAssertEqual(try MotionPhotoBatchCheckpoint.load(url: checkpoint).count, 0)
+    }
+
     func testChangedInputSignatureDoesNotResumeAsDone() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("xdremux-motion-checkpoint-change-\(UUID().uuidString)", isDirectory: true)
