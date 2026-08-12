@@ -47,6 +47,7 @@ public enum OppoMotionPhotoFallbackParser {
             videoHeight: rawMetadata.videoHeight,
             originPhotoWidth: rawMetadata.originPhotoWidth,
             originPhotoHeight: rawMetadata.originPhotoHeight,
+            photoEisCropFactor: rawMetadata.photoEisCropFactor,
             eisCropFactor: rawMetadata.eisCropFactor,
             photoCropFactor: rawMetadata.photoCropFactor,
             streamCount: streamCount
