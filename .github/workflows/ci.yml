@@ -175,6 +175,7 @@ jobs:
         with:
           name: xdremux-ci-diagnostics
           if-no-files-found: ignore
+          retention-days: 7
           path: |
             artifacts/
             ${{ runner.temp }}/xdremuxapp-derived/Logs/XDRemux/build.log
