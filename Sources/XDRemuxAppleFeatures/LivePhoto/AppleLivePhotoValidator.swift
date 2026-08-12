@@ -14,6 +14,9 @@ public struct AppleLivePhotoValidationReport: Sendable {
     public let hasGainMap: Bool
     public let hasTransform: Bool
     public let hasTransformReferenceDimensions: Bool
+    public let stillImageTransform: [Double]?
+    public let stillImageTransformReferenceDimensions: [Float]?
+    public let vitalityTransformLimitingAllowed: Bool
 }
 
 public enum AppleLivePhotoValidator {
@@ -31,6 +34,7 @@ public enum AppleLivePhotoValidator {
         sourceHadAudio: Bool? = nil,
         sourceHadGainMap: Bool? = nil,
         expectsOppoTransform: Bool = false,
+        expectedStillImageTransform: AppleLivePhotoStillTransform? = nil,
         requirePhotoKitLoad: Bool = true
     ) async throws -> AppleLivePhotoValidationReport {
         guard FileManager.default.fileExists(atPath: imageURL.path) else {
@@ -121,6 +125,32 @@ public enum AppleLivePhotoValidator {
         if timed.hasTransform, !timed.hasTransformReferenceDimensions {
             throw AppleLivePhotoError.pairValidationFailed("Live Photo transform is missing reference dimensions")
         }
+        let vitalityTransformLimitingAllowed = await AppleLivePhotoVideoWriter
+            .vitalityTransformLimitingAllowed(in: videoURL)
+        if let expectedStillImageTransform {
+            guard let storedMatrix = timed.transform,
+                  approximatelyEqual(storedMatrix, expectedStillImageTransform.matrix, tolerance: 1e-9) else {
+                throw AppleLivePhotoError.pairValidationFailed(
+                    "stored Live Photo transform differs from the selected transform"
+                )
+            }
+            guard let storedDimensions = timed.transformReferenceDimensions,
+                  approximatelyEqual(
+                    storedDimensions.map(Double.init),
+                    expectedStillImageTransform.referenceDimensions.map(Double.init),
+                    tolerance: 1e-6
+                  ) else {
+                throw AppleLivePhotoError.pairValidationFailed(
+                    "stored Live Photo transform reference dimensions differ from the selected dimensions"
+                )
+            }
+            if expectedStillImageTransform.source == .colorOS16VisionTrajectory,
+               !vitalityTransformLimitingAllowed {
+                throw AppleLivePhotoError.pairValidationFailed(
+                    "Vision-selected Live Photo transform is missing the vitality limiting flag"
+                )
+            }
+        }
 
         if requirePhotoKitLoad {
             try validateWithPhotoKit(imageURL: imageURL, videoURL: videoURL)
@@ -132,7 +162,10 @@ public enum AppleLivePhotoValidator {
             hasAudio: hasAudio,
             hasGainMap: hasGainMap,
             hasTransform: timed.hasTransform,
-            hasTransformReferenceDimensions: timed.hasTransformReferenceDimensions
+            hasTransformReferenceDimensions: timed.hasTransformReferenceDimensions,
+            stillImageTransform: timed.transform,
+            stillImageTransformReferenceDimensions: timed.transformReferenceDimensions,
+            vitalityTransformLimitingAllowed: vitalityTransformLimitingAllowed
         )
     }
 
@@ -160,6 +193,8 @@ public enum AppleLivePhotoValidator {
         var stillImageTimes: [CMTime] = []
         var hasTransform = false
         var hasTransformReferenceDimensions = false
+        var transform: [Double]?
+        var transformReferenceDimensions: [Float]?
     }
 
     private struct StillGeometry: Equatable {
@@ -338,8 +373,17 @@ public enum AppleLivePhotoValidator {
                         summary.stillImageTimes.append(group.timeRange.start)
                     } else if key == transformKey {
                         summary.hasTransform = true
+                        if let values = try? await item.load(.value) as? [NSNumber] {
+                            summary.transform = values.map(\.doubleValue)
+                        } else if let values = try? await item.load(.value) as? NSArray {
+                            summary.transform = values.compactMap { ($0 as? NSNumber)?.doubleValue }
+                        }
                     } else if key == transformReferenceDimensionsKey {
                         summary.hasTransformReferenceDimensions = true
+                        if let value = try? await item.load(.value) as? NSValue {
+                            let size = value.sizeValue
+                            summary.transformReferenceDimensions = [Float(size.width), Float(size.height)]
+                        }
                     }
                 }
             }
@@ -350,6 +394,15 @@ public enum AppleLivePhotoValidator {
             }
         }
         return summary
+    }
+
+    private static func approximatelyEqual(
+        _ lhs: [Double],
+        _ rhs: [Double],
+        tolerance: Double
+    ) -> Bool {
+        lhs.count == rhs.count
+            && zip(lhs, rhs).allSatisfy { abs($0 - $1) <= tolerance }
     }
 
     private static func metadataKey(_ item: AVMetadataItem) -> String? {

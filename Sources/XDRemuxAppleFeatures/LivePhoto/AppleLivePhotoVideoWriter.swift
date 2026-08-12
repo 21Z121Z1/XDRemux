@@ -6,6 +6,8 @@ import XDRemuxCore
 public enum AppleLivePhotoVideoWriter {
     private static let quickTimeKeySpace = "mdta"
     private static let contentIdentifierKey = "com.apple.quicktime.content.identifier"
+    private static let vitalityTransformLimitingKey =
+        "com.apple.quicktime.limit-still-image-transform"
     private static let stillImageTimeKey = "com.apple.quicktime.still-image-time"
     private static let transformKey = "com.apple.quicktime.live-photo-still-image-transform"
     private static let transformReferenceDimensionsKey = "com.apple.quicktime.live-photo-still-image-transform-reference-dimensions"
@@ -16,7 +18,8 @@ public enum AppleLivePhotoVideoWriter {
         assetIdentifier: String,
         stillImageTime: CMTime,
         oppoMetadata: OppoMotionPhotoMetadata? = nil,
-        stillImageReferenceDimensions: [Float]? = nil
+        stillImageReferenceDimensions: [Float]? = nil,
+        stillImageTransform: AppleLivePhotoStillTransform? = nil
     ) async throws {
         let asset = AVURLAsset(url: videoInputURL)
         guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else {
@@ -86,14 +89,20 @@ public enum AppleLivePhotoVideoWriter {
             audioInput = input
         }
 
-        writer.metadata = [contentIdentifierMetadata(assetIdentifier)]
-
-        let transform = oppoMetadata.flatMap(OppoLivePhotoAlignment.transformMatrix)
-        let referenceDimensions = transformReferenceDimensions(
-            transform: transform,
+        let fallbackTransform = oppoMetadata.flatMap(OppoLivePhotoAlignment.transformMatrix)
+        let fallbackReferenceDimensions = transformReferenceDimensions(
+            transform: fallbackTransform,
             requestedStillImageDimensions: stillImageReferenceDimensions,
             oppoMetadata: oppoMetadata
         )
+        let transform = stillImageTransform?.matrix ?? fallbackTransform
+        let referenceDimensions = stillImageTransform?.referenceDimensions
+            ?? fallbackReferenceDimensions
+        var movieMetadata = [contentIdentifierMetadata(assetIdentifier)]
+        if stillImageTransform?.source == .colorOS16VisionTrajectory {
+            movieMetadata.append(vitalityTransformLimitingMetadata())
+        }
+        writer.metadata = movieMetadata
         let metadataSetup = try makeTimedMetadataSetup(
             includeTransform: transform != nil,
             includeReferenceDimensions: transform != nil && referenceDimensions != nil
@@ -178,6 +187,17 @@ public enum AppleLivePhotoVideoWriter {
         return nil
     }
 
+    public static func vitalityTransformLimitingAllowed(in videoURL: URL) async -> Bool {
+        let asset = AVURLAsset(url: videoURL)
+        guard let metadata = try? await asset.load(.metadata) else { return false }
+        for item in metadata where metadataKey(item) == vitalityTransformLimitingKey {
+            if let number = try? await item.load(.value) as? NSNumber {
+                return number.boolValue
+            }
+        }
+        return false
+    }
+
     static func transformReferenceDimensions(
         transform: [Double]?,
         requestedStillImageDimensions: [Float]?,
@@ -199,6 +219,29 @@ public enum AppleLivePhotoVideoWriter {
         item.value = assetIdentifier as NSString
         item.dataType = kCMMetadataBaseDataType_UTF8 as String
         return item
+    }
+
+    /// iOS Photos reads this movie-level flag through
+    /// `PFMetadataMovie.livePhotoVitalityLimitingAllowed`. PhotosUI forwards it as
+    /// `limitingAllowed` to `PUBrowsingIrisPlayer`, which permits the larger inset budget used
+    /// when applying a non-trivial still-image transform during horizontal-scroll vitality.
+    /// Restrict it to the fixture-gated Stream 1/Stream 2 Vision result; metadata-only fallbacks do
+    /// not have enough evidence to opt into the larger transform.
+    private static func vitalityTransformLimitingMetadata() -> AVMetadataItem {
+        let item = AVMutableMetadataItem()
+        item.key = vitalityTransformLimitingKey as NSString
+        item.keySpace = AVMetadataKeySpace(rawValue: quickTimeKeySpace)
+        item.value = NSNumber(value: Int8(1))
+        item.dataType = kCMMetadataBaseDataType_SInt8 as String
+        return item
+    }
+
+    private static func metadataKey(_ item: AVMetadataItem) -> String? {
+        if let key = item.key as? String { return key }
+        if let key = item.key as? NSString { return key as String }
+        guard let raw = item.identifier?.rawValue else { return nil }
+        let prefix = "\(quickTimeKeySpace)/"
+        return raw.hasPrefix(prefix) ? String(raw.dropFirst(prefix.count)) : raw
     }
 
     /// AVFoundation owns these callback objects and serializes access through the queues passed to
