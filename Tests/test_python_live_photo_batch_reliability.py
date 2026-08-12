@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from xdremux_py.cli import _default_batch_candidates, _validate_unique_normal_plan
 from xdremux_py.live_photo_batch import (
     StateWriter,
     load_state,
@@ -156,6 +157,24 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
                 state_path(output, requested),
                 requested.parent / "state.jsonl.motion-photo",
             )
+
+    def test_hidden_transaction_temp_is_never_discovered_as_user_input(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            visible = root / "IMG.heic"
+            hidden_temp = root / ".IMG.abc123.tmp.heic"
+            visible.write_bytes(b"visible")
+            hidden_temp.write_bytes(b"transaction-temp")
+            self.assertEqual(_default_batch_candidates(root), [visible])
+
+    def test_normal_output_collision_fails_before_any_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "A" / "IMG.heic"
+            second = root / "B" / "IMG.heic"
+            output = root / "output" / "IMG.heic"
+            with self.assertRaisesRegex(ValueError, "planned ProXDR output collision"):
+                _validate_unique_normal_plan([(first, output), (second, output)])
 
     def test_schema_one_style_entry_without_digest_is_not_trusted(self):
         with tempfile.TemporaryDirectory() as tmp:
