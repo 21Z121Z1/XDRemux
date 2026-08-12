@@ -62,9 +62,6 @@ enum MotionPhotoCLIIntegration {
         if outputWasExplicit {
             outputImageURL = command.outputURL.standardizedFileURL
         } else if isHEIC(inputURL) {
-            // A HEIF Motion Photo is already named .heic/.heif. Never overwrite the source just to
-            // obtain the Apple paired representation; the suffix makes the one-to-two conversion
-            // explicit while preserving the original Android file.
             outputImageURL = inputURL.deletingPathExtension()
                 .appendingPathExtension("live")
                 .appendingPathExtension("heic")
@@ -87,12 +84,9 @@ enum MotionPhotoCLIIntegration {
         return true
     }
 
-    /// Plans the Motion Photo portion of a default batch. Explicit --glob retains the old contract.
-    ///
-    /// JPEG Motion Photos can coexist with the unchanged legacy HEIC pass by deferring their output
-    /// until that pass completes. HEIF Motion Photos are themselves `.heic` inputs, so any batch
-    /// containing one must classify HEIC files first; otherwise the legacy `*.heic` enumerator would
-    /// feed the Android Motion Photo container into the ProXDR pipeline.
+    /// Plans the entire Motion Photo portion of a default batch before the first write. Explicit
+    /// --glob retains the old contract. Stable Motion Photo destination names are derived from the
+    /// source path relative to input-dir, never from the current batch ordering or membership.
     private static func prepareDefaultBatch(_ rawArguments: [String]) throws -> Bool {
         guard !rawArguments.contains("--glob") else { return false }
 
@@ -125,7 +119,7 @@ enum MotionPhotoCLIIntegration {
         let motionInputs = jpegMotionInputs + heifMotionInputs
         guard !motionInputs.isEmpty else { return false }
 
-        let workItems = makeWorkItems(
+        let workItems = try makeWorkItems(
             inputs: motionInputs,
             heicInputs: sourceHEICInputs,
             command: command
@@ -137,15 +131,10 @@ enum MotionPhotoCLIIntegration {
         }
 
         if heifMotionInputs.isEmpty, existingLivePhotoStills.isEmpty {
-            // First JPEG-only mixed run: no Motion Photo HEIC source/output exists, so the unchanged
-            // HEIC batch can enumerate safely. Motion outputs are emitted only after it succeeds.
             pendingBatchStore.set(PendingBatch(command: command, workItems: workItems))
             return false
         }
 
-        // HEIF Motion Photo source or an already generated Live Photo pair is present. Do not invoke
-        // the legacy glob-based batch enumerator because it cannot distinguish those paired/source
-        // Motion Photo HEICs from ProXDR HEIC inputs. Convert only the classified source HEIC set.
         try runClassifiedHEICBatch(command: command, inputs: sourceHEICInputs)
         try runMotionBatch(command: command, workItems: workItems)
         return true
@@ -223,12 +212,10 @@ enum MotionPhotoCLIIntegration {
         workItems: [MotionBatchWorkItem]
     ) throws {
         let checkpointURL = MotionPhotoBatchCheckpoint.resolvedURL(for: command)
-        if !command.resume {
-            try MotionPhotoBatchCheckpoint.reset(url: checkpointURL)
-        }
-        let checkpointState = command.resume
-            ? try MotionPhotoBatchCheckpoint.load(url: checkpointURL)
-            : [:]
+        // Keep successful entries as durable provenance instead of deleting/resetting them. Old
+        // schema-1 entries remain readable but cannot authorize reuse because they have no SHA-256
+        // or asset identifier.
+        let checkpointState = try MotionPhotoBatchCheckpoint.load(url: checkpointURL)
         let checkpointWriter = try MotionPhotoBatchCheckpoint.Writer(url: checkpointURL)
         defer { try? checkpointWriter.close() }
 
@@ -247,20 +234,42 @@ enum MotionPhotoCLIIntegration {
                         for: item.outputImageURL
                     )
                     let inputKey = item.inputURL.standardizedFileURL.path
-                    let signature = try? MotionPhotoBatchCheckpoint.signature(for: item.inputURL)
                     let prior = checkpointState[inputKey]
+
+                    let signature: MotionPhotoBatchCheckpoint.FileSignature
+                    do {
+                        signature = try MotionPhotoBatchCheckpoint.signature(for: item.inputURL)
+                    } catch {
+                        lock.lock(); failures.append((item.inputURL, error)); lock.unlock()
+                        printSynchronized("failed \(item.inputURL.lastPathComponent): could not fingerprint source: \(singleLine(error))")
+                        return
+                    }
+
+                    func pairIsValid(expectedAssetIdentifier: String? = nil) -> Bool {
+                        if let expectedAssetIdentifier,
+                           AppleLivePhotoStillWriter.assetIdentifier(in: item.outputImageURL) != expectedAssetIdentifier {
+                            return false
+                        }
+                        return AppleLivePhotoValidator.isValidPair(
+                            imageURL: item.outputImageURL,
+                            videoURL: outputVideoURL
+                        )
+                    }
 
                     func record(
                         _ status: MotionPhotoBatchCheckpoint.Status,
+                        assetIdentifier: String? = nil,
                         error: String? = nil
                     ) {
                         do {
                             try checkpointWriter.append(
                                 inputURL: item.inputURL,
+                                inputRootURL: command.inputDirURL,
                                 outputImageURL: item.outputImageURL,
                                 outputVideoURL: outputVideoURL,
                                 status: status,
                                 signature: signature,
+                                assetIdentifier: assetIdentifier,
                                 error: error
                             )
                         } catch {
@@ -268,49 +277,54 @@ enum MotionPhotoCLIIntegration {
                         }
                     }
 
-                    func pairIsValid() -> Bool {
-                        AppleLivePhotoValidator.isValidPair(
-                            imageURL: item.outputImageURL,
-                            videoURL: outputVideoURL
-                        )
-                    }
-
                     let signatureMatches = prior?.matchesSignature(signature) == true
-                    if command.resume,
-                       let prior,
-                       signatureMatches,
-                       prior.matchesOutputs(
-                            imageURL: item.outputImageURL,
-                            videoURL: outputVideoURL
-                       ),
-                       (prior.status == .success || prior.status == .skippedExisting),
-                       pairIsValid() {
+                    let outputsMatch = prior?.matchesOutputs(
+                        imageURL: item.outputImageURL,
+                        videoURL: outputVideoURL
+                    ) == true
+                    let priorSucceeded = prior?.status == .success || prior?.status == .skippedExisting
+                    let priorAssetIdentifier = prior?.assetIdentifier
+                    let provenanceMatches = signatureMatches
+                        && outputsMatch
+                        && priorSucceeded
+                        && priorAssetIdentifier != nil
+                        && pairIsValid(expectedAssetIdentifier: priorAssetIdentifier)
+
+                    if (command.resume || command.skipExisting), provenanceMatches,
+                       let priorAssetIdentifier {
                         lock.lock(); skipped += 1; lock.unlock()
-                        record(.skippedExisting)
-                        printSynchronized("skipped \(item.inputURL.lastPathComponent) (Live Photo pair already up to date)")
+                        record(.skippedExisting, assetIdentifier: priorAssetIdentifier)
+                        printSynchronized("skipped \(item.inputURL.lastPathComponent) (Live Photo source provenance matched)")
                         return
                     }
 
-                    if command.skipExisting {
-                        let mustRetryFailure = command.resume
-                            && signatureMatches
-                            && prior?.status == .failure
-                        let inputChanged = prior != nil && !signatureMatches
-                        if !mustRetryFailure, !inputChanged, pairIsValid() {
-                            lock.lock(); skipped += 1; lock.unlock()
-                            record(.skippedExisting)
-                            printSynchronized("skipped \(item.inputURL.lastPathComponent) (Live Photo pair already valid)")
+                    if command.resume || command.skipExisting {
+                        let existingPairValid = pairIsValid()
+                        let knownLineage = outputsMatch
+                            && priorAssetIdentifier != nil
+                            && pairIsValid(expectedAssetIdentifier: priorAssetIdentifier)
+                        if existingPairValid && !knownLineage {
+                            let error = MotionBatchOutputConflictError(
+                                input: item.inputURL,
+                                image: item.outputImageURL,
+                                video: outputVideoURL
+                            )
+                            lock.lock(); failures.append((item.inputURL, error)); lock.unlock()
+                            record(.failure, error: error.localizedDescription)
+                            printSynchronized("failed \(item.inputURL.lastPathComponent): \(singleLine(error))")
                             return
                         }
+                        // A known pair from the same source path with a different content digest is
+                        // stale, not foreign. Rebuild it rather than silently reusing old content.
                     }
 
                     do {
-                        _ = try AppleLivePhotoConversionEngine.convert(
+                        let result = try AppleLivePhotoConversionEngine.convert(
                             inputURL: item.inputURL,
                             outputImageURL: item.outputImageURL
                         )
                         lock.lock(); converted += 1; lock.unlock()
-                        record(.success)
+                        record(.success, assetIdentifier: result.assetIdentifier)
                         printSynchronized("converted Motion Photo \(item.inputURL.lastPathComponent)")
                     } catch {
                         lock.lock(); failures.append((item.inputURL, error)); lock.unlock()
@@ -327,10 +341,8 @@ enum MotionPhotoCLIIntegration {
             "Motion Photo batch pass: \(converted) converted, \(skipped) skipped, "
                 + "\(failures.count) failed"
         )
-        if failures.isEmpty {
-            try? FileManager.default.removeItem(at: checkpointURL)
-        } else {
-            print("run the same command again to retry only the \(failures.count) failed Motion Photo file(s)")
+        if !failures.isEmpty {
+            print("run the same command again to retry the \(failures.count) unresolved Motion Photo file(s)")
             throw CLIError.batchFailed(
                 failures: failures.count,
                 checkpoint: checkpointURL
@@ -352,6 +364,25 @@ enum MotionPhotoCLIIntegration {
         let failures: Int
         var errorDescription: String? {
             "classified HEIC batch pass failed for \(failures) file(s); rerun the same command to retry unresolved inputs"
+        }
+    }
+
+    private struct MotionBatchOutputConflictError: LocalizedError {
+        let input: URL
+        let image: URL
+        let video: URL
+
+        var errorDescription: String? {
+            "existing Live Photo pair \(image.lastPathComponent) + \(video.lastPathComponent) has no matching provenance for \(input.path); refusing silent reuse"
+        }
+    }
+
+    private struct MotionBatchPlanningConflictError: LocalizedError {
+        let input: URL
+        let output: URL
+
+        var errorDescription: String? {
+            "stable Motion Photo destination for \(input.path) conflicts with another planned output: \(output.path)"
         }
     }
 
@@ -399,34 +430,35 @@ enum MotionPhotoCLIIntegration {
         inputs: [URL],
         heicInputs: [URL],
         command: BatchCommand
-    ) -> [MotionBatchWorkItem] {
-        var reserved = Set<String>()
+    ) throws -> [MotionBatchWorkItem] {
+        let heicItems = makeHEICWorkItems(inputs: heicInputs, command: command)
+        var reserved = Set(heicItems.map { $0.outputURL.standardizedFileURL.path })
 
-        for item in makeHEICWorkItems(inputs: heicInputs, command: command) {
-            reserved.insert(item.outputURL.standardizedFileURL.path)
-        }
-
-        return inputs.sorted { $0.path < $1.path }.map { input in
-            let directory = categorizedOutputDirectory(for: input, command: command)
-            let sourceStem = input.deletingPathExtension().lastPathComponent
-            let outputStem = isHEIC(input) ? "\(sourceStem).live" : sourceStem
-            var sequence = 1
-            var output = directory.appendingPathComponent(outputStem).appendingPathExtension("heic")
-            while reserved.contains(output.standardizedFileURL.path)
-                || reserved.contains(
-                    AppleLivePhotoConversionEngine.companionVideoURL(for: output)
-                        .standardizedFileURL.path
-                )
-                || output.standardizedFileURL.path == input.standardizedFileURL.path {
-                sequence += 1
-                output = directory.appendingPathComponent("\(outputStem) (\(sequence))").appendingPathExtension("heic")
-            }
-            reserved.insert(output.standardizedFileURL.path)
-            reserved.insert(
-                AppleLivePhotoConversionEngine.companionVideoURL(for: output).standardizedFileURL.path
+        let planned = inputs.sorted { $0.path < $1.path }.map { input -> (input: URL, output: URL) in
+            let output = MotionPhotoBatchPlanner.outputImageURL(
+                for: input,
+                inputRootURL: command.inputDirURL,
+                outputDirectoryURL: categorizedOutputDirectory(for: input, command: command)
             )
-            return MotionBatchWorkItem(inputURL: input, outputImageURL: output)
+            return (input, output)
         }
+        try MotionPhotoBatchPlanner.validateUnique(planned)
+
+        var result: [MotionBatchWorkItem] = []
+        for item in planned {
+            let imagePath = item.output.standardizedFileURL.path
+            let videoPath = AppleLivePhotoConversionEngine.companionVideoURL(for: item.output)
+                .standardizedFileURL.path
+            if reserved.contains(imagePath)
+                || reserved.contains(videoPath)
+                || imagePath == item.input.standardizedFileURL.path {
+                throw MotionBatchPlanningConflictError(input: item.input, output: item.output)
+            }
+            reserved.insert(imagePath)
+            reserved.insert(videoPath)
+            result.append(MotionBatchWorkItem(inputURL: item.input, outputImageURL: item.output))
+        }
+        return result
     }
 
     private static func categorizedOutputDirectory(for input: URL, command: BatchCommand) -> URL {
