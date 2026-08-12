@@ -115,6 +115,7 @@ jobs:
         with:
           name: motion-photo-real-fixture-evidence
           if-no-files-found: error
+          retention-days: 14
           path: |
             artifacts/motion-photo-runner.txt
             artifacts/motion-photo-real-fixture-status.txt
@@ -127,5 +128,5 @@ jobs:
         with:
           name: live-photo-device-validation-${{ github.sha }}
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
           path: artifacts/live-photo-device-validation
