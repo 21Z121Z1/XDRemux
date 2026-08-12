@@ -73,9 +73,13 @@ public enum AppleLivePhotoConversionEngine {
             at: outputDirectory,
             withIntermediateDirectories: true
         )
-        // A prior process may have died between the two resource renames. Recover that transaction
-        // before generating another pair in the same destination directory.
-        try LivePhotoPairTransaction.recover(in: outputDirectory)
+        try LivePhotoPairPublisher.reconcile(
+            finalImageURL: outputImageURL,
+            finalVideoURL: outputVideoURL,
+            validatePair: { image, video in
+                AppleLivePhotoValidator.isValidPair(imageURL: image, videoURL: video)
+            }
+        )
 
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("xdremux-livephoto-\(UUID().uuidString)", isDirectory: true)
@@ -103,11 +107,11 @@ public enum AppleLivePhotoConversionEngine {
             requestedSource: asset.presentationSource
         )
         let assetIdentifier = UUID().uuidString
-        let transactionID = UUID().uuidString
+        let publicationID = UUID().uuidString
         let directory = outputImageURL.deletingLastPathComponent()
         let stem = outputImageURL.deletingPathExtension().lastPathComponent
-        let temporaryImageURL = directory.appendingPathComponent(".\(stem).\(transactionID).tmp.heic")
-        let temporaryVideoURL = directory.appendingPathComponent(".\(stem).\(transactionID).tmp.mov")
+        let temporaryImageURL = directory.appendingPathComponent(".\(stem).\(publicationID).tmp.heic")
+        let temporaryVideoURL = directory.appendingPathComponent(".\(stem).\(publicationID).tmp.mov")
         defer {
             try? FileManager.default.removeItem(at: temporaryImageURL)
             try? FileManager.default.removeItem(at: temporaryVideoURL)
@@ -144,7 +148,7 @@ public enum AppleLivePhotoConversionEngine {
             requirePhotoKitLoad: requirePhotoKitValidation
         )
 
-        try LivePhotoPairTransaction.commit(
+        try LivePhotoPairPublisher.publish(
             temporaryImageURL: temporaryImageURL,
             temporaryVideoURL: temporaryVideoURL,
             finalImageURL: outputImageURL,

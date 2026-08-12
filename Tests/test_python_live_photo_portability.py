@@ -15,6 +15,7 @@ class PythonLivePhotoPortabilityTests(unittest.TestCase):
             "motion_photo.py",
             "motion_video.py",
             "live_photo.py",
+            "live_photo_publish.py",
             "live_photo_mov.py",
             "live_photo_still.py",
             "live_photo_still_portable.py",
@@ -39,9 +40,6 @@ class PythonLivePhotoPortabilityTests(unittest.TestCase):
         self.assertEqual(violations, [])
 
     def test_decodes_libultrahdr_common_denominator_iso_metadata(self):
-        # AOSP libultrahdr low bits: bit 0 multi-channel, bit 1 base colourspace,
-        # bit 2 backward direction, bit 3 common denominator. This fixture is
-        # one-channel + base colourspace + common denominator = 0b00001010.
         payload = (
             struct.pack(">HHB", 0, 0, 0x0A)
             + struct.pack(">III", 1000, 0, 2500)
