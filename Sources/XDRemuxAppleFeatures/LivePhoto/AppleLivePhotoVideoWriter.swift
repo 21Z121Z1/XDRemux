@@ -15,7 +15,8 @@ public enum AppleLivePhotoVideoWriter {
         outputURL: URL,
         assetIdentifier: String,
         stillImageTime: CMTime,
-        oppoMetadata: OppoMotionPhotoMetadata? = nil
+        oppoMetadata: OppoMotionPhotoMetadata? = nil,
+        stillImageReferenceDimensions: [Float]? = nil
     ) async throws {
         let asset = AVURLAsset(url: videoInputURL)
         guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else {
@@ -88,7 +89,11 @@ public enum AppleLivePhotoVideoWriter {
         writer.metadata = [contentIdentifierMetadata(assetIdentifier)]
 
         let transform = oppoMetadata.flatMap(OppoLivePhotoAlignment.transformMatrix)
-        let referenceDimensions = oppoMetadata.flatMap(OppoLivePhotoAlignment.referenceDimensions)
+        let referenceDimensions = transformReferenceDimensions(
+            transform: transform,
+            requestedStillImageDimensions: stillImageReferenceDimensions,
+            oppoMetadata: oppoMetadata
+        )
         let metadataSetup = try makeTimedMetadataSetup(
             includeTransform: transform != nil,
             includeReferenceDimensions: transform != nil && referenceDimensions != nil
@@ -171,6 +176,20 @@ public enum AppleLivePhotoVideoWriter {
             }
         }
         return nil
+    }
+
+    static func transformReferenceDimensions(
+        transform: [Double]?,
+        requestedStillImageDimensions: [Float]?,
+        oppoMetadata: OppoMotionPhotoMetadata?
+    ) -> [Float]? {
+        guard transform != nil else { return nil }
+        if let requestedStillImageDimensions,
+           requestedStillImageDimensions.count == 2,
+           requestedStillImageDimensions.allSatisfy({ $0.isFinite && $0 > 0 }) {
+            return requestedStillImageDimensions
+        }
+        return oppoMetadata.flatMap(OppoLivePhotoAlignment.referenceDimensions)
     }
 
     private static func contentIdentifierMetadata(_ assetIdentifier: String) -> AVMetadataItem {

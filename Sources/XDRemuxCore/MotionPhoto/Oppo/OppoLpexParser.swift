@@ -118,6 +118,7 @@ public enum OppoLpexParser {
 
         let videoSize = size(dictionary["videoSize"])
         let originPhotoSize = size(dictionary["originPhotoSize"])
+        let photoEisCropFactor = numberArray(dictionary["photoEisCropFactor"], maxCount: 8)
         let eisCropFactor = numberArray(dictionary["eisCropFactor"], maxCount: 8)
         let photoCropFactor = double(dictionary["photoCropFactor"])
 
@@ -132,6 +133,7 @@ public enum OppoLpexParser {
             videoHeight: videoSize?.1,
             originPhotoWidth: originPhotoSize?.0,
             originPhotoHeight: originPhotoSize?.1,
+            photoEisCropFactor: photoEisCropFactor,
             eisCropFactor: eisCropFactor,
             photoCropFactor: photoCropFactor
         )

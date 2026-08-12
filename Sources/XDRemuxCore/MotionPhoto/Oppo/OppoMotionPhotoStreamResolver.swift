@@ -2,26 +2,20 @@ import Foundation
 
 public enum OppoMotionPhotoStreamResolver {
     /// Returns the primary OPPO Live Photo video stream. ColorOS 16 commonly stores two
-    /// concatenated BMFF streams; the penultimate ftyp starts Stream 1 and the last starts Stream 2.
-    /// This preserves the behavior of LivePhotoToolbox without making generic Android parsing
-    /// depend on OPPO's dual-stream convention.
+    /// concatenated BMFF streams; Stream 1 is the Apple paired movie and Stream 2 is retained only
+    /// as an auxiliary geometry source. The shared layout resolver owns the topology so downstream
+    /// code does not need another OPPO-only interpretation of the same bytes.
     public static func primaryVideoRange(for asset: MotionPhotoAsset) throws -> MotionPhotoByteRange {
-        guard asset.sourceKind == .oppoLivePhoto,
-              (asset.vendorMetadata?.streamCount ?? 1) >= 2 else {
-            return asset.videoResourceRange
-        }
-        let offsets = try ISOBaseMediaStreamScanner.ftypBoxOffsets(
-            in: asset.sourceURL,
-            range: asset.videoResourceRange
-        )
-        guard offsets.count >= 2 else { return asset.videoResourceRange }
-        let stream1Start = offsets[offsets.count - 2]
-        let stream2Start = offsets[offsets.count - 1]
-        guard stream1Start >= asset.videoResourceRange.lowerBound,
-              stream2Start > stream1Start,
-              stream2Start <= asset.videoResourceRange.upperBound else {
-            throw MotionPhotoParsingError.invalidVideoPayload
-        }
-        return try MotionPhotoByteRange(lowerBound: stream1Start, upperBound: stream2Start)
+        try MotionPhotoVideoStreamLayoutResolver.resolve(for: asset).primary.range
+    }
+
+    /// Returns analysis-only auxiliary video resources when the vendor layout is proven.
+    /// Current real fixtures expose one such stream for ColorOS 16 and none for Samsung.
+    public static func auxiliaryGeometryVideoRanges(
+        for asset: MotionPhotoAsset
+    ) throws -> [MotionPhotoByteRange] {
+        try MotionPhotoVideoStreamLayoutResolver.resolve(for: asset)
+            .auxiliaryGeometry
+            .map(\.range)
     }
 }

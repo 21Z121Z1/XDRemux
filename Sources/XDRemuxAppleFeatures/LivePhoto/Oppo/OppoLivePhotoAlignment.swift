@@ -2,13 +2,14 @@ import Foundation
 import XDRemuxCore
 
 public enum OppoLivePhotoAlignment {
-    private static let colorOS16EISCompensationScale = 0.90
+    private static let legacyColorOS16EISCompensationScale = 0.90
 
     public static func transformMatrix(for metadata: OppoMotionPhotoMetadata) -> [Double]? {
         if metadata.version >= 1 {
+            let scale = colorOS16EISCompensationScale(for: metadata)
             var result: [Double] = [
-                colorOS16EISCompensationScale, 0, 0,
-                0, colorOS16EISCompensationScale, 0,
+                scale.x, 0, 0,
+                0, scale.y, 0,
                 0, 0, 1,
             ]
             if let crop = metadata.photoCropMatrix,
@@ -40,6 +41,25 @@ public enum OppoLivePhotoAlignment {
         return isIdentity(result) ? nil : result
     }
 
+    /// Normalizes the two OPPO crop-factor conventions seen in real data to an Apple-facing scale.
+    /// ColorOS 16 `photoEisCropFactor` commonly stores values greater than one (for example 1.11),
+    /// while older `eisCropFactor` samples can already store a direct scale below one. In either
+    /// representation the normalized result is constrained to `(0, 1]` and never enlarges the FOV.
+    static func colorOS16EISCompensationScale(
+        for metadata: OppoMotionPhotoMetadata
+    ) -> (x: Double, y: Double) {
+        if let scale = normalizedScale(metadata.photoEisCropFactor) {
+            return scale
+        }
+        if let scale = normalizedScale(metadata.eisCropFactor) {
+            return scale
+        }
+        return (
+            legacyColorOS16EISCompensationScale,
+            legacyColorOS16EISCompensationScale
+        )
+    }
+
     public static func encodeForApple(_ matrix: [Double]) -> Data {
         guard matrix.count == 9 else { return Data() }
         var output = Data(capacity: 72)
@@ -50,6 +70,9 @@ public enum OppoLivePhotoAlignment {
         return output
     }
 
+    /// Compatibility fallback for direct writer callers. Production conversion passes the actual
+    /// still-image pixel dimensions because Core Media defines the reference dimensions as the
+    /// dimensions of the Live Photo still, not the video raster.
     public static func referenceDimensions(for metadata: OppoMotionPhotoMetadata) -> [Float]? {
         guard let width = metadata.videoWidth, let height = metadata.videoHeight,
               width > 0, height > 0 else { return nil }
@@ -92,5 +115,23 @@ public enum OppoLivePhotoAlignment {
             (f*g-d*i)*inv, (a*i-c*g)*inv, (c*d-a*f)*inv,
             (d*h-e*g)*inv, (b*g-a*h)*inv, (a*e-b*d)*inv,
         ]
+    }
+
+    private static func normalizedScale(_ factors: [Double]?) -> (x: Double, y: Double)? {
+        guard let factors, !factors.isEmpty else { return nil }
+        let rawX = factors[0]
+        let rawY = factors.count >= 2 ? factors[1] : rawX
+        guard let x = normalizedAxisScale(rawX),
+              let y = normalizedAxisScale(rawY) else {
+            return nil
+        }
+        return (x, y)
+    }
+
+    private static func normalizedAxisScale(_ value: Double) -> Double? {
+        guard value.isFinite, value > 0 else { return nil }
+        let scale = value > 1 ? 1.0 / value : value
+        guard scale.isFinite, scale > 0, scale <= 1 else { return nil }
+        return scale
     }
 }

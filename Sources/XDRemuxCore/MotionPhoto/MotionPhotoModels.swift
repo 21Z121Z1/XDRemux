@@ -59,6 +59,11 @@ public struct OppoMotionPhotoMetadata: Sendable, Equatable {
     public let videoHeight: Int?
     public let originPhotoWidth: Int?
     public let originPhotoHeight: Int?
+    /// ColorOS 16 field observed on current devices. Values are commonly crop factors greater than
+    /// one (for example 1.11), so Apple-facing compensation uses their reciprocal.
+    public let photoEisCropFactor: [Double]?
+    /// Older/alternate OPPO field. Existing samples can encode either a direct scale below one or
+    /// a crop factor above one, so consumers must normalize its convention rather than assume one.
     public let eisCropFactor: [Double]?
     public let photoCropFactor: Double?
     public let streamCount: Int
@@ -74,6 +79,7 @@ public struct OppoMotionPhotoMetadata: Sendable, Equatable {
         videoHeight: Int? = nil,
         originPhotoWidth: Int? = nil,
         originPhotoHeight: Int? = nil,
+        photoEisCropFactor: [Double]? = nil,
         eisCropFactor: [Double]? = nil,
         photoCropFactor: Double? = nil,
         streamCount: Int = 1
@@ -88,6 +94,7 @@ public struct OppoMotionPhotoMetadata: Sendable, Equatable {
         self.videoHeight = videoHeight
         self.originPhotoWidth = originPhotoWidth
         self.originPhotoHeight = originPhotoHeight
+        self.photoEisCropFactor = photoEisCropFactor
         self.eisCropFactor = eisCropFactor
         self.photoCropFactor = photoCropFactor
         self.streamCount = max(1, streamCount)
