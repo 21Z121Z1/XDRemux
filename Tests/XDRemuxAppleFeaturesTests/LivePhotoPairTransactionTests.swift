@@ -166,6 +166,41 @@ final class LivePhotoPairTransactionTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: videoBackup.path))
     }
 
+    func testCommittedRecoveryNeverRollsBackWhenCleanupWasInterrupted() throws {
+        let directory = try makeDirectory("recovery-committed-cleanup")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let id = "c0ffee"
+        let image = directory.appendingPathComponent("photo.heic")
+        let video = directory.appendingPathComponent("photo.mov")
+        let imageBackup = directory.appendingPathComponent(".photo.heic.c0ffee.backup")
+        let videoBackup = directory.appendingPathComponent(".photo.mov.c0ffee.backup")
+        try Data("new-image".utf8).write(to: image)
+        try Data("new-video".utf8).write(to: video)
+        // Simulate cleanup already having deleted one backup when the process died.
+        try Data("old-video".utf8).write(to: videoBackup)
+
+        let manifest = LivePhotoPairTransaction.Manifest(
+            schemaVersion: LivePhotoPairTransaction.schemaVersion,
+            transactionID: id,
+            state: .committed,
+            finalImage: image.lastPathComponent,
+            finalVideo: video.lastPathComponent,
+            temporaryImage: ".photo.c0ffee.tmp.heic",
+            temporaryVideo: ".photo.c0ffee.tmp.mov",
+            backupImage: imageBackup.lastPathComponent,
+            backupVideo: videoBackup.lastPathComponent,
+            hadImage: true,
+            hadVideo: true
+        )
+        _ = try LivePhotoPairTransaction.writeManifest(manifest, in: directory)
+
+        try LivePhotoPairTransaction.recover(in: directory, validatePair: { _, _ in false })
+
+        XCTAssertEqual(try Data(contentsOf: image), Data("new-image".utf8))
+        XCTAssertEqual(try Data(contentsOf: video), Data("new-video".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: videoBackup.path))
+    }
+
     private func makeDirectory(_ suffix: String) throws -> URL {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "xdremux-live-photo-transaction-\(suffix)-\(UUID().uuidString)",
