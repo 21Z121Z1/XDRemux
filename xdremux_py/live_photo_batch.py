@@ -110,8 +110,7 @@ def relative_source_path(source: Path, input_root: Path) -> Path:
 def planned_output_image(source: Path, input_root: Path, output_directory: Path) -> Path:
     source = Path(source)
     relative = relative_source_path(source, input_root)
-    stem = source.stem + (".live" if source.suffix.lower() in {".heic", ".heif"} else "")
-    return Path(output_directory) / relative.parent / f"{stem}.heic"
+    return Path(output_directory) / relative.parent / f"{source.stem}.live.heic"
 
 
 def validate_unique_plan(outputs: list[tuple[Path, Path]]) -> None:

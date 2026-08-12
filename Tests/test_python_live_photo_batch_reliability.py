@@ -33,9 +33,21 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
             b_output = planned_output_image(b, root, output)
             b_subset_output = planned_output_image(b, root, output)
 
-            self.assertEqual(a_output, output / "A" / "IMG.heic")
-            self.assertEqual(b_output, output / "B" / "IMG.heic")
+            self.assertEqual(a_output, output / "A" / "IMG.live.heic")
+            self.assertEqual(b_output, output / "B" / "IMG.live.heic")
             self.assertEqual(b_output, b_subset_output)
+
+    def test_jpeg_batch_output_does_not_use_sibling_source_heic_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "input"
+            source = root / "A" / "IMG.jpg"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"jpeg")
+            sibling_heic = root / "A" / "IMG.heic"
+            sibling_heic.write_bytes(b"heic")
+            planned = planned_output_image(source, root, root)
+            self.assertNotEqual(planned, sibling_heic)
+            self.assertEqual(planned, root / "A" / "IMG.live.heic")
 
     def test_absolute_input_root_does_not_leak_into_output_name(self):
         with tempfile.TemporaryDirectory() as tmp:

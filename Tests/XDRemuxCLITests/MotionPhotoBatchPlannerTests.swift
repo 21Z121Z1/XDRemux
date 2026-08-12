@@ -25,9 +25,23 @@ final class MotionPhotoBatchPlannerTests: XCTestCase {
             outputDirectoryURL: output
         )
 
-        XCTAssertEqual(aOutput.path, output.appendingPathComponent("A/IMG.heic").path)
-        XCTAssertEqual(bOutput.path, output.appendingPathComponent("B/IMG.heic").path)
+        XCTAssertEqual(aOutput.path, output.appendingPathComponent("A/IMG.live.heic").path)
+        XCTAssertEqual(bOutput.path, output.appendingPathComponent("B/IMG.live.heic").path)
         XCTAssertEqual(bOutput, bSubsetOutput)
+    }
+
+    func testJPEGOutputDoesNotUseSiblingSourceHEICName() {
+        let root = URL(fileURLWithPath: "/tmp/xdremux-input", isDirectory: true)
+        let output = root
+        let jpeg = root.appendingPathComponent("A/IMG.jpg")
+        let siblingHEIC = root.appendingPathComponent("A/IMG.heic")
+        let planned = MotionPhotoBatchPlanner.outputImageURL(
+            for: jpeg,
+            inputRootURL: root,
+            outputDirectoryURL: output
+        )
+        XCTAssertNotEqual(planned.path, siblingHEIC.path)
+        XCTAssertEqual(planned.path, root.appendingPathComponent("A/IMG.live.heic").path)
     }
 
     func testAbsoluteInputRootDoesNotLeakIntoOutputName() {
@@ -48,7 +62,7 @@ final class MotionPhotoBatchPlannerTests: XCTestCase {
             outputDirectoryURL: output
         )
 
-        XCTAssertEqual(firstOutput.path, output.appendingPathComponent("A/IMG.heic").path)
+        XCTAssertEqual(firstOutput.path, output.appendingPathComponent("A/IMG.live.heic").path)
         XCTAssertEqual(secondOutput, firstOutput)
     }
 
