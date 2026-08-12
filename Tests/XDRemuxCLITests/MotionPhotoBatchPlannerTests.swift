@@ -32,6 +32,27 @@ final class MotionPhotoBatchPlannerTests: XCTestCase {
         XCTAssertEqual(aOutput.pathExtension, "heic")
     }
 
+    func testSameRelativePathInDifferentInputRootsCannotAliasSharedOutputDirectory() {
+        let firstRoot = URL(fileURLWithPath: "/tmp/xdremux-root-one", isDirectory: true)
+        let secondRoot = URL(fileURLWithPath: "/tmp/xdremux-root-two", isDirectory: true)
+        let output = URL(fileURLWithPath: "/tmp/xdremux-shared-output", isDirectory: true)
+        let first = firstRoot.appendingPathComponent("A/IMG.jpg")
+        let second = secondRoot.appendingPathComponent("A/IMG.jpg")
+
+        let firstOutput = MotionPhotoBatchPlanner.outputImageURL(
+            for: first,
+            inputRootURL: firstRoot,
+            outputDirectoryURL: output
+        )
+        let secondOutput = MotionPhotoBatchPlanner.outputImageURL(
+            for: second,
+            inputRootURL: secondRoot,
+            outputDirectoryURL: output
+        )
+
+        XCTAssertNotEqual(firstOutput, secondOutput)
+    }
+
     func testHEIFMotionPhotoUsesSeparateLiveNamespace() {
         let root = URL(fileURLWithPath: "/tmp/xdremux-input", isDirectory: true)
         let output = URL(fileURLWithPath: "/tmp/xdremux-output", isDirectory: true)
