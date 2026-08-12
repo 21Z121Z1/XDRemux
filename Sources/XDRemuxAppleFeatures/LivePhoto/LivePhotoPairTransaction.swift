@@ -132,11 +132,14 @@ enum LivePhotoPairTransaction {
                     )
                 }
 
-                // This durable marker is the commit point. Backup cleanup happens only afterwards.
-                // If cleanup itself is interrupted, recovery must continue cleanup and never roll
-                // one resource back independently of the other.
-                manifest.state = .committed
-                journalURL = try writeManifest(manifest, in: directory)
+                // This durable marker is the commit point. Do not update the in-memory state until
+                // the journal write returns successfully; otherwise a failed journal publication
+                // could make the catch path clean backups instead of rolling the transaction back.
+                var committedManifest = manifest
+                committedManifest.state = .committed
+                let committedJournalURL = try writeManifest(committedManifest, in: directory)
+                manifest = committedManifest
+                journalURL = committedJournalURL
                 try cleanupCommitted(manifest, journalURL: journalURL, in: directory)
             } catch {
                 do {
@@ -189,8 +192,10 @@ enum LivePhotoPairTransaction {
                FileManager.default.fileExists(atPath: finalVideo.path),
                let validatePair,
                validatePair(finalImage, finalVideo) {
-                manifest.state = .committed
-                let committedJournalURL = try writeManifest(manifest, in: directory)
+                var committedManifest = manifest
+                committedManifest.state = .committed
+                let committedJournalURL = try writeManifest(committedManifest, in: directory)
+                manifest = committedManifest
                 try cleanupCommitted(manifest, journalURL: committedJournalURL, in: directory)
                 continue
             }
