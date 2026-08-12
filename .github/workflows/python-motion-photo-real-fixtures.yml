@@ -42,8 +42,7 @@ jobs:
 
       - name: Run portable Python tests
         shell: bash
-        run: |
-          python -m unittest discover -s Tests -p 'test_*.py' -v
+        run: python -m unittest discover -s Tests -p 'test_*.py' -v
 
       - name: Resolve private fixture archive
         shell: bash
@@ -60,13 +59,23 @@ jobs:
             --output "$RUNNER_TEMP/xdremux-fixtures.zip"
           unzip -q "$RUNNER_TEMP/xdremux-fixtures.zip" -d "$RUNNER_TEMP/xdremux-fixtures"
 
-      - name: Convert all real fixtures on Linux with pure Python
+      - name: Convert all real fixtures once on Linux
         shell: bash
         run: |
+          OUTPUT_ROOT="$RUNNER_TEMP/xdremux-python-live-photo-output"
+          mkdir -p "$OUTPUT_ROOT"
           python Tests/validation/verify_python_motion_photo_fixtures.py \
             --fixture-root "$RUNNER_TEMP/xdremux-fixtures" \
-            --output-root "$RUNNER_TEMP/xdremux-python-live-photo-output" \
-            --manifest "$RUNNER_TEMP/xdremux-python-live-photo-manifest.json"
+            --output-root "$OUTPUT_ROOT" \
+            --manifest "$OUTPUT_ROOT/manifest.json" \
+            2>&1 | tee "$OUTPUT_ROOT/conversion.log"
+
+      - name: Upload generated Live Photo pairs
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-live-photo-generated-pairs
+          if-no-files-found: error
+          path: ${{ runner.temp }}/xdremux-python-live-photo-output/
 
   apple-compatibility-oracle:
     needs: portable-python
@@ -83,27 +92,17 @@ jobs:
             echo "runner_os=$(sw_vers -productVersion)"
             echo "runner_build=$(sw_vers -buildVersion)"
             echo "arch=$(uname -m)"
-            echo "conversion_runtime=pure Python; Apple frameworks are validation-only"
+            echo "conversion_runtime=Linux pure Python"
+            echo "Apple frameworks=validation-only"
           } | tee artifacts/python-live-photo-runner.txt
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install Python package
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .
-
-      - name: Resolve private fixture archive
+      - name: Resolve private fixture archive for source-side validation
         shell: bash
         env:
           FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_FIXTURE_ARCHIVE_URL }}
         run: |
           if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
-            echo "::error::XDREMUX_FIXTURE_ARCHIVE_URL is required for the strict Python gate"
+            echo "::error::XDREMUX_FIXTURE_ARCHIVE_URL is required for the PhotoKit oracle"
             exit 1
           fi
           mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
@@ -112,22 +111,48 @@ jobs:
             --output "$RUNNER_TEMP/xdremux-fixtures.zip"
           ditto -x -k "$RUNNER_TEMP/xdremux-fixtures.zip" "$RUNNER_TEMP/xdremux-fixtures"
           echo "FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
-          echo "PYTHON_OUTPUT_ROOT=$RUNNER_TEMP/xdremux-python-live-photo-output" >> "$GITHUB_ENV"
-          echo "PYTHON_MANIFEST=$RUNNER_TEMP/xdremux-python-live-photo-manifest.json" >> "$GITHUB_ENV"
 
-      - name: Convert all real fixtures with pure Python
+      - name: Download Linux-generated Live Photo pairs
+        uses: actions/download-artifact@v8
+        with:
+          name: python-live-photo-generated-pairs
+          path: ${{ runner.temp }}/xdremux-python-live-photo-output
+
+      - name: Rebase artifact manifest paths for this runner
         shell: bash
         run: |
-          echo "::group::Pure Python Samsung / Xiaomi / OPPO / vivo conversion"
-          python Tests/validation/verify_python_motion_photo_fixtures.py \
-            --fixture-root "$FIXTURE_ROOT" \
-            --output-root "$PYTHON_OUTPUT_ROOT" \
-            --manifest "$PYTHON_MANIFEST" \
-            2>&1 | tee artifacts/python-motion-photo-real-fixtures.log
-          echo "::endgroup::"
-          cp "$PYTHON_MANIFEST" artifacts/python-live-photo-manifest.json
+          OUTPUT_ROOT="$RUNNER_TEMP/xdremux-python-live-photo-output"
+          MANIFEST="$OUTPUT_ROOT/manifest.json"
+          python3 - "$MANIFEST" "$FIXTURE_ROOT" "$OUTPUT_ROOT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
 
-      - name: Validate Python outputs with macOS PhotoKit
+          manifest_path = Path(sys.argv[1])
+          fixture_root = Path(sys.argv[2])
+          output_root = Path(sys.argv[3])
+          data = json.loads(manifest_path.read_text(encoding="utf-8"))
+          by_name = {}
+          wanted = {entry["sourceFilename"] for entry in data["fixtures"]}
+          for candidate in fixture_root.rglob("*"):
+              if candidate.is_file() and candidate.name in wanted:
+                  if candidate.name in by_name and by_name[candidate.name] != candidate:
+                      raise RuntimeError(f"duplicate fixture filename: {candidate.name}")
+                  by_name[candidate.name] = candidate
+          missing = wanted - by_name.keys()
+          if missing:
+              raise RuntimeError("missing source fixtures: " + ", ".join(sorted(missing)))
+          for entry in data["fixtures"]:
+              entry["sourcePath"] = str(by_name[entry["sourceFilename"]])
+              entry["outputImagePath"] = str(output_root / Path(entry["outputImagePath"]).name)
+              entry["outputVideoPath"] = str(output_root / Path(entry["outputVideoPath"]).name)
+          manifest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+          PY
+          cp "$MANIFEST" artifacts/python-live-photo-manifest.json
+          cp "$OUTPUT_ROOT/conversion.log" artifacts/python-motion-photo-real-fixtures.log
+          echo "PYTHON_MANIFEST=$MANIFEST" >> "$GITHUB_ENV"
+
+      - name: Validate Linux outputs with macOS PhotoKit
         shell: bash
         env:
           XDREMUX_PYTHON_LIVE_PHOTO_MANIFEST: ${{ env.PYTHON_MANIFEST }}
@@ -144,11 +169,11 @@ jobs:
           {
             echo "## Python Motion Photo → Apple Live Photo Gate"
             echo
-            echo "- Linux real-fixture conversion: required before this job"
-            echo "- macOS conversion runtime: pure Python/container code"
-            echo "- Apple frameworks: final structural/PhotoKit acceptance oracle only"
+            echo "- Linux real-fixture conversion: one authoritative generation pass"
+            echo "- macOS conversion: none"
+            echo "- Apple frameworks: structural/PhotoKit acceptance oracle only"
             if [[ -f artifacts/python-live-photo-manifest.json ]]; then
-              echo "- Real fixture manifest: produced"
+              echo "- Linux-generated artifact manifest: validated"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
