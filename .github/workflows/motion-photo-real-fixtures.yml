@@ -128,5 +128,5 @@ jobs:
         with:
           name: live-photo-device-validation-${{ github.sha }}
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 1
           path: artifacts/live-photo-device-validation
