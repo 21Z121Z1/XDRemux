@@ -10,6 +10,7 @@ on:
       - "Tests/**/*MotionPhoto*.swift"
       - "Tests/**/*LivePhoto*.swift"
       - "fixtures/**"
+      - "scripts/build_live_photo_device_validation.sh"
       - ".github/workflows/motion-photo-real-fixtures.yml"
 
 jobs:
@@ -74,6 +75,15 @@ jobs:
           echo "tests=passed" >> artifacts/motion-photo-real-fixture-status.txt
           echo "photoKit=passed" >> artifacts/motion-photo-real-fixture-status.txt
 
+      - name: Build importable ColorOS 16 and Samsung Live Photo pairs
+        shell: bash
+        run: |
+          swift build -c release --product xdremux
+          XDREMUX_BIN=".build/release/xdremux" \
+            bash scripts/build_live_photo_device_validation.sh \
+              "$FIXTURE_ROOT" \
+              artifacts/live-photo-device-validation
+
       - name: Run historical OPPO characterization when present
         shell: bash
         env:
@@ -100,3 +110,12 @@ jobs:
             artifacts/motion-photo-real-fixture-status.txt
             artifacts/motion-photo-real-fixtures.log
             artifacts/motion-photo-historical-oppo.log
+
+      - name: Upload device-validation Live Photo pairs
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-photo-device-validation-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: artifacts/live-photo-device-validation
