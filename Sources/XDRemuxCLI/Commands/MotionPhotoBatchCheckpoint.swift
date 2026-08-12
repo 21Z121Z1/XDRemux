@@ -3,6 +3,7 @@ import Foundation
 
 /// Durable sidecar state for the Motion Photo pre-pass. Besides retry status, this is the
 /// provenance record that proves a specific source produced a specific HEIC+MOV pair.
+/// The wire format intentionally matches xdremux_py.live_photo_batch.
 enum MotionPhotoBatchCheckpoint {
     enum Status: String, Codable {
         case success
@@ -103,9 +104,16 @@ enum MotionPhotoBatchCheckpoint {
         for line in data.split(separator: 0x0a) where !line.isEmpty {
             guard let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
                   object["kind"] as? String == "item" else {
+                // A crash can leave a truncated final JSONL record. Ignoring it is fail-closed:
+                // the input will be rebuilt rather than incorrectly authorized for reuse.
                 continue
             }
-            let item = try decoder.decode(Item.self, from: Data(line))
+            guard let item = try? decoder.decode(Item.self, from: Data(line)) else {
+                // Foreign/unsupported item schemas also cannot authorize reuse. This makes the
+                // checkpoint robust to mixed runtime versions without turning corruption into a
+                // batch-wide availability failure.
+                continue
+            }
             state[item.inputPath] = item
         }
         return state
