@@ -55,6 +55,18 @@ compatibility fallback when no still dimensions were supplied.
 The actual Track 5 transform source is otherwise unchanged by this branch: XDRemux only writes an
 OPPO transform that the existing alignment implementation can derive from vendor metadata.
 
+### Vision registration is available as an analysis primitive
+
+`VendorLivePhotoVisionHomographyEstimator` exposes the same public Vision homographic registration
+primitive needed by ColorOS Stream 1/Stream 2/still analysis and by future auxiliary-stream vendors.
+It returns a finite, normalized row-major `floatingToReference` matrix and deliberately retains
+Vision's mapping direction in the API name. A synthetic high-texture identity-registration test
+checks both the Vision call and the SIMD-to-row-major conversion.
+
+This estimator is not connected to Apple metadata writing. A caller may use it for diagnostics or
+for offline trajectory research without silently crossing the still-unverified Apple coordinate
+boundary.
+
 ## Deliberately not written yet
 
 The following data is useful research evidence but is **not production-writable on this branch**:
@@ -92,7 +104,9 @@ Synthetic tests additionally cover:
 - `1.11 -> 1/1.11` ColorOS normalization;
 - direct sub-unity legacy factors;
 - `photoEisCropFactor` precedence;
-- still-image dimensions taking priority over video dimensions for Track 5 metadata.
+- still-image dimensions taking priority over video dimensions for Track 5 metadata;
+- Track 5 reference dimensions surviving an AVFoundation write/read round trip;
+- Vision identity registration producing a normalized near-identity homography.
 
 ## Device validation still required
 
