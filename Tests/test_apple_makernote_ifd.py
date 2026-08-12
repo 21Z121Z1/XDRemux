@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import struct
+import tempfile
 import unittest
+from pathlib import Path
 
+import pillow_heif
 from PIL import ExifTags, Image
 
 from xdremux_py.live_photo_still import (
@@ -10,6 +13,7 @@ from xdremux_py.live_photo_still import (
     _inject_makernote,
     _maker_identifier,
     build_apple_makernote,
+    read_apple_content_identifier,
 )
 
 
@@ -57,6 +61,28 @@ class AppleMakerNoteIFDTests(unittest.TestCase):
             _maker_identifier(result_exif.get(APPLE_MAKERNOTE_TAG)),
             "ABC-123",
         )
+
+    @staticmethod
+    def _write_heic(path: Path, exif: Image.Exif) -> None:
+        image = Image.new("RGB", (4, 4), (32, 64, 96))
+        heif = pillow_heif.from_pillow(image)
+        heif.save(str(path), quality=90, exif=exif.tobytes())
+
+    def test_reader_accepts_only_exif_ifd_makernote(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            correct = root / "correct.heic"
+            misplaced = root / "misplaced.heic"
+
+            correct_exif = Image.Exif()
+            correct_exif.get_ifd(ExifTags.IFD.Exif)[APPLE_MAKERNOTE_TAG] = build_apple_makernote("ABC-123")
+            self._write_heic(correct, correct_exif)
+            self.assertEqual(read_apple_content_identifier(correct), "ABC-123")
+
+            legacy_exif = Image.Exif()
+            legacy_exif[APPLE_MAKERNOTE_TAG] = build_apple_makernote("ABC-123")
+            self._write_heic(misplaced, legacy_exif)
+            self.assertIsNone(read_apple_content_identifier(misplaced))
 
 
 if __name__ == "__main__":
