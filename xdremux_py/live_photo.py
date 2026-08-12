@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import tempfile
 import uuid
@@ -23,6 +22,7 @@ from .live_photo_still_portable import (
     read_apple_content_identifier,
     write_live_photo_still,
 )
+from .live_photo_transaction import commit_pair, recover_transactions
 from .motion_photo import MotionPhotoError, copy_range, parse_motion_photo, primary_video_range
 from .motion_video import MotionVideoError, strip_trailing_vendor_data
 
@@ -60,38 +60,6 @@ def companion_video_path(image_path: Path) -> Path:
     return image_path.with_suffix(".mov")
 
 
-def _transactional_commit(temp_image: Path, temp_video: Path, image: Path, video: Path) -> None:
-    image.parent.mkdir(parents=True, exist_ok=True)
-    backup_id = uuid.uuid4().hex
-    image_backup = image.with_name(f".{image.name}.{backup_id}.backup")
-    video_backup = video.with_name(f".{video.name}.{backup_id}.backup")
-    had_image, had_video = image.exists(), video.exists()
-    image_installed = video_installed = False
-    try:
-        if had_image:
-            os.replace(image, image_backup)
-        if had_video:
-            os.replace(video, video_backup)
-        os.replace(temp_image, image)
-        image_installed = True
-        os.replace(temp_video, video)
-        video_installed = True
-        if image_backup.exists():
-            image_backup.unlink()
-        if video_backup.exists():
-            video_backup.unlink()
-    except Exception:
-        if image_installed and image.exists():
-            image.unlink()
-        if video_installed and video.exists():
-            video.unlink()
-        if image_backup.exists():
-            os.replace(image_backup, image)
-        if video_backup.exists():
-            os.replace(video_backup, video)
-        raise
-
-
 def validate_pair(image: Path, video: Path, content_identifier: str, still_time_seconds: float) -> None:
     image_identifier = read_apple_content_identifier(image)
     if image_identifier is None or image_identifier.upper() != content_identifier.upper():
@@ -102,7 +70,7 @@ def validate_pair(image: Path, video: Path, content_identifier: str, still_time_
     validate_live_photo_movie(video, movie_identifier, still_time_seconds)
 
 
-def existing_pair_is_valid(image: Path, video: Path) -> bool:
+def existing_pair_matches_identifier(image: Path, video: Path, content_identifier: str) -> bool:
     image, video = Path(image), Path(video)
     if not image.is_file() or not video.is_file():
         return False
@@ -110,12 +78,26 @@ def existing_pair_is_valid(image: Path, video: Path) -> bool:
         image_identifier = read_apple_content_identifier(image)
         movie_identifier = read_movie_identifier(video)
         still_time = read_still_time(video)
+        expected = content_identifier.upper()
         if not image_identifier or not movie_identifier or still_time is None:
             return False
-        if image_identifier.upper() != movie_identifier.upper():
+        if image_identifier.upper() != expected or movie_identifier.upper() != expected:
             return False
         validate_live_photo_movie(video, movie_identifier, still_time)
         return True
+    except (OSError, ValueError, LivePhotoMovieError, LivePhotoStillError):
+        return False
+
+
+def existing_pair_is_valid(image: Path, video: Path) -> bool:
+    image, video = Path(image), Path(video)
+    if not image.is_file() or not video.is_file():
+        return False
+    try:
+        image_identifier = read_apple_content_identifier(image)
+        if not image_identifier:
+            return False
+        return existing_pair_matches_identifier(image, video, image_identifier)
     except (OSError, ValueError, LivePhotoMovieError, LivePhotoStillError):
         return False
 
@@ -137,7 +119,23 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
     if output_image.resolve() == input_path.resolve():
         raise LivePhotoConversionError("Motion Photo conversion never overwrites the source image")
     output_video = companion_video_path(output_image)
+    output_directory = output_image.parent
+    output_directory.mkdir(parents=True, exist_ok=True)
+
+    # Recover an interrupted two-file commit before starting a new one. The transaction journal
+    # itself lives under output_directory and validates any pair that reached pair_installed.
+    try:
+        recover_transactions(output_directory, existing_pair_is_valid)
+    except (OSError, ValueError) as exc:
+        raise LivePhotoConversionError(f"could not recover prior Live Photo transaction: {exc}") from exc
+
     content_identifier = str(uuid.uuid4()).upper()
+    transaction_id = uuid.uuid4().hex
+    stem = output_image.stem
+    # Final-pair temporaries intentionally live beside the destination. This is required for
+    # rename/replace atomicity and prevents EXDEV when /tmp and the output are different volumes.
+    temp_image = output_directory / f".{stem}.{transaction_id}.tmp.heic"
+    temp_video = output_directory / f".{stem}.{transaction_id}.tmp.mov"
 
     scratch = Path(tempfile.mkdtemp(prefix="xdremux-py-livephoto-"))
     try:
@@ -149,8 +147,6 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
         except (LivePhotoMovieError, MotionVideoError) as exc:
             raise LivePhotoConversionError(str(exc)) from exc
 
-        temp_image = scratch / "pair.heic"
-        temp_video = scratch / "pair.mov"
         try:
             had_gain_map = write_live_photo_still(asset, temp_image, content_identifier)
             source_media_hashes = media_payload_sha256(video_source)
@@ -190,7 +186,17 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
         if asset.source_kind == "androidHeifMotionPhotoV1":
             diagnostics.append("HEIF mpvd video extracted without trailing vendor boxes")
 
-        _transactional_commit(temp_image, temp_video, output_image, output_video)
+        try:
+            commit_pair(
+                temp_image,
+                temp_video,
+                output_image,
+                output_video,
+                pair_validator=existing_pair_is_valid,
+            )
+        except (OSError, ValueError) as exc:
+            raise LivePhotoConversionError(f"Live Photo pair commit failed: {exc}") from exc
+
         return LivePhotoResult(
             input_path=input_path,
             image_path=output_image,
@@ -202,4 +208,12 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
             diagnostics=tuple(diagnostics),
         )
     finally:
+        try:
+            temp_image.unlink()
+        except FileNotFoundError:
+            pass
+        try:
+            temp_video.unlink()
+        except FileNotFoundError:
+            pass
         shutil.rmtree(scratch, ignore_errors=True)
