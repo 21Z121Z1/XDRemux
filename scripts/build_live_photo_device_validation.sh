@@ -3,11 +3,6 @@ set -euo pipefail
 
 fixture_root="${1:-fixtures}"
 output_root="${2:-artifacts/live-photo-device-validation}"
-xdremux_bin="${XDREMUX_BIN:-.build/release/xdremux}"
-
-if [[ ! -x "$xdremux_bin" ]]; then
-  swift build -c release --product xdremux
-fi
 
 rm -rf "$output_root"
 mkdir -p "$output_root"
@@ -46,10 +41,16 @@ for entry in "${cases[@]}"; do
 
   output_heic="$case_dir/$output_stem.heic"
   output_mov="$case_dir/$output_stem.mov"
-  "$xdremux_bin" convert \
-    --input "$source" \
-    --output "$output_heic" \
-    2>&1 | tee "$case_dir/conversion.log"
+
+  # The preceding real-fixture CI gate already exercises the same production converter through
+  # PhotoKit for all 14 repository fixtures. Repeating PHLivePhoto loading once per downloadable
+  # artifact is both redundant and susceptible to runner lifecycle timeouts. This dedicated test
+  # harness calls AppleLivePhotoConversionEngine with requirePhotoKitValidation=false while keeping
+  # every other production validation, including compressed sample byte equality.
+  XDREMUX_DEVICE_VALIDATION_SOURCE="$source" \
+  XDREMUX_DEVICE_VALIDATION_OUTPUT="$output_heic" \
+    swift test --filter LivePhotoDeviceValidationBundleTests \
+      2>&1 | tee "$case_dir/conversion.log"
 
   if [[ ! -s "$output_heic" || ! -s "$output_mov" ]]; then
     echo "converter did not produce a complete Live Photo pair for $filename" >&2
@@ -124,6 +125,11 @@ re-encoding.
 This archive is intentionally limited to the active ColorOS 16 and Samsung validation corpus.
 `R002_...` and `R003_...` are omitted because they are byte-identical duplicates of the included
 Samsung HEIF fixtures.
+
+The CI lane first validates all 14 real fixtures through PhotoKit. Pair generation then reuses the
+same production converter with only the repeated PhotoKit load disabled; structural metadata,
+gain-map preservation, source immutability, and exact compressed video/audio sample checks remain
+enforced by the production validator.
 
 ## Import for device testing
 
