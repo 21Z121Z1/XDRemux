@@ -131,9 +131,12 @@ def relative_source_path(source: Path, input_root: Path) -> str:
 
 
 def stable_source_token(source: Path, input_root: Path, length: int = 32) -> str:
-    """Return a 128-bit-by-default deterministic token from normalized source-relative path."""
-    relative = relative_source_path(source, input_root)
-    return hashlib.sha256(relative.encode("utf-8")).hexdigest()[:length]
+    """Return a 128-bit token namespaced by canonical root plus normalized relative path."""
+    root = Path(input_root).resolve()
+    root_identity = unicodedata.normalize("NFC", root.as_posix())
+    relative = relative_source_path(source, root)
+    identity = root_identity + "\0" + relative
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:length]
 
 
 def planned_output_image(source: Path, input_root: Path, output_directory: Path) -> Path:
