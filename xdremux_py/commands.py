@@ -36,6 +36,9 @@ class BatchCommand:
     glob: str
     glob_explicit: bool
     categorize_output: bool
+    skip_existing: bool
+    resume: bool
+    checkpoint_path: Path | None
     configuration: ConversionConfiguration
 
     @classmethod
@@ -47,6 +50,9 @@ class BatchCommand:
             glob=args.glob or DEFAULT_BATCH_GLOB,
             glob_explicit=bool(args.glob),
             categorize_output=bool(getattr(args, "categorize_output", False)),
+            skip_existing=bool(getattr(args, "skip_existing", False)),
+            resume=bool(getattr(args, "resume", False)),
+            checkpoint_path=Path(args.checkpoint) if getattr(args, "checkpoint", None) else None,
             configuration=conversion_configuration(args),
         )
 
