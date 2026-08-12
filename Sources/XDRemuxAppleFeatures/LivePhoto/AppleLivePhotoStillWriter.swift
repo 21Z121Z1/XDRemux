@@ -64,6 +64,23 @@ public enum AppleLivePhotoStillWriter {
         }
     }
 
+    /// Returns the encoded still-image pixel dimensions used by Core Media's Live Photo transform
+    /// reference-dimensions metadata. Orientation remains a separate image property and is preserved
+    /// by the still writer, so this reports the underlying raster width and height without swapping.
+    public static func pixelDimensions(in imageURL: URL) -> [Float]? {
+        guard let source = CGImageSourceCreateWithURL(
+            imageURL as CFURL,
+            [kCGImageSourceShouldCache: false] as CFDictionary
+        ),
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+        let width = (properties[kCGImagePropertyPixelWidth as String] as? NSNumber)?.floatValue,
+        let height = (properties[kCGImagePropertyPixelHeight as String] as? NSNumber)?.floatValue,
+        width > 0, height > 0 else {
+            return nil
+        }
+        return [width, height]
+    }
+
     public static func assetIdentifier(in imageURL: URL) -> String? {
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, options),
