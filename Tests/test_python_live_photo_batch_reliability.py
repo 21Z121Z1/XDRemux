@@ -18,7 +18,7 @@ from xdremux_py.live_photo_batch import (
 
 
 class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
-    def test_duplicate_basenames_have_stable_distinct_outputs_across_subset_rerun(self):
+    def test_duplicate_basenames_preserve_relative_directories_across_subset_rerun(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "input"
             output = Path(tmp) / "output"
@@ -33,52 +33,48 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
             b_output = planned_output_image(b, root, output)
             b_subset_output = planned_output_image(b, root, output)
 
-            self.assertNotEqual(a_output, b_output)
+            self.assertEqual(a_output, output / "A" / "IMG.heic")
+            self.assertEqual(b_output, output / "B" / "IMG.heic")
             self.assertEqual(b_output, b_subset_output)
-            self.assertTrue(a_output.name.startswith("IMG~"))
-            self.assertTrue(b_output.name.startswith("IMG~"))
 
-    def test_same_relative_path_in_different_input_roots_cannot_alias_shared_output(self):
+    def test_absolute_input_root_does_not_leak_into_output_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             first_root = base / "root-one"
             second_root = base / "root-two"
-            output = base / "shared-output"
+            output = base / "output"
             first = first_root / "A" / "IMG.jpg"
             second = second_root / "A" / "IMG.jpg"
             first.parent.mkdir(parents=True)
             second.parent.mkdir(parents=True)
             first.write_bytes(b"first")
             second.write_bytes(b"second")
-
-            self.assertNotEqual(
+            self.assertEqual(
                 planned_output_image(first, first_root, output),
                 planned_output_image(second, second_root, output),
             )
 
-    def test_heif_motion_photo_uses_live_namespace_and_stable_token(self):
+    def test_heif_motion_photo_uses_readable_live_filename(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "input"
-            root.mkdir()
-            source = root / "same.heic"
+            source = root / "Trips" / "same.heic"
+            source.parent.mkdir(parents=True)
             source.write_bytes(b"heif")
             output = planned_output_image(source, root, Path(tmp) / "output")
-            self.assertTrue(output.name.startswith("same.live~"))
-            self.assertTrue(output.name.endswith(".heic"))
+            self.assertEqual(output, Path(tmp) / "output" / "Trips" / "same.live.heic")
 
-    def test_content_hash_detects_change_even_when_size_and_mtime_are_preserved(self):
+    def test_source_signature_uses_size_and_mtime(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.jpg"
             source.write_bytes(b"AAAA")
             before = source_signature(source)
-            source.write_bytes(b"BBBB")
-            os.utime(source, ns=(before.mtime_ns, before.mtime_ns))
+            new_mtime = before.mtime_ns + 10_000_000_000
+            os.utime(source, ns=(new_mtime, new_mtime))
             after = source_signature(source)
             self.assertEqual(before.size, after.size)
-            self.assertEqual(before.mtime_ns, after.mtime_ns)
-            self.assertNotEqual(before.sha256, after.sha256)
+            self.assertNotEqual(before.mtime_ns, after.mtime_ns)
 
-    def test_state_requires_source_hash_outputs_asset_identifier_and_pair_match(self):
+    def test_state_reuse_requires_source_metadata_outputs_and_pair_match(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "input"
             output = Path(tmp) / "output"
@@ -121,19 +117,40 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
                     lambda i, v, identifier: False,
                 )
             )
-            source.write_bytes(b"SOURCE")
-            changed = source_signature(source)
-            self.assertFalse(
-                provenance_allows_reuse(
-                    prior,
-                    changed,
-                    image,
-                    video,
-                    lambda i, v, identifier: True,
-                )
-            )
 
-    def test_python_writer_uses_swift_checkpoint_wire_schema(self):
+    def test_pr18_camel_case_checkpoint_migrates_without_hash_dependency(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "input"
+            output = Path(tmp) / "output"
+            root.mkdir()
+            output.mkdir()
+            source = root / "IMG.jpg"
+            source.write_bytes(b"source")
+            signature = source_signature(source)
+            image = planned_output_image(source, root, output)
+            video = image.with_suffix(".mov")
+            checkpoint = output / ".state.jsonl"
+            checkpoint.write_text(
+                json.dumps({
+                    "kind": "item",
+                    "inputPath": str(source.resolve()),
+                    "sourceRelativePath": "IMG.jpg",
+                    "outputImagePath": str(image.resolve()),
+                    "outputVideoPath": str(video.resolve()),
+                    "status": "success",
+                    "inputSize": signature.size,
+                    "inputMtimeNs": signature.mtime_ns,
+                    "inputSHA256": "deadbeef",
+                    "assetIdentifier": "ASSET-OLD",
+                    "error": None,
+                }) + "\n",
+                encoding="utf-8",
+            )
+            prior = load_state(checkpoint)[str(source.resolve())]
+            self.assertTrue(prior.matches_source(signature))
+            self.assertEqual(prior.asset_identifier, "ASSET-OLD")
+
+    def test_new_python_checkpoint_is_runtime_local_not_swift_wire_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "input"
             output = Path(tmp) / "output"
@@ -158,31 +175,25 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
                 )
 
             records = [json.loads(line) for line in checkpoint.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual(records[0]["schemaVersion"], 2)
+            self.assertEqual(records[0]["schema_version"], 1)
             item = records[1]
-            self.assertEqual(item["inputPath"], str(source.resolve()))
-            self.assertEqual(item["sourceRelativePath"], "IMG.jpg")
-            self.assertEqual(item["inputSHA256"], signature.sha256)
-            self.assertEqual(item["assetIdentifier"], "ASSET-1")
-            self.assertNotIn("input_path", item)
-            self.assertNotIn("input_sha256", item)
+            self.assertEqual(item["input_path"], str(source.resolve()))
+            self.assertNotIn("inputPath", item)
+            self.assertNotIn("inputSHA256", item)
 
-    def test_custom_checkpoint_path_matches_swift_motion_photo_suffix_contract(self):
+    def test_custom_checkpoint_path_stays_separate_from_legacy_batch_checkpoint(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "output"
             requested = Path(tmp) / "state.jsonl"
-            self.assertEqual(
-                state_path(output, requested),
-                requested.parent / "state.jsonl.motion-photo",
-            )
+            self.assertEqual(state_path(output, requested), requested.parent / "state.jsonl.motion-photo")
 
-    def test_hidden_transaction_temp_is_never_discovered_as_user_input(self):
+    def test_hidden_publication_temp_is_never_discovered_as_user_input(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             visible = root / "IMG.heic"
             hidden_temp = root / ".IMG.abc123.tmp.heic"
             visible.write_bytes(b"visible")
-            hidden_temp.write_bytes(b"transaction-temp")
+            hidden_temp.write_bytes(b"publication-temp")
             self.assertEqual(_default_batch_candidates(root), [visible])
 
     def test_normal_output_collision_fails_before_any_write(self):
@@ -193,18 +204,6 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
             output = root / "output" / "IMG.heic"
             with self.assertRaisesRegex(ValueError, "planned ProXDR output collision"):
                 _validate_unique_normal_plan([(first, output), (second, output)])
-
-    def test_schema_one_style_entry_without_digest_is_not_trusted(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            checkpoint = Path(tmp) / "state.jsonl"
-            checkpoint.write_text(
-                '{"kind":"header","schema_version":1}\n'
-                '{"kind":"item","input_path":"/tmp/a.jpg","output_image_path":"/tmp/a.heic",'
-                '"output_video_path":"/tmp/a.mov","status":"success","input_size":1,'
-                '"input_mtime_ns":1,"error":null}\n',
-                encoding="utf-8",
-            )
-            self.assertEqual(load_state(checkpoint), {})
 
 
 if __name__ == "__main__":

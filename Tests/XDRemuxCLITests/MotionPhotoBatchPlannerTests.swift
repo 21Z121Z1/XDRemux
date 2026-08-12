@@ -3,7 +3,7 @@ import XCTest
 @testable import XDRemuxCLI
 
 final class MotionPhotoBatchPlannerTests: XCTestCase {
-    func testDuplicateBasenamesRemainDistinctAndStableAcrossSubsetRuns() throws {
+    func testDuplicateBasenamesPreserveRelativeDirectoriesAcrossSubsetRuns() throws {
         let root = URL(fileURLWithPath: "/tmp/xdremux-input", isDirectory: true)
         let output = URL(fileURLWithPath: "/tmp/xdremux-output", isDirectory: true)
         let a = root.appendingPathComponent("A/IMG.jpg")
@@ -25,17 +25,15 @@ final class MotionPhotoBatchPlannerTests: XCTestCase {
             outputDirectoryURL: output
         )
 
-        XCTAssertNotEqual(aOutput, bOutput)
+        XCTAssertEqual(aOutput.path, output.appendingPathComponent("A/IMG.heic").path)
+        XCTAssertEqual(bOutput.path, output.appendingPathComponent("B/IMG.heic").path)
         XCTAssertEqual(bOutput, bSubsetOutput)
-        XCTAssertTrue(aOutput.lastPathComponent.hasPrefix("IMG~"))
-        XCTAssertTrue(bOutput.lastPathComponent.hasPrefix("IMG~"))
-        XCTAssertEqual(aOutput.pathExtension, "heic")
     }
 
-    func testSameRelativePathInDifferentInputRootsCannotAliasSharedOutputDirectory() {
+    func testAbsoluteInputRootDoesNotLeakIntoOutputName() {
         let firstRoot = URL(fileURLWithPath: "/tmp/xdremux-root-one", isDirectory: true)
         let secondRoot = URL(fileURLWithPath: "/tmp/xdremux-root-two", isDirectory: true)
-        let output = URL(fileURLWithPath: "/tmp/xdremux-shared-output", isDirectory: true)
+        let output = URL(fileURLWithPath: "/tmp/xdremux-output", isDirectory: true)
         let first = firstRoot.appendingPathComponent("A/IMG.jpg")
         let second = secondRoot.appendingPathComponent("A/IMG.jpg")
 
@@ -50,23 +48,23 @@ final class MotionPhotoBatchPlannerTests: XCTestCase {
             outputDirectoryURL: output
         )
 
-        XCTAssertNotEqual(firstOutput, secondOutput)
+        XCTAssertEqual(firstOutput.path, output.appendingPathComponent("A/IMG.heic").path)
+        XCTAssertEqual(secondOutput, firstOutput)
     }
 
-    func testHEIFMotionPhotoUsesSeparateLiveNamespace() {
+    func testHEIFMotionPhotoUsesReadableLiveFilenameInsideRelativeDirectory() {
         let root = URL(fileURLWithPath: "/tmp/xdremux-input", isDirectory: true)
         let output = URL(fileURLWithPath: "/tmp/xdremux-output", isDirectory: true)
-        let input = root.appendingPathComponent("IMG.heic")
+        let input = root.appendingPathComponent("Trips/IMG.heic")
         let planned = MotionPhotoBatchPlanner.outputImageURL(
             for: input,
             inputRootURL: root,
             outputDirectoryURL: output
         )
-        XCTAssertTrue(planned.lastPathComponent.hasPrefix("IMG.live~"))
-        XCTAssertEqual(planned.pathExtension, "heic")
+        XCTAssertEqual(planned.path, output.appendingPathComponent("Trips/IMG.live.heic").path)
     }
 
-    func testPlannerRejectsDuplicateDestinationInsteadOfRenumberingByOrder() {
+    func testPlannerRejectsDuplicateDestination() {
         let first = URL(fileURLWithPath: "/tmp/a.jpg")
         let second = URL(fileURLWithPath: "/tmp/b.jpg")
         let output = URL(fileURLWithPath: "/tmp/result.heic")

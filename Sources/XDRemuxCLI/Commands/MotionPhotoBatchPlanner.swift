@@ -1,9 +1,8 @@
-import CryptoKit
 import Foundation
 
-/// Stable Motion Photo batch naming. A destination is a pure function of the canonical batch root
-/// plus the source path relative to that root, so batch membership/order cannot remap a source and
-/// two different input roots cannot silently target the same persisted Live Photo name.
+/// Stable Motion Photo batch naming based on the source path below the batch input root.
+/// Preserving the relative directory structure makes duplicate basenames unambiguous without
+/// introducing opaque hashed namespaces into user-visible filenames.
 enum MotionPhotoBatchPlanner {
     static func outputImageURL(
         for inputURL: URL,
@@ -12,29 +11,26 @@ enum MotionPhotoBatchPlanner {
     ) -> URL {
         let source = inputURL.resolvingSymlinksInPath().standardizedFileURL
         let root = inputRootURL.resolvingSymlinksInPath().standardizedFileURL
-        let rootIdentity = root.path.precomposedStringWithCanonicalMapping
-        let relativePath: String
         let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        let relativePath: String
         if source.path.hasPrefix(prefix) {
             relativePath = String(source.path.dropFirst(prefix.count)).precomposedStringWithCanonicalMapping
         } else {
-            relativePath = source.path.precomposedStringWithCanonicalMapping
+            // Batch discovery normally guarantees that inputs are below inputRootURL. Keep the
+            // fallback readable and let validateUnique() reject any resulting collision.
+            relativePath = source.lastPathComponent.precomposedStringWithCanonicalMapping
         }
 
-        // Root namespace + relative path is equivalent to a canonical source identity while keeping
-        // the intent explicit. This prevents two independent input trees with the same A/IMG.jpg
-        // layout from overwriting each other when they share an output directory.
-        let identity = rootIdentity + "\u{0}" + relativePath
-        let digest = SHA256.hash(data: Data(identity.utf8))
-        // 128 bits keeps the filename compact while making accidental persisted-name collisions
-        // negligible. validateUnique() still fails closed if a collision is ever observed.
-        let token = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+        let components = relativePath.split(separator: "/").map(String.init)
+        var directory = outputDirectoryURL
+        for component in components.dropLast() {
+            directory.appendPathComponent(component, isDirectory: true)
+        }
+
         let ext = source.pathExtension.lowercased()
         let sourceStem = source.deletingPathExtension().lastPathComponent
         let stem = (ext == "heic" || ext == "heif") ? "\(sourceStem).live" : sourceStem
-        return outputDirectoryURL
-            .appendingPathComponent("\(stem)~\(token)")
-            .appendingPathExtension("heic")
+        return directory.appendingPathComponent(stem).appendingPathExtension("heic")
     }
 
     static func validateUnique(_ items: [(input: URL, output: URL)]) throws {
@@ -55,7 +51,7 @@ enum MotionPhotoBatchPlanner {
         var errorDescription: String? {
             switch self {
             case let .collision(first, second, output):
-                return "stable Motion Photo output collision: \(first) and \(second) -> \(output)"
+                return "Motion Photo output collision: \(first) and \(second) -> \(output)"
             }
         }
     }
