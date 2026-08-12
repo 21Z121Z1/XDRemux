@@ -21,7 +21,9 @@ enum MotionPhotoBatchPlanner {
         }
 
         let digest = SHA256.hash(data: Data(relativePath.utf8))
-        let token = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        // 128 bits keeps the filename compact while making accidental persisted-name collisions
+        // negligible. validateUnique() still fails closed if a collision is ever observed.
+        let token = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
         let ext = source.pathExtension.lowercased()
         let sourceStem = source.deletingPathExtension().lastPathComponent
         let stem = (ext == "heic" || ext == "heif") ? "\(sourceStem).live" : sourceStem
