@@ -14,7 +14,7 @@ enum VendorLivePhotoGeometryKind: String, Sendable, Equatable {
 struct VendorLivePhotoGeometryPlan: Sendable, Equatable {
     let kind: VendorLivePhotoGeometryKind
     let streamLayout: MotionPhotoVideoStreamLayout
-    let stillReferenceDimensions: [Float]?
+    let stillRasterDimensions: [Float]?
 }
 
 enum VendorLivePhotoGeometryPolicy {
@@ -32,7 +32,7 @@ enum VendorLivePhotoGeometryPolicy {
             return VendorLivePhotoGeometryPlan(
                 kind: .colorOS16,
                 streamLayout: layout,
-                stillReferenceDimensions: AppleLivePhotoStillWriter.pixelDimensions(in: stillResourceURL)
+                stillRasterDimensions: AppleLivePhotoStillWriter.pixelDimensions(in: stillResourceURL)
             )
         }
 
@@ -40,7 +40,7 @@ enum VendorLivePhotoGeometryPolicy {
             return VendorLivePhotoGeometryPlan(
                 kind: .samsung,
                 streamLayout: layout,
-                stillReferenceDimensions: AppleLivePhotoStillWriter.pixelDimensions(in: stillResourceURL)
+                stillRasterDimensions: AppleLivePhotoStillWriter.pixelDimensions(in: stillResourceURL)
             )
         }
 

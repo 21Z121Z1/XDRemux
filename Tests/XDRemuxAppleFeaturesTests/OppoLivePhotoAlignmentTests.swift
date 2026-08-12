@@ -53,7 +53,7 @@ final class OppoLivePhotoAlignmentTests: XCTestCase {
         XCTAssertEqual(scale.y, 1.0 / 1.11, accuracy: 1e-12)
     }
 
-    func testWriterReferenceDimensionsPreferActualStillRaster() {
+    func testWriterCompatibilityReferenceDimensionsPreferExplicitAnalysisSpace() {
         let metadata = OppoMotionPhotoMetadata(
             version: 1,
             videoWidth: 1728,

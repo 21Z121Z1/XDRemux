@@ -55,7 +55,7 @@ final class UploadedMotionPhotoFixtureGateTestsVendorGeometry: XCTestCase {
             XCTAssertEqual(plan?.streamLayout.auxiliaryGeometry.count ?? 0, expected.auxiliaryCount, expected.relativePath)
 
             if expected.kind != nil {
-                XCTAssertNotNil(plan?.stillReferenceDimensions, expected.relativePath)
+                XCTAssertNotNil(plan?.stillRasterDimensions, expected.relativePath)
             }
             if expected.kind == .samsung {
                 XCTAssertEqual(plan?.streamLayout.primary.range, asset.videoResourceRange, expected.relativePath)

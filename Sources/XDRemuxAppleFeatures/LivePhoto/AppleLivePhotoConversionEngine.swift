@@ -105,6 +105,26 @@ public enum AppleLivePhotoConversionEngine {
             for: asset,
             stillResourceURL: stillSourceURL
         )
+        var geometryPreparationDiagnostics: [String] = []
+        let auxiliaryVideoURL: URL?
+        if let auxiliary = geometryPlan?.streamLayout.auxiliaryGeometry.first {
+            let extractedURL = scratch.appendingPathComponent("auxiliary-geometry.mp4")
+            do {
+                try MotionPhotoPayloadExtractor.copy(
+                    range: auxiliary.range,
+                    from: inputURL,
+                    to: extractedURL
+                )
+                auxiliaryVideoURL = extractedURL
+            } catch {
+                auxiliaryVideoURL = nil
+                geometryPreparationDiagnostics.append(
+                    "Auxiliary geometry extraction failed; retained the metadata-only fallback: \(error.localizedDescription)"
+                )
+            }
+        } else {
+            auxiliaryVideoURL = nil
+        }
 
         let timeline = try await AppleLivePhotoTimelineResolver.resolve(
             videoURL: videoSourceURL,
@@ -125,6 +145,14 @@ public enum AppleLivePhotoConversionEngine {
         let sourceHadGainMap = AppleLivePhotoStillWriter.hasGainMap(stillSourceURL)
         let sourceAsset = AVURLAsset(url: videoSourceURL)
         let sourceHadAudio = !(try await sourceAsset.loadTracks(withMediaType: .audio)).isEmpty
+        let transformResolution = await VendorLivePhotoStillTransformResolver.resolve(.init(
+            asset: asset,
+            geometryPlan: geometryPlan,
+            primaryVideoURL: videoSourceURL,
+            auxiliaryVideoURL: auxiliaryVideoURL,
+            stillImageURL: stillSourceURL,
+            stillImageTime: timeline.stillImageTime
+        ))
 
         try AppleLivePhotoStillWriter.write(
             stillInputURL: stillSourceURL,
@@ -137,10 +165,10 @@ public enum AppleLivePhotoConversionEngine {
             assetIdentifier: assetIdentifier,
             stillImageTime: timeline.stillImageTime,
             oppoMetadata: asset.vendorMetadata,
-            stillImageReferenceDimensions: geometryPlan?.stillReferenceDimensions
+            stillImageTransform: transformResolution.transform
         )
 
-        let expectedTransform = asset.vendorMetadata.flatMap(OppoLivePhotoAlignment.transformMatrix) != nil
+        let expectedTransform = transformResolution.transform != nil
         _ = try await AppleLivePhotoValidator.validate(
             imageURL: temporaryImageURL,
             videoURL: temporaryVideoURL,
@@ -151,6 +179,7 @@ public enum AppleLivePhotoConversionEngine {
             sourceHadAudio: sourceHadAudio,
             sourceHadGainMap: sourceHadGainMap,
             expectsOppoTransform: expectedTransform,
+            expectedStillImageTransform: transformResolution.transform,
             requirePhotoKitLoad: requirePhotoKitValidation
         )
 
@@ -162,6 +191,8 @@ public enum AppleLivePhotoConversionEngine {
         )
 
         var diagnostics: [String] = []
+        diagnostics.append(contentsOf: geometryPreparationDiagnostics)
+        diagnostics.append(contentsOf: transformResolution.diagnostics)
         if let xmp = asset.presentationTimestampUs,
            let cover = asset.vendorMetadata?.coverFramePtsUs,
            xmp != cover {

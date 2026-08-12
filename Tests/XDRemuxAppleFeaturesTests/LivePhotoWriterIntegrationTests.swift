@@ -87,10 +87,66 @@ final class LivePhotoWriterIntegrationTests: XCTestCase {
         )
         XCTAssertTrue(report.hasTransform)
         XCTAssertTrue(report.hasTransformReferenceDimensions)
+        XCTAssertFalse(report.vitalityTransformLimitingAllowed)
 
         let dimensions = try await readTransformReferenceDimensions(from: outputMOV)
         XCTAssertEqual(dimensions?.width ?? -1, 80, accuracy: 1e-6)
         XCTAssertEqual(dimensions?.height ?? -1, 60, accuracy: 1e-6)
+    }
+
+    func testVisionTransformWritesVitalityLimitingFlagWithoutChangingCompressedVideo() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-livephoto-vitality-limit-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let sourceJPEG = directory.appendingPathComponent("source.jpg")
+        let sourceMP4 = directory.appendingPathComponent("source.mp4")
+        let outputHEIC = directory.appendingPathComponent("output.heic")
+        let outputMOV = directory.appendingPathComponent("output.mov")
+        try createJPEG(at: sourceJPEG, width: 80, height: 60)
+        try await createCompressedVideo(
+            at: sourceMP4,
+            codec: .hevc,
+            width: 64,
+            height: 48,
+            frameCount: 8
+        )
+
+        let identifier = UUID().uuidString
+        let stillTime = CMTime(value: 2, timescale: 30)
+        let transform = try XCTUnwrap(AppleLivePhotoStillTransform(
+            matrix: [0.9, 0, 6, 0, 0.9, 4, 0, 0, 1],
+            referenceDimensions: [64, 48],
+            source: .colorOS16VisionTrajectory
+        ))
+        try AppleLivePhotoStillWriter.write(
+            stillInputURL: sourceJPEG,
+            outputURL: outputHEIC,
+            assetIdentifier: identifier
+        )
+        try await AppleLivePhotoVideoWriter.write(
+            videoInputURL: sourceMP4,
+            outputURL: outputMOV,
+            assetIdentifier: identifier,
+            stillImageTime: stillTime,
+            stillImageTransform: transform
+        )
+
+        let report = try await AppleLivePhotoValidator.validate(
+            imageURL: outputHEIC,
+            videoURL: outputMOV,
+            expectedAssetIdentifier: identifier,
+            expectedStillImageTime: stillTime,
+            sourceStillURL: sourceJPEG,
+            sourceVideoURL: sourceMP4,
+            sourceHadAudio: false,
+            sourceHadGainMap: false,
+            expectsOppoTransform: true,
+            expectedStillImageTransform: transform,
+            requirePhotoKitLoad: true
+        )
+        XCTAssertTrue(report.vitalityTransformLimitingAllowed)
     }
 
     private func assertSyntheticPair(
