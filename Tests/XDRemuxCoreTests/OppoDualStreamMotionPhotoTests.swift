@@ -77,6 +77,28 @@ final class OppoDualStreamMotionPhotoTests: XCTestCase {
         )
     }
 
+    func testGenericAndroidLayoutNeverInventsAuxiliaryStream() throws {
+        let primaryRange = try MotionPhotoByteRange(lowerBound: 100, upperBound: 200)
+        let stillRange = try MotionPhotoByteRange(lowerBound: 0, upperBound: 100)
+        let asset = MotionPhotoAsset(
+            sourceURL: URL(fileURLWithPath: "/tmp/not-read-for-single-stream-layout.jpg"),
+            sourceKind: .androidMotionPhotoV1,
+            items: [
+                MotionPhotoItem(mime: "image/jpeg", semantic: "Primary", length: 0, padding: 0),
+                MotionPhotoItem(mime: "video/mp4", semantic: "MotionPhoto", length: 100, padding: 0),
+            ],
+            stillResourceRange: stillRange,
+            videoResourceRange: primaryRange,
+            presentationTimestampUs: nil,
+            presentationSource: nil
+        )
+
+        let layout = try MotionPhotoVideoStreamLayoutResolver.resolve(for: asset)
+        XCTAssertEqual(layout.primary.range, primaryRange)
+        XCTAssertEqual(layout.primary.role, .primary)
+        XCTAssertTrue(layout.auxiliaryGeometry.isEmpty)
+    }
+
     private func assertDualStreamAsset(
         url: URL,
         stream1Start: Int64,
@@ -99,6 +121,18 @@ final class OppoDualStreamMotionPhotoTests: XCTestCase {
         let primary = try OppoMotionPhotoStreamResolver.primaryVideoRange(for: asset)
         XCTAssertEqual(primary.lowerBound, stream1Start)
         XCTAssertEqual(primary.upperBound, stream2Start)
+
+        let layout = try MotionPhotoVideoStreamLayoutResolver.resolve(for: asset)
+        XCTAssertEqual(layout.primary.range, primary)
+        XCTAssertEqual(layout.primary.role, .primary)
+        XCTAssertEqual(layout.auxiliaryGeometry.count, 1)
+        XCTAssertEqual(layout.auxiliaryGeometry[0].role, .auxiliaryGeometry)
+        XCTAssertEqual(layout.auxiliaryGeometry[0].range.lowerBound, stream2Start)
+        XCTAssertEqual(layout.auxiliaryGeometry[0].range.upperBound, asset.videoResourceRange.upperBound)
+        XCTAssertEqual(
+            try OppoMotionPhotoStreamResolver.auxiliaryGeometryVideoRanges(for: asset),
+            layout.auxiliaryGeometry.map(\.range)
+        )
     }
 
     private func fakeMP4(brand: String, payloadByte: UInt8) -> Data {
