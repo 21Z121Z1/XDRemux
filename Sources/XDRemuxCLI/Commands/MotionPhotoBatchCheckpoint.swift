@@ -1,8 +1,8 @@
+import CryptoKit
 import Foundation
 
-/// Independent sidecar checkpoint for the Motion Photo pre-pass. It intentionally does not share
-/// the existing HEIC checkpoint file because the two passes can run in the same `batch` invocation
-/// and have different output cardinality (one file versus HEIC+MOV pair).
+/// Durable sidecar state for the Motion Photo pre-pass. Besides retry status, this is the
+/// provenance record that proves a specific source produced a specific HEIC+MOV pair.
 enum MotionPhotoBatchCheckpoint {
     enum Status: String, Codable {
         case success
@@ -13,23 +13,29 @@ enum MotionPhotoBatchCheckpoint {
     struct FileSignature: Equatable {
         let size: Int64
         let mtimeNs: Int64
+        let sha256: String
     }
 
     struct Item: Codable {
         let kind: String
         let inputPath: String
+        let sourceRelativePath: String?
         let outputImagePath: String
         let outputVideoPath: String
         let status: Status
         let inputSize: Int64?
         let inputMtimeNs: Int64?
+        let inputSHA256: String?
+        let assetIdentifier: String?
         let error: String?
 
+        /// Old schema-1 entries intentionally fail this check: size/mtime alone are not strong
+        /// enough provenance to allow --skip-existing to claim a pair for the current source.
         func matchesSignature(_ signature: FileSignature?) -> Bool {
-            guard let signature else { return true }
-            if let inputSize, inputSize != signature.size { return false }
-            if let inputMtimeNs, inputMtimeNs != signature.mtimeNs { return false }
-            return true
+            guard let signature,
+                  let inputSize,
+                  let inputSHA256 else { return false }
+            return inputSize == signature.size && inputSHA256 == signature.sha256
         }
 
         func matchesOutputs(imageURL: URL, videoURL: URL) -> Bool {
@@ -45,7 +51,7 @@ enum MotionPhotoBatchCheckpoint {
 
         init(createdAt: String) {
             self.kind = "header"
-            self.schemaVersion = 1
+            self.schemaVersion = 2
             self.createdAt = createdAt
         }
     }
@@ -63,10 +69,29 @@ enum MotionPhotoBatchCheckpoint {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
         let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let data = try handle.read(upToCount: 1024 * 1024), !data.isEmpty {
+            hasher.update(data: data)
+        }
+        let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
         return FileSignature(
             size: size,
-            mtimeNs: Int64(modified * 1_000_000_000)
+            mtimeNs: Int64(modified * 1_000_000_000),
+            sha256: digest
         )
+    }
+
+    static func relativeSourcePath(inputURL: URL, inputRootURL: URL) -> String {
+        let input = inputURL.standardizedFileURL.path
+        let root = inputRootURL.standardizedFileURL.path
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        if input.hasPrefix(prefix) {
+            return String(input.dropFirst(prefix.count)).precomposedStringWithCanonicalMapping
+        }
+        return input.precomposedStringWithCanonicalMapping
     }
 
     static func load(url: URL) throws -> [String: Item] {
@@ -121,21 +146,31 @@ enum MotionPhotoBatchCheckpoint {
 
         func append(
             inputURL: URL,
+            inputRootURL: URL? = nil,
             outputImageURL: URL,
             outputVideoURL: URL,
             status: Status,
             signature: FileSignature?,
+            assetIdentifier: String? = nil,
             error: String? = nil
         ) throws {
             try appendEncodable(
                 Item(
                     kind: "item",
                     inputPath: inputURL.standardizedFileURL.path,
+                    sourceRelativePath: inputRootURL.map {
+                        MotionPhotoBatchCheckpoint.relativeSourcePath(
+                            inputURL: inputURL,
+                            inputRootURL: $0
+                        )
+                    },
                     outputImagePath: outputImageURL.standardizedFileURL.path,
                     outputVideoPath: outputVideoURL.standardizedFileURL.path,
                     status: status,
                     inputSize: signature?.size,
                     inputMtimeNs: signature?.mtimeNs,
+                    inputSHA256: signature?.sha256,
+                    assetIdentifier: assetIdentifier,
                     error: error
                 )
             )
