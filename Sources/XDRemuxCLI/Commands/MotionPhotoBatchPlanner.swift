@@ -1,8 +1,8 @@
 import Foundation
 
 /// Stable Motion Photo batch naming based on the source path below the batch input root.
-/// Preserving the relative directory structure plus a readable `.live` suffix makes duplicate
-/// basenames unambiguous without opaque hashes and avoids the common JPEG/HEIC sibling collision.
+/// Preserving the relative directory structure plus a readable source-kind suffix makes duplicate
+/// basenames unambiguous without opaque hashes and avoids common JPEG/HEIF sibling collisions.
 enum MotionPhotoBatchPlanner {
     static func outputImageURL(
         for inputURL: URL,
@@ -27,8 +27,10 @@ enum MotionPhotoBatchPlanner {
             directory.appendPathComponent(component, isDirectory: true)
         }
 
+        let ext = source.pathExtension.lowercased()
         let sourceStem = source.deletingPathExtension().lastPathComponent
-        return directory.appendingPathComponent("\(sourceStem).live").appendingPathExtension("heic")
+        let kindSuffix = (ext == "heic" || ext == "heif") ? "live" : "motion"
+        return directory.appendingPathComponent("\(sourceStem).\(kindSuffix)").appendingPathExtension("heic")
     }
 
     static func validateUnique(_ items: [(input: URL, output: URL)]) throws {
