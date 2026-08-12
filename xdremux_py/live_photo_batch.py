@@ -1,4 +1,8 @@
-"""Stable output planning and provenance for Python Motion Photo batch conversion."""
+"""Stable output planning and provenance for Python Motion Photo batch conversion.
+
+The JSONL wire schema intentionally matches the Swift CLI (camelCase field names). Both runtimes
+can therefore reuse the same durable provenance file without weakening skip/resume checks.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +10,7 @@ import hashlib
 import json
 import os
 import unicodedata
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -26,13 +30,13 @@ class SourceSignature:
 class BatchStateItem:
     kind: str
     input_path: str
-    relative_source_path: str
+    relative_source_path: str | None
     output_image_path: str
     output_video_path: str
     status: str
-    input_size: int
-    input_mtime_ns: int
-    input_sha256: str
+    input_size: int | None
+    input_mtime_ns: int | None
+    input_sha256: str | None
     asset_identifier: str | None
     error: str | None = None
 
@@ -54,6 +58,51 @@ class BatchStateItem:
             and self.matches_source(signature)
             and self.matches_outputs(image, video)
         )
+
+    def to_wire(self) -> dict[str, object]:
+        """Canonical schema shared with Swift MotionPhotoBatchCheckpoint.Item."""
+        return {
+            "kind": self.kind,
+            "inputPath": self.input_path,
+            "sourceRelativePath": self.relative_source_path,
+            "outputImagePath": self.output_image_path,
+            "outputVideoPath": self.output_video_path,
+            "status": self.status,
+            "inputSize": self.input_size,
+            "inputMtimeNs": self.input_mtime_ns,
+            "inputSHA256": self.input_sha256,
+            "assetIdentifier": self.asset_identifier,
+            "error": self.error,
+        }
+
+    @classmethod
+    def from_wire(cls, raw: dict[str, object]) -> "BatchStateItem" | None:
+        """Read canonical camelCase and the short-lived Python snake_case schema fail-closed."""
+        def value(camel: str, snake: str):
+            return raw[camel] if camel in raw else raw.get(snake)
+
+        try:
+            input_path = value("inputPath", "input_path")
+            image_path = value("outputImagePath", "output_image_path")
+            video_path = value("outputVideoPath", "output_video_path")
+            status = raw.get("status")
+            if not all(isinstance(item, str) and item for item in (input_path, image_path, video_path, status)):
+                return None
+            return cls(
+                kind="item",
+                input_path=input_path,
+                relative_source_path=value("sourceRelativePath", "relative_source_path") if isinstance(value("sourceRelativePath", "relative_source_path"), str) else None,
+                output_image_path=image_path,
+                output_video_path=video_path,
+                status=status,
+                input_size=int(value("inputSize", "input_size")) if value("inputSize", "input_size") is not None else None,
+                input_mtime_ns=int(value("inputMtimeNs", "input_mtime_ns")) if value("inputMtimeNs", "input_mtime_ns") is not None else None,
+                input_sha256=value("inputSHA256", "input_sha256") if isinstance(value("inputSHA256", "input_sha256"), str) else None,
+                asset_identifier=value("assetIdentifier", "asset_identifier") if isinstance(value("assetIdentifier", "asset_identifier"), str) else None,
+                error=value("error", "error") if isinstance(value("error", "error"), str) else None,
+            )
+        except (TypeError, ValueError):
+            return None
 
 
 def source_signature(path: Path, chunk_size: int = 1024 * 1024) -> SourceSignature:
@@ -124,16 +173,17 @@ def load_state(path: Path) -> dict[str, BatchStateItem]:
             try:
                 raw = json.loads(line)
             except json.JSONDecodeError:
+                # A power loss may leave a truncated final JSONL record. Ignoring an unreadable
+                # provenance record is safe because it can only force a rebuild, never a reuse.
                 continue
-            if raw.get("kind") != "item":
+            if not isinstance(raw, dict) or raw.get("kind") != "item":
+                continue
+            item = BatchStateItem.from_wire(raw)
+            if item is None:
                 continue
             # Schema-1 entries did not contain a content digest/asset identifier and therefore are
             # deliberately not trusted as provenance for --skip-existing.
-            if not raw.get("input_sha256") or not raw.get("asset_identifier"):
-                continue
-            try:
-                item = BatchStateItem(**raw)
-            except TypeError:
+            if not item.input_sha256 or not item.asset_identifier:
                 continue
             state[item.input_path] = item
     return state
@@ -146,7 +196,7 @@ class StateWriter:
         new_file = not self.path.exists() or self.path.stat().st_size == 0
         self._handle = self.path.open("a", encoding="utf-8", newline="\n")
         if new_file:
-            self._append({"kind": "header", "schema_version": SCHEMA_VERSION})
+            self._append({"kind": "header", "schemaVersion": SCHEMA_VERSION})
 
     def _append(self, value: dict[str, object]) -> None:
         self._handle.write(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
@@ -178,7 +228,7 @@ class StateWriter:
             asset_identifier=asset_identifier,
             error=error,
         )
-        self._append(asdict(item))
+        self._append(item.to_wire())
 
     def close(self) -> None:
         if not self._handle.closed:
