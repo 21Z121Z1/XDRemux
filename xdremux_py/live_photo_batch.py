@@ -81,7 +81,8 @@ def relative_source_path(source: Path, input_root: Path) -> str:
     return unicodedata.normalize("NFC", relative)
 
 
-def stable_source_token(source: Path, input_root: Path, length: int = 16) -> str:
+def stable_source_token(source: Path, input_root: Path, length: int = 32) -> str:
+    """Return a 128-bit-by-default deterministic token from normalized source-relative path."""
     relative = relative_source_path(source, input_root)
     return hashlib.sha256(relative.encode("utf-8")).hexdigest()[:length]
 
