@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import struct
 import unittest
 
 from PIL import ExifTags, Image
@@ -8,10 +9,26 @@ from xdremux_py.live_photo_still import (
     APPLE_MAKERNOTE_TAG,
     _inject_makernote,
     _maker_identifier,
+    build_apple_makernote,
 )
 
 
 class AppleMakerNoteIFDTests(unittest.TestCase):
+    def test_minimal_makernote_contains_only_content_identifier(self):
+        identifier = "DF64C2AE-ED3C-4778-BFCA-C15277E521D2"
+        maker = build_apple_makernote(identifier)
+
+        self.assertEqual(maker[:14], b"Apple iOS\0\0\x01MM")
+        self.assertEqual(struct.unpack_from(">H", maker, 14)[0], 1)
+        tag, field_type, count, offset = struct.unpack_from(">HHII", maker, 16)
+        self.assertEqual((tag, field_type), (0x0011, 2))
+        self.assertEqual(count, len(identifier) + 1)
+        self.assertEqual(offset, 32)
+        self.assertEqual(maker[28:32], b"\0\0\0\0")
+        self.assertEqual(maker[offset:offset + count], identifier.encode("ascii") + b"\0")
+        self.assertEqual(len(maker), 32 + count)
+        self.assertEqual(_maker_identifier(maker), identifier)
+
     def test_makernote_is_serialized_in_exif_ifd_not_ifd0(self):
         payload = _inject_makernote(None, "ABC-123", orientation=1)
         exif = Image.Exif()
