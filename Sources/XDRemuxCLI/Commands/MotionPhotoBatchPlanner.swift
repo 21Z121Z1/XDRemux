@@ -1,17 +1,18 @@
 import CryptoKit
 import Foundation
 
-/// Stable Motion Photo batch naming. A destination is a pure function of the source path relative
-/// to the batch root, so adding/removing another input cannot remap an existing source onto a
-/// different Live Photo pair.
+/// Stable Motion Photo batch naming. A destination is a pure function of the canonical batch root
+/// plus the source path relative to that root, so batch membership/order cannot remap a source and
+/// two different input roots cannot silently target the same persisted Live Photo name.
 enum MotionPhotoBatchPlanner {
     static func outputImageURL(
         for inputURL: URL,
         inputRootURL: URL,
         outputDirectoryURL: URL
     ) -> URL {
-        let source = inputURL.standardizedFileURL
-        let root = inputRootURL.standardizedFileURL
+        let source = inputURL.resolvingSymlinksInPath().standardizedFileURL
+        let root = inputRootURL.resolvingSymlinksInPath().standardizedFileURL
+        let rootIdentity = root.path.precomposedStringWithCanonicalMapping
         let relativePath: String
         let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
         if source.path.hasPrefix(prefix) {
@@ -20,7 +21,11 @@ enum MotionPhotoBatchPlanner {
             relativePath = source.path.precomposedStringWithCanonicalMapping
         }
 
-        let digest = SHA256.hash(data: Data(relativePath.utf8))
+        // Root namespace + relative path is equivalent to a canonical source identity while keeping
+        // the intent explicit. This prevents two independent input trees with the same A/IMG.jpg
+        // layout from overwriting each other when they share an output directory.
+        let identity = rootIdentity + "\u{0}" + relativePath
+        let digest = SHA256.hash(data: Data(identity.utf8))
         // 128 bits keeps the filename compact while making accidental persisted-name collisions
         // negligible. validateUnique() still fails closed if a collision is ever observed.
         let token = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
@@ -36,7 +41,7 @@ enum MotionPhotoBatchPlanner {
         var owners: [String: String] = [:]
         for item in items {
             let outputPath = item.output.standardizedFileURL.path
-            let inputPath = item.input.standardizedFileURL.path
+            let inputPath = item.input.resolvingSymlinksInPath().standardizedFileURL.path
             if let prior = owners[outputPath], prior != inputPath {
                 throw PlannerError.collision(first: prior, second: inputPath, output: outputPath)
             }
