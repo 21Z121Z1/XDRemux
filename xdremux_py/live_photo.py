@@ -17,12 +17,12 @@ from .live_photo_mov import (
     validate_live_photo_movie,
     write_live_photo_movie,
 )
+from .live_photo_publish import publish_pair, reconcile_pair
 from .live_photo_still_portable import (
     LivePhotoStillError,
     read_apple_content_identifier,
     write_live_photo_still,
 )
-from .live_photo_transaction import commit_pair, recover_transactions
 from .motion_photo import MotionPhotoError, copy_range, parse_motion_photo, primary_video_range
 from .motion_video import MotionVideoError, strip_trailing_vendor_data
 
@@ -122,20 +122,18 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
     output_directory = output_image.parent
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    # Recover an interrupted two-file commit before starting a new one. The transaction journal
-    # itself lives under output_directory and validates any pair that reached pair_installed.
     try:
-        recover_transactions(output_directory, existing_pair_is_valid)
+        reconcile_pair(output_image, output_video, existing_pair_is_valid)
     except (OSError, ValueError) as exc:
-        raise LivePhotoConversionError(f"could not recover prior Live Photo transaction: {exc}") from exc
+        raise LivePhotoConversionError(f"could not reconcile prior Live Photo output: {exc}") from exc
 
     content_identifier = str(uuid.uuid4()).upper()
-    transaction_id = uuid.uuid4().hex
+    publication_id = uuid.uuid4().hex
     stem = output_image.stem
-    # Final-pair temporaries intentionally live beside the destination. This is required for
-    # rename/replace atomicity and prevents EXDEV when /tmp and the output are different volumes.
-    temp_image = output_directory / f".{stem}.{transaction_id}.tmp.heic"
-    temp_video = output_directory / f".{stem}.{transaction_id}.tmp.mov"
+    # Final-pair temporaries live beside the destination so each publication rename stays on the
+    # same filesystem. Interrupted outputs are discarded and rebuilt on the next conversion.
+    temp_image = output_directory / f".{stem}.{publication_id}.tmp.heic"
+    temp_video = output_directory / f".{stem}.{publication_id}.tmp.mov"
 
     scratch = Path(tempfile.mkdtemp(prefix="xdremux-py-livephoto-"))
     try:
@@ -187,15 +185,9 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
             diagnostics.append("HEIF mpvd video extracted without trailing vendor boxes")
 
         try:
-            commit_pair(
-                temp_image,
-                temp_video,
-                output_image,
-                output_video,
-                pair_validator=existing_pair_is_valid,
-            )
+            publish_pair(temp_image, temp_video, output_image, output_video)
         except (OSError, ValueError) as exc:
-            raise LivePhotoConversionError(f"Live Photo pair commit failed: {exc}") from exc
+            raise LivePhotoConversionError(f"Live Photo pair publication failed: {exc}") from exc
 
         return LivePhotoResult(
             input_path=input_path,
