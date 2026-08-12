@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
+import piexif
 from PIL import ExifTags, Image, ImageOps
 
 from . import heif_io
@@ -56,26 +57,61 @@ def build_apple_makernote(content_identifier: str) -> bytes:
     return bytes(header)
 
 
+def _empty_piexif_dict() -> dict:
+    return {
+        "0th": {},
+        "Exif": {},
+        "GPS": {},
+        "Interop": {},
+        "1st": {},
+        "thumbnail": None,
+    }
+
+
+def _load_piexif_dict(exif_bytes: bytes | None) -> dict:
+    if not exif_bytes:
+        return _empty_piexif_dict()
+    try:
+        loaded = piexif.load(exif_bytes)
+    except Exception:
+        return _empty_piexif_dict()
+    result = _empty_piexif_dict()
+    for key in ("0th", "Exif", "GPS", "Interop", "1st"):
+        value = loaded.get(key)
+        if isinstance(value, dict):
+            result[key] = dict(value)
+    thumbnail = loaded.get("thumbnail")
+    if isinstance(thumbnail, (bytes, bytearray)):
+        result["thumbnail"] = bytes(thumbnail)
+    return result
+
+
 def _inject_makernote(exif_bytes: bytes | None, content_identifier: str, *, orientation: int | None = None) -> bytes:
-    exif = Image.Exif()
-    if exif_bytes:
-        try:
-            exif.load(exif_bytes)
-        except Exception:
-            exif = Image.Exif()
+    """Inject tag 0x927C into the canonical Exif IFD and serialize conventional TIFF EXIF.
 
-    # EXIF MakerNote (tag 37500 / 0x927C) belongs to the Exif IFD, not IFD0.
-    # Pillow's mapping syntax writes an unknown tag directly into IFD0, which our
-    # own parser could read back but ImageIO correctly ignored as a MakerNote.
-    # Write through the nested Exif IFD so the serialized TIFF contains the
-    # standard ExifIFD pointer (0x8769) and places 0x927C in that directory.
-    exif.pop(APPLE_MAKERNOTE_TAG, None)
-    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
-    exif_ifd[APPLE_MAKERNOTE_TAG] = build_apple_makernote(content_identifier)
+    ImageIO's native Live Photo writer serializes MakerApple[17] as an Apple iOS
+    MakerNote stored in the Exif IFD. Pillow's Image.Exif serializer can produce
+    TIFF that it can read back itself but that ImageIO does not classify as an
+    Apple MakerNote. piexif gives us explicit IFD ownership and conventional EXIF
+    pointer/offset serialization while keeping the runtime cross-platform.
+    """
+    exif = _load_piexif_dict(exif_bytes)
+    exif_ifd = exif["Exif"]
 
+    # Android files occasionally expose SceneType as an integer even though EXIF
+    # defines it as UNDEFINED. Normalize the known mismatch before piexif.dump.
+    scene_type = exif_ifd.get(piexif.ExifIFD.SceneType)
+    if isinstance(scene_type, int):
+        exif_ifd[piexif.ExifIFD.SceneType] = scene_type.to_bytes(1, "big", signed=False)
+
+    exif_ifd[piexif.ExifIFD.MakerNote] = build_apple_makernote(content_identifier)
     if orientation is not None:
-        exif[274] = orientation
-    return exif.tobytes()
+        exif["0th"][piexif.ImageIFD.Orientation] = orientation
+
+    try:
+        return piexif.dump(exif)
+    except Exception as exc:
+        raise LivePhotoStillError("could not serialize Live Photo EXIF metadata") from exc
 
 
 def _clean_motion_xmp(xmp: bytes) -> bytes:
@@ -332,7 +368,7 @@ def _heif_exif_replacement(old_payload: bytes, content_identifier: str) -> bytes
         raise LivePhotoStillError("HEIF Exif TIFF offset is invalid")
     modified = _inject_makernote(b"Exif\0\0" + old_payload[start:], content_identifier)
     if not modified.startswith(b"Exif\0\0"):
-        raise LivePhotoStillError("Pillow produced invalid EXIF payload")
+        raise LivePhotoStillError("EXIF serializer produced an invalid payload")
     return struct.pack(">I", 0) + modified[6:]
 
 
