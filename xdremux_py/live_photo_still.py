@@ -33,7 +33,12 @@ class LivePhotoStillError(ValueError):
 
 
 def build_apple_makernote(content_identifier: str) -> bytes:
-    """Build an Apple iOS MakerNote carrying tag 17 ContentIdentifier."""
+    """Build the minimal Apple iOS MakerNote required to pair a Live Photo still.
+
+    The Apple still/movie contract needs the shared content identifier. Do not
+    fabricate unrelated Apple capture metadata (capture type, video index,
+    feature flags, request IDs, and so on) for an Android-originated image.
+    """
     try:
         identifier = content_identifier.upper().encode("ascii")
     except UnicodeEncodeError as exc:
@@ -41,30 +46,14 @@ def build_apple_makernote(content_identifier: str) -> bytes:
     if not identifier or b"\0" in identifier:
         raise LivePhotoStillError("invalid Live Photo content identifier")
 
-    entries: list[tuple[int, int, int, int | bytes]] = [
-        (0x0001, 9, 1, 16),
-        (0x0011, 2, len(identifier) + 1, identifier + b"\0"),
-        (0x0014, 9, 1, 12),
-        (0x0017, 16, 1, (0).to_bytes(8, "big")),
-        (0x001F, 9, 1, 0),
-    ]
+    value = identifier + b"\0"
     header = bytearray(b"Apple iOS\0\0\x01MM")
-    header.extend(struct.pack(">H", len(entries)))
-    data_base = len(header) + len(entries) * 12 + 4
-    variable = bytearray()
-    result = bytearray(header)
-    for tag, field_type, count, value in entries:
-        if isinstance(value, bytes):
-            offset = data_base + len(variable)
-            result.extend(struct.pack(">HHII", tag, field_type, count, offset))
-            variable.extend(value)
-            if len(variable) & 1:
-                variable.append(0)
-        else:
-            result.extend(struct.pack(">HHII", tag, field_type, count, value & 0xFFFFFFFF))
-    result.extend(struct.pack(">I", 0))
-    result.extend(variable)
-    return bytes(result)
+    header.extend(struct.pack(">H", 1))
+    value_offset = len(header) + 12 + 4
+    header.extend(struct.pack(">HHII", 0x0011, 2, len(value), value_offset))
+    header.extend(struct.pack(">I", 0))
+    header.extend(value)
+    return bytes(header)
 
 
 def _inject_makernote(exif_bytes: bytes | None, content_identifier: str, *, orientation: int | None = None) -> bytes:
