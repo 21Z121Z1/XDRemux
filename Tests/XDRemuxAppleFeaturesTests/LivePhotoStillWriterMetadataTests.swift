@@ -43,6 +43,37 @@ final class LivePhotoStillWriterMetadataTests: XCTestCase {
         XCTAssertEqual(exif[kCGImagePropertyExifDateTimeOriginal] as? String, exifDate)
     }
 
+    /// Characterization-only guard for the private Apple MakerNote serialization that ImageIO
+    /// itself emits when given MakerApple[17]. This keeps the portable writer derived from bytes
+    /// produced by the platform oracle rather than from folklore about the MakerNote layout.
+    func testCharacterizeNativeMakerNoteBytes() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-native-makernote-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let sourceJPEG = directory.appendingPathComponent("source.jpg")
+        let outputHEIC = directory.appendingPathComponent("reference.heic")
+        try createJPEG(at: sourceJPEG, exifDate: "2026:08:12 09:20:00")
+        let identifier = "DF64C2AE-ED3C-4778-BFCA-C15277E521D2"
+        try AppleLivePhotoStillWriter.write(
+            stillInputURL: sourceJPEG,
+            outputURL: outputHEIC,
+            assetIdentifier: identifier
+        )
+        XCTAssertEqual(AppleLivePhotoStillWriter.assetIdentifier(in: outputHEIC), identifier)
+
+        let data = try Data(contentsOf: outputHEIC)
+        let signature = Data("Apple iOS".utf8)
+        let range = try XCTUnwrap(data.range(of: signature), "ImageIO output contains no Apple iOS MakerNote signature")
+        let start = range.lowerBound
+        let end = min(data.count, start + 512)
+        let bytes = data[start..<end]
+        let hex = bytes.map { String(format: "%02x", $0) }.joined()
+        print("REFERENCE_APPLE_MAKERNOTE_OFFSET=\(start)")
+        print("REFERENCE_APPLE_MAKERNOTE_HEX=\(hex)")
+    }
+
     private func createJPEG(at url: URL, exifDate: String) throws {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let context = CGContext(
