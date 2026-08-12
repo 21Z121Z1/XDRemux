@@ -68,6 +68,7 @@ class OppoMetadata:
     eis_crop_factor: tuple[float, ...] | None = None
     photo_crop_factor: float | None = None
     stream_count: int = 1
+    photo_eis_crop_factor: tuple[float, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -460,9 +461,12 @@ def _number_tuple(value, limit: int) -> tuple[float, ...] | None:
     if not isinstance(value, list) or len(value) > limit:
         return None
     try:
-        return tuple(float(item) for item in value)
+        values = tuple(float(item) for item in value)
     except (TypeError, ValueError):
         return None
+    if any(not (-1e308 < item < 1e308) for item in values):
+        return None
+    return values
 
 
 def _parse_lpex_object(raw: bytes) -> OppoMetadata | None:
@@ -526,6 +530,7 @@ def _parse_lpex_object(raw: bytes) -> OppoMetadata | None:
         eis_crop_factor=_number_tuple(obj.get("eisCropFactor"), 8),
         photo_crop_factor=photo_crop_factor,
         stream_count=1,
+        photo_eis_crop_factor=_number_tuple(obj.get("photoEisCropFactor"), 8),
     )
 
 

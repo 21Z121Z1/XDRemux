@@ -41,8 +41,18 @@ final class PythonLivePhotoOutputGateTests: XCTestCase {
                 "Swift reference parser rejected source fixture: \(entry.sourceFilename)"
             )
             XCTAssertEqual(sourceAsset.sourceKind.rawValue, entry.sourceKind, entry.sourceFilename)
-            let expectsTransform = sourceAsset.vendorMetadata
-                .flatMap(OppoLivePhotoAlignment.transformMatrix) != nil
+
+            let expectedTransform = sourceAsset.vendorMetadata.flatMap { metadata -> AppleLivePhotoStillTransform? in
+                guard let matrix = OppoLivePhotoAlignment.transformMatrix(for: metadata),
+                      let referenceDimensions = OppoLivePhotoAlignment.referenceDimensions(for: metadata) else {
+                    return nil
+                }
+                return AppleLivePhotoStillTransform(
+                    matrix: matrix,
+                    referenceDimensions: referenceDimensions,
+                    source: .oppoMetadata
+                )
+            }
             let expectedTime = CMTime(
                 seconds: entry.stillImageTimeSeconds,
                 preferredTimescale: 1_000_000
@@ -54,12 +64,33 @@ final class PythonLivePhotoOutputGateTests: XCTestCase {
                 expectedAssetIdentifier: entry.contentIdentifier,
                 expectedStillImageTime: expectedTime,
                 sourceHadGainMap: entry.expectsGainMap,
-                expectsOppoTransform: expectsTransform,
+                expectsOppoTransform: expectedTransform != nil,
+                expectedStillImageTransform: expectedTransform,
                 requirePhotoKitLoad: true
             )
             XCTAssertEqual(report.assetIdentifier, entry.contentIdentifier, entry.sourceFilename)
             XCTAssertEqual(report.hasGainMap, entry.expectsGainMap, entry.sourceFilename)
-            XCTAssertEqual(report.hasTransform, expectsTransform, entry.sourceFilename)
+            XCTAssertEqual(report.hasTransform, expectedTransform != nil, entry.sourceFilename)
+            XCTAssertEqual(
+                report.hasTransformReferenceDimensions,
+                expectedTransform != nil,
+                entry.sourceFilename
+            )
+            if let expectedTransform {
+                let storedMatrix = try XCTUnwrap(report.stillImageTransform, entry.sourceFilename)
+                XCTAssertEqual(storedMatrix.count, expectedTransform.matrix.count, entry.sourceFilename)
+                for (actual, expected) in zip(storedMatrix, expectedTransform.matrix) {
+                    XCTAssertEqual(actual, expected, accuracy: 1e-9, entry.sourceFilename)
+                }
+                let storedDimensions = try XCTUnwrap(
+                    report.stillImageTransformReferenceDimensions,
+                    entry.sourceFilename
+                )
+                XCTAssertEqual(storedDimensions.count, expectedTransform.referenceDimensions.count, entry.sourceFilename)
+                for (actual, expected) in zip(storedDimensions, expectedTransform.referenceDimensions) {
+                    XCTAssertEqual(actual, expected, accuracy: 1e-6, entry.sourceFilename)
+                }
+            }
         }
     }
 }

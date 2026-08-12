@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import struct
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from xdremux_py.live_photo_mov import (
     _box,
     _full_box,
     media_payload_sha256,
+    oppo_transform,
     read_content_identifier,
     read_still_time,
     resolve_still_time,
@@ -16,7 +18,12 @@ from xdremux_py.live_photo_mov import (
     write_live_photo_movie,
 )
 from xdremux_py.live_photo_still import build_apple_makernote, parse_ultrahdr_metadata
-from xdremux_py.motion_photo import ByteRange, parse_android_motion_photo
+from xdremux_py.motion_photo import (
+    ByteRange,
+    OppoMetadata,
+    parse_android_motion_photo,
+    parse_oppo_lpex,
+)
 from xdremux_py.motion_video import strip_trailing_vendor_data
 
 
@@ -95,6 +102,82 @@ class PythonMotionPhotoTests(unittest.TestCase):
             self.assertEqual(asset.video_range.start, len(ftyp) + len(metadata) + 8)
             self.assertEqual(asset.video_range.end, len(ftyp) + len(metadata) + len(mpvd))
 
+    def test_lpex_parser_reads_photo_eis_crop_factor(self):
+        payload = {
+            "version": 1,
+            "photoEisCropFactor": [1.11, 1.12],
+            "eisCropFactor": [0.80, 0.81],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "coloros16.bin"
+            path.write_bytes(b"prefix-lpexLivePhotoExtension" + json.dumps(payload).encode() + b"-suffix")
+            metadata = parse_oppo_lpex(path)
+            self.assertIsNotNone(metadata)
+            assert metadata is not None
+            self.assertEqual(metadata.photo_eis_crop_factor, (1.11, 1.12))
+            self.assertEqual(metadata.eis_crop_factor, (0.80, 0.81))
+
+    def test_coloros16_uses_legacy_eis_compensation_when_no_factor_exists(self):
+        identity = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+        matrix = oppo_transform(OppoMetadata(
+            version=1,
+            photo_crop_matrix=identity,
+            photo_eis_matrix=identity,
+        ))
+        self.assertIsNotNone(matrix)
+        assert matrix is not None
+        self.assertAlmostEqual(matrix[0], 0.90, places=12)
+        self.assertAlmostEqual(matrix[4], 0.90, places=12)
+        self.assertAlmostEqual(matrix[8], 1.0, places=12)
+
+    def test_coloros16_uses_reciprocal_photo_eis_crop_factor(self):
+        matrix = oppo_transform(OppoMetadata(
+            version=1,
+            photo_eis_crop_factor=(1.11, 1.12),
+        ))
+        self.assertIsNotNone(matrix)
+        assert matrix is not None
+        self.assertAlmostEqual(matrix[0], 1.0 / 1.11, places=12)
+        self.assertAlmostEqual(matrix[4], 1.0 / 1.12, places=12)
+        self.assertAlmostEqual(matrix[8], 1.0, places=12)
+
+    def test_coloros16_accepts_legacy_direct_scale_below_one(self):
+        matrix = oppo_transform(OppoMetadata(
+            version=1,
+            eis_crop_factor=(0.91, 0.92),
+        ))
+        self.assertIsNotNone(matrix)
+        assert matrix is not None
+        self.assertAlmostEqual(matrix[0], 0.91, places=12)
+        self.assertAlmostEqual(matrix[4], 0.92, places=12)
+
+    def test_photo_eis_crop_factor_wins_over_legacy_eis_factor(self):
+        matrix = oppo_transform(OppoMetadata(
+            version=1,
+            photo_eis_crop_factor=(1.11, 1.11),
+            eis_crop_factor=(0.80, 0.80),
+        ))
+        self.assertIsNotNone(matrix)
+        assert matrix is not None
+        self.assertAlmostEqual(matrix[0], 1.0 / 1.11, places=12)
+        self.assertAlmostEqual(matrix[4], 1.0 / 1.11, places=12)
+
+    def test_coloros15_uses_closest_cover_frame_and_inverts_matrix(self):
+        matrix = oppo_transform(OppoMetadata(
+            cover_frame_pts_us=1100,
+            version=0,
+            matrix_count=2,
+            matrices=(
+                (1000, (2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 1.0)),
+                (2000, (4.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 1.0)),
+            ),
+        ))
+        self.assertIsNotNone(matrix)
+        assert matrix is not None
+        self.assertAlmostEqual(matrix[0], 0.5, places=12)
+        self.assertAlmostEqual(matrix[4], 0.5, places=12)
+        self.assertAlmostEqual(matrix[8], 1.0, places=12)
+
     def test_pure_python_mov_writer_preserves_media_and_writes_live_photo_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.mp4"
@@ -108,6 +191,27 @@ class PythonMotionPhotoTests(unittest.TestCase):
             self.assertAlmostEqual(read_still_time(output) or -1, 0.1, places=3)
             self.assertEqual(media_payload_sha256(output), source_hashes)
             validate_live_photo_movie(output, "ABC-123", resolved)
+
+    def test_pure_python_mov_writer_embeds_oppo_transform_without_reencoding_media(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.mp4"
+            output = Path(tmp) / "output.mov"
+            source.write_bytes(_fake_video())
+            source_hashes = media_payload_sha256(source)
+            metadata = OppoMetadata(
+                version=1,
+                photo_eis_crop_factor=(1.11, 1.12),
+                video_width=1728,
+                video_height=1296,
+            )
+            expected = oppo_transform(metadata)
+            self.assertIsNotNone(expected)
+            assert expected is not None
+            write_live_photo_movie(source, output, "ABC-123", 0.1, oppo_metadata=metadata)
+            payload = output.read_bytes()
+            self.assertIn(struct.pack(">9d", *expected), payload)
+            self.assertIn(struct.pack(">2f", 1728.0, 1296.0), payload)
+            self.assertEqual(media_payload_sha256(output), source_hashes)
 
     def test_trailing_vendor_bytes_are_removed_only_after_complete_bmff(self):
         with tempfile.TemporaryDirectory() as tmp:
