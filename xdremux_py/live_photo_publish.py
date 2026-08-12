@@ -86,8 +86,11 @@ def publish_pair(
 
     # Both final names are installed. Cleanup is best-effort; reconcile_pair() removes leftovers on
     # the next run, so a cleanup failure must not invalidate a successfully published pair.
-    _unlink_if_exists(image_backup)
-    _unlink_if_exists(video_backup)
+    for backup in (image_backup, video_backup):
+        try:
+            _unlink_if_exists(backup)
+        except OSError:
+            pass
 
 
 def _remove_stale_artifacts(image: Path, video: Path) -> None:
