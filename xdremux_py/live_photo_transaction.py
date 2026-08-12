@@ -2,9 +2,9 @@
 
 A Live Photo is a HEIC/HEIF still plus a MOV resource. No filesystem primitive can
 atomically rename both files together, so this module uses a small, durable journal
-and same-directory renames. Recovery is conservative: an interrupted transaction is
-rolled back unless the journal reached ``pair_installed`` and the caller confirms the
-final pair is valid.
+and same-directory renames. The durable ``committed`` marker is written before backup
+cleanup so another crash during cleanup can never cause a later rollback to mix old
+and new resources.
 """
 
 from __future__ import annotations
@@ -55,6 +55,7 @@ _STATE_ORDER = {
     "originals_backed_up": 1,
     "image_installed": 2,
     "pair_installed": 3,
+    "committed": 4,
 }
 
 
@@ -196,14 +197,22 @@ def _rollback(directory: Path, manifest: TransactionManifest, journal_path: Path
     _fsync_directory(journal_path.parent)
 
 
-def _finalize(directory: Path, manifest: TransactionManifest, journal_path: Path) -> None:
+def _cleanup_committed(directory: Path, manifest: TransactionManifest, journal_path: Path) -> None:
+    """Complete post-commit cleanup; this is idempotent and never rolls the pair back."""
     _remove_if_exists(_safe_child(directory, manifest.backup_image))
     _remove_if_exists(_safe_child(directory, manifest.backup_video))
     _remove_if_exists(_safe_child(directory, manifest.temporary_image))
     _remove_if_exists(_safe_child(directory, manifest.temporary_video))
     _fsync_directory(directory)
+    # Journal removal is deliberately last. Until then, a crash simply re-enters this cleanup path.
     _remove_if_exists(journal_path)
     _fsync_directory(journal_path.parent)
+
+
+def _mark_committed(directory: Path, manifest: TransactionManifest) -> tuple[TransactionManifest, Path]:
+    committed = replace(manifest, state="committed")
+    journal_path = _write_manifest(directory, committed)
+    return committed, journal_path
 
 
 def _recover_locked(directory: Path, pair_validator: PairValidator | None) -> None:
@@ -212,6 +221,10 @@ def _recover_locked(directory: Path, pair_validator: PairValidator | None) -> No
         return
     for journal_path in sorted(journal_dir.glob("*.json")):
         manifest = _load_manifest(journal_path)
+        if manifest.state == "committed":
+            _cleanup_committed(directory, manifest, journal_path)
+            continue
+
         final_image = _safe_child(directory, manifest.final_image)
         final_video = _safe_child(directory, manifest.final_video)
         if (
@@ -221,7 +234,8 @@ def _recover_locked(directory: Path, pair_validator: PairValidator | None) -> No
             and final_video.is_file()
             and pair_validator(final_image, final_video)
         ):
-            _finalize(directory, manifest, journal_path)
+            manifest, journal_path = _mark_committed(directory, manifest)
+            _cleanup_committed(directory, manifest, journal_path)
         else:
             _rollback(directory, manifest, journal_path)
 
@@ -295,19 +309,26 @@ def commit_pair(
             os.replace(temporary_video, final_video)
             manifest = replace(manifest, state="pair_installed")
             journal_path = _write_manifest(directory, manifest)
+            # Make both installed directory entries durable before publishing the committed marker.
             _fsync_directory(directory)
 
             if pair_validator is not None and not pair_validator(final_image, final_video):
                 raise ValueError("installed Live Photo pair failed final validation")
-            _finalize(directory, manifest, journal_path)
+
+            # This is the transaction commit point. Once durable state says committed, recovery must
+            # only clean backups; it must never attempt rollback even if cleanup was interrupted.
+            manifest, journal_path = _mark_committed(directory, manifest)
+            _cleanup_committed(directory, manifest, journal_path)
         except BaseException:
-            # Python exceptions, KeyboardInterrupt and SystemExit all get an immediate rollback.
-            # SIGKILL/power loss cannot execute this block; the durable journal handles those on
-            # the next invocation.
+            # Before the committed marker, Python exceptions, KeyboardInterrupt and SystemExit get
+            # an immediate rollback. After it, rollback would be incorrect; finish cleanup instead.
             try:
-                _rollback(directory, manifest, journal_path)
+                if manifest.state == "committed":
+                    _cleanup_committed(directory, manifest, journal_path)
+                else:
+                    _rollback(directory, manifest, journal_path)
             except Exception:
                 # Keep the original exception. Any surviving journal is intentionally left for the
-                # next recovery pass if rollback itself could not finish.
+                # next recovery pass if cleanup/rollback itself could not finish.
                 pass
             raise
