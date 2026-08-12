@@ -94,11 +94,16 @@ public enum AppleLivePhotoConversionEngine {
             from: inputURL,
             to: stillSourceURL
         )
-        let primaryVideoRange = try OppoMotionPhotoStreamResolver.primaryVideoRange(for: asset)
+
+        let streamLayout = try MotionPhotoVideoStreamLayoutResolver.resolve(for: asset)
         try MotionPhotoPayloadExtractor.copy(
-            range: primaryVideoRange,
+            range: streamLayout.primary.range,
             from: inputURL,
             to: videoSourceURL
+        )
+        let geometryPlan = try VendorLivePhotoGeometryPolicy.plan(
+            for: asset,
+            stillResourceURL: stillSourceURL
         )
 
         let timeline = try await AppleLivePhotoTimelineResolver.resolve(
@@ -131,7 +136,8 @@ public enum AppleLivePhotoConversionEngine {
             outputURL: temporaryVideoURL,
             assetIdentifier: assetIdentifier,
             stillImageTime: timeline.stillImageTime,
-            oppoMetadata: asset.vendorMetadata
+            oppoMetadata: asset.vendorMetadata,
+            stillImageReferenceDimensions: geometryPlan?.stillReferenceDimensions
         )
 
         let expectedTransform = asset.vendorMetadata.flatMap(OppoLivePhotoAlignment.transformMatrix) != nil
@@ -163,8 +169,19 @@ public enum AppleLivePhotoConversionEngine {
                 "XMP still time \(formatMicroseconds(xmp)) s differs from OPPO coverFramePts \(formatMicroseconds(cover)) s; selected \(timeline.source.rawValue)."
             )
         }
-        if let metadata = asset.vendorMetadata, metadata.streamCount >= 2 {
-            diagnostics.append("OPPO dual-stream input detected; selected Stream 1 for Apple paired video.")
+        if let geometryPlan {
+            switch geometryPlan.kind {
+            case .colorOS16:
+                diagnostics.append(
+                    "ColorOS 16 geometry scope enabled: Stream 1 is the paired MOV and \(geometryPlan.streamLayout.auxiliaryGeometry.count) auxiliary stream(s) remain analysis-only."
+                )
+            case .samsung:
+                diagnostics.append(
+                    "Samsung geometry scope enabled: semantic Motion Photo video remains the only paired stream; vendor BMFF/SEFD regions are not treated as auxiliary video."
+                )
+            }
+        } else if let metadata = asset.vendorMetadata, metadata.streamCount >= 2 {
+            diagnostics.append("OPPO multi-stream input detected outside the ColorOS 16 geometry policy; selected the semantic primary stream only.")
         }
         if asset.sourceKind == .androidHeifMotionPhotoV1 {
             diagnostics.append("HEIF Motion Photo mpvd payload extracted without trailing vendor boxes.")
