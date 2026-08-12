@@ -112,6 +112,11 @@ def cmd_convert(command: ConvertCommand) -> int:
     return _convert_one(command.input_path, command.output_path, command.configuration)
 
 
+def _is_internal_batch_artifact(path: Path) -> bool:
+    """Never classify XDRemux hidden temp/recovery files as user inputs."""
+    return path.name.startswith(".")
+
+
 def _default_batch_candidates(input_dir: Path) -> list[Path]:
     """Preserve the legacy non-recursive Python batch discovery contract."""
     allowed = {".heic", ".heif", ".jpg", ".jpeg"}
@@ -119,7 +124,9 @@ def _default_batch_candidates(input_dir: Path) -> list[Path]:
         (
             path
             for path in input_dir.iterdir()
-            if path.is_file() and path.suffix.lower() in allowed
+            if path.is_file()
+            and path.suffix.lower() in allowed
+            and not _is_internal_batch_artifact(path)
         ),
         key=lambda value: str(value.resolve()),
     )
@@ -150,6 +157,17 @@ def _plan_motion_outputs(motion_inputs: list[Path], command: BatchCommand) -> li
     return plan
 
 
+def _validate_unique_normal_plan(plan: list[tuple[Path, Path]]) -> None:
+    """Fail before writes if an explicit glob/categorization flattens two inputs onto one output."""
+    owners: dict[str, Path] = {}
+    for source, output in plan:
+        key = str(output.resolve())
+        prior = owners.get(key)
+        if prior is not None and prior.resolve() != source.resolve():
+            raise ValueError(f"planned ProXDR output collision: {prior} and {source} -> {output}")
+        owners[key] = source
+
+
 def cmd_batch(command: BatchCommand) -> int:
     if not command.input_dir.is_dir():
         print(f"error: input dir not found: {command.input_dir}", file=sys.stderr)
@@ -157,7 +175,11 @@ def cmd_batch(command: BatchCommand) -> int:
     command.output_dir.mkdir(parents=True, exist_ok=True)
     candidates = (
         sorted(
-            (path for path in command.input_dir.glob(command.glob) if path.is_file()),
+            (
+                path
+                for path in command.input_dir.glob(command.glob)
+                if path.is_file() and not _is_internal_batch_artifact(path)
+            ),
             key=lambda value: str(value.resolve()),
         )
         if command.glob_explicit
@@ -198,6 +220,7 @@ def cmd_batch(command: BatchCommand) -> int:
         for input_path in normal_inputs
     ]
     try:
+        _validate_unique_normal_plan(normal_plan)
         motion_plan = _plan_motion_outputs(motion_inputs, command)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
