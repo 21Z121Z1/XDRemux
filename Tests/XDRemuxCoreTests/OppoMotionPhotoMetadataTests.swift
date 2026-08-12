@@ -24,6 +24,19 @@ final class OppoMotionPhotoMetadataTests: XCTestCase {
         XCTAssertEqual(metadata.originPhotoWidth, 4096)
         XCTAssertEqual(metadata.originPhotoHeight, 3072)
         XCTAssertEqual(metadata.photoCropFactor, 0.9)
+        XCTAssertEqual(metadata.eisCropFactor ?? [], [0.9, 0.9])
+        XCTAssertNil(metadata.photoEisCropFactor)
+    }
+
+    func testParsesPhotoEisCropFactorWithoutConflatingLegacyField() throws {
+        let json = """
+        {"version":1,"coverFramePts":1634640,
+         "photoEisCropFactor":[1.11,1.12],"eisCropFactor":[0.90,0.91]}
+        """
+        let payload = Data("lpexLivePhotoExtension \(json)".utf8)
+        let metadata = try XCTUnwrap(OppoLpexParser.parseFirstObject(in: payload))
+        XCTAssertEqual(metadata.photoEisCropFactor ?? [], [1.11, 1.12])
+        XCTAssertEqual(metadata.eisCropFactor ?? [], [0.90, 0.91])
     }
 
     func testRejectsNonFiniteMatrix() throws {
