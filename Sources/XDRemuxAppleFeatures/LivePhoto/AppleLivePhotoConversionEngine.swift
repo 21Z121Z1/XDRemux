@@ -68,10 +68,14 @@ public enum AppleLivePhotoConversionEngine {
         }
 
         let outputVideoURL = companionVideoURL(for: outputImageURL)
+        let outputDirectory = outputImageURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(
-            at: outputImageURL.deletingLastPathComponent(),
+            at: outputDirectory,
             withIntermediateDirectories: true
         )
+        // A prior process may have died between the two resource renames. Recover that transaction
+        // before generating another pair in the same destination directory.
+        try LivePhotoPairTransaction.recover(in: outputDirectory)
 
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("xdremux-livephoto-\(UUID().uuidString)", isDirectory: true)
@@ -140,7 +144,7 @@ public enum AppleLivePhotoConversionEngine {
             requirePhotoKitLoad: requirePhotoKitValidation
         )
 
-        try commitPair(
+        try LivePhotoPairTransaction.commit(
             temporaryImageURL: temporaryImageURL,
             temporaryVideoURL: temporaryVideoURL,
             finalImageURL: outputImageURL,
@@ -170,45 +174,6 @@ public enum AppleLivePhotoConversionEngine {
             sourceKind: asset.sourceKind,
             diagnostics: diagnostics
         )
-    }
-
-    private static func commitPair(
-        temporaryImageURL: URL,
-        temporaryVideoURL: URL,
-        finalImageURL: URL,
-        finalVideoURL: URL
-    ) throws {
-        let fileManager = FileManager.default
-        let backupID = UUID().uuidString
-        let imageBackup = finalImageURL.deletingLastPathComponent()
-            .appendingPathComponent(".\(finalImageURL.lastPathComponent).\(backupID).backup")
-        let videoBackup = finalVideoURL.deletingLastPathComponent()
-            .appendingPathComponent(".\(finalVideoURL.lastPathComponent).\(backupID).backup")
-        let hadImage = fileManager.fileExists(atPath: finalImageURL.path)
-        let hadVideo = fileManager.fileExists(atPath: finalVideoURL.path)
-        var newImageInstalled = false
-
-        do {
-            if hadImage { try fileManager.moveItem(at: finalImageURL, to: imageBackup) }
-            if hadVideo { try fileManager.moveItem(at: finalVideoURL, to: videoBackup) }
-            try fileManager.moveItem(at: temporaryImageURL, to: finalImageURL)
-            newImageInstalled = true
-            try fileManager.moveItem(at: temporaryVideoURL, to: finalVideoURL)
-            if hadImage { try? fileManager.removeItem(at: imageBackup) }
-            if hadVideo { try? fileManager.removeItem(at: videoBackup) }
-        } catch {
-            if newImageInstalled { try? fileManager.removeItem(at: finalImageURL) }
-            // A throwing move of the temporary video cannot have installed it successfully, and
-            // there are no throwing operations after the successful video move. Therefore no
-            // separate newVideoInstalled state is needed here.
-            if hadImage, fileManager.fileExists(atPath: imageBackup.path) {
-                try? fileManager.moveItem(at: imageBackup, to: finalImageURL)
-            }
-            if hadVideo, fileManager.fileExists(atPath: videoBackup.path) {
-                try? fileManager.moveItem(at: videoBackup, to: finalVideoURL)
-            }
-            throw AppleLivePhotoError.transactionFailed(error.localizedDescription)
-        }
     }
 
     private static func formatMicroseconds(_ value: Int64) -> String {
