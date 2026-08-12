@@ -63,15 +63,18 @@ enum VendorLivePhotoGeometryPolicy {
             return false
         }
 
-        if let make = properties[kCGImagePropertyTIFFMake as String] as? String,
-           make.localizedCaseInsensitiveContains("samsung") {
+        if isSamsungMake(properties[kCGImagePropertyTIFFMake as String] as? String) {
             return true
         }
         if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any],
-           let make = tiff[kCGImagePropertyTIFFMake as String] as? String,
-           make.localizedCaseInsensitiveContains("samsung") {
+           isSamsungMake(tiff[kCGImagePropertyTIFFMake as String] as? String) {
             return true
         }
         return false
+    }
+
+    static func isSamsungMake(_ make: String?) -> Bool {
+        guard let make else { return false }
+        return make.localizedCaseInsensitiveContains("samsung")
     }
 }
