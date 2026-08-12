@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -100,7 +101,6 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
                     lambda i, v, identifier: False,
                 )
             )
-            changed = source_signature(source)
             source.write_bytes(b"SOURCE")
             changed = source_signature(source)
             self.assertFalse(
@@ -112,6 +112,40 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
                     lambda i, v, identifier: True,
                 )
             )
+
+    def test_python_writer_uses_swift_checkpoint_wire_schema(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "input"
+            output = Path(tmp) / "output"
+            root.mkdir()
+            output.mkdir()
+            source = root / "IMG.jpg"
+            source.write_bytes(b"source")
+            signature = source_signature(source)
+            image = planned_output_image(source, root, output)
+            video = image.with_suffix(".mov")
+            state_path = output / ".state.jsonl"
+
+            with StateWriter(state_path) as writer:
+                writer.append(
+                    source=source,
+                    input_root=root,
+                    image=image,
+                    video=video,
+                    status="success",
+                    signature=signature,
+                    asset_identifier="ASSET-1",
+                )
+
+            records = [json.loads(line) for line in state_path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(records[0]["schemaVersion"], 2)
+            item = records[1]
+            self.assertEqual(item["inputPath"], str(source.resolve()))
+            self.assertEqual(item["sourceRelativePath"], "IMG.jpg")
+            self.assertEqual(item["inputSHA256"], signature.sha256)
+            self.assertEqual(item["assetIdentifier"], "ASSET-1")
+            self.assertNotIn("input_path", item)
+            self.assertNotIn("input_sha256", item)
 
     def test_schema_one_style_entry_without_digest_is_not_trusted(self):
         with tempfile.TemporaryDirectory() as tmp:
