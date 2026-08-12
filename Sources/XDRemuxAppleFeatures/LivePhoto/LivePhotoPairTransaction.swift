@@ -120,10 +120,12 @@ enum LivePhotoPairTransaction {
                 manifest.state = .pairInstalled
                 journalURL = try writeManifest(manifest, in: directory)
 
-                let validator = validatePair ?? { image, video in
-                    AppleLivePhotoValidator.isValidPair(imageURL: image, videoURL: video)
-                }
-                guard validator(finalImage, finalVideo) else {
+                // AppleLivePhotoConversionEngine fully validates the temporary pair before commit.
+                // A same-directory rename does not mutate file contents. Keep this transaction layer
+                // synchronous: invoking AppleLivePhotoValidator.isValidPair here would nest an async
+                // AVFoundation validation behind a blocking semaphore while the transaction lock is
+                // held. Callers that have a genuinely synchronous validator can still supply one.
+                if let validatePair, !validatePair(finalImage, finalVideo) {
                     throw AppleLivePhotoError.transactionFailed(
                         "installed Live Photo pair failed final validation"
                     )
@@ -167,15 +169,16 @@ enum LivePhotoPairTransaction {
             let finalVideo = try safeChild(manifest.finalVideo, of: directory)
             if manifest.state == .pairInstalled,
                FileManager.default.fileExists(atPath: finalImage.path),
-               FileManager.default.fileExists(atPath: finalVideo.path) {
-                let validator = validatePair ?? { image, video in
-                    AppleLivePhotoValidator.isValidPair(imageURL: image, videoURL: video)
-                }
-                if validator(finalImage, finalVideo) {
-                    try finalize(manifest, journalURL: journalURL, in: directory)
-                    continue
-                }
+               FileManager.default.fileExists(atPath: finalVideo.path),
+               let validatePair,
+               validatePair(finalImage, finalVideo) {
+                try finalize(manifest, journalURL: journalURL, in: directory)
+                continue
             }
+
+            // No synchronous validator means fail closed. A pair-installed journal is still an
+            // uncommitted transaction until the journal is removed; restoring the prior pair is the
+            // conservative atomicity rule and avoids accepting an unverified cross-resource state.
             try rollback(manifest, journalURL: journalURL, in: directory)
         }
     }
