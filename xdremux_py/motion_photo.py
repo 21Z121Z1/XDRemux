@@ -461,9 +461,12 @@ def _number_tuple(value, limit: int) -> tuple[float, ...] | None:
     if not isinstance(value, list) or len(value) > limit:
         return None
     try:
-        return tuple(float(item) for item in value)
+        values = tuple(float(item) for item in value)
     except (TypeError, ValueError):
         return None
+    if any(not (-1e308 < item < 1e308) for item in values):
+        return None
+    return values
 
 
 def _parse_lpex_object(raw: bytes) -> OppoMetadata | None:
