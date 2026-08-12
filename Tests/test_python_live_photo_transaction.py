@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -60,7 +59,6 @@ class PythonLivePhotoTransactionTests(unittest.TestCase):
             image_backup = directory / ".photo.heic.abc123.backup"
             video_backup = directory / ".photo.mov.abc123.backup"
 
-            # Filesystem truth after: old pair -> backups, new image installed, new video pending.
             image.write_bytes(b"new-image")
             temp_video.write_bytes(b"new-video")
             image_backup.write_bytes(b"old-image")
@@ -98,8 +96,6 @@ class PythonLivePhotoTransactionTests(unittest.TestCase):
             temp_image = directory / ".photo.deadbeef.tmp.heic"
             temp_video = directory / ".photo.deadbeef.tmp.mov"
 
-            # No originals existed. The image rename happened, then the process died before the
-            # journal advanced from originals_backed_up to image_installed.
             image.write_bytes(b"new-image")
             temp_video.write_bytes(b"new-video")
             manifest = {
@@ -158,6 +154,41 @@ class PythonLivePhotoTransactionTests(unittest.TestCase):
             self.assertEqual(image.read_bytes(), b"new-image")
             self.assertEqual(video.read_bytes(), b"new-video")
             self.assertFalse(image_backup.exists())
+            self.assertFalse(video_backup.exists())
+            self.assertEqual(list(journal_dir.glob("*.json")), [])
+
+    def test_committed_recovery_never_rolls_back_during_cleanup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            journal_dir = directory / JOURNAL_DIRECTORY
+            journal_dir.mkdir()
+            transaction_id = "c0ffee"
+            image = directory / "photo.heic"
+            video = directory / "photo.mov"
+            image.write_bytes(b"new-image")
+            video.write_bytes(b"new-video")
+            # Simulate a crash after cleanup removed the image backup but before removing video backup.
+            video_backup = directory / ".photo.mov.c0ffee.backup"
+            video_backup.write_bytes(b"old-video")
+            manifest = {
+                "schema_version": SCHEMA_VERSION,
+                "transaction_id": transaction_id,
+                "state": "committed",
+                "final_image": image.name,
+                "final_video": video.name,
+                "temporary_image": ".photo.c0ffee.tmp.heic",
+                "temporary_video": ".photo.c0ffee.tmp.mov",
+                "backup_image": ".photo.heic.c0ffee.backup",
+                "backup_video": video_backup.name,
+                "had_image": True,
+                "had_video": True,
+            }
+            (journal_dir / f"{transaction_id}.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+            recover_transactions(directory, pair_validator=lambda i, v: False)
+
+            self.assertEqual(image.read_bytes(), b"new-image")
+            self.assertEqual(video.read_bytes(), b"new-video")
             self.assertFalse(video_backup.exists())
             self.assertEqual(list(journal_dir.glob("*.json")), [])
 
