@@ -21,45 +21,7 @@ jobs:
       - name: Bound PhotoKit validation render size
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("Sources/XDRemuxAppleFeatures/LivePhoto/AppleLivePhotoValidator.swift")
-          text = path.read_text()
-          old_block = '''    private static var photoKitValidationTimeout: TimeInterval {
-          guard let raw = ProcessInfo.processInfo.environment["XDREMUX_PHOTOKIT_VALIDATION_TIMEOUT_SECONDS"],
-                let seconds = Double(raw), seconds.isFinite, seconds >= 1 else {
-              return 30
-          }
-          return min(seconds, 300)
-      }
-
-      private static func validateWithPhotoKit(imageURL: URL, videoURL: URL) throws {
-          '''
-          # The previous one-shot insertion may have lost indentation in YAML; normalize by locating
-          # the semantic block boundaries rather than relying on whitespace.
-          start = text.index('    private static var photoKitValidationTimeout: TimeInterval {')
-          end = text.index('        let semaphore = DispatchSemaphore(value: 0)', start)
-          normalized = '''    private static var photoKitValidationTimeout: TimeInterval {
-              guard let raw = ProcessInfo.processInfo.environment["XDREMUX_PHOTOKIT_VALIDATION_TIMEOUT_SECONDS"],
-                    let seconds = Double(raw), seconds.isFinite, seconds >= 1 else {
-                  return 30
-              }
-              return min(seconds, 300)
-          }
-
-          private static func validateWithPhotoKit(imageURL: URL, videoURL: URL) throws {
-          '''
-          text = text[:start] + normalized + text[end:]
-          if text.count('            targetSize: .zero,') != 1:
-              raise SystemExit('expected exactly one original-size PhotoKit request')
-          text = text.replace(
-              '            targetSize: .zero,',
-              '            targetSize: CGSize(width: 512, height: 512),',
-              1,
-          )
-          path.write_text(text)
-          PY
+          python3 -c 'from pathlib import Path; p=Path("Sources/XDRemuxAppleFeatures/LivePhoto/AppleLivePhotoValidator.swift"); s=p.read_text(); assert s.count("targetSize: .zero,")==1; p.write_text(s.replace("targetSize: .zero,", "targetSize: CGSize(width: 512, height: 512),", 1))'
           git diff --check
           git diff -- Sources/XDRemuxAppleFeatures/LivePhoto/AppleLivePhotoValidator.swift
 
