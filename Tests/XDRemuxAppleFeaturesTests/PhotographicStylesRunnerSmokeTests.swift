@@ -4,7 +4,7 @@ import XDRemuxCore
 @testable import XDRemuxAppleFeatures
 
 final class PhotographicStylesRunnerSmokeTests: XCTestCase {
-    func testColorOS16MotionPhotoStillGeneratesPhotographicStyles() throws {
+    func testColorOS16MotionPhotoConvertsToLivePhotoWithPhotographicStyles() throws {
         let environment = ProcessInfo.processInfo.environment
         let repositoryRoot = URL(
             fileURLWithPath: environment["GITHUB_WORKSPACE"] ?? FileManager.default.currentDirectoryPath,
@@ -40,55 +40,44 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
             "fixture static-resource boundary changed"
         )
 
-        let sourceData = try Data(contentsOf: fixtureURL, options: [.mappedIfSafe])
-        let stillLower = try XCTUnwrap(Int(exactly: asset.stillResourceRange.lowerBound))
-        let stillUpper = try XCTUnwrap(Int(exactly: asset.stillResourceRange.upperBound))
-        guard stillLower >= 0, stillUpper > stillLower, stillUpper <= sourceData.count else {
-            XCTFail("Motion Photo parser returned an invalid static-resource range")
-            return
-        }
-
-        let baseJPEGURL = outputRoot.appendingPathComponent("coloros16-base.jpg")
-        let baseHEICURL = outputRoot.appendingPathComponent("coloros16-base.heic")
-        let stylesHEICURL = outputRoot.appendingPathComponent("coloros16-base-styles.heic")
-        let diagnosticsURL = outputRoot.appendingPathComponent("diagnostics", isDirectory: true)
+        let outputImageURL = outputRoot.appendingPathComponent("coloros16-live-styles.heic")
+        let outputVideoURL = AppleLivePhotoConversionEngine.companionVideoURL(for: outputImageURL)
         let validationURL = outputRoot.appendingPathComponent("validation.json")
 
-        try sourceData.subdata(in: stillLower..<stillUpper).write(to: baseJPEGURL, options: .atomic)
-
-        try AppleLivePhotoStillWriter.write(
-            stillInputURL: baseJPEGURL,
-            outputURL: baseHEICURL,
-            assetIdentifier: "xdremux-macos26-photographic-styles-smoke",
-            lossyCompressionQuality: 1.0
-        )
-        XCTAssertTrue(
-            AppleLivePhotoStillWriter.hasGainMap(baseHEICURL),
-            "ImageIO failed to preserve the ColorOS 16 Ultra HDR gain map"
-        )
-        XCTAssertTrue(
-            AppleFeatureConversionEngine.hasValidISOGainMap(baseHEICURL),
-            "materialized base HEIC is not an ImageIO-readable ISO gain-map image"
-        )
-
-        // This gate answers the runner-capability question only: can a GitHub-hosted
-        // macOS 26 machine generate a complete Photographic Styles container and can
-        // Apple's own NeutrinoCore consume the resulting style metadata? Solver quality
-        // is a separate regression surface, so use the deterministic identity producer.
-        let configuration = ConversionConfiguration(
-            debugDirectory: diagnosticsURL,
+        // Keep this smoke gate deterministic and focused on hosted-runner capability. The full
+        // constrained solver has its own quality regression surface; identity-fallback still writes
+        // the complete 51,840-byte key-1 payload and exercises the same NeutrinoCore consumer path.
+        let stylesConfiguration = ConversionConfiguration(
             skipExisting: false,
             applePhotographicStyles: true,
             appleStyleDataProducer: .identityFallback
         )
-        try AppleFeatureConversionEngine.convert(
-            inputURL: baseHEICURL,
-            outputURL: stylesHEICURL,
-            configuration: configuration
+        let result = try AppleLivePhotoConversionEngine.convert(
+            inputURL: fixtureURL,
+            outputImageURL: outputImageURL,
+            requirePhotoKitValidation: true,
+            photographicStylesConfiguration: stylesConfiguration
+        )
+
+        XCTAssertEqual(result.imageURL, outputImageURL)
+        XCTAssertEqual(result.videoURL, outputVideoURL)
+        XCTAssertEqual(result.sourceKind, .oppoLivePhoto)
+        XCTAssertEqual(
+            AppleLivePhotoStillWriter.assetIdentifier(in: outputImageURL),
+            result.assetIdentifier,
+            "Photographic Styles rewrite changed the Live Photo asset identifier"
+        )
+        XCTAssertTrue(
+            AppleLivePhotoValidator.isValidPair(imageURL: outputImageURL, videoURL: outputVideoURL),
+            "combined output is not a structurally valid Apple Live Photo pair"
+        )
+        XCTAssertTrue(
+            AppleLivePhotoStillWriter.hasGainMap(outputImageURL),
+            "combined output lost the Ultra HDR gain map"
         )
 
         let report = try AppleFeatureConversionEngine.validationReport(
-            for: stylesHEICURL,
+            for: outputImageURL,
             expectsPortrait: false
         )
         XCTAssertEqual(report["passed"] as? Bool, true)
@@ -101,18 +90,22 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
         )
         try reportData.write(to: validationURL, options: .atomic)
 
+        let imageBytes = (try? outputImageURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+        let videoBytes = (try? outputVideoURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
         let summary: [String: Any] = [
             "fixture": fixtureURL.lastPathComponent,
-            "fixtureBytes": sourceData.count,
-            "stillResourceBytes": stillUpper - stillLower,
             "producer": "identity-fallback",
-            "baseJPEG": baseJPEGURL.path,
-            "baseHEIC": baseHEICURL.path,
-            "stylesHEIC": stylesHEICURL.path,
-            "validation": validationURL.path,
-            "passed": report["passed"] as? Bool ?? false,
+            "livePhotoPairValid": true,
+            "photoKitValidationRequired": true,
+            "assetIdentifierPreserved": true,
+            "gainMapPreserved": true,
+            "photographicStylesPassed": report["passed"] as? Bool ?? false,
             "semanticStyleProperties": report["semanticStyleProperties"] as? Bool ?? false,
             "styleDataLength": (report["styleDataLength"] as? NSNumber)?.intValue ?? -1,
+            "image": outputImageURL.lastPathComponent,
+            "imageBytes": imageBytes,
+            "video": outputVideoURL.lastPathComponent,
+            "videoBytes": videoBytes,
         ]
         let summaryData = try JSONSerialization.data(
             withJSONObject: summary,
