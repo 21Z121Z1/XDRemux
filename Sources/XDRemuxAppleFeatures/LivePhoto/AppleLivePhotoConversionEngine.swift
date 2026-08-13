@@ -159,6 +159,7 @@ public enum AppleLivePhotoConversionEngine {
         let styledTemporaryImageURL = directory.appendingPathComponent(
             ".\(stem).\(publicationID).tmp.styles.heic"
         )
+        let failedStylesImageURL = directory.appendingPathComponent("failed-styles.heic")
         let temporaryVideoURL = directory.appendingPathComponent(".\(stem).\(publicationID).tmp.mov")
         defer {
             try? FileManager.default.removeItem(at: temporaryImageURL)
@@ -181,16 +182,28 @@ public enum AppleLivePhotoConversionEngine {
         try AppleLivePhotoStillWriter.write(
             stillInputURL: stillSourceURL,
             outputURL: temporaryImageURL,
-            assetIdentifier: assetIdentifier
+            assetIdentifier: assetIdentifier,
+            lossyCompressionQuality: stylesConfiguration == nil ? nil : 1.0
         )
 
         let pairedImageURL: URL
         if let stylesConfiguration {
-            try AppleFeatureConversionEngine.convert(
-                inputURL: temporaryImageURL,
-                outputURL: styledTemporaryImageURL,
-                configuration: stylesConfiguration
-            )
+            try? FileManager.default.removeItem(at: failedStylesImageURL)
+            do {
+                try AppleFeatureConversionEngine.convert(
+                    inputURL: temporaryImageURL,
+                    outputURL: styledTemporaryImageURL,
+                    configuration: stylesConfiguration
+                )
+            } catch {
+                if FileManager.default.fileExists(atPath: styledTemporaryImageURL.path) {
+                    try? FileManager.default.copyItem(
+                        at: styledTemporaryImageURL,
+                        to: failedStylesImageURL
+                    )
+                }
+                throw error
+            }
             let stylesReport = try AppleFeatureConversionEngine.validationReport(
                 for: styledTemporaryImageURL,
                 expectsPortrait: false
@@ -236,6 +249,7 @@ public enum AppleLivePhotoConversionEngine {
             finalImageURL: outputImageURL,
             finalVideoURL: outputVideoURL
         )
+        try? FileManager.default.removeItem(at: failedStylesImageURL)
 
         var diagnostics: [String] = []
         diagnostics.append(contentsOf: geometryPreparationDiagnostics)
