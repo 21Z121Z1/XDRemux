@@ -49,7 +49,13 @@ final class CoreContractTests: XCTestCase {
         XCTAssertEqual(plan.items.count, 3)
         XCTAssertEqual(plan.items[0].destinationURL.deletingLastPathComponent().lastPathComponent, "人像")
         XCTAssertEqual(plan.items[1].destinationURL.lastPathComponent, "plain.jpg")
-        XCTAssertEqual(plan.items[1].destinationURL.deletingLastPathComponent(), output)
+        let unclassifiedDirectory = output
+            .appendingPathComponent("静态照片", isDirectory: true)
+            .appendingPathComponent("未分类", isDirectory: true)
+        XCTAssertEqual(
+            plan.items[1].destinationURL.deletingLastPathComponent().standardizedFileURL.path,
+            unclassifiedDirectory.standardizedFileURL.path
+        )
         XCTAssertEqual(plan.items[2].destinationURL.lastPathComponent, "same (2).heic")
 
         let result = PhotoCategorizationEngine.execute(plan, jobs: 2)
@@ -57,6 +63,56 @@ final class CoreContractTests: XCTestCase {
         let repeated = try PhotoCategorizationEngine.makePlan(inputs: [input], outputDirectory: output)
         XCTAssertEqual(repeated.items.count, 3)
         XCTAssertTrue(repeated.items.allSatisfy { $0.disposition == .duplicate })
+    }
+
+    func testPhotoCategorizationKeepsValidatedLivePhotoResourcesTogether() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("xdremux-categorize-live-pair-\(UUID().uuidString)", isDirectory: true)
+        let input = root.appendingPathComponent("input", isDirectory: true)
+        let output = root.appendingPathComponent("output", isDirectory: true)
+        try FileManager.default.createDirectory(at: input, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let image = input.appendingPathComponent("pair.heic")
+        let video = input.appendingPathComponent("pair.mov")
+        try Data("oplus_18".utf8).write(to: image)
+        try Data("paired-video".utf8).write(to: video)
+
+        let occupied = output
+            .appendingPathComponent("实况照片", isDirectory: true)
+            .appendingPathComponent("人像", isDirectory: true)
+        try FileManager.default.createDirectory(at: occupied, withIntermediateDirectories: true)
+        try Data("foreign-image".utf8).write(to: occupied.appendingPathComponent("pair.heic"))
+
+        let paired = try PhotoCategorizationEngine.makePlan(
+            inputs: [input],
+            outputDirectory: output,
+            livePhotoPairValidator: { candidateImage, candidateVideo in
+                candidateImage.lastPathComponent == "pair.heic"
+                    && candidateVideo.lastPathComponent == "pair.mov"
+            }
+        )
+        XCTAssertEqual(paired.items.count, 2)
+        XCTAssertTrue(paired.items.allSatisfy { $0.classification.assetType == .livePhoto })
+        XCTAssertEqual(
+            Set(paired.items.map(\.destinationURL.lastPathComponent)),
+            Set(["pair (2).heic", "pair (2).mov"])
+        )
+        XCTAssertTrue(paired.items.allSatisfy {
+            $0.destinationURL.path.contains("实况照片/人像/")
+        })
+
+        let rejected = try PhotoCategorizationEngine.makePlan(
+            inputs: [input],
+            outputDirectory: output,
+            livePhotoPairValidator: { _, _ in false }
+        )
+        XCTAssertEqual(rejected.items.count, 1)
+        XCTAssertEqual(
+            rejected.items[0].sourceURL.resolvingSymlinksInPath().standardizedFileURL.path,
+            image.resolvingSymlinksInPath().standardizedFileURL.path
+        )
+        XCTAssertEqual(rejected.items[0].classification.assetType, .staticPhoto)
     }
 
     func testPhotoCategorizationReadsTIFFUserCommentBytes() throws {

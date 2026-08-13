@@ -37,7 +37,7 @@ class PhotoCategorizationTests(unittest.TestCase):
                 self.assertEqual(result.mode.folder_name if result.mode else None, item["folder"])
                 self.assertEqual(result.status, item["status"])
 
-    def test_plan_copies_to_categories_and_root_without_duplicate_reruns(self) -> None:
+    def test_plan_projects_asset_type_and_mode_without_duplicate_reruns(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / "source"
@@ -51,13 +51,48 @@ class PhotoCategorizationTests(unittest.TestCase):
             plan = categorize.make_plan([source], output)
             self.assertEqual(len(plan), 3)
             self.assertEqual(plan[0].destination.parent.name, "人像")
-            self.assertEqual(plan[1].destination, output / "plain.jpg")
+            self.assertEqual(plan[1].destination, output / "静态照片" / "未分类" / "plain.jpg")
             self.assertEqual(plan[2].destination.name, "same (2).heic")
 
             results = categorize.execute_plan(plan, jobs=2)
             self.assertTrue(all(item.disposition == "copied" for item in results))
             repeated = categorize.make_plan([source], output)
             self.assertTrue(all(item.disposition == "duplicate" for item in repeated))
+
+    def test_validated_live_photo_pair_moves_as_one_asset(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            output = root / "output"
+            source.mkdir()
+            image = source / "pair.heic"
+            video = source / "pair.mov"
+            image.write_bytes(b"oplus_18")
+            video.write_bytes(b"paired-video")
+            occupied = output / "实况照片" / "人像"
+            occupied.mkdir(parents=True)
+            (occupied / "pair.heic").write_bytes(b"foreign-image")
+
+            paired = categorize.make_plan(
+                [source],
+                output,
+                live_photo_pair_validator=lambda candidate_image, candidate_video: (
+                    candidate_image == image and candidate_video == video
+                ),
+            )
+            self.assertEqual(len(paired), 2)
+            self.assertTrue(all(item.classification.asset_type is categorize.AssetType.LIVE_PHOTO for item in paired))
+            self.assertEqual({item.destination.name for item in paired}, {"pair (2).heic", "pair (2).mov"})
+            self.assertTrue(all("实况照片/人像" in item.destination.as_posix() for item in paired))
+
+            rejected = categorize.make_plan(
+                [source],
+                output,
+                live_photo_pair_validator=lambda _image, _video: False,
+            )
+            self.assertEqual(len(rejected), 1)
+            self.assertEqual(rejected[0].source, image)
+            self.assertIs(rejected[0].classification.asset_type, categorize.AssetType.STATIC_PHOTO)
 
     def test_dry_run_writes_nothing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -69,7 +104,7 @@ class PhotoCategorizationTests(unittest.TestCase):
             self.assertEqual(results[0].disposition, "dry-run")
             self.assertFalse(output.exists())
 
-    def test_malformed_comment_is_copied_to_root_and_returns_failure(self) -> None:
+    def test_malformed_comment_is_copied_to_unclassified_and_returns_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / "malformed.jpg"
@@ -85,7 +120,7 @@ class PhotoCategorizationTests(unittest.TestCase):
             ])
 
             self.assertEqual(result, 1)
-            self.assertEqual((output / source.name).read_bytes(), source.read_bytes())
+            self.assertEqual((output / "静态照片" / "未分类" / source.name).read_bytes(), source.read_bytes())
 
     def test_reads_tiff_user_comment_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

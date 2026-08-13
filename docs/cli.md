@@ -38,7 +38,7 @@ xdremux categorize --input ~/Pictures/ProXDR --output-dir ~/Pictures/分类
 
 - `convert` 省略 `--output` 时**原地覆盖输入文件**。
 - `batch` 省略 `--output-dir` 时写回输入目录。
-- `batch --categorize` 把结果放进中文拍摄模式子目录（`人像`、`夜景`、`大师模式` 等）。读不出模式的照片留在输出根目录。
+- `batch --categorize` 先按资产类型写进 `静态照片` / `实况照片`，再按主拍摄模式写进 `人像`、`夜景`、`大师模式` 等子目录；读不出模式的照片进入 `未分类`。
 - `categorize` 只复制 HEIC/HEIF/JPEG 文件到这些目录，不修改也不转换任何东西。
 
 ## 参数
@@ -63,7 +63,7 @@ xdremux categorize --input ~/Pictures/ProXDR --output-dir ~/Pictures/分类
 | `--output-dir <目录>` | 输入目录 | 输出目录 |
 | `--glob <模式>` | `*.heic` | 挑选哪些文件 |
 | `--jobs <数量>` | `min(cpu, 4)` | 同时转换几个文件 |
-| `--categorize` | 关闭 | 按拍摄模式分目录写出 |
+| `--categorize` | 关闭 | 按资产类型 + 主拍摄模式分目录写出 |
 | `--resume` / `--no-resume` | `--resume` | 是否续跑上次的进度 |
 | `--skip-existing` / `--no-skip-existing` | `--skip-existing` | 输出已经符合当前设置时是否跳过 |
 | `--checkpoint <文件>` | 输出目录下的隐藏 JSONL | 进度记录位置 |
@@ -130,7 +130,7 @@ CLI 输出人类可读的文本：进度写 stdout，错误写 stderr。目前�
 
 1. 已经符合当前设置的输出直接跳过（`--skip-existing`，默认开启）。
 2. 之前失败的文件重新尝试（`--resume`，默认开启）。
-3. `--categorize` 写出的拍摄模式目录不会被当成新输入重新扫描，所以重复运行是幂等的。
+3. `--categorize` 写出的资产类型目录（以及旧版拍摄模式目录）不会被当成新输入重新扫描，所以重复运行是幂等的。
 
 ## 常见错误
 

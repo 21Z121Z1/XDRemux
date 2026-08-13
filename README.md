@@ -47,7 +47,7 @@ swift build
 
 ## 按拍摄模式归档
 
-读出照片里记录的拍摄模式，把照片复制进对应的中文目录（`人像`、`夜景`、`大师模式` 等）。只复制，不修改也不删除源文件：
+分类器会保留照片上同时激活的多个拍摄标签，再把它们投影到唯一的物理目录。第一层按资产类型分为 `静态照片` / `实况照片`，第二层按主拍摄模式分为 `人像`、`夜景`、`大师模式` 等。实况照片的 HEIC 和 MOV 始终位于同一目录。只复制，不修改也不删除源文件：
 
 ```bash
 swift run xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run
@@ -59,7 +59,7 @@ swift run xdremux categorize --input photo_dump/ --output-dir categorized/ --dry
 python3 xdremux/python/XDRemux.py categorize --input photo_dump/ --output-dir categorized/
 ```
 
-读不出拍摄模式的照片会留在输出根目录，不算失败。
+读不出拍摄模式的照片会进入对应资产类型下的 `未分类`。已有的 Apple Live Photo 只有在 HEIC/JPEG 与 MOV 的内容标识等配对信息通过校验后，才会作为同一个资产一起移动；仅仅同名的随机 MOV 不会被认领。ProXDR、HDR、Gain Map、景深和厂商等属性只作为标签保留，不继续增加物理目录层级。
 
 ## Apple 摄影风格与人像
 

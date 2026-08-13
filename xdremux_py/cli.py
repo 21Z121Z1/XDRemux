@@ -27,9 +27,9 @@ from .live_photo_batch import (
     load_state,
     planned_output_image,
     provenance_allows_reuse,
+    reserve_output_image,
     source_signature,
     state_path,
-    validate_unique_plan,
 )
 from .motion_photo import MotionPhotoError, parse_motion_photo
 from .pipeline import ConversionAnalysis, ConversionConfiguration, ConversionError, MissingImagingDependencies
@@ -141,19 +141,27 @@ def _motion_output_directory(source: Path, command: BatchCommand) -> Path:
     return parent
 
 
-def _plan_motion_outputs(motion_inputs: list[Path], command: BatchCommand) -> list[tuple[Path, Path]]:
-    plan = [
-        (
+def _plan_motion_outputs(
+    motion_inputs: list[Path],
+    command: BatchCommand,
+    *,
+    reserved_paths: set[str],
+    state: dict,
+) -> list[tuple[Path, Path]]:
+    reserved = set(reserved_paths)
+    plan: list[tuple[Path, Path]] = []
+    for source in sorted(motion_inputs, key=lambda value: str(value.resolve())):
+        prior = state.get(str(source.resolve()))
+        output = reserve_output_image(
             source,
-            planned_output_image(
-                source,
-                command.input_dir,
-                _motion_output_directory(source, command),
+            command.input_dir,
+            _motion_output_directory(source, command),
+            reserved,
+            candidate_belongs_to_source=(
+                (lambda image, video, prior=prior: prior is not None and prior.matches_outputs(image, video))
             ),
         )
-        for source in sorted(motion_inputs, key=lambda value: str(value.resolve()))
-    ]
-    validate_unique_plan(plan)
+        plan.append((source, output))
     return plan
 
 
@@ -219,20 +227,20 @@ def cmd_batch(command: BatchCommand) -> int:
         (input_path, normal_destinations.get(input_path, command.output_dir / input_path.name))
         for input_path in normal_inputs
     ]
+    checkpoint = state_path(command.output_dir, command.checkpoint_path) if motion_inputs else None
+    state = load_state(checkpoint) if checkpoint is not None else {}
+    normal_output_paths = {str(output.resolve()) for _, output in normal_plan}
     try:
         _validate_unique_normal_plan(normal_plan)
-        motion_plan = _plan_motion_outputs(motion_inputs, command)
+        motion_plan = _plan_motion_outputs(
+            motion_inputs,
+            command,
+            reserved_paths=normal_output_paths,
+            state=state,
+        )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-
-    normal_output_paths = {str(output.resolve()) for _, output in normal_plan}
-    for source, output in motion_plan:
-        image_key = str(output.resolve())
-        video_key = str(live_photo.companion_video_path(output).resolve())
-        if image_key in normal_output_paths or video_key in normal_output_paths:
-            print(f"error: planned output collision for {source}: {output}", file=sys.stderr)
-            return 1
 
     converted = 0
     for input_path, output_path in normal_plan:
@@ -248,8 +256,7 @@ def cmd_batch(command: BatchCommand) -> int:
         )
         failed += len(motion_inputs)
     elif motion_plan:
-        checkpoint = state_path(command.output_dir, command.checkpoint_path)
-        state = load_state(checkpoint)
+        assert checkpoint is not None
         with StateWriter(checkpoint) as writer:
             for input_path, output_image in motion_plan:
                 output_video = live_photo.companion_video_path(output_image)
@@ -352,9 +359,9 @@ def cmd_categorize(command: CategorizeCommand) -> int:
         return 1
     results = categorize.execute_plan(plan, jobs=command.jobs, dry_run=command.dry_run)
     for item in results:
-        mode = item.classification.mode.folder_name if item.classification.mode else f"根目录 ({item.classification.status})"
+        category = categorize.FolderProjection.relative_directory(item.classification)
         detail = f" error={item.error}" if item.error else ""
-        print(f"{item.disposition} [{mode}] {item.source} -> {item.destination}{detail}")
+        print(f"{item.disposition} [{category}] {item.source} -> {item.destination}{detail}")
     copied = sum(item.disposition == "copied" for item in results)
     dry_run = sum(item.disposition == "dry-run" for item in results)
     duplicate = sum(item.disposition == "duplicate" for item in results)
@@ -365,7 +372,7 @@ def cmd_categorize(command: CategorizeCommand) -> int:
         for item in results
     )
     print(
-        f"categorize complete: {categorized} categorized, {root} kept at root, "
+        f"categorize complete: {categorized} categorized, {root} unclassified, "
         f"{copied} copied, {dry_run} dry-run, {duplicate} duplicate, {failed} failed"
     )
     return 0 if failed == 0 else 1
@@ -408,13 +415,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     b.add_argument("--categorize", action="store_true", dest="categorize_output",
-                   help="Write outputs under Chinese shooting-mode directories")
+                   help="Write outputs under asset-type / primary shooting-mode directories")
     b.add_argument("--skip-existing", action="store_true",
                    help="Reuse an existing Live Photo pair only when saved source provenance matches")
     b.add_argument("--resume", action="store_true",
                    help="Resume using the durable Motion Photo checkpoint/provenance state")
     b.add_argument("--checkpoint", help="Path for durable Motion Photo batch checkpoint/provenance state")
-    category = sub.add_parser("categorize", help="Copy photos into shooting-mode directories")
+    category = sub.add_parser("categorize", help="Copy photo assets into asset-type / shooting-mode directories")
     category.add_argument("--input", action="append", required=True,
                           help="Input photo or directory; may be repeated")
     category.add_argument("--output-dir", required=True)

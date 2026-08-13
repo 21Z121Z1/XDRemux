@@ -118,7 +118,8 @@ def main() -> int:
             completed = subprocess.run(command, cwd=repo, text=True, capture_output=True)
             if completed.returncode == 0:
                 raise AssertionError(f"{label} accepted a malformed UserComment without reporting failure")
-            if (output / malformed.name).read_bytes() != malformed.read_bytes():
+            unclassified = output / "静态照片" / "未分类" / malformed.name
+            if unclassified.read_bytes() != malformed.read_bytes():
                 raise AssertionError(f"{label} did not preserve the malformed photo in the output root")
 
         swift = run(

@@ -51,9 +51,12 @@ def is_motion_photo(path: Path) -> bool:
 
 
 def default_output_image(input_path: Path) -> Path:
-    if input_path.suffix.lower() in {".heic", ".heif"}:
-        return input_path.with_name(input_path.stem + ".live.heic")
-    return input_path.with_suffix(".heic")
+    """Preserve the user's basename; only avoid overwriting a same-path HEIC source."""
+    input_path = Path(input_path)
+    output = input_path.with_suffix(".heic")
+    if output.resolve() == input_path.resolve():
+        return output.with_name(f"{output.stem} (2){output.suffix}")
+    return output
 
 
 def companion_video_path(image_path: Path) -> Path:

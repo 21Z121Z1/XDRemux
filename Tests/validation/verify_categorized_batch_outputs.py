@@ -28,7 +28,7 @@ def main() -> int:
     source = Path(args.input).resolve()
     source_comment = categorize.extract_user_comment(source)
     classification = categorize.classify_path(source)
-    folder = classification.mode.folder_name if classification.mode else ""
+    relative_folder = categorize.FolderProjection.relative_directory(classification)
     swift_executable = str((repo / args.swift_executable).resolve())
     python_cli = str(repo / "xdremux/python/XDRemux.py")
 
@@ -58,7 +58,7 @@ def main() -> int:
                     ],
                     repo,
                 )
-            output = output_dir / folder / source.name if folder else output_dir / source.name
+            output = output_dir / relative_folder / source.name
             if not output.is_file():
                 raise AssertionError(f"{implementation} categorized output missing: {output}")
             if categorize.extract_user_comment(output) != source_comment:
@@ -72,7 +72,7 @@ def main() -> int:
                 raise AssertionError("pillow-heif is required for the functional batch check") from exc
             outputs.append(output)
 
-    print(f"categorized Swift and Python batch outputs passed for {source.name} in {folder or 'root'}")
+    print(f"categorized Swift and Python batch outputs passed for {source.name} in {relative_folder}")
     return 0
 
 

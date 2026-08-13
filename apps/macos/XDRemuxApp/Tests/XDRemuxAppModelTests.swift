@@ -37,7 +37,7 @@ struct XDRemuxAppModelTests {
     @MainActor
     static func main() async throws {
         try await testImportDiscoversHEICFilesAndDeduplicates()
-        try await testConversionCategorizationMapsModeAndRootDirectories()
+        try await testConversionCategorizationUsesAssetTypeAndModeDirectories()
         try await testCategorizationPreviewCopyAndDuplicateRerun()
         try await testCategorizationDefaultsToEachSourceDirectory()
         try await testCategorizationCancellationKeepsCancelledState()
@@ -71,7 +71,7 @@ struct XDRemuxAppModelTests {
     }
 
     @MainActor
-    private static func testConversionCategorizationMapsModeAndRootDirectories() async throws {
+    private static func testConversionCategorizationUsesAssetTypeAndModeDirectories() async throws {
         let root = try makeTempDirectory("conversion-categorize")
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         let output = root.appendingPathComponent("output", isDirectory: true)
@@ -87,9 +87,9 @@ struct XDRemuxAppModelTests {
 
         let byName = Dictionary(uniqueKeysWithValues: viewModel.queue.map { ($0.inputURL.lastPathComponent, $0) })
         try expect(byName["portrait.heic"]?.captureMode == .portrait, "conversion queue should expose the parsed capture mode")
-        try expect(byName["portrait.heic"]?.outputURL == output.appendingPathComponent("人像/portrait.heic"), "categorized conversion should use the mode directory")
+        try expect(byName["portrait.heic"]?.outputURL == output.appendingPathComponent("静态照片/人像/portrait.heic"), "categorized conversion should use the mode directory")
         try expect(byName["unknown.heic"]?.classificationStatus == .unknownFlags, "unknown flags should remain visible in the queue")
-        try expect(byName["unknown.heic"]?.outputURL == output.appendingPathComponent("unknown.heic"), "unclassified conversion should stay at the output root")
+        try expect(byName["unknown.heic"]?.outputURL == output.appendingPathComponent("静态照片/未分类/unknown.heic"), "unclassified conversion should use the static-photo / unclassified projection")
     }
 
     @MainActor
@@ -110,16 +110,16 @@ struct XDRemuxAppModelTests {
 
         try expect(viewModel.state == .ready, "scan should produce a ready preview")
         try expect(viewModel.items.count == 2, "preview should include both supported files")
-        try expect(viewModel.categorizedCount == 1 && viewModel.rootCount == 1, "preview counts should separate categorized and root items")
+        try expect(viewModel.categorizedCount == 1 && viewModel.rootCount == 1, "preview counts should separate categorized and unclassified items")
         try expect(viewModel.modeSummary.contains("人像 1"), "preview should summarize counts by capture mode")
-        try expect(viewModel.items.contains { $0.destinationURL == output.appendingPathComponent("人像/portrait.heic") }, "preview should show the mode destination")
-        try expect(viewModel.items.contains { $0.destinationURL == output.appendingPathComponent("plain.jpg") }, "preview should show the root destination")
+        try expect(viewModel.items.contains { $0.destinationURL == output.appendingPathComponent("静态照片/人像/portrait.heic") }, "preview should show the mode destination")
+        try expect(viewModel.items.contains { $0.destinationURL == output.appendingPathComponent("静态照片/未分类/plain.jpg") }, "preview should show the unclassified destination")
 
         viewModel.copyPlannedFiles()
         try await waitForCategorization(viewModel)
         try expect(viewModel.state == .completed, "copy should complete")
-        try expect(FileManager.default.fileExists(atPath: output.appendingPathComponent("人像/portrait.heic").path), "copy should create the categorized file")
-        try expect(FileManager.default.fileExists(atPath: output.appendingPathComponent("plain.jpg").path), "copy should create the root file")
+        try expect(FileManager.default.fileExists(atPath: output.appendingPathComponent("静态照片/人像/portrait.heic").path), "copy should create the categorized file")
+        try expect(FileManager.default.fileExists(atPath: output.appendingPathComponent("静态照片/未分类/plain.jpg").path), "copy should create the unclassified file")
 
         viewModel.scan()
         try await waitForCategorization(viewModel)
@@ -161,8 +161,8 @@ struct XDRemuxAppModelTests {
         try await waitForCategorization(viewModel)
 
         let destinations = Set(viewModel.items.map(\.destinationURL))
-        try expect(destinations.contains(firstDirectory.appendingPathComponent("人像/a.heic")), "first input should use its own parent as the classification root")
-        try expect(destinations.contains(secondDirectory.appendingPathComponent("专业模式/b.heic")), "second input should use its own parent as the classification root")
+        try expect(destinations.contains(firstDirectory.appendingPathComponent("静态照片/人像/a.heic")), "first input should use its own parent as the classification root")
+        try expect(destinations.contains(secondDirectory.appendingPathComponent("静态照片/专业模式/b.heic")), "second input should use its own parent as the classification root")
     }
 
     @MainActor

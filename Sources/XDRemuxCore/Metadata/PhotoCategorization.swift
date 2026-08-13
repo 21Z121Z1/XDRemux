@@ -2,6 +2,80 @@ import CryptoKit
 import Foundation
 import ImageIO
 
+public let photoClassificationLayoutVersion = "asset-type-v1"
+public let photoUnclassifiedFolderName = "未分类"
+
+public enum PhotoAssetType: String, CaseIterable, Codable, Sendable, Identifiable, Hashable {
+    case staticPhoto = "static-photo"
+    case livePhoto = "live-photo"
+
+    public var id: String { rawValue }
+
+    public var folderName: String {
+        switch self {
+        case .staticPhoto: return "静态照片"
+        case .livePhoto: return "实况照片"
+        }
+    }
+
+    public var tagID: String { "asset.\(rawValue)" }
+}
+
+public enum PhotoResourceRole: String, Codable, Sendable, Hashable {
+    case primaryImage = "primary-image"
+    case pairedVideo = "paired-video"
+    case sidecar
+}
+
+public struct PhotoResource: Codable, Sendable, Hashable {
+    public let url: URL
+    public let role: PhotoResourceRole
+
+    public init(url: URL, role: PhotoResourceRole) {
+        self.url = url
+        self.role = role
+    }
+}
+
+public struct PhotoAsset: Codable, Sendable, Identifiable, Hashable {
+    public let id: String
+    public let type: PhotoAssetType
+    public let resources: [PhotoResource]
+
+    public init(id: String, type: PhotoAssetType, resources: [PhotoResource]) {
+        self.id = id
+        self.type = type
+        self.resources = resources
+    }
+
+    public static func staticPhoto(_ url: URL) -> PhotoAsset {
+        PhotoAsset(
+            id: url.standardizedFileURL.path,
+            type: .staticPhoto,
+            resources: [PhotoResource(url: url, role: .primaryImage)]
+        )
+    }
+
+    public static func livePhoto(
+        imageURL: URL,
+        videoURL: URL,
+        id: String? = nil
+    ) -> PhotoAsset {
+        PhotoAsset(
+            id: id ?? imageURL.standardizedFileURL.path,
+            type: .livePhoto,
+            resources: [
+                PhotoResource(url: imageURL, role: .primaryImage),
+                PhotoResource(url: videoURL, role: .pairedVideo)
+            ]
+        )
+    }
+
+    public var primaryImageURL: URL? {
+        resources.first(where: { $0.role == .primaryImage })?.url
+    }
+}
+
 public enum OppoCaptureMode: String, CaseIterable, Codable, Sendable, Identifiable, Hashable {
     case normal
     case master
@@ -20,6 +94,7 @@ public enum OppoCaptureMode: String, CaseIterable, Codable, Sendable, Identifiab
     case beauty
 
     public var id: String { rawValue }
+    public var tagID: String { "capture.\(rawValue)" }
 
     public var folderName: String {
         switch self {
@@ -61,7 +136,23 @@ public enum OppoCaptureMode: String, CaseIterable, Codable, Sendable, Identifiab
         }
     }
 
-    fileprivate static let priority = allCases.filter { $0 != .normal }
+    /// Historical ordering is retained only for deterministic folder projection.
+    public static let folderProjectionPriority = allCases.filter { $0 != .normal }
+}
+
+public enum PhotoCapability: String, CaseIterable, Codable, Sendable, Hashable {
+    case proXDR = "proxdr"
+    case gainMap = "gain-map"
+    case hdr
+    case depth
+
+    public var tagID: String { "capability.\(rawValue)" }
+}
+
+public enum CameraVendor: String, Codable, Sendable, Hashable {
+    case oppo
+
+    public var tagID: String { "vendor.\(rawValue)" }
 }
 
 public enum OppoPhotoClassificationStatus: String, Codable, Sendable, Equatable {
@@ -72,25 +163,169 @@ public enum OppoPhotoClassificationStatus: String, Codable, Sendable, Equatable 
     case unreadableImage = "unreadable-image"
 }
 
-public struct OppoPhotoClassification: Sendable, Equatable {
-    public let rawUserComment: String?
-    public let tagFlags: UInt64?
+public enum PhotoMetadataReadStatus: String, Codable, Sendable, Equatable {
+    case ok
+    case missingUserComment = "missing-user-comment"
+    case malformedUserComment = "malformed-user-comment"
+    case unreadableImage = "unreadable-image"
+}
+
+public struct OppoFlagEvidence: Codable, Sendable, Equatable {
+    public let rawFlags: UInt64
+    public let recognizedFlags: UInt64
+    public let knownUnmappedFlags: UInt64
     public let unknownFlags: UInt64
-    public let mode: OppoCaptureMode?
-    public let status: OppoPhotoClassificationStatus
+
+    public init(
+        rawFlags: UInt64,
+        recognizedFlags: UInt64,
+        knownUnmappedFlags: UInt64,
+        unknownFlags: UInt64
+    ) {
+        self.rawFlags = rawFlags
+        self.recognizedFlags = recognizedFlags
+        self.knownUnmappedFlags = knownUnmappedFlags
+        self.unknownFlags = unknownFlags
+    }
+}
+
+public struct OppoPhotoClassification: Codable, Sendable, Equatable {
+    public let rawUserComment: String?
+    public let flagEvidence: OppoFlagEvidence?
+    public let captureModes: Set<OppoCaptureMode>
+    public let metadataStatus: PhotoMetadataReadStatus
 
     public init(
         rawUserComment: String?,
-        tagFlags: UInt64?,
-        unknownFlags: UInt64,
-        mode: OppoCaptureMode?,
-        status: OppoPhotoClassificationStatus
+        flagEvidence: OppoFlagEvidence?,
+        captureModes: Set<OppoCaptureMode>,
+        metadataStatus: PhotoMetadataReadStatus
     ) {
         self.rawUserComment = rawUserComment
-        self.tagFlags = tagFlags
-        self.unknownFlags = unknownFlags
-        self.mode = mode
-        self.status = status
+        self.flagEvidence = flagEvidence
+        self.captureModes = captureModes
+        self.metadataStatus = metadataStatus
+    }
+
+    public var tagFlags: UInt64? { flagEvidence?.rawFlags }
+    public var recognizedFlags: UInt64 { flagEvidence?.recognizedFlags ?? 0 }
+    public var knownUnmappedFlags: UInt64 { flagEvidence?.knownUnmappedFlags ?? 0 }
+    public var unknownFlags: UInt64 { flagEvidence?.unknownFlags ?? 0 }
+
+    public var status: OppoPhotoClassificationStatus {
+        switch metadataStatus {
+        case .missingUserComment: return .missingUserComment
+        case .malformedUserComment: return .malformedUserComment
+        case .unreadableImage: return .unreadableImage
+        case .ok:
+            if !captureModes.isEmpty || unknownFlags == 0 { return .categorized }
+            return .unknownFlags
+        }
+    }
+}
+
+public struct PhotoClassification: Codable, Sendable, Equatable {
+    public let assetType: PhotoAssetType
+    public let captureModes: Set<OppoCaptureMode>
+    public let capabilities: Set<PhotoCapability>
+    public let vendor: CameraVendor?
+    public let evidence: OppoPhotoClassification
+
+    public init(
+        assetType: PhotoAssetType,
+        captureModes: Set<OppoCaptureMode>,
+        capabilities: Set<PhotoCapability>,
+        vendor: CameraVendor?,
+        evidence: OppoPhotoClassification
+    ) {
+        self.assetType = assetType
+        self.captureModes = captureModes
+        self.capabilities = capabilities
+        self.vendor = vendor
+        self.evidence = evidence
+    }
+
+    public var rawUserComment: String? { evidence.rawUserComment }
+    public var tagFlags: UInt64? { evidence.tagFlags }
+    public var recognizedFlags: UInt64 { evidence.recognizedFlags }
+    public var knownUnmappedFlags: UInt64 { evidence.knownUnmappedFlags }
+    public var unknownFlags: UInt64 { evidence.unknownFlags }
+    public var metadataStatus: PhotoMetadataReadStatus { evidence.metadataStatus }
+    public var status: OppoPhotoClassificationStatus { evidence.status }
+
+    /// Compatibility view for old callers. The semantic source of truth is `captureModes`; this is
+    /// only the deterministic physical-folder projection.
+    public var mode: OppoCaptureMode? { PhotoFolderProjection.primaryCaptureMode(for: self) }
+
+    public var tags: [String] {
+        var values = Set<String>()
+        values.insert(assetType.tagID)
+        values.formUnion(captureModes.map(\.tagID))
+        values.formUnion(capabilities.map(\.tagID))
+        if let vendor { values.insert(vendor.tagID) }
+        return values.sorted()
+    }
+}
+
+public enum PhotoFolderProjection {
+    public static let layoutVersion = photoClassificationLayoutVersion
+    public static let rootFolderNames = Set(PhotoAssetType.allCases.map(\.folderName))
+    public static let unclassifiedFolderName = photoUnclassifiedFolderName
+
+    public static func primaryCaptureMode(for classification: PhotoClassification) -> OppoCaptureMode? {
+        for candidate in OppoCaptureMode.folderProjectionPriority
+        where classification.captureModes.contains(candidate) {
+            return candidate
+        }
+        // `normal` is a folder/presentation fallback, not an activated semantic tag. Preserve the
+        // historical normal handling for zero and known-but-unmapped OPPO bits, but do not hide
+        // completely unknown flags under the normal folder.
+        if classification.metadataStatus == .ok,
+           classification.tagFlags != nil,
+           classification.unknownFlags == 0 {
+            return .normal
+        }
+        return nil
+    }
+
+    public static func relativeDirectoryComponents(
+        for classification: PhotoClassification,
+        assetType: PhotoAssetType? = nil
+    ) -> [String] {
+        let resolvedType = assetType ?? classification.assetType
+        let leaf = primaryCaptureMode(for: classification)?.folderName ?? photoUnclassifiedFolderName
+        return [resolvedType.folderName, leaf]
+    }
+
+    public static func relativeDirectory(
+        for classification: PhotoClassification,
+        assetType: PhotoAssetType? = nil
+    ) -> String {
+        relativeDirectoryComponents(for: classification, assetType: assetType).joined(separator: "/")
+    }
+}
+
+public struct PhotoClassificationContract: Codable, Sendable, Equatable {
+    public let assetType: String
+    public let captureModes: [String]
+    public let primaryCaptureMode: String?
+    public let folder: String
+    public let metadataStatus: String
+    public let recognizedFlags: UInt64
+    public let knownUnmappedFlags: UInt64
+    public let unknownFlags: UInt64
+    public let tags: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case assetType = "asset_type"
+        case captureModes = "capture_modes"
+        case primaryCaptureMode = "primary_capture_mode"
+        case folder
+        case metadataStatus = "metadata_status"
+        case recognizedFlags = "recognized_flags"
+        case knownUnmappedFlags = "known_unmapped_flags"
+        case unknownFlags = "unknown_flags"
+        case tags
     }
 }
 
@@ -105,7 +340,7 @@ public enum PhotoCategorizationDisposition: String, Codable, Sendable {
 public struct PhotoCategorizationItem: Sendable, Identifiable {
     public let sourceURL: URL
     public let destinationURL: URL
-    public let classification: OppoPhotoClassification
+    public let classification: PhotoClassification
     public let disposition: PhotoCategorizationDisposition
     public let errorDescription: String?
 
@@ -114,7 +349,7 @@ public struct PhotoCategorizationItem: Sendable, Identifiable {
     public init(
         sourceURL: URL,
         destinationURL: URL,
-        classification: OppoPhotoClassification,
+        classification: PhotoClassification,
         disposition: PhotoCategorizationDisposition,
         errorDescription: String? = nil
     ) {
@@ -144,7 +379,9 @@ public struct PhotoCategorizationResult: Sendable {
     public var duplicateCount: Int { items.count { $0.disposition == .duplicate } }
     public var failedCount: Int { items.count { $0.disposition == .failed } }
     public var categorizedCount: Int { items.count { $0.classification.mode != nil } }
-    public var rootCount: Int { items.count { $0.classification.mode == nil } }
+    public var unclassifiedCount: Int { items.count { $0.classification.mode == nil } }
+    /// Compatibility alias. V1 no longer writes uncategorized photos to the output root.
+    public var rootCount: Int { unclassifiedCount }
     public var issueCount: Int {
         items.count {
             $0.disposition == .failed
@@ -160,7 +397,8 @@ public struct PhotoCategorizationResult: Sendable {
 
 public enum PhotoCategorizationEngine {
     private static let supportedExtensions = Set(["heic", "heif", "jpg", "jpeg"])
-    private static let captureModeFolderNames = Set(OppoCaptureMode.allCases.map(\.folderName))
+    private static let legacyCaptureModeFolderNames = Set(OppoCaptureMode.allCases.map(\.folderName))
+    private static let projectionRootFolderNames = Set(PhotoAssetType.allCases.map(\.folderName))
     private static let knownFlagsMask: UInt64 = [
         0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80,
         0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000,
@@ -169,58 +407,117 @@ public enum PhotoCategorizationEngine {
         0x800_0000, 0x1000_0000, 0x2000_0000, 0x4000_0000, 0x8000_0000,
         0x1_0000_0000, 0x2_0000_0000, 0x4000_0000_0000_0000
     ].reduce(0, |)
+    private static let mappedFlagsMask: UInt64 = OppoCaptureMode.folderProjectionPriority
+        .map(\.bit)
+        .reduce(0, |)
 
-    public static func classify(userComment: String?) -> OppoPhotoClassification {
+    public static func classify(
+        userComment: String?,
+        assetType: PhotoAssetType = .staticPhoto,
+        capabilities: Set<PhotoCapability> = []
+    ) -> PhotoClassification {
+        let evidence: OppoPhotoClassification
+        let vendor: CameraVendor?
         guard let raw = userComment?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
-            return OppoPhotoClassification(
+            evidence = OppoPhotoClassification(
                 rawUserComment: userComment,
-                tagFlags: nil,
-                unknownFlags: 0,
-                mode: nil,
-                status: .missingUserComment
+                flagEvidence: nil,
+                captureModes: [],
+                metadataStatus: .missingUserComment
+            )
+            return PhotoClassification(
+                assetType: assetType,
+                captureModes: [],
+                capabilities: capabilities,
+                vendor: nil,
+                evidence: evidence
             )
         }
         guard let flags = parseFlags(from: raw) else {
-            return OppoPhotoClassification(
+            evidence = OppoPhotoClassification(
                 rawUserComment: raw,
-                tagFlags: nil,
-                unknownFlags: 0,
-                mode: nil,
-                status: .malformedUserComment
+                flagEvidence: nil,
+                captureModes: [],
+                metadataStatus: .malformedUserComment
+            )
+            return PhotoClassification(
+                assetType: assetType,
+                captureModes: [],
+                capabilities: capabilities,
+                vendor: nil,
+                evidence: evidence
             )
         }
 
+        let recognized = flags & mappedFlagsMask
+        let knownUnmapped = flags & knownFlagsMask & ~mappedFlagsMask
         let unknown = flags & ~knownFlagsMask
-        let mode = OppoCaptureMode.priority.first { flags & $0.bit != 0 }
-        if mode == nil, unknown != 0 {
-            return OppoPhotoClassification(
-                rawUserComment: raw,
-                tagFlags: flags,
-                unknownFlags: unknown,
-                mode: nil,
-                status: .unknownFlags
-            )
-        }
-        return OppoPhotoClassification(
+        let modes = Set(OppoCaptureMode.folderProjectionPriority.filter { flags & $0.bit != 0 })
+        evidence = OppoPhotoClassification(
             rawUserComment: raw,
-            tagFlags: flags,
-            unknownFlags: unknown,
-            mode: mode ?? .normal,
-            status: .categorized
+            flagEvidence: OppoFlagEvidence(
+                rawFlags: flags,
+                recognizedFlags: recognized,
+                knownUnmappedFlags: knownUnmapped,
+                unknownFlags: unknown
+            ),
+            captureModes: modes,
+            metadataStatus: .ok
+        )
+        vendor = .oppo
+        return PhotoClassification(
+            assetType: assetType,
+            captureModes: modes,
+            capabilities: capabilities,
+            vendor: vendor,
+            evidence: evidence
         )
     }
 
-    public static func classify(at url: URL) -> OppoPhotoClassification {
-        guard let data = try? Data(contentsOf: url) else {
-            return OppoPhotoClassification(
+    public static func classify(asset: PhotoAsset) -> PhotoClassification {
+        guard let primaryImageURL = asset.primaryImageURL else {
+            let evidence = OppoPhotoClassification(
                 rawUserComment: nil,
-                tagFlags: nil,
-                unknownFlags: 0,
-                mode: nil,
-                status: .unreadableImage
+                flagEvidence: nil,
+                captureModes: [],
+                metadataStatus: .unreadableImage
+            )
+            return PhotoClassification(
+                assetType: asset.type,
+                captureModes: [],
+                capabilities: [],
+                vendor: nil,
+                evidence: evidence
             )
         }
-        return classify(userComment: extractedUserComment(from: data))
+        return classify(at: primaryImageURL, assetType: asset.type)
+    }
+
+    public static func classify(
+        at url: URL,
+        assetType: PhotoAssetType? = nil
+    ) -> PhotoClassification {
+        let resolvedAssetType = assetType ?? inferredAssetType(at: url)
+        guard let data = try? Data(contentsOf: url) else {
+            let evidence = OppoPhotoClassification(
+                rawUserComment: nil,
+                flagEvidence: nil,
+                captureModes: [],
+                metadataStatus: .unreadableImage
+            )
+            return PhotoClassification(
+                assetType: resolvedAssetType,
+                captureModes: [],
+                capabilities: [],
+                vendor: nil,
+                evidence: evidence
+            )
+        }
+        return classify(
+            userComment: extractedUserComment(from: data),
+            assetType: resolvedAssetType,
+            capabilities: detectedCapabilities(in: data)
+        )
     }
 
     public static func makePlan(
@@ -235,9 +532,10 @@ public enum PhotoCategorizationEngine {
         for source in sources {
             let classification = classify(at: source)
             let destinationRoot = outputDirectory ?? source.deletingLastPathComponent()
-            let destinationDirectory = classification.mode.map {
-                destinationRoot.appendingPathComponent($0.folderName, isDirectory: true)
-            } ?? destinationRoot
+            let destinationDirectory = PhotoFolderProjection.relativeDirectoryComponents(for: classification)
+                .reduce(destinationRoot) { partial, component in
+                    partial.appendingPathComponent(component, isDirectory: true)
+                }
             let sourceDigest = try sha256Hex(source)
             var sequence = 1
             while true {
@@ -340,8 +638,51 @@ public enum PhotoCategorizationEngine {
         return PhotoCategorizationResult(items: ordered)
     }
 
-    public static func categorizedDirectory(for url: URL) -> String? {
-        classify(at: url).mode?.folderName
+    public static func categorizedDirectory(
+        for url: URL,
+        assetType: PhotoAssetType? = nil
+    ) -> String? {
+        PhotoFolderProjection.relativeDirectory(for: classify(at: url, assetType: assetType))
+    }
+
+    public static func classificationContract(
+        for classification: PhotoClassification
+    ) -> PhotoClassificationContract {
+        let mode = classification.mode
+        return PhotoClassificationContract(
+            assetType: classification.assetType.rawValue,
+            captureModes: OppoCaptureMode.folderProjectionPriority
+                .filter { classification.captureModes.contains($0) }
+                .map(\.rawValue),
+            primaryCaptureMode: mode?.rawValue,
+            folder: mode?.folderName ?? photoUnclassifiedFolderName,
+            metadataStatus: classification.metadataStatus.rawValue,
+            recognizedFlags: classification.recognizedFlags,
+            knownUnmappedFlags: classification.knownUnmappedFlags,
+            unknownFlags: classification.unknownFlags,
+            tags: classification.tags
+        )
+    }
+
+    public static func inferredAssetType(at url: URL) -> PhotoAssetType {
+        let ext = url.pathExtension.lowercased()
+        guard ext == "jpg" || ext == "jpeg" || ext == "heic" || ext == "heif" else {
+            return .staticPhoto
+        }
+        return ((try? OppoMotionPhotoParser.parse(url: url)) ?? nil) == nil ? .staticPhoto : .livePhoto
+    }
+
+    private static func detectedCapabilities(in data: Data) -> Set<PhotoCapability> {
+        var capabilities = Set<PhotoCapability>()
+        let privateGainMapNames = ["\"local.uhdr.gainmap.data\"", "\"local.uhdr.gainmap.info\""]
+        if privateGainMapNames.contains(where: { data.range(of: Data($0.utf8)) != nil }) {
+            capabilities.formUnion([.proXDR, .gainMap, .hdr])
+        }
+        if data.range(of: Data("\"rear.depth\"".utf8)) != nil,
+           data.range(of: Data("\"rear.depth.config\"".utf8)) != nil {
+            capabilities.insert(.depth)
+        }
+        return capabilities
     }
 
     private static func parseFlags(from raw: String) -> UInt64? {
@@ -469,6 +810,7 @@ public enum PhotoCategorizationEngine {
     ) throws -> [URL] {
         let excluded = outputDirectory?.standardizedFileURL.path
         var collected: [String: URL] = [:]
+        let inPlaceSkipRoots = projectionRootFolderNames.union(legacyCaptureModeFolderNames)
         for input in inputs {
             var isDirectory: ObjCBool = false
             guard fileManager.fileExists(atPath: input.path, isDirectory: &isDirectory) else {
@@ -485,6 +827,7 @@ public enum PhotoCategorizationEngine {
                 includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
                 options: [.skipsHiddenFiles]
             ) else { throw XDRemuxError.unableToRead(input) }
+            let inputRoot = input.standardizedFileURL.path
             for case let url as URL in enumerator {
                 let path = url.standardizedFileURL.path
                 let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
@@ -493,7 +836,8 @@ public enum PhotoCategorizationEngine {
                     continue
                 }
                 if outputDirectory == nil, isDirectory,
-                   captureModeFolderNames.contains(url.lastPathComponent) {
+                   url.deletingLastPathComponent().standardizedFileURL.path == inputRoot,
+                   inPlaceSkipRoots.contains(url.lastPathComponent) {
                     enumerator.skipDescendants()
                     continue
                 }

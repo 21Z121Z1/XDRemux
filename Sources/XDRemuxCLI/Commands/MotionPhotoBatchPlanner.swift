@@ -1,62 +1,70 @@
-import CryptoKit
 import Foundation
 
-/// Stable Motion Photo batch naming. A destination is a pure function of the canonical batch root
-/// plus the source path relative to that root, so batch membership/order cannot remap a source and
-/// two different input roots cannot silently target the same persisted Live Photo name.
+/// User-facing Motion Photo naming policy.
+///
+/// Preserve the source basename whenever possible. Sequence suffixes are introduced only when the
+/// destination namespace has a real collision. Source identity remains in checkpoint/provenance;
+/// it is deliberately not exposed in the user's filename.
 enum MotionPhotoBatchPlanner {
     static func outputImageURL(
         for inputURL: URL,
-        inputRootURL: URL,
+        inputRootURL _: URL,
         outputDirectoryURL: URL
     ) -> URL {
         let source = inputURL.resolvingSymlinksInPath().standardizedFileURL
-        let root = inputRootURL.resolvingSymlinksInPath().standardizedFileURL
-        let rootIdentity = root.path.precomposedStringWithCanonicalMapping
-        let relativePath: String
-        let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        if source.path.hasPrefix(prefix) {
-            relativePath = String(source.path.dropFirst(prefix.count)).precomposedStringWithCanonicalMapping
-        } else {
-            relativePath = source.path.precomposedStringWithCanonicalMapping
-        }
-
-        // Root namespace + relative path is equivalent to a canonical source identity while keeping
-        // the intent explicit. This prevents two independent input trees with the same A/IMG.jpg
-        // layout from overwriting each other when they share an output directory.
-        let identity = rootIdentity + "\u{0}" + relativePath
-        let digest = SHA256.hash(data: Data(identity.utf8))
-        // 128 bits keeps the filename compact while making accidental persisted-name collisions
-        // negligible. validateUnique() still fails closed if a collision is ever observed.
-        let token = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
-        let ext = source.pathExtension.lowercased()
-        let sourceStem = source.deletingPathExtension().lastPathComponent
-        let stem = (ext == "heic" || ext == "heif") ? "\(sourceStem).live" : sourceStem
+        let stem = source.deletingPathExtension().lastPathComponent
         return outputDirectoryURL
-            .appendingPathComponent("\(stem)~\(token)")
+            .appendingPathComponent(stem)
             .appendingPathExtension("heic")
     }
 
-    static func validateUnique(_ items: [(input: URL, output: URL)]) throws {
-        var owners: [String: String] = [:]
-        for item in items {
-            let outputPath = item.output.standardizedFileURL.path
-            let inputPath = item.input.resolvingSymlinksInPath().standardizedFileURL.path
-            if let prior = owners[outputPath], prior != inputPath {
-                throw PlannerError.collision(first: prior, second: inputPath, output: outputPath)
-            }
-            owners[outputPath] = inputPath
-        }
+    static func numberedOutputImageURL(base: URL, sequence: Int) -> URL {
+        guard sequence > 1 else { return base }
+        let stem = base.deletingPathExtension().lastPathComponent
+        return base.deletingLastPathComponent()
+            .appendingPathComponent("\(stem) (\(sequence))")
+            .appendingPathExtension(base.pathExtension)
     }
 
-    enum PlannerError: LocalizedError {
-        case collision(first: String, second: String, output: String)
+    static func companionVideoURL(for imageURL: URL) -> URL {
+        imageURL.deletingPathExtension().appendingPathExtension("mov")
+    }
 
-        var errorDescription: String? {
-            switch self {
-            case let .collision(first, second, output):
-                return "stable Motion Photo output collision: \(first) and \(second) -> \(output)"
+    /// Reserves one HEIC+MOV namespace atomically. `candidateBelongsToSource` lets durable
+    /// provenance keep an existing name on rerun, while unrelated pre-existing files count as real
+    /// collisions and receive the next sequence number.
+    static func reserveOutputImageURL(
+        for inputURL: URL,
+        inputRootURL: URL,
+        outputDirectoryURL: URL,
+        reservedPaths: inout Set<String>,
+        candidateBelongsToSource: (URL, URL) -> Bool = { _, _ in false },
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL {
+        let sourcePath = inputURL.resolvingSymlinksInPath().standardizedFileURL.path
+        let base = outputImageURL(
+            for: inputURL,
+            inputRootURL: inputRootURL,
+            outputDirectoryURL: outputDirectoryURL
+        )
+        var sequence = 1
+
+        while true {
+            let image = numberedOutputImageURL(base: base, sequence: sequence)
+            let video = companionVideoURL(for: image)
+            let imagePath = image.standardizedFileURL.path
+            let videoPath = video.standardizedFileURL.path
+            let plannedConflict = reservedPaths.contains(imagePath) || reservedPaths.contains(videoPath)
+            let sourceConflict = imagePath == sourcePath || videoPath == sourcePath
+            let belongsToSource = candidateBelongsToSource(image, video)
+            let filesystemConflict = !belongsToSource && (fileExists(image) || fileExists(video))
+
+            if !plannedConflict && !sourceConflict && !filesystemConflict {
+                reservedPaths.insert(imagePath)
+                reservedPaths.insert(videoPath)
+                return image
             }
+            sequence += 1
         }
     }
 }

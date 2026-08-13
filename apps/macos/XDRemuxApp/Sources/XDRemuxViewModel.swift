@@ -97,6 +97,7 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
     var startedAt: Date?
     var finishedAt: Date?
     var captureMode: OppoCaptureMode?
+    var assetType: PhotoAssetType
     var classificationStatus: OppoPhotoClassificationStatus
 
     init(
@@ -109,6 +110,7 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
         startedAt: Date? = nil,
         finishedAt: Date? = nil,
         captureMode: OppoCaptureMode? = nil,
+        assetType: PhotoAssetType = .staticPhoto,
         classificationStatus: OppoPhotoClassificationStatus = .missingUserComment
     ) {
         self.id = id
@@ -120,6 +122,7 @@ struct ConversionQueueItem: Identifiable, Sendable, Equatable {
         self.startedAt = startedAt
         self.finishedAt = finishedAt
         self.captureMode = captureMode
+        self.assetType = assetType
         self.classificationStatus = classificationStatus
     }
 
@@ -258,13 +261,15 @@ final class XDRemuxViewModel {
                 let outputURL = Self.makeOutputURL(
                     for: inputURL,
                     config: config,
-                    captureMode: classification.mode
+                    captureMode: classification.mode,
+                    assetType: classification.assetType
                 )
                 return ConversionQueueItem(
                     inputURL: inputURL,
                     outputURL: outputURL,
                     outputPlanStatus: Self.outputPlanStatus(inputURL: inputURL, outputURL: outputURL, config: config),
                     captureMode: classification.mode,
+                    assetType: classification.assetType,
                     classificationStatus: classification.status
                 )
             }
@@ -330,7 +335,7 @@ final class XDRemuxViewModel {
             queue[index].errorMessage = nil
             queue[index].startedAt = nil
             queue[index].finishedAt = nil
-            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode)
+            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode, assetType: queue[index].assetType)
             queue[index].outputPlanStatus = Self.outputPlanStatus(inputURL: queue[index].inputURL, outputURL: queue[index].outputURL, config: config)
         }
         refreshOutputURLsAndPlansForEditableItems()
@@ -398,7 +403,7 @@ final class XDRemuxViewModel {
 
     private func refreshOutputURLsAndPlansForEditableItems() {
         for index in queue.indices where queue[index].status == .pending || queue[index].status == .failed || queue[index].status == .cancelled {
-            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode)
+            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode, assetType: queue[index].assetType)
             queue[index].outputPlanStatus = Self.outputPlanStatus(
                 inputURL: queue[index].inputURL,
                 outputURL: queue[index].outputURL,
@@ -561,7 +566,7 @@ final class XDRemuxViewModel {
             queue[index].errorMessage = nil
             queue[index].startedAt = nil
             queue[index].finishedAt = nil
-            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode)
+            queue[index].outputURL = Self.makeOutputURL(for: queue[index].inputURL, config: config, captureMode: queue[index].captureMode, assetType: queue[index].assetType)
             queue[index].outputPlanStatus = Self.outputPlanStatus(inputURL: queue[index].inputURL, outputURL: queue[index].outputURL, config: config)
         }
         refreshOutputURLsAndPlansForEditableItems()
@@ -648,21 +653,27 @@ final class XDRemuxViewModel {
     nonisolated private static func makeOutputURL(
         for inputURL: URL,
         config: ConversionConfig,
-        captureMode: OppoCaptureMode?
+        captureMode: OppoCaptureMode?,
+        assetType: PhotoAssetType
     ) -> URL {
-        let category = config.categorizeOutputByCaptureMode ? captureMode?.folderName : nil
+        let categoryComponents = config.categorizeOutputByCaptureMode
+            ? [assetType.folderName, captureMode?.folderName ?? PhotoFolderProjection.unclassifiedFolderName]
+            : []
+
+        func projectedDirectory(from root: URL) -> URL {
+            categoryComponents.reduce(root) { directory, component in
+                directory.appendingPathComponent(component, isDirectory: true)
+            }
+        }
+
         if let outputDirectory = config.outputDirectory {
-            let directory = category.map {
-                outputDirectory.appendingPathComponent($0, isDirectory: true)
-            } ?? outputDirectory
-            return directory.appendingPathComponent(inputURL.lastPathComponent)
+            return projectedDirectory(from: outputDirectory)
+                .appendingPathComponent(inputURL.lastPathComponent)
         }
 
         let suffix = config.fileNameSuffix.isEmpty ? "_iso" : config.fileNameSuffix
         let stem = inputURL.deletingPathExtension().lastPathComponent
-        let parent = category.map {
-            inputURL.deletingLastPathComponent().appendingPathComponent($0, isDirectory: true)
-        } ?? inputURL.deletingLastPathComponent()
+        let parent = projectedDirectory(from: inputURL.deletingLastPathComponent())
         return parent.appendingPathComponent("\(stem)\(suffix).heic")
     }
 
