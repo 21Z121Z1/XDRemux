@@ -4543,12 +4543,12 @@ package enum ApplePhotographicStylesPipeline {
         let deltaGrid = refs.first(where: { ref in
             ref.type == "dimg" && ref.to.count == 30
                 && items.first(where: { $0.itemID == ref.from })?.type == "grid"
+                && refs.contains(where: {
+                    $0.type == "auxl" && $0.from == ref.from
+                        && Set($0.to) == Set([primaryID, tmapID])
+                })
         })
-        guard let deltaGrid,
-              refs.contains(where: {
-                  $0.type == "auxl" && $0.from == deltaGrid.from
-                      && Set($0.to) == Set([primaryID, tmapID])
-              }),
+        guard deltaGrid != nil,
               data.range(of: Data("tag:apple.com,2023:photo:aux:styledeltamap".utf8)) != nil,
               data.range(of: Data("tag:apple.com,2023:photo:aux:linearthumbnail".utf8)) != nil else {
             throw CLIError.invalidContainer("Styles validation: auxiliary item graph is incomplete")
