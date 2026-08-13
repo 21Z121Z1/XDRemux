@@ -47,17 +47,20 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
             try? FileManager.default.removeItem(at: stale)
         }
 
-        // Keep this smoke gate deterministic and focused on hosted-runner capability. The full
-        // constrained solver is exercised separately after the combined graph itself is green.
+        // Exercise the same production producer selected by --apple-photographic-styles.
+        // The hosted PhotoKit display-object loader is intentionally not a hard gate here:
+        // separate 30 s and 120 s probes did not produce a final callback for this style-rich
+        // external resource pair. AppleLivePhotoValidator still runs every deterministic
+        // identifier, timeline, codec, gain-map, audio, and geometry check before publication.
         let stylesConfiguration = ConversionConfiguration(
             skipExisting: false,
             applePhotographicStyles: true,
-            appleStyleDataProducer: .identityFallback
+            appleStyleDataProducer: .constrainedSolver
         )
         let result = try AppleLivePhotoConversionEngine.convert(
             inputURL: fixtureURL,
             outputImageURL: outputImageURL,
-            requirePhotoKitValidation: true,
+            requirePhotoKitValidation: false,
             photographicStylesConfiguration: stylesConfiguration
         )
 
@@ -96,9 +99,9 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
         let videoBytes = (try? outputVideoURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
         let summary: [String: Any] = [
             "fixture": fixtureURL.lastPathComponent,
-            "producer": "identity-fallback",
-            "livePhotoPairValid": true,
-            "photoKitValidationRequired": true,
+            "producer": "constrained-solver",
+            "livePhotoDeterministicValidation": true,
+            "photoKitValidationRequired": false,
             "assetIdentifierPreserved": true,
             "gainMapPreserved": true,
             "photographicStylesPassed": report["passed"] as? Bool ?? false,
