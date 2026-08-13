@@ -1,0 +1,71 @@
+name: Patch Styles Grid Validator Once
+
+on:
+  push:
+    branches:
+      - test/macos26-photographic-styles-smoke
+    paths:
+      - .github/workflows/patch-styles-grid-validator-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Select the Style Delta grid structurally
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("Sources/XDRemuxAppleFeatures/PhotographicStyles/ApplePhotographicStylesPipeline.swift")
+          text = path.read_text()
+          old = '''        let deltaGrid = refs.first(where: { ref in
+              ref.type == "dimg" && ref.to.count == 30
+                  && items.first(where: { $0.itemID == ref.from })?.type == "grid"
+          })
+          guard let deltaGrid,
+                refs.contains(where: {
+                    $0.type == "auxl" && $0.from == deltaGrid.from
+                        && Set($0.to) == Set([primaryID, tmapID])
+                }),
+                data.range(of: Data("tag:apple.com,2023:photo:aux:styledeltamap".utf8)) != nil,
+                data.range(of: Data("tag:apple.com,2023:photo:aux:linearthumbnail".utf8)) != nil else {
+              throw CLIError.invalidContainer("Styles validation: auxiliary item graph is incomplete")
+          }
+          '''
+          new = '''        let deltaGrid = refs.first(where: { ref in
+              ref.type == "dimg" && ref.to.count == 30
+                  && items.first(where: { $0.itemID == ref.from })?.type == "grid"
+                  && refs.contains(where: {
+                      $0.type == "auxl" && $0.from == ref.from
+                          && Set($0.to) == Set([primaryID, tmapID])
+                  })
+          })
+          guard deltaGrid != nil,
+                data.range(of: Data("tag:apple.com,2023:photo:aux:styledeltamap".utf8)) != nil,
+                data.range(of: Data("tag:apple.com,2023:photo:aux:linearthumbnail".utf8)) != nil else {
+              throw CLIError.invalidContainer("Styles validation: auxiliary item graph is incomplete")
+          }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f"expected exactly one validator block, found {text.count(old)}")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          git diff --check
+          git diff -- Sources/XDRemuxAppleFeatures/PhotographicStyles/ApplePhotographicStylesPipeline.swift
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Sources/XDRemuxAppleFeatures/PhotographicStyles/ApplePhotographicStylesPipeline.swift
+          git commit -m "fix: identify the Styles delta grid structurally"
+          git push origin HEAD:test/macos26-photographic-styles-smoke
