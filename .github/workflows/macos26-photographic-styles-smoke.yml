@@ -45,9 +45,10 @@ jobs:
             echo "## macOS 26 Live Photo + Photographic Styles smoke"
             echo
             echo "Fixture: \`IMG20260801190843_ColorOS_16.jpg\`"
-            echo "Path: ColorOS 16 Motion Photo -> Apple Live Photo HEIC+MOV -> deterministic Live Photo validation -> Photographic Styles -> NeutrinoCore"
+            echo "Path: ColorOS 16 Motion Photo -> Apple Live Photo HEIC+MOV -> deterministic Live Photo validation -> Photographic Styles metadata -> NeutrinoCore consumer validation"
             echo
-            echo "The hosted PHLivePhoto loader is not a hard gate for style-rich external pairs; separate 30 s and 120 s probes produced no final callback."
+            echo "Hosted-runner scope: the smoke explicitly uses identity-fallback for key-1 coefficients. The product default remains constrained-solver; the hosted complete-Neutrino calibration renderer rejects SemanticStyle with NUError Code 9 (Unsupported)."
+            echo "The hosted PHLivePhoto display-object loader is also not a hard gate for style-rich external pairs; separate 30 s and 120 s probes produced no final callback."
             echo
             if [[ -f "$XDREMUX_STYLE_RUNNER_OUTPUT/smoke-summary.json" ]]; then
               echo '```json'
