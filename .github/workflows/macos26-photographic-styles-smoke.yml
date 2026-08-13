@@ -66,6 +66,7 @@ jobs:
           path: |
             artifacts/macos26-photographic-styles/coloros16-live-styles.heic
             artifacts/macos26-photographic-styles/coloros16-live-styles.mov
+            artifacts/macos26-photographic-styles/failed-styles.heic
             artifacts/macos26-photographic-styles/validation.json
             artifacts/macos26-photographic-styles/smoke-summary.json
             artifacts/macos26-photographic-styles/runner.txt
