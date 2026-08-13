@@ -30,7 +30,7 @@ jobs:
             swift --version
           } | tee "$XDREMUX_STYLE_RUNNER_OUTPUT/runner.txt"
 
-      - name: Generate and validate Photographic Styles data
+      - name: Convert Motion Photo with Photographic Styles and validate
         shell: bash
         run: |
           set -o pipefail
@@ -42,25 +42,31 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## macOS 26 Photographic Styles smoke"
+            echo "## macOS 26 Live Photo + Photographic Styles smoke"
             echo
             echo "Fixture: \`IMG20260801190843_ColorOS_16.jpg\`"
-            echo "Path: Motion Photo static JPEG -> ImageIO HEIC -> XDRemux Photographic Styles -> NeutrinoCore validation"
+            echo "Path: ColorOS 16 Motion Photo -> Apple Live Photo HEIC+MOV -> Photographic Styles -> NeutrinoCore -> PhotoKit"
             echo
             if [[ -f "$XDREMUX_STYLE_RUNNER_OUTPUT/smoke-summary.json" ]]; then
               echo '```json'
               cat "$XDREMUX_STYLE_RUNNER_OUTPUT/smoke-summary.json"
               echo '```'
             else
-              echo "No success summary was produced; inspect the uploaded log and diagnostics."
+              echo "No success summary was produced; inspect the uploaded test log."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload smoke artifacts
+      - name: Upload final outputs and receipts
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: macos26-photographic-styles-smoke
+          name: macos26-live-photo-photographic-styles
           if-no-files-found: warn
-          retention-days: 7
-          path: artifacts/macos26-photographic-styles/
+          retention-days: 1
+          path: |
+            artifacts/macos26-photographic-styles/coloros16-live-styles.heic
+            artifacts/macos26-photographic-styles/coloros16-live-styles.mov
+            artifacts/macos26-photographic-styles/validation.json
+            artifacts/macos26-photographic-styles/smoke-summary.json
+            artifacts/macos26-photographic-styles/runner.txt
+            artifacts/macos26-photographic-styles/swift-test.log
