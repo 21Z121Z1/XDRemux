@@ -23,24 +23,27 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("Sources/XDRemuxAppleFeatures/PhotographicStyles/ApplePhotographicStylesPipeline.swift")
           text = path.read_text()
-          old = '''        defer { try? FileManager.default.removeItem(at: featureInputURL) }
-          defer { try? FileManager.default.removeItem(at: sharedSemanticDirectory) }
-          '''
-          new = '''        defer { try? FileManager.default.removeItem(at: featureInputURL) }
-          defer {
-              if FileManager.default.fileExists(atPath: sharedSemanticDirectory.path) {
-                  try? FileManager.default.removeItem(at: sharedSemanticDirectory)
-              }
-          }
-          '''
-          if old not in text:
-              raise SystemExit("expected shared-semantics cleanup block was not found exactly once")
-          if text.count(old) != 1:
-              raise SystemExit(f"expected one cleanup block, found {text.count(old)}")
-          path.write_text(text.replace(old, new, 1))
+          pattern = re.compile(
+              r'(?m)^(\s*)defer \{ try\? FileManager\.default\.removeItem\(at: featureInputURL\) \}\n'
+              r'^\1defer \{ try\? FileManager\.default\.removeItem\(at: sharedSemanticDirectory\) \}$'
+          )
+          matches = list(pattern.finditer(text))
+          if len(matches) != 1:
+              raise SystemExit(f"expected exactly one shared-semantics cleanup block, found {len(matches)}")
+          indent = matches[0].group(1)
+          replacement = (
+              f"{indent}defer {{ try? FileManager.default.removeItem(at: featureInputURL) }}\n"
+              f"{indent}defer {{\n"
+              f"{indent}    if FileManager.default.fileExists(atPath: sharedSemanticDirectory.path) {{\n"
+              f"{indent}        try? FileManager.default.removeItem(at: sharedSemanticDirectory)\n"
+              f"{indent}    }}\n"
+              f"{indent}}}"
+          )
+          path.write_text(pattern.sub(replacement, text, count=1))
           PY
 
           git diff --check
