@@ -417,7 +417,15 @@ public enum AppleLivePhotoValidator {
         return nil
     }
 
-    private static func validateWithPhotoKit(imageURL: URL, videoURL: URL) throws {
+    private static var photoKitValidationTimeout: TimeInterval {
+    guard let raw = ProcessInfo.processInfo.environment["XDREMUX_PHOTOKIT_VALIDATION_TIMEOUT_SECONDS"],
+          let seconds = Double(raw), seconds.isFinite, seconds >= 1 else {
+        return 30
+    }
+    return min(seconds, 300)
+}
+
+private static func validateWithPhotoKit(imageURL: URL, videoURL: URL) throws {
         let semaphore = DispatchSemaphore(value: 0)
         let box = PhotoKitValidationBox()
         PHLivePhoto.request(
@@ -438,8 +446,11 @@ public enum AppleLivePhotoValidator {
             }
             semaphore.signal()
         }
-        guard semaphore.wait(timeout: .now() + 30) == .success else {
-            throw AppleLivePhotoError.pairValidationFailed("PhotoKit validation timed out")
+        let timeout = photoKitValidationTimeout
+        guard semaphore.wait(timeout: .now() + timeout) == .success else {
+            throw AppleLivePhotoError.pairValidationFailed(
+                "PhotoKit validation timed out after \(Int(timeout)) seconds"
+            )
         }
         try box.result.get()
     }
