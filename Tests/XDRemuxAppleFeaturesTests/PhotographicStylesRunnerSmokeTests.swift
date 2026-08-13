@@ -71,11 +71,15 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
             "materialized base HEIC is not an ImageIO-readable ISO gain-map image"
         )
 
+        // This gate answers the runner-capability question only: can a GitHub-hosted
+        // macOS 26 machine generate a complete Photographic Styles container and can
+        // Apple's own NeutrinoCore consume the resulting style metadata? Solver quality
+        // is a separate regression surface, so use the deterministic identity producer.
         let configuration = ConversionConfiguration(
             debugDirectory: diagnosticsURL,
             skipExisting: false,
             applePhotographicStyles: true,
-            appleStyleDataProducer: .constrainedSolver
+            appleStyleDataProducer: .identityFallback
         )
         try AppleFeatureConversionEngine.convert(
             inputURL: baseHEICURL,
@@ -101,6 +105,7 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
             "fixture": fixtureURL.lastPathComponent,
             "fixtureBytes": sourceData.count,
             "stillResourceBytes": stillUpper - stillLower,
+            "producer": "identity-fallback",
             "baseJPEG": baseJPEGURL.path,
             "baseHEIC": baseHEICURL.path,
             "stylesHEIC": stylesHEICURL.path,
