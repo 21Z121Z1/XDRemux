@@ -431,7 +431,7 @@ private static func validateWithPhotoKit(imageURL: URL, videoURL: URL) throws {
         PHLivePhoto.request(
             withResourceFileURLs: [imageURL, videoURL],
             placeholderImage: nil,
-            targetSize: .zero,
+            targetSize: CGSize(width: 512, height: 512),
             contentMode: .aspectFit
         ) { livePhoto, info in
             if (info[PHLivePhotoInfoIsDegradedKey] as? Bool) == true { return }
