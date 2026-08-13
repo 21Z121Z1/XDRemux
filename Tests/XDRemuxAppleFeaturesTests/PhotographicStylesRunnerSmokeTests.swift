@@ -25,7 +25,6 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
         ).standardizedFileURL
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixtureURL.path), fixtureURL.path)
-        try? FileManager.default.removeItem(at: outputRoot)
         try FileManager.default.createDirectory(at: outputRoot, withIntermediateDirectories: true)
 
         let asset = try XCTUnwrap(
@@ -43,10 +42,13 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
         let outputImageURL = outputRoot.appendingPathComponent("coloros16-live-styles.heic")
         let outputVideoURL = AppleLivePhotoConversionEngine.companionVideoURL(for: outputImageURL)
         let validationURL = outputRoot.appendingPathComponent("validation.json")
+        let summaryURL = outputRoot.appendingPathComponent("smoke-summary.json")
+        for stale in [outputImageURL, outputVideoURL, validationURL, summaryURL] {
+            try? FileManager.default.removeItem(at: stale)
+        }
 
         // Keep this smoke gate deterministic and focused on hosted-runner capability. The full
-        // constrained solver has its own quality regression surface; identity-fallback still writes
-        // the complete 51,840-byte key-1 payload and exercises the same NeutrinoCore consumer path.
+        // constrained solver is exercised separately after the combined graph itself is green.
         let stylesConfiguration = ConversionConfiguration(
             skipExisting: false,
             applePhotographicStyles: true,
@@ -111,10 +113,7 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
             withJSONObject: summary,
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         )
-        try summaryData.write(
-            to: outputRoot.appendingPathComponent("smoke-summary.json"),
-            options: .atomic
-        )
+        try summaryData.write(to: summaryURL, options: .atomic)
         FileHandle.standardOutput.write(summaryData)
         FileHandle.standardOutput.write(Data("\n".utf8))
     }
