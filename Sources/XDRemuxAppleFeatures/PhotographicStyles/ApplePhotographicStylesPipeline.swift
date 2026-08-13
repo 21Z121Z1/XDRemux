@@ -3894,7 +3894,11 @@ package enum ApplePhotographicStylesPipeline {
                 isDirectory: true
             )
         defer { try? FileManager.default.removeItem(at: featureInputURL) }
-        defer { try? FileManager.default.removeItem(at: sharedSemanticDirectory) }
+        defer {
+            if FileManager.default.fileExists(atPath: sharedSemanticDirectory.path) {
+                try? FileManager.default.removeItem(at: sharedSemanticDirectory)
+            }
+        }
 
         var portraitUnavailableReason: String?
         var portraitWritten = false
