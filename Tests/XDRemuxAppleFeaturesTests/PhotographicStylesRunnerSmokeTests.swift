@@ -47,15 +47,16 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
             try? FileManager.default.removeItem(at: stale)
         }
 
-        // Exercise the same production producer selected by --apple-photographic-styles.
-        // The hosted PhotoKit display-object loader is intentionally not a hard gate here:
-        // separate 30 s and 120 s probes did not produce a final callback for this style-rich
-        // external resource pair. AppleLivePhotoValidator still runs every deterministic
-        // identifier, timeline, codec, gain-map, audio, and geometry check before publication.
+        // Hosted macOS 26 exposes the metadata consumer used by validate-apple, but its complete
+        // Neutrino SemanticStyle adjustment renderer rejects calibration renders with NUError Code 9
+        // (Unsupported). Keep production behavior unchanged: the CLI still defaults to the
+        // constrained solver. This hosted capability gate explicitly uses the deterministic identity
+        // producer so it tests the parts the runner can actually provide: complete Styles graph
+        // generation, NeutrinoCore metadata consumption, and Live Photo resource preservation.
         let stylesConfiguration = ConversionConfiguration(
             skipExisting: false,
             applePhotographicStyles: true,
-            appleStyleDataProducer: .constrainedSolver
+            appleStyleDataProducer: .identityFallback
         )
         let result = try AppleLivePhotoConversionEngine.convert(
             inputURL: fixtureURL,
@@ -99,7 +100,8 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
         let videoBytes = (try? outputVideoURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
         let summary: [String: Any] = [
             "fixture": fixtureURL.lastPathComponent,
-            "producer": "constrained-solver",
+            "producer": "identity-fallback-hosted-smoke-only",
+            "productionDefaultProducer": "constrained-solver",
             "livePhotoDeterministicValidation": true,
             "photoKitValidationRequired": false,
             "assetIdentifierPreserved": true,
