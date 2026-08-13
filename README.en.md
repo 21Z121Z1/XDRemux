@@ -47,7 +47,7 @@ Every option, default, and exit code is in the [CLI reference](docs/cli.en.md), 
 
 ## Sorting by shooting mode
 
-Reads the shooting mode recorded in each photo and copies it into the matching Chinese-named folder (`人像` portrait, `夜景` night, `大师模式` master mode, and so on). It only copies — sources are never modified or deleted:
+Keeps every recognized shooting-mode tag, then projects those tags onto one physical location. The first level is the asset type (`静态照片` static photo / `实况照片` Live Photo), and the second level is the primary shooting mode (`人像` portrait, `夜景` night, `大师模式` master mode, and so on). A Live Photo HEIC and MOV stay together in the same directory. It only copies — sources are never modified or deleted:
 
 ```bash
 swift run xdremux categorize --input photo_dump/ --output-dir categorized/ --dry-run
@@ -59,7 +59,7 @@ swift run xdremux categorize --input photo_dump/ --output-dir categorized/ --dry
 python3 xdremux/python/XDRemux.py categorize --input photo_dump/ --output-dir categorized/
 ```
 
-Photos whose mode cannot be read stay in the output root and are not counted as failures.
+Photos whose mode cannot be read go to `未分类` under their asset-type directory. An existing Apple Live Photo is moved as one asset only after its HEIC/JPEG and MOV pass pair-identity validation; an unrelated same-name MOV is never claimed. ProXDR, HDR, gain-map, depth, and vendor facts remain tags and do not add more physical folder levels.
 
 ## Apple Photographic Styles and portrait
 

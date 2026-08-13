@@ -24,7 +24,7 @@ struct PhotoCategorizationView: View {
                             .truncationMode(.middle)
                     }
                     TableColumn("拍摄模式") { item in
-                        Text(item.classification.mode?.folderName ?? "根目录")
+                        Text(item.classification.mode?.folderName ?? "未分类")
                     }
                     TableColumn("状态") { item in
                         Text(item.classification.mode == nil
@@ -112,10 +112,10 @@ struct PhotoCategorizationView: View {
 
     private var footer: some View {
         HStack(spacing: 18) {
-            Label("\(viewModel.items.isEmpty ? viewModel.inputURLs.count : viewModel.items.count) 张照片", systemImage: "photo.on.rectangle")
+            Label("\(viewModel.items.isEmpty ? viewModel.inputURLs.count : viewModel.items.count) 个文件", systemImage: "photo.on.rectangle")
             Label("\(viewModel.categorizedCount) 已分类", systemImage: "folder.badge.gearshape")
                 .help(viewModel.modeSummary)
-            Label("\(viewModel.rootCount) 根目录", systemImage: "tray")
+            Label("\(viewModel.unclassifiedCount) 未分类", systemImage: "tray")
             Label("\(viewModel.duplicateCount) 重复", systemImage: "equal.circle")
             if viewModel.failedCount > 0 {
                 Label("\(viewModel.failedCount) 失败", systemImage: "exclamationmark.triangle")

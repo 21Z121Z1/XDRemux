@@ -61,12 +61,17 @@ enum MotionPhotoCLIIntegration {
         let outputImageURL: URL
         if outputWasExplicit {
             outputImageURL = command.outputURL.standardizedFileURL
-        } else if isHEIC(inputURL) {
-            outputImageURL = inputURL.deletingPathExtension()
-                .appendingPathExtension("live")
-                .appendingPathExtension("heic")
         } else {
-            outputImageURL = inputURL.deletingPathExtension().appendingPathExtension("heic")
+            var reserved = Set<String>()
+            outputImageURL = MotionPhotoBatchPlanner.reserveOutputImageURL(
+                for: inputURL,
+                inputRootURL: inputURL.deletingLastPathComponent(),
+                outputDirectoryURL: inputURL.deletingLastPathComponent(),
+                reservedPaths: &reserved,
+                // Single-file conversion historically replaces its deterministic output on rerun.
+                // Ignore unrelated pre-existing outputs here; only protect the source path itself.
+                fileExists: { _ in false }
+            )
         }
         try validateLivePhotoOutputExtension(outputImageURL)
 
@@ -85,8 +90,8 @@ enum MotionPhotoCLIIntegration {
     }
 
     /// Plans the entire Motion Photo portion of a default batch before the first write. Explicit
-    /// --glob retains the old contract. Stable Motion Photo destination names are derived from the
-    /// source path relative to input-dir, never from the current batch ordering or membership.
+    /// --glob retains the old contract. User basenames are preserved; deterministic `(2)`, `(3)`, …
+    /// suffixes are introduced only when assets actually converge on the same destination namespace.
     private static func prepareDefaultBatch(_ rawArguments: [String]) throws -> Bool {
         guard !rawArguments.contains("--glob") else { return false }
 
@@ -377,15 +382,6 @@ enum MotionPhotoCLIIntegration {
         }
     }
 
-    private struct MotionBatchPlanningConflictError: LocalizedError {
-        let input: URL
-        let output: URL
-
-        var errorDescription: String? {
-            "stable Motion Photo destination for \(input.path) conflicts with another planned output: \(output.path)"
-        }
-    }
-
     private final class PendingBatchStore: @unchecked Sendable {
         private let lock = NSLock()
         private var pending: PendingBatch?
@@ -433,30 +429,23 @@ enum MotionPhotoCLIIntegration {
     ) throws -> [MotionBatchWorkItem] {
         let heicItems = makeHEICWorkItems(inputs: heicInputs, command: command)
         var reserved = Set(heicItems.map { $0.outputURL.standardizedFileURL.path })
-
-        let planned = inputs.sorted { $0.path < $1.path }.map { input -> (input: URL, output: URL) in
-            let output = MotionPhotoBatchPlanner.outputImageURL(
-                for: input,
-                inputRootURL: command.inputDirURL,
-                outputDirectoryURL: categorizedOutputDirectory(for: input, command: command)
-            )
-            return (input, output)
-        }
-        try MotionPhotoBatchPlanner.validateUnique(planned)
+        let checkpointState = try MotionPhotoBatchCheckpoint.load(
+            url: MotionPhotoBatchCheckpoint.resolvedURL(for: command)
+        )
 
         var result: [MotionBatchWorkItem] = []
-        for item in planned {
-            let imagePath = item.output.standardizedFileURL.path
-            let videoPath = AppleLivePhotoConversionEngine.companionVideoURL(for: item.output)
-                .standardizedFileURL.path
-            if reserved.contains(imagePath)
-                || reserved.contains(videoPath)
-                || imagePath == item.input.standardizedFileURL.path {
-                throw MotionBatchPlanningConflictError(input: item.input, output: item.output)
-            }
-            reserved.insert(imagePath)
-            reserved.insert(videoPath)
-            result.append(MotionBatchWorkItem(inputURL: item.input, outputImageURL: item.output))
+        for input in inputs.sorted(by: { $0.path < $1.path }) {
+            let prior = checkpointState[input.standardizedFileURL.path]
+            let output = MotionPhotoBatchPlanner.reserveOutputImageURL(
+                for: input,
+                inputRootURL: command.inputDirURL,
+                outputDirectoryURL: categorizedOutputDirectory(for: input, command: command),
+                reservedPaths: &reserved,
+                candidateBelongsToSource: { image, video in
+                    prior?.matchesOutputs(imageURL: image, videoURL: video) == true
+                }
+            )
+            result.append(MotionBatchWorkItem(inputURL: input, outputImageURL: output))
         }
         return result
     }

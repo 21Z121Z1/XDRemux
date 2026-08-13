@@ -469,6 +469,9 @@ enum XDRemuxCommand {
         let plan = try PhotoCategorizationEngine.makePlan(
             inputs: cmd.inputURLs,
             outputDirectory: cmd.outputDirURL,
+            livePhotoPairValidator: { imageURL, videoURL in
+                AppleLivePhotoValidator.isValidPair(imageURL: imageURL, videoURL: videoURL)
+            },
             fileManager: fileManager
         )
         let result = PhotoCategorizationEngine.execute(
@@ -478,14 +481,13 @@ enum XDRemuxCommand {
             fileManager: fileManager
         )
         for item in result.items {
-            let mode = item.classification.mode?.folderName
-                ?? "根目录 (\(item.classification.status.rawValue))"
+            let category = PhotoFolderProjection.relativeDirectory(for: item.classification)
             let detail = item.errorDescription.map { " error=\($0)" } ?? ""
-            print("\(item.disposition.rawValue) [\(mode)] \(item.sourceURL.path) -> \(item.destinationURL.path)\(detail)")
+            print("\(item.disposition.rawValue) [\(category)] \(item.sourceURL.path) -> \(item.destinationURL.path)\(detail)")
         }
         print(
             "categorize complete: \(result.categorizedCount) categorized, "
-                + "\(result.rootCount) kept at root, \(result.copiedCount) copied, "
+                + "\(result.unclassifiedCount) unclassified, \(result.copiedCount) copied, "
                 + "\(result.dryRunCount) dry-run, \(result.duplicateCount) duplicate, "
                 + "\(result.issueCount) failed"
         )
@@ -736,7 +738,8 @@ enum XDRemuxCommand {
             ("appleStyleDataProducer", cmd.appleStyleDataProducer.rawValue),
             ("tmapFormat", cmd.tmapFormat.rawValue),
             ("outputDir", cmd.outputDirURL.standardizedFileURL.path),
-            ("categorizeOutput", cmd.categorizeOutput ? "true" : "false")
+            ("categorizeOutput", cmd.categorizeOutput ? "true" : "false"),
+            ("categorizationLayout", cmd.categorizeOutput ? PhotoFolderProjection.layoutVersion : "off")
         ]
         let stable = entries.sorted(by: { $0.0 < $1.0 }).map { "\($0.0)=\($0.1)" }.joined(separator: "\n")
         return sha256Hex(Data(stable.utf8))
@@ -793,7 +796,8 @@ enum XDRemuxCommand {
         // skipping them keeps a repeated batch over the same directory
         // idempotent instead of re-converting yesterday's results.
         let categorizedParent = categorized ? (outputPath ?? rootPath) : nil
-        let captureModeFolders = Set(OppoCaptureMode.allCases.map(\.folderName))
+        let categorizedRootFolders = PhotoFolderProjection.rootFolderNames
+            .union(Set(OppoCaptureMode.allCases.map(\.folderName)))
 
         var matched: [URL] = []
         for case let fileURL as URL in enumerator {
@@ -807,7 +811,7 @@ enum XDRemuxCommand {
             }
             if isDirectory, let categorizedParent,
                fileURL.deletingLastPathComponent().standardizedFileURL.path == categorizedParent,
-               captureModeFolders.contains(fileURL.lastPathComponent) {
+               categorizedRootFolders.contains(fileURL.lastPathComponent) {
                 enumerator.skipDescendants()
                 continue
             }

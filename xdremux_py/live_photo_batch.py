@@ -130,22 +130,50 @@ def relative_source_path(source: Path, input_root: Path) -> str:
     return unicodedata.normalize("NFC", relative)
 
 
-def stable_source_token(source: Path, input_root: Path, length: int = 32) -> str:
-    """Return a 128-bit token namespaced by canonical root plus normalized relative path."""
-    root = Path(input_root).resolve()
-    root_identity = unicodedata.normalize("NFC", root.as_posix())
-    relative = relative_source_path(source, root)
-    identity = root_identity + "\0" + relative
-    return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:length]
-
-
 def planned_output_image(source: Path, input_root: Path, output_directory: Path) -> Path:
-    """Return a stable Motion Photo output independent of the current batch membership/order."""
+    """Return the preferred user-facing output before collision resolution."""
     source = Path(source)
-    output_directory = Path(output_directory)
-    token = stable_source_token(source, input_root)
-    stem = source.stem + (".live" if source.suffix.lower() in {".heic", ".heif"} else "")
-    return output_directory / f"{stem}~{token}.heic"
+    _ = input_root  # Kept in the shared planner signature for Swift/Python parity.
+    return Path(output_directory) / f"{source.stem}.heic"
+
+
+def numbered_output_image(base: Path, sequence: int) -> Path:
+    base = Path(base)
+    if sequence <= 1:
+        return base
+    return base.with_name(f"{base.stem} ({sequence}){base.suffix}")
+
+
+def reserve_output_image(
+    source: Path,
+    input_root: Path,
+    output_directory: Path,
+    reserved_paths: set[str],
+    *,
+    candidate_belongs_to_source: Callable[[Path, Path], bool] | None = None,
+    path_exists: Callable[[Path], bool] | None = None,
+) -> Path:
+    """Reserve one HEIC+MOV basename, numbering only genuine destination collisions."""
+    source = Path(source)
+    base = planned_output_image(source, input_root, output_directory)
+    belongs = candidate_belongs_to_source or (lambda _image, _video: False)
+    exists = path_exists or (lambda path: path.exists())
+    source_key = str(source.resolve())
+    sequence = 1
+
+    while True:
+        image = numbered_output_image(base, sequence)
+        video = image.with_suffix(".mov")
+        image_key = str(image.resolve())
+        video_key = str(video.resolve())
+        planned_conflict = image_key in reserved_paths or video_key in reserved_paths
+        source_conflict = image_key == source_key or video_key == source_key
+        filesystem_conflict = not belongs(image, video) and (exists(image) or exists(video))
+        if not planned_conflict and not source_conflict and not filesystem_conflict:
+            reserved_paths.add(image_key)
+            reserved_paths.add(video_key)
+            return image
+        sequence += 1
 
 
 def validate_unique_plan(outputs: list[tuple[Path, Path]]) -> None:

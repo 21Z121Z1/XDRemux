@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import XDRemuxCore
+import XDRemuxAppleFeatures
 import AppKit
 
 enum PhotoCategorizationAppState: Equatable {
@@ -43,7 +44,8 @@ final class PhotoCategorizationViewModel {
     var canCopy: Bool { state == .ready && items.contains { $0.disposition == .copy } }
     var isBusy: Bool { state == .scanning || state == .copying }
     var categorizedCount: Int { items.count { $0.classification.mode != nil } }
-    var rootCount: Int { items.count { $0.classification.mode == nil } }
+    var unclassifiedCount: Int { items.count { $0.classification.mode == nil } }
+    var rootCount: Int { unclassifiedCount } // compatibility for older UI/tests
     var duplicateCount: Int { items.count { $0.disposition == .duplicate } }
     var failedCount: Int { items.count { $0.disposition == .failed } }
     var modeSummary: String {
@@ -88,7 +90,10 @@ final class PhotoCategorizationViewModel {
                 let plan = try await Task.detached(priority: .userInitiated) {
                     try PhotoCategorizationEngine.makePlan(
                         inputs: inputs,
-                        outputDirectory: outputDirectory
+                        outputDirectory: outputDirectory,
+                        livePhotoPairValidator: { imageURL, videoURL in
+                            AppleLivePhotoValidator.isValidPair(imageURL: imageURL, videoURL: videoURL)
+                        }
                     )
                 }.value
                 guard !Task.isCancelled else { return }

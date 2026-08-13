@@ -38,7 +38,7 @@ xdremux categorize --input ~/Pictures/ProXDR --output-dir ~/Pictures/Sorted
 
 - `convert` **overwrites the input file** when `--output` is omitted.
 - `batch` writes back into the input directory when `--output-dir` is omitted.
-- `batch --categorize` files results under Chinese shooting-mode folders (`人像`, `夜景`, `大师模式`, …). Photos whose mode cannot be read stay in the output root.
+- `batch --categorize` first files results by asset type (`静态照片` / `实况照片`), then by the primary shooting mode (`人像`, `夜景`, `大师模式`, …). Photos whose mode cannot be read go to `未分类`.
 - `categorize` only copies HEIC/HEIF/JPEG files into those folders. It never modifies or converts anything.
 
 ## Options
@@ -63,7 +63,7 @@ xdremux categorize --input ~/Pictures/ProXDR --output-dir ~/Pictures/Sorted
 | `--output-dir <dir>` | the input directory | Output directory |
 | `--glob <pattern>` | `*.heic` | Which files to pick up |
 | `--jobs <n>` | `min(cpu, 4)` | How many files to convert at once |
-| `--categorize` | off | File results under shooting-mode folders |
+| `--categorize` | off | File results by asset type + primary shooting mode |
 | `--resume` / `--no-resume` | `--resume` | Continue from the previous run's progress |
 | `--skip-existing` / `--no-skip-existing` | `--skip-existing` | Skip a file whose output already matches the current settings |
 | `--checkpoint <file>` | a hidden JSONL file under the output directory | Where progress is recorded |
@@ -130,7 +130,7 @@ The CLI prints human-readable text: progress on stdout, errors on stderr. There 
 
 1. Skips outputs that already match the current settings (`--skip-existing`, on by default).
 2. Retries the files that failed (`--resume`, on by default).
-3. Does not re-scan the shooting-mode folders `--categorize` wrote, so repeated runs are idempotent.
+3. Does not re-scan the asset-type folders written by `--categorize` (or legacy shooting-mode folders), so repeated runs are idempotent.
 
 ## Common errors
 

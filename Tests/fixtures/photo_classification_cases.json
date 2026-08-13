@@ -1,0 +1,403 @@
+[
+  {
+    "name": "normal-zero",
+    "user_comment": "oplus_0",
+    "asset_type": "static-photo",
+    "capture_modes": [],
+    "primary_capture_mode": "normal",
+    "folder": "普通拍照",
+    "metadata_status": "ok",
+    "recognized_flags": 0,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "normal-local-hdr",
+    "user_comment": "Oplus_262144",
+    "asset_type": "static-photo",
+    "capture_modes": [],
+    "primary_capture_mode": "normal",
+    "folder": "普通拍照",
+    "metadata_status": "ok",
+    "recognized_flags": 0,
+    "known_unmapped_flags": 262144,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "normal-known-uint64-additional-bit",
+    "user_comment": "oplus_4611686018427387904",
+    "asset_type": "static-photo",
+    "capture_modes": [],
+    "primary_capture_mode": "normal",
+    "folder": "普通拍照",
+    "metadata_status": "ok",
+    "recognized_flags": 0,
+    "known_unmapped_flags": 4611686018427387904,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "master-over-professional",
+    "user_comment": "oplus_4294967552",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "master",
+      "professional"
+    ],
+    "primary_capture_mode": "master",
+    "folder": "大师模式",
+    "metadata_status": "ok",
+    "recognized_flags": 4294967552,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.master",
+      "capture.professional",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "ricoh-gr",
+    "user_comment": "oplus_2147483648",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "ricoh-gr"
+    ],
+    "primary_capture_mode": "ricoh-gr",
+    "folder": "RICOH GR",
+    "metadata_status": "ok",
+    "recognized_flags": 2147483648,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.ricoh-gr",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "professional",
+    "user_comment": "oplus_256",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "professional"
+    ],
+    "primary_capture_mode": "professional",
+    "folder": "专业模式",
+    "metadata_status": "ok",
+    "recognized_flags": 256,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.professional",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "portrait-over-beauty",
+    "user_comment": "oplus_18",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "portrait",
+      "beauty"
+    ],
+    "primary_capture_mode": "portrait",
+    "folder": "人像",
+    "metadata_status": "ok",
+    "recognized_flags": 18,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.beauty",
+      "capture.portrait",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "portrait-beauty-live-photo",
+    "user_comment": "oplus_18",
+    "asset_type": "live-photo",
+    "capture_modes": [
+      "portrait",
+      "beauty"
+    ],
+    "primary_capture_mode": "portrait",
+    "folder": "人像",
+    "metadata_status": "ok",
+    "recognized_flags": 18,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.live-photo",
+      "capture.beauty",
+      "capture.portrait",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "night",
+    "user_comment": "oplus_2048",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "night"
+    ],
+    "primary_capture_mode": "night",
+    "folder": "夜景",
+    "metadata_status": "ok",
+    "recognized_flags": 2048,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.night",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "panorama-oppo-prefix",
+    "user_comment": "Oppo_4",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "panorama"
+    ],
+    "primary_capture_mode": "panorama",
+    "folder": "全景",
+    "metadata_status": "ok",
+    "recognized_flags": 4,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.panorama",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "time-lapse",
+    "user_comment": "oplus_8",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "time-lapse"
+    ],
+    "primary_capture_mode": "time-lapse",
+    "folder": "延时摄影",
+    "metadata_status": "ok",
+    "recognized_flags": 8,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.time-lapse",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "ultra-high-resolution",
+    "user_comment": "oplus_8192",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "ultra-high-resolution"
+    ],
+    "primary_capture_mode": "ultra-high-resolution",
+    "folder": "超清",
+    "metadata_status": "ok",
+    "recognized_flags": 8192,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.ultra-high-resolution",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "id-photo",
+    "user_comment": "oplus_16384",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "id-photo"
+    ],
+    "primary_capture_mode": "id-photo",
+    "folder": "证件照",
+    "metadata_status": "ok",
+    "recognized_flags": 16384,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.id-photo",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "sticker",
+    "user_comment": "oplus_512",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "sticker"
+    ],
+    "primary_capture_mode": "sticker",
+    "folder": "贴纸",
+    "metadata_status": "ok",
+    "recognized_flags": 512,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.sticker",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "enhanced-text-ascii",
+    "user_comment": "ASCIIOplus_4096",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "enhanced-text"
+    ],
+    "primary_capture_mode": "enhanced-text",
+    "folder": "超级文本",
+    "metadata_status": "ok",
+    "recognized_flags": 4096,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.enhanced-text",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "group-photo-json",
+    "user_comment": "{\"oplustag\":4194304}",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "group-photo"
+    ],
+    "primary_capture_mode": "group-photo",
+    "folder": "合影",
+    "metadata_status": "ok",
+    "recognized_flags": 4194304,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.group-photo",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "double-exposure",
+    "user_comment": "oplus_32768",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "double-exposure"
+    ],
+    "primary_capture_mode": "double-exposure",
+    "folder": "双重曝光",
+    "metadata_status": "ok",
+    "recognized_flags": 32768,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.double-exposure",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "beauty",
+    "user_comment": "oplus_2",
+    "asset_type": "static-photo",
+    "capture_modes": [
+      "beauty"
+    ],
+    "primary_capture_mode": "beauty",
+    "folder": "美颜",
+    "metadata_status": "ok",
+    "recognized_flags": 2,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo",
+      "capture.beauty",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "missing",
+    "user_comment": null,
+    "asset_type": "static-photo",
+    "capture_modes": [],
+    "primary_capture_mode": null,
+    "folder": "未分类",
+    "metadata_status": "missing-user-comment",
+    "recognized_flags": 0,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo"
+    ]
+  },
+  {
+    "name": "malformed",
+    "user_comment": "not-an-oppo-comment",
+    "asset_type": "static-photo",
+    "capture_modes": [],
+    "primary_capture_mode": null,
+    "folder": "未分类",
+    "metadata_status": "malformed-user-comment",
+    "recognized_flags": 0,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 0,
+    "tags": [
+      "asset.static-photo"
+    ]
+  },
+  {
+    "name": "unknown",
+    "user_comment": "oplus_17179869184",
+    "asset_type": "static-photo",
+    "capture_modes": [],
+    "primary_capture_mode": null,
+    "folder": "未分类",
+    "metadata_status": "ok",
+    "recognized_flags": 0,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 17179869184,
+    "tags": [
+      "asset.static-photo",
+      "vendor.oppo"
+    ]
+  },
+  {
+    "name": "unknown-above-int64",
+    "user_comment": "oplus_9223372036854775808",
+    "asset_type": "static-photo",
+    "capture_modes": [],
+    "primary_capture_mode": null,
+    "folder": "未分类",
+    "metadata_status": "ok",
+    "recognized_flags": 0,
+    "known_unmapped_flags": 0,
+    "unknown_flags": 9223372036854775808,
+    "tags": [
+      "asset.static-photo",
+      "vendor.oppo"
+    ]
+  }
+]

@@ -12,13 +12,14 @@ from xdremux_py.live_photo_batch import (
     load_state,
     planned_output_image,
     provenance_allows_reuse,
+    reserve_output_image,
     source_signature,
     state_path,
 )
 
 
 class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
-    def test_duplicate_basenames_have_stable_distinct_outputs_across_subset_rerun(self):
+    def test_duplicate_basenames_are_numbered_only_when_they_share_a_destination(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "input"
             output = Path(tmp) / "output"
@@ -28,43 +29,75 @@ class PythonLivePhotoBatchReliabilityTests(unittest.TestCase):
             b.parent.mkdir(parents=True)
             a.write_bytes(b"a")
             b.write_bytes(b"b")
+            reserved: set[str] = set()
 
-            a_output = planned_output_image(a, root, output)
-            b_output = planned_output_image(b, root, output)
-            b_subset_output = planned_output_image(b, root, output)
+            a_output = reserve_output_image(a, root, output, reserved, path_exists=lambda _path: False)
+            b_output = reserve_output_image(b, root, output, reserved, path_exists=lambda _path: False)
 
-            self.assertNotEqual(a_output, b_output)
-            self.assertEqual(b_output, b_subset_output)
-            self.assertTrue(a_output.name.startswith("IMG~"))
-            self.assertTrue(b_output.name.startswith("IMG~"))
+            self.assertEqual(a_output.name, "IMG.heic")
+            self.assertEqual(b_output.name, "IMG (2).heic")
+            self.assertIn(str((output / "IMG.mov").resolve()), reserved)
+            self.assertIn(str((output / "IMG (2).mov").resolve()), reserved)
 
-    def test_same_relative_path_in_different_input_roots_cannot_alias_shared_output(self):
+    def test_preferred_output_preserves_basename_across_input_roots(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            first_root = base / "root-one"
-            second_root = base / "root-two"
             output = base / "shared-output"
-            first = first_root / "A" / "IMG.jpg"
-            second = second_root / "A" / "IMG.jpg"
+            first = base / "root-one" / "A" / "IMG.jpg"
+            second = base / "root-two" / "A" / "IMG.jpg"
             first.parent.mkdir(parents=True)
             second.parent.mkdir(parents=True)
             first.write_bytes(b"first")
             second.write_bytes(b"second")
 
-            self.assertNotEqual(
-                planned_output_image(first, first_root, output),
-                planned_output_image(second, second_root, output),
-            )
+            self.assertEqual(planned_output_image(first, first.parents[1], output).name, "IMG.heic")
+            self.assertEqual(planned_output_image(second, second.parents[1], output).name, "IMG.heic")
 
-    def test_heif_motion_photo_uses_live_namespace_and_stable_token(self):
+    def test_heif_motion_photo_does_not_add_live_or_hash_markers(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "input"
             root.mkdir()
             source = root / "same.heic"
             source.write_bytes(b"heif")
             output = planned_output_image(source, root, Path(tmp) / "output")
-            self.assertTrue(output.name.startswith("same.live~"))
-            self.assertTrue(output.name.endswith(".heic"))
+            self.assertEqual(output.name, "same.heic")
+
+            reserved: set[str] = set()
+            same_directory = reserve_output_image(
+                source,
+                root,
+                root,
+                reserved,
+                path_exists=lambda _path: False,
+            )
+            self.assertEqual(same_directory.name, "same (2).heic")
+
+    def test_foreign_existing_pair_sequences_but_owned_pair_keeps_original_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "input"
+            output = Path(tmp) / "output"
+            root.mkdir()
+            output.mkdir()
+            source = root / "IMG.jpg"
+            source.write_bytes(b"source")
+            (output / "IMG.heic").write_bytes(b"foreign")
+            (output / "IMG.mov").write_bytes(b"foreign")
+
+            foreign_reserved: set[str] = set()
+            foreign = reserve_output_image(source, root, output, foreign_reserved)
+            self.assertEqual(foreign.name, "IMG (2).heic")
+
+            owned_reserved: set[str] = set()
+            owned = reserve_output_image(
+                source,
+                root,
+                output,
+                owned_reserved,
+                candidate_belongs_to_source=lambda image, video: (
+                    image.name == "IMG.heic" and video.name == "IMG.mov"
+                ),
+            )
+            self.assertEqual(owned.name, "IMG.heic")
 
     def test_content_hash_detects_change_even_when_size_and_mtime_are_preserved(self):
         with tempfile.TemporaryDirectory() as tmp:
