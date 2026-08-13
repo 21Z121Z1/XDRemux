@@ -1,0 +1,66 @@
+name: macOS 26 Photographic Styles Smoke
+
+on:
+  push:
+    branches:
+      - test/macos26-photographic-styles-smoke
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  photographic-styles-smoke:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      XDREMUX_STYLE_RUNNER_FIXTURE: ${{ github.workspace }}/fixtures/IMG20260801190843_ColorOS_16.jpg
+      XDREMUX_STYLE_RUNNER_OUTPUT: ${{ github.workspace }}/artifacts/macos26-photographic-styles
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Record runner environment
+        shell: bash
+        run: |
+          mkdir -p "$XDREMUX_STYLE_RUNNER_OUTPUT"
+          {
+            sw_vers
+            echo "arch=$(uname -m)"
+            xcodebuild -version
+            swift --version
+          } | tee "$XDREMUX_STYLE_RUNNER_OUTPUT/runner.txt"
+
+      - name: Generate and validate Photographic Styles data
+        shell: bash
+        run: |
+          set -o pipefail
+          swift test --filter PhotographicStylesRunnerSmokeTests \
+            2>&1 | tee "$XDREMUX_STYLE_RUNNER_OUTPUT/swift-test.log"
+
+      - name: Write summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## macOS 26 Photographic Styles smoke"
+            echo
+            echo "Fixture: \`IMG20260801190843_ColorOS_16.jpg\`"
+            echo "Path: Motion Photo static JPEG -> ImageIO HEIC -> XDRemux Photographic Styles -> NeutrinoCore validation"
+            echo
+            if [[ -f "$XDREMUX_STYLE_RUNNER_OUTPUT/smoke-summary.json" ]]; then
+              echo '```json'
+              cat "$XDREMUX_STYLE_RUNNER_OUTPUT/smoke-summary.json"
+              echo '```'
+            else
+              echo "No success summary was produced; inspect the uploaded log and diagnostics."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos26-photographic-styles-smoke
+          if-no-files-found: warn
+          retention-days: 7
+          path: artifacts/macos26-photographic-styles/
