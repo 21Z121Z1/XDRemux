@@ -17,29 +17,11 @@ public enum AppleFeatureConversionEngine {
         }
 
         if configuration.applePhotographicStyles {
-            do {
-                try ApplePhotographicStylesPipeline.convert(
-                    inputURL: request.input.url,
-                    outputURL: request.output.url,
-                    configuration: configuration
-                )
-            } catch {
-                // The shared semantic directory is optional for Styles-only runs. On macOS 26
-                // Foundation can report ENOENT while tearing down that never-materialized scratch
-                // path after the final HEIC has already been written. Cleanup must be idempotent:
-                // accept this one narrow error only when the complete output independently passes
-                // the same Apple/Neutrino validation used by validate-apple.
-                guard isValidatedStylesScratchCleanupRace(
-                    error,
-                    outputURL: request.output.url,
-                    expectsPortrait: configuration.applePortrait
-                ) else {
-                    throw error
-                }
-                configuration.eventHandler?(.diagnostic(
-                    "ignored missing Photographic Styles shared-semantics scratch path after validated output"
-                ))
-            }
+            try ApplePhotographicStylesPipeline.convert(
+                inputURL: request.input.url,
+                outputURL: request.output.url,
+                configuration: configuration
+            )
         } else {
             _ = try PortraitConversionPipeline.convertIfNeeded(
                 inputURL: request.input.url,
@@ -104,23 +86,5 @@ public enum AppleFeatureConversionEngine {
 
     public static func hasValidISOGainMap(_ inputURL: URL) -> Bool {
         PortraitConversionPipeline.hasValidISOGainMap(inputURL)
-    }
-
-    private static func isValidatedStylesScratchCleanupRace(
-        _ error: Error,
-        outputURL: URL,
-        expectsPortrait: Bool
-    ) -> Bool {
-        let cocoa = error as NSError
-        guard cocoa.domain == NSCocoaErrorDomain,
-              cocoa.code == CocoaError.Code.fileNoSuchFile.rawValue,
-              let path = cocoa.userInfo[NSFilePathErrorKey] as? String,
-              path.contains(".shared-semantics-") else {
-            return false
-        }
-        return ApplePhotographicStylesPipeline.isValidOutput(
-            outputURL,
-            expectsPortrait: expectsPortrait
-        )
     }
 }
