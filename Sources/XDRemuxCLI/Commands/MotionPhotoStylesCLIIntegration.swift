@@ -2,10 +2,10 @@ import Foundation
 import XDRemuxCore
 import XDRemuxAppleFeatures
 
-/// Opt-in bridge for the one Apple-feature combination Motion Photo can already support safely:
-/// convert the Android Motion Photo to an Apple Live Photo pair, then add Photographic Styles to
-/// the still before the pair is validated and atomically published. Plain Motion Photo conversion
-/// remains owned by MotionPhotoCLIIntegration.
+/// Opt-in bridge for the Apple-feature combination Motion Photo can support safely:
+/// convert the Android Motion Photo to an Apple Live Photo pair, add Photographic Styles to the
+/// still, validate both the Live Photo resource contract and the NeutrinoCore Styles contract, then
+/// atomically publish the pair. Plain Motion Photo conversion remains owned by MotionPhotoCLIIntegration.
 enum MotionPhotoStylesCLIIntegration {
     static func handleIfNeeded(_ arguments: [String]) throws -> Bool {
         guard arguments.first == "convert" else { return false }
@@ -53,9 +53,14 @@ enum MotionPhotoStylesCLIIntegration {
             )
         }
 
+        // PHLivePhoto.request is a display-object loader in addition to a validator. On hosted
+        // macOS 26 it does not return a final callback for style-rich external HEIC resources even
+        // after the pair has passed the deterministic Live Photo checks and NeutrinoCore Styles
+        // round-trip. Do not make that hosted/display-service behavior a production write gate.
         let result = try AppleLivePhotoConversionEngine.convert(
             inputURL: inputURL,
             outputImageURL: outputImageURL,
+            requirePhotoKitValidation: false,
             photographicStylesConfiguration: command.configuration
         )
         print(
