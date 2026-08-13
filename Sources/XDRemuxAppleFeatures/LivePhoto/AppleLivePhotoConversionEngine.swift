@@ -160,6 +160,8 @@ public enum AppleLivePhotoConversionEngine {
             ".\(stem).\(publicationID).tmp.styles.heic"
         )
         let failedStylesImageURL = directory.appendingPathComponent("failed-styles.heic")
+        let failedLiveImageURL = directory.appendingPathComponent("failed-live-styles.heic")
+        let failedLiveVideoURL = directory.appendingPathComponent("failed-live-styles.mov")
         let temporaryVideoURL = directory.appendingPathComponent(".\(stem).\(publicationID).tmp.mov")
         defer {
             try? FileManager.default.removeItem(at: temporaryImageURL)
@@ -182,8 +184,7 @@ public enum AppleLivePhotoConversionEngine {
         try AppleLivePhotoStillWriter.write(
             stillInputURL: stillSourceURL,
             outputURL: temporaryImageURL,
-            assetIdentifier: assetIdentifier,
-            lossyCompressionQuality: stylesConfiguration == nil ? nil : 1.0
+            assetIdentifier: assetIdentifier
         )
 
         let pairedImageURL: URL
@@ -214,6 +215,7 @@ public enum AppleLivePhotoConversionEngine {
                     "Photographic Styles generation did not preserve a valid Live Photo still identity"
                 )
             }
+            try? FileManager.default.removeItem(at: failedStylesImageURL)
             pairedImageURL = styledTemporaryImageURL
         } else {
             pairedImageURL = temporaryImageURL
@@ -229,19 +231,27 @@ public enum AppleLivePhotoConversionEngine {
         )
 
         let expectedTransform = transformResolution.transform != nil
-        _ = try await AppleLivePhotoValidator.validate(
-            imageURL: pairedImageURL,
-            videoURL: temporaryVideoURL,
-            expectedAssetIdentifier: assetIdentifier,
-            expectedStillImageTime: timeline.stillImageTime,
-            sourceStillURL: stillSourceURL,
-            sourceVideoURL: videoSourceURL,
-            sourceHadAudio: sourceHadAudio,
-            sourceHadGainMap: sourceHadGainMap,
-            expectsOppoTransform: expectedTransform,
-            expectedStillImageTransform: transformResolution.transform,
-            requirePhotoKitLoad: requirePhotoKitValidation
-        )
+        try? FileManager.default.removeItem(at: failedLiveImageURL)
+        try? FileManager.default.removeItem(at: failedLiveVideoURL)
+        do {
+            _ = try await AppleLivePhotoValidator.validate(
+                imageURL: pairedImageURL,
+                videoURL: temporaryVideoURL,
+                expectedAssetIdentifier: assetIdentifier,
+                expectedStillImageTime: timeline.stillImageTime,
+                sourceStillURL: stillSourceURL,
+                sourceVideoURL: videoSourceURL,
+                sourceHadAudio: sourceHadAudio,
+                sourceHadGainMap: sourceHadGainMap,
+                expectsOppoTransform: expectedTransform,
+                expectedStillImageTransform: transformResolution.transform,
+                requirePhotoKitLoad: requirePhotoKitValidation
+            )
+        } catch {
+            try? FileManager.default.copyItem(at: pairedImageURL, to: failedLiveImageURL)
+            try? FileManager.default.copyItem(at: temporaryVideoURL, to: failedLiveVideoURL)
+            throw error
+        }
 
         try LivePhotoPairPublisher.publish(
             temporaryImageURL: pairedImageURL,
@@ -249,7 +259,8 @@ public enum AppleLivePhotoConversionEngine {
             finalImageURL: outputImageURL,
             finalVideoURL: outputVideoURL
         )
-        try? FileManager.default.removeItem(at: failedStylesImageURL)
+        try? FileManager.default.removeItem(at: failedLiveImageURL)
+        try? FileManager.default.removeItem(at: failedLiveVideoURL)
 
         var diagnostics: [String] = []
         diagnostics.append(contentsOf: geometryPreparationDiagnostics)
