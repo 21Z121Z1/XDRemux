@@ -29,6 +29,8 @@ jobs:
           python3 scripts/apply_performance_by_design_followup.py
           python3 scripts/apply_performance_by_design_phase2.py
           python3 scripts/apply_performance_by_design_phase2_fix.py
+          python3 scripts/apply_performance_by_design_phase3.py
+          python3 scripts/apply_performance_by_design_phase3_followup.py
 
       - name: Architecture regression checks
         run: python3 -m unittest Tests.test_performance_design
@@ -38,6 +40,18 @@ jobs:
 
       - name: Release build
         run: swift build -c release
+
+      - name: macOS app model regression
+        shell: bash
+        run: |
+          xcodebuild \
+            -quiet \
+            -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \
+            -scheme XDRemuxAppModelTests \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/xdremux-app-model-tests" \
+            build
+          "$RUNNER_TEMP/xdremux-app-model-tests/Build/Products/Debug/XDRemuxAppModelTests"
 
       - name: Commit verified source transformation
         shell: bash
@@ -55,7 +69,10 @@ jobs:
             Sources/XDRemuxCore/HEIF/DirectTiledHEVCGainMapEncoder.swift \
             Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift \
             Sources/XDRemuxAppleFeatures/PhotographicStyles/ConstrainedPolynomialStyleDataProducer.swift \
+            apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift \
+            apps/macos/XDRemuxApp/Sources/ContentView.swift \
+            apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift \
             Tests/test_performance_design.py \
             Tests/XDRemuxAppleFeaturesTests/PerformanceDesignTests.swift
-          git commit -m "perf: bound Swift render storage"
+          git commit -m "perf: bound app and solver hot-path work"
           git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
