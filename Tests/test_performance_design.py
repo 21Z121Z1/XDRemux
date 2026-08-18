@@ -40,6 +40,8 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertNotIn("var output = source", source)
         self.assertIn("fileManager.copyItem(at: heicURL, to: outputURL)", source)
         self.assertIn("try handle.seek(toOffset: UInt64(styleOffset))", source)
+        self.assertIn("permissions & 0o200 == 0", source)
+        self.assertIn(".posixPermissions: permissions | 0o200", source)
 
     def test_direct_raster_encoder_uses_raw_transport(self) -> None:
         wrapper = self.source("Sources/XDRemuxCore/HEIF/DirectTiledHEVCGainMapEncoder.swift")
@@ -61,7 +63,6 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertNotIn("queue.firstIndex(where: { $0.id == item.id })", source)
         self.assertIn("struct ConversionQueueStatusCounts", source)
         self.assertIn("queueIndexByID.reserveCapacity(queue.count)", source)
-
 
 
 if __name__ == "__main__":
