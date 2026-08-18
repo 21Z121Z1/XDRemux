@@ -24,7 +24,7 @@ permissions:
 jobs:
   release-performance:
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
@@ -63,6 +63,66 @@ jobs:
             --filter PerformanceMeasurementTests/testLegacyFullDerivativeReferencePerformance \
             2>&1 | tee artifacts/performance/legacy-full-derivative.log
 
+      - name: Run HEAD-bound completion gate
+        shell: bash
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          runner_temp = os.environ["RUNNER_TEMP"]
+          app_build = (
+              "xcodebuild -quiet "
+              "-project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj "
+              "-scheme XDRemuxAppModelTests -configuration Debug "
+              f"-derivedDataPath '{runner_temp}/xdremux-gate-app' build && "
+              f"'{runner_temp}/xdremux-gate-app/Build/Products/Debug/XDRemuxAppModelTests'"
+          )
+          plan = {
+              "schema_version": 1,
+              "scope": "Swift performance-by-design refactor",
+              "checks": [
+                  {
+                      "name": "allocation-shape regressions",
+                      "kind": "regression",
+                      "command": ["python3", "-m", "unittest", "Tests.test_performance_design"],
+                      "timeout_seconds": 120,
+                  },
+                  {
+                      "name": "full Swift Release suite",
+                      "kind": "functional",
+                      "command": ["swift", "test", "-c", "release"],
+                      "timeout_seconds": 2400,
+                  },
+                  {
+                      "name": "macOS app model integration",
+                      "kind": "integration",
+                      "command": ["/bin/bash", "-lc", app_build],
+                      "timeout_seconds": 1200,
+                  },
+                  {
+                      "name": "Release package build",
+                      "kind": "static",
+                      "command": ["swift", "build", "-c", "release"],
+                      "timeout_seconds": 1200,
+                  },
+              ],
+          }
+          Path("/tmp/xdremux-agent-verification.json").write_text(
+              json.dumps(plan, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/main \
+            --plan /tmp/xdremux-agent-verification.json
+          HEAD_SHA="$(git rev-parse HEAD)"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/${HEAD_SHA}.json"
+          cp ".codex/verification-receipts/${HEAD_SHA}.json" \
+            artifacts/performance/completion-receipt.json
+
       - name: Write performance summary
         if: always()
         shell: bash
@@ -72,6 +132,7 @@ jobs:
             echo
             echo "Hard gates enforce the optimized storage/data-movement shape and semantic equivalence."
             echo "Sampled and legacy reference measurements run in separate XCTest processes so peak-memory metrics are not contaminated by allocator high-water marks from the other implementation."
+            echo "The completion gate is bound to the exact checked-out HEAD and verifies regression, functional, integration, Release-build, diff-cleanliness, and unchanged-HEAD evidence."
             echo
             echo '```text'
             grep -hE "(PerformanceMeasurementTests|measured|average:|Test Case.*passed|Test Case.*failed)" \
