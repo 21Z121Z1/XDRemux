@@ -46,6 +46,8 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         helper = self.source("Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift")
         self.assertNotIn("CGImageDestinationCreateWithData", wrapper)
         self.assertIn('pathExtension: "raw"', wrapper)
+        self.assertNotIn("let bytes = [UInt8](annexB)", wrapper)
+        self.assertIn("Data(contentsOf: annexBURL, options: [.mappedIfSafe])", wrapper)
         self.assertIn("RawRasterDescriptor", helper)
         self.assertIn("Data(contentsOf: url, options: [.mappedIfSafe])", helper)
 

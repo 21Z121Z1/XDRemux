@@ -2217,6 +2217,17 @@ package struct ConstrainedPolynomialStyleDataProducer {
             // On APFS FileManager.copyItem creates a clone. Only the key-1 blocks touched below
             // become private; non-APFS volumes retain the same correctness with a normal copy.
             try fileManager.copyItem(at: heicURL, to: outputURL)
+            // copyItem preserves POSIX mode bits. Inputs from read-only media may therefore clone
+            // as 0444 even though the old Data.write candidate path could still create a writable
+            // scratch output. Restore owner-write permission on the private candidate only.
+            let copiedAttributes = try fileManager.attributesOfItem(atPath: outputURL.path)
+            if let permissions = (copiedAttributes[.posixPermissions] as? NSNumber)?.intValue,
+               permissions & 0o200 == 0 {
+                try fileManager.setAttributes(
+                    [.posixPermissions: permissions | 0o200],
+                    ofItemAtPath: outputURL.path
+                )
+            }
             let handle = try FileHandle(forWritingTo: outputURL)
             do {
                 try handle.seek(toOffset: UInt64(styleOffset))

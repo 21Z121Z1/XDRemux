@@ -40,7 +40,9 @@ package enum DirectTiledHEVCGainMapEncoder {
             pathExtension: channelCount == 1 ? "png" : "jpg"
         )
         defer { try? FileManager.default.removeItem(at: inputURL) }
-        try imageData.write(to: inputURL, options: .atomic)
+        // The input is UUID-scoped scratch consumed immediately by the helper; durability and
+        // atomic replacement are not part of this internal transport contract.
+        try imageData.write(to: inputURL)
         return try encodeFile(
             inputURL: inputURL,
             width: width,
@@ -134,7 +136,9 @@ package enum DirectTiledHEVCGainMapEncoder {
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown error"
             throw CLIError.invalidContainer("private tile encoder failed: \(diagnostic)")
         }
-        let tilePayloads = try idrTilePayloads(from: Data(contentsOf: annexBURL))
+        let tilePayloads = try idrTilePayloads(
+            from: Data(contentsOf: annexBURL, options: [.mappedIfSafe])
+        )
         let columns = (width + tileSize - 1) / tileSize
         let rows = (height + tileSize - 1) / tileSize
         guard tilePayloads.count == rows * columns else {
@@ -155,15 +159,15 @@ package enum DirectTiledHEVCGainMapEncoder {
     }
 
     private static func idrTilePayloads(from annexB: Data) throws -> [Data] {
-        let bytes = [UInt8](annexB)
         var starts: [(offset: Int, length: Int)] = []
-        var index = 0
-        while index + 3 < bytes.count {
-            if bytes[index] == 0, bytes[index + 1] == 0,
-               bytes[index + 2] == 0, bytes[index + 3] == 1 {
+        starts.reserveCapacity(64)
+        var index = annexB.startIndex
+        while index + 3 < annexB.endIndex {
+            if annexB[index] == 0, annexB[index + 1] == 0,
+               annexB[index + 2] == 0, annexB[index + 3] == 1 {
                 starts.append((index, 4))
                 index += 4
-            } else if bytes[index] == 0, bytes[index + 1] == 0, bytes[index + 2] == 1 {
+            } else if annexB[index] == 0, annexB[index + 1] == 0, annexB[index + 2] == 1 {
                 starts.append((index, 3))
                 index += 3
             } else {
@@ -171,15 +175,17 @@ package enum DirectTiledHEVCGainMapEncoder {
             }
         }
         var payloads: [Data] = []
+        payloads.reserveCapacity(starts.count)
         for position in starts.indices {
             let start = starts[position].offset + starts[position].length
-            let end = position + 1 < starts.count ? starts[position + 1].offset : bytes.count
+            let end = position + 1 < starts.count ? starts[position + 1].offset : annexB.endIndex
             guard start < end else { continue }
-            let type = (bytes[start] >> 1) & 0x3f
+            let type = (annexB[start] >> 1) & 0x3f
             guard type == 19 || type == 20 else { continue }
             var payload = Data()
+            payload.reserveCapacity(4 + end - start)
             appendUInt32BE(end - start, to: &payload)
-            payload.append(contentsOf: bytes[start..<end])
+            payload.append(contentsOf: annexB[start..<end])
             payloads.append(payload)
         }
         guard !payloads.isEmpty else {

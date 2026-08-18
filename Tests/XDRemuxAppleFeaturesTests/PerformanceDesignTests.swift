@@ -76,6 +76,10 @@ final class PerformanceDesignTests: XCTestCase {
         let input = root.appendingPathComponent("input.heic")
         let output = root.appendingPathComponent("output.heic")
         try base.write(to: input)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o444],
+            ofItemAtPath: input.path
+        )
 
         let styleData = try Producer.styleData(parameters: [0.01, -0.01, 0.005, 0, 0, 0])
         XCTAssertEqual(styleData.count, identity.count)
