@@ -32,6 +32,7 @@ jobs:
           python3 scripts/apply_performance_by_design_phase3.py
           python3 scripts/apply_performance_by_design_phase3_followup.py
           python3 scripts/apply_performance_by_design_phase4.py
+          python3 scripts/apply_performance_by_design_phase5.py
 
       - name: Architecture regression checks
         run: python3 -m unittest Tests.test_performance_design
@@ -78,5 +79,5 @@ jobs:
             Tests/test_performance_design.py \
             Tests/XDRemuxAppleFeaturesTests/PerformanceDesignTests.swift \
             Tests/XDRemuxCoreTests/PerformanceDesignCoreTests.swift
-          git commit -m "perf: bound app and solver hot-path work"
+          git commit -m "perf: finish hot-path ownership cleanup"
           git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
