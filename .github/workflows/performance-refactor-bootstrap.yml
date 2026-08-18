@@ -23,15 +23,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
           fetch-depth: 0
 
-      - name: Apply deterministic refactor
+      - name: Apply pending deterministic follow-ups
         run: |
-          python3 scripts/apply_performance_by_design.py
-          python3 scripts/apply_performance_by_design_followup.py
-          python3 scripts/apply_performance_by_design_phase2.py
-          python3 scripts/apply_performance_by_design_phase2_fix.py
-          python3 scripts/apply_performance_by_design_phase3.py
-          python3 scripts/apply_performance_by_design_phase3_followup.py
-          python3 scripts/apply_performance_by_design_phase4.py
           python3 scripts/apply_performance_by_design_phase5.py
           python3 scripts/apply_performance_by_design_phase6.py
 
@@ -69,16 +62,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
-            Sources/XDRemuxCore/RAW/CoreImageRAW.swift \
-            Sources/XDRemuxCore/HDR/HDRPipeline.swift \
             Sources/XDRemuxCore/HEIF/DirectTiledHEVCGainMapEncoder.swift \
-            Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift \
             Sources/XDRemuxAppleFeatures/PhotographicStyles/ConstrainedPolynomialStyleDataProducer.swift \
-            apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift \
-            apps/macos/XDRemuxApp/Sources/ContentView.swift \
-            apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift \
             Tests/test_performance_design.py \
-            Tests/XDRemuxAppleFeaturesTests/PerformanceDesignTests.swift \
-            Tests/XDRemuxCoreTests/PerformanceDesignCoreTests.swift
+            Tests/XDRemuxAppleFeaturesTests/PerformanceDesignTests.swift
           git commit -m "perf: finish hot-path ownership cleanup"
           git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
