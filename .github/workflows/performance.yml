@@ -28,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Build optimized package
@@ -41,15 +42,26 @@ jobs:
           swift test -c release --filter PerformanceDesignTests
           swift test -c release --filter PerformanceDesignCoreTests
 
-      - name: Measure wall clock CPU and memory
+      - name: Measure sampled Jacobian
         shell: bash
         env:
           XDREMUX_RUN_PERFORMANCE_MEASUREMENTS: "1"
         run: |
           mkdir -p artifacts/performance
           set -o pipefail
-          swift test -c release --filter PerformanceMeasurementTests \
-            2>&1 | tee artifacts/performance/xctest-performance.log
+          swift test -c release \
+            --filter PerformanceMeasurementTests/testSampledJacobianReleasePerformance \
+            2>&1 | tee artifacts/performance/sampled-jacobian.log
+
+      - name: Measure legacy full-raster reference
+        shell: bash
+        env:
+          XDREMUX_RUN_PERFORMANCE_MEASUREMENTS: "1"
+        run: |
+          set -o pipefail
+          swift test -c release \
+            --filter PerformanceMeasurementTests/testLegacyFullDerivativeReferencePerformance \
+            2>&1 | tee artifacts/performance/legacy-full-derivative.log
 
       - name: Write performance summary
         if: always()
@@ -59,11 +71,11 @@ jobs:
             echo "## XDRemux Release Performance"
             echo
             echo "Hard gates enforce the optimized storage/data-movement shape and semantic equivalence."
-            echo "XCTest records wall-clock, CPU, and physical-memory metrics in Release configuration."
+            echo "Sampled and legacy reference measurements run in separate XCTest processes so peak-memory metrics are not contaminated by allocator high-water marks from the other implementation."
             echo
             echo '```text'
-            grep -E "(PerformanceMeasurementTests|measured|average:|Test Case.*passed|Test Case.*failed)" \
-              artifacts/performance/xctest-performance.log 2>/dev/null || true
+            grep -hE "(PerformanceMeasurementTests|measured|average:|Test Case.*passed|Test Case.*failed)" \
+              artifacts/performance/*.log 2>/dev/null || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
