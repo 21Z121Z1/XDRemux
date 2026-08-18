@@ -1,0 +1,57 @@
+name: Performance Refactor Bootstrap
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: performance-refactor-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply-and-verify:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'codex/performance-by-design'
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply deterministic refactor
+        run: python3 scripts/apply_performance_by_design.py
+
+      - name: Architecture regression checks
+        run: python3 -m unittest Tests.test_performance_design
+
+      - name: Swift targeted regression tests
+        run: swift test --filter PerformanceDesignTests
+
+      - name: Release build
+        run: swift build -c release
+
+      - name: Commit verified source transformation
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No source transformation pending."
+            exit 0
+          fi
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            Sources/XDRemuxCore/RAW/CoreImageRAW.swift \
+            Sources/XDRemuxCore/HDR/HDRPipeline.swift \
+            Sources/XDRemuxCore/HEIF/DirectTiledHEVCGainMapEncoder.swift \
+            Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift \
+            Sources/XDRemuxAppleFeatures/PhotographicStyles/ConstrainedPolynomialStyleDataProducer.swift \
+            Tests/test_performance_design.py \
+            Tests/XDRemuxAppleFeaturesTests/PerformanceDesignTests.swift
+          git commit -m "perf: bound Swift hot-path data movement"
+          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
