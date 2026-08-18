@@ -454,7 +454,7 @@ package struct ConstrainedPolynomialStyleDataProducer {
                 requests: requests
             ))
         }
-        let initializationRasters = try Self.render(
+        try Self.executeRenderRequests(
             executable: executable,
             requests: initializationWork.flatMap(\.requests)
         )
@@ -466,21 +466,17 @@ package struct ConstrainedPolynomialStyleDataProducer {
             identityRender.raster
         )
         var latestResponse = identityResponse
-        var initializationCursor = 0
         for work in initializationWork {
-            guard initializationCursor + work.requests.count <= initializationRasters.count else {
-                throw CLIError.invalidContainer(
-                    "constrained key-1 renderer returned an incomplete initialization batch"
+            let raster = try Self.decodeRGB8(work.requests[0].pngURL)
+            let candidateResponse: ResponseObjectiveState?
+            if responseActive {
+                candidateResponse = responseState(
+                    mid: try Self.decodeRGB8(work.requests[1].pngURL),
+                    plus: try Self.decodeRGB8(work.requests[2].pngURL)
                 )
+            } else {
+                candidateResponse = nil
             }
-            let raster = initializationRasters[initializationCursor]
-            let candidateResponse: ResponseObjectiveState? = responseActive
-                ? responseState(
-                    mid: initializationRasters[initializationCursor + 1],
-                    plus: initializationRasters[initializationCursor + 2]
-                )
-                : nil
-            initializationCursor += work.requests.count
             let candidateMetrics = Self.metrics(raster, target)
             let candidateScore = Self.responseScore(
                 rmse8: candidateMetrics.rmse8,
@@ -624,7 +620,7 @@ package struct ConstrainedPolynomialStyleDataProducer {
                     requests: requests
                 ))
             }
-            let derivativeRasters = try Self.render(
+            try Self.executeRenderRequests(
                 executable: executable,
                 requests: derivativeWork.flatMap(\.requests)
             )
@@ -636,21 +632,17 @@ package struct ConstrainedPolynomialStyleDataProducer {
             var derivativeRows: [[String: Any]] = []
             var hueDerivative = Array(repeating: 0.0, count: parameterCount)
             var rgDerivative = Array(repeating: 0.0, count: parameterCount)
-            var derivativeCursor = 0
             for work in derivativeWork {
-                guard derivativeCursor + work.requests.count <= derivativeRasters.count else {
-                    throw CLIError.invalidContainer(
-                        "constrained key-1 renderer returned an incomplete Jacobian batch"
+                let rendered = try Self.decodeRGB8(work.requests[0].pngURL)
+                let perturbedResponse: ResponseObjectiveState?
+                if responseActive {
+                    perturbedResponse = responseState(
+                        mid: try Self.decodeRGB8(work.requests[1].pngURL),
+                        plus: try Self.decodeRGB8(work.requests[2].pngURL)
                     )
+                } else {
+                    perturbedResponse = nil
                 }
-                let rendered = derivativeRasters[derivativeCursor]
-                let perturbedResponse: ResponseObjectiveState? = responseActive
-                    ? responseState(
-                        mid: derivativeRasters[derivativeCursor + 1],
-                        plus: derivativeRasters[derivativeCursor + 2]
-                    )
-                    : nil
-                derivativeCursor += work.requests.count
                 guard rendered.rgb.count == currentRaster.rgb.count else {
                     throw CLIError.invalidContainer(
                         "constrained key-1 renderer returned inconsistent raster dimensions"
@@ -780,26 +772,22 @@ package struct ConstrainedPolynomialStyleDataProducer {
                     requests: requests
                 ))
             }
-            let lineSearchRasters = try Self.render(
+            try Self.executeRenderRequests(
                 executable: executable,
                 requests: lineSearchWork.flatMap(\.requests)
             )
             var proposedRaster: Raster?
-            var lineSearchCursor = 0
             for work in lineSearchWork {
-                guard lineSearchCursor + work.requests.count <= lineSearchRasters.count else {
-                    throw CLIError.invalidContainer(
-                        "constrained key-1 renderer returned an incomplete line-search batch"
+                let raster = try Self.decodeRGB8(work.requests[0].pngURL)
+                let candidateResponse: ResponseObjectiveState?
+                if responseActive {
+                    candidateResponse = responseState(
+                        mid: try Self.decodeRGB8(work.requests[1].pngURL),
+                        plus: try Self.decodeRGB8(work.requests[2].pngURL)
                     )
+                } else {
+                    candidateResponse = nil
                 }
-                let raster = lineSearchRasters[lineSearchCursor]
-                let candidateResponse: ResponseObjectiveState? = responseActive
-                    ? responseState(
-                        mid: lineSearchRasters[lineSearchCursor + 1],
-                        plus: lineSearchRasters[lineSearchCursor + 2]
-                    )
-                    : nil
-                lineSearchCursor += work.requests.count
                 let candidateMetrics = Self.metrics(raster, target)
                 let candidateScore = Self.responseScore(
                     rmse8: candidateMetrics.rmse8,
@@ -1142,11 +1130,11 @@ package struct ConstrainedPolynomialStyleDataProducer {
         return min(4, max(1, ProcessInfo.processInfo.activeProcessorCount))
     }()
 
-    private static func render(
+    private static func executeRenderRequests(
         executable: URL,
         requests: [RenderRequest]
-    ) throws -> [Raster] {
-        guard !requests.isEmpty else { return [] }
+    ) throws {
+        guard !requests.isEmpty else { return }
         for request in requests {
             try FileManager.default.createDirectory(
                 at: request.outputDirectory,
@@ -1155,7 +1143,8 @@ package struct ConstrainedPolynomialStyleDataProducer {
         }
         let workerCount = min(renderConcurrency, requests.count)
         guard workerCount > 1 else {
-            return try renderChunk(executable: executable, requests: requests)
+            try executeRenderChunk(executable: executable, requests: requests)
+            return
         }
 
         var chunks: [[RenderRequest]] = []
@@ -1170,14 +1159,10 @@ package struct ConstrainedPolynomialStyleDataProducer {
         }
 
         let lock = NSLock()
-        var rastersByChunk: [Int: [Raster]] = [:]
         var firstError: (index: Int, error: Error)?
         DispatchQueue.concurrentPerform(iterations: chunks.count) { index in
             do {
-                let rasters = try renderChunk(executable: executable, requests: chunks[index])
-                lock.lock()
-                rastersByChunk[index] = rasters
-                lock.unlock()
+                try executeRenderChunk(executable: executable, requests: chunks[index])
             } catch {
                 lock.lock()
                 if firstError == nil || index < firstError!.index {
@@ -1189,19 +1174,20 @@ package struct ConstrainedPolynomialStyleDataProducer {
         if let firstError {
             throw firstError.error
         }
-        let rasters = (0..<chunks.count).flatMap { rastersByChunk[$0] ?? [] }
-        guard rasters.count == requests.count else {
-            throw CLIError.invalidContainer(
-                "complete-Neutrino render chunks returned \(rasters.count) rasters; expected \(requests.count)"
-            )
-        }
-        return rasters
     }
 
-    private static func renderChunk(
+    private static func render(
         executable: URL,
         requests: [RenderRequest]
     ) throws -> [Raster] {
+        try executeRenderRequests(executable: executable, requests: requests)
+        return try requests.map { try decodeRGB8($0.pngURL) }
+    }
+
+    private static func executeRenderChunk(
+        executable: URL,
+        requests: [RenderRequest]
+    ) throws {
         let planURL = FileManager.default.temporaryDirectory.appendingPathComponent(
             "xdremux-neutrino-style-render-batch-\(UUID().uuidString).json"
         )
@@ -1235,7 +1221,6 @@ package struct ConstrainedPolynomialStyleDataProducer {
                         .joined(separator: " ")
             )
         }
-        return try requests.map { try decodeRGB8($0.pngURL) }
     }
 
     private static func decodeRGB8(_ url: URL) throws -> Raster {
@@ -1330,7 +1315,7 @@ package struct ConstrainedPolynomialStyleDataProducer {
         ]
         var rows: [[String: Any]] = []
         var failures: [String] = []
-        var renderCache: [String: Raster] = [:]
+        var renderURLs: [String: URL] = [:]
         var renderWork: [(cacheKey: String, request: RenderRequest)] = []
 
         func cacheKey(owner: String, setting: StyleSetting) -> String {
@@ -1389,12 +1374,12 @@ package struct ConstrainedPolynomialStyleDataProducer {
                 )
             }
         }
-        let responseRasters = try render(
+        try executeRenderRequests(
             executable: executable,
             requests: renderWork.map(\.request)
         )
-        for (work, raster) in zip(renderWork, responseRasters) {
-            renderCache[work.cacheKey] = raster
+        for work in renderWork {
+            renderURLs[work.cacheKey] = work.request.pngURL
         }
 
         func rendered(
@@ -1405,12 +1390,12 @@ package struct ConstrainedPolynomialStyleDataProducer {
             setting: StyleSetting
         ) throws -> Raster {
             let key = cacheKey(owner: owner, setting: setting)
-            guard let cached = renderCache[key] else {
+            guard let url = renderURLs[key] else {
                 throw CLIError.invalidContainer(
                     "missing batched native response render \(owner)/\(pairName)-\(side) for \(heicURL.lastPathComponent)"
                 )
             }
-            return cached
+            return try decodeRGB8(url)
         }
 
         for pair in pairs {

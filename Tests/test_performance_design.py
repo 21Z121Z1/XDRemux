@@ -26,6 +26,11 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertNotIn("zip(rendered.rgb, currentRaster.rgb).map", source)
         self.assertIn("private struct SampledJacobian", source)
         self.assertIn("var values: [Float]", source)
+        self.assertNotIn("let derivativeRasters = try Self.render", source)
+        self.assertNotIn("let initializationRasters = try Self.render", source)
+        self.assertNotIn("let lineSearchRasters = try Self.render", source)
+        self.assertIn("try Self.executeRenderRequests", source)
+        self.assertNotIn("var renderCache: [String: Raster]", source)
 
     def test_style_candidate_does_not_copy_whole_heic_in_swift(self) -> None:
         source = self.source(
