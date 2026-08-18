@@ -36,7 +36,9 @@ jobs:
         run: python3 -m unittest Tests.test_performance_design
 
       - name: Swift targeted regression tests
-        run: swift test --filter PerformanceDesignTests
+        run: |
+          swift test --filter PerformanceDesignTests
+          swift test --filter PerformanceDesignCoreTests
 
       - name: Release build
         run: swift build -c release
@@ -73,6 +75,7 @@ jobs:
             apps/macos/XDRemuxApp/Sources/ContentView.swift \
             apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift \
             Tests/test_performance_design.py \
-            Tests/XDRemuxAppleFeaturesTests/PerformanceDesignTests.swift
+            Tests/XDRemuxAppleFeaturesTests/PerformanceDesignTests.swift \
+            Tests/XDRemuxCoreTests/PerformanceDesignCoreTests.swift
           git commit -m "perf: bound app and solver hot-path work"
           git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
