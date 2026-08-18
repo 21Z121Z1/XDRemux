@@ -27,6 +27,7 @@ jobs:
         run: |
           python3 scripts/apply_performance_by_design.py
           python3 scripts/apply_performance_by_design_followup.py
+          python3 scripts/apply_performance_by_design_phase2.py
 
       - name: Architecture regression checks
         run: python3 -m unittest Tests.test_performance_design
@@ -55,5 +56,5 @@ jobs:
             Sources/XDRemuxAppleFeatures/PhotographicStyles/ConstrainedPolynomialStyleDataProducer.swift \
             Tests/test_performance_design.py \
             Tests/XDRemuxAppleFeaturesTests/PerformanceDesignTests.swift
-          git commit -m "perf: bound Swift hot-path data movement"
+          git commit -m "perf: bound Swift render storage"
           git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
