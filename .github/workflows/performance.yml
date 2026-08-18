@@ -1,0 +1,77 @@
+name: XDRemux Performance
+
+on:
+  pull_request:
+    paths:
+      - "Sources/**/*.swift"
+      - "apps/macos/XDRemuxApp/Sources/**/*.swift"
+      - "Tests/**/*Performance*.swift"
+      - "Tests/test_performance_design.py"
+      - ".github/workflows/performance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Sources/**/*.swift"
+      - "apps/macos/XDRemuxApp/Sources/**/*.swift"
+      - "Tests/**/*Performance*.swift"
+      - "Tests/test_performance_design.py"
+      - ".github/workflows/performance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-performance:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build optimized package
+        run: swift build -c release
+
+      - name: Enforce allocation-shape regressions
+        run: python3 -m unittest Tests.test_performance_design
+
+      - name: Verify optimized-path semantics
+        run: |
+          swift test -c release --filter PerformanceDesignTests
+          swift test -c release --filter PerformanceDesignCoreTests
+
+      - name: Measure wall clock CPU and memory
+        shell: bash
+        env:
+          XDREMUX_RUN_PERFORMANCE_MEASUREMENTS: "1"
+        run: |
+          mkdir -p artifacts/performance
+          set -o pipefail
+          swift test -c release --filter PerformanceMeasurementTests \
+            2>&1 | tee artifacts/performance/xctest-performance.log
+
+      - name: Write performance summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## XDRemux Release Performance"
+            echo
+            echo "Hard gates enforce the optimized storage/data-movement shape and semantic equivalence."
+            echo "XCTest records wall-clock, CPU, and physical-memory metrics in Release configuration."
+            echo
+            echo '```text'
+            grep -E "(PerformanceMeasurementTests|measured|average:|Test Case.*passed|Test Case.*failed)" \
+              artifacts/performance/xctest-performance.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload performance measurements
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: xdremux-release-performance
+          if-no-files-found: warn
+          retention-days: 14
+          path: artifacts/performance/
