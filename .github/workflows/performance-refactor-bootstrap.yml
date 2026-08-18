@@ -28,6 +28,7 @@ jobs:
           python3 scripts/apply_performance_by_design.py
           python3 scripts/apply_performance_by_design_followup.py
           python3 scripts/apply_performance_by_design_phase2.py
+          python3 scripts/apply_performance_by_design_phase2_fix.py
 
       - name: Architecture regression checks
         run: python3 -m unittest Tests.test_performance_design
