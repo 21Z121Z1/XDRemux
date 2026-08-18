@@ -1354,38 +1354,42 @@ package enum GainMapReconstructor {
 
         let outputBytesPerRow = alignUp(mask.width, toMultipleOf: 256)
         var output = Data(count: outputBytesPerRow * mask.height)
-        let maskBytes = [UInt8](mask.data)
 
-        output.withUnsafeMutableBytes { rawBuffer in
-            guard let outBase = rawBuffer.bindMemory(to: UInt8.self).baseAddress else { return }
-            for y in 0..<mask.height {
-                let inRow = y * mask.bytesPerRow
-                let outRow = y * outputBytesPerRow
-                for x in 0..<mask.width {
-                    let maskValue = Double(maskBytes[inRow + x]) / 255.0
-                    let idx0 = clamp(Int(maskValue * 1000.0), min: 0, max: 1000)
-                    let linGray = lut0[idx0]
+        mask.data.withUnsafeBytes { inputRawBuffer in
+            output.withUnsafeMutableBytes { outputRawBuffer in
+                guard let inBase = inputRawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                      let outBase = outputRawBuffer.bindMemory(to: UInt8.self).baseAddress else {
+                    return
+                }
+                for y in 0..<mask.height {
+                    let inRow = y * mask.bytesPerRow
+                    let outRow = y * outputBytesPerRow
+                    for x in 0..<mask.width {
+                        let maskValue = Double(inBase[inRow + x]) / 255.0
+                        let idx0 = clamp(Int(maskValue * 1000.0), min: 0, max: 1000)
+                        let linGray = lut0[idx0]
 
-                    let boosted: Double
-                    if linGray < params.knee {
-                        boosted = 1.0
-                    } else {
-                        let t = (linGray - params.knee) / params.kneeRange
-                        let idx1 = clamp(Int(t * 1000.0), min: 0, max: 1000)
-                        let linear = lut1[idx1]
-                        let idx2 = clamp(Int(linear * 1000.0), min: 0, max: 1000)
-                        boosted = lut2[idx2]
+                        let boosted: Double
+                        if linGray < params.knee {
+                            boosted = 1.0
+                        } else {
+                            let t = (linGray - params.knee) / params.kneeRange
+                            let idx1 = clamp(Int(t * 1000.0), min: 0, max: 1000)
+                            let linear = lut1[idx1]
+                            let idx2 = clamp(Int(linear * 1000.0), min: 0, max: 1000)
+                            boosted = lut2[idx2]
+                        }
+
+                        let idx3: Int
+                        if boosted < 1.0 {
+                            idx3 = 1000
+                        } else {
+                            idx3 = clamp(Int(min(boosted, 8.0) * 1000.0), min: 0, max: 8000)
+                        }
+
+                        let logGain = clamp(Int(lut3[idx3]), min: 0, max: 255)
+                        outBase[outRow + x] = UInt8(logGain)
                     }
-
-                    let idx3: Int
-                    if boosted < 1.0 {
-                        idx3 = 1000
-                    } else {
-                        idx3 = clamp(Int(min(boosted, 8.0) * 1000.0), min: 0, max: 8000)
-                    }
-
-                    let logGain = clamp(Int(lut3[idx3]), min: 0, max: 255)
-                    outBase[outRow + x] = UInt8(logGain)
                 }
             }
         }

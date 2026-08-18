@@ -28,6 +28,12 @@ struct SourceFrame {
     let height: Int
 }
 
+struct RawRasterDescriptor {
+    let width: Int
+    let height: Int
+    let bytesPerRow: Int
+}
+
 final class TileEncoderState {
     let lock = NSLock()
     var samples: [Data?]
@@ -103,6 +109,51 @@ func loadImage(_ path: String) -> CGImage {
     guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
           let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
         fail("Could not load image: \(path)")
+    }
+    return image
+}
+
+func loadRawImage(
+    _ path: String,
+    mode: PixelMode,
+    descriptor: RawRasterDescriptor
+) -> CGImage {
+    let isMono = mode == .mono8 || mode == .mono8tile
+    let bytesPerPixel = isMono ? 1 : 4
+    guard descriptor.width > 0, descriptor.height > 0,
+          descriptor.width <= Int.max / bytesPerPixel,
+          descriptor.bytesPerRow >= descriptor.width * bytesPerPixel,
+          descriptor.height <= Int.max / descriptor.bytesPerRow else {
+        fail("Invalid raw raster geometry")
+    }
+    let expectedCount = descriptor.bytesPerRow * descriptor.height
+    let url = URL(fileURLWithPath: path)
+    guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]),
+          data.count == expectedCount,
+          let provider = CGDataProvider(data: data as CFData) else {
+        fail("Could not map raw raster: \(path)")
+    }
+    let colorSpace = isMono ? CGColorSpaceCreateDeviceGray() : CGColorSpaceCreateDeviceRGB()
+    let bitmapInfo = isMono
+        ? CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue)
+        : CGBitmapInfo(
+            rawValue: CGBitmapInfo.byteOrder32Little.rawValue
+                | CGImageAlphaInfo.noneSkipFirst.rawValue
+        )
+    guard let image = CGImage(
+        width: descriptor.width,
+        height: descriptor.height,
+        bitsPerComponent: 8,
+        bitsPerPixel: bytesPerPixel * 8,
+        bytesPerRow: descriptor.bytesPerRow,
+        space: colorSpace,
+        bitmapInfo: bitmapInfo,
+        provider: provider,
+        decode: nil,
+        shouldInterpolate: false,
+        intent: .defaultIntent
+    ) else {
+        fail("Could not create CGImage from raw raster")
     }
     return image
 }
@@ -240,8 +291,15 @@ func makeYUV444Frame(
     return SourceFrame(pixelBuffer: destination, width: width, height: height)
 }
 
-func makeSourceFrame(path: String, mode: PixelMode, tileSize: Int = 512) -> SourceFrame {
-    let image = loadImage(path)
+func makeSourceFrame(
+    path: String,
+    mode: PixelMode,
+    tileSize: Int = 512,
+    rawDescriptor: RawRasterDescriptor? = nil
+) -> SourceFrame {
+    let image = rawDescriptor.map {
+        loadRawImage(path, mode: mode, descriptor: $0)
+    } ?? loadImage(path)
     if mode == .rgb4448 || mode == .rgb4448tile {
         return makeYUV444Frame(
             from: image,
@@ -623,10 +681,11 @@ let callback: VTCompressionOutputCallback = { refcon, _, status, _, sampleBuffer
 }
 
 let args = CommandLine.arguments
-if args.count < 3 || args.count > 7 {
+if args.count < 3 || (args.count > 7 && args.count != 10) {
     fail(
         "usage: apple_vt_hevc_encoder.swift input output.hevc "
-            + "[quality] [rgb10|rgb4448|rgb4448tile|mono8|mono8tile] [output.hvcc] [tile-size]"
+            + "[quality] [rgb10|rgb4448|rgb4448tile|mono8|mono8tile] [output.hvcc] [tile-size] "
+            + "[raw-width raw-height raw-bytes-per-row]"
     )
 }
 
@@ -660,7 +719,29 @@ if args.count >= 7 {
     tileSize = 512
 }
 
-let source = makeSourceFrame(path: args[1], mode: mode, tileSize: tileSize)
+let rawDescriptor: RawRasterDescriptor?
+if args.count == 10 {
+    guard mode == .mono8tile || mode == .rgb4448tile,
+          let rawWidth = Int(args[7]),
+          let rawHeight = Int(args[8]),
+          let rawBytesPerRow = Int(args[9]) else {
+        fail("raw geometry is valid only for mono8tile/rgb4448tile and must contain integers")
+    }
+    rawDescriptor = RawRasterDescriptor(
+        width: rawWidth,
+        height: rawHeight,
+        bytesPerRow: rawBytesPerRow
+    )
+} else {
+    rawDescriptor = nil
+}
+
+let source = makeSourceFrame(
+    path: args[1],
+    mode: mode,
+    tileSize: tileSize,
+    rawDescriptor: rawDescriptor
+)
 let pixelBuffer = source.pixelBuffer
 if mode == .rgb4448tile || mode == .mono8tile {
     let tileState = encodeWithTileSession(
