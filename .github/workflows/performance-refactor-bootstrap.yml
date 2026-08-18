@@ -24,7 +24,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply deterministic refactor
-        run: python3 scripts/apply_performance_by_design.py
+        run: |
+          python3 scripts/apply_performance_by_design.py
+          python3 scripts/apply_performance_by_design_followup.py
 
       - name: Architecture regression checks
         run: python3 -m unittest Tests.test_performance_design
