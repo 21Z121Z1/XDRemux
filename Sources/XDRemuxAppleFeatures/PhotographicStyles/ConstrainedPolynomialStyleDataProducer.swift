@@ -122,30 +122,23 @@ package struct ConstrainedPolynomialStyleDataProducer {
             let pixelCount = current.count / 3
             let parameterBase = parameter * sampleCount
             var sampled = 0
-            var nextSamplePixel = 0
             var squared = 0.0
 
-            // One streaming pass computes the full-raster diagnostic RMS while retaining only the
-            // derivative samples used by solveUpdate. No temporary derivative raster is created.
-            for pixel in 0..<pixelCount {
-                let store = pixel == nextSamplePixel
+            // The normal-equation solver consumes exactly this sample grid. Do not spend a second
+            // full-raster pass computing diagnostics for derivatives the solver will discard.
+            for pixel in Swift.stride(from: 0, to: pixelCount, by: pixelStride) {
                 let base = pixel * 3
                 for channel in 0..<3 {
                     let derivative = (rendered[base + channel] - current[base + channel]) / floatStep
+                    values[parameterBase + sampled] = derivative
                     squared += Double(derivative * derivative)
-                    if store {
-                        values[parameterBase + sampled] = derivative
-                        sampled += 1
-                    }
-                }
-                if store {
-                    nextSamplePixel += pixelStride
+                    sampled += 1
                 }
             }
             guard sampled == sampleCount else {
                 throw CLIError.invalidContainer("constrained key-1 sampled Jacobian count mismatch")
             }
-            return sqrt(squared / Double(max(1, current.count)))
+            return sqrt(squared / Double(max(1, sampleCount)))
         }
 
         @inline(__always)
@@ -659,7 +652,14 @@ package struct ConstrainedPolynomialStyleDataProducer {
                     "coefficientIndex": work.coefficientIndex,
                     "step": work.step,
                     "derivativeRMS8": derivativeRMS,
-                    "metricsAgainstDisabled": Self.metrics(rendered, target).dictionary,
+                    "derivativeRMS8Sampling": "solver-sample-grid",
+                    "derivativeRMS8SampleCount": jacobian.sampleCount,
+                    "metricsAgainstDisabled": Self.sampledMetrics(
+                        rendered,
+                        target,
+                        pixelStride: jacobian.pixelStride
+                    ).dictionary,
+                    "metricsAgainstDisabledSampling": "solver-sample-grid",
                 ]
                 if let perturbedResponse, let currentResponse {
                     // A vanished-ROI state carries substituted identity values,
@@ -2221,7 +2221,6 @@ package struct ConstrainedPolynomialStyleDataProducer {
             do {
                 try handle.seek(toOffset: UInt64(styleOffset))
                 try handle.write(contentsOf: styleData)
-                try handle.synchronize()
                 try handle.close()
             } catch {
                 try? handle.close()
@@ -2279,6 +2278,37 @@ package struct ConstrainedPolynomialStyleDataProducer {
             maximum = max(maximum, abs(difference))
         }
         let count = Double(max(1, left.rgb.count))
+        return Metrics(
+            rmse8: sqrt(squared / count),
+            mae8: absolute / count,
+            maximumAbsolute8: maximum
+        )
+    }
+
+    private static func sampledMetrics(
+        _ left: Raster,
+        _ right: Raster,
+        pixelStride: Int
+    ) -> Metrics {
+        precondition(left.width == right.width && left.height == right.height)
+        precondition(left.rgb.count == right.rgb.count && left.rgb.count.isMultiple(of: 3))
+        precondition(pixelStride > 0)
+        var squared = 0.0
+        var absolute = 0.0
+        var maximum = 0.0
+        var sampleCount = 0
+        let pixelCount = left.rgb.count / 3
+        for pixel in Swift.stride(from: 0, to: pixelCount, by: pixelStride) {
+            let base = pixel * 3
+            for channel in 0..<3 {
+                let difference = Double(left.rgb[base + channel] - right.rgb[base + channel])
+                squared += difference * difference
+                absolute += abs(difference)
+                maximum = max(maximum, abs(difference))
+                sampleCount += 1
+            }
+        }
+        let count = Double(max(1, sampleCount))
         return Metrics(
             rmse8: sqrt(squared / count),
             mae8: absolute / count,

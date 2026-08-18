@@ -71,7 +71,9 @@ package enum DirectTiledHEVCGainMapEncoder {
             pathExtension: "raw"
         )
         defer { try? FileManager.default.removeItem(at: rawURL) }
-        try raster.data.write(to: rawURL, options: .atomic)
+        // UUID-scoped scratch has no durability contract; a direct write avoids an otherwise
+        // redundant safe-save/rename before the helper maps the bytes read-only.
+        try raster.data.write(to: rawURL)
         return try encodeFile(
             inputURL: rawURL,
             width: raster.width,
