@@ -120,12 +120,15 @@ struct ContentView: View {
     }
 
     private var sidebar: some View {
-        VStack(spacing: 0) {
+        let counts = viewModel.queueStatusCounts
+        return VStack(spacing: 0) {
             QueueSidebarHeader(
-                stateTitle: stateTitle,
-                stateDetail: stateDetail,
-                progressFraction: viewModel.progressFraction,
-                processedCount: viewModel.processedCount,
+                stateTitle: stateTitle(counts: counts),
+                stateDetail: stateDetail(counts: counts),
+                progressFraction: viewModel.totalFiles > 0
+                    ? Double(counts.processed) / Double(viewModel.totalFiles)
+                    : 0,
+                processedCount: counts.processed,
                 totalFiles: viewModel.totalFiles
             )
 
@@ -153,14 +156,15 @@ struct ContentView: View {
     }
 
     private var workbench: some View {
-        VStack(spacing: 0) {
+        let counts = viewModel.queueStatusCounts
+        return VStack(spacing: 0) {
             ProgressSurface(
-                convertedCount: viewModel.convertedCount,
-                skippedCount: viewModel.skippedCount,
-                failedCount: viewModel.failedCount,
-                cancelledCount: viewModel.cancelledCount,
-                pendingCount: viewModel.pendingCount,
-                runningCount: viewModel.runningCount,
+                convertedCount: counts.converted,
+                skippedCount: counts.skipped,
+                failedCount: counts.failed,
+                cancelledCount: counts.cancelled,
+                pendingCount: counts.pending,
+                runningCount: counts.running,
                 totalFiles: viewModel.totalFiles,
                 displayedConcurrency: displayedConcurrency,
                 configSummary: configSummary
@@ -197,8 +201,8 @@ struct ContentView: View {
                 queueCount: viewModel.queue.count,
                 visibleErrors: viewModel.visibleErrors,
                 canEditQueue: viewModel.canEditQueue,
-                failedCount: viewModel.failedCount,
-                completedCount: viewModel.convertedCount + viewModel.skippedCount,
+                failedCount: counts.failed,
+                completedCount: counts.converted + counts.skipped,
                 hasSuccessfulOutputs: viewModel.queue.contains { $0.isSuccessful },
                 retryFailed: viewModel.retryFailed,
                 clearCompleted: viewModel.clearCompleted,
@@ -233,7 +237,7 @@ struct ContentView: View {
         return "\(viewModel.config.family.appTitle) / \(viewModel.config.inputProcessingBranch.appTitle) / \(oppo) / \(cameraTail) / \(output)"
     }
 
-    private var stateTitle: String {
+    private func stateTitle(counts: ConversionQueueStatusCounts) -> String {
         switch viewModel.state {
         case .idle:
             return viewModel.queue.isEmpty ? AppStrings.ready : AppStrings.queueReady
@@ -242,20 +246,20 @@ struct ContentView: View {
         case .processing:
             return AppStrings.converting
         case .completed:
-            return viewModel.failedCount == 0 ? AppStrings.conversionFinished : AppStrings.conversionFinishedWithFailures
+            return counts.failed == 0 ? AppStrings.conversionFinished : AppStrings.conversionFinishedWithFailures
         case .cancelled:
             return AppStrings.statCancelled
         }
     }
 
-    private var stateDetail: String {
+    private func stateDetail(counts: ConversionQueueStatusCounts) -> String {
         if !viewModel.currentFileName.isEmpty {
             return viewModel.currentFileName
         }
         if viewModel.queue.isEmpty {
             return AppStrings.waitingForInput
         }
-        return "\(AppStrings.pending) \(viewModel.pendingCount)，\(AppStrings.running) \(viewModel.runningCount)"
+        return "\(AppStrings.pending) \(counts.pending)，\(AppStrings.running) \(counts.running)"
     }
 
     private var displayedConcurrency: Int {

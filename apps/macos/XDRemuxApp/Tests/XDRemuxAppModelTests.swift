@@ -48,6 +48,7 @@ struct XDRemuxAppModelTests {
         try testPreparingOutputKeepsInvalidExistingFileUntilConversionSucceeds()
         try testThumbnailRendererProducesBoundedPNGData()
         try testEffectiveConcurrencyRespectsMemoryAndUserLimit()
+        try testQueueStatusCountsMatchAllTerminalStates()
         try testClearCompletedAndRetryFailedKeepQueuePredictable()
         try testThumbnailResultOnlyAppliesToExistingMatchingQueueItem()
         try testUserFacingCopyUsesClearConversionTerms()
@@ -336,6 +337,31 @@ struct XDRemuxAppModelTests {
             processorCount: 8
         )
         try expect(large == 1, "oversized inputs should drop concurrency to one")
+    }
+
+    @MainActor
+    private static func testQueueStatusCountsMatchAllTerminalStates() throws {
+        let root = FileManager.default.temporaryDirectory
+        let statuses: [ConversionQueueStatus] = [
+            .pending, .running, .converted, .converted,
+            .skippedExisting, .failed, .cancelled,
+        ]
+        let viewModel = XDRemuxViewModel()
+        viewModel.queue = statuses.enumerated().map { index, status in
+            ConversionQueueItem(
+                inputURL: root.appendingPathComponent("input-\(index).heic"),
+                outputURL: root.appendingPathComponent("output-\(index).heic"),
+                status: status
+            )
+        }
+        let counts = viewModel.queueStatusCounts
+        try expect(counts.pending == 1, "queue summary should count pending rows once")
+        try expect(counts.running == 1, "queue summary should count running rows once")
+        try expect(counts.converted == 2, "queue summary should count converted rows once")
+        try expect(counts.skipped == 1, "queue summary should count skipped rows once")
+        try expect(counts.failed == 1, "queue summary should count failed rows once")
+        try expect(counts.cancelled == 1, "queue summary should count cancelled rows once")
+        try expect(counts.processed == 5, "queue summary should keep pending/running out of processed")
     }
 
     @MainActor
