@@ -314,3 +314,117 @@ enum ConversionArgumentParser {
         try CategorizeArguments.parse(rawArguments).command()
     }
 }
+
+struct XDRemuxRootCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "xdremux",
+        abstract: "Convert ProXDR photos to ISO 21496-1 HDR HEIC.",
+        discussion: """
+        Conversion rewrites the HDR gain-map graph and the container descriptions it depends on. \
+        Watermark, master-mode, portrait, depth, source-image, edit, Live Photo, and unknown \
+        non-HDR vendor data are preserved unless an explicit option says otherwise.
+        """,
+        subcommands: [
+            ConvertCLICommand.self,
+            BatchCLICommand.self,
+            CategorizeCLICommand.self,
+            ValidateAppleCLICommand.self,
+            ValidatePortraitCLICommand.self,
+            PortraitSelfTestCLICommand.self,
+        ]
+    )
+}
+
+private struct ConvertCLICommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "convert",
+        abstract: "Convert one photo."
+    )
+
+    @OptionGroup var arguments: ConvertArguments
+
+    mutating func run() throws {
+        try XDRemuxCommand.runConvert(try arguments.command())
+    }
+}
+
+private struct BatchCLICommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "batch",
+        abstract: "Recursively convert a directory."
+    )
+
+    @OptionGroup var arguments: BatchArguments
+
+    mutating func run() throws {
+        try XDRemuxCommand.runBatch(try arguments.command())
+    }
+}
+
+private struct CategorizeCLICommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "categorize",
+        abstract: "Sort photos by capture mode without converting them."
+    )
+
+    @OptionGroup var arguments: CategorizeArguments
+
+    mutating func run() throws {
+        try XDRemuxCommand.runCategorize(try arguments.command())
+    }
+}
+
+private struct ValidateAppleCLICommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "validate-apple",
+        abstract: "Validate Apple Photographic Styles output and print JSON."
+    )
+
+    @Option(name: .customLong("input"), help: "HEIC to validate.")
+    var inputPath: String
+
+    @Flag(name: .customLong("expect-portrait"), help: "Require combined Portrait resources.")
+    var expectsPortrait = false
+
+    @Option(name: .customLong("json"), help: "Also write the JSON report to this path.")
+    var reportPath: String?
+
+    mutating func run() throws {
+        try XDRemuxCommand.runAppleValidation(
+            inputURL: URL(fileURLWithPath: inputPath),
+            reportURL: reportPath.map { URL(fileURLWithPath: $0) },
+            expectsPortrait: expectsPortrait
+        )
+    }
+}
+
+private struct ValidatePortraitCLICommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "validate-portrait",
+        abstract: "Validate Apple Portrait output and print JSON."
+    )
+
+    @Option(name: .customLong("input"), help: "HEIC to validate.")
+    var inputPath: String
+
+    @Option(name: .customLong("json"), help: "Also write the JSON report to this path.")
+    var reportPath: String?
+
+    mutating func run() throws {
+        try XDRemuxCommand.runPortraitValidation(
+            inputURL: URL(fileURLWithPath: inputPath),
+            reportURL: reportPath.map { URL(fileURLWithPath: $0) }
+        )
+    }
+}
+
+private struct PortraitSelfTestCLICommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "portrait-self-test",
+        abstract: "Run the Apple Portrait pipeline self-test and print JSON."
+    )
+
+    mutating func run() throws {
+        try XDRemuxCommand.runPortraitSelfTest()
+    }
+}
