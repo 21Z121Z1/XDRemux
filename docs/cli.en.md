@@ -2,13 +2,14 @@
 
 English | [简体中文](cli.md)
 
-This document covers the `xdremux` command-line tool. `xdremux --help` prints the same material.
+This document covers the `xdremux` command-line tool. `xdremux --help` lists the commands; `xdremux <command> --help` shows that command's options and defaults.
 
 ## Build and run
 
 ```bash
 swift build
 swift run xdremux --help
+swift run xdremux convert --help
 ```
 
 You can also invoke the built binary directly:
@@ -98,7 +99,7 @@ Needed only when investigating a problem; ordinary use can ignore them.
 | --- | --- | --- |
 | `--input-processing system\|system-decoded\|hybrid\|passthrough` | `hybrid` | How the base image and gain map are rebuilt |
 | `--tmap-format imageio\|strict` | `imageio` | `strict` writes the 145-byte ISO form, which breaks Gallery Exif parsing and editing on Find X9 Ultra |
-| `--oppo-compat <mode>` | `off` | Finer-grained control over the HDR routing flags: `auto`, `iso`, `iso-no-local`, `iso-graph`, `on`, `tail`, `off`. `--no-oppo-compat` means `off`. |
+| `--oppo-compat [mode]` | `off` | Finer-grained control over the HDR routing flags: `auto`, `iso`, `iso-no-local`, `iso-graph`, `on`, `tail`, `off`. A bare `--oppo-compat` means `on`; `--no-oppo-compat` means `off`. |
 
 ### `--oppo-camera-tail` values
 
@@ -121,8 +122,9 @@ The CLI prints human-readable text: progress on stdout, errors on stderr. There 
 
 | Exit code | Meaning |
 | --- | --- |
-| `0` | Success |
-| `1` | Any error — bad arguments, unsupported input, a failed conversion, or a batch with failures |
+| `0` | Success, or normal help/version output |
+| `1` | Conversion, validation, batch execution, or another runtime failure |
+| `64` | Command-line usage error, such as a missing required option, unknown option, or unparsable value |
 
 ## Re-running a batch
 
