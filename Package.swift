@@ -11,8 +11,7 @@ let package = Package(
     products: [
         .library(name: "XDRemuxCore", targets: ["XDRemuxCore"]),
         .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"]),
-        .executable(name: "xdremux", targets: ["XDRemuxCLI"]),
-        .executable(name: "coreimage-raw-diagnostics", targets: ["CoreImageRAWDiagnostics"])
+        .executable(name: "xdremux", targets: ["XDRemuxCLI"])
     ],
     dependencies: [
         .package(
@@ -45,6 +44,9 @@ let package = Package(
             ],
             path: "Sources/XDRemuxCLI"
         ),
+        // Developer-only diagnostic executable. Keeping it as a target means it
+        // remains buildable with `swift build --target CoreImageRAWDiagnostics`
+        // without vending it as part of XDRemux's public package product surface.
         .executableTarget(
             name: "CoreImageRAWDiagnostics",
             dependencies: ["XDRemuxCore"],
