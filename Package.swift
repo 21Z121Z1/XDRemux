@@ -14,6 +14,12 @@ let package = Package(
         .executable(name: "xdremux", targets: ["XDRemuxCLI"]),
         .executable(name: "coreimage-raw-diagnostics", targets: ["CoreImageRAWDiagnostics"])
     ],
+    dependencies: [
+        .package(
+            url: "https://github.com/apple/swift-argument-parser",
+            from: "1.8.2"
+        )
+    ],
     targets: [
         .target(
             name: "XDRemuxCore",
@@ -32,7 +38,11 @@ let package = Package(
         ),
         .executableTarget(
             name: "XDRemuxCLI",
-            dependencies: ["XDRemuxCore", "XDRemuxAppleFeatures"],
+            dependencies: [
+                "XDRemuxCore",
+                "XDRemuxAppleFeatures",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
             path: "Sources/XDRemuxCLI"
         ),
         .executableTarget(
