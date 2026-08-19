@@ -97,9 +97,10 @@ Everything except an explicit `debug` builds Release: solving for Photographic S
 | `Sources/CoreImageRAWDiagnostics/` | RAW diagnostics tool |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI app |
 | `xdremux/python/` | Cross-platform Python CLI |
-| `xdremux/swift-cli/` | Legacy script entry point; forwards to `xdremux` |
 | `Tests/` | Swift tests, Python policy suites, validation harnesses |
 | `scripts/` | Build and acceptance scripts |
+
+The Swift CLI has a single maintained entry point: the SwiftPM `xdremux` executable. Repository validation builds and invokes that product directly instead of maintaining a separate one-file Swift forwarding script.
 
 ## Debugging environment variables
 
