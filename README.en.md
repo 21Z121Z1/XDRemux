@@ -43,7 +43,7 @@ Convert a whole directory:
 
 By default only the HDR data is rewritten (the industry calls it a gain map: it records how much brighter each pixel should get). The picture, the watermark, the master-mode settings all stay exactly as they were. HDR precision is preserved too; `--oppo-compatible` has to drop it a notch before OPPO Gallery will read it, and there is no way back.
 
-Every option, default, and exit code is in the [CLI reference](docs/cli.en.md), or run `swift run xdremux --help`.
+Every option, default, and exit code is in the [CLI reference](docs/cli.en.md). `swift run xdremux --help` lists commands; `swift run xdremux <command> --help` shows the options for one command.
 
 ## Sorting by shooting mode
 
