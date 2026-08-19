@@ -56,7 +56,7 @@ swift run xdremux categorize --input photo_dump/ --output-dir categorized/ --dry
 `--dry-run` prints the plan without touching anything. Passing `--categorize` to `batch` files the converted results into those same folders instead. The Python version behaves identically:
 
 ```bash
-python3 xdremux/python/XDRemux.py categorize --input photo_dump/ --output-dir categorized/
+python3 -m xdremux_py categorize --input photo_dump/ --output-dir categorized/
 ```
 
 Photos whose mode cannot be read go to `未分类` under their asset-type directory. An existing Apple Live Photo is moved as one asset only after its HEIC/JPEG and MOV pass pair-identity validation; an unrelated same-name MOV is never claimed. ProXDR, HDR, gain-map, depth, and vendor facts remain tags and do not add more physical folder levels.
@@ -92,7 +92,7 @@ pip install -e .
 xdremux-py convert --input IMG_001.heic --output IMG_001_hdr.heic
 ```
 
-You can skip installing and run the same commands from the repository root with `python3 xdremux/python/XDRemux.py` or `python3 -m xdremux_py`.
+You can skip installing and run the same commands from the repository root with `python3 -m xdremux_py`.
 
 ## Using it as a Swift package
 
