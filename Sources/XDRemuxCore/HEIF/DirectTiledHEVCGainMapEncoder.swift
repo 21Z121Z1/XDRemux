@@ -34,6 +34,66 @@ package enum DirectTiledHEVCGainMapEncoder {
         channelCount: Int,
         scratchBaseURL: URL
     ) throws -> DirectTiledHEVCGainMap {
+        let inputURL = siblingURL(
+            for: scratchBaseURL,
+            label: "direct-gain",
+            pathExtension: channelCount == 1 ? "png" : "jpg"
+        )
+        defer { try? FileManager.default.removeItem(at: inputURL) }
+        // The input is UUID-scoped scratch consumed immediately by the helper; durability and
+        // atomic replacement are not part of this internal transport contract.
+        try imageData.write(to: inputURL)
+        return try encodeFile(
+            inputURL: inputURL,
+            width: width,
+            height: height,
+            bytesPerRow: nil,
+            channelCount: channelCount,
+            scratchBaseURL: scratchBaseURL
+        )
+    }
+
+    package static func encode(
+        raster: GainMapRaster,
+        scratchBaseURL: URL
+    ) throws -> DirectTiledHEVCGainMap {
+        guard raster.width > 0, raster.height > 0,
+              raster.channelCount == 1 || raster.channelCount == 3 else {
+            throw CLIError.invalidContainer("direct Gain Map encoder received invalid raster geometry")
+        }
+        let minimumBytesPerRow = raster.width * (raster.channelCount == 1 ? 1 : 4)
+        guard raster.bytesPerRow >= minimumBytesPerRow,
+              raster.height <= Int.max / raster.bytesPerRow,
+              raster.data.count >= raster.bytesPerRow * raster.height else {
+            throw CLIError.invalidContainer("direct Gain Map encoder received invalid raster storage")
+        }
+        let rawURL = siblingURL(
+            for: scratchBaseURL,
+            label: "direct-gain",
+            pathExtension: "raw"
+        )
+        defer { try? FileManager.default.removeItem(at: rawURL) }
+        // UUID-scoped scratch has no durability contract; a direct write avoids an otherwise
+        // redundant safe-save/rename before the helper maps the bytes read-only.
+        try raster.data.write(to: rawURL)
+        return try encodeFile(
+            inputURL: rawURL,
+            width: raster.width,
+            height: raster.height,
+            bytesPerRow: raster.bytesPerRow,
+            channelCount: raster.channelCount,
+            scratchBaseURL: scratchBaseURL
+        )
+    }
+
+    private static func encodeFile(
+        inputURL: URL,
+        width: Int,
+        height: Int,
+        bytesPerRow: Int?,
+        channelCount: Int,
+        scratchBaseURL: URL
+    ) throws -> DirectTiledHEVCGainMap {
         guard width > 0, height > 0, channelCount == 1 || channelCount == 3 else {
             throw CLIError.invalidContainer("direct Gain Map encoder received invalid raster geometry")
         }
@@ -42,50 +102,45 @@ package enum DirectTiledHEVCGainMapEncoder {
             defaultValue: 512,
             allowedValues: [256, 512, 1024]
         )
-        let tileWidth = tileSize
-        let tileHeight = tileSize
-        let imageURL = siblingURL(
-            for: scratchBaseURL,
-            label: "direct-gain",
-            pathExtension: channelCount == 1 ? "png" : "jpg"
-        )
         let annexBURL = siblingURL(for: scratchBaseURL, label: "direct-gain", pathExtension: "hevc")
         let hvcCURL = siblingURL(for: scratchBaseURL, label: "direct-gain", pathExtension: "hvcc")
         defer {
             let environment = ProcessInfo.processInfo.environment
             if environment["XDREMUX_KEEP_GAIN_SCRATCH"] != "1"
                 && environment["XDREMUX_KEEP_PORTRAIT_SCRATCH"] != "1" {
-                for url in [imageURL, annexBURL, hvcCURL] {
+                for url in [annexBURL, hvcCURL] {
                     try? FileManager.default.removeItem(at: url)
                 }
             }
         }
-        try imageData.write(to: imageURL, options: .atomic)
         let executable = try encoderExecutable()
         let mode = channelCount == 1 ? "mono8tile" : "rgb4448tile"
         let quality = EncodingQualityPolicy.value(
             environmentKey: "XDREMUX_GAIN_MAP_QUALITY",
             defaultValue: 0.9
         )
-        let result = try run(
-            executable,
-            arguments: [
-                imageURL.path,
-                annexBURL.path,
-                String(format: "%.6f", quality),
-                mode,
-                hvcCURL.path,
-                String(tileSize),
-            ]
-        )
+        var arguments = [
+            inputURL.path,
+            annexBURL.path,
+            String(format: "%.6f", quality),
+            mode,
+            hvcCURL.path,
+            String(tileSize),
+        ]
+        if let bytesPerRow {
+            arguments += [String(width), String(height), String(bytesPerRow)]
+        }
+        let result = try run(executable, arguments: arguments)
         guard result.status == 0 else {
             let diagnostic = String(data: result.stderr + result.stdout, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown error"
             throw CLIError.invalidContainer("private tile encoder failed: \(diagnostic)")
         }
-        let tilePayloads = try idrTilePayloads(from: Data(contentsOf: annexBURL))
-        let columns = (width + tileWidth - 1) / tileWidth
-        let rows = (height + tileHeight - 1) / tileHeight
+        let tilePayloads = try idrTilePayloads(
+            from: Data(contentsOf: annexBURL, options: [.mappedIfSafe])
+        )
+        let columns = (width + tileSize - 1) / tileSize
+        let rows = (height + tileSize - 1) / tileSize
         guard tilePayloads.count == rows * columns else {
             throw CLIError.invalidContainer(
                 "private tile encoder returned \(tilePayloads.count) samples; expected \(rows * columns)"
@@ -94,72 +149,25 @@ package enum DirectTiledHEVCGainMapEncoder {
         return DirectTiledHEVCGainMap(
             width: width,
             height: height,
-            tileWidth: tileWidth,
-            tileHeight: tileHeight,
+            tileWidth: tileSize,
+            tileHeight: tileSize,
             tilePayloads: tilePayloads,
-            tileSizes: Array(repeating: (tileWidth, tileHeight), count: tilePayloads.count),
+            tileSizes: Array(repeating: (tileSize, tileSize), count: tilePayloads.count),
             hvcC: try Data(contentsOf: hvcCURL),
             channelCount: channelCount
         )
     }
 
-    package static func encode(
-        raster: GainMapRaster,
-        scratchBaseURL: URL
-    ) throws -> DirectTiledHEVCGainMap {
-        let isColor = raster.channelCount == 3
-        guard let provider = CGDataProvider(data: raster.data as CFData),
-              let image = CGImage(
-                  width: raster.width,
-                  height: raster.height,
-                  bitsPerComponent: 8,
-                  bitsPerPixel: isColor ? 32 : 8,
-                  bytesPerRow: raster.bytesPerRow,
-                  space: isColor ? CGColorSpaceCreateDeviceRGB() : CGColorSpaceCreateDeviceGray(),
-                  bitmapInfo: CGBitmapInfo(
-                      rawValue: isColor
-                          ? CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.noneSkipFirst.rawValue
-                          : CGImageAlphaInfo.none.rawValue
-                  ),
-                  provider: provider,
-                  decode: nil,
-                  shouldInterpolate: false,
-                  intent: .defaultIntent
-              ) else {
-            throw CLIError.invalidContainer("cannot materialize direct Gain Map raster")
-        }
-        let imageData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            imageData,
-            UTType.png.identifier as CFString,
-            1,
-            nil
-        ) else {
-            throw CLIError.invalidContainer("cannot create direct Gain Map PNG bridge")
-        }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else {
-            throw CLIError.invalidContainer("cannot finalize direct Gain Map PNG bridge")
-        }
-        return try encode(
-            imageData: imageData as Data,
-            width: raster.width,
-            height: raster.height,
-            channelCount: raster.channelCount,
-            scratchBaseURL: scratchBaseURL
-        )
-    }
-
     private static func idrTilePayloads(from annexB: Data) throws -> [Data] {
-        let bytes = [UInt8](annexB)
         var starts: [(offset: Int, length: Int)] = []
-        var index = 0
-        while index + 3 < bytes.count {
-            if bytes[index] == 0, bytes[index + 1] == 0,
-               bytes[index + 2] == 0, bytes[index + 3] == 1 {
+        starts.reserveCapacity(64)
+        var index = annexB.startIndex
+        while index + 3 < annexB.endIndex {
+            if annexB[index] == 0, annexB[index + 1] == 0,
+               annexB[index + 2] == 0, annexB[index + 3] == 1 {
                 starts.append((index, 4))
                 index += 4
-            } else if bytes[index] == 0, bytes[index + 1] == 0, bytes[index + 2] == 1 {
+            } else if annexB[index] == 0, annexB[index + 1] == 0, annexB[index + 2] == 1 {
                 starts.append((index, 3))
                 index += 3
             } else {
@@ -167,15 +175,17 @@ package enum DirectTiledHEVCGainMapEncoder {
             }
         }
         var payloads: [Data] = []
+        payloads.reserveCapacity(starts.count)
         for position in starts.indices {
             let start = starts[position].offset + starts[position].length
-            let end = position + 1 < starts.count ? starts[position + 1].offset : bytes.count
+            let end = position + 1 < starts.count ? starts[position + 1].offset : annexB.endIndex
             guard start < end else { continue }
-            let type = (bytes[start] >> 1) & 0x3f
+            let type = (annexB[start] >> 1) & 0x3f
             guard type == 19 || type == 20 else { continue }
             var payload = Data()
+            payload.reserveCapacity(4 + end - start)
             appendUInt32BE(end - start, to: &payload)
-            payload.append(contentsOf: bytes[start..<end])
+            payload.append(contentsOf: annexB[start..<end])
             payloads.append(payload)
         }
         guard !payloads.isEmpty else {

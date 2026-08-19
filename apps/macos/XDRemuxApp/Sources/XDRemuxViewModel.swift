@@ -67,6 +67,30 @@ enum OutputPreparationDisposition: String, Sendable, Equatable {
     case replacesExistingInvalidOutput
 }
 
+struct ConversionQueueStatusCounts: Equatable {
+    var pending = 0
+    var running = 0
+    var converted = 0
+    var skipped = 0
+    var failed = 0
+    var cancelled = 0
+
+    init(queue: [ConversionQueueItem]) {
+        for item in queue {
+            switch item.status {
+            case .pending: pending += 1
+            case .running: running += 1
+            case .converted: converted += 1
+            case .skippedExisting: skipped += 1
+            case .failed: failed += 1
+            case .cancelled: cancelled += 1
+            }
+        }
+    }
+
+    var processed: Int { converted + skipped + failed + cancelled }
+}
+
 enum ThumbnailStatus: Equatable {
     case empty
     case loading
@@ -160,37 +184,21 @@ final class XDRemuxViewModel {
 
     var totalFiles: Int { queue.count }
 
-    var processedCount: Int {
-        queue.filter { $0.status.isTerminal }.count
+    var queueStatusCounts: ConversionQueueStatusCounts {
+        ConversionQueueStatusCounts(queue: queue)
     }
 
-    var pendingCount: Int {
-        queue.filter { $0.status == .pending }.count
-    }
-
-    var runningCount: Int {
-        queue.filter { $0.status == .running }.count
-    }
-
-    var convertedCount: Int {
-        queue.filter { $0.status == .converted }.count
-    }
-
-    var skippedCount: Int {
-        queue.filter { $0.status == .skippedExisting }.count
-    }
-
-    var failedCount: Int {
-        queue.filter { $0.status == .failed }.count
-    }
-
-    var cancelledCount: Int {
-        queue.filter { $0.status == .cancelled }.count
-    }
+    var processedCount: Int { queueStatusCounts.processed }
+    var pendingCount: Int { queueStatusCounts.pending }
+    var runningCount: Int { queueStatusCounts.running }
+    var convertedCount: Int { queueStatusCounts.converted }
+    var skippedCount: Int { queueStatusCounts.skipped }
+    var failedCount: Int { queueStatusCounts.failed }
+    var cancelledCount: Int { queueStatusCounts.cancelled }
 
     var progressFraction: Double {
         guard totalFiles > 0 else { return 0 }
-        return Double(processedCount) / Double(totalFiles)
+        return Double(queueStatusCounts.processed) / Double(totalFiles)
     }
 
     var canStart: Bool {
@@ -209,11 +217,13 @@ final class XDRemuxViewModel {
     }
 
     var visibleErrors: [String] {
-        queue
-            .reversed()
-            .filter { $0.status == .failed }
-            .prefix(5)
-            .map { "\($0.inputURL.lastPathComponent): \($0.errorMessage ?? "未知错误")" }
+        var result: [String] = []
+        result.reserveCapacity(5)
+        for item in queue.reversed() where item.status == .failed {
+            result.append("\(item.inputURL.lastPathComponent): \(item.errorMessage ?? "未知错误")")
+            if result.count == 5 { break }
+        }
+        return result
     }
 
     private var processTask: Task<Void, Never>?
@@ -463,6 +473,14 @@ final class XDRemuxViewModel {
             return
         }
 
+        // Queue structure is immutable while processing (`canEditQueue == false`), so build the
+        // UUID projection once instead of rescanning the whole value array for every result.
+        var queueIndexByID: [UUID: Int] = [:]
+        queueIndexByID.reserveCapacity(queue.count)
+        for index in queue.indices {
+            queueIndexByID[queue[index].id] = index
+        }
+
         let runConfig = config
         let fileSizes = runnableItems.map { Self.fileSize($0.inputURL) }
         let concurrencyLimit = Self.effectiveConcurrency(
@@ -479,7 +497,9 @@ final class XDRemuxViewModel {
 
             @MainActor
             func schedule(_ item: WorkItem) {
-                if let index = queue.firstIndex(where: { $0.id == item.id }) {
+                if let index = queueIndexByID[item.id],
+                   index < queue.count,
+                   queue[index].id == item.id {
                     queue[index].status = .running
                     queue[index].errorMessage = nil
                     queue[index].startedAt = Date()
@@ -498,7 +518,7 @@ final class XDRemuxViewModel {
 
             for await result in group {
                 active -= 1
-                apply(result)
+                apply(result, index: queueIndexByID[result.id])
 
                 if Task.isCancelled {
                     group.cancelAll()
@@ -525,8 +545,10 @@ final class XDRemuxViewModel {
         }
     }
 
-    private func apply(_ result: QueueWorkResult) {
-        guard let index = queue.firstIndex(where: { $0.id == result.id }) else { return }
+    private func apply(_ result: QueueWorkResult, index: Int?) {
+        guard let index,
+              index < queue.count,
+              queue[index].id == result.id else { return }
         queue[index].status = result.status
         queue[index].errorMessage = result.errorMessage
         queue[index].finishedAt = result.finishedAt

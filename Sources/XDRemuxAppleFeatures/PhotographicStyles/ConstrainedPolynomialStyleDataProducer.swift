@@ -80,6 +80,73 @@ package struct ConstrainedPolynomialStyleDataProducer {
         let rgb: [Float]
     }
 
+    /// Parameter-major storage for exactly the samples consumed by the normal-equation solve.
+    /// The former implementation retained a full RGB derivative raster for every parameter even
+    /// though solveUpdate sampled at most roughly 50k pixels. Keeping the sampling contract here
+    /// makes the data movement explicit and bounds Jacobian storage independently of image area.
+    private struct SampledJacobian {
+        let pixelStride: Int
+        let sampleCount: Int
+        let parameterCount: Int
+        var values: [Float]
+
+        init(rgbValueCount: Int, parameterCount: Int) {
+            precondition(rgbValueCount >= 0 && rgbValueCount.isMultiple(of: 3))
+            precondition(parameterCount >= 0)
+            let pixelCount = rgbValueCount / 3
+            pixelStride = max(1, rgbValueCount / (50_000 * 3))
+            let sampledPixelCount = pixelCount == 0
+                ? 0
+                : ((pixelCount - 1) / pixelStride + 1)
+            sampleCount = sampledPixelCount * 3
+            self.parameterCount = parameterCount
+            values = Array(repeating: 0, count: sampleCount * parameterCount)
+        }
+
+        mutating func populate(
+            parameter: Int,
+            rendered: [Float],
+            current: [Float],
+            step: Double
+        ) throws -> Double {
+            guard parameter >= 0, parameter < parameterCount,
+                  rendered.count == current.count,
+                  rendered.count.isMultiple(of: 3),
+                  step.isFinite, step != 0 else {
+                throw CLIError.invalidContainer("invalid constrained key-1 sampled Jacobian input")
+            }
+            let floatStep = Float(step)
+            guard floatStep.isFinite, floatStep != 0 else {
+                throw CLIError.invalidContainer("non-finite constrained key-1 Jacobian step")
+            }
+            let pixelCount = current.count / 3
+            let parameterBase = parameter * sampleCount
+            var sampled = 0
+            var squared = 0.0
+
+            // The normal-equation solver consumes exactly this sample grid. Do not spend a second
+            // full-raster pass computing diagnostics for derivatives the solver will discard.
+            for pixel in Swift.stride(from: 0, to: pixelCount, by: pixelStride) {
+                let base = pixel * 3
+                for channel in 0..<3 {
+                    let derivative = (rendered[base + channel] - current[base + channel]) / floatStep
+                    values[parameterBase + sampled] = derivative
+                    squared += Double(derivative * derivative)
+                    sampled += 1
+                }
+            }
+            guard sampled == sampleCount else {
+                throw CLIError.invalidContainer("constrained key-1 sampled Jacobian count mismatch")
+            }
+            return sqrt(squared / Double(max(1, sampleCount)))
+        }
+
+        @inline(__always)
+        func derivative(parameter: Int, sample: Int) -> Float {
+            values[parameter * sampleCount + sample]
+        }
+    }
+
     private struct Metrics {
         let rmse8: Double
         let mae8: Double
@@ -380,7 +447,7 @@ package struct ConstrainedPolynomialStyleDataProducer {
                 requests: requests
             ))
         }
-        let initializationRasters = try Self.render(
+        try Self.executeRenderRequests(
             executable: executable,
             requests: initializationWork.flatMap(\.requests)
         )
@@ -392,21 +459,17 @@ package struct ConstrainedPolynomialStyleDataProducer {
             identityRender.raster
         )
         var latestResponse = identityResponse
-        var initializationCursor = 0
         for work in initializationWork {
-            guard initializationCursor + work.requests.count <= initializationRasters.count else {
-                throw CLIError.invalidContainer(
-                    "constrained key-1 renderer returned an incomplete initialization batch"
+            let raster = try Self.decodeRGB8(work.requests[0].pngURL)
+            let candidateResponse: ResponseObjectiveState?
+            if responseActive {
+                candidateResponse = responseState(
+                    mid: try Self.decodeRGB8(work.requests[1].pngURL),
+                    plus: try Self.decodeRGB8(work.requests[2].pngURL)
                 )
+            } else {
+                candidateResponse = nil
             }
-            let raster = initializationRasters[initializationCursor]
-            let candidateResponse: ResponseObjectiveState? = responseActive
-                ? responseState(
-                    mid: initializationRasters[initializationCursor + 1],
-                    plus: initializationRasters[initializationCursor + 2]
-                )
-                : nil
-            initializationCursor += work.requests.count
             let candidateMetrics = Self.metrics(raster, target)
             let candidateScore = Self.responseScore(
                 rmse8: candidateMetrics.rmse8,
@@ -550,49 +613,53 @@ package struct ConstrainedPolynomialStyleDataProducer {
                     requests: requests
                 ))
             }
-            let derivativeRasters = try Self.render(
+            try Self.executeRenderRequests(
                 executable: executable,
                 requests: derivativeWork.flatMap(\.requests)
             )
-            var derivatives: [[Float]] = []
-            var derivativeRows: [[String: Any]] = []
             let parameterCount = Self.solverRefinementParameterNames.count
+            var jacobian = SampledJacobian(
+                rgbValueCount: currentRaster.rgb.count,
+                parameterCount: parameterCount
+            )
+            var derivativeRows: [[String: Any]] = []
             var hueDerivative = Array(repeating: 0.0, count: parameterCount)
             var rgDerivative = Array(repeating: 0.0, count: parameterCount)
-            var derivativeCursor = 0
             for work in derivativeWork {
-                guard derivativeCursor + work.requests.count <= derivativeRasters.count else {
-                    throw CLIError.invalidContainer(
-                        "constrained key-1 renderer returned an incomplete Jacobian batch"
+                let rendered = try Self.decodeRGB8(work.requests[0].pngURL)
+                let perturbedResponse: ResponseObjectiveState?
+                if responseActive {
+                    perturbedResponse = responseState(
+                        mid: try Self.decodeRGB8(work.requests[1].pngURL),
+                        plus: try Self.decodeRGB8(work.requests[2].pngURL)
                     )
+                } else {
+                    perturbedResponse = nil
                 }
-                let rendered = derivativeRasters[derivativeCursor]
-                let perturbedResponse: ResponseObjectiveState? = responseActive
-                    ? responseState(
-                        mid: derivativeRasters[derivativeCursor + 1],
-                        plus: derivativeRasters[derivativeCursor + 2]
-                    )
-                    : nil
-                derivativeCursor += work.requests.count
                 guard rendered.rgb.count == currentRaster.rgb.count else {
                     throw CLIError.invalidContainer(
                         "constrained key-1 renderer returned inconsistent raster dimensions"
                     )
                 }
-                let derivative = zip(rendered.rgb, currentRaster.rgb).map {
-                    ($0 - $1) / Float(work.step)
-                }
-                derivatives.append(derivative)
-                let derivativeRMS = sqrt(
-                    derivative.reduce(0.0) { $0 + Double($1 * $1) }
-                        / Double(max(1, derivative.count))
+                let derivativeRMS = try jacobian.populate(
+                    parameter: work.refinementIndex,
+                    rendered: rendered.rgb,
+                    current: currentRaster.rgb,
+                    step: work.step
                 )
                 var derivativeRow: [String: Any] = [
                     "parameter": Self.solverRefinementParameterNames[work.refinementIndex],
                     "coefficientIndex": work.coefficientIndex,
                     "step": work.step,
                     "derivativeRMS8": derivativeRMS,
-                    "metricsAgainstDisabled": Self.metrics(rendered, target).dictionary,
+                    "derivativeRMS8Sampling": "solver-sample-grid",
+                    "derivativeRMS8SampleCount": jacobian.sampleCount,
+                    "metricsAgainstDisabled": Self.sampledMetrics(
+                        rendered,
+                        target,
+                        pixelStride: jacobian.pixelStride
+                    ).dictionary,
+                    "metricsAgainstDisabledSampling": "solver-sample-grid",
                 ]
                 if let perturbedResponse, let currentResponse {
                     // A vanished-ROI state carries substituted identity values,
@@ -650,7 +717,7 @@ package struct ConstrainedPolynomialStyleDataProducer {
             let update = try Self.solveUpdate(
                 current: currentRaster,
                 target: target,
-                derivatives: derivatives,
+                jacobian: jacobian,
                 scalarRows: scalarRows
             )
             var proposed = coefficients
@@ -705,26 +772,22 @@ package struct ConstrainedPolynomialStyleDataProducer {
                     requests: requests
                 ))
             }
-            let lineSearchRasters = try Self.render(
+            try Self.executeRenderRequests(
                 executable: executable,
                 requests: lineSearchWork.flatMap(\.requests)
             )
             var proposedRaster: Raster?
-            var lineSearchCursor = 0
             for work in lineSearchWork {
-                guard lineSearchCursor + work.requests.count <= lineSearchRasters.count else {
-                    throw CLIError.invalidContainer(
-                        "constrained key-1 renderer returned an incomplete line-search batch"
+                let raster = try Self.decodeRGB8(work.requests[0].pngURL)
+                let candidateResponse: ResponseObjectiveState?
+                if responseActive {
+                    candidateResponse = responseState(
+                        mid: try Self.decodeRGB8(work.requests[1].pngURL),
+                        plus: try Self.decodeRGB8(work.requests[2].pngURL)
                     )
+                } else {
+                    candidateResponse = nil
                 }
-                let raster = lineSearchRasters[lineSearchCursor]
-                let candidateResponse: ResponseObjectiveState? = responseActive
-                    ? responseState(
-                        mid: lineSearchRasters[lineSearchCursor + 1],
-                        plus: lineSearchRasters[lineSearchCursor + 2]
-                    )
-                    : nil
-                lineSearchCursor += work.requests.count
                 let candidateMetrics = Self.metrics(raster, target)
                 let candidateScore = Self.responseScore(
                     rmse8: candidateMetrics.rmse8,
@@ -1067,11 +1130,11 @@ package struct ConstrainedPolynomialStyleDataProducer {
         return min(4, max(1, ProcessInfo.processInfo.activeProcessorCount))
     }()
 
-    private static func render(
+    private static func executeRenderRequests(
         executable: URL,
         requests: [RenderRequest]
-    ) throws -> [Raster] {
-        guard !requests.isEmpty else { return [] }
+    ) throws {
+        guard !requests.isEmpty else { return }
         for request in requests {
             try FileManager.default.createDirectory(
                 at: request.outputDirectory,
@@ -1080,7 +1143,8 @@ package struct ConstrainedPolynomialStyleDataProducer {
         }
         let workerCount = min(renderConcurrency, requests.count)
         guard workerCount > 1 else {
-            return try renderChunk(executable: executable, requests: requests)
+            try executeRenderChunk(executable: executable, requests: requests)
+            return
         }
 
         var chunks: [[RenderRequest]] = []
@@ -1095,14 +1159,10 @@ package struct ConstrainedPolynomialStyleDataProducer {
         }
 
         let lock = NSLock()
-        var rastersByChunk: [Int: [Raster]] = [:]
         var firstError: (index: Int, error: Error)?
         DispatchQueue.concurrentPerform(iterations: chunks.count) { index in
             do {
-                let rasters = try renderChunk(executable: executable, requests: chunks[index])
-                lock.lock()
-                rastersByChunk[index] = rasters
-                lock.unlock()
+                try executeRenderChunk(executable: executable, requests: chunks[index])
             } catch {
                 lock.lock()
                 if firstError == nil || index < firstError!.index {
@@ -1114,19 +1174,20 @@ package struct ConstrainedPolynomialStyleDataProducer {
         if let firstError {
             throw firstError.error
         }
-        let rasters = (0..<chunks.count).flatMap { rastersByChunk[$0] ?? [] }
-        guard rasters.count == requests.count else {
-            throw CLIError.invalidContainer(
-                "complete-Neutrino render chunks returned \(rasters.count) rasters; expected \(requests.count)"
-            )
-        }
-        return rasters
     }
 
-    private static func renderChunk(
+    private static func render(
         executable: URL,
         requests: [RenderRequest]
     ) throws -> [Raster] {
+        try executeRenderRequests(executable: executable, requests: requests)
+        return try requests.map { try decodeRGB8($0.pngURL) }
+    }
+
+    private static func executeRenderChunk(
+        executable: URL,
+        requests: [RenderRequest]
+    ) throws {
         let planURL = FileManager.default.temporaryDirectory.appendingPathComponent(
             "xdremux-neutrino-style-render-batch-\(UUID().uuidString).json"
         )
@@ -1160,7 +1221,6 @@ package struct ConstrainedPolynomialStyleDataProducer {
                         .joined(separator: " ")
             )
         }
-        return try requests.map { try decodeRGB8($0.pngURL) }
     }
 
     private static func decodeRGB8(_ url: URL) throws -> Raster {
@@ -1255,7 +1315,7 @@ package struct ConstrainedPolynomialStyleDataProducer {
         ]
         var rows: [[String: Any]] = []
         var failures: [String] = []
-        var renderCache: [String: Raster] = [:]
+        var renderURLs: [String: URL] = [:]
         var renderWork: [(cacheKey: String, request: RenderRequest)] = []
 
         func cacheKey(owner: String, setting: StyleSetting) -> String {
@@ -1314,12 +1374,12 @@ package struct ConstrainedPolynomialStyleDataProducer {
                 )
             }
         }
-        let responseRasters = try render(
+        try executeRenderRequests(
             executable: executable,
             requests: renderWork.map(\.request)
         )
-        for (work, raster) in zip(renderWork, responseRasters) {
-            renderCache[work.cacheKey] = raster
+        for work in renderWork {
+            renderURLs[work.cacheKey] = work.request.pngURL
         }
 
         func rendered(
@@ -1330,12 +1390,12 @@ package struct ConstrainedPolynomialStyleDataProducer {
             setting: StyleSetting
         ) throws -> Raster {
             let key = cacheKey(owner: owner, setting: setting)
-            guard let cached = renderCache[key] else {
+            guard let url = renderURLs[key] else {
                 throw CLIError.invalidContainer(
                     "missing batched native response render \(owner)/\(pairName)-\(side) for \(heicURL.lastPathComponent)"
                 )
             }
-            return cached
+            return try decodeRGB8(url)
         }
 
         for pair in pairs {
@@ -1880,6 +1940,45 @@ package struct ConstrainedPolynomialStyleDataProducer {
             + responseScoreRGWeight * state.rgViolation
     }
 
+    package static func sampledJacobianStorageValueCount(
+        rgbValueCount: Int,
+        parameterCount: Int = 12
+    ) -> Int {
+        SampledJacobian(
+            rgbValueCount: rgbValueCount,
+            parameterCount: parameterCount
+        ).values.count
+    }
+
+    package static func solveSampledUpdateForTesting(
+        currentRGB: [Float],
+        targetRGB: [Float],
+        perturbedRGB: [[Float]],
+        steps: [Double]
+    ) throws -> [Double] {
+        guard perturbedRGB.count == solverRefinementParameterNames.count,
+              steps.count == perturbedRGB.count else {
+            throw CLIError.invalidContainer("invalid sampled Jacobian regression fixture")
+        }
+        var jacobian = SampledJacobian(
+            rgbValueCount: currentRGB.count,
+            parameterCount: perturbedRGB.count
+        )
+        for parameter in perturbedRGB.indices {
+            _ = try jacobian.populate(
+                parameter: parameter,
+                rendered: perturbedRGB[parameter],
+                current: currentRGB,
+                step: steps[parameter]
+            )
+        }
+        return try solveUpdate(
+            currentRGB: currentRGB,
+            targetRGB: targetRGB,
+            jacobian: jacobian
+        )
+    }
+
     package static func styleData(parameters: [Double]) throws -> Data {
         guard parameters.count == directParameterIndices.count else {
             throw CLIError.invalidContainer("invalid constrained key-1 parameter vector")
@@ -2092,25 +2191,83 @@ package struct ConstrainedPolynomialStyleDataProducer {
         outputURL: URL
     ) throws {
         let identity = try AppleStyleDataLayout.completeIdentity()
-        guard let identityRange = uniqueRange(of: identity, in: identityStylePropertyList) else {
+        guard styleData.count == identity.count,
+              let identityRange = uniqueRange(of: identity, in: identityStylePropertyList),
+              identityRange.count == styleData.count else {
             throw CLIError.invalidContainer(
                 "identity key 1 does not occur exactly once in the preliminary style plist"
             )
         }
-        var replacementPropertyList = identityStylePropertyList
-        replacementPropertyList.replaceSubrange(identityRange, with: styleData)
         let source = try Data(contentsOf: heicURL, options: [.mappedIfSafe])
-        let range = try identityPlistRange(
+        let plistRange = try identityPlistRange(
             in: source,
             of: heicURL,
             identityStylePropertyList: identityStylePropertyList
         )
-        var output = source
-        output.replaceSubrange(range, with: replacementPropertyList)
-        guard output.count == source.count else {
-            throw CLIError.invalidContainer("key-1 injection changed HEIC byte length")
+        let styleOffset = plistRange.lowerBound + identityRange.lowerBound
+        guard styleOffset >= source.startIndex,
+              styleOffset <= source.endIndex,
+              styleData.count <= source.endIndex - styleOffset else {
+            throw CLIError.invalidContainer("key-1 injection range is outside the HEIC")
         }
-        try output.write(to: outputURL, options: .atomic)
+
+        let fileManager = FileManager.default
+        try? fileManager.removeItem(at: outputURL)
+        do {
+            // On APFS FileManager.copyItem creates a clone. Only the key-1 blocks touched below
+            // become private; non-APFS volumes retain the same correctness with a normal copy.
+            try fileManager.copyItem(at: heicURL, to: outputURL)
+            // copyItem preserves POSIX mode bits. Inputs from read-only media may therefore clone
+            // as 0444 even though the old Data.write candidate path could still create a writable
+            // scratch output. Restore owner-write permission on the private candidate only.
+            let copiedAttributes = try fileManager.attributesOfItem(atPath: outputURL.path)
+            if let permissions = (copiedAttributes[.posixPermissions] as? NSNumber)?.intValue,
+               permissions & 0o200 == 0 {
+                try fileManager.setAttributes(
+                    [.posixPermissions: permissions | 0o200],
+                    ofItemAtPath: outputURL.path
+                )
+            }
+            let handle = try FileHandle(forWritingTo: outputURL)
+            do {
+                try handle.seek(toOffset: UInt64(styleOffset))
+                try handle.write(contentsOf: styleData)
+                try handle.close()
+            } catch {
+                try? handle.close()
+                throw error
+            }
+
+            let attributes = try fileManager.attributesOfItem(atPath: outputURL.path)
+            let outputSize = (attributes[.size] as? NSNumber)?.intValue
+            guard outputSize == source.count else {
+                throw CLIError.invalidContainer("key-1 injection changed HEIC byte length")
+            }
+            let verification = try FileHandle(forReadingFrom: outputURL)
+            defer { try? verification.close() }
+            try verification.seek(toOffset: UInt64(styleOffset))
+            let patched = try verification.read(upToCount: styleData.count) ?? Data()
+            guard patched == styleData else {
+                throw CLIError.invalidContainer("key-1 injection verification failed")
+            }
+        } catch {
+            try? fileManager.removeItem(at: outputURL)
+            throw error
+        }
+    }
+
+    package static func injectStyleDataForTesting(
+        _ styleData: Data,
+        into heicURL: URL,
+        identityStylePropertyList: Data,
+        outputURL: URL
+    ) throws {
+        try injectStyleData(
+            styleData,
+            into: heicURL,
+            identityStylePropertyList: identityStylePropertyList,
+            outputURL: outputURL
+        )
     }
 
     private static func uniqueRange(of needle: Data, in haystack: Data) -> Range<Data.Index>? {
@@ -2139,16 +2296,61 @@ package struct ConstrainedPolynomialStyleDataProducer {
         )
     }
 
+    private static func sampledMetrics(
+        _ left: Raster,
+        _ right: Raster,
+        pixelStride: Int
+    ) -> Metrics {
+        precondition(left.width == right.width && left.height == right.height)
+        precondition(left.rgb.count == right.rgb.count && left.rgb.count.isMultiple(of: 3))
+        precondition(pixelStride > 0)
+        var squared = 0.0
+        var absolute = 0.0
+        var maximum = 0.0
+        var sampleCount = 0
+        let pixelCount = left.rgb.count / 3
+        for pixel in Swift.stride(from: 0, to: pixelCount, by: pixelStride) {
+            let base = pixel * 3
+            for channel in 0..<3 {
+                let difference = Double(left.rgb[base + channel] - right.rgb[base + channel])
+                squared += difference * difference
+                absolute += abs(difference)
+                maximum = max(maximum, abs(difference))
+                sampleCount += 1
+            }
+        }
+        let count = Double(max(1, sampleCount))
+        return Metrics(
+            rmse8: sqrt(squared / count),
+            mae8: absolute / count,
+            maximumAbsolute8: maximum
+        )
+    }
+
     private static func solveUpdate(
         current: Raster,
         target: Raster,
-        derivatives: [[Float]],
+        jacobian: SampledJacobian,
+        scalarRows: [(derivative: [Double], residual: Double, weight: Double)] = []
+    ) throws -> [Double] {
+        try solveUpdate(
+            currentRGB: current.rgb,
+            targetRGB: target.rgb,
+            jacobian: jacobian,
+            scalarRows: scalarRows
+        )
+    }
+
+    private static func solveUpdate(
+        currentRGB: [Float],
+        targetRGB: [Float],
+        jacobian: SampledJacobian,
         scalarRows: [(derivative: [Double], residual: Double, weight: Double)] = []
     ) throws -> [Double] {
         let count = solverRefinementParameterNames.count
-        guard derivatives.count == count,
-              derivatives.allSatisfy({ $0.count == current.rgb.count }),
-              target.rgb.count == current.rgb.count,
+        guard jacobian.parameterCount == count,
+              targetRGB.count == currentRGB.count,
+              currentRGB.count.isMultiple(of: 3),
               scalarRows.allSatisfy({
                   $0.derivative.count == count
                       && $0.derivative.allSatisfy(\.isFinite)
@@ -2160,23 +2362,32 @@ package struct ConstrainedPolynomialStyleDataProducer {
         }
         var normal = Array(repeating: Array(repeating: 0.0, count: count), count: count)
         var gradient = Array(repeating: 0.0, count: count)
-        let stride = max(1, current.rgb.count / (50_000 * 3))
         var sampleCount = 0
-        for pixel in Swift.stride(from: 0, to: current.rgb.count / 3, by: stride) {
+        var sampleOrdinal = 0
+        for pixel in Swift.stride(
+            from: 0,
+            to: currentRGB.count / 3,
+            by: jacobian.pixelStride
+        ) {
             for channel in 0..<3 {
                 let sample = pixel * 3 + channel
-                let residual = Double(target.rgb[sample] - current.rgb[sample])
+                let residual = Double(targetRGB[sample] - currentRGB[sample])
                 let huberWeight = min(1.0, 12.0 / max(12.0, abs(residual)))
                 sampleCount += 1
                 for row in 0..<count {
-                    let rowValue = Double(derivatives[row][sample])
+                    let rowValue = Double(jacobian.derivative(parameter: row, sample: sampleOrdinal))
                     gradient[row] += huberWeight * rowValue * residual
                     for column in row..<count {
                         normal[row][column] += huberWeight
-                            * rowValue * Double(derivatives[column][sample])
+                            * rowValue
+                            * Double(jacobian.derivative(parameter: column, sample: sampleOrdinal))
                     }
                 }
+                sampleOrdinal += 1
             }
+        }
+        guard sampleOrdinal == jacobian.sampleCount else {
+            throw CLIError.invalidContainer("constrained key-1 sampled Jacobian solve count mismatch")
         }
         // Mean-scale the pixel block so scalar-response rows carry
         // sample-count-independent weights; the pure pixel solution is

@@ -287,7 +287,7 @@ public enum CoreImageRAW {
     }
 
     private struct TIFFReader {
-        let bytes: [UInt8]
+        let bytes: Data
         let littleEndian: Bool
         let tiffStart: Int
 
@@ -490,7 +490,7 @@ public enum CoreImageRAW {
     }
 
     private static func tiffReader(for data: Data) throws -> TIFFReader {
-        let bytes = [UInt8](data)
+        let bytes = data
         guard bytes.count >= 8 else { throw DecodeError.invalidDNG("TIFF header is truncated") }
         let littleEndian: Bool
         if bytes[0] == 0x49 && bytes[1] == 0x49 {

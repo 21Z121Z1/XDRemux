@@ -28,8 +28,6 @@ PUBLIC_DOCUMENTS = ROOT_READMES + tuple(
         "docs/xdremux/README.md",
         "docs/xdremux/README.en.md",
         "Tests/README.md",
-        "xdremux/README.md",
-        "xdremux/swift-cli/README.md",
     )
 )
 # Documents published in both languages. Each pair must exist and cross-link,
@@ -53,7 +51,7 @@ class PublicDocumentationTests(unittest.TestCase):
     def test_bilingual_readmes_publish_matching_categorize_workflows(self) -> None:
         required = (
             "swift run xdremux categorize",
-            "python3 xdremux/python/XDRemux.py categorize",
+            "python3 -m xdremux_py categorize",
             "--categorize",
         )
         forbidden = ("--categorize-output", "--organize-by-mode", "xdremux classify")

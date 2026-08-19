@@ -11,8 +11,13 @@ let package = Package(
     products: [
         .library(name: "XDRemuxCore", targets: ["XDRemuxCore"]),
         .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"]),
-        .executable(name: "xdremux", targets: ["XDRemuxCLI"]),
-        .executable(name: "coreimage-raw-diagnostics", targets: ["CoreImageRAWDiagnostics"])
+        .executable(name: "xdremux", targets: ["XDRemuxCLI"])
+    ],
+    dependencies: [
+        .package(
+            url: "https://github.com/apple/swift-argument-parser",
+            from: "1.8.2"
+        )
     ],
     targets: [
         .target(
@@ -32,9 +37,16 @@ let package = Package(
         ),
         .executableTarget(
             name: "XDRemuxCLI",
-            dependencies: ["XDRemuxCore", "XDRemuxAppleFeatures"],
+            dependencies: [
+                "XDRemuxCore",
+                "XDRemuxAppleFeatures",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
             path: "Sources/XDRemuxCLI"
         ),
+        // Developer-only diagnostic executable. Keeping it as a target means it
+        // remains buildable with `swift build --target CoreImageRAWDiagnostics`
+        // without vending it as part of XDRemux's public package product surface.
         .executableTarget(
             name: "CoreImageRAWDiagnostics",
             dependencies: ["XDRemuxCore"],

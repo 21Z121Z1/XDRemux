@@ -60,6 +60,10 @@ def result_manifest(stdout: str, output_root: Path) -> list[tuple[str, str, str]
     return results
 
 
+def python_cli() -> list[str]:
+    return [sys.executable, "-m", "xdremux_py"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", action="append", required=True)
@@ -69,7 +73,6 @@ def main() -> int:
     repo = Path(__file__).resolve().parents[2]
     inputs = [str(Path(value).resolve()) for value in args.input]
     swift_executable = str((repo / args.swift_executable).resolve())
-    python_cli = str(repo / "xdremux/python/XDRemux.py")
 
     with tempfile.TemporaryDirectory(prefix="xdremux-categorization-cross-") as temporary:
         root = Path(temporary)
@@ -84,7 +87,7 @@ def main() -> int:
             (0, 1),
         )
         python_dry = run(
-            [sys.executable, python_cli, "categorize", *common, "--output-dir", str(python_dry_output), "--jobs", "3", "--dry-run"],
+            [*python_cli(), "categorize", *common, "--output-dir", str(python_dry_output), "--jobs", "3", "--dry-run"],
             repo,
             (0, 1),
         )
@@ -111,7 +114,7 @@ def main() -> int:
             ),
             (
                 "Python",
-                [sys.executable, python_cli, "categorize", "--input", str(malformed), "--output-dir", str(root / "python-malformed")],
+                [*python_cli(), "categorize", "--input", str(malformed), "--output-dir", str(root / "python-malformed")],
                 root / "python-malformed",
             ),
         ):
@@ -128,7 +131,7 @@ def main() -> int:
             (0, 1),
         )
         python = run(
-            [sys.executable, python_cli, "categorize", *common, "--output-dir", str(python_output), "--jobs", "2"],
+            [*python_cli(), "categorize", *common, "--output-dir", str(python_output), "--jobs", "2"],
             repo,
             (0, 1),
         )
@@ -149,7 +152,7 @@ def main() -> int:
             (0, 1),
         )
         python_repeat = run(
-            [sys.executable, python_cli, "categorize", *common, "--output-dir", str(python_output)],
+            [*python_cli(), "categorize", *common, "--output-dir", str(python_output)],
             repo,
             (0, 1),
         )

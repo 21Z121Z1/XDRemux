@@ -4,6 +4,23 @@ import XDRemuxCore
 @testable import XDRemuxCLI
 
 final class ConversionArgumentParserTests: XCTestCase {
+    func testRootCommandDeclaresTheSupportedCommandTree() {
+        let commandNames = XDRemuxRootCommand.configuration.subcommands.map {
+            $0.configuration.commandName
+        }
+        XCTAssertEqual(
+            commandNames,
+            [
+                "convert",
+                "batch",
+                "categorize",
+                "validate-apple",
+                "validate-portrait",
+                "portrait-self-test",
+            ]
+        )
+    }
+
     func testSingleFileDefaultsPreserveLegacyConfiguration() throws {
         let command = try ConversionArgumentParser.parseConvert([
             "--input", "/tmp/input.heic",
@@ -71,6 +88,22 @@ final class ConversionArgumentParserTests: XCTestCase {
         XCTAssertEqual(standard.oppoCameraTail, .preserveWithoutPrivateHDR)
         XCTAssertEqual(oppo.oppoCompatibility, .auto)
         XCTAssertEqual(oppo.oppoCameraTail, .preserve)
+    }
+
+    func testOppoCompatSupportsBareFlagAndExplicitMode() throws {
+        let bare = try ConversionArgumentParser.parseConvert([
+            "--input", "/tmp/input.heic",
+            "--oppo-compat",
+        ])
+        let explicit = try ConversionArgumentParser.parseConvert([
+            "--input", "/tmp/input.heic",
+            "--oppo-compat", "iso-graph",
+        ])
+
+        XCTAssertEqual(bare.oppoCompatibility, .on)
+        XCTAssertEqual(bare.oppoCameraTail, .preserve)
+        XCTAssertEqual(explicit.oppoCompatibility, .isoGraph)
+        XCTAssertEqual(explicit.oppoCameraTail, .preserve)
     }
 
     func testAppleModesAreIndependentAndComposable() throws {
@@ -177,7 +210,7 @@ final class ConversionArgumentParserTests: XCTestCase {
         XCTAssertEqual(convert.debugRootURL, batch.debugRootURL)
     }
 
-    func testAppleAndOppoConflictPreservesLegacyError() {
+    func testAppleAndOppoConflictPreservesDomainError() {
         XCTAssertThrowsError(
             try ConversionArgumentParser.parseConvert([
                 "--input", "/tmp/input.heic",
@@ -192,15 +225,17 @@ final class ConversionArgumentParserTests: XCTestCase {
         }
     }
 
-    func testMissingUnknownAndInvalidArgumentsKeepErrorTypes() {
-        XCTAssertThrowsError(try ConversionArgumentParser.parseConvert([])) { error in
-            XCTAssertEqual(String(describing: error), "missing required argument: --input")
-        }
+    func testParserOwnedAndDomainInvalidArgumentsAreRejected() {
+        // ArgumentParser owns the wording and concrete error representation for
+        // syntactic parse failures. Its public contract is rejection, not the
+        // debug description of its internal CommandError value.
+        XCTAssertThrowsError(try ConversionArgumentParser.parseConvert([]))
         XCTAssertThrowsError(
             try ConversionArgumentParser.parseConvert(["--input", "a.heic", "--wat"])
-        ) { error in
-            XCTAssertEqual(String(describing: error), "unknown option: --wat")
-        }
+        )
+
+        // Domain validation remains XDRemux-owned and therefore keeps its stable
+        // project error contract.
         XCTAssertThrowsError(
             try ConversionArgumentParser.parseBatch(["--input-dir", "/tmp", "--jobs", "0"])
         ) { error in
