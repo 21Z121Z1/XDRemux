@@ -2788,6 +2788,19 @@ package enum ApplePhotographicStylesPipeline {
             height: bundle.height,
             outputURL: linearPNG
         )
+        let modelStyledThumbnail = try rgb8FromNativeCodedLinearRGBAHalf(
+            bundle.styleEngineToneRGBAHalf,
+            width: bundle.styleEngineWidth,
+            height: bundle.styleEngineHeight
+        ).pixels
+        try writeRGBPNG(
+            pixels: modelStyledThumbnail,
+            width: bundle.styleEngineWidth,
+            height: bundle.styleEngineHeight,
+            outputURL: outputDirectory.appendingPathComponent(
+                "model-styled-thumbnail.png"
+            )
+        )
         let linearQuality = EncodingQualityPolicy.value(
             environmentKey: "XDREMUX_STYLES_LINEAR_QUALITY",
             defaultValue: 0.85
@@ -4035,6 +4048,26 @@ package enum ApplePhotographicStylesPipeline {
         debugRootURL: URL?
     ) throws {
         let augmentStartedAt = CFAbsoluteTimeGetCurrent()
+        let fastModelURL = ProcessInfo.processInfo.environment[
+            "XDREMUX_RESEARCH_REVERSE_KEY1_COREML_MODEL"
+        ].map { URL(fileURLWithPath: $0) }
+        let fastWarmupGroup = DispatchGroup()
+        let fastWarmupLock = NSLock()
+        var fastWarmupError: String?
+        if styleDataProducer == .constrainedSolver, let fastModelURL {
+            fastWarmupGroup.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                defer { fastWarmupGroup.leave() }
+                do {
+                    _ = try AppleNativeToolchain.learnExecutable()
+                    try ReverseKey1CoreMLPredictor.prepare(modelURL: fastModelURL)
+                } catch {
+                    fastWarmupLock.lock()
+                    fastWarmupError = String(describing: error)
+                    fastWarmupLock.unlock()
+                }
+            }
+        }
         let runToken = UUID().uuidString.uppercased()
         let persistEvidence = debugRootURL != nil
         let evidenceContainer: URL
@@ -4181,14 +4214,15 @@ package enum ApplePhotographicStylesPipeline {
         let stylePayloadStartedAt = CFAbsoluteTimeGetCurrent()
         let stylePayload: ApplePhotographicStylePayload
         if styleDataProducer == .constrainedSolver {
+            let preliminaryDirectory = styleDirectory
+                .appendingPathComponent("preliminary-identity", isDirectory: true)
             let preliminaryPayload = try buildStylePayload(
                 sourceURL: sourceURL,
                 standardHDRURL: featureGraphURL,
                 rawDNGURL: rawDNGURL,
                 semantics: analysis,
                 portraitWritten: portraitWritten,
-                outputDirectory: styleDirectory
-                    .appendingPathComponent("preliminary-identity", isDirectory: true),
+                outputDirectory: preliminaryDirectory,
                 photoIdentifier: photoIdentifier,
                 producerMode: .identityFallback
             )
@@ -4209,13 +4243,82 @@ package enum ApplePhotographicStylesPipeline {
                 "constrained-solver",
                 isDirectory: true
             )
-            let selectedStyleData = try ConstrainedPolynomialStyleDataProducer()
-                .makeStyleData(
+            let producer = ConstrainedPolynomialStyleDataProducer()
+            let selectedStyleData: AppleStyleDataResult
+            if let fastModelURL {
+                fastWarmupGroup.wait()
+                fastWarmupLock.lock()
+                let warmupError = fastWarmupError
+                fastWarmupLock.unlock()
+                if let warmupError {
+                    FileHandle.standardError.write(Data(
+                        "warning: reverse-key fast-path warmup failed: \(warmupError)\n".utf8
+                    ))
+                }
+                let disabledDirectory = solverDirectory.appendingPathComponent(
+                    "disabled-anchor", isDirectory: true
+                )
+                do {
+                    let disabledURL = try producer.renderDisabledThumbnail(
+                        preliminaryHEICURL: preliminaryURL,
+                        outputDirectory: disabledDirectory
+                    )
+                    let prediction = try ReverseKey1CoreMLPredictor.predict(
+                        modelURL: fastModelURL,
+                        styledURL: preliminaryURL,
+                        unstyledURL: disabledURL
+                    )
+                    selectedStyleData = try producer.makeModelFastStyleData(
+                        preliminaryHEICURL: preliminaryURL,
+                        identityStylePropertyList: preliminaryPayload.stylePropertyList,
+                        modelStyleData: prediction.styleData,
+                        linearThumbnailURL: preliminaryDirectory.appendingPathComponent(
+                            "linear-thumbnail.png"
+                        ),
+                        styledThumbnailURL: preliminaryDirectory.appendingPathComponent(
+                            "model-styled-thumbnail.png"
+                        ),
+                        modelTiming: prediction.timing,
+                        outputDirectory: solverDirectory
+                    )
+                } catch {
+                    let diagnostic: [String: Any] = [
+                        "schema": "xdremux-model-fast-key1-fallback-v1",
+                        "status": "identity-fallback",
+                        "error": String(describing: error),
+                        "model": fastModelURL.path,
+                        "claimBoundary": "The bounded model path failed; no slow solver was entered.",
+                    ]
+                    let data = try JSONSerialization.data(
+                        withJSONObject: diagnostic,
+                        options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+                    )
+                    try data.write(
+                        to: solverDirectory.appendingPathComponent(
+                            "fast-path-fallback.json"
+                        ),
+                        options: .atomic
+                    )
+                    selectedStyleData = try IdentityStyleDataProducer().makeStyleData(
+                        request: AppleStyleDataRequest(
+                            sourceURL: preliminaryURL,
+                            renderedTargetURL: preliminaryURL,
+                            outputDirectory: solverDirectory.appendingPathComponent(
+                                "identity-fallback", isDirectory: true
+                            ),
+                            sourceDomain: "model fast path failed before admission",
+                            targetDomain: "complete identity fail-closed output"
+                        )
+                    )
+                }
+            } else {
+                selectedStyleData = try producer.makeStyleData(
                     preliminaryHEICURL: preliminaryURL,
                     identityStylePropertyList: preliminaryPayload.stylePropertyList,
                     outputDirectory: solverDirectory,
                     skinMask: solverSkinMask(analysis.skin)
                 )
+            }
             stylePayload = try replacingStyleData(
                 in: preliminaryPayload,
                 with: selectedStyleData,

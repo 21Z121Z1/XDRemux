@@ -104,6 +104,22 @@ final class AppleFeatureContractTests: XCTestCase {
         XCTAssertEqual(try AppleStyleDataLayout.validate(styleData)["finite"] as? Bool, true)
     }
 
+    func testModelSeededResidualPreservesIdentityParameterization() throws {
+        let identity = try AppleStyleDataLayout.completeIdentity()
+        let residual = (0..<AppleStyleDataLayout.blockValueCount).map { index in
+            index < 12 ? Double(index - 6) / 1024.0 : 0
+        }
+        let seeded = try ConstrainedPolynomialStyleDataProducer.styleData(
+            base: identity,
+            coefficientDeltas: residual
+        )
+        let legacy = try ConstrainedPolynomialStyleDataProducer.styleData(
+            coefficientDeltas: residual
+        )
+        XCTAssertEqual(seeded, legacy)
+        XCTAssertEqual(seeded.count, AppleStyleDataLayout.byteCount)
+    }
+
     func testConstrainedStyleDataRejectsMalformedOrNonfiniteParameters() {
         XCTAssertThrowsError(
             try ConstrainedPolynomialStyleDataProducer.styleData(parameters: [0])
@@ -231,6 +247,152 @@ final class AppleFeatureContractTests: XCTestCase {
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         )
         print(String(decoding: reportData, as: UTF8.self))
+    }
+
+    func testConfiguredModelSeededSolverFixtureImprovesSceneMatch() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let fixturePath = environment["XDREMUX_STYLE_SOLVER_FIXTURE"],
+              let propertyListPath = environment["XDREMUX_STYLE_SOLVER_IDENTITY_PLIST"],
+              let seedPath = environment["XDREMUX_STYLE_SOLVER_MODEL_SEED"],
+              let outputPath = environment["XDREMUX_STYLE_SOLVER_OUTPUT"] else {
+            throw XCTSkip("configured private model-seeded solver fixture is unavailable")
+        }
+        let fixtureURL = URL(fileURLWithPath: fixturePath)
+        let propertyListURL = URL(fileURLWithPath: propertyListPath)
+        let seedURL = URL(fileURLWithPath: seedPath)
+        let outputURL = URL(fileURLWithPath: outputPath, isDirectory: true)
+        try? FileManager.default.removeItem(at: outputURL)
+        let validateResponse = environment["XDREMUX_STYLE_SOLVER_VALIDATE_RESPONSE"] != "off"
+
+        let startedAt = Date()
+        let result = try ConstrainedPolynomialStyleDataProducer().makeModelSeededStyleData(
+            preliminaryHEICURL: fixtureURL,
+            identityStylePropertyList: try Data(contentsOf: propertyListURL),
+            seedStyleData: try Data(contentsOf: seedURL),
+            outputDirectory: outputURL,
+            validateNativeResponse: validateResponse
+        )
+        let identity = try XCTUnwrap(result.reconstructionMetrics["identity"] as? [String: Any])
+        let seed = try XCTUnwrap(result.reconstructionMetrics["seed"] as? [String: Any])
+        let selected = try XCTUnwrap(result.reconstructionMetrics["selected"] as? [String: Any])
+        let identityRMSE = try XCTUnwrap(identity["rmse8"] as? Double)
+        let seedRMSE = try XCTUnwrap(seed["rmse8"] as? Double)
+        let selectedRMSE = try XCTUnwrap(selected["rmse8"] as? Double)
+
+        XCTAssertTrue(result.sceneMatched)
+        XCTAssertTrue(result.key1IncrementEligible)
+        XCTAssertLessThan(selectedRMSE, identityRMSE * 0.98)
+        XCTAssertLessThanOrEqual(selectedRMSE, seedRMSE)
+        let report: [String: Any] = [
+            "fixture": fixtureURL.path,
+            "seed": seedURL.path,
+            "styleDataSHA256": result.styleDataSHA256,
+            "identityRMSE8": identityRMSE,
+            "seedRMSE8": seedRMSE,
+            "selectedRMSE8": selectedRMSE,
+            "rmseImprovementFraction": 1 - selectedRMSE / identityRMSE,
+            "nativeResponseValidated": validateResponse,
+            "elapsedSeconds": Date().timeIntervalSince(startedAt),
+        ]
+        let reportData = try JSONSerialization.data(
+            withJSONObject: report,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
+        print(String(decoding: reportData, as: UTF8.self))
+    }
+
+    func testConfiguredModelFastPathMeetsBoundedProxyContract() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let fixturePath = environment["XDREMUX_STYLE_SOLVER_FIXTURE"],
+              let propertyListPath = environment["XDREMUX_STYLE_SOLVER_IDENTITY_PLIST"],
+              let seedPath = environment["XDREMUX_STYLE_SOLVER_MODEL_SEED"],
+              let linearThumbnailPath = environment["XDREMUX_STYLE_LINEAR_THUMBNAIL"],
+              let outputPath = environment["XDREMUX_STYLE_SOLVER_OUTPUT"] else {
+            throw XCTSkip("configured private model fast-path fixture is unavailable")
+        }
+        let outputURL = URL(fileURLWithPath: outputPath, isDirectory: true)
+        try? FileManager.default.removeItem(at: outputURL)
+        let result = try ConstrainedPolynomialStyleDataProducer().makeModelFastStyleData(
+            preliminaryHEICURL: URL(fileURLWithPath: fixturePath),
+            identityStylePropertyList: try Data(
+                contentsOf: URL(fileURLWithPath: propertyListPath)
+            ),
+            modelStyleData: try Data(contentsOf: URL(fileURLWithPath: seedPath)),
+            linearThumbnailURL: URL(fileURLWithPath: linearThumbnailPath),
+            outputDirectory: outputURL
+        )
+        let elapsed = try XCTUnwrap(
+            result.reconstructionMetrics["elapsedSeconds"] as? Double
+        )
+        XCTAssertLessThanOrEqual(elapsed, 20)
+        XCTAssertEqual(result.sceneMatched, !result.identityFallback)
+        XCTAssertFalse(result.productionEligible)
+        if let expected = environment["XDREMUX_STYLE_FAST_EXPECT_MODEL"] {
+            XCTAssertEqual(result.sceneMatched, expected == "1")
+        }
+        print(String(data: try Data(
+            contentsOf: outputURL.appendingPathComponent("fast-path-result.json")
+        ), encoding: .utf8) ?? "")
+    }
+
+    func testConfiguredCoreMLReverseKey1MatchesPythonReference() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let modelPath = environment["XDREMUX_REVERSE_KEY1_COREML_MODEL"],
+              let styledPath = environment["XDREMUX_REVERSE_KEY1_STYLED"],
+              let unstyledPath = environment["XDREMUX_REVERSE_KEY1_UNSTYLED"],
+              let referencePath = environment["XDREMUX_REVERSE_KEY1_REFERENCE"] else {
+            throw XCTSkip("configured private Core ML reverse-key fixture is unavailable")
+        }
+        let prediction = try ReverseKey1CoreMLPredictor.predict(
+            modelURL: URL(fileURLWithPath: modelPath),
+            styledURL: URL(fileURLWithPath: styledPath),
+            unstyledURL: URL(fileURLWithPath: unstyledPath)
+        )
+        let reference = try Data(contentsOf: URL(fileURLWithPath: referencePath))
+        XCTAssertEqual(prediction.styleData.count, reference.count)
+        let actualValues = prediction.styleData.withUnsafeBytes {
+            Array($0.bindMemory(to: UInt16.self))
+        }
+        let referenceValues = reference.withUnsafeBytes {
+            Array($0.bindMemory(to: UInt16.self))
+        }
+        var maximum = 0.0
+        var absolute = 0.0
+        for (actual, expected) in zip(actualValues, referenceValues) {
+            let error = abs(
+                Double(Float(Float16(bitPattern: actual)))
+                    - Double(Float(Float16(bitPattern: expected)))
+            )
+            maximum = max(maximum, error)
+            absolute += error
+        }
+        XCTAssertLessThanOrEqual(maximum, 0.02)
+        let report: [String: Any] = [
+            "maximumAbsoluteError": maximum,
+            "meanAbsoluteError": absolute / Double(actualValues.count),
+            "timing": prediction.timing,
+        ]
+        print(String(data: try JSONSerialization.data(
+            withJSONObject: report,
+            options: [.prettyPrinted, .sortedKeys]
+        ), encoding: .utf8) ?? "")
+    }
+
+    func testNativeReverseKeyProxyInversionSelfTest() throws {
+        let executable = try AppleNativeToolchain.learnExecutable()
+        let process = try AppleNativeToolchain.run(
+            executable,
+            arguments: ["--self-test-composition"],
+            timeout: 10
+        )
+        XCTAssertFalse(process.timedOut)
+        XCTAssertEqual(process.status, 0)
+        let result = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: process.stdout) as? [String: Any]
+        )
+        XCTAssertEqual(result["passed"] as? Bool, true)
+        XCTAssertEqual(result["inversionPreservesIdentity"] as? Bool, true)
+        XCTAssertEqual(result["inversionRoundTrips"] as? Bool, true)
     }
 
     func testNativeIncrementResponseMetricSubtractsIdentityResponse() throws {

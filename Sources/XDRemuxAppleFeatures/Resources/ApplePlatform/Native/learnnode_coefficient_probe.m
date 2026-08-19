@@ -1340,6 +1340,63 @@ static uint16_t HalfBitsFromFloat(float value) {
     return bits;
 }
 
+static NSMutableData *InvertIdentityRelativeKey1(NSData *key1) {
+    if (!key1 || key1.length % sizeof(uint16_t) != 0) {
+        return nil;
+    }
+    NSMutableData *result = [key1 mutableCopy];
+    uint16_t *values = result.mutableBytes;
+    NSUInteger count = result.length / sizeof(uint16_t);
+    for (NSUInteger index = 0; index < count; index++) {
+        NSUInteger blockIndex = index % 30;
+        float identity = blockIndex == 3 || blockIndex == 7 || blockIndex == 11
+            ? 1.0f
+            : 0.0f;
+        float inverted = 2.0f * identity - FloatFromHalfBits(values[index]);
+        if (!isfinite(inverted)) {
+            return nil;
+        }
+        values[index] = HalfBitsFromFloat(inverted);
+    }
+    return result;
+}
+
+static NSDictionary *RGBAHalfMetrics(NSData *candidate, NSData *target) {
+    if (!candidate || candidate.length != target.length ||
+        candidate.length % (4 * sizeof(uint16_t)) != 0) {
+        return nil;
+    }
+    const uint16_t *candidateValues = candidate.bytes;
+    const uint16_t *targetValues = target.bytes;
+    NSUInteger componentCount = candidate.length / sizeof(uint16_t);
+    double squared = 0.0;
+    double absolute = 0.0;
+    NSUInteger rgbCount = 0;
+    for (NSUInteger index = 0; index < componentCount; index++) {
+        if (index % 4 == 3) {
+            continue;
+        }
+        double difference = (
+            (double)FloatFromHalfBits(candidateValues[index]) -
+            (double)FloatFromHalfBits(targetValues[index])
+        ) * 255.0;
+        if (!isfinite(difference)) {
+            return nil;
+        }
+        squared += difference * difference;
+        absolute += fabs(difference);
+        rgbCount += 1;
+    }
+    if (rgbCount == 0) {
+        return nil;
+    }
+    return @{
+        @"rmse8": @(sqrt(squared / (double)rgbCount)),
+        @"mae8": @(absolute / (double)rgbCount),
+        @"rgbComponentCount": @(rgbCount),
+    };
+}
+
 static NSMutableData *ComposeLearnedWithIdentityRelativeKey1(
     NSData *learned,
     NSData *key1,
@@ -1413,12 +1470,20 @@ static NSDictionary *CompositionSelfTest(void) {
     BOOL identityIsByteIdentical = [identityComposed isEqualToData:learned];
     BOOL perturbationChangesBytes = perturbedComposed &&
         ![perturbedComposed isEqualToData:learned];
-    BOOL passed = identityIsByteIdentical && perturbationChangesBytes;
+    NSData *invertedIdentity = InvertIdentityRelativeKey1(identity);
+    NSData *invertedPerturbed = InvertIdentityRelativeKey1(perturbed);
+    NSData *roundTripPerturbed = InvertIdentityRelativeKey1(invertedPerturbed);
+    BOOL inversionPreservesIdentity = [invertedIdentity isEqualToData:identity];
+    BOOL inversionRoundTrips = [roundTripPerturbed isEqualToData:perturbed];
+    BOOL passed = identityIsByteIdentical && perturbationChangesBytes &&
+        inversionPreservesIdentity && inversionRoundTrips;
     return @{
         @"schema": @"learnnode-key1-composition-self-test-v1",
         @"passed": @(passed),
         @"identityIsByteIdentical": @(identityIsByteIdentical),
         @"perturbationChangesBytes": @(perturbationChangesBytes),
+        @"inversionPreservesIdentity": @(inversionPreservesIdentity),
+        @"inversionRoundTrips": @(inversionRoundTrips),
         @"identitySummary": identitySummary ?: (id)[NSNull null],
         @"perturbedSummary": perturbedSummary ?: (id)[NSNull null],
     };
@@ -2512,11 +2577,22 @@ int main(int argc, const char *argv[]) {
             fputc('\n', stdout);
             return [result[@"passed"] boolValue] ? 0 : 1;
         }
+        CFAbsoluteTime applyModeStartedAt = CFAbsoluteTimeGetCurrent();
+        BOOL applyKeyMode = argc == 6 && strcmp(argv[1], "--apply-key1") == 0;
+        BOOL applyKeyBatchMode = argc >= 6 &&
+            strcmp(argv[1], "--apply-key1-batch") == 0;
+        BOOL semanticApplyKeyBatchMode = argc >= 10 &&
+            strcmp(argv[1], "--semantic-apply-key1-batch") == 0;
         BOOL semanticMode = argc == 9 && strcmp(argv[1], "--semantic") == 0;
         BOOL directMode = argc == 4;
-        if (!semanticMode && !directMode) {
+        if (!applyKeyMode && !applyKeyBatchMode && !semanticApplyKeyBatchMode &&
+            !semanticMode && !directMode) {
             fprintf(stderr,
                     "usage: %s input-image target-image output-directory\n"
+                    "       %s --apply-key1 input-image target-image key1.f16.bin output-directory\n"
+                    "       %s --apply-key1-batch input-image target-image output-directory key1...\n"
+                    "       %s --semantic-apply-key1-batch image.heic style-metadata.bplist "
+                    "linear-thumbnail subject-matte skin-matte sky-matte output-directory key1...\n"
                     "       %s --semantic image.heic style-metadata.bplist "
                     "linear-thumbnail subject-matte skin-matte sky-matte output-directory\n"
                     "       %s --render-style image.heic output.png manifest.json "
@@ -2524,16 +2600,21 @@ int main(int argc, const char *argv[]) {
                     "       %s --render-style-batch plan.json\n"
                     "       %s --style-settings image.heic\n"
                     "       %s --self-test-composition\n",
-                    argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
+                    argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
             return 2;
         }
-        int inputIndex = semanticMode ? 2 : 1;
-        int outputIndex = semanticMode ? 8 : 3;
+        BOOL semanticInputMode = semanticMode || semanticApplyKeyBatchMode;
+        BOOL anyApplyMode = applyKeyMode || applyKeyBatchMode || semanticApplyKeyBatchMode;
+        int inputIndex = semanticInputMode || anyApplyMode ? 2 : 1;
+        int outputIndex = semanticApplyKeyBatchMode
+            ? 8
+            : (semanticMode ? 8 : (applyKeyMode ? 5 : (applyKeyBatchMode ? 4 : 3)));
         NSString *inputPath = [[NSString stringWithUTF8String:argv[inputIndex]]
             stringByStandardizingPath];
-        NSString *targetPath = directMode
-            ? [[NSString stringWithUTF8String:argv[2]] stringByStandardizingPath]
-            : @"<PISemanticStyleFilter output>";
+        NSString *targetPath = semanticInputMode
+            ? @"<PISemanticStyleFilter output>"
+            : [[NSString stringWithUTF8String:argv[anyApplyMode ? 3 : 2]]
+                stringByStandardizingPath];
         NSString *outputDirectory = [[NSString stringWithUTF8String:argv[outputIndex]]
             stringByStandardizingPath];
         NSError *error = nil;
@@ -2563,11 +2644,11 @@ int main(int argc, const char *argv[]) {
         }
 
         CIImage *input = LoadImage(inputPath, YES);
-        CIImage *target = directMode ? LoadImage(targetPath, YES) : nil;
+        CIImage *target = semanticInputMode ? nil : LoadImage(targetPath, YES);
         NSDictionary *semanticCapture = nil;
         NSData *nativeStyleData = nil;
         NSError *semanticError = nil;
-        if (semanticMode && input) {
+        if (semanticInputMode && input) {
             target = SemanticTarget(
                 input,
                 inputPath,
@@ -2584,7 +2665,10 @@ int main(int argc, const char *argv[]) {
         if (!input || !target) {
             NSDictionary *failure = @{
                 @"schema": @"learnnode-coefficient-probe-v2",
-                @"mode": semanticMode ? @"semantic" : @"direct",
+                @"mode": semanticMode ? @"semantic" : (
+                    semanticApplyKeyBatchMode ? @"semantic-apply-key1-batch" :
+                    (anyApplyMode ? @"apply-key1" : @"direct")
+                ),
                 @"input": inputPath,
                 @"target": targetPath,
                 @"semantic": semanticCapture ?: (id)[NSNull null],
@@ -2630,13 +2714,13 @@ int main(int argc, const char *argv[]) {
 
         NSMutableDictionary *configuration = [baseConfiguration mutableCopy];
         NSMutableDictionary *tuning = [baseTuning mutableCopy];
-        if (directMode) {
+        if (directMode || anyApplyMode) {
             // Same-image learning is a deterministic source-derived identity baseline.
             configuration[@"applyDithering"] = @NO;
             configuration[@"applySyntheticNoise"] = @NO;
         }
         Class filterClass = NSClassFromString(@"PISemanticStyleFilter");
-        NSDictionary *requestedStyle = semanticMode ? semanticCapture[@"styleSettings"] : nil;
+        NSDictionary *requestedStyle = semanticInputMode ? semanticCapture[@"styleSettings"] : nil;
         NSString *cast = requestedStyle[@"cast"] ?: @"Standard";
         float tone = requestedStyle ? [requestedStyle[@"tone"] floatValue] : 0.0f;
         float color = requestedStyle ? [requestedStyle[@"color"] floatValue] : 0.0f;
@@ -2702,7 +2786,10 @@ int main(int argc, const char *argv[]) {
             (!inputMatchesThumbnailSize || !targetMatchesThumbnailSize)) {
             NSDictionary *failure = @{
                 @"schema": @"learnnode-coefficient-probe-v2",
-                @"mode": semanticMode ? @"semantic" : @"direct",
+                @"mode": semanticMode ? @"semantic" : (
+                    semanticApplyKeyBatchMode ? @"semantic-apply-key1-batch" :
+                    (anyApplyMode ? @"apply-key1" : @"direct")
+                ),
                 @"error": @"precomputed thumbnails do not match configured thumbnail size",
                 @"thumbnailSize": @{
                     @"width": @(thumbnailTargetSize.first),
@@ -2742,7 +2829,10 @@ int main(int argc, const char *argv[]) {
         if (!inputThumbnail || !targetThumbnail) {
             NSDictionary *failure = @{
                 @"schema": @"learnnode-coefficient-probe-v2",
-                @"mode": semanticMode ? @"semantic" : @"direct",
+                @"mode": semanticMode ? @"semantic" : (
+                    semanticApplyKeyBatchMode ? @"semantic-apply-key1-batch" :
+                    (anyApplyMode ? @"apply-key1" : @"direct")
+                ),
                 @"inputThumbnailError": JSONSafe(inputThumbnailError),
                 @"targetThumbnailError": JSONSafe(targetThumbnailError),
                 @"semantic": semanticCapture ?: (id)[NSNull null],
@@ -2750,6 +2840,190 @@ int main(int argc, const char *argv[]) {
             WriteJSON(failure, [outputDirectory stringByAppendingPathComponent:@"probe.json"], NULL);
             fprintf(stderr, "failed to create exact style-transfer thumbnails\n");
             return 1;
+        }
+
+        if (anyApplyMode) {
+            NSMutableArray<NSString *> *keyPaths = [NSMutableArray array];
+            if (applyKeyMode) {
+                [keyPaths addObject:[[NSString stringWithUTF8String:argv[4]]
+                    stringByStandardizingPath]];
+            } else if (semanticApplyKeyBatchMode) {
+                for (int index = 9; index < argc; index++) {
+                    [keyPaths addObject:[[NSString stringWithUTF8String:argv[index]]
+                        stringByStandardizingPath]];
+                }
+            } else {
+                for (int index = 5; index < argc; index++) {
+                    [keyPaths addObject:[[NSString stringWithUTF8String:argv[index]]
+                        stringByStandardizingPath]];
+                }
+            }
+            NSUInteger coefficientRowBytes =
+                (NSUInteger)llround(coefficientSize.width) * sizeof(uint16_t);
+            NSUInteger expectedCoefficientBytes = coefficientRowBytes *
+                (NSUInteger)llround(coefficientSize.height);
+            id<MTLDevice> applyDevice = MTLCreateSystemDefaultDevice();
+            CIContext *applyContext = applyDevice
+                ? [CIContext contextWithMTLDevice:applyDevice options:@{
+                    kCIContextWorkingColorSpace: [NSNull null],
+                    kCIContextOutputColorSpace: [NSNull null],
+                }]
+                : nil;
+            Class applyProcessorClass = NSClassFromString(@"_NUStyleTransferApplyProcessor");
+            NSString *targetThumbnailPath = [outputDirectory
+                stringByAppendingPathComponent:@"target_thumbnail.rgba16f.bin"];
+            BOOL targetWritten = applyContext && RenderHalfRGBA(
+                applyContext,
+                targetThumbnail,
+                targetThumbnailPath,
+                &error
+            );
+            NSData *targetData = targetWritten
+                ? [NSData dataWithContentsOfFile:targetThumbnailPath]
+                : nil;
+            NSMutableArray<NSDictionary *> *candidateRows = [NSMutableArray array];
+            BOOL allApplied = keyPaths.count > 0;
+            for (NSUInteger index = 0; index < keyPaths.count; index++) {
+                NSString *keyPath = keyPaths[index];
+                NSError *keyError = nil;
+                NSData *key1 = [NSData dataWithContentsOfFile:keyPath
+                                                      options:0
+                                                        error:&keyError];
+                NSData *appliedKey1 = semanticApplyKeyBatchMode
+                    ? InvertIdentityRelativeKey1(key1)
+                    : key1;
+                CIImage *styleImage = appliedKey1.length == expectedCoefficientBytes
+                    ? [CIImage imageWithBitmapData:appliedKey1
+                                      bytesPerRow:coefficientRowBytes
+                                             size:coefficientSize
+                                           format:kCIFormatRh
+                                       colorSpace:nil]
+                    : nil;
+                NSError *applyError = nil;
+                CFAbsoluteTime processorStartedAt = CFAbsoluteTimeGetCurrent();
+                CIImage *applied = styleImage ? SendClassApply(
+                    applyProcessorClass,
+                    NSSelectorFromString(
+                        @"applyStyle:toImage:thumbnail:target:deltaMap:colorSpace:configuration:tuningParameters:noiseModel:error:"
+                    ),
+                    styleImage,
+                    inputThumbnail,
+                    inputThumbnail,
+                    targetThumbnail,
+                    nil,
+                    nuColorSpace,
+                    configuration,
+                    tuning,
+                    nil,
+                    &applyError
+                ) : nil;
+                CFAbsoluteTime processorCompletedAt = CFAbsoluteTimeGetCurrent();
+                NSString *appliedPath = [outputDirectory stringByAppendingPathComponent:
+                    [NSString stringWithFormat:@"candidate-%02lu.rgba16f.bin", (unsigned long)index]];
+                BOOL appliedWritten = applyContext && applied && RenderHalfRGBA(
+                    applyContext,
+                    applied,
+                    appliedPath,
+                    &keyError
+                );
+                NSData *appliedData = appliedWritten
+                    ? [NSData dataWithContentsOfFile:appliedPath]
+                    : nil;
+                NSDictionary *targetMetrics = RGBAHalfMetrics(appliedData, targetData);
+                allApplied = allApplied && appliedWritten;
+                [candidateRows addObject:@{
+                    @"index": @(index),
+                    @"key1": keyPath,
+                    @"key1Bytes": @(key1.length),
+                    @"appliedPath": appliedWritten ? appliedPath : (id)[NSNull null],
+                    @"applyError": JSONSafe(applyError),
+                    @"error": JSONSafe(keyError),
+                    @"processorMilliseconds": @(
+                        (processorCompletedAt - processorStartedAt) * 1000.0
+                    ),
+                    @"targetMetrics": targetMetrics ?: (id)[NSNull null],
+                    @"coefficientTransform": semanticApplyKeyBatchMode
+                        ? @"completeIdentity - (reverseKey1 - completeIdentity)"
+                        : @"none",
+                    @"passed": @(appliedWritten),
+                }];
+            }
+            NSUInteger selectedIndex = NSNotFound;
+            double selectedRMSE8 = INFINITY;
+            for (NSDictionary *row in candidateRows) {
+                NSDictionary *metrics = [row[@"targetMetrics"] isKindOfClass:[NSDictionary class]]
+                    ? row[@"targetMetrics"]
+                    : nil;
+                double rmse8 = [metrics[@"rmse8"] doubleValue];
+                if (metrics && isfinite(rmse8) && rmse8 < selectedRMSE8) {
+                    selectedRMSE8 = rmse8;
+                    selectedIndex = [row[@"index"] unsignedIntegerValue];
+                }
+            }
+            NSDictionary *identityMetrics = candidateRows.count > 0 &&
+                [candidateRows[0][@"targetMetrics"] isKindOfClass:[NSDictionary class]]
+                    ? candidateRows[0][@"targetMetrics"]
+                    : nil;
+            double identityRMSE8 = [identityMetrics[@"rmse8"] doubleValue];
+            double improvementFraction = identityMetrics && identityRMSE8 > 0 &&
+                isfinite(selectedRMSE8)
+                    ? (identityRMSE8 - selectedRMSE8) / identityRMSE8
+                    : -INFINITY;
+            const double minimumImprovementFraction = 0.02;
+            BOOL nonIdentityAccepted = selectedIndex != NSNotFound && selectedIndex > 0 &&
+                improvementFraction >= minimumImprovementFraction;
+            NSDictionary *result = @{
+                @"schema": @"learnnode-apply-key1-probe-v2",
+                @"mode": semanticApplyKeyBatchMode
+                    ? @"semantic-apply-key1-batch"
+                    : (applyKeyBatchMode ? @"apply-key1-batch" : @"apply-key1"),
+                @"semantic": semanticCapture ?: (id)[NSNull null],
+                @"input": inputPath,
+                @"target": targetPath,
+                @"expectedKey1Bytes": @(expectedCoefficientBytes),
+                @"thumbnailSize": @{
+                    @"width": @(thumbnailTargetSize.first),
+                    @"height": @(thumbnailTargetSize.second),
+                },
+                @"coefficientTextureSize": @{
+                    @"width": @(coefficientSize.width),
+                    @"height": @(coefficientSize.height),
+                },
+                @"candidates": candidateRows,
+                @"selection": @{
+                    @"identityCandidateIndex": @0,
+                    @"selectedCandidateIndex": selectedIndex == NSNotFound
+                        ? (id)[NSNull null]
+                        : @(selectedIndex),
+                    @"identityRMSE8": identityMetrics ? @(identityRMSE8) : (id)[NSNull null],
+                    @"selectedRMSE8": isfinite(selectedRMSE8)
+                        ? @(selectedRMSE8)
+                        : (id)[NSNull null],
+                    @"improvementFraction": isfinite(improvementFraction)
+                        ? @(improvementFraction)
+                        : (id)[NSNull null],
+                    @"minimumImprovementFraction": @(minimumImprovementFraction),
+                    @"nonIdentityAccepted": @(nonIdentityAccepted),
+                },
+                @"targetPath": targetWritten ? targetThumbnailPath : (id)[NSNull null],
+                @"error": JSONSafe(error),
+                @"totalMilliseconds": @(
+                    (CFAbsoluteTimeGetCurrent() - applyModeStartedAt) * 1000.0
+                ),
+                @"passed": @(allApplied && targetWritten),
+                @"claimBoundary": semanticApplyKeyBatchMode
+                    ? @"Fast semantic reverse-residual proxy; complete Neutrino consumer equivalence is not implied."
+                    : @"Low-level style-transfer apply health probe; complete Neutrino consumer equivalence is not implied.",
+            };
+            NSString *manifestPath = [outputDirectory
+                stringByAppendingPathComponent:@"probe.json"];
+            WriteJSON(result, manifestPath, NULL);
+            NSData *json = [NSJSONSerialization dataWithJSONObject:JSONSafe(result)
+                                                           options:NSJSONWritingSortedKeys
+                                                             error:nil];
+            fwrite(json.bytes, 1, json.length, stdout);
+            fputc('\n', stdout);
+            return allApplied && targetWritten ? 0 : 1;
         }
 
         Class learnProcessorClass = NSClassFromString(@"_NUStyleTransferLearnProcessor");

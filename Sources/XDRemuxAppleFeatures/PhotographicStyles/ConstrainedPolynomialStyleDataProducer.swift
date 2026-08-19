@@ -1086,6 +1086,394 @@ package struct ConstrainedPolynomialStyleDataProducer {
         )
     }
 
+    /// Experimental fast path: start from a full spatial model prediction and
+    /// fit only one bounded global quadratic residual. The production solver
+    /// remains the caller-selected fallback when this fail-closed path rejects.
+    package func makeModelSeededStyleData(
+        preliminaryHEICURL: URL,
+        identityStylePropertyList: Data,
+        seedStyleData: Data,
+        outputDirectory: URL,
+        validateNativeResponse: Bool = true
+    ) throws -> AppleStyleDataResult {
+        let admissionStartedAt = CFAbsoluteTimeGetCurrent()
+        Self.solverAdmission.wait()
+        let admissionWaitSeconds = CFAbsoluteTimeGetCurrent() - admissionStartedAt
+        defer { Self.solverAdmission.signal() }
+        let startedAt = CFAbsoluteTimeGetCurrent()
+        try FileManager.default.createDirectory(
+            at: outputDirectory,
+            withIntermediateDirectories: true
+        )
+        let executable = try AppleNativeToolchain.learnExecutable()
+        _ = try AppleStyleDataLayout.validate(seedStyleData)
+        let initializationDirectory = outputDirectory.appendingPathComponent(
+            "initialization",
+            isDirectory: true
+        )
+        let seedHEICURL = try Self.materialize(
+            baseHEICURL: preliminaryHEICURL,
+            identityStylePropertyList: identityStylePropertyList,
+            styleData: seedStyleData,
+            outputDirectory: initializationDirectory,
+            label: "model-seed"
+        )
+        let initialRequests = [
+            RenderRequest(
+                heicURL: preliminaryHEICURL,
+                outputDirectory: outputDirectory.appendingPathComponent("target"),
+                label: "disabled",
+                enabled: false
+            ),
+            RenderRequest(
+                heicURL: preliminaryHEICURL,
+                outputDirectory: initializationDirectory,
+                label: "identity",
+                enabled: true
+            ),
+            RenderRequest(
+                heicURL: seedHEICURL,
+                outputDirectory: initializationDirectory,
+                label: "model-seed",
+                enabled: true
+            ),
+        ]
+        let initialRasters = try Self.render(
+            executable: executable,
+            requests: initialRequests
+        )
+        guard initialRasters.count == initialRequests.count else {
+            throw CLIError.invalidContainer(
+                "model-seeded key-1 renderer returned an incomplete initial batch"
+            )
+        }
+        let target = initialRasters[0]
+        let identityMetrics = Self.metrics(initialRasters[1], target)
+        let seedMetrics = Self.metrics(initialRasters[2], target)
+        let analyticResidual = try Self.fitGlobalPolynomial(
+            sourceRGB8: initialRasters[2].rgb,
+            targetRGB8: target.rgb
+        )
+        var bestStyleData = seedStyleData
+        var bestMetrics = seedMetrics
+        var selectedScale = 0.0
+        var candidateRows: [[String: Any]] = []
+        var work: [(scale: Double, styleData: Data, request: RenderRequest)] = []
+        for scale in Self.lineSearchScales {
+            let residual = analyticResidual.map { $0 * scale }
+            let styleData = try Self.styleData(
+                base: seedStyleData,
+                coefficientDeltas: residual
+            )
+            let label = String(format: "seed-residual-s%03d", Int(scale * 100))
+            let heicURL = try Self.materialize(
+                baseHEICURL: preliminaryHEICURL,
+                identityStylePropertyList: identityStylePropertyList,
+                styleData: styleData,
+                outputDirectory: initializationDirectory,
+                label: label
+            )
+            work.append((
+                scale: scale,
+                styleData: styleData,
+                request: RenderRequest(
+                    heicURL: heicURL,
+                    outputDirectory: initializationDirectory,
+                    label: label,
+                    enabled: true
+                )
+            ))
+        }
+        try Self.executeRenderRequests(
+            executable: executable,
+            requests: work.map(\.request)
+        )
+        for candidate in work {
+            let raster = try Self.decodeRGB8(candidate.request.pngURL)
+            let metrics = Self.metrics(raster, target)
+            candidateRows.append([
+                "scale": candidate.scale,
+                "metrics": metrics.dictionary,
+            ])
+            if metrics.rmse8 < bestMetrics.rmse8 {
+                bestStyleData = candidate.styleData
+                bestMetrics = metrics
+                selectedScale = candidate.scale
+            }
+        }
+        let optimizationCompletedAt = CFAbsoluteTimeGetCurrent()
+        guard bestMetrics.rmse8 < identityMetrics.rmse8 * 0.98 else {
+            let rejected: [String: Any] = [
+                "schema": "xdremux-model-seeded-key1-v1",
+                "status": "rejected_no_improvement",
+                "identityMetrics": identityMetrics.dictionary,
+                "seedMetrics": seedMetrics.dictionary,
+                "bestMetrics": bestMetrics.dictionary,
+                "selectedScale": selectedScale,
+                "candidates": candidateRows,
+            ]
+            try Self.writeJSON(
+                rejected,
+                to: outputDirectory.appendingPathComponent("solver-result.json")
+            )
+            throw CLIError.invalidContainer(
+                "model-seeded key-1 did not improve neutral reconstruction by two percent"
+            )
+        }
+
+        let responseEnvelope: [String: Any]
+        if validateNativeResponse {
+            responseEnvelope = try Self.validateResponseEnvelope(
+                executable: executable,
+                preliminaryHEICURL: preliminaryHEICURL,
+                identityStylePropertyList: identityStylePropertyList,
+                styleData: bestStyleData,
+                outputDirectory: outputDirectory.appendingPathComponent(
+                    "response-envelope",
+                    isDirectory: true
+                )
+            )
+            guard responseEnvelope["passed"] as? Bool == true else {
+                let rejected: [String: Any] = [
+                    "schema": "xdremux-model-seeded-key1-v1",
+                    "status": "rejected_native_increment_envelope",
+                    "identityMetrics": identityMetrics.dictionary,
+                    "seedMetrics": seedMetrics.dictionary,
+                    "bestMetrics": bestMetrics.dictionary,
+                    "selectedScale": selectedScale,
+                    "responseEnvelope": responseEnvelope,
+                    "candidates": candidateRows,
+                ]
+                try Self.writeJSON(
+                    rejected,
+                    to: outputDirectory.appendingPathComponent("solver-result.json")
+                )
+                throw CLIError.invalidContainer(
+                    "model-seeded key-1 exceeded the native response envelope"
+                )
+            }
+        } else {
+            responseEnvelope = [
+                "passed": NSNull(),
+                "skipped": true,
+                "claimBoundary": "neutral reconstruction experiment only",
+            ]
+        }
+        let completedAt = CFAbsoluteTimeGetCurrent()
+        let improvement = 1 - bestMetrics.rmse8 / identityMetrics.rmse8
+        let styleDataURL = outputDirectory.appendingPathComponent(
+            "model-seeded-style-data.f16.bin"
+        )
+        try bestStyleData.write(to: styleDataURL, options: .atomic)
+        let result: [String: Any] = [
+            "schema": "xdremux-model-seeded-key1-v1",
+            "status": "accepted",
+            "identityMetrics": identityMetrics.dictionary,
+            "seedMetrics": seedMetrics.dictionary,
+            "bestMetrics": bestMetrics.dictionary,
+            "rmseImprovementFraction": improvement,
+            "selectedScale": selectedScale,
+            "candidates": candidateRows,
+            "nativeResponseValidated": validateNativeResponse,
+            "responseEnvelope": responseEnvelope,
+            "renderRequestCount": initialRequests.count + work.count,
+            "timing": [
+                "admissionWaitSeconds": admissionWaitSeconds,
+                "optimizationSeconds": optimizationCompletedAt - startedAt,
+                "responseSeconds": completedAt - optimizationCompletedAt,
+                "totalSeconds": completedAt - startedAt,
+            ],
+            "styleDataSHA256": sha256Hex(bestStyleData),
+        ]
+        try Self.writeJSON(
+            result,
+            to: outputDirectory.appendingPathComponent("solver-result.json")
+        )
+        let sourceData = try Data(contentsOf: preliminaryHEICURL, options: [.mappedIfSafe])
+        let targetPNG = outputDirectory
+            .appendingPathComponent("target")
+            .appendingPathComponent("disabled.png")
+        return AppleStyleDataResult(
+            styleData: bestStyleData,
+            styleDataSHA256: sha256Hex(bestStyleData),
+            polynomialCount: AppleStyleDataLayout.polynomialCount,
+            blockValueCount: AppleStyleDataLayout.blockValueCount,
+            tileCount: AppleStyleDataLayout.tileCount,
+            producer: "modelSeededConstrainedSolverExperimental",
+            producerVersion: "full-key1-model-seed-global-residual-v1",
+            sourceSHA256: sha256Hex(sourceData),
+            targetSHA256: sha256Hex(try Data(contentsOf: targetPNG)),
+            sourceDomain: "model-predicted full spatial key 1 in complete Neutrino graph",
+            targetDomain: "same photo rendered by complete Neutrino with SemanticStyle disabled",
+            learnBufferKind: nil,
+            solverKind: "full-spatial-model-seed+one-global-quadratic-residual-line-search",
+            evidence: .completeNeutrinoConstrainedSolver,
+            sceneMatched: true,
+            identityFallback: false,
+            fallbackKind: nil,
+            reconstructionMetrics: [
+                "status": "neutral_scene_matched",
+                "identity": identityMetrics.dictionary,
+                "seed": seedMetrics.dictionary,
+                "selected": bestMetrics.dictionary,
+                "rmseImprovementFraction": improvement,
+                "nativeResponseValidated": validateNativeResponse,
+                "responseEnvelope": responseEnvelope,
+            ],
+            warnings: [
+                "Experimental model-seeded path; production must retain the existing constrained solver as fail-closed fallback."
+            ]
+        )
+    }
+
+    /// Select a model-predicted reverse key with a bounded thumbnail semantic
+    /// proxy. Candidate zero is complete identity; candidate one is the model.
+    /// The helper applies the inverse of the reverse-key residual, matching the
+    /// producer/consumer direction observed in complete-Neutrino A/B fixtures.
+    package func makeModelFastStyleData(
+        preliminaryHEICURL: URL,
+        identityStylePropertyList: Data,
+        modelStyleData: Data,
+        linearThumbnailURL: URL,
+        styledThumbnailURL: URL? = nil,
+        modelTiming: [String: Double] = [:],
+        outputDirectory: URL
+    ) throws -> AppleStyleDataResult {
+        let startedAt = CFAbsoluteTimeGetCurrent()
+        try FileManager.default.createDirectory(
+            at: outputDirectory,
+            withIntermediateDirectories: true
+        )
+        _ = try AppleStyleDataLayout.validate(modelStyleData)
+        let identity = try AppleStyleDataLayout.completeIdentity()
+        let identityURL = outputDirectory.appendingPathComponent("identity-key1.f16.bin")
+        let modelURL = outputDirectory.appendingPathComponent("model-key1.f16.bin")
+        let metadataURL = outputDirectory.appendingPathComponent("identity-style.bplist")
+        try identity.write(to: identityURL, options: .atomic)
+        try modelStyleData.write(to: modelURL, options: .atomic)
+        try identityStylePropertyList.write(to: metadataURL, options: .atomic)
+
+        var helperReport: [String: Any] = [
+            "passed": false,
+            "status": "helper-unavailable",
+        ]
+        var selected = identity
+        var fallbackKind: String? = "semantic-proxy-unavailable"
+        do {
+            let executable = try AppleNativeToolchain.learnExecutable()
+            let nullMatte = "/dev/null"
+            let process = try AppleNativeToolchain.run(
+                executable,
+                arguments: [
+                    "--semantic-apply-key1-batch",
+                    (styledThumbnailURL ?? preliminaryHEICURL).path,
+                    metadataURL.path,
+                    linearThumbnailURL.path,
+                    nullMatte,
+                    nullMatte,
+                    nullMatte,
+                    outputDirectory.path,
+                    identityURL.path,
+                    modelURL.path,
+                ],
+                timeout: 10,
+                environment: styledThumbnailURL == nil
+                    ? [:]
+                    : ["XDREMUX_STYLE_ALLOW_DEFAULT_SETTINGS": "1"]
+            )
+            if let decoded = try? JSONSerialization.jsonObject(with: process.stdout)
+                as? [String: Any] {
+                helperReport = decoded
+            }
+            let selection = helperReport["selection"] as? [String: Any]
+            let selectedIndex = (selection?["selectedCandidateIndex"] as? NSNumber)?.intValue
+            let accepted = selection?["nonIdentityAccepted"] as? Bool == true
+            if !process.timedOut,
+               process.status == 0,
+               helperReport["passed"] as? Bool == true,
+               accepted,
+               selectedIndex == 1 {
+                selected = modelStyleData
+                fallbackKind = nil
+            } else if process.timedOut {
+                fallbackKind = "semantic-proxy-timeout"
+            } else if process.status != 0 {
+                fallbackKind = "semantic-proxy-helper-failed"
+            } else {
+                fallbackKind = "semantic-proxy-rejected-model"
+            }
+        } catch {
+            helperReport["swiftError"] = String(describing: error)
+        }
+
+        let accepted = fallbackKind == nil
+        let elapsed = CFAbsoluteTimeGetCurrent() - startedAt
+        let resultReport: [String: Any] = [
+            "schema": "xdremux-model-fast-key1-v1",
+            "status": accepted ? "accepted-model" : "identity-fallback",
+            "fallbackKind": fallbackKind ?? NSNull(),
+            "elapsedSeconds": elapsed,
+            "deadlineSeconds": 20,
+            "withinDeadline": elapsed <= 20,
+            "helper": helperReport,
+            "modelTiming": modelTiming,
+            "styleDataSHA256": sha256Hex(selected),
+            "claimBoundary": "Fast semantic reverse-residual proxy; complete Neutrino and Photos behavior remain offline acceptance gates.",
+        ]
+        try Self.writeJSON(
+            resultReport,
+            to: outputDirectory.appendingPathComponent("fast-path-result.json")
+        )
+        let sourceData = try Data(contentsOf: preliminaryHEICURL, options: [.mappedIfSafe])
+        let targetData = (try? Data(contentsOf: linearThumbnailURL, options: [.mappedIfSafe]))
+            ?? Data()
+        let selection = helperReport["selection"] as? [String: Any] ?? [:]
+        return AppleStyleDataResult(
+            styleData: selected,
+            styleDataSHA256: sha256Hex(selected),
+            polynomialCount: AppleStyleDataLayout.polynomialCount,
+            blockValueCount: AppleStyleDataLayout.blockValueCount,
+            tileCount: AppleStyleDataLayout.tileCount,
+            producer: "reverseKey1ModelFastPathExperimental",
+            producerVersion: "semantic-reverse-residual-proxy-v1",
+            sourceSHA256: sha256Hex(sourceData),
+            targetSHA256: sha256Hex(targetData),
+            sourceDomain: "model-predicted full spatial reverse key 1",
+            targetDomain: "PISemanticStyleFilter thumbnail target with zero semantic mattes",
+            learnBufferKind: nil,
+            solverKind: "model+bounded-semantic-reverse-residual-proxy",
+            evidence: .sourceDerivedApproximation,
+            sceneMatched: accepted,
+            identityFallback: !accepted,
+            fallbackKind: fallbackKind,
+            reconstructionMetrics: [
+                "status": accepted ? "semantic_proxy_matched" : "identity_fallback",
+                "selection": selection,
+                "elapsedSeconds": elapsed,
+                "modelTiming": modelTiming,
+                "withinTwentySecondMethodBudget": elapsed <= 20,
+            ],
+            warnings: [
+                "Experimental fast path: four-scene OPPO correlation does not replace complete-Neutrino or real Photos acceptance."
+            ]
+        )
+    }
+
+    package func renderDisabledThumbnail(
+        preliminaryHEICURL: URL,
+        outputDirectory: URL
+    ) throws -> URL {
+        let executable = try AppleNativeToolchain.learnExecutable()
+        let request = RenderRequest(
+            heicURL: preliminaryHEICURL,
+            outputDirectory: outputDirectory,
+            label: "disabled",
+            enabled: false
+        )
+        _ = try Self.render(executable: executable, requests: [request])
+        return request.pngURL
+    }
+
     private static func materialize(
         baseHEICURL: URL,
         identityStylePropertyList: Data,
@@ -1112,6 +1500,33 @@ package struct ConstrainedPolynomialStyleDataProducer {
                 outputURL: heicURL
             )
         }
+        return heicURL
+    }
+
+    private static func materialize(
+        baseHEICURL: URL,
+        identityStylePropertyList: Data,
+        styleData: Data,
+        outputDirectory: URL,
+        label: String
+    ) throws -> URL {
+        try FileManager.default.createDirectory(
+            at: outputDirectory,
+            withIntermediateDirectories: true
+        )
+        _ = try AppleStyleDataLayout.validate(styleData)
+        let keyURL = outputDirectory.appendingPathComponent("\(label).f16.bin")
+        try styleData.write(to: keyURL, options: .atomic)
+        if styleData == (try AppleStyleDataLayout.completeIdentity()) {
+            return baseHEICURL
+        }
+        let heicURL = outputDirectory.appendingPathComponent("\(label).heic")
+        try injectStyleData(
+            styleData,
+            into: baseHEICURL,
+            identityStylePropertyList: identityStylePropertyList,
+            outputURL: heicURL
+        )
         return heicURL
     }
 
@@ -2015,6 +2430,44 @@ package struct ConstrainedPolynomialStyleDataProducer {
                 var bits = Float16(value).bitPattern.littleEndian
                 withUnsafeBytes(of: &bits) { result.append(contentsOf: $0) }
             }
+        }
+        _ = try AppleStyleDataLayout.validate(result)
+        return result
+    }
+
+    package static func styleData(
+        base: Data,
+        coefficientDeltas: [Double]
+    ) throws -> Data {
+        _ = try AppleStyleDataLayout.validate(base)
+        guard coefficientDeltas.count == AppleStyleDataLayout.blockValueCount else {
+            throw CLIError.invalidContainer(
+                "invalid model-seeded key-1 coefficient vector"
+            )
+        }
+        for index in coefficientDeltas.indices {
+            guard coefficientDeltas[index].isFinite,
+                  abs(coefficientDeltas[index]) <= bound(forCoefficientIndex: index) + 1e-9 else {
+                throw CLIError.invalidContainer(
+                    "invalid model-seeded key-1 coefficient vector"
+                )
+            }
+        }
+        var result = Data()
+        result.reserveCapacity(base.count)
+        for valueIndex in 0..<(base.count / 2) {
+            let byteOffset = valueIndex * 2
+            let bits = UInt16(base[byteOffset]) | (UInt16(base[byteOffset + 1]) << 8)
+            let baseValue = Float(Float16(bitPattern: bits))
+            let coefficientIndex = valueIndex % AppleStyleDataLayout.blockValueCount
+            let value = baseValue + Float(coefficientDeltas[coefficientIndex])
+            guard value.isFinite else {
+                throw CLIError.invalidContainer(
+                    "model-seeded key-1 residual produced a non-finite value"
+                )
+            }
+            var encoded = Float16(value).bitPattern.littleEndian
+            withUnsafeBytes(of: &encoded) { result.append(contentsOf: $0) }
         }
         _ = try AppleStyleDataLayout.validate(result)
         return result

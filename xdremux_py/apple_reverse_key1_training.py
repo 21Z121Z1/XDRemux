@@ -1,0 +1,1647 @@
+"""Dataset preparation and structured training for Apple's reverse key1.
+
+This module deliberately keeps the first learning boundary narrow:
+
+    styled thumbnail + disabled/native reverse thumbnail -> key1
+
+Device, OS, and lens metadata start as audit covariates.  An optional tiny
+target-device adapter can be enabled only after the shared-model audit shows a
+repeatable profile bias.  Private HEIC inputs and generated training caches
+remain outside Git under ``.codex``.
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+import datetime as dt
+import hashlib
+import json
+import math
+import os
+import subprocess
+import tempfile
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
+
+import numpy as np
+from PIL import Image, ImageOps
+
+
+DATASET_SCHEMA = "xdremux-reverse-key1-dataset-v1"
+SAMPLE_SCHEMA = "xdremux-reverse-key1-sample-v1"
+REPORT_SCHEMA = "xdremux-reverse-key1-training-report-v1"
+KEY1_BYTE_LENGTH = 51_840
+KEY1_VALUE_COUNT = 25_920
+GRID_LONG = 12
+GRID_SHORT = 9
+PLANE_COUNT = 8
+POLYNOMIAL_COUNT = 10
+OUTPUT_COUNT = 3
+INPUT_SIZE = 256
+INPUT_CHANNELS = 12
+
+
+class ReverseKey1Error(RuntimeError):
+    """The reverse-key1 data or training contract is invalid."""
+
+
+def canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def sha256_file(path: Path, block_size: int = 1 << 20) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(block_size), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _atomic_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = canonical_json_bytes(value) + b"\n"
+    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as handle:
+        temporary = Path(handle.name)
+        handle.write(payload)
+    os.replace(temporary, path)
+
+
+def _atomic_npz(path: Path, **arrays: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=path.parent, suffix=".npz", delete=False
+    ) as handle:
+        temporary = Path(handle.name)
+    try:
+        np.savez(temporary, **arrays)
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def identity_key1() -> np.ndarray:
+    """Return the native quadratic identity template for a padded 12x12 grid."""
+    result = np.zeros(
+        (
+            GRID_LONG,
+            GRID_LONG,
+            PLANE_COUNT,
+            POLYNOMIAL_COUNT,
+            OUTPUT_COUNT,
+        ),
+        dtype=np.float32,
+    )
+    result[:, :, :, 1, 0] = 1.0
+    result[:, :, :, 2, 1] = 1.0
+    result[:, :, :, 3, 2] = 1.0
+    return result
+
+
+def decode_key1(
+    payload: bytes,
+    *,
+    display_width: int,
+    display_height: int,
+) -> tuple[np.ndarray, np.ndarray, int, int]:
+    """Decode persisted x-major Float16 key1 into a padded y/x training grid."""
+    if len(payload) != KEY1_BYTE_LENGTH:
+        raise ReverseKey1Error(
+            f"key1 must contain {KEY1_BYTE_LENGTH} bytes, got {len(payload)}"
+        )
+    if display_width < 1 or display_height < 1:
+        raise ReverseKey1Error("display dimensions must be positive")
+    landscape = display_width >= display_height
+    width_slots = GRID_LONG if landscape else GRID_SHORT
+    height_slots = GRID_SHORT if landscape else GRID_LONG
+    values = np.frombuffer(payload, dtype="<f2")
+    if values.size != KEY1_VALUE_COUNT:
+        raise ReverseKey1Error("key1 Float16 value count is invalid")
+    x_major = values.reshape(
+        width_slots,
+        height_slots,
+        PLANE_COUNT,
+        POLYNOMIAL_COUNT,
+        OUTPUT_COUNT,
+    )
+    y_major = np.transpose(x_major, (1, 0, 2, 3, 4))
+    padded = np.zeros(
+        (
+            GRID_LONG,
+            GRID_LONG,
+            PLANE_COUNT,
+            POLYNOMIAL_COUNT,
+            OUTPUT_COUNT,
+        ),
+        dtype=np.float16,
+    )
+    padded[:height_slots, :width_slots] = y_major
+    mask = np.zeros((GRID_LONG, GRID_LONG), dtype=np.bool_)
+    mask[:height_slots, :width_slots] = True
+    return padded, mask, width_slots, height_slots
+
+
+def encode_key1(
+    padded: np.ndarray,
+    *,
+    width_slots: int,
+    height_slots: int,
+) -> bytes:
+    expected = {GRID_LONG, GRID_SHORT}
+    if {width_slots, height_slots} != expected:
+        raise ReverseKey1Error("key1 grid must be 12x9 or 9x12")
+    value = np.asarray(padded)
+    expected_shape = (
+        GRID_LONG,
+        GRID_LONG,
+        PLANE_COUNT,
+        POLYNOMIAL_COUNT,
+        OUTPUT_COUNT,
+    )
+    if value.shape != expected_shape:
+        raise ReverseKey1Error(f"padded key1 shape must be {expected_shape}")
+    y_major = value[:height_slots, :width_slots]
+    x_major = np.transpose(y_major, (1, 0, 2, 3, 4))
+    return np.asarray(x_major, dtype="<f2").tobytes(order="C")
+
+
+def split_for_session(session_id: str) -> str:
+    bucket = int(hashlib.sha256(session_id.encode()).hexdigest()[:8], 16) % 100
+    if bucket < 70:
+        return "train"
+    if bucket < 85:
+        return "calibration"
+    return "heldout"
+
+
+def _timestamp(record: Mapping[str, Any]) -> dt.datetime | None:
+    value = record.get("DateTimeOriginal")
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = dt.datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
+    except ValueError:
+        return None
+    fraction = "".join(ch for ch in str(record.get("SubSecTimeOriginal", "")) if ch.isdigit())
+    if fraction:
+        parsed = parsed.replace(microsecond=int((fraction + "000000")[:6]))
+    return parsed
+
+
+def assign_sessions(records: list[dict[str, Any]], gap_seconds: int = 120) -> None:
+    """Assign deterministic capture sessions without using device IDs as inputs."""
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        camera = "|".join(
+            str(record.get(key) or "unknown") for key in ("Model", "LensModel")
+        )
+        grouped[camera].append(record)
+    for camera, items in grouped.items():
+        items.sort(
+            key=lambda item: (
+                item.get("_captureTime") is None,
+                item.get("_captureTime") or dt.datetime.max,
+                item["sourcePath"],
+            )
+        )
+        previous: dt.datetime | None = None
+        session_seed = ""
+        ordinal = -1
+        for item in items:
+            captured = item.get("_captureTime")
+            if (
+                previous is None
+                or captured is None
+                or (captured - previous).total_seconds() > gap_seconds
+            ):
+                ordinal += 1
+                session_seed = (
+                    f"{camera}|{ordinal}|"
+                    f"{captured.isoformat() if captured else item['sourcePath']}"
+                )
+            session = "session-" + hashlib.sha256(
+                session_seed.encode()
+            ).hexdigest()[:16]
+            item["captureSession"] = session
+            item["split"] = split_for_session(session)
+            if captured is not None:
+                previous = captured
+
+
+def _exif_inventory(paths: Sequence[Path], exiftool: str) -> list[dict[str, Any]]:
+    tags = (
+        "FileName",
+        "Directory",
+        "Model",
+        "Software",
+        "LensModel",
+        "DateTimeOriginal",
+        "SubSecTimeOriginal",
+        "OffsetTimeOriginal",
+        "ImageWidth",
+        "ImageHeight",
+        "Orientation",
+        "Tag0",
+    )
+    result: list[dict[str, Any]] = []
+    for start in range(0, len(paths), 48):
+        command = [exiftool, "-j", "-n"]
+        command.extend(f"-{tag}" for tag in tags)
+        command.extend(str(path) for path in paths[start : start + 48])
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+        if completed.returncode:
+            raise ReverseKey1Error(
+                f"exiftool inventory failed: {completed.stderr[-2000:]}"
+            )
+        values = json.loads(completed.stdout)
+        if not isinstance(values, list):
+            raise ReverseKey1Error("exiftool inventory root is not an array")
+        result.extend(value for value in values if isinstance(value, dict))
+    if len(result) != len(paths):
+        raise ReverseKey1Error(
+            f"exiftool returned {len(result)} records for {len(paths)} inputs"
+        )
+    return result
+
+
+def _fit_rgb(image: Image.Image, size: int = INPUT_SIZE) -> np.ndarray:
+    value = ImageOps.exif_transpose(image).convert("RGB")
+    value = ImageOps.contain(value, (size, size), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", (size, size), (0, 0, 0))
+    canvas.paste(value, ((size - value.width) // 2, (size - value.height) // 2))
+    return np.transpose(np.asarray(canvas, dtype=np.uint8), (2, 0, 1))
+
+
+def _read_primary(path: Path) -> tuple[np.ndarray, int, int]:
+    try:
+        import pillow_heif
+    except ImportError as error:
+        raise ReverseKey1Error(
+            "dataset preparation requires pillow-heif"
+        ) from error
+    pillow_heif.register_heif_opener()
+    with Image.open(path) as image:
+        display = ImageOps.exif_transpose(image)
+        width, height = display.size
+        return _fit_rgb(display), width, height
+
+
+def _read_key1(path: Path, exiftool: str) -> bytes:
+    completed = subprocess.run(
+        [exiftool, "-b", "-Tag1", str(path)],
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    if completed.returncode:
+        raise ReverseKey1Error(
+            f"key1 extraction failed: {completed.stderr.decode(errors='replace')[-1000:]}"
+        )
+    return completed.stdout
+
+
+def _disabled_render(
+    helper: Path,
+    source: Path,
+    output: Path,
+    manifest: Path,
+) -> dict[str, Any]:
+    completed = subprocess.run(
+        [
+            str(helper),
+            "--render-style",
+            str(source),
+            str(output),
+            str(manifest),
+            "0",
+            "0",
+            "1",
+            "0",
+            str(INPUT_SIZE),
+            "Standard",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=240,
+    )
+    try:
+        result = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        result = {}
+    if completed.returncode or result.get("status") != "written" or not output.is_file():
+        raise ReverseKey1Error(
+            "disabled native render failed: "
+            f"exit={completed.returncode} stderr={completed.stderr[-1200:]} "
+            f"result={json.dumps(result)[:1200]}"
+        )
+    return result
+
+
+@dataclass(frozen=True)
+class PreparationConfig:
+    corpus: Path
+    output: Path
+    helper: Path
+    exiftool: str = "exiftool"
+    workers: int = 4
+    maximum_output_bytes: int = 4 * 1024**3
+
+
+def _prepare_one(
+    record: Mapping[str, Any],
+    config: PreparationConfig,
+) -> dict[str, Any]:
+    source = Path(str(record["sourcePath"]))
+    source_hash = str(record["sourceSHA256"])
+    sample_path = config.output / "samples" / f"{source_hash}.npz"
+    if sample_path.is_file():
+        try:
+            with np.load(sample_path, allow_pickle=False) as existing:
+                if (
+                    str(existing["schema"].reshape(-1)[0]) == SAMPLE_SCHEMA
+                    and str(existing["source_sha256"].reshape(-1)[0]) == source_hash
+                ):
+                    return {
+                        **dict(record),
+                        "status": "cached",
+                        "samplePath": str(sample_path.relative_to(config.output)),
+                        "sampleBytes": sample_path.stat().st_size,
+                    }
+        except (OSError, KeyError, ValueError):
+            pass
+
+    styled, display_width, display_height = _read_primary(source)
+    payload = _read_key1(source, config.exiftool)
+    if len(payload) != KEY1_BYTE_LENGTH:
+        return {
+            **dict(record),
+            "status": "ineligible_key1",
+            "key1Bytes": len(payload),
+        }
+    key1, mask, width_slots, height_slots = decode_key1(
+        payload,
+        display_width=display_width,
+        display_height=display_height,
+    )
+    with tempfile.TemporaryDirectory(prefix="xdremux-key1-render-") as directory:
+        render_dir = Path(directory)
+        output = render_dir / "disabled.png"
+        manifest = render_dir / "disabled.json"
+        render_result = _disabled_render(config.helper, source, output, manifest)
+        with Image.open(output) as image:
+            unstyled = _fit_rgb(image)
+
+    images = np.stack((styled, unstyled), axis=0)
+    _atomic_npz(
+        sample_path,
+        schema=np.asarray([SAMPLE_SCHEMA]),
+        source_sha256=np.asarray([source_hash]),
+        images=images,
+        key1=key1,
+        mask=mask,
+        grid=np.asarray([width_slots, height_slots], dtype=np.int16),
+    )
+    return {
+        **dict(record),
+        "status": "prepared",
+        "samplePath": str(sample_path.relative_to(config.output)),
+        "sampleBytes": sample_path.stat().st_size,
+        "displayWidth": display_width,
+        "displayHeight": display_height,
+        "gridWidth": width_slots,
+        "gridHeight": height_slots,
+        "renderStageMilliseconds": render_result.get("stageMilliseconds"),
+    }
+
+
+def prepare_dataset(config: PreparationConfig) -> dict[str, Any]:
+    corpus = config.corpus.resolve()
+    output = config.output.resolve()
+    helper = config.helper.resolve()
+    if not corpus.is_dir():
+        raise ReverseKey1Error(f"missing corpus: {corpus}")
+    if not helper.is_file() or not os.access(helper, os.X_OK):
+        raise ReverseKey1Error(f"helper is not executable: {helper}")
+    if config.workers < 1 or config.workers > 4:
+        raise ReverseKey1Error("workers must be between 1 and 4")
+    output.mkdir(parents=True, exist_ok=True)
+    paths = sorted(
+        (
+            path
+            for path in corpus.iterdir()
+            if path.is_file() and path.suffix.lower() in {".heic", ".heif"}
+        ),
+        key=lambda path: path.name.casefold(),
+    )
+    if not paths:
+        raise ReverseKey1Error("corpus contains no HEIC/HEIF inputs")
+
+    inventory = _exif_inventory(paths, config.exiftool)
+    metadata_by_path = {
+        Path(str(item["SourceFile"])).resolve(): item for item in inventory
+    }
+    with concurrent.futures.ThreadPoolExecutor(max_workers=config.workers) as pool:
+        hashes = dict(zip(paths, pool.map(sha256_file, paths)))
+    canonical_by_hash: dict[str, Path] = {}
+    records: list[dict[str, Any]] = []
+    duplicate_count = 0
+    for path in paths:
+        content_hash = hashes[path]
+        if content_hash in canonical_by_hash:
+            duplicate_count += 1
+            continue
+        canonical_by_hash[content_hash] = path
+        raw = metadata_by_path[path.resolve()]
+        record = {
+            "sourcePath": str(path.resolve()),
+            "relativePath": path.name,
+            "sourceSHA256": content_hash,
+            "sourceBytes": path.stat().st_size,
+            "Model": raw.get("Model"),
+            "Software": raw.get("Software"),
+            "LensModel": raw.get("LensModel"),
+            "Orientation": raw.get("Orientation"),
+            "Tag0": raw.get("Tag0"),
+            "_captureTime": _timestamp(raw),
+        }
+        records.append(record)
+    assign_sessions(records)
+
+    def run(record: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            return _prepare_one(record, config)
+        except Exception as error:  # keep the full corpus run resumable
+            return {
+                **dict(record),
+                "status": "failed",
+                "error": f"{type(error).__name__}: {error}",
+            }
+
+    prepared: list[dict[str, Any]] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=config.workers) as pool:
+        futures = [pool.submit(run, record) for record in records]
+        for index, future in enumerate(concurrent.futures.as_completed(futures), 1):
+            prepared.append(future.result())
+            if index % 25 == 0 or index == len(futures):
+                cache_bytes = sum(
+                    path.stat().st_size
+                    for path in (output / "samples").glob("*.npz")
+                )
+                if cache_bytes > config.maximum_output_bytes:
+                    raise ReverseKey1Error(
+                        "training cache exceeded configured storage ceiling: "
+                        f"{cache_bytes} > {config.maximum_output_bytes}"
+                    )
+                print(
+                    json.dumps(
+                        {
+                            "prepared": index,
+                            "total": len(futures),
+                            "cacheBytes": cache_bytes,
+                            "statusCounts": Counter(
+                                item.get("status") for item in prepared
+                            ),
+                        },
+                        default=dict,
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+    for item in prepared:
+        item.pop("_captureTime", None)
+    prepared.sort(key=lambda item: str(item["relativePath"]).casefold())
+    usable = [
+        item
+        for item in prepared
+        if item.get("status") in {"prepared", "cached"}
+    ]
+    header = {
+        "schema": DATASET_SCHEMA,
+        "corpusSHA256": hashlib.sha256(
+            canonical_json_bytes(
+                [(item["relativePath"], item["sourceSHA256"]) for item in prepared]
+            )
+        ).hexdigest(),
+        "inputSize": INPUT_SIZE,
+        "inputContract": [
+            "styled_rgb",
+            "unstyled_rgb",
+            "styled_minus_unstyled_rgb",
+            "ycbcr_difference",
+        ],
+        "labelContract": "padded-y-x-12x12x8x10x3-with-native-orientation-mask",
+        "deviceMetadataPolicy": "audit_only_not_model_input",
+        "unstyledProvenance": "PLPhotoEditRenderer disabled SemanticStyle render",
+        "styledProvenance": "oriented native HEIC primary downsample",
+        "counts": {
+            "files": len(paths),
+            "uniqueContent": len(records),
+            "duplicateExtraCopies": duplicate_count,
+            "usable": len(usable),
+            "failed": sum(item.get("status") == "failed" for item in prepared),
+            "ineligibleKey1": sum(
+                item.get("status") == "ineligible_key1" for item in prepared
+            ),
+            "independentSessions": len(
+                {item["captureSession"] for item in usable}
+            ),
+        },
+        "splitCounts": dict(Counter(item["split"] for item in usable)),
+        "modelCounts": dict(Counter(str(item.get("Model")) for item in usable)),
+        "softwareCounts": dict(
+            Counter(str(item.get("Software")) for item in usable)
+        ),
+        "protocolCounts": dict(Counter(str(item.get("Tag0")) for item in usable)),
+        "cacheBytes": sum(int(item.get("sampleBytes", 0)) for item in usable),
+    }
+    manifest = {"header": header, "samples": prepared}
+    header["recordsSHA256"] = hashlib.sha256(
+        canonical_json_bytes(prepared)
+    ).hexdigest()
+    _atomic_json(output / "manifest.json", manifest)
+    return header
+
+
+def load_manifest(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    header = value.get("header")
+    samples = value.get("samples")
+    if not isinstance(header, dict) or header.get("schema") != DATASET_SCHEMA:
+        raise ReverseKey1Error("invalid reverse-key1 dataset header")
+    if not isinstance(samples, list):
+        raise ReverseKey1Error("reverse-key1 samples must be an array")
+    expected = hashlib.sha256(canonical_json_bytes(samples)).hexdigest()
+    if header.get("recordsSHA256") != expected:
+        raise ReverseKey1Error("reverse-key1 manifest record hash mismatch")
+    usable = [
+        sample
+        for sample in samples
+        if sample.get("status") in {"prepared", "cached"}
+    ]
+    sessions_by_split: dict[str, set[str]] = defaultdict(set)
+    for sample in usable:
+        sessions_by_split[str(sample["split"])].add(str(sample["captureSession"]))
+    splits = list(sessions_by_split)
+    for index, left in enumerate(splits):
+        for right in splits[index + 1 :]:
+            overlap = sessions_by_split[left] & sessions_by_split[right]
+            if overlap:
+                raise ReverseKey1Error(
+                    f"capture-session leakage between {left} and {right}"
+                )
+    return header, usable
+
+
+def input_features(images: np.ndarray) -> np.ndarray:
+    value = np.asarray(images, dtype=np.float32) / 255.0
+    if value.shape != (2, 3, INPUT_SIZE, INPUT_SIZE):
+        raise ReverseKey1Error("cached image pair has an invalid shape")
+    styled, unstyled = value
+    difference = styled - unstyled
+    matrix = np.asarray(
+        [
+            [0.2126, 0.7152, 0.0722],
+            [-0.114572, -0.385428, 0.5],
+            [0.5, -0.454153, -0.045847],
+        ],
+        dtype=np.float32,
+    )
+    ycbcr_difference = np.einsum("oc,chw->ohw", matrix, difference)
+    return np.concatenate((styled, unstyled, difference, ycbcr_difference), axis=0)
+
+
+def runtime_gate_scores(
+    prediction: np.ndarray,
+    baseline_prediction: np.ndarray,
+    candidate_prediction: np.ndarray,
+    scales: np.ndarray,
+    mask: np.ndarray,
+) -> dict[str, float]:
+    """Return label-free native-distribution scores for one key1 prediction."""
+    expected = identity_key1().shape
+    values = [prediction, baseline_prediction, candidate_prediction]
+    if any(np.asarray(value).shape != expected for value in values):
+        raise ReverseKey1Error(f"runtime key1 prediction shape must be {expected}")
+    valid = np.asarray(mask, dtype=np.bool_)
+    if valid.shape != (GRID_LONG, GRID_LONG) or not valid.any():
+        raise ReverseKey1Error("runtime key1 mask is invalid")
+    coefficient_scales = np.asarray(scales, dtype=np.float32)
+    if coefficient_scales.shape != (PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT):
+        raise ReverseKey1Error("runtime coefficient scales have an invalid shape")
+    if not np.isfinite(coefficient_scales).all() or np.any(coefficient_scales <= 0):
+        raise ReverseKey1Error("runtime coefficient scales must be positive and finite")
+    normalized = (
+        np.asarray(prediction, dtype=np.float32) - identity_key1()
+    ) / coefficient_scales
+    disagreement = (
+        np.asarray(baseline_prediction, dtype=np.float32)
+        - np.asarray(candidate_prediction, dtype=np.float32)
+    ) / coefficient_scales
+    selected = normalized[valid]
+    selected_disagreement = disagreement[valid]
+    total_variation: list[np.ndarray] = []
+    horizontal = valid[:, 1:] & valid[:, :-1]
+    vertical = valid[1:, :] & valid[:-1, :]
+    if horizontal.any():
+        total_variation.append(
+            np.abs(normalized[:, 1:] - normalized[:, :-1])[horizontal]
+        )
+    if vertical.any():
+        total_variation.append(
+            np.abs(normalized[1:] - normalized[:-1])[vertical]
+        )
+    spatial = np.concatenate([value.reshape(-1) for value in total_variation])
+    return {
+        "normalizedResidualRMS": float(np.sqrt(np.mean(selected * selected))),
+        "normalizedResidualP99": float(np.quantile(np.abs(selected), 0.99)),
+        "maximumNormalizedResidual": float(np.max(np.abs(selected))),
+        "ensembleDisagreementRMS": float(
+            np.sqrt(np.mean(selected_disagreement * selected_disagreement))
+        ),
+        "spatialTotalVariationMean": float(np.mean(spatial)),
+    }
+
+
+def runtime_gate_passes(
+    scores: Mapping[str, float],
+    thresholds: Mapping[str, float],
+) -> bool:
+    if set(scores) != set(thresholds):
+        raise ReverseKey1Error("runtime gate scores and thresholds differ")
+    return all(
+        math.isfinite(float(scores[name]))
+        and float(scores[name]) <= float(thresholds[name])
+        for name in scores
+    )
+
+
+def _require_torch() -> tuple[Any, Any]:
+    try:
+        import torch
+        import torch.nn as nn
+    except ImportError as error:
+        raise ReverseKey1Error(
+            "training requires PyTorch; install the project training extra"
+        ) from error
+    return torch, nn
+
+
+def build_model(
+    scales: np.ndarray | None = None,
+    *,
+    profile_count: int = 0,
+    architecture: str = "small",
+) -> Any:
+    torch, nn = _require_torch()
+    if profile_count < 0:
+        raise ReverseKey1Error("profile count cannot be negative")
+    if architecture not in {"small", "multiscale_large"}:
+        raise ReverseKey1Error(f"unsupported architecture: {architecture}")
+
+    class ResidualBlock(nn.Module):
+        def __init__(self, channels: int):
+            super().__init__()
+            self.layers = nn.Sequential(
+                nn.Conv2d(channels, channels, 3, padding=1),
+                nn.GroupNorm(8, channels),
+                nn.SiLU(),
+                nn.Conv2d(channels, channels, 3, padding=1),
+                nn.GroupNorm(8, channels),
+            )
+
+        def forward(self, value: Any) -> Any:
+            return torch.nn.functional.silu(value + self.layers(value))
+
+    class ReverseKey1Net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            channels = (32, 48, 64, 96, 128)
+            layers: list[Any] = []
+            incoming = INPUT_CHANNELS
+            for channel in channels:
+                layers.extend(
+                    [
+                        nn.Conv2d(incoming, channel, 3, stride=2, padding=1),
+                        nn.GroupNorm(8, channel),
+                        nn.SiLU(),
+                        ResidualBlock(channel),
+                    ]
+                )
+                incoming = channel
+            self.encoder = nn.Sequential(*layers)
+            self.plane_embedding = nn.Embedding(PLANE_COUNT, 32)
+            output_layer = nn.Linear(128, POLYNOMIAL_COUNT * OUTPUT_COUNT)
+            nn.init.zeros_(output_layer.weight)
+            nn.init.zeros_(output_layer.bias)
+            self.head = nn.Sequential(
+                nn.Linear(channels[-1] + 32, 128),
+                nn.SiLU(),
+                output_layer,
+            )
+            self.profile_count = profile_count
+            if profile_count:
+                # Per-profile FiLM and plane deltas alter how image features map
+                # to coefficients.  Zero initialization keeps a warm-started
+                # conditioned model bit-equivalent to the shared v1 model.
+                profile_width = 2 * channels[-1] + PLANE_COUNT * 32
+                self.profile_embedding = nn.Embedding(profile_count, profile_width)
+                nn.init.zeros_(self.profile_embedding.weight)
+            else:
+                self.profile_embedding = None
+            initial_scales = np.ones(
+                (PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT), dtype=np.float32
+            ) if scales is None else np.asarray(scales, dtype=np.float32)
+            if initial_scales.shape != (
+                PLANE_COUNT,
+                POLYNOMIAL_COUNT,
+                OUTPUT_COUNT,
+            ):
+                raise ReverseKey1Error("coefficient scale shape is invalid")
+            self.register_buffer(
+                "coefficient_scales",
+                torch.from_numpy(initial_scales).reshape(
+                    1, 1, 1, PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT
+                ),
+            )
+            self.register_buffer(
+                "identity",
+                torch.from_numpy(identity_key1()).reshape(
+                    1,
+                    GRID_LONG,
+                    GRID_LONG,
+                    PLANE_COUNT,
+                    POLYNOMIAL_COUNT,
+                    OUTPUT_COUNT,
+                ),
+            )
+
+        def forward(self, value: Any, profile_ids: Any | None = None) -> Any:
+            spatial = torch.nn.functional.interpolate(
+                self.encoder(value),
+                size=(GRID_LONG, GRID_LONG),
+                mode="bilinear",
+                align_corners=False,
+            ).permute(0, 2, 3, 1)
+            batch, height, width, _ = spatial.shape
+            profile_plane = None
+            if self.profile_count:
+                if profile_ids is None:
+                    raise ReverseKey1Error(
+                        "profile-conditioned model requires profile IDs"
+                    )
+                profile = self.profile_embedding(profile_ids)
+                gamma, beta, profile_plane = torch.split(
+                    profile,
+                    (spatial.shape[-1], spatial.shape[-1], PLANE_COUNT * 32),
+                    dim=-1,
+                )
+                spatial = spatial * (1.0 + gamma[:, None, None, :])
+                spatial = spatial + beta[:, None, None, :]
+            spatial = spatial[:, :, :, None, :].expand(
+                batch, height, width, PLANE_COUNT, spatial.shape[-1]
+            )
+            plane = self.plane_embedding.weight.reshape(
+                1, 1, 1, PLANE_COUNT, -1
+            ).expand(batch, height, width, -1, -1)
+            if profile_plane is not None:
+                plane = plane + profile_plane.reshape(
+                    batch, 1, 1, PLANE_COUNT, 32
+                )
+            normalized_residual = self.head(torch.cat((spatial, plane), dim=-1))
+            normalized_residual = normalized_residual.reshape(
+                batch,
+                height,
+                width,
+                PLANE_COUNT,
+                POLYNOMIAL_COUNT,
+                OUTPUT_COUNT,
+            )
+            return self.identity + normalized_residual * self.coefficient_scales
+
+    class EncoderStage(nn.Module):
+        def __init__(self, incoming: int, outgoing: int):
+            super().__init__()
+            self.layers = nn.Sequential(
+                nn.Conv2d(incoming, outgoing, 3, stride=2, padding=1),
+                nn.GroupNorm(8, outgoing),
+                nn.SiLU(),
+                ResidualBlock(outgoing),
+                ResidualBlock(outgoing),
+            )
+
+        def forward(self, value: Any) -> Any:
+            return self.layers(value)
+
+    class GlobalContextBlock(nn.Module):
+        def __init__(self, width: int):
+            super().__init__()
+            self.attention_norm = nn.LayerNorm(width)
+            self.attention = nn.MultiheadAttention(
+                width, num_heads=8, dropout=0.1, batch_first=True
+            )
+            self.feed_forward_norm = nn.LayerNorm(width)
+            self.feed_forward = nn.Sequential(
+                nn.Linear(width, width * 2),
+                nn.GELU(),
+                nn.Dropout(0.1),
+                nn.Linear(width * 2, width),
+                nn.Dropout(0.1),
+            )
+
+        def forward(self, value: Any) -> Any:
+            normalized = self.attention_norm(value)
+            attended, _ = self.attention(
+                normalized, normalized, normalized, need_weights=False
+            )
+            value = value + attended
+            return value + self.feed_forward(self.feed_forward_norm(value))
+
+    class MultiscaleLargeReverseKey1Net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            channels = (64, 96, 160, 256)
+            stages: list[Any] = []
+            incoming = INPUT_CHANNELS
+            for outgoing in channels:
+                stages.append(EncoderStage(incoming, outgoing))
+                incoming = outgoing
+            self.encoder_stages = nn.ModuleList(stages)
+            self.scale_projections = nn.ModuleList(
+                nn.Conv2d(channel, 64, 1) for channel in channels
+            )
+            self.spatial_fusion = nn.Sequential(
+                nn.Conv2d(64 * len(channels), 256, 1),
+                nn.GroupNorm(16, 256),
+                nn.SiLU(),
+                ResidualBlock(256),
+                ResidualBlock(256),
+                ResidualBlock(256),
+            )
+            self.context = nn.ModuleList(
+                GlobalContextBlock(256) for _ in range(2)
+            )
+            self.plane_embedding = nn.Embedding(PLANE_COUNT, 64)
+            output_layer = nn.Linear(256, POLYNOMIAL_COUNT * OUTPUT_COUNT)
+            nn.init.zeros_(output_layer.weight)
+            nn.init.zeros_(output_layer.bias)
+            self.head = nn.Sequential(
+                nn.Linear(256 + 64, 256),
+                nn.SiLU(),
+                nn.Dropout(0.1),
+                output_layer,
+            )
+            self.profile_count = profile_count
+            if profile_count:
+                profile_width = 2 * 256 + PLANE_COUNT * 64
+                self.profile_embedding = nn.Embedding(profile_count, profile_width)
+                nn.init.zeros_(self.profile_embedding.weight)
+            else:
+                self.profile_embedding = None
+            initial_scales = (
+                np.ones(
+                    (PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT),
+                    dtype=np.float32,
+                )
+                if scales is None
+                else np.asarray(scales, dtype=np.float32)
+            )
+            if initial_scales.shape != (
+                PLANE_COUNT,
+                POLYNOMIAL_COUNT,
+                OUTPUT_COUNT,
+            ):
+                raise ReverseKey1Error("coefficient scale shape is invalid")
+            self.register_buffer(
+                "coefficient_scales",
+                torch.from_numpy(initial_scales).reshape(
+                    1, 1, 1, PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT
+                ),
+            )
+            self.register_buffer(
+                "identity",
+                torch.from_numpy(identity_key1()).reshape(
+                    1,
+                    GRID_LONG,
+                    GRID_LONG,
+                    PLANE_COUNT,
+                    POLYNOMIAL_COUNT,
+                    OUTPUT_COUNT,
+                ),
+            )
+
+        def forward(self, value: Any, profile_ids: Any | None = None) -> Any:
+            pyramid = []
+            for stage, projection in zip(
+                self.encoder_stages, self.scale_projections
+            ):
+                value = stage(value)
+                projected = projection(value)
+                pyramid.append(
+                    torch.nn.functional.interpolate(
+                        projected,
+                        size=(GRID_LONG, GRID_LONG),
+                        mode="bilinear",
+                        align_corners=False,
+                    )
+                )
+            spatial = self.spatial_fusion(torch.cat(pyramid, dim=1))
+            batch = spatial.shape[0]
+            tokens = spatial.flatten(2).transpose(1, 2)
+            for block in self.context:
+                tokens = block(tokens)
+            spatial = tokens.reshape(
+                batch, GRID_LONG, GRID_LONG, 256
+            )
+
+            profile_plane = None
+            if self.profile_count:
+                if profile_ids is None:
+                    raise ReverseKey1Error(
+                        "profile-conditioned model requires profile IDs"
+                    )
+                profile = self.profile_embedding(profile_ids)
+                gamma, beta, profile_plane = torch.split(
+                    profile, (256, 256, PLANE_COUNT * 64), dim=-1
+                )
+                spatial = spatial * (1.0 + gamma[:, None, None, :])
+                spatial = spatial + beta[:, None, None, :]
+
+            spatial = spatial[:, :, :, None, :].expand(
+                batch, GRID_LONG, GRID_LONG, PLANE_COUNT, 256
+            )
+            plane = self.plane_embedding.weight.reshape(
+                1, 1, 1, PLANE_COUNT, 64
+            ).expand(batch, GRID_LONG, GRID_LONG, -1, -1)
+            if profile_plane is not None:
+                plane = plane + profile_plane.reshape(
+                    batch, 1, 1, PLANE_COUNT, 64
+                )
+            normalized_residual = self.head(
+                torch.cat((spatial, plane), dim=-1)
+            ).reshape(
+                batch,
+                GRID_LONG,
+                GRID_LONG,
+                PLANE_COUNT,
+                POLYNOMIAL_COUNT,
+                OUTPUT_COUNT,
+            )
+            return self.identity + normalized_residual * self.coefficient_scales
+
+    if architecture == "multiscale_large":
+        return MultiscaleLargeReverseKey1Net()
+    return ReverseKey1Net()
+
+
+def device_profile_vocabulary(
+    samples: Sequence[Mapping[str, Any]],
+) -> tuple[str, ...]:
+    profiles = sorted({str(sample.get("Model") or "unknown") for sample in samples})
+    return tuple(profiles + ["__unknown__"])
+
+
+class _CachedDataset:
+    def __init__(
+        self,
+        root: Path,
+        samples: Sequence[Mapping[str, Any]],
+        profile_vocabulary: Sequence[str] = (),
+        horizontal_flip_probability: float = 0.0,
+    ):
+        self.root = root
+        self.samples = list(samples)
+        self.profile_vocabulary = tuple(profile_vocabulary)
+        self.profile_ids = {
+            value: index for index, value in enumerate(self.profile_vocabulary)
+        }
+        self.unknown_profile_id = self.profile_ids.get("__unknown__", 0)
+        self.horizontal_flip_probability = horizontal_flip_probability
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, index: int) -> tuple[Any, ...]:
+        torch, _ = _require_torch()
+        record = self.samples[index]
+        path = self.root / str(record["samplePath"])
+        with np.load(path, allow_pickle=False) as archive:
+            features = input_features(archive["images"])
+            key1 = np.asarray(archive["key1"], dtype=np.float32)
+            mask = np.asarray(archive["mask"], dtype=np.bool_)
+        if (
+            self.horizontal_flip_probability > 0
+            and float(torch.rand(())) < self.horizontal_flip_probability
+        ):
+            features = np.flip(features, axis=2).copy()
+            key1 = np.flip(key1, axis=1).copy()
+            mask = np.flip(mask, axis=1).copy()
+        return (
+            torch.from_numpy(features),
+            torch.from_numpy(key1),
+            torch.from_numpy(mask),
+            str(record.get("Model") or "unknown"),
+            str(record["captureSession"]),
+            torch.tensor(
+                self.profile_ids.get(
+                    str(record.get("Model") or "unknown"),
+                    self.unknown_profile_id,
+                ),
+                dtype=torch.long,
+            ),
+        )
+
+
+def coefficient_scales(
+    root: Path,
+    samples: Sequence[Mapping[str, Any]],
+) -> np.ndarray:
+    identity = identity_key1()
+    residuals: list[np.ndarray] = []
+    for sample in samples:
+        with np.load(root / str(sample["samplePath"]), allow_pickle=False) as archive:
+            key1 = np.asarray(archive["key1"], dtype=np.float32)
+            mask = np.asarray(archive["mask"], dtype=np.bool_)
+        residuals.append((key1 - identity)[mask])
+    if not residuals:
+        raise ReverseKey1Error("training split is empty")
+    stacked = np.concatenate(residuals, axis=0)
+    scale = np.quantile(np.abs(stacked), 0.75, axis=0).astype(np.float32)
+    return np.maximum(scale, 1e-3)
+
+
+@dataclass(frozen=True)
+class TrainingConfig:
+    manifest: Path
+    output: Path
+    epochs: int = 60
+    batch_size: int = 8
+    learning_rate: float = 2e-4
+    seed: int = 260819
+    device: str = "auto"
+    num_workers: int = 0
+    profile_conditioning: str = "none"
+    balance_profiles: bool = False
+    initialize_from: Path | None = None
+    base_learning_rate_scale: float = 0.1
+    architecture: str = "small"
+    horizontal_flip_probability: float = 0.0
+    checkpoint_interval: int = 1
+
+
+def _select_device(torch: Any, requested: str) -> str:
+    if requested == "auto":
+        return "mps" if torch.backends.mps.is_available() else "cpu"
+    if requested == "mps" and not torch.backends.mps.is_available():
+        raise ReverseKey1Error("MPS was requested but is unavailable")
+    if requested not in {"mps", "cpu"}:
+        raise ReverseKey1Error("training device must be auto, mps, or cpu")
+    return requested
+
+
+def _masked_losses(
+    torch: Any,
+    prediction: Any,
+    target: Any,
+    mask: Any,
+    scales: Any,
+) -> tuple[Any, dict[str, float]]:
+    expanded = mask[:, :, :, None, None, None]
+    normalized = (prediction - target) / scales
+    selected = normalized[expanded.expand_as(normalized)]
+    coefficient = torch.nn.functional.huber_loss(
+        selected, torch.zeros_like(selected), delta=1.0
+    )
+    horizontal_mask = mask[:, :, 1:] & mask[:, :, :-1]
+    vertical_mask = mask[:, 1:, :] & mask[:, :-1, :]
+    normalized_prediction = (prediction - target.new_tensor(identity_key1())) / scales
+    horizontal = normalized_prediction[:, :, 1:] - normalized_prediction[:, :, :-1]
+    vertical = normalized_prediction[:, 1:] - normalized_prediction[:, :-1]
+    spatial_values = []
+    if horizontal_mask.any():
+        spatial_values.append(
+            horizontal[
+                horizontal_mask[:, :, :, None, None, None].expand_as(horizontal)
+            ].abs().mean()
+        )
+    if vertical_mask.any():
+        spatial_values.append(
+            vertical[
+                vertical_mask[:, :, :, None, None, None].expand_as(vertical)
+            ].abs().mean()
+        )
+    spatial = sum(spatial_values) / max(1, len(spatial_values))
+    total = coefficient + 2e-4 * spatial
+    return total, {
+        "coefficientHuber": float(coefficient.detach().cpu()),
+        "spatialL1": float(spatial.detach().cpu()),
+    }
+
+
+def _evaluate(
+    torch: Any,
+    model: Any,
+    loader: Any,
+    device: str,
+    *,
+    shuffle_inputs: bool = False,
+) -> dict[str, Any]:
+    model.eval()
+    normalized_absolute: list[Any] = []
+    raw_absolute: list[Any] = []
+    per_model: dict[str, list[float]] = defaultdict(list)
+    scales = model.coefficient_scales
+    with torch.no_grad():
+        for features, target, mask, models, _sessions, profile_ids in loader:
+            features = features.to(device)
+            target = target.to(device)
+            mask = mask.to(device)
+            profile_ids = profile_ids.to(device)
+            if shuffle_inputs and len(features) > 1:
+                features = torch.roll(features, shifts=1, dims=0)
+            prediction = model(features, profile_ids)
+            normalized = ((prediction - target) / scales).abs()
+            raw = (prediction - target).abs()
+            for index, model_name in enumerate(models):
+                selected = mask[index, :, :, None, None, None].expand_as(
+                    normalized[index]
+                )
+                normalized_values = normalized[index][selected]
+                raw_values = raw[index][selected]
+                normalized_absolute.append(normalized_values.cpu())
+                raw_absolute.append(raw_values.cpu())
+                per_model[str(model_name)].append(
+                    float(normalized_values.mean().cpu())
+                )
+    if not normalized_absolute:
+        raise ReverseKey1Error("evaluation split is empty")
+    normalized_values = torch.cat(normalized_absolute)
+    raw_values = torch.cat(raw_absolute)
+    per_model_metrics = {
+        name: float(np.mean(values)) for name, values in sorted(per_model.items())
+    }
+    return {
+        "normalizedMAE": float(normalized_values.mean()),
+        "normalizedRMSE": float(torch.sqrt(torch.mean(normalized_values**2))),
+        "normalizedP95Absolute": float(torch.quantile(normalized_values, 0.95)),
+        "rawMAE": float(raw_values.mean()),
+        "rawP95Absolute": float(torch.quantile(raw_values, 0.95)),
+        "perModelNormalizedMAE": per_model_metrics,
+        "macroModelNormalizedMAE": float(np.mean(list(per_model_metrics.values()))),
+    }
+
+
+def train(config: TrainingConfig) -> dict[str, Any]:
+    torch, _ = _require_torch()
+    if config.profile_conditioning not in {"none", "target_device_model"}:
+        raise ReverseKey1Error(
+            "profile conditioning must be none or target_device_model"
+        )
+    if not 0 <= config.base_learning_rate_scale <= 1:
+        raise ReverseKey1Error("base learning-rate scale must be in [0, 1]")
+    if config.architecture not in {"small", "multiscale_large"}:
+        raise ReverseKey1Error("unsupported training architecture")
+    if not 0 <= config.horizontal_flip_probability <= 1:
+        raise ReverseKey1Error("horizontal flip probability must be in [0, 1]")
+    if config.checkpoint_interval < 1:
+        raise ReverseKey1Error("checkpoint interval must be positive")
+    torch.manual_seed(config.seed)
+    np.random.seed(config.seed)
+    header, samples = load_manifest(config.manifest.resolve())
+    root = config.manifest.resolve().parent
+    by_split = {
+        split: [sample for sample in samples if sample["split"] == split]
+        for split in ("train", "calibration", "heldout")
+    }
+    if any(not by_split[split] for split in by_split):
+        raise ReverseKey1Error("train/calibration/heldout splits must all be non-empty")
+    scales = coefficient_scales(root, by_split["train"])
+    profile_vocabulary = (
+        device_profile_vocabulary(samples)
+        if config.profile_conditioning == "target_device_model"
+        else ()
+    )
+    profile_count = len(profile_vocabulary)
+    if config.architecture == "multiscale_large":
+        architecture = "ReverseKey1Net-v4-multiscale-large"
+        if profile_count:
+            architecture += "-profile-film"
+    else:
+        architecture = (
+            "ReverseKey1Net-v3-profile-film"
+            if profile_count
+            else "ReverseKey1Net-v1"
+        )
+    model = build_model(
+        scales,
+        profile_count=profile_count,
+        architecture=config.architecture,
+    )
+    identity_model = build_model(
+        scales,
+        profile_count=profile_count,
+        architecture=config.architecture,
+    )
+    initialization: dict[str, Any] | None = None
+    if config.initialize_from is not None:
+        initial_path = config.initialize_from.resolve()
+        initial = torch.load(initial_path, map_location="cpu", weights_only=False)
+        if initial.get("manifestSHA256") != sha256_file(config.manifest.resolve()):
+            raise ReverseKey1Error("warm-start checkpoint uses another manifest")
+        initial_scales = np.asarray(initial.get("coefficientScales"), dtype=np.float32)
+        if initial_scales.shape != scales.shape or not np.array_equal(
+            initial_scales, scales
+        ):
+            raise ReverseKey1Error("warm-start coefficient scales do not match")
+        incompatible = model.load_state_dict(initial["model"], strict=False)
+        allowed_missing = {"profile_embedding.weight"} if profile_count else set()
+        if set(incompatible.missing_keys) != allowed_missing:
+            raise ReverseKey1Error(
+                "unexpected warm-start missing keys: "
+                f"{sorted(incompatible.missing_keys)}"
+            )
+        if incompatible.unexpected_keys:
+            raise ReverseKey1Error(
+                "unexpected warm-start keys: "
+                f"{sorted(incompatible.unexpected_keys)}"
+            )
+        initialization = {
+            "checkpointSHA256": sha256_file(initial_path),
+            "architecture": initial.get("architecture"),
+            "epoch": initial.get("epoch"),
+        }
+    device = _select_device(torch, config.device)
+    model.to(device)
+    identity_model.to(device)
+    datasets = {
+        split: _CachedDataset(
+            root,
+            values,
+            profile_vocabulary,
+            horizontal_flip_probability=(
+                config.horizontal_flip_probability if split == "train" else 0.0
+            ),
+        )
+        for split, values in by_split.items()
+    }
+    training_sampler = None
+    if config.balance_profiles:
+        counts = Counter(
+            str(sample.get("Model") or "unknown")
+            for sample in by_split["train"]
+        )
+        weights = torch.tensor(
+            [
+                1.0 / counts[str(sample.get("Model") or "unknown")]
+                for sample in by_split["train"]
+            ],
+            dtype=torch.double,
+        )
+        generator = torch.Generator().manual_seed(config.seed)
+        training_sampler = torch.utils.data.WeightedRandomSampler(
+            weights,
+            num_samples=len(weights),
+            replacement=True,
+            generator=generator,
+        )
+    loaders = {}
+    for split, dataset in datasets.items():
+        loaders[split] = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=config.batch_size,
+            shuffle=split == "train" and training_sampler is None,
+            sampler=training_sampler if split == "train" else None,
+            num_workers=config.num_workers,
+        )
+    freeze_base = bool(
+        profile_count
+        and initialization is not None
+        and config.base_learning_rate_scale == 0
+    )
+    if profile_count and initialization is not None:
+        profile_parameters = list(model.profile_embedding.parameters())
+        profile_parameter_ids = {id(parameter) for parameter in profile_parameters}
+        base_parameters = [
+            parameter
+            for parameter in model.parameters()
+            if id(parameter) not in profile_parameter_ids
+        ]
+        if freeze_base:
+            for parameter in base_parameters:
+                parameter.requires_grad_(False)
+            optimizer = torch.optim.AdamW(
+                profile_parameters,
+                lr=config.learning_rate,
+                weight_decay=1e-4,
+            )
+        else:
+            optimizer = torch.optim.AdamW(
+                [
+                    {
+                        "params": base_parameters,
+                        "lr": (
+                            config.learning_rate
+                            * config.base_learning_rate_scale
+                        ),
+                    },
+                    {"params": profile_parameters, "lr": config.learning_rate},
+                ],
+                weight_decay=1e-4,
+            )
+    else:
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=config.learning_rate, weight_decay=1e-4
+        )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=max(1, config.epochs)
+    )
+    config.output.mkdir(parents=True, exist_ok=True)
+    selection_metric = (
+        "macroModelNormalizedMAE" if config.balance_profiles else "normalizedMAE"
+    )
+    best = math.inf
+    history: list[dict[str, Any]] = []
+    baselines = {
+        "identityCalibration": _evaluate(
+            torch, identity_model, loaders["calibration"], device
+        ),
+        "identityHeldout": _evaluate(
+            torch, identity_model, loaders["heldout"], device
+        ),
+    }
+    initialization_metrics = (
+        {
+            "calibration": _evaluate(
+                torch, model, loaders["calibration"], device
+            ),
+            "heldout": _evaluate(torch, model, loaders["heldout"], device),
+        }
+        if initialization is not None
+        else None
+    )
+    for epoch in range(1, config.epochs + 1):
+        model.train()
+        if freeze_base:
+            # Keep frozen dropout and normalization behavior identical to the
+            # selected shared checkpoint while learning only profile FiLM.
+            model.eval()
+            model.profile_embedding.train()
+        epoch_losses: list[float] = []
+        for (
+            features,
+            target,
+            mask,
+            _models,
+            _sessions,
+            profile_ids,
+        ) in loaders["train"]:
+            features = features.to(device)
+            target = target.to(device)
+            mask = mask.to(device)
+            profile_ids = profile_ids.to(device)
+            optimizer.zero_grad(set_to_none=True)
+            identity_features = torch.cat(
+                (
+                    features[:, 3:6],
+                    features[:, 3:6],
+                    torch.zeros_like(features[:, 6:12]),
+                ),
+                dim=1,
+            )
+            combined_prediction = model(
+                torch.cat((features, identity_features), dim=0),
+                torch.cat((profile_ids, profile_ids), dim=0),
+            )
+            prediction, identity_prediction = combined_prediction.chunk(2, dim=0)
+            loss, _parts = _masked_losses(
+                torch,
+                prediction,
+                target,
+                mask,
+                model.coefficient_scales,
+            )
+            identity_normalized = (
+                identity_prediction - model.identity
+            ) / model.coefficient_scales
+            identity_selected = identity_normalized[
+                mask[:, :, :, None, None, None].expand_as(identity_normalized)
+            ]
+            identity_loss = torch.nn.functional.huber_loss(
+                identity_selected,
+                torch.zeros_like(identity_selected),
+                delta=1.0,
+            )
+            loss = loss + 0.01 * identity_loss
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+            optimizer.step()
+            epoch_losses.append(float(loss.detach().cpu()))
+        scheduler.step()
+        calibration = _evaluate(torch, model, loaders["calibration"], device)
+        epoch_record = {
+            "epoch": epoch,
+            "learningRates": [float(value) for value in scheduler.get_last_lr()],
+            "trainingLoss": float(np.mean(epoch_losses)),
+            "calibration": calibration,
+        }
+        history.append(epoch_record)
+        checkpoint = {
+            "schema": REPORT_SCHEMA,
+            "epoch": epoch,
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "coefficientScales": scales,
+            "manifestSHA256": sha256_file(config.manifest.resolve()),
+            "sourceCorpusSHA256": header["corpusSHA256"],
+            "architecture": architecture,
+            "inputChannels": INPUT_CHANNELS,
+            "profileConditioning": config.profile_conditioning,
+            "profileVocabulary": list(profile_vocabulary),
+            "deviceMetadataPolicy": (
+                "target_device_model_only"
+                if profile_count
+                else "audit_only_not_model_input"
+            ),
+            "initialization": initialization,
+        }
+        if epoch % config.checkpoint_interval == 0 or epoch == config.epochs:
+            torch.save(checkpoint, config.output / "last.pt")
+        if calibration[selection_metric] < best:
+            best = calibration[selection_metric]
+            inference_checkpoint = dict(checkpoint)
+            inference_checkpoint.pop("optimizer")
+            torch.save(inference_checkpoint, config.output / "best.pt")
+        _atomic_json(config.output / "history.json", history)
+        print(json.dumps(epoch_record, sort_keys=True), flush=True)
+
+    best_checkpoint = torch.load(
+        config.output / "best.pt", map_location=device, weights_only=False
+    )
+    model.load_state_dict(best_checkpoint["model"])
+    heldout = _evaluate(torch, model, loaders["heldout"], device)
+    heldout_shuffled = _evaluate(
+        torch,
+        model,
+        loaders["heldout"],
+        device,
+        shuffle_inputs=True,
+    )
+    report = {
+        "schema": REPORT_SCHEMA,
+        "architecture": architecture,
+        "device": device,
+        "epochs": config.epochs,
+        "batchSize": config.batch_size,
+        "learningRate": config.learning_rate,
+        "baseLearningRateScale": config.base_learning_rate_scale,
+        "baseFrozen": freeze_base,
+        "architectureConfig": config.architecture,
+        "horizontalFlipProbability": config.horizontal_flip_probability,
+        "checkpointInterval": config.checkpoint_interval,
+        "seed": config.seed,
+        "parameterCount": sum(parameter.numel() for parameter in model.parameters()),
+        "dataset": header,
+        "splitCounts": {name: len(values) for name, values in by_split.items()},
+        "profileConditioning": config.profile_conditioning,
+        "profileVocabulary": list(profile_vocabulary),
+        "balancedProfileSampling": config.balance_profiles,
+        "selectionMetric": selection_metric,
+        "initialization": initialization,
+        "initializationMetrics": initialization_metrics,
+        "baselines": baselines,
+        "bestEpoch": int(best_checkpoint["epoch"]),
+        "calibrationBestSelectionValue": best,
+        "calibrationBestNormalizedMAE": next(
+            item["calibration"]["normalizedMAE"]
+            for item in history
+            if item["epoch"] == int(best_checkpoint["epoch"])
+        ),
+        "heldout": heldout,
+        "heldoutShuffledInput": heldout_shuffled,
+        "artifacts": {
+            "best": "best.pt",
+            "last": "last.pt",
+            "history": "history.json",
+        },
+    }
+    _atomic_json(config.output / "report.json", report)
+    return report
+
+
+def verify_training_run(manifest: Path, run_directory: Path) -> dict[str, Any]:
+    """Verify checkpoint provenance and the minimum offline learning evidence."""
+    torch, _ = _require_torch()
+    manifest = manifest.resolve()
+    run_directory = run_directory.resolve()
+    header, samples = load_manifest(manifest)
+    report_path = run_directory / "report.json"
+    if not report_path.is_file():
+        raise ReverseKey1Error(f"missing training report: {report_path}")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if report.get("schema") != REPORT_SCHEMA:
+        raise ReverseKey1Error("training report schema is invalid")
+    if report.get("dataset", {}).get("corpusSHA256") != header.get("corpusSHA256"):
+        raise ReverseKey1Error("training report is bound to another corpus")
+    if report.get("splitCounts") != dict(Counter(sample["split"] for sample in samples)):
+        raise ReverseKey1Error("training report split counts do not match the manifest")
+    best_path = run_directory / str(report.get("artifacts", {}).get("best", ""))
+    last_path = run_directory / str(report.get("artifacts", {}).get("last", ""))
+    if not best_path.is_file() or not last_path.is_file():
+        raise ReverseKey1Error("best/last checkpoint pair is incomplete")
+    checkpoint = torch.load(best_path, map_location="cpu", weights_only=False)
+    if checkpoint.get("manifestSHA256") != sha256_file(manifest):
+        raise ReverseKey1Error("best checkpoint manifest hash does not match")
+    if checkpoint.get("sourceCorpusSHA256") != header.get("corpusSHA256"):
+        raise ReverseKey1Error("best checkpoint corpus hash does not match")
+    if int(checkpoint.get("epoch", -1)) != int(report.get("bestEpoch", -2)):
+        raise ReverseKey1Error("best checkpoint epoch does not match the report")
+    heldout = report.get("heldout", {})
+    identity = report.get("baselines", {}).get("identityHeldout", {})
+    shuffled = report.get("heldoutShuffledInput", {})
+    metrics = {
+        "heldoutNormalizedMAE": heldout.get("normalizedMAE"),
+        "identityNormalizedMAE": identity.get("normalizedMAE"),
+        "shuffledNormalizedMAE": shuffled.get("normalizedMAE"),
+    }
+    if any(not isinstance(value, (int, float)) or not math.isfinite(value) for value in metrics.values()):
+        raise ReverseKey1Error("required held-out metrics are missing or non-finite")
+    if not metrics["heldoutNormalizedMAE"] < metrics["identityNormalizedMAE"]:
+        raise ReverseKey1Error("trained checkpoint does not beat the identity baseline")
+    if not metrics["heldoutNormalizedMAE"] < metrics["shuffledNormalizedMAE"]:
+        raise ReverseKey1Error("trained checkpoint does not use paired image information")
+    return {
+        "schema": "xdremux-reverse-key1-training-verification-v1",
+        "passed": True,
+        "manifestSHA256": sha256_file(manifest),
+        "reportSHA256": sha256_file(report_path),
+        "bestCheckpointSHA256": sha256_file(best_path),
+        "lastCheckpointSHA256": sha256_file(last_path),
+        "bestEpoch": int(report["bestEpoch"]),
+        "parameterCount": int(report["parameterCount"]),
+        "sampleCount": len(samples),
+        "metrics": metrics,
+    }
+
+
+def storage_summary(paths: Iterable[Path]) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for path in paths:
+        if path.is_file():
+            result[str(path)] = path.stat().st_size
+        elif path.is_dir():
+            result[str(path)] = sum(
+                child.stat().st_size for child in path.rglob("*") if child.is_file()
+            )
+    return result
+
+
+def select_linear_blend_weight(
+    baseline: np.ndarray,
+    candidate: np.ndarray,
+    target: np.ndarray,
+    scales: np.ndarray,
+    mask: np.ndarray,
+    *,
+    grid_size: int = 41,
+) -> tuple[float, float]:
+    """Select a candidate weight using only the supplied calibration tensors."""
+    baseline = np.asarray(baseline, dtype=np.float32)
+    candidate = np.asarray(candidate, dtype=np.float32)
+    target = np.asarray(target, dtype=np.float32)
+    scales = np.asarray(scales, dtype=np.float32)
+    mask = np.asarray(mask, dtype=np.bool_)
+    if baseline.shape != candidate.shape or baseline.shape != target.shape:
+        raise ReverseKey1Error("ensemble prediction shapes do not match")
+    if baseline.ndim < 2 or mask.shape != baseline.shape[: mask.ndim]:
+        raise ReverseKey1Error("ensemble mask shape is invalid")
+    if grid_size < 2:
+        raise ReverseKey1Error("ensemble grid size must be at least two")
+    expanded_scales = np.broadcast_to(scales, baseline.shape)
+    expanded_mask = np.broadcast_to(
+        mask.reshape(mask.shape + (1,) * (baseline.ndim - mask.ndim)),
+        baseline.shape,
+    )
+    best_weight = 0.0
+    best_mae = math.inf
+    for weight in np.linspace(0.0, 1.0, grid_size):
+        prediction = (1.0 - weight) * baseline + weight * candidate
+        normalized = np.abs(prediction - target) / expanded_scales
+        value = float(normalized[expanded_mask].mean())
+        if value < best_mae:
+            best_mae = value
+            best_weight = float(weight)
+    return best_weight, best_mae
