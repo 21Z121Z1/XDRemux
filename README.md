@@ -56,7 +56,7 @@ swift run xdremux categorize --input photo_dump/ --output-dir categorized/ --dry
 `--dry-run` 只打印计划。给 `batch` 加 `--categorize` 可以让转换结果直接写进这些目录。Python 版本行为一致：
 
 ```bash
-python3 xdremux/python/XDRemux.py categorize --input photo_dump/ --output-dir categorized/
+python3 -m xdremux_py categorize --input photo_dump/ --output-dir categorized/
 ```
 
 读不出拍摄模式的照片会进入对应资产类型下的 `未分类`。已有的 Apple Live Photo 只有在 HEIC/JPEG 与 MOV 的内容标识等配对信息通过校验后，才会作为同一个资产一起移动；仅仅同名的随机 MOV 不会被认领。ProXDR、HDR、Gain Map、景深和厂商等属性只作为标签保留，不继续增加物理目录层级。
@@ -92,7 +92,7 @@ pip install -e .
 xdremux-py convert --input IMG_001.heic --output IMG_001_hdr.heic
 ```
 
-不安装也可以，从仓库根目录用 `python3 xdremux/python/XDRemux.py` 或 `python3 -m xdremux_py` 调用同一套命令。
+不安装也可以，从仓库根目录用 `python3 -m xdremux_py` 调用同一套命令。
 
 ## 作为 Swift Package 使用
 
