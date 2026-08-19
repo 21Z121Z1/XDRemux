@@ -625,6 +625,71 @@ def input_features(images: np.ndarray) -> np.ndarray:
     return np.concatenate((styled, unstyled, difference, ycbcr_difference), axis=0)
 
 
+def runtime_gate_scores(
+    prediction: np.ndarray,
+    baseline_prediction: np.ndarray,
+    candidate_prediction: np.ndarray,
+    scales: np.ndarray,
+    mask: np.ndarray,
+) -> dict[str, float]:
+    """Return label-free native-distribution scores for one key1 prediction."""
+    expected = identity_key1().shape
+    values = [prediction, baseline_prediction, candidate_prediction]
+    if any(np.asarray(value).shape != expected for value in values):
+        raise ReverseKey1Error(f"runtime key1 prediction shape must be {expected}")
+    valid = np.asarray(mask, dtype=np.bool_)
+    if valid.shape != (GRID_LONG, GRID_LONG) or not valid.any():
+        raise ReverseKey1Error("runtime key1 mask is invalid")
+    coefficient_scales = np.asarray(scales, dtype=np.float32)
+    if coefficient_scales.shape != (PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT):
+        raise ReverseKey1Error("runtime coefficient scales have an invalid shape")
+    if not np.isfinite(coefficient_scales).all() or np.any(coefficient_scales <= 0):
+        raise ReverseKey1Error("runtime coefficient scales must be positive and finite")
+    normalized = (
+        np.asarray(prediction, dtype=np.float32) - identity_key1()
+    ) / coefficient_scales
+    disagreement = (
+        np.asarray(baseline_prediction, dtype=np.float32)
+        - np.asarray(candidate_prediction, dtype=np.float32)
+    ) / coefficient_scales
+    selected = normalized[valid]
+    selected_disagreement = disagreement[valid]
+    total_variation: list[np.ndarray] = []
+    horizontal = valid[:, 1:] & valid[:, :-1]
+    vertical = valid[1:, :] & valid[:-1, :]
+    if horizontal.any():
+        total_variation.append(
+            np.abs(normalized[:, 1:] - normalized[:, :-1])[horizontal]
+        )
+    if vertical.any():
+        total_variation.append(
+            np.abs(normalized[1:] - normalized[:-1])[vertical]
+        )
+    spatial = np.concatenate([value.reshape(-1) for value in total_variation])
+    return {
+        "normalizedResidualRMS": float(np.sqrt(np.mean(selected * selected))),
+        "normalizedResidualP99": float(np.quantile(np.abs(selected), 0.99)),
+        "maximumNormalizedResidual": float(np.max(np.abs(selected))),
+        "ensembleDisagreementRMS": float(
+            np.sqrt(np.mean(selected_disagreement * selected_disagreement))
+        ),
+        "spatialTotalVariationMean": float(np.mean(spatial)),
+    }
+
+
+def runtime_gate_passes(
+    scores: Mapping[str, float],
+    thresholds: Mapping[str, float],
+) -> bool:
+    if set(scores) != set(thresholds):
+        raise ReverseKey1Error("runtime gate scores and thresholds differ")
+    return all(
+        math.isfinite(float(scores[name]))
+        and float(scores[name]) <= float(thresholds[name])
+        for name in scores
+    )
+
+
 def _require_torch() -> tuple[Any, Any]:
     try:
         import torch

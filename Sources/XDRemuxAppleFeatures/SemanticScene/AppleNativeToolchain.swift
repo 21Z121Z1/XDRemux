@@ -90,11 +90,17 @@ package enum AppleNativeToolchain {
     static func run(
         _ executableURL: URL,
         arguments: [String],
-        timeout: TimeInterval? = nil
+        timeout: TimeInterval? = nil,
+        environment: [String: String] = [:]
     ) throws -> Result {
         let process = Process()
         process.executableURL = executableURL
         process.arguments = arguments
+        if !environment.isEmpty {
+            process.environment = ProcessInfo.processInfo.environment.merging(
+                environment
+            ) { _, override in override }
+        }
         let output = Pipe()
         let errors = Pipe()
         process.standardOutput = output

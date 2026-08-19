@@ -120,8 +120,14 @@ Swift CLI 只维护 SwiftPM 的 `xdremux` executable；仓库内部验证也直�
 | `XDREMUX_KEEP_PORTRAIT_SCRATCH=1` | 保留人像转换中间产物 |
 | `XDREMUX_ENCODING_AUDIT_DIR=<目录>` | 把编码审计数据写到指定目录 |
 | `XDREMUX_STYLE_RENDER_JOBS=<n>` | 限制摄影风格渲染并发数 |
+| `XDREMUX_RESEARCH_REVERSE_KEY1_COREML_MODEL=<路径>` | 研究用：加载外部 `.mlmodelc` / `.mlpackage` ReverseKey1Net，使用 10 秒有界语义代理选择模型 key1；失败或超时直接回退 identity，不进入慢 solver |
 
 摄影风格还有若干 `XDREMUX_RESEARCH_*` 和 `XDREMUX_STYLES_*` 研究开关，会在输出 manifest 里标记为研究模式并排除生产判定，见 [Apple 功能文档](apple-features.md)。
+
+ReverseKey1Net 的 Core ML 产物不提交进 Git。`scripts/export_reverse_key1_coreml.py`
+从两个本地 checkpoint 生成融合模型；`computeUnits = .all` 允许系统选择 CPU、GPU
+或 Neural Engine，但不能据此声称实际落在 Neural Engine。在线语义代理只是完整 Neutrino
+响应的快速筛选器，完整 renderer A/B 和真实 Photos 验收仍是独立证据层。
 
 ## 验收规则
 

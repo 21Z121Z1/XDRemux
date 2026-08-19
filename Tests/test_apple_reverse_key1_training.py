@@ -15,6 +15,8 @@ from xdremux_py.apple_reverse_key1_training import (
     encode_key1,
     identity_key1,
     input_features,
+    runtime_gate_passes,
+    runtime_gate_scores,
     select_linear_blend_weight,
     split_for_session,
 )
@@ -152,6 +154,33 @@ class ReverseKey1TrainingTests(unittest.TestCase):
         )
         self.assertEqual(weight, 0.5)
         self.assertEqual(error, 0.0)
+
+    def test_runtime_gate_identity_scores_are_zero_and_pass(self) -> None:
+        identity = identity_key1()
+        mask = np.zeros((GRID_LONG, GRID_LONG), dtype=np.bool_)
+        mask[:GRID_SHORT, :GRID_LONG] = True
+        scores = runtime_gate_scores(
+            identity,
+            identity,
+            identity,
+            np.ones((8, 10, 3), dtype=np.float32),
+            mask,
+        )
+        self.assertEqual(
+            scores,
+            {
+                "normalizedResidualRMS": 0.0,
+                "normalizedResidualP99": 0.0,
+                "maximumNormalizedResidual": 0.0,
+                "ensembleDisagreementRMS": 0.0,
+                "spatialTotalVariationMean": 0.0,
+            },
+        )
+        self.assertTrue(runtime_gate_passes(scores, scores))
+
+    def test_runtime_gate_rejects_mismatched_contract(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "scores and thresholds differ"):
+            runtime_gate_passes({"score": 0.0}, {"other": 1.0})
 
 
 if __name__ == "__main__":
