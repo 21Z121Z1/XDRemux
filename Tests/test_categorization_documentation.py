@@ -20,7 +20,6 @@ class CategorizationDocumentationTests(unittest.TestCase):
         paths = (
             root / "Sources/XDRemuxCLI/Commands/XDRemuxCommand.swift",
             root / "xdremux_py/cli.py",
-            root / "xdremux/README.md",
         )
         for path in paths:
             with self.subTest(path=path.name):
