@@ -177,7 +177,7 @@ final class ConversionArgumentParserTests: XCTestCase {
         XCTAssertEqual(convert.debugRootURL, batch.debugRootURL)
     }
 
-    func testAppleAndOppoConflictPreservesLegacyError() {
+    func testAppleAndOppoConflictPreservesDomainError() {
         XCTAssertThrowsError(
             try ConversionArgumentParser.parseConvert([
                 "--input", "/tmp/input.heic",
@@ -192,15 +192,17 @@ final class ConversionArgumentParserTests: XCTestCase {
         }
     }
 
-    func testMissingUnknownAndInvalidArgumentsKeepErrorTypes() {
-        XCTAssertThrowsError(try ConversionArgumentParser.parseConvert([])) { error in
-            XCTAssertEqual(String(describing: error), "missing required argument: --input")
-        }
+    func testParserOwnedAndDomainInvalidArgumentsAreRejected() {
+        // ArgumentParser owns the wording and concrete error representation for
+        // syntactic parse failures. Its public contract is rejection, not the
+        // debug description of its internal CommandError value.
+        XCTAssertThrowsError(try ConversionArgumentParser.parseConvert([]))
         XCTAssertThrowsError(
             try ConversionArgumentParser.parseConvert(["--input", "a.heic", "--wat"])
-        ) { error in
-            XCTAssertEqual(String(describing: error), "unknown option: --wat")
-        }
+        )
+
+        // Domain validation remains XDRemux-owned and therefore keeps its stable
+        // project error contract.
         XCTAssertThrowsError(
             try ConversionArgumentParser.parseBatch(["--input-dir", "/tmp", "--jobs", "0"])
         ) { error in
