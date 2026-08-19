@@ -4,9 +4,10 @@ This module deliberately keeps the first learning boundary narrow:
 
     styled thumbnail + disabled/native reverse thumbnail -> key1
 
-Device, OS, and lens metadata are audit covariates only.  They are never fed to
-the first model.  Private HEIC inputs and generated training caches remain
-outside Git under ``.codex``.
+Device, OS, and lens metadata start as audit covariates.  An optional tiny
+target-device adapter can be enabled only after the shared-model audit shows a
+repeatable profile bias.  Private HEIC inputs and generated training caches
+remain outside Git under ``.codex``.
 """
 
 from __future__ import annotations
@@ -635,8 +636,14 @@ def _require_torch() -> tuple[Any, Any]:
     return torch, nn
 
 
-def build_model(scales: np.ndarray | None = None) -> Any:
+def build_model(
+    scales: np.ndarray | None = None,
+    *,
+    profile_count: int = 0,
+) -> Any:
     torch, nn = _require_torch()
+    if profile_count < 0:
+        raise ReverseKey1Error("profile count cannot be negative")
 
     class ResidualBlock(nn.Module):
         def __init__(self, channels: int):
@@ -678,6 +685,16 @@ def build_model(scales: np.ndarray | None = None) -> Any:
                 nn.SiLU(),
                 output_layer,
             )
+            self.profile_count = profile_count
+            if profile_count:
+                # Per-profile FiLM and plane deltas alter how image features map
+                # to coefficients.  Zero initialization keeps a warm-started
+                # conditioned model bit-equivalent to the shared v1 model.
+                profile_width = 2 * channels[-1] + PLANE_COUNT * 32
+                self.profile_embedding = nn.Embedding(profile_count, profile_width)
+                nn.init.zeros_(self.profile_embedding.weight)
+            else:
+                self.profile_embedding = None
             initial_scales = np.ones(
                 (PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT), dtype=np.float32
             ) if scales is None else np.asarray(scales, dtype=np.float32)
@@ -705,7 +722,7 @@ def build_model(scales: np.ndarray | None = None) -> Any:
                 ),
             )
 
-        def forward(self, value: Any) -> Any:
+        def forward(self, value: Any, profile_ids: Any | None = None) -> Any:
             spatial = torch.nn.functional.interpolate(
                 self.encoder(value),
                 size=(GRID_LONG, GRID_LONG),
@@ -713,12 +730,30 @@ def build_model(scales: np.ndarray | None = None) -> Any:
                 align_corners=False,
             ).permute(0, 2, 3, 1)
             batch, height, width, _ = spatial.shape
+            profile_plane = None
+            if self.profile_count:
+                if profile_ids is None:
+                    raise ReverseKey1Error(
+                        "profile-conditioned model requires profile IDs"
+                    )
+                profile = self.profile_embedding(profile_ids)
+                gamma, beta, profile_plane = torch.split(
+                    profile,
+                    (spatial.shape[-1], spatial.shape[-1], PLANE_COUNT * 32),
+                    dim=-1,
+                )
+                spatial = spatial * (1.0 + gamma[:, None, None, :])
+                spatial = spatial + beta[:, None, None, :]
             spatial = spatial[:, :, :, None, :].expand(
                 batch, height, width, PLANE_COUNT, spatial.shape[-1]
             )
             plane = self.plane_embedding.weight.reshape(
                 1, 1, 1, PLANE_COUNT, -1
             ).expand(batch, height, width, -1, -1)
+            if profile_plane is not None:
+                plane = plane + profile_plane.reshape(
+                    batch, 1, 1, PLANE_COUNT, 32
+                )
             normalized_residual = self.head(torch.cat((spatial, plane), dim=-1))
             normalized_residual = normalized_residual.reshape(
                 batch,
@@ -733,10 +768,27 @@ def build_model(scales: np.ndarray | None = None) -> Any:
     return ReverseKey1Net()
 
 
+def device_profile_vocabulary(
+    samples: Sequence[Mapping[str, Any]],
+) -> tuple[str, ...]:
+    profiles = sorted({str(sample.get("Model") or "unknown") for sample in samples})
+    return tuple(profiles + ["__unknown__"])
+
+
 class _CachedDataset:
-    def __init__(self, root: Path, samples: Sequence[Mapping[str, Any]]):
+    def __init__(
+        self,
+        root: Path,
+        samples: Sequence[Mapping[str, Any]],
+        profile_vocabulary: Sequence[str] = (),
+    ):
         self.root = root
         self.samples = list(samples)
+        self.profile_vocabulary = tuple(profile_vocabulary)
+        self.profile_ids = {
+            value: index for index, value in enumerate(self.profile_vocabulary)
+        }
+        self.unknown_profile_id = self.profile_ids.get("__unknown__", 0)
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -755,6 +807,13 @@ class _CachedDataset:
             torch.from_numpy(mask),
             str(record.get("Model") or "unknown"),
             str(record["captureSession"]),
+            torch.tensor(
+                self.profile_ids.get(
+                    str(record.get("Model") or "unknown"),
+                    self.unknown_profile_id,
+                ),
+                dtype=torch.long,
+            ),
         )
 
 
@@ -786,6 +845,10 @@ class TrainingConfig:
     seed: int = 260819
     device: str = "auto"
     num_workers: int = 0
+    profile_conditioning: str = "none"
+    balance_profiles: bool = False
+    initialize_from: Path | None = None
+    base_learning_rate_scale: float = 0.1
 
 
 def _select_device(torch: Any, requested: str) -> str:
@@ -851,13 +914,14 @@ def _evaluate(
     per_model: dict[str, list[float]] = defaultdict(list)
     scales = model.coefficient_scales
     with torch.no_grad():
-        for features, target, mask, models, _sessions in loader:
+        for features, target, mask, models, _sessions, profile_ids in loader:
             features = features.to(device)
             target = target.to(device)
             mask = mask.to(device)
+            profile_ids = profile_ids.to(device)
             if shuffle_inputs and len(features) > 1:
                 features = torch.roll(features, shifts=1, dims=0)
-            prediction = model(features)
+            prediction = model(features, profile_ids)
             normalized = ((prediction - target) / scales).abs()
             raw = (prediction - target).abs()
             for index, model_name in enumerate(models):
@@ -875,20 +939,28 @@ def _evaluate(
         raise ReverseKey1Error("evaluation split is empty")
     normalized_values = torch.cat(normalized_absolute)
     raw_values = torch.cat(raw_absolute)
+    per_model_metrics = {
+        name: float(np.mean(values)) for name, values in sorted(per_model.items())
+    }
     return {
         "normalizedMAE": float(normalized_values.mean()),
         "normalizedRMSE": float(torch.sqrt(torch.mean(normalized_values**2))),
         "normalizedP95Absolute": float(torch.quantile(normalized_values, 0.95)),
         "rawMAE": float(raw_values.mean()),
         "rawP95Absolute": float(torch.quantile(raw_values, 0.95)),
-        "perModelNormalizedMAE": {
-            name: float(np.mean(values)) for name, values in sorted(per_model.items())
-        },
+        "perModelNormalizedMAE": per_model_metrics,
+        "macroModelNormalizedMAE": float(np.mean(list(per_model_metrics.values()))),
     }
 
 
 def train(config: TrainingConfig) -> dict[str, Any]:
     torch, _ = _require_torch()
+    if config.profile_conditioning not in {"none", "target_device_model"}:
+        raise ReverseKey1Error(
+            "profile conditioning must be none or target_device_model"
+        )
+    if not 0 <= config.base_learning_rate_scale <= 1:
+        raise ReverseKey1Error("base learning-rate scale must be in [0, 1]")
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
     header, samples = load_manifest(config.manifest.resolve())
@@ -900,40 +972,147 @@ def train(config: TrainingConfig) -> dict[str, Any]:
     if any(not by_split[split] for split in by_split):
         raise ReverseKey1Error("train/calibration/heldout splits must all be non-empty")
     scales = coefficient_scales(root, by_split["train"])
-    model = build_model(scales)
+    profile_vocabulary = (
+        device_profile_vocabulary(samples)
+        if config.profile_conditioning == "target_device_model"
+        else ()
+    )
+    profile_count = len(profile_vocabulary)
+    architecture = (
+        "ReverseKey1Net-v3-profile-film"
+        if profile_count
+        else "ReverseKey1Net-v1"
+    )
+    model = build_model(scales, profile_count=profile_count)
+    identity_model = build_model(scales, profile_count=profile_count)
+    initialization: dict[str, Any] | None = None
+    if config.initialize_from is not None:
+        initial_path = config.initialize_from.resolve()
+        initial = torch.load(initial_path, map_location="cpu", weights_only=False)
+        if initial.get("manifestSHA256") != sha256_file(config.manifest.resolve()):
+            raise ReverseKey1Error("warm-start checkpoint uses another manifest")
+        initial_scales = np.asarray(initial.get("coefficientScales"), dtype=np.float32)
+        if initial_scales.shape != scales.shape or not np.array_equal(
+            initial_scales, scales
+        ):
+            raise ReverseKey1Error("warm-start coefficient scales do not match")
+        incompatible = model.load_state_dict(initial["model"], strict=False)
+        allowed_missing = {"profile_embedding.weight"} if profile_count else set()
+        if set(incompatible.missing_keys) != allowed_missing:
+            raise ReverseKey1Error(
+                "unexpected warm-start missing keys: "
+                f"{sorted(incompatible.missing_keys)}"
+            )
+        if incompatible.unexpected_keys:
+            raise ReverseKey1Error(
+                "unexpected warm-start keys: "
+                f"{sorted(incompatible.unexpected_keys)}"
+            )
+        initialization = {
+            "checkpointSHA256": sha256_file(initial_path),
+            "architecture": initial.get("architecture"),
+            "epoch": initial.get("epoch"),
+        }
     device = _select_device(torch, config.device)
     model.to(device)
-    loaders = {
-        split: torch.utils.data.DataLoader(
-            _CachedDataset(root, values),
-            batch_size=config.batch_size,
-            shuffle=split == "train",
-            num_workers=config.num_workers,
-        )
+    identity_model.to(device)
+    datasets = {
+        split: _CachedDataset(root, values, profile_vocabulary)
         for split, values in by_split.items()
     }
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=config.learning_rate, weight_decay=1e-4
-    )
+    training_sampler = None
+    if config.balance_profiles:
+        counts = Counter(
+            str(sample.get("Model") or "unknown")
+            for sample in by_split["train"]
+        )
+        weights = torch.tensor(
+            [
+                1.0 / counts[str(sample.get("Model") or "unknown")]
+                for sample in by_split["train"]
+            ],
+            dtype=torch.double,
+        )
+        generator = torch.Generator().manual_seed(config.seed)
+        training_sampler = torch.utils.data.WeightedRandomSampler(
+            weights,
+            num_samples=len(weights),
+            replacement=True,
+            generator=generator,
+        )
+    loaders = {}
+    for split, dataset in datasets.items():
+        loaders[split] = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=config.batch_size,
+            shuffle=split == "train" and training_sampler is None,
+            sampler=training_sampler if split == "train" else None,
+            num_workers=config.num_workers,
+        )
+    if profile_count and initialization is not None:
+        profile_parameters = list(model.profile_embedding.parameters())
+        profile_parameter_ids = {id(parameter) for parameter in profile_parameters}
+        base_parameters = [
+            parameter
+            for parameter in model.parameters()
+            if id(parameter) not in profile_parameter_ids
+        ]
+        optimizer = torch.optim.AdamW(
+            [
+                {
+                    "params": base_parameters,
+                    "lr": config.learning_rate * config.base_learning_rate_scale,
+                },
+                {"params": profile_parameters, "lr": config.learning_rate},
+            ],
+            weight_decay=1e-4,
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=config.learning_rate, weight_decay=1e-4
+        )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=max(1, config.epochs)
     )
     config.output.mkdir(parents=True, exist_ok=True)
+    selection_metric = (
+        "macroModelNormalizedMAE" if config.balance_profiles else "normalizedMAE"
+    )
     best = math.inf
     history: list[dict[str, Any]] = []
     baselines = {
         "identityCalibration": _evaluate(
-            torch, model, loaders["calibration"], device
+            torch, identity_model, loaders["calibration"], device
         ),
-        "identityHeldout": _evaluate(torch, model, loaders["heldout"], device),
+        "identityHeldout": _evaluate(
+            torch, identity_model, loaders["heldout"], device
+        ),
     }
+    initialization_metrics = (
+        {
+            "calibration": _evaluate(
+                torch, model, loaders["calibration"], device
+            ),
+            "heldout": _evaluate(torch, model, loaders["heldout"], device),
+        }
+        if initialization is not None
+        else None
+    )
     for epoch in range(1, config.epochs + 1):
         model.train()
         epoch_losses: list[float] = []
-        for features, target, mask, _models, _sessions in loaders["train"]:
+        for (
+            features,
+            target,
+            mask,
+            _models,
+            _sessions,
+            profile_ids,
+        ) in loaders["train"]:
             features = features.to(device)
             target = target.to(device)
             mask = mask.to(device)
+            profile_ids = profile_ids.to(device)
             optimizer.zero_grad(set_to_none=True)
             identity_features = torch.cat(
                 (
@@ -943,7 +1122,10 @@ def train(config: TrainingConfig) -> dict[str, Any]:
                 ),
                 dim=1,
             )
-            combined_prediction = model(torch.cat((features, identity_features), dim=0))
+            combined_prediction = model(
+                torch.cat((features, identity_features), dim=0),
+                torch.cat((profile_ids, profile_ids), dim=0),
+            )
             prediction, identity_prediction = combined_prediction.chunk(2, dim=0)
             loss, _parts = _masked_losses(
                 torch,
@@ -972,7 +1154,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
         calibration = _evaluate(torch, model, loaders["calibration"], device)
         epoch_record = {
             "epoch": epoch,
-            "learningRate": float(scheduler.get_last_lr()[0]),
+            "learningRates": [float(value) for value in scheduler.get_last_lr()],
             "trainingLoss": float(np.mean(epoch_losses)),
             "calibration": calibration,
         }
@@ -985,13 +1167,20 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             "coefficientScales": scales,
             "manifestSHA256": sha256_file(config.manifest.resolve()),
             "sourceCorpusSHA256": header["corpusSHA256"],
-            "architecture": "ReverseKey1Net-v1",
+            "architecture": architecture,
             "inputChannels": INPUT_CHANNELS,
-            "deviceMetadataPolicy": "audit_only_not_model_input",
+            "profileConditioning": config.profile_conditioning,
+            "profileVocabulary": list(profile_vocabulary),
+            "deviceMetadataPolicy": (
+                "target_device_model_only"
+                if profile_count
+                else "audit_only_not_model_input"
+            ),
+            "initialization": initialization,
         }
         torch.save(checkpoint, config.output / "last.pt")
-        if calibration["normalizedMAE"] < best:
-            best = calibration["normalizedMAE"]
+        if calibration[selection_metric] < best:
+            best = calibration[selection_metric]
             torch.save(checkpoint, config.output / "best.pt")
         _atomic_json(config.output / "history.json", history)
         print(json.dumps(epoch_record, sort_keys=True), flush=True)
@@ -1010,18 +1199,30 @@ def train(config: TrainingConfig) -> dict[str, Any]:
     )
     report = {
         "schema": REPORT_SCHEMA,
-        "architecture": "ReverseKey1Net-v1",
+        "architecture": architecture,
         "device": device,
         "epochs": config.epochs,
         "batchSize": config.batch_size,
         "learningRate": config.learning_rate,
+        "baseLearningRateScale": config.base_learning_rate_scale,
         "seed": config.seed,
         "parameterCount": sum(parameter.numel() for parameter in model.parameters()),
         "dataset": header,
         "splitCounts": {name: len(values) for name, values in by_split.items()},
+        "profileConditioning": config.profile_conditioning,
+        "profileVocabulary": list(profile_vocabulary),
+        "balancedProfileSampling": config.balance_profiles,
+        "selectionMetric": selection_metric,
+        "initialization": initialization,
+        "initializationMetrics": initialization_metrics,
         "baselines": baselines,
         "bestEpoch": int(best_checkpoint["epoch"]),
-        "calibrationBestNormalizedMAE": best,
+        "calibrationBestSelectionValue": best,
+        "calibrationBestNormalizedMAE": next(
+            item["calibration"]["normalizedMAE"]
+            for item in history
+            if item["epoch"] == int(best_checkpoint["epoch"])
+        ),
         "heldout": heldout,
         "heldoutShuffledInput": heldout_shuffled,
         "artifacts": {

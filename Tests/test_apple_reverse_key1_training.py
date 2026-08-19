@@ -11,6 +11,7 @@ from xdremux_py.apple_reverse_key1_training import (
     KEY1_BYTE_LENGTH,
     build_model,
     decode_key1,
+    device_profile_vocabulary,
     encode_key1,
     identity_key1,
     input_features,
@@ -77,6 +78,43 @@ class ReverseKey1TrainingTests(unittest.TestCase):
             torch.equal(output, torch.from_numpy(identity_key1()).unsqueeze(0))
         )
         self.assertLess(sum(parameter.numel() for parameter in model.parameters()), 2_000_000)
+
+    def test_profile_adapter_starts_equivalent_to_shared_model(self) -> None:
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch training extra is unavailable")
+        torch.manual_seed(9)
+        shared = build_model(np.ones((8, 10, 3), dtype=np.float32))
+        conditioned = build_model(
+            np.ones((8, 10, 3), dtype=np.float32), profile_count=5
+        )
+        incompatible = conditioned.load_state_dict(shared.state_dict(), strict=False)
+        self.assertEqual(
+            set(incompatible.missing_keys),
+            {"profile_embedding.weight"},
+        )
+        self.assertEqual(incompatible.unexpected_keys, [])
+        value = torch.randn((2, INPUT_CHANNELS, INPUT_SIZE, INPUT_SIZE))
+        shared_output = shared(value)
+        conditioned_output = conditioned(value, torch.tensor([0, 3]))
+        self.assertTrue(torch.equal(shared_output, conditioned_output))
+        extra_parameters = sum(
+            parameter.numel() for parameter in conditioned.parameters()
+        ) - sum(parameter.numel() for parameter in shared.parameters())
+        self.assertLess(extra_parameters, 5_000)
+        self.assertEqual(extra_parameters, 5 * (2 * 128 + 8 * 32))
+
+    def test_device_profile_vocabulary_is_stable_and_has_unknown(self) -> None:
+        samples = [
+            {"Model": "iPhone 17 Pro"},
+            {"Model": "iPhone 16"},
+            {"Model": "iPhone 17 Pro"},
+        ]
+        self.assertEqual(
+            device_profile_vocabulary(samples),
+            ("iPhone 16", "iPhone 17 Pro", "__unknown__"),
+        )
 
 
 if __name__ == "__main__":
