@@ -43,7 +43,7 @@ swift build
 
 默认只重写 HDR 那部分数据（业内叫 Gain Map，记录每个像素该提亮多少），画面、水印、大师模式这些一律原样保留。HDR 精度也保持原样；`--oppo-compatible` 必须把它降一档 OPPO 相册才认，降完回不去。
 
-全部参数、默认值和退出码见 [CLI 参考](docs/cli.md)，或直接跑 `swift run xdremux --help`。
+全部参数、默认值和退出码见 [CLI 参考](docs/cli.md)。`swift run xdremux --help` 列出命令，`swift run xdremux <命令> --help` 显示该命令的参数。
 
 ## 按拍摄模式归档
 
