@@ -28,7 +28,8 @@ public enum AppleLivePhotoConversionEngine {
     public static func convert(
         inputURL: URL,
         outputImageURL: URL,
-        requirePhotoKitValidation: Bool = true
+        requirePhotoKitValidation: Bool = true,
+        photographicStylesConfiguration: ConversionConfiguration? = nil
     ) throws -> LivePhotoConversionResult {
         let semaphore = DispatchSemaphore(value: 0)
         let box = LivePhotoConversionResultBox()
@@ -37,7 +38,8 @@ public enum AppleLivePhotoConversionEngine {
                 let value = try await convertAsync(
                     inputURL: inputURL,
                     outputImageURL: outputImageURL,
-                    requirePhotoKitValidation: requirePhotoKitValidation
+                    requirePhotoKitValidation: requirePhotoKitValidation,
+                    photographicStylesConfiguration: photographicStylesConfiguration
                 )
                 box.set(.success(value))
             } catch {
@@ -52,7 +54,8 @@ public enum AppleLivePhotoConversionEngine {
     public static func convertAsync(
         inputURL: URL,
         outputImageURL: URL,
-        requirePhotoKitValidation: Bool = true
+        requirePhotoKitValidation: Bool = true,
+        photographicStylesConfiguration: ConversionConfiguration? = nil
     ) async throws -> LivePhotoConversionResult {
         guard let asset = try OppoMotionPhotoParser.parse(url: inputURL) else {
             throw AppleLivePhotoError.transactionFailed("input is not a supported Motion Photo")
@@ -65,6 +68,23 @@ public enum AppleLivePhotoConversionEngine {
         let ext = outputImageURL.pathExtension.lowercased()
         guard ext == "heic" || ext == "heif" else {
             throw AppleLivePhotoError.transactionFailed("Live Photo still output must use .heic or .heif")
+        }
+
+        let stylesConfiguration: ConversionConfiguration?
+        if let configuration = photographicStylesConfiguration, configuration.appleFeaturesEnabled {
+            guard configuration.applePhotographicStyles, !configuration.applePortrait else {
+                throw AppleLivePhotoError.transactionFailed(
+                    "Live Photo conversion currently supports Photographic Styles but not Apple Portrait in the same pass"
+                )
+            }
+            guard !configuration.oppoCompatibility.wantsOppoCompat else {
+                throw AppleLivePhotoError.transactionFailed(
+                    "Live Photo Photographic Styles output cannot use OPPO-compatible HDR mode"
+                )
+            }
+            stylesConfiguration = configuration
+        } else {
+            stylesConfiguration = nil
         }
 
         let outputVideoURL = companionVideoURL(for: outputImageURL)
@@ -136,9 +156,13 @@ public enum AppleLivePhotoConversionEngine {
         let directory = outputImageURL.deletingLastPathComponent()
         let stem = outputImageURL.deletingPathExtension().lastPathComponent
         let temporaryImageURL = directory.appendingPathComponent(".\(stem).\(publicationID).tmp.heic")
+        let styledTemporaryImageURL = directory.appendingPathComponent(
+            ".\(stem).\(publicationID).tmp.styles.heic"
+        )
         let temporaryVideoURL = directory.appendingPathComponent(".\(stem).\(publicationID).tmp.mov")
         defer {
             try? FileManager.default.removeItem(at: temporaryImageURL)
+            try? FileManager.default.removeItem(at: styledTemporaryImageURL)
             try? FileManager.default.removeItem(at: temporaryVideoURL)
         }
 
@@ -159,6 +183,29 @@ public enum AppleLivePhotoConversionEngine {
             outputURL: temporaryImageURL,
             assetIdentifier: assetIdentifier
         )
+
+        let pairedImageURL: URL
+        if let stylesConfiguration {
+            try AppleFeatureConversionEngine.convert(
+                inputURL: temporaryImageURL,
+                outputURL: styledTemporaryImageURL,
+                configuration: stylesConfiguration
+            )
+            let stylesReport = try AppleFeatureConversionEngine.validationReport(
+                for: styledTemporaryImageURL,
+                expectsPortrait: false
+            )
+            guard stylesReport["passed"] as? Bool == true,
+                  AppleLivePhotoStillWriter.assetIdentifier(in: styledTemporaryImageURL) == assetIdentifier else {
+                throw AppleLivePhotoError.transactionFailed(
+                    "Photographic Styles generation did not preserve a valid Live Photo still identity"
+                )
+            }
+            pairedImageURL = styledTemporaryImageURL
+        } else {
+            pairedImageURL = temporaryImageURL
+        }
+
         try await AppleLivePhotoVideoWriter.write(
             videoInputURL: videoSourceURL,
             outputURL: temporaryVideoURL,
@@ -170,7 +217,7 @@ public enum AppleLivePhotoConversionEngine {
 
         let expectedTransform = transformResolution.transform != nil
         _ = try await AppleLivePhotoValidator.validate(
-            imageURL: temporaryImageURL,
+            imageURL: pairedImageURL,
             videoURL: temporaryVideoURL,
             expectedAssetIdentifier: assetIdentifier,
             expectedStillImageTime: timeline.stillImageTime,
@@ -184,7 +231,7 @@ public enum AppleLivePhotoConversionEngine {
         )
 
         try LivePhotoPairPublisher.publish(
-            temporaryImageURL: temporaryImageURL,
+            temporaryImageURL: pairedImageURL,
             temporaryVideoURL: temporaryVideoURL,
             finalImageURL: outputImageURL,
             finalVideoURL: outputVideoURL
@@ -193,6 +240,11 @@ public enum AppleLivePhotoConversionEngine {
         var diagnostics: [String] = []
         diagnostics.append(contentsOf: geometryPreparationDiagnostics)
         diagnostics.append(contentsOf: transformResolution.diagnostics)
+        if stylesConfiguration != nil {
+            diagnostics.append(
+                "Photographic Styles generated on the converted Live Photo still and validated through NeutrinoCore before publication."
+            )
+        }
         if let xmp = asset.presentationTimestampUs,
            let cover = asset.vendorMetadata?.coverFramePtsUs,
            xmp != cover {
