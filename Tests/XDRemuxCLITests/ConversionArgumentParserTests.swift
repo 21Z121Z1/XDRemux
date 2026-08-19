@@ -73,6 +73,22 @@ final class ConversionArgumentParserTests: XCTestCase {
         XCTAssertEqual(oppo.oppoCameraTail, .preserve)
     }
 
+    func testOppoCompatSupportsBareFlagAndExplicitMode() throws {
+        let bare = try ConversionArgumentParser.parseConvert([
+            "--input", "/tmp/input.heic",
+            "--oppo-compat",
+        ])
+        let explicit = try ConversionArgumentParser.parseConvert([
+            "--input", "/tmp/input.heic",
+            "--oppo-compat", "iso-graph",
+        ])
+
+        XCTAssertEqual(bare.oppoCompatibility, .on)
+        XCTAssertEqual(bare.oppoCameraTail, .preserve)
+        XCTAssertEqual(explicit.oppoCompatibility, .isoGraph)
+        XCTAssertEqual(explicit.oppoCameraTail, .preserve)
+    }
+
     func testAppleModesAreIndependentAndComposable() throws {
         let styles = try parseApple(["--apple-photographic-styles"])
         let portrait = try parseApple(["--apple-portrait"])
