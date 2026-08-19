@@ -15,6 +15,7 @@ from xdremux_py.apple_reverse_key1_training import (
     encode_key1,
     identity_key1,
     input_features,
+    select_linear_blend_weight,
     split_for_session,
 )
 
@@ -105,6 +106,27 @@ class ReverseKey1TrainingTests(unittest.TestCase):
         self.assertLess(extra_parameters, 5_000)
         self.assertEqual(extra_parameters, 5 * (2 * 128 + 8 * 32))
 
+    def test_multiscale_large_model_is_structured_and_identity_centered(self) -> None:
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch training extra is unavailable")
+        torch.manual_seed(11)
+        model = build_model(
+            np.ones((8, 10, 3), dtype=np.float32),
+            profile_count=5,
+            architecture="multiscale_large",
+        )
+        value = torch.zeros((1, INPUT_CHANNELS, INPUT_SIZE, INPUT_SIZE))
+        output = model(value, torch.tensor([2]))
+        self.assertEqual(tuple(output.shape), (1, 12, 12, 8, 10, 3))
+        self.assertTrue(
+            torch.equal(output, torch.from_numpy(identity_key1()).unsqueeze(0))
+        )
+        parameter_count = sum(parameter.numel() for parameter in model.parameters())
+        self.assertGreater(parameter_count, 8_000_000)
+        self.assertLess(parameter_count, 15_000_000)
+
     def test_device_profile_vocabulary_is_stable_and_has_unknown(self) -> None:
         samples = [
             {"Model": "iPhone 17 Pro"},
@@ -115,6 +137,21 @@ class ReverseKey1TrainingTests(unittest.TestCase):
             device_profile_vocabulary(samples),
             ("iPhone 16", "iPhone 17 Pro", "__unknown__"),
         )
+
+    def test_linear_blend_weight_is_selected_only_from_supplied_tensors(self) -> None:
+        baseline = np.asarray([[[0.0]], [[2.0]]], dtype=np.float32)
+        candidate = np.asarray([[[2.0]], [[0.0]]], dtype=np.float32)
+        target = np.asarray([[[1.0]], [[1.0]]], dtype=np.float32)
+        weight, error = select_linear_blend_weight(
+            baseline,
+            candidate,
+            target,
+            np.ones((1,), dtype=np.float32),
+            np.ones((2,), dtype=np.bool_),
+            grid_size=5,
+        )
+        self.assertEqual(weight, 0.5)
+        self.assertEqual(error, 0.0)
 
 
 if __name__ == "__main__":

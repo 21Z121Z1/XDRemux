@@ -640,10 +640,13 @@ def build_model(
     scales: np.ndarray | None = None,
     *,
     profile_count: int = 0,
+    architecture: str = "small",
 ) -> Any:
     torch, nn = _require_torch()
     if profile_count < 0:
         raise ReverseKey1Error("profile count cannot be negative")
+    if architecture not in {"small", "multiscale_large"}:
+        raise ReverseKey1Error(f"unsupported architecture: {architecture}")
 
     class ResidualBlock(nn.Module):
         def __init__(self, channels: int):
@@ -765,6 +768,178 @@ def build_model(
             )
             return self.identity + normalized_residual * self.coefficient_scales
 
+    class EncoderStage(nn.Module):
+        def __init__(self, incoming: int, outgoing: int):
+            super().__init__()
+            self.layers = nn.Sequential(
+                nn.Conv2d(incoming, outgoing, 3, stride=2, padding=1),
+                nn.GroupNorm(8, outgoing),
+                nn.SiLU(),
+                ResidualBlock(outgoing),
+                ResidualBlock(outgoing),
+            )
+
+        def forward(self, value: Any) -> Any:
+            return self.layers(value)
+
+    class GlobalContextBlock(nn.Module):
+        def __init__(self, width: int):
+            super().__init__()
+            self.attention_norm = nn.LayerNorm(width)
+            self.attention = nn.MultiheadAttention(
+                width, num_heads=8, dropout=0.1, batch_first=True
+            )
+            self.feed_forward_norm = nn.LayerNorm(width)
+            self.feed_forward = nn.Sequential(
+                nn.Linear(width, width * 2),
+                nn.GELU(),
+                nn.Dropout(0.1),
+                nn.Linear(width * 2, width),
+                nn.Dropout(0.1),
+            )
+
+        def forward(self, value: Any) -> Any:
+            normalized = self.attention_norm(value)
+            attended, _ = self.attention(
+                normalized, normalized, normalized, need_weights=False
+            )
+            value = value + attended
+            return value + self.feed_forward(self.feed_forward_norm(value))
+
+    class MultiscaleLargeReverseKey1Net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            channels = (64, 96, 160, 256)
+            stages: list[Any] = []
+            incoming = INPUT_CHANNELS
+            for outgoing in channels:
+                stages.append(EncoderStage(incoming, outgoing))
+                incoming = outgoing
+            self.encoder_stages = nn.ModuleList(stages)
+            self.scale_projections = nn.ModuleList(
+                nn.Conv2d(channel, 64, 1) for channel in channels
+            )
+            self.spatial_fusion = nn.Sequential(
+                nn.Conv2d(64 * len(channels), 256, 1),
+                nn.GroupNorm(16, 256),
+                nn.SiLU(),
+                ResidualBlock(256),
+                ResidualBlock(256),
+                ResidualBlock(256),
+            )
+            self.context = nn.ModuleList(
+                GlobalContextBlock(256) for _ in range(2)
+            )
+            self.plane_embedding = nn.Embedding(PLANE_COUNT, 64)
+            output_layer = nn.Linear(256, POLYNOMIAL_COUNT * OUTPUT_COUNT)
+            nn.init.zeros_(output_layer.weight)
+            nn.init.zeros_(output_layer.bias)
+            self.head = nn.Sequential(
+                nn.Linear(256 + 64, 256),
+                nn.SiLU(),
+                nn.Dropout(0.1),
+                output_layer,
+            )
+            self.profile_count = profile_count
+            if profile_count:
+                profile_width = 2 * 256 + PLANE_COUNT * 64
+                self.profile_embedding = nn.Embedding(profile_count, profile_width)
+                nn.init.zeros_(self.profile_embedding.weight)
+            else:
+                self.profile_embedding = None
+            initial_scales = (
+                np.ones(
+                    (PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT),
+                    dtype=np.float32,
+                )
+                if scales is None
+                else np.asarray(scales, dtype=np.float32)
+            )
+            if initial_scales.shape != (
+                PLANE_COUNT,
+                POLYNOMIAL_COUNT,
+                OUTPUT_COUNT,
+            ):
+                raise ReverseKey1Error("coefficient scale shape is invalid")
+            self.register_buffer(
+                "coefficient_scales",
+                torch.from_numpy(initial_scales).reshape(
+                    1, 1, 1, PLANE_COUNT, POLYNOMIAL_COUNT, OUTPUT_COUNT
+                ),
+            )
+            self.register_buffer(
+                "identity",
+                torch.from_numpy(identity_key1()).reshape(
+                    1,
+                    GRID_LONG,
+                    GRID_LONG,
+                    PLANE_COUNT,
+                    POLYNOMIAL_COUNT,
+                    OUTPUT_COUNT,
+                ),
+            )
+
+        def forward(self, value: Any, profile_ids: Any | None = None) -> Any:
+            pyramid = []
+            for stage, projection in zip(
+                self.encoder_stages, self.scale_projections
+            ):
+                value = stage(value)
+                projected = projection(value)
+                pyramid.append(
+                    torch.nn.functional.interpolate(
+                        projected,
+                        size=(GRID_LONG, GRID_LONG),
+                        mode="bilinear",
+                        align_corners=False,
+                    )
+                )
+            spatial = self.spatial_fusion(torch.cat(pyramid, dim=1))
+            batch = spatial.shape[0]
+            tokens = spatial.flatten(2).transpose(1, 2)
+            for block in self.context:
+                tokens = block(tokens)
+            spatial = tokens.reshape(
+                batch, GRID_LONG, GRID_LONG, 256
+            )
+
+            profile_plane = None
+            if self.profile_count:
+                if profile_ids is None:
+                    raise ReverseKey1Error(
+                        "profile-conditioned model requires profile IDs"
+                    )
+                profile = self.profile_embedding(profile_ids)
+                gamma, beta, profile_plane = torch.split(
+                    profile, (256, 256, PLANE_COUNT * 64), dim=-1
+                )
+                spatial = spatial * (1.0 + gamma[:, None, None, :])
+                spatial = spatial + beta[:, None, None, :]
+
+            spatial = spatial[:, :, :, None, :].expand(
+                batch, GRID_LONG, GRID_LONG, PLANE_COUNT, 256
+            )
+            plane = self.plane_embedding.weight.reshape(
+                1, 1, 1, PLANE_COUNT, 64
+            ).expand(batch, GRID_LONG, GRID_LONG, -1, -1)
+            if profile_plane is not None:
+                plane = plane + profile_plane.reshape(
+                    batch, 1, 1, PLANE_COUNT, 64
+                )
+            normalized_residual = self.head(
+                torch.cat((spatial, plane), dim=-1)
+            ).reshape(
+                batch,
+                GRID_LONG,
+                GRID_LONG,
+                PLANE_COUNT,
+                POLYNOMIAL_COUNT,
+                OUTPUT_COUNT,
+            )
+            return self.identity + normalized_residual * self.coefficient_scales
+
+    if architecture == "multiscale_large":
+        return MultiscaleLargeReverseKey1Net()
     return ReverseKey1Net()
 
 
@@ -781,6 +956,7 @@ class _CachedDataset:
         root: Path,
         samples: Sequence[Mapping[str, Any]],
         profile_vocabulary: Sequence[str] = (),
+        horizontal_flip_probability: float = 0.0,
     ):
         self.root = root
         self.samples = list(samples)
@@ -789,6 +965,7 @@ class _CachedDataset:
             value: index for index, value in enumerate(self.profile_vocabulary)
         }
         self.unknown_profile_id = self.profile_ids.get("__unknown__", 0)
+        self.horizontal_flip_probability = horizontal_flip_probability
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -801,6 +978,13 @@ class _CachedDataset:
             features = input_features(archive["images"])
             key1 = np.asarray(archive["key1"], dtype=np.float32)
             mask = np.asarray(archive["mask"], dtype=np.bool_)
+        if (
+            self.horizontal_flip_probability > 0
+            and float(torch.rand(())) < self.horizontal_flip_probability
+        ):
+            features = np.flip(features, axis=2).copy()
+            key1 = np.flip(key1, axis=1).copy()
+            mask = np.flip(mask, axis=1).copy()
         return (
             torch.from_numpy(features),
             torch.from_numpy(key1),
@@ -849,6 +1033,9 @@ class TrainingConfig:
     balance_profiles: bool = False
     initialize_from: Path | None = None
     base_learning_rate_scale: float = 0.1
+    architecture: str = "small"
+    horizontal_flip_probability: float = 0.0
+    checkpoint_interval: int = 1
 
 
 def _select_device(torch: Any, requested: str) -> str:
@@ -961,6 +1148,12 @@ def train(config: TrainingConfig) -> dict[str, Any]:
         )
     if not 0 <= config.base_learning_rate_scale <= 1:
         raise ReverseKey1Error("base learning-rate scale must be in [0, 1]")
+    if config.architecture not in {"small", "multiscale_large"}:
+        raise ReverseKey1Error("unsupported training architecture")
+    if not 0 <= config.horizontal_flip_probability <= 1:
+        raise ReverseKey1Error("horizontal flip probability must be in [0, 1]")
+    if config.checkpoint_interval < 1:
+        raise ReverseKey1Error("checkpoint interval must be positive")
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
     header, samples = load_manifest(config.manifest.resolve())
@@ -978,13 +1171,26 @@ def train(config: TrainingConfig) -> dict[str, Any]:
         else ()
     )
     profile_count = len(profile_vocabulary)
-    architecture = (
-        "ReverseKey1Net-v3-profile-film"
-        if profile_count
-        else "ReverseKey1Net-v1"
+    if config.architecture == "multiscale_large":
+        architecture = "ReverseKey1Net-v4-multiscale-large"
+        if profile_count:
+            architecture += "-profile-film"
+    else:
+        architecture = (
+            "ReverseKey1Net-v3-profile-film"
+            if profile_count
+            else "ReverseKey1Net-v1"
+        )
+    model = build_model(
+        scales,
+        profile_count=profile_count,
+        architecture=config.architecture,
     )
-    model = build_model(scales, profile_count=profile_count)
-    identity_model = build_model(scales, profile_count=profile_count)
+    identity_model = build_model(
+        scales,
+        profile_count=profile_count,
+        architecture=config.architecture,
+    )
     initialization: dict[str, Any] | None = None
     if config.initialize_from is not None:
         initial_path = config.initialize_from.resolve()
@@ -1017,7 +1223,14 @@ def train(config: TrainingConfig) -> dict[str, Any]:
     model.to(device)
     identity_model.to(device)
     datasets = {
-        split: _CachedDataset(root, values, profile_vocabulary)
+        split: _CachedDataset(
+            root,
+            values,
+            profile_vocabulary,
+            horizontal_flip_probability=(
+                config.horizontal_flip_probability if split == "train" else 0.0
+            ),
+        )
         for split, values in by_split.items()
     }
     training_sampler = None
@@ -1049,6 +1262,11 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             sampler=training_sampler if split == "train" else None,
             num_workers=config.num_workers,
         )
+    freeze_base = bool(
+        profile_count
+        and initialization is not None
+        and config.base_learning_rate_scale == 0
+    )
     if profile_count and initialization is not None:
         profile_parameters = list(model.profile_embedding.parameters())
         profile_parameter_ids = {id(parameter) for parameter in profile_parameters}
@@ -1057,16 +1275,28 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             for parameter in model.parameters()
             if id(parameter) not in profile_parameter_ids
         ]
-        optimizer = torch.optim.AdamW(
-            [
-                {
-                    "params": base_parameters,
-                    "lr": config.learning_rate * config.base_learning_rate_scale,
-                },
-                {"params": profile_parameters, "lr": config.learning_rate},
-            ],
-            weight_decay=1e-4,
-        )
+        if freeze_base:
+            for parameter in base_parameters:
+                parameter.requires_grad_(False)
+            optimizer = torch.optim.AdamW(
+                profile_parameters,
+                lr=config.learning_rate,
+                weight_decay=1e-4,
+            )
+        else:
+            optimizer = torch.optim.AdamW(
+                [
+                    {
+                        "params": base_parameters,
+                        "lr": (
+                            config.learning_rate
+                            * config.base_learning_rate_scale
+                        ),
+                    },
+                    {"params": profile_parameters, "lr": config.learning_rate},
+                ],
+                weight_decay=1e-4,
+            )
     else:
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=config.learning_rate, weight_decay=1e-4
@@ -1100,6 +1330,11 @@ def train(config: TrainingConfig) -> dict[str, Any]:
     )
     for epoch in range(1, config.epochs + 1):
         model.train()
+        if freeze_base:
+            # Keep frozen dropout and normalization behavior identical to the
+            # selected shared checkpoint while learning only profile FiLM.
+            model.eval()
+            model.profile_embedding.train()
         epoch_losses: list[float] = []
         for (
             features,
@@ -1178,10 +1413,13 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             ),
             "initialization": initialization,
         }
-        torch.save(checkpoint, config.output / "last.pt")
+        if epoch % config.checkpoint_interval == 0 or epoch == config.epochs:
+            torch.save(checkpoint, config.output / "last.pt")
         if calibration[selection_metric] < best:
             best = calibration[selection_metric]
-            torch.save(checkpoint, config.output / "best.pt")
+            inference_checkpoint = dict(checkpoint)
+            inference_checkpoint.pop("optimizer")
+            torch.save(inference_checkpoint, config.output / "best.pt")
         _atomic_json(config.output / "history.json", history)
         print(json.dumps(epoch_record, sort_keys=True), flush=True)
 
@@ -1205,6 +1443,10 @@ def train(config: TrainingConfig) -> dict[str, Any]:
         "batchSize": config.batch_size,
         "learningRate": config.learning_rate,
         "baseLearningRateScale": config.base_learning_rate_scale,
+        "baseFrozen": freeze_base,
+        "architectureConfig": config.architecture,
+        "horizontalFlipProbability": config.horizontal_flip_probability,
+        "checkpointInterval": config.checkpoint_interval,
         "seed": config.seed,
         "parameterCount": sum(parameter.numel() for parameter in model.parameters()),
         "dataset": header,
@@ -1300,3 +1542,41 @@ def storage_summary(paths: Iterable[Path]) -> dict[str, int]:
                 child.stat().st_size for child in path.rglob("*") if child.is_file()
             )
     return result
+
+
+def select_linear_blend_weight(
+    baseline: np.ndarray,
+    candidate: np.ndarray,
+    target: np.ndarray,
+    scales: np.ndarray,
+    mask: np.ndarray,
+    *,
+    grid_size: int = 41,
+) -> tuple[float, float]:
+    """Select a candidate weight using only the supplied calibration tensors."""
+    baseline = np.asarray(baseline, dtype=np.float32)
+    candidate = np.asarray(candidate, dtype=np.float32)
+    target = np.asarray(target, dtype=np.float32)
+    scales = np.asarray(scales, dtype=np.float32)
+    mask = np.asarray(mask, dtype=np.bool_)
+    if baseline.shape != candidate.shape or baseline.shape != target.shape:
+        raise ReverseKey1Error("ensemble prediction shapes do not match")
+    if baseline.ndim < 2 or mask.shape != baseline.shape[: mask.ndim]:
+        raise ReverseKey1Error("ensemble mask shape is invalid")
+    if grid_size < 2:
+        raise ReverseKey1Error("ensemble grid size must be at least two")
+    expanded_scales = np.broadcast_to(scales, baseline.shape)
+    expanded_mask = np.broadcast_to(
+        mask.reshape(mask.shape + (1,) * (baseline.ndim - mask.ndim)),
+        baseline.shape,
+    )
+    best_weight = 0.0
+    best_mae = math.inf
+    for weight in np.linspace(0.0, 1.0, grid_size):
+        prediction = (1.0 - weight) * baseline + weight * candidate
+        normalized = np.abs(prediction - target) / expanded_scales
+        value = float(normalized[expanded_mask].mean())
+        if value < best_mae:
+            best_mae = value
+            best_weight = float(weight)
+    return best_weight, best_mae
