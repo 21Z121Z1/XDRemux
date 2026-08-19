@@ -29,7 +29,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-completion-plan.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Repository simplification: public package surface, CLI parsing, retired compatibility entry points, and regression coverage",
+            "scope": "Repository simplification: public package surface, declarative CLI parsing, retired compatibility entry points, and regression coverage",
             "checks": [
               {
                 "name": "swift-package-build",
@@ -64,7 +64,7 @@ jobs:
               {
                 "name": "canonical-cli-entrypoint-smoke",
                 "kind": "functional",
-                "command": ["/bin/zsh", "-lc", "test ! -e xdremux/swift-cli/XDRemux.swift && test ! -e xdremux/python/XDRemux.py && .build/debug/xdremux --help >/dev/null"],
+                "command": ["/bin/zsh", "-lc", "set -euo pipefail; test ! -e xdremux/swift-cli/XDRemux.swift; test ! -e xdremux/python/XDRemux.py; .build/debug/xdremux --help >/dev/null; for command in convert batch categorize validate-apple validate-portrait portrait-self-test; do .build/debug/xdremux $command --help >/dev/null; done; set +e; .build/debug/xdremux convert >/dev/null 2>&1; status=$?; set -e; test $status -eq 64"],
                 "timeout_seconds": 300
               }
             ]
