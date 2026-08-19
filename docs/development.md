@@ -124,10 +124,13 @@ Swift CLI 只维护 SwiftPM 的 `xdremux` executable；仓库内部验证也直�
 
 摄影风格还有若干 `XDREMUX_RESEARCH_*` 和 `XDREMUX_STYLES_*` 研究开关，会在输出 manifest 里标记为研究模式并排除生产判定，见 [Apple 功能文档](apple-features.md)。
 
-ReverseKey1Net 的 Core ML 产物不提交进 Git。`scripts/export_reverse_key1_coreml.py`
-从两个本地 checkpoint 生成融合模型；`computeUnits = .all` 允许系统选择 CPU、GPU
-或 Neural Engine，但不能据此声称实际落在 Neural Engine。在线语义代理只是完整 Neutrino
-响应的快速筛选器，完整 renderer A/B 和真实 Photos 验收仍是独立证据层。
+备选方案使用的 Core ML 模型随仓库放在
+`Models/ReverseKey1Ensemble.mlpackage`，模型契约、哈希和验证边界见同目录的
+`ReverseKey1Ensemble.model-card.md`。`scripts/export_reverse_key1_coreml.py` 可以从两个训练
+checkpoint 重新导出融合模型；训练 checkpoint 和私有样片不进入 Git。
+`computeUnits = .all` 允许系统选择 CPU、GPU 或 Neural Engine，但不能据此声称实际落在
+Neural Engine。在线语义代理只是完整 Neutrino 响应的快速筛选器，完整 renderer A/B 和
+真实 Photos 验收仍是独立证据层。
 
 ## 验收规则
 
