@@ -151,8 +151,8 @@ xdremux-py convert --input IMG_001.heic
 xdremux-py convert --oppo-compatible --input IMG_001.heic
 ```
 
-不安装时，从仓库根目录用 `python3 -m xdremux_py` 或 `python3 xdremux/python/XDRemux.py` 调用同一套命令。
+不安装时，从仓库根目录用 `python3 -m xdremux_py` 调用同一套命令。
 
-实现位于根目录的 `xdremux_py/` 包：`cli.py` 负责参数与输出，`pipeline.py` 负责转换，`commands.py` 是解析后的命令模型。`xdremux/python/XDRemux.py` 是转发到该包的兼容入口。
+实现位于根目录的 `xdremux_py/` 包：`cli.py` 负责参数与输出，`pipeline.py` 负责转换，`commands.py` 是解析后的命令模型。安装后的控制台入口是 `xdremux-py`，仓库内直接运行的入口是 `python3 -m xdremux_py`。
 
 需要 Python 3.11 或更高版本。新功能和自动化集成优先用 Swift CLI。
