@@ -29,8 +29,9 @@ RAW 的 CoreImage 探测程序仍保留为开发 target，但不再作为对外 
 
 ```bash
 swift build --target CoreImageRAWDiagnostics
-.build/debug/CoreImageRAWDiagnostics --help
 ```
+
+它的入口源码在 `Sources/CoreImageRAWDiagnostics/main.swift`，参数契约是 `DNG_DIRECTORY OUTPUT_DIRECTORY [MAX_SIZE]`。
 
 ## 集成到自己的项目
 
