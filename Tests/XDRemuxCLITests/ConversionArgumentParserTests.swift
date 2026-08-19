@@ -4,6 +4,23 @@ import XDRemuxCore
 @testable import XDRemuxCLI
 
 final class ConversionArgumentParserTests: XCTestCase {
+    func testRootCommandDeclaresTheSupportedCommandTree() {
+        let commandNames = XDRemuxRootCommand.configuration.subcommands.map {
+            $0.configuration.commandName
+        }
+        XCTAssertEqual(
+            commandNames,
+            [
+                "convert",
+                "batch",
+                "categorize",
+                "validate-apple",
+                "validate-portrait",
+                "portrait-self-test",
+            ]
+        )
+    }
+
     func testSingleFileDefaultsPreserveLegacyConfiguration() throws {
         let command = try ConversionArgumentParser.parseConvert([
             "--input", "/tmp/input.heic",
