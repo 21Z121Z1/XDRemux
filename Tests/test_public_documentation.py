@@ -28,7 +28,6 @@ PUBLIC_DOCUMENTS = ROOT_READMES + tuple(
         "docs/xdremux/README.md",
         "docs/xdremux/README.en.md",
         "Tests/README.md",
-        "xdremux/README.md",
     )
 )
 # Documents published in both languages. Each pair must exist and cross-link,
