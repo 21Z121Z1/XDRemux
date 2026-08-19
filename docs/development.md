@@ -18,12 +18,18 @@
 | `XDRemuxCore` | Library | 转换核心：HDR、HEIF、元数据、批量、输出校验 |
 | `XDRemuxAppleFeatures` | Library | Apple 语义分析、摄影风格和人像 |
 | `xdremux` | Executable | 命令行工具 |
-| `coreimage-raw-diagnostics` | Executable | RAW 相关的 CoreImage 诊断工具 |
 
 ```bash
 swift build
 swift test
 swift run xdremux --help
+```
+
+RAW 的 CoreImage 探测程序仍保留为开发 target，但不再作为对外 Swift Package 产品发布。需要时显式构建：
+
+```bash
+swift build --target CoreImageRAWDiagnostics
+.build/debug/CoreImageRAWDiagnostics --help
 ```
 
 ## 集成到自己的项目
@@ -94,7 +100,7 @@ scripts/build_and_run.sh clean    # 清掉 DerivedData
 | `Sources/XDRemuxCore/` | 转换核心 |
 | `Sources/XDRemuxAppleFeatures/` | Apple 专用功能 |
 | `Sources/XDRemuxCLI/` | 命令行解析与入口 |
-| `Sources/CoreImageRAWDiagnostics/` | RAW 诊断工具 |
+| `Sources/CoreImageRAWDiagnostics/` | 仅开发使用的 RAW 诊断 target |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI App |
 | `xdremux_py/` | 跨平台 Python CLI 实现与仓库内模块入口 |
 | `Tests/` | Swift 测试、Python 策略套件和验证 harness |
