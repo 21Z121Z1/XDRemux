@@ -29,8 +29,9 @@ The CoreImage RAW probe remains available as a developer target, but is no longe
 
 ```bash
 swift build --target CoreImageRAWDiagnostics
-.build/debug/CoreImageRAWDiagnostics --help
 ```
+
+Its entry source is `Sources/CoreImageRAWDiagnostics/main.swift`; its argument contract is `DNG_DIRECTORY OUTPUT_DIRECTORY [MAX_SIZE]`.
 
 ## Integrating into your own project
 
