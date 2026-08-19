@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile/run the Swift CLI on one real sample and assert ImageIO pixel format."""
+"""Build/run the SwiftPM CLI on one real sample and assert ImageIO pixel format."""
 
 from __future__ import annotations
 
@@ -63,12 +63,30 @@ def run(
     return result
 
 
+def production_cli(repo: Path, explicit_binary: Path | None) -> Path:
+    if explicit_binary is not None:
+        binary = explicit_binary.expanduser().resolve()
+        if not binary.is_file():
+            raise FileNotFoundError(f"Swift CLI binary not found: {binary}")
+        return binary
+
+    run(["swift", "build", "--quiet", "--product", "xdremux"], cwd=repo)
+    bin_path = run(
+        ["swift", "build", "--show-bin-path"],
+        cwd=repo,
+        echo_output=False,
+    ).stdout.strip()
+    binary = Path(bin_path) / "xdremux"
+    if not binary.is_file():
+        raise FileNotFoundError(f"SwiftPM did not produce xdremux at {binary}")
+    return binary
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--expected-pixel-format", required=True, choices=("444f", "420f", "420v", "x420", "L008"))
-    parser.add_argument("--cli", type=Path, default=Path("xdremux/swift-cli/XDRemux.swift"))
-    parser.add_argument("--binary", type=Path, help="reuse an already compiled Swift CLI")
+    parser.add_argument("--binary", type=Path, help="reuse an already built SwiftPM xdremux binary")
     parser.add_argument("--oppo-compatible", action="store_true")
     parser.add_argument("--apple-portrait", action="store_true")
     parser.add_argument(
@@ -115,14 +133,11 @@ def main() -> int:
     arguments = parse_arguments()
     repo = Path.cwd().resolve()
     input_path = arguments.input.expanduser().resolve()
-    cli_path = arguments.cli.resolve()
     if not input_path.is_file():
         print(f"input sample not found: {input_path}", file=sys.stderr)
         return 2
 
     if arguments.validate_only:
-        # The sample is already a conversion output; only assert its gain-map
-        # pixel format. No CLI is needed, so none is resolved or compiled.
         run(
             [
                 "swift",
@@ -135,21 +150,14 @@ def main() -> int:
         )
         return 0
 
-    if not arguments.binary and not cli_path.is_file():
-        print(f"Swift CLI not found: {cli_path}", file=sys.stderr)
+    try:
+        binary = production_cli(repo, arguments.binary)
+    except FileNotFoundError as error:
+        print(error, file=sys.stderr)
         return 2
 
     with tempfile.TemporaryDirectory(prefix="xdremux-swift-sample-") as directory:
         temporary = Path(directory)
-        if arguments.binary:
-            binary = arguments.binary.expanduser().resolve()
-            if not binary.is_file():
-                print(f"Swift CLI binary not found: {binary}", file=sys.stderr)
-                return 2
-        else:
-            binary = temporary / "xdremux"
-            run(["swiftc", str(cli_path), "-o", str(binary)], cwd=repo)
-
         if arguments.in_place:
             output = temporary / input_path.name
             shutil.copy2(input_path, output)

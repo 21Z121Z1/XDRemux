@@ -6,12 +6,10 @@ on:
     paths:
       - "**/*.md"
       - "Tests/test_public_documentation.py"
-      - "docs/validation/xdremux-source-manifest.json"
   pull_request:
     paths:
       - "**/*.md"
       - "Tests/test_public_documentation.py"
-      - "docs/validation/xdremux-source-manifest.json"
 
 jobs:
   docs:

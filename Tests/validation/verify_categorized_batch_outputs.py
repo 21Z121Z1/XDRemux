@@ -30,7 +30,6 @@ def main() -> int:
     classification = categorize.classify_path(source)
     relative_folder = categorize.FolderProjection.relative_directory(classification)
     swift_executable = str((repo / args.swift_executable).resolve())
-    python_cli = str(repo / "xdremux/python/XDRemux.py")
 
     with tempfile.TemporaryDirectory(prefix="xdremux-categorized-batch-") as temporary:
         root = Path(temporary)
@@ -53,8 +52,9 @@ def main() -> int:
             else:
                 run(
                     [
-                        sys.executable, python_cli, "batch", "--input-dir", str(input_dir),
-                        "--output-dir", str(output_dir), "--glob", "*.heic", "--categorize",
+                        sys.executable, "-m", "xdremux_py", "batch",
+                        "--input-dir", str(input_dir), "--output-dir", str(output_dir),
+                        "--glob", "*.heic", "--categorize",
                     ],
                     repo,
                 )

@@ -42,10 +42,10 @@ The verification plan uses this schema:
   "scope": "Fix default Swift CLI conversion for an existing ISO gain-map input",
   "checks": [
     {
-      "name": "swift-cli-typecheck",
+      "name": "swift-cli-build",
       "kind": "static",
-      "command": ["swiftc", "-typecheck", "xdremux/swift-cli/XDRemux.swift"],
-      "timeout_seconds": 120
+      "command": ["swift", "build", "--product", "xdremux"],
+      "timeout_seconds": 900
     },
     {
       "name": "existing-iso-default-regression",
@@ -84,9 +84,9 @@ If shell composition is genuinely required, make it explicit with
 string environment variables.
 
 `Tests/validation/verify_swift_cli_sample.py` is the reusable real-sample
-harness for Swift CLI plans. It compiles the production CLI, converts a
-temporary output (or temporary in-place copy), and asks ImageIO to assert the
-expected gain-map pixel format. Private samples remain outside Git.
+harness for Swift CLI plans. It builds the production SwiftPM `xdremux` product,
+converts a temporary output (or temporary in-place copy), and asks ImageIO to
+assert the expected gain-map pixel format. Private samples remain outside Git.
 
 Kinds are `static`, `regression`, `functional`, `integration`, and `device`.
 All listed checks are mandatory. Source changes require a `regression` check;

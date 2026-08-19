@@ -1,4 +1,3 @@
-
 import Foundation
 import CoreGraphics
 import CoreVideo
@@ -11,10 +10,7 @@ package let cgImageDestinationEncodeGainMapSubsampleFactorCompat =
     "kCGImageDestinationEncodeGainMapSubsampleFactor" as CFString
 
 public enum XDRemuxError: Error, CustomStringConvertible {
-    case usage(String)
-    case invalidCommand(String)
     case missingArgument(String)
-    case unknownOption(String)
     case invalidValue(option: String, value: String)
     case inputNotFound(URL)
     case noFilesMatched(URL, String)
@@ -73,14 +69,8 @@ public enum XDRemuxError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .usage(let message):
-            return message
-        case .invalidCommand(let command):
-            return "invalid command: \(command)"
         case .missingArgument(let name):
             return "missing required argument: \(name)"
-        case .unknownOption(let option):
-            return "unknown option: \(option)"
         case .invalidValue(let option, let value):
             return "invalid value for \(option): \(value)"
         case .inputNotFound(let url):

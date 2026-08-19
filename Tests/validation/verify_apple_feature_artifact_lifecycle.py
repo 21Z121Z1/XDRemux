@@ -22,11 +22,24 @@ def run(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
     return result
 
 
+def production_cli(repo: Path, explicit_binary: Path | None) -> Path:
+    if explicit_binary is not None:
+        binary = explicit_binary.expanduser().resolve()
+        if not binary.is_file():
+            raise FileNotFoundError(f"Swift CLI binary not found: {binary}")
+        return binary
+    run(["swift", "build", "--quiet", "--product", "xdremux"], cwd=repo)
+    bin_path = run(["swift", "build", "--show-bin-path"], cwd=repo).stdout.strip()
+    binary = Path(bin_path) / "xdremux"
+    if not binary.is_file():
+        raise FileNotFoundError(f"SwiftPM did not produce xdremux at {binary}")
+    return binary
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
-    parser.add_argument("--cli", type=Path, default=Path("xdremux/swift-cli/XDRemux.swift"))
-    parser.add_argument("--binary", type=Path, help="reuse an already compiled production CLI")
+    parser.add_argument("--binary", type=Path, help="reuse an already built SwiftPM xdremux binary")
     return parser.parse_args()
 
 
@@ -72,37 +85,26 @@ def main() -> int:
     args = parse_arguments()
     repo = Path.cwd().resolve()
     input_path = args.input.expanduser().resolve()
-    cli_path = args.cli.resolve()
     if not input_path.is_file():
         print(f"input sample not found: {input_path}", file=sys.stderr)
         return 2
-    if not cli_path.is_file():
-        print(f"Swift CLI not found: {cli_path}", file=sys.stderr)
+    try:
+        binary = production_cli(repo, args.binary)
+    except FileNotFoundError as error:
+        print(error, file=sys.stderr)
         return 2
 
     with tempfile.TemporaryDirectory(prefix="xdremux-artifact-lifecycle-") as directory:
         temporary = Path(directory)
         output_directory = temporary / "outputs"
         output_directory.mkdir()
-        if args.binary:
-            binary = args.binary.expanduser().resolve()
-            if not binary.is_file():
-                print(f"Swift CLI binary not found: {binary}", file=sys.stderr)
-                return 2
-        else:
-            binary = temporary / "xdremux"
-            run(["swiftc", str(cli_path), "-o", str(binary)], cwd=repo)
 
         default_output = output_directory / "default.heic"
         temporary_evidence_before = set(
             Path(tempfile.gettempdir()).glob("xdremux-photographic-styles-*")
         )
         run(
-            conversion_command(
-                binary,
-                input_path,
-                default_output,
-            ),
+            conversion_command(binary, input_path, default_output),
             cwd=repo,
         )
         validate_output(binary, default_output, cwd=repo)
@@ -120,12 +122,7 @@ def main() -> int:
         debug_root = temporary / "debug"
         debug_output = output_directory / "debug.heic"
         run(
-            conversion_command(
-                binary,
-                input_path,
-                debug_output,
-                debug_root=debug_root,
-            ),
+            conversion_command(binary, input_path, debug_output, debug_root=debug_root),
             cwd=repo,
         )
         validate_output(binary, debug_output, cwd=repo)

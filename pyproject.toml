@@ -47,7 +47,6 @@ packages = ["xdremux_py"]
 [tool.hatch.build.targets.sdist]
 include = [
     "/xdremux_py",
-    "/xdremux/python/XDRemux.py",
     "/README.md",
     "/README.en.md",
 ]

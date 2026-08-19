@@ -3,164 +3,19 @@ import CryptoKit
 import XDRemuxCore
 import XDRemuxAppleFeatures
 
+/// Runtime behavior for parsed CLI commands. Argument declaration, command
+/// routing, validation command options, and generated help live in
+/// `XDRemuxRootCommand`; this type owns execution only.
 enum XDRemuxCommand {
     private static let fileManager = FileManager.default
-    private static let usage = """
-    xdremux — convert OPPO, OnePlus, and realme ProXDR photos into standard ISO 21496-1 HDR HEIC.
 
-    USAGE
-      xdremux convert           --input <file.heic|portrait.jpg> [--output <file.heic>] [options]
-      xdremux batch             --input-dir <dir> [--output-dir <dir>] [options]
-      xdremux categorize        --input <file-or-dir> [--input ...] --output-dir <dir> [--jobs <n>] [--dry-run]
-      xdremux validate-apple    --input <file.heic> [--expect-portrait] [--json <report.json>]
-      xdremux validate-portrait --input <file.heic> [--json <report.json>]
-      xdremux portrait-self-test
-
-    WHERE THE RESULTS GO
-      --output omitted        the input file is overwritten in place
-      --output-dir omitted    results are written into the input directory
-      batch --categorize      results are filed under Chinese shooting-mode folders (人像, 夜景, ...);
-                              photos whose mode cannot be read stay in the output root
-      categorize              only sorts HEIC/HEIF/JPEG files into those folders; it never
-                              converts or modifies them
-
-    CONVERSION OPTIONS (convert and batch)
-      --oppo-compatible       Write a 4:2:0 gain map OPPO Gallery can display and keep the complete
-                              OPPO private tail. Without it the output is standard ISO HDR and the
-                              gain map keeps its source channel structure, which may be 4:4:4.
-                              A gain map that is already 4:2:0 cannot be upgraded — the discarded
-                              chroma is unrecoverable.
-      --discard-portrait-data Drop bulky depth and re-edit resources. Watermark, master-mode, and
-                              other non-HDR vendor data are still kept.
-      --oppo-camera-tail <m>  Which parts of the OPPO camera tail to keep. Default
-                              preserve-without-private-hdr. Values: off, watermark, compact,
-                              preserve, preserve-without-portrait,
-                              preserve-without-portrait-or-private-hdr, preserve-without-private-uhdr,
-                              preserve-without-private-hdr, preserve-no-uhdr, preserve-no-hdr.
-      --family auto|x6|x7     Which ProXDR layout the source uses. Default auto.
-      --debug-dir <dir>       Keep this run's intermediate artifacts for inspection.
-
-    BATCH OPTIONS
-      --glob <pattern>        Which files to pick up. Default *.heic.
-      --jobs <n>              How many files to convert at once. Default min(cpu, 4).
-      --resume | --no-resume  Default --resume.
-      --skip-existing | --no-skip-existing
-                              Skip a file whose output already matches the current settings.
-                              Default --skip-existing.
-      --checkpoint <file>     Where to keep progress. Default a hidden JSONL file under the output
-                              directory, deleted once the batch finishes with no failures. Rerun the
-                              same command to retry only the files that failed.
-
-    APPLE FEATURES (macOS only, research features)
-      --apple-photographic-styles   Generate Apple Photographic Styles data from the photo itself,
-                                    with no Apple donor photo. --apple-styles is a legacy spelling.
-      --apple-portrait              Generate Apple portrait data. Needs an OPPO portrait photo that
-                                    carries rear.depth, rear.depth.config, and src.image.
-      --apple-styles-raw-dng <f>    Pair one matching OPPO RAW MAX DNG with the input. A mismatched
-                                    or differently oriented DNG is rejected rather than used.
-      --apple-style-data-producer constrained-solver|learn-node|identity-fallback
-                                    Default constrained-solver. learn-node and identity-fallback are
-                                    diagnostic controls.
-      The two features are independent and can be enabled together; in a combined run a non-portrait
-      photo still gets styles output. Apple output and --oppo-compatible are mutually exclusive.
-      These features are not accepted as production Photos output — see docs/apple-features.md for
-      exactly what has and has not been proven.
-
-    DIAGNOSTIC OPTIONS
-      --input-processing system|system-decoded|hybrid|passthrough
-                              How the base image and gain map are rebuilt. Default hybrid.
-      --tmap-format imageio|strict
-                              Default imageio. strict writes the 145-byte ISO form, which breaks
-                              Gallery Exif parsing and editing on Find X9 Ultra.
-      --oppo-compat <mode>    Finer-grained control over the HDR routing flags: auto, iso,
-                              iso-no-local, iso-graph, on, tail, off. --no-oppo-compat means off.
-
-    WHAT IS PRESERVED
-      Only the HDR gain-map graph and the container descriptions it depends on are ever rewritten.
-      By default the private HDR entries are removed from the vendor tail and everything else is
-      kept: watermark, master mode, portrait, depth, source image, edits, live photo, and entries
-      XDRemux does not recognize.
-    """
-
-    static func main() {
-        do {
-            let args = Array(CommandLine.arguments.dropFirst())
-            guard let command = args.first else {
-                throw CLIError.usage(usage)
-            }
-
-            switch command {
-            case "convert":
-                let cmd = try ConversionArgumentParser.parseConvert(Array(args.dropFirst()))
-                try runConvert(cmd)
-            case "batch":
-                let cmd = try ConversionArgumentParser.parseBatch(Array(args.dropFirst()))
-                try runBatch(cmd)
-            case "categorize":
-                let cmd = try ConversionArgumentParser.parseCategorize(Array(args.dropFirst()))
-                try runCategorize(cmd)
-            case "validate-apple":
-                try runAppleValidation(Array(args.dropFirst()))
-            case "validate-portrait":
-                try runPortraitValidation(Array(args.dropFirst()))
-            case "portrait-self-test":
-                guard args.count == 1 else { throw CLIError.usage(usage) }
-                let report = try AppleFeatureConversionEngine.portraitSelfTestReport()
-                let data = try JSONSerialization.data(
-                    withJSONObject: report,
-                    options: [.prettyPrinted, .sortedKeys]
-                )
-                FileHandle.standardOutput.write(data)
-                FileHandle.standardOutput.write(Data("\n".utf8))
-            case "-h", "--help", "help":
-                print(usage)
-            default:
-                throw CLIError.invalidCommand(command)
-            }
-        } catch {
-            if let cli = error as? CLIError {
-                switch cli {
-                case .usage(let message):
-                    FileHandle.standardError.write(Data("\(message)\n".utf8))
-                case .invalidCommand, .missingArgument, .unknownOption, .invalidValue:
-                    FileHandle.standardError.write(Data("error: \(cli)\n\n\(usage)\n".utf8))
-                default:
-                    FileHandle.standardError.write(Data("error: \(cli)\n".utf8))
-                }
-            } else {
-                FileHandle.standardError.write(Data("error: \(error)\n".utf8))
-            }
-            exit(1)
-        }
-    }
-
-    private static func runAppleValidation(_ rawArgs: [String]) throws {
-        var inputURL: URL?
-        var reportURL: URL?
-        var expectsPortrait = false
-        var index = 0
-        while index < rawArgs.count {
-            let option = rawArgs[index]
-            index += 1
-            func nextValue() throws -> String {
-                guard index < rawArgs.count else { throw CLIError.missingArgument(option) }
-                defer { index += 1 }
-                return rawArgs[index]
-            }
-            switch option {
-            case "--input":
-                inputURL = URL(fileURLWithPath: try nextValue()).standardizedFileURL
-            case "--expect-portrait":
-                expectsPortrait = true
-            case "--json":
-                reportURL = URL(fileURLWithPath: try nextValue()).standardizedFileURL
-            default:
-                throw CLIError.unknownOption(option)
-            }
-        }
-        guard let inputURL else { throw CLIError.missingArgument("--input") }
+    static func runAppleValidation(
+        inputURL: URL,
+        reportURL: URL?,
+        expectsPortrait: Bool
+    ) throws {
         let report = try AppleFeatureConversionEngine.validationReport(
-            for: inputURL,
+            for: inputURL.standardizedFileURL,
             expectsPortrait: expectsPortrait
         )
         let data = try JSONSerialization.data(
@@ -168,49 +23,51 @@ enum XDRemuxCommand {
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         )
         if let reportURL {
-            try ensureDirectory(reportURL.deletingLastPathComponent(), fileManager: fileManager)
-            try data.write(to: reportURL, options: .atomic)
+            let standardizedReportURL = reportURL.standardizedFileURL
+            try ensureDirectory(
+                standardizedReportURL.deletingLastPathComponent(),
+                fileManager: fileManager
+            )
+            try data.write(to: standardizedReportURL, options: .atomic)
         }
         FileHandle.standardOutput.write(data)
         FileHandle.standardOutput.write(Data("\n".utf8))
     }
 
-    private static func runPortraitValidation(_ rawArgs: [String]) throws {
-        var inputURL: URL?
-        var reportURL: URL?
-        var index = 0
-        while index < rawArgs.count {
-            let option = rawArgs[index]
-            index += 1
-            func nextValue() throws -> String {
-                guard index < rawArgs.count else { throw CLIError.missingArgument(option) }
-                defer { index += 1 }
-                return rawArgs[index]
-            }
-            switch option {
-            case "--input":
-                inputURL = URL(fileURLWithPath: try nextValue()).standardizedFileURL
-            case "--json":
-                reportURL = URL(fileURLWithPath: try nextValue()).standardizedFileURL
-            default:
-                throw CLIError.unknownOption(option)
-            }
-        }
-        guard let inputURL else { throw CLIError.missingArgument("--input") }
-        let report = try AppleFeatureConversionEngine.portraitValidationReport(for: inputURL)
+    static func runPortraitValidation(
+        inputURL: URL,
+        reportURL: URL?
+    ) throws {
+        let report = try AppleFeatureConversionEngine.portraitValidationReport(
+            for: inputURL.standardizedFileURL
+        )
         let data = try JSONSerialization.data(
             withJSONObject: report,
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         )
         if let reportURL {
-            try ensureDirectory(reportURL.deletingLastPathComponent(), fileManager: fileManager)
-            try data.write(to: reportURL, options: .atomic)
+            let standardizedReportURL = reportURL.standardizedFileURL
+            try ensureDirectory(
+                standardizedReportURL.deletingLastPathComponent(),
+                fileManager: fileManager
+            )
+            try data.write(to: standardizedReportURL, options: .atomic)
         }
         FileHandle.standardOutput.write(data)
         FileHandle.standardOutput.write(Data("\n".utf8))
     }
 
-    private static func runConvert(_ cmd: ConvertCommand) throws {
+    static func runPortraitSelfTest() throws {
+        let report = try AppleFeatureConversionEngine.portraitSelfTestReport()
+        let data = try JSONSerialization.data(
+            withJSONObject: report,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+
+    static func runConvert(_ cmd: ConvertCommand) throws {
         try validateInputType(cmd.inputURL, appleFeatures: cmd.appleFeatures)
         if cmd.appleFeatures.photographicStyles {
             try AppleFeatureConversionEngine.convert(
@@ -248,7 +105,7 @@ enum XDRemuxCommand {
             .joined(separator: " ")
     }
 
-    private static func runBatch(_ cmd: BatchCommand) throws {
+    static func runBatch(_ cmd: BatchCommand) throws {
         try ensureDirectory(cmd.outputDirURL, fileManager: fileManager)
         let discovered = try enumerateInputs(
             root: cmd.inputDirURL,
@@ -465,7 +322,7 @@ enum XDRemuxCommand {
         }
     }
 
-    private static func runCategorize(_ cmd: CategorizeCommand) throws {
+    static func runCategorize(_ cmd: CategorizeCommand) throws {
         let plan = try PhotoCategorizationEngine.makePlan(
             inputs: cmd.inputURLs,
             outputDirectory: cmd.outputDirURL,
@@ -663,7 +520,10 @@ enum XDRemuxCommand {
         }
     }
 
-    private static func loadCheckpointStateIfPresent(url: URL, expectedConfigHash: String) throws -> [String: BatchCheckpointItem] {
+    private static func loadCheckpointStateIfPresent(
+        url: URL,
+        expectedConfigHash: String
+    ) throws -> [String: BatchCheckpointItem] {
         guard fileManager.fileExists(atPath: url.path) else { return [:] }
         let data: Data
         do {
@@ -698,7 +558,11 @@ enum XDRemuxCommand {
                 sawHeader = true
                 let actual = dict["configHash"] as? String ?? "missing"
                 if actual != expectedConfigHash {
-                    throw CLIError.checkpointConfigMismatch(url, expected: expectedConfigHash, actual: actual)
+                    throw CLIError.checkpointConfigMismatch(
+                        url,
+                        expected: expectedConfigHash,
+                        actual: actual
+                    )
                 }
                 continue
             }
@@ -741,11 +605,16 @@ enum XDRemuxCommand {
             ("categorizeOutput", cmd.categorizeOutput ? "true" : "false"),
             ("categorizationLayout", cmd.categorizeOutput ? PhotoFolderProjection.layoutVersion : "off")
         ]
-        let stable = entries.sorted(by: { $0.0 < $1.0 }).map { "\($0.0)=\($0.1)" }.joined(separator: "\n")
+        let stable = entries.sorted(by: { $0.0 < $1.0 })
+            .map { "\($0.0)=\($0.1)" }
+            .joined(separator: "\n")
         return sha256Hex(Data(stable.utf8))
     }
 
-    private static func resolvedCheckpointURL(cmd: BatchCommand, configHash: String) -> URL {
+    private static func resolvedCheckpointURL(
+        cmd: BatchCommand,
+        configHash: String
+    ) -> URL {
         if let checkpointURL = cmd.checkpointURL {
             return checkpointURL
         }
@@ -758,7 +627,11 @@ enum XDRemuxCommand {
         for item in items {
             let key = item.outputURL.standardizedFileURL.path
             if let prior = seen[key] {
-                throw CLIError.outputPathCollision(output: item.outputURL, firstInput: prior, secondInput: item.inputURL)
+                throw CLIError.outputPathCollision(
+                    output: item.outputURL,
+                    firstInput: prior,
+                    secondInput: item.inputURL
+                )
             }
             seen[key] = item.inputURL
         }
@@ -819,8 +692,15 @@ enum XDRemuxCommand {
 
             let relative = fileURL.path.replacingOccurrences(of: root.path + "/", with: "")
             let filename = fileURL.lastPathComponent
-            if regex.firstMatch(in: relative, options: [], range: NSRange(relative.startIndex..., in: relative)) != nil ||
-                regex.firstMatch(in: filename, options: [], range: NSRange(filename.startIndex..., in: filename)) != nil {
+            if regex.firstMatch(
+                in: relative,
+                options: [],
+                range: NSRange(relative.startIndex..., in: relative)
+            ) != nil || regex.firstMatch(
+                in: filename,
+                options: [],
+                range: NSRange(filename.startIndex..., in: filename)
+            ) != nil {
                 matched.append(fileURL)
             }
         }

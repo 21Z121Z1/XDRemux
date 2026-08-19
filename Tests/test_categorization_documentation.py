@@ -9,7 +9,7 @@ class CategorizationDocumentationTests(unittest.TestCase):
             with self.subTest(name=name):
                 text = (root / name).read_text(encoding="utf-8")
                 self.assertIn("swift run xdremux categorize", text)
-                self.assertIn("python3 xdremux/python/XDRemux.py categorize", text)
+                self.assertIn("python3 -m xdremux_py categorize", text)
                 self.assertIn("--categorize", text)
                 self.assertNotIn("--categorize-output", text)
                 self.assertNotIn("--organize-by-mode", text)
@@ -20,8 +20,6 @@ class CategorizationDocumentationTests(unittest.TestCase):
         paths = (
             root / "Sources/XDRemuxCLI/Commands/XDRemuxCommand.swift",
             root / "xdremux_py/cli.py",
-            root / "xdremux/python/XDRemux.py",
-            root / "xdremux/README.md",
         )
         for path in paths:
             with self.subTest(path=path.name):

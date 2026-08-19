@@ -2,13 +2,14 @@
 
 [English](cli.en.md) | 简体中文
 
-本文档说明 `xdremux` 命令行工具。运行 `xdremux --help` 可以看到同样的内容。
+本文档说明 `xdremux` 命令行工具。`xdremux --help` 列出命令；`xdremux <命令> --help` 显示该命令的参数和默认值。
 
 ## 构建与运行
 
 ```bash
 swift build
 swift run xdremux --help
+swift run xdremux convert --help
 ```
 
 也可以直接用构建产物：
@@ -98,7 +99,7 @@ xdremux categorize --input ~/Pictures/ProXDR --output-dir ~/Pictures/分类
 | --- | --- | --- |
 | `--input-processing system\|system-decoded\|hybrid\|passthrough` | `hybrid` | base image 和 gain map 的重建方式 |
 | `--tmap-format imageio\|strict` | `imageio` | `strict` 写 145 字节 ISO 形式，实测会让 Find X9 Ultra 相册的 Exif 解析和编辑异常 |
-| `--oppo-compat <模式>` | `off` | 更细粒度的 HDR 路由位控制：`auto`、`iso`、`iso-no-local`、`iso-graph`、`on`、`tail`、`off`。`--no-oppo-compat` 等同 `off`。 |
+| `--oppo-compat [模式]` | `off` | 更细粒度的 HDR 路由位控制：`auto`、`iso`、`iso-no-local`、`iso-graph`、`on`、`tail`、`off`。只写裸 `--oppo-compat` 等同 `on`，`--no-oppo-compat` 等同 `off`。 |
 
 ### `--oppo-camera-tail` 取值
 
@@ -121,8 +122,9 @@ CLI 输出人类可读的文本：进度写 stdout，错误写 stderr。目前�
 
 | 退出码 | 含义 |
 | --- | --- |
-| `0` | 成功 |
-| `1` | 任何错误（参数错误、输入不支持、转换失败、批量存在失败项） |
+| `0` | 成功，或正常显示帮助/版本信息 |
+| `1` | 转换、验证、批量执行或其他运行时失败 |
+| `64` | 命令行用法错误，例如缺少必填参数、未知参数或参数值无法解析 |
 
 ## 批量重跑
 
@@ -151,8 +153,8 @@ xdremux-py convert --input IMG_001.heic
 xdremux-py convert --oppo-compatible --input IMG_001.heic
 ```
 
-不安装时，从仓库根目录用 `python3 -m xdremux_py` 或 `python3 xdremux/python/XDRemux.py` 调用同一套命令。
+不安装时，从仓库根目录用 `python3 -m xdremux_py` 调用同一套命令。
 
-实现位于根目录的 `xdremux_py/` 包：`cli.py` 负责参数与输出，`pipeline.py` 负责转换，`commands.py` 是解析后的命令模型。`xdremux/python/XDRemux.py` 是转发到该包的兼容入口。
+实现位于根目录的 `xdremux_py/` 包：`cli.py` 负责参数与输出，`pipeline.py` 负责转换，`commands.py` 是解析后的命令模型。安装后的控制台入口是 `xdremux-py`，仓库内直接运行的入口是 `python3 -m xdremux_py`。
 
 需要 Python 3.11 或更高版本。新功能和自动化集成优先用 Swift CLI。
