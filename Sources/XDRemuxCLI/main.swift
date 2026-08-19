@@ -1,3 +1,4 @@
+import ArgumentParser
 import Foundation
 import XDRemuxAppleFeatures
 
@@ -6,7 +7,7 @@ do {
     if try MotionPhotoCLIIntegration.handleIfNeeded(arguments) {
         // The Motion Photo integration fully handled this command.
     } else {
-        XDRemuxCommand.main()
+        XDRemuxRootCommand.main(arguments)
         try MotionPhotoCLIIntegration.finishPendingBatchIfNeeded()
     }
 } catch {
