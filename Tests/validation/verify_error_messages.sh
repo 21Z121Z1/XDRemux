@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Error text and help text are product surfaces, so exercise them through the
-# real binary on real files rather than trusting the unit-level string checks.
+# real binary on real files rather than trusting unit-level string checks.
 #
 # usage: verify_error_messages.sh <proxdr-sample.heic>
 
@@ -46,13 +46,28 @@ expect_absent() {
   fi
 }
 
-echo "== help text names the real binary and documents every option =="
-HELP="$("$CLI" --help 2>&1)"
-expect_contains "$HELP" "xdremux convert" "help"
-expect_absent "$HELP" "XDRemux.swift" "help"
-for option in --family --input-processing --tmap-format --oppo-camera-tail --oppo-compat \
-              --glob --jobs --checkpoint --categorize --dry-run --debug-dir; do
-  expect_contains "$HELP" "$option" "help"
+echo "== generated help owns the command tree and each command owns its options =="
+ROOT_HELP="$("$CLI" --help 2>&1)"
+expect_absent "$ROOT_HELP" "XDRemux.swift" "root help"
+for command in convert batch categorize validate-apple validate-portrait portrait-self-test; do
+  expect_contains "$ROOT_HELP" "$command" "root help"
+done
+
+CONVERT_HELP="$("$CLI" convert --help 2>&1)"
+for option in --input --output --family --input-processing --tmap-format --oppo-camera-tail \
+              --oppo-compat --debug-dir --apple-photographic-styles --apple-portrait; do
+  expect_contains "$CONVERT_HELP" "$option" "convert help"
+done
+
+BATCH_HELP="$("$CLI" batch --help 2>&1)"
+for option in --input-dir --output-dir --glob --jobs --checkpoint --categorize \
+              --resume --skip-existing --family --oppo-compatible; do
+  expect_contains "$BATCH_HELP" "$option" "batch help"
+done
+
+CATEGORIZE_HELP="$("$CLI" categorize --help 2>&1)"
+for option in --input --output-dir --jobs --dry-run; do
+  expect_contains "$CATEGORIZE_HELP" "$option" "categorize help"
 done
 
 echo "== converting an already-converted file explains there is nothing to do =="
