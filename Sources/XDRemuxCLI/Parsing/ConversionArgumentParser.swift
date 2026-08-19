@@ -1,91 +1,119 @@
+import ArgumentParser
 import Foundation
 import XDRemuxCore
 
-struct CommonConversionArguments {
-    var family = Family.auto
-    var debugDirectoryPath: String?
-    var oppoCompatibility: OppoCompatibility = .off
-    var inputProcessingBranch = InputProcessingBranch.hybrid
-    var applePortraitEnabled = false
-    var applePhotographicStylesEnabled = false
-    var appleStylesRawDNGPath: String?
-    var appleStyleDataProducer = AppleStyleDataProducerMode.unspecified
-    var appleStyleDataProducerWasExplicit = false
-    var oppoCompatibilityWasExplicit = false
-    var oppoCameraTail = OppoCameraTail.preserveWithoutPrivateHDR
-    var oppoCameraTailWasExplicit = false
-    var discardPortraitData = false
-    var tmapFormat = TmapFormat.imageIO
+private struct ResolvedCommonConversionArguments {
+    let family: Family
+    let debugDirectoryPath: String?
+    let oppoCompatibility: OppoCompatibility
+    let inputProcessingBranch: InputProcessingBranch
+    let appleFeatures: AppleFeatureOptions
+    let appleStylesRawDNGPath: String?
+    let appleStyleDataProducer: AppleStyleDataProducerMode
+    let oppoCameraTail: OppoCameraTail
+    let tmapFormat: TmapFormat
+}
 
-    mutating func consume(
-        _ option: String,
-        cursor: inout ConversionArgumentParser.ArgumentCursor
-    ) throws -> Bool {
-        switch option {
-        case "--apple-photographic-styles", "--apple-styles":
-            applePhotographicStylesEnabled = true
-        case "--apple-style-data-producer":
-            let value = try cursor.nextValue(for: option)
-            guard let parsed = AppleStyleDataProducerMode(rawValue: value),
-                  parsed != .unspecified else {
-                throw CLIError.invalidValue(option: option, value: value)
+private struct CommonConversionArguments: ParsableArguments {
+    @Flag(
+        name: [.customLong("apple-photographic-styles"), .customLong("apple-styles")],
+        help: "Generate Apple Photographic Styles metadata."
+    )
+    var applePhotographicStylesEnabled = false
+
+    @Option(
+        name: .customLong("apple-style-data-producer"),
+        help: "Style-data producer: constrained-solver, learn-node, or identity-fallback."
+    )
+    var appleStyleDataProducerRaw: String?
+
+    @Flag(name: .customLong("apple-portrait"), help: "Generate Apple Portrait metadata.")
+    var applePortraitEnabled = false
+
+    @Option(name: .customLong("apple-styles-raw-dng"), help: "Matching RAW DNG for Styles analysis.")
+    var appleStylesRawDNGPath: String?
+
+    @Option(name: .customLong("family"), help: "Source ProXDR family: auto, x6, or x7.")
+    var familyRaw = Family.auto.rawValue
+
+    @Option(
+        name: .customLong("input-processing"),
+        help: "Input processing branch: system, system-decoded, hybrid, or passthrough."
+    )
+    var inputProcessingRaw = InputProcessingBranch.hybrid.rawValue
+
+    @Option(name: .customLong("debug-dir"), help: "Directory for retained diagnostic artifacts.")
+    var debugDirectoryPath: String?
+
+    @Option(name: .customLong("oppo-camera-tail"), help: "OPPO private-tail preservation policy.")
+    var oppoCameraTailRaw: String?
+
+    @Option(name: .customLong("tmap-format"), help: "Tone-map metadata format: imageio or strict.")
+    var tmapFormatRaw = TmapFormat.imageIO.rawValue
+
+    @Option(name: .customLong("oppo-compat"), help: "Fine-grained OPPO compatibility mode.")
+    var oppoCompatibilityRaw: String?
+
+    @Flag(name: .customLong("no-oppo-compat"), help: "Disable OPPO-compatible output.")
+    var noOppoCompatibility = false
+
+    @Flag(name: .customLong("oppo-compatible"), help: "Enable automatic OPPO Gallery compatibility.")
+    var oppoCompatible = false
+
+    @Flag(name: .customLong("discard-portrait-data"), help: "Discard OPPO portrait/depth editing data.")
+    var discardPortraitData = false
+
+    func resolve() throws -> ResolvedCommonConversionArguments {
+        guard let family = Family(rawValue: familyRaw) else {
+            throw CLIError.invalidValue(option: "--family", value: familyRaw)
+        }
+        guard let inputProcessingBranch = InputProcessingBranch(rawValue: inputProcessingRaw) else {
+            throw CLIError.invalidValue(option: "--input-processing", value: inputProcessingRaw)
+        }
+        guard let tmapFormat = TmapFormat(rawValue: tmapFormatRaw) else {
+            throw CLIError.invalidValue(option: "--tmap-format", value: tmapFormatRaw)
+        }
+
+        let explicitCompatibilityCount = [
+            oppoCompatibilityRaw != nil,
+            noOppoCompatibility,
+            oppoCompatible,
+        ].filter { $0 }.count
+        guard explicitCompatibilityCount <= 1 else {
+            throw CLIError.invalidValue(
+                option: "--oppo-compat",
+                value: "OPPO compatibility switches are mutually exclusive"
+            )
+        }
+
+        let oppoCompatibility: OppoCompatibility
+        let oppoCompatibilityWasExplicit: Bool
+        if let raw = oppoCompatibilityRaw {
+            guard let parsed = OppoCompatibility(rawValue: raw) else {
+                throw CLIError.invalidValue(option: "--oppo-compat", value: raw)
             }
-            appleStyleDataProducer = parsed
-            appleStyleDataProducerWasExplicit = true
-        case "--apple-portrait":
-            applePortraitEnabled = true
-        case "--apple-styles-raw-dng":
-            appleStylesRawDNGPath = try cursor.nextValue(for: option)
-        case "--family":
-            let value = try cursor.nextValue(for: option)
-            guard let parsed = Family(rawValue: value) else {
-                throw CLIError.invalidValue(option: option, value: value)
-            }
-            family = parsed
-        case "--input-processing":
-            let value = try cursor.nextValue(for: option)
-            guard let parsed = InputProcessingBranch(rawValue: value) else {
-                throw CLIError.invalidValue(option: option, value: value)
-            }
-            inputProcessingBranch = parsed
-        case "--debug-dir":
-            debugDirectoryPath = try cursor.nextValue(for: option)
-        case "--oppo-camera-tail":
-            let value = try cursor.nextValue(for: option)
-            guard let parsed = OppoCameraTail(rawValue: value) else {
-                throw CLIError.invalidValue(option: option, value: value)
-            }
-            oppoCameraTail = parsed
-            oppoCameraTailWasExplicit = true
-        case "--tmap-format":
-            let value = try cursor.nextValue(for: option)
-            guard let parsed = TmapFormat(rawValue: value) else {
-                throw CLIError.invalidValue(option: option, value: value)
-            }
-            tmapFormat = parsed
-        case "--oppo-compat":
-            oppoCompatibility = cursor.consumeOptionalOppoCompatibility() ?? .on
+            oppoCompatibility = parsed
             oppoCompatibilityWasExplicit = true
-        case "--no-oppo-compat":
+        } else if noOppoCompatibility {
             oppoCompatibility = .off
             oppoCompatibilityWasExplicit = true
-        case "--oppo-compatible":
+        } else if oppoCompatible {
             oppoCompatibility = .auto
             oppoCompatibilityWasExplicit = true
-        case "--discard-portrait-data":
-            discardPortraitData = true
-        default:
-            return false
+        } else {
+            oppoCompatibility = .off
+            oppoCompatibilityWasExplicit = false
         }
-        return true
-    }
 
-    mutating func resolve() throws -> AppleFeatureOptions {
-        let appleFeatures = AppleFeatureOptions(
-            photographicStyles: applePhotographicStylesEnabled,
-            portrait: applePortraitEnabled
-        )
-        if appleStyleDataProducerWasExplicit, !applePhotographicStylesEnabled {
+        let producerWasExplicit = appleStyleDataProducerRaw != nil
+        var styleDataProducer = AppleStyleDataProducerMode.unspecified
+        if let raw = appleStyleDataProducerRaw {
+            guard let parsed = AppleStyleDataProducerMode(rawValue: raw), parsed != .unspecified else {
+                throw CLIError.invalidValue(option: "--apple-style-data-producer", value: raw)
+            }
+            styleDataProducer = parsed
+        }
+        if producerWasExplicit, !applePhotographicStylesEnabled {
             throw CLIError.invalidValue(
                 option: "--apple-style-data-producer",
                 value: "requires --apple-photographic-styles"
@@ -97,9 +125,14 @@ struct CommonConversionArguments {
                 value: "requires --apple-photographic-styles"
             )
         }
-        if applePhotographicStylesEnabled, !appleStyleDataProducerWasExplicit {
-            appleStyleDataProducer = .constrainedSolver
+        if applePhotographicStylesEnabled, !producerWasExplicit {
+            styleDataProducer = .constrainedSolver
         }
+
+        let appleFeatures = AppleFeatureOptions(
+            photographicStyles: applePhotographicStylesEnabled,
+            portrait: applePortraitEnabled
+        )
         if appleFeatures.isEnabled,
            oppoCompatibilityWasExplicit,
            oppoCompatibility.wantsOppoCompat {
@@ -110,149 +143,124 @@ struct CommonConversionArguments {
                 value: "cannot be combined with OPPO-compatible output"
             )
         }
-        if appleFeatures.isEnabled {
-            oppoCompatibility = .off
-            if applePortraitEnabled {
-                oppoCameraTail = .preserveWithoutPortraitOrPrivateHDR
-            } else if !oppoCameraTailWasExplicit {
-                oppoCameraTail = .preserveWithoutPrivateHDR
+
+        let cameraTailWasExplicit = oppoCameraTailRaw != nil
+        var cameraTail: OppoCameraTail
+        if let raw = oppoCameraTailRaw {
+            guard let parsed = OppoCameraTail(rawValue: raw) else {
+                throw CLIError.invalidValue(option: "--oppo-camera-tail", value: raw)
             }
-        } else if discardPortraitData, !oppoCameraTailWasExplicit {
-            oppoCameraTail = oppoCompatibility.wantsOppoCompat
+            cameraTail = parsed
+        } else {
+            cameraTail = .preserveWithoutPrivateHDR
+        }
+
+        var effectiveCompatibility = oppoCompatibility
+        if appleFeatures.isEnabled {
+            effectiveCompatibility = .off
+            if applePortraitEnabled {
+                cameraTail = .preserveWithoutPortraitOrPrivateHDR
+            } else if !cameraTailWasExplicit {
+                cameraTail = .preserveWithoutPrivateHDR
+            }
+        } else if discardPortraitData, !cameraTailWasExplicit {
+            cameraTail = effectiveCompatibility.wantsOppoCompat
                 ? .preserveWithoutPortrait
                 : .preserveWithoutPortraitOrPrivateHDR
-        } else if !oppoCameraTailWasExplicit, oppoCompatibility.wantsOppoCompat {
-            oppoCameraTail = .preserve
+        } else if !cameraTailWasExplicit, effectiveCompatibility.wantsOppoCompat {
+            cameraTail = .preserve
         }
-        return appleFeatures
+
+        return ResolvedCommonConversionArguments(
+            family: family,
+            debugDirectoryPath: debugDirectoryPath,
+            oppoCompatibility: effectiveCompatibility,
+            inputProcessingBranch: inputProcessingBranch,
+            appleFeatures: appleFeatures,
+            appleStylesRawDNGPath: appleStylesRawDNGPath,
+            appleStyleDataProducer: styleDataProducer,
+            oppoCameraTail: cameraTail,
+            tmapFormat: tmapFormat
+        )
     }
 }
 
-enum ConversionArgumentParser {
-    struct ArgumentCursor {
-        let arguments: [String]
-        var index = 0
+private struct ConvertArguments: ParsableArguments {
+    @Option(name: .customLong("input"), help: "Input HEIC/HEIF or supported portrait JPEG.")
+    var inputPath: String
 
-        mutating func nextOption() -> String? {
-            guard index < arguments.count else { return nil }
-            defer { index += 1 }
-            return arguments[index]
-        }
+    @Option(name: .customLong("output"), help: "Output HEIC. Defaults to replacing the input.")
+    var outputPath: String?
 
-        mutating func nextValue(for option: String) throws -> String {
-            guard index < arguments.count else {
-                throw CLIError.missingArgument(option)
-            }
-            defer { index += 1 }
-            return arguments[index]
-        }
+    @OptionGroup var common: CommonConversionArguments
 
-        mutating func consumeOptionalOppoCompatibility() -> OppoCompatibility? {
-            guard index < arguments.count,
-                  let parsed = OppoCompatibility(rawValue: arguments[index]) else {
-                return nil
-            }
-            index += 1
-            return parsed
-        }
-    }
-
-    static func parseConvert(_ rawArguments: [String]) throws -> ConvertCommand {
-        var cursor = ArgumentCursor(arguments: rawArguments)
-        var common = CommonConversionArguments()
-        var inputPath: String?
-        var outputPath: String?
-
-        while let option = cursor.nextOption() {
-            if try common.consume(option, cursor: &cursor) { continue }
-            switch option {
-            case "--input":
-                inputPath = try cursor.nextValue(for: option)
-            case "--output":
-                outputPath = try cursor.nextValue(for: option)
-            default:
-                throw CLIError.unknownOption(option)
-            }
-        }
-
-        guard let inputPath else { throw CLIError.missingArgument("--input") }
-        let appleFeatures = try common.resolve()
+    func command() throws -> ConvertCommand {
+        let resolved = try common.resolve()
         return ConvertCommand(
             inputURL: URL(fileURLWithPath: inputPath),
             outputURL: URL(fileURLWithPath: outputPath ?? inputPath),
-            family: common.family,
-            debugRootURL: common.debugDirectoryPath.map { URL(fileURLWithPath: $0) },
-            oppoCompatibility: common.oppoCompatibility,
-            inputProcessingBranch: common.inputProcessingBranch,
-            appleFeatures: appleFeatures,
-            appleStylesRawDNGURL: common.appleStylesRawDNGPath.map { URL(fileURLWithPath: $0) },
-            appleStyleDataProducer: common.appleStyleDataProducer,
-            oppoCameraTail: common.oppoCameraTail,
-            tmapFormat: common.tmapFormat
+            family: resolved.family,
+            debugRootURL: resolved.debugDirectoryPath.map { URL(fileURLWithPath: $0) },
+            oppoCompatibility: resolved.oppoCompatibility,
+            inputProcessingBranch: resolved.inputProcessingBranch,
+            appleFeatures: resolved.appleFeatures,
+            appleStylesRawDNGURL: resolved.appleStylesRawDNGPath.map { URL(fileURLWithPath: $0) },
+            appleStyleDataProducer: resolved.appleStyleDataProducer,
+            oppoCameraTail: resolved.oppoCameraTail,
+            tmapFormat: resolved.tmapFormat
         )
     }
+}
 
-    static func parseBatch(_ rawArguments: [String]) throws -> BatchCommand {
-        var cursor = ArgumentCursor(arguments: rawArguments)
-        var common = CommonConversionArguments()
-        var inputDirectoryPath: String?
-        var outputDirectoryPath: String?
-        var glob = "*.heic"
-        var jobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
-        var checkpointPath: String?
-        var resume = true
-        var skipExisting = true
-        var categorizeOutput = false
+private struct BatchArguments: ParsableArguments {
+    @Option(name: .customLong("input-dir"), help: "Directory to scan recursively.")
+    var inputDirectoryPath: String
 
-        while let option = cursor.nextOption() {
-            if try common.consume(option, cursor: &cursor) { continue }
-            switch option {
-            case "--input-dir":
-                inputDirectoryPath = try cursor.nextValue(for: option)
-            case "--output-dir":
-                outputDirectoryPath = try cursor.nextValue(for: option)
-            case "--glob":
-                glob = try cursor.nextValue(for: option)
-            case "--jobs":
-                let value = try cursor.nextValue(for: option)
-                guard let parsed = Int(value), parsed > 0 else {
-                    throw CLIError.invalidValue(option: option, value: value)
-                }
-                jobs = parsed
-            case "--checkpoint":
-                checkpointPath = try cursor.nextValue(for: option)
-            case "--resume":
-                resume = true
-            case "--no-resume":
-                resume = false
-            case "--skip-existing":
-                skipExisting = true
-            case "--no-skip-existing":
-                skipExisting = false
-            case "--categorize":
-                categorizeOutput = true
-            default:
-                throw CLIError.unknownOption(option)
-            }
+    @Option(name: .customLong("output-dir"), help: "Output directory. Defaults to the input directory.")
+    var outputDirectoryPath: String?
+
+    @Option(name: .customLong("glob"), help: "Filename pattern to include.")
+    var glob = "*.heic"
+
+    @Option(name: .customLong("jobs"), help: "Maximum concurrent conversions.")
+    var jobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
+
+    @Option(name: .customLong("checkpoint"), help: "Checkpoint JSONL path.")
+    var checkpointPath: String?
+
+    @Flag(name: .customLong("resume"), inversion: .prefixedNo, help: "Resume successful checkpoint entries.")
+    var resume = true
+
+    @Flag(
+        name: .customLong("skip-existing"),
+        inversion: .prefixedNo,
+        help: "Skip outputs that already validate for the current configuration."
+    )
+    var skipExisting = true
+
+    @Flag(name: .customLong("categorize"), help: "File converted assets by capture-mode classification.")
+    var categorizeOutput = false
+
+    @OptionGroup var common: CommonConversionArguments
+
+    func command() throws -> BatchCommand {
+        guard jobs > 0 else {
+            throw CLIError.invalidValue(option: "--jobs", value: String(jobs))
         }
-
-        guard let inputDirectoryPath else {
-            throw CLIError.missingArgument("--input-dir")
-        }
-        let appleFeatures = try common.resolve()
+        let resolved = try common.resolve()
         return BatchCommand(
             inputDirURL: URL(fileURLWithPath: inputDirectoryPath),
             outputDirURL: URL(fileURLWithPath: outputDirectoryPath ?? inputDirectoryPath),
-            family: common.family,
+            family: resolved.family,
             glob: glob,
-            debugRootURL: common.debugDirectoryPath.map { URL(fileURLWithPath: $0) },
-            oppoCompatibility: common.oppoCompatibility,
-            inputProcessingBranch: common.inputProcessingBranch,
-            appleFeatures: appleFeatures,
-            appleStylesRawDNGURL: common.appleStylesRawDNGPath.map { URL(fileURLWithPath: $0) },
-            appleStyleDataProducer: common.appleStyleDataProducer,
-            oppoCameraTail: common.oppoCameraTail,
-            tmapFormat: common.tmapFormat,
+            debugRootURL: resolved.debugDirectoryPath.map { URL(fileURLWithPath: $0) },
+            oppoCompatibility: resolved.oppoCompatibility,
+            inputProcessingBranch: resolved.inputProcessingBranch,
+            appleFeatures: resolved.appleFeatures,
+            appleStylesRawDNGURL: resolved.appleStylesRawDNGPath.map { URL(fileURLWithPath: $0) },
+            appleStyleDataProducer: resolved.appleStyleDataProducer,
+            oppoCameraTail: resolved.oppoCameraTail,
+            tmapFormat: resolved.tmapFormat,
             jobs: jobs,
             checkpointURL: checkpointPath.map { URL(fileURLWithPath: $0) },
             resume: resume,
@@ -260,40 +268,72 @@ enum ConversionArgumentParser {
             categorizeOutput: categorizeOutput
         )
     }
+}
 
-    static func parseCategorize(_ rawArguments: [String]) throws -> CategorizeCommand {
-        var cursor = ArgumentCursor(arguments: rawArguments)
-        var inputPaths: [String] = []
-        var outputDirectoryPath: String?
-        var jobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
-        var dryRun = false
+private struct CategorizeArguments: ParsableArguments {
+    @Option(name: .customLong("input"), parsing: .unconditionalSingleValue, help: "Input file or directory; repeatable.")
+    var inputPaths: [String] = []
 
-        while let option = cursor.nextOption() {
-            switch option {
-            case "--input":
-                inputPaths.append(try cursor.nextValue(for: option))
-            case "--output-dir":
-                outputDirectoryPath = try cursor.nextValue(for: option)
-            case "--jobs":
-                let value = try cursor.nextValue(for: option)
-                guard let parsed = Int(value), parsed > 0 else {
-                    throw CLIError.invalidValue(option: option, value: value)
-                }
-                jobs = parsed
-            case "--dry-run":
-                dryRun = true
-            default:
-                throw CLIError.unknownOption(option)
-            }
-        }
+    @Option(name: .customLong("output-dir"), help: "Destination root.")
+    var outputDirectoryPath: String
 
+    @Option(name: .customLong("jobs"), help: "Maximum concurrent copies.")
+    var jobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
+
+    @Flag(name: .customLong("dry-run"), help: "Plan without copying files.")
+    var dryRun = false
+
+    func command() throws -> CategorizeCommand {
         guard !inputPaths.isEmpty else { throw CLIError.missingArgument("--input") }
-        guard let outputDirectoryPath else { throw CLIError.missingArgument("--output-dir") }
+        guard jobs > 0 else {
+            throw CLIError.invalidValue(option: "--jobs", value: String(jobs))
+        }
         return CategorizeCommand(
             inputURLs: inputPaths.map { URL(fileURLWithPath: $0) },
             outputDirURL: URL(fileURLWithPath: outputDirectoryPath),
             jobs: jobs,
             dryRun: dryRun
         )
+    }
+}
+
+enum ConversionArgumentParser {
+    static func parseConvert(_ rawArguments: [String]) throws -> ConvertCommand {
+        try ConvertArguments.parse(normalizeOptionalOppoCompat(rawArguments)).command()
+    }
+
+    static func parseBatch(_ rawArguments: [String]) throws -> BatchCommand {
+        try BatchArguments.parse(normalizeOptionalOppoCompat(rawArguments)).command()
+    }
+
+    static func parseCategorize(_ rawArguments: [String]) throws -> CategorizeCommand {
+        try CategorizeArguments.parse(rawArguments).command()
+    }
+
+    /// Historical `--oppo-compat` accepts either a value or no value (meaning `on`).
+    /// ArgumentParser owns all actual option parsing; this normalizer only makes the
+    /// one legacy hybrid spelling explicit before parsing.
+    private static func normalizeOptionalOppoCompat(_ arguments: [String]) -> [String] {
+        var normalized: [String] = []
+        normalized.reserveCapacity(arguments.count + 1)
+        var index = 0
+        while index < arguments.count {
+            let argument = arguments[index]
+            normalized.append(argument)
+            guard argument == "--oppo-compat" else {
+                index += 1
+                continue
+            }
+            let nextIndex = index + 1
+            if nextIndex < arguments.count,
+               OppoCompatibility(rawValue: arguments[nextIndex]) != nil {
+                normalized.append(arguments[nextIndex])
+                index += 2
+            } else {
+                normalized.append(OppoCompatibility.on.rawValue)
+                index += 1
+            }
+        }
+        return normalized
     }
 }
