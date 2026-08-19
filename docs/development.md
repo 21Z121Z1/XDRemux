@@ -97,9 +97,10 @@ scripts/build_and_run.sh clean    # 清掉 DerivedData
 | `Sources/CoreImageRAWDiagnostics/` | RAW 诊断工具 |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI App |
 | `xdremux/python/` | 跨平台 Python CLI |
-| `xdremux/swift-cli/` | 兼容旧脚本的入口，转发到 `xdremux` |
 | `Tests/` | Swift 测试、Python 策略套件和验证 harness |
 | `scripts/` | 构建与验收脚本 |
+
+Swift CLI 只维护 SwiftPM 的 `xdremux` executable；仓库内部验证也直接构建和调用这个产品，不再维护独立的单文件 Swift 转发入口。
 
 ## 调试用环境变量
 
