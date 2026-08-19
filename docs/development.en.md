@@ -18,12 +18,18 @@ For people changing the converter, integrating the Swift package, or building th
 | `XDRemuxCore` | Library | The conversion core: HDR, HEIF, metadata, batch, output validation |
 | `XDRemuxAppleFeatures` | Library | Apple semantic analysis, Photographic Styles, portrait |
 | `xdremux` | Executable | The command-line tool |
-| `coreimage-raw-diagnostics` | Executable | CoreImage diagnostics for RAW inputs |
 
 ```bash
 swift build
 swift test
 swift run xdremux --help
+```
+
+The CoreImage RAW probe remains available as a developer target, but is no longer vended as a public Swift package product. Build it explicitly when needed:
+
+```bash
+swift build --target CoreImageRAWDiagnostics
+.build/debug/CoreImageRAWDiagnostics --help
 ```
 
 ## Integrating into your own project
@@ -94,7 +100,7 @@ Everything except an explicit `debug` builds Release: solving for Photographic S
 | `Sources/XDRemuxCore/` | Conversion core |
 | `Sources/XDRemuxAppleFeatures/` | Apple-specific features |
 | `Sources/XDRemuxCLI/` | Command-line parsing and entry point |
-| `Sources/CoreImageRAWDiagnostics/` | RAW diagnostics tool |
+| `Sources/CoreImageRAWDiagnostics/` | Developer-only RAW diagnostics target |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI app |
 | `xdremux_py/` | Cross-platform Python CLI implementation and repository-local module entry point |
 | `Tests/` | Swift tests, Python policy suites, validation harnesses |
