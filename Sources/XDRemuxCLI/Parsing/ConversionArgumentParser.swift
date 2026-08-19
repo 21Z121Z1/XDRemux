@@ -51,7 +51,11 @@ private struct CommonConversionArguments: ParsableArguments {
     @Option(name: .customLong("tmap-format"), help: "Tone-map metadata format: imageio or strict.")
     var tmapFormatRaw = TmapFormat.imageIO.rawValue
 
-    @Option(name: .customLong("oppo-compat"), help: "Fine-grained OPPO compatibility mode.")
+    @Option(
+        name: .customLong("oppo-compat"),
+        defaultAsFlag: OppoCompatibility.on.rawValue,
+        help: "Fine-grained OPPO compatibility mode. A bare flag means on."
+    )
     var oppoCompatibilityRaw: String?
 
     @Flag(name: .customLong("no-oppo-compat"), help: "Disable OPPO-compatible output.")
@@ -299,41 +303,14 @@ private struct CategorizeArguments: ParsableArguments {
 
 enum ConversionArgumentParser {
     static func parseConvert(_ rawArguments: [String]) throws -> ConvertCommand {
-        try ConvertArguments.parse(normalizeOptionalOppoCompat(rawArguments)).command()
+        try ConvertArguments.parse(rawArguments).command()
     }
 
     static func parseBatch(_ rawArguments: [String]) throws -> BatchCommand {
-        try BatchArguments.parse(normalizeOptionalOppoCompat(rawArguments)).command()
+        try BatchArguments.parse(rawArguments).command()
     }
 
     static func parseCategorize(_ rawArguments: [String]) throws -> CategorizeCommand {
         try CategorizeArguments.parse(rawArguments).command()
-    }
-
-    /// Historical `--oppo-compat` accepts either a value or no value (meaning `on`).
-    /// ArgumentParser owns all actual option parsing; this normalizer only makes the
-    /// one legacy hybrid spelling explicit before parsing.
-    private static func normalizeOptionalOppoCompat(_ arguments: [String]) -> [String] {
-        var normalized: [String] = []
-        normalized.reserveCapacity(arguments.count + 1)
-        var index = 0
-        while index < arguments.count {
-            let argument = arguments[index]
-            normalized.append(argument)
-            guard argument == "--oppo-compat" else {
-                index += 1
-                continue
-            }
-            let nextIndex = index + 1
-            if nextIndex < arguments.count,
-               OppoCompatibility(rawValue: arguments[nextIndex]) != nil {
-                normalized.append(arguments[nextIndex])
-                index += 2
-            } else {
-                normalized.append(OppoCompatibility.on.rawValue)
-                index += 1
-            }
-        }
-        return normalized
     }
 }
