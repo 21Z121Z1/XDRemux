@@ -14,6 +14,7 @@ class ReverseKey1DataAuditTests(unittest.TestCase):
     def test_structured_probe_is_rank_bounded_and_calibration_only(self):
         source = (ROOT / "scripts/evaluate_17pro_structured_residual.py").read_text()
         self.assertIn("for rank in (1,2,3)", source)
+        self.assertIn("for k in (3,5)", source)
         self.assertIn("heldoutUsedForSelection", source)
 
 if __name__ == "__main__":

@@ -30,5 +30,12 @@ def main():
   rr=r.reshape(sum(sel),12,12,8,10,3); mm=valid.reshape(sum(sel),12,12,8,10,3); value=(rr[mm].mean() if kind=='bias' else 1+((rr*rr)[mm].mean()*0)); pred=bc.copy();
   if kind=='bias': pred[sc]+=float(value)*ca['scales']
   rows.append({'name':'term_channel_'+kind,'parameters':30,'calibrationOverall':float(errors(pred,ca).mean()),'baseOverall':float(errors(bc,ca).mean()),'calibration17Pro':float(errors(pred,ca)[sc].mean()),'base17Pro':float(errors(bc,ca)[sc].mean()),'relativeOverallPercent':float((errors(bc,ca).mean()-errors(pred,ca).mean())/errors(bc,ca).mean()*100),'relative17ProPercent':float((errors(bc,ca)[sc].mean()-errors(pred,ca)[sc].mean())/errors(bc,ca)[sc].mean()*100)})
+ # kNN uses train-only image statistics and a scalar residual target; shrink is
+ # fixed before calibration and cannot use calibration labels.
+ sample_bias=r.mean(1); dist=((xc[:,None,:]-xt[None,:,:])**2).sum(2)
+ for k in (3,5):
+  nearest=np.argsort(dist,axis=1)[:,:k]; nb=sample_bias[nearest].mean(1)
+  for shrink in (.25,.5,1.):
+   pred=bc.copy();pred[sc]+= (shrink*nb)[:,None,None,None,None,None]*ca['scales'];ee=errors(pred,ca);eb=errors(bc,ca);rows.append({'name':f'knn{k}_shrink{shrink}','parameters':2,'calibrationOverall':float(ee.mean()),'baseOverall':float(eb.mean()),'calibration17Pro':float(ee[sc].mean()),'base17Pro':float(eb[sc].mean()),'relativeOverallPercent':float((eb.mean()-ee.mean())/eb.mean()*100),'relative17ProPercent':float((eb[sc].mean()-ee[sc].mean())/eb[sc].mean()*100)})
  report={'schema':'xdremux-reverse-key1-17pro-structured-residual-v1','train17ProSamples':int(sum(sel)),'train17ProSessions':len(uniq),'calibration17ProSamples':int(sum(sc)),'basisExplainedVariance':ev[:10].tolist(),'candidates':rows,'heldoutUsedForSelection':False,'status':'rejected_no_candidate_meets_10_percent_17pro_and_1_percent_overall'};a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n');print(json.dumps(report,indent=2))
 if __name__=='__main__':main()
