@@ -52,7 +52,8 @@ def summarize_scene(scene: Path) -> dict[str, Any]:
         "locked": False,
         "lockedReason": "historical model/scale/solver selection artifacts are present",
         "paths": {
-            "directModelProposal": probe_metrics(model_probe),
+            "cachedReverseKey1Proposal": probe_metrics(model_probe),
+            "universalProposal": None,
             "boundedOneStepResidual": bounded.get("bestMetrics"),
             "fullSolver": full.get("bestMetrics") or bounded.get("bestMetrics"),
             "identity": full.get("identityMetrics") or bounded.get("identityMetrics"),
