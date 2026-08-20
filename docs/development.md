@@ -121,6 +121,7 @@ Swift CLI 只维护 SwiftPM 的 `xdremux` executable；仓库内部验证也直�
 | `XDREMUX_ENCODING_AUDIT_DIR=<目录>` | 把编码审计数据写到指定目录 |
 | `XDREMUX_STYLE_RENDER_JOBS=<n>` | 限制摄影风格渲染并发数 |
 | `XDREMUX_RESEARCH_REVERSE_KEY1_COREML_MODEL=<路径>` | 研究用：加载外部 `.mlmodelc` / `.mlpackage` ReverseKey1Net，使用 10 秒有界语义代理选择模型 key1；失败或超时直接回退 identity，不进入慢 solver |
+| `XDREMUX_RESEARCH_UNIVERSAL_STYLE_COREML_MODEL=<路径>` | 研究用：单张主图直接预测 key1 和完整候选状态；用 iPhone calibration p95 不确定度和 10 秒语义代理双重门控，失败回退 identity，不先渲染 disabled anchor |
 
 摄影风格还有若干 `XDREMUX_RESEARCH_*` 和 `XDREMUX_STYLES_*` 研究开关，会在输出 manifest 里标记为研究模式并排除生产判定，见 [Apple 功能文档](apple-features.md)。
 
@@ -131,6 +132,15 @@ checkpoint 重新导出融合模型；训练 checkpoint 和私有样片不进入
 `computeUnits = .all` 允许系统选择 CPU、GPU 或 Neural Engine，但不能据此声称实际落在
 Neural Engine。在线语义代理只是完整 Neutrino 响应的快速筛选器，完整 renderer A/B 和
 真实 Photos 验收仍是独立证据层。
+
+仓库还包含一个更通用但仍为备选研究用途的单图状态模型：
+`Models/UniversalPhotographicStyleStateNet.mlpackage`。它不需要运行时 unstyled 图，
+可从 JPEG、HEIC、PNG、TIFF、WebP、AVIF，以及使用嵌入预览的 DNG 构造 key1、
+GTC、c/d 和 capture scalars 候选。输入/输出契约、iPhone 会话留出、213 张 OPPO
+label-free 覆盖结果和 Core ML 哈希见
+`Models/UniversalPhotographicStyleStateNet.model-card.md`。研究开关当前只授权 key1 进入
+有界语义代理；GTC、c/d 和 scalars 仅写入调试候选目录，不覆盖最终容器。它没有接入
+默认 converter，也没有完成 Photos consumer 验收。
 
 ## 验收规则
 

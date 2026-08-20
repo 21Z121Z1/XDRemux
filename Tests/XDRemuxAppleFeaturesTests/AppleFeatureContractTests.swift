@@ -378,6 +378,80 @@ final class AppleFeatureContractTests: XCTestCase {
         ), encoding: .utf8) ?? "")
     }
 
+    func testConfiguredUniversalStyleCoreMLMatchesPythonReference() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let modelPath = environment["XDREMUX_UNIVERSAL_STYLE_COREML_MODEL"],
+              let inputPath = environment["XDREMUX_UNIVERSAL_STYLE_INPUT"],
+              let referencePath = environment["XDREMUX_UNIVERSAL_STYLE_REFERENCE_DIR"] else {
+            throw XCTSkip("configured universal Photographic Style fixture is unavailable")
+        }
+        let inputURL = URL(fileURLWithPath: inputPath)
+        let prediction = try UniversalPhotographicStyleCoreMLPredictor.predict(
+            modelURL: URL(fileURLWithPath: modelPath),
+            styledURL: inputURL,
+            metadataURL: inputURL
+        )
+        let referenceURL = URL(fileURLWithPath: referencePath)
+        let key1Error = try maximumFloat16Error(
+            prediction.styleData,
+            Data(contentsOf: referenceURL.appendingPathComponent("key1.bin"))
+        )
+        let cError = try maximumFloat16Error(
+            prediction.lightMapCData,
+            Data(contentsOf: referenceURL.appendingPathComponent("c.bin"))
+        )
+        let dError = try maximumFloat16Error(
+            prediction.lightMapDData,
+            Data(contentsOf: referenceURL.appendingPathComponent("d.bin"))
+        )
+        XCTAssertLessThanOrEqual(key1Error, 0.02)
+        XCTAssertLessThanOrEqual(cError, 0.02)
+        XCTAssertLessThanOrEqual(dError, 0.02)
+        let expectedGTC = try Data(
+            contentsOf: referenceURL.appendingPathComponent("key3-gtc.bin")
+        )
+        XCTAssertEqual(prediction.gtcData.count, expectedGTC.count)
+        let gtcMaximum = zip(prediction.gtcData, expectedGTC).map {
+            abs(Int($0.0) - Int($0.1))
+        }.max() ?? 0
+        XCTAssertLessThanOrEqual(gtcMaximum, 2)
+        let referenceReport = try XCTUnwrap(
+            try JSONSerialization.jsonObject(
+                with: Data(contentsOf: referenceURL.appendingPathComponent("report.json"))
+            ) as? [String: Any]
+        )
+        let referenceScalars = try XCTUnwrap(referenceReport["scalars"] as? [String: Double])
+        for (name, expected) in referenceScalars {
+            XCTAssertEqual(try XCTUnwrap(prediction.scalars[name]), expected, accuracy: 0.1)
+        }
+        let expectedUncertainty = try XCTUnwrap(referenceReport["uncertainty"] as? Double)
+        XCTAssertEqual(prediction.uncertainty, expectedUncertainty, accuracy: 0.1)
+        print(String(data: try JSONSerialization.data(
+            withJSONObject: [
+                "key1MaximumAbsoluteError": key1Error,
+                "gtcMaximumByteError": gtcMaximum,
+                "lightMapCMaximumAbsoluteError": cError,
+                "lightMapDMaximumAbsoluteError": dError,
+                "uncertainty": prediction.uncertainty,
+                "timing": prediction.timing,
+            ],
+            options: [.prettyPrinted, .sortedKeys]
+        ), encoding: .utf8) ?? "")
+    }
+
+    private func maximumFloat16Error(_ actual: Data, _ expected: Data) throws -> Double {
+        XCTAssertEqual(actual.count, expected.count)
+        XCTAssertEqual(actual.count % 2, 0)
+        let actualValues = actual.withUnsafeBytes { Array($0.bindMemory(to: UInt16.self)) }
+        let expectedValues = expected.withUnsafeBytes { Array($0.bindMemory(to: UInt16.self)) }
+        return zip(actualValues, expectedValues).map {
+            abs(
+                Double(Float(Float16(bitPattern: $0.0)))
+                    - Double(Float(Float16(bitPattern: $0.1)))
+            )
+        }.max() ?? 0
+    }
+
     func testNativeReverseKeyProxyInversionSelfTest() throws {
         let executable = try AppleNativeToolchain.learnExecutable()
         let process = try AppleNativeToolchain.run(

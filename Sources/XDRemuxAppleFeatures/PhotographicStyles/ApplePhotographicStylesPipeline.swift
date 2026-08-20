@@ -4051,16 +4051,28 @@ package enum ApplePhotographicStylesPipeline {
         let fastModelURL = ProcessInfo.processInfo.environment[
             "XDREMUX_RESEARCH_REVERSE_KEY1_COREML_MODEL"
         ].map { URL(fileURLWithPath: $0) }
+        let universalFastModelURL = ProcessInfo.processInfo.environment[
+            "XDREMUX_RESEARCH_UNIVERSAL_STYLE_COREML_MODEL"
+        ].map { URL(fileURLWithPath: $0) }
+        let selectedFastModelURL = universalFastModelURL ?? fastModelURL
         let fastWarmupGroup = DispatchGroup()
         let fastWarmupLock = NSLock()
         var fastWarmupError: String?
-        if styleDataProducer == .constrainedSolver, let fastModelURL {
+        if styleDataProducer == .constrainedSolver, let selectedFastModelURL {
             fastWarmupGroup.enter()
             DispatchQueue.global(qos: .userInitiated).async {
                 defer { fastWarmupGroup.leave() }
                 do {
                     _ = try AppleNativeToolchain.learnExecutable()
-                    try ReverseKey1CoreMLPredictor.prepare(modelURL: fastModelURL)
+                    if universalFastModelURL != nil {
+                        try UniversalPhotographicStyleCoreMLPredictor.prepare(
+                            modelURL: selectedFastModelURL
+                        )
+                    } else {
+                        try ReverseKey1CoreMLPredictor.prepare(
+                            modelURL: selectedFastModelURL
+                        )
+                    }
                 } catch {
                     fastWarmupLock.lock()
                     fastWarmupError = String(describing: error)
@@ -4243,9 +4255,13 @@ package enum ApplePhotographicStylesPipeline {
                 "constrained-solver",
                 isDirectory: true
             )
+            try FileManager.default.createDirectory(
+                at: solverDirectory,
+                withIntermediateDirectories: true
+            )
             let producer = ConstrainedPolynomialStyleDataProducer()
             let selectedStyleData: AppleStyleDataResult
-            if let fastModelURL {
+            if let selectedFastModelURL {
                 fastWarmupGroup.wait()
                 fastWarmupLock.lock()
                 let warmupError = fastWarmupError
@@ -4255,30 +4271,90 @@ package enum ApplePhotographicStylesPipeline {
                         "warning: reverse-key fast-path warmup failed: \(warmupError)\n".utf8
                     ))
                 }
-                let disabledDirectory = solverDirectory.appendingPathComponent(
-                    "disabled-anchor", isDirectory: true
-                )
                 do {
-                    let disabledURL = try producer.renderDisabledThumbnail(
-                        preliminaryHEICURL: preliminaryURL,
-                        outputDirectory: disabledDirectory
-                    )
-                    let prediction = try ReverseKey1CoreMLPredictor.predict(
-                        modelURL: fastModelURL,
-                        styledURL: preliminaryURL,
-                        unstyledURL: disabledURL
-                    )
+                    let modelStyleData: Data
+                    let modelTiming: [String: Double]
+                    if universalFastModelURL != nil {
+                        let prediction = try UniversalPhotographicStyleCoreMLPredictor.predict(
+                            modelURL: selectedFastModelURL,
+                            styledURL: preliminaryURL,
+                            metadataURL: sourceURL
+                        )
+                        let calibrationP95Uncertainty = 2.2910144329071027
+                        guard prediction.uncertainty <= calibrationP95Uncertainty else {
+                            throw CLIError.invalidContainer(
+                                "universal Photographic Style model uncertainty "
+                                    + "\(prediction.uncertainty) exceeds calibration p95 "
+                                    + "\(calibrationP95Uncertainty)"
+                            )
+                        }
+                        let candidateDirectory = solverDirectory.appendingPathComponent(
+                            "universal-model-state", isDirectory: true
+                        )
+                        try FileManager.default.createDirectory(
+                            at: candidateDirectory,
+                            withIntermediateDirectories: true
+                        )
+                        try prediction.gtcData.write(
+                            to: candidateDirectory.appendingPathComponent("key3-gtc.bin"),
+                            options: .atomic
+                        )
+                        try prediction.lightMapCData.write(
+                            to: candidateDirectory.appendingPathComponent("c.bin"),
+                            options: .atomic
+                        )
+                        try prediction.lightMapDData.write(
+                            to: candidateDirectory.appendingPathComponent("d.bin"),
+                            options: .atomic
+                        )
+                        let stateReport: [String: Any] = [
+                            "schema": "xdremux-universal-photographic-style-state-v1",
+                            "uncertainty": prediction.uncertainty,
+                            "uncertaintyThreshold": calibrationP95Uncertainty,
+                            "scalars": prediction.scalars,
+                            "timing": prediction.timing,
+                            "auxiliaryAuthorization": "candidate-only-not-written-to-final-container",
+                            "claimBoundary": "Only key1 enters the bounded semantic proxy; GTC, c/d, and scalars remain research candidates.",
+                        ]
+                        try JSONSerialization.data(
+                            withJSONObject: stateReport,
+                            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+                        ).write(
+                            to: candidateDirectory.appendingPathComponent("state.json"),
+                            options: .atomic
+                        )
+                        modelStyleData = prediction.styleData
+                        modelTiming = prediction.timing.merging([
+                            "uncertainty": prediction.uncertainty,
+                            "uncertaintyThreshold": calibrationP95Uncertainty,
+                        ]) { _, new in new }
+                    } else {
+                        let disabledDirectory = solverDirectory.appendingPathComponent(
+                            "disabled-anchor", isDirectory: true
+                        )
+                        let disabledURL = try producer.renderDisabledThumbnail(
+                            preliminaryHEICURL: preliminaryURL,
+                            outputDirectory: disabledDirectory
+                        )
+                        let prediction = try ReverseKey1CoreMLPredictor.predict(
+                            modelURL: selectedFastModelURL,
+                            styledURL: preliminaryURL,
+                            unstyledURL: disabledURL
+                        )
+                        modelStyleData = prediction.styleData
+                        modelTiming = prediction.timing
+                    }
                     selectedStyleData = try producer.makeModelFastStyleData(
                         preliminaryHEICURL: preliminaryURL,
                         identityStylePropertyList: preliminaryPayload.stylePropertyList,
-                        modelStyleData: prediction.styleData,
+                        modelStyleData: modelStyleData,
                         linearThumbnailURL: preliminaryDirectory.appendingPathComponent(
                             "linear-thumbnail.png"
                         ),
                         styledThumbnailURL: preliminaryDirectory.appendingPathComponent(
                             "model-styled-thumbnail.png"
                         ),
-                        modelTiming: prediction.timing,
+                        modelTiming: modelTiming,
                         outputDirectory: solverDirectory
                     )
                 } catch {
@@ -4286,7 +4362,7 @@ package enum ApplePhotographicStylesPipeline {
                         "schema": "xdremux-model-fast-key1-fallback-v1",
                         "status": "identity-fallback",
                         "error": String(describing: error),
-                        "model": fastModelURL.path,
+                        "model": selectedFastModelURL.path,
                         "claimBoundary": "The bounded model path failed; no slow solver was entered.",
                     ]
                     let data = try JSONSerialization.data(
