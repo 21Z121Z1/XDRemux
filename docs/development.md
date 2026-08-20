@@ -142,6 +142,12 @@ label-free 覆盖结果和 Core ML 哈希见
 有界语义代理；GTC、c/d 和 scalars 仅写入调试候选目录，不覆盖最终容器。它没有接入
 默认 converter，也没有完成 Photos consumer 验收。
 
+历史 OPPO consumer A/B 产物可用
+`scripts/evaluate_oppo_solver_ab.py` 汇总；该脚本会分别保留 direct model proposal、
+bounded seeded residual、full solver 与 identity 的 neutral RMSE，并记录 solver/response
+artifact hash。当前四个缓存场景都已有调参产物，因此报告会明确标记 `lockedSet` 不可用，
+不能把它们当作 untouched 泛化验收。
+
 ## 验收规则
 
 声明改动完成之前，要为最终提交跑一次 completion gate：
