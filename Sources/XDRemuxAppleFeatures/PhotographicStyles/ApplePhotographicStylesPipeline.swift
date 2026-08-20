@@ -4714,20 +4714,30 @@ package enum ApplePhotographicStylesPipeline {
         let locations = try parseISOBMFFILoc(data, iloc)
         let locationByID = Dictionary(uniqueKeysWithValues: locations.map { ($0.itemID, $0) })
         let refs = parseISOBMFFIRefs(data, iref).refs
-        guard let tmapID = items.first(where: { $0.type == "tmap" })?.itemID,
-              let styleMetadataID = items.first(where: { item in
-                  item.type == "uri " && item.rawInfe.range(
-                      of: Data("tag:apple.com,2023:photo:metadata:styles".utf8)
-                  ) != nil
-              })?.itemID,
-              let styleLocation = locationByID[styleMetadataID],
-              refs.contains(where: {
-                  $0.type == "cdsc" && $0.from == styleMetadataID
-                      && Set($0.to) == Set([primaryID, tmapID])
-              }) else {
+        guard let tmapID = items.first(where: { $0.type == "tmap" })?.itemID else {
             throw CLIError.invalidContainer("Styles validation: style uri item or cdsc reference is missing")
         }
-        let styleData = try itemPayload(in: data, entry: styleLocation, idat: idat)
+        let styleURIItems = items.filter { item in
+            item.type == "uri " && item.rawInfe.range(
+                of: Data("tag:apple.com,2023:photo:metadata:styles".utf8)
+            ) != nil
+        }
+        let styleCandidates = styleURIItems.compactMap { item -> (Int, Data)? in
+            guard let location = locationByID[item.itemID],
+                  refs.contains(where: {
+                      $0.type == "cdsc" && $0.from == item.itemID
+                          && Set($0.to) == Set([primaryID, tmapID])
+                  }),
+                  let payload = try? itemPayload(in: data, entry: location, idat: idat)
+            else { return nil }
+            return (item.itemID, payload)
+        }
+        let selectedStyle: (Int, Data)? = styleCandidates.first(where: {
+            prevalidatedStylePropertyList == nil || $0.1 == prevalidatedStylePropertyList
+        }) ?? styleCandidates.first
+        guard let (_, styleData) = selectedStyle else {
+            throw CLIError.invalidContainer("Styles validation: style uri item or cdsc reference is missing")
+        }
         guard styleData.starts(with: Data("bplist00".utf8)),
               let object = try PropertyListSerialization.propertyList(
                   from: styleData, options: [], format: nil

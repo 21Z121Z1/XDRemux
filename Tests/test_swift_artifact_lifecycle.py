@@ -52,6 +52,18 @@ class SwiftArtifactLifecycleTests(unittest.TestCase):
         self.assertIn("donorContaminationScan", validation)
         self.assertIn("guard contamination.matches.isEmpty", validation)
 
+    def test_styles_validation_skips_legacy_uri_when_prevalidated_payload_exists(self) -> None:
+        validation = STYLES_SWIFT.split(
+            "private static func validatePhotographicStylesOutput", 1
+        )[1].split("private static func donorContaminationScan", 1)[0]
+        # Native files can retain an older style URI item before the generated
+        # item. The validator must select the exact payload already accepted by
+        # the producer instead of blindly taking the first URI item.
+        self.assertIn("let styleURIItems = items.filter", validation)
+        self.assertIn("let styleCandidates = styleURIItems.compactMap", validation)
+        self.assertIn("prevalidatedStylePropertyList == nil || $0.1 == prevalidatedStylePropertyList", validation)
+        self.assertIn("styleCandidates.first(where:", validation)
+
     def test_styles_scene_bundle_retains_one_shared_hdr_rgb_plane(self) -> None:
         scene_bundle = STYLES_SWIFT.split(
             "private struct PhotoDerivedStyleSceneBundle", 1

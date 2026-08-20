@@ -163,6 +163,16 @@ unstyled estimator。该 cascade 仍是离线诊断，不接 runtime。
 
 ## 验收规则
 
+### Native style plist contract selection
+
+Some native iPhone files retain an older `tag:apple.com,2023:photo:metadata:styles`
+URI item (plist version 8) alongside the generated Photographic Styles item
+(plist version 15). The research converter keeps the native item and adds its
+validated style graph; final validation therefore enumerates URI candidates and
+selects the byte-identical payload already accepted by the producer. It must not
+blindly validate the first URI item. This is a contract-selection fix only; it
+does not establish Photos import/edit/save/reopen acceptance.
+
 ### OPPO self-pair prospective locked set
 
 `.codex/reverse-key1/self-pair-locked-v1/manifest.json` freezes one existing
