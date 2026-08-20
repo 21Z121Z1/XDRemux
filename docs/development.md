@@ -182,6 +182,14 @@ bounded direct path; `...=seeded` invokes the one-step native residual path.
 Both operate only after the pipeline has generated and validated its own
 `constrained-solver-preliminary-identity.heic`.
 
+The native-consumer calibration freeze is stored under
+`.codex/reverse-key1/native-consumer-v1/`. It contains four calibration and
+four held-out iPhone sessions, selected per device from the existing fixed
+dataset split by source SHA only. The first iPhone 16 causal probe proved that
+identity and self-pair key1 produce distinct native apply rasters; full HEIC
+replacement was not claimed when the current converter rejected the source's
+binary-plist contract.
+
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
 ```bash
