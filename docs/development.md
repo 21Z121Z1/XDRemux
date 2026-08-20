@@ -232,6 +232,16 @@ must preserve true-pair quality, shuffle separation, and device slices. If no
 candidate meets the 1% self-pair improvement gate, the 97-sample heldout split
 is not opened and no research model is exported.
 
+The self-pair v3/v4 profile experiment is `scripts/evaluate_selfpair_ensemble_profiles.py`.
+It reports train/calibration device, term, spatial-band, session and model-
+disagreement decomposition, then evaluates only bounded device-alpha and
+disagreement-gate candidates on calibration. Unknown profiles fall back to
+global alpha=.625. A candidate must improve calibration by at least 1%, improve
+iPhone 17 Pro, and pass the per-device and shuffle guards before a frozen
+choice can authorize one heldout run. High 17 Pro MAE with near-perfect model
+error correlation is evidence for a data/label long tail, not evidence that a
+larger fusion gate is warranted.
+
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
 ```bash
