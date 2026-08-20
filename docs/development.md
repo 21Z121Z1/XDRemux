@@ -211,6 +211,18 @@ For equal-alpha investigations, `scripts/audit_native_alpha_provenance.py`
 requires distinct seed and HEIC hashes and distinct renderer output paths before
 accepting equal consumer pixels as genuine insensitivity evidence.
 
+The key1-only self-pair low-dimensional adapter experiment is driven by
+`scripts/evaluate_selfpair_lowdim_adapter.py`. Run `collect` on calibration,
+then `select` to write a frozen calibration-only choice, and only then run
+`heldout --frozen`. The phase boundary is intentional: the 417/89/97 dataset
+split is recorded in the archive metadata and heldout is never used for
+candidate selection. Candidates are a v3/v4 self-pair blend, a global
+identity-centered affine correction, or a 30-channel strongly regularized
+bias; no per-pixel fit is permitted. The fixed promotion threshold is 1%
+normalized-MAE improvement over self-pair alpha=.625, with shuffle and device
+guardrails. This key1 metric is separate from full-HEIC consumer-insensitivity
+and does not establish Photos import/edit/save/reopen behavior.
+
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
 ```bash
