@@ -40,6 +40,8 @@ def main() -> None:
         choices=("base", "multiscale_large"),
         default="base",
     )
+    train.add_argument("--consumer-weight", type=float, default=0.0)
+    train.add_argument("--resume", type=Path)
     args = parser.parse_args()
     if args.command == "prepare":
         result = prepare_universal_dataset(
@@ -61,6 +63,8 @@ def main() -> None:
                 seed=args.seed,
                 metadata_dropout=args.metadata_dropout,
                 architecture=args.architecture,
+                consumer_weight=args.consumer_weight,
+                resume=args.resume,
             )
         )
     print(json.dumps(result, indent=2, sort_keys=True))

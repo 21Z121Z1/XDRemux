@@ -14,6 +14,7 @@ from xdremux_py.universal_photographic_style_training import (
     decode_style_binary,
     metadata_vector,
     primary_image_features,
+    _consumer_quadratic_proxy,
 )
 from xdremux_py.universal_photographic_style import (
     UniversalImageInput,
@@ -134,6 +135,20 @@ class UniversalPhotographicStyleTrainingTests(unittest.TestCase):
         self.assertEqual(len(resources["c"]), 2_048)
         self.assertEqual(len(resources["d"]), 2_048)
         self.assertEqual(resources["uncertainty"], 1.0)
+
+    def test_consumer_quadratic_proxy_identity_is_neutral(self) -> None:
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch is unavailable")
+        primary = torch.rand((2, PRIMARY_CHANNELS, 256, 256))
+        identity = torch.zeros((2, 12, 12, 8, 10, 3))
+        identity[..., 1, 0] = 1.0
+        identity[..., 2, 1] = 1.0
+        identity[..., 3, 2] = 1.0
+        actual = _consumer_quadratic_proxy(torch, identity, primary)
+        expected = primary[:, :3, ::4, ::4]
+        self.assertTrue(torch.allclose(actual, expected, atol=1e-6))
 
 
 if __name__ == "__main__":

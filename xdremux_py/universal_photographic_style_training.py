@@ -691,7 +691,30 @@ class _UniversalDataset:
         )
 
 
-def _losses(torch: Any, model: Any, output: Mapping[str, Any], batch: Sequence[Any]) -> tuple[Any, dict[str, float]]:
+def _consumer_quadratic_proxy(torch: Any, key1: Any, primary: Any) -> Any:
+    """Differentiable global quadratic proxy for the native key1 consumer.
+
+    This is deliberately a training regularizer, not a runtime renderer: it
+    averages the spatial/directional lattice and applies the verified ten-term
+    encoded-RGB basis to the paired styled thumbnail.
+    """
+    rgb = primary[:, :3, ::4, ::4]
+    red, green, blue = rgb[:, 0], rgb[:, 1], rgb[:, 2]
+    terms = torch.stack(
+        (torch.ones_like(red), red, green, blue, red.square(), red * green,
+         red * blue, green.square(), green * blue, blue.square()), dim=1
+    )
+    coefficients = key1.mean(dim=(1, 2, 3))
+    return torch.einsum("bthw,btc->bchw", terms, coefficients).clamp(0.0, 1.0)
+
+
+def _losses(
+    torch: Any,
+    model: Any,
+    output: Mapping[str, Any],
+    batch: Sequence[Any],
+    consumer_weight: float = 0.0,
+) -> tuple[Any, dict[str, float]]:
     (
         _primary,
         _metadata,
@@ -722,6 +745,8 @@ def _losses(torch: Any, model: Any, output: Mapping[str, Any], batch: Sequence[A
         normalized_scalars[scalar_mask], torch.zeros_like(normalized_scalars[scalar_mask])
     )
     unstyled_loss = torch.nn.functional.l1_loss(output["unstyled"], unstyled)
+    consumer_proxy = _consumer_quadratic_proxy(torch, output["key1"], _primary)
+    consumer_loss = torch.nn.functional.smooth_l1_loss(consumer_proxy, unstyled)
     squared = normalized_key.square()
     spatial_mask = key_mask[:, :, :, None, None, None].expand_as(squared)
     numerator = (squared * spatial_mask).sum(dim=(1, 2))
@@ -733,6 +758,7 @@ def _losses(torch: Any, model: Any, output: Mapping[str, Any], batch: Sequence[A
     values = (key_loss, gtc_loss, light_loss, scalar_loss, unstyled_loss, uncertainty_loss)
     task_noise = model.task_log_variances.clamp(-3.0, 3.0)
     total = sum(torch.exp(-task_noise[i]) * loss + task_noise[i] for i, loss in enumerate(values))
+    total = total + float(consumer_weight) * consumer_loss
     return total, {
         "key1": float(key_loss.detach().cpu()),
         "gtc": float(gtc_loss.detach().cpu()),
@@ -740,6 +766,7 @@ def _losses(torch: Any, model: Any, output: Mapping[str, Any], batch: Sequence[A
         "scalars": float(scalar_loss.detach().cpu()),
         "unstyled": float(unstyled_loss.detach().cpu()),
         "uncertainty": float(uncertainty_loss.detach().cpu()),
+        "consumerProxy": float(consumer_loss.detach().cpu()),
     }
 
 
@@ -756,10 +783,16 @@ def _evaluate(torch: Any, model: Any, loader: Any, device: str) -> dict[str, Any
     light_errors: list[float] = []
     scalar_errors: list[float] = []
     unstyled_errors: list[float] = []
+    consumer_proxy_errors: list[float] = []
     with torch.no_grad():
         for original in loader:
             batch = _move_batch(original, device)
             output = model(batch[0], batch[1], batch[2])
+            consumer_proxy = _consumer_quadratic_proxy(torch, output["key1"], batch[0])
+            consumer_delta = consumer_proxy - batch[9]
+            consumer_proxy_errors.extend(
+                consumer_delta.abs().mean(dim=(1, 2, 3)).cpu().tolist()
+            )
             key1, key_mask = batch[3], batch[4]
             normalized = ((output["key1"] - key1) / model.key1_scale).abs()
             for index, model_name in enumerate(original[-1]):
@@ -798,6 +831,10 @@ def _evaluate(torch: Any, model: Any, loader: Any, device: str) -> dict[str, Any
         "lightMapsNormalizedMAE": float(np.mean(light_errors)),
         "scalarsNormalizedMAE": float(np.mean(scalar_errors)),
         "unstyledMAE": float(np.mean(unstyled_errors)),
+        "consumerProxyMAE": float(np.mean(consumer_proxy_errors)),
+        "consumerProxyRMSE8": float(
+            np.sqrt(np.mean(np.asarray(consumer_proxy_errors) ** 2)) * 255.0
+        ),
         "uncertaintyErrorCorrelation": uncertainty_correlation,
     }
 
@@ -813,6 +850,8 @@ class UniversalTrainingConfig:
     seed: int = 260820
     metadata_dropout: float = 0.25
     architecture: str = "base"
+    consumer_weight: float = 0.0
+    resume: Path | None = None
 
 
 def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
@@ -825,6 +864,8 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         raise ReverseKey1Error("MPS was requested but is unavailable")
     if not 0 <= config.metadata_dropout <= 1:
         raise ReverseKey1Error("metadata dropout must be in [0, 1]")
+    if config.consumer_weight < 0:
+        raise ReverseKey1Error("consumer weight must be non-negative")
     if config.architecture not in {"base", "multiscale_large"}:
         raise ReverseKey1Error(
             f"unsupported universal architecture: {config.architecture}"
@@ -843,6 +884,11 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
     model = build_universal_model(
         statistics, architecture=config.architecture
     ).to(device)
+    if config.resume is not None:
+        checkpoint = torch.load(config.resume.resolve(), map_location=device, weights_only=False)
+        if checkpoint.get("manifestSHA256") != sha256_file(manifest):
+            raise ReverseKey1Error("resume checkpoint manifest hash does not match dataset")
+        model.load_state_dict(checkpoint["model"])
     loaders = {
         split: torch.utils.data.DataLoader(
             _UniversalDataset(
@@ -871,7 +917,9 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
             batch = _move_batch(original, device)
             optimizer.zero_grad(set_to_none=True)
             prediction = model(batch[0], batch[1], batch[2])
-            total, details = _losses(torch, model, prediction, batch)
+            total, details = _losses(
+                torch, model, prediction, batch, consumer_weight=config.consumer_weight
+            )
             total.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
             optimizer.step()
@@ -937,6 +985,8 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
             "Native iPhone session holdout only; arbitrary-device quality and Photos behavior "
             "require separate acceptance."
         ),
+        "consumerWeight": config.consumer_weight,
+        "resume": str(config.resume.resolve()) if config.resume else None,
     }
     _atomic_json(output / "report.json", report)
     return report

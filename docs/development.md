@@ -148,6 +148,11 @@ bounded seeded residual、full solver 与 identity 的 neutral RMSE，并记录 
 artifact hash。当前四个缓存场景都已有调参产物，因此报告会明确标记 `lockedSet` 不可用，
 不能把它们当作 untouched 泛化验收。
 
+Universal 训练支持 `--resume`（要求 checkpoint 与 manifest hash 一致）及可选的
+`--consumer-weight`。后者只启用 identity-neutral 的十项 encoded-RGB quadratic
+consumer proxy 训练正则；它不是 Apple renderer。短程 v3 resume ablation 的 held-out
+key1 MAE 有改善，但 proxy 像素 RMSE 仍高于 identity，未导出或替换发布模型。
+
 ## 验收规则
 
 声明改动完成之前，要为最终提交跑一次 completion gate：
