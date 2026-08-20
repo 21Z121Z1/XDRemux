@@ -163,6 +163,18 @@ unstyled estimator。该 cascade 仍是离线诊断，不接 runtime。
 
 ## 验收规则
 
+### OPPO self-pair prospective locked set
+
+`.codex/reverse-key1/self-pair-locked-v1/manifest.json` freezes one existing
+source per canonical OPPO model using only file existence, historical
+solver-scene/hash exclusion, model grouping, and lexicographically smallest
+source SHA-256. The five rows were observed by the label-free OOD inventory,
+but were not used for iPhone training or self-pair/solver/consumer tuning.
+They therefore measure prospective zero-shot consumer behavior, not entirely
+unseen OOD generalization. Consumer results belong in the ignored `.codex`
+report and must keep identity, direct self-pair, one-step bounded correction,
+and full solver separate; a renderer or target failure remains partial.
+
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
 ```bash
