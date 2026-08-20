@@ -39,6 +39,7 @@ def main():
         d = root / f"calibration-{sample['sourceSHA256'][:16]}"; nd = native_dir(d)
         for w in WEIGHTS:
             t = tag(w); response = load(d/f"alpha-{t}-response.json")
+            conversion = load(d/f"alpha-{t}-conversion.json")
             if w == .625:
                 response = response or load(d/"selfpair-response-fixed2.json") or load(d/"selfpair-response-rerun.json") or load(d/"selfpair-response.json")
                 summary = load(d/"response-ab-summary.json")
@@ -47,7 +48,7 @@ def main():
                 summary = None; candidate_dir = d/f"alpha-{t}-renders"
             metrics = {s: metric(candidate_dir/f"{s}.png", nd/f"{s}.png") if nd else None for s in STATES}
             vals = [v["rmse"] for v in metrics.values() if v is not None]
-            rows.append({"split":"calibration","model":sample["model"],"sourceSHA256":sample["sourceSHA256"],"alpha":w,"cacheHit":w==.625,"responseAvailable":response is not None,"insideNativeHueEnvelope":response.get("toneAtColor100HueInsideNativeEnvelope") if response else None,"states":metrics,"aggregateRGBRMSE":(sum(vals)/len(vals) if vals else (summary.get("aggregateRMSE") if summary else None))})
+            rows.append({"split":"calibration","model":sample["model"],"sourceSHA256":sample["sourceSHA256"],"alpha":w,"cacheHit":w==.625,"conversionWallTimeSeconds":conversion.get("seconds") if conversion else None,"responseWallTimeSeconds":None,"responseAvailable":response is not None,"insideNativeHueEnvelope":response.get("toneAtColor100HueInsideNativeEnvelope") if response else None,"states":metrics,"aggregateRGBRMSE":(sum(vals)/len(vals) if vals else (summary.get("aggregateRMSE") if summary else None))})
     by_alpha = {}
     for w in WEIGHTS:
         rs = [r for r in rows if r["alpha"] == w]; vals = [r["aggregateRGBRMSE"] for r in rs if r["aggregateRGBRMSE"] is not None]
