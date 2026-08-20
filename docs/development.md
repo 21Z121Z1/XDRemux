@@ -153,6 +153,14 @@ Universal 训练支持 `--resume`（要求 checkpoint 与 manifest hash 一致�
 consumer proxy 训练正则；它不是 Apple renderer。短程 v3 resume ablation 的 held-out
 key1 MAE 有改善，但 proxy 像素 RMSE 仍高于 identity，未导出或替换发布模型。
 
+Privileged-teacher cascade 评测入口为
+`scripts/evaluate_universal_paired_cascade.py`。它固定 calibration-derived 的
+paired ensemble alpha `0.625`，分别报告 Universal direct、真实 disabled unstyled 的
+paired oracle、Universal predicted unstyled cascade、primary-as-unstyled 和 shuffled
+controls，并按设备/session 输出结果。当前 held-out cascade 为 `0.82674`，差于 direct
+Universal `0.82233`；真实 unstyled oracle 为 `0.78123`，说明主要缺口在 Universal
+unstyled estimator。该 cascade 仍是离线诊断，不接 runtime。
+
 ## 验收规则
 
 声明改动完成之前，要为最终提交跑一次 completion gate：
