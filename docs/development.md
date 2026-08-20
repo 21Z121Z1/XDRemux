@@ -207,6 +207,9 @@ The pre-registered alpha consumer grid is summarized by
 `scripts/summarize_native_alpha_grid.py`; its selection rule is calibration-only
 and requires no more than a 10% device regression, no increase in reversals or
 failures, and at least 1% aggregate improvement before changing `.625`.
+For equal-alpha investigations, `scripts/audit_native_alpha_provenance.py`
+requires distinct seed and HEIC hashes and distinct renderer output paths before
+accepting equal consumer pixels as genuine insensitivity evidence.
 
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
