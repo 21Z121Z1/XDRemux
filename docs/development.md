@@ -232,6 +232,14 @@ must preserve true-pair quality, shuffle separation, and device slices. If no
 candidate meets the 1% self-pair improvement gate, the 97-sample heldout split
 is not opened and no research model is exported.
 
+The iPhone 17 Pro boundary audit is `scripts/audit_reverse_key1_17pro_data.py`.
+It reads only the manifest, prepared NPZ cache, and the known
+`Apple_Native_Samples` root; it does not copy media. The bounded fallback
+experiment is `scripts/evaluate_17pro_scalar_adapter.py`: one scalar residual is
+fit on train sessions with session-group CV, applied only to 17 Pro, and
+calibration is the promotion gate. The 97 heldout records remain unopened when
+the adapter fails its 10% 17 Pro and 1% aggregate thresholds.
+
 The self-pair v3/v4 profile experiment is `scripts/evaluate_selfpair_ensemble_profiles.py`.
 It reports train/calibration device, term, spatial-band, session and model-
 disagreement decomposition, then evaluates only bounded device-alpha and
