@@ -55,8 +55,11 @@ def summarize_scene(scene: Path) -> dict[str, Any]:
             "cachedReverseKey1Proposal": probe_metrics(model_probe),
             "universalProposal": None,
             "boundedOneStepResidual": bounded.get("bestMetrics"),
-            "fullSolver": full.get("bestMetrics") or bounded.get("bestMetrics"),
-            "identity": full.get("identityMetrics") or bounded.get("identityMetrics"),
+            # Never substitute the bounded result for a missing full-solver
+            # artifact: that would falsely promote a development path to an
+            # oracle comparison.
+            "fullSolver": full.get("bestMetrics") if full else None,
+            "identity": full.get("identityMetrics") if full else bounded.get("identityMetrics"),
         },
         "solver": {
             "boundedArtifact": str(bounded_path),
@@ -65,8 +68,8 @@ def summarize_scene(scene: Path) -> dict[str, Any]:
             "fullArtifact": str(full_path),
             "fullArtifactSHA256": digest(full_path) if full_path.is_file() else None,
             "fullSeconds": (full.get("timing") or {}).get("totalSeconds"),
-            "nativeResponseValidated": full.get("nativeResponseValidated") or bounded.get("nativeResponseValidated"),
-            "renderRequestCount": full.get("renderRequestCount") or bounded.get("renderRequestCount"),
+            "nativeResponseValidated": full.get("nativeResponseValidated") if full else None,
+            "renderRequestCount": full.get("renderRequestCount") if full else None,
         },
         "responseEnvelope": {
             "available": envelope.is_file(),
