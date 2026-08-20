@@ -223,6 +223,15 @@ normalized-MAE improvement over self-pair alpha=.625, with shuffle and device
 guardrails. This key1 metric is separate from full-HEIC consumer-insensitivity
 and does not establish Photos import/edit/save/reopen behavior.
 
+The mixed-input fine-tune probe is `scripts/train_mixed_selfpair.py`. It starts
+from the multiscale checkpoint, freezes the encoder, and trains only the head
+on an explicit mixture of true paired and duplicated-primary self-pair inputs;
+the shared target and consistency loss are recorded in a calibration-only
+report. Candidate selection must remain on the 89-sample calibration split and
+must preserve true-pair quality, shuffle separation, and device slices. If no
+candidate meets the 1% self-pair improvement gate, the 97-sample heldout split
+is not opened and no research model is exported.
+
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
 ```bash
