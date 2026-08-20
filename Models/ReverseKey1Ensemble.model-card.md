@@ -21,6 +21,16 @@ XDREMUX_RESEARCH_REVERSE_KEY1_COREML_MODEL="$PWD/Models/ReverseKey1Ensemble.mlpa
 
 ## 已验证范围
 
+### 单图 self-pair 研究分支（未 promotion）
+
+训练管线支持显式 `--single-image-self-pair` 模式：将同一张 styled
+primary 缩略图复制为第二个输入，仍使用原生 key1 标签与固定的
+417/89/97 session split。该模式会在 checkpoint/report 中写入
+`inputMode=single_image_self_pair`，不能与真实 disabled-unstyled paired
+模型混淆，也未接入默认 runtime。v3 small 2-epoch 与 v4 multiscale 2-epoch
+短程候选的 held-out normalized MAE 分别为 `0.80226` 与 `0.78751`；两者都
+劣于未微调 self-pair baseline `0.78220`，因此保留为可复现实验而拒绝 promotion。
+
 - 五张额外 OPPO 原生 HEIC 的离线端到端转换为 `3.80–5.62` 秒，均通过 XDRemux
   结构和摄影风格 metadata 校验。
 - 四个具有完整 Neutrino A/B 的 OPPO 场景中，快速语义代理与完整 renderer 对模型

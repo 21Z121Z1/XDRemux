@@ -1022,6 +1022,7 @@ class _CachedDataset:
         samples: Sequence[Mapping[str, Any]],
         profile_vocabulary: Sequence[str] = (),
         horizontal_flip_probability: float = 0.0,
+        single_image_self_pair: bool = False,
     ):
         self.root = root
         self.samples = list(samples)
@@ -1031,6 +1032,7 @@ class _CachedDataset:
         }
         self.unknown_profile_id = self.profile_ids.get("__unknown__", 0)
         self.horizontal_flip_probability = horizontal_flip_probability
+        self.single_image_self_pair = single_image_self_pair
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -1040,7 +1042,11 @@ class _CachedDataset:
         record = self.samples[index]
         path = self.root / str(record["samplePath"])
         with np.load(path, allow_pickle=False) as archive:
-            features = input_features(archive["images"])
+            images = np.asarray(archive["images"], dtype=np.uint8)
+            if self.single_image_self_pair:
+                images = images.copy()
+                images[1] = images[0]
+            features = input_features(images)
             key1 = np.asarray(archive["key1"], dtype=np.float32)
             mask = np.asarray(archive["mask"], dtype=np.bool_)
         if (
@@ -1101,6 +1107,7 @@ class TrainingConfig:
     architecture: str = "small"
     horizontal_flip_probability: float = 0.0
     checkpoint_interval: int = 1
+    single_image_self_pair: bool = False
 
 
 def _select_device(torch: Any, requested: str) -> str:
@@ -1269,7 +1276,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             raise ReverseKey1Error("warm-start coefficient scales do not match")
         incompatible = model.load_state_dict(initial["model"], strict=False)
         allowed_missing = {"profile_embedding.weight"} if profile_count else set()
-        if set(incompatible.missing_keys) != allowed_missing:
+        if not set(incompatible.missing_keys).issubset(allowed_missing):
             raise ReverseKey1Error(
                 "unexpected warm-start missing keys: "
                 f"{sorted(incompatible.missing_keys)}"
@@ -1295,6 +1302,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             horizontal_flip_probability=(
                 config.horizontal_flip_probability if split == "train" else 0.0
             ),
+            single_image_self_pair=config.single_image_self_pair,
         )
         for split, values in by_split.items()
     }
@@ -1469,6 +1477,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             "sourceCorpusSHA256": header["corpusSHA256"],
             "architecture": architecture,
             "inputChannels": INPUT_CHANNELS,
+            "inputMode": "single_image_self_pair" if config.single_image_self_pair else "paired_styled_unstyled",
             "profileConditioning": config.profile_conditioning,
             "profileVocabulary": list(profile_vocabulary),
             "deviceMetadataPolicy": (
@@ -1512,6 +1521,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
         "architectureConfig": config.architecture,
         "horizontalFlipProbability": config.horizontal_flip_probability,
         "checkpointInterval": config.checkpoint_interval,
+        "inputMode": "single_image_self_pair" if config.single_image_self_pair else "paired_styled_unstyled",
         "seed": config.seed,
         "parameterCount": sum(parameter.numel() for parameter in model.parameters()),
         "dataset": header,

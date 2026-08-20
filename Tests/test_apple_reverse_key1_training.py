@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +16,7 @@ from xdremux_py.apple_reverse_key1_training import (
     encode_key1,
     identity_key1,
     input_features,
+    _CachedDataset,
     runtime_gate_passes,
     runtime_gate_scores,
     select_linear_blend_weight,
@@ -23,6 +25,35 @@ from xdremux_py.apple_reverse_key1_training import (
 
 
 class ReverseKey1TrainingTests(unittest.TestCase):
+    def test_single_image_self_pair_duplicates_only_the_runtime_input(self) -> None:
+        try:
+            import torch  # noqa: F401
+        except ImportError:
+            self.skipTest("PyTorch training extra is unavailable")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            images = np.zeros((2, 3, INPUT_SIZE, INPUT_SIZE), dtype=np.uint8)
+            images[0, 0] = 255
+            images[1, 1] = 127
+            np.savez(
+                root / "sample.npz",
+                images=images,
+                key1=identity_key1(),
+                mask=np.ones((GRID_LONG, GRID_LONG), dtype=np.bool_),
+            )
+            sample = {
+                "samplePath": "sample.npz",
+                "captureSession": "session-self-pair-test",
+                "Model": "iPhone 16",
+            }
+            paired = _CachedDataset(root, [sample])[0][0].numpy()
+            self_pair = _CachedDataset(
+                root, [sample], single_image_self_pair=True
+            )[0][0].numpy()
+            self.assertTrue(np.array_equal(self_pair[:3], self_pair[3:6]))
+            self.assertFalse(np.array_equal(paired[:3], paired[3:6]))
+            self.assertTrue(np.array_equal(self_pair[:3], paired[:3]))
+
     def test_identity_template_has_native_quadratic_diagonal(self) -> None:
         identity = identity_key1()
         self.assertEqual(identity.shape, (12, 12, 8, 10, 3))
