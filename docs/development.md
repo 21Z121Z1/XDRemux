@@ -250,6 +250,14 @@ choice can authorize one heldout run. High 17 Pro MAE with near-perfect model
 error correlation is evidence for a data/label long tail, not evidence that a
 larger fusion gate is warranted.
 
+The final structured probe is `scripts/evaluate_17pro_structured_residual.py`.
+It derives session-mean residual PCA only from the 22 train sessions, predicts
+rank 1/2/3 coefficients from six stable thumbnail statistics with strong ridge
+regularization, and compares a bounded term/channel control. Calibration is
+the only promotion gate; the 97-sample heldout is not opened for a rejected
+probe. Low explained variance or weak calibration gain points to missing
+native 17 Pro supervision, not a justification for more post-hoc tuning.
+
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
 ```bash
