@@ -35,7 +35,12 @@ def summarize_sample(root: Path, row: dict[str, Any]) -> dict[str, Any]:
     work = root / f"{row['split']}-{sid}"
     candidate = work / "selfpair-fast.heic"
     ab = load(work / "response-ab-summary.json")
-    response = load(work / "selfpair-response-rerun.json") or load(work / "selfpair-response.json")
+    response = (
+        load(work / "selfpair-response-fixed2.json")
+        or load(work / "selfpair-response-rerun.json")
+        or load(work / "selfpair-response.json")
+        or load(work / "candidate-response.json")
+    )
     failure = None
     if not candidate.exists():
         failure = "candidate_native_conversion_missing"
@@ -87,12 +92,12 @@ def main() -> None:
             "boundedResidualGainGrid": [0.5, 0.75, 1, 1.25, 1.5],
             "states": STATES,
             "heldoutUsedForSelection": False,
-            "frozenChoice": None,
-            "status": "not-selected-insufficient-calibration" if len(complete_calibration) < len(calibration) else "selection-required",
+            "status": "frozen-current-baseline-only" if len(complete_calibration) == len(calibration) else "not-selected-insufficient-calibration",
+            "frozenChoice": 0.625 if len(complete_calibration) == len(calibration) else None,
         },
         "calibration": {"sampleCount": len(calibration), "completeResponseCount": len(complete_calibration), "rows": calibration},
         "heldout": {"sampleCount": len(heldout), "completeResponseCount": sum(row["response"]["aggregateRGBRMSE"] is not None for row in heldout), "rows": heldout},
-        "promotion": {"promoted": False, "reason": "Calibration conversion/response coverage is incomplete; no heldout reveal or model update is valid."},
+        "promotion": {"promoted": False, "reason": "Only the pre-registered current alpha=.625 was rendered; no alternate alpha/gain response matrix exists, so no improvement over current baseline can be claimed."},
     }
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
@@ -110,7 +115,7 @@ def main() -> None:
         response = row["response"]
         value = "null" if response["aggregateRGBRMSE"] is None else f"{response['aggregateRGBRMSE']:.6f}"
         lines.append(f"| {row['split']} | {row['model']} | `{row['candidate']['alpha']}` | {value} | {response['available']} | {row['failure'] or ''} |")
-    lines += ["", "## Decision", "", "No alpha/gain was frozen and no heldout promotion was performed because calibration response coverage is incomplete."]
+    lines += ["", "## Decision", "", "The pre-registered current alpha=.625 is frozen as a baseline-only choice because all calibration responses are available. No alternate alpha/gain matrix exists, so no improvement or promotion is claimed."]
     args.output_markdown.parent.mkdir(parents=True, exist_ok=True)
     args.output_markdown.write_text("\n".join(lines) + "\n")
 

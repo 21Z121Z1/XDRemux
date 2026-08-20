@@ -22,9 +22,18 @@ class SwiftAppleSemanticPolicyTests(unittest.TestCase):
     def test_styles_scaffold_does_not_force_six_portrait_roles(self) -> None:
         self.assertIn("profile: AppleSemanticWriteProfile", SWIFT)
         self.assertIn("dictionaries.count == profile.roles.count", SWIFT)
-        self.assertIn("semanticImageIDs.count == profile.roles.count", SWIFT)
+        self.assertIn("scaffoldSemanticImageIDs.count >= profile.roles.count", SWIFT)
         self.assertNotIn("semantic scaffold must expose exactly PEM", SWIFT)
-        self.assertIn("styles-only semantics must be sky-only or PEM+skin+sky", SWIFT)
+
+    def test_styles_merge_preserves_native_auxiliary_roles_before_authored_suffix(self) -> None:
+        self.assertIn("let scaffoldSemanticImageIDs = scaffold.refs.compactMap", SWIFT)
+        self.assertIn("scaffoldSemanticImageIDs.count >= profile.roles.count", SWIFT)
+        self.assertIn("Array(scaffoldSemanticImageIDs.suffix(profile.roles.count))", SWIFT)
+        self.assertNotIn("scaffoldSemanticImageIDs.count == profile.roles.count", SWIFT)
+
+    def test_styles_validation_allows_preserved_native_portrait_mattes(self) -> None:
+        self.assertIn("A native source may carry additional portrait mattes", SWIFT)
+        self.assertNotIn("styles-only semantics must be sky-only or PEM+skin+sky", SWIFT)
 
     def test_sparse_masks_are_not_dropped_by_a_percentage_threshold(self) -> None:
         semantic_matte = SWIFT.split("struct AppleSemanticMatte", 1)[1].split(

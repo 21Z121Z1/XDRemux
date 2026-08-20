@@ -3244,18 +3244,24 @@ package enum ApplePhotographicStylesPipeline {
               let scaffoldExifLocation = scaffoldLocationsByID[scaffoldExifID] else {
             throw CLIError.invalidContainer("semantic merge requires source and scaffold Exif items")
         }
-        let semanticImageIDs = scaffold.refs.compactMap { ref -> Int? in
+        let scaffoldSemanticImageIDs = scaffold.refs.compactMap { ref -> Int? in
             guard ref.type == "auxl",
                   ref.to.contains(scaffold.primaryID),
                   ref.to.contains(scaffold.toneMapID),
                   scaffoldItemsByID[ref.from]?.type == "hvc1" else { return nil }
             return ref.from
         }
-        guard semanticImageIDs.count == profile.roles.count else {
+        guard scaffoldSemanticImageIDs.count >= profile.roles.count else {
             throw CLIError.invalidContainer(
-                "semantic scaffold \(profile.kind.rawValue) expected \(profile.roles.count) roles, found \(semanticImageIDs.count)"
+                "semantic scaffold \(profile.kind.rawValue) requires at least \(profile.roles.count) roles, found \(scaffoldSemanticImageIDs.count)"
             )
         }
+        // CGImageDestination can preserve one or more source auxiliary mattes
+        // while appending the roles authored by this run. The authored records
+        // are the final profile-sized suffix (in the same order as
+        // AppleSemanticWriteProfile.orderedRoles); retain earlier native
+        // records in the scaffold, but do not import them as duplicate roles.
+        let semanticImageIDs = Array(scaffoldSemanticImageIDs.suffix(profile.roles.count))
         let semanticMetadataIDs = scaffold.refs.compactMap { ref -> Int? in
             guard ref.type == "cdsc", ref.to.count == 1,
                   semanticImageIDs.contains(ref.to[0]),
@@ -4797,24 +4803,12 @@ package enum ApplePhotographicStylesPipeline {
                 throw CLIError.invalidContainer("Styles validation: combined Portrait resources are incomplete")
             }
         } else {
-            let person = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
-                imageSource, 0, kCGImageAuxiliaryDataTypePortraitEffectsMatte
-            )
-            let skin = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
-                imageSource, 0, kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte
-            )
-            let hasUnexpectedFullPortraitRole = [
-                kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte,
-                kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte,
-                kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte,
-            ].contains { type in
-                CGImageSourceCopyAuxiliaryDataInfoAtIndex(imageSource, 0, type) != nil
-            }
-            guard (person == nil) == (skin == nil), !hasUnexpectedFullPortraitRole else {
-                throw CLIError.invalidContainer(
-                    "Styles validation: styles-only semantics must be sky-only or PEM+skin+sky"
-                )
-            }
+            // A native source may carry additional portrait mattes. They are
+            // preserved by the scaffold transplant and are not donor styles;
+            // rejecting them here would either discard native state or make a
+            // valid four-role source impossible to validate. The generated
+            // style profile is still constrained at semantic merge time, and
+            // the sky matte above remains mandatory for the styles contract.
         }
         let contamination = try donorContaminationScan(data: data, items: items, locations: locations, idat: idat)
         guard contamination.matches.isEmpty else {
