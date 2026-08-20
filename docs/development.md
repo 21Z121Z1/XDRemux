@@ -199,6 +199,10 @@ dataset split by source SHA only. The first iPhone 16 causal probe proved that
 identity and self-pair key1 produce distinct native apply rasters; full HEIC
 replacement was not claimed when the current converter rejected the source's
 binary-plist contract.
+Use `scripts/summarize_native_consumer_calibration.py` to summarize this cache.
+It preserves missing conversions and responses as null and refuses to freeze a
+choice when calibration coverage is incomplete; it never substitutes identity
+or another split for missing native renders.
 
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
