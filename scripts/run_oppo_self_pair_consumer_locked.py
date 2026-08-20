@@ -40,6 +40,8 @@ def main() -> None:
     p.add_argument("--baseline", type=Path, required=True)
     p.add_argument("--candidate", type=Path, required=True)
     p.add_argument("--helper", required=True)
+    p.add_argument("--preliminary-root", type=Path, required=True)
+    p.add_argument("--response-timeout", type=float, default=30.0)
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     torch, _ = _require_torch()
@@ -54,7 +56,27 @@ def main() -> None:
         scene = sample["sha256"][:16]
         scene_dir = args.output / scene
         scene_dir.mkdir(parents=True, exist_ok=True)
-        styled, width, height = _read_fitted_rgb(source)
+        preliminary_candidates = sorted(args.preliminary_root.joinpath(scene).rglob("constrained-solver-preliminary-identity.heic"))
+        preliminary = preliminary_candidates[0] if preliminary_candidates else None
+        if preliminary is None:
+            row = {
+                "model": sample["model"], "sourcePath": str(source),
+                "sourceSHA256": sample["sha256"], "preliminaryPath": None,
+                "preliminarySHA256": None, "inputMode": "single_image_self_pair",
+                "proposal": None,
+                "routes": {name: {"status": "blocked", "reason": "preliminary fixture unavailable"}
+                           for name in ("identity", "selfPairDirect", "selfPairOneStep", "fullSolver")},
+                "nativeRendererProbe": None, "responseEnvelopeProbe": None,
+                "consumerMetrics": None, "responseEnvelope": None,
+            }
+            (scene_dir / "result.json").write_text(
+                json.dumps(row, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            rows.append(row)
+            continue
+        input_path = preliminary
+        styled, width, height = _read_fitted_rgb(input_path)
         features = torch.from_numpy(
             input_features(np.stack((styled, styled), axis=0))
         ).unsqueeze(0)
@@ -65,7 +87,7 @@ def main() -> None:
         np.save(prediction_path, prediction.astype(np.float32))
         render_path = scene_dir / "disabled.png"
         render_manifest = scene_dir / "disabled.json"
-        command = [args.helper, "--render-style", str(source), str(render_path), str(render_manifest), "0", "0", "1", "false", "1024", "Standard"]
+        command = [args.helper, "--render-style", str(input_path), str(render_path), str(render_manifest), "0", "0", "1", "false", "1024", "Standard"]
         started = time.monotonic()
         completed = subprocess.run(command, capture_output=True, text=True, timeout=120, check=False)
         render = {
@@ -81,33 +103,48 @@ def main() -> None:
         response_command = [
             sys.executable,
             str(Path(__file__).with_name("measure_style_editor_response.py")),
-            "--input", str(source),
+            "--input", str(input_path),
             "--output", str(response_path),
             "--helper", args.helper,
         ]
         response_started = time.monotonic()
-        response_completed = subprocess.run(
-            response_command, capture_output=True, text=True, timeout=180, check=False
-        )
-        response_probe = {
-            "command": response_command,
-            "exitCode": response_completed.returncode,
-            "stdout": response_completed.stdout[-4000:],
-            "stderr": response_completed.stderr[-4000:],
-            "seconds": time.monotonic() - response_started,
-            "outputExists": response_path.is_file(),
-        }
+        try:
+            response_completed = subprocess.run(
+                response_command, capture_output=True, text=True,
+                timeout=args.response_timeout, check=False
+            )
+            response_probe = {
+                "command": response_command,
+                "exitCode": response_completed.returncode,
+                "stdout": response_completed.stdout[-4000:],
+                "stderr": response_completed.stderr[-4000:],
+                "seconds": time.monotonic() - response_started,
+                "outputExists": response_path.is_file(),
+            }
+        except subprocess.TimeoutExpired as error:
+            response_probe = {
+                "command": response_command,
+                "exitCode": None,
+                "timeoutSeconds": args.response_timeout,
+                "error": "timeout",
+                "stdout": str(error.stdout or "")[-4000:],
+                "stderr": str(error.stderr or "")[-4000:],
+                "seconds": time.monotonic() - response_started,
+                "outputExists": response_path.is_file(),
+            }
         row = {
             "model": sample["model"],
             "sourcePath": str(source),
             "sourceSHA256": sample["sha256"],
+            "preliminaryPath": str(preliminary) if preliminary else None,
+            "preliminarySHA256": digest(preliminary) if preliminary else None,
             "inputWidth": width,
             "inputHeight": height,
             "inputMode": "single_image_self_pair",
             "proposal": {"path": str(prediction_path), "sha256": digest(prediction_path), "ensembleAlpha": 0.625},
             "routes": {
                 "identity": {"status": "blocked", "reason": "no native target/consumer comparison"},
-                "selfPairDirect": {"status": "proposal-only", "proposalPath": str(prediction_path)},
+                "selfPairDirect": {"status": "proposal-only" if preliminary else "blocked", "proposalPath": str(prediction_path), "input": str(input_path)},
                 "selfPairOneStep": {"status": "blocked", "reason": "bounded residual requires native target/response"},
                 "fullSolver": {"status": "blocked", "reason": "native target/solver input contract unavailable"},
             },

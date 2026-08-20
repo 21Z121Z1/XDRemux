@@ -175,6 +175,13 @@ unseen OOD generalization. Consumer results belong in the ignored `.codex`
 report and must keep identity, direct self-pair, one-step bounded correction,
 and full solver separate; a renderer or target failure remains partial.
 
+For reproducible preliminary-fixture experiments, the constrained solver also
+accepts the research-only `XDREMUX_STYLE_SOLVER_MODEL_SEED` pointing to a
+native-layout 51,840-byte Float16 key1. `...MODEL_SEED_MODE=fast` records the
+bounded direct path; `...=seeded` invokes the one-step native residual path.
+Both operate only after the pipeline has generated and validated its own
+`constrained-solver-preliminary-identity.heic`.
+
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
 ```bash

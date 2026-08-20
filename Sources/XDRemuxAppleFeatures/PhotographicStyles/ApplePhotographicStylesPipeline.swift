@@ -4054,6 +4054,12 @@ package enum ApplePhotographicStylesPipeline {
         let universalFastModelURL = ProcessInfo.processInfo.environment[
             "XDREMUX_RESEARCH_UNIVERSAL_STYLE_COREML_MODEL"
         ].map { URL(fileURLWithPath: $0) }
+        let modelSeedURL = ProcessInfo.processInfo.environment[
+            "XDREMUX_STYLE_SOLVER_MODEL_SEED"
+        ].map { URL(fileURLWithPath: $0) }
+        let modelSeedMode = ProcessInfo.processInfo.environment[
+            "XDREMUX_STYLE_SOLVER_MODEL_SEED_MODE"
+        ] ?? "fast"
         let selectedFastModelURL = universalFastModelURL ?? fastModelURL
         let fastWarmupGroup = DispatchGroup()
         let fastWarmupLock = NSLock()
@@ -4261,7 +4267,34 @@ package enum ApplePhotographicStylesPipeline {
             )
             let producer = ConstrainedPolynomialStyleDataProducer()
             let selectedStyleData: AppleStyleDataResult
-            if let selectedFastModelURL {
+            if let modelSeedURL {
+                do {
+                    let seedStyleData = try Data(contentsOf: modelSeedURL, options: [.mappedIfSafe])
+                    if modelSeedMode == "seeded" {
+                        selectedStyleData = try producer.makeModelSeededStyleData(
+                            preliminaryHEICURL: preliminaryURL,
+                            identityStylePropertyList: preliminaryPayload.stylePropertyList,
+                            seedStyleData: seedStyleData,
+                            outputDirectory: solverDirectory,
+                            validateNativeResponse: true
+                        )
+                    } else {
+                        selectedStyleData = try producer.makeModelFastStyleData(
+                            preliminaryHEICURL: preliminaryURL,
+                            identityStylePropertyList: preliminaryPayload.stylePropertyList,
+                            modelStyleData: seedStyleData,
+                            linearThumbnailURL: preliminaryDirectory.appendingPathComponent("linear-thumbnail.png"),
+                            styledThumbnailURL: preliminaryDirectory.appendingPathComponent("model-styled-thumbnail.png"),
+                            modelTiming: ["externalModelSeed": 1.0],
+                            outputDirectory: solverDirectory
+                        )
+                    }
+                } catch {
+                    throw CLIError.invalidContainer(
+                        "external model seed failed (\(modelSeedMode)): \(error)"
+                    )
+                }
+            } else if let selectedFastModelURL {
                 fastWarmupGroup.wait()
                 fastWarmupLock.lock()
                 let warmupError = fastWarmupError
