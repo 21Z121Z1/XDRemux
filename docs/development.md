@@ -203,6 +203,10 @@ Use `scripts/summarize_native_consumer_calibration.py` to summarize this cache.
 It preserves missing conversions and responses as null and refuses to freeze a
 choice when calibration coverage is incomplete; it never substitutes identity
 or another split for missing native renders.
+The pre-registered alpha consumer grid is summarized by
+`scripts/summarize_native_alpha_grid.py`; its selection rule is calibration-only
+and requires no more than a 10% device regression, no increase in reversals or
+failures, and at least 1% aggregate improvement before changing `.625`.
 
 声明改动完成之前，要为最终提交跑一次 completion gate：
 
