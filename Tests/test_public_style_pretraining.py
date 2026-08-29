@@ -32,7 +32,7 @@ class PublicStylePretrainingTests(unittest.TestCase):
             "query": {
                 "pages": [
                     page("allowed.jpg", "CC BY 4.0"),
-                    page("legacy.jpg", "CC BY-SA 3.0"),
+                    page("legacy.jpg", "CC BY-NC 4.0"),
                     page("video.webm", "CC0", "video/webm"),
                 ]
             }

@@ -7,6 +7,7 @@ import hashlib
 import html
 import json
 import random
+import re
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -40,7 +41,16 @@ DEFAULT_CATEGORIES = (
     "Taken with Oppo A3x 4G",
     "Taken with Oppo F29 5G",
 )
-ALLOWED_LICENSES = frozenset(("CC0", "CC BY 4.0", "CC BY-SA 4.0"))
+ALLOWED_LICENSE_POLICY = (
+    "CC0 or Public Domain, or CC BY / CC BY-SA versions 1.0 through 4.0; "
+    "NC and ND variants are rejected"
+)
+
+
+def license_is_allowed(value: str) -> bool:
+    if value.casefold() in {"cc0", "public domain", "public-domain"}:
+        return True
+    return bool(re.fullmatch(r"CC BY(?:-SA)? (?:1\.0|2\.0|2\.5|3\.0|4\.0)", value))
 
 
 def _metadata_value(metadata: Mapping[str, Any], name: str) -> str:
@@ -67,7 +77,7 @@ def commons_candidates(
         mime = str(info.get("mime") or "")
         download_url = info.get("thumburl") or info.get("url")
         if (
-            license_name not in ALLOWED_LICENSES
+            not license_is_allowed(license_name)
             or mime not in {"image/jpeg", "image/png", "image/webp"}
             or not isinstance(download_url, str)
         ):
@@ -180,7 +190,7 @@ def collect_public_corpus(
     result = {
         "schema": PUBLIC_CORPUS_SCHEMA,
         "seed": seed,
-        "allowedLicenses": sorted(ALLOWED_LICENSES),
+        "allowedLicensePolicy": ALLOWED_LICENSE_POLICY,
         "categories": list(categories),
         "samples": records,
         "failures": failures,

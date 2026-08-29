@@ -206,7 +206,8 @@ self-hosted Apple Silicon runner，并从 repository variables 读取私有 mani
 
 公开内容域的第一阶段预训练由 `scripts/train_public_synthetic_style.py` 完成。collector
 通过 Wikimedia Commons API 从 iPhone 16/16 Pro/17 Pro 与 OPPO A3x/F29 实拍分类抽样，
-只接受 `CC0`、`CC BY 4.0`、`CC BY-SA 4.0`，保存源页面、作者、许可 URL、源 SHA-1、
+只接受 `CC0`、Public Domain，以及 1.0–4.0 的 `CC BY` / `CC BY-SA`（排除 NC/ND），
+保存源页面、作者、许可 URL、源 SHA-1、
 下载 SHA-256 与归一化 tensor SHA-256。原图和 tensor 只存在于 Actions 临时目录。
 
 由于这些公开图没有 Apple key1 真值，训练脚本对每张图生成有精确解析逆解的受约束
