@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import hashlib
 import html
 import json
 import random
 import re
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -34,12 +37,95 @@ from xdremux_py.universal_photographic_style_training import (
 PUBLIC_CORPUS_SCHEMA = "xdremux-public-style-content-corpus-v1"
 SYNTHETIC_REPORT_SCHEMA = "xdremux-public-synthetic-style-pretraining-v1"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
+COMMONS_USER_AGENT = (
+    "XDRemuxStyleResearchBot/1.1 "
+    "(https://github.com/21Z121Z1/XDRemux; contact via GitHub Issues)"
+)
 DEFAULT_CATEGORIES = (
     "Taken with iPhone 16",
     "Taken with iPhone 16 Pro",
     "Taken with iPhone 17 Pro",
     "Taken with Oppo A3x 4G",
     "Taken with Oppo F29 5G",
+)
+CURATED_GITHUB_SAMPLES: tuple[dict[str, str], ...] = (
+    {
+        "category": "scikit-image public-domain photos",
+        "title": "astronaut.png",
+        "downloadURL": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/astronaut.png",
+        "sourceURL": "https://github.com/scikit-image/scikit-image/blob/v0.24.0/skimage/data/astronaut.png",
+        "sourceGitBlobSHA1": "834cda0012478c5edc8d43bade96d315dedeaab4",
+        "license": "Public domain",
+        "licenseURL": "https://scikit-image.org/docs/stable/api/skimage.data#skimage.data.astronaut",
+        "artist": "NASA",
+        "credit": "NASA Great Images",
+    },
+    {
+        "category": "scikit-image CC0 photos",
+        "title": "brick.png",
+        "downloadURL": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/brick.png",
+        "sourceURL": "https://github.com/scikit-image/scikit-image/blob/v0.24.0/skimage/data/brick.png",
+        "sourceGitBlobSHA1": "79941ecd6605663c653e03c85b4ca7e59b3c4412",
+        "license": "CC0",
+        "licenseURL": "https://scikit-image.org/docs/stable/api/skimage.data#skimage.data.brick",
+        "artist": "CC0Textures",
+        "credit": "scikit-image data",
+    },
+    {
+        "category": "scikit-image CC0 photos",
+        "title": "camera.png",
+        "downloadURL": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/camera.png",
+        "sourceURL": "https://github.com/scikit-image/scikit-image/blob/v0.24.0/skimage/data/camera.png",
+        "sourceGitBlobSHA1": "cdb3405d0086639638a13a2c72bfb646060180e2",
+        "license": "CC0",
+        "licenseURL": "https://scikit-image.org/docs/stable/api/skimage.data#skimage.data.camera",
+        "artist": "Lav Varshney",
+        "credit": "scikit-image data",
+    },
+    {
+        "category": "scikit-image CC0 photos",
+        "title": "chelsea.png",
+        "downloadURL": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/chelsea.png",
+        "sourceURL": "https://github.com/scikit-image/scikit-image/blob/v0.24.0/skimage/data/chelsea.png",
+        "sourceGitBlobSHA1": "fae212d2befa8926f05d7cf06c799f06b81545ab",
+        "license": "CC0",
+        "licenseURL": "https://scikit-image.org/docs/stable/api/skimage.data#skimage.data.chelsea",
+        "artist": "Stefan van der Walt",
+        "credit": "scikit-image data",
+    },
+    {
+        "category": "scikit-image CC0 photos",
+        "title": "coffee.png",
+        "downloadURL": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/coffee.png",
+        "sourceURL": "https://github.com/scikit-image/scikit-image/blob/v0.24.0/skimage/data/coffee.png",
+        "sourceGitBlobSHA1": "f8350bf7e6e22734667f8c86fd230a741370fbcb",
+        "license": "CC0",
+        "licenseURL": "https://scikit-image.org/docs/stable/api/skimage.data#skimage.data.coffee",
+        "artist": "Rachel Michetti",
+        "credit": "Pikolo Espresso Bar / scikit-image data",
+    },
+    {
+        "category": "scikit-image public-domain photos",
+        "title": "hubble_deep_field.jpg",
+        "downloadURL": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/hubble_deep_field.jpg",
+        "sourceURL": "https://github.com/scikit-image/scikit-image/blob/v0.24.0/skimage/data/hubble_deep_field.jpg",
+        "sourceGitBlobSHA1": "50c1b81aea1d565d78741387b5279bbed0ba4ce8",
+        "license": "Public domain",
+        "licenseURL": "https://scikit-image.org/docs/stable/api/skimage.data#skimage.data.hubble_deep_field",
+        "artist": "NASA",
+        "credit": "HubbleSite / scikit-image data",
+    },
+    {
+        "category": "scikit-image public-domain photos",
+        "title": "rocket.jpg",
+        "downloadURL": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/rocket.jpg",
+        "sourceURL": "https://github.com/scikit-image/scikit-image/blob/v0.24.0/skimage/data/rocket.jpg",
+        "sourceGitBlobSHA1": "32bdd33960c60d012fc71b5fd80a7ccc24d3b906",
+        "license": "Public domain",
+        "licenseURL": "https://scikit-image.org/docs/stable/api/skimage.data#skimage.data.rocket",
+        "artist": "SpaceX",
+        "credit": "SpaceX Photos / scikit-image data",
+    },
 )
 ALLOWED_LICENSE_POLICY = (
     "CC0 or Public Domain, or CC BY / CC BY-SA versions 1.0 through 4.0; "
@@ -117,7 +203,10 @@ def _commons_category(category: str, request_limit: int = 80) -> list[dict[str, 
     )
     request = urllib.request.Request(
         f"{COMMONS_API}?{query}",
-        headers={"User-Agent": "XDRemux-public-style-research/1.0"},
+        headers={
+            "User-Agent": COMMONS_USER_AGENT,
+            "Api-User-Agent": COMMONS_USER_AGENT,
+        },
     )
     with urllib.request.urlopen(request, timeout=60) as response:
         return commons_candidates(json.load(response), category, request_limit)
@@ -126,10 +215,28 @@ def _commons_category(category: str, request_limit: int = 80) -> list[dict[str, 
 def _download_sample(record: Mapping[str, Any], path: Path) -> dict[str, Any]:
     request = urllib.request.Request(
         str(record["downloadURL"]),
-        headers={"User-Agent": "XDRemux-public-style-research/1.0"},
+        headers={"User-Agent": COMMONS_USER_AGENT},
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        payload = response.read(24 * 1024 * 1024 + 1)
+    payload: bytes | None = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                payload = response.read(24 * 1024 * 1024 + 1)
+            break
+        except urllib.error.HTTPError as error:
+            if error.code != 429 or attempt == 2:
+                raise
+            retry_after = error.headers.get("Retry-After")
+            delay = (
+                float(retry_after)
+                if retry_after and retry_after.isdigit()
+                else 2 ** (attempt + 1)
+            )
+            time.sleep(min(delay, 30.0))
+    if payload is None:
+        raise ReverseKey1Error(
+            f"public sample download returned no data: {record['title']}"
+        )
     if len(payload) > 24 * 1024 * 1024:
         raise ReverseKey1Error(f"public sample exceeds 24 MiB: {record['title']}")
     try:
@@ -169,6 +276,22 @@ def collect_public_corpus(
     rng = random.Random(seed)
     records: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
+    for candidate in CURATED_GITHUB_SAMPLES:
+        path = image_directory.resolve() / f"{len(records):04d}.npy"
+        try:
+            records.append(_download_sample(candidate, path))
+        except (OSError, ReverseKey1Error) as error:
+            failures.append({"title": candidate["title"], "error": str(error)})
+            print(
+                json.dumps(
+                    {
+                        "category": candidate["category"],
+                        "title": candidate["title"],
+                        "error": str(error),
+                    }
+                ),
+                flush=True,
+            )
     for category in categories:
         candidates = _commons_category(category)
         print(
@@ -179,13 +302,17 @@ def collect_public_corpus(
         )
         rng.shuffle(candidates)
         accepted = 0
+        consecutive_failures = 0
         for candidate in candidates:
             if accepted >= per_category:
                 break
+            if accepted or consecutive_failures:
+                time.sleep(1.0)
             path = image_directory.resolve() / f"{len(records):04d}.npy"
             try:
                 records.append(_download_sample(candidate, path))
             except (OSError, ReverseKey1Error) as error:
+                consecutive_failures += 1
                 failures.append({"title": candidate["title"], "error": str(error)})
                 print(
                     json.dumps(
@@ -193,8 +320,11 @@ def collect_public_corpus(
                     ),
                     flush=True,
                 )
+                if consecutive_failures >= 3:
+                    break
                 continue
             accepted += 1
+            consecutive_failures = 0
     if len(records) < 2:
         raise ReverseKey1Error(
             f"only {len(records)} public samples passed license/decode checks"
@@ -204,8 +334,10 @@ def collect_public_corpus(
         "seed": seed,
         "allowedLicensePolicy": ALLOWED_LICENSE_POLICY,
         "categories": list(categories),
-        "requestedSamples": len(categories) * per_category,
-        "complete": len(records) == len(categories) * per_category,
+        "requestedSamples": len(CURATED_GITHUB_SAMPLES)
+        + len(categories) * per_category,
+        "complete": len(records)
+        == len(CURATED_GITHUB_SAMPLES) + len(categories) * per_category,
         "samples": records,
         "failures": failures,
     }
@@ -269,12 +401,18 @@ class PublicPretrainingConfig:
     batch_size: int = 2
     learning_rate: float = 2e-4
     transforms_per_image: int = 2
+    key_loss_weight: float = 8.0
+    unstyled_loss_weight: float = 0.1
     device: str = "cpu"
     seed: int = 260829
 
 
 def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str, Any]:
     torch, _ = _require_torch()
+    if config.epochs <= 0 or config.transforms_per_image <= 0:
+        raise ReverseKey1Error("epochs and transforms-per-image must be positive")
+    if config.key_loss_weight <= 0 or config.unstyled_loss_weight < 0:
+        raise ReverseKey1Error("key loss weight must be positive and unstyled weight nonnegative")
     if config.device == "mps" and not torch.backends.mps.is_available():
         raise ReverseKey1Error("MPS was requested but is unavailable")
     manifest = config.manifest.resolve()
@@ -286,8 +424,10 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
         raise ReverseKey1Error("public style corpus is too small")
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
+    shuffled_records = list(records)
+    random.Random(config.seed).shuffle(shuffled_records)
     examples: list[tuple[np.ndarray, np.ndarray, np.ndarray, str]] = []
-    for record_index, record in enumerate(records):
+    for record_index, record in enumerate(shuffled_records):
         path = Path(str(record["imagePath"]))
         if record.get("tensorSHA256") != sha256_file(path):
             raise ReverseKey1Error(f"public tensor identity mismatch: {path}")
@@ -400,6 +540,9 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
         }
 
     baseline = evaluate()
+    best_epoch = 0
+    best_metrics = dict(baseline)
+    best_state = copy.deepcopy(model.state_dict())
     history: list[dict[str, Any]] = []
     for epoch in range(1, config.epochs + 1):
         model.train()
@@ -414,9 +557,12 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
                 torch.zeros((len(primary), len(METADATA_FIELDS)), device=config.device),
                 torch.zeros((len(primary), len(METADATA_FIELDS)), device=config.device),
             )
-            key_loss = torch.nn.functional.smooth_l1_loss(output["key1"], key1)
+            key_loss = torch.nn.functional.l1_loss(output["key1"], key1)
             unstyled_loss = torch.nn.functional.l1_loss(output["unstyled"], clean)
-            loss = key_loss + 0.25 * unstyled_loss
+            loss = (
+                config.key_loss_weight * key_loss
+                + config.unstyled_loss_weight * unstyled_loss
+            )
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
             optimizer.step()
@@ -425,14 +571,23 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
         history.append(
             {"epoch": epoch, "trainingLoss": float(np.mean(losses)), "heldout": metrics}
         )
+        selection = (metrics["key1MAE"], metrics["syntheticResponseRMSE8"])
+        best_selection = (
+            best_metrics["key1MAE"], best_metrics["syntheticResponseRMSE8"]
+        )
+        if selection < best_selection:
+            best_epoch = epoch
+            best_metrics = dict(metrics)
+            best_state = copy.deepcopy(model.state_dict())
         print(json.dumps(history[-1], sort_keys=True), flush=True)
+    model.load_state_dict(best_state)
     output = config.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     checkpoint = {
         "schema": SYNTHETIC_REPORT_SCHEMA,
         "architecture": "UniversalPhotographicStyleStateNet-v3-optional-modalities",
         "architectureConfig": "multimodal_large",
-        "epoch": config.epochs,
+        "epoch": best_epoch,
         "manifestSHA256": sha256_file(manifest),
         "model": model.state_dict(),
         "statistics": {name: array.tolist() for name, array in statistics.items()},
@@ -452,8 +607,14 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
         },
         "architecture": checkpoint["architecture"],
         "device": config.device,
+        "lossWeights": {
+            "key1L1": config.key_loss_weight,
+            "unstyledL1": config.unstyled_loss_weight,
+        },
         "baseline": baseline,
-        "final": history[-1]["heldout"],
+        "bestEpoch": best_epoch,
+        "final": best_metrics,
+        "lastEpoch": history[-1]["heldout"],
         "history": history,
         "licenses": sorted({str(record["license"]) for record in records}),
         "categories": sorted({str(record["category"]) for record in records}),

@@ -3,12 +3,25 @@ import unittest
 import numpy as np
 
 from xdremux_py.public_style_pretraining import (
+    COMMONS_USER_AGENT,
+    CURATED_GITHUB_SAMPLES,
     commons_candidates,
     synthetic_affine_pair,
 )
 
 
 class PublicStylePretrainingTests(unittest.TestCase):
+    def test_commons_user_agent_identifies_bot_and_contact(self) -> None:
+        self.assertIn("Bot/", COMMONS_USER_AGENT)
+        self.assertIn("https://github.com/21Z121Z1/XDRemux", COMMONS_USER_AGENT)
+
+    def test_curated_github_samples_are_reusable_and_revision_pinned(self) -> None:
+        self.assertGreaterEqual(len(CURATED_GITHUB_SAMPLES), 7)
+        for sample in CURATED_GITHUB_SAMPLES:
+            self.assertIn(sample["license"], {"CC0", "Public domain"})
+            self.assertIn("/v0.24.0/", sample["downloadURL"])
+            self.assertEqual(len(sample["sourceGitBlobSHA1"]), 40)
+
     def test_commons_candidates_enforce_license_and_raster_contract(self) -> None:
         def page(title: str, license_name: str, mime: str = "image/jpeg") -> dict:
             return {

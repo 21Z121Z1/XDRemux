@@ -58,12 +58,12 @@ jobs:
             --image-directory "$RUNNER_TEMP/public-style-images" \
             --per-category 2
 
-      - name: Run one public synthetic pretraining epoch
+      - name: Run public synthetic pretraining
         run: |
           python scripts/train_public_synthetic_style.py train \
             --manifest "$RUNNER_TEMP/public-style-corpus.json" \
             --output "$RUNNER_TEMP/public-style-pretraining" \
-            --epochs 1 \
+            --epochs 3 \
             --batch-size 2 \
             --transforms-per-image 8 \
             --device cpu

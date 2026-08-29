@@ -205,8 +205,10 @@ self-hosted Apple Silicon runner，并从 repository variables 读取私有 mani
 路径。训练产物只上传为短期 Actions artifact，不提交样片或 checkpoint。
 
 公开内容域的第一阶段预训练由 `scripts/train_public_synthetic_style.py` 完成。collector
-通过 Wikimedia Commons API 从 iPhone 16/16 Pro/17 Pro 与 OPPO A3x/F29 实拍分类抽样，
-只接受 `CC0`、Public Domain，以及 1.0–4.0 的 `CC BY` / `CC BY-SA`（排除 NC/ND），
+先从固定到 `scikit-image` v0.24.0 revision 的 GitHub 数据中下载逐张确认过的 CC0/
+Public Domain 人像、动物、静物、纹理、暗场和航天照片，再通过 Wikimedia Commons API
+从 iPhone 16/16 Pro/17 Pro 与 OPPO A3x/F29 实拍分类抽样。它只接受 `CC0`、
+Public Domain，以及 1.0–4.0 的 `CC BY` / `CC BY-SA`（排除 NC/ND），
 保存源页面、作者、许可 URL、源 SHA-1、
 下载 SHA-256 与归一化 tensor SHA-256。原图和 tensor 只存在于 Actions 临时目录。
 

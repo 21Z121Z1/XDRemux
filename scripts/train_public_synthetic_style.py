@@ -35,6 +35,8 @@ def main() -> None:
     train.add_argument("--batch-size", type=int, default=2)
     train.add_argument("--learning-rate", type=float, default=2e-4)
     train.add_argument("--transforms-per-image", type=int, default=2)
+    train.add_argument("--key-loss-weight", type=float, default=8.0)
+    train.add_argument("--unstyled-loss-weight", type=float, default=0.1)
     train.add_argument("--device", choices=("cpu", "mps"), default="cpu")
     train.add_argument("--seed", type=int, default=260829)
     args = parser.parse_args()
@@ -55,6 +57,8 @@ def main() -> None:
                 batch_size=args.batch_size,
                 learning_rate=args.learning_rate,
                 transforms_per_image=args.transforms_per_image,
+                key_loss_weight=args.key_loss_weight,
+                unstyled_loss_weight=args.unstyled_loss_weight,
                 device=args.device,
                 seed=args.seed,
             )
