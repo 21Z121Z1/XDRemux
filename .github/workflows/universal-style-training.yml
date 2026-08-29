@@ -65,7 +65,7 @@ jobs:
             --output "$RUNNER_TEMP/public-style-pretraining" \
             --epochs 1 \
             --batch-size 2 \
-            --transforms-per-image 2 \
+            --transforms-per-image 8 \
             --device cpu
 
       - name: Upload public corpus audit and synthetic checkpoint

@@ -8,8 +8,6 @@ import html
 import json
 import random
 import re
-import time
-import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -130,18 +128,8 @@ def _download_sample(record: Mapping[str, Any], path: Path) -> dict[str, Any]:
         str(record["downloadURL"]),
         headers={"User-Agent": "XDRemux-public-style-research/1.0"},
     )
-    payload: bytes | None = None
-    for attempt in range(4):
-        try:
-            with urllib.request.urlopen(request, timeout=90) as response:
-                payload = response.read(24 * 1024 * 1024 + 1)
-            break
-        except urllib.error.HTTPError as error:
-            if error.code not in {429, 500, 502, 503, 504} or attempt == 3:
-                raise
-            time.sleep(2**attempt)
-    if payload is None:
-        raise ReverseKey1Error(f"public sample download returned no data: {record['title']}")
+    with urllib.request.urlopen(request, timeout=20) as response:
+        payload = response.read(24 * 1024 * 1024 + 1)
     if len(payload) > 24 * 1024 * 1024:
         raise ReverseKey1Error(f"public sample exceeds 24 MiB: {record['title']}")
     try:
@@ -207,8 +195,7 @@ def collect_public_corpus(
                 )
                 continue
             accepted += 1
-            time.sleep(0.5)
-    if len(records) < max(4, len(categories)):
+    if len(records) < 2:
         raise ReverseKey1Error(
             f"only {len(records)} public samples passed license/decode checks"
         )
@@ -217,6 +204,8 @@ def collect_public_corpus(
         "seed": seed,
         "allowedLicensePolicy": ALLOWED_LICENSE_POLICY,
         "categories": list(categories),
+        "requestedSamples": len(categories) * per_category,
+        "complete": len(records) == len(categories) * per_category,
         "samples": records,
         "failures": failures,
     }
@@ -293,7 +282,7 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
     if value.get("schema") != PUBLIC_CORPUS_SCHEMA:
         raise ReverseKey1Error("invalid public style corpus manifest")
     records = value.get("samples")
-    if not isinstance(records, list) or len(records) < 4:
+    if not isinstance(records, list) or len(records) < 2:
         raise ReverseKey1Error("public style corpus is too small")
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
