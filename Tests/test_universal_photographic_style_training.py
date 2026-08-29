@@ -1,5 +1,7 @@
 import base64
 import hashlib
+import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -7,13 +9,20 @@ import numpy as np
 
 from xdremux_py.apple_reverse_key1_training import ReverseKey1Error
 from xdremux_py.universal_photographic_style_training import (
+    GAIN_MAP_CHANNELS,
+    INPUT_SIZE,
+    LINEAR_CHANNELS,
     METADATA_FIELDS,
+    MODALITY_FIELDS,
+    OPTIONAL_MODALITIES_SCHEMA,
     PRIMARY_CHANNELS,
     STYLE_SCALAR_FIELDS,
     build_universal_model,
     decode_style_binary,
+    gain_map_features,
     metadata_vector,
     primary_image_features,
+    _load_optional_modalities_manifest,
     _consumer_quadratic_proxy,
 )
 from xdremux_py.universal_photographic_style import (
@@ -23,6 +32,23 @@ from xdremux_py.universal_photographic_style import (
 
 
 class UniversalPhotographicStyleTrainingTests(unittest.TestCase):
+    @staticmethod
+    def _statistics() -> dict[str, np.ndarray]:
+        return {
+            "metadataCenter": np.zeros(len(METADATA_FIELDS), dtype=np.float32),
+            "metadataScale": np.ones(len(METADATA_FIELDS), dtype=np.float32),
+            "metadataActive": np.ones(len(METADATA_FIELDS), dtype=np.float32),
+            "key1Scale": np.ones((8, 10, 3), dtype=np.float32),
+            "gtcCenter": np.zeros(516, dtype=np.float32),
+            "gtcScale": np.ones(516, dtype=np.float32),
+            "lightCenter": np.zeros((2, 32, 32), dtype=np.float32),
+            "lightScale": np.ones(2, dtype=np.float32),
+            "scalarCenter": np.zeros(len(STYLE_SCALAR_FIELDS), dtype=np.float32),
+            "scalarScale": np.ones(len(STYLE_SCALAR_FIELDS), dtype=np.float32),
+            "scalarLow": np.full(len(STYLE_SCALAR_FIELDS), -10.0, dtype=np.float32),
+            "scalarHigh": np.full(len(STYLE_SCALAR_FIELDS), 10.0, dtype=np.float32),
+        }
+
     def test_published_coreml_package_has_recorded_file_identities(self) -> None:
         root = (
             Path(__file__).resolve().parents[1]
@@ -58,6 +84,45 @@ class UniversalPhotographicStyleTrainingTests(unittest.TestCase):
         self.assertEqual(mask[METADATA_FIELDS.index("has_gain_map")], 1)
         self.assertEqual(values[METADATA_FIELDS.index("has_gain_map")], 0)
 
+    def test_gain_map_features_use_linear_gain_ratio_contract(self) -> None:
+        neutral = gain_map_features(np.ones((INPUT_SIZE, INPUT_SIZE), dtype=np.float32))
+        self.assertEqual(neutral.shape, (GAIN_MAP_CHANNELS, INPUT_SIZE, INPUT_SIZE))
+        self.assertTrue(np.array_equal(neutral, np.zeros_like(neutral)))
+        with self.assertRaises(ReverseKey1Error):
+            gain_map_features(np.zeros((INPUT_SIZE, INPUT_SIZE), dtype=np.float32))
+
+    def test_optional_modality_manifest_is_content_addressed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            np.save(
+                root / "linear.npy",
+                np.full((3, INPUT_SIZE, INPUT_SIZE), 0.5, dtype=np.float32),
+            )
+            np.save(
+                root / "gain.npy",
+                np.ones((INPUT_SIZE, INPUT_SIZE), dtype=np.float32),
+            )
+            manifest = root / "modalities.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schema": OPTIONAL_MODALITIES_SCHEMA,
+                        "samples": [
+                            {
+                                "sourceSHA256": "a" * 64,
+                                "linearRGBPath": "linear.npy",
+                                "gainMapPath": "gain.npy",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            loaded = _load_optional_modalities_manifest(manifest)["a" * 64]
+            self.assertEqual(len(loaded["linearRGBSHA256"]), 64)
+            self.assertEqual(len(loaded["gainMapSHA256"]), 64)
+            self.assertEqual(Path(loaded["linearRGBPath"]), (root / "linear.npy").resolve())
+
     def test_binary_labels_are_length_checked(self) -> None:
         encoded = "base64:" + base64.b64encode(b"abcd").decode("ascii")
         self.assertEqual(decode_style_binary(encoded, 4, "test"), b"abcd")
@@ -69,20 +134,7 @@ class UniversalPhotographicStyleTrainingTests(unittest.TestCase):
             import torch
         except ImportError:
             self.skipTest("PyTorch is unavailable")
-        statistics = {
-            "metadataCenter": np.zeros(len(METADATA_FIELDS), dtype=np.float32),
-            "metadataScale": np.ones(len(METADATA_FIELDS), dtype=np.float32),
-            "metadataActive": np.ones(len(METADATA_FIELDS), dtype=np.float32),
-            "key1Scale": np.ones((8, 10, 3), dtype=np.float32),
-            "gtcCenter": np.zeros(516, dtype=np.float32),
-            "gtcScale": np.ones(516, dtype=np.float32),
-            "lightCenter": np.zeros((2, 32, 32), dtype=np.float32),
-            "lightScale": np.ones(2, dtype=np.float32),
-            "scalarCenter": np.zeros(len(STYLE_SCALAR_FIELDS), dtype=np.float32),
-            "scalarScale": np.ones(len(STYLE_SCALAR_FIELDS), dtype=np.float32),
-            "scalarLow": np.full(len(STYLE_SCALAR_FIELDS), -10.0, dtype=np.float32),
-            "scalarHigh": np.full(len(STYLE_SCALAR_FIELDS), 10.0, dtype=np.float32),
-        }
+        statistics = self._statistics()
         expected = {
             "key1": (1, 12, 12, 8, 10, 3),
             "key1LogVariance": (1, 8, 10, 3),
@@ -91,7 +143,7 @@ class UniversalPhotographicStyleTrainingTests(unittest.TestCase):
             "scalars": (1, len(STYLE_SCALAR_FIELDS)),
             "unstyled": (1, 3, 64, 64),
         }
-        for architecture in ("base", "multiscale_large"):
+        for architecture in ("base", "multiscale_large", "multimodal_large"):
             with self.subTest(architecture=architecture):
                 model = build_universal_model(
                     statistics, architecture=architecture
@@ -109,6 +161,30 @@ class UniversalPhotographicStyleTrainingTests(unittest.TestCase):
                 self.assertTrue(
                     all(bool(torch.isfinite(value).all()) for value in output.values())
                 )
+
+    def test_multimodal_zero_mask_is_identical_to_missing_sidecars(self) -> None:
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch is unavailable")
+        model = build_universal_model(
+            self._statistics(), architecture="multimodal_large"
+        ).eval()
+        primary = torch.rand((1, PRIMARY_CHANNELS, INPUT_SIZE, INPUT_SIZE))
+        metadata = torch.zeros((1, len(METADATA_FIELDS)))
+        metadata_mask = torch.zeros_like(metadata)
+        with torch.no_grad():
+            missing = model(primary, metadata, metadata_mask)
+            masked = model(
+                primary,
+                metadata,
+                metadata_mask,
+                torch.rand((1, LINEAR_CHANNELS, INPUT_SIZE, INPUT_SIZE)),
+                torch.rand((1, GAIN_MAP_CHANNELS, INPUT_SIZE, INPUT_SIZE)),
+                torch.zeros((1, len(MODALITY_FIELDS))),
+            )
+        for name in missing:
+            self.assertTrue(torch.equal(missing[name], masked[name]), name)
 
     def test_native_state_resources_have_native_byte_lengths(self) -> None:
         image = UniversalImageInput(

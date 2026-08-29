@@ -27,9 +27,24 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--device", choices=("auto", "mps", "cpu"), default="auto")
     parser.add_argument("--exiftool", default="exiftool")
+    parser.add_argument(
+        "--linear-rgb-sidecar",
+        type=Path,
+        help="decoded oriented 3x256x256 linear RGB .npy/.npz sidecar",
+    )
+    parser.add_argument(
+        "--gain-map-sidecar",
+        type=Path,
+        help="decoded oriented 256x256 exposure-gain-ratio .npy/.npz sidecar",
+    )
     args = parser.parse_args()
 
-    image = load_universal_image(args.input, exiftool=args.exiftool)
+    image = load_universal_image(
+        args.input,
+        exiftool=args.exiftool,
+        linear_rgb_sidecar=args.linear_rgb_sidecar,
+        gain_map_sidecar=args.gain_map_sidecar,
+    )
     model, checkpoint, device = load_universal_model(args.checkpoint, args.device)
     prediction, elapsed = predict_universal_state(image, model, device=device)
     resources = native_state_resources(image, prediction)
@@ -52,6 +67,8 @@ def main() -> None:
             "displayHeight": image.display_height,
             "hasRAW": image.has_raw,
             "hasGainMap": image.has_gain_map,
+            "usedLinearRGB": image.linear_rgb_features is not None,
+            "usedGainMap": image.gain_map_features is not None,
             "make": image.source_make,
             "model": image.source_model,
         },

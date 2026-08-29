@@ -1,0 +1,106 @@
+name: Universal Style Training
+
+on:
+  pull_request:
+    paths:
+      - "xdremux_py/universal_photographic_style.py"
+      - "xdremux_py/universal_photographic_style_training.py"
+      - "scripts/export_universal_photographic_style_coreml.py"
+      - "scripts/predict_universal_photographic_style.py"
+      - "scripts/train_universal_photographic_style.py"
+      - "Tests/test_universal_photographic_style_training.py"
+      - ".github/workflows/universal-style-training.yml"
+  workflow_dispatch:
+    inputs:
+      run_private_training:
+        description: Run training on the labelled-data self-hosted Mac
+        required: true
+        default: false
+        type: boolean
+      epochs:
+        description: Training epochs
+        required: true
+        default: "40"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  multimodal-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install training dependencies
+        run: python -m pip install -e ".[training]"
+
+      - name: Run universal model regressions with PyTorch
+        run: >-
+          python -m unittest
+          Tests.test_apple_reverse_key1_training
+          Tests.test_universal_photographic_style_training
+
+  private-training:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_private_training
+    runs-on: [self-hosted, macOS, ARM64, xdremux-style-training]
+    timeout-minutes: 720
+    env:
+      UNIVERSAL_MANIFEST: ${{ vars.XDREMUX_UNIVERSAL_MANIFEST }}
+      RESUME_CHECKPOINT: ${{ vars.XDREMUX_UNIVERSAL_CHECKPOINT }}
+      TRAINING_EPOCHS: ${{ inputs.epochs }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Require private labelled inputs
+        shell: bash
+        run: |
+          test -n "$UNIVERSAL_MANIFEST"
+          test -f "$UNIVERSAL_MANIFEST"
+          if [[ -n "$RESUME_CHECKPOINT" ]]; then
+            test -f "$RESUME_CHECKPOINT"
+          fi
+
+      - name: Install training dependencies
+        run: python -m pip install -e ".[training]"
+
+      - name: Train required-image plus optional-modality model
+        shell: bash
+        run: |
+          args=(
+            python scripts/train_universal_photographic_style.py train
+            --manifest "$UNIVERSAL_MANIFEST"
+            --output "$RUNNER_TEMP/universal-style-v3"
+            --epochs "$TRAINING_EPOCHS"
+            --architecture multimodal_large
+            --metadata-dropout 0.25
+            --optional-modality-dropout 0.35
+            --device mps
+          )
+          if [[ -n "$RESUME_CHECKPOINT" ]]; then
+            args+=(--warm-start "$RESUME_CHECKPOINT")
+          fi
+          "${args[@]}"
+
+      - name: Upload checkpoint and reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: universal-style-v3-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/universal-style-v3/best.pt
+            ${{ runner.temp }}/universal-style-v3/last.pt
+            ${{ runner.temp }}/universal-style-v3/history.json
+            ${{ runner.temp }}/universal-style-v3/report.json
+          if-no-files-found: error
+          retention-days: 14

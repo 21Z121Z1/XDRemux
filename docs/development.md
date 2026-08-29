@@ -153,6 +153,57 @@ Universal 训练支持 `--resume`（要求 checkpoint 与 manifest hash 一致�
 consumer proxy 训练正则；它不是 Apple renderer。短程 v3 resume ablation 的 held-out
 key1 MAE 有改善，但 proxy 像素 RMSE 仍高于 identity，未导出或替换发布模型。
 
+### Universal optional-modality v3 研究接口
+
+新的 `multimodal_large` 训练架构仍把一张普通主图设为唯一必需输入。RAW 解码得到的
+归一化 scene-linear RGB 与 HDR gain map 是两个可选张量，并另带 `modality_mask`；因此“没有该模态”
+不会和全零线性图或 neutral gain map 混淆。训练默认独立随机丢弃 35% 的可选模态，
+用于约束 primary-only 路径，而不是让网络依赖某一手机的容器结构。
+
+训练 sidecar 必须预先解码、方向归一并缩放到 `256 × 256`。线性 RGB 数值范围为
+`[0, 1]`，其中 `1.0` 是归一化线性白点；数据形状为
+`3 × 256 × 256` 浮点 `.npy`，或带 `linear_rgb` key 的 `.npz`；gain map 为线性曝光
+倍率（`1.0` 表示 neutral）的 `256 × 256` 浮点 `.npy`，或带 `gain_map` key 的
+`.npz`。清单示例：
+
+```json
+{
+  "schema": "xdremux-universal-optional-modalities-v1",
+  "samples": [
+    {
+      "sourceSHA256": "<对应 native 样本的 SHA-256>",
+      "linearRGBPath": "sidecars/example-linear.npy",
+      "gainMapPath": "sidecars/example-gain.npy"
+    }
+  ]
+}
+```
+
+先把 sidecar 与 native 标签清单合并，再训练：
+
+```bash
+python3 scripts/train_universal_photographic_style.py prepare \
+  --native-manifest /private/native/manifest.json \
+  --optional-modalities-manifest /private/modalities.json \
+  --output /private/universal-v3
+
+python3 scripts/train_universal_photographic_style.py train \
+  --manifest /private/universal-v3/manifest.json \
+  --output /private/universal-v3-run \
+  --architecture multimodal_large \
+  --warm-start /private/checkpoints/multiscale-large.pt
+```
+
+`--resume` 只允许完全相同的 prepared manifest；增加样本或 sidecar 后必须使用
+`--warm-start`。从 `multiscale_large` checkpoint warm-start 时，主图通道权重原样迁移，新模态通道以
+零初始化，所以所有可选模态缺失时的初始函数保持一致。在线普通图片没有 key1/GTC/
+light-map 真值，只能扩充内容域或做自监督；要提升 solver 一致性，仍必须在具备完整
+Neutrino 的受控 Mac 上为它们生成教师标签。GitHub 托管 macOS runner 的 identity
+fallback 不能作为教师。`Universal Style Training` workflow 因此只在 Ubuntu 执行公开
+PyTorch 契约测试；真实训练是显式触发、带 `xdremux-style-training` 标签的私有
+self-hosted Apple Silicon runner，并从 repository variables 读取私有 manifest/checkpoint
+路径。训练产物只上传为短期 Actions artifact，不提交样片或 checkpoint。
+
 Privileged-teacher cascade 评测入口为
 `scripts/evaluate_universal_paired_cascade.py`。它固定 calibration-derived 的
 paired ensemble alpha `0.625`，分别报告 Universal direct、真实 disabled unstyled 的

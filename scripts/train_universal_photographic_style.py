@@ -26,6 +26,11 @@ def main() -> None:
     prepare.add_argument("--native-manifest", required=True, type=Path)
     prepare.add_argument("--output", required=True, type=Path)
     prepare.add_argument("--exiftool", default="exiftool")
+    prepare.add_argument(
+        "--optional-modalities-manifest",
+        type=Path,
+        help="optional decoded RAW-linear/gain-map sidecar manifest",
+    )
     train = commands.add_parser("train")
     train.add_argument("--manifest", required=True, type=Path)
     train.add_argument("--output", required=True, type=Path)
@@ -35,13 +40,24 @@ def main() -> None:
     train.add_argument("--device", choices=("auto", "mps", "cpu"), default="auto")
     train.add_argument("--seed", type=int, default=260820)
     train.add_argument("--metadata-dropout", type=float, default=0.25)
+    train.add_argument("--optional-modality-dropout", type=float, default=0.35)
     train.add_argument(
         "--architecture",
-        choices=("base", "multiscale_large"),
+        choices=("base", "multiscale_large", "multimodal_large"),
         default="base",
     )
     train.add_argument("--consumer-weight", type=float, default=0.0)
-    train.add_argument("--resume", type=Path)
+    checkpoint = train.add_mutually_exclusive_group()
+    checkpoint.add_argument(
+        "--resume",
+        type=Path,
+        help="continue from the exact same prepared manifest",
+    )
+    checkpoint.add_argument(
+        "--warm-start",
+        type=Path,
+        help="initialize from a checkpoint while allowing a new manifest",
+    )
     args = parser.parse_args()
     if args.command == "prepare":
         result = prepare_universal_dataset(
@@ -49,6 +65,7 @@ def main() -> None:
                 native_manifest=args.native_manifest,
                 output=args.output,
                 exiftool=args.exiftool,
+                optional_modalities_manifest=args.optional_modalities_manifest,
             )
         )
     else:
@@ -62,9 +79,11 @@ def main() -> None:
                 device=args.device,
                 seed=args.seed,
                 metadata_dropout=args.metadata_dropout,
+                optional_modality_dropout=args.optional_modality_dropout,
                 architecture=args.architecture,
                 consumer_weight=args.consumer_weight,
                 resume=args.resume,
+                warm_start=args.warm_start,
             )
         )
     print(json.dumps(result, indent=2, sort_keys=True))

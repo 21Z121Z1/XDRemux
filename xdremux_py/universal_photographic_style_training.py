@@ -39,8 +39,12 @@ from xdremux_py.apple_reverse_key1_training import (
 
 DATASET_SCHEMA = "xdremux-universal-photographic-style-dataset-v1"
 REPORT_SCHEMA = "xdremux-universal-photographic-style-training-v1"
+OPTIONAL_MODALITIES_SCHEMA = "xdremux-universal-optional-modalities-v1"
 INPUT_SIZE = 256
 PRIMARY_CHANNELS = 9
+LINEAR_CHANNELS = PRIMARY_CHANNELS
+GAIN_MAP_CHANNELS = 3
+MODALITY_FIELDS = ("linear_rgb", "gain_map")
 METADATA_FIELDS = (
     "log2_display_width",
     "log2_display_height",
@@ -101,6 +105,108 @@ def primary_image_features(styled: np.ndarray) -> np.ndarray:
         ),
         axis=0,
     ).astype(np.float32)
+
+
+def gain_map_features(gain_map: np.ndarray) -> np.ndarray:
+    """Build bounded features from a decoded linear exposure-gain ratio map.
+
+    The sidecar contract is deliberately semantic rather than container
+    specific: callers decode and orient the gain map, resample it to 256x256,
+    and supply linear gain ratios where 1.0 means no exposure gain.
+    """
+
+    value = np.asarray(gain_map, dtype=np.float32).squeeze()
+    if value.shape != (INPUT_SIZE, INPUT_SIZE):
+        raise ReverseKey1Error(
+            f"gain map must be {INPUT_SIZE}x{INPUT_SIZE} after decoding"
+        )
+    if not np.isfinite(value).all() or np.any(value <= 0):
+        raise ReverseKey1Error("gain map must contain finite positive gain ratios")
+    log_gain = np.clip(np.log2(value), -4.0, 4.0) / 4.0
+    gradient_x = np.zeros_like(log_gain)
+    gradient_y = np.zeros_like(log_gain)
+    gradient_x[:, 1:] = log_gain[:, 1:] - log_gain[:, :-1]
+    gradient_y[1:, :] = log_gain[1:, :] - log_gain[:-1, :]
+    return np.stack((log_gain, gradient_x, gradient_y), axis=0).astype(np.float32)
+
+
+def _sidecar_array(path: Path, preferred_key: str) -> np.ndarray:
+    if path.suffix.lower() == ".npy":
+        return np.asarray(np.load(path, allow_pickle=False))
+    if path.suffix.lower() == ".npz":
+        with np.load(path, allow_pickle=False) as archive:
+            if preferred_key not in archive:
+                raise ReverseKey1Error(
+                    f"optional modality archive {path} is missing {preferred_key!r}"
+                )
+            return np.asarray(archive[preferred_key])
+    raise ReverseKey1Error(
+        f"optional modality sidecar must be .npy or .npz: {path}"
+    )
+
+
+def linear_sidecar_features(path: Path) -> np.ndarray:
+    value = np.asarray(_sidecar_array(path, "linear_rgb"), dtype=np.float32)
+    if value.shape == (INPUT_SIZE, INPUT_SIZE, 3):
+        value = value.transpose(2, 0, 1)
+    if not np.isfinite(value).all() or np.any(value < 0) or np.any(value > 1):
+        raise ReverseKey1Error(
+            "linear RGB sidecar must contain finite scene-linear values in [0, 1]"
+        )
+    return primary_image_features(value)
+
+
+def gain_map_sidecar_features(path: Path) -> np.ndarray:
+    return gain_map_features(_sidecar_array(path, "gain_map"))
+
+
+def _load_optional_modalities_manifest(
+    path: Path | None,
+) -> dict[str, dict[str, Any]]:
+    if path is None:
+        return {}
+    manifest = path.resolve()
+    value = json.loads(manifest.read_text(encoding="utf-8"))
+    if value.get("schema") != OPTIONAL_MODALITIES_SCHEMA:
+        raise ReverseKey1Error("invalid optional modalities manifest")
+    samples = value.get("samples")
+    if not isinstance(samples, list):
+        raise ReverseKey1Error("optional modalities samples are not an array")
+    by_sha: dict[str, dict[str, Any]] = {}
+    for item in samples:
+        if not isinstance(item, dict):
+            raise ReverseKey1Error("optional modality record is not an object")
+        source_sha = str(item.get("sourceSHA256") or "")
+        try:
+            int(source_sha, 16)
+        except ValueError:
+            source_sha = ""
+        if len(source_sha) != 64 or source_sha in by_sha:
+            raise ReverseKey1Error(
+                "optional modality sourceSHA256 must be unique 64-character values"
+            )
+        prepared: dict[str, Any] = {"sourceSHA256": source_sha}
+        for field, feature_builder in (
+            ("linearRGBPath", linear_sidecar_features),
+            ("gainMapPath", gain_map_sidecar_features),
+        ):
+            relative = item.get(field)
+            if relative is None:
+                continue
+            sidecar = (manifest.parent / str(relative)).resolve()
+            if not sidecar.is_file():
+                raise ReverseKey1Error(f"optional modality sidecar does not exist: {sidecar}")
+            # Decode once during preparation so a malformed sidecar cannot make
+            # a long training run fail much later.
+            feature_builder(sidecar)
+            prepared[field] = str(sidecar)
+            prepared[field.removesuffix("Path") + "SHA256"] = sha256_file(sidecar)
+        if len(prepared) == 1:
+            raise ReverseKey1Error(
+                f"optional modality record {source_sha} has no sidecar paths"
+            )
+        by_sha[source_sha] = prepared
+    return by_sha
 
 
 def _number(value: Any) -> float | None:
@@ -191,11 +297,22 @@ class UniversalPreparationConfig:
     native_manifest: Path
     output: Path
     exiftool: str = "exiftool"
+    optional_modalities_manifest: Path | None = None
 
 
 def prepare_universal_dataset(config: UniversalPreparationConfig) -> dict[str, Any]:
     source_manifest = config.native_manifest.resolve()
     source_header, records = load_manifest(source_manifest)
+    optional_modalities = _load_optional_modalities_manifest(
+        config.optional_modalities_manifest
+    )
+    native_hashes = {str(record["sourceSHA256"]) for record in records}
+    unknown_hashes = sorted(set(optional_modalities) - native_hashes)
+    if unknown_hashes:
+        raise ReverseKey1Error(
+            "optional modalities contain samples outside the native manifest: "
+            + ", ".join(unknown_hashes[:3])
+        )
     paths = [str(record["sourcePath"]) for record in records]
     command = [
         config.exiftool,
@@ -238,6 +355,7 @@ def prepare_universal_dataset(config: UniversalPreparationConfig) -> dict[str, A
     source_root = source_manifest.parent
     for index, record in enumerate(records):
         tags = by_path[str(record["sourcePath"])]
+        optional = optional_modalities.get(str(record["sourceSHA256"]), {})
         tag3 = decode_style_binary(tags.get("Tag3"), 516, "Tag3")
         tag_c = decode_style_binary(tags.get("TagC"), 2048, "TagC")
         tag_d = decode_style_binary(tags.get("TagD"), 2048, "TagD")
@@ -249,19 +367,26 @@ def prepare_universal_dataset(config: UniversalPreparationConfig) -> dict[str, A
             if value is not None:
                 scalars[index, scalar_index] = value
                 scalar_mask[index, scalar_index] = 1.0
-        metadata[index], metadata_mask[index] = metadata_vector(record, tags)
-        prepared_records.append(
-            {
-                "index": index,
-                "sourceSHA256": record["sourceSHA256"],
-                "sourcePath": record["sourcePath"],
-                "samplePath": str((source_root / str(record["samplePath"])).resolve()),
-                "captureSession": record["captureSession"],
-                "split": record["split"],
-                "Model": record.get("Model"),
-                "Software": record.get("Software"),
-            }
+        metadata[index], metadata_mask[index] = metadata_vector(
+            record,
+            tags,
+            has_gain_map="gainMapPath" in optional,
+            has_raw="linearRGBPath" in optional,
         )
+        prepared_record = {
+            "index": index,
+            "sourceSHA256": record["sourceSHA256"],
+            "sourcePath": record["sourcePath"],
+            "samplePath": str((source_root / str(record["samplePath"])).resolve()),
+            "captureSession": record["captureSession"],
+            "split": record["split"],
+            "Model": record.get("Model"),
+            "Software": record.get("Software"),
+        }
+        prepared_record.update(
+            {name: value for name, value in optional.items() if name != "sourceSHA256"}
+        )
+        prepared_records.append(prepared_record)
     for name, values in (
         ("lightMaps", light_maps),
         ("scalars", scalars),
@@ -303,6 +428,14 @@ def prepare_universal_dataset(config: UniversalPreparationConfig) -> dict[str, A
             "uncertainty": "input-conditioned normalized error prediction",
         },
         "metadataFields": list(METADATA_FIELDS),
+        "optionalModalities": {
+            "fields": list(MODALITY_FIELDS),
+            "linearRGB": "oriented linear RGB, 3x256x256, .npy or NPZ key linear_rgb",
+            "gainMap": (
+                "oriented linear exposure-gain ratios, 256x256, .npy or NPZ key gain_map"
+            ),
+            "sampleCount": len(optional_modalities),
+        },
     }
     header["recordsSHA256"] = __import__("hashlib").sha256(
         canonical_json_bytes(prepared_records)
@@ -406,7 +539,7 @@ def build_universal_model(
     statistics: Mapping[str, np.ndarray], *, architecture: str = "base"
 ) -> Any:
     torch, nn = _require_torch()
-    if architecture not in {"base", "multiscale_large"}:
+    if architecture not in {"base", "multiscale_large", "multimodal_large"}:
         raise ReverseKey1Error(f"unsupported universal architecture: {architecture}")
 
     class ResidualBlock(nn.Module):
@@ -428,7 +561,10 @@ def build_universal_model(
             super().__init__()
             channels = (64, 96, 160, 256)
             stages: list[Any] = []
+            self.supports_optional_modalities = architecture == "multimodal_large"
             incoming = PRIMARY_CHANNELS
+            if self.supports_optional_modalities:
+                incoming += LINEAR_CHANNELS + GAIN_MAP_CHANNELS + len(MODALITY_FIELDS)
             for outgoing in channels:
                 blocks: list[Any] = [
                     nn.Conv2d(incoming, outgoing, 3, stride=2, padding=1, bias=False),
@@ -436,11 +572,11 @@ def build_universal_model(
                     nn.SiLU(),
                     ResidualBlock(outgoing),
                 ]
-                if architecture == "multiscale_large":
+                if architecture in {"multiscale_large", "multimodal_large"}:
                     blocks.append(ResidualBlock(outgoing))
                 stages.append(nn.Sequential(*blocks))
                 incoming = outgoing
-            if architecture == "multiscale_large":
+            if architecture in {"multiscale_large", "multimodal_large"}:
                 self.encoder = None
                 self.encoder_stages = nn.ModuleList(stages)
                 self.scale_projections = nn.ModuleList(
@@ -557,10 +693,60 @@ def build_universal_model(
                 )
 
         def forward(
-            self, primary: Any, metadata: Any, metadata_mask: Any
+            self,
+            primary: Any,
+            metadata: Any,
+            metadata_mask: Any,
+            linear_rgb: Any | None = None,
+            gain_map: Any | None = None,
+            modality_mask: Any | None = None,
         ) -> dict[str, Any]:
+            encoder_input = primary
+            if self.supports_optional_modalities:
+                batch_size = primary.shape[0]
+                if linear_rgb is None:
+                    linear_rgb = primary.new_zeros(
+                        (batch_size, LINEAR_CHANNELS, INPUT_SIZE, INPUT_SIZE)
+                    )
+                if gain_map is None:
+                    gain_map = primary.new_zeros(
+                        (batch_size, GAIN_MAP_CHANNELS, INPUT_SIZE, INPUT_SIZE)
+                    )
+                if modality_mask is None:
+                    modality_mask = primary.new_zeros(
+                        (batch_size, len(MODALITY_FIELDS))
+                    )
+                if tuple(linear_rgb.shape[1:]) != (
+                    LINEAR_CHANNELS,
+                    INPUT_SIZE,
+                    INPUT_SIZE,
+                ):
+                    raise ReverseKey1Error("invalid linear RGB feature tensor shape")
+                if tuple(gain_map.shape[1:]) != (
+                    GAIN_MAP_CHANNELS,
+                    INPUT_SIZE,
+                    INPUT_SIZE,
+                ):
+                    raise ReverseKey1Error("invalid gain-map feature tensor shape")
+                if tuple(modality_mask.shape[1:]) != (len(MODALITY_FIELDS),):
+                    raise ReverseKey1Error("invalid optional modality mask shape")
+                mask = modality_mask.clamp(0.0, 1.0)
+                linear_mask = mask[:, 0, None, None, None]
+                gain_mask = mask[:, 1, None, None, None]
+                mask_planes = mask[:, :, None, None].expand(
+                    -1, -1, INPUT_SIZE, INPUT_SIZE
+                )
+                encoder_input = torch.cat(
+                    (
+                        primary,
+                        linear_rgb * linear_mask,
+                        gain_map * gain_mask,
+                        mask_planes,
+                    ),
+                    dim=1,
+                )
             if self.encoder_stages is not None:
-                value = primary
+                value = encoder_input
                 pyramid = []
                 for stage, projection in zip(
                     self.encoder_stages, self.scale_projections
@@ -576,7 +762,7 @@ def build_universal_model(
                     )
                 spatial = self.spatial_fusion(torch.cat(pyramid, dim=1))
             else:
-                spatial = self.encoder(primary)
+                spatial = self.encoder(encoder_input)
                 # MPS does not implement adaptive pooling when the input size
                 # is not divisible by the output size (16 -> 12 here).
                 spatial = torch.nn.functional.interpolate(
@@ -651,11 +837,25 @@ class _UniversalDataset:
         manifest: Path,
         records: Sequence[Mapping[str, Any]],
         metadata_dropout: float = 0.0,
+        optional_modality_dropout: float = 0.0,
     ) -> None:
         self.manifest = manifest
         self.records = list(records)
         self.labels = np.load(manifest.parent / "labels.npz", allow_pickle=False)
         self.metadata_dropout = metadata_dropout
+        self.optional_modality_dropout = optional_modality_dropout
+        for record in self.records:
+            for path_field in ("linearRGBPath", "gainMapPath"):
+                path_value = record.get(path_field)
+                if path_value is None:
+                    continue
+                path = Path(str(path_value))
+                expected = record.get(path_field.removesuffix("Path") + "SHA256")
+                if not path.is_file() or expected != sha256_file(path):
+                    raise ReverseKey1Error(
+                        f"optional modality identity mismatch: {path_field} for "
+                        f"{record.get('sourceSHA256')}"
+                    )
 
     def __len__(self) -> int:
         return len(self.records)
@@ -675,6 +875,29 @@ class _UniversalDataset:
         if self.metadata_dropout and float(torch.rand(())) < self.metadata_dropout:
             metadata = np.zeros_like(metadata)
             metadata_mask = np.zeros_like(metadata_mask)
+        linear_rgb = np.zeros(
+            (LINEAR_CHANNELS, INPUT_SIZE, INPUT_SIZE), dtype=np.float32
+        )
+        gain_map = np.zeros(
+            (GAIN_MAP_CHANNELS, INPUT_SIZE, INPUT_SIZE), dtype=np.float32
+        )
+        modality_mask = np.zeros(len(MODALITY_FIELDS), dtype=np.float32)
+        if record.get("linearRGBPath"):
+            linear_rgb = linear_sidecar_features(Path(str(record["linearRGBPath"])))
+            modality_mask[0] = 1.0
+        if record.get("gainMapPath"):
+            gain_map = gain_map_sidecar_features(Path(str(record["gainMapPath"])))
+            modality_mask[1] = 1.0
+        if self.optional_modality_dropout:
+            keep = (
+                torch.rand(len(MODALITY_FIELDS))
+                >= self.optional_modality_dropout
+            ).numpy().astype(np.float32)
+            modality_mask *= keep
+            linear_rgb *= modality_mask[0]
+            gain_map *= modality_mask[1]
+            metadata[METADATA_FIELDS.index("has_raw")] = modality_mask[0]
+            metadata[METADATA_FIELDS.index("has_gain_map")] = modality_mask[1]
         return (
             torch.from_numpy(primary),
             torch.from_numpy(metadata),
@@ -688,7 +911,36 @@ class _UniversalDataset:
             torch.from_numpy(unstyled),
             str(record["captureSession"]),
             str(record.get("Model") or "unknown"),
+            torch.from_numpy(linear_rgb),
+            torch.from_numpy(gain_map),
+            torch.from_numpy(modality_mask),
         )
+
+
+def _model_forward(model: Any, batch: Sequence[Any]) -> Mapping[str, Any]:
+    return model(batch[0], batch[1], batch[2], batch[12], batch[13], batch[14])
+
+
+def _apply_modality_policy(batch: Sequence[Any], policy: str) -> tuple[Any, ...]:
+    if policy == "available":
+        return tuple(batch)
+    if policy not in {"primary_only", "linear_only", "gain_only"}:
+        raise ReverseKey1Error(f"unsupported modality evaluation policy: {policy}")
+    values = list(batch)
+    mask = values[14].clone()
+    if policy == "primary_only":
+        mask.zero_()
+    elif policy == "linear_only":
+        mask[:, 1] = 0
+    else:
+        mask[:, 0] = 0
+    values[12] = values[12] * mask[:, 0, None, None, None]
+    values[13] = values[13] * mask[:, 1, None, None, None]
+    values[14] = mask
+    values[1] = values[1].clone()
+    values[1][:, METADATA_FIELDS.index("has_raw")] = mask[:, 0]
+    values[1][:, METADATA_FIELDS.index("has_gain_map")] = mask[:, 1]
+    return tuple(values)
 
 
 def _consumer_quadratic_proxy(torch: Any, key1: Any, primary: Any) -> Any:
@@ -728,6 +980,9 @@ def _losses(
         unstyled,
         _sessions,
         _models,
+        _linear_rgb,
+        _gain_map,
+        _modality_mask,
     ) = batch
     expanded = key_mask[:, :, :, None, None, None].expand_as(key1)
     normalized_key = (output["key1"] - key1) / model.key1_scale
@@ -774,7 +1029,14 @@ def _move_batch(batch: Sequence[Any], device: str) -> tuple[Any, ...]:
     return tuple(value.to(device) if hasattr(value, "to") else value for value in batch)
 
 
-def _evaluate(torch: Any, model: Any, loader: Any, device: str) -> dict[str, Any]:
+def _evaluate(
+    torch: Any,
+    model: Any,
+    loader: Any,
+    device: str,
+    *,
+    modality_policy: str = "available",
+) -> dict[str, Any]:
     model.eval()
     key_errors: list[float] = []
     predicted_uncertainty: list[float] = []
@@ -786,8 +1048,10 @@ def _evaluate(torch: Any, model: Any, loader: Any, device: str) -> dict[str, Any
     consumer_proxy_errors: list[float] = []
     with torch.no_grad():
         for original in loader:
-            batch = _move_batch(original, device)
-            output = model(batch[0], batch[1], batch[2])
+            batch = _apply_modality_policy(
+                _move_batch(original, device), modality_policy
+            )
+            output = _model_forward(model, batch)
             consumer_proxy = _consumer_quadratic_proxy(torch, output["key1"], batch[0])
             consumer_delta = consumer_proxy - batch[9]
             consumer_proxy_errors.extend(
@@ -795,7 +1059,7 @@ def _evaluate(torch: Any, model: Any, loader: Any, device: str) -> dict[str, Any
             )
             key1, key_mask = batch[3], batch[4]
             normalized = ((output["key1"] - key1) / model.key1_scale).abs()
-            for index, model_name in enumerate(original[-1]):
+            for index, model_name in enumerate(original[11]):
                 selected = key_mask[index, :, :, None, None, None].expand_as(normalized[index])
                 error = float(normalized[index][selected].mean().cpu())
                 key_errors.append(error)
@@ -849,9 +1113,11 @@ class UniversalTrainingConfig:
     device: str = "auto"
     seed: int = 260820
     metadata_dropout: float = 0.25
+    optional_modality_dropout: float = 0.35
     architecture: str = "base"
     consumer_weight: float = 0.0
     resume: Path | None = None
+    warm_start: Path | None = None
 
 
 def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
@@ -864,9 +1130,13 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         raise ReverseKey1Error("MPS was requested but is unavailable")
     if not 0 <= config.metadata_dropout <= 1:
         raise ReverseKey1Error("metadata dropout must be in [0, 1]")
+    if not 0 <= config.optional_modality_dropout <= 1:
+        raise ReverseKey1Error("optional modality dropout must be in [0, 1]")
     if config.consumer_weight < 0:
         raise ReverseKey1Error("consumer weight must be non-negative")
-    if config.architecture not in {"base", "multiscale_large"}:
+    if config.resume is not None and config.warm_start is not None:
+        raise ReverseKey1Error("resume and warm start are mutually exclusive")
+    if config.architecture not in {"base", "multiscale_large", "multimodal_large"}:
         raise ReverseKey1Error(
             f"unsupported universal architecture: {config.architecture}"
         )
@@ -884,17 +1154,51 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
     model = build_universal_model(
         statistics, architecture=config.architecture
     ).to(device)
-    if config.resume is not None:
-        checkpoint = torch.load(config.resume.resolve(), map_location=device, weights_only=False)
-        if checkpoint.get("manifestSHA256") != sha256_file(manifest):
+    checkpoint_path = config.resume or config.warm_start
+    if checkpoint_path is not None:
+        checkpoint = torch.load(
+            checkpoint_path.resolve(), map_location=device, weights_only=False
+        )
+        if (
+            config.resume is not None
+            and checkpoint.get("manifestSHA256") != sha256_file(manifest)
+        ):
             raise ReverseKey1Error("resume checkpoint manifest hash does not match dataset")
-        model.load_state_dict(checkpoint["model"])
+        checkpoint_architecture = checkpoint.get("architectureConfig", "base")
+        if checkpoint_architecture == config.architecture:
+            model.load_state_dict(checkpoint["model"])
+        elif (
+            config.architecture == "multimodal_large"
+            and checkpoint_architecture == "multiscale_large"
+        ):
+            # Warm-start the required-image path exactly. Optional channels are
+            # initialized to zero so an all-missing v3 model starts from the
+            # same function as the v2 checkpoint.
+            migrated = model.state_dict()
+            for name, value in checkpoint["model"].items():
+                if name == "encoder_stages.0.0.weight":
+                    migrated[name].zero_()
+                    migrated[name][:, :PRIMARY_CHANNELS].copy_(value)
+                elif name in migrated and migrated[name].shape == value.shape:
+                    migrated[name].copy_(value)
+                else:
+                    raise ReverseKey1Error(
+                        f"cannot migrate multiscale checkpoint parameter: {name}"
+                    )
+            model.load_state_dict(migrated)
+        else:
+            raise ReverseKey1Error(
+                f"cannot resume {config.architecture} from {checkpoint_architecture}"
+            )
     loaders = {
         split: torch.utils.data.DataLoader(
             _UniversalDataset(
                 manifest,
                 values,
                 metadata_dropout=config.metadata_dropout if split == "train" else 0.0,
+                optional_modality_dropout=(
+                    config.optional_modality_dropout if split == "train" else 0.0
+                ),
             ),
             batch_size=config.batch_size,
             shuffle=split == "train",
@@ -916,7 +1220,7 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         for original in loaders["train"]:
             batch = _move_batch(original, device)
             optimizer.zero_grad(set_to_none=True)
-            prediction = model(batch[0], batch[1], batch[2])
+            prediction = _model_forward(model, batch)
             total, details = _losses(
                 torch, model, prediction, batch, consumer_weight=config.consumer_weight
             )
@@ -926,7 +1230,13 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
             totals.append(float(total.detach().cpu()))
             for name, value in details.items():
                 components[name].append(value)
-        calibration = _evaluate(torch, model, loaders["calibration"], device)
+        calibration = _evaluate(
+            torch,
+            model,
+            loaders["calibration"],
+            device,
+            modality_policy="primary_only",
+        )
         score = calibration["key1NormalizedMAE"] + 0.15 * (
             calibration["gtcNormalizedMAE"] + calibration["lightMapsNormalizedMAE"]
         )
@@ -942,11 +1252,11 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         history.append(row)
         checkpoint = {
             "schema": REPORT_SCHEMA,
-            "architecture": (
-                "UniversalPhotographicStyleStateNet-v2-multiscale-large"
-                if config.architecture == "multiscale_large"
-                else "UniversalPhotographicStyleStateNet-v1"
-            ),
+            "architecture": {
+                "base": "UniversalPhotographicStyleStateNet-v1",
+                "multiscale_large": "UniversalPhotographicStyleStateNet-v2-multiscale-large",
+                "multimodal_large": "UniversalPhotographicStyleStateNet-v3-optional-modalities",
+            }[config.architecture],
             "architectureConfig": config.architecture,
             "epoch": epoch,
             "manifestSHA256": manifest_hash,
@@ -964,8 +1274,29 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         print(json.dumps(row, sort_keys=True), flush=True)
     best = torch.load(output / "best.pt", map_location=device, weights_only=False)
     model.load_state_dict(best["model"])
-    heldout = _evaluate(torch, model, loaders["heldout"], device)
-    calibration = _evaluate(torch, model, loaders["calibration"], device)
+    heldout = _evaluate(
+        torch, model, loaders["heldout"], device, modality_policy="primary_only"
+    )
+    calibration = _evaluate(
+        torch,
+        model,
+        loaders["calibration"],
+        device,
+        modality_policy="primary_only",
+    )
+    modality_ablations = {
+        split: {
+            policy: _evaluate(
+                torch,
+                model,
+                loaders[split],
+                device,
+                modality_policy=policy,
+            )
+            for policy in ("available", "linear_only", "gain_only")
+        }
+        for split in ("calibration", "heldout")
+    }
     report = {
         "schema": REPORT_SCHEMA,
         "architecture": best["architecture"],
@@ -978,6 +1309,8 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         "bestSelectionScore": best_score,
         "calibration": calibration,
         "heldout": heldout,
+        "primaryOnly": {"calibration": calibration, "heldout": heldout},
+        "modalityAblations": modality_ablations,
         "parameterCount": sum(parameter.numel() for parameter in model.parameters()),
         "inputContract": header["inputContract"],
         "outputContract": header["outputContract"],
@@ -986,7 +1319,10 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
             "require separate acceptance."
         ),
         "consumerWeight": config.consumer_weight,
+        "optionalModalityDropout": config.optional_modality_dropout,
+        "optionalModalities": header.get("optionalModalities", {}),
         "resume": str(config.resume.resolve()) if config.resume else None,
+        "warmStart": str(config.warm_start.resolve()) if config.warm_start else None,
     }
     _atomic_json(output / "report.json", report)
     return report

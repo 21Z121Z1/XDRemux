@@ -18,6 +18,12 @@ if __package__ in (None, ""):
 from xdremux_py.apple_reverse_key1_training import _atomic_json, _require_torch, sha256_file
 from xdremux_py.universal_photographic_style import load_universal_image, load_universal_model
 from xdremux_py.universal_photographic_style_training import METADATA_FIELDS, PRIMARY_CHANNELS
+from xdremux_py.universal_photographic_style_training import (
+    GAIN_MAP_CHANNELS,
+    INPUT_SIZE,
+    LINEAR_CHANNELS,
+    MODALITY_FIELDS,
+)
 
 
 def main() -> None:
@@ -26,6 +32,8 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--fixture", type=Path)
+    parser.add_argument("--linear-rgb-sidecar", type=Path)
+    parser.add_argument("--gain-map-sidecar", type=Path)
     args = parser.parse_args()
     output = args.output.resolve()
     if output.exists():
@@ -80,8 +88,31 @@ def main() -> None:
                 source.key1_scale.detach().reshape(1, 1, 1, 8, 30),
             )
 
-        def forward(self, features: Any, metadata: Any, metadata_mask: Any) -> tuple[Any, ...]:
+        def forward(
+            self,
+            features: Any,
+            metadata: Any,
+            metadata_mask: Any,
+            linear_features: Any | None = None,
+            gain_map_features: Any | None = None,
+            modality_mask: Any | None = None,
+        ) -> tuple[Any, ...]:
             value = features
+            if self.source.supports_optional_modalities:
+                linear_mask = modality_mask[:, 0, None, None, None]
+                gain_mask = modality_mask[:, 1, None, None, None]
+                mask_planes = modality_mask[:, :, None, None].expand(
+                    -1, -1, INPUT_SIZE, INPUT_SIZE
+                )
+                value = torch.cat(
+                    (
+                        features,
+                        linear_features * linear_mask,
+                        gain_map_features * gain_mask,
+                        mask_planes,
+                    ),
+                    dim=1,
+                )
             pyramid = []
             for stage, projection in zip(
                 self.source.encoder_stages, self.source.scale_projections
@@ -149,7 +180,11 @@ def main() -> None:
     if hasattr(torch.backends, "mha"):
         torch.backends.mha.set_fastpath_enabled(False)
     if args.fixture is not None:
-        fixture = load_universal_image(args.fixture)
+        fixture = load_universal_image(
+            args.fixture,
+            linear_rgb_sidecar=args.linear_rgb_sidecar,
+            gain_map_sidecar=args.gain_map_sidecar,
+        )
         examples = (
             torch.from_numpy(fixture.primary).unsqueeze(0),
             torch.from_numpy(fixture.metadata).unsqueeze(0),
@@ -161,6 +196,29 @@ def main() -> None:
             torch.zeros((1, PRIMARY_CHANNELS, 256, 256), dtype=torch.float32),
             torch.zeros((1, len(METADATA_FIELDS)), dtype=torch.float32),
             torch.zeros((1, len(METADATA_FIELDS)), dtype=torch.float32),
+        )
+    if model.supports_optional_modalities:
+        linear = (
+            fixture.linear_rgb_features
+            if fixture is not None and fixture.linear_rgb_features is not None
+            else np.zeros((LINEAR_CHANNELS, INPUT_SIZE, INPUT_SIZE), dtype=np.float32)
+        )
+        gain = (
+            fixture.gain_map_features
+            if fixture is not None and fixture.gain_map_features is not None
+            else np.zeros((GAIN_MAP_CHANNELS, INPUT_SIZE, INPUT_SIZE), dtype=np.float32)
+        )
+        modality_mask = np.asarray(
+            [
+                fixture is not None and fixture.linear_rgb_features is not None,
+                fixture is not None and fixture.gain_map_features is not None,
+            ],
+            dtype=np.float32,
+        )
+        examples = examples + (
+            torch.from_numpy(linear).unsqueeze(0),
+            torch.from_numpy(gain).unsqueeze(0),
+            torch.from_numpy(modality_mask).unsqueeze(0),
         )
     with torch.no_grad():
         expected = [value.numpy() for value in wrapper(*examples)]
@@ -174,7 +232,22 @@ def main() -> None:
             ct.TensorType(
                 name="metadata_mask", shape=examples[2].shape, dtype=np.float32
             ),
-        ],
+        ]
+        + (
+            [
+                ct.TensorType(
+                    name="linear_features", shape=examples[3].shape, dtype=np.float32
+                ),
+                ct.TensorType(
+                    name="gain_map_features", shape=examples[4].shape, dtype=np.float32
+                ),
+                ct.TensorType(
+                    name="modality_mask", shape=examples[5].shape, dtype=np.float32
+                ),
+            ]
+            if model.supports_optional_modalities
+            else []
+        ),
         outputs=[
             ct.TensorType(name="key1"),
             ct.TensorType(name="key1_log_variance"),
@@ -192,7 +265,9 @@ def main() -> None:
     )
     converted.user_defined_metadata["architecture"] = str(checkpoint["architecture"])
     converted.user_defined_metadata["inputContract"] = (
-        "primary image features plus masked metadata"
+        "required primary features plus masked metadata and optional linear/gain tensors"
+        if model.supports_optional_modalities
+        else "primary image features plus masked metadata"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     converted.save(output)
@@ -203,6 +278,14 @@ def main() -> None:
         "metadata": examples[1].numpy(),
         "metadata_mask": examples[2].numpy(),
     }
+    if model.supports_optional_modalities:
+        feed.update(
+            {
+                "linear_features": examples[3].numpy(),
+                "gain_map_features": examples[4].numpy(),
+                "modality_mask": examples[5].numpy(),
+            }
+        )
     names = (
         "key1",
         "key1_log_variance",
