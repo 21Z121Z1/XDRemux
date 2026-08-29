@@ -9,6 +9,9 @@ on:
       - "scripts/predict_universal_photographic_style.py"
       - "scripts/train_universal_photographic_style.py"
       - "Tests/test_universal_photographic_style_training.py"
+      - "Tests/test_public_style_pretraining.py"
+      - "xdremux_py/public_style_pretraining.py"
+      - "scripts/train_public_synthetic_style.py"
       - ".github/workflows/universal-style-training.yml"
   workflow_dispatch:
     inputs:
@@ -45,7 +48,36 @@ jobs:
         run: >-
           python -m unittest
           Tests.test_apple_reverse_key1_training
+          Tests.test_public_style_pretraining
           Tests.test_universal_photographic_style_training
+
+      - name: Collect licensed public camera samples
+        run: |
+          python scripts/train_public_synthetic_style.py collect \
+            --output "$RUNNER_TEMP/public-style-corpus.json" \
+            --image-directory "$RUNNER_TEMP/public-style-images" \
+            --per-category 2
+
+      - name: Run one public synthetic pretraining epoch
+        run: |
+          python scripts/train_public_synthetic_style.py train \
+            --manifest "$RUNNER_TEMP/public-style-corpus.json" \
+            --output "$RUNNER_TEMP/public-style-pretraining" \
+            --epochs 1 \
+            --batch-size 2 \
+            --transforms-per-image 2 \
+            --device cpu
+
+      - name: Upload public corpus audit and synthetic checkpoint
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-synthetic-style-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/public-style-corpus.json
+            ${{ runner.temp }}/public-style-pretraining/report.json
+            ${{ runner.temp }}/public-style-pretraining/synthetic-pretrained.pt
+          if-no-files-found: error
+          retention-days: 14
 
   private-training:
     if: github.event_name == 'workflow_dispatch' && inputs.run_private_training

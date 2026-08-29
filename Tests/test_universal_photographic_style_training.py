@@ -23,6 +23,7 @@ from xdremux_py.universal_photographic_style_training import (
     metadata_vector,
     primary_image_features,
     _load_optional_modalities_manifest,
+    _warm_start_model_state,
     _consumer_quadratic_proxy,
 )
 from xdremux_py.universal_photographic_style import (
@@ -185,6 +186,36 @@ class UniversalPhotographicStyleTrainingTests(unittest.TestCase):
             )
         for name in missing:
             self.assertTrue(torch.equal(missing[name], masked[name]), name)
+
+    def test_warm_start_migrates_stem_but_keeps_target_statistics(self) -> None:
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch is unavailable")
+        source_statistics = self._statistics()
+        source_statistics["key1Scale"] = np.full((8, 10, 3), 7.0, dtype=np.float32)
+        source = build_universal_model(
+            source_statistics, architecture="multiscale_large"
+        )
+        target = build_universal_model(
+            self._statistics(), architecture="multimodal_large"
+        )
+        _warm_start_model_state(
+            target,
+            source.state_dict(),
+            source_architecture="multiscale_large",
+            target_architecture="multimodal_large",
+        )
+        self.assertTrue(torch.equal(target.key1_scale, torch.ones_like(target.key1_scale)))
+        source_stem = source.encoder_stages[0][0].weight
+        target_stem = target.encoder_stages[0][0].weight
+        self.assertTrue(torch.equal(target_stem[:, :PRIMARY_CHANNELS], source_stem))
+        self.assertTrue(
+            torch.equal(
+                target_stem[:, PRIMARY_CHANNELS:],
+                torch.zeros_like(target_stem[:, PRIMARY_CHANNELS:]),
+            )
+        )
 
     def test_native_state_resources_have_native_byte_lengths(self) -> None:
         image = UniversalImageInput(

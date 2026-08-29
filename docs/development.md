@@ -204,6 +204,18 @@ PyTorch 契约测试；真实训练是显式触发、带 `xdremux-style-training
 self-hosted Apple Silicon runner，并从 repository variables 读取私有 manifest/checkpoint
 路径。训练产物只上传为短期 Actions artifact，不提交样片或 checkpoint。
 
+公开内容域的第一阶段预训练由 `scripts/train_public_synthetic_style.py` 完成。collector
+通过 Wikimedia Commons API 从 iPhone 16/16 Pro/17 Pro 与 OPPO A3x/F29 实拍分类抽样，
+只接受 `CC0`、`CC BY 4.0`、`CC BY-SA 4.0`，保存源页面、作者、许可 URL、源 SHA-1、
+下载 SHA-256 与归一化 tensor SHA-256。原图和 tensor 只存在于 Actions 临时目录。
+
+由于这些公开图没有 Apple key1 真值，训练脚本对每张图生成有精确解析逆解的受约束
+RGB affine style，并把对应的 10 项 polynomial key1 作为合成教师；训练目标只用于主图
+encoder/key1/unstyled 的内容域预训练。报告明确标为 `syntheticPretrainingOnly`，不能把
+合成 heldout 的改善解释为 native Apple 或 constrained solver 精度。下一阶段必须用
+原生样本或完整 Neutrino solver 标注 warm-start 该 checkpoint，并以原有 session-heldout
+与真实 consumer A/B 决定是否接受。
+
 Privileged-teacher cascade 评测入口为
 `scripts/evaluate_universal_paired_cascade.py`。它固定 calibration-derived 的
 paired ensemble alpha `0.625`，分别报告 Universal direct、真实 disabled unstyled 的

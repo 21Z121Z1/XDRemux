@@ -831,6 +831,57 @@ def build_universal_model(
     return UniversalPhotographicStyleStateNet()
 
 
+_STATISTIC_STATE_KEYS = frozenset(
+    (
+        "identity",
+        "key1_scale",
+        "metadata_center",
+        "metadata_scale",
+        "gtc_center",
+        "gtc_scale",
+        "light_center",
+        "light_scale",
+        "scalar_center",
+        "scalar_scale",
+    )
+)
+
+
+def _warm_start_model_state(
+    model: Any,
+    checkpoint_state: Mapping[str, Any],
+    *,
+    source_architecture: str,
+    target_architecture: str,
+) -> None:
+    compatible = source_architecture == target_architecture or (
+        source_architecture == "multiscale_large"
+        and target_architecture == "multimodal_large"
+    )
+    if not compatible:
+        raise ReverseKey1Error(
+            f"cannot warm-start {target_architecture} from {source_architecture}"
+        )
+    migrated = model.state_dict()
+    for name, value in checkpoint_state.items():
+        if name in _STATISTIC_STATE_KEYS:
+            # Target-corpus statistics define output normalization and must not
+            # leak from synthetic or earlier-data checkpoints.
+            continue
+        if (
+            name == "encoder_stages.0.0.weight"
+            and source_architecture == "multiscale_large"
+            and target_architecture == "multimodal_large"
+        ):
+            migrated[name].zero_()
+            migrated[name][:, :PRIMARY_CHANNELS].copy_(value)
+        elif name in migrated and migrated[name].shape == value.shape:
+            migrated[name].copy_(value)
+        else:
+            raise ReverseKey1Error(f"cannot migrate checkpoint parameter: {name}")
+    model.load_state_dict(migrated)
+
+
 class _UniversalDataset:
     def __init__(
         self,
@@ -1165,27 +1216,17 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         ):
             raise ReverseKey1Error("resume checkpoint manifest hash does not match dataset")
         checkpoint_architecture = checkpoint.get("architectureConfig", "base")
-        if checkpoint_architecture == config.architecture:
+        if config.resume is not None and checkpoint_architecture == config.architecture:
             model.load_state_dict(checkpoint["model"])
-        elif (
-            config.architecture == "multimodal_large"
-            and checkpoint_architecture == "multiscale_large"
-        ):
-            # Warm-start the required-image path exactly. Optional channels are
-            # initialized to zero so an all-missing v3 model starts from the
-            # same function as the v2 checkpoint.
-            migrated = model.state_dict()
-            for name, value in checkpoint["model"].items():
-                if name == "encoder_stages.0.0.weight":
-                    migrated[name].zero_()
-                    migrated[name][:, :PRIMARY_CHANNELS].copy_(value)
-                elif name in migrated and migrated[name].shape == value.shape:
-                    migrated[name].copy_(value)
-                else:
-                    raise ReverseKey1Error(
-                        f"cannot migrate multiscale checkpoint parameter: {name}"
-                    )
-            model.load_state_dict(migrated)
+        elif config.warm_start is not None:
+            # Warm-start learned parameters while keeping normalization buffers
+            # computed from the new target corpus.
+            _warm_start_model_state(
+                model,
+                checkpoint["model"],
+                source_architecture=str(checkpoint_architecture),
+                target_architecture=config.architecture,
+            )
         else:
             raise ReverseKey1Error(
                 f"cannot resume {config.architecture} from {checkpoint_architecture}"
