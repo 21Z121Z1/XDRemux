@@ -1,37 +1,61 @@
-# Regression and real-sample verification
+# Regression and Real-Sample Verification
 
 English | [简体中文](evals.md)
 
-So that "I looked at it and it seemed fine" is never the evidence. This lists the reusable verification harnesses and what each one actually proves. For the rules, see the [testing policy](testing.en.md).
+Use a reusable harness when a change needs evidence beyond a unit test.
 
-## Reusable harnesses
+The [testing policy](testing.en.md) defines which evidence class is required.
 
-All of these live in `Tests/validation/` and can be used directly as a check in a completion-gate plan.
+## Versioned Motion Photo gates
 
-| Harness | What it proves |
+The repository contains real Motion Photo fixtures under `fixtures/`.
+
+Current strict gates include Swift and pure-Python paths. They verify input identity before conversion and reject a fixture whose bytes do not match `fixtures/SHA256SUMS`.
+
+The fixture gates cover multiple JPEG and HEIC/HEIF container layouts. The gate names and exact assertions can change with the implementation, so use the workflow and test source as the final authority.
+
+Important current assertions include:
+
+- Motion Photo resource boundaries are parseable.
+- The selected cover time can be mapped to Apple `still-image-time`.
+- The output still and MOV share the expected Live Photo asset identity.
+- Source Gain Map presence is preserved when required.
+- Compressed video samples are preserved by the normal passthrough path.
+- Compressed audio samples are preserved when source audio is present.
+- Output publication does not silently reuse a valid pair from unknown source provenance.
+- macOS validation can load applicable generated pairs through the tested Apple framework path.
+
+## Reusable validation harnesses
+
+`Tests/validation/` contains reusable scripts.
+
+| Harness | Purpose |
 | --- | --- |
-| `verify_swift_cli_sample.py` | Converts one real photo end to end and asserts the gain-map pixel format through ImageIO. `--require-compressed-primary-preserved` additionally asserts the primary image bytes were untouched; `--validate-only` inspects an existing output without converting |
-| `verify_error_messages.sh` | Checks help text and error text through the real binary: re-converting an output, a non-ProXDR input, and the length of a batch failure line |
-| `verify_batch_categorize_idempotence.sh` | Runs `batch --categorize` twice over one directory; the second run must skip everything rather than re-scanning its own output |
-| `verify_validate_only_harness.sh` | `--validate-only` on a match, a mismatch, and a misuse |
-| `verify_categorization_cross_implementation.py` | The Swift and Python implementations categorize identically |
-| `verify_categorized_batch_outputs.py` | The directory structure a categorized batch produces |
-| `verify_apple_feature_artifact_lifecycle.py` | Apple feature intermediates are cleaned up or retained as intended |
-| `verify_macos_app_model_tests.sh` | Builds and runs the macOS app's model tests |
+| `verify_swift_cli_sample.py` | Run or validate a Swift HDR conversion and inspect the expected Gain Map pixel format. |
+| `verify_error_messages.sh` | Check selected help and error contracts through the real Swift binary. |
+| `verify_batch_categorize_idempotence.sh` | Check repeated categorized batch behavior. |
+| `verify_validate_only_harness.sh` | Check validation-only behavior. |
+| `verify_categorization_cross_implementation.py` | Compare Swift and Python classification results. |
+| `verify_categorized_batch_outputs.py` | Check the categorized directory projection. |
+| `verify_apple_feature_artifact_lifecycle.py` | Check Apple-feature temporary artifact policy. |
+| `verify_macos_app_model_tests.sh` | Build and run the macOS app model tests. |
+| `verify_python_motion_photo_fixtures.py` | Convert and validate the versioned Motion Photo corpus with Python. |
 
-## Choosing one
+## Choose evidence by affected path
 
-- Changed gain-map encoding or container writing → `verify_swift_cli_sample.py` with the expected pixel format.
-- Changed text users see → `verify_error_messages.sh`.
-- Changed batch enumeration or resume logic → `verify_batch_categorize_idempotence.sh`.
-- Changed categorization → the two categorization harnesses.
-- Changed the app's view model → `verify_macos_app_model_tests.sh`.
+- Gain Map encoding or HEIF structure: use the HDR validation harness and a representative real input.
+- Motion Photo parser or writer: use the strict fixture gates and the targeted Swift/Python tests.
+- Batch provenance or output safety: use the output-collision and checkpoint regressions.
+- Classification: use both cross-implementation and output-layout checks when both implementations are affected.
+- App state: use the macOS app model tests.
+- Apple Photos behavior: use native-framework or device evidence in addition to structural checks.
 
-Real samples are not in the repository, so plans must give absolute paths to them.
+## Known limits
 
-## Known gaps
+No single harness proves every user-visible behavior.
 
-1. There is no golden-output comparison. The assertions are structural — pixel format, byte preservation, exit codes — not bit-identical output hashes.
-2. Real-sample coverage is thin; only a few models and shooting modes are represented.
-3. Nothing automatically proves a Photographic Styles output is genuinely editable in Photos. The checks reach container structure only.
-4. OPPO Gallery behaviour needs a real device and is in no automated path.
+Bit-for-bit golden output is not a universal requirement because some valid outputs contain generated identifiers or framework-dependent encoding choices.
+
+Structural validation does not prove visual equivalence.
+
+A fixture corpus proves behavior for those files. It does not prove every firmware, device, or capture mode.

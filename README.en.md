@@ -2,55 +2,52 @@
 
 English | [简体中文](README.md)
 
-XDRemux converts vendor-specific HDR photos and Android Motion Photos into formats that are compatible with standard HDR viewers and Apple Photos.
+XDRemux converts vendor HDR photos to standardized HDR HEIC and converts supported Android Motion Photos to Apple Live Photo.
 
-For ProXDR photos, XDRemux reads the original HDR Gain Map and related metadata and remuxes them into an HDR HEIC that conforms to ISO/TS 21496-1.
+For ProXDR input, XDRemux reads the source Gain Map and related metadata and writes an HDR HEIC for the ISO/TS 21496-1 representation.
 
-For Motion Photos, XDRemux creates an Apple Live Photo resource pair while preserving the HDR still image, the cover-frame presentation timestamp, and the original compressed video and audio samples.
+For Motion Photo input, XDRemux creates an Apple Live Photo HEIC + MOV pair. The normal Live Photo path preserves the HDR still, the cover-frame presentation timestamp (PTS), and compressed video and audio samples.
 
-## Features
+## Main features
 
-| Feature | Usage | Output |
+| Feature | Selection | Output |
 | --- | --- | --- |
-| Standard HDR | Default | ISO/TS 21496-1 HDR HEIC |
-| Motion Photo conversion | Automatic | Apple Live Photo HEIC + MOV |
-| OPPO Gallery compatibility | `--oppo-compatible` | HDR HEIC with a 4:2:0 Gain Map |
-| Apple Photographic Styles | `--apple-photographic-styles` | HEIC with Photographic Styles editing data |
-| Apple Portrait | `--apple-portrait` | HEIC with Apple Photos portrait editing data |
-| Photo classification | `categorize` or `batch --categorize` | Asset and capture-mode folders |
+| Standard HDR | default | ISO/TS 21496-1 HDR HEIC |
+| Motion Photo to Live Photo | automatic | HEIC + MOV |
+| OPPO Gallery compatibility | `--oppo-compatible` | compatibility-oriented HDR HEIC |
+| Apple Photographic Styles | `--apple-photographic-styles` | HEIC with Apple style-editing resources |
+| Apple Portrait | `--apple-portrait` | HEIC with Apple portrait-editing resources |
+| Classification | `categorize` or `batch --categorize` | asset-type and capture-mode directories |
 
-Photographic Styles and Apple Portrait use Apple-specific editing metadata. They are separate from the standard HDR and Live Photo conversion paths.
+Apple-specific editing features have separate support and validation boundaries. See the [Apple features guide](docs/apple-features.en.md).
 
 ## Requirements
 
-The Swift implementation requires:
-
-- macOS 15 or later
-- Swift 6
-
-Clone and build the project:
+The Swift package requires macOS 15 or later and uses Swift tools 6.0.
 
 ```bash
 git clone https://github.com/21Z121Z1/XDRemux.git
 cd XDRemux
 swift build
+swift run xdremux --help
 ```
 
-For normal use, a release build is recommended:
+For CPU-heavy Photographic Styles work:
 
 ```bash
 swift build -c release
 ```
 
-Show the command hierarchy:
+The Python package requires Python 3.11 or later.
 
 ```bash
-swift run xdremux --help
+pip install -e .
+xdremux-py --help
 ```
 
-## HDR conversion
+## Standard HDR conversion
 
-Convert one ProXDR photo:
+Convert one photo:
 
 ```bash
 swift run xdremux convert \
@@ -66,54 +63,42 @@ swift run xdremux batch \
   --output-dir converted/
 ```
 
-The standard path preserves the original encoded image data and reconstructs the HDR Gain Map metadata in the ISO/TS 21496-1 representation.
-
-Source Gain Map characteristics are preserved when the output format supports them. This includes single-channel Gain Maps and high-precision three-channel Gain Maps.
+The standard path preserves source compressed image data when the selected conversion path permits it. The converter writes standardized Gain Map metadata and preserves supported source Gain Map characteristics.
 
 > [!IMPORTANT]
-> A normal HEIC conversion without `--output` can replace the input file. Keep an unmodified copy of important source photos.
+> For normal HDR input, omitting `--output` can target the input file. Keep an unmodified source when the original file is important.
 
 ## Motion Photo to Apple Live Photo
 
-XDRemux automatically detects supported Motion Photos. No additional option is required.
+Motion Photo detection is automatic for supported JPEG and HEIC/HEIF inputs.
 
 ```bash
-swift run xdremux convert \
-  --input IMG_001.jpg
+swift run xdremux convert --input IMG_001.jpg
 ```
 
-The output is an Apple Live Photo resource pair:
+The output pair uses one basename:
 
 ```text
 IMG_001.heic
 IMG_001.mov
 ```
 
-The two files share the Apple Live Photo asset identifier and must remain together.
+The normal Live Photo path preserves:
 
-The conversion preserves the following data:
-
-- HDR still-image data, including the Gain Map
-- The source cover-frame presentation timestamp (PTS)
-- The corresponding Apple `still-image-time`
-- Compressed video samples
-- Compressed audio samples
-- Supported orientation and geometry metadata
-
-The video and audio paths use compressed-sample passthrough. XDRemux does not re-encode these samples during the normal Live Photo remux path.
+- the HDR still and Gain Map when present;
+- the resolved source cover-frame PTS;
+- Apple `still-image-time`;
+- compressed video samples;
+- compressed audio samples when present;
+- supported orientation and geometry metadata.
 
 The source Motion Photo is not modified.
 
-If the destination already contains either member of the requested Live Photo pair, XDRemux selects the next available basename:
+If an implicit output name collides with an existing HEIC/HEIF or companion MOV, XDRemux selects the next available basename such as `IMG_001 (2)`.
 
-```text
-IMG_001 (2).heic
-IMG_001 (2).mov
-```
+If you explicitly set `--output`, XDRemux refuses to overwrite an existing Live Photo output pair.
 
-An explicit `--output` never silently replaces an existing HEIC or its companion MOV.
-
-Batch conversion uses the same automatic detection:
+Batch conversion can contain normal HDR photos and Motion Photos:
 
 ```bash
 swift run xdremux batch \
@@ -121,13 +106,11 @@ swift run xdremux batch \
   --output-dir converted/
 ```
 
-A batch can contain normal HDR photos and Motion Photos. XDRemux selects the applicable conversion path for each input.
+See the [CLI reference](docs/cli.en.md) for batch discovery, checkpoint, and provenance rules.
 
 ## OPPO Gallery compatibility
 
-Some OPPO Gallery versions do not accept high-specification Gain Maps.
-
-Use the compatibility mode when the converted file must remain editable or viewable in OPPO Gallery:
+Use `--oppo-compatible` when the output must use the OPPO compatibility path:
 
 ```bash
 swift run xdremux convert \
@@ -136,9 +119,7 @@ swift run xdremux convert \
   --output IMG_001_oppo.heic
 ```
 
-This mode writes the Gain Map as HEVC Main Still Picture 4:2:0 and preserves the required private metadata when available.
-
-This conversion reduces the Gain Map chroma representation. It is not reversible to the original higher-precision representation.
+This path can reduce Gain Map chroma representation for compatibility. A reduction cannot reconstruct discarded source chroma later.
 
 ## Apple Photographic Styles
 
@@ -149,9 +130,11 @@ swift run xdremux convert \
   --output IMG_001_styles.heic
 ```
 
-XDRemux can generate the metadata and image resources used by the Photographic Styles editing interface in Apple Photos.
+The current default style-data producer is `constrained-solver` when Photographic Styles is enabled.
 
-This is an Apple-specific compatibility feature. Its implementation and validation status are documented separately in [Apple features](docs/apple-features.md).
+The repository also contains research and diagnostic producer paths. They are not the normal default.
+
+See [Apple features](docs/apple-features.en.md) for supported combinations and acceptance limits.
 
 ## Apple Portrait
 
@@ -162,15 +145,13 @@ swift run xdremux convert \
   --output IMG_001_portrait.heic
 ```
 
-When the source photo contains the required portrait resources, XDRemux can convert depth, focus, aperture, and semantic data into a representation that Apple Photos can use for portrait editing.
+The source photo must contain the portrait resources required by the converter.
 
-The available editing functions depend on the data present in the source photo.
-
-See [Apple features](docs/apple-features.md) for the current input requirements and validation boundary.
+See [Apple features](docs/apple-features.en.md) for the current resource and validation boundary.
 
 ## Classification
 
-XDRemux can classify photos without changing their encoded image data:
+Classify without converting:
 
 ```bash
 swift run xdremux categorize \
@@ -178,7 +159,7 @@ swift run xdremux categorize \
   --output-dir categorized/
 ```
 
-Use `--dry-run` to inspect the planned file layout:
+Preview the Swift plan:
 
 ```bash
 swift run xdremux categorize \
@@ -187,62 +168,62 @@ swift run xdremux categorize \
   --dry-run
 ```
 
-The physical layout separates static photos and Live Photos, then groups assets by their primary capture mode.
+A validated Live Photo HEIC and MOV remain one asset during classification.
 
-A validated Live Photo HEIC and MOV remain one asset and move together.
+Batch conversion can classify its outputs with `--categorize`:
 
-Additional properties such as HDR, Gain Map, portrait data, and vendor metadata remain classification tags instead of additional directory levels.
+```bash
+swift run xdremux batch \
+  --input-dir photo_dump/ \
+  --output-dir converted/ \
+  --categorize
+```
+
+Python provides the same classification command family:
+
+```bash
+python3 -m xdremux_py categorize \
+  --input photo_dump/ \
+  --output-dir categorized/
+```
 
 ## Python CLI
 
-The Python implementation supports cross-platform HDR conversion, Motion Photo to Live Photo conversion, and classification.
-
-It does not require Apple frameworks for conversion.
-
-Install the package:
-
-```bash
-pip install -e .
-```
-
-Convert an HDR photo:
+Python supports cross-platform HDR conversion, Motion Photo to Live Photo conversion, and classification.
 
 ```bash
 xdremux-py convert \
   --input IMG_001.heic \
   --output IMG_001_hdr.heic
+
+xdremux-py convert --input IMG_001.jpg
 ```
 
-Convert a Motion Photo:
+Python conversion does not require Apple platform frameworks. macOS Apple frameworks are used by separate compatibility tests where applicable.
 
-```bash
-xdremux-py convert \
-  --input IMG_001.jpg
-```
+Python does not generate Photographic Styles or Apple Portrait data.
 
-The Python Live Photo path preserves the HDR still-image data, cover-frame timing, and compressed media samples.
+See the [CLI reference](docs/cli.en.md) for differences between Swift and Python batch behavior.
 
-Apple platform frameworks are used only by the macOS compatibility tests. They are not runtime dependencies of the Python converter.
+## macOS app
 
-The package can also run directly from the repository:
-
-```bash
-python3 -m xdremux_py --help
-```
-
-## macOS App
-
-Build and run the macOS application:
+Build and run the app:
 
 ```bash
 scripts/build_and_run.sh run
 ```
 
-The application provides the conversion and classification workflows through a graphical interface.
+The app links the Swift package directly.
 
-## Swift Package
+## Swift package
 
-XDRemuxCore and XDRemuxAppleFeatures are available as Swift Package products.
+Public package products are:
+
+- `XDRemuxCore`
+- `XDRemuxAppleFeatures`
+- `xdremux`
+
+Example:
 
 ```swift
 .package(
@@ -251,63 +232,35 @@ XDRemuxCore and XDRemuxAppleFeatures are available as Swift Package products.
 )
 ```
 
-Use `XDRemuxCore` for the standard conversion pipeline:
-
-```swift
-import XDRemuxCore
-
-let input = InputSource(url: inputURL)
-
-let request = ConversionRequest(
-    input: input,
-    output: OutputTarget.file(outputURL).destination(for: input),
-    configuration: ConversionConfiguration()
-)
-
-let result = try ConversionEngine.convert(request)
-```
-
-Apple-specific features are provided by `XDRemuxAppleFeatures`.
+Use `XDRemuxCore` for the standard conversion API and `XDRemuxAppleFeatures` for Apple-specific conversion engines.
 
 ## Validation
 
-XDRemux uses automated structural tests and real-file integration tests.
+The repository uses unit tests, repository policy tests, real Motion Photo fixtures, macOS framework validation, and device validation when a claim requires it.
 
-The Motion Photo test corpus contains multiple JPEG and HEIC/HEIF layouts. The CI pipeline verifies:
+The public Motion Photo corpus is versioned under `fixtures/`. The strict gates verify exact fixture identity and applicable Live Photo contracts such as timing, asset identity, Gain Map preservation, compressed-sample passthrough, and publication safety.
 
-- Source-file integrity
-- Motion Photo resource boundaries
-- Cover-frame timing
-- Live Photo asset identifiers
-- Apple `still-image-time` metadata
-- HDR Gain Map preservation
-- Compressed video sample equality
-- Compressed audio sample equality
-- Live Photo structural validity
-- PhotoKit compatibility on macOS
-
-The downloadable device-validation bundles are generated by the same production conversion engine.
+See the [testing policy](docs/quality/testing.en.md).
 
 ## Documentation
 
-| Document | Description |
+| Document | Purpose |
 | --- | --- |
-| [CLI reference](docs/cli.md) | Commands, options, defaults, and exit behavior |
-| [Apple features](docs/apple-features.md) | Photographic Styles and Apple Portrait |
-| [Supported devices](docs/supported-devices.md) | ProXDR capture compatibility |
-| [Development](docs/development.md) | Package structure and development workflow |
-| [Technical implementation](docs/xdremux/README.md) | HDR, HEIF, Gain Map, and container implementation |
+| [Documentation index](docs/README.en.md) | All current and historical technical documents |
+| [CLI reference](docs/cli.en.md) | Commands, defaults, and output rules |
+| [Apple features](docs/apple-features.en.md) | Photographic Styles and Apple Portrait |
+| [Supported devices](docs/supported-devices.en.md) | ProXDR compatibility boundary |
+| [Development](docs/development.en.md) | Package structure and build workflow |
+| [Testing policy](docs/quality/testing.en.md) | Required verification evidence |
+| [Technical implementation](docs/xdremux/README.en.md) | Current implementation contracts |
+| [Technical writing guide](docs/style-guide.en.md) | Documentation terminology and STE principles |
 
 ## Known limitations
 
-- Application support for ISO/TS 21496-1 HDR varies.
-- HDR rendering can differ between operating systems and image viewers.
-- Editing and saving a converted HDR photo in a vendor gallery can remove standardized HDR metadata.
-- Apple-specific editing metadata depends on the behavior of the Apple Photos version that reads it.
-- A supported device does not guarantee that every photo from that device has the required source metadata.
+- HDR rendering depends on the operating system and viewer.
+- A vendor gallery can remove standardized HDR metadata when it edits and saves a converted file.
+- Apple-specific editing behavior depends on the Apple Photos and framework version.
+- A supported device model does not guarantee that every file contains the data required by every conversion feature.
+- Structural validation does not replace device evidence for a device-dependent claim.
 
-Keep the original photo when the source data is important.
-
-## License
-
-See [LICENSE](LICENSE).
+Keep the original file when source data is important.

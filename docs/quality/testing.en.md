@@ -1,32 +1,64 @@
-# Testing policy
+# Testing Policy
 
 English | [简体中文](testing.md)
 
-What a change has to pass before it counts as done. For how to run the tests, see [Tests/README.md](../../Tests/README.md); for the acceptance flow, see the [validation guide](../validation/README.md).
+A change is complete only when its evidence matches the behavior that changed.
 
-## Four layers
+For commands, see [Tests/README.en.md](../../Tests/README.en.md). For completion-gate plans, see the [validation runbook](../validation/README.en.md).
 
-| Layer | Command | Covers |
+## Evidence layers
+
+| Layer | Typical command or source | What it proves |
 | --- | --- | --- |
-| Unit and contract | `swift test` | Conversion models, HEIF bounds, error text, CLI parsing, Apple feature contracts |
-| Policy | `python3 -m unittest discover -s Tests` | Architecture boundaries, documentation consistency, categorization behaviour, Python tail policy |
-| Real samples | the harnesses in `Tests/validation/` | Run a full conversion on real OPPO photos and assert the result |
-| Acceptance | `scripts/agent_completion_gate.py` | Bind the selected checks to a specific commit and emit a receipt |
+| Unit and contract | `swift test` | Swift model, parser, format, and Apple-feature contracts. |
+| Repository policy | `python3 -m unittest discover -s Tests -v` | Cross-file policy, Python behavior, documentation, and architecture contracts. |
+| Real fixture | `fixtures/` and `Tests/validation/` | Behavior on versioned or supplied real media. |
+| Native framework | macOS validation jobs | ImageIO, PhotoKit, or other tested Apple framework behavior. |
+| Device | manual or recorded real-device validation | Behavior that depends on a specific gallery, Photos version, display, or device. |
+| Completion receipt | `scripts/agent_completion_gate.py` | The selected checks passed for the exact commit. |
 
-The policy tests are purely static — they read source and documentation and assert on it. They never run a conversion. **Do not count a static check as functional evidence.**
+A static policy test is not functional conversion evidence.
 
-## Passing
+A parser test is not a device test.
 
-`swift test` and the Python suites must be green. A change that affects conversion behaviour also needs at least one piece of real-sample evidence; type-checking is not enough.
+A container parser pass is not proof that a gallery renders the result correctly.
 
-## Adding tests
+## Minimum evidence
 
-1. A bug fix needs a regression assertion, and that assertion should fail against the unfixed code.
-2. A change to text users see — error messages, help output, command output — needs an assertion pinning it.
-3. If something cannot be automated, say in the commit message what could not be verified and why.
+Use the smallest complete evidence set.
 
-## Known gaps
+- Documentation-only change: documentation policy and link checks.
+- CLI parser or message change: targeted parser/output regression.
+- HDR or container change: unit tests plus a real conversion or equivalent functional fixture.
+- Motion Photo change: parser/writer tests plus the applicable real Motion Photo fixture gates.
+- Apple feature change: structural tests plus the applicable native-framework or device evidence.
+- App change: app build and the affected model/UI test.
+- Verification-framework change: completion-gate self-tests and a real gate run.
 
-- The strict Samsung/Xiaomi/OPPO/vivo Motion Photo fixtures are versioned under `fixtures/`, so those CI gates do not require a private archive or repository secret. Other legacy ProXDR / Apple-feature regression samples remain separate and may still be private.
-- There is no automated acceptance against Photos on a real device. The import-edit-save-reopen round trip for Apple Photographic Styles and portrait is still manual.
-- How a photo actually displays in OPPO Gallery cannot be verified in CI.
+Every source bug fix should add a regression assertion that would fail for the original defect when that is practical.
+
+## Public Motion Photo fixtures
+
+The repository contains versioned real Motion Photo fixtures under `fixtures/`.
+
+Their exact bytes are part of the test contract. `fixtures/SHA256SUMS` is the identity manifest.
+
+Strict Swift and pure-Python CI gates use these fixtures to test multiple JPEG and HEIC/HEIF Motion Photo layouts.
+
+Do not describe all real samples as private. Some older ProXDR, device-only, and Apple-feature samples can still be external or private.
+
+## Device-dependent claims
+
+A claim about Apple Photos editing, OPPO Gallery display, or another device UI requires evidence from that environment.
+
+If the environment is unavailable, narrow the claim to the behavior that was actually tested.
+
+Do not mark an untested device-dependent claim as passed.
+
+## Documentation is testable behavior
+
+User-visible command names, options, defaults, output-safety rules, and support boundaries are product contracts.
+
+When code changes one of these contracts, update the English and Chinese documentation in the same change.
+
+Current technical documentation follows the [technical writing guide](../style-guide.en.md).

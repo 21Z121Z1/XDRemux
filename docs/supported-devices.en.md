@@ -2,7 +2,11 @@
 
 English | [简体中文](supported-devices.md)
 
-XDRemux targets OPPO, OnePlus, and realme devices that can capture ProXDR HEIC. The table lists mainland China models known to support ProXDR capture; it does not mean every firmware release and camera mode has been independently qualified.
+This document lists device models that are known to capture ProXDR HEIC.
+
+A listed model is not a guarantee for every firmware version, camera mode, or individual file. XDRemux validates the file structure and metadata that the selected conversion path requires.
+
+## Known ProXDR capture models
 
 | Brand or series | Models |
 | --- | --- |
@@ -14,8 +18,42 @@ XDRemux targets OPPO, OnePlus, and realme devices that can capture ProXDR HEIC. 
 | realme Neo series | realme GT Neo6 SE, realme GT Neo6, realme Neo7, realme Neo7 SE, realme Neo7x, realme Neo8 |
 | realme number series | realme 12 Pro, realme 12 Pro+, realme 13 Pro+, realme 13 Pro Supreme Edition, realme 13 Pro, realme 14 Pro+, realme 14 Pro, realme 14, realme 15, realme 15 Pro |
 
-OPPO Find X8 Ultra, the Find X9 series, and realme GT8 Pro in Ricoh mode may use YCbCr 4:4:4 HDR Gain Maps in known implementations.
+This list records known capture support. It is not a code allow-list.
 
-Being listed does not guarantee that every photo contains a convertible Gain Map or Apple Portrait depth resources. Actual capabilities depend on the photo, camera mode, firmware version, and later editing history.
+## Gain Map differences
 
-If a new model produces a ProXDR file that cannot be converted, keep the original and include the error code, system version, and redacted container diagnostics in an issue. Do not publish photos containing personal content.
+Known files can contain different Gain Map layouts.
+
+OPPO Find X8 Ultra, the Find X9 series, and realme GT8 Pro in Ricoh mode can use YCbCr 4:4:4 HDR Gain Maps in known implementations.
+
+Other files can use 4:2:0 or monochrome Gain Maps.
+
+The standard conversion path preserves source Gain Map characteristics when the selected output path supports them. `--oppo-compatible` can reduce the representation to a compatibility form.
+
+Do not infer the Gain Map layout from the phone name alone.
+
+## Motion Photo support
+
+Motion Photo support is capability-based and fixture-tested. It is not controlled by the ProXDR model table above.
+
+A Motion Photo input must contain a still resource, a motion-video resource that the parser can resolve, and the required timing/container information.
+
+The current public fixture set contains multiple Android Motion Photo layouts. See the [fixture guide](../fixtures/README.en.md).
+
+## Apple Portrait support
+
+Apple Portrait conversion requires compatible portrait resources in the individual source photo.
+
+A supported ProXDR model does not imply that every photo contains depth, focus, semantic, or restore-original data.
+
+## Reporting a new file
+
+If a new device or firmware produces a file that XDRemux cannot convert:
+
+1. Keep the original file.
+2. Record the device model, OS version, and camera mode.
+3. Include the exact XDRemux error.
+4. Include redacted container diagnostics when they are sufficient.
+5. Do not publish personal photo content unless you intend to make it public.
+
+A new compatibility claim should have a reproducible file or test. The device model alone is not sufficient evidence.

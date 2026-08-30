@@ -1,100 +1,131 @@
-# Apple Photographic Styles and Portrait
+# Apple Features
 
 English | [简体中文](apple-features.md)
 
-Beyond the standard HDR output, XDRemux can generate the data that makes a photo editable in Apple Photos. Both features are off by default and both are experimental.
+XDRemux has Apple-specific conversion paths for Photographic Styles, Apple Portrait, and Apple Live Photo metadata.
 
-| Feature | What you get |
-| --- | --- |
-| Apple Photographic Styles | Switch styles in Apple Photos and adjust tone, colour, and intensity |
-| Apple portrait | Adjust the blur in Apple Photos, and refocus where the data allows |
-| Both together | HDR, style editing, and portrait editing preserved in one file |
+These paths are separate from the standard ISO HDR path. Some combinations are supported, and some combinations are rejected before output is written.
 
-Everything is computed from your own photo. Nothing is copied from another picture — not the image, not the editing parameters.
+## Platform boundary
 
-## Requirements
+The Swift package requires macOS 15 or later.
 
-- macOS 15 or newer
-- Run a full `swift build` once when working from source
-- `zstd` for Apple portrait (`brew install zstd`)
-- `ultrahdr_app` as well, for JPEG portraits
-- The system must provide Apple's image-analysis capability
+Apple-specific analysis and rendering use Apple platform frameworks and helper processes. The normal cross-platform Python converter does not generate Photographic Styles or Apple Portrait data.
 
-When a capability is missing the conversion fails with a clear error rather than writing an empty placeholder.
+OPPO-compatible HDR output and Apple-specific editing output are mutually exclusive.
 
-## Apple Photographic Styles
+## Photographic Styles
+
+Enable Photographic Styles with:
 
 ```bash
-swift run xdremux convert \
+xdremux convert \
   --apple-photographic-styles \
   --input IMG_001.heic \
   --output IMG_001_styles.heic
 ```
 
-XDRemux analyses the photo's content, brightness, colour, and regions such as people and sky, and generates the data Photographic Styles needs. Only regions actually detected are written.
+When Photographic Styles is enabled and no producer is selected, the CLI uses `constrained-solver`.
 
-The resulting style parameters are checked against how a native iPhone photo responds in the editor. If this photo's response falls outside the range of the native samples, that gets folded into what the solver is optimizing for, and the result is required to be no worse than before the correction. Photos that are already in range take a fast path with a single check at the end.
+The parser also accepts:
 
-This mode keeps the standard HDR output. It cannot be combined with `--oppo-compatible`.
+- `--apple-style-data-producer constrained-solver`
+- `--apple-style-data-producer learn-node`
+- `--apple-style-data-producer identity-fallback`
+- `--apple-styles-raw-dng <file>`
 
-Solving is CPU-heavy. For batches, use a release build: `swift build -c release`, then run `.build/release/xdremux`.
+The producer option and RAW DNG option require `--apple-photographic-styles`.
 
-## Apple portrait
+`learn-node` and `identity-fallback` are diagnostic or research controls. Do not treat them as the normal product default.
+
+A supplied RAW DNG must match the source photo requirements enforced by the pipeline. The conversion rejects an unusable optional RAW input instead of silently applying unrelated RAW data.
+
+### Validation boundary
+
+The Photographic Styles pipeline validates its generated HEIC structure and its Apple style resources with repository validators and native Apple components where the host supports them.
+
+Private Apple interfaces can change between macOS releases. The repository includes runtime ABI checks for the private selectors used by the style-response tools. Unsupported private ABI shapes fail with a compatibility error instead of being invoked with an assumed function signature.
+
+Offline structural validation is not the same as a complete import-edit-save-reopen test on every Apple Photos version. Treat a device-dependent editing claim as device-dependent evidence.
+
+## Apple Portrait
+
+Enable Apple Portrait with:
 
 ```bash
-swift run xdremux convert \
+xdremux convert \
   --apple-portrait \
   --input IMG_001.heic \
   --output IMG_001_portrait.heic
 ```
 
-The source photo must have been shot in portrait mode, with its depth data, focus information, and un-blurred original still present in the file. XDRemux converts those into the form Apple Photos can keep editing, preserving the original focus point and blur strength as far as possible.
+The source must contain the portrait resources required by the conversion pipeline. A normal non-portrait photo does not automatically become a portrait photo.
 
-Ordinary non-portrait photos do not carry that data, so portrait conversion is unavailable for them. A portrait-only batch records them as failures; if Photographic Styles is also enabled, such a photo falls back to styles-only output.
+The conversion can use source depth, focus, aperture, semantic, and restore-original resources when they are present and valid.
 
-Each successful portrait conversion also writes `<output>.portrait-manifest.json` next to the result, recording what the input carried, what the conversion chose, and any warnings. That file does not need to be imported into Apple Photos.
+Supported portrait JPEG inputs are accepted only through the Apple Portrait path. The output is HEIC.
 
-## JPEG portraits
+A successful portrait conversion can emit a portrait manifest next to the output. The manifest records the resources and decisions used by the conversion. It is diagnostic data and is not imported into Apple Photos.
 
-Some OPPO portrait photos are JPEG on the outside. Those are accepted only with `--apple-portrait`, and the output is still HEIC. Batches need it spelled out:
+## Photographic Styles + Apple Portrait
 
-```bash
-swift run xdremux batch \
-  --apple-portrait \
-  --glob '*.jpg' \
-  --input-dir photo_dump/ \
-  --output-dir apple_portraits/
-```
-
-Every other mode — standard HDR, styles alone, OPPO-compatible — still takes HEIC only.
-
-## Enabling both
+Static-photo conversion can enable both options:
 
 ```bash
-swift run xdremux convert \
+xdremux convert \
   --apple-photographic-styles \
   --apple-portrait \
   --input IMG_001.heic \
   --output IMG_001_apple.heic
 ```
 
-This produces a single file. `--oppo-compatible` targets OPPO Gallery and the Apple modes target Apple Photos; they cannot be combined, and the CLI rejects that combination before writing anything.
+When Styles is enabled, the Apple feature engine runs the Photographic Styles pipeline. The Styles pipeline owns the combined Styles + Portrait output contract.
 
-## How far this has been verified
+If a source does not contain the required portrait data, do not assume that a combined request can produce valid portrait editing data.
 
-What has been checked:
+## Motion Photo + Photographic Styles
 
-- The output file reopens.
-- The HDR data and the references to the Apple auxiliary resources parse correctly.
-- The styles and portrait resources pass the repository's own checking tools.
-- The app and the CLI produce the same result for the same request.
+The current Swift CLI has a separate single-file bridge for this combination:
 
-What has **not**: importing the file into Apple Photos on a real device, editing it, saving, quitting, and reopening it to confirm the editing still works. That round trip is manual today and is not claimed as a public pass.
+```bash
+xdremux convert \
+  --apple-photographic-styles \
+  --input IMG_001.jpg \
+  --output IMG_001_apple.heic
+```
 
-That is why the output manifest for these features always records them as not production-ready. Structural checks offline are also not the same as how the photo actually looks on an iPhone, on a Mac, or in OPPO Gallery, and nothing here claims coverage across every model, focal length, or OS version.
+This path first converts the Motion Photo to an Apple Live Photo pair. It then generates Photographic Styles on the Live Photo still and verifies that the Live Photo asset identifier remains valid.
 
-## Research switches
+This combination does not support Apple Portrait in the same pass.
 
-Several `XDREMUX_RESEARCH_*` and `XDREMUX_STYLES_*` environment variables select experimental solver paths. **None of them need to be set.** Setting one marks the output manifest as a research run and excludes it from production judgement. They are listed in the [development guide](development.en.md).
+This combination is not the same as plain Motion Photo conversion. The hosted style-rich path does not use PhotoKit loading as a write gate because some hosted macOS versions do not complete that display-object request for external style-rich HEIC resources. The deterministic Live Photo validator and the Photographic Styles validator remain required before publication.
 
-Implementation and acceptance material: the [technical index](xdremux/README.en.md), the [ISO container audit](xdremux/iso-conformance-audit-20260511.md), and the [validation guide](validation/README.md).
+Plain Motion Photo conversion continues to use its own Live Photo validation path.
+
+## Unsupported combinations
+
+The CLI rejects these combinations:
+
+- Apple features + OPPO-compatible output.
+- Plain Motion Photo + Apple Portrait.
+- Motion Photo + Photographic Styles + Apple Portrait.
+- Style producer selection without `--apple-photographic-styles`.
+- Styles RAW DNG input without `--apple-photographic-styles`.
+
+## Research controls
+
+The repository contains environment variables and optional model paths for style research.
+
+A research control can change solver behavior or validation scope. Do not describe a research result as the default product result unless the default code path uses the same configuration.
+
+The optional `ReverseKey1Ensemble` model is documented in the [model card](../Models/ReverseKey1Ensemble.model-card.en.md).
+
+## Acceptance
+
+Use three separate evidence classes:
+
+1. Structural evidence proves that the HEIF resources and metadata are present and parseable.
+2. Native framework evidence proves that the tested macOS framework accepts the generated resources.
+3. Device evidence proves behavior in a specific Apple Photos version on a real device.
+
+Do not replace device evidence with structural evidence when the product claim is about interactive Apple Photos editing.
