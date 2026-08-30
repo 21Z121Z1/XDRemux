@@ -68,12 +68,22 @@ enum MotionPhotoCLIIntegration {
                 inputRootURL: inputURL.deletingLastPathComponent(),
                 outputDirectoryURL: inputURL.deletingLastPathComponent(),
                 reservedPaths: &reserved,
-                // Single-file conversion historically replaces its deterministic output on rerun.
-                // Ignore unrelated pre-existing outputs here; only protect the source path itself.
-                fileExists: { _ in false }
+                // Treat any existing HEIC or companion MOV as a collision. Single-file
+                // conversion must never infer ownership of an unrelated destination resource.
+                fileExists: { FileManager.default.fileExists(atPath: $0.path) }
             )
         }
         try validateLivePhotoOutputExtension(outputImageURL)
+        if outputWasExplicit {
+            let outputVideoURL = AppleLivePhotoConversionEngine.companionVideoURL(for: outputImageURL)
+            if FileManager.default.fileExists(atPath: outputImageURL.path)
+                || FileManager.default.fileExists(atPath: outputVideoURL.path) {
+                throw CLIError.invalidValue(
+                    option: "--output",
+                    value: "target HEIC/MOV already exists; refusing to overwrite an output pair with unknown provenance"
+                )
+            }
+        }
 
         let result = try AppleLivePhotoConversionEngine.convert(
             inputURL: inputURL,

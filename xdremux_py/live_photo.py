@@ -51,12 +51,24 @@ def is_motion_photo(path: Path) -> bool:
 
 
 def default_output_image(input_path: Path) -> Path:
-    """Preserve the user's basename; only avoid overwriting a same-path HEIC source."""
+    """Preserve the basename while never claiming an existing HEIC/MOV namespace."""
     input_path = Path(input_path)
-    output = input_path.with_suffix(".heic")
-    if output.resolve() == input_path.resolve():
-        return output.with_name(f"{output.stem} (2){output.suffix}")
-    return output
+    base = input_path.with_suffix(".heic")
+    sequence = 1
+    while True:
+        candidate = (
+            base
+            if sequence == 1
+            else base.with_name(f"{base.stem} ({sequence}){base.suffix}")
+        )
+        video = companion_video_path(candidate)
+        if (
+            candidate.resolve() != input_path.resolve()
+            and not candidate.exists()
+            and not video.exists()
+        ):
+            return candidate
+        sequence += 1
 
 
 def companion_video_path(image_path: Path) -> Path:
@@ -116,12 +128,18 @@ def convert_motion_photo(input_path: Path, output_image: Path | None = None) -> 
     if asset is None:
         raise LivePhotoConversionError("input is not a supported Motion Photo")
 
-    output_image = Path(output_image) if output_image is not None else default_output_image(input_path)
+    output_was_explicit = output_image is not None
+    output_image = Path(output_image) if output_was_explicit else default_output_image(input_path)
     if output_image.suffix.lower() not in {".heic", ".heif"}:
         raise LivePhotoConversionError("Live Photo still output must use .heic or .heif")
     if output_image.resolve() == input_path.resolve():
         raise LivePhotoConversionError("Motion Photo conversion never overwrites the source image")
     output_video = companion_video_path(output_image)
+    if output_was_explicit and (output_image.exists() or output_video.exists()):
+        raise LivePhotoConversionError(
+            "explicit Live Photo output HEIC/MOV already exists; "
+            "refusing to overwrite an output pair with unknown provenance"
+        )
     output_directory = output_image.parent
     output_directory.mkdir(parents=True, exist_ok=True)
 
