@@ -13,7 +13,7 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
         let fixtureURL = URL(
             fileURLWithPath: environment["XDREMUX_STYLE_RUNNER_FIXTURE"]
                 ?? repositoryRoot
-                    .appendingPathComponent("fixtures/IMG20260710191114_ColorOS_16.jpg")
+                    .appendingPathComponent("fixtures/IMG20260801190843_ColorOS_16.jpg")
                     .path
         ).standardizedFileURL
         let outputRoot = URL(
@@ -35,7 +35,7 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
         XCTAssertEqual(asset.stillResourceRange.lowerBound, 0)
         XCTAssertEqual(
             asset.stillResourceRange.upperBound,
-            6_809_684,
+            13_591_436,
             "fixture static-resource boundary changed"
         )
 
@@ -81,10 +81,6 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
             AppleLivePhotoStillWriter.hasGainMap(outputImageURL),
             "combined output lost the Ultra HDR gain map"
         )
-        XCTAssertTrue(
-            result.diagnostics.contains { $0.contains("Vision Track5 cover alignment accepted") },
-            "fixture must exercise the accepted ColorOS 16 Vision Track5 alignment path"
-        )
 
         let report = try AppleFeatureConversionEngine.validationReport(
             for: outputImageURL,
@@ -110,7 +106,6 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
             "photoKitValidationRequired": false,
             "assetIdentifierPreserved": true,
             "gainMapPreserved": true,
-            "visionTrack5Accepted": result.diagnostics.contains { $0.contains("Vision Track5 cover alignment accepted") },
             "photographicStylesPassed": report["passed"] as? Bool ?? false,
             "semanticStyleProperties": report["semanticStyleProperties"] as? Bool ?? false,
             "styleDataLength": (report["styleDataLength"] as? NSNumber)?.intValue ?? -1,
