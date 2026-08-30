@@ -1,148 +1,157 @@
-# XDRemux Development and Builds
+# Development and Builds
 
 English | [简体中文](development.md)
 
-For people changing the converter, integrating the Swift package, or building the macOS app. For ordinary conversion use, see the [CLI reference](cli.en.md).
+Use this document when you change XDRemux, integrate its Swift package, or build the macOS app.
 
-## Environment
+For command-line use, see the [CLI reference](cli.en.md).
 
-- macOS 15 or newer
-- Swift 6 toolchain
-- Xcode, to build the macOS app
-- `zstd` for the Apple portrait feature (`brew install zstd`)
+## Toolchain
 
-## Swift package products
+The package manifest sets:
 
-| Product | Kind | Purpose |
-| --- | --- | --- |
-| `XDRemuxCore` | Library | The conversion core: HDR, HEIF, metadata, batch, output validation |
-| `XDRemuxAppleFeatures` | Library | Apple semantic analysis, Photographic Styles, portrait |
-| `xdremux` | Executable | The command-line tool |
+- Swift tools version 6.0;
+- minimum platform macOS 15;
+- package default localization `en`.
+
+The package currently uses Swift language mode 5 for its targets.
+
+Build and test:
 
 ```bash
 swift build
 swift test
-swift run xdremux --help
+python3 -m unittest discover -s Tests -v
 ```
 
-The CoreImage RAW probe remains available as a developer target, but is no longer vended as a public Swift package product. Build it explicitly when needed:
+## Swift package products
+
+| Product | Type | Purpose |
+| --- | --- | --- |
+| `XDRemuxCore` | library | HDR conversion, HEIF/ISO-BMFF work, metadata, Motion Photo parsing, classification, and shared validation. |
+| `XDRemuxAppleFeatures` | library | Apple Live Photo, Photographic Styles, Apple Portrait, and Apple-specific analysis. |
+| `xdremux` | executable | Swift command-line interface. |
+
+`CoreImageRAWDiagnostics` is a developer-only executable target. It is not a public package product.
+
+Build it with:
 
 ```bash
 swift build --target CoreImageRAWDiagnostics
 ```
 
-Its entry source is `Sources/CoreImageRAWDiagnostics/main.swift`; its argument contract is `DNG_DIRECTORY OUTPUT_DIRECTORY [MAX_SIZE]`.
+## Package integration
 
-## Integrating into your own project
+Add the repository as a package dependency:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/21Z121Z1/XDRemux.git", branch: "main")
+    .package(
+        url: "https://github.com/21Z121Z1/XDRemux.git",
+        branch: "main"
+    )
 ]
 ```
 
-Depend on `XDRemuxCore` or `XDRemuxAppleFeatures` as needed:
+Use `XDRemuxCore` when you need the standard conversion pipeline.
 
 ```swift
 import XDRemuxCore
 
 let input = InputSource(url: inputURL)
-var configuration = ConversionConfiguration()
-configuration.eventHandler = { event in
-    // Route structured events into your own logging or UI.
-}
-
-let result = try ConversionEngine.convert(
-    ConversionRequest(
-        input: input,
-        output: OutputTarget.file(outputURL).destination(for: input),
-        configuration: configuration
-    )
+let request = ConversionRequest(
+    input: input,
+    output: OutputTarget.file(outputURL).destination(for: input),
+    configuration: ConversionConfiguration()
 )
+
+let result = try ConversionEngine.convert(request)
 ```
 
-Apple features are configured through `configuration.appleFeatureOptions` and run through `AppleFeatureConversionEngine`.
+Use `XDRemuxAppleFeatures` for Apple-specific conversion engines.
 
-`XDRemuxCore` stays out of terminals, ANSI, localization, SwiftUI, and CI output — callers receive stages, warnings, and results as `ConversionEvent` values.
-
-There is no stable tag yet, so tracking `main` means accepting API changes.
-
-## Helpers compiled at runtime
-
-The Vision analysis, HEVC encoding, and style-property probing inside the Apple features run in separate processes. Their sources ship as package resources and are **compiled on first use**: `AppleNativeToolchain` hashes the source, calls `/usr/bin/xcrun` to build into the user cache directory, and reuses that build for identical sources afterwards.
-
-Two consequences:
-
-- The first run of an Apple feature pays a one-time compile; later runs do not.
-- The cache directory is shared machine-wide, so a build is published through a temporary file and an atomic rename. Two XDRemux processes starting at once cannot read a half-written binary.
-
-Every helper invocation is bounded by a timeout. Helper stdout carries only a versioned machine protocol; diagnostics go to stderr.
-
-## macOS app
-
-The app lives in `apps/macos/XDRemuxApp/` and links the Swift package directly rather than shelling out to the CLI — `Tests/test_swift_app_architecture.py` enforces that.
-
-```bash
-scripts/build_and_run.sh run      # build and launch
-scripts/build_and_run.sh build    # build only
-scripts/build_and_run.sh debug    # build the Debug configuration
-scripts/build_and_run.sh verify   # swift build + swift test + the Python suites
-scripts/build_and_run.sh logs     # show the last build log
-scripts/build_and_run.sh clean    # remove DerivedData
-```
-
-Everything except an explicit `debug` builds Release: solving for Photographic Styles is CPU-heavy and a debug build is several times slower.
+There is no stable release tag contract in the current package documentation. A dependency on `main` can receive API changes.
 
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `Package.swift` | SwiftPM products and targets |
-| `Sources/XDRemuxCore/` | Conversion core |
-| `Sources/XDRemuxAppleFeatures/` | Apple-specific features |
-| `Sources/XDRemuxCLI/` | Command-line parsing and entry point |
-| `Sources/CoreImageRAWDiagnostics/` | Developer-only RAW diagnostics target |
-| `apps/macos/XDRemuxApp/` | macOS SwiftUI app |
-| `xdremux_py/` | Cross-platform Python CLI implementation and repository-local module entry point |
-| `Tests/` | Swift tests, Python policy suites, validation harnesses |
-| `scripts/` | Build and acceptance scripts |
+| `Sources/XDRemuxCore/` | Core conversion and format logic. |
+| `Sources/XDRemuxAppleFeatures/` | Apple-specific conversion and validation. |
+| `Sources/XDRemuxCLI/` | Swift CLI parser and command routing. |
+| `Sources/CoreImageRAWDiagnostics/` | Developer RAW diagnostic target. |
+| `xdremux_py/` | Cross-platform Python implementation. |
+| `apps/macos/XDRemuxApp/` | macOS SwiftUI app. |
+| `Tests/` | Swift tests, Python policy tests, and validation harnesses. |
+| `fixtures/` | Versioned real Motion Photo fixtures used by strict CI gates. |
+| `scripts/` | Build, evaluation, and acceptance utilities. |
+| `docs/` | Current documentation and historical validation records. |
+| `Models/` | Optional research models and model documentation. |
 
-The Swift CLI has a single maintained entry point: the SwiftPM `xdremux` executable. Repository validation builds and invokes that product directly instead of maintaining a separate one-file Swift forwarding script. The Python CLI likewise has only the `xdremux-py` installed command and `python3 -m xdremux_py`, both owned by the same package.
+## Apple helper processes
 
-## Debugging environment variables
+Some Apple-feature operations compile or run helper programs from package resources.
 
-None of these are needed for normal use.
+The helper toolchain hashes source content and caches compatible built tools. The implementation uses bounded helper invocations and separates machine-readable stdout from diagnostics where the helper protocol requires it.
 
-| Variable | Effect |
-| --- | --- |
-| `XDREMUX_DISABLE_DIRECT_GAIN=1` | Disable the one-pass direct gain-map encoder |
-| `XDREMUX_KEEP_GAIN_SCRATCH=1` | Keep gain-map intermediates |
-| `XDREMUX_KEEP_PORTRAIT_SCRATCH=1` | Keep portrait conversion intermediates |
-| `XDREMUX_ENCODING_AUDIT_DIR=<dir>` | Write encoding audit data to a directory |
-| `XDREMUX_STYLE_RENDER_JOBS=<n>` | Cap Photographic Styles render concurrency |
+Private Apple API compatibility must be checked at runtime. Do not call a private Objective-C selector with an assumed ABI when the runtime method signature does not match a supported form.
 
-Photographic Styles also has several `XDREMUX_RESEARCH_*` and `XDREMUX_STYLES_*` switches. They mark the output manifest as a research run and exclude it from production judgement — see the [Apple features guide](apple-features.en.md).
+The macOS 27 compatibility path in the style-response helper checks known initializer and style-apply ABI shapes before calling them.
 
-## Acceptance rules
+## macOS app
 
-Before calling a change done, run the completion gate against the final commit:
+The app is in `apps/macos/XDRemuxApp/`.
+
+Common commands:
 
 ```bash
-python3 scripts/agent_completion_gate.py run \
-  --base origin/main \
-  --plan /tmp/xdremux-agent-verification.json
-
-python3 scripts/agent_completion_gate.py verify \
-  .codex/verification-receipts/$(git rev-parse HEAD).json
+scripts/build_and_run.sh run
+scripts/build_and_run.sh build
+scripts/build_and_run.sh debug
+scripts/build_and_run.sh verify
+scripts/build_and_run.sh logs
+scripts/build_and_run.sh clean
 ```
 
-The receipt binds to the current HEAD, the base commit, the changed-file set, and a clean worktree. Any later commit or edit invalidates it.
+The app links the Swift package. It does not use the CLI as a subprocess for core conversion.
 
-Pick evidence to match the change; do not run a full real-photo matrix for a one-line documentation edit:
+## Python package
 
-- Documentation only: link, command-example, and documentation-policy checks.
-- CLI parsing: the matching option and output regressions.
-- Conversion core: unit tests plus functional verification on real samples.
-- App or helpers: build, run, or device evidence.
+The Python package requires Python 3.11 or newer.
 
-The plan schema and evidence requirements are in the [validation guide](validation/README.md); reusable harnesses live in `Tests/validation/`.
+Runtime dependencies include:
+
+- `pillow-heif`;
+- `Pillow`;
+- `numpy`;
+- `piexif`.
+
+The optional `training` dependency adds PyTorch.
+
+The installed console command is `xdremux-py`. The repository-local entry point is `python3 -m xdremux_py`.
+
+## Debug and research controls
+
+Environment variables exist for encoding diagnostics, scratch retention, style rendering, and research model selection.
+
+Do not add a research environment variable to a normal user command unless the product behavior requires it.
+
+Do not document a research switch as a stable public interface unless tests and the current product path depend on it.
+
+The optional Reverse Key 1 model has a separate [model card](../Models/ReverseKey1Ensemble.model-card.en.md).
+
+## Completion gate
+
+Repository agents must validate the exact committed `HEAD` before they claim completion.
+
+The acceptance runbook is in [validation/README.en.md](validation/README.en.md).
+
+Use targeted evidence. A documentation-only change does not need the full real-photo matrix. A conversion-core change needs functional evidence in addition to static checks.
+
+The completion receipt is bound to the commit, base commit, changed paths, and clean worktree. A later tracked edit invalidates the receipt.
+
+## Documentation changes
+
+Current technical documentation follows the [technical writing guide](style-guide.en.md).
+
+When a code change alters a documented command, output rule, format contract, or acceptance boundary, update the English document first and then update its Chinese translation.

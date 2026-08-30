@@ -2,55 +2,52 @@
 
 [English](README.en.md) | 简体中文
 
-XDRemux 将厂商私有的 HDR 照片和 Android 实况照片转换为兼容标准 HDR 显示和 Apple Photos 的格式。
+XDRemux 将厂商 HDR 照片转换为标准 HDR HEIC，并把支持的 Android Motion Photo 转换为 Apple Live Photo。
 
-对于 ProXDR 照片，XDRemux 会读取原始 HDR Gain Map 及相关元数据，并将其重新封装为符合 ISO/TS 21496-1 的 HDR HEIC。
+对于 ProXDR 输入，XDRemux 读取源 Gain Map 和相关 metadata，并写出采用 ISO/TS 21496-1 表示的 HDR HEIC。
 
-对于实况照片，XDRemux 会生成 Apple Live Photo 资源对，同时保留 HDR 静态照片、封面帧的呈现时间戳以及原始压缩视频和音频数据。
+对于 Motion Photo 输入，XDRemux 生成 Apple Live Photo HEIC + MOV 资源对。正常 Live Photo 链路保留 HDR 静态照片、封面帧呈现时间戳（PTS）以及压缩视频和音频样本。
 
-## 功能
+## 主要功能
 
-| 功能 | 用法 | 输出 |
+| 功能 | 选择方式 | 输出 |
 | --- | --- | --- |
 | 标准 HDR | 默认 | ISO/TS 21496-1 HDR HEIC |
-| 实况照片转换 | 自动识别 | Apple Live Photo HEIC + MOV |
-| OPPO 相册兼容 | `--oppo-compatible` | 使用 4:2:0 Gain Map 的 HDR HEIC |
-| Apple 摄影风格 | `--apple-photographic-styles` | 包含摄影风格编辑数据的 HEIC |
-| Apple 人像 | `--apple-portrait` | 包含 Apple Photos 人像编辑数据的 HEIC |
-| 照片分类 | `categorize` 或 `batch --categorize` | 按资产类型和拍摄模式分类 |
+| Motion Photo → Live Photo | 自动识别 | HEIC + MOV |
+| OPPO 相册兼容 | `--oppo-compatible` | 兼容性 HDR HEIC |
+| Apple 摄影风格 | `--apple-photographic-styles` | 包含 Apple 风格编辑资源的 HEIC |
+| Apple 人像 | `--apple-portrait` | 包含 Apple 人像编辑资源的 HEIC |
+| 分类 | `categorize` 或 `batch --categorize` | 按资产类型和拍摄模式分类 |
 
-摄影风格和 Apple 人像使用 Apple 特有的编辑元数据。它们与标准 HDR 和 Live Photo 转换链路相互独立。
+Apple 特有编辑功能有独立的支持和验证边界。见 [Apple 功能文档](docs/apple-features.md)。
 
 ## 环境要求
 
-Swift 版本需要：
-
-- macOS 15 或更高版本
-- Swift 6
-
-克隆并构建项目：
+Swift package 需要 macOS 15 或更高版本，使用 Swift tools 6.0。
 
 ```bash
 git clone https://github.com/21Z121Z1/XDRemux.git
 cd XDRemux
 swift build
+swift run xdremux --help
 ```
 
-正常使用建议构建 Release 版本：
+进行 CPU 开销较大的摄影风格工作时：
 
 ```bash
 swift build -c release
 ```
 
-查看命令结构：
+Python package 需要 Python 3.11 或更高版本。
 
 ```bash
-swift run xdremux --help
+pip install -e .
+xdremux-py --help
 ```
 
-## HDR 转换
+## 标准 HDR 转换
 
-转换单张 ProXDR 照片：
+转换单张照片：
 
 ```bash
 swift run xdremux convert \
@@ -58,7 +55,7 @@ swift run xdremux convert \
   --output IMG_001_hdr.heic
 ```
 
-转换整个目录：
+转换目录：
 
 ```bash
 swift run xdremux batch \
@@ -66,54 +63,42 @@ swift run xdremux batch \
   --output-dir converted/
 ```
 
-标准转换链路保留原始编码图像数据，并将 HDR Gain Map 元数据重建为 ISO/TS 21496-1 表示。
-
-在输出格式支持的情况下，XDRemux 会保留源 Gain Map 的特征，包括单通道 Gain Map 和高精度三通道 Gain Map。
+所选转换链路允许时，标准链路会保留源压缩图像数据。转换器写入标准 Gain Map metadata，并保留输出链路支持的源 Gain Map 特征。
 
 > [!IMPORTANT]
-> 普通 HEIC 转换如果没有指定 `--output`，可能会替换输入文件。对于重要照片，请保留未经修改的原片。
+> 对普通 HDR 输入，如果没有 `--output`，目标可能就是输入文件。原文件重要时请保留未经修改的源文件。
 
-## 实况照片转换为 Apple Live Photo
+## Motion Photo 转换为 Apple Live Photo
 
-XDRemux 会自动识别支持的 Motion Photo，不需要额外参数。
+对于支持的 JPEG 和 HEIC/HEIF 输入，Motion Photo 会被自动识别。
 
 ```bash
-swift run xdremux convert \
-  --input IMG_001.jpg
+swift run xdremux convert --input IMG_001.jpg
 ```
 
-转换结果是一组 Apple Live Photo 资源：
+输出资源对使用同一个 basename：
 
 ```text
 IMG_001.heic
 IMG_001.mov
 ```
 
-两个文件共享同一个 Apple Live Photo 资产标识，必须作为一组保存。
+正常 Live Photo 链路保留：
 
-转换会保留：
-
-- HDR 静态照片数据，包括 Gain Map
-- 源文件封面帧的呈现时间戳（PTS）
-- 对应的 Apple `still-image-time`
-- 压缩视频样本
-- 压缩音频样本
-- 支持的方向和几何元数据
-
-视频和音频链路使用压缩样本透传。正常 Live Photo 重封装过程中，XDRemux 不会重新编码这些样本。
+- 源文件存在时的 HDR 静态照片和 Gain Map；
+- 解析得到的源 cover-frame PTS；
+- Apple `still-image-time`；
+- 压缩视频样本；
+- 源文件存在时的压缩音频样本；
+- 支持的方向和几何 metadata。
 
 源 Motion Photo 不会被修改。
 
-如果目标位置已经存在对应名称的 HEIC 或 MOV，XDRemux 会选择下一个可用文件名：
+隐式输出名称与已有 HEIC/HEIF 或配套 MOV 冲突时，XDRemux 会选择下一个可用 basename，例如 `IMG_001 (2)`。
 
-```text
-IMG_001 (2).heic
-IMG_001 (2).mov
-```
+显式设置 `--output` 时，XDRemux 拒绝覆盖已有 Live Photo 输出资源对。
 
-如果显式指定 `--output`，XDRemux 不会静默覆盖已经存在的 HEIC 或配套 MOV。
-
-批量转换同样会自动识别：
+batch 可以同时包含普通 HDR 照片和 Motion Photo：
 
 ```bash
 swift run xdremux batch \
@@ -121,13 +106,11 @@ swift run xdremux batch \
   --output-dir converted/
 ```
 
-同一个批次可以同时包含普通 HDR 照片和实况照片。XDRemux 会根据每个输入文件自动选择对应的转换链路。
+batch discovery、checkpoint 和 provenance 规则见 [CLI 参考](docs/cli.md)。
 
-## OPPO 相册兼容模式
+## OPPO 相册兼容
 
-部分 OPPO 相册版本不能正确处理高规格 Gain Map。
-
-如果转换后的照片还需要在 OPPO 相册中查看或编辑，可以使用兼容模式：
+输出需要进入 OPPO 兼容链路时使用 `--oppo-compatible`：
 
 ```bash
 swift run xdremux convert \
@@ -136,9 +119,7 @@ swift run xdremux convert \
   --output IMG_001_oppo.heic
 ```
 
-该模式将 Gain Map 写为 HEVC Main Still Picture 4:2:0，并在存在相关数据时保留所需的私有元数据。
-
-这个过程会降低 Gain Map 的色度表示精度，无法再恢复为原始的高精度表示。
+这条链路可能为了兼容性降低 Gain Map 色度表示。已经丢弃的源色度无法在之后恢复。
 
 ## Apple 摄影风格
 
@@ -149,9 +130,11 @@ swift run xdremux convert \
   --output IMG_001_styles.heic
 ```
 
-XDRemux 可以生成 Apple Photos 摄影风格编辑界面所使用的元数据和图像资源。
+启用摄影风格时，当前默认 style-data producer 是 `constrained-solver`。
 
-这是 Apple 特有的兼容功能。具体实现和当前验证状态见 [Apple 功能](docs/apple-features.md)。
+仓库还包含研究和诊断 producer，它们不是正常默认路径。
+
+支持的组合和验收边界见 [Apple 功能](docs/apple-features.md)。
 
 ## Apple 人像
 
@@ -162,15 +145,13 @@ swift run xdremux convert \
   --output IMG_001_portrait.heic
 ```
 
-如果源照片包含所需的人像资源，XDRemux 可以将景深、焦点、光圈和语义数据转换为 Apple Photos 可以用于人像编辑的表示。
+源照片必须包含转换器要求的人像资源。
 
-最终可以使用哪些编辑功能，取决于源照片实际保存的数据。
+当前资源和验证边界见 [Apple 功能](docs/apple-features.md)。
 
-当前输入要求和验证边界见 [Apple 功能](docs/apple-features.md)。
+## 分类
 
-## 照片分类
-
-XDRemux 可以在不修改编码图像数据的情况下对照片进行分类：
+只分类，不转换：
 
 ```bash
 swift run xdremux categorize \
@@ -178,7 +159,7 @@ swift run xdremux categorize \
   --output-dir categorized/
 ```
 
-使用 `--dry-run` 可以先查看计划生成的目录：
+预览 Swift 计划：
 
 ```bash
 swift run xdremux categorize \
@@ -187,62 +168,62 @@ swift run xdremux categorize \
   --dry-run
 ```
 
-物理目录首先区分静态照片和 Live Photo，然后按主要拍摄模式分类。
+通过验证的 Live Photo HEIC 和 MOV 在分类时始终作为一个资产一起移动。
 
-通过验证的 Live Photo HEIC 和 MOV 始终作为同一个资产一起移动。
+batch 转换可以用 `--categorize` 对输出分类：
 
-HDR、Gain Map、人像数据和厂商元数据等其他属性作为分类标签保留，不继续增加物理目录层级。
+```bash
+swift run xdremux batch \
+  --input-dir photo_dump/ \
+  --output-dir converted/ \
+  --categorize
+```
+
+Python 提供相同的分类命令族：
+
+```bash
+python3 -m xdremux_py categorize \
+  --input photo_dump/ \
+  --output-dir categorized/
+```
 
 ## Python CLI
 
-Python 版本支持跨平台 HDR 转换、Motion Photo → Live Photo 转换和照片分类。
-
-转换过程不依赖 Apple 平台框架。
-
-安装：
-
-```bash
-pip install -e .
-```
-
-转换 HDR 照片：
+Python 支持跨平台 HDR 转换、Motion Photo → Live Photo 和分类。
 
 ```bash
 xdremux-py convert \
   --input IMG_001.heic \
   --output IMG_001_hdr.heic
+
+xdremux-py convert --input IMG_001.jpg
 ```
 
-转换实况照片：
+Python 转换不依赖 Apple 平台 framework。适用时，macOS Apple framework 只用于独立兼容性测试。
 
-```bash
-xdremux-py convert \
-  --input IMG_001.jpg
-```
+Python 不生成摄影风格或 Apple 人像数据。
 
-Python Live Photo 链路同样保留 HDR 静态照片数据、封面时间信息和压缩媒体样本。
-
-Apple 平台框架只用于 macOS 上的独立兼容性测试，不是 Python 转换器的运行时依赖。
-
-也可以直接从仓库运行：
-
-```bash
-python3 -m xdremux_py --help
-```
+Swift 和 Python batch 的差异见 [CLI 参考](docs/cli.md)。
 
 ## macOS App
 
-构建并运行 macOS 应用：
+构建并运行 App：
 
 ```bash
 scripts/build_and_run.sh run
 ```
 
-图形界面提供照片转换和分类功能。
+App 直接链接 Swift package。
 
 ## Swift Package
 
-`XDRemuxCore` 和 `XDRemuxAppleFeatures` 可以作为 Swift Package 产品使用。
+公开 package product：
+
+- `XDRemuxCore`
+- `XDRemuxAppleFeatures`
+- `xdremux`
+
+示例：
 
 ```swift
 .package(
@@ -251,63 +232,35 @@ scripts/build_and_run.sh run
 )
 ```
 
-标准转换链路使用 `XDRemuxCore`：
-
-```swift
-import XDRemuxCore
-
-let input = InputSource(url: inputURL)
-
-let request = ConversionRequest(
-    input: input,
-    output: OutputTarget.file(outputURL).destination(for: input),
-    configuration: ConversionConfiguration()
-)
-
-let result = try ConversionEngine.convert(request)
-```
-
-Apple 特有功能位于 `XDRemuxAppleFeatures`。
+标准转换 API 使用 `XDRemuxCore`，Apple 特有转换引擎使用 `XDRemuxAppleFeatures`。
 
 ## 验证
 
-XDRemux 使用自动化结构测试和真实文件集成测试。
+仓库使用 unit test、仓库 policy test、真实 Motion Photo fixture、macOS framework 验证，以及在产品结论需要时使用真机验证。
 
-Motion Photo 测试集包含多种 JPEG 和 HEIC/HEIF 文件结构。CI 会验证：
+公开 Motion Photo corpus 版本化保存在 `fixtures/`。strict gate 会检查准确 fixture identity，以及适用的 Live Photo timing、asset identity、Gain Map 保留、压缩样本透传和 publication safety 契约。
 
-- 源文件完整性
-- Motion Photo 资源边界
-- 封面帧时间
-- Live Photo 资产标识
-- Apple `still-image-time` 元数据
-- HDR Gain Map 保留
-- 压缩视频样本一致性
-- 压缩音频样本一致性
-- Live Photo 文件结构
-- macOS PhotoKit 兼容性
-
-用于真机测试的 Live Photo 文件包也由同一套正式转换引擎生成。
+见[测试政策](docs/quality/testing.md)。
 
 ## 文档
 
-| 文档 | 内容 |
+| 文档 | 用途 |
 | --- | --- |
-| [CLI 参考](docs/cli.md) | 命令、参数、默认值和退出行为 |
+| [文档索引](docs/README.md) | 全部当前和历史技术文档 |
+| [CLI 参考](docs/cli.md) | 命令、默认值和输出规则 |
 | [Apple 功能](docs/apple-features.md) | 摄影风格和 Apple 人像 |
-| [支持设备](docs/supported-devices.md) | ProXDR 拍摄兼容性 |
-| [开发文档](docs/development.md) | Package 结构和开发流程 |
-| [技术实现](docs/xdremux/README.md) | HDR、HEIF、Gain Map 和容器实现 |
+| [支持设备](docs/supported-devices.md) | ProXDR 兼容性边界 |
+| [开发文档](docs/development.md) | Package 结构和构建流程 |
+| [测试政策](docs/quality/testing.md) | 必需验证证据 |
+| [技术实现](docs/xdremux/README.md) | 当前实现契约 |
+| [技术写作规范](docs/style-guide.md) | 文档术语和 STE 原则 |
 
 ## 已知限制
 
-- 不同应用对 ISO/TS 21496-1 HDR 的支持程度不同。
-- 不同操作系统和图像查看器的 HDR 呈现可能不同。
-- 转换后的 HDR 照片如果再次在厂商相册中编辑并保存，标准 HDR 元数据可能会被移除。
-- Apple 特有编辑元数据的实际行为取决于读取它的 Apple Photos 版本。
-- 设备本身受支持，不代表该设备拍摄的每张照片都包含转换所需的源数据。
+- HDR 呈现取决于操作系统和查看器。
+- 厂商相册编辑并保存转换文件时可能移除标准 HDR metadata。
+- Apple 特有编辑行为取决于 Apple Photos 和 framework 版本。
+- 设备型号受支持，不代表每个文件都包含所有转换功能需要的数据。
+- 结构验证不能替代依赖设备结论所需的 device evidence。
 
-如果源数据很重要，请保留原始照片。
-
-## 许可证
-
-见 [LICENSE](LICENSE)。
+源数据重要时，请保留原始文件。

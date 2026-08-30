@@ -1,48 +1,76 @@
-# 输出规范
+# CLI 输出政策
 
 [English](logging.en.md) | 简体中文
 
-规定 XDRemux 往终端写什么、写到哪里。用户视角的命令输出见 [CLI 参考](../cli.md)。
+本文档定义当前命令输出契约。
 
-## 现状
+命令参数见 [CLI 参考](../cli.md)。
 
-CLI 只输出人类可读的文本，没有 JSON 事件流，也没有 `--quiet` / `--verbose` / `--format` 这类开关。
+## 面向人的输出
 
-- 进度和结果写 **stdout**：`converted X -> Y`、`skipped X (output already up to date)`、`batch complete: N converted, N skipped, N failed -> <dir>`。
-- 错误和诊断提示写 **stderr**，统一带 `error:` 前缀。
-- 退出码只有 `0`（成功）和 `1`（任何错误）。
+普通 Swift 和 Python 转换命令输出面向人的进度信息。
 
-`validate-apple`、`validate-portrait` 和 `portrait-self-test` 例外：它们往 stdout 写 JSON，可以直接重定向到文件。
+正常进度和结果写到 stdout。
 
-## 错误文案
+错误写到 stderr。
 
-`XDRemuxError` 有两种呈现：
+除非 CLI 契约明确增加新的协议，否则不要再添加第二套通用日志协议。
 
-- `description` 是完整形式，可以多行，用于单文件 `convert` —— 第一行说发生了什么，后面解释原因和下一步。
-- `headline` 是单行形式，用于批量列表，保证一个文件一行。
+## 机器可读命令
 
-写新的错误信息时：**先说用户能理解的事实，再给技术细节。** 不要把内部数据块名当成第一句话 —— `not a ProXDR photo` 是给人看的，`local.hdr.meta.data` 不是。
+以下 Swift 命令把 JSON 写到 stdout：
 
-`XDRemuxCore` 的错误文案保持英文，因为它是对外的 Swift Package。中文本地化放在展示层：macOS App 里的 `AppStrings.failureReason`。
+- `validate-apple`
+- `validate-portrait`
+- `portrait-self-test`
 
-## 转换过程的诊断行
+不要在这些命令的 JSON stdout 中混入无关进度文本。
 
-转换器会打印少量诊断，用于确认走了哪条路径，例如：
+## 错误文本
 
-```text
-[direct-gain] preserved compressed Base; encoded 15 Gain Map tiles once quality=0.90 tile=512x512
-```
+错误信息首先说明用户可见的问题。
 
-这类行是**被测试断言的**（`verify_swift_cli_sample.py --expect-direct-gain` 会数它出现的次数），改动措辞前先看有没有人在断言它。
+只有在有助于诊断时，再加入内部 metadata key 或容器术语。
 
-## 排查失败
+batch UI 依赖逐行输出时，每个文件失败保持一行。
 
-- `--debug-dir <目录>` 保留本次运行的中间产物。
-- Apple 摄影风格在**失败时会保留**证据目录，并往 stderr 打印路径；成功才清理。
-- 更细的调试开关见[开发文档](../development.md)的环境变量表。
+上层增加上下文时要保留原始错误。
 
-## 代码要求
+不要把关键路径的 thrown error 替换成无结构 `print`，然后继续按成功处理。
 
-1. 关键路径不要只靠 `print` 吞掉异常。
-2. 捕获异常时保留原始错误，不要压成一句话。
-3. 批量场景一个文件一行，多行解释留给单文件路径。
+## 退出状态
+
+Swift 和 Python 使用不同的参数解析实现。
+
+Swift：
+
+- 正常成功使用 `0`；
+- 运行时失败使用 `1`；
+- parser-level usage exit 由 Swift Argument Parser 处理；
+- `main.swift` 捕获的 Motion Photo 预路由失败使用 `1`。
+
+Python：
+
+- 正常成功使用 `0`；
+- 命令运行失败使用 `1`；
+- `argparse` parser-level usage error 使用 `2`。
+
+除非两套实现确实共享相同行为，不要发布一张统一数字退出码表。
+
+## 诊断输出
+
+部分转换链路会打印用于标识实际实现路径的诊断行。
+
+测试可能依赖准确诊断文本。修改诊断字符串前先搜索对应断言。
+
+支持的转换链路可以使用 `--debug-dir` 保留诊断产物。
+
+Apple feature 实现需要时，也可能在失败时保留证据或 helper 输出。
+
+## Library 边界
+
+`XDRemuxCore` 是 library。它应该暴露结构化结果、warning 和 error，不应该依赖终端格式。
+
+终端格式和 localization 属于 CLI 或 App presentation layer。
+
+当前技术写作和用户可见错误规则遵循[技术写作规范](../style-guide.md)。
