@@ -7,6 +7,7 @@ on:
       - "xdremux_py/**"
       - "Tests/test_python_motion_photo.py"
       - "Tests/test_python_live_photo_portability.py"
+      - "Tests/test_python_live_photo_output_safety.py"
       - "Tests/validation/verify_python_motion_photo_fixtures.py"
       - "Tests/XDRemuxAppleFeaturesTests/PythonLivePhotoOutputGateTests.swift"
       - "fixtures/**"
