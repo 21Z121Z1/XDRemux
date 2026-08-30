@@ -2,39 +2,41 @@
 
 English | [简体中文](supported-devices.md)
 
-This document lists known ProXDR capture families. It is not a guarantee for every firmware version, camera mode, or individual file.
+This document lists device models that are known to capture ProXDR HEIC.
 
-XDRemux validates the input file, not only the device model. A listed phone can produce photos that do not contain the data required by a selected conversion path.
+A listed model is not a guarantee for every firmware version, camera mode, or individual file. XDRemux validates the file structure and metadata that the selected conversion path requires.
 
-## Known ProXDR capture families
+## Known ProXDR capture models
 
-| Brand or series | Known models or families |
+| Brand or series | Models |
 | --- | --- |
-| OnePlus | Ace 2 Pro, 12, Ace 3 family, 13 family, Ace 5 family, Ace 6 family, Turbo 6, 15 family |
-| OPPO K | K12 family, K13 Turbo family, K15 Pro family |
-| OPPO Find | Find X6 family, Find N3 family, Find X7 family, Find X8 family, Find N5, Find X9 family, Find N6 |
-| OPPO Reno | Reno10 Pro family through later ProXDR-capable Reno generations documented by project samples and reports |
-| realme GT | GT5 family, GT6, GT7 family, GT8 family |
-| realme Neo | GT Neo6 family, Neo7 family, Neo8 |
-| realme number series | ProXDR-capable 12 through 15 series models documented by project samples and reports |
+| OnePlus | OnePlus Ace2 Pro, OnePlus 12, OnePlus Ace3, OnePlus Ace 3V, OnePlus Ace 3 Pro, OnePlus 13, OnePlus Ace 5 series, OnePlus 13T, OnePlus Ace 6, OnePlus Ace 6T, OnePlus Turbo 6, OnePlus 15, OnePlus 15T, OnePlus Ace 5 Supreme Edition |
+| OPPO K series | K12, K12x, K13 Turbo series, K15 Pro series |
+| OPPO Find series | Find X6, Find X6 Pro, Find N3, Find N3 Flip, Find X7, Find X7 Ultra, Find X8 series, Find N5, Find X8s, Find X9 series, Find N6 |
+| OPPO Reno series | Reno10 Pro, Reno10 Pro+, Reno11 Pro, Reno12 series, Reno13 series, Reno14 series, Reno15 series, Reno 16 series |
+| realme GT series | realme GT5 series, realme GT5 Pro, realme GT6, realme GT7 Pro, realme GT7 Pro Racing Edition, realme GT7, realme Neo7 Turbo, realme GT8, realme GT8 Pro |
+| realme Neo series | realme GT Neo6 SE, realme GT Neo6, realme Neo7, realme Neo7 SE, realme Neo7x, realme Neo8 |
+| realme number series | realme 12 Pro, realme 12 Pro+, realme 13 Pro+, realme 13 Pro Supreme Edition, realme 13 Pro, realme 14 Pro+, realme 14 Pro, realme 14, realme 15, realme 15 Pro |
 
-The table intentionally groups models when the converter contract depends on file structure rather than a marketing model name.
+This list records known capture support. It is not a code allow-list.
 
 ## Gain Map differences
 
 Known files can contain different Gain Map layouts.
 
-Some newer devices and modes can use three-channel 4:4:4 Gain Maps. Other files use 4:2:0 or monochrome Gain Maps.
+OPPO Find X8 Ultra, the Find X9 series, and realme GT8 Pro in Ricoh mode can use YCbCr 4:4:4 HDR Gain Maps in known implementations.
 
-The standard conversion path preserves the source channel characteristics when the selected output path supports them. `--oppo-compatible` can reduce the representation to a compatibility form.
+Other files can use 4:2:0 or monochrome Gain Maps.
+
+The standard conversion path preserves source Gain Map characteristics when the selected output path supports them. `--oppo-compatible` can reduce the representation to a compatibility form.
 
 Do not infer the Gain Map layout from the phone name alone.
 
 ## Motion Photo support
 
-Motion Photo support is capability-based and fixture-tested. It is not documented as a phone allow-list.
+Motion Photo support is capability-based and fixture-tested. It is not controlled by the ProXDR model table above.
 
-A Motion Photo input must contain a still resource, a valid motion-video resource, and timing/container data that the parser can resolve.
+A Motion Photo input must contain a still resource, a motion-video resource that the parser can resolve, and the required timing/container information.
 
 The current public fixture set contains multiple Android Motion Photo layouts. See the [fixture guide](../fixtures/README.en.md).
 
@@ -42,11 +44,11 @@ The current public fixture set contains multiple Android Motion Photo layouts. S
 
 Apple Portrait conversion requires compatible portrait resources in the individual source photo.
 
-A supported ProXDR device does not imply that every photo contains depth, focus, semantic, or restore-original data.
+A supported ProXDR model does not imply that every photo contains depth, focus, semantic, or restore-original data.
 
 ## Reporting a new file
 
-If a file from a new device or firmware cannot be converted:
+If a new device or firmware produces a file that XDRemux cannot convert:
 
 1. Keep the original file.
 2. Record the device model, OS version, and camera mode.
@@ -54,4 +56,4 @@ If a file from a new device or firmware cannot be converted:
 4. Include redacted container diagnostics when they are sufficient.
 5. Do not publish personal photo content unless you intend to make it public.
 
-A new compatibility claim should be supported by a reproducible file or test, not only by the model name.
+A new compatibility claim should have a reproducible file or test. The device model alone is not sufficient evidence.
