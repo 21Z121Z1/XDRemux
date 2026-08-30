@@ -133,6 +133,244 @@ static id SendClassThumbnail(
     );
 }
 
+static const char *SkipObjCTypeQualifiers(const char *type) {
+    while (type && *type && strchr("rnNoORV", *type)) {
+        type++;
+    }
+    return type;
+}
+
+static BOOL ObjCMethodReturnsObject(Method method) {
+    if (!method) {
+        return NO;
+    }
+    char type[128] = {0};
+    method_getReturnType(method, type, sizeof(type));
+    const char *normalized = SkipObjCTypeQualifiers(type);
+    return normalized && normalized[0] == '@';
+}
+
+static BOOL ObjCMethodArgumentIsObject(Method method, unsigned int index) {
+    if (!method || index >= method_getNumberOfArguments(method)) {
+        return NO;
+    }
+    char type[128] = {0};
+    method_getArgumentType(method, index, type, sizeof(type));
+    const char *normalized = SkipObjCTypeQualifiers(type);
+    return normalized && normalized[0] == '@';
+}
+
+static BOOL ObjCMethodArgumentIsObjectPointer(Method method, unsigned int index) {
+    if (!method || index >= method_getNumberOfArguments(method)) {
+        return NO;
+    }
+    char type[128] = {0};
+    method_getArgumentType(method, index, type, sizeof(type));
+    const char *normalized = SkipObjCTypeQualifiers(type);
+    if (!normalized || normalized[0] != '^') {
+        return NO;
+    }
+    normalized = SkipObjCTypeQualifiers(normalized + 1);
+    return normalized && normalized[0] == '@';
+}
+
+static BOOL ObjCMethodArgumentIsBool(Method method, unsigned int index) {
+    if (!method || index >= method_getNumberOfArguments(method)) {
+        return NO;
+    }
+    char type[128] = {0};
+    method_getArgumentType(method, index, type, sizeof(type));
+    const char *normalized = SkipObjCTypeQualifiers(type);
+    return normalized && (normalized[0] == 'c' || normalized[0] == 'B');
+}
+
+static BOOL PhotoEditSourceInitializerABICompatible(Method method, BOOL includesImage) {
+    unsigned int expectedArgumentCount = includesImage ? 6 : 5;
+    if (!method || method_getNumberOfArguments(method) != expectedArgumentCount ||
+        !ObjCMethodReturnsObject(method) ||
+        !ObjCMethodArgumentIsObject(method, 2) ||
+        !ObjCMethodArgumentIsObject(method, 3)) {
+        return NO;
+    }
+    if (includesImage) {
+        return ObjCMethodArgumentIsObject(method, 4) &&
+            ObjCMethodArgumentIsBool(method, 5);
+    }
+    return ObjCMethodArgumentIsBool(method, 4);
+}
+
+static BOOL StyleApplyABICompatible(Method method, BOOL includesDisplacement) {
+    unsigned int expectedArgumentCount = includesDisplacement ? 13 : 12;
+    if (!method || method_getNumberOfArguments(method) != expectedArgumentCount ||
+        !ObjCMethodReturnsObject(method)) {
+        return NO;
+    }
+    unsigned int lastObjectArgument = includesDisplacement ? 11 : 10;
+    for (unsigned int index = 2; index <= lastObjectArgument; index++) {
+        if (!ObjCMethodArgumentIsObject(method, index)) {
+            return NO;
+        }
+    }
+    return ObjCMethodArgumentIsObjectPointer(
+        method,
+        includesDisplacement ? 12 : 11
+    );
+}
+
+static void SetPrivateABIError(
+    NSError **error,
+    NSInteger code,
+    NSString *description
+) {
+    if (!error || *error) {
+        return;
+    }
+    *error = [NSError errorWithDomain:@"LearnNodeCoefficientProbe.PrivateABI"
+                                 code:code
+                             userInfo:@{
+        NSLocalizedDescriptionKey: description ?: @"private API compatibility failure",
+    }];
+}
+
+static id CreatePhotoEditSourceCompatible(
+    Class sourceClass,
+    NSURL *url,
+    id type,
+    id image,
+    BOOL useEmbeddedPreview,
+    NSError **error,
+    NSString **selectedInitializer
+) {
+    if (selectedInitializer) {
+        *selectedInitializer = nil;
+    }
+    if (!sourceClass) {
+        SetPrivateABIError(error, 50, @"PLPhotoEditSource class is unavailable");
+        return nil;
+    }
+
+    SEL legacySelector = NSSelectorFromString(
+        @"initWithURL:type:image:useEmbeddedPreview:"
+    );
+    SEL modernSelector = NSSelectorFromString(
+        @"initWithURL:type:useEmbeddedPreview:"
+    );
+    Method legacyMethod = class_getInstanceMethod(sourceClass, legacySelector);
+    Method modernMethod = class_getInstanceMethod(sourceClass, modernSelector);
+    BOOL legacyCompatible = PhotoEditSourceInitializerABICompatible(legacyMethod, YES);
+    BOOL modernCompatible = PhotoEditSourceInitializerABICompatible(modernMethod, NO);
+
+    if (!legacyCompatible && !modernCompatible) {
+        SetPrivateABIError(
+            error,
+            51,
+            [NSString stringWithFormat:
+                @"PLPhotoEditSource has no supported initializer ABI "
+                 "(legacy present=%@ compatible=%@, modern present=%@ compatible=%@)",
+                legacyMethod ? @"yes" : @"no",
+                legacyCompatible ? @"yes" : @"no",
+                modernMethod ? @"yes" : @"no",
+                modernCompatible ? @"yes" : @"no"]
+        );
+        return nil;
+    }
+
+    id allocated = ((id (*)(id, SEL))objc_msgSend)(
+        (id)sourceClass,
+        sel_registerName("alloc")
+    );
+    @try {
+        id source = nil;
+        if (legacyCompatible) {
+            source = ((id (*)(id, SEL, id, id, id, BOOL))objc_msgSend)(
+                allocated,
+                legacySelector,
+                url,
+                type,
+                image,
+                useEmbeddedPreview
+            );
+            if (selectedInitializer && source) {
+                *selectedInitializer = NSStringFromSelector(legacySelector);
+            }
+        } else {
+            source = ((id (*)(id, SEL, id, id, BOOL))objc_msgSend)(
+                allocated,
+                modernSelector,
+                url,
+                type,
+                useEmbeddedPreview
+            );
+            if (selectedInitializer && source) {
+                *selectedInitializer = NSStringFromSelector(modernSelector);
+            }
+        }
+        if (!source) {
+            SetPrivateABIError(
+                error,
+                52,
+                @"PLPhotoEditSource compatible initializer returned nil"
+            );
+        }
+        return source;
+    } @catch (NSException *exception) {
+        SetPrivateABIError(
+            error,
+            53,
+            [NSString stringWithFormat:
+                @"PLPhotoEditSource initializer raised %@: %@",
+                exception.name,
+                exception.reason ?: @"<no reason>"]
+        );
+        return nil;
+    }
+}
+
+static SEL ResolveStyleApplySelector(
+    Class cls,
+    BOOL *usesDisplacement,
+    NSError **error
+) {
+    if (usesDisplacement) {
+        *usesDisplacement = NO;
+    }
+    if (!cls) {
+        SetPrivateABIError(error, 60, @"_NUStyleTransferApplyProcessor class is unavailable");
+        return NULL;
+    }
+    SEL legacySelector = NSSelectorFromString(
+        @"applyStyle:toImage:thumbnail:target:deltaMap:colorSpace:configuration:tuningParameters:noiseModel:error:"
+    );
+    SEL displacementSelector = NSSelectorFromString(
+        @"applyStyle:toImage:thumbnail:target:deltaMap:displacement:colorSpace:configuration:tuningParameters:noiseModel:error:"
+    );
+    Method legacyMethod = class_getClassMethod(cls, legacySelector);
+    Method displacementMethod = class_getClassMethod(cls, displacementSelector);
+    BOOL legacyCompatible = StyleApplyABICompatible(legacyMethod, NO);
+    BOOL displacementCompatible = StyleApplyABICompatible(displacementMethod, YES);
+    if (legacyCompatible) {
+        return legacySelector;
+    }
+    if (displacementCompatible) {
+        if (usesDisplacement) {
+            *usesDisplacement = YES;
+        }
+        return displacementSelector;
+    }
+    SetPrivateABIError(
+        error,
+        61,
+        [NSString stringWithFormat:
+            @"_NUStyleTransferApplyProcessor has no supported apply ABI "
+             "(legacy present=%@ compatible=%@, displacement present=%@ compatible=%@)",
+            legacyMethod ? @"yes" : @"no",
+            legacyCompatible ? @"yes" : @"no",
+            displacementMethod ? @"yes" : @"no",
+            displacementCompatible ? @"yes" : @"no"]
+    );
+    return NULL;
+}
+
 static id SendClassApply(
     Class cls,
     SEL selector,
@@ -147,21 +385,157 @@ static id SendClassApply(
     id noiseModel,
     NSError **error
 ) {
-    return ((id (*)(id, SEL, id, id, id, id, id, id, id, id, id, NSError **))objc_msgSend)(
-        (id)cls,
-        selector,
-        style,
-        image,
-        thumbnail,
-        target,
-        deltaMap,
-        colorSpace,
-        configuration,
-        tuning,
-        noiseModel,
+    (void)selector;
+    BOOL usesDisplacement = NO;
+    SEL resolvedSelector = ResolveStyleApplySelector(
+        cls,
+        &usesDisplacement,
         error
     );
+    if (!resolvedSelector) {
+        return nil;
+    }
+    @try {
+        if (usesDisplacement) {
+            return ((id (*)(id, SEL, id, id, id, id, id, id, id, id, id, id, NSError **))objc_msgSend)(
+                (id)cls,
+                resolvedSelector,
+                style,
+                image,
+                thumbnail,
+                target,
+                deltaMap,
+                nil,
+                colorSpace,
+                configuration,
+                tuning,
+                noiseModel,
+                error
+            );
+        }
+        return ((id (*)(id, SEL, id, id, id, id, id, id, id, id, id, NSError **))objc_msgSend)(
+            (id)cls,
+            resolvedSelector,
+            style,
+            image,
+            thumbnail,
+            target,
+            deltaMap,
+            colorSpace,
+            configuration,
+            tuning,
+            noiseModel,
+            error
+        );
+    } @catch (NSException *exception) {
+        SetPrivateABIError(
+            error,
+            62,
+            [NSString stringWithFormat:
+                @"_NUStyleTransferApplyProcessor raised %@: %@",
+                exception.name,
+                exception.reason ?: @"<no reason>"]
+        );
+        return nil;
+    }
 }
+
+@interface XDRemuxLegacyPhotoEditSourceFixture : NSObject
+@property(nonatomic, strong) id capturedImage;
+@end
+
+@implementation XDRemuxLegacyPhotoEditSourceFixture
+- (instancetype)initWithURL:(NSURL *)url
+                       type:(id)type
+                      image:(id)image
+         useEmbeddedPreview:(BOOL)useEmbeddedPreview {
+    self = [super init];
+    if (self) {
+        self.capturedImage = image;
+    }
+    return self;
+}
+@end
+
+@interface XDRemuxModernPhotoEditSourceFixture : NSObject
+@end
+
+@implementation XDRemuxModernPhotoEditSourceFixture
+- (instancetype)initWithURL:(NSURL *)url
+                       type:(id)type
+         useEmbeddedPreview:(BOOL)useEmbeddedPreview {
+    return [super init];
+}
+@end
+
+@interface XDRemuxIncompatiblePhotoEditSourceFixture : NSObject
+@end
+
+@implementation XDRemuxIncompatiblePhotoEditSourceFixture
+- (instancetype)initWithURL:(NSURL *)url
+                       type:(double)type
+         useEmbeddedPreview:(BOOL)useEmbeddedPreview {
+    return [super init];
+}
+@end
+
+@interface XDRemuxLegacyStyleApplyFixture : NSObject
+@end
+
+@implementation XDRemuxLegacyStyleApplyFixture
++ (id)applyStyle:(id)style
+         toImage:(id)image
+       thumbnail:(id)thumbnail
+          target:(id)target
+        deltaMap:(id)deltaMap
+      colorSpace:(id)colorSpace
+   configuration:(id)configuration
+tuningParameters:(id)tuning
+      noiseModel:(id)noiseModel
+           error:(NSError **)error {
+    return @"legacy-apply";
+}
+@end
+
+static BOOL gCompatibilityFixtureSawNilDisplacement = NO;
+
+@interface XDRemuxDisplacementStyleApplyFixture : NSObject
+@end
+
+@implementation XDRemuxDisplacementStyleApplyFixture
++ (id)applyStyle:(id)style
+         toImage:(id)image
+       thumbnail:(id)thumbnail
+          target:(id)target
+        deltaMap:(id)deltaMap
+    displacement:(id)displacement
+      colorSpace:(id)colorSpace
+   configuration:(id)configuration
+tuningParameters:(id)tuning
+      noiseModel:(id)noiseModel
+           error:(NSError **)error {
+    gCompatibilityFixtureSawNilDisplacement = displacement == nil;
+    return @"displacement-apply";
+}
+@end
+
+@interface XDRemuxIncompatibleStyleApplyFixture : NSObject
+@end
+
+@implementation XDRemuxIncompatibleStyleApplyFixture
++ (id)applyStyle:(double)style
+         toImage:(id)image
+       thumbnail:(id)thumbnail
+          target:(id)target
+        deltaMap:(id)deltaMap
+      colorSpace:(id)colorSpace
+   configuration:(id)configuration
+tuningParameters:(id)tuning
+      noiseModel:(id)noiseModel
+           error:(NSError **)error {
+    return @"incompatible";
+}
+@end
 
 static int SendSmartStyleUtilityLearn(
     id utility,
@@ -1954,11 +2328,17 @@ static NSDictionary *RunNeutrinoStyleRender(
         rendererClass, NSSelectorFromString(@"configureNeutrinoCacheDirectoryIfNeeded")
     );
     Class sourceClass = NSClassFromString(@"PLPhotoEditSource");
-    id sourceObject = ((id (*)(id, SEL, id, id, id, BOOL))objc_msgSend)(
-        [sourceClass alloc],
-        NSSelectorFromString(@"initWithURL:type:image:useEmbeddedPreview:"),
-        photoURL, @"public.heic", nil, NO
+    NSString *sourceInitializerVariant = nil;
+    id sourceObject = CreatePhotoEditSourceCompatible(
+        sourceClass,
+        photoURL,
+        @"public.heic",
+        nil,
+        NO,
+        &error,
+        &sourceInitializerVariant
     );
+    result[@"photoEditSourceInitializer"] = sourceInitializerVariant ?: [NSNull null];
     id renderer = ((id (*)(id, SEL, id))objc_msgSend)(
         [rendererClass alloc], NSSelectorFromString(@"initWithEditSource:"), sourceObject
     );
@@ -2495,8 +2875,212 @@ static NSDictionary *ReadSemanticStyleSettings(NSString *imagePath, NSError **er
     return [settings isKindOfClass:[NSDictionary class]] ? settings : nil;
 }
 
+
+static NSDictionary *RuntimeCompatibilitySelfTest(void) {
+    NSURL *url = [NSURL fileURLWithPath:@"/tmp/xdremux-private-api-compat.heic"];
+    id imageMarker = [NSObject new];
+
+    NSError *legacySourceError = nil;
+    NSString *legacySourceVariant = nil;
+    id legacySource = CreatePhotoEditSourceCompatible(
+        [XDRemuxLegacyPhotoEditSourceFixture class],
+        url,
+        @"public.heic",
+        imageMarker,
+        NO,
+        &legacySourceError,
+        &legacySourceVariant
+    );
+    BOOL legacySourcePassed = legacySource != nil &&
+        [legacySourceVariant isEqualToString:@"initWithURL:type:image:useEmbeddedPreview:"] &&
+        [(XDRemuxLegacyPhotoEditSourceFixture *)legacySource capturedImage] == imageMarker &&
+        legacySourceError == nil;
+
+    NSError *modernSourceError = nil;
+    NSString *modernSourceVariant = nil;
+    id modernSource = CreatePhotoEditSourceCompatible(
+        [XDRemuxModernPhotoEditSourceFixture class],
+        url,
+        @"public.heic",
+        imageMarker,
+        NO,
+        &modernSourceError,
+        &modernSourceVariant
+    );
+    BOOL modernSourcePassed = modernSource != nil &&
+        [modernSourceVariant isEqualToString:@"initWithURL:type:useEmbeddedPreview:"] &&
+        modernSourceError == nil;
+
+    NSError *missingSourceError = nil;
+    id missingSource = CreatePhotoEditSourceCompatible(
+        [NSObject class],
+        url,
+        @"public.heic",
+        imageMarker,
+        NO,
+        &missingSourceError,
+        NULL
+    );
+    BOOL missingSourcePassed = missingSource == nil && missingSourceError != nil;
+
+    NSError *incompatibleSourceError = nil;
+    id incompatibleSource = CreatePhotoEditSourceCompatible(
+        [XDRemuxIncompatiblePhotoEditSourceFixture class],
+        url,
+        @"public.heic",
+        imageMarker,
+        NO,
+        &incompatibleSourceError,
+        NULL
+    );
+    BOOL incompatibleSourcePassed = incompatibleSource == nil &&
+        incompatibleSourceError != nil;
+
+    SEL legacyApplySelector = NSSelectorFromString(
+        @"applyStyle:toImage:thumbnail:target:deltaMap:colorSpace:configuration:tuningParameters:noiseModel:error:"
+    );
+    NSError *legacyApplyError = nil;
+    id legacyApply = SendClassApply(
+        [XDRemuxLegacyStyleApplyFixture class],
+        legacyApplySelector,
+        @1, @2, @3, @4, @5, @6, @7, @8, @9,
+        &legacyApplyError
+    );
+    BOOL legacyApplyPassed = [legacyApply isEqual:@"legacy-apply"] &&
+        legacyApplyError == nil;
+
+    gCompatibilityFixtureSawNilDisplacement = NO;
+    NSError *displacementApplyError = nil;
+    id displacementApply = SendClassApply(
+        [XDRemuxDisplacementStyleApplyFixture class],
+        legacyApplySelector,
+        @1, @2, @3, @4, @5, @6, @7, @8, @9,
+        &displacementApplyError
+    );
+    BOOL displacementApplyPassed = [displacementApply isEqual:@"displacement-apply"] &&
+        gCompatibilityFixtureSawNilDisplacement && displacementApplyError == nil;
+
+    NSError *missingApplyError = nil;
+    id missingApply = SendClassApply(
+        [NSObject class],
+        legacyApplySelector,
+        @1, @2, @3, @4, @5, @6, @7, @8, @9,
+        &missingApplyError
+    );
+    BOOL missingApplyPassed = missingApply == nil && missingApplyError != nil;
+
+    NSError *incompatibleApplyError = nil;
+    id incompatibleApply = SendClassApply(
+        [XDRemuxIncompatibleStyleApplyFixture class],
+        legacyApplySelector,
+        @1, @2, @3, @4, @5, @6, @7, @8, @9,
+        &incompatibleApplyError
+    );
+    BOOL incompatibleApplyPassed = incompatibleApply == nil &&
+        incompatibleApplyError != nil;
+
+    BOOL passed = legacySourcePassed && modernSourcePassed &&
+        missingSourcePassed && incompatibleSourcePassed &&
+        legacyApplyPassed && displacementApplyPassed &&
+        missingApplyPassed && incompatibleApplyPassed;
+    return @{
+        @"schema": @"xdremux-private-api-compat-self-test-v1",
+        @"passed": @(passed),
+        @"photoEditSource": @{
+            @"legacy": @(legacySourcePassed),
+            @"modern": @(modernSourcePassed),
+            @"missing": @(missingSourcePassed),
+            @"abiMismatch": @(incompatibleSourcePassed),
+        },
+        @"styleApply": @{
+            @"legacy": @(legacyApplyPassed),
+            @"displacement": @(displacementApplyPassed),
+            @"displacementWasNil": @(gCompatibilityFixtureSawNilDisplacement),
+            @"missing": @(missingApplyPassed),
+            @"abiMismatch": @(incompatibleApplyPassed),
+        },
+    };
+}
+
+static NSDictionary *RunPrivateAPICapabilityProbe(NSString *photoPath) {
+    NSArray<NSString *> *frameworks = @[
+        @"/System/Library/PrivateFrameworks/NeutrinoCore.framework/NeutrinoCore",
+        @"/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",
+        @"/System/Library/PrivateFrameworks/PhotosUICore.framework/PhotosUICore",
+        @"/System/Library/PrivateFrameworks/PhotosUIPrivate.framework/PhotosUIPrivate",
+    ];
+    NSMutableArray *loadResults = [NSMutableArray array];
+    BOOL frameworksLoaded = YES;
+    for (NSString *path in frameworks) {
+        BOOL loaded = dlopen(path.UTF8String, RTLD_NOW | RTLD_GLOBAL) != NULL;
+        frameworksLoaded = frameworksLoaded && loaded;
+        [loadResults addObject:@{ @"path": path, @"loaded": @(loaded) }];
+    }
+
+    NSError *sourceError = nil;
+    NSString *sourceInitializer = nil;
+    id sourceObject = frameworksLoaded ? CreatePhotoEditSourceCompatible(
+        NSClassFromString(@"PLPhotoEditSource"),
+        [NSURL fileURLWithPath:photoPath],
+        @"public.heic",
+        nil,
+        NO,
+        &sourceError,
+        &sourceInitializer
+    ) : nil;
+
+    NSError *applyError = nil;
+    BOOL usesDisplacement = NO;
+    SEL applySelector = frameworksLoaded ? ResolveStyleApplySelector(
+        NSClassFromString(@"_NUStyleTransferApplyProcessor"),
+        &usesDisplacement,
+        &applyError
+    ) : NULL;
+    BOOL passed = frameworksLoaded && sourceObject != nil && applySelector != NULL;
+    return @{
+        @"schema": @"xdremux-private-api-capability-probe-v1",
+        @"passed": @(passed),
+        @"frameworks": loadResults,
+        @"photoEditSource": @{
+            @"created": @(sourceObject != nil),
+            @"class": sourceObject ? NSStringFromClass([sourceObject class]) : (id)[NSNull null],
+            @"initializer": sourceInitializer ?: (id)[NSNull null],
+            @"error": JSONSafe(sourceError),
+        },
+        @"styleApply": @{
+            @"selector": applySelector ? NSStringFromSelector(applySelector) : (id)[NSNull null],
+            @"usesDisplacement": @(usesDisplacement),
+            @"error": JSONSafe(applyError),
+        },
+    };
+}
+
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        BOOL runtimeCompatibilitySelfTest = argc == 2 &&
+            strcmp(argv[1], "--self-test-runtime-compat") == 0;
+        if (runtimeCompatibilitySelfTest) {
+            NSDictionary *result = RuntimeCompatibilitySelfTest();
+            NSData *json = [NSJSONSerialization dataWithJSONObject:result
+                                                           options:NSJSONWritingSortedKeys
+                                                             error:nil];
+            fwrite(json.bytes, 1, json.length, stdout);
+            fputc('\n', stdout);
+            return [result[@"passed"] boolValue] ? 0 : 1;
+        }
+        BOOL privateAPICapabilityMode = argc == 3 &&
+            strcmp(argv[1], "--private-api-capabilities") == 0;
+        if (privateAPICapabilityMode) {
+            NSDictionary *result = RunPrivateAPICapabilityProbe(
+                [[NSString stringWithUTF8String:argv[2]] stringByStandardizingPath]
+            );
+            NSData *json = [NSJSONSerialization dataWithJSONObject:JSONSafe(result)
+                                                           options:NSJSONWritingSortedKeys
+                                                             error:nil];
+            fwrite(json.bytes, 1, json.length, stdout);
+            fputc('\n', stdout);
+            return [result[@"passed"] boolValue] ? 0 : 1;
+        }
         BOOL styleSettingsMode = argc == 3 &&
             strcmp(argv[1], "--style-settings") == 0;
         if (styleSettingsMode) {
