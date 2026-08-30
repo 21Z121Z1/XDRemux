@@ -7,7 +7,7 @@ import XDRemuxAppleFeatures
 final class MotionPhotoOutputSafetyTests: XCTestCase {
     private let fixtureName = "IMG20260710191114_ColorOS_16.jpg"
 
-    func testImplicitConvertPreservesForeignSameBasenamePairAndUsesNumberedOutput() throws {
+    func testImplicitPlannerPreservesForeignSameBasenamePairAndConvertedOutputUsesNumberedNamespace() throws {
         let sourceFixture = try fixtureURL()
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("xdremux-motion-output-safety-\(UUID().uuidString)", isDirectory: true)
@@ -24,14 +24,25 @@ final class MotionPhotoOutputSafetyTests: XCTestCase {
         let imageDigest = try digest(foreignImage)
         let videoDigest = try digest(foreignVideo)
 
-        XCTAssertTrue(try MotionPhotoCLIIntegration.handleIfNeeded([
-            "convert", "--input", source.path,
-        ]))
+        var reserved = Set<String>()
+        let outputImage = MotionPhotoBatchPlanner.reserveOutputImageURL(
+            for: source,
+            inputRootURL: directory,
+            outputDirectoryURL: directory,
+            reservedPaths: &reserved
+        )
+        let outputVideo = AppleLivePhotoConversionEngine.companionVideoURL(for: outputImage)
+        XCTAssertEqual(outputImage.lastPathComponent, "\(stem) (2).heic")
+        XCTAssertEqual(outputVideo.lastPathComponent, "\(stem) (2).mov")
+
+        _ = try AppleLivePhotoConversionEngine.convert(
+            inputURL: source,
+            outputImageURL: outputImage,
+            requirePhotoKitValidation: false
+        )
 
         XCTAssertEqual(try digest(foreignImage), imageDigest)
         XCTAssertEqual(try digest(foreignVideo), videoDigest)
-        let outputImage = directory.appendingPathComponent("\(stem) (2).heic")
-        let outputVideo = directory.appendingPathComponent("\(stem) (2).mov")
         XCTAssertTrue(FileManager.default.fileExists(atPath: outputImage.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: outputVideo.path))
         XCTAssertTrue(AppleLivePhotoValidator.isValidPair(imageURL: outputImage, videoURL: outputVideo))
