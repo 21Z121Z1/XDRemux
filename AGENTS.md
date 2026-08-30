@@ -9,7 +9,7 @@ This file defines the repository acceptance contract. Use the [validation runboo
 ## Required sequence
 
 1. Identify each affected product path.
-2. Identify the acceptance evidence for each path.
+2. Identify the acceptance criteria and required evidence for each path.
 3. Make the intended change without unrelated edits.
 4. Commit the change.
 5. Create a completion-gate plan.
@@ -32,25 +32,29 @@ A compiler pass, parser pass, or smoke test is not a substitute for the required
 
 ## Evidence requirements
 
-A source change must have a targeted regression check when the changed behavior can be tested.
+Every source change must have a targeted regression check that would fail for the original defect or contract violation.
 
-A production conversion-core or app-core change must also have functional, integration, or device evidence that reaches the changed behavior.
+Every production conversion-core or app-core change must also have functional, integration, or device evidence that reaches the changed behavior.
 
 If more than one entry point changes, validate each affected entry point.
 
 Do not use a static source check as functional evidence.
 
-Do not use strict ISO parser success as evidence for OPPO Gallery rendering.
+Do not relabel a static check as a regression or functional check to satisfy the gate.
+
+Strict ISO parser success alone is not acceptance evidence for OPPO Gallery behavior. Keep structural, ImageIO, renderer, and device evidence distinct.
 
 Do not use container structure alone as evidence for interactive Apple Photos editing.
 
-A device-dependent claim requires device evidence. If the required device or closed component is unavailable, limit the claim to the tested offline behavior.
+A device-dependent product claim requires device evidence. If the required device or closed component is unavailable, report the device-dependent claim as blocked or explicitly limit the claim to tested offline behavior. Do not mark the device-dependent claim complete without device evidence.
+
+All checks declared in a completion plan are mandatory.
 
 ## Scope
 
 Use targeted verification by default.
 
-Run broader repository verification for release work, cross-module changes, or verification-framework changes.
+Run broader repository verification for release or preflight work, cross-module changes, or verification-framework changes.
 
 Do not run unrelated expensive checks only to make a plan look more complete.
 
@@ -66,15 +70,15 @@ The completion receipt is bound to:
 
 A later commit or tracked edit invalidates the receipt.
 
-All checks in a completion plan are mandatory.
-
 ## Media and fixtures
 
 Public Motion Photo fixtures are versioned under `fixtures/`.
 
 Other large, private, device-only, or Apple-feature samples can remain outside Git.
 
-A plan can reference an external local sample when the runner can access it.
+A verification plan can reference an external local sample when the runner can access it.
+
+Verification receipts under `.codex/verification-receipts/` remain ignored by Git.
 
 ## Documentation
 
