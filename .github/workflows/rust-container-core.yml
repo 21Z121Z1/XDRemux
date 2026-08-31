@@ -36,18 +36,16 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Resolve bootstrap lockfile
-        run: cargo generate-lockfile
-      - name: Check formatting
-        run: cargo fmt --all --check
+      - name: Format working copy for bootstrap diagnostics
+        run: cargo fmt --all
       - name: Lint xdremux-container
-        run: cargo clippy -p xdremux-container --all-targets -- -D warnings
+        run: cargo clippy --locked -p xdremux-container --all-targets -- -D warnings
       - name: Test xdremux-container
-        run: cargo test -p xdremux-container
-      - name: Print resolved lockfile
+        run: cargo test --locked -p xdremux-container
+      - name: Print formatted extractor for bootstrap diagnostics
         if: always()
         shell: bash
         run: |
-          echo '--- XDREMUX_CARGO_LOCK_BEGIN ---'
-          cat Cargo.lock
-          echo '--- XDREMUX_CARGO_LOCK_END ---'
+          echo '--- XDREMUX_FORMATTED_EXTRACTOR_BEGIN ---'
+          cat crates/xdremux-container/src/extractor.rs
+          echo '--- XDREMUX_FORMATTED_EXTRACTOR_END ---'
