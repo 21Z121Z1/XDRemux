@@ -9,5 +9,7 @@ grep -Fx 'promote-422|chroma=Yuv444|depth=8' <<<"$output" >/dev/null
 grep -Fx 'strict-tmap|requested=Passthrough|effective=Hybrid' <<<"$output" >/dev/null
 grep -F 'reject-444-to-420|no encoder capability preserves Gain Map layout GainMapCodecLayout { chroma: Yuv444' <<<"$output" >/dev/null
 grep -F 'reject-10-to-8|no encoder capability preserves Gain Map layout GainMapCodecLayout { chroma: Yuv444, luma_bit_depth: 10' <<<"$output" >/dev/null
+grep -Fx 'missing-decoder|missing required operation capabilities: RasterDecoder(Jpeg)' <<<"$output" >/dev/null
+grep -Fx 'missing-styles|missing required operation capabilities: PhotographicStylesAdapter' <<<"$output" >/dev/null
 
 echo 'PASS Rust conversion planner integration vectors'

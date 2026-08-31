@@ -1,7 +1,8 @@
 use xdremux_engine::{
-    plan_conversion, ConversionAnalysis, ConversionRequest, GainMapChannels, GainMapCodec,
-    GainMapCodecLayout, GainMapEncoderCapabilities, GainMapSourceProfile, GainMapStorageProfile,
-    InputProcessingBranch, OppoCameraTail, SourceFamily, SourceHdrMode, TmapFormat,
+    plan_conversion, AppleFeatureRequest, CapabilityInventory, ConversionAnalysis,
+    ConversionRequest, GainMapChannels, GainMapCodec, GainMapCodecLayout, GainMapSourceProfile,
+    GainMapStorageProfile, InputProcessingBranch, OperationCapability, OppoCameraTail, SourceFamily,
+    SourceHdrMode, TmapFormat,
 };
 use xdremux_format::ChromaSampling;
 
@@ -31,8 +32,18 @@ fn analysis(chroma: Option<ChromaSampling>, bit_depth: u8) -> ConversionAnalysis
     }
 }
 
+fn capabilities(layouts: impl IntoIterator<Item = GainMapCodecLayout>) -> CapabilityInventory {
+    let mut operations = vec![OperationCapability::RasterDecoder(GainMapCodec::Jpeg)];
+    operations.extend(
+        layouts
+            .into_iter()
+            .map(OperationCapability::GainMapTileEncoder),
+    );
+    CapabilityInventory::new(operations)
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let direct = GainMapEncoderCapabilities::new([
+    let direct = capabilities([
         layout(ChromaSampling::Yuv420, 8),
         layout(ChromaSampling::Yuv444, 8),
     ]);
@@ -50,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         plan.gain_map_target.layout.luma_bit_depth
     );
 
-    let only_444 = GainMapEncoderCapabilities::new([layout(ChromaSampling::Yuv444, 8)]);
+    let only_444 = capabilities([layout(ChromaSampling::Yuv444, 8)]);
     let plan = plan_conversion(
         &analysis(Some(ChromaSampling::Yuv422), 8),
         ConversionRequest::default(),
@@ -77,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         plan.requested_input_processing_branch, plan.effective_input_processing_branch
     );
 
-    let only_420 = GainMapEncoderCapabilities::new([layout(ChromaSampling::Yuv420, 8)]);
+    let only_420 = capabilities([layout(ChromaSampling::Yuv420, 8)]);
     let error = plan_conversion(
         &analysis(Some(ChromaSampling::Yuv444), 8),
         ConversionRequest::default(),
@@ -93,5 +104,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .expect_err("10-bit input must never silently downconvert to 8-bit");
     println!("reject-10-to-8|{error}");
+
+    let encoder_only = CapabilityInventory::new([OperationCapability::GainMapTileEncoder(layout(
+        ChromaSampling::Yuv420,
+        8,
+    ))]);
+    let error = plan_conversion(
+        &analysis(Some(ChromaSampling::Yuv420), 8),
+        ConversionRequest::default(),
+        &encoder_only,
+    )
+    .expect_err("source JPEG must require a JPEG raster decoder capability");
+    println!("missing-decoder|{error}");
+
+    let styles_request = ConversionRequest {
+        apple_features: AppleFeatureRequest {
+            photographic_styles: true,
+            portrait: false,
+        },
+        ..ConversionRequest::default()
+    };
+    let error = plan_conversion(
+        &analysis(Some(ChromaSampling::Yuv420), 8),
+        styles_request,
+        &only_420,
+    )
+    .expect_err("Photographic Styles request must require its operation adapter");
+    println!("missing-styles|{error}");
+
     Ok(())
 }

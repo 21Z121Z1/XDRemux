@@ -1,11 +1,17 @@
 #![forbid(unsafe_code)]
 
+mod capabilities;
 mod source_profile;
 
 use std::collections::BTreeSet;
 
 use xdremux_format::ChromaSampling;
 
+pub use capabilities::{
+    CapabilityInventory, ConsumerValidator, GainMapTileEncoder, OperationCapability,
+    PhotographicStylesAdapter, PlatformCapability, PortraitAdapter, RasterDecoder,
+    RasterDecoderCapabilities, RawProcessor,
+};
 pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,
@@ -131,7 +137,7 @@ impl GainMapChannels {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum GainMapCodec {
     Jpeg,
     Hevc,
@@ -184,6 +190,10 @@ impl GainMapEncoderCapabilities {
     pub fn supports(&self, layout: GainMapCodecLayout) -> bool {
         self.layouts.contains(&layout)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = GainMapCodecLayout> + '_ {
+        self.layouts.iter().copied()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,13 +204,6 @@ pub enum BaseStrategy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContainerWriter {
     Rust,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PlatformCapability {
-    GainMapEncoder(GainMapCodecLayout),
-    ApplePhotographicStyles,
-    ApplePortrait,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -221,13 +224,14 @@ pub struct ConversionPlan {
     pub oppo_compatibility: OppoCompatibility,
     pub oppo_camera_tail: OppoCameraTail,
     pub tmap_format: TmapFormat,
-    pub required_capabilities: Vec<PlatformCapability>,
+    pub required_capabilities: Vec<OperationCapability>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlannerError {
     InvalidGainMapProfile(&'static str),
     UnsupportedGainMapLayout(GainMapCodecLayout),
+    MissingOperationCapabilities(Vec<OperationCapability>),
 }
 
 impl std::fmt::Display for PlannerError {
@@ -241,6 +245,16 @@ impl std::fmt::Display for PlannerError {
                     f,
                     "no encoder capability preserves Gain Map layout {layout:?}"
                 )
+            }
+            Self::MissingOperationCapabilities(capabilities) => {
+                f.write_str("missing required operation capabilities: ")?;
+                for (index, capability) in capabilities.iter().enumerate() {
+                    if index != 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{capability:?}")?;
+                }
+                Ok(())
             }
         }
     }
@@ -336,27 +350,35 @@ pub fn resolve_gain_map_encode_profile(
 pub fn plan_conversion(
     analysis: &ConversionAnalysis,
     request: ConversionRequest,
-    gain_map_encoder: &GainMapEncoderCapabilities,
+    capabilities: &CapabilityInventory,
 ) -> Result<ConversionPlan> {
     let effective_family = match request.family {
         FamilyPreference::Auto => analysis.source_family,
         FamilyPreference::X6 => SourceFamily::X6,
         FamilyPreference::X7 => SourceFamily::X7,
     };
-    let gain_map_target = resolve_gain_map_encode_profile(analysis.gain_map, gain_map_encoder)?;
+    let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
+    let gain_map_target = resolve_gain_map_encode_profile(analysis.gain_map, &gain_map_encoder)?;
     let effective_input_processing_branch = resolve_effective_input_processing_branch(
         request.input_processing_branch,
         request.oppo_camera_tail,
         request.tmap_format,
     );
 
-    let mut required_capabilities =
-        vec![PlatformCapability::GainMapEncoder(gain_map_target.layout)];
+    let mut required_capabilities = vec![
+        OperationCapability::RasterDecoder(analysis.gain_map.storage.codec),
+        OperationCapability::GainMapTileEncoder(gain_map_target.layout),
+    ];
     if request.apple_features.photographic_styles {
-        required_capabilities.push(PlatformCapability::ApplePhotographicStyles);
+        required_capabilities.push(OperationCapability::PhotographicStylesAdapter);
     }
     if request.apple_features.portrait {
-        required_capabilities.push(PlatformCapability::ApplePortrait);
+        required_capabilities.push(OperationCapability::PortraitAdapter);
+    }
+
+    let missing = capabilities.missing(required_capabilities.iter().copied());
+    if !missing.is_empty() {
+        return Err(PlannerError::MissingOperationCapabilities(missing));
     }
 
     Ok(ConversionPlan {
@@ -401,6 +423,18 @@ mod tests {
                 chroma_bit_depth: bit_depth,
             },
         }
+    }
+
+    fn capability_inventory(
+        layouts: impl IntoIterator<Item = GainMapCodecLayout>,
+    ) -> CapabilityInventory {
+        let mut operations = vec![OperationCapability::RasterDecoder(GainMapCodec::Jpeg)];
+        operations.extend(
+            layouts
+                .into_iter()
+                .map(OperationCapability::GainMapTileEncoder),
+        );
+        CapabilityInventory::new(operations)
     }
 
     #[test]
@@ -520,6 +554,49 @@ mod tests {
     }
 
     #[test]
+    fn planner_requires_decoder_for_the_probed_source_codec() {
+        let target = layout(ChromaSampling::Yuv420, 8);
+        let capabilities = CapabilityInventory::new([OperationCapability::GainMapTileEncoder(target)]);
+        let analysis = ConversionAnalysis {
+            source_family: SourceFamily::X7,
+            hdr_mode: SourceHdrMode::Uhdr,
+            gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+        };
+
+        assert_eq!(
+            plan_conversion(&analysis, ConversionRequest::default(), &capabilities),
+            Err(PlannerError::MissingOperationCapabilities(vec![
+                OperationCapability::RasterDecoder(GainMapCodec::Jpeg),
+            ]))
+        );
+    }
+
+    #[test]
+    fn planner_rejects_requested_apple_feature_without_its_adapter() {
+        let target = layout(ChromaSampling::Yuv420, 8);
+        let capabilities = capability_inventory([target]);
+        let analysis = ConversionAnalysis {
+            source_family: SourceFamily::X7,
+            hdr_mode: SourceHdrMode::Uhdr,
+            gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+        };
+        let request = ConversionRequest {
+            apple_features: AppleFeatureRequest {
+                photographic_styles: true,
+                portrait: false,
+            },
+            ..ConversionRequest::default()
+        };
+
+        assert_eq!(
+            plan_conversion(&analysis, request, &capabilities),
+            Err(PlannerError::MissingOperationCapabilities(vec![
+                OperationCapability::PhotographicStylesAdapter,
+            ]))
+        );
+    }
+
+    #[test]
     fn full_plan_preserves_base_and_declares_operation_capabilities() {
         let analysis = ConversionAnalysis {
             source_family: SourceFamily::X7,
@@ -535,7 +612,12 @@ mod tests {
             },
             ..ConversionRequest::default()
         };
-        let capabilities = GainMapEncoderCapabilities::new([layout(ChromaSampling::Yuv420, 8)]);
+        let target = layout(ChromaSampling::Yuv420, 8);
+        let capabilities = CapabilityInventory::new([
+            OperationCapability::RasterDecoder(GainMapCodec::Jpeg),
+            OperationCapability::GainMapTileEncoder(target),
+            OperationCapability::PhotographicStylesAdapter,
+        ]);
         let plan = plan_conversion(&analysis, request, &capabilities).unwrap();
 
         assert_eq!(plan.effective_family, SourceFamily::X7);
@@ -545,15 +627,13 @@ mod tests {
             plan.effective_input_processing_branch,
             InputProcessingBranch::Passthrough
         );
-        assert_eq!(
-            plan.gain_map_target.layout,
-            layout(ChromaSampling::Yuv420, 8)
-        );
+        assert_eq!(plan.gain_map_target.layout, target);
         assert_eq!(
             plan.required_capabilities,
             vec![
-                PlatformCapability::GainMapEncoder(layout(ChromaSampling::Yuv420, 8)),
-                PlatformCapability::ApplePhotographicStyles,
+                OperationCapability::RasterDecoder(GainMapCodec::Jpeg),
+                OperationCapability::GainMapTileEncoder(target),
+                OperationCapability::PhotographicStylesAdapter,
             ]
         );
     }

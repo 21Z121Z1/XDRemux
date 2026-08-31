@@ -73,7 +73,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-engine-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Establish the Rust conversion planner as the canonical product-policy layer while pinning remaining Swift legacy planning semantics with a differential oracle",
+            "scope": "Establish the Rust conversion planner and operation-level capability boundary as the canonical product-policy layer while pinning remaining Swift legacy planning semantics with a differential oracle",
             "checks": [
               {
                 "name": "rust-engine-regressions",
