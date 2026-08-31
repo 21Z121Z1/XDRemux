@@ -32,7 +32,8 @@ fn extract_xmp_string(data: &[u8]) -> Option<&str> {
     let end = [b"</x:xmpmeta>".as_slice(), b"</xmpmeta>".as_slice()]
         .into_iter()
         .filter_map(|closing| {
-            find_bytes(prefix, closing, start).and_then(|position| position.checked_add(closing.len()))
+            find_bytes(prefix, closing, start)
+                .and_then(|position| position.checked_add(closing.len()))
         })
         .min()?;
     std::str::from_utf8(prefix.get(start..end)?).ok()
@@ -186,8 +187,8 @@ fn resolve_fallback_video_range(
 
     if let Some(declared_length) = declared_length {
         if declared_length > 0 {
-            let declared_length = u64::try_from(declared_length)
-                .map_err(|_| MotionPhotoError::InvalidItemLength)?;
+            let declared_length =
+                u64::try_from(declared_length).map_err(|_| MotionPhotoError::InvalidItemLength)?;
             if declared_length <= file_size {
                 let start = file_size
                     .checked_sub(declared_length)
@@ -359,7 +360,10 @@ mod tests {
         assert_eq!(asset.source_kind, MotionPhotoSourceKind::OppoLivePhoto);
         assert_eq!(asset.video_resource_range.lower_bound, video_start);
         assert_eq!(asset.presentation_timestamp_us, Some(1_634_640));
-        assert_eq!(asset.presentation_source, Some(PresentationSource::AndroidXmp));
+        assert_eq!(
+            asset.presentation_source,
+            Some(PresentationSource::AndroidXmp)
+        );
         assert_eq!(asset.vendor_metadata.unwrap().stream_count, 1);
     }
 
@@ -385,7 +389,8 @@ mod tests {
             r#"<x:xmpmeta><rdf:RDF><rdf:Description xmlns:OpCamera="http://ns.oppo.com/photos/1.0/camera/" OpCamera:VideoLength="{}" GCamera:MotionPhotoPresentationTimestampUs="1634640"/></rdf:RDF></x:xmpmeta>"#,
             stream2.len()
         );
-        let lpex = r#"lpexLivePhotoExtension {"version":1,"coverFramePts":1666666,"matrixCount":0}"#;
+        let lpex =
+            r#"lpexLivePhotoExtension {"version":1,"coverFramePts":1666666,"matrixCount":0}"#;
         let mut data = vec![0xff, 0xd8];
         data.extend_from_slice(xmp.as_bytes());
         data.extend_from_slice(lpex.as_bytes());
@@ -432,7 +437,10 @@ mod tests {
         assert_eq!(asset.source_kind, MotionPhotoSourceKind::OppoLivePhoto);
         assert_eq!(asset.video_resource_range.lower_bound, stream1_start);
         assert_eq!(asset.presentation_timestamp_us, Some(1_634_640));
-        assert_eq!(asset.presentation_source, Some(PresentationSource::AndroidXmp));
+        assert_eq!(
+            asset.presentation_source,
+            Some(PresentationSource::AndroidXmp)
+        );
         assert_eq!(asset.vendor_metadata.unwrap().stream_count, 2);
     }
 
@@ -447,6 +455,9 @@ mod tests {
 
         let asset = parse_oppo_fallback(&data).unwrap().unwrap();
         assert_eq!(asset.presentation_timestamp_us, Some(777_777));
-        assert_eq!(asset.presentation_source, Some(PresentationSource::OppoCoverFrame));
+        assert_eq!(
+            asset.presentation_source,
+            Some(PresentationSource::OppoCoverFrame)
+        );
     }
 }
