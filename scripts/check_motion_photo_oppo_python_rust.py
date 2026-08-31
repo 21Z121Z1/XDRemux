@@ -194,6 +194,20 @@ def main() -> None:
     cover_lpex = b'lpexLivePhotoExtension {"version":0,"coverFramePts":777777}'
     assert_asset_case("cover_only", b"\xff\xd8" + cover_lpex + b"\xff\xd9" + cover_video)
 
+    sentinel_video = fake_mp4(payload_size=128, payload_byte=0x89)
+    sentinel_xmp = f"""
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF><rdf:Description xmlns:OpCamera="http://ns.oppo.com/photos/1.0/camera/"
+                            OpCamera:VideoLength="{len(sentinel_video)}"
+                            GCamera:MotionPhotoPresentationTimestampUs="-1"/></rdf:RDF>
+</x:xmpmeta>
+"""
+    sentinel_lpex = b'lpexLivePhotoExtension {"version":0,"coverFramePts":777777}'
+    assert_asset_case(
+        "sentinel_cover_fallback",
+        b"\xff\xd8" + sentinel_xmp.encode() + sentinel_lpex + b"\xff\xd9" + sentinel_video,
+    )
+
     recover_video = fake_mp4(payload_byte=0x99)
     malformed_oppo = f"""
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
