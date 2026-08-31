@@ -12,6 +12,7 @@ swift test --filter MotionPhotoAndroidRustConformanceTests/testSwiftAndRustAndro
 swift test --filter MotionPhotoOppoRustConformanceTests/testSwiftAndRustOppoParserContractsMatch
 swift test --filter MotionPhotoOppoSentinelRustConformanceTests/testMinusOneXMPPresentationFallsBackToLpexCoverFrame
 swift test --filter MotionPhotoPayloadRustConformanceTests/testSwiftAndRustPayloadExtractionContractsMatch
+swift test --filter MotionPhotoModelRustConformanceTests/testPresentationSourceRawValuesMatchRust
 python3 scripts/check_motion_photo_oppo_python_rust.py
 python3 scripts/check_motion_photo_payload_python_rust.py
 python3 -m unittest discover -s Tests -p 'test_python_motion_photo*.py' -v
