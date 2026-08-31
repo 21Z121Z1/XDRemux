@@ -19,8 +19,8 @@ fn balanced_json_range(data: &[u8], start: usize) -> Option<std::ops::Range<usiz
     let mut depth = 0usize;
     let mut in_string = false;
     let mut escaping = false;
-    for index in start..limit {
-        let byte = data[index];
+    for (relative, byte) in data[start..limit].iter().copied().enumerate() {
+        let index = start.checked_add(relative)?;
         if in_string {
             if escaping {
                 escaping = false;
