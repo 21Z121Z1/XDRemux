@@ -179,7 +179,7 @@ class PublicDocumentationTests(unittest.TestCase):
         ):
             self.assertIn(migration_field, roadmap)
 
-        self.assertIn("v1.4 is the final release", development)
+        self.assertIn("is the final release that ships both", development)
         self.assertNotIn("There is no stable release tag contract", development)
 
     def test_ci_references_present_documentation_test_module(self) -> None:
