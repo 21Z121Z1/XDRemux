@@ -96,11 +96,22 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
         return result
     }
 
-    private func manifestJSON(for blocks: [NamedBlock], preludeLength: Int) -> Data {
-        var end = preludeLength
+    private func manifestJSON(
+        for blocks: [NamedBlock],
+        preludeLength: Int,
+        dataAreaLength: Int
+    ) -> Data {
+        var start = preludeLength
         let objects = blocks.map { block -> String in
-            end += block.data.count
-            return "{\"name\":\"\(block.name)\",\"offset\":\(end),\"length\":\(block.data.count)}"
+            // Current OPPO manifests are consumed in two coordinate systems:
+            // blockStart first tries jsonStart - offset, while data-base
+            // calibration uses start = offset - length. Model the former exactly
+            // here; corpus tail padding is chosen so the calibration anchor also
+            // resolves to the actual data base.
+            let offset = dataAreaLength - start
+            let object = "{\"name\":\"\(block.name)\",\"offset\":\(offset),\"length\":\(block.data.count)}"
+            start += block.data.count
+            return object
         }
         return Data(("[" + objects.joined(separator: ",") + "]").utf8)
     }
@@ -109,7 +120,8 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
         marker: String,
         padding: Int,
         prelude: Data = Data(),
-        blocks: [NamedBlock]
+        blocks: [NamedBlock],
+        tailPadding: Int
     ) -> Data {
         var result = qtiPrefix(marker: marker)
         result.append(Data(repeating: 0xa5, count: padding))
@@ -117,21 +129,36 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
         for block in blocks {
             result.append(block.data)
         }
-        result.append(manifestJSON(for: blocks, preludeLength: prelude.count))
+        result.append(Data(repeating: 0xcc, count: tailPadding))
+        let dataAreaLength = prelude.count + blocks.reduce(0) { $0 + $1.data.count } + tailPadding
+        result.append(
+            manifestJSON(
+                for: blocks,
+                preludeLength: prelude.count,
+                dataAreaLength: dataAreaLength
+            )
+        )
         return result
     }
 
     private func jxrsContainer(
         prefix: Data,
         prelude: Data = Data(),
-        blocks: [NamedBlock]
+        blocks: [NamedBlock],
+        tailPadding: Int
     ) -> Data {
         var result = prefix
         result.append(prelude)
         for block in blocks {
             result.append(block.data)
         }
-        let json = manifestJSON(for: blocks, preludeLength: prelude.count)
+        result.append(Data(repeating: 0xdd, count: tailPadding))
+        let dataAreaLength = prelude.count + blocks.reduce(0) { $0 + $1.data.count } + tailPadding
+        let json = manifestJSON(
+            for: blocks,
+            preludeLength: prelude.count,
+            dataAreaLength: dataAreaLength
+        )
         result.append(json)
         result.append(0)
         result.append(Data("jxrs".utf8))
@@ -155,7 +182,8 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
                         NamedBlock(name: "local.hdr.meta.data", data: meta),
                         NamedBlock(name: "local.hdr.linear.mask", data: maskA),
                         NamedBlock(name: "portrait.depth", data: portrait),
-                    ]
+                    ],
+                    tailPadding: 136
                 ),
                 expectedMode: "lhdr",
                 expectedDataBaseDelta: 11
@@ -168,7 +196,8 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
                     prelude: meta,
                     blocks: [
                         NamedBlock(name: "local.hdr.linear.mask", data: maskB),
-                    ]
+                    ],
+                    tailPadding: 144
                 ),
                 expectedMode: "lhdr",
                 expectedDataBaseDelta: 7
@@ -180,7 +209,8 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
                     blocks: [
                         NamedBlock(name: "local.uhdr.gainmap.info", data: Data(count: 80)),
                         NamedBlock(name: "local.uhdr.gainmap.data", data: maskA),
-                    ]
+                    ],
+                    tailPadding: 80
                 ),
                 expectedMode: "uhdr",
                 expectedDataBaseDelta: 0
@@ -193,7 +223,8 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
                     blocks: [
                         NamedBlock(name: "local.uhdr.gainmap.info", data: validUHDRMetadata()),
                         NamedBlock(name: "local.uhdr.gainmap.data", data: maskB),
-                    ]
+                    ],
+                    tailPadding: 80
                 ),
                 expectedMode: "uhdr",
                 expectedDataBaseDelta: 5
