@@ -1,12 +1,20 @@
 name: XDRemux Repository Hardening
 
 on:
+  push:
+    branches:
+      - chore/repository-hardening-bootstrap
+    paths:
+      - ".github/workflows/repository-hardening.yml"
+      - "scripts/repository_settings.py"
+      - "Tests/test_repository_settings.py"
   pull_request:
     paths:
       - ".github/workflows/repository-hardening.yml"
       - ".github/dependabot.yml"
       - ".github/SECURITY.md"
       - ".github/SECURITY.zh-CN.md"
+      - ".github/workflows/completion-gate.yml"
       - "scripts/repository_settings.py"
       - "Tests/test_repository_settings.py"
   workflow_dispatch:
@@ -43,7 +51,7 @@ jobs:
         run: python3 -m unittest Tests.test_repository_settings
 
   administer:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -52,20 +60,32 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Require repository administration token
+      - name: Check repository administration token
         shell: bash
         run: |
-          if [[ -z "${REPOSITORY_ADMIN_TOKEN:-}" ]]; then
-            echo "::error::Add a fine-grained PAT as the REPOSITORY_ADMIN_TOKEN repository secret. Limit repository access to XDRemux and grant Administration: read and write."
-            exit 64
+          if [[ -n "${REPOSITORY_ADMIN_TOKEN:-}" ]]; then
+            echo "ADMIN_TOKEN_AVAILABLE=true" >> "$GITHUB_ENV"
+            exit 0
           fi
+          echo "ADMIN_TOKEN_AVAILABLE=false" >> "$GITHUB_ENV"
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "::notice::Repository bootstrap is staged but not applied. Add a short-lived fine-grained PAT as REPOSITORY_ADMIN_TOKEN, then re-run this job. Limit repository access to XDRemux and grant Administration: read and write."
+            exit 0
+          fi
+          echo "::error::Add a fine-grained PAT as the REPOSITORY_ADMIN_TOKEN repository secret. Limit repository access to XDRemux and grant Administration: read and write."
+          exit 64
 
       - name: Run repository settings controller
+        if: env.ADMIN_TOKEN_AVAILABLE == 'true'
         shell: bash
         run: |
-          args=(--mode "${{ inputs.mode }}")
-          if [[ "${{ inputs.enforce_codeql }}" == "true" ]]; then
-            args+=(--enforce-codeql)
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            args=(--mode apply)
+          else
+            args=(--mode "${{ inputs.mode }}")
+            if [[ "${{ inputs.enforce_codeql }}" == "true" ]]; then
+              args+=(--enforce-codeql)
+            fi
           fi
           python3 scripts/repository_settings.py "${args[@]}" | tee "$RUNNER_TEMP/repository-settings.json"
 
@@ -76,8 +96,15 @@ jobs:
           {
             echo "## XDRemux repository hardening"
             echo
-            echo "- Mode: \`${{ inputs.mode }}\`"
-            echo "- CodeQL merge protection requested: \`${{ inputs.enforce_codeql }}\`"
+            echo "- Event: \`${{ github.event_name }}\`"
+            if [[ "${{ github.event_name }}" == "push" ]]; then
+              echo "- Mode: \`apply\` (bootstrap)"
+              echo "- CodeQL merge protection requested: \`false\`"
+            else
+              echo "- Mode: \`${{ inputs.mode }}\`"
+              echo "- CodeQL merge protection requested: \`${{ inputs.enforce_codeql }}\`"
+            fi
+            echo "- Administration token available: \`${ADMIN_TOKEN_AVAILABLE:-false}\`"
             echo
             if [[ -s "$RUNNER_TEMP/repository-settings.json" ]]; then
               echo '```json'
