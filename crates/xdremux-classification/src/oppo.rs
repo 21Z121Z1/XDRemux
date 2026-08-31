@@ -113,7 +113,9 @@ pub fn classify_user_comment_with_context(
     }
 }
 
-pub fn classification_contract(classification: &PhotoClassification) -> PhotoClassificationContract {
+pub fn classification_contract(
+    classification: &PhotoClassification,
+) -> PhotoClassificationContract {
     let primary = classification.primary_capture_mode();
     PhotoClassificationContract {
         asset_type: classification.asset_type.as_str().to_owned(),
@@ -138,8 +140,6 @@ mod tests {
 
     #[test]
     fn parses_json_and_embedded_prefix_forms() {
-        assert_eq!(parse_flags(r#"{"oplustag":4194304}"#), None);
-        assert_eq!(parse_flags(r#"{"OplusTag":"18"}"#), None);
         assert_eq!(parse_flags("{\"oplustag\":4194304}"), Some(4_194_304));
         assert_eq!(parse_flags("{\"OplusTag\":\"18\"}"), Some(18));
         assert_eq!(parse_flags("ASCIIOplus_4096"), Some(4096));

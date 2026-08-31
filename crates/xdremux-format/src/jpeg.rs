@@ -89,10 +89,19 @@ fn classify_sampling(components: &[JpegComponent]) -> Option<ChromaSampling> {
     }
 }
 
-fn parse_sof(data: &[u8], marker: u8, payload_start: usize, payload_end: usize) -> Result<JpegFrameProfile> {
-    let payload = data
-        .get(payload_start..payload_end)
-        .ok_or_else(|| truncated(payload_start, payload_end.saturating_sub(payload_start), data.len()))?;
+fn parse_sof(
+    data: &[u8],
+    marker: u8,
+    payload_start: usize,
+    payload_end: usize,
+) -> Result<JpegFrameProfile> {
+    let payload = data.get(payload_start..payload_end).ok_or_else(|| {
+        truncated(
+            payload_start,
+            payload_end.saturating_sub(payload_start),
+            data.len(),
+        )
+    })?;
     if payload.len() < 6 {
         return Err(invalid("SOF payload is shorter than its fixed header"));
     }
@@ -121,7 +130,7 @@ fn parse_sof(data: &[u8], marker: u8, payload_start: usize, payload_end: usize) 
     }
 
     let mut components = Vec::with_capacity(component_count);
-    for chunk in payload[6..].chunks_exact(3) {
+    for chunk in payload[6..].as_chunks::<3>().0 {
         let sampling = chunk[1];
         let horizontal_sampling = sampling >> 4;
         let vertical_sampling = sampling & 0x0f;
@@ -220,10 +229,7 @@ mod tests {
 
     fn jpeg_with_sof(components: &[(u8, u8, u8, u8)], precision: u8) -> Vec<u8> {
         let mut output = vec![0xff, 0xd8];
-        output.extend_from_slice(&[
-            0xff, 0xe0, 0x00, 0x04, 0x12, 0x34,
-            0xff, 0xc0,
-        ]);
+        output.extend_from_slice(&[0xff, 0xe0, 0x00, 0x04, 0x12, 0x34, 0xff, 0xc0]);
         let segment_length = 8 + components.len() * 3;
         output.extend_from_slice(&(segment_length as u16).to_be_bytes());
         output.push(precision);

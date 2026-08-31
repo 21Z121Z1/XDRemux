@@ -3,7 +3,10 @@ use std::collections::BTreeSet;
 use crate::model::PhotoCapability;
 
 fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
-    !needle.is_empty() && haystack.windows(needle.len()).any(|window| window == needle)
+    !needle.is_empty()
+        && haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
 }
 
 /// Detects only capabilities backed by container evidence that the existing
@@ -19,9 +22,7 @@ pub fn detect_capabilities(data: &[u8]) -> BTreeSet<PhotoCapability> {
             PhotoCapability::Hdr,
         ]);
     }
-    if contains_bytes(data, br#""rear.depth""#)
-        && contains_bytes(data, br#""rear.depth.config""#)
-    {
+    if contains_bytes(data, br#""rear.depth""#) && contains_bytes(data, br#""rear.depth.config""#) {
         capabilities.insert(PhotoCapability::Depth);
     }
     capabilities

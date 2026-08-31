@@ -7,9 +7,9 @@ mod oppo;
 pub use capabilities::detect_capabilities;
 pub use model::{
     CameraVendor, OppoCaptureMode, OppoFlagEvidence, OppoPhotoClassification,
-    OppoPhotoClassificationStatus, PhotoAsset, PhotoAssetType, PhotoCapability, PhotoClassification,
-    PhotoClassificationContract, PhotoMetadataReadStatus, PhotoResource, PhotoResourceRole,
-    CLASSIFICATION_LAYOUT_VERSION, UNCLASSIFIED_FOLDER_NAME,
+    OppoPhotoClassificationStatus, PhotoAsset, PhotoAssetType, PhotoCapability,
+    PhotoClassification, PhotoClassificationContract, PhotoMetadataReadStatus, PhotoResource,
+    PhotoResourceRole, CLASSIFICATION_LAYOUT_VERSION, UNCLASSIFIED_FOLDER_NAME,
 };
 pub use oppo::{
     classification_contract, classify_user_comment, classify_user_comment_with_context, parse_flags,
@@ -31,7 +31,9 @@ mod tests {
         };
 
         for mut item in cases {
-            let object = item.as_object_mut().expect("fixture entry must be an object");
+            let object = item
+                .as_object_mut()
+                .expect("fixture entry must be an object");
             let name = object
                 .remove("name")
                 .and_then(|value| value.as_str().map(ToOwned::to_owned))
@@ -64,7 +66,10 @@ mod tests {
     fn photo_asset_keeps_live_photo_resources_together() {
         let asset = PhotoAsset::live_photo("IMG.heic", "IMG.mov", "asset-id");
         assert_eq!(asset.asset_type, PhotoAssetType::LivePhoto);
-        assert_eq!(asset.primary_image(), Some(PathBuf::from("IMG.heic").as_path()));
+        assert_eq!(
+            asset.primary_image(),
+            Some(PathBuf::from("IMG.heic").as_path())
+        );
         assert_eq!(
             asset
                 .resources

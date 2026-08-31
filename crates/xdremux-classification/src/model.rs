@@ -337,7 +337,9 @@ impl OppoPhotoClassification {
     }
 
     pub fn raw_flags(&self) -> Option<u64> {
-        self.flag_evidence.as_ref().map(|evidence| evidence.raw_flags)
+        self.flag_evidence
+            .as_ref()
+            .map(|evidence| evidence.raw_flags)
     }
 
     pub fn recognized_flags(&self) -> u64 {
@@ -396,8 +398,18 @@ impl PhotoClassification {
     pub fn tags(&self) -> Vec<String> {
         let mut tags = BTreeSet::new();
         tags.insert(self.asset_type.tag_id());
-        tags.extend(self.capture_modes.iter().copied().map(OppoCaptureMode::tag_id));
-        tags.extend(self.capabilities.iter().copied().map(PhotoCapability::tag_id));
+        tags.extend(
+            self.capture_modes
+                .iter()
+                .copied()
+                .map(OppoCaptureMode::tag_id),
+        );
+        tags.extend(
+            self.capabilities
+                .iter()
+                .copied()
+                .map(PhotoCapability::tag_id),
+        );
         if let Some(vendor) = self.vendor {
             tags.insert(vendor.tag_id());
         }
