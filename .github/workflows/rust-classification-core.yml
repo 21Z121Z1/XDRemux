@@ -1,0 +1,98 @@
+name: Rust classification core
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-classification/**"
+      - "Sources/XDRemuxCore/Metadata/PhotoCategorization.swift"
+      - "Tests/XDRemuxCoreTests/PhotoClassificationContractTests.swift"
+      - "Tests/test_photo_classification_contract.py"
+      - "Tests/fixtures/photo_classification_cases.json"
+      - "xdremux_py/categorize.py"
+      - "scripts/check_classification_conformance.sh"
+      - ".github/workflows/rust-classification-core.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-classification/**"
+      - "Sources/XDRemuxCore/Metadata/PhotoCategorization.swift"
+      - "Tests/XDRemuxCoreTests/PhotoClassificationContractTests.swift"
+      - "Tests/test_photo_classification_contract.py"
+      - "Tests/fixtures/photo_classification_cases.json"
+      - "xdremux_py/categorize.py"
+      - "scripts/check_classification_conformance.sh"
+      - ".github/workflows/rust-classification-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  classification-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint classification crate
+        run: cargo clippy --locked -p xdremux-classification --all-targets -- -D warnings
+      - name: Test classification crate
+        run: cargo test --locked -p xdremux-classification
+      - name: Pin Python classification oracle
+        run: python3 -m unittest Tests.test_photo_classification_contract
+
+  classification-conformance:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Compare Rust, Swift, and Python classification contracts
+        run: bash scripts/check_classification_conformance.sh
+      - name: Verify cross-language completion gate
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/xdremux-classification-gate.json" <<'JSON'
+          {
+            "schema_version": 1,
+            "scope": "Port the canonical photo tag/asset classification contract into an isolated Rust domain crate without changing product entry points",
+            "checks": [
+              {
+                "name": "rust-classification-regressions",
+                "kind": "regression",
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-classification"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "swift-python-rust-classification-conformance",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_classification_conformance.sh"],
+                "timeout_seconds": 1200
+              },
+              {
+                "name": "rust-classification-clippy",
+                "kind": "static",
+                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-classification", "--all-targets", "--", "-D", "warnings"],
+                "timeout_seconds": 600
+              }
+            ]
+          }
+          JSON
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/main \
+            --plan "$RUNNER_TEMP/xdremux-classification-gate.json"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/$(git rev-parse HEAD).json"
