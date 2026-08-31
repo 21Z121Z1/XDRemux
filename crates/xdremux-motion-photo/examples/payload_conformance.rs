@@ -46,16 +46,18 @@ fn run() -> Result<Value, String> {
     let max_bytes = parse_u64(&args[4])?;
     let buffer_size = parse_usize(&args[5])?;
 
-    Ok(match copy_payload_range_with_options(
-        Path::new(&args[0]),
-        range,
-        Path::new(&args[3]),
-        max_bytes,
-        buffer_size,
-    ) {
-        Ok(()) => json!({"status": "ok"}),
-        Err(error) => error_json(error),
-    })
+    Ok(
+        match copy_payload_range_with_options(
+            Path::new(&args[0]),
+            range,
+            Path::new(&args[3]),
+            max_bytes,
+            buffer_size,
+        ) {
+            Ok(()) => json!({"status": "ok"}),
+            Err(error) => error_json(error),
+        },
+    )
 }
 
 fn main() -> ExitCode {
