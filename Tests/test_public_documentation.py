@@ -160,6 +160,7 @@ class PublicDocumentationTests(unittest.TestCase):
         architecture = (ROOT / "docs/architecture.en.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "docs/roadmap.en.md").read_text(encoding="utf-8")
         development = (ROOT / "docs/development.en.md").read_text(encoding="utf-8")
+        pr_template = (ROOT / ".github/pull_request_template.md").read_text(encoding="utf-8")
 
         for path in ("docs/architecture.en.md", "docs/roadmap.en.md"):
             self.assertIn(path, agents)
@@ -178,6 +179,15 @@ class PublicDocumentationTests(unittest.TestCase):
             "promotion evidence",
         ):
             self.assertIn(migration_field, roadmap)
+
+        for ledger_field in (
+            "Capability / layer:",
+            "Invariant that must remain true:",
+            "Exact `HEAD`:",
+            "Residual gaps",
+            "Normalized contract:",
+        ):
+            self.assertIn(ledger_field, pr_template)
 
         self.assertIn("is the final release that ships both", development)
         self.assertNotIn("There is no stable release tag contract", development)
