@@ -78,8 +78,8 @@ pub fn ftyp_box_offsets(data: &[u8], range: ByteRange, buffer_size: usize) -> Re
         for index in 4..haystack.len().saturating_sub(3) {
             if &haystack[index..index + 4] == b"ftyp" {
                 let candidate = start + index - 4;
-                let candidate_u64 = u64::try_from(candidate)
-                    .map_err(|_| MotionPhotoError::ArithmeticOverflow)?;
+                let candidate_u64 =
+                    u64::try_from(candidate).map_err(|_| MotionPhotoError::ArithmeticOverflow)?;
                 if is_ftyp_box_start(data, candidate_u64, range.upper_bound)? {
                     rough.push(candidate_u64);
                 }

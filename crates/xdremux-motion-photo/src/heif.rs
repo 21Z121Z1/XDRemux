@@ -112,9 +112,7 @@ pub fn resolve_heif_motion_photo_ranges(
 ) -> Result<(ByteRange, ByteRange)> {
     let primary = items.first().ok_or(MotionPhotoError::InvalidDirectory)?;
     let motion = items.last().ok_or(MotionPhotoError::InvalidDirectory)?;
-    if !is_heif_mime(&primary.mime)
-        || !motion.semantic.eq_ignore_ascii_case("MotionPhoto")
-    {
+    if !is_heif_mime(&primary.mime) || !motion.semantic.eq_ignore_ascii_case("MotionPhoto") {
         return Err(MotionPhotoError::InvalidDirectory);
     }
     if primary.padding != 8 {
@@ -125,7 +123,10 @@ pub fn resolve_heif_motion_photo_ranges(
     if boxes.first().map(|value| value.kind) != Some(*b"ftyp") {
         return Err(MotionPhotoError::InvalidVideoPayload);
     }
-    let mpvd: Vec<_> = boxes.iter().filter(|value| value.kind == *b"mpvd").collect();
+    let mpvd: Vec<_> = boxes
+        .iter()
+        .filter(|value| value.kind == *b"mpvd")
+        .collect();
     if mpvd.len() != 1 {
         return Err(MotionPhotoError::InvalidVideoPayload);
     }
@@ -190,6 +191,9 @@ mod tests {
         ];
         let (still, extracted) = resolve_heif_motion_photo_ranges(&data, &items).unwrap();
         assert_eq!(still, ByteRange::new(0, mpvd_offset).unwrap());
-        assert_eq!(extracted, ByteRange::new(payload_start, payload_start + video.len() as u64).unwrap());
+        assert_eq!(
+            extracted,
+            ByteRange::new(payload_start, payload_start + video.len() as u64).unwrap()
+        );
     }
 }

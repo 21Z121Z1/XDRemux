@@ -16,7 +16,9 @@ impl fmt::Display for MotionPhotoError {
             Self::InvalidByteRange => "Motion Photo contains an invalid byte range",
             Self::InvalidDirectory => "Motion Photo container directory is invalid",
             Self::InvalidItemLength => "Motion Photo item length or padding is invalid",
-            Self::InvalidVideoPayload => "Motion Photo video payload is not a valid ISO BMFF stream",
+            Self::InvalidVideoPayload => {
+                "Motion Photo video payload is not a valid ISO BMFF stream"
+            }
             Self::ArithmeticOverflow => "Motion Photo byte-range arithmetic overflowed",
             Self::MalformedLpex => "OPPO LPEX metadata is malformed",
         };

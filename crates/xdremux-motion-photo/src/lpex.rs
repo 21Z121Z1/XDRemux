@@ -53,7 +53,8 @@ fn number_as_i64(value: Option<&Value>) -> Option<i64> {
             .or_else(|| number.as_u64().and_then(|value| i64::try_from(value).ok()))
             .or_else(|| {
                 number.as_f64().and_then(|value| {
-                    value.is_finite()
+                    value
+                        .is_finite()
                         .then(|| value.trunc())
                         .filter(|value| *value >= i64::MIN as f64 && *value <= i64::MAX as f64)
                         .map(|value| value as i64)
@@ -213,14 +214,16 @@ mod tests {
 
     #[test]
     fn rejects_non_finite_matrix_but_keeps_object() {
-        let data = br#"lpexLivePhotoExtension {"version":1,"photoCropMatrix":["nan",0,0,0,1,0,0,0,1]}"#;
+        let data =
+            br#"lpexLivePhotoExtension {"version":1,"photoCropMatrix":["nan",0,0,0,1,0,0,0,1]}"#;
         let metadata = parse_first_lpex_object(data).unwrap();
         assert!(metadata.photo_crop_matrix.is_none());
     }
 
     #[test]
     fn ignores_braces_inside_strings() {
-        let data = br#"lpexLivePhotoExtension {"version":1,"note":"} { still string","coverFramePts":42}"#;
+        let data =
+            br#"lpexLivePhotoExtension {"version":1,"note":"} { still string","coverFramePts":42}"#;
         let metadata = parse_first_lpex_object(data).unwrap();
         assert_eq!(metadata.cover_frame_pts_us, Some(42));
     }
