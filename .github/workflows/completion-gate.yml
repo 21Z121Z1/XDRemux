@@ -2,16 +2,9 @@ name: XDRemux Completion Gate
 
 on:
   pull_request:
-    paths:
-      - "Package.swift"
-      - "pyproject.toml"
-      - "Sources/**"
-      - "xdremux/**"
-      - "xdremux_py/**"
-      - "apps/macos/XDRemuxApp/Sources/**"
-      - "Tests/**"
-      - "scripts/**"
-      - ".github/workflows/completion-gate.yml"
+
+permissions:
+  contents: read
 
 jobs:
   exact-head:
@@ -29,7 +22,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-completion-plan.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Repository simplification: public package surface, declarative CLI parsing, retired compatibility entry points, and regression coverage",
+            "scope": "Default-branch required gate: package surfaces, buildability, tests, documentation policy, and canonical CLI behavior",
             "checks": [
               {
                 "name": "swift-package-build",
