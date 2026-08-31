@@ -112,18 +112,21 @@ pub fn copy_payload_range_with_options(
         let mut source = File::open(source_path)?;
         source.seek(SeekFrom::Start(range.lower_bound))?;
 
+        let buffer_size_u64 =
+            u64::try_from(buffer_size).map_err(|_| MotionPhotoError::ArithmeticOverflow)?;
         let mut remaining = range.length();
         let mut buffer = vec![0u8; buffer_size];
         while remaining > 0 {
-            let requested = usize::try_from(remaining.min(buffer_size as u64))
+            let requested = usize::try_from(remaining.min(buffer_size_u64))
                 .map_err(|_| MotionPhotoError::ArithmeticOverflow)?;
             let read = source.read(&mut buffer[..requested])?;
             if read == 0 {
                 return Err(MotionPhotoError::InvalidByteRange.into());
             }
             destination.write_all(&buffer[..read])?;
+            let read_u64 = u64::try_from(read).map_err(|_| MotionPhotoError::ArithmeticOverflow)?;
             remaining = remaining
-                .checked_sub(read as u64)
+                .checked_sub(read_u64)
                 .ok_or(MotionPhotoError::ArithmeticOverflow)?;
         }
         destination.sync_all()?;
@@ -185,7 +188,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(fs::read(&destination).unwrap(), (17u8..91).collect::<Vec<_>>());
+        assert_eq!(
+            fs::read(&destination).unwrap(),
+            (17u8..91).collect::<Vec<_>>()
+        );
     }
 
     #[test]
