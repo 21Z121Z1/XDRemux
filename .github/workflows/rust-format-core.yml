@@ -11,6 +11,7 @@ on:
       - "Sources/XDRemuxCore/HEIF/ISOBMFF.swift"
       - "scripts/check_rust_format_fixtures.sh"
       - "scripts/check_format_conformance.sh"
+      - "scripts/check_format_constructor_conformance.sh"
       - ".github/workflows/rust-format-core.yml"
   pull_request:
     paths:
@@ -22,6 +23,7 @@ on:
       - "Sources/XDRemuxCore/HEIF/ISOBMFF.swift"
       - "scripts/check_rust_format_fixtures.sh"
       - "scripts/check_format_conformance.sh"
+      - "scripts/check_format_constructor_conformance.sh"
       - ".github/workflows/rust-format-core.yml"
 
 permissions:
@@ -106,13 +108,16 @@ jobs:
       - name: Compare Swift and Rust on real HEIF fixtures
         run: bash scripts/check_format_conformance.sh
 
+      - name: Compare Swift and Rust constructor bytes
+        run: bash scripts/check_format_constructor_conformance.sh
+
       - name: Verify cross-language completion gate
         shell: bash
         run: |
           cat > "$RUNNER_TEMP/xdremux-format-conformance-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Prove xdremux-format matches established Swift container semantics on repository fixtures",
+            "scope": "Prove xdremux-format matches established Swift parser and constructor semantics",
             "checks": [
               {
                 "name": "swift-isobmff-hardening-contracts",
@@ -124,6 +129,12 @@ jobs:
                 "name": "swift-rust-format-conformance",
                 "kind": "integration",
                 "command": ["bash", "scripts/check_format_conformance.sh"],
+                "timeout_seconds": 1200
+              },
+              {
+                "name": "swift-rust-constructor-conformance",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_format_constructor_conformance.sh"],
                 "timeout_seconds": 1200
               }
             ]
