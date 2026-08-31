@@ -556,7 +556,8 @@ mod tests {
     #[test]
     fn planner_requires_decoder_for_the_probed_source_codec() {
         let target = layout(ChromaSampling::Yuv420, 8);
-        let capabilities = CapabilityInventory::new([OperationCapability::GainMapTileEncoder(target)]);
+        let capabilities =
+            CapabilityInventory::new([OperationCapability::GainMapTileEncoder(target)]);
         let analysis = ConversionAnalysis {
             source_family: SourceFamily::X7,
             hdr_mode: SourceHdrMode::Uhdr,

@@ -116,11 +116,8 @@ impl CapabilityInventory {
         T: RasterDecoder + ?Sized,
     {
         let capabilities = decoder.raster_decoder_capabilities();
-        self.operations.extend(
-            capabilities
-                .iter()
-                .map(OperationCapability::RasterDecoder),
-        );
+        self.operations
+            .extend(capabilities.iter().map(OperationCapability::RasterDecoder));
     }
 
     pub fn advertise_raw_processor<T>(&mut self, _processor: &T)
@@ -150,8 +147,7 @@ impl CapabilityInventory {
     where
         T: PortraitAdapter + ?Sized,
     {
-        self.operations
-            .insert(OperationCapability::PortraitAdapter);
+        self.operations.insert(OperationCapability::PortraitAdapter);
     }
 }
 
@@ -350,9 +346,7 @@ mod tests {
             _port: &dyn GainMapTileEncoder<Request = (), Output = (), Error = MockError>,
         ) {
         }
-        fn accept_decoder(
-            _port: &dyn RasterDecoder<Request = (), Output = (), Error = MockError>,
-        ) {
+        fn accept_decoder(_port: &dyn RasterDecoder<Request = (), Output = (), Error = MockError>) {
         }
         fn accept_styles(
             _port: &dyn PhotographicStylesAdapter<Request = (), Output = (), Error = MockError>,
