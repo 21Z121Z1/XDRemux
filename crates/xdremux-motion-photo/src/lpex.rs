@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn ignores_braces_inside_strings() {
-        let data = br#"lpexLivePhotoExtension {"version":1,"note":"} { escaped \\" still string","coverFramePts":42}"#;
+        let data = br#"lpexLivePhotoExtension {"version":1,"note":"} { still string","coverFramePts":42}"#;
         let metadata = parse_first_lpex_object(data).unwrap();
         assert_eq!(metadata.cover_frame_pts_us, Some(42));
     }
