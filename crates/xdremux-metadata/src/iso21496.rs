@@ -178,26 +178,28 @@ pub fn make_hdrgm_xmp(info: &[f64]) -> Result<Vec<u8>> {
     }
 
     let xml = format!(
-        "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n\
-<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"XMP Core 6.0.0\">\n\
-   <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n\
-      <rdf:Description rdf:about=\"\"\n\
-            xmlns:hdrgm=\"http://ns.adobe.com/hdr-gain-map/1.0/\"\n\
-            xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\"\n\
-            xmlns:photoshop=\"http://ns.adobe.com/photoshop/1.0/\">\n\
-         <hdrgm:Version>1.0</hdrgm:Version>\n\
-         <hdrgm:GainMapMin>{}</hdrgm:GainMapMin>\n\
-         <hdrgm:GainMapMax>{}</hdrgm:GainMapMax>\n\
-         <hdrgm:Gamma>{}</hdrgm:Gamma>\n\
-         <hdrgm:OffsetSDR>{}</hdrgm:OffsetSDR>\n\
-         <hdrgm:OffsetHDR>{}</hdrgm:OffsetHDR>\n\
-         <hdrgm:HDRCapacityMin>{:.6}</hdrgm:HDRCapacityMin>\n\
-         <hdrgm:HDRCapacityMax>{:.6}</hdrgm:HDRCapacityMax>\n\
-         <hdrgm:BaseRenditionIsHDR>False</hdrgm:BaseRenditionIsHDR>\n\
-      </rdf:Description>\n\
-   </rdf:RDF>\n\
-</x:xmpmeta>\n\
-<?xpacket end=\"w\"?>",
+        concat!(
+            "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n",
+            "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"XMP Core 6.0.0\">\n",
+            "   <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n",
+            "      <rdf:Description rdf:about=\"\"\n",
+            "            xmlns:hdrgm=\"http://ns.adobe.com/hdr-gain-map/1.0/\"\n",
+            "            xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\"\n",
+            "            xmlns:photoshop=\"http://ns.adobe.com/photoshop/1.0/\">\n",
+            "         <hdrgm:Version>1.0</hdrgm:Version>\n",
+            "         <hdrgm:GainMapMin>{}</hdrgm:GainMapMin>\n",
+            "         <hdrgm:GainMapMax>{}</hdrgm:GainMapMax>\n",
+            "         <hdrgm:Gamma>{}</hdrgm:Gamma>\n",
+            "         <hdrgm:OffsetSDR>{}</hdrgm:OffsetSDR>\n",
+            "         <hdrgm:OffsetHDR>{}</hdrgm:OffsetHDR>\n",
+            "         <hdrgm:HDRCapacityMin>{:.6}</hdrgm:HDRCapacityMin>\n",
+            "         <hdrgm:HDRCapacityMax>{:.6}</hdrgm:HDRCapacityMax>\n",
+            "         <hdrgm:BaseRenditionIsHDR>False</hdrgm:BaseRenditionIsHDR>\n",
+            "      </rdf:Description>\n",
+            "   </rdf:RDF>\n",
+            "</x:xmpmeta>\n",
+            "<?xpacket end=\"w\"?>"
+        ),
         format_three(gain_min),
         format_three(gain_max),
         format_three(gamma),
@@ -251,6 +253,20 @@ mod tests {
         assert!(xmp.contains("2.000000 2.321928 2.584963"));
         let first_channel_only = make_apple_tmap_payload(&info).unwrap();
         assert_eq!(first_channel_only.len(), 62);
+    }
+
+    #[test]
+    fn hdrgm_xmp_preserves_current_swift_indentation_contract() {
+        let xmp = String::from_utf8(make_hdrgm_xmp(&canonical_sample()).unwrap()).unwrap();
+        assert!(xmp.contains(
+            "\n   <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n"
+        ));
+        assert!(xmp.contains(
+            "\n      <rdf:Description rdf:about=\"\"\n            xmlns:hdrgm=\"http://ns.adobe.com/hdr-gain-map/1.0/\"\n"
+        ));
+        assert!(xmp.contains("\n         <hdrgm:Version>1.0</hdrgm:Version>\n"));
+        assert!(xmp.contains("\n      </rdf:Description>\n   </rdf:RDF>\n"));
+        assert!(!xmp.ends_with('\n'));
     }
 
     #[test]
