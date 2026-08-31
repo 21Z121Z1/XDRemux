@@ -7,7 +7,11 @@ fn bits(value: f64) -> String {
 }
 
 fn bits_list(values: &[f64]) -> String {
-    values.iter().map(|value| bits(*value)).collect::<Vec<_>>().join(",")
+    values
+        .iter()
+        .map(|value| bits(*value))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn emit_resolved(name: &str, resolved: &ResolvedScale) {
@@ -37,30 +41,44 @@ fn emit_resolved(name: &str, resolved: &ResolvedScale) {
 }
 
 fn run(path: &str) -> Result<(), String> {
-    let input = fs::read_to_string(path).map_err(|error| format!("unable to read {path}: {error}"))?;
+    let input =
+        fs::read_to_string(path).map_err(|error| format!("unable to read {path}: {error}"))?;
     for (line_index, raw_line) in input.lines().enumerate() {
         let line = raw_line.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
         let mut fields = line.split('\t');
-        let name = fields.next().ok_or_else(|| format!("line {} missing name", line_index + 1))?;
-        let mode_name = fields.next().ok_or_else(|| format!("line {} missing mode", line_index + 1))?;
-        let encoded = fields.next().ok_or_else(|| format!("line {} missing values", line_index + 1))?;
+        let name = fields
+            .next()
+            .ok_or_else(|| format!("line {} missing name", line_index + 1))?;
+        let mode_name = fields
+            .next()
+            .ok_or_else(|| format!("line {} missing mode", line_index + 1))?;
+        let encoded = fields
+            .next()
+            .ok_or_else(|| format!("line {} missing values", line_index + 1))?;
         if fields.next().is_some() {
             return Err(format!("line {} has extra fields", line_index + 1));
         }
         let mode = match mode_name {
             "lhdr" => ExtractionMode::Lhdr,
             "uhdr" => ExtractionMode::Uhdr,
-            _ => return Err(format!("line {} has unknown mode {mode_name}", line_index + 1)),
+            _ => {
+                return Err(format!(
+                    "line {} has unknown mode {mode_name}",
+                    line_index + 1
+                ))
+            }
         };
         let values = encoded
             .split(',')
             .map(|word| {
                 u32::from_str_radix(word, 16)
                     .map(|value| f64::from(f32::from_bits(value)))
-                    .map_err(|error| format!("line {} invalid float bits {word}: {error}", line_index + 1))
+                    .map_err(|error| {
+                        format!("line {} invalid float bits {word}: {error}", line_index + 1)
+                    })
             })
             .collect::<Result<Vec<_>, _>>()?;
         let resolved = resolve(&values, mode).map_err(|error| format!("{name}: {error}"))?;
