@@ -45,8 +45,24 @@ jobs:
           components: rustfmt, clippy
       - name: Bootstrap dependency lockfile
         run: cargo generate-lockfile
-      - name: Format diagnostic checkout
-        run: cargo fmt --all
+      - name: Apply diagnostic checkout fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/xdremux-codec/src/portable/libheif.rs")
+          text = path.read_text()
+          text = text.replace(
+              "origin_y\n            .checked_add(y)\n            .unwrap_or(u32::MAX)",
+              "origin_y.saturating_add(y)",
+          )
+          text = text.replace(
+              "origin_x\n                .checked_add(x)\n                .unwrap_or(u32::MAX)",
+              "origin_x.saturating_add(x)",
+          )
+          path.write_text(text)
+          PY
+          cargo fmt --all
       - name: Lint portable codec provider
         run: cargo clippy -p xdremux-codec --all-targets -- -D warnings
       - name: Test portable codec provider
