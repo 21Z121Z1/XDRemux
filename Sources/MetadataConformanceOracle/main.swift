@@ -129,14 +129,17 @@ func metadataVectors() throws -> String {
     }
 
     let exif = syntheticExif("Oplus_00000001")
+    let sourceStart = 1013
+    let sourceEnd = sourceStart + exif.count
     var mdat = Data(repeating: 0x55, count: 13)
     mdat.append(exif)
     mdat.append(Data(repeating: 0x77, count: 11))
+    let originalMdatCount = mdat.count
     let entry = ISOBMFFILocEntry(
         itemID: 7,
         constructionMethod: 0,
         dataReferenceIndex: 0,
-        extents: [(offset: 1013, length: exif.count)]
+        extents: [(offset: sourceStart, length: exif.count)]
     )
     guard let patchedComment = adjustedOppoUserComment(in: exif, compatibility: .on) else {
         throw MetadataConformanceOracleError.invalid("synthetic OPPO comment did not require activation")
@@ -149,8 +152,9 @@ func metadataVectors() throws -> String {
     ) else {
         throw MetadataConformanceOracleError.invalid("synthetic OPPO UserComment patch failed")
     }
+    let patchDelta = mdat.count - originalMdatCount
     lines.append(
-        "patch\t\(patch.sourceRange.lowerBound)\t\(patch.sourceRange.upperBound)\t\(patch.delta)\t\(hex(mdat))"
+        "patch\t\(sourceStart)\t\(sourceEnd)\t\(patchDelta)\t\(hex(mdat))"
     )
     emitExtent(
         "before",
@@ -170,7 +174,7 @@ func metadataVectors() throws -> String {
     emitExtent(
         "partial",
         adjustedExtentForOppoUserCommentPatch(
-            (offset: patch.sourceRange.lowerBound + 1, length: 20),
+            (offset: sourceStart + 1, length: 20),
             patch: patch
         ),
         into: &lines
