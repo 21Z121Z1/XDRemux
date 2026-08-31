@@ -6,12 +6,20 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/xdremux-format/**"
+      - "Package.swift"
+      - "Sources/FormatConformanceOracle/**"
+      - "Sources/XDRemuxCore/HEIF/ISOBMFF.swift"
+      - "scripts/check_format_conformance.sh"
       - ".github/workflows/rust-format-core.yml"
   pull_request:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/xdremux-format/**"
+      - "Package.swift"
+      - "Sources/FormatConformanceOracle/**"
+      - "Sources/XDRemuxCore/HEIF/ISOBMFF.swift"
+      - "scripts/check_format_conformance.sh"
       - ".github/workflows/rust-format-core.yml"
 
 permissions:
@@ -65,5 +73,53 @@ jobs:
           python3 scripts/agent_completion_gate.py run \
             --base origin/main \
             --plan "$RUNNER_TEMP/xdremux-format-gate.json"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/$(git rev-parse HEAD).json"
+
+  format-conformance:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Pin established Swift hardening contracts
+        run: swift test --filter ISOBMFFHardeningTests
+
+      - name: Compare Swift and Rust on real HEIF fixtures
+        run: bash scripts/check_format_conformance.sh
+
+      - name: Verify cross-language completion gate
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/xdremux-format-conformance-gate.json" <<'JSON'
+          {
+            "schema_version": 1,
+            "scope": "Prove xdremux-format matches established Swift container semantics on repository fixtures",
+            "checks": [
+              {
+                "name": "swift-isobmff-hardening-contracts",
+                "kind": "regression",
+                "command": ["swift", "test", "--filter", "ISOBMFFHardeningTests"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "swift-rust-format-conformance",
+                "kind": "regression",
+                "command": ["bash", "scripts/check_format_conformance.sh"],
+                "timeout_seconds": 1200
+              }
+            ]
+          }
+          JSON
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/main \
+            --plan "$RUNNER_TEMP/xdremux-format-conformance-gate.json"
           python3 scripts/agent_completion_gate.py verify \
             ".codex/verification-receipts/$(git rev-parse HEAD).json"
