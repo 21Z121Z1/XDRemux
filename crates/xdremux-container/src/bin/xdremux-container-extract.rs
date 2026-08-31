@@ -19,7 +19,8 @@ fn reset_directory(path: &Path) -> Result<(), String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(format!("unable to remove {}: {error}", path.display())),
     }
-    fs::create_dir_all(path).map_err(|error| format!("unable to create {}: {error}", path.display()))
+    fs::create_dir_all(path)
+        .map_err(|error| format!("unable to create {}: {error}", path.display()))
 }
 
 fn write_snapshot(input_path: &Path, output_path: &Path) -> Result<(), String> {
@@ -98,14 +99,12 @@ fn write_snapshot(input_path: &Path, output_path: &Path) -> Result<(), String> {
 
 fn run() -> Result<(), String> {
     let mut arguments = env::args_os().skip(1);
-    let input = arguments
-        .next()
-        .map(PathBuf::from)
-        .ok_or_else(|| "usage: xdremux-container-extract <input-file> <output-directory>".to_owned())?;
-    let output = arguments
-        .next()
-        .map(PathBuf::from)
-        .ok_or_else(|| "usage: xdremux-container-extract <input-file> <output-directory>".to_owned())?;
+    let input = arguments.next().map(PathBuf::from).ok_or_else(|| {
+        "usage: xdremux-container-extract <input-file> <output-directory>".to_owned()
+    })?;
+    let output = arguments.next().map(PathBuf::from).ok_or_else(|| {
+        "usage: xdremux-container-extract <input-file> <output-directory>".to_owned()
+    })?;
     if arguments.next().is_some() {
         return Err("usage: xdremux-container-extract <input-file> <output-directory>".to_owned());
     }
