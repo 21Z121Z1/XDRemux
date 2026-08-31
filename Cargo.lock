@@ -107,6 +107,13 @@ name = "xdremux-hdr"
 version = "0.1.0"
 
 [[package]]
+name = "xdremux-heif"
+version = "0.1.0"
+dependencies = [
+ "xdremux-format",
+]
+
+[[package]]
 name = "xdremux-metadata"
 version = "0.1.0"
 dependencies = [
