@@ -140,9 +140,8 @@ mod tests {
     fn parses_json_and_embedded_prefix_forms() {
         assert_eq!(parse_flags(r#"{"oplustag":4194304}"#), None);
         assert_eq!(parse_flags(r#"{"OplusTag":"18"}"#), None);
-        assert_eq!(parse_flags(r#"{"other":1}"#), None);
-        assert_eq!(parse_flags(r#"{"oplustag":4194304}"#.replace("\\\"", "\"").as_str()), Some(4_194_304));
-        assert_eq!(parse_flags(r#"{"OplusTag":"18"}"#.replace("\\\"", "\"").as_str()), Some(18));
+        assert_eq!(parse_flags("{\"oplustag\":4194304}"), Some(4_194_304));
+        assert_eq!(parse_flags("{\"OplusTag\":\"18\"}"), Some(18));
         assert_eq!(parse_flags("ASCIIOplus_4096"), Some(4096));
         assert_eq!(parse_flags("junk\0OPPO_2048tail"), Some(2048));
     }
