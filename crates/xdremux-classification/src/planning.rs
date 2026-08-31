@@ -170,9 +170,9 @@ pub fn resolve_photo_asset(
     pair_validator: impl FnOnce(&Path, &Path) -> bool,
 ) -> PhotoAsset {
     let image = primary_image.into();
-    if let Some(video) = companion_video.filter(|video| is_same_stem_sibling(&image, video))
-        && pair_validator(&image, &video)
-    {
+    if let Some(video) = companion_video.filter(|video| {
+        is_same_stem_sibling(&image, video) && pair_validator(&image, video)
+    }) {
         let id = image.to_string_lossy().into_owned();
         return PhotoAsset::live_photo(image, video, id);
     }
@@ -218,9 +218,7 @@ fn validate_input(input: &PhotoAssetPlanningInput) -> PlanningResult<&Path> {
         .keys()
         .find(|path| !resource_paths.contains(*path))
     {
-        return Err(PhotoAssetPlanningError::UnexpectedFingerprint {
-            path: path.clone(),
-        });
+        return Err(PhotoAssetPlanningError::UnexpectedFingerprint { path: path.clone() });
     }
     Ok(primary)
 }
