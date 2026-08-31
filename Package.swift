@@ -52,6 +52,14 @@ let package = Package(
             dependencies: ["XDRemuxCore"],
             path: "Sources/CoreImageRAWDiagnostics"
         ),
+        // Developer-only parser oracle used to compare the established Swift
+        // container semantics with the isolated Rust format crate. It is not a
+        // public package product and is never used by the conversion hot path.
+        .executableTarget(
+            name: "FormatConformanceOracle",
+            dependencies: ["XDRemuxCore"],
+            path: "Sources/FormatConformanceOracle"
+        ),
         .testTarget(
             name: "XDRemuxCoreTests",
             dependencies: ["XDRemuxCore"],
