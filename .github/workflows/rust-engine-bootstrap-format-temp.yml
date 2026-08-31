@@ -27,66 +27,30 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           path = Path("crates/xdremux-engine/src/lib.rs")
           text = path.read_text()
           replacements = [
-              (
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum FamilyPreference {\n    Auto,\n    X6,\n    X7,\n}\n\nimpl Default for FamilyPreference {\n    fn default() -> Self {\n        Self::Auto\n    }\n}\n",
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum FamilyPreference {\n    #[default]\n    Auto,\n    X6,\n    X7,\n}\n",
-              ),
-              (
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum InputProcessingBranch {\n    System,\n    SystemDecoded,\n    Hybrid,\n    Passthrough,\n}\n\nimpl Default for InputProcessingBranch {\n    fn default() -> Self {\n        Self::Hybrid\n    }\n}\n",
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum InputProcessingBranch {\n    System,\n    SystemDecoded,\n    #[default]\n    Hybrid,\n    Passthrough,\n}\n",
-              ),
-              (
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum TmapFormat {\n    Strict,\n    ImageIo,\n}\n\nimpl Default for TmapFormat {\n    fn default() -> Self {\n        Self::ImageIo\n    }\n}\n",
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum TmapFormat {\n    Strict,\n    #[default]\n    ImageIo,\n}\n",
-              ),
-              (
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum OppoCompatibility {\n    Auto,\n    Iso,\n    IsoNoLocal,\n    IsoGraph,\n    On,\n    Tail,\n    Off,\n}\n\nimpl Default for OppoCompatibility {\n    fn default() -> Self {\n        Self::Off\n    }\n}\n",
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum OppoCompatibility {\n    Auto,\n    Iso,\n    IsoNoLocal,\n    IsoGraph,\n    On,\n    Tail,\n    #[default]\n    Off,\n}\n",
-              ),
-              (
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum OppoCameraTail {\n    Off,\n    Watermark,\n    Compact,\n    Preserve,\n    PreserveWithoutPortrait,\n    PreserveWithoutPortraitOrPrivateHdr,\n    PreserveWithoutPrivateUhdr,\n    PreserveWithoutPrivateHdr,\n    PreserveNoUhdr,\n    PreserveNoHdr,\n}\n\nimpl Default for OppoCameraTail {\n    fn default() -> Self {\n        Self::PreserveWithoutPrivateHdr\n    }\n}\n",
-                  "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum OppoCameraTail {\n    Off,\n    Watermark,\n    Compact,\n    Preserve,\n    PreserveWithoutPortrait,\n    PreserveWithoutPortraitOrPrivateHdr,\n    PreserveWithoutPrivateUhdr,\n    #[default]\n    PreserveWithoutPrivateHdr,\n    PreserveNoUhdr,\n    PreserveNoHdr,\n}\n",
-              ),
+              ("#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum FamilyPreference {\n    Auto,\n    X6,\n    X7,\n}\n\nimpl Default for FamilyPreference {\n    fn default() -> Self {\n        Self::Auto\n    }\n}\n", "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum FamilyPreference {\n    #[default]\n    Auto,\n    X6,\n    X7,\n}\n"),
+              ("#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum InputProcessingBranch {\n    System,\n    SystemDecoded,\n    Hybrid,\n    Passthrough,\n}\n\nimpl Default for InputProcessingBranch {\n    fn default() -> Self {\n        Self::Hybrid\n    }\n}\n", "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum InputProcessingBranch {\n    System,\n    SystemDecoded,\n    #[default]\n    Hybrid,\n    Passthrough,\n}\n"),
+              ("#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum TmapFormat {\n    Strict,\n    ImageIo,\n}\n\nimpl Default for TmapFormat {\n    fn default() -> Self {\n        Self::ImageIo\n    }\n}\n", "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum TmapFormat {\n    Strict,\n    #[default]\n    ImageIo,\n}\n"),
+              ("#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum OppoCompatibility {\n    Auto,\n    Iso,\n    IsoNoLocal,\n    IsoGraph,\n    On,\n    Tail,\n    Off,\n}\n\nimpl Default for OppoCompatibility {\n    fn default() -> Self {\n        Self::Off\n    }\n}\n", "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum OppoCompatibility {\n    Auto,\n    Iso,\n    IsoNoLocal,\n    IsoGraph,\n    On,\n    Tail,\n    #[default]\n    Off,\n}\n"),
+              ("#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum OppoCameraTail {\n    Off,\n    Watermark,\n    Compact,\n    Preserve,\n    PreserveWithoutPortrait,\n    PreserveWithoutPortraitOrPrivateHdr,\n    PreserveWithoutPrivateUhdr,\n    PreserveWithoutPrivateHdr,\n    PreserveNoUhdr,\n    PreserveNoHdr,\n}\n\nimpl Default for OppoCameraTail {\n    fn default() -> Self {\n        Self::PreserveWithoutPrivateHdr\n    }\n}\n", "#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]\npub enum OppoCameraTail {\n    Off,\n    Watermark,\n    Compact,\n    Preserve,\n    PreserveWithoutPortrait,\n    PreserveWithoutPortraitOrPrivateHdr,\n    PreserveWithoutPrivateUhdr,\n    #[default]\n    PreserveWithoutPrivateHdr,\n    PreserveNoUhdr,\n    PreserveNoHdr,\n}\n"),
           ]
           for old, new in replacements:
               count = text.count(old)
               if count != 1:
                   raise SystemExit(f"expected one default impl site, found {count}")
               text = text.replace(old, new)
-
-          old = """        let mut request = ConversionRequest::default();
-        request.input_processing_branch = InputProcessingBranch::Passthrough;
-        request.oppo_camera_tail = OppoCameraTail::Off;
-"""
-          new = """        let request = ConversionRequest {
-            input_processing_branch: InputProcessingBranch::Passthrough,
-            oppo_camera_tail: OppoCameraTail::Off,
-            ..ConversionRequest::default()
-        };
-"""
+          old = "        let mut request = ConversionRequest::default();\n        request.input_processing_branch = InputProcessingBranch::Passthrough;\n        request.oppo_camera_tail = OppoCameraTail::Off;\n"
+          new = "        let request = ConversionRequest {\n            input_processing_branch: InputProcessingBranch::Passthrough,\n            oppo_camera_tail: OppoCameraTail::Off,\n            ..ConversionRequest::default()\n        };\n"
           count = text.count(old)
           if count != 1:
               raise SystemExit(f"expected one test request reassignment site, found {count}")
           path.write_text(text.replace(old, new))
-
           path = Path("crates/xdremux-engine/src/bin/xdremux-engine-vectors.rs")
           text = path.read_text()
-          old = """    let mut request = ConversionRequest::default();
-    request.input_processing_branch = InputProcessingBranch::Passthrough;
-    request.oppo_camera_tail = OppoCameraTail::Off;
-    request.tmap_format = TmapFormat::Strict;
-"""
-          new = """    let request = ConversionRequest {
-        input_processing_branch: InputProcessingBranch::Passthrough,
-        oppo_camera_tail: OppoCameraTail::Off,
-        tmap_format: TmapFormat::Strict,
-        ..ConversionRequest::default()
-    };
-"""
+          old = "    let mut request = ConversionRequest::default();\n    request.input_processing_branch = InputProcessingBranch::Passthrough;\n    request.oppo_camera_tail = OppoCameraTail::Off;\n    request.tmap_format = TmapFormat::Strict;\n"
+          new = "    let request = ConversionRequest {\n        input_processing_branch: InputProcessingBranch::Passthrough,\n        oppo_camera_tail: OppoCameraTail::Off,\n        tmap_format: TmapFormat::Strict,\n        ..ConversionRequest::default()\n    };\n"
           count = text.count(old)
           if count != 1:
               raise SystemExit(f"expected one vector request reassignment site, found {count}")
@@ -99,7 +63,7 @@ jobs:
           cargo clippy --locked -p xdremux-engine --all-targets -- -D warnings
           cargo test --locked -p xdremux-engine
           bash scripts/check_engine_plan_vectors.sh
-      - name: Commit verified formatting and cleanup
+      - name: Commit verified engine cleanup
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
