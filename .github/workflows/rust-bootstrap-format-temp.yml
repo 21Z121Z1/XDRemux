@@ -22,6 +22,8 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
+      - name: Refresh canonical Cargo lockfile
+        run: cargo generate-lockfile
       - name: Apply canonical rustfmt
         run: cargo fmt --all
       - name: Verify format crate
@@ -32,15 +34,15 @@ jobs:
         run: |
           cargo clippy --locked -p xdremux-classification --all-targets -- -D warnings
           cargo test --locked -p xdremux-classification
-      - name: Commit verified formatting
+      - name: Commit verified bootstrap output
         shell: bash
         run: |
           if git diff --quiet; then
-            echo "rustfmt made no changes"
+            echo "Cargo/rustfmt made no changes"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/xdremux-format crates/xdremux-classification
-          git commit -m "style(rust): apply canonical core formatting"
+          git add Cargo.lock crates/xdremux-format crates/xdremux-classification
+          git commit -m "build(rust): normalize classification bootstrap"
           git push origin HEAD:feat/rust-xdremux-format
