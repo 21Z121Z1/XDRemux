@@ -1,18 +1,20 @@
-# 技术实现索引
+# v1.4 技术实现索引
 
 [English](README.en.md) | 简体中文
 
-本目录索引 XDRemux 当前稳定的实现契约。
+本目录索引已经发布的 XDRemux v1.4 Swift/Python 线的稳定实现契约。
+
+系统级 ownership、架构层和 branch 职责见[系统架构](../architecture.md)。Rust 迁移见[迁移路线图](../roadmap.md)。不要把下面的 v1.4 目录结构当作未来架构规范。
 
 普通使用见[项目 README](../../README.md)，命令行为见 [CLI 参考](../cli.md)。
 
-## 当前架构
+## v1.4 实现结构
 
 ### `XDRemuxCore`
 
-`XDRemuxCore` 负责不需要 Apple feature layer 的格式和转换逻辑。
+`XDRemuxCore` 在 v1.4 中负责不需要 Apple feature layer 的格式和转换逻辑。
 
-当前职责包括：
+当前 v1.4 职责包括：
 
 - ProXDR metadata 解析；
 - ISO/TS 21496-1 Gain Map 转换；
@@ -23,9 +25,9 @@
 
 ### `XDRemuxAppleFeatures`
 
-`XDRemuxAppleFeatures` 负责 Apple 特有转换和验证。
+`XDRemuxAppleFeatures` 在 v1.4 中负责 Apple 特有转换和验证。
 
-当前职责包括：
+当前 v1.4 职责包括：
 
 - Motion Photo → Apple Live Photo；
 - Live Photo 静态照片和 MOV 写入；
@@ -37,7 +39,7 @@
 
 ### CLI 层
 
-`Sources/XDRemuxCLI/` 负责用户命令解析和路由。
+`Sources/XDRemuxCLI/` 负责 v1.4 用户命令解析和路由。
 
 CLI 会在普通 HDR 命令链路前自动路由支持的 Motion Photo 输入。
 
@@ -45,11 +47,15 @@ Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](
 
 ### Python 实现
 
-`xdremux_py/` 是独立的跨平台实现。
+`xdremux_py/` 是独立的跨平台 v1.4 实现。
 
 它支持标准 HDR 转换、Motion Photo → Live Photo 和分类，不实现摄影风格或 Apple 人像生成。
 
+Rust transition 中，只有当前 contract 或独立 evidence 支持时，才把这些实现作为有边界的 behavioral reference。不要为了形式对称保留它们的 file/module 切分。
+
 ## 稳定媒体契约
+
+即使 implementation owner 发生变化，这些契约仍然是 migration input。
 
 ### 标准 HDR
 
@@ -73,8 +79,12 @@ Live Photo 输出是资源对事务。一个资源最终发布失败时，不能
 
 batch 复用要求 source provenance。来源未知的有效 pair 不能被接受为无关输入的输出。
 
+Publication、provenance、collision handling 和 crash recovery 都是 product correctness contract。Rust rewrite 必须通过显式第 5 层 ownership 保留它们，而不是继续把它们当作 CLI-specific behavior。
+
 ## 当前技术文档
 
+- [系统架构](../architecture.md)
+- [迁移路线图](../roadmap.md)
 - [Apple 功能文档](../apple-features.md)
 - [开发文档](../development.md)
 - [测试政策](../quality/testing.md)
