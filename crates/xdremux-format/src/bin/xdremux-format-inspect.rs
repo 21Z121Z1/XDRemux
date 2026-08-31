@@ -1,10 +1,17 @@
 use std::{env, fs, process};
 
 use xdremux_format::isobmff::{
-    parse_ispe_dimensions, parse_meta_box, scan_top_level_boxes, BoxHeader, FourCC, IPRP, ISPE,
-    META,
+    parse_boxes, parse_ispe_dimensions, parse_meta_box, scan_top_level_boxes, BoxHeader, IPRP,
+    ISPE, META,
 };
-use xdremux_format::{FormatError, Result};
+use xdremux_format::{FormatError, FourCC, Result};
+
+fn invalid(context: &'static str, message: impl Into<String>) -> FormatError {
+    FormatError::InvalidData {
+        context,
+        message: message.into(),
+    }
+}
 
 fn fourcc_hex(kind: FourCC) -> String {
     kind.as_bytes()
@@ -13,11 +20,15 @@ fn fourcc_hex(kind: FourCC) -> String {
         .collect::<String>()
 }
 
-fn required_box<'a>(boxes: &'a [BoxHeader], kind: FourCC, context: &'static str) -> Result<&'a BoxHeader> {
+fn required_box<'a>(
+    boxes: &'a [BoxHeader],
+    kind: FourCC,
+    context: &'static str,
+) -> Result<&'a BoxHeader> {
     boxes
         .iter()
         .find(|header| header.kind == kind)
-        .ok_or_else(|| FormatError::invalid(context, format!("required box {kind} is missing")))
+        .ok_or_else(|| invalid(context, format!("required box {kind} is missing")))
 }
 
 fn canonical_summary(data: &[u8]) -> Result<String> {
@@ -124,23 +135,24 @@ fn canonical_summary(data: &[u8]) -> Result<String> {
         lines.push("iref-version\t0".to_string());
     }
 
-    let top_meta_children = xdremux_format::isobmff::parse_boxes(
-        data,
-        (meta_header.data_start + 4)..meta_header.data_end,
-    )?;
-    let iprp = required_box(&top_meta_children, IPRP, "meta")?;
+    let meta_children = parse_boxes(data, (meta_header.data_start + 4)..meta_header.data_end)?;
+    let _iprp = required_box(&meta_children, IPRP, "meta")?;
     let mut properties = meta.properties;
     properties.sort_by_key(|property| property.index);
     for property in properties {
         let geometry = if property.kind == ISPE {
-            let header = BoxHeader {
-                kind: property.kind,
-                box_start: property.box_range.start,
-                data_start: property.box_range.start + 8,
-                data_end: property.box_range.end,
-                size: property.box_range.end - property.box_range.start,
-            };
-            let (width, height) = parse_ispe_dimensions(data, &header)?;
+            let parsed = parse_boxes(data, property.box_range.clone())?;
+            if parsed.len() != 1 {
+                return Err(invalid(
+                    "ipco property",
+                    format!(
+                        "property {} range contains {} boxes",
+                        property.index,
+                        parsed.len()
+                    ),
+                ));
+            }
+            let (width, height) = parse_ispe_dimensions(data, &parsed[0])?;
             format!("\t{width}\t{height}")
         } else {
             String::new()
@@ -153,9 +165,6 @@ fn canonical_summary(data: &[u8]) -> Result<String> {
         ));
     }
 
-    // Ensure the same `iprp` box that supplied the property list is structurally complete.
-    let _ = iprp;
-
     Ok(lines.join("\n") + "\n")
 }
 
@@ -163,19 +172,19 @@ fn run() -> Result<()> {
     let mut arguments = env::args_os();
     let _program = arguments.next();
     let Some(path) = arguments.next() else {
-        return Err(FormatError::invalid(
+        return Err(invalid(
             "xdremux-format-inspect",
             "usage: xdremux-format-inspect <heif-file>",
         ));
     };
     if arguments.next().is_some() {
-        return Err(FormatError::invalid(
+        return Err(invalid(
             "xdremux-format-inspect",
             "expected exactly one input path",
         ));
     }
     let data = fs::read(&path).map_err(|error| {
-        FormatError::invalid(
+        invalid(
             "xdremux-format-inspect",
             format!("cannot read {}: {error}", path.to_string_lossy()),
         )
