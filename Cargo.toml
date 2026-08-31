@@ -2,6 +2,7 @@
 members = [
     "crates/xdremux-format",
     "crates/xdremux-metadata",
+    "crates/xdremux-hdr",
 ]
 resolver = "2"
 
