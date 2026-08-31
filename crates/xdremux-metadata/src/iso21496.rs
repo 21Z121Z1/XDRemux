@@ -15,11 +15,19 @@ fn require_info_floats(values: &[f64]) -> Result<()> {
 }
 
 fn swift_max(left: f64, right: f64) -> f64 {
-    if left < right { right } else { left }
+    if left < right {
+        right
+    } else {
+        left
+    }
 }
 
 fn safe_log2(value: f64) -> f64 {
-    if value > 0.0 { value.log2() } else { 0.0 }
+    if value > 0.0 {
+        value.log2()
+    } else {
+        0.0
+    }
 }
 
 fn push_i32_be(value: i32, output: &mut Vec<u8>) {
@@ -42,7 +50,10 @@ fn append_imageio_rational(value: f64, output: &mut Vec<u8>) {
     }
 
     let rounded = value.round();
-    if (value - rounded).abs() < 1e-12 && rounded >= f64::from(i32::MIN) && rounded <= f64::from(i32::MAX) {
+    if (value - rounded).abs() < 1e-12
+        && rounded >= f64::from(i32::MIN)
+        && rounded <= f64::from(i32::MAX)
+    {
         push_i32_be(rounded as i32, output);
         push_i32_be(1, output);
         return;
@@ -138,7 +149,10 @@ pub fn make_strict_tmap_payload(payload: &[u8]) -> Result<Vec<u8>> {
     if payload.len() != 62 && payload.len() != 142 {
         return Err(MetadataError::invalid(
             "strict ISO 21496 tmap",
-            format!("expected a 62- or 142-byte ImageIO payload, got {}", payload.len()),
+            format!(
+                "expected a 62- or 142-byte ImageIO payload, got {}",
+                payload.len()
+            ),
         ));
     }
     let mut output = Vec::with_capacity(payload.len() + 3);
@@ -202,8 +216,8 @@ mod tests {
     fn canonical_sample() -> [f64; 20] {
         let ratio = 4.926108360290527;
         [
-            1.0, 1.0, 1.0, 1.0, ratio, ratio, ratio, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 1.0, ratio, ratio, 0.0,
+            1.0, 1.0, 1.0, 1.0, ratio, ratio, ratio, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            1.0, ratio, ratio, 0.0,
         ]
     }
 
@@ -229,8 +243,8 @@ mod tests {
     #[test]
     fn distinct_channels_are_preserved_in_xmp_but_not_first_channel_tmap() {
         let info = [
-            1.25, 1.5, 1.75, 1.0, 4.0, 5.0, 6.0, 0.8, 1.1, 1.2, 0.01, 0.02, 0.03,
-            0.04, 0.05, 0.06, 1.5, 6.5, 2.0, 0.0,
+            1.25, 1.5, 1.75, 1.0, 4.0, 5.0, 6.0, 0.8, 1.1, 1.2, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06,
+            1.5, 6.5, 2.0, 0.0,
         ];
         let xmp = String::from_utf8(make_hdrgm_xmp(&info).unwrap()).unwrap();
         assert!(xmp.contains("0.321928 0.584963 0.807355"));

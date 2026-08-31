@@ -146,7 +146,12 @@ pub fn adjusted_oppo_user_comment_in_heif(
         return Ok(None);
     };
     let meta = parse_meta_box(data, meta_header)?;
-    let Some(exif_item) = meta.iinf.entries.iter().find(|item| item.item_type == Some(EXIF)) else {
+    let Some(exif_item) = meta
+        .iinf
+        .entries
+        .iter()
+        .find(|item| item.item_type == Some(EXIF))
+    else {
         return Ok(None);
     };
     let exif_entry = meta
@@ -229,9 +234,9 @@ pub fn apply_oppo_user_comment_patch(
     let extent_end = extent_start
         .checked_add(extent.length)
         .ok_or_else(|| MetadataError::overflow("Exif extent end"))?;
-    let local_start_u64 = extent_start
-        .checked_sub(mdat_data_start)
-        .ok_or_else(|| MetadataError::invalid("OPPO UserComment patch", "Exif extent starts before mdat"))?;
+    let local_start_u64 = extent_start.checked_sub(mdat_data_start).ok_or_else(|| {
+        MetadataError::invalid("OPPO UserComment patch", "Exif extent starts before mdat")
+    })?;
     let local_start = usize::try_from(local_start_u64)
         .map_err(|_| MetadataError::overflow("Exif local start"))?;
     let extent_length = usize::try_from(extent.length)
@@ -241,7 +246,9 @@ pub fn apply_oppo_user_comment_patch(
         .ok_or_else(|| MetadataError::overflow("Exif local end"))?;
     let mut exif_payload = mdat_payload
         .get(local_start..local_end)
-        .ok_or_else(|| MetadataError::invalid("OPPO UserComment patch", "Exif extent is outside mdat"))?
+        .ok_or_else(|| {
+            MetadataError::invalid("OPPO UserComment patch", "Exif extent is outside mdat")
+        })?
         .to_vec();
 
     if exif_payload.len() < 12 {
@@ -253,7 +260,9 @@ pub fn apply_oppo_user_comment_patch(
             .map_err(|_| MetadataError::invalid("Exif item", "missing TIFF offset"))?,
     );
     let tiff_start = 4usize
-        .checked_add(usize::try_from(tiff_offset).map_err(|_| MetadataError::overflow("TIFF offset"))?)
+        .checked_add(
+            usize::try_from(tiff_offset).map_err(|_| MetadataError::overflow("TIFF offset"))?,
+        )
         .ok_or_else(|| MetadataError::overflow("TIFF start"))?;
     let tiff_header_end = tiff_start
         .checked_add(8)
@@ -279,7 +288,10 @@ pub fn apply_oppo_user_comment_patch(
             continue;
         }
         let ifd = tiff_start
-            .checked_add(usize::try_from(relative_ifd).map_err(|_| MetadataError::overflow("TIFF IFD offset"))?)
+            .checked_add(
+                usize::try_from(relative_ifd)
+                    .map_err(|_| MetadataError::overflow("TIFF IFD offset"))?,
+            )
             .ok_or_else(|| MetadataError::overflow("TIFF IFD start"))?;
         let count = usize::from(read_u16(&exif_payload, ifd, endian, "TIFF IFD")?);
         if count > 4096 {
@@ -288,7 +300,11 @@ pub fn apply_oppo_user_comment_patch(
         for index in 0..count {
             let entry_offset = ifd
                 .checked_add(2)
-                .and_then(|value| index.checked_mul(12).and_then(|delta| value.checked_add(delta)))
+                .and_then(|value| {
+                    index
+                        .checked_mul(12)
+                        .and_then(|delta| value.checked_add(delta))
+                })
                 .ok_or_else(|| MetadataError::overflow("TIFF IFD entry"))?;
             let entry_end = entry_offset
                 .checked_add(12)
@@ -327,11 +343,14 @@ pub fn apply_oppo_user_comment_patch(
         entry + 8
     } else {
         tiff_start
-            .checked_add(usize::try_from(old_value_offset).map_err(|_| MetadataError::overflow("UserComment offset"))?)
+            .checked_add(
+                usize::try_from(old_value_offset)
+                    .map_err(|_| MetadataError::overflow("UserComment offset"))?,
+            )
             .ok_or_else(|| MetadataError::overflow("UserComment start"))?
     };
-    let old_count_usize = usize::try_from(old_count)
-        .map_err(|_| MetadataError::overflow("UserComment count"))?;
+    let old_count_usize =
+        usize::try_from(old_count).map_err(|_| MetadataError::overflow("UserComment count"))?;
     let old_value_end = old_value_start
         .checked_add(old_count_usize)
         .ok_or_else(|| MetadataError::overflow("UserComment end"))?;
@@ -342,7 +361,10 @@ pub fn apply_oppo_user_comment_patch(
     let Some(tag) = find_oppo_tag_flag(&new_value) else {
         return Ok(None);
     };
-    new_value.splice(tag.offset..tag.digits_end, patched_user_comment.as_bytes().iter().copied());
+    new_value.splice(
+        tag.offset..tag.digits_end,
+        patched_user_comment.as_bytes().iter().copied(),
+    );
 
     while exif_payload.len() % 4 != 0 {
         exif_payload.push(0);
@@ -356,7 +378,13 @@ pub fn apply_oppo_user_comment_patch(
     let new_value_offset = u32::try_from(new_value_offset)
         .map_err(|_| MetadataError::overflow("new UserComment offset"))?;
     exif_payload.extend_from_slice(&new_value);
-    write_u32(&mut exif_payload, entry + 4, endian, new_count, "UserComment entry")?;
+    write_u32(
+        &mut exif_payload,
+        entry + 4,
+        endian,
+        new_count,
+        "UserComment entry",
+    )?;
     write_u32(
         &mut exif_payload,
         entry + 8,
@@ -367,8 +395,8 @@ pub fn apply_oppo_user_comment_patch(
 
     let new_extent_length = exif_payload.len();
     mdat_payload.splice(local_start..local_end, exif_payload);
-    let old_len_i64 = i64::try_from(extent_length)
-        .map_err(|_| MetadataError::overflow("Exif patch delta"))?;
+    let old_len_i64 =
+        i64::try_from(extent_length).map_err(|_| MetadataError::overflow("Exif patch delta"))?;
     let new_len_i64 = i64::try_from(new_extent_length)
         .map_err(|_| MetadataError::overflow("Exif patch delta"))?;
     let delta = new_len_i64
@@ -463,10 +491,19 @@ mod tests {
     #[test]
     fn routing_matches_current_swift_contract() {
         let source = OPPO_ULTRA_HDR_FLAG | ISO_ULTRA_HDR_FLAG | LOCAL_HDR_FLAG | 0x1234;
-        assert_eq!(target_oppo_tag_flags(source, OppoCompatibility::Off), source);
-        assert_eq!(target_oppo_tag_flags(source, OppoCompatibility::Auto), source);
+        assert_eq!(
+            target_oppo_tag_flags(source, OppoCompatibility::Off),
+            source
+        );
+        assert_eq!(
+            target_oppo_tag_flags(source, OppoCompatibility::Auto),
+            source
+        );
         assert_eq!(target_oppo_tag_flags(source, OppoCompatibility::On), source);
-        assert_eq!(target_oppo_tag_flags(source, OppoCompatibility::Tail), source);
+        assert_eq!(
+            target_oppo_tag_flags(source, OppoCompatibility::Tail),
+            source
+        );
         assert_eq!(
             target_oppo_tag_flags(source, OppoCompatibility::Iso),
             (source & !OPPO_ULTRA_HDR_FLAG) | ISO_ULTRA_HDR_FLAG

@@ -100,8 +100,8 @@ fn run() -> Result<()> {
         0.0,
     ];
     let distinct = [
-        1.25, 1.5, 1.75, 1.0, 4.0, 5.0, 6.0, 0.8, 1.1, 1.2, 0.01, 0.02, 0.03,
-        0.04, 0.05, 0.06, 1.5, 6.5, 2.0, 0.0,
+        1.25, 1.5, 1.75, 1.0, 4.0, 5.0, 6.0, 0.8, 1.1, 1.2, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06,
+        1.5, 6.5, 2.0, 0.0,
     ];
     for (name, info) in [("canonical", canonical), ("distinct", distinct)] {
         let apple = make_apple_tmap_payload(&info)?;
@@ -116,7 +116,10 @@ fn run() -> Result<()> {
             "metadata\t{name}\tstrict-native-tmap\t{}",
             hex(&make_strict_tmap_payload(&native)?)
         );
-        println!("metadata\t{name}\thdrgm-xmp\t{}", hex(&make_hdrgm_xmp(&info)?));
+        println!(
+            "metadata\t{name}\thdrgm-xmp\t{}",
+            hex(&make_hdrgm_xmp(&info)?)
+        );
     }
 
     let exif = synthetic_exif("Oplus_00000001");
