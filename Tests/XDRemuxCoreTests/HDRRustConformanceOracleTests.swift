@@ -42,12 +42,20 @@ final class HDRRustConformanceOracleTests: XCTestCase {
         }
     }
 
+    private func caseNamed(_ name: String) throws -> EDRCase {
+        try XCTUnwrap(loadCases().first { $0.name == name }, "missing HDR EDR case \(name)")
+    }
+
     private func bits(_ value: Double) -> String {
         String(format: "%016llx", value.bitPattern)
     }
 
     private func bitsList(_ values: [Double]) -> String {
         values.map(bits).joined(separator: ",")
+    }
+
+    private func hex(_ data: Data) -> String {
+        data.map { String(format: "%02x", $0) }.joined()
     }
 
     private func resolvedLine(name: String, resolved: ResolvedScale) -> String {
@@ -89,6 +97,80 @@ final class HDRRustConformanceOracleTests: XCTestCase {
         return lines.joined(separator: "\n") + "\n"
     }
 
+    private func allByteMask() -> GainMapRaster {
+        GainMapRaster(
+            width: 256,
+            height: 1,
+            bytesPerRow: 256,
+            channelCount: 1,
+            data: Data((0...255).map(UInt8.init))
+        )
+    }
+
+    private func paddedMask() -> GainMapRaster {
+        let width = 257
+        let height = 2
+        let bytesPerRow = 300
+        var data = Data(repeating: 0xA5, count: bytesPerRow * height)
+        for x in 0..<width {
+            data[x] = UInt8((x * 17 + 3) & 0xFF)
+            data[bytesPerRow + x] = UInt8(255 - ((x * 11) & 0xFF))
+        }
+        return GainMapRaster(
+            width: width,
+            height: height,
+            bytesPerRow: bytesPerRow,
+            channelCount: 1,
+            data: data
+        )
+    }
+
+    private func gainMapLine(name: String, raster: GainMapRaster, params: GainMapParams) -> String {
+        [
+            "gainmap", name,
+            String(raster.width),
+            String(raster.height),
+            String(raster.bytesPerRow),
+            String(raster.channelCount),
+            params.family.rawValue,
+            bits(params.knee),
+            bits(params.kneeRange),
+            bits(params.headroomScale),
+            bits(params.maxBoost),
+            bits(params.log2Scale),
+            params.kneeSource,
+            hex(raster.data),
+        ].joined(separator: "\t")
+    }
+
+    private func reconstruct(caseName: String, mask: GainMapRaster) throws -> (GainMapRaster, GainMapParams) {
+        let item = try caseNamed(caseName)
+        let scale = try EDRScaleResolver.resolve(metaFloats: item.values, mode: item.mode)
+        return try GainMapReconstructor.reconstruct(
+            mask: mask,
+            family: .x7,
+            scale: scale,
+            metaFloats: item.values
+        )
+    }
+
+    private func gainMapVectorText() throws -> String {
+        var lines: [String] = []
+        for (outputName, caseName) in [
+            ("early-all-bytes", "early-face-mid-highlight"),
+            ("modern-all-bytes", "modern-precomputed-f32-source"),
+        ] {
+            let (raster, params) = try reconstruct(caseName: caseName, mask: allByteMask())
+            lines.append(gainMapLine(name: outputName, raster: raster, params: params))
+        }
+        let (padded, paddedParams) = try reconstruct(
+            caseName: "modern-precomputed-f32-source",
+            mask: paddedMask()
+        )
+        lines.append(gainMapLine(name: "padded-stride", raster: padded, params: paddedParams))
+        return lines.joined(separator: "\n") + "\n"
+    }
+
     func testEDRSharedVectorsCoverPrecisionAndBranchBoundaries() throws {
         let cases = try loadCases()
         XCTAssertEqual(cases.count, 17)
@@ -117,5 +199,38 @@ final class HDRRustConformanceOracleTests: XCTestCase {
             throw XCTSkip("set XDREMUX_HDR_ORACLE_OUTPUT to emit Swift EDR vectors")
         }
         try Data(vectorText().utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
+    }
+
+    func testGainMapSharedVectorsExhaustByteDomainAndPadding() throws {
+        let mask = allByteMask()
+        XCTAssertEqual(Set(mask.data), Set(UInt8.min...UInt8.max))
+
+        let (early, _) = try reconstruct(caseName: "early-face-mid-highlight", mask: mask)
+        XCTAssertEqual(early.width, 256)
+        XCTAssertEqual(early.height, 1)
+        XCTAssertEqual(early.bytesPerRow, 256)
+        XCTAssertEqual(early.data.count, 256)
+
+        let (modern, _) = try reconstruct(caseName: "modern-precomputed-f32-source", mask: mask)
+        XCTAssertEqual(modern.data.count, 256)
+        XCTAssertEqual(modern.data[6], 1, "current Swift quantization truncates rather than rounds")
+
+        let (padded, _) = try reconstruct(
+            caseName: "modern-precomputed-f32-source",
+            mask: paddedMask()
+        )
+        XCTAssertEqual(padded.width, 257)
+        XCTAssertEqual(padded.height, 2)
+        XCTAssertEqual(padded.bytesPerRow, 512)
+        XCTAssertEqual(padded.data.count, 1024)
+        XCTAssertTrue(padded.data[257..<512].allSatisfy { $0 == 0 })
+        XCTAssertTrue(padded.data[(512 + 257)..<1024].allSatisfy { $0 == 0 })
+    }
+
+    func testEmitGainMapVectorsForRustDifferential() throws {
+        guard let path = ProcessInfo.processInfo.environment["XDREMUX_GAINMAP_ORACLE_OUTPUT"], !path.isEmpty else {
+            throw XCTSkip("set XDREMUX_GAINMAP_ORACLE_OUTPUT to emit Swift gain map vectors")
+        }
+        try Data(gainMapVectorText().utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
     }
 }
