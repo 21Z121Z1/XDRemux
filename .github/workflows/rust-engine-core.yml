@@ -1,0 +1,76 @@
+name: Rust conversion engine
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-format/**"
+      - "scripts/check_engine_plan_vectors.sh"
+      - ".github/workflows/rust-engine-core.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-format/**"
+      - "scripts/check_engine_plan_vectors.sh"
+      - ".github/workflows/rust-engine-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  engine-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint conversion engine
+        run: cargo clippy --locked -p xdremux-engine --all-targets -- -D warnings
+      - name: Test conversion engine
+        run: cargo test --locked -p xdremux-engine
+      - name: Exercise product planning vectors
+        run: bash scripts/check_engine_plan_vectors.sh
+      - name: Verify repository completion gate
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/xdremux-engine-gate.json" <<'JSON'
+          {
+            "schema_version": 1,
+            "scope": "Establish the isolated Rust conversion planner as an explicit product-policy layer without changing product entry points",
+            "checks": [
+              {
+                "name": "rust-engine-regressions",
+                "kind": "regression",
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-engine"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "rust-engine-plan-vectors",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_engine_plan_vectors.sh"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "rust-engine-clippy",
+                "kind": "static",
+                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-engine", "--all-targets", "--", "-D", "warnings"],
+                "timeout_seconds": 600
+              }
+            ]
+          }
+          JSON
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/main \
+            --plan "$RUNNER_TEMP/xdremux-engine-gate.json"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/$(git rev-parse HEAD).json"
