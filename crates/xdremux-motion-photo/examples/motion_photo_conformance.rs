@@ -3,8 +3,8 @@ use std::{env, fs, process::ExitCode};
 use serde_json::{json, Value};
 use xdremux_motion_photo::{
     enrich_oppo_video_range, ftyp_box_offsets, parse_android_motion_photo, parse_first_lpex_object,
-    resolve_heif_motion_photo_ranges, resolve_video_stream_layout, ByteRange, MotionPhotoAsset,
-    MotionPhotoItem, VideoStreamRole,
+    parse_oppo_motion_photo, resolve_heif_motion_photo_ranges, resolve_video_stream_layout,
+    ByteRange, MotionPhotoAsset, MotionPhotoItem, OppoMetadata, VideoStreamRole,
 };
 
 fn parse_u64(text: &str) -> Result<u64, String> {
@@ -21,34 +21,7 @@ fn range_json(range: ByteRange) -> Value {
     json!({"lower": range.lower_bound, "upper": range.upper_bound})
 }
 
-fn asset_json(asset: MotionPhotoAsset) -> Value {
-    let items = asset
-        .items
-        .into_iter()
-        .map(|item| {
-            json!({
-                "mime": item.mime,
-                "semantic": item.semantic,
-                "length": item.length,
-                "padding": item.padding,
-            })
-        })
-        .collect::<Vec<_>>();
-    json!({
-        "status": "asset",
-        "sourceKind": asset.source_kind.as_str(),
-        "items": items,
-        "still": range_json(asset.still_resource_range),
-        "video": range_json(asset.video_resource_range),
-        "presentationTimestampUs": asset.presentation_timestamp_us,
-        "presentationSource": asset.presentation_source.map(|value| value.as_str()),
-    })
-}
-
-fn metadata_json(data: &[u8]) -> Value {
-    let Some(metadata) = parse_first_lpex_object(data) else {
-        return Value::Null;
-    };
+fn oppo_metadata_json(metadata: OppoMetadata) -> Value {
     let matrices = metadata
         .matrices
         .into_iter()
@@ -72,6 +45,42 @@ fn metadata_json(data: &[u8]) -> Value {
     })
 }
 
+fn asset_json(asset: MotionPhotoAsset) -> Value {
+    let vendor_metadata = asset
+        .vendor_metadata
+        .map(oppo_metadata_json)
+        .unwrap_or(Value::Null);
+    let items = asset
+        .items
+        .into_iter()
+        .map(|item| {
+            json!({
+                "mime": item.mime,
+                "semantic": item.semantic,
+                "length": item.length,
+                "padding": item.padding,
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "status": "asset",
+        "sourceKind": asset.source_kind.as_str(),
+        "items": items,
+        "still": range_json(asset.still_resource_range),
+        "video": range_json(asset.video_resource_range),
+        "presentationTimestampUs": asset.presentation_timestamp_us,
+        "presentationSource": asset.presentation_source.map(|value| value.as_str()),
+        "vendorMetadata": vendor_metadata,
+    })
+}
+
+fn metadata_json(data: &[u8]) -> Value {
+    let Some(metadata) = parse_first_lpex_object(data) else {
+        return Value::Null;
+    };
+    oppo_metadata_json(metadata)
+}
+
 fn run() -> Result<Value, String> {
     let args = env::args().skip(1).collect::<Vec<_>>();
     let mode = args.first().map(String::as_str).ok_or("missing mode")?;
@@ -82,6 +91,17 @@ fn run() -> Result<Value, String> {
             }
             let data = fs::read(&args[1]).map_err(|error| error.to_string())?;
             Ok(match parse_android_motion_photo(&data) {
+                Ok(Some(asset)) => asset_json(asset),
+                Ok(None) => json!({"status": "none"}),
+                Err(error) => json!({"status": "error", "code": error.code()}),
+            })
+        }
+        "oppo" => {
+            if args.len() != 2 {
+                return Err("usage: motion_photo_conformance oppo <file>".into());
+            }
+            let data = fs::read(&args[1]).map_err(|error| error.to_string())?;
+            Ok(match parse_oppo_motion_photo(&data) {
                 Ok(Some(asset)) => asset_json(asset),
                 Ok(None) => json!({"status": "none"}),
                 Err(error) => json!({"status": "error", "code": error.code()}),
