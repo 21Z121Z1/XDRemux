@@ -5,17 +5,29 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "Package.swift"
       - "crates/xdremux-motion-photo/**"
+      - "Sources/XDRemuxCore/MotionPhoto/**"
+      - "Tests/XDRemuxCoreTests/MotionPhotoRustConformanceTests.swift"
+      - "Tests/test_python_motion_photo.py"
+      - "xdremux_py/motion_photo.py"
+      - "scripts/check_motion_photo_rust_conformance.sh"
       - ".github/workflows/rust-motion-photo-core.yml"
   pull_request:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "Package.swift"
       - "crates/xdremux-motion-photo/**"
+      - "Sources/XDRemuxCore/MotionPhoto/**"
+      - "Tests/XDRemuxCoreTests/MotionPhotoRustConformanceTests.swift"
+      - "Tests/test_python_motion_photo.py"
+      - "xdremux_py/motion_photo.py"
+      - "scripts/check_motion_photo_rust_conformance.sh"
       - ".github/workflows/rust-motion-photo-core.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   motion-photo-core:
@@ -28,23 +40,51 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Normalize workspace
-        run: |
-          cargo fmt --all
-          cargo check -p xdremux-motion-photo
+      - name: Check formatting
+        run: cargo fmt --all --check
       - name: Lint Motion Photo core
-        run: cargo clippy -p xdremux-motion-photo --all-targets -- -D warnings
+        run: cargo clippy --locked -p xdremux-motion-photo --all-targets -- -D warnings
       - name: Test Motion Photo core
-        run: cargo test -p xdremux-motion-photo
-      - name: Commit normalized source and lockfile
-        if: github.event_name == 'push'
+        run: cargo test --locked -p xdremux-motion-photo
+
+  motion-photo-conformance:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Compare Swift, Rust, and Python Motion Photo contracts
+        run: bash scripts/check_motion_photo_rust_conformance.sh
+      - name: Verify cross-language completion gate
         shell: bash
         run: |
-          if git diff --quiet -- Cargo.lock crates/xdremux-motion-photo; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock crates/xdremux-motion-photo
-          git commit -m "style(rust): normalize Motion Photo core"
-          git push origin HEAD:feat/rust-xdremux-format
+          cat > "$RUNNER_TEMP/xdremux-motion-photo-conformance-gate.json" <<'JSON'
+          {
+            "schema_version": 1,
+            "scope": "Port the portable Motion Photo byte-range, LPEX metadata, HEIF mpvd, and proven OPPO dual-stream topology contracts into the isolated Rust core without changing current Swift semantics",
+            "checks": [
+              {
+                "name": "rust-motion-photo-regressions",
+                "kind": "regression",
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-motion-photo"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "swift-rust-python-motion-photo-corpus",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_motion_photo_rust_conformance.sh"],
+                "timeout_seconds": 1800
+              }
+            ]
+          }
+          JSON
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/main \
+            --plan "$RUNNER_TEMP/xdremux-motion-photo-conformance-gate.json"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/$(git rev-parse HEAD).json"
