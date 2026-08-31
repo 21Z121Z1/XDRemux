@@ -8,7 +8,7 @@ on:
       - "Package.swift"
       - "crates/xdremux-container/**"
       - "Sources/XDRemuxCore/HDR/**"
-      - "Sources/ContainerConformanceOracle/**"
+      - "Tests/XDRemuxCoreTests/ContainerRustConformanceOracleTests.swift"
       - "scripts/check_container_conformance.sh"
       - ".github/workflows/rust-container-core.yml"
   pull_request:
@@ -18,7 +18,7 @@ on:
       - "Package.swift"
       - "crates/xdremux-container/**"
       - "Sources/XDRemuxCore/HDR/**"
-      - "Sources/ContainerConformanceOracle/**"
+      - "Tests/XDRemuxCoreTests/ContainerRustConformanceOracleTests.swift"
       - "scripts/check_container_conformance.sh"
       - ".github/workflows/rust-container-core.yml"
 
@@ -54,9 +54,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Build Swift container oracle
-        run: swift build --target ContainerConformanceOracle
-      - name: Compare Swift and Rust repository fixtures
+      - name: Compare Swift and Rust deterministic corpus
         run: bash scripts/check_container_conformance.sh
       - name: Verify cross-language completion gate
         shell: bash
@@ -73,7 +71,7 @@ jobs:
                 "timeout_seconds": 600
               },
               {
-                "name": "swift-rust-container-fixtures",
+                "name": "swift-rust-container-corpus",
                 "kind": "integration",
                 "command": ["bash", "scripts/check_container_conformance.sh"],
                 "timeout_seconds": 1800
