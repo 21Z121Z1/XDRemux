@@ -43,6 +43,8 @@ jobs:
       - name: Test xdremux-container
         run: cargo test --locked -p xdremux-container
 
+  # The Swift XCTest constructs deterministic LHDR/UHDR inputs from the current
+  # extractor contract, then the Rust emitter must reproduce every snapshot byte.
   container-conformance:
     runs-on: macos-latest
     timeout-minutes: 45
