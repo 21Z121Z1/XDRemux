@@ -4,6 +4,7 @@ members = [
     "crates/xdremux-metadata",
     "crates/xdremux-hdr",
     "crates/xdremux-container",
+    "crates/xdremux-heif",
 ]
 resolver = "2"
 
