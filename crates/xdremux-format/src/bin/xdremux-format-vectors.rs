@@ -55,10 +55,7 @@ fn run() -> Result<()> {
             }],
         },
     ];
-    emit(
-        "iloc-v1-44",
-        &make_iloc_box(1, 4, 4, 0, 0, &iloc_entries)?,
-    );
+    emit("iloc-v1-44", &make_iloc_box(1, 4, 4, 0, 0, &iloc_entries)?);
 
     let narrow_ipma = vec![IpmaEntry {
         item_id: 0x1234,
