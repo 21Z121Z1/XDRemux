@@ -20,7 +20,10 @@ fn push_uint_be(value: u64, width: u8, output: &mut Vec<u8>, context: &'static s
     validate_field_width(width, context)?;
     if width == 0 {
         if value != 0 {
-            return Err(FormatError::invalid(context, "non-zero value cannot fit in zero bytes"));
+            return Err(FormatError::invalid(
+                context,
+                "non-zero value cannot fit in zero bytes",
+            ));
         }
         return Ok(());
     }
@@ -69,7 +72,10 @@ pub fn make_box(kind: FourCC, payload: &[u8]) -> Result<Vec<u8>> {
 
 pub fn make_full_box(kind: FourCC, version: u8, flags: u32, payload: &[u8]) -> Result<Vec<u8>> {
     if flags > 0x00ff_ffff {
-        return Err(FormatError::invalid("full box flags", format!("0x{flags:x} exceeds 24 bits")));
+        return Err(FormatError::invalid(
+            "full box flags",
+            format!("0x{flags:x} exceeds 24 bits"),
+        ));
     }
     let mut body = Vec::with_capacity(payload.len() + 4);
     body.push(version);
@@ -113,8 +119,8 @@ pub fn make_iinf_box(version: u8, entries: &[Vec<u8>]) -> Result<Vec<u8>> {
             .map_err(|_| FormatError::invalid("iinf", "version 0 entry count exceeds u16"))?;
         push_u16_be(count, &mut payload);
     } else {
-        let count = u32::try_from(entries.len())
-            .map_err(|_| FormatError::overflow("iinf entry count"))?;
+        let count =
+            u32::try_from(entries.len()).map_err(|_| FormatError::overflow("iinf entry count"))?;
         push_u32_be(count, &mut payload);
     }
     for entry in entries {
@@ -126,7 +132,8 @@ pub fn make_iinf_box(version: u8, entries: &[Vec<u8>]) -> Result<Vec<u8>> {
 pub fn make_ipma_box(version: u8, flags: u32, entries: &[IpmaEntry]) -> Result<Vec<u8>> {
     let wide = flags & 1 != 0;
     let mut payload = Vec::new();
-    let count = u32::try_from(entries.len()).map_err(|_| FormatError::overflow("ipma entry count"))?;
+    let count =
+        u32::try_from(entries.len()).map_err(|_| FormatError::overflow("ipma entry count"))?;
     push_u32_be(count, &mut payload);
     for entry in entries {
         if version >= 1 {
@@ -142,15 +149,23 @@ pub fn make_ipma_box(version: u8, flags: u32, entries: &[IpmaEntry]) -> Result<V
         for association in &entry.associations {
             if wide {
                 if association.property_index > 0x7fff {
-                    return Err(FormatError::invalid("ipma", "property index exceeds 15 bits"));
+                    return Err(FormatError::invalid(
+                        "ipma",
+                        "property index exceeds 15 bits",
+                    ));
                 }
-                let raw = association.property_index | if association.essential { 0x8000 } else { 0 };
+                let raw =
+                    association.property_index | if association.essential { 0x8000 } else { 0 };
                 push_u16_be(raw, &mut payload);
             } else {
                 if association.property_index > 0x7f {
-                    return Err(FormatError::invalid("ipma", "property index exceeds 7 bits"));
+                    return Err(FormatError::invalid(
+                        "ipma",
+                        "property index exceeds 7 bits",
+                    ));
                 }
-                let raw = association.property_index as u8 | if association.essential { 0x80 } else { 0 };
+                let raw =
+                    association.property_index as u8 | if association.essential { 0x80 } else { 0 };
                 payload.push(raw);
             }
         }
@@ -182,8 +197,9 @@ pub fn make_iref_box(version: u8, entries: &[IrefEntry]) -> Result<Vec<u8>> {
             if version >= 1 {
                 push_u32_be(*item_id, &mut reference);
             } else {
-                let item_id = u16::try_from(*item_id)
-                    .map_err(|_| FormatError::invalid("iref", "version 0 to_item_id exceeds u16"))?;
+                let item_id = u16::try_from(*item_id).map_err(|_| {
+                    FormatError::invalid("iref", "version 0 to_item_id exceeds u16")
+                })?;
                 push_u16_be(item_id, &mut reference);
             }
         }
@@ -215,13 +231,17 @@ pub fn make_iloc_box(
         validate_field_width(width, context)?;
     }
     if version == 0 && index_size != 0 {
-        return Err(FormatError::invalid("iloc", "version 0 cannot encode extent_index"));
+        return Err(FormatError::invalid(
+            "iloc",
+            "version 0 cannot encode extent_index",
+        ));
     }
     let mut payload = Vec::new();
     payload.push((offset_size << 4) | length_size);
     payload.push((base_offset_size << 4) | if version == 0 { 0 } else { index_size });
     if version >= 2 {
-        let count = u32::try_from(entries.len()).map_err(|_| FormatError::overflow("iloc entry count"))?;
+        let count =
+            u32::try_from(entries.len()).map_err(|_| FormatError::overflow("iloc entry count"))?;
         push_u32_be(count, &mut payload);
     } else {
         let count = u16::try_from(entries.len())
@@ -240,16 +260,36 @@ pub fn make_iloc_box(
             push_u16_be(entry.construction_method & 0x000f, &mut payload);
         }
         push_u16_be(entry.data_reference_index, &mut payload);
-        push_uint_be(entry.base_offset, base_offset_size, &mut payload, "iloc base_offset")?;
+        push_uint_be(
+            entry.base_offset,
+            base_offset_size,
+            &mut payload,
+            "iloc base_offset",
+        )?;
         let extent_count = u16::try_from(entry.extents.len())
             .map_err(|_| FormatError::invalid("iloc", "extent count exceeds u16"))?;
         push_u16_be(extent_count, &mut payload);
         for extent in &entry.extents {
             if index_size > 0 {
-                push_uint_be(extent.index.unwrap_or(0), index_size, &mut payload, "iloc extent_index")?;
+                push_uint_be(
+                    extent.index.unwrap_or(0),
+                    index_size,
+                    &mut payload,
+                    "iloc extent_index",
+                )?;
             }
-            push_uint_be(extent.offset, offset_size, &mut payload, "iloc extent_offset")?;
-            push_uint_be(extent.length, length_size, &mut payload, "iloc extent_length")?;
+            push_uint_be(
+                extent.offset,
+                offset_size,
+                &mut payload,
+                "iloc extent_offset",
+            )?;
+            push_uint_be(
+                extent.length,
+                length_size,
+                &mut payload,
+                "iloc extent_length",
+            )?;
         }
     }
     make_full_box(ILOC, version, 0, &payload)

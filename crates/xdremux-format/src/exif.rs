@@ -93,14 +93,18 @@ pub fn read_item_payload(
     }
     let construction_base = match entry.construction_method {
         0 => 0usize,
-        1 => idat
-            .ok_or_else(|| {
+        1 => {
+            idat.ok_or_else(|| {
                 FormatError::invalid(
                     "HEIF item",
-                    format!("item {} references idat, but meta has no idat box", entry.item_id),
+                    format!(
+                        "item {} references idat, but meta has no idat box",
+                        entry.item_id
+                    ),
                 )
             })?
-            .data_start,
+            .data_start
+        }
         other => {
             return Err(FormatError::Unsupported {
                 context: "iloc construction_method",
@@ -127,7 +131,10 @@ pub fn read_item_payload(
         let bytes = data.get(start..end).ok_or_else(|| {
             FormatError::invalid(
                 "HEIF item",
-                format!("item {} extent {start}..{end} is outside the file", entry.item_id),
+                format!(
+                    "item {} extent {start}..{end} is outside the file",
+                    entry.item_id
+                ),
             )
         })?;
         output.extend_from_slice(bytes);
@@ -162,7 +169,10 @@ pub fn parse_heif_exif_orientation(exif_item: &[u8]) -> Result<Orientation> {
         return parse_tiff_orientation(exif_item);
     }
     if exif_item.len() < 4 {
-        return Err(FormatError::invalid("Exif item", "missing 4-byte TIFF offset"));
+        return Err(FormatError::invalid(
+            "Exif item",
+            "missing 4-byte TIFF offset",
+        ));
     }
     let mut offset_cursor = Cursor::new(exif_item, Endian::Big, "Exif item");
     let offset = usize::try_from(offset_cursor.read_u32()?)
@@ -185,7 +195,10 @@ pub fn parse_heif_exif_orientation(exif_item: &[u8]) -> Result<Orientation> {
 
 pub fn parse_tiff_orientation(tiff: &[u8]) -> Result<Orientation> {
     if tiff.len() < 8 {
-        return Err(FormatError::invalid("TIFF", "header is shorter than 8 bytes"));
+        return Err(FormatError::invalid(
+            "TIFF",
+            "header is shorter than 8 bytes",
+        ));
     }
     let endian = match tiff.get(0..2) {
         Some(bytes) if bytes == b"II" => Endian::Little,
@@ -222,12 +235,7 @@ pub fn parse_tiff_orientation(tiff: &[u8]) -> Result<Orientation> {
         let entry_end = entry_start
             .checked_add(12)
             .ok_or_else(|| FormatError::overflow("TIFF IFD entry"))?;
-        let mut entry = Cursor::bounded(
-            tiff,
-            entry_start..entry_end,
-            endian,
-            "TIFF IFD entry",
-        )?;
+        let mut entry = Cursor::bounded(tiff, entry_start..entry_end, endian, "TIFF IFD entry")?;
         let tag = entry.read_u16()?;
         let field_type = entry.read_u16()?;
         let count = entry.read_u32()?;

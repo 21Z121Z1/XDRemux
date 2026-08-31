@@ -7,7 +7,10 @@ use super::model::*;
 
 pub fn parse_iloc(data: &[u8], header: &BoxHeader) -> Result<IlocBox> {
     if header.kind != ILOC {
-        return Err(FormatError::invalid("iloc", format!("expected iloc, got {}", header.kind)));
+        return Err(FormatError::invalid(
+            "iloc",
+            format!("expected iloc, got {}", header.kind),
+        ));
     }
     let mut cursor = Cursor::bounded(data, header.payload_range(), Endian::Big, "iloc")?;
     let (version, _) = read_full_box_header(&mut cursor)?;
@@ -51,7 +54,10 @@ pub fn parse_iloc(data: &[u8], header: &BoxHeader) -> Result<IlocBox> {
     if item_count > cursor.remaining() / minimum_item_bytes {
         return Err(FormatError::invalid(
             "iloc",
-            format!("declares {item_count} entries but only {} bytes remain", cursor.remaining()),
+            format!(
+                "declares {item_count} entries but only {} bytes remain",
+                cursor.remaining()
+            ),
         ));
     }
 
@@ -126,7 +132,10 @@ pub fn parse_iloc(data: &[u8], header: &BoxHeader) -> Result<IlocBox> {
 
 fn parse_infe(data: &[u8], header: &BoxHeader) -> Result<ItemInfo> {
     if header.kind != INFE {
-        return Err(FormatError::invalid("infe", format!("expected infe, got {}", header.kind)));
+        return Err(FormatError::invalid(
+            "infe",
+            format!("expected infe, got {}", header.kind),
+        ));
     }
     let mut cursor = Cursor::bounded(data, header.payload_range(), Endian::Big, "infe")?;
     let (version, flags) = read_full_box_header(&mut cursor)?;
@@ -156,19 +165,26 @@ fn parse_infe(data: &[u8], header: &BoxHeader) -> Result<ItemInfo> {
 
 pub fn parse_iinf(data: &[u8], header: &BoxHeader) -> Result<IinfBox> {
     if header.kind != IINF {
-        return Err(FormatError::invalid("iinf", format!("expected iinf, got {}", header.kind)));
+        return Err(FormatError::invalid(
+            "iinf",
+            format!("expected iinf, got {}", header.kind),
+        ));
     }
     let mut cursor = Cursor::bounded(data, header.payload_range(), Endian::Big, "iinf")?;
     let (version, _) = read_full_box_header(&mut cursor)?;
     let declared_count = if version >= 1 {
-        usize::try_from(cursor.read_u32()?).map_err(|_| FormatError::overflow("iinf entry count"))?
+        usize::try_from(cursor.read_u32()?)
+            .map_err(|_| FormatError::overflow("iinf entry count"))?
     } else {
         usize::from(cursor.read_u16()?)
     };
     if declared_count > cursor.remaining() / 8 {
         return Err(FormatError::invalid(
             "iinf",
-            format!("declares {declared_count} entries but only {} bytes remain", cursor.remaining()),
+            format!(
+                "declares {declared_count} entries but only {} bytes remain",
+                cursor.remaining()
+            ),
         ));
     }
     let children = parse_boxes(data, cursor.position()..cursor.end())?;
@@ -185,7 +201,10 @@ pub fn parse_iinf(data: &[u8], header: &BoxHeader) -> Result<IinfBox> {
     if entries.len() != declared_count {
         return Err(FormatError::invalid(
             "iinf",
-            format!("declared {declared_count} entries, parsed {}", entries.len()),
+            format!(
+                "declared {declared_count} entries, parsed {}",
+                entries.len()
+            ),
         ));
     }
     Ok(IinfBox { version, entries })
@@ -193,7 +212,10 @@ pub fn parse_iinf(data: &[u8], header: &BoxHeader) -> Result<IinfBox> {
 
 pub fn parse_pitm(data: &[u8], header: &BoxHeader) -> Result<u32> {
     if header.kind != PITM {
-        return Err(FormatError::invalid("pitm", format!("expected pitm, got {}", header.kind)));
+        return Err(FormatError::invalid(
+            "pitm",
+            format!("expected pitm, got {}", header.kind),
+        ));
     }
     let mut cursor = Cursor::bounded(data, header.payload_range(), Endian::Big, "pitm")?;
     let (version, _) = read_full_box_header(&mut cursor)?;
@@ -210,7 +232,10 @@ pub fn parse_pitm(data: &[u8], header: &BoxHeader) -> Result<u32> {
 
 pub fn parse_ipma(data: &[u8], header: &BoxHeader) -> Result<IpmaBox> {
     if header.kind != IPMA {
-        return Err(FormatError::invalid("ipma", format!("expected ipma, got {}", header.kind)));
+        return Err(FormatError::invalid(
+            "ipma",
+            format!("expected ipma, got {}", header.kind),
+        ));
     }
     let mut cursor = Cursor::bounded(data, header.payload_range(), Endian::Big, "ipma")?;
     let (version, flags) = read_full_box_header(&mut cursor)?;
@@ -271,7 +296,10 @@ pub fn parse_ipma(data: &[u8], header: &BoxHeader) -> Result<IpmaBox> {
 
 pub fn parse_iref(data: &[u8], header: &BoxHeader) -> Result<IrefBox> {
     if header.kind != IREF {
-        return Err(FormatError::invalid("iref", format!("expected iref, got {}", header.kind)));
+        return Err(FormatError::invalid(
+            "iref",
+            format!("expected iref, got {}", header.kind),
+        ));
     }
     let mut cursor = Cursor::bounded(data, header.payload_range(), Endian::Big, "iref")?;
     let (version, _) = read_full_box_header(&mut cursor)?;
@@ -284,7 +312,8 @@ pub fn parse_iref(data: &[u8], header: &BoxHeader) -> Result<IrefBox> {
     let children = parse_boxes(data, cursor.position()..cursor.end())?;
     let mut entries = Vec::new();
     for child in children {
-        let mut reference = Cursor::bounded(data, child.payload_range(), Endian::Big, "iref entry")?;
+        let mut reference =
+            Cursor::bounded(data, child.payload_range(), Endian::Big, "iref entry")?;
         let from_item_id = if version >= 1 {
             reference.read_u32()?
         } else {
@@ -295,7 +324,10 @@ pub fn parse_iref(data: &[u8], header: &BoxHeader) -> Result<IrefBox> {
         if to_count > reference.remaining() / id_width {
             return Err(FormatError::invalid(
                 "iref",
-                format!("reference {} from item {from_item_id} exceeds child box", child.kind),
+                format!(
+                    "reference {} from item {from_item_id} exceeds child box",
+                    child.kind
+                ),
             ));
         }
         let mut to_item_ids = Vec::new();
@@ -307,7 +339,10 @@ pub fn parse_iref(data: &[u8], header: &BoxHeader) -> Result<IrefBox> {
             });
         }
         if !reference.is_empty() {
-            return Err(FormatError::invalid("iref", "unexpected trailing bytes in reference"));
+            return Err(FormatError::invalid(
+                "iref",
+                "unexpected trailing bytes in reference",
+            ));
         }
         entries.push(IrefEntry {
             kind: child.kind,
@@ -320,7 +355,10 @@ pub fn parse_iref(data: &[u8], header: &BoxHeader) -> Result<IrefBox> {
 
 pub fn parse_ipco_properties(data: &[u8], iprp: &BoxHeader) -> Result<Vec<PropertyInfo>> {
     if iprp.kind != IPRP {
-        return Err(FormatError::invalid("iprp", format!("expected iprp, got {}", iprp.kind)));
+        return Err(FormatError::invalid(
+            "iprp",
+            format!("expected iprp, got {}", iprp.kind),
+        ));
     }
     let children = parse_boxes(data, iprp.payload_range())?;
     let ipco = children
@@ -343,7 +381,10 @@ pub fn parse_ipco_properties(data: &[u8], iprp: &BoxHeader) -> Result<Vec<Proper
 
 pub fn parse_meta_box(data: &[u8], meta: &BoxHeader) -> Result<ParsedMeta> {
     if meta.kind != META {
-        return Err(FormatError::invalid("meta", format!("expected meta, got {}", meta.kind)));
+        return Err(FormatError::invalid(
+            "meta",
+            format!("expected meta, got {}", meta.kind),
+        ));
     }
     let mut cursor = Cursor::bounded(data, meta.payload_range(), Endian::Big, "meta")?;
     let _ = read_full_box_header(&mut cursor)?;
@@ -352,7 +393,9 @@ pub fn parse_meta_box(data: &[u8], meta: &BoxHeader) -> Result<ParsedMeta> {
         children
             .iter()
             .find(|child| child.kind == kind)
-            .ok_or_else(|| FormatError::invalid("meta", format!("required child {kind} is missing")))
+            .ok_or_else(|| {
+                FormatError::invalid("meta", format!("required child {kind} is missing"))
+            })
     };
     let iloc_header = find_required(ILOC)?;
     let iinf_header = find_required(IINF)?;

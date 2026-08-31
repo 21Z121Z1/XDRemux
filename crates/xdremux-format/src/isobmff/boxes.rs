@@ -23,7 +23,12 @@ pub(crate) fn validate_field_width(width: u8, context: &'static str) -> Result<(
     }
 }
 
-fn parse_box_at(data: &[u8], position: usize, end: usize, context: &'static str) -> Result<BoxHeader> {
+fn parse_box_at(
+    data: &[u8],
+    position: usize,
+    end: usize,
+    context: &'static str,
+) -> Result<BoxHeader> {
     let mut cursor = Cursor::bounded(data, position..end, Endian::Big, context)?;
     let size32 = cursor.read_u32()?;
     let kind = FourCC::from_slice(cursor.take(4)?)?;
@@ -32,8 +37,8 @@ fn parse_box_at(data: &[u8], position: usize, end: usize, context: &'static str)
         0 => (end - position, 8usize),
         1 => {
             let large = cursor.read_u64()?;
-            let size = usize::try_from(large)
-                .map_err(|_| FormatError::overflow("ISOBMFF largesize"))?;
+            let size =
+                usize::try_from(large).map_err(|_| FormatError::overflow("ISOBMFF largesize"))?;
             if size == 0 {
                 return Err(FormatError::invalid(context, "largesize cannot be zero"));
             }
@@ -64,7 +69,10 @@ fn parse_box_at(data: &[u8], position: usize, end: usize, context: &'static str)
         .checked_add(header_size)
         .ok_or_else(|| FormatError::overflow("ISOBMFF box header"))?;
     if data_end <= position {
-        return Err(FormatError::invalid(context, "box does not advance the cursor"));
+        return Err(FormatError::invalid(
+            context,
+            "box does not advance the cursor",
+        ));
     }
 
     Ok(BoxHeader {
@@ -80,7 +88,12 @@ pub fn parse_boxes(data: &[u8], range: Range<usize>) -> Result<Vec<BoxHeader>> {
     if range.start > range.end || range.end > data.len() {
         return Err(FormatError::invalid(
             "ISOBMFF box list",
-            format!("range {}..{} exceeds input length {}", range.start, range.end, data.len()),
+            format!(
+                "range {}..{} exceeds input length {}",
+                range.start,
+                range.end,
+                data.len()
+            ),
         ));
     }
     let mut boxes = Vec::new();
