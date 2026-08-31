@@ -3,8 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use xdremux_heif::{
-    replace_private_jpeg_gain_map_with_hevc_tiles, validate_gain_map_structure,
-    DirectHevcGainMap, GainMapTile,
+    replace_private_jpeg_gain_map_with_hevc_tiles, validate_gain_map_structure, DirectHevcGainMap,
+    GainMapTile,
 };
 
 fn parse_u32(value: &str, name: &str) -> u32 {
@@ -88,7 +88,10 @@ fn main() {
     let validated = validate_gain_map_structure(&output)
         .unwrap_or_else(|error| panic!("Rust HEIF structural validation failed: {error}"));
     assert_eq!(validated.width, gain_map_width, "validated Gain Map width");
-    assert_eq!(validated.height, gain_map_height, "validated Gain Map height");
+    assert_eq!(
+        validated.height, gain_map_height,
+        "validated Gain Map height"
+    );
     assert_eq!(
         validated.channel_count, channel_count,
         "validated Gain Map channel count"

@@ -51,11 +51,7 @@ fn invalid(message: impl Into<String>) -> HeifError {
     HeifError::invalid(message)
 }
 
-fn one_top_level<'a>(
-    boxes: &'a [BoxHeader],
-    kind: FourCC,
-    context: &str,
-) -> Result<&'a BoxHeader> {
+fn one_top_level<'a>(boxes: &'a [BoxHeader], kind: FourCC, context: &str) -> Result<&'a BoxHeader> {
     let mut matches = boxes.iter().filter(|header| header.kind == kind);
     let Some(first) = matches.next() else {
         return Err(invalid(format!("{context} is missing")));
@@ -195,8 +191,12 @@ fn item_extent_range(
         .base_offset
         .checked_add(extent_offset)
         .ok_or_else(|| invalid(format!("item {} extent offset overflows", entry.item_id)))?;
-    let length = usize::try_from(extent_length)
-        .map_err(|_| invalid(format!("item {} extent length exceeds usize", entry.item_id)))?;
+    let length = usize::try_from(extent_length).map_err(|_| {
+        invalid(format!(
+            "item {} extent length exceeds usize",
+            entry.item_id
+        ))
+    })?;
     let start = match entry.construction_method {
         0 => usize::try_from(relative)
             .map_err(|_| invalid(format!("item {} file offset exceeds usize", entry.item_id)))?,
@@ -246,26 +246,22 @@ fn item_extent_range(
 
 fn item_payload(source: &[u8], idat: Option<&BoxHeader>, entry: &IlocEntry) -> Result<Vec<u8>> {
     let total = entry.extents.iter().try_fold(0usize, |total, extent| {
-        let length = usize::try_from(extent.length)
-            .map_err(|_| invalid(format!("item {} extent length exceeds usize", entry.item_id)))?;
+        let length = usize::try_from(extent.length).map_err(|_| {
+            invalid(format!(
+                "item {} extent length exceeds usize",
+                entry.item_id
+            ))
+        })?;
         total
             .checked_add(length)
             .ok_or_else(|| invalid(format!("item {} payload length overflows", entry.item_id)))
     })?;
     let mut payload = Vec::with_capacity(total);
     for extent in &entry.extents {
-        let range = item_extent_range(
-            source.len(),
-            idat,
-            entry,
-            extent.offset,
-            extent.length,
-        )?;
-        payload.extend_from_slice(
-            source
-                .get(range)
-                .ok_or_else(|| invalid(format!("item {} extent is outside the HEIF", entry.item_id)))?,
-        );
+        let range = item_extent_range(source.len(), idat, entry, extent.offset, extent.length)?;
+        payload.extend_from_slice(source.get(range).ok_or_else(|| {
+            invalid(format!("item {} extent is outside the HEIF", entry.item_id))
+        })?);
     }
     Ok(payload)
 }
@@ -392,8 +388,11 @@ fn validate_meta_integrity<'a>(
         }
     }
 
-    let properties: HashMap<u32, &PropertyInfo> =
-        meta.properties.iter().map(|property| (property.index, property)).collect();
+    let properties: HashMap<u32, &PropertyInfo> = meta
+        .properties
+        .iter()
+        .map(|property| (property.index, property))
+        .collect();
     if properties.len() != meta.properties.len() {
         return Err(invalid("duplicate ipco property index"));
     }
@@ -527,10 +526,11 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
         return Err(invalid("gain-map dimg reference repeats a tile item ID"));
     }
 
-    let gain_location = locations
-        .get(&gain_map_item_id)
-        .copied()
-        .ok_or_else(|| invalid(format!("gain-map item {gain_map_item_id} has no iloc entry")))?;
+    let gain_location = locations.get(&gain_map_item_id).copied().ok_or_else(|| {
+        invalid(format!(
+            "gain-map item {gain_map_item_id} has no iloc entry"
+        ))
+    })?;
     let grid = parse_grid(&item_payload(source, meta.idat.as_ref(), gain_location)?)?;
     let expected_tiles = grid
         .rows
@@ -545,12 +545,7 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
         )));
     }
 
-    let gain_ispe = associated_property(
-        gain_map_item_id,
-        ISPE,
-        &ipma_by_item,
-        &properties,
-    )?;
+    let gain_ispe = associated_property(gain_map_item_id, ISPE, &ipma_by_item, &properties)?;
     let (ispe_width, ispe_height) = parse_ispe(source, gain_ispe)?;
     if (ispe_width, ispe_height) != (grid.width, grid.height) {
         return Err(invalid(format!(
@@ -558,12 +553,7 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
             grid.width, grid.height, ispe_width, ispe_height
         )));
     }
-    let gain_pixi = associated_property(
-        gain_map_item_id,
-        PIXI,
-        &ipma_by_item,
-        &properties,
-    )?;
+    let gain_pixi = associated_property(gain_map_item_id, PIXI, &ipma_by_item, &properties)?;
     let (channel_count, channel_bits) = parse_pixi(source, gain_pixi)?;
     if !matches!(channel_count, 1 | 3) || channel_bits.iter().any(|bits| *bits != 8) {
         return Err(invalid(format!(
@@ -644,8 +634,8 @@ mod tests {
     use super::*;
     use xdremux_format::isobmff::{
         make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,
-        make_iref_box, make_ispe_box, make_pitm_box, IlocExtent, IpmaAssociation, IrefEntry,
-        IPCO, IDAT, IPRP,
+        make_iref_box, make_ispe_box, make_pitm_box, IlocExtent, IpmaAssociation, IrefEntry, IDAT,
+        IPCO, IPRP,
     };
 
     const PRIMARY_ID: u32 = 1;
@@ -693,12 +683,7 @@ mod tests {
 
     fn fixture(options: FixtureOptions) -> Vec<u8> {
         let primary_payload = [0xa1];
-        let mut grid_payload = vec![
-            0,
-            0,
-            options.grid_rows - 1,
-            options.grid_columns - 1,
-        ];
+        let mut grid_payload = vec![0, 0, options.grid_rows - 1, options.grid_columns - 1];
         grid_payload.extend_from_slice(&4u16.to_be_bytes());
         grid_payload.extend_from_slice(&4u16.to_be_bytes());
         let tmap_payload = [0xb2];
@@ -721,12 +706,7 @@ mod tests {
         let tile_hvcc = hvcc_box(options.hvcc_chroma);
         let mut ipco_payload = Vec::new();
         for property in [
-            &gain_ispe,
-            &gain_pixi,
-            &tmap_ispe,
-            &tmap_pixi,
-            &tile_ispe,
-            &tile_hvcc,
+            &gain_ispe, &gain_pixi, &tmap_ispe, &tmap_pixi, &tile_ispe, &tile_hvcc,
         ] {
             ipco_payload.extend_from_slice(property);
         }
