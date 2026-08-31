@@ -1,0 +1,42 @@
+name: Rust OPPO Motion Photo bootstrap
+
+on:
+  push:
+    branches: [feat/rust-xdremux-format]
+    paths:
+      - "crates/xdremux-motion-photo/**"
+      - ".github/workflows/rust-oppo-motion-bootstrap.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Normalize and compile
+        run: |
+          cargo fmt --all
+          cargo check --locked -p xdremux-motion-photo
+      - name: Lint
+        run: cargo clippy --locked -p xdremux-motion-photo --all-targets -- -D warnings
+      - name: Unit tests
+        run: cargo test --locked -p xdremux-motion-photo
+      - name: Commit canonical formatting
+        shell: bash
+        run: |
+          if git diff --quiet -- crates/xdremux-motion-photo; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-motion-photo
+          git commit -m "style(rust): normalize OPPO Motion Photo parser"
+          git push origin HEAD:feat/rust-xdremux-format
