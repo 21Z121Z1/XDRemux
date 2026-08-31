@@ -1,0 +1,249 @@
+name: XDRemux Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/releases/*.json"
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: "Release manifest path"
+        required: true
+        default: ".github/releases/v1.4.json"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: xdremux-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      title: ${{ steps.release.outputs.title }}
+      notes: ${{ steps.release.outputs.notes }}
+      replace_tag_if: ${{ steps.release.outputs.replace_tag_if }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release manifest
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_MANIFEST: ${{ inputs.manifest }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            manifest="$DISPATCH_MANIFEST"
+          else
+            mapfile -t manifests < <(
+              git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA" -- '.github/releases/*.json'
+            )
+            if [[ ${#manifests[@]} -ne 1 ]]; then
+              echo "::error::Expected exactly one changed release manifest, found ${#manifests[@]}."
+              exit 1
+            fi
+            manifest="${manifests[0]}"
+          fi
+
+          if [[ "$manifest" != .github/releases/*.json || ! -f "$manifest" ]]; then
+            echo "::error::Invalid release manifest: $manifest"
+            exit 1
+          fi
+
+          version="$(jq -r '.version // empty' "$manifest")"
+          title="$(jq -r '.title // empty' "$manifest")"
+          notes="$(jq -r '.notes // empty' "$manifest")"
+          replace_tag_if="$(jq -r '.replace_tag_if // empty' "$manifest")"
+
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "::error::Invalid release version: $version"
+            exit 1
+          fi
+          if [[ -z "$title" ]]; then
+            echo "::error::Release title is required."
+            exit 1
+          fi
+          if [[ "$notes" != docs/releases/*.md || ! -f "$notes" ]]; then
+            echo "::error::Invalid release notes path: $notes"
+            exit 1
+          fi
+          if [[ -n "$replace_tag_if" && ! "$replace_tag_if" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::replace_tag_if must be a full commit SHA."
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "title=$title"
+            echo "notes=$notes"
+            echo "replace_tag_if=$replace_tag_if"
+          } >> "$GITHUB_OUTPUT"
+
+  swift-package:
+    needs: metadata
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and test Swift release
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build -c release --product xdremux
+          swift test -c release
+
+      - name: Package Swift CLI
+        shell: bash
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          bin_dir="$(swift build -c release --show-bin-path)"
+          arch="$(uname -m)"
+          stage="$RUNNER_TEMP/XDRemux-${VERSION}-macOS-${arch}"
+          archive="$RUNNER_TEMP/XDRemux-${VERSION}-macOS-${arch}.tar.gz"
+
+          mkdir -p "$stage"
+          cp "$bin_dir/xdremux" "$stage/"
+          find "$bin_dir" -maxdepth 1 -type d -name '*.bundle' -exec cp -R {} "$stage/" \;
+          cp README.md README.en.md "$stage/"
+          printf '%s\n' "$GITHUB_SHA" > "$stage/COMMIT"
+
+          "$stage/xdremux" --help >/dev/null
+          tar -C "$RUNNER_TEMP" -czf "$archive" "$(basename "$stage")"
+          printf '%s  %s\n' "$(shasum -a 256 "$archive" | awk '{print $1}')" "$(basename "$archive")" > "$archive.sha256"
+
+          mkdir -p release-assets
+          cp "$archive" "$archive.sha256" release-assets/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swift-release-assets
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 14
+
+  python-package:
+    needs: metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Build and test Python distributions
+        shell: bash
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip build
+          python -m build
+
+          expected="${VERSION#v}.0"
+          actual="$(python -c 'import xdremux_py; print(xdremux_py.__version__)')"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Python package version $actual does not match release $VERSION (expected $expected)."
+            exit 1
+          fi
+
+          python -m venv "$RUNNER_TEMP/release-smoke"
+          "$RUNNER_TEMP/release-smoke/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/release-smoke/bin/xdremux-py" --help >/dev/null
+
+          mkdir -p release-assets
+          cp dist/* release-assets/
+          (
+            cd release-assets
+            sha256sum * > SHA256SUMS-python.txt
+          )
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-release-assets
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: [metadata, swift-package, python-package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.metadata.outputs.version }}
+      TITLE: ${{ needs.metadata.outputs.title }}
+      NOTES: ${{ needs.metadata.outputs.notes }}
+      REPLACE_TAG_IF: ${{ needs.metadata.outputs.replace_tag_if }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify tag state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "::error::Release $VERSION already exists."
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            old="$(git rev-parse "$VERSION^{commit}")"
+            if [[ "$old" != "$GITHUB_SHA" ]]; then
+              if [[ -z "$REPLACE_TAG_IF" || "$old" != "$REPLACE_TAG_IF" ]]; then
+                echo "::error::Tag $VERSION points to unexpected commit $old."
+                exit 1
+              fi
+            fi
+          fi
+
+      - name: Publish tag and GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$VERSION" "$GITHUB_SHA"
+          git push origin "refs/tags/$VERSION" --force
+
+          gh release create "$VERSION" \
+            release-assets/* \
+            --verify-tag \
+            --title "$TITLE" \
+            --notes-file "$NOTES"
+
+      - name: Verify published release
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_target="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" --jq '.object.sha')"
+          if [[ "$release_target" != "$GITHUB_SHA" ]]; then
+            echo "::error::Published tag points to $release_target instead of $GITHUB_SHA."
+            exit 1
+          fi
+          gh release view "$VERSION" --json tagName,name,isDraft,isPrerelease,url
