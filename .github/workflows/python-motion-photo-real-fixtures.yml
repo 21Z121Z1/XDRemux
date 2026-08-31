@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -76,7 +76,7 @@ jobs:
           echo "PYTHON_OUTPUT_ROOT=$RUNNER_TEMP/xdremux-python-live-photo-output" >> "$GITHUB_ENV"
           echo "PYTHON_MANIFEST=$RUNNER_TEMP/xdremux-python-live-photo-manifest.json" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
