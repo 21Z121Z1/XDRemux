@@ -1,18 +1,20 @@
-# Technical Implementation Index
+# v1.4 Technical Implementation Index
 
 English | [简体中文](README.md)
 
-This directory indexes stable implementation contracts for XDRemux.
+This directory indexes stable implementation contracts for the released XDRemux v1.4 Swift/Python line.
+
+For system-wide ownership, architectural layers, and branch roles, use the [system architecture](../architecture.en.md). For the Rust transition, use the [transition roadmap](../roadmap.en.md). Do not use the v1.4 directory structure below as the future architecture specification.
 
 Use the [project README](../../README.en.md) for normal use and the [CLI reference](../cli.en.md) for command behavior.
 
-## Current architecture
+## v1.4 implementation structure
 
 ### `XDRemuxCore`
 
-`XDRemuxCore` owns format and conversion logic that does not require the Apple feature layer.
+`XDRemuxCore` owns format and conversion logic that does not require the Apple feature layer in v1.4.
 
-Current responsibilities include:
+Current v1.4 responsibilities include:
 
 - ProXDR metadata parsing;
 - ISO/TS 21496-1 Gain Map conversion;
@@ -23,9 +25,9 @@ Current responsibilities include:
 
 ### `XDRemuxAppleFeatures`
 
-`XDRemuxAppleFeatures` owns Apple-specific conversion and validation.
+`XDRemuxAppleFeatures` owns Apple-specific conversion and validation in v1.4.
 
-Current responsibilities include:
+Current v1.4 responsibilities include:
 
 - Motion Photo to Apple Live Photo;
 - Live Photo still and MOV writing;
@@ -37,7 +39,7 @@ Current responsibilities include:
 
 ### CLI layer
 
-`Sources/XDRemuxCLI/` owns user command parsing and routing.
+`Sources/XDRemuxCLI/` owns v1.4 user command parsing and routing.
 
 The CLI automatically routes supported Motion Photo inputs before the normal HDR command path.
 
@@ -45,11 +47,15 @@ The Motion Photo and normal HDR paths have different output-safety rules. See th
 
 ### Python implementation
 
-`xdremux_py/` is a separate cross-platform implementation.
+`xdremux_py/` is the separate cross-platform v1.4 implementation.
 
 It supports standard HDR conversion, Motion Photo to Live Photo conversion, and classification. It does not implement Photographic Styles or Apple Portrait generation.
 
+During the Rust transition, use these implementations as bounded behavioral references where current contracts or independent evidence support them. Do not preserve their file/module split merely for symmetry.
+
 ## Stable media contracts
+
+These contracts remain migration inputs even when their implementation owner changes.
 
 ### Standard HDR
 
@@ -73,8 +79,12 @@ Live Photo output is a pair transaction. A conversion must not leave one final m
 
 Batch reuse requires source provenance. A valid pair with unknown lineage is not accepted as the output of an unrelated input.
 
+Publication, provenance, collision handling, and crash recovery are product correctness contracts. The Rust rewrite must preserve them through explicit Layer 5 ownership rather than leaving them as CLI-specific behavior.
+
 ## Current technical documents
 
+- [System architecture](../architecture.en.md)
+- [Transition roadmap](../roadmap.en.md)
 - [Apple feature guide](../apple-features.en.md)
 - [Development guide](../development.en.md)
 - [Testing policy](../quality/testing.en.md)
