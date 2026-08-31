@@ -1,6 +1,4 @@
-use xdremux_heif::{
-    replace_private_jpeg_gain_map_with_hevc_tiles, DirectHevcGainMap, GainMapTile,
-};
+use xdremux_heif::{replace_private_jpeg_gain_map_with_hevc_tiles, DirectHevcGainMap, GainMapTile};
 
 fn hvcc() -> Vec<u8> {
     let mut value = vec![0u8; 19];
