@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use xdremux_format::isobmff::{
-    make_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box, make_iref_box,
-    make_ispe_box, parse_boxes, parse_iinf, parse_iloc, parse_ipco_properties, parse_ipma,
-    parse_iref, parse_pitm, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
+    make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,
+    make_iref_box, make_ispe_box, parse_boxes, parse_iinf, parse_iloc, parse_ipco_properties,
+    parse_ipma, parse_iref, parse_pitm, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
     IpmaAssociation, IpmaEntry, IrefEntry, ItemInfo, PropertyInfo, FTYP, IDAT, IINF, ILOC, IPMA,
     IPRP, IREF, MDAT, META, PITM,
 };
-use xdremux_format::FourCC;
+use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};
 
 use crate::error::{HeifError, Result};
 
@@ -39,12 +39,51 @@ const COLR_UNSPECIFIED_BT601_BOX: &[u8] = &[
     0x00, 0x00, 0x00, 0x13, 0x63, 0x6f, 0x6c, 0x72, 0x6e, 0x63, 0x6c, 0x78, 0x00, 0x02, 0x00, 0x02,
     0x00, 0x06, 0x80,
 ];
-const PIXI_MONO8_BOX: &[u8] = &[
-    0x00, 0x00, 0x00, 0x0e, 0x70, 0x69, 0x78, 0x69, 0x00, 0x00, 0x00, 0x00, 0x01, 0x08,
-];
-const PIXI_RGB8_BOX: &[u8] = &[
-    0x00, 0x00, 0x00, 0x10, 0x70, 0x69, 0x78, 0x69, 0x00, 0x00, 0x00, 0x00, 0x03, 0x08, 0x08, 0x08,
-];
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GainMapChannels {
+    Mono,
+    Rgb,
+}
+
+impl GainMapChannels {
+    pub const fn semantic_channel_count(self) -> u8 {
+        match self {
+            Self::Mono => 1,
+            Self::Rgb => 3,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GainMapEncodeProfile {
+    pub channels: GainMapChannels,
+    pub chroma: ChromaSampling,
+    pub luma_bit_depth: u8,
+    pub chroma_bit_depth: u8,
+}
+
+impl GainMapEncodeProfile {
+    fn validate(self) -> Result<()> {
+        if !(8..=15).contains(&self.luma_bit_depth) || !(8..=15).contains(&self.chroma_bit_depth) {
+            return Err(invalid(
+                "direct HEVC Gain Map bit depth must fit the hvcC 8..15 range",
+            ));
+        }
+        match (self.channels, self.chroma) {
+            (GainMapChannels::Mono, ChromaSampling::Mono400) => Ok(()),
+            (
+                GainMapChannels::Rgb,
+                ChromaSampling::Yuv420 | ChromaSampling::Yuv422 | ChromaSampling::Yuv444,
+            ) => Ok(()),
+            (GainMapChannels::Mono, _) => Err(invalid(
+                "monochrome Gain Map semantics require 4:0:0 storage",
+            )),
+            (GainMapChannels::Rgb, ChromaSampling::Mono400) => {
+                Err(invalid("RGB Gain Map semantics require color HEVC storage"))
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GainMapTile<'a> {
@@ -62,7 +101,7 @@ pub struct DirectHevcGainMap<'a> {
     pub tiles: &'a [GainMapTile<'a>],
     /// HEVCDecoderConfigurationRecord payload, without the outer hvcC box.
     pub hvcc: &'a [u8],
-    pub channel_count: u8,
+    pub profile: GainMapEncodeProfile,
 }
 
 fn invalid(message: impl Into<String>) -> HeifError {
@@ -124,12 +163,12 @@ fn validate_spec(spec: &DirectHevcGainMap<'_>) -> Result<(u32, u32)> {
         || spec.gain_map_height == 0
         || spec.tile_width == 0
         || spec.tile_height == 0
-        || !matches!(spec.channel_count, 1 | 3)
     {
         return Err(invalid(
             "direct HEVC Gain Map has unsupported tile geometry",
         ));
     }
+    spec.profile.validate()?;
     let columns = ceil_div(spec.gain_map_width, spec.tile_width, "gain-map columns")?;
     let rows = ceil_div(spec.gain_map_height, spec.tile_height, "gain-map rows")?;
     let expected_count = usize::try_from(
@@ -177,18 +216,31 @@ fn validate_spec(spec: &DirectHevcGainMap<'_>) -> Result<(u32, u32)> {
         }
     }
 
-    if spec.hvcc.len() <= 18
-        || spec.hvcc[0] != 1
-        || spec.hvcc[1] & 0x1f != 4
-        || spec.hvcc[16] & 0x03 != if spec.channel_count == 1 { 0 } else { 3 }
-        || (spec.hvcc[17] & 0x07) + 8 != 8
-        || (spec.hvcc[18] & 0x07) + 8 != 8
+    let codec = parse_hvcc_profile(spec.hvcc)
+        .map_err(|error| invalid(format!("invalid direct HEVC Gain Map hvcC: {error}")))?;
+    if codec.chroma_sampling != spec.profile.chroma
+        || codec.luma_bit_depth != spec.profile.luma_bit_depth
+        || codec.chroma_bit_depth != spec.profile.chroma_bit_depth
     {
         return Err(invalid(
-            "direct HEVC Gain Map codec does not match its channel layout",
+            "direct HEVC Gain Map hvcC does not match its explicit encode profile",
         ));
     }
     Ok((rows, columns))
+}
+
+fn make_gain_map_pixi_box(profile: GainMapEncodeProfile) -> Result<Vec<u8>> {
+    profile.validate()?;
+    let mut payload = vec![profile.channels.semantic_channel_count()];
+    match profile.channels {
+        GainMapChannels::Mono => payload.push(profile.luma_bit_depth),
+        GainMapChannels::Rgb => {
+            payload.push(profile.luma_bit_depth);
+            payload.push(profile.chroma_bit_depth);
+            payload.push(profile.chroma_bit_depth);
+        }
+    }
+    Ok(make_full_box(PIXI, 0, 0, &payload)?)
 }
 
 fn make_grid_payload(rows: u32, columns: u32, width: u32, height: u32) -> Result<Vec<u8>> {
@@ -562,7 +614,7 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     let gain_colr_index = next_property(
         &mut ipco_payload,
         &mut next_property_index,
-        if spec.channel_count == 1 {
+        if spec.profile.channels == GainMapChannels::Mono {
             COLR_SRGB_BOX
         } else {
             COLR_UNSPECIFIED_BT601_BOX
@@ -587,17 +639,15 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
         raw_property(source, tmap_pixi)?,
     )?;
 
-    let gain_pixi_index = if spec.channel_count == 1 {
-        next_property(&mut ipco_payload, &mut next_property_index, PIXI_MONO8_BOX)?
-    } else if let Some(existing) = original_non_codec
-        .iter()
-        .find(|property| raw_property(source, property).is_ok_and(|raw| raw == PIXI_RGB8_BOX))
-    {
+    let gain_pixi = make_gain_map_pixi_box(spec.profile)?;
+    let gain_pixi_index = if let Some(existing) = original_non_codec.iter().find(|property| {
+        raw_property(source, property).is_ok_and(|raw| raw == gain_pixi.as_slice())
+    }) {
         *remapped_property_indices
             .get(&existing.index)
-            .ok_or_else(|| invalid("RGB pixi property remap is missing"))?
+            .ok_or_else(|| invalid("Gain Map pixi property remap is missing"))?
     } else {
-        next_property(&mut ipco_payload, &mut next_property_index, PIXI_RGB8_BOX)?
+        next_property(&mut ipco_payload, &mut next_property_index, &gain_pixi)?
     };
 
     let mut unique_tile_sizes: Vec<(u32, u32)> = Vec::new();
@@ -1131,7 +1181,12 @@ mod tests {
             tile_height: 4,
             tiles: &[tile],
             hvcc: &hvcc,
-            channel_count: 3,
+            profile: GainMapEncodeProfile {
+                channels: GainMapChannels::Rgb,
+                chroma: ChromaSampling::Yuv444,
+                luma_bit_depth: 8,
+                chroma_bit_depth: 8,
+            },
         };
         assert!(replace_private_jpeg_gain_map_with_hevc_tiles(&[], &spec).is_err());
     }
@@ -1151,7 +1206,12 @@ mod tests {
             tile_height: 4,
             tiles: &[tile],
             hvcc: &hvcc,
-            channel_count: 3,
+            profile: GainMapEncodeProfile {
+                channels: GainMapChannels::Rgb,
+                chroma: ChromaSampling::Yuv444,
+                luma_bit_depth: 8,
+                chroma_bit_depth: 8,
+            },
         };
         assert!(replace_private_jpeg_gain_map_with_hevc_tiles(&[], &spec).is_err());
     }
@@ -1166,5 +1226,39 @@ mod tests {
             make_grid_payload(1, 1, 65_536, 70_000).unwrap(),
             vec![0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0x11, 0x70]
         );
+    }
+    #[test]
+    fn accepts_explicit_chroma_and_bit_depth_profiles() {
+        for (channels, chroma, depth) in [
+            (GainMapChannels::Mono, ChromaSampling::Mono400, 10),
+            (GainMapChannels::Rgb, ChromaSampling::Yuv420, 8),
+            (GainMapChannels::Rgb, ChromaSampling::Yuv422, 10),
+            (GainMapChannels::Rgb, ChromaSampling::Yuv444, 10),
+        ] {
+            let tile = GainMapTile {
+                payload: &[1],
+                width: 4,
+                height: 4,
+            };
+            let mut hvcc = valid_hvcc(channels.semantic_channel_count());
+            hvcc[16] = chroma.hevc_chroma_format_idc();
+            hvcc[17] = depth - 8;
+            hvcc[18] = depth - 8;
+            let spec = DirectHevcGainMap {
+                gain_map_width: 4,
+                gain_map_height: 4,
+                tile_width: 4,
+                tile_height: 4,
+                tiles: std::slice::from_ref(&tile),
+                hvcc: &hvcc,
+                profile: GainMapEncodeProfile {
+                    channels,
+                    chroma,
+                    luma_bit_depth: depth,
+                    chroma_bit_depth: depth,
+                },
+            };
+            validate_spec(&spec).unwrap();
+        }
     }
 }

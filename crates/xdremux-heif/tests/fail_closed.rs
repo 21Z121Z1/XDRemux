@@ -1,4 +1,8 @@
-use xdremux_heif::{replace_private_jpeg_gain_map_with_hevc_tiles, DirectHevcGainMap, GainMapTile};
+use xdremux_format::ChromaSampling;
+use xdremux_heif::{
+    replace_private_jpeg_gain_map_with_hevc_tiles, DirectHevcGainMap, GainMapChannels,
+    GainMapEncodeProfile, GainMapTile,
+};
 
 fn hvcc() -> Vec<u8> {
     let mut value = vec![0u8; 19];
@@ -24,7 +28,12 @@ fn malformed_source_fails_closed_after_validating_spec() {
         tile_height: 4,
         tiles: &[tile],
         hvcc: &hvcc,
-        channel_count: 3,
+        profile: GainMapEncodeProfile {
+            channels: GainMapChannels::Rgb,
+            chroma: ChromaSampling::Yuv444,
+            luma_bit_depth: 8,
+            chroma_bit_depth: 8,
+        },
     };
 
     // Declares a largesize box but truncates the 16-byte header. The hardened
@@ -49,7 +58,12 @@ fn structurally_incomplete_source_is_rejected() {
         tile_height: 4,
         tiles: &[tile],
         hvcc: &hvcc,
-        channel_count: 3,
+        profile: GainMapEncodeProfile {
+            channels: GainMapChannels::Rgb,
+            chroma: ChromaSampling::Yuv444,
+            luma_bit_depth: 8,
+            chroma_bit_depth: 8,
+        },
     };
 
     let ftyp_only = [0, 0, 0, 8, b'f', b't', b'y', b'p'];

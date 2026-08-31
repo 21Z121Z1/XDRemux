@@ -2,9 +2,10 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+use xdremux_format::parse_hvcc_profile;
 use xdremux_heif::{
     replace_private_jpeg_gain_map_with_hevc_tiles, validate_gain_map_structure, DirectHevcGainMap,
-    GainMapTile,
+    GainMapChannels, GainMapEncodeProfile, GainMapTile,
 };
 
 fn parse_u32(value: &str, name: &str) -> u32 {
@@ -47,6 +48,13 @@ fn main() {
     let tile_height = parse_u32(&args[6], "tile height");
     let channel_count = parse_u8(&args[7], "channel count");
     let hvcc = decode_hex(&args[8]);
+    let codec = parse_hvcc_profile(&hvcc).expect("parse hvcC profile");
+    let channels = match channel_count {
+        1 => GainMapChannels::Mono,
+        3 => GainMapChannels::Rgb,
+        _ => panic!("unsupported semantic channel count: {channel_count}"),
+    };
+    assert_eq!(channels.semantic_channel_count(), channel_count);
 
     let tile_storage: Vec<(Vec<u8>, u32, u32)> = args[9..]
         .iter()
@@ -81,7 +89,12 @@ fn main() {
             tile_height,
             tiles: &tiles,
             hvcc: &hvcc,
-            channel_count,
+            profile: GainMapEncodeProfile {
+                channels,
+                chroma: codec.chroma_sampling,
+                luma_bit_depth: codec.luma_bit_depth,
+                chroma_bit_depth: codec.chroma_bit_depth,
+            },
         },
     )
     .unwrap_or_else(|error| panic!("Rust HEIF writer failed: {error}"));

@@ -5,7 +5,7 @@ use xdremux_format::isobmff::{
     parse_boxes, parse_ispe_dimensions, parse_meta_box, scan_top_level_boxes, BoxHeader, IlocEntry,
     IpmaEntry, ParsedMeta, PropertyInfo, FTYP, MDAT, META,
 };
-use xdremux_format::FourCC;
+use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC, HevcDecoderConfigurationProfile};
 
 use crate::error::{HeifError, Result};
 
@@ -30,13 +30,10 @@ pub struct GainMapStructure {
     pub channel_count: u8,
     pub chroma_format_idc: u8,
     pub bit_depth: u8,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct CodecLayout {
-    chroma_format_idc: u8,
-    bit_depth_luma: u8,
-    bit_depth_chroma: u8,
+    pub chroma_sampling: ChromaSampling,
+    pub luma_bit_depth: u8,
+    pub chroma_bit_depth: u8,
+    pub general_profile_idc: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,7 +125,7 @@ fn parse_ispe(source: &[u8], property: &PropertyInfo) -> Result<(u32, u32)> {
     Ok((width, height))
 }
 
-fn parse_hvcc(source: &[u8], property: &PropertyInfo) -> Result<CodecLayout> {
+fn parse_hvcc(source: &[u8], property: &PropertyInfo) -> Result<HevcDecoderConfigurationProfile> {
     let (raw, header) = property_box(source, property)?;
     if header.kind != HVCC {
         return Err(invalid(format!(
@@ -139,39 +136,7 @@ fn parse_hvcc(source: &[u8], property: &PropertyInfo) -> Result<CodecLayout> {
     let payload = raw
         .get(header.payload_range())
         .ok_or_else(|| invalid("hvcC payload is outside its property box"))?;
-    if payload.len() <= 18 {
-        return Err(invalid("hvcC is shorter than the channel-layout fields"));
-    }
-    if payload[0] != 1 {
-        return Err(invalid(format!(
-            "hvcC configurationVersion {} is unsupported",
-            payload[0]
-        )));
-    }
-    if payload[1] & 0x1f != 4 {
-        return Err(invalid(format!(
-            "hvcC general_profile_idc {} does not match the direct Gain Map contract",
-            payload[1] & 0x1f
-        )));
-    }
-    let chroma_format_idc = payload[16] & 0x03;
-    if !matches!(chroma_format_idc, 0 | 3) {
-        return Err(invalid(format!(
-            "hvcC chroma_format_idc {chroma_format_idc} is unsupported for a Gain Map"
-        )));
-    }
-    let bit_depth_luma = (payload[17] & 0x07) + 8;
-    let bit_depth_chroma = (payload[18] & 0x07) + 8;
-    if bit_depth_luma != 8 || bit_depth_chroma != 8 {
-        return Err(invalid(format!(
-            "hvcC Gain Map bit depth must be 8/8, got {bit_depth_luma}/{bit_depth_chroma}"
-        )));
-    }
-    Ok(CodecLayout {
-        chroma_format_idc,
-        bit_depth_luma,
-        bit_depth_chroma,
-    })
+    parse_hvcc_profile(payload).map_err(|error| invalid(format!("invalid Gain Map hvcC: {error}")))
 }
 
 fn item_extent_range(
@@ -564,10 +529,9 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
     }
     let gain_pixi = associated_property(gain_map_item_id, PIXI, &ipma_by_item, &properties)?;
     let (channel_count, channel_bits) = parse_pixi(source, gain_pixi)?;
-    if !matches!(channel_count, 1 | 3) || channel_bits.iter().any(|bits| *bits != 8) {
+    if !matches!(channel_count, 1 | 3) {
         return Err(invalid(format!(
-            "gain-map pixi must declare one or three 8-bit channels, got {channel_count} {:?}",
-            channel_bits
+            "gain-map pixi must declare one or three channels, got {channel_count}"
         )));
     }
 
@@ -580,7 +544,7 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
         associated_property(tmap_item_id, PIXI, &ipma_by_item, &properties)?,
     )?;
 
-    let mut expected_codec: Option<CodecLayout> = None;
+    let mut expected_codec: Option<HevcDecoderConfigurationProfile> = None;
     for tile_item_id in &tile_item_ids {
         let tile_item = items
             .get(tile_item_id)
@@ -615,11 +579,26 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
         }
     }
     let codec = expected_codec.ok_or_else(|| invalid("gain-map contains no HEVC tiles"))?;
-    let codec_channels = if codec.chroma_format_idc == 0 { 1 } else { 3 };
+    let codec_channels = codec.chroma_sampling.semantic_channel_count();
     if channel_count != codec_channels {
         return Err(invalid(format!(
-            "gain-map pixi declares {channel_count} channels but hvcC chroma_format_idc {} implies {codec_channels}",
-            codec.chroma_format_idc
+            "gain-map pixi declares {channel_count} channels but hvcC {:?} implies {codec_channels}",
+            codec.chroma_sampling
+        )));
+    }
+    let expected_channel_bits = match channel_count {
+        1 => vec![codec.luma_bit_depth],
+        3 => vec![
+            codec.luma_bit_depth,
+            codec.chroma_bit_depth,
+            codec.chroma_bit_depth,
+        ],
+        _ => unreachable!("channel count validated above"),
+    };
+    if channel_bits != expected_channel_bits {
+        return Err(invalid(format!(
+            "gain-map pixi bit depths {:?} disagree with hvcC {}/{}",
+            channel_bits, codec.luma_bit_depth, codec.chroma_bit_depth
         )));
     }
 
@@ -633,8 +612,12 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
         rows: grid.rows,
         columns: grid.columns,
         channel_count,
-        chroma_format_idc: codec.chroma_format_idc,
-        bit_depth: codec.bit_depth_luma,
+        chroma_format_idc: codec.chroma_sampling.hevc_chroma_format_idc(),
+        bit_depth: codec.luma_bit_depth,
+        chroma_sampling: codec.chroma_sampling,
+        luma_bit_depth: codec.luma_bit_depth,
+        chroma_bit_depth: codec.chroma_bit_depth,
+        general_profile_idc: codec.general_profile_idc,
     })
 }
 
@@ -657,6 +640,9 @@ mod tests {
         gain_targets: Vec<u32>,
         gain_pixi_channels: u8,
         hvcc_chroma: u8,
+        gain_pixi_bit_depth: u8,
+        hvcc_luma_bit_depth: u8,
+        hvcc_chroma_bit_depth: u8,
         tile_extent_length: u64,
         grid_rows: u8,
         grid_columns: u8,
@@ -669,6 +655,9 @@ mod tests {
                 gain_targets: vec![TILE_ID],
                 gain_pixi_channels: 3,
                 hvcc_chroma: 3,
+                gain_pixi_bit_depth: 8,
+                hvcc_luma_bit_depth: 8,
+                hvcc_chroma_bit_depth: 8,
                 tile_extent_length: 1,
                 grid_rows: 1,
                 grid_columns: 1,
@@ -676,17 +665,19 @@ mod tests {
         }
     }
 
-    fn pixi_box(channels: u8) -> Vec<u8> {
+    fn pixi_box(channels: u8, bit_depth: u8) -> Vec<u8> {
         let mut payload = vec![channels];
-        payload.extend(std::iter::repeat_n(8, usize::from(channels)));
+        payload.extend(std::iter::repeat_n(bit_depth, usize::from(channels)));
         make_full_box(PIXI, 0, 0, &payload).unwrap()
     }
 
-    fn hvcc_box(chroma: u8) -> Vec<u8> {
+    fn hvcc_box(chroma: u8, luma_bit_depth: u8, chroma_bit_depth: u8) -> Vec<u8> {
         let mut payload = vec![0u8; 19];
         payload[0] = 1;
         payload[1] = 4;
         payload[16] = chroma;
+        payload[17] = luma_bit_depth - 8;
+        payload[18] = chroma_bit_depth - 8;
         make_box(HVCC, &payload).unwrap()
     }
 
@@ -708,11 +699,15 @@ mod tests {
         idat_payload.extend_from_slice(&tile_payload);
 
         let gain_ispe = make_ispe_box(4, 4).unwrap();
-        let gain_pixi = pixi_box(options.gain_pixi_channels);
+        let gain_pixi = pixi_box(options.gain_pixi_channels, options.gain_pixi_bit_depth);
         let tmap_ispe = make_ispe_box(4, 4).unwrap();
-        let tmap_pixi = pixi_box(3);
+        let tmap_pixi = pixi_box(3, 8);
         let tile_ispe = make_ispe_box(4, 4).unwrap();
-        let tile_hvcc = hvcc_box(options.hvcc_chroma);
+        let tile_hvcc = hvcc_box(
+            options.hvcc_chroma,
+            options.hvcc_luma_bit_depth,
+            options.hvcc_chroma_bit_depth,
+        );
         let mut ipco_payload = Vec::new();
         for property in [
             &gain_ispe, &gain_pixi, &tmap_ispe, &tmap_pixi, &tile_ispe, &tile_hvcc,
@@ -910,5 +905,23 @@ mod tests {
             ..FixtureOptions::default()
         };
         assert!(validate_gain_map_structure(&fixture(options)).is_err());
+    }
+    #[test]
+    fn accepts_mono_420_422_444_and_ten_bit_profiles() {
+        for (hvcc_chroma, channels) in [(0, 1), (1, 3), (2, 3), (3, 3)] {
+            let options = FixtureOptions {
+                gain_pixi_channels: channels,
+                hvcc_chroma,
+                gain_pixi_bit_depth: 10,
+                hvcc_luma_bit_depth: 10,
+                hvcc_chroma_bit_depth: 10,
+                ..FixtureOptions::default()
+            };
+            let result = validate_gain_map_structure(&fixture(options)).unwrap();
+            assert_eq!(result.channel_count, channels);
+            assert_eq!(result.chroma_format_idc, hvcc_chroma);
+            assert_eq!(result.luma_bit_depth, 10);
+            assert_eq!(result.chroma_bit_depth, 10);
+        }
     }
 }
