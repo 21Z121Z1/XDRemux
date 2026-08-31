@@ -3,6 +3,7 @@
 mod capabilities;
 mod model;
 mod oppo;
+mod planning;
 
 pub use capabilities::detect_capabilities;
 pub use model::{
@@ -13,6 +14,11 @@ pub use model::{
 };
 pub use oppo::{
     classification_contract, classify_user_comment, classify_user_comment_with_context, parse_flags,
+};
+pub use planning::{
+    plan_photo_assets, resolve_photo_asset, CategorizationDestinationRoot,
+    PhotoAssetCategorizationDisposition, PhotoAssetCategorizationItem, PhotoAssetCategorizationPlan,
+    PhotoAssetPlanningError, PhotoAssetPlanningInput, PlanningResult, ResourceFingerprint,
 };
 
 #[cfg(test)]

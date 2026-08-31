@@ -67,6 +67,48 @@ class PhotoClassificationContractTests(unittest.TestCase):
             [categorize.ResourceRole.PRIMARY_IMAGE, categorize.ResourceRole.PAIRED_VIDEO],
         )
 
+    def test_asset_planning_keeps_validated_live_pair_on_shared_collision_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            input_dir = root / "input"
+            output = root / "output"
+            input_dir.mkdir()
+
+            image = input_dir / "pair.heic"
+            video = input_dir / "pair.mov"
+            image.write_bytes(b"oplus_18")
+            video.write_bytes(b"paired-video")
+
+            occupied = output / "实况照片" / "人像"
+            occupied.mkdir(parents=True)
+            (occupied / "pair.heic").write_bytes(b"foreign-image")
+
+            paired = categorize.make_plan(
+                [input_dir],
+                output,
+                live_photo_pair_validator=lambda candidate_image, candidate_video: (
+                    candidate_image.name == "pair.heic" and candidate_video.name == "pair.mov"
+                ),
+            )
+            self.assertEqual(len(paired), 2)
+            self.assertTrue(
+                all(item.classification.asset_type is categorize.AssetType.LIVE_PHOTO for item in paired)
+            )
+            self.assertEqual(
+                {item.destination.name for item in paired},
+                {"pair (2).heic", "pair (2).mov"},
+            )
+            self.assertTrue(all("实况照片/人像" in item.destination.as_posix() for item in paired))
+
+            rejected = categorize.make_plan(
+                [input_dir],
+                output,
+                live_photo_pair_validator=lambda _image, _video: False,
+            )
+            self.assertEqual(len(rejected), 1)
+            self.assertEqual(rejected[0].source.resolve(), image.resolve())
+            self.assertIs(rejected[0].classification.asset_type, categorize.AssetType.STATIC_PHOTO)
+
     def test_capabilities_require_complete_manifest_entry_names(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -7,7 +7,9 @@ on:
       - "Cargo.lock"
       - "crates/xdremux-classification/**"
       - "Sources/XDRemuxCore/Metadata/PhotoCategorization.swift"
+      - "Sources/XDRemuxCore/Metadata/PhotoAssetCategorizationPlanning.swift"
       - "Tests/XDRemuxCoreTests/PhotoClassificationContractTests.swift"
+      - "Tests/XDRemuxCoreTests/CoreContractTests.swift"
       - "Tests/test_photo_classification_contract.py"
       - "Tests/fixtures/photo_classification_cases.json"
       - "xdremux_py/categorize.py"
@@ -19,7 +21,9 @@ on:
       - "Cargo.lock"
       - "crates/xdremux-classification/**"
       - "Sources/XDRemuxCore/Metadata/PhotoCategorization.swift"
+      - "Sources/XDRemuxCore/Metadata/PhotoAssetCategorizationPlanning.swift"
       - "Tests/XDRemuxCoreTests/PhotoClassificationContractTests.swift"
+      - "Tests/XDRemuxCoreTests/CoreContractTests.swift"
       - "Tests/test_photo_classification_contract.py"
       - "Tests/fixtures/photo_classification_cases.json"
       - "xdremux_py/categorize.py"
@@ -60,7 +64,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Compare Rust, Swift, and Python classification contracts
+      - name: Compare Rust, Swift, and Python classification and asset-planning contracts
         run: bash scripts/check_classification_conformance.sh
       - name: Verify cross-language completion gate
         shell: bash
@@ -68,7 +72,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-classification-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Port the canonical photo tag/asset classification contract into an isolated Rust domain crate without changing product entry points",
+            "scope": "Port the canonical photo tag/asset classification and asset-aware categorization planning contracts into an isolated Rust domain crate without changing product entry points",
             "checks": [
               {
                 "name": "rust-classification-regressions",
