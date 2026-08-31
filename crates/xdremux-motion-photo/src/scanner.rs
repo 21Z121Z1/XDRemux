@@ -26,8 +26,7 @@ pub fn is_ftyp_box_start(data: &[u8], offset: u64, upper_bound: u64) -> Result<b
             .map_err(|_| MotionPhotoError::InvalidVideoPayload)?,
     );
     let available = upper_bound - offset;
-    let brand_start;
-    if size32 == 1 {
+    let brand_start = if size32 == 1 {
         if available < 24 || offset + 24 > data.len() {
             return Ok(false);
         }
@@ -36,16 +35,22 @@ pub fn is_ftyp_box_start(data: &[u8], offset: u64, upper_bound: u64) -> Result<b
                 .try_into()
                 .map_err(|_| MotionPhotoError::InvalidVideoPayload)?,
         );
-        if large_size < 24 || large_size > u64::try_from(available).map_err(|_| MotionPhotoError::ArithmeticOverflow)? {
+        if large_size < 24
+            || large_size
+                > u64::try_from(available).map_err(|_| MotionPhotoError::ArithmeticOverflow)?
+        {
             return Ok(false);
         }
-        brand_start = offset + 16;
+        offset + 16
     } else {
-        if size32 < 16 || u64::from(size32) > u64::try_from(available).map_err(|_| MotionPhotoError::ArithmeticOverflow)? {
+        if size32 < 16
+            || u64::from(size32)
+                > u64::try_from(available).map_err(|_| MotionPhotoError::ArithmeticOverflow)?
+        {
             return Ok(false);
         }
-        brand_start = offset + 8;
-    }
+        offset + 8
+    };
     let brand_end = brand_start
         .checked_add(4)
         .ok_or(MotionPhotoError::ArithmeticOverflow)?;
