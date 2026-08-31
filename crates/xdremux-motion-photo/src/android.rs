@@ -65,8 +65,7 @@ fn attributes(element: &BytesStart<'_>) -> Result<BTreeMap<String, String>> {
     let mut output = BTreeMap::new();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|_| MotionPhotoError::MalformedXmp)?;
-        let key = std::str::from_utf8(attribute.key.as_ref())
-            .map_err(|_| MotionPhotoError::MalformedXmp)?;
+        let key = attribute.key.as_ref();
         let value = attribute
             .normalized_value(XmlVersion::Implicit1_0)
             .map_err(|_| MotionPhotoError::MalformedXmp)?;
@@ -182,9 +181,7 @@ fn parse_xmp(xmp: &[u8]) -> Result<ParsedXmp> {
             .map_err(|_| MotionPhotoError::MalformedXmp)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let name = std::str::from_utf8(element.name().as_ref())
-                    .map_err(|_| MotionPhotoError::MalformedXmp)?
-                    .to_owned();
+                let name = element.name().as_ref().to_owned();
                 if name == "rdf:Description" {
                     parse_description(&mut parsed, &attributes(&element)?);
                 } else if name == "Container:Directory" {
@@ -199,8 +196,7 @@ fn parse_xmp(xmp: &[u8]) -> Result<ParsedXmp> {
                 }
             }
             Event::End(element) => {
-                let name = std::str::from_utf8(element.name().as_ref())
-                    .map_err(|_| MotionPhotoError::MalformedXmp)?;
+                let name = element.name().as_ref();
                 if name == "Container:Directory" || name == "GContainer:Directory" {
                     directory_prefix = None;
                 }
@@ -256,14 +252,13 @@ fn derive_jpeg_style_ranges(
     file_size: u64,
 ) -> Result<(ByteRange, ByteRange)> {
     let mut item_start = file_size;
-    let mut item_end = file_size;
     let mut primary_encoding_end = None;
     let mut video_start = None;
     let mut video_end = None;
 
     for index in (0..items.len()).rev() {
         let item = &items[index];
-        item_end = item_start;
+        let mut item_end = item_start;
         if index == 0 {
             let unpadded_end = item_end
                 .checked_sub(item.padding)
@@ -360,11 +355,7 @@ pub fn parse_android_motion_photo(data: &[u8]) -> Result<Option<MotionPhotoAsset
             resolve_heif_motion_photo_ranges(data, &items)?
         } else {
             let ranges = derive_jpeg_style_ranges(&items, file_size)?;
-            if !is_ftyp_box_start(
-                data,
-                ranges.1.lower_bound,
-                ranges.1.upper_bound,
-            )? {
+            if !is_ftyp_box_start(data, ranges.1.lower_bound, ranges.1.upper_bound)? {
                 return Err(MotionPhotoError::InvalidVideoPayload);
             }
             ranges
@@ -502,7 +493,7 @@ mod tests {
     fn rejects_motion_photo_item_that_is_not_last() {
         let video = fake_mp4();
         let trailing = r#"<rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="application/octet-stream" Item:Semantic="Auxiliary" Item:Length="0" Item:Padding="0"/></rdf:li>"#;
-        let xmp = standard_xmp(video.len() as u64, None, trailing).replace("</rdf:Seq>", &format!("{trailing}</rdf:Seq>"));
+        let xmp = standard_xmp(video.len() as u64, None, "").replace("</rdf:Seq>", &format!("{trailing}</rdf:Seq>"));
         let mut data = xmp.into_bytes();
         data.extend_from_slice(&video);
         assert_eq!(
