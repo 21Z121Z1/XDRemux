@@ -4,10 +4,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-cargo build --locked -q -p xdremux-motion-photo --example motion_photo_conformance
+cargo build --locked -q -p xdremux-motion-photo \
+  --example motion_photo_conformance \
+  --example payload_conformance
 swift test --filter MotionPhotoRustConformanceTests/testSwiftAndRustPureMotionPhotoContractsMatch
 swift test --filter MotionPhotoAndroidRustConformanceTests/testSwiftAndRustAndroidParserContractsMatch
 swift test --filter MotionPhotoOppoRustConformanceTests/testSwiftAndRustOppoParserContractsMatch
 swift test --filter MotionPhotoOppoSentinelRustConformanceTests/testMinusOneXMPPresentationFallsBackToLpexCoverFrame
+swift test --filter MotionPhotoPayloadRustConformanceTests/testSwiftAndRustPayloadExtractionContractsMatch
 python3 scripts/check_motion_photo_oppo_python_rust.py
+python3 scripts/check_motion_photo_payload_python_rust.py
 python3 -m unittest discover -s Tests -p 'test_python_motion_photo*.py' -v
