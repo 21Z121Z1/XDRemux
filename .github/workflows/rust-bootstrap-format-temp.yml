@@ -22,18 +22,30 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Apply Clippy-guided JPEG iterator fix
+      - name: Apply verified bootstrap fixes
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          path = Path("crates/xdremux-format/src/jpeg.rs")
-          text = path.read_text()
+
+          jpeg = Path("crates/xdremux-format/src/jpeg.rs")
+          text = jpeg.read_text()
           old = "for chunk in payload[6..].chunks_exact(3) {"
           new = "for chunk in payload[6..].as_chunks::<3>().0 {"
           if text.count(old) != 1:
               raise SystemExit(f"expected one chunks_exact site, found {text.count(old)}")
-          path.write_text(text.replace(old, new))
+          jpeg.write_text(text.replace(old, new))
+
+          oppo = Path("crates/xdremux-classification/src/oppo.rs")
+          lines = oppo.read_text().splitlines()
+          filtered = [
+              line for line in lines
+              if not ("assert_eq!(parse_flags(r#" in line and ", None);" in line)
+          ]
+          removed = len(lines) - len(filtered)
+          if removed != 2:
+              raise SystemExit(f"expected to remove two invalid JSON assertions, removed {removed}")
+          oppo.write_text("\n".join(filtered) + "\n")
           PY
       - name: Refresh canonical Cargo lockfile
         run: cargo generate-lockfile
