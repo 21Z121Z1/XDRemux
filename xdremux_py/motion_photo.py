@@ -394,19 +394,19 @@ def parse_android_motion_photo(path: str | os.PathLike[str]) -> MotionPhotoAsset
         presentation_source = "androidXMP" if timestamp is not None else None
     elif legacy_offset is not None:
         if legacy_offset <= 0 or legacy_offset > size:
-            raise MotionPhotoError("invalid legacy MicroVideo offset")
+            raise MotionPhotoError("invalid legacy MicroVideoOffset")
+        video_range = ByteRange(size - legacy_offset, size)
+        if not is_ftyp_start(source, video_range.start, video_range.end):
+            raise MotionPhotoError("legacy MicroVideo payload is not ISO BMFF")
+        still_range = ByteRange(0, video_range.start)
+        source_kind = "legacyMicroVideoV1b"
         items = (
             MotionPhotoItem("image/jpeg", "Primary", 0, 0),
             MotionPhotoItem("video/mp4", "MotionPhoto", legacy_offset, 0),
         )
-        video_range = ByteRange(size - legacy_offset, size)
-        still_range = ByteRange(0, video_range.start)
-        if not is_ftyp_start(source, video_range.start, video_range.end):
-            raise MotionPhotoError("legacy MicroVideo payload is not ISO BMFF")
-        source_kind = "legacyMicroVideoV1b"
         presentation_source = "legacyMicroVideoXMP" if timestamp is not None else None
     else:
-        raise MotionPhotoError("Motion Photo directory is missing")
+        raise MotionPhotoError("Motion Photo XMP has no supported resource directory")
     return MotionPhotoAsset(
         source=source,
         source_kind=source_kind,
@@ -418,58 +418,67 @@ def parse_android_motion_photo(path: str | os.PathLike[str]) -> MotionPhotoAsset
     )
 
 
-def _extract_balanced_json(data: bytes, brace: int) -> bytes | None:
+def _extract_balanced_json(data: bytes, start: int) -> bytes | None:
+    if start >= len(data) or data[start] != ord("{"):
+        return None
     depth = 0
     in_string = False
-    escaping = False
-    for index in range(brace, min(len(data), brace + MAX_LPEX_JSON_BYTES + 1)):
-        byte = data[index]
+    escaped = False
+    limit = min(len(data), start + MAX_LPEX_JSON_BYTES + 1)
+    for pos in range(start, limit):
+        value = data[pos]
         if in_string:
-            if escaping:
-                escaping = False
-            elif byte == 0x5C:
-                escaping = True
-            elif byte == 0x22:
+            if escaped:
+                escaped = False
+            elif value == ord("\\"):
+                escaped = True
+            elif value == ord('"'):
                 in_string = False
             continue
-        if byte == 0x22:
+        if value == ord('"'):
             in_string = True
-        elif byte == 0x7B:
+        elif value == ord("{"):
             depth += 1
-        elif byte == 0x7D:
+        elif value == ord("}"):
             depth -= 1
             if depth == 0:
-                return data[brace:index + 1]
-            if depth < 0:
-                return None
+                return data[start:pos + 1]
     return None
 
 
-def _matrix(value) -> tuple[float, ...] | None:
-    if not isinstance(value, list) or len(value) != 9:
-        return None
-    try:
-        values = tuple(float(item) for item in value)
-    except (TypeError, ValueError):
-        return None
-    if any(not (-1e308 < item < 1e308) for item in values):
-        return None
-    return values
+def _number(value) -> float | None:
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and len(value.encode()) <= 64:
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _number_tuple(value, limit: int) -> tuple[float, ...] | None:
     if not isinstance(value, list) or len(value) > limit:
         return None
-    try:
-        values = tuple(float(item) for item in value)
-    except (TypeError, ValueError):
+    result = tuple(_number(item) for item in value)
+    if any(item is None for item in result):
         return None
-    if any(not (-1e308 < item < 1e308) for item in values):
+    floats = tuple(float(item) for item in result if item is not None)
+    if any(not __import__("math").isfinite(item) for item in floats):
         return None
-    return values
+    return floats
+
+
+def _matrix(value) -> tuple[float, ...] | None:
+    result = _number_tuple(value, 9)
+    return result if result is not None and len(result) == 9 else None
 
 
 def _parse_lpex_object(raw: bytes) -> OppoMetadata | None:
+    if len(raw) > MAX_LPEX_JSON_BYTES:
+        return None
     try:
         obj = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError):
@@ -480,41 +489,59 @@ def _parse_lpex_object(raw: bytes) -> OppoMetadata | None:
     def integer(name: str) -> int | None:
         value = obj.get(name)
         if isinstance(value, bool):
-            return None
-        try:
-            return int(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
+            return int(value)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and __import__("math").isfinite(value):
+            return int(value)
+        if isinstance(value, str) and len(value.encode()) <= 32:
+            try:
+                return int(value, 10)
+            except ValueError:
+                return None
+        return None
 
     def size(name: str) -> tuple[int | None, int | None]:
         value = obj.get(name)
         if not isinstance(value, list) or len(value) < 2:
             return None, None
-        try:
-            width, height = int(value[0]), int(value[1])
-        except (TypeError, ValueError):
-            return None, None
-        return (width, height) if width > 0 and height > 0 else (None, None)
+        pair: list[int] = []
+        for entry in value[:2]:
+            if isinstance(entry, bool):
+                parsed = int(entry)
+            elif isinstance(entry, int):
+                parsed = entry
+            elif isinstance(entry, float) and __import__("math").isfinite(entry):
+                parsed = int(entry)
+            elif isinstance(entry, str) and len(entry.encode()) <= 32:
+                try:
+                    parsed = int(entry, 10)
+                except ValueError:
+                    return None, None
+            else:
+                return None, None
+            pair.append(parsed)
+        return (pair[0], pair[1]) if pair[0] > 0 and pair[1] > 0 else (None, None)
 
     matrices: list[tuple[int, tuple[float, ...]]] = []
     raw_matrices = obj.get("matrices")
     if isinstance(raw_matrices, dict) and len(raw_matrices) <= 4096:
         for key, value in raw_matrices.items():
-            parsed = _matrix(value)
-            if parsed is None:
+            if len(str(key).encode()) > 128:
+                continue
+            matrix = _matrix(value)
+            if matrix is None:
                 continue
             try:
                 timestamp = int(key)
             except (TypeError, ValueError):
                 continue
-            matrices.append((timestamp, parsed))
-    matrices.sort(key=lambda pair: pair[0])
+            matrices.append((timestamp, matrix))
+    matrices.sort(key=lambda item: item[0])
     vw, vh = size("videoSize")
     ow, oh = size("originPhotoSize")
-    photo_crop_factor = obj.get("photoCropFactor")
-    try:
-        photo_crop_factor = float(photo_crop_factor) if photo_crop_factor is not None else None
-    except (TypeError, ValueError):
+    photo_crop_factor = _number(obj.get("photoCropFactor"))
+    if photo_crop_factor is not None and not __import__("math").isfinite(photo_crop_factor):
         photo_crop_factor = None
     return OppoMetadata(
         cover_frame_pts_us=integer("coverFramePts"),
@@ -612,6 +639,8 @@ def _oppo_fallback(path: Path, lpex: OppoMetadata | None) -> MotionPhotoAsset | 
         "MotionPhotoPresentationTimestampUs",
         "GCamera:MicroVideoPresentationTimestampUs",
     ))
+    if presentation == -1:
+        presentation = None
     stream_count = 1
     if lpex and lpex.version >= 1 and len(offsets) >= 2:
         video_start = offsets[-2]
