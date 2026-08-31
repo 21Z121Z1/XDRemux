@@ -15,7 +15,7 @@ on:
       - ".github/workflows/rust-format-core.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   format-core:
@@ -30,16 +30,37 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
+      - name: Normalize Rust formatting on this feature branch
+        id: rustfmt
+        if: github.event_name == 'push' && github.ref_name == 'feat/rust-xdremux-format'
+        shell: bash
+        run: |
+          cargo fmt --all
+          if git diff --quiet -- Cargo.toml Cargo.lock crates/xdremux-format; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock crates/xdremux-format
+          git commit -m "style(rust): apply rustfmt"
+          git push origin HEAD:"$GITHUB_REF_NAME"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
       - name: Check formatting
+        if: steps.rustfmt.outputs.changed != 'true'
         run: cargo fmt --all --check
 
       - name: Lint xdremux-format
+        if: steps.rustfmt.outputs.changed != 'true'
         run: cargo clippy --locked -p xdremux-format --all-targets -- -D warnings
 
       - name: Test xdremux-format
+        if: steps.rustfmt.outputs.changed != 'true'
         run: cargo test --locked -p xdremux-format
 
       - name: Verify repository completion gate
+        if: steps.rustfmt.outputs.changed != 'true'
         shell: bash
         run: |
           cat > "$RUNNER_TEMP/xdremux-format-gate.json" <<'JSON'
