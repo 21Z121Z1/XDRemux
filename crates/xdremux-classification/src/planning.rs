@@ -170,9 +170,9 @@ pub fn resolve_photo_asset(
     pair_validator: impl FnOnce(&Path, &Path) -> bool,
 ) -> PhotoAsset {
     let image = primary_image.into();
-    if let Some(video) = companion_video.filter(|video| {
-        is_same_stem_sibling(&image, video) && pair_validator(&image, video)
-    }) {
+    if let Some(video) = companion_video
+        .filter(|video| is_same_stem_sibling(&image, video) && pair_validator(&image, video))
+    {
         let id = image.to_string_lossy().into_owned();
         return PhotoAsset::live_photo(image, video, id);
     }
@@ -255,10 +255,9 @@ fn destination_directory(
 ) -> PathBuf {
     let mut directory = match root {
         CategorizationDestinationRoot::Explicit(path) => path.clone(),
-        CategorizationDestinationRoot::AlongsidePrimary => primary
-            .parent()
-            .unwrap_or(Path::new(""))
-            .to_path_buf(),
+        CategorizationDestinationRoot::AlongsidePrimary => {
+            primary.parent().unwrap_or(Path::new("")).to_path_buf()
+        }
     };
     for component in classification.relative_directory_components() {
         directory.push(component);
