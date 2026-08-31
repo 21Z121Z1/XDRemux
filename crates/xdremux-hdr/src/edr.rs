@@ -82,16 +82,8 @@ pub fn resolve(meta_floats: &[f64], mode: ExtractionMode) -> Result<ResolvedScal
             alternate_headroom: safe_log2(display_ratio_hdr),
             source: "local.uhdr.gainmap.info",
             channel_count: 3,
-            per_channel_gain_map_min: meta_floats[0..3]
-                .iter()
-                .copied()
-                .map(safe_log2)
-                .collect(),
-            per_channel_gain_map_max: meta_floats[4..7]
-                .iter()
-                .copied()
-                .map(safe_log2)
-                .collect(),
+            per_channel_gain_map_min: meta_floats[0..3].iter().copied().map(safe_log2).collect(),
+            per_channel_gain_map_max: meta_floats[4..7].iter().copied().map(safe_log2).collect(),
             per_channel_gamma: meta_floats[7..10].to_vec(),
             per_channel_base_offset: meta_floats[10..13].to_vec(),
             per_channel_alternate_offset: meta_floats[13..16].to_vec(),
@@ -110,7 +102,10 @@ pub fn resolve(meta_floats: &[f64], mode: ExtractionMode) -> Result<ResolvedScal
     } else {
         "empirical_edrScaleCalculator"
     };
-    Ok(resolved_lhdr_scale(edr_scale_calculator(meta_floats), source))
+    Ok(resolved_lhdr_scale(
+        edr_scale_calculator(meta_floats),
+        source,
+    ))
 }
 
 fn resolved_lhdr_scale(edr_scale: f64, source: &'static str) -> ResolvedScale {
@@ -299,7 +294,8 @@ fn float32_early_lhdr_scale(f: &[f64]) -> f32 {
     let sqrt_term = face_adjusted.sqrt().abs() - 1.0_f32;
     let highlight_adjusted = if highlight >= 200.0_f32 {
         let high_highlight = sqrt_term.mul_add(1.340_000_033_378_601_f32, 1.0_f32);
-        let mid_factor = highlight.mul_add(-0.020_500_000_566_244_125_f32, 7.900_000_095_367_432_f32);
+        let mid_factor =
+            highlight.mul_add(-0.020_500_000_566_244_125_f32, 7.900_000_095_367_432_f32);
         let mid_highlight = sqrt_term.mul_add(mid_factor, 1.0_f32);
         if highlight >= 320.0_f32 {
             high_highlight
@@ -383,12 +379,15 @@ mod tests {
     #[test]
     fn uhdr_keeps_distinct_channels() {
         let info = [
-            1.25, 1.5, 1.75, 1.0, 4.0, 5.0, 6.0, 0.8, 1.1, 1.2, 0.01, 0.02, 0.03,
-            0.04, 0.05, 0.06, 1.5, 6.5, 2.0, 0.0,
+            1.25, 1.5, 1.75, 1.0, 4.0, 5.0, 6.0, 0.8, 1.1, 1.2, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06,
+            1.5, 6.5, 2.0, 0.0,
         ];
         let resolved = resolve(&info, ExtractionMode::Uhdr).unwrap();
         assert_eq!(resolved.channel_count, 3);
         assert_eq!(resolved.per_channel_gamma, vec![0.8, 1.1, 1.2]);
-        assert_ne!(resolved.per_channel_gain_map_max[0], resolved.per_channel_gain_map_max[2]);
+        assert_ne!(
+            resolved.per_channel_gain_map_max[0],
+            resolved.per_channel_gain_map_max[2]
+        );
     }
 }
