@@ -67,6 +67,14 @@ let package = Package(
             dependencies: ["XDRemuxCore"],
             path: "Sources/MetadataConformanceOracle"
         ),
+        // Developer-only LHDR/UHDR extraction oracle. The executable serializes
+        // the current Swift extractor's exact bytes and normalized structure so
+        // the portable Rust container crate can be differentially verified.
+        .executableTarget(
+            name: "ContainerConformanceOracle",
+            dependencies: ["XDRemuxCore"],
+            path: "Sources/ContainerConformanceOracle"
+        ),
         .testTarget(
             name: "XDRemuxCoreTests",
             dependencies: ["XDRemuxCore"],
