@@ -1,5 +1,7 @@
 name: XDRemux Repository Hardening
 
+# Bootstrap pushes are intentionally scoped to the hardening branch. After the
+# baseline is applied, routine administration remains explicit via workflow_dispatch.
 on:
   push:
     branches:
