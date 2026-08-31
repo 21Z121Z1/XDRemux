@@ -24,6 +24,7 @@ permissions:
 jobs:
   engine-core:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
