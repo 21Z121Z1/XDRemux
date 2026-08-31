@@ -10,6 +10,7 @@ on:
       - "Tests/XDRemuxCoreTests/HDRRustConformanceOracleTests.swift"
       - "Tests/fixtures/hdr_edr_cases.tsv"
       - "scripts/check_hdr_edr_conformance.sh"
+      - "scripts/check_hdr_gainmap_conformance.sh"
       - ".github/workflows/rust-hdr-core.yml"
   pull_request:
     paths:
@@ -20,6 +21,7 @@ on:
       - "Tests/XDRemuxCoreTests/HDRRustConformanceOracleTests.swift"
       - "Tests/fixtures/hdr_edr_cases.tsv"
       - "scripts/check_hdr_edr_conformance.sh"
+      - "scripts/check_hdr_gainmap_conformance.sh"
       - ".github/workflows/rust-hdr-core.yml"
 
 permissions:
@@ -50,13 +52,16 @@ jobs:
       - name: Exercise shared EDR vectors
         run: cargo run --quiet --locked -p xdremux-hdr --bin xdremux-hdr-vectors -- Tests/fixtures/hdr_edr_cases.tsv >/dev/null
 
+      - name: Exercise gain map vectors
+        run: cargo run --quiet --locked -p xdremux-hdr --bin xdremux-gainmap-vectors -- Tests/fixtures/hdr_edr_cases.tsv >/dev/null
+
       - name: Verify repository completion gate
         shell: bash
         run: |
           cat > "$RUNNER_TEMP/xdremux-hdr-core-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Add isolated Rust HDR EDR semantics with precision-path regressions",
+            "scope": "Add isolated Rust HDR EDR and gain-map reconstruction semantics with precision and raster regressions",
             "checks": [
               {
                 "name": "rust-hdr-regressions",
@@ -65,9 +70,15 @@ jobs:
                 "timeout_seconds": 300
               },
               {
-                "name": "rust-hdr-vector-integration",
+                "name": "rust-edr-vector-integration",
                 "kind": "integration",
                 "command": ["cargo", "run", "--quiet", "--locked", "-p", "xdremux-hdr", "--bin", "xdremux-hdr-vectors", "--", "Tests/fixtures/hdr_edr_cases.tsv"],
+                "timeout_seconds": 300
+              },
+              {
+                "name": "rust-gainmap-vector-integration",
+                "kind": "integration",
+                "command": ["cargo", "run", "--quiet", "--locked", "-p", "xdremux-hdr", "--bin", "xdremux-gainmap-vectors", "--", "Tests/fixtures/hdr_edr_cases.tsv"],
                 "timeout_seconds": 300
               },
               {
@@ -101,8 +112,14 @@ jobs:
       - name: Pin Swift HDR branch contract
         run: swift test --filter HDRRustConformanceOracleTests/testEDRSharedVectorsCoverPrecisionAndBranchBoundaries
 
+      - name: Pin Swift gain map contract
+        run: swift test --filter HDRRustConformanceOracleTests/testGainMapSharedVectorsExhaustByteDomainAndPadding
+
       - name: Compare Swift and Rust EDR semantics
         run: bash scripts/check_hdr_edr_conformance.sh
+
+      - name: Compare Swift and Rust gain map semantics
+        run: bash scripts/check_hdr_gainmap_conformance.sh
 
       - name: Verify cross-language completion gate
         shell: bash
@@ -110,7 +127,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-hdr-conformance-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Prove Rust EDR resolution and knee computation match current Swift Float32/Float64 semantics",
+            "scope": "Prove Rust EDR, knee, and gain-map reconstruction match current Swift precision and raster semantics",
             "checks": [
               {
                 "name": "swift-hdr-branch-contract",
@@ -119,9 +136,21 @@ jobs:
                 "timeout_seconds": 600
               },
               {
+                "name": "swift-gainmap-contract",
+                "kind": "regression",
+                "command": ["swift", "test", "--filter", "HDRRustConformanceOracleTests/testGainMapSharedVectorsExhaustByteDomainAndPadding"],
+                "timeout_seconds": 600
+              },
+              {
                 "name": "swift-rust-edr-conformance",
                 "kind": "integration",
                 "command": ["bash", "scripts/check_hdr_edr_conformance.sh"],
+                "timeout_seconds": 1200
+              },
+              {
+                "name": "swift-rust-gainmap-conformance",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_hdr_gainmap_conformance.sh"],
                 "timeout_seconds": 1200
               }
             ]
