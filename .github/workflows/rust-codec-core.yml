@@ -1,0 +1,55 @@
+name: Rust codec provider
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-format/**"
+      - "crates/xdremux-heif/**"
+      - "xdremux_py/heif_io.py"
+      - "Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift"
+      - ".github/workflows/rust-codec-core.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-format/**"
+      - "crates/xdremux-heif/**"
+      - "xdremux_py/heif_io.py"
+      - "Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift"
+      - ".github/workflows/rust-codec-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  codec-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install libheif HEVC provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Bootstrap dependency lockfile
+        run: |
+          cargo generate-lockfile
+          cat Cargo.lock
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint portable codec provider
+        run: cargo clippy -p xdremux-codec --all-targets -- -D warnings
+      - name: Test portable codec provider
+        run: cargo test -p xdremux-codec

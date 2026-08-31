@@ -8,6 +8,7 @@ members = [
     "crates/xdremux-motion-photo",
     "crates/xdremux-classification",
     "crates/xdremux-engine",
+    "crates/xdremux-codec",
 ]
 resolver = "2"
 
