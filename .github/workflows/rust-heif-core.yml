@@ -30,6 +30,7 @@ permissions:
 jobs:
   heif-core:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -64,10 +65,10 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-heif-conformance-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Port the deterministic private-JPEG to tiled-HEVC HEIF graph replacement and portable post-write Gain Map structural validation into the isolated Rust HEIF crate while preserving source payloads and current Swift container semantics; Apple ImageIO/Photos consumer recognition remains a separate Apple-platform gate",
+            "scope": "Use the shared xdremux-format hvcC parser and explicit semantic-channel/chroma/bit-depth profiles throughout the isolated Rust HEIF writer and structural validator while preserving the existing Swift mono8/4448 writer corpus byte-for-byte; Apple ImageIO/Photos consumer recognition remains a separate Apple-platform gate",
             "checks": [
               {
-                "name": "rust-heif-structural-regressions",
+                "name": "rust-heif-profile-and-structural-regressions",
                 "kind": "regression",
                 "command": ["cargo", "test", "--locked", "-p", "xdremux-heif"],
                 "timeout_seconds": 600
