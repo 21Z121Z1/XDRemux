@@ -1,7 +1,10 @@
 [package]
 name = "xdremux-engine"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 
 [dependencies]
 xdremux-format = { path = "../xdremux-format" }
+
+[lints]
+workspace = true
