@@ -21,7 +21,7 @@ on:
       - ".github/workflows/rust-heif-core.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   heif-core:
@@ -34,16 +34,35 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Format bootstrap working copy
-        run: cargo fmt --all
+      - name: Normalize HEIF writer
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("crates/xdremux-heif/src/direct.rs")
+          s = p.read_text()
+          old = '''    for chunk in payload[8..].chunks_exact(4) {\n        brands.push(chunk.try_into().expect("chunks_exact(4)"));\n    }'''
+          new = '''    let (chunks, _) = payload[8..].as_chunks::<4>();\n    for chunk in chunks {\n        brands.push(*chunk);\n    }'''
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit("expected source_brand_order chunk loop not found")
+          p.write_text(s)
+          PY
+          cargo fmt --all
       - name: Lint xdremux-heif
         run: cargo clippy --locked -p xdremux-heif --all-targets -- -D warnings
       - name: Test xdremux-heif
         run: cargo test --locked -p xdremux-heif
-      - name: Print formatted HEIF writer
-        if: always()
+      - name: Commit normalized source
+        if: github.event_name == 'push'
         shell: bash
         run: |
-          echo '--- XDREMUX_HEIF_FORMATTED_BEGIN ---'
-          cat crates/xdremux-heif/src/direct.rs
-          echo '--- XDREMUX_HEIF_FORMATTED_END ---'
+          if git diff --quiet -- crates/xdremux-heif/src/direct.rs crates/xdremux-heif/src/lib.rs; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-heif/src/direct.rs crates/xdremux-heif/src/lib.rs
+          git commit -m "style(rust): normalize HEIF writer"
+          git push origin HEAD:feat/rust-xdremux-format
