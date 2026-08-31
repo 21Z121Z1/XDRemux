@@ -1,8 +1,15 @@
 #![forbid(unsafe_code)]
 
+mod source_profile;
+
 use std::collections::BTreeSet;
 
 use xdremux_format::ChromaSampling;
+
+pub use source_profile::{
+    gain_map_channels_from_count, gain_map_source_profile_from_hevc,
+    gain_map_source_profile_from_jpeg,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FamilyPreference {
