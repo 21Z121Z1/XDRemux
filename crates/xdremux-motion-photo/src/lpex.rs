@@ -48,7 +48,17 @@ fn balanced_json_range(data: &[u8], start: usize) -> Option<std::ops::Range<usiz
 
 fn number_as_i64(value: Option<&Value>) -> Option<i64> {
     match value? {
-        Value::Number(number) => number.as_i64().or_else(|| number.as_u64().and_then(|v| i64::try_from(v).ok())),
+        Value::Number(number) => number
+            .as_i64()
+            .or_else(|| number.as_u64().and_then(|value| i64::try_from(value).ok()))
+            .or_else(|| {
+                number.as_f64().and_then(|value| {
+                    value.is_finite()
+                        .then(|| value.trunc())
+                        .filter(|value| *value >= i64::MIN as f64 && *value <= i64::MAX as f64)
+                        .map(|value| value as i64)
+                })
+            }),
         Value::String(text) if text.len() <= 32 => text.parse().ok(),
         Value::Bool(flag) => Some(i64::from(*flag)),
         _ => None,
@@ -69,9 +79,15 @@ fn number_array(value: Option<&Value>, max_count: usize) -> Option<Vec<f64>> {
     if values.len() > max_count {
         return None;
     }
-    let parsed: Option<Vec<_>> = values.iter().map(|value| number_as_f64(Some(value))).collect();
+    let parsed: Option<Vec<_>> = values
+        .iter()
+        .map(|value| number_as_f64(Some(value)))
+        .collect();
     let parsed = parsed?;
-    parsed.iter().all(|value| value.is_finite()).then_some(parsed)
+    parsed
+        .iter()
+        .all(|value| value.is_finite())
+        .then_some(parsed)
 }
 
 fn matrix(value: Option<&Value>) -> Option<[f64; 9]> {
@@ -141,17 +157,23 @@ pub fn parse_first_lpex_object(data: &[u8]) -> Option<OppoMetadata> {
     for needle in NEEDLES {
         let mut search_start = 0usize;
         while search_start < data.len() {
-            let relative = data[search_start..]
+            let Some(relative) = data[search_start..]
                 .windows(needle.len())
-                .position(|window| window == needle)?;
-            let found = search_start + relative;
+                .position(|window| window == needle)
+            else {
+                break;
+            };
+            let found = search_start.checked_add(relative)?;
             let after = found.checked_add(needle.len())?;
             if after >= data.len() {
                 break;
             }
             let search_end = data.len().min(after.checked_add(33)?);
-            if let Some(relative_brace) = data[after..search_end].iter().position(|byte| *byte == b'{') {
-                let brace = after + relative_brace;
+            if let Some(relative_brace) = data[after..search_end]
+                .iter()
+                .position(|byte| *byte == b'{')
+            {
+                let brace = after.checked_add(relative_brace)?;
                 if let Some(range) = balanced_json_range(data, brace) {
                     if range.len() <= MAX_JSON_BYTES {
                         if let Some(parsed) = parse_json(&data[range]) {
@@ -179,6 +201,14 @@ mod tests {
         assert!(metadata.matrices.contains_key("frame-A"));
         assert_eq!(metadata.video_width, Some(1728));
         assert_eq!(metadata.photo_eis_crop_factor, Some(vec![1.11, 1.12]));
+    }
+
+    #[test]
+    fn parses_compatibility_needle_when_primary_needle_is_absent() {
+        let data = br#"prefix LivePhotoExtension {"version":2,"coverFramePts":7}"#;
+        let metadata = parse_first_lpex_object(data).unwrap();
+        assert_eq!(metadata.version, 2);
+        assert_eq!(metadata.cover_frame_pts_us, Some(7));
     }
 
     #[test]
