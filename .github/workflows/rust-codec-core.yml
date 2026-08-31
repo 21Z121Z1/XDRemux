@@ -50,28 +50,14 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           path = Path("crates/xdremux-codec/src/portable/libheif.rs")
           text = path.read_text()
-          text = text.replace(
-              "origin_y\n            .checked_add(y)\n            .unwrap_or(u32::MAX)",
-              "origin_y.saturating_add(y)",
-          )
-          text = text.replace(
-              "origin_x\n                .checked_add(x)\n                .unwrap_or(u32::MAX)",
-              "origin_x.saturating_add(x)",
-          )
-          readback = '''        match encoder.parameter("chroma").map_err(CodecError::libheif)? {
-            Some(EncoderParameterValue::String(value)) if value == chroma => {}
-            other => {
-                return Err(CodecError::InconsistentEncoderConfiguration(format!(
-                    "requested chroma {chroma}, encoder reports {other:?}"
-                )));
-            }
-        }
-'''
-          if readback not in text:
-              raise SystemExit("expected chroma readback block not found")
-          text = text.replace(readback, "")
+          text = text.replace("origin_y\n            .checked_add(y)\n            .unwrap_or(u32::MAX)", "origin_y.saturating_add(y)")
+          text = text.replace("origin_x\n                .checked_add(x)\n                .unwrap_or(u32::MAX)", "origin_x.saturating_add(x)")
+          text, count = re.subn(r'        match encoder\.parameter\("chroma"\).*?\n        \}\n', '', text, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit("expected one chroma readback block")
           path.write_text(text)
           PY
           cargo fmt --all
