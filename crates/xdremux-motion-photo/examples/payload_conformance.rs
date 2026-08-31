@@ -1,9 +1,7 @@
 use std::{env, path::Path, process::ExitCode};
 
 use serde_json::{json, Value};
-use xdremux_motion_photo::{
-    copy_payload_range_with_options, ByteRange, MotionPhotoCopyError, MotionPhotoError,
-};
+use xdremux_motion_photo::{copy_payload_range_with_options, ByteRange, MotionPhotoCopyError};
 
 fn parse_u64(text: &str) -> Result<u64, String> {
     text.parse::<u64>()
@@ -71,9 +69,4 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
-}
-
-#[allow(dead_code)]
-fn _assert_error_variants_are_stable(error: MotionPhotoError) -> &'static str {
-    error.code()
 }
