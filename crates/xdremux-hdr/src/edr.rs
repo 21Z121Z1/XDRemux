@@ -44,6 +44,9 @@ fn safe_log2(value: f64) -> f64 {
     }
 }
 
+// Keep the explicit max/min sequence: it mirrors the current Swift source and
+// intentionally avoids changing exceptional-value behavior during migration.
+#[allow(clippy::manual_clamp)]
 fn clamp_edr(value: f64) -> f64 {
     value.max(1.0).min(7.9)
 }
@@ -148,14 +151,14 @@ pub fn get_knee_point(edr: f64) -> f64 {
 
 pub fn get_knee_point_result(edr: f64) -> KneePointResult {
     let scale = edr as f32;
-    let inv_gamma = 0.454_545_438_289_642_33_f32;
+    let inv_gamma = 0.454_545_44_f32;
     let t = 1.0_f32 / (scale * 100.0_f32);
     let k = 1.0_f32 - t;
     let p1 = scale.powf(inv_gamma);
     let div1 = 1.0_f32 / p1;
-    let x_norm = (0.980_000_019_073_486_3_f32 - t) / k;
+    let x_norm = (0.98_f32 - t) / k;
     let p2 = x_norm.powf(inv_gamma);
-    let y = (p2 * 1.003_937_005_996_704_f32 - div1) / (1.0_f32 - div1);
+    let y = (p2 * 1.003_937_f32 - div1) / (1.0_f32 - div1);
     KneePointResult {
         value: f64::from(quantized_knee(y, inv_gamma)),
         source: "float32_early_lhdr_knee",
@@ -276,10 +279,8 @@ fn float32_early_lhdr_scale(f: &[f64]) -> f32 {
     let face_strength = f[24] as f32;
     let highlight = f[29] as f32;
 
-    let mut edr = raw_gain
-        .mul_add(-0.117_499_999_701_976_78_f32, -6.828_999_996_185_303_f32)
-        .exp2();
-    edr = 780.299_987_792_968_8_f32 / (edr + 1.0_f32) + -772.299_987_792_968_8_f32;
+    let mut edr = raw_gain.mul_add(-0.1175_f32, -6.829_f32).exp2();
+    edr = 780.3_f32 / (edr + 1.0_f32) + -772.3_f32;
 
     let mut face_adjusted = edr;
     if face_strength > 0.0_f32 {
@@ -293,9 +294,8 @@ fn float32_early_lhdr_scale(f: &[f64]) -> f32 {
 
     let sqrt_term = face_adjusted.sqrt().abs() - 1.0_f32;
     let highlight_adjusted = if highlight >= 200.0_f32 {
-        let high_highlight = sqrt_term.mul_add(1.340_000_033_378_601_f32, 1.0_f32);
-        let mid_factor =
-            highlight.mul_add(-0.020_500_000_566_244_125_f32, 7.900_000_095_367_432_f32);
+        let high_highlight = sqrt_term.mul_add(1.34_f32, 1.0_f32);
+        let mid_factor = highlight.mul_add(-0.0205_f32, 7.9_f32);
         let mid_highlight = sqrt_term.mul_add(mid_factor, 1.0_f32);
         if highlight >= 320.0_f32 {
             high_highlight
@@ -303,27 +303,27 @@ fn float32_early_lhdr_scale(f: &[f64]) -> f32 {
             mid_highlight
         }
     } else {
-        sqrt_term.mul_add(3.799_999_952_316_284_f32, 1.0_f32)
+        sqrt_term.mul_add(3.8_f32, 1.0_f32)
     };
 
     if (f[34] as f32).to_bits() == 1 {
         let cfg_term = highlight_adjusted.sqrt().abs() - 1.0_f32;
-        return cfg_term.mul_add(1.299_999_952_316_284_2_f32, 1.0_f32);
+        return cfg_term.mul_add(1.3_f32, 1.0_f32);
     }
 
     if face_strength > 0.0_f32 {
         let face_term = highlight_adjusted.sqrt().abs() - 1.0_f32;
-        let adjusted = face_term.mul_add(1.850_000_023_841_858_f32, 1.0_f32);
+        let adjusted = face_term.mul_add(1.85_f32, 1.0_f32);
         if highlight <= 320.0_f32 {
             return adjusted;
         }
-        return (adjusted - 1.0_f32).mul_add(0.800_000_011_920_929_f32, 1.0_f32);
+        return (adjusted - 1.0_f32).mul_add(0.8_f32, 1.0_f32);
     }
 
     if highlight <= 320.0_f32 {
         return highlight_adjusted;
     }
-    (highlight_adjusted - 1.0_f32).mul_add(0.800_000_011_920_929_f32, 1.0_f32)
+    (highlight_adjusted - 1.0_f32).mul_add(0.8_f32, 1.0_f32)
 }
 
 #[cfg(test)]
