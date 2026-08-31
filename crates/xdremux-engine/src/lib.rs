@@ -4,17 +4,12 @@ use std::collections::BTreeSet;
 
 use xdremux_format::ChromaSampling;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FamilyPreference {
+    #[default]
     Auto,
     X6,
     X7,
-}
-
-impl Default for FamilyPreference {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,33 +24,23 @@ pub enum SourceHdrMode {
     Uhdr,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InputProcessingBranch {
     System,
     SystemDecoded,
+    #[default]
     Hybrid,
     Passthrough,
 }
 
-impl Default for InputProcessingBranch {
-    fn default() -> Self {
-        Self::Hybrid
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TmapFormat {
     Strict,
+    #[default]
     ImageIo,
 }
 
-impl Default for TmapFormat {
-    fn default() -> Self {
-        Self::ImageIo
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OppoCompatibility {
     Auto,
     Iso,
@@ -63,16 +48,11 @@ pub enum OppoCompatibility {
     IsoGraph,
     On,
     Tail,
+    #[default]
     Off,
 }
 
-impl Default for OppoCompatibility {
-    fn default() -> Self {
-        Self::Off
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OppoCameraTail {
     Off,
     Watermark,
@@ -81,15 +61,10 @@ pub enum OppoCameraTail {
     PreserveWithoutPortrait,
     PreserveWithoutPortraitOrPrivateHdr,
     PreserveWithoutPrivateUhdr,
+    #[default]
     PreserveWithoutPrivateHdr,
     PreserveNoUhdr,
     PreserveNoHdr,
-}
-
-impl Default for OppoCameraTail {
-    fn default() -> Self {
-        Self::PreserveWithoutPrivateHdr
-    }
 }
 
 impl OppoCameraTail {
@@ -251,9 +226,14 @@ pub enum PlannerError {
 impl std::fmt::Display for PlannerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidGainMapProfile(message) => write!(f, "invalid Gain Map profile: {message}"),
+            Self::InvalidGainMapProfile(message) => {
+                write!(f, "invalid Gain Map profile: {message}")
+            }
             Self::UnsupportedGainMapLayout(layout) => {
-                write!(f, "no encoder capability preserves Gain Map layout {layout:?}")
+                write!(
+                    f,
+                    "no encoder capability preserves Gain Map layout {layout:?}"
+                )
             }
         }
     }
@@ -363,7 +343,8 @@ pub fn plan_conversion(
         request.tmap_format,
     );
 
-    let mut required_capabilities = vec![PlatformCapability::GainMapEncoder(gain_map_target.layout)];
+    let mut required_capabilities =
+        vec![PlatformCapability::GainMapEncoder(gain_map_target.layout)];
     if request.apple_features.photographic_styles {
         required_capabilities.push(PlatformCapability::ApplePhotographicStyles);
     }
@@ -420,8 +401,14 @@ mod tests {
         let request = ConversionRequest::default();
         assert_eq!(request.family, FamilyPreference::Auto);
         assert_eq!(request.oppo_compatibility, OppoCompatibility::Off);
-        assert_eq!(request.input_processing_branch, InputProcessingBranch::Hybrid);
-        assert_eq!(request.oppo_camera_tail, OppoCameraTail::PreserveWithoutPrivateHdr);
+        assert_eq!(
+            request.input_processing_branch,
+            InputProcessingBranch::Hybrid
+        );
+        assert_eq!(
+            request.oppo_camera_tail,
+            OppoCameraTail::PreserveWithoutPrivateHdr
+        );
         assert_eq!(request.tmap_format, TmapFormat::ImageIo);
         assert_eq!(request.apple_features, AppleFeatureRequest::default());
     }
@@ -475,11 +462,9 @@ mod tests {
             (GainMapChannels::Rgb, ChromaSampling::Yuv420),
             (GainMapChannels::Rgb, ChromaSampling::Yuv444),
         ] {
-            let profile = resolve_gain_map_encode_profile(
-                source(channels, Some(chroma), 8),
-                &capabilities,
-            )
-            .unwrap();
+            let profile =
+                resolve_gain_map_encode_profile(source(channels, Some(chroma), 8), &capabilities)
+                    .unwrap();
             assert_eq!(profile.layout.chroma, chroma);
             assert_eq!(profile.channels, channels);
         }
@@ -499,11 +484,9 @@ mod tests {
     #[test]
     fn unknown_rgb_sampling_uses_444_as_information_safe_target() {
         let capabilities = GainMapEncoderCapabilities::new([layout(ChromaSampling::Yuv444, 8)]);
-        let profile = resolve_gain_map_encode_profile(
-            source(GainMapChannels::Rgb, None, 8),
-            &capabilities,
-        )
-        .unwrap();
+        let profile =
+            resolve_gain_map_encode_profile(source(GainMapChannels::Rgb, None, 8), &capabilities)
+                .unwrap();
         assert_eq!(profile.layout.chroma, ChromaSampling::Yuv444);
     }
 
@@ -536,18 +519,29 @@ mod tests {
             hdr_mode: SourceHdrMode::Uhdr,
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         };
-        let mut request = ConversionRequest::default();
-        request.input_processing_branch = InputProcessingBranch::Passthrough;
-        request.oppo_camera_tail = OppoCameraTail::Off;
-        request.apple_features.photographic_styles = true;
+        let request = ConversionRequest {
+            input_processing_branch: InputProcessingBranch::Passthrough,
+            oppo_camera_tail: OppoCameraTail::Off,
+            apple_features: AppleFeatureRequest {
+                photographic_styles: true,
+                portrait: false,
+            },
+            ..ConversionRequest::default()
+        };
         let capabilities = GainMapEncoderCapabilities::new([layout(ChromaSampling::Yuv420, 8)]);
         let plan = plan_conversion(&analysis, request, &capabilities).unwrap();
 
         assert_eq!(plan.effective_family, SourceFamily::X7);
         assert_eq!(plan.base_strategy, BaseStrategy::PreserveCompressed);
         assert_eq!(plan.container_writer, ContainerWriter::Rust);
-        assert_eq!(plan.effective_input_processing_branch, InputProcessingBranch::Passthrough);
-        assert_eq!(plan.gain_map_target.layout, layout(ChromaSampling::Yuv420, 8));
+        assert_eq!(
+            plan.effective_input_processing_branch,
+            InputProcessingBranch::Passthrough
+        );
+        assert_eq!(
+            plan.gain_map_target.layout,
+            layout(ChromaSampling::Yuv420, 8)
+        );
         assert_eq!(
             plan.required_capabilities,
             vec![
