@@ -12,6 +12,7 @@ pub enum MotionPhotoError {
     InvalidPrimaryItem,
     InvalidMotionPhotoItem,
     InvalidVideoPayload,
+    PayloadTooLarge,
     ArithmeticOverflow,
     MalformedLpex,
 }
@@ -29,6 +30,7 @@ impl MotionPhotoError {
             Self::InvalidPrimaryItem => "invalidPrimaryItem",
             Self::InvalidMotionPhotoItem => "invalidMotionPhotoItem",
             Self::InvalidVideoPayload => "invalidVideoPayload",
+            Self::PayloadTooLarge => "payloadTooLarge",
             Self::ArithmeticOverflow => "arithmeticOverflow",
             Self::MalformedLpex => "malformedLpex",
         }
@@ -53,6 +55,9 @@ impl fmt::Display for MotionPhotoError {
             Self::InvalidMotionPhotoItem => f.write_str("MotionPhoto video item is invalid"),
             Self::InvalidVideoPayload => {
                 f.write_str("Motion Photo video payload is not a valid ISO BMFF stream")
+            }
+            Self::PayloadTooLarge => {
+                f.write_str("Motion Photo payload exceeds the configured extraction limit")
             }
             Self::ArithmeticOverflow => {
                 f.write_str("Motion Photo byte-range arithmetic overflowed")
