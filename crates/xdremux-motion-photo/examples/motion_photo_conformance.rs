@@ -98,18 +98,14 @@ fn run() -> Result<Value, String> {
                 return Err("usage: motion_photo_conformance topology <file> <still-upper> <video-lower> <video-upper> <lpex-version>".into());
             }
             let data = fs::read(&args[1]).map_err(|error| error.to_string())?;
-            let declared_still = ByteRange::new(0, parse_u64(&args[2])?)
-                .map_err(|error| error.to_string())?;
+            let declared_still =
+                ByteRange::new(0, parse_u64(&args[2])?).map_err(|error| error.to_string())?;
             let declared_video = ByteRange::new(parse_u64(&args[3])?, parse_u64(&args[4])?)
                 .map_err(|error| error.to_string())?;
             let version = parse_i64(&args[5])?;
-            let (still, video, stream_count) = enrich_oppo_video_range(
-                &data,
-                declared_still,
-                declared_video,
-                version,
-            )
-            .map_err(|error| error.to_string())?;
+            let (still, video, stream_count) =
+                enrich_oppo_video_range(&data, declared_still, declared_video, version)
+                    .map_err(|error| error.to_string())?;
             let layout = resolve_video_stream_layout(&data, video, true, stream_count)
                 .map_err(|error| error.to_string())?;
             let role = match layout.primary.role {
