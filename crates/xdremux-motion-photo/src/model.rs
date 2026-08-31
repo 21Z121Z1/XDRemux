@@ -32,6 +32,53 @@ pub struct MotionPhotoItem {
     pub padding: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MotionPhotoSourceKind {
+    AndroidMotionPhotoV1,
+    AndroidHeifMotionPhotoV1,
+    LegacyMicroVideoV1b,
+    OppoLivePhoto,
+}
+
+impl MotionPhotoSourceKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::AndroidMotionPhotoV1 => "androidMotionPhotoV1",
+            Self::AndroidHeifMotionPhotoV1 => "androidHeifMotionPhotoV1",
+            Self::LegacyMicroVideoV1b => "legacyMicroVideoV1b",
+            Self::OppoLivePhoto => "oppoLivePhoto",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PresentationSource {
+    AndroidXmp,
+    LegacyMicroVideoXmp,
+    OppoCoverFrame,
+}
+
+impl PresentationSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::AndroidXmp => "androidXMP",
+            Self::LegacyMicroVideoXmp => "legacyMicroVideoXMP",
+            Self::OppoCoverFrame => "oppoCoverFrame",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MotionPhotoAsset {
+    pub source_kind: MotionPhotoSourceKind,
+    pub items: Vec<MotionPhotoItem>,
+    pub still_resource_range: ByteRange,
+    pub video_resource_range: ByteRange,
+    pub presentation_timestamp_us: Option<i64>,
+    pub presentation_source: Option<PresentationSource>,
+    pub vendor_metadata: Option<OppoMetadata>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct OppoMetadata {
     pub cover_frame_pts_us: Option<i64>,
