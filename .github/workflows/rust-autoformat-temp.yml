@@ -1,0 +1,38 @@
+name: Temporary Rust formatter
+
+on:
+  push:
+    branches:
+      - feat/rust-xdremux-format
+    paths:
+      - ".github/workflows/rust-autoformat-temp.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-xdremux-format
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Apply canonical rustfmt
+        run: cargo fmt --all
+      - name: Commit formatter output
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "rustfmt made no changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-heif
+          git commit -m "style(rust): apply canonical HEIF formatting"
+          git push origin HEAD:feat/rust-xdremux-format
