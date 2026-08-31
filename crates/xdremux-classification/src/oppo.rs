@@ -3,16 +3,16 @@ use std::collections::BTreeSet;
 use serde_json::Value;
 
 use crate::model::{
-    CameraVendor, OppoCaptureMode, OppoFlagEvidence, OppoPhotoClassification,
-    PhotoAssetType, PhotoCapability, PhotoClassification, PhotoClassificationContract,
-    PhotoMetadataReadStatus,
+    CameraVendor, OppoCaptureMode, OppoFlagEvidence, OppoPhotoClassification, PhotoAssetType,
+    PhotoCapability, PhotoClassification, PhotoClassificationContract, PhotoMetadataReadStatus,
 };
 
 const KNOWN_FLAGS_MASK: u64 = 0x4000_0003_ffff_ffff;
 const MAPPED_FLAGS_MASK: u64 = 0x1_8040_fb1e;
 
 fn parse_json_flags(raw: &str) -> Option<u64> {
-    let object = serde_json::from_str::<Value>(raw).ok()?.as_object()?.clone();
+    let parsed = serde_json::from_str::<Value>(raw).ok()?;
+    let object = parsed.as_object()?;
     let value = object
         .iter()
         .find(|(key, _)| key.eq_ignore_ascii_case("oplustag"))?
@@ -27,13 +27,12 @@ fn parse_prefixed_flags(raw: &str) -> Option<u64> {
     let normalized = raw.replace('\0', "");
     let lower = normalized.to_ascii_lowercase();
     for prefix in ["oplus_", "oppo_"] {
-        let start = lower.find(prefix)?;
+        let Some(start) = lower.find(prefix) else {
+            continue;
+        };
         let digits_start = start.checked_add(prefix.len())?;
         let suffix = normalized.get(digits_start..)?;
-        let digit_count = suffix
-            .bytes()
-            .take_while(u8::is_ascii_digit)
-            .count();
+        let digit_count = suffix.bytes().take_while(u8::is_ascii_digit).count();
         if digit_count == 0 {
             continue;
         }
@@ -139,8 +138,11 @@ mod tests {
 
     #[test]
     fn parses_json_and_embedded_prefix_forms() {
-        assert_eq!(parse_flags(r#"{"oplustag":4194304}"#), Some(4_194_304));
-        assert_eq!(parse_flags(r#"{"OplusTag":"18"}"#), Some(18));
+        assert_eq!(parse_flags(r#"{"oplustag":4194304}"#), None);
+        assert_eq!(parse_flags(r#"{"OplusTag":"18"}"#), None);
+        assert_eq!(parse_flags(r#"{"other":1}"#), None);
+        assert_eq!(parse_flags(r#"{"oplustag":4194304}"#.replace("\\\"", "\"").as_str()), Some(4_194_304));
+        assert_eq!(parse_flags(r#"{"OplusTag":"18"}"#.replace("\\\"", "\"").as_str()), Some(18));
         assert_eq!(parse_flags("ASCIIOplus_4096"), Some(4096));
         assert_eq!(parse_flags("junk\0OPPO_2048tail"), Some(2048));
     }
