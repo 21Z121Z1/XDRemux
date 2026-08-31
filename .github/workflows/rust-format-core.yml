@@ -9,6 +9,7 @@ on:
       - "Package.swift"
       - "Sources/FormatConformanceOracle/**"
       - "Sources/XDRemuxCore/HEIF/ISOBMFF.swift"
+      - "scripts/check_rust_format_fixtures.sh"
       - "scripts/check_format_conformance.sh"
       - ".github/workflows/rust-format-core.yml"
   pull_request:
@@ -19,6 +20,7 @@ on:
       - "Package.swift"
       - "Sources/FormatConformanceOracle/**"
       - "Sources/XDRemuxCore/HEIF/ISOBMFF.swift"
+      - "scripts/check_rust_format_fixtures.sh"
       - "scripts/check_format_conformance.sh"
       - ".github/workflows/rust-format-core.yml"
 
@@ -47,19 +49,28 @@ jobs:
       - name: Test xdremux-format
         run: cargo test --locked -p xdremux-format
 
+      - name: Exercise real HEIF fixtures
+        run: bash scripts/check_rust_format_fixtures.sh
+
       - name: Verify repository completion gate
         shell: bash
         run: |
           cat > "$RUNNER_TEMP/xdremux-format-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Add the isolated xdremux-format Rust parsing foundation",
+            "scope": "Add the isolated xdremux-format Rust parsing foundation and exercise it on repository HEIF fixtures",
             "checks": [
               {
                 "name": "rust-format-core-regressions",
                 "kind": "regression",
                 "command": ["cargo", "test", "--locked", "-p", "xdremux-format"],
                 "timeout_seconds": 300
+              },
+              {
+                "name": "rust-format-real-fixtures",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_rust_format_fixtures.sh"],
+                "timeout_seconds": 600
               },
               {
                 "name": "rust-format-core-clippy",
@@ -111,7 +122,7 @@ jobs:
               },
               {
                 "name": "swift-rust-format-conformance",
-                "kind": "regression",
+                "kind": "integration",
                 "command": ["bash", "scripts/check_format_conformance.sh"],
                 "timeout_seconds": 1200
               }
