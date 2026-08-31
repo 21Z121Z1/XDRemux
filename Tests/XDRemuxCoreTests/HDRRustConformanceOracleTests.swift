@@ -18,7 +18,7 @@ final class HDRRustConformanceOracleTests: XCTestCase {
 
     private func loadCases() throws -> [EDRCase] {
         let text = try String(contentsOf: fixtureURL(), encoding: .utf8)
-        return try text.split(whereSeparator: \ .isNewline).enumerated().compactMap { index, rawLine in
+        return try text.split(whereSeparator: \.isNewline).enumerated().compactMap { index, rawLine in
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !line.isEmpty, !line.hasPrefix("#") else { return nil }
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
