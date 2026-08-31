@@ -1,0 +1,6 @@
+{
+  "version": "v1.4",
+  "title": "XDRemux v1.4",
+  "notes": "docs/releases/v1.4.md",
+  "replace_tag_if": "6d99b568f9eefc95d307d52542d20754e8412a9e"
+}
