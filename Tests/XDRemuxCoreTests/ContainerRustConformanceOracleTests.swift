@@ -3,11 +3,16 @@ import XCTest
 @testable import XDRemuxCore
 
 final class ContainerRustConformanceOracleTests: XCTestCase {
-    private func repositoryRoot() -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+    private struct NamedBlock {
+        let name: String
+        let data: Data
+    }
+
+    private struct CorpusCase {
+        let name: String
+        let data: Data
+        let expectedMode: String
+        let expectedDataBaseDelta: Int
     }
 
     private func hex(_ data: Data) -> String {
@@ -23,6 +28,177 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
             try fileManager.removeItem(at: url)
         }
         try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+    }
+
+    private func appendUInt32BE(_ value: UInt32, to data: inout Data) {
+        data.append(UInt8((value >> 24) & 0xff))
+        data.append(UInt8((value >> 16) & 0xff))
+        data.append(UInt8((value >> 8) & 0xff))
+        data.append(UInt8(value & 0xff))
+    }
+
+    private func appendUInt32LE(_ value: UInt32, to data: inout Data) {
+        data.append(UInt8(value & 0xff))
+        data.append(UInt8((value >> 8) & 0xff))
+        data.append(UInt8((value >> 16) & 0xff))
+        data.append(UInt8((value >> 24) & 0xff))
+    }
+
+    private func packFloat32LE(_ values: [Float]) -> Data {
+        var result = Data()
+        result.reserveCapacity(values.count * MemoryLayout<UInt32>.size)
+        for value in values {
+            var bits = value.bitPattern.littleEndian
+            withUnsafeBytes(of: &bits) { result.append(contentsOf: $0) }
+        }
+        return result
+    }
+
+    private func lhdrMetadata() -> Data {
+        var values = Array(repeating: Float(0), count: 36)
+        values[0] = 3.0
+        values[1] = 1.0
+        values[2] = 144.0
+        values[3] = 0.0
+        values[4] = 6.25
+        values[5] = -1.0
+        values[7] = 1.0
+        values[8] = 0.125
+        values[9] = 0.75
+        values[16] = 1.0
+        values[18] = 10.0
+        values[19] = 6.0
+        values[23] = 0.8
+        values[24] = 0.25
+        values[29] = 4.0
+        values[32] = 2.0
+        values[33] = 4.5
+        values[34] = 1.0
+        return packFloat32LE(values)
+    }
+
+    private func validUHDRMetadata() -> Data {
+        packFloat32LE([
+            1.0, 1.05, 0.95, 1.0,
+            4.0, 4.5, 5.0,
+            1.0, 0.9, 1.1,
+            0.01, 0.02, 0.03,
+            0.04, 0.05, 0.06,
+            1.0, 4.5, 4.5, 0.0,
+        ])
+    }
+
+    private func qtiPrefix(marker: String) -> Data {
+        let markerData = Data(marker.utf8)
+        var result = Data()
+        appendUInt32BE(UInt32(4 + markerData.count), to: &result)
+        result.append(markerData)
+        return result
+    }
+
+    private func manifestJSON(for blocks: [NamedBlock], preludeLength: Int) -> Data {
+        var end = preludeLength
+        let objects = blocks.map { block -> String in
+            end += block.data.count
+            return "{\"name\":\"\(block.name)\",\"offset\":\(end),\"length\":\(block.data.count)}"
+        }
+        return Data(("[" + objects.joined(separator: ",") + "]").utf8)
+    }
+
+    private func qtiContainer(
+        marker: String,
+        padding: Int,
+        prelude: Data = Data(),
+        blocks: [NamedBlock]
+    ) -> Data {
+        var result = qtiPrefix(marker: marker)
+        result.append(Data(repeating: 0xa5, count: padding))
+        result.append(prelude)
+        for block in blocks {
+            result.append(block.data)
+        }
+        result.append(manifestJSON(for: blocks, preludeLength: prelude.count))
+        return result
+    }
+
+    private func jxrsContainer(
+        prefix: Data,
+        prelude: Data = Data(),
+        blocks: [NamedBlock]
+    ) -> Data {
+        var result = prefix
+        result.append(prelude)
+        for block in blocks {
+            result.append(block.data)
+        }
+        let json = manifestJSON(for: blocks, preludeLength: prelude.count)
+        result.append(json)
+        result.append(0)
+        result.append(Data("jxrs".utf8))
+        appendUInt32LE(UInt32(json.count + 9), to: &result)
+        return result
+    }
+
+    private func corpusCases() -> [CorpusCase] {
+        let meta = lhdrMetadata()
+        let maskA = Data([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x02, 0x11, 0x22, 0xff, 0xd9])
+        let maskB = Data([0xff, 0xd8, 0xff, 0xe1, 0x00, 0x03, 0x33, 0x44, 0x55, 0xff, 0xd9])
+        let portrait = Data([0x50, 0x4f, 0x52, 0x54, 0x52, 0x41, 0x49, 0x54])
+
+        return [
+            CorpusCase(
+                name: "lhdr-qti-calibrated",
+                data: qtiContainer(
+                    marker: "QTI Debug",
+                    padding: 11,
+                    blocks: [
+                        NamedBlock(name: "local.hdr.meta.data", data: meta),
+                        NamedBlock(name: "local.hdr.linear.mask", data: maskA),
+                        NamedBlock(name: "portrait.depth", data: portrait),
+                    ]
+                ),
+                expectedMode: "lhdr",
+                expectedDataBaseDelta: 11
+            ),
+            CorpusCase(
+                name: "lhdr-qti-float144-fallback",
+                data: qtiContainer(
+                    marker: "QTI ",
+                    padding: 7,
+                    prelude: meta,
+                    blocks: [
+                        NamedBlock(name: "local.hdr.linear.mask", data: maskB),
+                    ]
+                ),
+                expectedMode: "lhdr",
+                expectedDataBaseDelta: 7
+            ),
+            CorpusCase(
+                name: "uhdr-jxrs-canonical-fallback",
+                data: jxrsContainer(
+                    prefix: Data([0x4a, 0x58, 0x52, 0x53, 0x10, 0x20]),
+                    blocks: [
+                        NamedBlock(name: "local.uhdr.gainmap.info", data: Data(count: 80)),
+                        NamedBlock(name: "local.uhdr.gainmap.data", data: maskA),
+                    ]
+                ),
+                expectedMode: "uhdr",
+                expectedDataBaseDelta: 0
+            ),
+            CorpusCase(
+                name: "uhdr-qti-valid-multichannel",
+                data: qtiContainer(
+                    marker: "QTI Debug",
+                    padding: 5,
+                    blocks: [
+                        NamedBlock(name: "local.uhdr.gainmap.info", data: validUHDRMetadata()),
+                        NamedBlock(name: "local.uhdr.gainmap.data", data: maskB),
+                    ]
+                ),
+                expectedMode: "uhdr",
+                expectedDataBaseDelta: 5
+            ),
+        ]
     }
 
     private func writeSnapshot(
@@ -85,85 +261,76 @@ final class ContainerRustConformanceOracleTests: XCTestCase {
         )
     }
 
-    private func flattenedError(_ error: Error) -> String {
-        String(describing: error)
-            .replacingOccurrences(of: "\t", with: " ")
-            .replacingOccurrences(of: "\r", with: " ")
-            .replacingOccurrences(of: "\n", with: " ")
-    }
-
-    func testEmitRepositoryFixtureSnapshots() throws {
+    func testEmitContainerConformanceCorpus() throws {
         guard let outputPath = ProcessInfo.processInfo.environment["XDREMUX_CONTAINER_ORACLE_ROOT"],
               !outputPath.isEmpty else {
-            throw XCTSkip("set XDREMUX_CONTAINER_ORACLE_ROOT to emit Swift container fixture snapshots")
+            throw XCTSkip("set XDREMUX_CONTAINER_ORACLE_ROOT to emit Swift container conformance corpus")
         }
 
         let fileManager = FileManager.default
         let outputRoot = URL(fileURLWithPath: outputPath, isDirectory: true)
         try resetDirectory(outputRoot, fileManager: fileManager)
+        let inputsRoot = outputRoot.appendingPathComponent("inputs", isDirectory: true)
+        try fileManager.createDirectory(at: inputsRoot, withIntermediateDirectories: true)
 
-        let repositoryRoot = repositoryRoot()
-        let fixturesRoot = repositoryRoot.appendingPathComponent("fixtures", isDirectory: true)
-        let supportedExtensions = Set(["jpg", "jpeg", "heic", "heif"])
-        let candidates = try fileManager
-            .contentsOfDirectory(
-                at: fixturesRoot,
-                includingPropertiesForKeys: nil,
-                options: [.skipsHiddenFiles]
-            )
-            .filter { supportedExtensions.contains($0.pathExtension.lowercased()) }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let cases = corpusCases()
+        XCTAssertEqual(cases.count, 4)
 
-        XCTAssertFalse(candidates.isEmpty, "repository must expose candidate container fixtures")
-
-        var acceptedLines: [String] = []
-        var rejectedLines: [String] = []
-        var acceptedCount = 0
+        var caseLines: [String] = []
         var lhdrCount = 0
         var uhdrCount = 0
 
-        for fixtureURL in candidates {
-            let relativePath = "fixtures/\(fixtureURL.lastPathComponent)"
-            do {
-                let data = try Data(contentsOf: fixtureURL, options: [.mappedIfSafe])
-                let snapshot = try ContainerConformanceSupport.snapshot(from: data)
-                let snapshotName = String(format: "fixture-%04d", acceptedCount)
-                let snapshotURL = outputRoot.appendingPathComponent(snapshotName, isDirectory: true)
-                try writeSnapshot(snapshot, to: snapshotURL, fileManager: fileManager)
-                acceptedLines.append("\(snapshotName)\t\(relativePath)\t\(snapshot.mode)")
-                acceptedCount += 1
-                switch snapshot.mode {
-                case "lhdr": lhdrCount += 1
-                case "uhdr": uhdrCount += 1
-                default: XCTFail("unexpected extraction mode \(snapshot.mode) for \(relativePath)")
-                }
-            } catch {
-                rejectedLines.append("\(relativePath)\t\(flattenedError(error))")
+        for (index, item) in cases.enumerated() {
+            let inputURL = inputsRoot.appendingPathComponent("\(item.name).bin")
+            try item.data.write(to: inputURL, options: .atomic)
+
+            let snapshot = try ContainerConformanceSupport.snapshot(from: item.data)
+            XCTAssertEqual(snapshot.mode, item.expectedMode, item.name)
+            XCTAssertEqual(
+                snapshot.dataBase - snapshot.extensionStart,
+                item.expectedDataBaseDelta,
+                "data-base calibration drifted for \(item.name)"
+            )
+
+            if item.name == "lhdr-qti-float144-fallback" {
+                XCTAssertEqual(snapshot.metaBytes, lhdrMetadata())
+            }
+            if item.name == "uhdr-jxrs-canonical-fallback" {
+                XCTAssertEqual(snapshot.metaFloats.count, 20)
+                XCTAssertEqual(snapshot.metaFloats[0], 1.0)
+                XCTAssertEqual(snapshot.metaFloats[4], 4.926)
+                XCTAssertFalse(snapshot.metaBytes.allSatisfy { $0 == 0 })
+            }
+            if item.name == "uhdr-qti-valid-multichannel" {
+                XCTAssertEqual(snapshot.metaBytes, validUHDRMetadata())
+                XCTAssertNotEqual(snapshot.metaFloats[4], snapshot.metaFloats[5])
+                XCTAssertNotEqual(snapshot.metaFloats[5], snapshot.metaFloats[6])
+            }
+
+            let snapshotName = String(format: "fixture-%04d", index)
+            try writeSnapshot(
+                snapshot,
+                to: outputRoot.appendingPathComponent(snapshotName, isDirectory: true),
+                fileManager: fileManager
+            )
+            caseLines.append(
+                "\(snapshotName)\t\(inputURL.path)\t\(snapshot.mode)\t\(item.name)"
+            )
+
+            switch snapshot.mode {
+            case "lhdr": lhdrCount += 1
+            case "uhdr": uhdrCount += 1
+            default: XCTFail("unexpected extraction mode \(snapshot.mode) for \(item.name)")
             }
         }
 
-        let acceptedText = acceptedLines.isEmpty ? "" : acceptedLines.joined(separator: "\n") + "\n"
-        let rejectedText = rejectedLines.isEmpty ? "" : rejectedLines.joined(separator: "\n") + "\n"
-        try Data(acceptedText.utf8).write(
-            to: outputRoot.appendingPathComponent("accepted.tsv"),
+        XCTAssertEqual(lhdrCount, 2)
+        XCTAssertEqual(uhdrCount, 2)
+        let caseText = caseLines.joined(separator: "\n") + "\n"
+        try Data(caseText.utf8).write(
+            to: outputRoot.appendingPathComponent("cases.tsv"),
             options: .atomic
         )
-        try Data(rejectedText.utf8).write(
-            to: outputRoot.appendingPathComponent("rejected.tsv"),
-            options: .atomic
-        )
-
-        print(
-            "Swift container fixture oracle: candidates=\(candidates.count) accepted=\(acceptedCount) lhdr=\(lhdrCount) uhdr=\(uhdrCount) rejected=\(rejectedLines.count)"
-        )
-        if !rejectedLines.isEmpty {
-            print("Swift container rejected fixtures:\n\(rejectedLines.joined(separator: "\n"))")
-        }
-
-        XCTAssertGreaterThanOrEqual(
-            acceptedCount,
-            2,
-            "container conformance requires at least two repository fixtures accepted by current Swift"
-        )
+        print("Swift container conformance corpus: cases=\(cases.count) lhdr=\(lhdrCount) uhdr=\(uhdrCount)")
     }
 }
