@@ -66,7 +66,8 @@ const PNG_START: &[u8] = &[0x89, 0x50, 0x4e, 0x47];
 
 pub fn extract(data: &[u8]) -> Result<ExtractedLhdr> {
     let manifest_info = locate_manifest(data)?;
-    let data_base = calibrate_data_base(data, &manifest_info).unwrap_or(manifest_info.extension_start);
+    let data_base =
+        calibrate_data_base(data, &manifest_info).unwrap_or(manifest_info.extension_start);
     let blocks = materialize_blocks(data, &manifest_info, data_base);
 
     let info_entry = manifest_info
@@ -80,11 +81,13 @@ pub fn extract(data: &[u8]) -> Result<ExtractedLhdr> {
 
     if let (Some(info_entry), Some(data_entry)) = (info_entry, data_entry) {
         let mut meta_bytes = block_start(data, &manifest_info, data_base, info_entry)
-            .and_then(|start| valid_range(data.len(), i64_from_usize(start)?, info_entry.length))
+            .and_then(|start| i64::try_from(start).ok())
+            .and_then(|start| valid_range(data.len(), start, info_entry.length))
             .and_then(|range| data.get(range).map(ToOwned::to_owned))
             .unwrap_or_else(|| vec![0; 80]);
 
-        let mut meta_floats = unpack_float_array_le(&meta_bytes, 20).unwrap_or_else(|_| vec![0.0; 20]);
+        let mut meta_floats =
+            unpack_float_array_le(&meta_bytes, 20).unwrap_or_else(|_| vec![0.0; 20]);
         let needs_fallback = meta_floats.iter().all(|value| *value == 0.0)
             || meta_floats.iter().any(|value| !value.is_finite())
             || (meta_floats[0] - 1.0).abs() > 0.1;
@@ -131,7 +134,8 @@ pub fn extract(data: &[u8]) -> Result<ExtractedLhdr> {
 
 pub fn portrait_blocks(data: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
     let manifest_info = locate_manifest(data)?;
-    let data_base = calibrate_data_base(data, &manifest_info).unwrap_or(manifest_info.extension_start);
+    let data_base =
+        calibrate_data_base(data, &manifest_info).unwrap_or(manifest_info.extension_start);
     let mut blocks = BTreeMap::new();
     for entry in &manifest_info.entries {
         let Some(start) = block_start(data, &manifest_info, data_base, entry) else {
@@ -153,7 +157,8 @@ fn locate_manifest(data: &[u8]) -> Result<ManifestInfo> {
     let manifest_array = parse_manifest(data).ok_or(ContainerError::ManifestNotFound)?;
 
     let json_start = last_subslice(data, JSON_START).ok_or(ContainerError::ManifestNotFound)?;
-    let json_end_base = find_byte(data, b']', json_start).ok_or(ContainerError::ManifestNotFound)?;
+    let json_end_base =
+        find_byte(data, b']', json_start).ok_or(ContainerError::ManifestNotFound)?;
     let json_end = json_end_base
         .checked_add(1)
         .ok_or_else(|| ContainerError::invalid("manifest", "JSON end overflow"))?;
@@ -165,7 +170,13 @@ fn locate_manifest(data: &[u8]) -> Result<ManifestInfo> {
         if marker_end != data.len() {
             return false;
         }
-        let Some(length_bytes) = data.get(marker + 5..marker + 9) else {
+        let Some(length_start) = marker.checked_add(5) else {
+            return false;
+        };
+        let Some(length_end) = length_start.checked_add(4) else {
+            return false;
+        };
+        let Some(length_bytes) = data.get(length_start..length_end) else {
             return false;
         };
         let footer_length = u32::from_le_bytes([
@@ -242,10 +253,14 @@ fn find_extension_start(data: &[u8]) -> Result<usize> {
         let Some(box_start) = position.checked_sub(4) else {
             continue;
         };
-        let Some(size_bytes) = data.get(box_start..box_start + 4) else {
+        let Some(box_end) = box_start.checked_add(4) else {
             continue;
         };
-        let box_size = u32::from_be_bytes([size_bytes[0], size_bytes[1], size_bytes[2], size_bytes[3]]);
+        let Some(size_bytes) = data.get(box_start..box_end) else {
+            continue;
+        };
+        let box_size =
+            u32::from_be_bytes([size_bytes[0], size_bytes[1], size_bytes[2], size_bytes[3]]);
         let Ok(box_size) = usize::try_from(box_size) else {
             continue;
         };
@@ -411,9 +426,9 @@ fn extract_meta(
     manifest_info: &ManifestInfo,
     blocks: &BTreeMap<String, Vec<u8>>,
 ) -> Result<Vec<u8>> {
-    let extension_data = data
-        .get(manifest_info.extension_start..)
-        .ok_or_else(|| ContainerError::invalid("LHDR metadata", "extension start is outside input"))?;
+    let extension_data = data.get(manifest_info.extension_start..).ok_or_else(|| {
+        ContainerError::invalid("LHDR metadata", "extension start is outside input")
+    })?;
     let manifest_start = last_subslice(extension_data, JSON_START);
 
     if let Some(entry) = manifest_info
@@ -481,7 +496,10 @@ fn extract_meta(
                 if let Some(chunk) = extension_data.get(start..end) {
                     if let Ok(floats) = unpack_float_array_le(chunk, 36) {
                         let score = score_meta_candidate(&floats);
-                        if best.as_ref().is_none_or(|(best_score, _)| score > *best_score) {
+                        if best
+                            .as_ref()
+                            .is_none_or(|(best_score, _)| score > *best_score)
+                        {
                             best = Some((score, chunk.to_vec()));
                         }
                     }
@@ -572,10 +590,11 @@ fn extract_mask(
 
     if let Some(entry) = mask_entry {
         let target = entry.length;
-        if let Some(best) = blobs
-            .iter()
-            .min_by_key(|blob| i64::try_from(blob.len()).unwrap_or(i64::MAX).abs_diff(target))
-        {
+        if let Some(best) = blobs.iter().min_by_key(|blob| {
+            i64::try_from(blob.len())
+                .unwrap_or(i64::MAX)
+                .abs_diff(target)
+        }) {
             return Ok(best.clone());
         }
     }
@@ -656,9 +675,9 @@ fn score_meta_chunk(chunk: &[u8]) -> i32 {
 }
 
 fn decode_local_hdr_info(meta_bytes: &[u8]) -> Result<LocalHdrInfo> {
-    let prefix = meta_bytes
-        .get(..16)
-        .ok_or_else(|| ContainerError::invalid("LHDR metadata", "metadata is shorter than 16 bytes"))?;
+    let prefix = meta_bytes.get(..16).ok_or_else(|| {
+        ContainerError::invalid("LHDR metadata", "metadata is shorter than 16 bytes")
+    })?;
     let values = unpack_float_array_le(prefix, 4)?;
     Ok(LocalHdrInfo {
         version: values[0],
@@ -680,8 +699,15 @@ fn unpack_float_array_le(data: &[u8], count: usize) -> Result<Vec<f64>> {
     }
     let mut values = Vec::with_capacity(count);
     for index in 0..count {
-        let start = index * 4;
-        let bytes = &data[start..start + 4];
+        let start = index
+            .checked_mul(4)
+            .ok_or_else(|| ContainerError::invalid("float payload", "offset overflow"))?;
+        let end = start
+            .checked_add(4)
+            .ok_or_else(|| ContainerError::invalid("float payload", "offset overflow"))?;
+        let bytes = data
+            .get(start..end)
+            .ok_or_else(|| ContainerError::invalid("float payload", "unexpected end of input"))?;
         let bits = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         values.push(f64::from(f32::from_bits(bits)));
     }
@@ -690,8 +716,8 @@ fn unpack_float_array_le(data: &[u8], count: usize) -> Result<Vec<f64>> {
 
 fn canonical_uhdr_floats() -> Vec<f64> {
     vec![
-        1.0, 1.0, 1.0, 1.0, 4.926, 4.926, 4.926, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 4.926, 4.926, 0.0,
+        1.0, 1.0, 1.0, 1.0, 4.926, 4.926, 4.926, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        4.926, 4.926, 0.0,
     ]
 }
 
@@ -730,8 +756,9 @@ fn valid_range(data_len: usize, start: i64, length: i64) -> Option<Range<usize>>
 }
 
 fn i64_from_usize(value: usize) -> Result<i64> {
-    i64::try_from(value)
-        .map_err(|_| ContainerError::invalid("container offset", "value exceeds signed 64-bit range"))
+    i64::try_from(value).map_err(|_| {
+        ContainerError::invalid("container offset", "value exceeds signed 64-bit range")
+    })
 }
 
 fn find_byte(data: &[u8], byte: u8, start: usize) -> Option<usize> {
@@ -758,7 +785,8 @@ fn last_subslice(data: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() || needle.len() > data.len() {
         return None;
     }
-    data.windows(needle.len()).rposition(|window| window == needle)
+    data.windows(needle.len())
+        .rposition(|window| window == needle)
 }
 
 #[cfg(test)]
@@ -776,7 +804,10 @@ mod tests {
     #[test]
     fn manifest_without_qti_or_valid_jxrs_fails_closed() {
         let data = br#"[{"name":"x","offset":1,"length":1}]"#;
-        assert_eq!(locate_manifest(data), Err(ContainerError::QtiMarkerNotFound));
+        assert_eq!(
+            locate_manifest(data),
+            Err(ContainerError::QtiMarkerNotFound)
+        );
     }
 
     #[test]
@@ -793,7 +824,10 @@ mod tests {
         let mut data = vec![0xff, 0xd8, 0xff, 0xe1, 0, 0, 0, 0];
         data.extend_from_slice(b"QTI ordinary metadata");
         data.extend_from_slice(br#"[{"name":"x","offset":1,"length":1}]"#);
-        assert_eq!(locate_manifest(&data), Err(ContainerError::QtiMarkerNotFound));
+        assert_eq!(
+            locate_manifest(&data),
+            Err(ContainerError::QtiMarkerNotFound)
+        );
     }
 
     #[test]
