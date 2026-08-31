@@ -47,6 +47,9 @@ jobs:
       - name: Test xdremux-hdr
         run: cargo test --locked -p xdremux-hdr
 
+      - name: Exercise shared EDR vectors
+        run: cargo run --quiet --locked -p xdremux-hdr --bin xdremux-hdr-vectors -- Tests/fixtures/hdr_edr_cases.tsv >/dev/null
+
       - name: Verify repository completion gate
         shell: bash
         run: |
@@ -59,6 +62,12 @@ jobs:
                 "name": "rust-hdr-regressions",
                 "kind": "regression",
                 "command": ["cargo", "test", "--locked", "-p", "xdremux-hdr"],
+                "timeout_seconds": 300
+              },
+              {
+                "name": "rust-hdr-vector-integration",
+                "kind": "integration",
+                "command": ["cargo", "run", "--quiet", "--locked", "-p", "xdremux-hdr", "--bin", "xdremux-hdr-vectors", "--", "Tests/fixtures/hdr_edr_cases.tsv"],
                 "timeout_seconds": 300
               },
               {
