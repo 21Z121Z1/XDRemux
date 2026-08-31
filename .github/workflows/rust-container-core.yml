@@ -1,0 +1,53 @@
+name: Rust container core
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-container/**"
+      - "Sources/XDRemuxCore/HDR/**"
+      - "Sources/ContainerConformanceOracle/**"
+      - "Tests/XDRemuxCoreTests/ContainerRustConformanceOracleTests.swift"
+      - "scripts/check_container_conformance.sh"
+      - ".github/workflows/rust-container-core.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-container/**"
+      - "Sources/XDRemuxCore/HDR/**"
+      - "Sources/ContainerConformanceOracle/**"
+      - "Tests/XDRemuxCoreTests/ContainerRustConformanceOracleTests.swift"
+      - "scripts/check_container_conformance.sh"
+      - ".github/workflows/rust-container-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  container-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Resolve bootstrap lockfile
+        run: cargo generate-lockfile
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint xdremux-container
+        run: cargo clippy -p xdremux-container --all-targets -- -D warnings
+      - name: Test xdremux-container
+        run: cargo test -p xdremux-container
+      - name: Print resolved lockfile
+        if: always()
+        shell: bash
+        run: |
+          echo '--- XDREMUX_CARGO_LOCK_BEGIN ---'
+          cat Cargo.lock
+          echo '--- XDREMUX_CARGO_LOCK_END ---'
