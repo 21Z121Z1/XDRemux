@@ -5,8 +5,10 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "Package.swift"
       - "crates/xdremux-format/**"
       - "crates/xdremux-heif/**"
+      - "Sources/XDRemuxCore/HEIF/ISOBMFF.swift"
       - "Tests/XDRemuxCoreTests/HEIFRustConformanceTests.swift"
       - "scripts/check_heif_conformance.sh"
       - ".github/workflows/rust-heif-core.yml"
@@ -14,14 +16,16 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "Package.swift"
       - "crates/xdremux-format/**"
       - "crates/xdremux-heif/**"
+      - "Sources/XDRemuxCore/HEIF/ISOBMFF.swift"
       - "Tests/XDRemuxCoreTests/HEIFRustConformanceTests.swift"
       - "scripts/check_heif_conformance.sh"
       - ".github/workflows/rust-heif-core.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   heif-core:
@@ -34,35 +38,51 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Normalize HEIF writer
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("crates/xdremux-heif/src/direct.rs")
-          s = p.read_text()
-          old = '''    for chunk in payload[8..].chunks_exact(4) {\n        brands.push(chunk.try_into().expect("chunks_exact(4)"));\n    }'''
-          new = '''    let (chunks, _) = payload[8..].as_chunks::<4>();\n    for chunk in chunks {\n        brands.push(*chunk);\n    }'''
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif new not in s:
-              raise SystemExit("expected source_brand_order chunk loop not found")
-          p.write_text(s)
-          PY
-          cargo fmt --all
+      - name: Check formatting
+        run: cargo fmt --all --check
       - name: Lint xdremux-heif
         run: cargo clippy --locked -p xdremux-heif --all-targets -- -D warnings
       - name: Test xdremux-heif
         run: cargo test --locked -p xdremux-heif
-      - name: Commit normalized source
-        if: github.event_name == 'push'
+
+  heif-conformance:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Compare Swift and Rust HEIF writer outputs
+        run: bash scripts/check_heif_conformance.sh
+      - name: Verify cross-language completion gate
         shell: bash
         run: |
-          if git diff --quiet -- crates/xdremux-heif/src/direct.rs crates/xdremux-heif/src/lib.rs; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/xdremux-heif/src/direct.rs crates/xdremux-heif/src/lib.rs
-          git commit -m "style(rust): normalize HEIF writer"
-          git push origin HEAD:feat/rust-xdremux-format
+          cat > "$RUNNER_TEMP/xdremux-heif-conformance-gate.json" <<'JSON'
+          {
+            "schema_version": 1,
+            "scope": "Port the deterministic private-JPEG to tiled-HEVC HEIF graph replacement into the isolated Rust HEIF crate while preserving source payloads and current Swift container semantics",
+            "checks": [
+              {
+                "name": "rust-heif-regressions",
+                "kind": "regression",
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-heif"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "swift-rust-heif-writer-corpus",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_heif_conformance.sh"],
+                "timeout_seconds": 1800
+              }
+            ]
+          }
+          JSON
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/main \
+            --plan "$RUNNER_TEMP/xdremux-heif-conformance-gate.json"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/$(git rev-parse HEAD).json"
