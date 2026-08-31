@@ -7,39 +7,37 @@ cd "$ROOT"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-container-conformance.XXXXXX")"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
-# `swift build --target` type-checks an executable target but does not link it
-# in a clean build. `swift run` is intentionally used below so the oracle is
-# linked without adding a developer-only executable to XDRemux's public product
-# surface. The first invocation builds; subsequent fixtures reuse that build.
-swift build --target ContainerConformanceOracle >/dev/null
+SWIFT_ROOT="$TMP_ROOT/swift"
+RUST_ROOT="$TMP_ROOT/rust"
 
 cargo build --locked -q -p xdremux-container --bin xdremux-container-extract
 RUST_ORACLE="$ROOT/target/debug/xdremux-container-extract"
-
 if [[ ! -x "$RUST_ORACLE" ]]; then
   echo "Rust container oracle was not built at $RUST_ORACLE" >&2
   exit 1
 fi
 
+XDREMUX_CONTAINER_ORACLE_ROOT="$SWIFT_ROOT" \
+  swift test --filter ContainerRustConformanceOracleTests/testEmitRepositoryFixtureSnapshots
+
+ACCEPTED="$SWIFT_ROOT/accepted.tsv"
+REJECTED="$SWIFT_ROOT/rejected.tsv"
+if [[ ! -f "$ACCEPTED" ]]; then
+  echo "Swift container oracle did not emit accepted.tsv" >&2
+  [[ -f "$REJECTED" ]] && cat "$REJECTED" >&2
+  exit 1
+fi
+
 matched=0
-skipped=0
 lhdr=0
 uhdr=0
 
-while IFS= read -r fixture; do
-  [[ -n "$fixture" ]] || continue
-  relative="${fixture#./}"
-  key="$(printf '%s' "$relative" | shasum -a 256 | awk '{print $1}')"
-  swift_dir="$TMP_ROOT/$key/swift"
-  rust_dir="$TMP_ROOT/$key/rust"
-  swift_err="$TMP_ROOT/$key/swift.err"
-  rust_err="$TMP_ROOT/$key/rust.err"
-  mkdir -p "$TMP_ROOT/$key"
-
-  if ! swift run -q ContainerConformanceOracle "$relative" "$swift_dir" 2>"$swift_err"; then
-    skipped=$((skipped + 1))
-    continue
-  fi
+while IFS=$'\t' read -r snapshot_name relative mode; do
+  [[ -n "$snapshot_name" ]] || continue
+  swift_dir="$SWIFT_ROOT/$snapshot_name"
+  rust_dir="$RUST_ROOT/$snapshot_name"
+  rust_err="$TMP_ROOT/$snapshot_name.rust.err"
+  mkdir -p "$RUST_ROOT"
 
   if ! "$RUST_ORACLE" "$relative" "$rust_dir" 2>"$rust_err"; then
     echo "Rust failed a fixture accepted by Swift: $relative" >&2
@@ -56,7 +54,6 @@ while IFS= read -r fixture; do
     exit 1
   fi
 
-  mode="$(awk -F '\t' '$1 == "mode" { print $2; exit }' "$swift_dir/summary.tsv")"
   case "$mode" in
     lhdr) lhdr=$((lhdr + 1)) ;;
     uhdr) uhdr=$((uhdr + 1)) ;;
@@ -67,15 +64,17 @@ while IFS= read -r fixture; do
   esac
   matched=$((matched + 1))
   echo "PASS container fixture: $relative ($mode)"
-done < <(
-  find fixtures -maxdepth 1 -type f \
-    \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' -o -iname '*.heif' \) \
-    -print | LC_ALL=C sort
-)
+done < "$ACCEPTED"
 
 if (( matched < 2 )); then
-  echo "Container conformance needs at least two Swift-accepted repository fixtures; matched=$matched skipped=$skipped" >&2
+  echo "Container conformance needs at least two Swift-accepted repository fixtures; matched=$matched" >&2
+  [[ -f "$REJECTED" ]] && cat "$REJECTED" >&2
   exit 1
 fi
 
-echo "PASS Swift/Rust container fixtures: matched=$matched lhdr=$lhdr uhdr=$uhdr skipped=$skipped"
+rejected=0
+if [[ -f "$REJECTED" ]]; then
+  rejected="$(awk 'NF { count += 1 } END { print count + 0 }' "$REJECTED")"
+fi
+
+echo "PASS Swift/Rust container fixtures: matched=$matched lhdr=$lhdr uhdr=$uhdr rejected=$rejected"
