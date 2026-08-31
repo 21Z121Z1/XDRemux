@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use xdremux_motion_photo::{
     enrich_oppo_video_range, ftyp_box_offsets, parse_android_motion_photo, parse_first_lpex_object,
     parse_oppo_motion_photo, resolve_heif_motion_photo_ranges, resolve_video_stream_layout,
-    ByteRange, MotionPhotoAsset, MotionPhotoItem, OppoMetadata, VideoStreamRole,
+    ByteRange, MotionPhotoAsset, MotionPhotoItem, OppoMetadata, PresentationSource, VideoStreamRole,
 };
 
 fn parse_u64(text: &str) -> Result<u64, String> {
@@ -85,6 +85,19 @@ fn run() -> Result<Value, String> {
     let args = env::args().skip(1).collect::<Vec<_>>();
     let mode = args.first().map(String::as_str).ok_or("missing mode")?;
     match mode {
+        "sources" => {
+            if args.len() != 1 {
+                return Err("usage: motion_photo_conformance sources".into());
+            }
+            Ok(json!({
+                "presentationSources": [
+                    PresentationSource::AndroidXmp.as_str(),
+                    PresentationSource::LegacyMicroVideoXmp.as_str(),
+                    PresentationSource::OppoCoverFrame.as_str(),
+                    PresentationSource::TimelineFallback.as_str(),
+                ]
+            }))
+        }
         "android" => {
             if args.len() != 2 {
                 return Err("usage: motion_photo_conformance android <file>".into());
