@@ -7,6 +7,10 @@ name = "xdremux-format"
 version = "0.1.0"
 
 [[package]]
+name = "xdremux-hdr"
+version = "0.1.0"
+
+[[package]]
 name = "xdremux-metadata"
 version = "0.1.0"
 dependencies = [
