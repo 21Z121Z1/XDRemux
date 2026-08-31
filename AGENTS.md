@@ -1,52 +1,69 @@
-# XDRemux Agent Operating and Acceptance Contract
+# XDRemux Agent Operating Contract
 
 English | [简体中文](AGENTS.zh-CN.md)
 
-An agent must understand the affected system boundary before it changes code, and it must not claim that a change is complete until the required evidence passes for the exact committed `HEAD`.
+This file is the low-cost entry point for repository agents. Keep the working set small, then expand it only when the affected contract requires more context.
 
-Use the [system architecture](docs/architecture.en.md) to identify ownership and dependencies. Use the [transition roadmap](docs/roadmap.en.md) for Rust migration and Photographic Styles research promotion. Use the [validation runbook](docs/validation/README.en.md) for completion-plan format and evidence examples.
+Use these canonical documents instead of reconstructing the system from directory names or old PRs:
 
-## Bootstrap sequence
+- [System architecture](docs/architecture.en.md): layers, capability ownership, branch roles, and source-of-truth rules.
+- [Transition roadmap](docs/roadmap.en.md): Rust migration state and Photographic Styles research promotion.
+- [Validation runbook](docs/validation/README.en.md): evidence classes, completion plans, and receipts.
 
-For a substantial task, establish the repository state before broad search or implementation:
+## Bootstrap
+
+For a substantial task:
 
 1. Record the current branch, exact `HEAD`, intended base, and clean/dirty state.
-2. Read `docs/architecture.en.md`.
-3. Read `docs/roadmap.en.md` when the task touches the Rust rewrite, a long-lived branch, or model research.
-4. Identify the affected capability identifiers and architectural layers.
-5. Compare the active branch with its intended base before assuming that either side contains all current knowledge.
-6. Read the owning modules, neighboring tests, relevant fixtures, and current normative documents.
-7. Define acceptance criteria before implementation when a task crosses layers or changes a contract.
+2. Identify the affected capability and layer from `docs/architecture.en.md`.
+3. Compare the active branch with its intended base before assuming either side is current.
+4. Read the owning module, neighboring tests, relevant fixtures, and current normative document.
+5. Read `docs/roadmap.en.md` only when the task touches migration, a long-lived branch, or model research.
+6. Define acceptance criteria before implementation when the task crosses layers or changes a contract.
 
-Do not start by scanning the whole repository unless the task is itself repository-wide. Expand the working set only when evidence shows that another layer is involved.
+Do not scan the whole repository by default. Expand the working set only when evidence shows that another layer is involved.
 
-## Source-of-truth discipline
+## Source of truth
 
-Use the source that is authoritative for the question:
+Use the narrowest authoritative source:
 
-- released user behavior: current release contract, current public documentation, implementation, and matching evidence;
-- architectural ownership: `docs/architecture.en.md` and current code boundaries;
+- released behavior: current release contract, current public documentation, implementation, and matching evidence;
+- architecture: `docs/architecture.en.md` and current code boundaries;
 - active branch facts: that branch plus an explicit comparison with its intended base;
 - behavioral invariants: standards, fixtures, conformance tests, and device evidence where applicable;
-- research claims: model cards, data provenance, evaluation code, and current measured artifacts;
-- dated audits and old PR descriptions: historical evidence unless a current document adopts the conclusion.
+- research claims: model cards, data provenance, evaluation code, and current measured artifacts.
 
-An old implementation is a useful migration oracle, not automatically the specification.
+Treat dated audits, old PR descriptions, and old implementations as evidence, not automatic specifications.
 
 No long-lived branch may be the only place where a stable system contract is recorded.
 
-## Required implementation sequence
+## Architecture invariants
 
-1. Identify each affected capability and product path.
-2. Identify the acceptance criteria and required evidence for each path.
-3. Make the intended change without unrelated edits.
-4. Add or update the targeted regression or conformance evidence.
-5. Update current normative documentation when a contract changes.
-6. Commit the change.
-7. Create a completion-gate plan.
-8. Run the gate against the intended base.
-9. Verify the generated receipt.
-10. Report only the behavior that the evidence proves.
+- Programming languages are implementation lanes, not architecture layers.
+- Format primitives do not own media or product policy.
+- Normalized media semantics do not depend on CLI, app, or research code.
+- Planning is deterministic and free of platform I/O.
+- Prefer operation-scoped adapter capabilities over a monolithic backend.
+- Publication, provenance, collision handling, and crash recovery are correctness contracts.
+- Product shells do not reimplement parsing or media semantics.
+- Research outputs are candidates until their promotion gates pass.
+- Do not create a Rust crate only to mirror an old Swift directory.
+
+If a change does not fit these boundaries, resolve ownership first instead of adding another special case.
+
+## Completion contract
+
+An agent must not claim that a change is complete until the required evidence passes for the exact committed `HEAD`.
+
+Required sequence:
+
+1. Identify every affected capability and product path.
+2. Select the regression, conformance, functional, integration, or device evidence that the claim requires.
+3. Make the intended change without unrelated edits and update contract documentation when needed.
+4. Commit the change.
+5. Run `scripts/agent_completion_gate.py` against the intended base with a plan that contains all required checks.
+6. Verify the generated receipt for the exact `HEAD`.
+7. Report only behavior that the evidence proves, and state residual gaps explicitly.
 
 Example:
 
@@ -59,112 +76,28 @@ python3 scripts/agent_completion_gate.py verify \
   .codex/verification-receipts/$(git rev-parse HEAD).json
 ```
 
-A compiler pass, parser pass, or smoke test is not a substitute for the required gate.
+A compiler, parser, smoke, or static source check is not a substitute for functional evidence when the changed claim is functional.
 
-## Architecture rules
+Keep structural, ImageIO, renderer, integration, and device evidence distinct. Apple Photos or device behavior requires evidence that reaches that consumer. If the required environment is unavailable, limit the claim instead of marking it complete.
 
-Keep the dependency rules in `docs/architecture.en.md` during implementation.
+All checks declared in the completion plan are mandatory. A later commit or tracked edit invalidates the receipt.
 
-In particular:
+## Migration and research
 
-- do not organize the architecture by programming language;
-- do not move product policy into parsers, codec adapters, native helpers, CLI code, or model predictors;
-- keep planning deterministic and free of platform I/O;
-- prefer operation-scoped adapter capabilities over a monolithic backend;
-- do not create a Rust crate only to mirror an old Swift directory;
-- treat publication, provenance, collision handling, and crash recovery as correctness contracts;
-- treat research model output as a candidate until its promotion gates pass;
-- do not add a permanent cross-language runtime dependency only to make migration easier.
+For each capability moved from Swift/Python to Rust, record four facts in the roadmap, PR, or current contract: normalized contract, oracle/evidence, Rust owner, and promotion evidence.
 
-When a change does not fit the current architecture, first decide which layer should own the behavior. Do not solve ownership ambiguity with another special case.
+Cross-implementation parity is useful but is not sufficient when the old implementation conflicts with an external standard or stronger evidence.
 
-## Evidence requirements
+The v1.4 Swift/Python line is a bounded released reference. Do not add large new architecture to it only to preserve symmetry with Rust.
 
-Every source change must have a targeted regression or conformance check that would fail for the original defect or contract violation.
+A model, learned heuristic, or research-only producer stays outside production defaults until the applicable gates in `docs/roadmap.en.md` pass.
 
-Every production conversion-core or app-core change must also have functional, integration, or device evidence that reaches the changed behavior.
+Before retiring a long-lived branch, promote branch-only stable knowledge into code, tests, model cards, or normative documentation. Preserve useful dated experiments as historical records.
 
-If more than one entry point changes, validate each affected entry point.
+## Media and documentation
 
-Do not use a static source check as functional evidence.
+Public Motion Photo fixtures are versioned under `fixtures/`. Large private, device-only, or Apple-feature samples can remain outside Git when their provenance and use are documented by the relevant validation path.
 
-Do not relabel a static check as a regression or functional check to satisfy the gate.
+Current technical documents follow [docs/style-guide.en.md](docs/style-guide.en.md). Update the English canonical document first, then its Chinese translation.
 
-Strict ISO parser success alone is not acceptance evidence for OPPO Gallery behavior. Keep structural, ImageIO, renderer, and device evidence distinct.
-
-Do not use container structure alone as evidence for interactive Apple Photos editing.
-
-A device-dependent product claim requires device evidence. If the required device or closed component is unavailable, report the device-dependent claim as blocked or explicitly limit the claim to tested offline behavior. Do not mark the device-dependent claim complete without device evidence.
-
-All checks declared in a completion plan are mandatory.
-
-## Migration evidence
-
-For a capability that moves from Swift/Python to Rust, record:
-
-1. the normalized contract;
-2. the old implementation or external evidence used as an oracle;
-3. the Rust owner;
-4. the promotion evidence.
-
-Cross-implementation parity is not enough when the old implementation conflicts with an external standard or stronger evidence.
-
-The v1.4 Swift/Python line is a bounded released reference. Do not keep adding large new architecture to it only to preserve implementation symmetry with Rust.
-
-## Research promotion
-
-A model, learned heuristic, or research-only producer must remain outside production defaults until the applicable promotion gates in `docs/roadmap.en.md` pass.
-
-Keep training provenance, leakage controls, held-out/OOD results, consumer correlation, uncertainty/fallback behavior, end-to-end evidence, and operational budget separate.
-
-Do not interpret lower offline loss as sufficient product evidence.
-
-## Scope
-
-Use targeted verification by default.
-
-Run broader repository verification for release or preflight work, cross-module changes, architecture/control-plane changes, or verification-framework changes.
-
-Do not run unrelated expensive checks only to make a plan look more complete.
-
-## Receipt integrity
-
-The completion receipt is bound to:
-
-- `HEAD`;
-- the base commit;
-- changed paths;
-- a clean tracked worktree;
-- declared checks and their results.
-
-A later commit or tracked edit invalidates the receipt.
-
-## Branch lifecycle
-
-Before deleting or retiring a long-lived branch:
-
-1. compare it with its intended destination;
-2. identify implementation, contracts, evidence, or provenance that exist only on that branch;
-3. promote reusable current knowledge into code, tests, model cards, or normative documentation;
-4. preserve useful dated experiments as historical records;
-5. retire the branch only when no stable contract depends on branch-only knowledge.
-
-A merged implementation is not sufficient if the maintenance reasoning or evidence boundary exists only in an old PR, branch, or chat transcript.
-
-## Media and fixtures
-
-Public Motion Photo fixtures are versioned under `fixtures/`.
-
-Other large, private, device-only, or Apple-feature samples can remain outside Git.
-
-A verification plan can reference an external local sample when the runner can access it.
-
-Verification receipts under `.codex/verification-receipts/` remain ignored by Git.
-
-## Documentation
-
-Current technical documents follow [docs/style-guide.en.md](docs/style-guide.en.md).
-
-When a code change alters a documented contract, update the English canonical document first and then update the Chinese version.
-
-Do not persist transient chain-of-thought or session scratch in the repository. Persist decisions, contracts, provenance, reusable evidence, and plans that another maintainer or agent must recover later.
+Do not persist transient chain-of-thought or session scratch in the repository. Persist only decisions, contracts, provenance, reusable evidence, and plans that another maintainer or agent must recover later.
