@@ -116,7 +116,7 @@ impl<'a> Cursor<'a> {
         let bytes = self
             .data
             .get(start..next)
-            .ok_or_else(|| FormatError::UnexpectedEof {
+            .ok_or(FormatError::UnexpectedEof {
                 context: self.context,
                 offset: start,
                 needed: count,
@@ -198,7 +198,7 @@ impl<'a> Cursor<'a> {
         let remaining =
             self.data
                 .get(self.pos..self.end)
-                .ok_or_else(|| FormatError::UnexpectedEof {
+                .ok_or(FormatError::UnexpectedEof {
                     context: self.context,
                     offset: self.pos,
                     needed: 1,
