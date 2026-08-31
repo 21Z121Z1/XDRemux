@@ -19,9 +19,7 @@ pub fn gain_map_channels_from_count(channel_count: u8) -> Result<GainMapChannels
 ///
 /// Pixel decoding is intentionally not involved: dimensions, precision,
 /// component count, and sampling all come from the JPEG SOF profile.
-pub fn gain_map_source_profile_from_jpeg(
-    frame: &JpegFrameProfile,
-) -> Result<GainMapSourceProfile> {
+pub fn gain_map_source_profile_from_jpeg(frame: &JpegFrameProfile) -> Result<GainMapSourceProfile> {
     let source = GainMapSourceProfile {
         width: u32::from(frame.width),
         height: u32::from(frame.height),
