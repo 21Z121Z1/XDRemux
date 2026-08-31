@@ -11,6 +11,8 @@ BILINGUAL_STEMS = (
     "README",
     "docs/README",
     "docs/style-guide",
+    "docs/architecture",
+    "docs/roadmap",
     "docs/cli",
     "docs/apple-features",
     "docs/development",
@@ -152,6 +154,33 @@ class PublicDocumentationTests(unittest.TestCase):
             text = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn("fixtures/", text)
             self.assertNotIn("Real samples are not in the repository", text)
+
+    def test_agent_system_docs_publish_bootstrap_and_transition_contract(self) -> None:
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        architecture = (ROOT / "docs/architecture.en.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/roadmap.en.md").read_text(encoding="utf-8")
+        development = (ROOT / "docs/development.en.md").read_text(encoding="utf-8")
+
+        for path in ("docs/architecture.en.md", "docs/roadmap.en.md"):
+            self.assertIn(path, agents)
+
+        for capability in (
+            "format.binary",
+            "engine.plan",
+            "adapter.apple.styles",
+            "research.styles-model",
+        ):
+            self.assertIn(capability, architecture)
+
+        for migration_field in (
+            "normalized contract",
+            "Rust owner",
+            "promotion evidence",
+        ):
+            self.assertIn(migration_field, roadmap)
+
+        self.assertIn("v1.4 is the final release", development)
+        self.assertNotIn("There is no stable release tag contract", development)
 
     def test_ci_references_present_documentation_test_module(self) -> None:
         workflow = ROOT / ".github" / "workflows" / "ci.yml"
