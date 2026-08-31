@@ -6,6 +6,14 @@
 
 所有当前技术文档都遵循[技术写作规范](style-guide.md)。双语当前文档以英文版为 canonical source。
 
+## 系统导航
+
+- [系统架构与 Agent 地图](architecture.md)：架构层、capability ownership、source-of-truth 规则、branch 职责和 Agent 启动协议。
+- [迁移路线图](roadmap.md)：从已经发布的 v1.4 Swift/Python 线迁移到 Rust，以及 Photographic Styles 研究 promotion gate。
+- [Agent 操作与验收契约](../AGENTS.zh-CN.md)：仓库启动、实现纪律、exact-HEAD evidence 和 branch 生命周期规则。
+
+进行大范围仓库工作之前先读系统架构。编程语言本身不是架构边界；媒体语义、能力、产品契约和证据才是。
+
 ## 用户文档
 
 - [CLI 参考](cli.md)：命令、参数、输出位置和退出行为。
@@ -14,7 +22,7 @@
 
 ## 开发文档
 
-- [开发与构建](development.md)：Package 产品、仓库结构、App 构建和集成方式。
+- [开发与构建](development.md)：v1.4 Package 产品、仓库结构、App 构建和集成方式。
 - [测试政策](quality/testing.md)：修改必须提供的验证证据。
 - [回归和真实样本验证](quality/evals.md)：可复用测试和 fixture gate。
 - [输出政策](quality/logging.md)：stdout、stderr、JSON 输出和错误文本规则。
@@ -24,7 +32,7 @@
 
 ## 技术实现
 
-- [技术实现索引](xdremux/README.md)：稳定的实现契约。
+- [技术实现索引](xdremux/README.md)：稳定的 v1.4 实现契约和产品链路细节。
 - [ReverseKey1Ensemble 模型卡](../Models/ReverseKey1Ensemble.model-card.md)：可选研究模型契约。
 
 ## 历史记录
@@ -35,4 +43,4 @@
 - 编码质量和体积审计，2026-07-18：[当前语言摘要](validation/encoding-quality-pareto-20260718.summary.md) | [原始记录](validation/encoding-quality-pareto-20260718.md)
 - 厂商 Live Photo 几何证据：[当前语言摘要](validation/vendor-live-photo-geometry.summary.md) | [原始记录](validation/vendor-live-photo-geometry.md)
 
-当前产品行为以本页上方的当前文档为准。不要根据历史记录中的旧路径、旧测量值或旧实现说明推断当前保证。
+当前产品行为以本页上方的当前文档为准。不要根据历史记录中的旧路径、旧测量值、旧实现说明、PR 描述或 branch 名称推断当前保证。
