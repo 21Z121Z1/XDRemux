@@ -1,0 +1,17 @@
+#![forbid(unsafe_code)]
+
+mod error;
+pub mod iso21496;
+pub mod oppo;
+
+pub use error::{MetadataError, Result};
+pub use iso21496::{
+    make_apple_tmap_payload, make_hdrgm_xmp, make_imageio_native_tmap_payload,
+    make_strict_tmap_payload,
+};
+pub use oppo::{
+    adjusted_extent_for_oppo_user_comment_patch, adjusted_oppo_user_comment,
+    adjusted_oppo_user_comment_in_heif, apply_oppo_user_comment_patch, find_oppo_tag_flag,
+    target_oppo_tag_flags, OppoCompatibility, OppoTagFlag, OppoUserCommentPatch,
+    ISO_ULTRA_HDR_FLAG, LOCAL_HDR_FLAG, OPPO_ULTRA_HDR_FLAG,
+};

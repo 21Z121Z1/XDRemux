@@ -60,6 +60,13 @@ let package = Package(
             dependencies: ["XDRemuxCore"],
             path: "Sources/FormatConformanceOracle"
         ),
+        // Developer-only metadata oracle used to prove routing, tmap, XMP, and
+        // Exif UserComment patch semantics against the Rust metadata crate.
+        .executableTarget(
+            name: "MetadataConformanceOracle",
+            dependencies: ["XDRemuxCore"],
+            path: "Sources/MetadataConformanceOracle"
+        ),
         .testTarget(
             name: "XDRemuxCoreTests",
             dependencies: ["XDRemuxCore"],

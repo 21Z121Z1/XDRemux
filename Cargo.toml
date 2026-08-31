@@ -1,5 +1,8 @@
 [workspace]
-members = ["crates/xdremux-format"]
+members = [
+    "crates/xdremux-format",
+    "crates/xdremux-metadata",
+]
 resolver = "2"
 
 [workspace.package]
