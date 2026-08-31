@@ -1,0 +1,75 @@
+use xdremux_engine::{
+    plan_conversion, ConversionAnalysis, ConversionRequest, GainMapChannels, GainMapCodec,
+    GainMapCodecLayout, GainMapEncoderCapabilities, GainMapSourceProfile, GainMapStorageProfile,
+    InputProcessingBranch, OppoCameraTail, SourceFamily, SourceHdrMode, TmapFormat,
+};
+use xdremux_format::ChromaSampling;
+
+fn layout(chroma: ChromaSampling, bit_depth: u8) -> GainMapCodecLayout {
+    GainMapCodecLayout {
+        chroma,
+        luma_bit_depth: bit_depth,
+        chroma_bit_depth: bit_depth,
+    }
+}
+
+fn analysis(chroma: Option<ChromaSampling>, bit_depth: u8) -> ConversionAnalysis {
+    ConversionAnalysis {
+        source_family: SourceFamily::X7,
+        hdr_mode: SourceHdrMode::Uhdr,
+        gain_map: GainMapSourceProfile {
+            width: 1024,
+            height: 768,
+            channels: GainMapChannels::Rgb,
+            storage: GainMapStorageProfile {
+                codec: GainMapCodec::Jpeg,
+                chroma,
+                luma_bit_depth: bit_depth,
+                chroma_bit_depth: bit_depth,
+            },
+        },
+    }
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let direct = GainMapEncoderCapabilities::new([
+        layout(ChromaSampling::Yuv420, 8),
+        layout(ChromaSampling::Yuv444, 8),
+    ]);
+    let plan = plan_conversion(&analysis(Some(ChromaSampling::Yuv420), 8), ConversionRequest::default(), &direct)?;
+    println!(
+        "preserve-420|family={:?}|requested={:?}|effective={:?}|chroma={:?}|depth={}",
+        plan.effective_family,
+        plan.requested_input_processing_branch,
+        plan.effective_input_processing_branch,
+        plan.gain_map_target.layout.chroma,
+        plan.gain_map_target.layout.luma_bit_depth
+    );
+
+    let only_444 = GainMapEncoderCapabilities::new([layout(ChromaSampling::Yuv444, 8)]);
+    let plan = plan_conversion(&analysis(Some(ChromaSampling::Yuv422), 8), ConversionRequest::default(), &only_444)?;
+    println!(
+        "promote-422|chroma={:?}|depth={}",
+        plan.gain_map_target.layout.chroma, plan.gain_map_target.layout.luma_bit_depth
+    );
+
+    let mut request = ConversionRequest::default();
+    request.input_processing_branch = InputProcessingBranch::Passthrough;
+    request.oppo_camera_tail = OppoCameraTail::Off;
+    request.tmap_format = TmapFormat::Strict;
+    let plan = plan_conversion(&analysis(Some(ChromaSampling::Yuv444), 8), request, &only_444)?;
+    println!(
+        "strict-tmap|requested={:?}|effective={:?}",
+        plan.requested_input_processing_branch, plan.effective_input_processing_branch
+    );
+
+    let only_420 = GainMapEncoderCapabilities::new([layout(ChromaSampling::Yuv420, 8)]);
+    let error = plan_conversion(&analysis(Some(ChromaSampling::Yuv444), 8), ConversionRequest::default(), &only_420)
+        .expect_err("444 must never silently downconvert to 420");
+    println!("reject-444-to-420|{error}");
+
+    let error = plan_conversion(&analysis(Some(ChromaSampling::Yuv444), 10), ConversionRequest::default(), &only_444)
+        .expect_err("10-bit input must never silently downconvert to 8-bit");
+    println!("reject-10-to-8|{error}");
+    Ok(())
+}
