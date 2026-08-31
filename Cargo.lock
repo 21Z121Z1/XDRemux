@@ -117,6 +117,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "xdremux-engine"
+version = "0.1.0"
+dependencies = [
+ "xdremux-format",
+]
+
+[[package]]
 name = "xdremux-format"
 version = "0.1.0"
 
