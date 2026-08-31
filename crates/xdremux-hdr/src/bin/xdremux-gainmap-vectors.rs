@@ -14,7 +14,8 @@ fn hex(data: &[u8]) -> String {
 }
 
 fn parse_cases(path: &str) -> Result<HashMap<String, (ExtractionMode, Vec<f64>)>, String> {
-    let input = fs::read_to_string(path).map_err(|error| format!("unable to read {path}: {error}"))?;
+    let input =
+        fs::read_to_string(path).map_err(|error| format!("unable to read {path}: {error}"))?;
     let mut cases = HashMap::new();
     for (line_index, raw_line) in input.lines().enumerate() {
         let line = raw_line.trim();
