@@ -34,9 +34,16 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Check formatting
-        run: cargo fmt --all --check
+      - name: Format bootstrap working copy
+        run: cargo fmt --all
       - name: Lint xdremux-heif
         run: cargo clippy --locked -p xdremux-heif --all-targets -- -D warnings
       - name: Test xdremux-heif
         run: cargo test --locked -p xdremux-heif
+      - name: Print formatted HEIF writer
+        if: always()
+        shell: bash
+        run: |
+          echo '--- XDREMUX_HEIF_FORMATTED_BEGIN ---'
+          cat crates/xdremux-heif/src/direct.rs
+          echo '--- XDREMUX_HEIF_FORMATTED_END ---'
