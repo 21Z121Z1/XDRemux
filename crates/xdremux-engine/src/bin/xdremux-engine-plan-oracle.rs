@@ -134,10 +134,8 @@ fn tmap_format_name(value: TmapFormat) -> &'static str {
 
 fn normalize(test_case: &PlanCase) -> io::Result<NormalizedPlan> {
     let family = parse_family(test_case.family.as_deref(), &test_case.name)?;
-    let oppo_compatibility = parse_oppo_compatibility(
-        test_case.oppo_compatibility.as_deref(),
-        &test_case.name,
-    )?;
+    let oppo_compatibility =
+        parse_oppo_compatibility(test_case.oppo_compatibility.as_deref(), &test_case.name)?;
     let requested_input_processing_branch = parse_input_processing_branch(
         test_case.input_processing_branch.as_deref(),
         &test_case.name,
@@ -188,7 +186,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let reader = BufReader::new(File::open(&arguments[1])?);
     let cases: Vec<PlanCase> = serde_json::from_reader(reader)?;
-    let plans = cases.iter().map(normalize).collect::<io::Result<Vec<_>>>()?;
+    let plans = cases
+        .iter()
+        .map(normalize)
+        .collect::<io::Result<Vec<_>>>()?;
 
     let stdout = io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
