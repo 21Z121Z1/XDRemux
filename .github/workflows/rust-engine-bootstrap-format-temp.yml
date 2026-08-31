@@ -42,11 +42,16 @@ jobs:
                   raise SystemExit(f"expected one default impl site, found {count}")
               text = text.replace(old, new)
           old = "        let mut request = ConversionRequest::default();\n        request.input_processing_branch = InputProcessingBranch::Passthrough;\n        request.oppo_camera_tail = OppoCameraTail::Off;\n"
-          new = "        let request = ConversionRequest {\n            input_processing_branch: InputProcessingBranch::Passthrough,\n            oppo_camera_tail: OppoCameraTail::Off,\n            ..ConversionRequest::default()\n        };\n"
+          new = "        let request = ConversionRequest {\n            input_processing_branch: InputProcessingBranch::Passthrough,\n            oppo_camera_tail: OppoCameraTail::Off,\n            apple_features: AppleFeatureRequest {\n                photographic_styles: true,\n                portrait: false,\n            },\n            ..ConversionRequest::default()\n        };\n"
           count = text.count(old)
           if count != 1:
               raise SystemExit(f"expected one test request reassignment site, found {count}")
-          path.write_text(text.replace(old, new))
+          text = text.replace(old, new)
+          old = "        request.apple_features.photographic_styles = true;\n"
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f"expected one photographic styles assignment, found {count}")
+          path.write_text(text.replace(old, ""))
           path = Path("crates/xdremux-engine/src/bin/xdremux-engine-vectors.rs")
           text = path.read_text()
           old = "    let mut request = ConversionRequest::default();\n    request.input_processing_branch = InputProcessingBranch::Passthrough;\n    request.oppo_camera_tail = OppoCameraTail::Off;\n    request.tmap_format = TmapFormat::Strict;\n"
