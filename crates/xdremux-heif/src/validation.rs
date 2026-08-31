@@ -344,15 +344,14 @@ fn associated_property<'a>(
     Ok(property)
 }
 
-fn validate_meta_integrity<'a>(
-    source: &[u8],
-    meta: &'a ParsedMeta,
-) -> Result<(
-    HashMap<u32, &'a xdremux_format::isobmff::ItemInfo>,
-    HashMap<u32, &'a IlocEntry>,
-    HashMap<u32, &'a IpmaEntry>,
-    HashMap<u32, &'a PropertyInfo>,
-)> {
+struct MetaIndex<'a> {
+    items: HashMap<u32, &'a xdremux_format::isobmff::ItemInfo>,
+    locations: HashMap<u32, &'a IlocEntry>,
+    ipma_by_item: HashMap<u32, &'a IpmaEntry>,
+    properties: HashMap<u32, &'a PropertyInfo>,
+}
+
+fn validate_meta_integrity<'a>(source: &[u8], meta: &'a ParsedMeta) -> Result<MetaIndex<'a>> {
     let mut items = HashMap::new();
     for item in &meta.iinf.entries {
         if items.insert(item.item_id, item).is_some() {
@@ -451,7 +450,12 @@ fn validate_meta_integrity<'a>(
         }
     }
 
-    Ok((items, locations, ipma_by_item, properties))
+    Ok(MetaIndex {
+        items,
+        locations,
+        ipma_by_item,
+        properties,
+    })
 }
 
 /// Validates the portable ISO-BMFF/HEVC structure emitted by XDRemux's direct
@@ -463,7 +467,12 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
     let meta_header = one_top_level(&top.boxes, META, "meta")?;
     let _mdat = one_top_level(&top.boxes, MDAT, "mdat")?;
     let meta = parse_meta_box(source, meta_header)?;
-    let (items, locations, ipma_by_item, properties) = validate_meta_integrity(source, &meta)?;
+    let MetaIndex {
+        items,
+        locations,
+        ipma_by_item,
+        properties,
+    } = validate_meta_integrity(source, &meta)?;
 
     let tmap_items: Vec<_> = meta
         .iinf
