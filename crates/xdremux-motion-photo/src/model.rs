@@ -56,6 +56,7 @@ pub enum PresentationSource {
     AndroidXmp,
     LegacyMicroVideoXmp,
     OppoCoverFrame,
+    TimelineFallback,
 }
 
 impl PresentationSource {
@@ -64,6 +65,7 @@ impl PresentationSource {
             Self::AndroidXmp => "androidXMP",
             Self::LegacyMicroVideoXmp => "legacyMicroVideoXMP",
             Self::OppoCoverFrame => "oppoCoverFrame",
+            Self::TimelineFallback => "timelineFallback",
         }
     }
 }
@@ -135,4 +137,20 @@ pub struct VideoStream {
 pub struct VideoStreamLayout {
     pub primary: VideoStream,
     pub auxiliary_geometry: Vec<VideoStream>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn presentation_source_raw_values_match_swift_model() {
+        assert_eq!(PresentationSource::AndroidXmp.as_str(), "androidXMP");
+        assert_eq!(
+            PresentationSource::LegacyMicroVideoXmp.as_str(),
+            "legacyMicroVideoXMP"
+        );
+        assert_eq!(PresentationSource::OppoCoverFrame.as_str(), "oppoCoverFrame");
+        assert_eq!(PresentationSource::TimelineFallback.as_str(), "timelineFallback");
+    }
 }
