@@ -1,0 +1,116 @@
+name: Temporary HEIF profile bootstrap
+
+on:
+  push:
+    branches:
+      - feat/rust-xdremux-format
+    paths:
+      - ".github/workflows/rust-heif-profile-bootstrap-temp.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  refactor-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-xdremux-format
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Refactor HEIF Gain Map profile model
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new)
+
+          def sub_once(text, pattern, replacement, label):
+              text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one regex match, found {count}")
+              return text
+
+          path = Path("crates/xdremux-heif/src/direct.rs")
+          text = path.read_text()
+          text = replace_once(text, "    make_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box, make_iref_box,\n", "    make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,\n    make_iref_box,\n", "direct full-box import")
+          text = replace_once(text, "use xdremux_format::FourCC;", "use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};", "direct format imports")
+          text = sub_once(text, r"const PIXI_MONO8_BOX: &\[u8\] = &\[.*?\];\nconst PIXI_RGB8_BOX: &\[u8\] = &\[.*?\];\n\n", "", "remove fixed pixi constants")
+          marker = "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct GainMapTile<'a> {"
+          profile_types = "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GainMapChannels {\n    Mono,\n    Rgb,\n}\n\nimpl GainMapChannels {\n    pub const fn semantic_channel_count(self) -> u8 {\n        match self {\n            Self::Mono => 1,\n            Self::Rgb => 3,\n        }\n    }\n}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub struct GainMapEncodeProfile {\n    pub channels: GainMapChannels,\n    pub chroma: ChromaSampling,\n    pub luma_bit_depth: u8,\n    pub chroma_bit_depth: u8,\n}\n\nimpl GainMapEncodeProfile {\n    fn validate(self) -> Result<()> {\n        if !(8..=15).contains(&self.luma_bit_depth) || !(8..=15).contains(&self.chroma_bit_depth) {\n            return Err(invalid(\"direct HEVC Gain Map bit depth must fit the hvcC 8..15 range\"));\n        }\n        match (self.channels, self.chroma) {\n            (GainMapChannels::Mono, ChromaSampling::Mono400) => Ok(()),\n            (GainMapChannels::Rgb, ChromaSampling::Yuv420 | ChromaSampling::Yuv422 | ChromaSampling::Yuv444) => Ok(()),\n            (GainMapChannels::Mono, _) => Err(invalid(\"monochrome Gain Map semantics require 4:0:0 storage\")),\n            (GainMapChannels::Rgb, ChromaSampling::Mono400) => Err(invalid(\"RGB Gain Map semantics require color HEVC storage\")),\n        }\n    }\n}\n\n" + marker
+          text = replace_once(text, marker, profile_types, "insert direct profile types")
+          text = replace_once(text, "    pub channel_count: u8,", "    pub profile: GainMapEncodeProfile,", "direct profile field")
+          text = replace_once(text, "        || spec.tile_height == 0\n        || !matches!(spec.channel_count, 1 | 3)\n", "        || spec.tile_height == 0\n", "remove channel geometry coupling")
+          text = replace_once(text, "    let columns = ceil_div(spec.gain_map_width, spec.tile_width, \"gain-map columns\")?;", "    spec.profile.validate()?;\n    let columns = ceil_div(spec.gain_map_width, spec.tile_width, \"gain-map columns\")?;", "validate explicit profile")
+          text = sub_once(text, r"\n    if spec\.hvcc\.len\(\) <= 18.*?\n    \}\n    Ok\(\(rows, columns\)\)\n\}", "\n    let codec = parse_hvcc_profile(spec.hvcc)\n        .map_err(|error| invalid(format!(\"invalid direct HEVC Gain Map hvcC: {error}\")))?;\n    if codec.chroma_sampling != spec.profile.chroma\n        || codec.luma_bit_depth != spec.profile.luma_bit_depth\n        || codec.chroma_bit_depth != spec.profile.chroma_bit_depth\n    {\n        return Err(invalid(\"direct HEVC Gain Map hvcC does not match its explicit encode profile\"));\n    }\n    Ok((rows, columns))\n}", "replace direct raw hvcc validation")
+          helper_marker = "fn make_grid_payload(rows: u32, columns: u32, width: u32, height: u32) -> Result<Vec<u8>> {"
+          helper = "fn make_gain_map_pixi_box(profile: GainMapEncodeProfile) -> Result<Vec<u8>> {\n    profile.validate()?;\n    let mut payload = vec![profile.channels.semantic_channel_count()];\n    match profile.channels {\n        GainMapChannels::Mono => payload.push(profile.luma_bit_depth),\n        GainMapChannels::Rgb => {\n            payload.push(profile.luma_bit_depth);\n            payload.push(profile.chroma_bit_depth);\n            payload.push(profile.chroma_bit_depth);\n        }\n    }\n    Ok(make_full_box(PIXI, 0, 0, &payload)?)\n}\n\n" + helper_marker
+          text = replace_once(text, helper_marker, helper, "insert dynamic pixi builder")
+          text = text.replace("spec.channel_count == 1", "spec.profile.channels == GainMapChannels::Mono")
+          text = sub_once(text, r"    let gain_pixi_index = if spec\.profile\.channels == GainMapChannels::Mono \{.*?\n    \};\n\n    let mut unique_tile_sizes", "    let gain_pixi = make_gain_map_pixi_box(spec.profile)?;\n    let gain_pixi_index = if let Some(existing) = original_non_codec\n        .iter()\n        .find(|property| raw_property(source, property).is_ok_and(|raw| raw == gain_pixi.as_slice()))\n    {\n        *remapped_property_indices\n            .get(&existing.index)\n            .ok_or_else(|| invalid(\"Gain Map pixi property remap is missing\"))?\n    } else {\n        next_property(&mut ipco_payload, &mut next_property_index, &gain_pixi)?\n    };\n\n    let mut unique_tile_sizes", "dynamic gain pixi selection")
+          text = text.replace("            channel_count: 3,", "            profile: GainMapEncodeProfile { channels: GainMapChannels::Rgb, chroma: ChromaSampling::Yuv444, luma_bit_depth: 8, chroma_bit_depth: 8 },")
+          text = text.replace("            channel_count: 1,", "            profile: GainMapEncodeProfile { channels: GainMapChannels::Mono, chroma: ChromaSampling::Mono400, luma_bit_depth: 8, chroma_bit_depth: 8 },")
+          extra_test = "\n    #[test]\n    fn accepts_explicit_chroma_and_bit_depth_profiles() {\n        for (channels, chroma, depth) in [\n            (GainMapChannels::Mono, ChromaSampling::Mono400, 10),\n            (GainMapChannels::Rgb, ChromaSampling::Yuv420, 8),\n            (GainMapChannels::Rgb, ChromaSampling::Yuv422, 10),\n            (GainMapChannels::Rgb, ChromaSampling::Yuv444, 10),\n        ] {\n            let tile = GainMapTile { payload: &[1], width: 4, height: 4 };\n            let mut hvcc = valid_hvcc(channels.semantic_channel_count());\n            hvcc[16] = chroma.hevc_chroma_format_idc();\n            hvcc[17] = depth - 8;\n            hvcc[18] = depth - 8;\n            let spec = DirectHevcGainMap {\n                gain_map_width: 4,\n                gain_map_height: 4,\n                tile_width: 4,\n                tile_height: 4,\n                tiles: std::slice::from_ref(&tile),\n                hvcc: &hvcc,\n                profile: GainMapEncodeProfile { channels, chroma, luma_bit_depth: depth, chroma_bit_depth: depth },\n            };\n            validate_spec(&spec).unwrap();\n        }\n    }\n"
+          head, tail = text.rsplit("\n}", 1)
+          path.write_text(head + extra_test + "\n}" + tail)
+
+          path = Path("crates/xdremux-heif/src/validation.rs")
+          text = path.read_text()
+          text = replace_once(text, "use xdremux_format::FourCC;", "use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC, HevcDecoderConfigurationProfile};", "validator format imports")
+          text = replace_once(text, "    pub channel_count: u8,\n    pub chroma_format_idc: u8,\n    pub bit_depth: u8,\n", "    pub channel_count: u8,\n    pub chroma_format_idc: u8,\n    pub bit_depth: u8,\n    pub chroma_sampling: ChromaSampling,\n    pub luma_bit_depth: u8,\n    pub chroma_bit_depth: u8,\n    pub general_profile_idc: u8,\n", "extend structure profile")
+          text = sub_once(text, r"\n#\[derive\(Debug, Clone, Copy, PartialEq, Eq\)\]\nstruct CodecLayout \{.*?\n\}\n", "", "remove validator codec duplicate")
+          text = sub_once(text, r"fn parse_hvcc\(source: &\[u8\], property: &PropertyInfo\) -> Result<CodecLayout> \{.*?\n\}\n\nfn item_extent_range", "fn parse_hvcc(source: &[u8], property: &PropertyInfo) -> Result<HevcDecoderConfigurationProfile> {\n    let (raw, header) = property_box(source, property)?;\n    if header.kind != HVCC {\n        return Err(invalid(format!(\"property {} is {}, expected hvcC\", property.index, header.kind)));\n    }\n    let payload = raw\n        .get(header.payload_range())\n        .ok_or_else(|| invalid(\"hvcC payload is outside its property box\"))?;\n    parse_hvcc_profile(payload).map_err(|error| invalid(format!(\"invalid Gain Map hvcC: {error}\")))\n}\n\nfn item_extent_range", "share hvcc parser")
+          text = sub_once(text, r"    if !matches!\(channel_count, 1 \| 3\) \|\| channel_bits\.iter\(\)\.any\(\|bits\| \*bits != 8\) \{.*?\n    \}\n", "    if !matches!(channel_count, 1 | 3) {\n        return Err(invalid(format!(\"gain-map pixi must declare one or three channels, got {channel_count}\")));\n    }\n", "allow profile bit depths")
+          text = replace_once(text, "    let mut expected_codec: Option<CodecLayout> = None;", "    let mut expected_codec: Option<HevcDecoderConfigurationProfile> = None;", "validator codec type")
+          old = "    let codec_channels = if codec.chroma_format_idc == 0 { 1 } else { 3 };\n    if channel_count != codec_channels {\n        return Err(invalid(format!(\n            \"gain-map pixi declares {channel_count} channels but hvcC chroma_format_idc {} implies {codec_channels}\",\n            codec.chroma_format_idc\n        )));\n    }\n"
+          new = "    let codec_channels = codec.chroma_sampling.semantic_channel_count();\n    if channel_count != codec_channels {\n        return Err(invalid(format!(\n            \"gain-map pixi declares {channel_count} channels but hvcC {:?} implies {codec_channels}\",\n            codec.chroma_sampling\n        )));\n    }\n    let expected_channel_bits = match channel_count {\n        1 => vec![codec.luma_bit_depth],\n        3 => vec![codec.luma_bit_depth, codec.chroma_bit_depth, codec.chroma_bit_depth],\n        _ => unreachable!(\"channel count validated above\"),\n    };\n    if channel_bits != expected_channel_bits {\n        return Err(invalid(format!(\n            \"gain-map pixi bit depths {:?} disagree with hvcC {}/{}\",\n            channel_bits, codec.luma_bit_depth, codec.chroma_bit_depth\n        )));\n    }\n"
+          text = replace_once(text, old, new, "validator pixi codec agreement")
+          text = replace_once(text, "        chroma_format_idc: codec.chroma_format_idc,\n        bit_depth: codec.bit_depth_luma,\n", "        chroma_format_idc: codec.chroma_sampling.hevc_chroma_format_idc(),\n        bit_depth: codec.luma_bit_depth,\n        chroma_sampling: codec.chroma_sampling,\n        luma_bit_depth: codec.luma_bit_depth,\n        chroma_bit_depth: codec.chroma_bit_depth,\n        general_profile_idc: codec.general_profile_idc,\n", "validator returned profile")
+          text = replace_once(text, "        hvcc_chroma: u8,\n        tile_extent_length: u64,", "        hvcc_chroma: u8,\n        gain_pixi_bit_depth: u8,\n        hvcc_luma_bit_depth: u8,\n        hvcc_chroma_bit_depth: u8,\n        tile_extent_length: u64,", "fixture depth fields")
+          text = replace_once(text, "                hvcc_chroma: 3,\n                tile_extent_length: 1,", "                hvcc_chroma: 3,\n                gain_pixi_bit_depth: 8,\n                hvcc_luma_bit_depth: 8,\n                hvcc_chroma_bit_depth: 8,\n                tile_extent_length: 1,", "fixture depth defaults")
+          text = replace_once(text, "    fn pixi_box(channels: u8) -> Vec<u8> {\n        let mut payload = vec![channels];\n        payload.extend(std::iter::repeat_n(8, usize::from(channels)));", "    fn pixi_box(channels: u8, bit_depth: u8) -> Vec<u8> {\n        let mut payload = vec![channels];\n        payload.extend(std::iter::repeat_n(bit_depth, usize::from(channels)));", "fixture pixi profile")
+          text = replace_once(text, "    fn hvcc_box(chroma: u8) -> Vec<u8> {\n        let mut payload = vec![0u8; 19];\n        payload[0] = 1;\n        payload[1] = 4;\n        payload[16] = chroma;\n", "    fn hvcc_box(chroma: u8, luma_bit_depth: u8, chroma_bit_depth: u8) -> Vec<u8> {\n        let mut payload = vec![0u8; 19];\n        payload[0] = 1;\n        payload[1] = 4;\n        payload[16] = chroma;\n        payload[17] = luma_bit_depth - 8;\n        payload[18] = chroma_bit_depth - 8;\n", "fixture hvcc profile")
+          text = replace_once(text, "        let gain_pixi = pixi_box(options.gain_pixi_channels);", "        let gain_pixi = pixi_box(options.gain_pixi_channels, options.gain_pixi_bit_depth);", "gain pixi fixture call")
+          text = replace_once(text, "        let tmap_pixi = pixi_box(3);", "        let tmap_pixi = pixi_box(3, 8);", "tmap pixi fixture call")
+          text = replace_once(text, "        let tile_hvcc = hvcc_box(options.hvcc_chroma);", "        let tile_hvcc = hvcc_box(options.hvcc_chroma, options.hvcc_luma_bit_depth, options.hvcc_chroma_bit_depth);", "tile hvcc fixture call")
+          extra_test = "\n    #[test]\n    fn accepts_mono_420_422_444_and_ten_bit_profiles() {\n        for (hvcc_chroma, channels) in [(0, 1), (1, 3), (2, 3), (3, 3)] {\n            let options = FixtureOptions {\n                gain_pixi_channels: channels,\n                hvcc_chroma,\n                gain_pixi_bit_depth: 10,\n                hvcc_luma_bit_depth: 10,\n                hvcc_chroma_bit_depth: 10,\n                ..FixtureOptions::default()\n            };\n            let result = validate_gain_map_structure(&fixture(options)).unwrap();\n            assert_eq!(result.channel_count, channels);\n            assert_eq!(result.chroma_format_idc, hvcc_chroma);\n            assert_eq!(result.luma_bit_depth, 10);\n            assert_eq!(result.chroma_bit_depth, 10);\n        }\n    }\n"
+          head, tail = text.rsplit("\n}", 1)
+          path.write_text(head + extra_test + "\n}" + tail)
+
+          path = Path("crates/xdremux-heif/examples/heif_conformance.rs")
+          text = path.read_text()
+          text = replace_once(text, "    replace_private_jpeg_gain_map_with_hevc_tiles, validate_gain_map_structure, DirectHevcGainMap,\n    GainMapTile,\n};", "    replace_private_jpeg_gain_map_with_hevc_tiles, validate_gain_map_structure, DirectHevcGainMap,\n    GainMapChannels, GainMapEncodeProfile, GainMapTile,\n};\nuse xdremux_format::parse_hvcc_profile;", "conformance imports")
+          text = replace_once(text, "    let hvcc = decode_hex(&args[8]);\n", "    let hvcc = decode_hex(&args[8]);\n    let codec = parse_hvcc_profile(&hvcc).expect(\"parse hvcC profile\");\n    let channels = match channel_count {\n        1 => GainMapChannels::Mono,\n        3 => GainMapChannels::Rgb,\n        _ => panic!(\"unsupported semantic channel count: {channel_count}\"),\n    };\n    assert_eq!(channels.semantic_channel_count(), channel_count);\n", "conformance profile parse")
+          text = replace_once(text, "            hvcc: &hvcc,\n            channel_count,\n", "            hvcc: &hvcc,\n            profile: GainMapEncodeProfile {\n                channels,\n                chroma: codec.chroma_sampling,\n                luma_bit_depth: codec.luma_bit_depth,\n                chroma_bit_depth: codec.chroma_bit_depth,\n            },\n", "conformance explicit profile")
+          path.write_text(text)
+
+          path = Path("crates/xdremux-heif/src/lib.rs")
+          text = path.read_text()
+          text = replace_once(text, "pub use direct::{replace_private_jpeg_gain_map_with_hevc_tiles, DirectHevcGainMap, GainMapTile};", "pub use direct::{\n    replace_private_jpeg_gain_map_with_hevc_tiles, DirectHevcGainMap, GainMapChannels,\n    GainMapEncodeProfile, GainMapTile,\n};", "heif profile exports")
+          path.write_text(text)
+          PY
+      - name: Apply canonical rustfmt
+        run: cargo fmt --all
+      - name: Verify HEIF profile model
+        run: |
+          cargo clippy --locked -p xdremux-heif --all-targets -- -D warnings
+          cargo test --locked -p xdremux-heif
+      - name: Commit verified HEIF profile model
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-heif
+          git commit -m "refactor(rust): model explicit HEIF Gain Map profiles"
+          git push origin HEAD:feat/rust-xdremux-format
