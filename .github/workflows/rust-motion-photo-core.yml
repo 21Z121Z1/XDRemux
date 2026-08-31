@@ -10,6 +10,7 @@ on:
       - "crates/xdremux-motion-photo/**"
       - "Sources/XDRemuxCore/MotionPhoto/**"
       - "Tests/XDRemuxCoreTests/MotionPhotoRustConformanceTests.swift"
+      - "Tests/XDRemuxCoreTests/MotionPhotoAndroidRustConformanceTests.swift"
       - "Tests/test_python_motion_photo.py"
       - "xdremux_py/motion_photo.py"
       - "scripts/check_motion_photo_rust_conformance.sh"
@@ -23,6 +24,7 @@ on:
       - "crates/xdremux-motion-photo/**"
       - "Sources/XDRemuxCore/MotionPhoto/**"
       - "Tests/XDRemuxCoreTests/MotionPhotoRustConformanceTests.swift"
+      - "Tests/XDRemuxCoreTests/MotionPhotoAndroidRustConformanceTests.swift"
       - "Tests/test_python_motion_photo.py"
       - "xdremux_py/motion_photo.py"
       - "scripts/check_motion_photo_rust_conformance.sh"
@@ -76,7 +78,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-motion-photo-conformance-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Port the portable Motion Photo byte-range, LPEX metadata, HEIF mpvd, and proven OPPO dual-stream topology contracts into the isolated Rust core without changing current Swift semantics",
+            "scope": "Port Android and legacy Motion Photo XMP parsing, checked resource ranges, HEIF mpvd extraction, OPPO LPEX metadata, and proven dual-stream topology into the isolated Rust core without changing current Swift semantics",
             "checks": [
               {
                 "name": "rust-motion-photo-regressions",
