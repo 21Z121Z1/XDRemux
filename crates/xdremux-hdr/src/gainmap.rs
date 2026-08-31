@@ -103,14 +103,12 @@ pub fn reconstruct_gain_map(
 
     let lut0 = make_lut(1001, |x| x.powf(0.625));
     let lut1 = make_lut(1001, |x| x.powf(2.2));
-    let lut2 = make_lut(1001, |x| {
-        (x * params.headroom_scale + 1.0).powf(2.2)
-    });
+    let lut2 = make_lut(1001, |x| (x * params.headroom_scale + 1.0).powf(2.2));
     let lut3 = make_lut(8001, |x| {
         if x == 0.0 {
             0.0
         } else {
-            let clamped = x.max(1.0).min(params.max_boost);
+            let clamped = swift_min_max_clamp(x, 1.0, params.max_boost);
             params.log2_scale * clamped.log2()
         }
     });
@@ -167,6 +165,12 @@ pub fn reconstruct_gain_map(
         },
         params,
     ))
+}
+
+// Preserve the current Swift `min(max(value, lower), upper)` operation order.
+#[allow(clippy::manual_clamp)]
+fn swift_min_max_clamp(value: f64, lower: f64, upper: f64) -> f64 {
+    value.max(lower).min(upper)
 }
 
 fn validate_mask(mask: &GainMapRaster) -> Result<()> {
