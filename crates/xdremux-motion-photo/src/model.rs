@@ -150,7 +150,13 @@ mod tests {
             PresentationSource::LegacyMicroVideoXmp.as_str(),
             "legacyMicroVideoXMP"
         );
-        assert_eq!(PresentationSource::OppoCoverFrame.as_str(), "oppoCoverFrame");
-        assert_eq!(PresentationSource::TimelineFallback.as_str(), "timelineFallback");
+        assert_eq!(
+            PresentationSource::OppoCoverFrame.as_str(),
+            "oppoCoverFrame"
+        );
+        assert_eq!(
+            PresentationSource::TimelineFallback.as_str(),
+            "timelineFallback"
+        );
     }
 }
