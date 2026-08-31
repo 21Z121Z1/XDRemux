@@ -195,15 +195,15 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn read_c_string(&mut self) -> Result<&'a [u8]> {
-        let remaining =
-            self.data
-                .get(self.pos..self.end)
-                .ok_or(FormatError::UnexpectedEof {
-                    context: self.context,
-                    offset: self.pos,
-                    needed: 1,
-                    end: self.end,
-                })?;
+        let remaining = self
+            .data
+            .get(self.pos..self.end)
+            .ok_or(FormatError::UnexpectedEof {
+                context: self.context,
+                offset: self.pos,
+                needed: 1,
+                end: self.end,
+            })?;
         let relative_end = remaining
             .iter()
             .position(|byte| *byte == 0)
