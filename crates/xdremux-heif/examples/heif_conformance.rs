@@ -2,20 +2,25 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-use xdremux_heif::{
-    replace_private_jpeg_gain_map_with_hevc_tiles, DirectHevcGainMap, GainMapTile,
-};
+use xdremux_heif::{replace_private_jpeg_gain_map_with_hevc_tiles, DirectHevcGainMap, GainMapTile};
 
 fn parse_u32(value: &str, name: &str) -> u32 {
-    value.parse().unwrap_or_else(|_| panic!("invalid {name}: {value}"))
+    value
+        .parse()
+        .unwrap_or_else(|_| panic!("invalid {name}: {value}"))
 }
 
 fn parse_u8(value: &str, name: &str) -> u8 {
-    value.parse().unwrap_or_else(|_| panic!("invalid {name}: {value}"))
+    value
+        .parse()
+        .unwrap_or_else(|_| panic!("invalid {name}: {value}"))
 }
 
 fn decode_hex(value: &str) -> Vec<u8> {
-    assert!(value.len().is_multiple_of(2), "hex input must have even length");
+    assert!(
+        value.len().is_multiple_of(2),
+        "hex input must have even length"
+    );
     let (pairs, remainder) = value.as_bytes().as_chunks::<2>();
     assert!(remainder.is_empty(), "hex input must have even length");
     pairs
@@ -47,7 +52,10 @@ fn main() {
             let payload = decode_hex(parts.next().expect("tile payload missing"));
             let width = parse_u32(parts.next().expect("tile width missing"), "tile width");
             let height = parse_u32(parts.next().expect("tile height missing"), "tile height");
-            assert!(parts.next().is_none(), "tile spec has too many fields: {arg}");
+            assert!(
+                parts.next().is_none(),
+                "tile spec has too many fields: {arg}"
+            );
             (payload, width, height)
         })
         .collect();
