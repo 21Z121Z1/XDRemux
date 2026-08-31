@@ -52,19 +52,35 @@ pub struct PhotoAssetCategorizationPlan {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PhotoAssetPlanningError {
-    MissingPrimaryImage { asset_id: String },
-    MultiplePrimaryImages { asset_id: String },
+    MissingPrimaryImage {
+        asset_id: String,
+    },
+    MultiplePrimaryImages {
+        asset_id: String,
+    },
     AssetTypeMismatch {
         asset_id: String,
         asset_type: PhotoAssetType,
         classification_asset_type: PhotoAssetType,
     },
-    DuplicateResourcePath { path: PathBuf },
-    MissingFingerprint { path: PathBuf },
-    UnexpectedFingerprint { path: PathBuf },
-    InvalidResourceName { path: PathBuf },
-    DuplicateDestination { path: PathBuf },
-    SequenceOverflow { asset_id: String },
+    DuplicateResourcePath {
+        path: PathBuf,
+    },
+    MissingFingerprint {
+        path: PathBuf,
+    },
+    UnexpectedFingerprint {
+        path: PathBuf,
+    },
+    InvalidResourceName {
+        path: PathBuf,
+    },
+    DuplicateDestination {
+        path: PathBuf,
+    },
+    SequenceOverflow {
+        asset_id: String,
+    },
 }
 
 impl std::fmt::Display for PhotoAssetPlanningError {
@@ -154,11 +170,11 @@ pub fn resolve_photo_asset(
     pair_validator: impl FnOnce(&Path, &Path) -> bool,
 ) -> PhotoAsset {
     let image = primary_image.into();
-    if let Some(video) = companion_video.filter(|video| is_same_stem_sibling(&image, video)) {
-        if pair_validator(&image, &video) {
-            let id = image.to_string_lossy().into_owned();
-            return PhotoAsset::live_photo(image, video, id);
-        }
+    if let Some(video) = companion_video.filter(|video| is_same_stem_sibling(&image, video))
+        && pair_validator(&image, &video)
+    {
+        let id = image.to_string_lossy().into_owned();
+        return PhotoAsset::live_photo(image, video, id);
     }
 
     match inferred_asset_type {
@@ -210,11 +226,12 @@ fn validate_input(input: &PhotoAssetPlanningInput) -> PlanningResult<&Path> {
 }
 
 fn sequenced_file_name(source: &Path, sequence: u32) -> PlanningResult<OsString> {
-    let file_name = source
-        .file_name()
-        .ok_or_else(|| PhotoAssetPlanningError::InvalidResourceName {
-            path: source.to_path_buf(),
-        })?;
+    let file_name =
+        source
+            .file_name()
+            .ok_or_else(|| PhotoAssetPlanningError::InvalidResourceName {
+                path: source.to_path_buf(),
+            })?;
     if sequence == 1 {
         return Ok(file_name.to_os_string());
     }
@@ -242,7 +259,7 @@ fn destination_directory(
         CategorizationDestinationRoot::Explicit(path) => path.clone(),
         CategorizationDestinationRoot::AlongsidePrimary => primary
             .parent()
-            .unwrap_or_else(|| Path::new(""))
+            .unwrap_or(Path::new(""))
             .to_path_buf(),
     };
     for component in classification.relative_directory_components() {
@@ -281,7 +298,9 @@ pub fn plan_photo_assets(
             for resource in &input.asset.resources {
                 let destination = directory.join(sequenced_file_name(&resource.path, sequence)?);
                 if !candidate_destinations.insert(destination.clone()) {
-                    return Err(PhotoAssetPlanningError::DuplicateDestination { path: destination });
+                    return Err(PhotoAssetPlanningError::DuplicateDestination {
+                        path: destination,
+                    });
                 }
                 let fingerprint = input
                     .fingerprints
@@ -354,11 +373,8 @@ mod tests {
         comment: &str,
         fingerprints: &[(&str, &str)],
     ) -> PhotoAssetPlanningInput {
-        let classification = classify_user_comment_with_context(
-            Some(comment),
-            asset.asset_type,
-            BTreeSet::new(),
-        );
+        let classification =
+            classify_user_comment_with_context(Some(comment), asset.asset_type, BTreeSet::new());
         PhotoAssetPlanningInput {
             asset,
             classification,
@@ -379,8 +395,15 @@ mod tests {
         );
         assert_eq!(asset.asset_type, PhotoAssetType::LivePhoto);
         assert_eq!(
-            asset.resources.iter().map(|resource| resource.role).collect::<Vec<_>>(),
-            vec![PhotoResourceRole::PrimaryImage, PhotoResourceRole::PairedVideo]
+            asset
+                .resources
+                .iter()
+                .map(|resource| resource.role)
+                .collect::<Vec<_>>(),
+            vec![
+                PhotoResourceRole::PrimaryImage,
+                PhotoResourceRole::PairedVideo
+            ]
         );
 
         let rejected = resolve_photo_asset(
@@ -431,7 +454,10 @@ mod tests {
                 .iter()
                 .map(|item| item.destination.file_name().unwrap().to_owned())
                 .collect::<BTreeSet<_>>(),
-            BTreeSet::from([OsString::from("pair (2).heic"), OsString::from("pair (2).mov")])
+            BTreeSet::from([
+                OsString::from("pair (2).heic"),
+                OsString::from("pair (2).mov")
+            ])
         );
         assert!(plan
             .items
@@ -466,7 +492,12 @@ mod tests {
         .unwrap();
         assert!(plan.items.iter().all(|item| {
             item.disposition == PhotoAssetCategorizationDisposition::Duplicate
-                && !item.destination.file_name().unwrap().to_string_lossy().contains("(2)")
+                && !item
+                    .destination
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .contains("(2)")
         }));
     }
 
@@ -492,7 +523,10 @@ mod tests {
         assert_eq!(plan.items[0].source, PathBuf::from("/a/same.heic"));
         assert_eq!(plan.items[0].destination.file_name().unwrap(), "same.heic");
         assert_eq!(plan.items[1].source, PathBuf::from("/b/same.heic"));
-        assert_eq!(plan.items[1].destination.file_name().unwrap(), "same (2).heic");
+        assert_eq!(
+            plan.items[1].destination.file_name().unwrap(),
+            "same (2).heic"
+        );
     }
 
     #[test]

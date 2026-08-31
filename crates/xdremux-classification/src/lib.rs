@@ -17,8 +17,9 @@ pub use oppo::{
 };
 pub use planning::{
     plan_photo_assets, resolve_photo_asset, CategorizationDestinationRoot,
-    PhotoAssetCategorizationDisposition, PhotoAssetCategorizationItem, PhotoAssetCategorizationPlan,
-    PhotoAssetPlanningError, PhotoAssetPlanningInput, PlanningResult, ResourceFingerprint,
+    PhotoAssetCategorizationDisposition, PhotoAssetCategorizationItem,
+    PhotoAssetCategorizationPlan, PhotoAssetPlanningError, PhotoAssetPlanningInput, PlanningResult,
+    ResourceFingerprint,
 };
 
 #[cfg(test)]
