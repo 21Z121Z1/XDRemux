@@ -2,9 +2,9 @@ use std::{env, fs, process::ExitCode};
 
 use serde_json::{json, Value};
 use xdremux_motion_photo::{
-    enrich_oppo_video_range, ftyp_box_offsets, parse_android_motion_photo,
-    parse_first_lpex_object, resolve_heif_motion_photo_ranges, resolve_video_stream_layout,
-    ByteRange, MotionPhotoAsset, MotionPhotoItem, VideoStreamRole,
+    enrich_oppo_video_range, ftyp_box_offsets, parse_android_motion_photo, parse_first_lpex_object,
+    resolve_heif_motion_photo_ranges, resolve_video_stream_layout, ByteRange, MotionPhotoAsset,
+    MotionPhotoItem, VideoStreamRole,
 };
 
 fn parse_u64(text: &str) -> Result<u64, String> {
