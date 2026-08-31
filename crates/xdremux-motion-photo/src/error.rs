@@ -54,7 +54,9 @@ impl fmt::Display for MotionPhotoError {
             Self::InvalidVideoPayload => {
                 f.write_str("Motion Photo video payload is not a valid ISO BMFF stream")
             }
-            Self::ArithmeticOverflow => f.write_str("Motion Photo byte-range arithmetic overflowed"),
+            Self::ArithmeticOverflow => {
+                f.write_str("Motion Photo byte-range arithmetic overflowed")
+            }
             Self::MalformedLpex => f.write_str("OPPO LPEX metadata is malformed"),
         }
     }

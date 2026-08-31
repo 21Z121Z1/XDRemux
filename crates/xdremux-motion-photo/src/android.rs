@@ -151,7 +151,8 @@ fn parse_item(
     let mime = bounded_string(attrs.get(&mime_key)).ok_or(MotionPhotoError::InvalidDirectory)?;
     let semantic =
         bounded_string(attrs.get(&semantic_key)).ok_or(MotionPhotoError::InvalidDirectory)?;
-    let length = nonnegative(attrs.get(&length_key), 0).ok_or(MotionPhotoError::InvalidDirectory)?;
+    let length =
+        nonnegative(attrs.get(&length_key), 0).ok_or(MotionPhotoError::InvalidDirectory)?;
     let padding =
         nonnegative(attrs.get(&padding_key), 0).ok_or(MotionPhotoError::InvalidDirectory)?;
     parsed.items.push(MotionPhotoItem {
@@ -196,7 +197,7 @@ fn parse_xmp(xmp: &[u8]) -> Result<ParsedXmp> {
                 }
             }
             Event::End(element) => {
-                let name = element.name().as_ref();
+                let name = element.name().as_ref().to_owned();
                 if name == "Container:Directory" || name == "GContainer:Directory" {
                     directory_prefix = None;
                 }
@@ -323,7 +324,8 @@ pub fn parse_android_motion_photo(data: &[u8]) -> Result<Option<MotionPhotoAsset
         if legacy_offset <= 0 {
             return Err(MotionPhotoError::InvalidItemLength);
         }
-        let length = u64::try_from(legacy_offset).map_err(|_| MotionPhotoError::InvalidItemLength)?;
+        let length =
+            u64::try_from(legacy_offset).map_err(|_| MotionPhotoError::InvalidItemLength)?;
         (
             MotionPhotoSourceKind::LegacyMicroVideoV1b,
             vec![
@@ -409,17 +411,29 @@ mod tests {
         let still_len = data.len() as u64;
         data.extend_from_slice(&video);
         let asset = parse_android_motion_photo(&data).unwrap().unwrap();
-        assert_eq!(asset.source_kind, MotionPhotoSourceKind::AndroidMotionPhotoV1);
+        assert_eq!(
+            asset.source_kind,
+            MotionPhotoSourceKind::AndroidMotionPhotoV1
+        );
         assert_eq!(asset.presentation_timestamp_us, Some(1_417_000));
-        assert_eq!(asset.presentation_source, Some(PresentationSource::AndroidXmp));
-        assert_eq!(asset.still_resource_range, ByteRange::new(0, still_len).unwrap());
+        assert_eq!(
+            asset.presentation_source,
+            Some(PresentationSource::AndroidXmp)
+        );
+        assert_eq!(
+            asset.still_resource_range,
+            ByteRange::new(0, still_len).unwrap()
+        );
     }
 
     #[test]
     fn preserves_positive_length_gain_map_in_static_resource() {
         let video = fake_mp4();
         let gain = vec![0xab; 64];
-        let extra = format!(r#"<rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="image/jpeg" Item:Semantic="GainMap" Item:Length="{}" Item:Padding="0"/></rdf:li>"#, gain.len());
+        let extra = format!(
+            r#"<rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="image/jpeg" Item:Semantic="GainMap" Item:Length="{}" Item:Padding="0"/></rdf:li>"#,
+            gain.len()
+        );
         let xmp = standard_xmp(video.len() as u64, None, &extra);
         let mut data = vec![0xff, 0xd8];
         data.extend_from_slice(xmp.as_bytes());
@@ -435,20 +449,29 @@ mod tests {
     #[test]
     fn parses_legacy_micro_video() {
         let video = fake_mp4();
-        let xmp = format!(r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" GCamera:MicroVideo="1" GCamera:MicroVideoOffset="{}" GCamera:MicroVideoPresentationTimestampUs="900000"/></rdf:RDF></x:xmpmeta>"#, video.len());
+        let xmp = format!(
+            r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" GCamera:MicroVideo="1" GCamera:MicroVideoOffset="{}" GCamera:MicroVideoPresentationTimestampUs="900000"/></rdf:RDF></x:xmpmeta>"#,
+            video.len()
+        );
         let mut data = vec![0xff, 0xd8];
         data.extend_from_slice(xmp.as_bytes());
         data.extend_from_slice(&[0xff, 0xd9]);
         data.extend_from_slice(&video);
         let asset = parse_android_motion_photo(&data).unwrap().unwrap();
-        assert_eq!(asset.source_kind, MotionPhotoSourceKind::LegacyMicroVideoV1b);
+        assert_eq!(
+            asset.source_kind,
+            MotionPhotoSourceKind::LegacyMicroVideoV1b
+        );
         assert_eq!(asset.presentation_timestamp_us, Some(900_000));
     }
 
     #[test]
     fn parses_gcontainer_namespace() {
         let video = fake_mp4();
-        let xmp = format!(r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" xmlns:GContainer="http://ns.google.com/photos/1.0/container/" xmlns:GContainerItem="http://ns.google.com/photos/1.0/container/item/" GCamera:MotionPhoto="1" GCamera:MotionPhotoVersion="1" GCamera:MotionPhotoPresentationTimestampUs="500000"><GContainer:Directory><rdf:Seq><rdf:li rdf:parseType="Resource"><GContainer:Item GContainerItem:Mime="image/jpeg" GContainerItem:Semantic="Primary" GContainerItem:Length="0" GContainerItem:Padding="0"/></rdf:li><rdf:li rdf:parseType="Resource"><GContainer:Item GContainerItem:Mime="video/mp4" GContainerItem:Semantic="MotionPhoto" GContainerItem:Length="{}" GContainerItem:Padding="0"/></rdf:li></rdf:Seq></GContainer:Directory></rdf:Description></rdf:RDF></x:xmpmeta>"#, video.len());
+        let xmp = format!(
+            r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" xmlns:GContainer="http://ns.google.com/photos/1.0/container/" xmlns:GContainerItem="http://ns.google.com/photos/1.0/container/item/" GCamera:MotionPhoto="1" GCamera:MotionPhotoVersion="1" GCamera:MotionPhotoPresentationTimestampUs="500000"><GContainer:Directory><rdf:Seq><rdf:li rdf:parseType="Resource"><GContainer:Item GContainerItem:Mime="image/jpeg" GContainerItem:Semantic="Primary" GContainerItem:Length="0" GContainerItem:Padding="0"/></rdf:li><rdf:li rdf:parseType="Resource"><GContainer:Item GContainerItem:Mime="video/mp4" GContainerItem:Semantic="MotionPhoto" GContainerItem:Length="{}" GContainerItem:Padding="0"/></rdf:li></rdf:Seq></GContainer:Directory></rdf:Description></rdf:RDF></x:xmpmeta>"#,
+            video.len()
+        );
         let mut data = vec![0xff, 0xd8];
         data.extend_from_slice(xmp.as_bytes());
         data.extend_from_slice(&[0xff, 0xd9]);
@@ -460,16 +483,23 @@ mod tests {
     #[test]
     fn rejects_dtd_and_entities_before_xml_parse() {
         let video = fake_mp4();
-        let xmp = format!(r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><!DOCTYPE rdf:RDF [<!ENTITY injected "MotionPhoto">]><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:Camera="http://ns.google.com/photos/1.0/camera/" xmlns:Container="http://ns.google.com/photos/1.0/container/" xmlns:Item="http://ns.google.com/photos/1.0/container/item/" Camera:MotionPhoto="1" Camera:MotionPhotoVersion="1"><Container:Directory><rdf:Seq><Container:Item Item:Mime="image/jpeg" Item:Semantic="Primary" Item:Length="0" Item:Padding="0"/><Container:Item Item:Mime="video/mp4" Item:Semantic="&injected;" Item:Length="{}" Item:Padding="0"/></rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>"#, video.len());
+        let xmp = format!(
+            r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><!DOCTYPE rdf:RDF [<!ENTITY injected "MotionPhoto">]><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:Camera="http://ns.google.com/photos/1.0/camera/" xmlns:Container="http://ns.google.com/photos/1.0/container/" xmlns:Item="http://ns.google.com/photos/1.0/container/item/" Camera:MotionPhoto="1" Camera:MotionPhotoVersion="1"><Container:Directory><rdf:Seq><Container:Item Item:Mime="image/jpeg" Item:Semantic="Primary" Item:Length="0" Item:Padding="0"/><Container:Item Item:Mime="video/mp4" Item:Semantic="&injected;" Item:Length="{}" Item:Padding="0"/></rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>"#,
+            video.len()
+        );
         let mut data = xmp.into_bytes();
         data.extend_from_slice(&video);
-        assert_eq!(parse_android_motion_photo(&data), Err(MotionPhotoError::MalformedXmp));
+        assert_eq!(
+            parse_android_motion_photo(&data),
+            Err(MotionPhotoError::MalformedXmp)
+        );
     }
 
     #[test]
     fn rejects_missing_version() {
         let video = fake_mp4();
-        let xmp = standard_xmp(video.len() as u64, None, "").replace(" Camera:MotionPhotoVersion=\"1\"", "");
+        let xmp = standard_xmp(video.len() as u64, None, "")
+            .replace(" Camera:MotionPhotoVersion=\"1\"", "");
         let mut data = xmp.into_bytes();
         data.extend_from_slice(&video);
         assert_eq!(
@@ -493,7 +523,8 @@ mod tests {
     fn rejects_motion_photo_item_that_is_not_last() {
         let video = fake_mp4();
         let trailing = r#"<rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="application/octet-stream" Item:Semantic="Auxiliary" Item:Length="0" Item:Padding="0"/></rdf:li>"#;
-        let xmp = standard_xmp(video.len() as u64, None, "").replace("</rdf:Seq>", &format!("{trailing}</rdf:Seq>"));
+        let xmp = standard_xmp(video.len() as u64, None, "")
+            .replace("</rdf:Seq>", &format!("{trailing}</rdf:Seq>"));
         let mut data = xmp.into_bytes();
         data.extend_from_slice(&video);
         assert_eq!(
