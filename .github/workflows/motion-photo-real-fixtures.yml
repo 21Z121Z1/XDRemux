@@ -2,18 +2,6 @@ name: Motion Photo Real Fixture Gate
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - "feature/vendor-live-photo-geometry"
-    paths:
-      - "Sources/XDRemuxCore/MotionPhoto/**"
-      - "Sources/XDRemuxAppleFeatures/LivePhoto/**"
-      - "Sources/XDRemuxCLI/Commands/MotionPhoto*.swift"
-      - "Tests/**/*MotionPhoto*.swift"
-      - "Tests/**/*LivePhoto*.swift"
-      - "fixtures/**"
-      - "scripts/build_live_photo_device_validation.sh"
-      - ".github/workflows/motion-photo-real-fixtures.yml"
   pull_request:
     paths:
       - "Sources/XDRemuxCore/MotionPhoto/**"
@@ -25,6 +13,13 @@ on:
       - "scripts/build_live_photo_device_validation.sh"
       - ".github/workflows/motion-photo-real-fixtures.yml"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: motion-photo-real-fixtures-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   real-motion-photo-fixtures:
     runs-on: macos-latest
@@ -33,6 +28,8 @@ jobs:
       FIXTURE_ROOT: ${{ github.workspace }}/fixtures
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Record macOS runner
         shell: bash
@@ -71,7 +68,9 @@ jobs:
                   actual = sha256(path.read_bytes()).hexdigest()
                   if actual != digest:
                       stream.write(f"{name}=SHA256_MISMATCH\n")
-                      raise SystemExit(f"repository fixture SHA-256 mismatch: {name}: {actual}")
+                      raise SystemExit(
+                          f"repository fixture SHA-256 mismatch: {name}: {actual}"
+                      )
                   stream.write(f"{name}=present\n")
           PY
 
