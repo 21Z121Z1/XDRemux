@@ -13,10 +13,12 @@ on:
       - "Tests/XDRemuxCoreTests/MotionPhotoAndroidRustConformanceTests.swift"
       - "Tests/XDRemuxCoreTests/MotionPhotoOppoRustConformanceTests.swift"
       - "Tests/XDRemuxCoreTests/MotionPhotoOppoSentinelRustConformanceTests.swift"
+      - "Tests/XDRemuxCoreTests/MotionPhotoPayloadRustConformanceTests.swift"
       - "Tests/test_python_motion_photo.py"
       - "Tests/test_python_motion_photo_oppo.py"
       - "xdremux_py/motion_photo.py"
       - "scripts/check_motion_photo_oppo_python_rust.py"
+      - "scripts/check_motion_photo_payload_python_rust.py"
       - "scripts/check_motion_photo_rust_conformance.sh"
       - ".github/workflows/rust-motion-photo-core.yml"
   pull_request:
@@ -31,10 +33,12 @@ on:
       - "Tests/XDRemuxCoreTests/MotionPhotoAndroidRustConformanceTests.swift"
       - "Tests/XDRemuxCoreTests/MotionPhotoOppoRustConformanceTests.swift"
       - "Tests/XDRemuxCoreTests/MotionPhotoOppoSentinelRustConformanceTests.swift"
+      - "Tests/XDRemuxCoreTests/MotionPhotoPayloadRustConformanceTests.swift"
       - "Tests/test_python_motion_photo.py"
       - "Tests/test_python_motion_photo_oppo.py"
       - "xdremux_py/motion_photo.py"
       - "scripts/check_motion_photo_oppo_python_rust.py"
+      - "scripts/check_motion_photo_payload_python_rust.py"
       - "scripts/check_motion_photo_rust_conformance.sh"
       - ".github/workflows/rust-motion-photo-core.yml"
 
@@ -86,7 +90,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-motion-photo-conformance-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Port Android and legacy Motion Photo XMP parsing, checked resource ranges, HEIF mpvd extraction, OPPO LPEX metadata, OPPO fallback recovery, presentation sentinel handling, top-level OPPO orchestration, and proven dual-stream topology into the isolated Rust core without changing current Swift or corrected Python semantics",
+            "scope": "Port Android and legacy Motion Photo XMP parsing, checked resource ranges, HEIF mpvd extraction, OPPO LPEX metadata, OPPO fallback recovery, presentation sentinel handling, top-level OPPO orchestration, proven dual-stream topology, and bounded transactional payload extraction into the isolated Rust core without changing current Swift or corrected Python semantics",
             "checks": [
               {
                 "name": "rust-motion-photo-regressions",
