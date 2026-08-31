@@ -4,8 +4,8 @@ use xdremux_format::isobmff::{
     make_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box, make_iref_box,
     make_ispe_box, parse_boxes, parse_iinf, parse_iloc, parse_ipco_properties, parse_ipma,
     parse_iref, parse_pitm, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
-    IpmaAssociation, IpmaEntry, IrefEntry, ItemInfo, PropertyInfo, FTYP, IDAT, IINF, ILOC,
-    IPMA, IPRP, IREF, MDAT, META, PITM,
+    IpmaAssociation, IpmaEntry, IrefEntry, ItemInfo, PropertyInfo, FTYP, IDAT, IINF, ILOC, IPMA,
+    IPRP, IREF, MDAT, META, PITM,
 };
 use xdremux_format::FourCC;
 
@@ -32,19 +32,18 @@ const ALTR: FourCC = FourCC::new(*b"altr");
 // Exact property bytes used by the current Swift writer. Keeping these local to
 // the writer avoids broadening the already-sealed xdremux-format contract.
 const COLR_SRGB_BOX: &[u8] = &[
-    0x00, 0x00, 0x00, 0x13, 0x63, 0x6f, 0x6c, 0x72, 0x6e, 0x63, 0x6c, 0x78, 0x00, 0x02,
-    0x00, 0x02, 0x00, 0x02, 0x80,
+    0x00, 0x00, 0x00, 0x13, 0x63, 0x6f, 0x6c, 0x72, 0x6e, 0x63, 0x6c, 0x78, 0x00, 0x02, 0x00, 0x02,
+    0x00, 0x02, 0x80,
 ];
 const COLR_UNSPECIFIED_BT601_BOX: &[u8] = &[
-    0x00, 0x00, 0x00, 0x13, 0x63, 0x6f, 0x6c, 0x72, 0x6e, 0x63, 0x6c, 0x78, 0x00, 0x02,
-    0x00, 0x02, 0x00, 0x06, 0x80,
+    0x00, 0x00, 0x00, 0x13, 0x63, 0x6f, 0x6c, 0x72, 0x6e, 0x63, 0x6c, 0x78, 0x00, 0x02, 0x00, 0x02,
+    0x00, 0x06, 0x80,
 ];
 const PIXI_MONO8_BOX: &[u8] = &[
     0x00, 0x00, 0x00, 0x0e, 0x70, 0x69, 0x78, 0x69, 0x00, 0x00, 0x00, 0x00, 0x01, 0x08,
 ];
 const PIXI_RGB8_BOX: &[u8] = &[
-    0x00, 0x00, 0x00, 0x10, 0x70, 0x69, 0x78, 0x69, 0x00, 0x00, 0x00, 0x00, 0x03, 0x08,
-    0x08, 0x08,
+    0x00, 0x00, 0x00, 0x10, 0x70, 0x69, 0x78, 0x69, 0x00, 0x00, 0x00, 0x00, 0x03, 0x08, 0x08, 0x08,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +69,12 @@ fn invalid(message: impl Into<String>) -> HeifError {
     HeifError::invalid(message)
 }
 
-fn checked_range(start: usize, length: usize, limit: usize, context: &str) -> Result<std::ops::Range<usize>> {
+fn checked_range(
+    start: usize,
+    length: usize,
+    limit: usize,
+    context: &str,
+) -> Result<std::ops::Range<usize>> {
     let end = start
         .checked_add(length)
         .ok_or_else(|| invalid(format!("{context} range overflows")))?;
@@ -96,7 +100,12 @@ fn child<'a>(children: &'a [BoxHeader], kind: FourCC, context: &str) -> Result<&
     children
         .iter()
         .find(|header| header.kind == kind)
-        .ok_or_else(|| invalid(format!("direct HEVC Gain Map source {context}/{} missing", kind)))
+        .ok_or_else(|| {
+            invalid(format!(
+                "direct HEVC Gain Map source {context}/{} missing",
+                kind
+            ))
+        })
 }
 
 fn item_is(item: &ItemInfo, kind: FourCC) -> bool {
@@ -117,7 +126,9 @@ fn validate_spec(spec: &DirectHevcGainMap<'_>) -> Result<(u32, u32)> {
         || spec.tile_height == 0
         || !matches!(spec.channel_count, 1 | 3)
     {
-        return Err(invalid("direct HEVC Gain Map has unsupported tile geometry"));
+        return Err(invalid(
+            "direct HEVC Gain Map has unsupported tile geometry",
+        ));
     }
     let columns = ceil_div(spec.gain_map_width, spec.tile_width, "gain-map columns")?;
     let rows = ceil_div(spec.gain_map_height, spec.tile_height, "gain-map rows")?;
@@ -197,7 +208,11 @@ fn make_grid_payload(rows: u32, columns: u32, width: u32, height: u32) -> Result
 }
 
 fn make_imageio_tmap_ispe(primary_ispe: &[u8], irot: &[u8]) -> Result<Vec<u8>> {
-    if primary_ispe.len() < 20 || &primary_ispe[4..8] != b"ispe" || irot.len() < 9 || &irot[4..8] != b"irot" {
+    if primary_ispe.len() < 20
+        || &primary_ispe[4..8] != b"ispe"
+        || irot.len() < 9
+        || &irot[4..8] != b"irot"
+    {
         return Err(invalid("cannot derive oriented tmap geometry"));
     }
     let width = u32::from_be_bytes(primary_ispe[12..16].try_into().expect("checked length"));
@@ -244,11 +259,14 @@ fn source_brand_order(source: &[u8], ftyp: &BoxHeader) -> Result<Vec<[u8; 4]>> {
         .get(ftyp.payload_range())
         .ok_or_else(|| invalid("ftyp payload is outside source"))?;
     if payload.len() < 8 {
-        return Err(invalid("ftyp payload is shorter than major brand/minor version"));
+        return Err(invalid(
+            "ftyp payload is shorter than major brand/minor version",
+        ));
     }
     let mut brands = Vec::new();
-    for chunk in payload[8..].chunks_exact(4) {
-        brands.push(chunk.try_into().expect("chunks_exact(4)"));
+    let (chunks, _) = payload[8..].as_chunks::<4>();
+    for chunk in chunks {
+        brands.push(*chunk);
     }
     Ok(brands)
 }
@@ -258,10 +276,13 @@ fn build_ftyp(source: &[u8], ftyp: &BoxHeader) -> Result<Vec<u8>> {
         .get(ftyp.payload_range())
         .ok_or_else(|| invalid("ftyp payload is outside source"))?;
     if payload.len() < 8 {
-        return Err(invalid("ftyp payload is shorter than major brand/minor version"));
+        return Err(invalid(
+            "ftyp payload is shorter than major brand/minor version",
+        ));
     }
     let mut output_payload = payload[..8].to_vec();
-    let mut ordered: Vec<[u8; 4]> = [*b"mif1", *b"tmap", *b"MiHE", *b"miaf", *b"MiHB", *b"heic"].to_vec();
+    let mut ordered: Vec<[u8; 4]> =
+        [*b"mif1", *b"tmap", *b"MiHE", *b"miaf", *b"MiHB", *b"heic"].to_vec();
     for brand in source_brand_order(source, ftyp)? {
         if !ordered.contains(&brand) {
             ordered.push(brand);
@@ -284,7 +305,11 @@ fn find_associated_property<'a>(
         .find(|entry| entry.item_id == item_id)?
         .associations
         .iter()
-        .filter_map(|association| property_by_index.get(&u32::from(association.property_index)).copied())
+        .filter_map(|association| {
+            property_by_index
+                .get(&u32::from(association.property_index))
+                .copied()
+        })
         .find(|property| property.kind == kind)
 }
 
@@ -297,10 +322,11 @@ fn mapped_associations(
         .iter()
         .map(|association| {
             let old = u32::from(association.property_index);
-            let property_index = remapped
-                .get(&old)
-                .copied()
-                .ok_or_else(|| invalid(format!("direct HEVC Gain Map cannot remap Base property {old}")))?;
+            let property_index = remapped.get(&old).copied().ok_or_else(|| {
+                invalid(format!(
+                    "direct HEVC Gain Map cannot remap Base property {old}"
+                ))
+            })?;
             Ok(IpmaAssociation {
                 property_index,
                 essential: association.essential,
@@ -313,9 +339,7 @@ fn resolved_extents(entry: &IlocEntry) -> Result<Vec<(u64, u64)>> {
     entry
         .extents
         .iter()
-        .map(|extent| {
-            Ok((entry.resolved_extent_offset(extent)?, extent.length))
-        })
+        .map(|extent| Ok((entry.resolved_extent_offset(extent)?, extent.length)))
         .collect()
 }
 
@@ -413,10 +437,10 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     let jpeg_end = jpeg_offset
         .checked_add(jpeg_extent.length)
         .ok_or_else(|| invalid("private JPEG Gain Map extent overflows"))?;
-    let mdat_start = u64::try_from(mdat.data_start)
-        .map_err(|_| invalid("mdat data offset exceeds u64"))?;
-    let mdat_end = u64::try_from(mdat.data_end)
-        .map_err(|_| invalid("mdat end offset exceeds u64"))?;
+    let mdat_start =
+        u64::try_from(mdat.data_start).map_err(|_| invalid("mdat data offset exceeds u64"))?;
+    let mdat_end =
+        u64::try_from(mdat.data_end).map_err(|_| invalid("mdat end offset exceeds u64"))?;
     if jpeg_offset < mdat_start || jpeg_end != mdat_end {
         return Err(invalid(
             "private JPEG Gain Map is not the final mdat payload",
@@ -528,7 +552,11 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     let mut remapped_property_indices: HashMap<u32, u16> = HashMap::new();
     let mut next_property_index: u16 = 1;
     for property in &original_non_codec {
-        let index = next_property(&mut ipco_payload, &mut next_property_index, raw_property(source, property)?)?;
+        let index = next_property(
+            &mut ipco_payload,
+            &mut next_property_index,
+            raw_property(source, property)?,
+        )?;
         remapped_property_indices.insert(property.index, index);
     }
     let gain_colr_index = next_property(
@@ -541,11 +569,8 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
         },
     )?;
     let gain_grid_ispe = make_ispe_box(spec.gain_map_width, spec.gain_map_height)?;
-    let gain_grid_ispe_index = next_property(
-        &mut ipco_payload,
-        &mut next_property_index,
-        &gain_grid_ispe,
-    )?;
+    let gain_grid_ispe_index =
+        next_property(&mut ipco_payload, &mut next_property_index, &gain_grid_ispe)?;
 
     let tmap_color = find_associated_property(tmap_id, COLR, &ipma.entries, &property_by_index)
         .ok_or_else(|| invalid("direct HEVC Gain Map tmap properties are incomplete"))?;
@@ -606,15 +631,28 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     let primary_ispe = primary_ipma
         .associations
         .iter()
-        .filter_map(|association| property_by_index.get(&u32::from(association.property_index)).copied())
+        .filter_map(|association| {
+            property_by_index
+                .get(&u32::from(association.property_index))
+                .copied()
+        })
         .find(|property| property.kind == ISPE)
         .ok_or_else(|| invalid("direct HEVC Gain Map Base properties lack ispe/irot"))?;
     let irot = primary_ipma
         .associations
         .iter()
-        .filter_map(|association| property_by_index.get(&u32::from(association.property_index)).copied())
+        .filter_map(|association| {
+            property_by_index
+                .get(&u32::from(association.property_index))
+                .copied()
+        })
         .find(|property| property.kind == IROT)
-        .or_else(|| original_non_codec.iter().copied().find(|property| property.kind == IROT))
+        .or_else(|| {
+            original_non_codec
+                .iter()
+                .copied()
+                .find(|property| property.kind == IROT)
+        })
         .ok_or_else(|| invalid("direct HEVC Gain Map Base properties lack ispe/irot"))?;
     let primary_ispe_index = *remapped_property_indices
         .get(&primary_ispe.index)
@@ -622,7 +660,10 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     let irot_index = *remapped_property_indices
         .get(&irot.index)
         .ok_or_else(|| invalid("irot property remap is missing"))?;
-    let tmap_ispe = make_imageio_tmap_ispe(raw_property(source, primary_ispe)?, raw_property(source, irot)?)?;
+    let tmap_ispe = make_imageio_tmap_ispe(
+        raw_property(source, primary_ispe)?,
+        raw_property(source, irot)?,
+    )?;
     let tmap_ispe_index = if raw_property(source, primary_ispe)? == tmap_ispe {
         primary_ispe_index
     } else {
@@ -630,15 +671,15 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     };
 
     for property in &original_codec {
-        let index = next_property(&mut ipco_payload, &mut next_property_index, raw_property(source, property)?)?;
+        let index = next_property(
+            &mut ipco_payload,
+            &mut next_property_index,
+            raw_property(source, property)?,
+        )?;
         remapped_property_indices.insert(property.index, index);
     }
     let hvcc_box = make_box(HVCC, spec.hvcc)?;
-    let tile_hvcc_index = next_property(
-        &mut ipco_payload,
-        &mut next_property_index,
-        &hvcc_box,
-    )?;
+    let tile_hvcc_index = next_property(&mut ipco_payload, &mut next_property_index, &hvcc_box)?;
 
     let mut output_ipma_entries = Vec::new();
     for entry in original_ipma_entries {
@@ -654,28 +695,61 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
         output_ipma_entries.push(IpmaEntry {
             item_id: tile_id,
             associations: vec![
-                IpmaAssociation { property_index: tile_ispe, essential: true },
-                IpmaAssociation { property_index: gain_colr_index, essential: true },
-                IpmaAssociation { property_index: tile_hvcc_index, essential: true },
+                IpmaAssociation {
+                    property_index: tile_ispe,
+                    essential: true,
+                },
+                IpmaAssociation {
+                    property_index: gain_colr_index,
+                    essential: true,
+                },
+                IpmaAssociation {
+                    property_index: tile_hvcc_index,
+                    essential: true,
+                },
             ],
         });
     }
     output_ipma_entries.push(IpmaEntry {
         item_id: output_gain_map_id,
         associations: vec![
-            IpmaAssociation { property_index: gain_colr_index, essential: true },
-            IpmaAssociation { property_index: gain_grid_ispe_index, essential: false },
-            IpmaAssociation { property_index: gain_pixi_index, essential: false },
-            IpmaAssociation { property_index: irot_index, essential: true },
+            IpmaAssociation {
+                property_index: gain_colr_index,
+                essential: true,
+            },
+            IpmaAssociation {
+                property_index: gain_grid_ispe_index,
+                essential: false,
+            },
+            IpmaAssociation {
+                property_index: gain_pixi_index,
+                essential: false,
+            },
+            IpmaAssociation {
+                property_index: irot_index,
+                essential: true,
+            },
         ],
     });
     output_ipma_entries.push(IpmaEntry {
         item_id: output_tmap_id,
         associations: vec![
-            IpmaAssociation { property_index: tmap_color_index, essential: true },
-            IpmaAssociation { property_index: tmap_ispe_index, essential: false },
-            IpmaAssociation { property_index: tmap_pixi_index, essential: false },
-            IpmaAssociation { property_index: irot_index, essential: true },
+            IpmaAssociation {
+                property_index: tmap_color_index,
+                essential: true,
+            },
+            IpmaAssociation {
+                property_index: tmap_ispe_index,
+                essential: false,
+            },
+            IpmaAssociation {
+                property_index: tmap_pixi_index,
+                essential: false,
+            },
+            IpmaAssociation {
+                property_index: irot_index,
+                essential: true,
+            },
         ],
     });
     let ipco_part = make_box(IPCO, &ipco_payload)?;
@@ -741,16 +815,13 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     )?;
     let retained_idat = &source_idat_payload[..old_tmap_range.start];
     let tmap_payload = &source_idat_payload[old_tmap_range.clone()];
-    let grid_payload = make_grid_payload(
-        rows,
-        columns,
-        spec.gain_map_width,
-        spec.gain_map_height,
-    )?;
-    let grid_idat_offset = u64::try_from(retained_idat.len())
-        .map_err(|_| invalid("grid idat offset exceeds u64"))?;
+    let grid_payload = make_grid_payload(rows, columns, spec.gain_map_width, spec.gain_map_height)?;
+    let grid_idat_offset =
+        u64::try_from(retained_idat.len()).map_err(|_| invalid("grid idat offset exceeds u64"))?;
     let tmap_idat_offset = grid_idat_offset
-        .checked_add(u64::try_from(grid_payload.len()).map_err(|_| invalid("grid payload exceeds u64"))?)
+        .checked_add(
+            u64::try_from(grid_payload.len()).map_err(|_| invalid("grid payload exceeds u64"))?,
+        )
         .ok_or_else(|| invalid("tmap idat offset overflows"))?;
     let mut idat_payload = retained_idat.to_vec();
     idat_payload.extend_from_slice(&grid_payload);
@@ -800,7 +871,9 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     });
     let maximum_ref_id = output_refs
         .iter()
-        .flat_map(|reference| std::iter::once(reference.from_item_id).chain(reference.to_item_ids.iter().copied()))
+        .flat_map(|reference| {
+            std::iter::once(reference.from_item_id).chain(reference.to_item_ids.iter().copied())
+        })
         .max()
         .unwrap_or(0);
     let iref_version = if maximum_ref_id > u32::from(u16::MAX) {
@@ -848,7 +921,8 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
         extents: vec![IlocExtent {
             index: None,
             offset: grid_idat_offset,
-            length: u64::try_from(grid_payload.len()).map_err(|_| invalid("grid payload exceeds u64"))?,
+            length: u64::try_from(grid_payload.len())
+                .map_err(|_| invalid("grid payload exceeds u64"))?,
         }],
     });
     for (tile_id, tile) in tile_ids.iter().copied().zip(spec.tiles.iter().copied()) {
@@ -921,7 +995,8 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
         .ok_or_else(|| invalid("output mdat offset overflows"))?;
     let file_delta = i128::try_from(new_mdat_data_start)
         .map_err(|_| invalid("output mdat offset exceeds i128"))?
-        - i128::try_from(mdat.data_start).map_err(|_| invalid("source mdat offset exceeds i128"))?;
+        - i128::try_from(mdat.data_start)
+            .map_err(|_| invalid("source mdat offset exceeds i128"))?;
 
     let jpeg_offset_usize = usize::try_from(jpeg_offset)
         .map_err(|_| invalid("private JPEG Gain Map offset exceeds usize"))?;
@@ -974,7 +1049,8 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
         extents: vec![IlocExtent {
             index: None,
             offset: grid_idat_offset,
-            length: u64::try_from(grid_payload.len()).map_err(|_| invalid("grid payload exceeds u64"))?,
+            length: u64::try_from(grid_payload.len())
+                .map_err(|_| invalid("grid payload exceeds u64"))?,
         }],
     });
 
@@ -991,8 +1067,10 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
             base_offset: 0,
             extents: vec![IlocExtent {
                 index: None,
-                offset: u64::try_from(absolute).map_err(|_| invalid("tile mdat offset exceeds u64"))?,
-                length: u64::try_from(tile.payload.len()).map_err(|_| invalid("tile payload exceeds u64"))?,
+                offset: u64::try_from(absolute)
+                    .map_err(|_| invalid("tile mdat offset exceeds u64"))?,
+                length: u64::try_from(tile.payload.len())
+                    .map_err(|_| invalid("tile payload exceeds u64"))?,
             }],
         });
         appended_tile_bytes = appended_tile_bytes
