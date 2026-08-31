@@ -7,17 +7,15 @@ cd "$ROOT"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-container-conformance.XXXXXX")"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
+# `swift build --target` type-checks an executable target but does not link it
+# in a clean build. `swift run` is intentionally used below so the oracle is
+# linked without adding a developer-only executable to XDRemux's public product
+# surface. The first invocation builds; subsequent fixtures reuse that build.
 swift build --target ContainerConformanceOracle >/dev/null
-SWIFT_BIN_DIR="$(swift build --show-bin-path)"
-SWIFT_ORACLE="$SWIFT_BIN_DIR/ContainerConformanceOracle"
 
 cargo build --locked -q -p xdremux-container --bin xdremux-container-extract
 RUST_ORACLE="$ROOT/target/debug/xdremux-container-extract"
 
-if [[ ! -x "$SWIFT_ORACLE" ]]; then
-  echo "Swift container oracle was not built at $SWIFT_ORACLE" >&2
-  exit 1
-fi
 if [[ ! -x "$RUST_ORACLE" ]]; then
   echo "Rust container oracle was not built at $RUST_ORACLE" >&2
   exit 1
@@ -38,7 +36,7 @@ while IFS= read -r fixture; do
   rust_err="$TMP_ROOT/$key/rust.err"
   mkdir -p "$TMP_ROOT/$key"
 
-  if ! "$SWIFT_ORACLE" "$relative" "$swift_dir" 2>"$swift_err"; then
+  if ! swift run -q ContainerConformanceOracle "$relative" "$swift_dir" 2>"$swift_err"; then
     skipped=$((skipped + 1))
     continue
   fi
