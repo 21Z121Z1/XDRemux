@@ -8,4 +8,5 @@ cargo build --locked -q -p xdremux-motion-photo --example motion_photo_conforman
 swift test --filter MotionPhotoRustConformanceTests/testSwiftAndRustPureMotionPhotoContractsMatch
 swift test --filter MotionPhotoAndroidRustConformanceTests/testSwiftAndRustAndroidParserContractsMatch
 swift test --filter MotionPhotoOppoRustConformanceTests/testSwiftAndRustOppoParserContractsMatch
+python3 scripts/check_motion_photo_oppo_python_rust.py
 python3 -m unittest discover -s Tests -p 'test_python_motion_photo.py' -v
