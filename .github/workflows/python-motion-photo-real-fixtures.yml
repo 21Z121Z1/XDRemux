@@ -13,6 +13,9 @@ on:
       - "fixtures/**"
       - ".github/workflows/python-motion-photo-real-fixtures.yml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: python-motion-photo-live-photo-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -23,6 +26,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-python@v7
         with:
@@ -61,6 +66,8 @@ jobs:
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Record runner and configure paths
         shell: bash
