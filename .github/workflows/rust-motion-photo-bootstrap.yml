@@ -23,6 +23,19 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
+      - name: Apply exact compiler fix
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/xdremux-motion-photo/src/android.rs")
+          text = path.read_text()
+          old = '            Event::End(element) => {\n                let name = element.name().as_ref();\n'
+          new = '            Event::End(element) => {\n                let name = element.name().as_ref().to_owned();\n'
+          if text.count(old) != 1:
+              raise SystemExit("expected exactly one Event::End QName borrow")
+          path.write_text(text.replace(old, new))
+          PY
       - name: Normalize and compile
         run: |
           cargo fmt --all
