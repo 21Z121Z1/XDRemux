@@ -47,7 +47,7 @@ class RepositorySettingsPayloadTests(unittest.TestCase):
             },
         )
 
-    def test_baseline_ruleset_does_not_require_codeql_before_first_scan(self) -> None:
+    def test_baseline_ruleset_requires_exact_head_gate_without_codeql(self) -> None:
         payload = repository_settings.ruleset_payload(enforce_codeql=False)
         rule_types = {rule["type"] for rule in payload["rules"]}
         self.assertEqual(payload["enforcement"], "active")
@@ -57,6 +57,7 @@ class RepositorySettingsPayloadTests(unittest.TestCase):
         self.assertIn("deletion", rule_types)
         self.assertIn("non_fast_forward", rule_types)
         self.assertIn("pull_request", rule_types)
+        self.assertIn("required_status_checks", rule_types)
         self.assertNotIn("code_scanning", rule_types)
 
         pull_request_rule = next(
@@ -65,6 +66,18 @@ class RepositorySettingsPayloadTests(unittest.TestCase):
         parameters = pull_request_rule["parameters"]
         self.assertEqual(parameters["required_approving_review_count"], 0)
         self.assertTrue(parameters["required_review_thread_resolution"])
+
+        status_rule = next(
+            rule
+            for rule in payload["rules"]
+            if rule["type"] == "required_status_checks"
+        )
+        status_parameters = status_rule["parameters"]
+        self.assertEqual(
+            status_parameters["required_status_checks"],
+            [{"context": "exact-head"}],
+        )
+        self.assertTrue(status_parameters["strict_required_status_checks_policy"])
 
     def test_codeql_merge_protection_is_opt_in_after_initial_scan(self) -> None:
         payload = repository_settings.ruleset_payload(enforce_codeql=True)
