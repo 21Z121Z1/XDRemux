@@ -16,9 +16,10 @@ fn parse_u8(value: &str, name: &str) -> u8 {
 
 fn decode_hex(value: &str) -> Vec<u8> {
     assert!(value.len().is_multiple_of(2), "hex input must have even length");
-    value
-        .as_bytes()
-        .chunks_exact(2)
+    let (pairs, remainder) = value.as_bytes().as_chunks::<2>();
+    assert!(remainder.is_empty(), "hex input must have even length");
+    pairs
+        .iter()
         .map(|pair| {
             let text = std::str::from_utf8(pair).expect("hex must be ASCII");
             u8::from_str_radix(text, 16).unwrap_or_else(|_| panic!("invalid hex byte: {text}"))
