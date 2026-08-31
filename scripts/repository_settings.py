@@ -20,6 +20,7 @@ from typing import Any
 API_ROOT = "https://api.github.com"
 API_VERSION = "2026-03-10"
 RULESET_NAME = "XDRemux default branch protection"
+REQUIRED_STATUS_CHECK = "exact-head"
 TOPICS = [
     "gain-map",
     "hdr",
@@ -75,6 +76,16 @@ def ruleset_payload(enforce_codeql: bool) -> dict[str, Any]:
                 "require_last_push_approval": False,
                 "required_approving_review_count": 0,
                 "required_review_thread_resolution": True,
+            },
+        },
+        {
+            "type": "required_status_checks",
+            "parameters": {
+                "do_not_enforce_on_create": False,
+                "required_status_checks": [
+                    {"context": REQUIRED_STATUS_CHECK},
+                ],
+                "strict_required_status_checks_policy": True,
             },
         },
     ]
@@ -293,15 +304,39 @@ def audit_settings(api: GitHubAPI, enforce_codeql: bool) -> dict[str, Any]:
 
     _, rulesets = api.request("GET", api.repo_path("/rulesets"), expected=(200,))
     matches = [item for item in rulesets if item.get("name") == RULESET_NAME]
-    observed["ruleset"] = matches
+    observed["ruleset_summary"] = matches
     checks["ruleset"] = len(matches) == 1 and matches[0].get("enforcement") == "active"
-    if checks["ruleset"] and enforce_codeql:
+    if checks["ruleset"]:
         _, full_ruleset = api.request(
             "GET", api.repo_path(f"/rulesets/{matches[0]['id']}"), expected=(200,)
         )
-        checks["ruleset_codeql"] = any(
-            rule.get("type") == "code_scanning" for rule in full_ruleset.get("rules", [])
+        observed["ruleset"] = full_ruleset
+        rule_types = {rule.get("type") for rule in full_ruleset.get("rules", [])}
+        checks["ruleset_baseline"] = {
+            "deletion",
+            "non_fast_forward",
+            "pull_request",
+            "required_status_checks",
+        }.issubset(rule_types)
+        status_rule = next(
+            (
+                rule
+                for rule in full_ruleset.get("rules", [])
+                if rule.get("type") == "required_status_checks"
+            ),
+            None,
         )
+        status_parameters = (status_rule or {}).get("parameters") or {}
+        contexts = {
+            item.get("context")
+            for item in status_parameters.get("required_status_checks", [])
+        }
+        checks["ruleset_required_gate"] = (
+            REQUIRED_STATUS_CHECK in contexts
+            and status_parameters.get("strict_required_status_checks_policy") is True
+        )
+        if enforce_codeql:
+            checks["ruleset_codeql"] = "code_scanning" in rule_types
 
     return {
         "compliant": all(checks.values()),
