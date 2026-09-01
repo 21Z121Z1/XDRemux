@@ -64,3 +64,45 @@ replace_once(
 """,
     "runtime JPEG primary encode",
 )
+
+primary = Path("crates/xdremux-codec/src/portable/primary_heif.rs")
+replace_once(
+    primary,
+    """        if let Some(exif) = request.exif_tiff.as_ref()
+            && !(exif.starts_with(b"II") || exif.starts_with(b"MM"))
+        {
+            return Err(CodecError::invalid(
+                "primary HEIF EXIF must begin at a TIFF II/MM header",
+            ));
+        }
+""",
+    """        if let Some(exif) = request.exif_tiff.as_ref() {
+            if !(exif.starts_with(b"II") || exif.starts_with(b"MM")) {
+                return Err(CodecError::invalid(
+                    "primary HEIF EXIF must begin at a TIFF II/MM header",
+                ));
+            }
+        }
+""",
+    "primary HEIF Rust-2021 EXIF guard",
+)
+
+raw_exif = Path("crates/xdremux-format/src/exif_raw.rs")
+replace_once(
+    raw_exif,
+    """        if let Some(tiff) = payload.get(start..)
+            && (tiff.starts_with(b"II") || tiff.starts_with(b"MM"))
+        {
+            tiff_header(tiff)?;
+            return Ok(tiff.to_vec());
+        }
+""",
+    """        if let Some(tiff) = payload.get(start..) {
+            if tiff.starts_with(b"II") || tiff.starts_with(b"MM") {
+                tiff_header(tiff)?;
+                return Ok(tiff.to_vec());
+            }
+        }
+""",
+    "raw HEIF EXIF Rust-2021 guard",
+)
