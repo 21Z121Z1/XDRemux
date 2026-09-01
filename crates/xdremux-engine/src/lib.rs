@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod capabilities;
+mod execution;
 mod source_profile;
 
 use std::collections::BTreeSet;
@@ -11,6 +12,10 @@ pub use capabilities::{
     CapabilityInventory, ConsumerValidator, GainMapTileEncoder, OperationCapability,
     PhotographicStylesAdapter, PlatformCapability, PortraitAdapter, RasterDecoder,
     RasterDecoderCapabilities, RawProcessor,
+};
+pub use execution::{
+    execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
+    ExecutionReceipt, ExecutionResult, ExecutionStage,
 };
 pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,

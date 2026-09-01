@@ -93,6 +93,12 @@ where
 {
 }
 
+pub type ExecutionResult<Published, BuildError, ValidationError, PublicationError> =
+    std::result::Result<
+        ExecutionReceipt<Published>,
+        ExecutionError<BuildError, ValidationError, PublicationError>,
+    >;
+
 /// Execute one conversion through the engine-owned lifecycle.
 ///
 /// The artifact is never passed to the publisher until validation succeeds.
@@ -106,7 +112,7 @@ pub fn execute_conversion<Builder, Validator, Publisher, Observe>(
     validator: &mut Validator,
     publisher: &mut Publisher,
     mut observe: Observe,
-) -> std::result::Result<ExecutionReceipt<Publisher::Output>, ExecutionError<Builder::Error, Validator::Error, Publisher::Error>>
+) -> ExecutionResult<Publisher::Output, Builder::Error, Validator::Error, Publisher::Error>
 where
     Builder: ArtifactBuilder,
     Validator: ArtifactValidator<Builder::Artifact>,
