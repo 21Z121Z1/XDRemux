@@ -1,3 +1,4 @@
+# This workflow is also the explicit bootstrap path for materializing Cargo.lock while the Rust product stack is under active unification.
 name: Verify Rust JPEG Live Photo slice
 
 on:
