@@ -87,26 +87,21 @@ jobs:
 
           vectors = Path("crates/xdremux-engine/src/bin/xdremux-engine-vectors.rs")
           text = vectors.read_text()
-          old = '''    let encoder_only = CapabilityInventory::new([OperationCapability::GainMapTileEncoder(layout(
-              ChromaSampling::Yuv420,
-              8,
-          ))]);'''
-          new = '''    let encoder_only = CapabilityInventory::new([OperationCapability::GainMapTileEncoder(layout(
-              ChromaSampling::Yuv444,
-              8,
-          ))]);'''
-          if old not in text:
-              raise SystemExit("missing-decoder vector encoder anchor not found")
-          text = text.replace(old, new, 1)
-          old = '''        &only_420,
-          )
-          .expect_err("Photographic Styles request must require its operation adapter");'''
-          new = '''        &only_444,
-          )
-          .expect_err("Photographic Styles request must require its operation adapter");'''
-          if old not in text:
-              raise SystemExit("missing-styles vector capability anchor not found")
-          vectors.write_text(text.replace(old, new, 1))
+          start = text.index("    let encoder_only = CapabilityInventory::new(")
+          end = text.index("\n    let error = plan_conversion(", start)
+          block = text[start:end]
+          if "ChromaSampling::Yuv420" not in block:
+              raise SystemExit("missing-decoder vector has no Yuv420 encoder fixture")
+          block = block.replace("ChromaSampling::Yuv420", "ChromaSampling::Yuv444", 1)
+          text = text[:start] + block + text[end:]
+
+          start = text.index("    let styles_request = ConversionRequest")
+          end = text.index("\n    println!(\"missing-styles|{error}\");", start)
+          block = text[start:end]
+          if "&only_420" not in block:
+              raise SystemExit("missing-styles vector has no only_420 capability fixture")
+          block = block.replace("&only_420", "&only_444", 1)
+          vectors.write_text(text[:start] + block + text[end:])
 
           check = Path("scripts/check_engine_plan_vectors.sh")
           text = check.read_text()
