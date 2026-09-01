@@ -1,0 +1,62 @@
+name: Verify Rust categorize product slice
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/rust-cli-unification]
+    paths:
+      - .github/workflows/implement-rust-categorize.yml
+      - scripts/materialize_rust_categorize.py
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - name: Install portable HEVC provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Materialize categorize product wiring
+        run: |
+          python3 scripts/materialize_rust_categorize.py
+          python3 scripts/materialize_rust_categorize.py
+          cargo generate-lockfile
+          cargo fmt -p xdremux-classification -p xdremux-runtime -p xdremux-cli
+          git diff --check
+      - name: Lint categorize stack
+        run: |
+          cargo clippy --locked \
+            -p xdremux-classification -p xdremux-runtime -p xdremux-cli \
+            --all-targets -- -D warnings
+      - name: Test categorize stack
+        run: |
+          cargo test --locked -p xdremux-classification
+          cargo test --locked -p xdremux-runtime categorize -- --nocapture
+          cargo test --locked -p xdremux-cli --test categorize -- --nocapture
+          cargo test --locked -p xdremux-cli --lib -- --nocapture
+      - name: Commit verified materialized state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock crates/xdremux-runtime crates/xdremux-cli
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No generated or formatting changes to commit.'
+          else
+            git commit -m 'feat(rust): wire canonical categorize product slice'
+            git push origin HEAD:feat/rust-cli-unification
+          fi
