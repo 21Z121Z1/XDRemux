@@ -111,8 +111,7 @@ def emit_status(args: argparse.Namespace) -> None:
     print(f"freshness: {status['freshness']}")
 
 
-def capability_by_id(identifier: str) -> dict[str, Any]:
-    data = load_map()
+def capability_by_id(identifier: str, data: dict[str, Any]) -> dict[str, Any]:
     for capability in data["capabilities"]:
         if capability["id"] == identifier:
             return capability
@@ -122,11 +121,13 @@ def capability_by_id(identifier: str) -> dict[str, Any]:
 
 def routed_capability(identifier: str) -> dict[str, Any]:
     data = load_map()
-    capability = capability_by_id(identifier).copy()
+    capability = capability_by_id(identifier, data).copy()
     context = data["path_context"]
     capability["rust_owner_branch"] = context["rust_owner_branch"]
-    capability["reference_owner_branch"] = capability.get(
-        "reference_owner_branch", context["released_reference_branch"]
+    capability["reference_owner_branch"] = (
+        context["styles_research_branch"]
+        if capability["layer"] == "research"
+        else context["released_reference_branch"]
     )
     return capability
 
