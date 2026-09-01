@@ -110,8 +110,7 @@ impl PortableRuntime {
                 })
             }
             SourceAsset::ProXdr { .. } => {
-                let receipt =
-                    self.convert_proxdr_file(&source, &item.output, request, |_| {})?;
+                let receipt = self.convert_proxdr_file(&source, &item.output, request, |_| {})?;
                 Ok(BatchSuccess {
                     input: item.input.clone(),
                     outputs: vec![receipt.output],
