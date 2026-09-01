@@ -45,6 +45,8 @@ jobs:
               "let name = local_name(element.name().as_ref()).to_owned();",
               "if active_field.as_deref() == Some(name) {":
               "if active_field.as_deref() == Some(name.as_str()) {",
+              "1000_i32 + channel as i32 * 100":
+              "1000_i32 + channel * 100",
           }
           for old, new in replacements.items():
               if old not in text:
