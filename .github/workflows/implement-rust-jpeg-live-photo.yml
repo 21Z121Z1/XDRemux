@@ -1,6 +1,7 @@
 name: Verify Rust JPEG Live Photo slice
 
 on:
+  workflow_dispatch:
   push:
     branches: [feat/rust-cli-unification]
     paths:
@@ -27,7 +28,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Materialize JPEG Live Photo compatibility fixes
+      - name: Verify JPEG Live Photo compatibility state
         run: python3 scripts/materialize_jpeg_live_photo.py
       - name: Materialize deterministic Rust workspace state
         run: |
@@ -63,6 +64,6 @@ jobs:
           if git diff --cached --quiet; then
             echo 'No generated or formatting changes to commit.'
           else
-            git commit -m 'fix(rust): complete JPEG Live Photo vertical slice'
+            git commit -m 'chore(rust): materialize deterministic workspace state'
             git push origin HEAD:feat/rust-cli-unification
           fi
