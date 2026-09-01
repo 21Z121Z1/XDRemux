@@ -1,5 +1,9 @@
 #![forbid(unsafe_code)]
 
+mod live_photo;
+
+pub use live_photo::LivePhotoFileReceipt;
+
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
@@ -40,14 +44,14 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    fn new(context: &'static str, detail: impl Into<String>) -> Self {
+    pub(crate) fn new(context: &'static str, detail: impl Into<String>) -> Self {
         Self {
             context,
             detail: detail.into(),
         }
     }
 
-    fn external(context: &'static str, error: impl fmt::Display) -> Self {
+    pub(crate) fn external(context: &'static str, error: impl fmt::Display) -> Self {
         Self::new(context, error.to_string())
     }
 }
@@ -180,6 +184,15 @@ impl PortableRuntime {
             plan: receipt.plan,
             output: receipt.published,
         })
+    }
+
+    pub fn convert_motion_photo_file(
+        &self,
+        source: &[u8],
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+    ) -> Result<LivePhotoFileReceipt> {
+        live_photo::convert_heif_motion_photo_file(source, input.as_ref(), output.as_ref())
     }
 }
 

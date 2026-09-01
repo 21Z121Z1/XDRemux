@@ -64,7 +64,8 @@ fn pair_matches(image: &Path, video: &Path) -> bool {
     if image_identifier != video_identifier {
         return false;
     }
-    let Ok(Some(still_time)) = xdremux_motion_photo::read_live_photo_still_time(&video_bytes) else {
+    let Ok(Some(still_time)) = xdremux_motion_photo::read_live_photo_still_time(&video_bytes)
+    else {
         return false;
     };
     validate_live_photo_movie(&video_bytes, &video_identifier, still_time).is_ok()
@@ -128,8 +129,16 @@ pub(crate) fn convert_heif_motion_photo_file(
     reconcile_live_photo_pair(output_image, &output_video, pair_matches)
         .map_err(|error| RuntimeError::external("Live Photo pair reconciliation", error))?;
 
-    let static_heif = range_slice(source, asset.still_resource_range, "Motion Photo still range")?;
-    let embedded_video = range_slice(source, asset.video_resource_range, "Motion Photo video range")?;
+    let static_heif = range_slice(
+        source,
+        asset.still_resource_range,
+        "Motion Photo still range",
+    )?;
+    let embedded_video = range_slice(
+        source,
+        asset.video_resource_range,
+        "Motion Photo video range",
+    )?;
     let normalized_video = normalize_embedded_video(embedded_video)
         .map_err(|error| RuntimeError::external("Motion Photo video normalization", error))?;
     let still_time_seconds =

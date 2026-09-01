@@ -3,15 +3,15 @@
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use xdremux_engine::ConversionRequest;
 use xdremux_runtime::PortableRuntime;
 use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
 
-const HELP: &str = "XDRemux Rust CLI\n\nUsage:\n  xdremux <COMMAND>\n\nCommands:\n  inspect <INPUT> [--json]                 Inspect the canonical Rust input route\n  convert --input <INPUT> [--output <OUT>] Convert ProXDR through the unified Rust runtime\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version\n";
+const HELP: &str = "XDRemux Rust CLI\n\nUsage:\n  xdremux <COMMAND>\n\nCommands:\n  inspect <INPUT> [--json]                 Inspect the canonical Rust input route\n  convert --input <INPUT> [--output <OUT>] Convert through the unified Rust runtime\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version\n";
 const INSPECT_HELP: &str = "Inspect one input without converting it.\n\nUsage:\n  xdremux inspect <INPUT> [--json]\n\nOptions:\n      --json  Emit the stable machine-readable inspection schema\n  -h, --help  Print help\n";
-const CONVERT_HELP: &str = "Convert one ProXDR image with the unified Rust engine/runtime.\n\nUsage:\n  xdremux convert --input <INPUT> [--output <OUTPUT>]\n\nOptions:\n      --input <INPUT>    Input ProXDR HEIC\n      --output <OUTPUT>  Output HEIC; defaults to the input path for in-place replacement\n  -h, --help             Print help\n";
+const CONVERT_HELP: &str = "Convert one supported source with the unified Rust engine/runtime.\n\nUsage:\n  xdremux convert --input <INPUT> [--output <OUTPUT>]\n\nOptions:\n      --input <INPUT>    Input ProXDR HEIC or supported Motion Photo\n      --output <OUTPUT>  Output HEIC; ProXDR defaults in-place, Motion Photo chooses a new pair\n  -h, --help             Print help\n";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
@@ -201,6 +201,26 @@ fn run_inspect(input: PathBuf, json: bool, stdout: &mut impl Write, stderr: &mut
     0
 }
 
+fn default_motion_photo_output(input: &Path) -> PathBuf {
+    let base = input.with_extension("heic");
+    let mut sequence = 1_u32;
+    loop {
+        let candidate = if sequence == 1 {
+            base.clone()
+        } else {
+            let stem = base
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("capture");
+            base.with_file_name(format!("{stem} ({sequence}).heic"))
+        };
+        if candidate != input && !candidate.exists() && !candidate.with_extension("mov").exists() {
+            return candidate;
+        }
+        sequence = sequence.saturating_add(1);
+    }
+}
+
 fn run_convert(
     input: PathBuf,
     output: Option<PathBuf>,
@@ -222,32 +242,43 @@ fn run_convert(
             return 1;
         }
     };
-    if matches!(asset, SourceAsset::MotionPhoto { .. }) {
-        let _ = writeln!(
-            stderr,
-            "error: Motion Photo conversion is not wired into the unified Rust runtime yet"
-        );
-        return 1;
-    }
-
-    let output = output.unwrap_or_else(|| input.clone());
     let runtime = PortableRuntime::new();
-    if let Err(error) =
-        runtime.convert_proxdr_file(&source, &output, ConversionRequest::default(), |_| {})
-    {
-        let _ = writeln!(stderr, "error: {error}");
-        return 1;
-    }
-
-    let result = if output == input {
-        writeln!(stdout, "converted: {} (in place)", input.display())
-    } else {
-        writeln!(
-            stdout,
-            "converted: {} -> {}",
-            input.display(),
-            output.display()
-        )
+    let result = match asset {
+        SourceAsset::MotionPhoto { .. } => {
+            let output = output.unwrap_or_else(|| default_motion_photo_output(&input));
+            match runtime.convert_motion_photo_file(&source, &input, &output) {
+                Ok(receipt) => writeln!(
+                    stdout,
+                    "converted: {} -> {} + {}",
+                    input.display(),
+                    receipt.image.display(),
+                    receipt.video.display()
+                ),
+                Err(error) => {
+                    let _ = writeln!(stderr, "error: {error}");
+                    return 1;
+                }
+            }
+        }
+        SourceAsset::ProXdr { .. } => {
+            let output = output.unwrap_or_else(|| input.clone());
+            if let Err(error) =
+                runtime.convert_proxdr_file(&source, &output, ConversionRequest::default(), |_| {})
+            {
+                let _ = writeln!(stderr, "error: {error}");
+                return 1;
+            }
+            if output == input {
+                writeln!(stdout, "converted: {} (in place)", input.display())
+            } else {
+                writeln!(
+                    stdout,
+                    "converted: {} -> {}",
+                    input.display(),
+                    output.display()
+                )
+            }
+        }
     };
     if let Err(error) = result {
         let _ = writeln!(stderr, "error: could not write output: {error}");
