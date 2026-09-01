@@ -33,11 +33,8 @@ pub fn make_private_gain_map_info_floats(scale: &ResolvedScale) -> [f64; 20] {
     let mut output = [0.0_f64; 20];
 
     for (channel, slot) in output[..3].iter_mut().enumerate() {
-        let gain_min = value_or_repeated(
-            &scale.per_channel_gain_map_min,
-            channel,
-            scale.gain_map_min,
-        );
+        let gain_min =
+            value_or_repeated(&scale.per_channel_gain_map_min, channel, scale.gain_map_min);
         *slot = quantize_f32(2.0_f64.powf(gain_min));
     }
     output[3] = quantize_f32(1.0);

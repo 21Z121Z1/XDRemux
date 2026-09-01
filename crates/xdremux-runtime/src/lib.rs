@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 use atomic_write_file::AtomicWriteFile;
 use xdremux_codec::{
-    GainMapTileEncodeRequest, JpegRasterDecodeRequest, LibHeifProvider, Raster8,
-    RasterPixelFormat, ZuneJpegProvider,
+    GainMapTileEncodeRequest, JpegRasterDecodeRequest, LibHeifProvider, Raster8, RasterPixelFormat,
+    ZuneJpegProvider,
 };
 use xdremux_container::{
     extract, is_oppo_private_hdr_tail_entry, pack_filtered_oppo_camera_tail, ExtractedLhdr,
@@ -359,7 +359,11 @@ impl ProXdrArtifactBuilder<'_> {
         Ok(())
     }
 
-    fn normalized_gain_map_raster(&self, decoded: Raster8, plan: &ConversionPlan) -> Result<Raster8> {
+    fn normalized_gain_map_raster(
+        &self,
+        decoded: Raster8,
+        plan: &ConversionPlan,
+    ) -> Result<Raster8> {
         let normalized = match self.prepared.extracted.mode {
             ContainerExtractionMode::Uhdr => decoded,
             ContainerExtractionMode::Lhdr => {
@@ -370,10 +374,12 @@ impl ProXdrArtifactBuilder<'_> {
                     ));
                 }
                 let mask = GainMapRaster {
-                    width: usize::try_from(decoded.width)
-                        .map_err(|_| RuntimeError::new("LHDR reconstruction", "width exceeds usize"))?,
-                    height: usize::try_from(decoded.height)
-                        .map_err(|_| RuntimeError::new("LHDR reconstruction", "height exceeds usize"))?,
+                    width: usize::try_from(decoded.width).map_err(|_| {
+                        RuntimeError::new("LHDR reconstruction", "width exceeds usize")
+                    })?,
+                    height: usize::try_from(decoded.height).map_err(|_| {
+                        RuntimeError::new("LHDR reconstruction", "height exceeds usize")
+                    })?,
                     bytes_per_row: decoded.bytes_per_row,
                     channel_count: 1,
                     data: decoded.data,
@@ -386,10 +392,12 @@ impl ProXdrArtifactBuilder<'_> {
                 )
                 .map_err(|error| RuntimeError::external("LHDR Gain Map reconstruction", error))?;
                 Raster8::new(
-                    u32::try_from(gain_map.width)
-                        .map_err(|_| RuntimeError::new("LHDR reconstruction", "width exceeds u32"))?,
-                    u32::try_from(gain_map.height)
-                        .map_err(|_| RuntimeError::new("LHDR reconstruction", "height exceeds u32"))?,
+                    u32::try_from(gain_map.width).map_err(|_| {
+                        RuntimeError::new("LHDR reconstruction", "width exceeds u32")
+                    })?,
+                    u32::try_from(gain_map.height).map_err(|_| {
+                        RuntimeError::new("LHDR reconstruction", "height exceeds u32")
+                    })?,
                     gain_map.bytes_per_row,
                     RasterPixelFormat::Mono8,
                     gain_map.data,
@@ -427,19 +435,22 @@ fn replicate_mono_to_rgb(raster: Raster8) -> Result<Raster8> {
         .map_err(|_| RuntimeError::new("Gain Map channel conformance", "width exceeds usize"))?;
     let height = usize::try_from(raster.height)
         .map_err(|_| RuntimeError::new("Gain Map channel conformance", "height exceeds usize"))?;
-    let row_bytes = width
-        .checked_mul(3)
-        .ok_or_else(|| RuntimeError::new("Gain Map channel conformance", "RGB row size overflows"))?;
-    let mut data = vec![0_u8; row_bytes.checked_mul(height).ok_or_else(|| {
-        RuntimeError::new("Gain Map channel conformance", "RGB raster size overflows")
-    })?];
+    let row_bytes = width.checked_mul(3).ok_or_else(|| {
+        RuntimeError::new("Gain Map channel conformance", "RGB row size overflows")
+    })?;
+    let mut data = vec![
+        0_u8;
+        row_bytes.checked_mul(height).ok_or_else(|| {
+            RuntimeError::new("Gain Map channel conformance", "RGB raster size overflows")
+        })?
+    ];
     for y in 0..height {
-        let source_row = y
-            .checked_mul(raster.bytes_per_row)
-            .ok_or_else(|| RuntimeError::new("Gain Map channel conformance", "source row overflows"))?;
-        let output_row = y
-            .checked_mul(row_bytes)
-            .ok_or_else(|| RuntimeError::new("Gain Map channel conformance", "output row overflows"))?;
+        let source_row = y.checked_mul(raster.bytes_per_row).ok_or_else(|| {
+            RuntimeError::new("Gain Map channel conformance", "source row overflows")
+        })?;
+        let output_row = y.checked_mul(row_bytes).ok_or_else(|| {
+            RuntimeError::new("Gain Map channel conformance", "output row overflows")
+        })?;
         for x in 0..width {
             let value = raster.data[source_row + x];
             let output = output_row + x * 3;
@@ -617,9 +628,7 @@ mod tests {
             tmap_format: TmapFormat::ImageIo,
             required_capabilities: Vec::new(),
         };
-        publisher
-            .publish_artifact(&plan, b"new".to_vec())
-            .unwrap();
+        publisher.publish_artifact(&plan, b"new".to_vec()).unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"new");
         fs::remove_file(path).unwrap();
     }
