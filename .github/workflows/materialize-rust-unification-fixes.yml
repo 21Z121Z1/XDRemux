@@ -27,28 +27,19 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Materialize native writer and codec fixes
+      - name: Materialize source fixes
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
 
-          native = Path("crates/xdremux-heif/src/native.rs")
-          text = native.read_text()
+          path = Path("crates/xdremux-heif/src/native.rs")
+          text = path.read_text()
 
-          order_guard = '''    if ftyp.box_start != 0
-              || ftyp.data_end > meta_header.box_start
-              || meta_header.data_end > mdat.box_start
-          {
-              return Err(invalid(
-                  "native HEIF augmentation requires ftyp -> meta -> mdat top-level order",
-              ));
-          }
-          '''
-          if order_guard not in text:
-              raise SystemExit("native HEIF top-level order guard not found")
-          text = text.replace(order_guard, "", 1)
+          guard_start = text.index("    if ftyp.box_start != 0")
+          guard_end = text.index("    let meta = parse_meta_box(source, meta_header)?;", guard_start)
+          text = text[:guard_start] + text[guard_end:]
 
           layout_start = text.index("    let ftyp_part = build_ftyp(source, ftyp)?;")
           layout_end = text.index("    let final_locations = build_final_locations(", layout_start)
@@ -57,9 +48,8 @@ jobs:
               .get(mdat.payload_range())
               .ok_or_else(|| invalid("source mdat payload is outside source"))?;
 
-          // Preserve the source top-level box order. The replacement sizes of boxes
-          // before mdat determine the relocated file-backed item offsets, regardless
-          // of whether meta appears before or after mdat.
+          // Preserve source top-level order. Replacement sizes before mdat determine
+          // relocated file-backed offsets whether meta is before or after mdat.
           let new_mdat_box_start = top
               .boxes
               .iter()
@@ -119,41 +109,29 @@ jobs:
           }
           output.extend_from_slice(trailing);'''
           text = text[:output_start] + output + text[output_end:]
-          native.write_text(text)
+          path.write_text(text)
 
-          codec = Path("crates/xdremux-codec/src/portable/libheif.rs")
-          text = codec.read_text()
-          old_y = '''origin_y
-                      .checked_add(y)
-                      .unwrap_or(u32::MAX)'''
-          old_x = '''origin_x
-                          .checked_add(x)
-                          .unwrap_or(u32::MAX)'''
-          y_count = text.count(old_y)
-          x_count = text.count(old_x)
+          path = Path("crates/xdremux-codec/src/portable/libheif.rs")
+          text = path.read_text()
+          text, y_count = re.subn(
+              r'origin_y\s*\.checked_add\(y\)\s*\.unwrap_or\(u32::MAX\)',
+              'origin_y.saturating_add(y)', text
+          )
+          text, x_count = re.subn(
+              r'origin_x\s*\.checked_add\(x\)\s*\.unwrap_or\(u32::MAX\)',
+              'origin_x.saturating_add(x)', text
+          )
           if y_count != 2 or x_count != 2:
               raise SystemExit(f"unexpected edge-padding patterns: y={y_count} x={x_count}")
-          text = text.replace(old_y, "origin_y.saturating_add(y)")
-          text = text.replace(old_x, "origin_x.saturating_add(x)")
-          readback = re.compile(
-              r'        match encoder\.parameter\("chroma"\)\.map_err\(CodecError::libheif\)\? \{\n'
-              r'            Some\(EncoderParameterValue::String\(value\)\) if value == chroma => \{\}\n'
-              r'            other => \{\n'
-              r'                return Err\(CodecError::InconsistentEncoderConfiguration\(format!\(\n'
-              r'                    "requested chroma \{chroma\}, encoder reports \{other:\?\}"\n'
-              r'                \)\)\);\n'
-              r'            \}\n'
-              r'        \}\n'
+          start = text.index('        match encoder.parameter("chroma")')
+          end = text.index("\n    }\n\n    let mut context", start)
+          text = (
+              text[:start]
+              + '        // Parameter readback is not a stable libheif cross-version contract.\n'
+              + '        // The emitted hvcC is parsed and validated after encoding instead.\n'
+              + text[end:]
           )
-          text, count = readback.subn(
-              '        // Parameter readback is not a stable libheif cross-version contract.\n'
-              '        // The emitted hvcC is parsed and validated after encoding instead.\n',
-              text,
-              count=1,
-          )
-          if count != 1:
-              raise SystemExit("libheif chroma readback block not found")
-          codec.write_text(text)
+          path.write_text(text)
           PY
 
           cat > .github/workflows/rust-codec-core.yml <<'YAML'
