@@ -65,7 +65,7 @@ impl Raster8 {
                 usize::try_from(self.height)
                     .map_err(|_| CodecError::invalid("raster height exceeds usize"))?,
             )
-            .ok_or_else(|| CodecError::invalid("raster byte size overflows usize"))?;
+            .ok_or_else(|| CodecError::invalid("raster byte size overflows"))?;
         if self.data.len() < required {
             return Err(CodecError::invalid(format!(
                 "raster data is too short: need at least {required}, got {}",
@@ -139,6 +139,8 @@ pub struct PrimaryHeifEncodeRequest {
     pub raster: Raster8,
     pub quality: u8,
     pub icc_profile: Option<Vec<u8>>,
+    /// Raw EXIF beginning at the TIFF `II`/`MM` header, as required by libheif.
+    pub exif_tiff: Option<Vec<u8>>,
 }
 
 impl PrimaryHeifEncodeRequest {
@@ -149,6 +151,12 @@ impl PrimaryHeifEncodeRequest {
             raster,
             quality: Self::LIVE_PHOTO_QUALITY,
             icc_profile,
+            exif_tiff: None,
         }
+    }
+
+    pub fn with_exif_tiff(mut self, exif_tiff: Vec<u8>) -> Self {
+        self.exif_tiff = Some(exif_tiff);
+        self
     }
 }
