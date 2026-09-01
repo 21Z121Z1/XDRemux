@@ -8,6 +8,11 @@
     "execution_plans": "docs/exec-plans/README.en.md",
     "agent_contract": "AGENTS.md"
   },
+  "path_context": {
+    "released_reference_branch": "main",
+    "rust_owner_branch": "feat/rust-xdremux-format",
+    "styles_research_branch": "codex/reverse-key1-oppo-solver"
+  },
   "branch_roles": {
     "main": {
       "role": "released-reference",
@@ -146,6 +151,7 @@
       "summary": "Photographic Styles learned proposals, provenance, uncertainty, and promotion evidence.",
       "rust_owner": [],
       "reference_owner": ["Models", "scripts"],
+      "reference_owner_branch": "codex/reverse-key1-oppo-solver",
       "evidence": ["data provenance", "held-out and OOD evaluation", "consumer A/B", "bounded fallback"]
     }
   ]
