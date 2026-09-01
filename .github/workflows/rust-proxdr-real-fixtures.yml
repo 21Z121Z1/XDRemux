@@ -1,0 +1,128 @@
+name: Rust ProXDR real fixtures
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-source/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-metadata/**"
+      - "crates/xdremux-format/**"
+      - "crates/xdremux-container/**"
+      - "fixtures/proxdr/**"
+      - ".github/workflows/rust-proxdr-real-fixtures.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-source/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-metadata/**"
+      - "crates/xdremux-format/**"
+      - "crates/xdremux-container/**"
+      - "fixtures/proxdr/**"
+      - ".github/workflows/rust-proxdr-real-fixtures.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  real-proxdr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install portable HEVC provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Verify and fingerprint ProXDR corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=(
+            fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic
+            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-01.heic
+            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-02.heic
+            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-03.heic
+            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-04.heic
+            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic
+            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-xpan-01.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-02.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v1-01.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-02.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic
+          )
+          for path in "${expected[@]}"; do test -f "$path"; done
+          test "$(find fixtures/proxdr -type f -name '*.heic' | wc -l)" -eq 14
+          sha256sum "${expected[@]}" | tee "$RUNNER_TEMP/proxdr-sha256.txt"
+      - name: Build canonical Rust CLI
+        run: cargo build --locked -p xdremux-cli
+      - name: Inspect every ProXDR fixture through Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/inspect"
+          while IFS= read -r path; do
+            name="$(echo "$path" | tr '/.' '__')"
+            target/debug/xdremux inspect "$path" --json > "$RUNNER_TEMP/inspect/$name.json"
+          done < <(find fixtures/proxdr -type f -name '*.heic' | sort)
+          python3 - "$RUNNER_TEMP/inspect" <<'PY'
+          import json
+          import pathlib
+          import sys
+          root = pathlib.Path(sys.argv[1])
+          records = []
+          for path in sorted(root.glob('*.json')):
+              record = json.loads(path.read_text())
+              if record['asset']['kind'] != 'proxdr':
+                  raise SystemExit(f"not routed as ProXDR: {record}")
+              records.append(record)
+          if len(records) != 14:
+              raise SystemExit(f"expected 14 inspections, found {len(records)}")
+          modes = {record['asset']['hdr_mode'] for record in records}
+          if modes != {'lhdr', 'uhdr'}:
+              raise SystemExit(f"expected LHDR and UHDR coverage, got {sorted(modes)}")
+          print(json.dumps(records, indent=2))
+          PY
+      - name: Convert representative real fixtures through Rust CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/converted"
+          cases=(
+            fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic
+            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-01.heic
+            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-xpan-01.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic
+            fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic
+          )
+          for input in "${cases[@]}"; do
+            output="$RUNNER_TEMP/converted/$(basename "$input")"
+            echo "::group::convert $input"
+            target/debug/xdremux convert --input "$input" --output "$output"
+            test -s "$output"
+            echo "output_bytes=$(stat -c %s "$output")"
+            echo "::endgroup::"
+          done
+      - name: Run Rust CLI/runtime regressions
+        run: cargo test --locked -p xdremux-source -p xdremux-runtime -p xdremux-cli
