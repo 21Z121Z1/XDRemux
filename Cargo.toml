@@ -10,6 +10,7 @@ members = [
     "crates/xdremux-source",
     "crates/xdremux-engine",
     "crates/xdremux-codec",
+    "crates/xdremux-runtime",
     "crates/xdremux-cli",
 ]
 resolver = "2"
