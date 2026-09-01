@@ -75,6 +75,9 @@ cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F "Convert o
 cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F "Convert a deterministic batch" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--input-dir <DIR>" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--recursive" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--skip-existing" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--resume" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--checkpoint <FILE>" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F "Classify photo assets" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F -- "--output-dir <DIR>" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F -- "--dry-run" >/dev/null
