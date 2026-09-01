@@ -2,13 +2,13 @@
 
 [English](README.en.md) | 简体中文
 
-本目录用于保存验证依据、验收条件和证据记录。
+本目录用于保存验证依据、验收条件和可复用证据记录。
 
 可执行测试放在 `Tests/` 或 `scripts/`。
 
 ## 证据类别
 
-以下类别保持分离：
+Evidence class 回答：**这个检查真正到达了哪类行为？** 以下类别保持分离：
 
 | 类别 | 示例 | 能证明什么 |
 | --- | --- | --- |
@@ -19,6 +19,22 @@
 | Device | 真实相册、Photos、显示或设备测试 | 对应环境中的真机依赖行为。 |
 
 更高层级证据可以包含低层检查，但不能改变无关检查本身能证明的范围。
+
+## 证据角色
+
+Evidence role 回答：**这个结果可以被怎样使用？** 它与 evidence class 相互独立。
+
+| Role | 用途 | 验收用途 |
+| --- | --- | --- |
+| Required gate | 某个明确 scope 的 merge/release/completion requirement | 必须在准确已提交 `HEAD` 上通过。 |
+| Promotion evidence | 把 capability、model 或 adapter 提升到更强 supported state 所需的证据 | 只对明确引用它的 promotion rule 生效。 |
+| Diagnostic probe | 刻画 dependency、environment、hypothesis 或未知行为 | 本身不能作为 completion 或 promotion。 |
+
+Diagnostic probe 可以为了隔离问题而临时加入 instrumentation、环境特定命令，甚至在 workflow 内对 checkout 做源码 patch。这对发现事实有价值，但它不是稳定 product contract。
+
+一个 diagnostic result 在成为 required 或 promotion evidence 之前，必须把发现固化到真实 implementation、fixture、test 或 supported-environment contract 中，并在没有隐藏 diagnostic mutation 的情况下运行可复现检查。
+
+Workflow 的红绿颜色本身不定义证据语义。绿色 diagnostic workflow 仍只是 diagnostic；红色 diagnostic workflow 也可能只是揭示外部限制，而不能直接证明产品损坏。做产品结论前先判断 role 和真正失败 step。
 
 ## Completion gate
 
@@ -61,13 +77,15 @@ plan 中每个命令使用参数数组。gate 不会添加隐式 shell 解析。
 
 确实需要 shell 组合时，在命令数组中显式调用 shell。
 
+completion-gate plan 只放 required check。探索性 probe 在结果被 promotion 成可复现 acceptance check 之前留在 plan 之外。
+
 ## Receipt 契约
 
 receipt 会绑定：
 
 - 当前 `HEAD`；
 - 选定 base commit；
-- changed-file set；
+- changed path；
 - clean tracked worktree；
 - 每个声明检查的退出状态和有限输出。
 
@@ -87,7 +105,20 @@ Motion Photo 修改应该在公开 fixture gate 能覆盖相关 parser、writer�
 
 涉及 Apple Photos 交互的结论，需要真正到达该行为的原生 framework 或 device evidence。
 
+codec 或 platform-adapter 修改应该区分纯 contract test 与 real-provider probe。当产品结论涉及 runtime capability 时，仅有 library advertised support 不够。
+
 不要为了增加检查数量而运行昂贵且无关的矩阵。
+
+## CI 命名与组合
+
+Rust 产品线成熟时，让 workflow/job 名称或其文档直接表达检查用途：
+
+- required product/merge gate 使用稳定名称；
+- capability promotion check 标明它 promotion 的 capability；
+- diagnostic probe 应明显可识别，而且不能静默变成 required check；
+- release/product gate 应组合 capability evidence，而不是重新复制逻辑。
+
+目标不是机械减少 workflow 数量，而是让 Agent 很容易读懂 evidence graph。
 
 ## 公开和私有媒体
 

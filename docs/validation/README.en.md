@@ -2,13 +2,13 @@
 
 English | [简体中文](README.md)
 
-Use this directory for validation rationale, acceptance criteria, and evidence records.
+Use this directory for validation rationale, acceptance criteria, and reusable evidence records.
 
 Keep executable tests under `Tests/` or `scripts/`.
 
 ## Evidence classes
 
-Keep these classes separate:
+Evidence class answers **what kind of behavior did the check reach?** Keep these classes separate:
 
 | Class | Example | What it can prove |
 | --- | --- | --- |
@@ -19,6 +19,22 @@ Keep these classes separate:
 | Device | real gallery, Photos, display, or device test | Device-dependent behavior in that exact environment. |
 
 A stricter class can include lower-level checks, but it does not change what an unrelated check proves.
+
+## Evidence roles
+
+Evidence role answers **how may this result be used?** This is independent from evidence class.
+
+| Role | Purpose | Acceptance use |
+| --- | --- | --- |
+| Required gate | Merge/release/completion requirement for a defined scope | Must pass on the exact committed `HEAD`. |
+| Promotion evidence | Evidence required to move a capability, model, or adapter to a stronger supported state | Counts only for the promotion rule that names it. |
+| Diagnostic probe | Characterization of a dependency, environment, hypothesis, or unknown behavior | Does not count as completion or promotion by itself. |
+
+A diagnostic probe may deliberately use temporary instrumentation, environment-specific commands, or an in-workflow source patch to isolate a problem. That is useful for discovery, but it is not a stable product contract.
+
+Before a diagnostic result becomes required or promotion evidence, encode the finding in the actual implementation, fixture, test, or supported-environment contract and run that reproducible check without hidden diagnostic mutations.
+
+Workflow color alone is not evidence semantics. A green diagnostic workflow is still diagnostic. A red diagnostic workflow can reveal an external limitation without proving the product is broken. Read the role and failing step before drawing a product conclusion.
 
 ## Completion gate
 
@@ -61,13 +77,15 @@ Example plan:
 
 If shell composition is necessary, make the shell explicit in the command array.
 
+Only required checks belong in a completion-gate plan. Keep exploratory probes outside the plan until their result has been promoted to a reproducible acceptance check.
+
 ## Receipt contract
 
 A receipt is bound to:
 
 - the current `HEAD`;
 - the selected base commit;
-- the changed-file set;
+- changed paths;
 - a clean tracked worktree;
 - the exit status and bounded output of each declared check.
 
@@ -87,7 +105,20 @@ A Motion Photo change should use the public fixture gates when they cover the af
 
 An Apple Photos interaction claim needs native-framework or device evidence that reaches that behavior.
 
+A codec or platform-adapter change should distinguish pure contract tests from real-provider probes. Advertised library support is not enough when runtime capability is the product claim.
+
 Do not run an expensive unrelated matrix only to increase the number of checks.
+
+## CI naming and composition
+
+As the Rust product line matures, make check purpose visible from the workflow/job or its documentation:
+
+- required product/merge gates should have stable names;
+- capability promotion checks should identify the capability they promote;
+- diagnostic probes should be recognizable as diagnostic and should not silently become required checks;
+- the release/product gate should compose capability evidence instead of re-implementing it.
+
+The objective is not to minimize workflow count. It is to make the evidence graph easy for an agent to interpret.
 
 ## Public and private media
 
