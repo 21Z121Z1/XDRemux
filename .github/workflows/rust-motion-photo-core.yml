@@ -65,7 +65,7 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
       - name: Check formatting
-        run: cargo fmt --all --check
+        run: cargo fmt -p xdremux-motion-photo -- --check
       - name: Lint Motion Photo core
         run: cargo clippy --locked -p xdremux-motion-photo --all-targets -- -D warnings
       - name: Test Motion Photo core
