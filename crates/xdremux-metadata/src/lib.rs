@@ -3,6 +3,7 @@
 mod error;
 pub mod iso21496;
 pub mod oppo;
+pub mod ultrahdr_jpeg;
 
 pub use error::{MetadataError, Result};
 pub use iso21496::{
@@ -15,3 +16,4 @@ pub use oppo::{
     target_oppo_tag_flags, OppoCompatibility, OppoTagFlag, OppoUserCommentPatch,
     ISO_ULTRA_HDR_FLAG, LOCAL_HDR_FLAG, OPPO_ULTRA_HDR_FLAG,
 };
+pub use ultrahdr_jpeg::{parse_ultrahdr_gain_map_metadata, UltraHdrGainMapMetadata};
