@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use xdremux_format::isobmff::{
     make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,
-    make_iref_box, make_irot_box, make_ispe_box, parse_boxes, parse_meta_box,
-    scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent, IpmaAssociation, IpmaEntry, IrefEntry,
-    ParsedMeta, PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE, IPCO, IPMA, IPRP, IREF, MDAT, META,
+    make_iref_box, make_irot_box, make_ispe_box, parse_boxes, parse_meta_box, scan_top_level_boxes,
+    BoxHeader, IlocEntry, IlocExtent, IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta,
+    PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE, IPCO, IPMA, IPRP, IREF, MDAT, META,
 };
 use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};
 
@@ -81,10 +81,14 @@ fn ceil_div(value: u32, divisor: u32, context: &str) -> Result<u32> {
 
 fn validate_assembly(spec: &IsoGainMapAssembly<'_>) -> Result<(u32, u32)> {
     if spec.tmap_payload.is_empty() {
-        return Err(invalid("native ISO Gain Map assembly requires a tmap payload"));
+        return Err(invalid(
+            "native ISO Gain Map assembly requires a tmap payload",
+        ));
     }
     if spec.xmp_payload.is_empty() {
-        return Err(invalid("native ISO Gain Map assembly requires an hdrgm XMP payload"));
+        return Err(invalid(
+            "native ISO Gain Map assembly requires an hdrgm XMP payload",
+        ));
     }
 
     let gain = &spec.gain_map;
@@ -98,7 +102,9 @@ fn validate_assembly(spec: &IsoGainMapAssembly<'_>) -> Result<(u32, u32)> {
     if !(8..=15).contains(&gain.profile.luma_bit_depth)
         || !(8..=15).contains(&gain.profile.chroma_bit_depth)
     {
-        return Err(invalid("native ISO Gain Map bit depth must fit the hvcC 8..15 range"));
+        return Err(invalid(
+            "native ISO Gain Map bit depth must fit the hvcC 8..15 range",
+        ));
     }
     match (gain.profile.channels, gain.profile.chroma) {
         (GainMapChannels::Mono, ChromaSampling::Mono400) => {}
@@ -107,7 +113,9 @@ fn validate_assembly(spec: &IsoGainMapAssembly<'_>) -> Result<(u32, u32)> {
             ChromaSampling::Yuv420 | ChromaSampling::Yuv422 | ChromaSampling::Yuv444,
         ) => {}
         (GainMapChannels::Mono, _) => {
-            return Err(invalid("monochrome Gain Map semantics require 4:0:0 storage"));
+            return Err(invalid(
+                "monochrome Gain Map semantics require 4:0:0 storage",
+            ));
         }
         (GainMapChannels::Rgb, ChromaSampling::Mono400) => {
             return Err(invalid("RGB Gain Map semantics require color HEVC storage"));
@@ -122,7 +130,9 @@ fn validate_assembly(spec: &IsoGainMapAssembly<'_>) -> Result<(u32, u32)> {
     )
     .map_err(|_| invalid("native ISO Gain Map tile count exceeds usize"))?;
     if gain.tiles.len() != expected_count || gain.tiles.is_empty() {
-        return Err(invalid("native ISO Gain Map tile count does not match geometry"));
+        return Err(invalid(
+            "native ISO Gain Map tile count does not match geometry",
+        ));
     }
 
     for row in 0..rows {
@@ -153,7 +163,9 @@ fn validate_assembly(spec: &IsoGainMapAssembly<'_>) -> Result<(u32, u32)> {
             let logical_edge = tile.width == expected_width && tile.height == expected_height;
             let padded_full = tile.width == gain.tile_width && tile.height == gain.tile_height;
             if !logical_edge && !padded_full {
-                return Err(invalid("native ISO Gain Map edge tile geometry is inconsistent"));
+                return Err(invalid(
+                    "native ISO Gain Map edge tile geometry is inconsistent",
+                ));
             }
         }
     }
@@ -164,7 +176,9 @@ fn validate_assembly(spec: &IsoGainMapAssembly<'_>) -> Result<(u32, u32)> {
         || codec.luma_bit_depth != gain.profile.luma_bit_depth
         || codec.chroma_bit_depth != gain.profile.chroma_bit_depth
     {
-        return Err(invalid("native Gain Map hvcC does not match its encode profile"));
+        return Err(invalid(
+            "native Gain Map hvcC does not match its encode profile",
+        ));
     }
 
     Ok((rows, columns))
@@ -233,7 +247,11 @@ fn make_mime_infe_box(item_id: u32, flags: u32) -> Result<Vec<u8>> {
 }
 
 fn associated_property_index(meta: &ParsedMeta, item_id: u32, kind: FourCC) -> Option<u16> {
-    let entry = meta.ipma.entries.iter().find(|entry| entry.item_id == item_id)?;
+    let entry = meta
+        .ipma
+        .entries
+        .iter()
+        .find(|entry| entry.item_id == item_id)?;
     entry.associations.iter().find_map(|association| {
         meta.properties
             .iter()
@@ -304,9 +322,17 @@ fn build_iprp(
         .ok_or_else(|| invalid("primary item has no ispe property association"))?;
     let irot = match associated_property_index(meta, meta.primary_item_id, IROT) {
         Some(index) => index,
-        None => append_property(&mut ipco_payload, &mut next_property_index, &make_irot_box(0)?)?,
+        None => append_property(
+            &mut ipco_payload,
+            &mut next_property_index,
+            &make_irot_box(0)?,
+        )?,
     };
-    let auxc = append_property(&mut ipco_payload, &mut next_property_index, &make_auxc_box()?)?;
+    let auxc = append_property(
+        &mut ipco_payload,
+        &mut next_property_index,
+        &make_auxc_box()?,
+    )?;
     let gain_colr = append_property(
         &mut ipco_payload,
         &mut next_property_index,
@@ -423,7 +449,11 @@ fn build_iprp(
         ],
     });
 
-    let maximum_item_id = ipma_entries.iter().map(|entry| entry.item_id).max().unwrap_or(0);
+    let maximum_item_id = ipma_entries
+        .iter()
+        .map(|entry| entry.item_id)
+        .max()
+        .unwrap_or(0);
     let ipma_version = if maximum_item_id > u32::from(u16::MAX) {
         1
     } else {
@@ -595,7 +625,9 @@ fn normalized_existing_location(entry: &IlocEntry, placeholder: bool) -> Result<
 
 fn ensure_u32(value: u64, context: &str) -> Result<()> {
     if value > u64::from(u32::MAX) {
-        return Err(invalid(format!("{context} exceeds the current 32-bit iloc contract")));
+        return Err(invalid(format!(
+            "{context} exceeds the current 32-bit iloc contract"
+        )));
     }
     Ok(())
 }
@@ -674,10 +706,10 @@ fn build_final_locations(
     xmp_length: u64,
     gain: &DirectHevcGainMap<'_>,
 ) -> Result<Vec<IlocEntry>> {
-    let old_mdat_start = u64::try_from(mdat.data_start)
-        .map_err(|_| invalid("source mdat offset exceeds u64"))?;
-    let old_mdat_end = u64::try_from(mdat.data_end)
-        .map_err(|_| invalid("source mdat end exceeds u64"))?;
+    let old_mdat_start =
+        u64::try_from(mdat.data_start).map_err(|_| invalid("source mdat offset exceeds u64"))?;
+    let old_mdat_end =
+        u64::try_from(mdat.data_end).map_err(|_| invalid("source mdat end exceeds u64"))?;
     let idat_len = u64::try_from(existing_idat_payload(source, meta)?.len())
         .map_err(|_| invalid("source idat length exceeds u64"))?;
 
@@ -687,9 +719,9 @@ fn build_final_locations(
         for extent in &mut normalized.extents {
             if normalized.construction_method == 0 {
                 let old_start = extent.offset;
-                let old_end = old_start
-                    .checked_add(extent.length)
-                    .ok_or_else(|| invalid(format!("item {} extent end overflows", entry.item_id)))?;
+                let old_end = old_start.checked_add(extent.length).ok_or_else(|| {
+                    invalid(format!("item {} extent end overflows", entry.item_id))
+                })?;
                 if old_start < old_mdat_start || old_end > old_mdat_end {
                     return Err(invalid(format!(
                         "item {} has file-backed data outside the primary mdat; native augmentation refuses to guess",
@@ -697,14 +729,13 @@ fn build_final_locations(
                     )));
                 }
                 let relative = old_start - old_mdat_start;
-                extent.offset = new_mdat_data_start
-                    .checked_add(relative)
-                    .ok_or_else(|| invalid(format!("item {} relocated offset overflows", entry.item_id)))?;
+                extent.offset = new_mdat_data_start.checked_add(relative).ok_or_else(|| {
+                    invalid(format!("item {} relocated offset overflows", entry.item_id))
+                })?;
             } else {
-                let end = extent
-                    .offset
-                    .checked_add(extent.length)
-                    .ok_or_else(|| invalid(format!("item {} idat extent end overflows", entry.item_id)))?;
+                let end = extent.offset.checked_add(extent.length).ok_or_else(|| {
+                    invalid(format!("item {} idat extent end overflows", entry.item_id))
+                })?;
                 if end > idat_len {
                     return Err(invalid(format!(
                         "item {} has an idat extent outside the preserved source idat",
@@ -836,8 +867,13 @@ pub fn assemble_iso_gain_map_heif(
     let ftyp = one_top_level(&top.boxes, FTYP, "ftyp")?;
     let meta_header = one_top_level(&top.boxes, META, "meta")?;
     let mdat = one_top_level(&top.boxes, MDAT, "mdat")?;
-    if ftyp.box_start != 0 || ftyp.data_end > meta_header.box_start || meta_header.data_end > mdat.box_start {
-        return Err(invalid("native HEIF augmentation requires ftyp -> meta -> mdat top-level order"));
+    if ftyp.box_start != 0
+        || ftyp.data_end > meta_header.box_start
+        || meta_header.data_end > mdat.box_start
+    {
+        return Err(invalid(
+            "native HEIF augmentation requires ftyp -> meta -> mdat top-level order",
+        ));
     }
 
     let meta = parse_meta_box(source, meta_header)?;
@@ -903,20 +939,16 @@ pub fn assemble_iso_gain_map_heif(
     let iref = build_iref(&meta, &tile_ids, gain_id, tmap_id, xmp_id)?;
 
     let mut idat_payload = existing_idat_payload(source, &meta)?.to_vec();
-    let gain_grid_offset = u64::try_from(idat_payload.len())
-        .map_err(|_| invalid("native idat offset exceeds u64"))?;
-    let gain_grid_payload = make_grid_payload(
-        rows,
-        columns,
-        gain.gain_map_width,
-        gain.gain_map_height,
-    )?;
+    let gain_grid_offset =
+        u64::try_from(idat_payload.len()).map_err(|_| invalid("native idat offset exceeds u64"))?;
+    let gain_grid_payload =
+        make_grid_payload(rows, columns, gain.gain_map_width, gain.gain_map_height)?;
     idat_payload.extend_from_slice(&gain_grid_payload);
-    let tmap_offset = u64::try_from(idat_payload.len())
-        .map_err(|_| invalid("native tmap offset exceeds u64"))?;
+    let tmap_offset =
+        u64::try_from(idat_payload.len()).map_err(|_| invalid("native tmap offset exceeds u64"))?;
     idat_payload.extend_from_slice(assembly.tmap_payload);
-    let xmp_offset = u64::try_from(idat_payload.len())
-        .map_err(|_| invalid("native XMP offset exceeds u64"))?;
+    let xmp_offset =
+        u64::try_from(idat_payload.len()).map_err(|_| invalid("native XMP offset exceeds u64"))?;
     idat_payload.extend_from_slice(assembly.xmp_payload);
     let idat = make_box(IDAT, &idat_payload)?;
 
@@ -1012,7 +1044,9 @@ pub fn assemble_iso_gain_map_heif(
         &idat,
     )?;
     if final_meta.len() != preliminary_meta.len() {
-        return Err(invalid("native HEIF iloc rewrite changed meta size unexpectedly"));
+        return Err(invalid(
+            "native HEIF iloc rewrite changed meta size unexpectedly",
+        ));
     }
 
     let appended_tile_bytes = gain.tiles.iter().try_fold(0usize, |total, tile| {
@@ -1036,7 +1070,9 @@ pub fn assemble_iso_gain_map_heif(
     }
     let final_mdat = make_box(MDAT, &final_mdat_payload)?;
     if final_mdat.len() != final_mdat_payload.len() + 8 {
-        return Err(invalid("native HEIF mdat unexpectedly used a large-size header"));
+        return Err(invalid(
+            "native HEIF mdat unexpectedly used a large-size header",
+        ));
     }
 
     let after_mdat = source
@@ -1063,7 +1099,9 @@ pub fn assemble_iso_gain_map_heif(
         || structure.tmap_item_id != tmap_id
         || structure.tile_item_ids != tile_ids
     {
-        return Err(invalid("native HEIF post-write structure does not match the assembly plan"));
+        return Err(invalid(
+            "native HEIF post-write structure does not match the assembly plan",
+        ));
     }
     Ok(output)
 }

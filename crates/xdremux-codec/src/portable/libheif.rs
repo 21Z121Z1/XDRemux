@@ -101,7 +101,8 @@ impl LibHeifProvider {
                 if let Some(expected) = &common_hvcc {
                     if expected != &item.hvcc {
                         return Err(CodecError::InconsistentEncoderConfiguration(
-                            "libheif emitted different hvcC records for fixed-size tiles".to_owned(),
+                            "libheif emitted different hvcC records for fixed-size tiles"
+                                .to_owned(),
                         ));
                     }
                 } else {
@@ -140,10 +141,9 @@ impl LibHeifProvider {
                 let image = lib
                     .decode(&handle, ColorSpace::Monochrome, None)
                     .map_err(CodecError::libheif)?;
-                let plane = image
-                    .planes()
-                    .y
-                    .ok_or_else(|| CodecError::invalid("decoded monochrome image has no Y plane"))?;
+                let plane = image.planes().y.ok_or_else(|| {
+                    CodecError::invalid("decoded monochrome image has no Y plane")
+                })?;
                 copy_plane_to_raster(plane.data, plane.stride, image.width(), image.height(), 1)
                     .and_then(|data| {
                         Raster8::new(
@@ -160,10 +160,9 @@ impl LibHeifProvider {
                 let image = lib
                     .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
                     .map_err(CodecError::libheif)?;
-                let plane = image
-                    .planes()
-                    .interleaved
-                    .ok_or_else(|| CodecError::invalid("decoded RGB image has no interleaved plane"))?;
+                let plane = image.planes().interleaved.ok_or_else(|| {
+                    CodecError::invalid("decoded RGB image has no interleaved plane")
+                })?;
                 let row_bytes = usize::try_from(image.width())
                     .ok()
                     .and_then(|width| width.checked_mul(3))
@@ -280,12 +279,10 @@ fn encode_tile_container(
     origin_y: u32,
 ) -> Result<Vec<u8>> {
     let mut image = match request.raster.format {
-        RasterPixelFormat::Mono8 => Image::new(
-            request.tile_size,
-            request.tile_size,
-            ColorSpace::Monochrome,
-        )
-        .map_err(CodecError::libheif)?,
+        RasterPixelFormat::Mono8 => {
+            Image::new(request.tile_size, request.tile_size, ColorSpace::Monochrome)
+                .map_err(CodecError::libheif)?
+        }
         RasterPixelFormat::Rgb8 => Image::new(
             request.tile_size,
             request.tile_size,
@@ -364,7 +361,11 @@ fn encode_tile_container(
                 ));
             }
         };
-        if !encoder.parameters_names().iter().any(|name| name == "chroma") {
+        if !encoder
+            .parameters_names()
+            .iter()
+            .any(|name| name == "chroma")
+        {
             return Err(CodecError::unsupported(
                 "selected libheif HEVC encoder does not expose the chroma parameter",
             ));
@@ -447,8 +448,7 @@ fn fill_rgb_planes(
             .map_err(|_| CodecError::invalid("source y exceeds usize"))?
             .checked_mul(source.bytes_per_row)
             .ok_or_else(|| CodecError::invalid("source row offset overflows"))?;
-        let ry = usize::try_from(y)
-            .map_err(|_| CodecError::invalid("tile y exceeds usize"))?;
+        let ry = usize::try_from(y).map_err(|_| CodecError::invalid("tile y exceeds usize"))?;
         let r_row = ry
             .checked_mul(r_stride)
             .ok_or_else(|| CodecError::invalid("R row offset overflows"))?;
@@ -471,8 +471,8 @@ fn fill_rgb_planes(
                         .ok_or_else(|| CodecError::invalid("source pixel offset overflows"))?,
                 )
                 .ok_or_else(|| CodecError::invalid("source pixel offset overflows"))?;
-            let output_x = usize::try_from(x)
-                .map_err(|_| CodecError::invalid("tile x exceeds usize"))?;
+            let output_x =
+                usize::try_from(x).map_err(|_| CodecError::invalid("tile x exceeds usize"))?;
             r[r_row + output_x] = source.data[source_pixel];
             g[g_row + output_x] = source.data[source_pixel + 1];
             b[b_row + output_x] = source.data[source_pixel + 2];
@@ -497,8 +497,8 @@ fn copy_plane_to_raster(
             "decoded libheif plane stride is shorter than its logical row",
         ));
     }
-    let height = usize::try_from(height)
-        .map_err(|_| CodecError::invalid("decoded height exceeds usize"))?;
+    let height =
+        usize::try_from(height).map_err(|_| CodecError::invalid("decoded height exceeds usize"))?;
     let output_len = row_bytes
         .checked_mul(height)
         .ok_or_else(|| CodecError::invalid("decoded raster size overflows"))?;
@@ -600,11 +600,9 @@ fn extract_primary_hevc_item(source: &[u8]) -> Result<HevcItem> {
         .find(|entry| entry.item_id == item.item_id)
         .ok_or_else(|| CodecError::format("libheif hvc1 item has no ipma entry"))?;
     let mut hvcc_matches = ipma.associations.iter().filter_map(|association| {
-        meta.properties
-            .iter()
-            .find(|property| {
-                property.index == u32::from(association.property_index) && property.kind == HVCC
-            })
+        meta.properties.iter().find(|property| {
+            property.index == u32::from(association.property_index) && property.kind == HVCC
+        })
     });
     let property = hvcc_matches
         .next()
@@ -658,8 +656,8 @@ mod tests {
         for y in 0..height {
             for x in 0..width {
                 let value = ((x * 3 + y * 5) & 0xff) as u8;
-                let offset = usize::try_from(y).unwrap() * row_bytes
-                    + usize::try_from(x).unwrap() * 3;
+                let offset =
+                    usize::try_from(y).unwrap() * row_bytes + usize::try_from(x).unwrap() * 3;
                 data[offset] = value;
                 data[offset + 1] = value.wrapping_add(17);
                 data[offset + 2] = value.wrapping_add(31);
@@ -690,7 +688,10 @@ mod tests {
         assert!(encoder.supports(layout(ChromaSampling::Yuv444)));
         assert!(!encoder.supports(layout(ChromaSampling::Yuv422)));
         assert_eq!(
-            provider.raster_decoder_capabilities().iter().collect::<Vec<_>>(),
+            provider
+                .raster_decoder_capabilities()
+                .iter()
+                .collect::<Vec<_>>(),
             vec![GainMapCodec::Hevc]
         );
     }
