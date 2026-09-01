@@ -5,10 +5,12 @@ edition.workspace = true
 
 [dependencies]
 libheif-rs = { version = "=2.7.0", default-features = false, features = ["v1_17"] }
+zune-jpeg = "=0.5.15"
 xdremux-engine = { path = "../xdremux-engine" }
 xdremux-format = { path = "../xdremux-format" }
 
 [dev-dependencies]
+xdremux-container = { path = "../xdremux-container" }
 xdremux-heif = { path = "../xdremux-heif" }
 
 [lints]
