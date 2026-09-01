@@ -1,3 +1,4 @@
+# During rust-cli unification this verifier also materializes Cargo.lock after product-surface dependency changes pass the same Rust vertical-slice checks.
 from pathlib import Path
 
 
