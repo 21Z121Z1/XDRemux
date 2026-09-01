@@ -82,7 +82,9 @@ fn resume_reuses_only_the_checkpoint_proven_live_photo_pair() {
     let item: Value = serde_json::from_str(lines.last().unwrap()).unwrap();
     assert_eq!(item["status"], "success");
     assert_eq!(item["assetIdentifier"], image_id);
-    assert!(item["inputSHA256"].as_str().is_some_and(|value| value.len() == 64));
+    assert!(item["inputSHA256"]
+        .as_str()
+        .is_some_and(|value| value.len() == 64));
 
     let second = run(&output, true);
     assert_eq!(second["processed"], 1);
