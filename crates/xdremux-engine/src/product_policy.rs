@@ -3,10 +3,28 @@ use xdremux_format::ChromaSampling;
 use crate::{
     validate_source_profile, GainMapChannels, GainMapCodecLayout, GainMapEncodeProfile,
     GainMapEncoderCapabilities, GainMapSourceProfile, OppoCompatibility, PlannerError, Result,
+    SourceFamily, SourceHdrMode,
 };
 
 pub const fn wants_oppo_compatibility(compatibility: OppoCompatibility) -> bool {
     !matches!(compatibility, OppoCompatibility::Off)
+}
+
+/// Canonical source-family detection shared by every front end and runtime.
+///
+/// UHDR is an X7-family source. LHDR uses the same metadata-version boundary
+/// as the current product: version >= 3 is X7, earlier versions are X6.
+pub fn detect_source_family(hdr_mode: SourceHdrMode, meta_floats: &[f64]) -> SourceFamily {
+    match hdr_mode {
+        SourceHdrMode::Uhdr => SourceFamily::X7,
+        SourceHdrMode::Lhdr => {
+            if meta_floats.first().copied().unwrap_or_default() >= 3.0 {
+                SourceFamily::X7
+            } else {
+                SourceFamily::X6
+            }
+        }
+    }
 }
 
 /// Resolve the product output profile rather than merely preserving source JPEG
@@ -80,6 +98,19 @@ mod tests {
             layout(ChromaSampling::Yuv420),
             layout(ChromaSampling::Yuv444),
         ])
+    }
+
+    #[test]
+    fn source_family_policy_matches_current_product_boundary() {
+        assert_eq!(detect_source_family(SourceHdrMode::Uhdr, &[]), SourceFamily::X7);
+        assert_eq!(
+            detect_source_family(SourceHdrMode::Lhdr, &[2.999]),
+            SourceFamily::X6
+        );
+        assert_eq!(
+            detect_source_family(SourceHdrMode::Lhdr, &[3.0]),
+            SourceFamily::X7
+        );
     }
 
     #[test]
