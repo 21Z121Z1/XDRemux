@@ -60,6 +60,7 @@ jobs:
         run: |
           cargo clippy --locked -p xdremux-motion-photo --all-targets -- -D warnings
           cargo test --locked -p xdremux-motion-photo
+          cargo test --locked -p xdremux-motion-photo --test live_photo_mov_fixture -- --nocapture
       - name: Verify diff
         run: |
           cargo fmt --all -- --check
