@@ -1,0 +1,230 @@
+name: Materialize Rust unification fixes
+
+on:
+  push:
+    branches:
+      - feat/rust-cli-unification
+    paths:
+      - ".github/workflows/materialize-rust-unification-fixes.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - name: Install libheif HEVC provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Materialize native writer and codec fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          native = Path("crates/xdremux-heif/src/native.rs")
+          text = native.read_text()
+
+          order_guard = '''    if ftyp.box_start != 0
+              || ftyp.data_end > meta_header.box_start
+              || meta_header.data_end > mdat.box_start
+          {
+              return Err(invalid(
+                  "native HEIF augmentation requires ftyp -> meta -> mdat top-level order",
+              ));
+          }
+          '''
+          if order_guard not in text:
+              raise SystemExit("native HEIF top-level order guard not found")
+          text = text.replace(order_guard, "", 1)
+
+          layout_start = text.index("    let ftyp_part = build_ftyp(source, ftyp)?;")
+          layout_end = text.index("    let final_locations = build_final_locations(", layout_start)
+          layout = '''    let ftyp_part = build_ftyp(source, ftyp)?;
+          let original_mdat_payload = source
+              .get(mdat.payload_range())
+              .ok_or_else(|| invalid("source mdat payload is outside source"))?;
+
+          // Preserve the source top-level box order. The replacement sizes of boxes
+          // before mdat determine the relocated file-backed item offsets, regardless
+          // of whether meta appears before or after mdat.
+          let new_mdat_box_start = top
+              .boxes
+              .iter()
+              .take_while(|header| header.box_start != mdat.box_start)
+              .try_fold(0usize, |offset, header| {
+                  let replacement_len = if header.kind == FTYP {
+                      ftyp_part.len()
+                  } else if header.kind == META {
+                      preliminary_meta.len()
+                  } else {
+                      header.size
+                  };
+                  offset
+                      .checked_add(replacement_len)
+                      .ok_or_else(|| invalid("native mdat file offset overflows"))
+              })?;
+          let new_mdat_data_start = new_mdat_box_start
+              .checked_add(8)
+              .ok_or_else(|| invalid("native mdat data offset overflows"))?;
+          let new_mdat_data_start_u64 = u64::try_from(new_mdat_data_start)
+              .map_err(|_| invalid("native mdat data offset exceeds u64"))?;
+          ensure_u32(new_mdat_data_start_u64, "native mdat data offset")?;
+
+          '''
+          text = text[:layout_start] + layout + text[layout_end:]
+
+          output_start = text.index("    let after_mdat = source")
+          output_end = text.index("\n\n    let structure =", output_start)
+          output = '''    let trailing = source
+              .get(top.trailing_range.clone())
+              .ok_or_else(|| invalid("top-level trailing bytes are outside source"))?;
+          let output_capacity = top.boxes.iter().try_fold(trailing.len(), |total, header| {
+              let replacement_len = if header.kind == FTYP {
+                  ftyp_part.len()
+              } else if header.kind == META {
+                  final_meta.len()
+              } else if header.kind == MDAT {
+                  final_mdat.len()
+              } else {
+                  header.size
+              };
+              total
+                  .checked_add(replacement_len)
+                  .ok_or_else(|| invalid("native HEIF output size overflows"))
+          })?;
+          let mut output = Vec::with_capacity(output_capacity);
+          for header in &top.boxes {
+              if header.kind == FTYP {
+                  output.extend_from_slice(&ftyp_part);
+              } else if header.kind == META {
+                  output.extend_from_slice(&final_meta);
+              } else if header.kind == MDAT {
+                  output.extend_from_slice(&final_mdat);
+              } else {
+                  output.extend_from_slice(raw_box(source, header, "top-level")?);
+              }
+          }
+          output.extend_from_slice(trailing);'''
+          text = text[:output_start] + output + text[output_end:]
+          native.write_text(text)
+
+          codec = Path("crates/xdremux-codec/src/portable/libheif.rs")
+          text = codec.read_text()
+          old_y = '''origin_y
+                      .checked_add(y)
+                      .unwrap_or(u32::MAX)'''
+          old_x = '''origin_x
+                          .checked_add(x)
+                          .unwrap_or(u32::MAX)'''
+          y_count = text.count(old_y)
+          x_count = text.count(old_x)
+          if y_count != 2 or x_count != 2:
+              raise SystemExit(f"unexpected edge-padding patterns: y={y_count} x={x_count}")
+          text = text.replace(old_y, "origin_y.saturating_add(y)")
+          text = text.replace(old_x, "origin_x.saturating_add(x)")
+          readback = re.compile(
+              r'        match encoder\.parameter\("chroma"\)\.map_err\(CodecError::libheif\)\? \{\n'
+              r'            Some\(EncoderParameterValue::String\(value\)\) if value == chroma => \{\}\n'
+              r'            other => \{\n'
+              r'                return Err\(CodecError::InconsistentEncoderConfiguration\(format!\(\n'
+              r'                    "requested chroma \{chroma\}, encoder reports \{other:\?\}"\n'
+              r'                \)\)\);\n'
+              r'            \}\n'
+              r'        \}\n'
+          )
+          text, count = readback.subn(
+              '        // Parameter readback is not a stable libheif cross-version contract.\n'
+              '        // The emitted hvcC is parsed and validated after encoding instead.\n',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("libheif chroma readback block not found")
+          codec.write_text(text)
+          PY
+
+          cat > .github/workflows/rust-codec-core.yml <<'YAML'
+          name: Rust codec provider
+
+          on:
+            push:
+              paths:
+                - "Cargo.toml"
+                - "Cargo.lock"
+                - "crates/xdremux-codec/**"
+                - "crates/xdremux-engine/**"
+                - "crates/xdremux-format/**"
+                - "crates/xdremux-heif/**"
+                - ".github/workflows/rust-codec-core.yml"
+            pull_request:
+              paths:
+                - "Cargo.toml"
+                - "Cargo.lock"
+                - "crates/xdremux-codec/**"
+                - "crates/xdremux-engine/**"
+                - "crates/xdremux-format/**"
+                - "crates/xdremux-heif/**"
+                - ".github/workflows/rust-codec-core.yml"
+
+          permissions:
+            contents: read
+
+          jobs:
+            codec-core:
+              runs-on: ubuntu-latest
+              timeout-minutes: 30
+              steps:
+                - uses: actions/checkout@v7
+                  with:
+                    fetch-depth: 0
+                - name: Install libheif HEVC provider
+                  run: |
+                    sudo apt-get update
+                    sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
+                - uses: actions-rust-lang/setup-rust-toolchain@v1
+                  with:
+                    toolchain: stable
+                    components: rustfmt, clippy
+                - name: Verify committed lockfile
+                  run: cargo metadata --locked --format-version 1 > /dev/null
+                - name: Check formatting
+                  run: cargo fmt --all -- --check
+                - name: Lint portable codec provider
+                  run: cargo clippy --locked -p xdremux-codec --all-targets -- -D warnings
+                - name: Test portable codec provider
+                  run: cargo test --locked -p xdremux-codec
+          YAML
+
+          rm -f .github/workflows/diagnose-heif-layout.yml
+          rm -f .github/workflows/materialize-rust-unification-fixes.yml
+          cargo fmt --all
+      - name: Verify patched source before commit
+        shell: bash
+        run: |
+          cargo metadata --locked --format-version 1 > /dev/null
+          cargo fmt --all -- --check
+          cargo clippy --locked -p xdremux-heif -p xdremux-codec --all-targets -- -D warnings
+          cargo test --locked -p xdremux-heif
+          cargo test --locked -p xdremux-codec
+      - name: Commit verified source
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(rust-heif): preserve source top-level layout"
+          git push origin HEAD:feat/rust-cli-unification
