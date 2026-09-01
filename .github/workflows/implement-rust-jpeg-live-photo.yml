@@ -1,0 +1,65 @@
+name: Verify Rust JPEG Live Photo slice
+
+on:
+  push:
+    branches: [feat/rust-cli-unification]
+    paths:
+      - .github/workflows/implement-rust-jpeg-live-photo.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - name: Install portable HEVC provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Materialize deterministic Rust workspace state
+        run: |
+          cargo generate-lockfile
+          cargo fmt -p xdremux-format -p xdremux-metadata -p xdremux-codec -p xdremux-motion-photo -p xdremux-runtime -p xdremux-cli
+          git diff --check
+      - name: Lint JPEG Live Photo stack
+        run: |
+          cargo clippy --locked \
+            -p xdremux-format -p xdremux-metadata -p xdremux-codec \
+            -p xdremux-motion-photo -p xdremux-runtime -p xdremux-cli \
+            --all-targets -- -D warnings
+      - name: Test JPEG and HEIF Live Photo vertical slices
+        run: |
+          cargo test --locked -p xdremux-format -p xdremux-metadata -p xdremux-codec -p xdremux-motion-photo
+          cargo test --locked -p xdremux-runtime --test live_photo_fixture --test live_photo_jpeg_fixtures -- --nocapture
+          cargo test --locked -p xdremux-runtime --test live_photo_jpeg_fixtures -- --ignored --nocapture
+          cargo test --locked -p xdremux-cli --test convert --test live_photo -- --nocapture
+      - name: Commit verified materialized state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock \
+            crates/xdremux-format \
+            crates/xdremux-metadata \
+            crates/xdremux-codec \
+            crates/xdremux-motion-photo \
+            crates/xdremux-runtime \
+            crates/xdremux-cli
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No generated or formatting changes to commit.'
+          else
+            git commit -m 'chore(rust): materialize JPEG Live Photo slice'
+            git push origin HEAD:feat/rust-cli-unification
+          fi
