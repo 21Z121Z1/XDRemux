@@ -8,6 +8,7 @@ pub mod fourcc;
 pub mod hevc;
 pub mod isobmff;
 pub mod jpeg;
+pub mod jpeg_segments;
 
 pub use codec::ChromaSampling;
 pub use cursor::{Cursor, Endian};
@@ -16,3 +17,4 @@ pub use exif::Orientation;
 pub use fourcc::FourCC;
 pub use hevc::{parse_hvcc_profile, HevcDecoderConfigurationProfile};
 pub use jpeg::{probe_frame_profile as probe_jpeg_frame_profile, JpegComponent, JpegFrameProfile};
+pub use jpeg_segments::{jpeg_icc_profile, jpeg_image_end};
