@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use xdremux_format::isobmff::{
     make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,
@@ -70,6 +70,80 @@ fn child<'a>(children: &'a [BoxHeader], kind: FourCC, context: &str) -> Result<&
         .iter()
         .find(|header| header.kind == kind)
         .ok_or_else(|| invalid(format!("{context}/{} is missing", kind)))
+}
+
+fn canonical_gain_map_graph_ids(meta: &ParsedMeta) -> Result<BTreeSet<u32>> {
+    let tmap_ids = meta
+        .iinf
+        .entries
+        .iter()
+        .filter(|item| item.item_type == Some(TMAP))
+        .map(|item| item.item_id)
+        .collect::<Vec<_>>();
+    if tmap_ids.is_empty() {
+        return Ok(BTreeSet::new());
+    }
+
+    let Some(iref) = meta.iref.as_ref() else {
+        return Err(invalid(
+            "source contains tmap items without iref; canonical replacement refuses to guess",
+        ));
+    };
+    let roots = tmap_ids
+        .iter()
+        .copied()
+        .filter(|tmap_id| {
+            iref.entries.iter().any(|reference| {
+                reference.kind == DIMG
+                    && reference.from_item_id == *tmap_id
+                    && reference.to_item_ids.contains(&meta.primary_item_id)
+            })
+        })
+        .collect::<Vec<_>>();
+    let tmap_id = match roots.as_slice() {
+        [only] => *only,
+        [] => {
+            return Err(invalid(
+                "source contains tmap items but no canonical tmap -> primary dimg graph",
+            ));
+        }
+        _ => {
+            return Err(invalid(
+                "source contains more than one canonical tmap -> primary graph",
+            ));
+        }
+    };
+
+    let mut removed = BTreeSet::from([tmap_id]);
+    loop {
+        let previous_len = removed.len();
+        for reference in &iref.entries {
+            if reference.kind == DIMG && removed.contains(&reference.from_item_id) {
+                for target in &reference.to_item_ids {
+                    if *target != meta.primary_item_id {
+                        removed.insert(*target);
+                    }
+                }
+            }
+        }
+        if removed.len() == previous_len {
+            break;
+        }
+    }
+
+    for item in &meta.iinf.entries {
+        if item.item_type == Some(MIME)
+            && iref.entries.iter().any(|reference| {
+                reference.kind == CDSC
+                    && reference.from_item_id == item.item_id
+                    && reference.to_item_ids.contains(&tmap_id)
+            })
+        {
+            removed.insert(item.item_id);
+        }
+    }
+    removed.remove(&meta.primary_item_id);
+    Ok(removed)
 }
 
 fn ceil_div(value: u32, divisor: u32, context: &str) -> Result<u32> {
@@ -301,9 +375,7 @@ fn build_iprp(
     iprp_header: &BoxHeader,
     meta: &ParsedMeta,
     gain: &DirectHevcGainMap<'_>,
-    tile_ids: &[u32],
-    gain_id: u32,
-    tmap_id: u32,
+    graph: AssemblyGraph<'_>,
 ) -> Result<Vec<u8>> {
     let mut properties = meta.properties.iter().collect::<Vec<_>>();
     properties.sort_by_key(|property| property.index);
@@ -380,8 +452,20 @@ fn build_iprp(
 
     let ipco_part = make_box(IPCO, &ipco_payload)?;
     let last_property_index = next_property_index.saturating_sub(1);
-    let mut ipma_entries = meta.ipma.entries.clone();
-    for (tile_id, tile) in tile_ids.iter().copied().zip(gain.tiles.iter().copied()) {
+    let mut ipma_entries = meta
+        .ipma
+        .entries
+        .iter()
+        .filter(|entry| !graph.removed.contains(&entry.item_id))
+        .cloned()
+        .collect::<Vec<_>>();
+    for (tile_id, tile) in graph
+        .ids
+        .tile_ids
+        .iter()
+        .copied()
+        .zip(gain.tiles.iter().copied())
+    {
         let tile_ispe = *tile_ispe_by_size
             .get(&(tile.width, tile.height))
             .ok_or_else(|| invalid("native HEIF tile ispe mapping is missing"))?;
@@ -404,7 +488,7 @@ fn build_iprp(
         });
     }
     ipma_entries.push(IpmaEntry {
-        item_id: gain_id,
+        item_id: graph.ids.gain_id,
         associations: vec![
             IpmaAssociation {
                 property_index: gain_colr,
@@ -429,7 +513,7 @@ fn build_iprp(
         ],
     });
     ipma_entries.push(IpmaEntry {
-        item_id: tmap_id,
+        item_id: graph.ids.tmap_id,
         associations: vec![
             IpmaAssociation {
                 property_index: tmap_colr,
@@ -501,9 +585,13 @@ fn build_iinf(
     gain_id: u32,
     tmap_id: u32,
     xmp_id: u32,
+    removed: &BTreeSet<u32>,
 ) -> Result<Vec<u8>> {
     let mut entries = Vec::new();
     for item in &meta.iinf.entries {
+        if removed.contains(&item.item_id) {
+            continue;
+        }
         entries.push(
             source
                 .get(item.box_range.clone())
@@ -532,11 +620,33 @@ fn build_iref(
     gain_id: u32,
     tmap_id: u32,
     xmp_id: u32,
+    removed: &BTreeSet<u32>,
 ) -> Result<Vec<u8>> {
-    let mut entries = meta
-        .iref
-        .as_ref()
-        .map_or_else(Vec::new, |iref| iref.entries.clone());
+    let mut entries = meta.iref.as_ref().map_or_else(Vec::new, |iref| {
+        iref.entries
+            .iter()
+            .filter_map(|reference| {
+                if removed.contains(&reference.from_item_id) {
+                    return None;
+                }
+                let to_item_ids = reference
+                    .to_item_ids
+                    .iter()
+                    .copied()
+                    .filter(|item_id| !removed.contains(item_id))
+                    .collect::<Vec<_>>();
+                if to_item_ids.is_empty() {
+                    None
+                } else {
+                    Some(IrefEntry {
+                        kind: reference.kind,
+                        from_item_id: reference.from_item_id,
+                        to_item_ids,
+                    })
+                }
+            })
+            .collect()
+    });
     entries.push(IrefEntry {
         kind: DIMG,
         from_item_id: gain_id,
@@ -642,6 +752,12 @@ struct AssemblyItemIds<'a> {
 }
 
 #[derive(Debug, Clone, Copy)]
+struct AssemblyGraph<'a> {
+    ids: AssemblyItemIds<'a>,
+    removed: &'a BTreeSet<u32>,
+}
+
+#[derive(Debug, Clone, Copy)]
 struct AppendedIdatLayout {
     gain_grid_offset: u64,
     gain_grid_length: u64,
@@ -662,11 +778,13 @@ fn build_placeholder_locations(
     ids: AssemblyItemIds<'_>,
     layout: AppendedIdatLayout,
     gain: &DirectHevcGainMap<'_>,
+    removed: &BTreeSet<u32>,
 ) -> Result<Vec<IlocEntry>> {
     let mut entries = meta
         .iloc
         .entries
         .iter()
+        .filter(|entry| !removed.contains(&entry.item_id))
         .map(|entry| normalized_existing_location(entry, true))
         .collect::<Result<Vec<_>>>()?;
     for (tile_id, tile) in ids.tile_ids.iter().copied().zip(gain.tiles.iter().copied()) {
@@ -713,7 +831,7 @@ fn build_final_locations(
     meta: &ParsedMeta,
     mdat: &BoxHeader,
     relocation: MdatRelocation,
-    ids: AssemblyItemIds<'_>,
+    graph: AssemblyGraph<'_>,
     layout: AppendedIdatLayout,
     gain: &DirectHevcGainMap<'_>,
 ) -> Result<Vec<IlocEntry>> {
@@ -726,6 +844,9 @@ fn build_final_locations(
 
     let mut entries = Vec::new();
     for entry in &meta.iloc.entries {
+        if graph.removed.contains(&entry.item_id) {
+            continue;
+        }
         let mut normalized = normalized_existing_location(entry, false)?;
         for extent in &mut normalized.extents {
             if normalized.construction_method == 0 {
@@ -767,7 +888,13 @@ fn build_final_locations(
     let mut appended = 0u64;
     let original_payload_len = u64::try_from(relocation.original_payload_len)
         .map_err(|_| invalid("source mdat payload length exceeds u64"))?;
-    for (tile_id, tile) in ids.tile_ids.iter().copied().zip(gain.tiles.iter().copied()) {
+    for (tile_id, tile) in graph
+        .ids
+        .tile_ids
+        .iter()
+        .copied()
+        .zip(gain.tiles.iter().copied())
+    {
         let offset = relocation
             .new_data_start
             .checked_add(original_payload_len)
@@ -795,12 +922,12 @@ fn build_final_locations(
 
     for (item_id, offset, length) in [
         (
-            ids.gain_id,
+            graph.ids.gain_id,
             layout.gain_grid_offset,
             layout.gain_grid_length,
         ),
-        (ids.tmap_id, layout.tmap_offset, layout.tmap_length),
-        (ids.xmp_id, layout.xmp_offset, layout.xmp_length),
+        (graph.ids.tmap_id, layout.tmap_offset, layout.tmap_length),
+        (graph.ids.xmp_id, layout.xmp_offset, layout.xmp_length),
     ] {
         ensure_u32(offset, "native idat offset")?;
         ensure_u32(length, "native idat length")?;
@@ -887,26 +1014,8 @@ pub fn assemble_iso_gain_map_heif(
     let ftyp = one_top_level(&top.boxes, FTYP, "ftyp")?;
     let meta_header = one_top_level(&top.boxes, META, "meta")?;
     let mdat = one_top_level(&top.boxes, MDAT, "mdat")?;
-    if ftyp.box_start != 0
-        || ftyp.data_end > meta_header.box_start
-        || meta_header.data_end > mdat.box_start
-    {
-        return Err(invalid(
-            "native HEIF augmentation requires ftyp -> meta -> mdat top-level order",
-        ));
-    }
-
     let meta = parse_meta_box(source, meta_header)?;
-    if meta
-        .iinf
-        .entries
-        .iter()
-        .any(|item| item.item_type == Some(TMAP))
-    {
-        return Err(invalid(
-            "source already contains a tmap graph; canonical graph replacement is a separate operation",
-        ));
-    }
+    let removed_graph_ids = canonical_gain_map_graph_ids(&meta)?;
     let meta_children_start = meta_header
         .data_start
         .checked_add(4)
@@ -923,6 +1032,7 @@ pub fn assemble_iso_gain_map_heif(
         .iinf
         .entries
         .iter()
+        .filter(|item| !removed_graph_ids.contains(&item.item_id))
         .map(|item| item.item_id)
         .max()
         .ok_or_else(|| invalid("source HEIF has no items"))?;
@@ -945,18 +1055,35 @@ pub fn assemble_iso_gain_map_heif(
     let tmap_id = allocate()?;
     let xmp_id = allocate()?;
     let maximum_item_id = xmp_id;
+    let ids = AssemblyItemIds {
+        tile_ids: &tile_ids,
+        gain_id,
+        tmap_id,
+        xmp_id,
+    };
+    let graph = AssemblyGraph {
+        ids,
+        removed: &removed_graph_ids,
+    };
 
-    let iinf = build_iinf(source, &meta, &tile_ids, gain_id, tmap_id, xmp_id)?;
-    let iprp = build_iprp(
+    let iinf = build_iinf(
         source,
-        iprp_header,
         &meta,
-        gain,
         &tile_ids,
         gain_id,
         tmap_id,
+        xmp_id,
+        &removed_graph_ids,
     )?;
-    let iref = build_iref(&meta, &tile_ids, gain_id, tmap_id, xmp_id)?;
+    let iprp = build_iprp(source, iprp_header, &meta, gain, graph)?;
+    let iref = build_iref(
+        &meta,
+        &tile_ids,
+        gain_id,
+        tmap_id,
+        xmp_id,
+        &removed_graph_ids,
+    )?;
 
     let mut idat_payload = existing_idat_payload(source, &meta)?.to_vec();
     let gain_grid_offset =
@@ -984,12 +1111,6 @@ pub fn assemble_iso_gain_map_heif(
     } else {
         meta.iloc.version.max(1)
     };
-    let ids = AssemblyItemIds {
-        tile_ids: &tile_ids,
-        gain_id,
-        tmap_id,
-        xmp_id,
-    };
     let idat_layout = AppendedIdatLayout {
         gain_grid_offset,
         gain_grid_length,
@@ -998,7 +1119,8 @@ pub fn assemble_iso_gain_map_heif(
         xmp_offset,
         xmp_length,
     };
-    let placeholder_locations = build_placeholder_locations(&meta, ids, idat_layout, gain)?;
+    let placeholder_locations =
+        build_placeholder_locations(&meta, ids, idat_layout, gain, &removed_graph_ids)?;
     let placeholder_iloc = make_iloc_box(iloc_version, 4, 4, 0, 0, &placeholder_locations)?;
     let preliminary_meta = build_meta(
         source,
@@ -1012,22 +1134,28 @@ pub fn assemble_iso_gain_map_heif(
     )?;
 
     let ftyp_part = build_ftyp(source, ftyp)?;
-    let between_ftyp_meta = source
-        .get(ftyp.data_end..meta_header.box_start)
-        .ok_or_else(|| invalid("bytes between ftyp and meta are outside source"))?;
-    let between_meta_mdat = source
-        .get(meta_header.data_end..mdat.box_start)
-        .ok_or_else(|| invalid("bytes between meta and mdat are outside source"))?;
     let original_mdat_payload = source
         .get(mdat.payload_range())
         .ok_or_else(|| invalid("source mdat payload is outside source"))?;
 
-    let new_mdat_box_start = ftyp_part
-        .len()
-        .checked_add(between_ftyp_meta.len())
-        .and_then(|value| value.checked_add(preliminary_meta.len()))
-        .and_then(|value| value.checked_add(between_meta_mdat.len()))
-        .ok_or_else(|| invalid("native mdat file offset overflows"))?;
+    // Preserve source top-level order. Replacement sizes before mdat determine
+    // relocated file-backed offsets whether meta is before or after mdat.
+    let new_mdat_box_start = top
+        .boxes
+        .iter()
+        .take_while(|header| header.box_start != mdat.box_start)
+        .try_fold(0usize, |offset, header| {
+            let replacement_len = if header.kind == FTYP {
+                ftyp_part.len()
+            } else if header.kind == META {
+                preliminary_meta.len()
+            } else {
+                header.size
+            };
+            offset
+                .checked_add(replacement_len)
+                .ok_or_else(|| invalid("native mdat file offset overflows"))
+        })?;
     let new_mdat_data_start = new_mdat_box_start
         .checked_add(8)
         .ok_or_else(|| invalid("native mdat data offset overflows"))?;
@@ -1043,7 +1171,7 @@ pub fn assemble_iso_gain_map_heif(
             new_data_start: new_mdat_data_start_u64,
             original_payload_len: original_mdat_payload.len(),
         },
-        ids,
+        graph,
         idat_layout,
         gain,
     )?;
@@ -1090,23 +1218,36 @@ pub fn assemble_iso_gain_map_heif(
         ));
     }
 
-    let after_mdat = source
-        .get(mdat.data_end..)
-        .ok_or_else(|| invalid("bytes after mdat are outside source"))?;
-    let mut output = Vec::with_capacity(
-        ftyp_part.len()
-            + between_ftyp_meta.len()
-            + final_meta.len()
-            + between_meta_mdat.len()
-            + final_mdat.len()
-            + after_mdat.len(),
-    );
-    output.extend_from_slice(&ftyp_part);
-    output.extend_from_slice(between_ftyp_meta);
-    output.extend_from_slice(&final_meta);
-    output.extend_from_slice(between_meta_mdat);
-    output.extend_from_slice(&final_mdat);
-    output.extend_from_slice(after_mdat);
+    let trailing = source
+        .get(top.trailing_range.clone())
+        .ok_or_else(|| invalid("top-level trailing bytes are outside source"))?;
+    let output_capacity = top.boxes.iter().try_fold(trailing.len(), |total, header| {
+        let replacement_len = if header.kind == FTYP {
+            ftyp_part.len()
+        } else if header.kind == META {
+            final_meta.len()
+        } else if header.kind == MDAT {
+            final_mdat.len()
+        } else {
+            header.size
+        };
+        total
+            .checked_add(replacement_len)
+            .ok_or_else(|| invalid("native HEIF output size overflows"))
+    })?;
+    let mut output = Vec::with_capacity(output_capacity);
+    for header in &top.boxes {
+        if header.kind == FTYP {
+            output.extend_from_slice(&ftyp_part);
+        } else if header.kind == META {
+            output.extend_from_slice(&final_meta);
+        } else if header.kind == MDAT {
+            output.extend_from_slice(&final_mdat);
+        } else {
+            output.extend_from_slice(raw_box(source, header, "top-level")?);
+        }
+    }
+    output.extend_from_slice(trailing);
 
     let structure = crate::validation::validate_gain_map_structure(&output)?;
     if structure.primary_item_id != meta.primary_item_id

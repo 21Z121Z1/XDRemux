@@ -373,14 +373,8 @@ fn encode_tile_container(
         encoder
             .set_parameter_value("chroma", EncoderParameterValue::String(chroma.to_owned()))
             .map_err(CodecError::libheif)?;
-        match encoder.parameter("chroma").map_err(CodecError::libheif)? {
-            Some(EncoderParameterValue::String(value)) if value == chroma => {}
-            other => {
-                return Err(CodecError::InconsistentEncoderConfiguration(format!(
-                    "requested chroma {chroma}, encoder reports {other:?}"
-                )));
-            }
-        }
+        // Parameter readback is not a stable libheif cross-version contract.
+        // The emitted hvcC is parsed and validated after encoding instead.
     }
 
     let mut context = HeifContext::new().map_err(CodecError::libheif)?;
@@ -399,10 +393,7 @@ fn fill_mono_plane(
     origin_y: u32,
 ) -> Result<()> {
     for y in 0..tile_size {
-        let source_y = origin_y
-            .checked_add(y)
-            .unwrap_or(u32::MAX)
-            .min(source.height - 1);
+        let source_y = origin_y.saturating_add(y).min(source.height - 1);
         let output_row = usize::try_from(y)
             .map_err(|_| CodecError::invalid("tile y exceeds usize"))?
             .checked_mul(output_stride)
@@ -412,10 +403,7 @@ fn fill_mono_plane(
             .checked_mul(source.bytes_per_row)
             .ok_or_else(|| CodecError::invalid("source row offset overflows"))?;
         for x in 0..tile_size {
-            let source_x = origin_x
-                .checked_add(x)
-                .unwrap_or(u32::MAX)
-                .min(source.width - 1);
+            let source_x = origin_x.saturating_add(x).min(source.width - 1);
             output[output_row
                 + usize::try_from(x).map_err(|_| CodecError::invalid("tile x exceeds usize"))?] =
                 source.data[source_row
@@ -440,10 +428,7 @@ fn fill_rgb_planes(
     origin_y: u32,
 ) -> Result<()> {
     for y in 0..tile_size {
-        let source_y = origin_y
-            .checked_add(y)
-            .unwrap_or(u32::MAX)
-            .min(source.height - 1);
+        let source_y = origin_y.saturating_add(y).min(source.height - 1);
         let source_row = usize::try_from(source_y)
             .map_err(|_| CodecError::invalid("source y exceeds usize"))?
             .checked_mul(source.bytes_per_row)
@@ -459,10 +444,7 @@ fn fill_rgb_planes(
             .checked_mul(b_stride)
             .ok_or_else(|| CodecError::invalid("B row offset overflows"))?;
         for x in 0..tile_size {
-            let source_x = origin_x
-                .checked_add(x)
-                .unwrap_or(u32::MAX)
-                .min(source.width - 1);
+            let source_x = origin_x.saturating_add(x).min(source.width - 1);
             let source_pixel = source_row
                 .checked_add(
                     usize::try_from(source_x)
