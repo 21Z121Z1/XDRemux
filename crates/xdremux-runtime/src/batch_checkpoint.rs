@@ -288,7 +288,7 @@ fn canonical_existing(path: &Path) -> Result<PathBuf> {
     fs::canonicalize(path).map_err(|error| RuntimeError::external("batch provenance path", error))
 }
 
-fn canonical_or_absolute(path: &Path) -> Result<PathBuf> {
+pub(crate) fn canonical_or_absolute(path: &Path) -> Result<PathBuf> {
     if path.exists() {
         return canonical_existing(path);
     }

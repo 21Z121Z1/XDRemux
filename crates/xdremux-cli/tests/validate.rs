@@ -22,7 +22,10 @@ fn unique_dir() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system time must be after epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("xdremux-cli-validate-{}-{stamp}", std::process::id()))
+    std::env::temp_dir().join(format!(
+        "xdremux-cli-validate-{}-{stamp}",
+        std::process::id()
+    ))
 }
 
 fn validate_json(input: &Path) -> (u8, Value, Vec<u8>) {
@@ -34,7 +37,8 @@ fn validate_json(input: &Path) -> (u8, Value, Vec<u8>) {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let code = xdremux_cli::run_from(arguments, &mut stdout, &mut stderr);
-    let value = serde_json::from_slice(&stdout).expect("validate --json must emit one JSON document");
+    let value =
+        serde_json::from_slice(&stdout).expect("validate --json must emit one JSON document");
     (code, value, stderr)
 }
 
@@ -47,12 +51,7 @@ fn validate_reports_iso_hdr_live_photo_and_failures_as_stable_json() {
     let source = fs::read(proxdr_fixture()).unwrap();
     let iso_output = root.join("iso.heic");
     runtime
-        .convert_proxdr_file(
-            &source,
-            &iso_output,
-            ConversionRequest::default(),
-            |_| {},
-        )
+        .convert_proxdr_file(&source, &iso_output, ConversionRequest::default(), |_| {})
         .unwrap();
     let (code, report, stderr) = validate_json(&iso_output);
     assert_eq!(code, 0, "{}", String::from_utf8_lossy(&stderr));
@@ -97,7 +96,9 @@ fn validate_reports_iso_hdr_live_photo_and_failures_as_stable_json() {
     assert_eq!(report["schema_version"], 1);
     assert_eq!(report["command"], "validate");
     assert_eq!(report["valid"], false);
-    assert!(report["error"].as_str().is_some_and(|value| !value.is_empty()));
+    assert!(report["error"]
+        .as_str()
+        .is_some_and(|value| !value.is_empty()));
 
     fs::remove_dir_all(root).unwrap();
 }

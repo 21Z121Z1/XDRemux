@@ -10,8 +10,8 @@ use xdremux_motion_photo::{
 use xdremux_source::{probe_bytes, SourceAsset};
 
 use crate::batch_checkpoint::{
-    source_signature, CheckpointOutcome, MotionPhotoCheckpoint, MotionPhotoCheckpointWriter,
-    SourceSignature,
+    canonical_or_absolute, source_signature, CheckpointOutcome, MotionPhotoCheckpoint,
+    MotionPhotoCheckpointWriter, SourceSignature,
 };
 use crate::{PortableRuntime, Result, RuntimeError};
 
@@ -137,10 +137,6 @@ fn output_candidate(input: &Path, parent: &Path, suffix: u32) -> Result<PathBuf>
     Ok(parent.join(name))
 }
 
-fn absolute(path: &Path) -> Result<PathBuf> {
-    std::path::absolute(path).map_err(|error| RuntimeError::external("batch absolute path", error))
-}
-
 fn reusable_planned_output(
     checkpoint: &MotionPhotoCheckpoint,
     input: &Path,
@@ -155,7 +151,7 @@ fn reusable_planned_output(
     if prior.video != prior.image.with_extension("mov") {
         return Ok(None);
     }
-    let desired_parent = absolute(parent)?;
+    let desired_parent = canonical_or_absolute(parent)?;
     if prior.image.parent() != Some(desired_parent.as_path()) {
         return Ok(None);
     }
@@ -401,14 +397,8 @@ impl PortableRuntime {
                             if let Some(prior) =
                                 checkpoint.reusable_item(&item.input, &signature)?
                             {
-                                if prior.image
-                                    == std::path::absolute(&item.output).map_err(|error| {
-                                        RuntimeError::external("batch resume output path", error)
-                                    })?
-                                    && prior.video
-                                        == std::path::absolute(&output_video).map_err(|error| {
-                                            RuntimeError::external("batch resume video path", error)
-                                        })?
+                                if prior.image == canonical_or_absolute(&item.output)?
+                                    && prior.video == canonical_or_absolute(&output_video)?
                                 {
                                     if pair_matches_identifier(
                                         &item.output,

@@ -158,10 +158,7 @@ fn companion_still_path(video: &Path) -> Result<PathBuf> {
     }
     Err(RuntimeError::new(
         "Live Photo pair validation",
-        format!(
-            "no sibling HEIC/HEIF still exists for {}",
-            video.display()
-        ),
+        format!("no sibling HEIC/HEIF still exists for {}", video.display()),
     ))
 }
 

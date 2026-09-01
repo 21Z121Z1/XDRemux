@@ -39,7 +39,11 @@ fn write_human(report: &ValidationReport, output: &mut impl Write) -> io::Result
             writeln!(output, "still: {}", value.image.display())?;
             writeln!(output, "movie: {}", value.video.display())?;
             writeln!(output, "content-identifier: {}", value.content_identifier)?;
-            writeln!(output, "still-time-seconds: {:.6}", value.still_time_seconds)
+            writeln!(
+                output,
+                "still-time-seconds: {:.6}",
+                value.still_time_seconds
+            )
         }
     }
 }
@@ -50,11 +54,7 @@ fn write_json(value: &serde_json::Value, output: &mut impl Write) -> io::Result<
         .and_then(|()| writeln!(output))
 }
 
-pub(crate) fn run(
-    arguments: ValidateArgs,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> u8 {
+pub(crate) fn run(arguments: ValidateArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
     match validate_media_file(&arguments.input) {
         Ok(report) => {
             let result = if arguments.json {
