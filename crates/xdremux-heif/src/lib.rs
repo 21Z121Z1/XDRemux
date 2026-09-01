@@ -2,6 +2,7 @@
 
 mod direct;
 pub mod error;
+mod native;
 mod validation;
 
 pub use direct::{
@@ -9,4 +10,5 @@ pub use direct::{
     GainMapEncodeProfile, GainMapTile,
 };
 pub use error::{HeifError, Result};
+pub use native::{assemble_iso_gain_map_heif, IsoGainMapAssembly};
 pub use validation::{validate_gain_map_structure, GainMapStructure};

@@ -8,9 +8,24 @@ use xdremux_engine::{
 };
 use xdremux_format::ChromaSampling;
 use xdremux_heif::{
-    replace_private_jpeg_gain_map_with_hevc_tiles, validate_gain_map_structure, DirectHevcGainMap,
+    assemble_iso_gain_map_heif, validate_gain_map_structure, DirectHevcGainMap,
     GainMapChannels as HeifChannels, GainMapEncodeProfile as HeifProfile, GainMapTile,
+    IsoGainMapAssembly,
 };
+
+const APPLE_TMAP_HEX: &str = concat!(
+    "000000000040000000000000000100933a9300400000000000000000000100",
+    "933a9300400000000000010000000100000000000000010000000000000001"
+);
+const HDRGM_XMP: &[u8] = br#"<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/">
+      <hdrgm:Version>1.0</hdrgm:Version>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#;
 
 fn source_fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -62,6 +77,23 @@ fn engine_profile(
     }
 }
 
+fn decode_hex(value: &str) -> Vec<u8> {
+    assert_eq!(value.len() % 2, 0);
+    value
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let digit = |byte: u8| match byte {
+                b'0'..=b'9' => byte - b'0',
+                b'a'..=b'f' => byte - b'a' + 10,
+                b'A'..=b'F' => byte - b'A' + 10,
+                _ => panic!("non-hex byte in test vector"),
+            };
+            (digit(pair[0]) << 4) | digit(pair[1])
+        })
+        .collect()
+}
+
 fn assemble_and_validate(
     source: &[u8],
     encoded: &xdremux_codec::EncodedGainMapTiles,
@@ -79,30 +111,36 @@ fn assemble_and_validate(
         EngineChannels::Mono => HeifChannels::Mono,
         EngineChannels::Rgb => HeifChannels::Rgb,
     };
-    let output = replace_private_jpeg_gain_map_with_hevc_tiles(
+    let tmap = decode_hex(APPLE_TMAP_HEX);
+    assert_eq!(tmap.len(), 62);
+    let output = assemble_iso_gain_map_heif(
         source,
-        &DirectHevcGainMap {
-            gain_map_width: encoded.gain_map_width,
-            gain_map_height: encoded.gain_map_height,
-            tile_width: encoded.tile_width,
-            tile_height: encoded.tile_height,
-            tiles: &tiles,
-            hvcc: &encoded.hvcc,
-            profile: HeifProfile {
-                channels,
-                chroma: encoded.profile.layout.chroma,
-                luma_bit_depth: encoded.profile.layout.luma_bit_depth,
-                chroma_bit_depth: encoded.profile.layout.chroma_bit_depth,
+        &IsoGainMapAssembly {
+            gain_map: DirectHevcGainMap {
+                gain_map_width: encoded.gain_map_width,
+                gain_map_height: encoded.gain_map_height,
+                tile_width: encoded.tile_width,
+                tile_height: encoded.tile_height,
+                tiles: &tiles,
+                hvcc: &encoded.hvcc,
+                profile: HeifProfile {
+                    channels,
+                    chroma: encoded.profile.layout.chroma,
+                    luma_bit_depth: encoded.profile.layout.luma_bit_depth,
+                    chroma_bit_depth: encoded.profile.layout.chroma_bit_depth,
+                },
             },
+            tmap_payload: &tmap,
+            xmp_payload: HDRGM_XMP,
         },
     )
-    .expect("assemble libheif tiles into final HEIF");
+    .expect("assemble libheif tiles directly into final HEIF");
     validate_gain_map_structure(&output).expect("validate final HEIF structure")
 }
 
 #[test]
-fn portable_libheif_profiles_produce_valid_final_gain_map_files() {
-    let source = fs::read(source_fixture()).expect("read public ProXDR fixture");
+fn portable_libheif_profiles_produce_valid_final_gain_map_files_without_swift_intermediate() {
+    let source = fs::read(source_fixture()).expect("read public HEIF fixture");
     let provider = LibHeifProvider::new();
     let width = 641;
     let height = 513;
