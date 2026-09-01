@@ -81,21 +81,24 @@ fn apple_makernote_identifier(maker_note: &[u8]) -> LivePhotoStillResult<Option<
     let count_end = count_offset
         .checked_add(2)
         .ok_or_else(|| LivePhotoStillError::new("Apple MakerNote entry-count overflow"))?;
-    let count_bytes = maker_note
-        .get(count_offset..count_end)
-        .ok_or_else(|| LivePhotoStillError::new("Apple MakerNote is truncated before entry count"))?;
-    let entry_count = usize::from(u16::from_be_bytes(
-        count_bytes
-            .try_into()
-            .map_err(|_| LivePhotoStillError::new("invalid Apple MakerNote entry count"))?,
-    ));
+    let count_bytes = maker_note.get(count_offset..count_end).ok_or_else(|| {
+        LivePhotoStillError::new("Apple MakerNote is truncated before entry count")
+    })?;
+    let entry_count =
+        usize::from(u16::from_be_bytes(count_bytes.try_into().map_err(
+            |_| LivePhotoStillError::new("invalid Apple MakerNote entry count"),
+        )?));
 
     let entries_start = count_end;
     for index in 0..entry_count {
         let entry_start = entries_start
-            .checked_add(index.checked_mul(APPLE_MAKERNOTE_ENTRY_SIZE).ok_or_else(|| {
-                LivePhotoStillError::new("Apple MakerNote entry offset overflow")
-            })?)
+            .checked_add(
+                index
+                    .checked_mul(APPLE_MAKERNOTE_ENTRY_SIZE)
+                    .ok_or_else(|| {
+                        LivePhotoStillError::new("Apple MakerNote entry offset overflow")
+                    })?,
+            )
             .ok_or_else(|| LivePhotoStillError::new("Apple MakerNote entry offset overflow"))?;
         let entry_end = entry_start
             .checked_add(APPLE_MAKERNOTE_ENTRY_SIZE)
@@ -108,19 +111,19 @@ fn apple_makernote_identifier(maker_note: &[u8]) -> LivePhotoStillResult<Option<
         if tag != APPLE_ASSET_IDENTIFIER_TAG || field_type != ASCII_TIFF_TYPE {
             continue;
         }
-        let component_count = usize::try_from(u32::from_be_bytes([
-            entry[4], entry[5], entry[6], entry[7],
-        ]))
-        .map_err(|_| LivePhotoStillError::new("Apple MakerNote value count exceeds usize"))?;
+        let component_count =
+            usize::try_from(u32::from_be_bytes([entry[4], entry[5], entry[6], entry[7]])).map_err(
+                |_| LivePhotoStillError::new("Apple MakerNote value count exceeds usize"),
+            )?;
         if component_count == 0 {
             return Err(LivePhotoStillError::new(
                 "Apple MakerNote asset identifier is empty",
             ));
         }
         let value = if component_count <= 4 {
-            entry
-                .get(8..8 + component_count)
-                .ok_or_else(|| LivePhotoStillError::new("inline Apple MakerNote value is truncated"))?
+            entry.get(8..8 + component_count).ok_or_else(|| {
+                LivePhotoStillError::new("inline Apple MakerNote value is truncated")
+            })?
         } else {
             let offset = usize::try_from(u32::from_be_bytes([
                 entry[8], entry[9], entry[10], entry[11],
@@ -200,7 +203,9 @@ pub fn write_live_photo_heif_still(
     let mut output = static_heif.to_vec();
     let mut metadata = Metadata::new_from_vec(&output, FileExtension::HEIF)
         .map_err(|error| LivePhotoStillError::external("read source HEIF EXIF", error))?;
-    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(content_identifier)?));
+    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(
+        content_identifier,
+    )?));
     metadata
         .write_to_vec(&mut output, FileExtension::HEIF)
         .map_err(|error| LivePhotoStillError::external("write Live Photo HEIF EXIF", error))?;
@@ -238,8 +243,8 @@ mod tests {
         let len = xmp.len();
         assert!(disable_motion_photo_flag(&mut xmp));
         assert_eq!(xmp.len(), len);
-        assert!(xmp.windows(b"Camera:MotionPhoto=\"0\"".len()).any(|window| {
-            window == b"Camera:MotionPhoto=\"0\""
-        }));
+        assert!(xmp
+            .windows(b"Camera:MotionPhoto=\"0\"".len())
+            .any(|window| { window == b"Camera:MotionPhoto=\"0\"" }));
     }
 }

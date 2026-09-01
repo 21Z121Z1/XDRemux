@@ -19,12 +19,15 @@ fn samsung_heif_motion_photo_becomes_portable_apple_live_photo_still() {
     let asset = parse_oppo_motion_photo(&source)
         .expect("Samsung HEIF Motion Photo parsing must succeed")
         .expect("fixture must remain a Motion Photo before conversion");
-    assert_eq!(asset.source_kind, MotionPhotoSourceKind::AndroidHeifMotionPhotoV1);
+    assert_eq!(
+        asset.source_kind,
+        MotionPhotoSourceKind::AndroidHeifMotionPhotoV1
+    );
 
     let still_start = usize::try_from(asset.still_resource_range.lower_bound)
         .expect("still start must fit usize");
-    let still_end = usize::try_from(asset.still_resource_range.upper_bound)
-        .expect("still end must fit usize");
+    let still_end =
+        usize::try_from(asset.still_resource_range.upper_bound).expect("still end must fit usize");
     let static_heif = source
         .get(still_start..still_end)
         .expect("parsed static HEIF range must be in bounds");
