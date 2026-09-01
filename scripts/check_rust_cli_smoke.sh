@@ -46,3 +46,6 @@ cargo run --locked --quiet -p xdremux-cli -- --help | grep -F "canonical Rust ru
 cargo run --locked --quiet -p xdremux-cli -- inspect --help | grep -F "Inspect one input" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F -- "--input <INPUT>" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F "Convert one supported source" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F "Convert a deterministic batch" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--input-dir <DIR>" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--recursive" >/dev/null
