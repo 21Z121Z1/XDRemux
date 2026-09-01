@@ -30,6 +30,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path('crates/xdremux-metadata/src/ultrahdr_jpeg.rs')
           text = path.read_text()
           replacements = {
@@ -47,12 +48,36 @@ jobs:
               text = text.replace(old, new)
           path.write_text(text)
 
-          path = Path('crates/xdremux-motion-photo/src/live_photo_still.rs')
+          path = Path('crates/xdremux-runtime/src/live_photo.rs')
           text = path.read_text()
-          old = "    let source = source_jpeg.to_vec();\n    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)\n        .map_err(|error| LivePhotoStillError::external(\"read source JPEG EXIF\", error))?;\n    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(\n        content_identifier,\n    )?));\n"
-          new = "    let source = source_jpeg.to_vec();\n    // Android vendor EXIF can contain non-standard tag/type combinations. Preserve\n    // it when it is safely parseable; otherwise match the established portable\n    // behavior by starting from clean EXIF and still writing the mandatory Apple\n    // Live Photo pairing MakerNote.\n    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)\n        .unwrap_or_else(|_| Metadata::new());\n    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(\n        content_identifier,\n    )?));\n"
+          old = """    reconcile_live_photo_pair, resolve_live_photo_still_time, validate_live_photo_movie,
+    write_live_photo_heif_still, write_live_photo_jpeg_metadata, write_live_photo_movie, ByteRange,
+    MotionPhotoAsset, MotionPhotoSourceKind,
+"""
+          new = """    build_live_photo_jpeg_exif, reconcile_live_photo_pair, resolve_live_photo_still_time,
+    validate_live_photo_movie, write_live_photo_heif_still, write_live_photo_movie, ByteRange,
+    MotionPhotoAsset, MotionPhotoSourceKind,
+"""
           if old not in text:
-              raise SystemExit('JPEG EXIF transfer fragment changed')
+              raise SystemExit('runtime Motion Photo import fragment changed')
+          text = text.replace(old, new, 1)
+          old = """    let encoded_base = heif
+        .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(raster, icc_profile))
+        .map_err(|error| RuntimeError::external("Motion Photo primary HEIC encode", error))?;
+    let encoded_base = write_live_photo_jpeg_metadata(primary, encoded_base, content_identifier)
+        .map_err(|error| RuntimeError::external("Live Photo JPEG EXIF transfer", error))?;
+"""
+          new = """    let exif_tiff = build_live_photo_jpeg_exif(primary, content_identifier)
+        .map_err(|error| RuntimeError::external("Live Photo JPEG EXIF transfer", error))?;
+    let encoded_base = heif
+        .encode_primary_heif(
+            &PrimaryHeifEncodeRequest::live_photo(raster, icc_profile)
+                .with_exif_tiff(exif_tiff),
+        )
+        .map_err(|error| RuntimeError::external("Motion Photo primary HEIC encode", error))?;
+"""
+          if old not in text:
+              raise SystemExit('runtime JPEG primary encode fragment changed')
           path.write_text(text.replace(old, new, 1))
           PY
       - name: Materialize deterministic Rust workspace state
