@@ -283,10 +283,11 @@ fn build_ftyp(source: &[u8], ftyp: &BoxHeader) -> Result<Vec<u8>> {
     let mut output_payload = payload[..8].to_vec();
     let mut brands: Vec<[u8; 4]> =
         [*b"mif1", *b"tmap", *b"MiHE", *b"miaf", *b"MiHB", *b"heic"].to_vec();
-    for chunk in payload[8..].chunks_exact(4) {
-        let brand: [u8; 4] = chunk.try_into().expect("chunks_exact returns four bytes");
-        if !brands.contains(&brand) {
-            brands.push(brand);
+    let (source_brands, remainder) = payload[8..].as_chunks::<4>();
+    debug_assert!(remainder.is_empty());
+    for brand in source_brands {
+        if !brands.contains(brand) {
+            brands.push(*brand);
         }
     }
     for brand in brands {
@@ -632,18 +633,34 @@ fn ensure_u32(value: u64, context: &str) -> Result<()> {
     Ok(())
 }
 
-fn build_placeholder_locations(
-    meta: &ParsedMeta,
-    tile_ids: &[u32],
+#[derive(Debug, Clone, Copy)]
+struct AssemblyItemIds<'a> {
+    tile_ids: &'a [u32],
     gain_id: u32,
     tmap_id: u32,
     xmp_id: u32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AppendedIdatLayout {
     gain_grid_offset: u64,
     gain_grid_length: u64,
     tmap_offset: u64,
     tmap_length: u64,
     xmp_offset: u64,
     xmp_length: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MdatRelocation {
+    new_data_start: u64,
+    original_payload_len: usize,
+}
+
+fn build_placeholder_locations(
+    meta: &ParsedMeta,
+    ids: AssemblyItemIds<'_>,
+    layout: AppendedIdatLayout,
     gain: &DirectHevcGainMap<'_>,
 ) -> Result<Vec<IlocEntry>> {
     let mut entries = meta
@@ -652,7 +669,7 @@ fn build_placeholder_locations(
         .iter()
         .map(|entry| normalized_existing_location(entry, true))
         .collect::<Result<Vec<_>>>()?;
-    for (tile_id, tile) in tile_ids.iter().copied().zip(gain.tiles.iter().copied()) {
+    for (tile_id, tile) in ids.tile_ids.iter().copied().zip(gain.tiles.iter().copied()) {
         entries.push(IlocEntry {
             item_id: tile_id,
             construction_method: 0,
@@ -667,9 +684,13 @@ fn build_placeholder_locations(
         });
     }
     for (item_id, offset, length) in [
-        (gain_id, gain_grid_offset, gain_grid_length),
-        (tmap_id, tmap_offset, tmap_length),
-        (xmp_id, xmp_offset, xmp_length),
+        (
+            ids.gain_id,
+            layout.gain_grid_offset,
+            layout.gain_grid_length,
+        ),
+        (ids.tmap_id, layout.tmap_offset, layout.tmap_length),
+        (ids.xmp_id, layout.xmp_offset, layout.xmp_length),
     ] {
         entries.push(IlocEntry {
             item_id,
@@ -687,23 +708,13 @@ fn build_placeholder_locations(
     Ok(entries)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_final_locations(
     source: &[u8],
     meta: &ParsedMeta,
     mdat: &BoxHeader,
-    new_mdat_data_start: u64,
-    original_mdat_payload_len: usize,
-    tile_ids: &[u32],
-    gain_id: u32,
-    tmap_id: u32,
-    xmp_id: u32,
-    gain_grid_offset: u64,
-    gain_grid_length: u64,
-    tmap_offset: u64,
-    tmap_length: u64,
-    xmp_offset: u64,
-    xmp_length: u64,
+    relocation: MdatRelocation,
+    ids: AssemblyItemIds<'_>,
+    layout: AppendedIdatLayout,
     gain: &DirectHevcGainMap<'_>,
 ) -> Result<Vec<IlocEntry>> {
     let old_mdat_start =
@@ -729,9 +740,13 @@ fn build_final_locations(
                     )));
                 }
                 let relative = old_start - old_mdat_start;
-                extent.offset = new_mdat_data_start.checked_add(relative).ok_or_else(|| {
-                    invalid(format!("item {} relocated offset overflows", entry.item_id))
-                })?;
+                extent.offset =
+                    relocation
+                        .new_data_start
+                        .checked_add(relative)
+                        .ok_or_else(|| {
+                            invalid(format!("item {} relocated offset overflows", entry.item_id))
+                        })?;
             } else {
                 let end = extent.offset.checked_add(extent.length).ok_or_else(|| {
                     invalid(format!("item {} idat extent end overflows", entry.item_id))
@@ -750,10 +765,11 @@ fn build_final_locations(
     }
 
     let mut appended = 0u64;
-    let original_payload_len = u64::try_from(original_mdat_payload_len)
+    let original_payload_len = u64::try_from(relocation.original_payload_len)
         .map_err(|_| invalid("source mdat payload length exceeds u64"))?;
-    for (tile_id, tile) in tile_ids.iter().copied().zip(gain.tiles.iter().copied()) {
-        let offset = new_mdat_data_start
+    for (tile_id, tile) in ids.tile_ids.iter().copied().zip(gain.tiles.iter().copied()) {
+        let offset = relocation
+            .new_data_start
             .checked_add(original_payload_len)
             .and_then(|value| value.checked_add(appended))
             .ok_or_else(|| invalid("native HEVC tile file offset overflows"))?;
@@ -778,9 +794,13 @@ fn build_final_locations(
     }
 
     for (item_id, offset, length) in [
-        (gain_id, gain_grid_offset, gain_grid_length),
-        (tmap_id, tmap_offset, tmap_length),
-        (xmp_id, xmp_offset, xmp_length),
+        (
+            ids.gain_id,
+            layout.gain_grid_offset,
+            layout.gain_grid_length,
+        ),
+        (ids.tmap_id, layout.tmap_offset, layout.tmap_length),
+        (ids.xmp_id, layout.xmp_offset, layout.xmp_length),
     ] {
         ensure_u32(offset, "native idat offset")?;
         ensure_u32(length, "native idat length")?;
@@ -964,20 +984,21 @@ pub fn assemble_iso_gain_map_heif(
     } else {
         meta.iloc.version.max(1)
     };
-    let placeholder_locations = build_placeholder_locations(
-        &meta,
-        &tile_ids,
+    let ids = AssemblyItemIds {
+        tile_ids: &tile_ids,
         gain_id,
         tmap_id,
         xmp_id,
+    };
+    let idat_layout = AppendedIdatLayout {
         gain_grid_offset,
         gain_grid_length,
         tmap_offset,
         tmap_length,
         xmp_offset,
         xmp_length,
-        gain,
-    )?;
+    };
+    let placeholder_locations = build_placeholder_locations(&meta, ids, idat_layout, gain)?;
     let placeholder_iloc = make_iloc_box(iloc_version, 4, 4, 0, 0, &placeholder_locations)?;
     let preliminary_meta = build_meta(
         source,
@@ -1018,18 +1039,12 @@ pub fn assemble_iso_gain_map_heif(
         source,
         &meta,
         mdat,
-        new_mdat_data_start_u64,
-        original_mdat_payload.len(),
-        &tile_ids,
-        gain_id,
-        tmap_id,
-        xmp_id,
-        gain_grid_offset,
-        gain_grid_length,
-        tmap_offset,
-        tmap_length,
-        xmp_offset,
-        xmp_length,
+        MdatRelocation {
+            new_data_start: new_mdat_data_start_u64,
+            original_payload_len: original_mdat_payload.len(),
+        },
+        ids,
+        idat_layout,
         gain,
     )?;
     let final_iloc = make_iloc_box(iloc_version, 4, 4, 0, 0, &final_locations)?;
