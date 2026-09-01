@@ -89,7 +89,7 @@
       "layer": 2,
       "summary": "Asset-aware classification facts and stable tag semantics.",
       "rust_owner": ["crates/xdremux-classification"],
-      "reference_owner": ["Sources/XDRemuxCore/Conversion"],
+      "reference_owner": ["Sources/XDRemuxCore/Metadata", "xdremux_py/categorize.py"],
       "evidence": ["classification contract fixtures"]
     },
     {
