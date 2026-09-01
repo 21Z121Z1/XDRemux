@@ -1,0 +1,43 @@
+name: Diagnose HEIF layout
+
+on:
+  push:
+    branches:
+      - feat/rust-cli-unification
+    paths:
+      - ".github/workflows/diagnose-heif-layout.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Print top-level boxes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          data = Path('fixtures/20260312_135609..heic').read_bytes()
+          off = 0
+          while off + 8 <= len(data):
+              size = struct.unpack_from('>I', data, off)[0]
+              typ = data[off+4:off+8].decode('latin1')
+              header = 8
+              if size == 1:
+                  if off + 16 > len(data):
+                      print('truncated large-size header at', off)
+                      break
+                  size = struct.unpack_from('>Q', data, off+8)[0]
+                  header = 16
+              elif size == 0:
+                  size = len(data) - off
+              if size < header or off + size > len(data):
+                  print('non-box trailing bytes', len(data)-off, 'at', off, 'prefix', data[off:off+16].hex())
+                  break
+              print(f'{off:10d} {typ!r} size={size} data={off+header} end={off+size}')
+              off += size
+          print('file_size', len(data), 'parsed_until', off, 'trailing', len(data)-off)
+          PY
