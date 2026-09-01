@@ -11,6 +11,7 @@ pub use direct::{
 };
 pub use error::{HeifError, Result};
 // Canonical portable final-file assembly. It consumes an ordinary source HEIF
-// directly and does not depend on a Python/Swift-generated intermediate graph.
+// directly, replaces an existing canonical gain-map graph when present, and
+// does not depend on a Python/Swift-generated intermediate graph.
 pub use native::{assemble_iso_gain_map_heif, IsoGainMapAssembly};
 pub use validation::{validate_gain_map_structure, GainMapStructure};
