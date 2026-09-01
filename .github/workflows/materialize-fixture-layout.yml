@@ -1,0 +1,141 @@
+name: Materialize vendor-organized fixture layout
+
+on:
+  push:
+    branches: [feat/rust-cli-unification]
+    paths:
+      - .github/workflows/materialize-fixture-layout.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+
+      - name: Move immutable media fixtures and rewrite path contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          mapping = {
+              "IMG20250502131605.jpg": "motion-photo/oppo/coloros15-ultrahdr-01.jpg",
+              "IMG20250502131608.jpg": "motion-photo/oppo/coloros15-ultrahdr-02.jpg",
+              "IMG20250819170327.jpg": "motion-photo/oppo/coloros15-ultrahdr-03.jpg",
+              "IMG20260710191114_ColorOS_16.jpg": "motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg",
+              "IMG20260801190843_ColorOS_16.jpg": "motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg",
+              "MVIMG_20260419_151324_2_3..jpg": "motion-photo/xiaomi/android-v1-ultrahdr-01.jpg",
+              "20260312_135625..jpg": "motion-photo/samsung/jpeg-ultrahdr-01.jpg",
+              "20260312_135627..jpg": "motion-photo/samsung/jpeg-ultrahdr-02.jpg",
+              "20260312_135609..heic": "motion-photo/samsung/heif-ultrahdr-01.heic",
+              "R002_20260312_135609..heic": "motion-photo/samsung/heif-ultrahdr-01-duplicate-r002.heic",
+              "20260312_135610..heic": "motion-photo/samsung/heif-ultrahdr-02.heic",
+              "R003_20260312_135610..heic": "motion-photo/samsung/heif-ultrahdr-02-duplicate-r003.heic",
+              "IMG_20260620_160335..jpg": "motion-photo/vivo/android-v1-sdr-01.jpg",
+              "IMG_20260620_160410..jpg": "motion-photo/vivo/android-v1-sdr-02.jpg",
+          }
+
+          root = Path("fixtures")
+          for old, new in mapping.items():
+              src = root / old
+              dst = root / new
+              if not src.is_file():
+                  raise SystemExit(f"missing fixture before migration: {src}")
+              dst.parent.mkdir(parents=True, exist_ok=True)
+              subprocess.run(["git", "mv", str(src), str(dst)], check=True)
+
+          tracked = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+          binary_suffixes = {".jpg", ".jpeg", ".heic", ".heif", ".mov", ".mp4", ".png", ".zip"}
+          for raw in tracked:
+              if not raw:
+                  continue
+              path = Path(raw.decode())
+              if path.suffix.lower() in binary_suffixes or not path.is_file():
+                  continue
+              try:
+                  text = path.read_text()
+              except UnicodeDecodeError:
+                  continue
+              updated = text
+              for old, new in mapping.items():
+                  updated = updated.replace(old, new)
+              if updated != text:
+                  path.write_text(updated)
+
+          # The Python fixture index used to key by basename because the corpus was flat.
+          # The vendor hierarchy makes the relative path the stable fixture identity instead.
+          py = Path("Tests/validation/verify_python_motion_photo_fixtures.py")
+          text = py.read_text()
+          old = '''    for path in root.rglob("*"):\n        if path.is_file() and path.name in expected:\n            if path.name in found and path.resolve() != found[path.name].resolve():\n                raise RuntimeError(f"duplicate fixture filename: {path.name}")\n            found[path.name] = path\n'''
+          new = '''    for path in root.rglob("*"):\n        if not path.is_file():\n            continue\n        relative = path.relative_to(root).as_posix()\n        if relative in expected:\n            if relative in found and path.resolve() != found[relative].resolve():\n                raise RuntimeError(f"duplicate fixture path: {relative}")\n            found[relative] = path\n'''
+          if old not in text:
+              raise SystemExit("Python fixture index contract changed; refusing blind rewrite")
+          py.write_text(text.replace(old, new))
+
+          # Nested source paths must not leak into generated output basenames.
+          bundle = Path("scripts/build_live_photo_device_validation.sh")
+          text = bundle.read_text()
+          old = '''  stem="${filename%.*}"\n  # The supplied Samsung fixture names contain a deliberate extra dot before the extension. Keep\n  # the source filename untouched while using a filesystem-friendly output stem.\n  output_stem="${stem%.}"\n'''
+          new = '''  basename="${filename##*/}"\n  stem="${basename%.*}"\n  output_stem="${stem%.}"\n'''
+          if old not in text:
+              raise SystemExit("device-validation output stem contract changed; refusing blind rewrite")
+          bundle.write_text(text.replace(old, new))
+          PY
+
+          cargo fmt --all
+          git diff --check
+
+          test -z "$(find fixtures -maxdepth 1 -type f \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.heic' -o -name '*.heif' \) -print -quit)"
+          for old in \
+            IMG20250502131605.jpg \
+            IMG20250502131608.jpg \
+            IMG20250819170327.jpg \
+            IMG20260710191114_ColorOS_16.jpg \
+            IMG20260801190843_ColorOS_16.jpg \
+            MVIMG_20260419_151324_2_3..jpg \
+            20260312_135625..jpg \
+            20260312_135627..jpg \
+            20260312_135609..heic \
+            R002_20260312_135609..heic \
+            20260312_135610..heic \
+            R003_20260312_135610..heic \
+            IMG_20260620_160335..jpg \
+            IMG_20260620_160410..jpg; do
+            if git grep -F -- "$old" -- ':!fixtures/motion-photo/**' >/dev/null; then
+              echo "stale fixture path remains: $old" >&2
+              git grep -n -F -- "$old" -- ':!fixtures/motion-photo/**' >&2
+              exit 1
+            fi
+          done
+
+      - name: Verify immutable byte identities after moves
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd fixtures
+          sha256sum -c SHA256SUMS
+
+      - name: Commit fixture migration atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/materialize-fixture-layout.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(fixtures): organize media corpus by vendor"
+          git push origin HEAD:feat/rust-cli-unification
