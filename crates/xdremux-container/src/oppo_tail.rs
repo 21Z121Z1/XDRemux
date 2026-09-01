@@ -132,8 +132,9 @@ where
     let manifest_bytes = source
         .get(manifest_info.json_start..manifest_info.json_end)
         .ok_or_else(|| ContainerError::invalid("OPPO tail", "manifest JSON is outside source"))?;
-    let manifest = serde_json::from_slice::<Value>(manifest_bytes)
-        .map_err(|error| ContainerError::invalid("OPPO tail", format!("invalid manifest JSON: {error}")))?;
+    let manifest = serde_json::from_slice::<Value>(manifest_bytes).map_err(|error| {
+        ContainerError::invalid("OPPO tail", format!("invalid manifest JSON: {error}"))
+    })?;
     let manifest = manifest
         .as_array()
         .ok_or_else(|| ContainerError::invalid("OPPO tail", "manifest root is not an array"))?;
@@ -189,8 +190,9 @@ where
         records.push(record);
     }
 
-    let manifest_json = serde_json::to_vec(&records)
-        .map_err(|error| ContainerError::invalid("OPPO tail", format!("manifest encode failed: {error}")))?;
+    let manifest_json = serde_json::to_vec(&records).map_err(|error| {
+        ContainerError::invalid("OPPO tail", format!("manifest encode failed: {error}"))
+    })?;
     let footer_len = manifest_json
         .len()
         .checked_add(9)
