@@ -81,3 +81,5 @@ cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--checkp
 cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F "Classify photo assets" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F -- "--output-dir <DIR>" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F -- "--dry-run" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- validate --help | grep -F "Validate one canonical output" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- validate --help | grep -F -- "--json" >/dev/null
