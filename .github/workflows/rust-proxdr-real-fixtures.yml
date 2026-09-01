@@ -15,6 +15,7 @@ on:
       - "crates/xdremux-metadata/**"
       - "crates/xdremux-format/**"
       - "crates/xdremux-container/**"
+      - "fixtures/SHA256SUMS"
       - "fixtures/proxdr/**"
       - ".github/workflows/rust-proxdr-real-fixtures.yml"
   pull_request:
@@ -31,6 +32,7 @@ on:
       - "crates/xdremux-metadata/**"
       - "crates/xdremux-format/**"
       - "crates/xdremux-container/**"
+      - "fixtures/SHA256SUMS"
       - "fixtures/proxdr/**"
       - ".github/workflows/rust-proxdr-real-fixtures.yml"
 
@@ -51,29 +53,12 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Verify and fingerprint ProXDR corpus
+      - name: Verify canonical fixture identities
         shell: bash
         run: |
           set -euo pipefail
-          expected=(
-            fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic
-            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-01.heic
-            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-02.heic
-            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-03.heic
-            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-04.heic
-            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic
-            fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-xpan-01.heic
-            fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic
-            fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-02.heic
-            fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v1-01.heic
-            fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic
-            fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-02.heic
-            fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic
-            fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic
-          )
-          for path in "${expected[@]}"; do test -f "$path"; done
+          (cd fixtures && sha256sum -c SHA256SUMS)
           test "$(find fixtures/proxdr -type f -name '*.heic' | wc -l)" -eq 14
-          sha256sum "${expected[@]}" | tee "$RUNNER_TEMP/proxdr-sha256.txt"
       - name: Build canonical Rust CLI
         run: cargo build --locked -p xdremux-cli
       - name: Inspect every ProXDR fixture through Rust
@@ -93,14 +78,18 @@ jobs:
           records = []
           for path in sorted(root.glob('*.json')):
               record = json.loads(path.read_text())
-              if record['asset']['kind'] != 'proxdr':
-                  raise SystemExit(f"not routed as ProXDR: {record}")
+              if record['schema_version'] != 1 or record['kind'] != 'pro-xdr':
+                  raise SystemExit(f"not routed as schema-v1 ProXDR: {record}")
+              if not record['input'].startswith('fixtures/proxdr/'):
+                  raise SystemExit(f"unexpected inspection input path: {record['input']}")
               records.append(record)
           if len(records) != 14:
               raise SystemExit(f"expected 14 inspections, found {len(records)}")
-          modes = {record['asset']['hdr_mode'] for record in records}
+          modes = {record['hdr_mode'] for record in records}
           if modes != {'lhdr', 'uhdr'}:
               raise SystemExit(f"expected LHDR and UHDR coverage, got {sorted(modes)}")
+          if any(record['gain_map_bytes'] <= 0 for record in records):
+              raise SystemExit('every ProXDR fixture must expose a non-empty private Gain Map')
           print(json.dumps(records, indent=2))
           PY
       - name: Convert representative real fixtures through Rust CLI
