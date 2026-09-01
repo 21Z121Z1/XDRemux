@@ -9,8 +9,6 @@ on:
       - "crates/xdremux-engine/**"
       - "crates/xdremux-format/**"
       - "crates/xdremux-heif/**"
-      - "xdremux_py/heif_io.py"
-      - "Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift"
       - ".github/workflows/rust-codec-core.yml"
   pull_request:
     paths:
@@ -20,8 +18,6 @@ on:
       - "crates/xdremux-engine/**"
       - "crates/xdremux-format/**"
       - "crates/xdremux-heif/**"
-      - "xdremux_py/heif_io.py"
-      - "Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift"
       - ".github/workflows/rust-codec-core.yml"
 
 permissions:
@@ -43,25 +39,11 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Bootstrap dependency lockfile
-        run: cargo generate-lockfile
-      - name: Apply diagnostic checkout fixes
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          path = Path("crates/xdremux-codec/src/portable/libheif.rs")
-          text = path.read_text()
-          text = text.replace("origin_y\n            .checked_add(y)\n            .unwrap_or(u32::MAX)", "origin_y.saturating_add(y)")
-          text = text.replace("origin_x\n                .checked_add(x)\n                .unwrap_or(u32::MAX)", "origin_x.saturating_add(x)")
-          text, count = re.subn(r'        match encoder\.parameter\("chroma"\).*?\n        \}\n', '', text, count=1, flags=re.S)
-          if count != 1:
-              raise SystemExit("expected one chroma readback block")
-          path.write_text(text)
-          PY
-          cargo fmt --all
+      - name: Verify committed lockfile
+        run: cargo metadata --locked --format-version 1 > /dev/null
+      - name: Check formatting
+        run: cargo fmt --all -- --check
       - name: Lint portable codec provider
-        run: cargo clippy -p xdremux-codec --all-targets -- -D warnings
+        run: cargo clippy --locked -p xdremux-codec --all-targets -- -D warnings
       - name: Test portable codec provider
-        run: cargo test -p xdremux-codec
+        run: cargo test --locked -p xdremux-codec
