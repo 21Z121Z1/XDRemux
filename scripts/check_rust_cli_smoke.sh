@@ -42,6 +42,7 @@ assert report["video"]["length"] > 0, report
 assert report["stream_count"] == 1, report
 PY
 
-cargo run --locked --quiet -p xdremux-cli -- --help | grep -F "inspect <INPUT> [--json]" >/dev/null
-cargo run --locked --quiet -p xdremux-cli -- --help | grep -F "convert --input <INPUT>" >/dev/null
-cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F "Convert one ProXDR image" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- --help | grep -F "canonical Rust runtime" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- inspect --help | grep -F "Inspect one input" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F -- "--input <INPUT>" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F "Convert one supported source" >/dev/null
