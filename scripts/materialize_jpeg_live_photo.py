@@ -1,39 +1,53 @@
 from pathlib import Path
 
 
-def replace_once(path: Path, old: str, new: str, label: str) -> None:
+def ensure_replace(path: Path, old: str, new: str, label: str) -> None:
     text = path.read_text()
-    if old not in text:
-        raise SystemExit(f"expected {label} fragment not found")
-    path.write_text(text.replace(old, new, 1))
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        return
+    if new in text:
+        return
+    raise SystemExit(f"expected old or new {label} fragment not found")
+
+
+def ensure_replace_all(path: Path, replacements: dict[str, str], label: str) -> None:
+    text = path.read_text()
+    changed = False
+    for old, new in replacements.items():
+        if old in text:
+            text = text.replace(old, new)
+            changed = True
+        elif new not in text:
+            raise SystemExit(f"expected old or new {label} fragment not found: {old[:80]!r}")
+    if changed:
+        path.write_text(text)
 
 
 metadata = Path("crates/xdremux-metadata/src/ultrahdr_jpeg.rs")
-text = metadata.read_text()
-replacements = {
-    "fn local_name(name: &[u8]) -> &[u8] {\n    name.rsplit(|byte| *byte == b':').next().unwrap_or(name)\n}":
-        "fn local_name(name: &str) -> &str {\n    name.rsplit(':').next().unwrap_or(name)\n}",
-    "let key = std::str::from_utf8(local_name(attribute.key.as_ref()))\n            .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 XML attribute name\"))?;":
-        "let key = local_name(attribute.key.as_ref());",
-    "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?\n                    .to_owned();":
-        "let name = local_name(element.name().as_ref()).to_owned();",
-    "let value = std::str::from_utf8(text.as_ref())\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 text value\"))?\n                    .trim();":
-        "let value = text.as_ref().trim();",
-    "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?;":
-        "let name = local_name(element.name().as_ref()).to_owned();",
-    "if active_field.as_deref() == Some(name) {":
-        "if active_field.as_deref() == Some(name.as_str()) {",
-    "1000_i32 + channel as i32 * 100":
-        "1000_i32 + channel * 100",
-}
-for old, new in replacements.items():
-    if old not in text:
-        raise SystemExit(f"expected metadata parser fragment not found: {old[:80]!r}")
-    text = text.replace(old, new)
-metadata.write_text(text)
+ensure_replace_all(
+    metadata,
+    {
+        "fn local_name(name: &[u8]) -> &[u8] {\n    name.rsplit(|byte| *byte == b':').next().unwrap_or(name)\n}":
+            "fn local_name(name: &str) -> &str {\n    name.rsplit(':').next().unwrap_or(name)\n}",
+        "let key = std::str::from_utf8(local_name(attribute.key.as_ref()))\n            .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 XML attribute name\"))?;":
+            "let key = local_name(attribute.key.as_ref());",
+        "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?\n                    .to_owned();":
+            "let name = local_name(element.name().as_ref()).to_owned();",
+        "let value = std::str::from_utf8(text.as_ref())\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 text value\"))?\n                    .trim();":
+            "let value = text.as_ref().trim();",
+        "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?;":
+            "let name = local_name(element.name().as_ref()).to_owned();",
+        "if active_field.as_deref() == Some(name) {":
+            "if active_field.as_deref() == Some(name.as_str()) {",
+        "1000_i32 + channel as i32 * 100":
+            "1000_i32 + channel * 100",
+    },
+    "Ultra HDR quick-xml adaptation",
+)
 
 runtime = Path("crates/xdremux-runtime/src/live_photo.rs")
-replace_once(
+ensure_replace(
     runtime,
     """    reconcile_live_photo_pair, resolve_live_photo_still_time, validate_live_photo_movie,
     write_live_photo_heif_still, write_live_photo_jpeg_metadata, write_live_photo_movie, ByteRange,
@@ -45,7 +59,7 @@ replace_once(
 """,
     "runtime Motion Photo import",
 )
-replace_once(
+ensure_replace(
     runtime,
     """    let encoded_base = heif
         .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(raster, icc_profile))
@@ -66,7 +80,7 @@ replace_once(
 )
 
 primary = Path("crates/xdremux-codec/src/portable/primary_heif.rs")
-replace_once(
+ensure_replace(
     primary,
     """        if let Some(exif) = request.exif_tiff.as_ref()
             && !(exif.starts_with(b"II") || exif.starts_with(b"MM"))
@@ -88,7 +102,7 @@ replace_once(
 )
 
 raw_exif = Path("crates/xdremux-format/src/exif_raw.rs")
-replace_once(
+ensure_replace(
     raw_exif,
     """        if let Some(tiff) = payload.get(start..)
             && (tiff.starts_with(b"II") || tiff.starts_with(b"MM"))
