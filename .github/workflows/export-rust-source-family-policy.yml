@@ -1,0 +1,47 @@
+name: Export Rust source family policy
+
+on:
+  push:
+    branches: [feat/rust-cli-unification]
+    paths: [.github/workflows/export-rust-source-family-policy.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Export policy and verify engine
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('crates/xdremux-engine/src/lib.rs')
+          text = path.read_text()
+          old = 'pub use product_policy::{resolve_product_gain_map_encode_profile, wants_oppo_compatibility};'
+          new = 'pub use product_policy::{\n    detect_source_family, resolve_product_gain_map_encode_profile, wants_oppo_compatibility,\n};'
+          if old not in text:
+              raise SystemExit('product policy export anchor not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          cargo fmt --all
+          cargo clippy --locked -p xdremux-engine --all-targets -- -D warnings
+          cargo test --locked -p xdremux-engine
+          bash scripts/check_engine_plan_vectors.sh
+      - name: Commit verified export
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add crates/xdremux-engine/src/lib.rs crates/xdremux-engine/src/product_policy.rs
+          git diff --cached --check
+          git commit -m 'feat(rust-engine): expose source family policy'
+          git push origin HEAD:feat/rust-cli-unification
