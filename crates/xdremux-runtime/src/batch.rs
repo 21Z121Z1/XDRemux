@@ -1,6 +1,9 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
+use std::thread;
 
 use xdremux_engine::ConversionRequest;
 use xdremux_motion_photo::{
@@ -37,10 +40,21 @@ pub struct BatchPlanOptions {
     pub reuse_existing: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchExecutionOptions {
     pub checkpoint_path: Option<PathBuf>,
     pub reuse_existing: bool,
+    pub jobs: usize,
+}
+
+impl Default for BatchExecutionOptions {
+    fn default() -> Self {
+        Self {
+            checkpoint_path: None,
+            reuse_existing: false,
+            jobs: 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -256,23 +270,229 @@ fn pair_matches_identifier(image: &Path, video: &Path, expected: &str) -> bool {
     validate_live_photo_movie(&video_bytes, expected, still_time).is_ok()
 }
 
-fn append_checkpoint_failure(
+#[derive(Debug)]
+enum OwnedCheckpointOutcome {
+    Success(String),
+    SkippedExisting(String),
+    Failure(String),
+}
+
+#[derive(Debug)]
+struct BatchCheckpointEvent {
+    source: PathBuf,
+    image: PathBuf,
+    video: PathBuf,
+    signature: SourceSignature,
+    outcome: OwnedCheckpointOutcome,
+}
+
+impl BatchCheckpointEvent {
+    fn append(
+        self,
+        writer: &mut Option<MotionPhotoCheckpointWriter>,
+        checkpoint_path: Option<&Path>,
+    ) -> Result<()> {
+        if writer.is_none() {
+            if let Some(path) = checkpoint_path {
+                *writer = Some(MotionPhotoCheckpointWriter::open(path)?);
+            }
+        }
+        let Some(writer) = writer.as_mut() else {
+            return Ok(());
+        };
+        let outcome = match &self.outcome {
+            OwnedCheckpointOutcome::Success(identifier) => CheckpointOutcome::Success(identifier),
+            OwnedCheckpointOutcome::SkippedExisting(identifier) => {
+                CheckpointOutcome::SkippedExisting(identifier)
+            }
+            OwnedCheckpointOutcome::Failure(error) => CheckpointOutcome::Failure(error),
+        };
+        writer.append_item(
+            &self.source,
+            &self.image,
+            &self.video,
+            &self.signature,
+            outcome,
+        )
+    }
+}
+
+#[derive(Debug)]
+struct BatchWorkResult {
+    item: BatchItem,
+    result: Result<BatchSuccess>,
+    checkpoint: Option<BatchCheckpointEvent>,
+}
+
+#[derive(Debug)]
+enum OrderedBatchOutcome {
+    Success(BatchSuccess),
+    Failure(BatchFailure),
+}
+
+fn process_batch_item_with_options(
+    runtime: &PortableRuntime,
+    item: BatchItem,
+    request: ConversionRequest,
+    checkpoint: &MotionPhotoCheckpoint,
+    reuse_existing: bool,
+) -> BatchWorkResult {
+    let mut checkpoint_event = None;
+    let result: Result<BatchSuccess> = (|| {
+        if item.input == item.output {
+            return Err(RuntimeError::new(
+                "batch output",
+                "batch conversion never overwrites its source",
+            ));
+        }
+        create_output_parent(&item.output)?;
+        let source = fs::read(&item.input)
+            .map_err(|error| RuntimeError::external("batch input read", error))?;
+        let asset = probe_bytes(&source)
+            .map_err(|error| RuntimeError::external("batch source probe", error))?;
+
+        match asset {
+            SourceAsset::MotionPhoto { .. } => {
+                let signature = source_signature(&item.input, &source)?;
+                let output_video = item.output.with_extension("mov");
+
+                if reuse_existing {
+                    if let Some(prior) = checkpoint.reusable_item(&item.input, &signature)? {
+                        if prior.image == canonical_or_absolute(&item.output)?
+                            && prior.video == canonical_or_absolute(&output_video)?
+                        {
+                            if pair_matches_identifier(
+                                &item.output,
+                                &output_video,
+                                &prior.asset_identifier,
+                            ) {
+                                checkpoint_event = Some(BatchCheckpointEvent {
+                                    source: item.input.clone(),
+                                    image: item.output.clone(),
+                                    video: output_video.clone(),
+                                    signature,
+                                    outcome: OwnedCheckpointOutcome::SkippedExisting(
+                                        prior.asset_identifier,
+                                    ),
+                                });
+                                return Ok(BatchSuccess {
+                                    input: item.input.clone(),
+                                    outputs: vec![item.output.clone(), output_video],
+                                    kind: BatchAssetKind::LivePhoto,
+                                    disposition: BatchSuccessDisposition::SkippedExisting,
+                                });
+                            }
+                            if item.output.exists() || output_video.exists() {
+                                return Err(RuntimeError::new(
+                                    "batch resume provenance",
+                                    "checkpoint matches the source, but the existing HEIC/MOV pair no longer matches its recorded asset identifier; refusing to overwrite",
+                                ));
+                            }
+                        }
+                    }
+                    if item.output.exists() || output_video.exists() {
+                        return Err(RuntimeError::new(
+                            "batch resume provenance",
+                            "existing Live Photo output has no matching source provenance; refusing to reuse or overwrite",
+                        ));
+                    }
+                } else if item.output.exists() || output_video.exists() {
+                    return Err(RuntimeError::new(
+                        "batch output",
+                        "output HEIC/MOV pair already exists; refusing to overwrite",
+                    ));
+                }
+
+                match runtime.convert_motion_photo_file(&source, &item.input, &item.output) {
+                    Ok(converted) => {
+                        checkpoint_event = Some(BatchCheckpointEvent {
+                            source: item.input.clone(),
+                            image: converted.image.clone(),
+                            video: converted.video.clone(),
+                            signature,
+                            outcome: OwnedCheckpointOutcome::Success(
+                                converted.content_identifier.clone(),
+                            ),
+                        });
+                        Ok(BatchSuccess {
+                            input: item.input.clone(),
+                            outputs: vec![converted.image, converted.video],
+                            kind: BatchAssetKind::LivePhoto,
+                            disposition: BatchSuccessDisposition::Converted,
+                        })
+                    }
+                    Err(error) => {
+                        checkpoint_event = Some(BatchCheckpointEvent {
+                            source: item.input.clone(),
+                            image: item.output.clone(),
+                            video: output_video,
+                            signature,
+                            outcome: OwnedCheckpointOutcome::Failure(error.to_string()),
+                        });
+                        Err(error)
+                    }
+                }
+            }
+            SourceAsset::ProXdr { .. } => {
+                if item.output.exists() {
+                    return Err(RuntimeError::new(
+                        "batch output",
+                        "output already exists; refusing to overwrite",
+                    ));
+                }
+                let converted =
+                    runtime.convert_proxdr_file(&source, &item.output, request, |_| {})?;
+                Ok(BatchSuccess {
+                    input: item.input.clone(),
+                    outputs: vec![converted.output],
+                    kind: BatchAssetKind::ProXdr,
+                    disposition: BatchSuccessDisposition::Converted,
+                })
+            }
+        }
+    })();
+
+    BatchWorkResult {
+        item,
+        result,
+        checkpoint: checkpoint_event,
+    }
+}
+
+fn finalize_work_result(
+    work: BatchWorkResult,
     writer: &mut Option<MotionPhotoCheckpointWriter>,
-    source: &Path,
-    output: &Path,
-    signature: &SourceSignature,
-    error: &str,
-) -> Result<()> {
-    let Some(writer) = writer.as_mut() else {
-        return Ok(());
-    };
-    writer.append_item(
-        source,
-        output,
-        &output.with_extension("mov"),
-        signature,
-        CheckpointOutcome::Failure(error),
-    )
+    checkpoint_path: Option<&Path>,
+) -> OrderedBatchOutcome {
+    let BatchWorkResult {
+        item,
+        mut result,
+        checkpoint,
+    } = work;
+    if let Some(event) = checkpoint {
+        if let Err(error) = event.append(writer, checkpoint_path) {
+            result = Err(error);
+        }
+    }
+    match result {
+        Ok(success) => OrderedBatchOutcome::Success(success),
+        Err(error) => OrderedBatchOutcome::Failure(BatchFailure {
+            input: item.input,
+            output: item.output,
+            error: error.to_string(),
+        }),
+    }
+}
+
+fn receipt_from_ordered(outcomes: Vec<Option<OrderedBatchOutcome>>) -> BatchReceipt {
+    let mut receipt = BatchReceipt::default();
+    for outcome in outcomes.into_iter().flatten() {
+        match outcome {
+            OrderedBatchOutcome::Success(success) => receipt.successes.push(success),
+            OrderedBatchOutcome::Failure(failure) => receipt.failures.push(failure),
+        }
+    }
+    receipt
 }
 
 impl PortableRuntime {
@@ -366,144 +586,75 @@ impl PortableRuntime {
                 };
             }
         };
-        let mut writer: Option<MotionPhotoCheckpointWriter> = None;
-        let mut receipt = BatchReceipt::default();
 
-        for item in items {
-            let result: Result<BatchSuccess> = (|| {
-                if item.input == item.output {
-                    return Err(RuntimeError::new(
-                        "batch output",
-                        "batch conversion never overwrites its source",
-                    ));
-                }
-                create_output_parent(&item.output)?;
-                let source = fs::read(&item.input)
-                    .map_err(|error| RuntimeError::external("batch input read", error))?;
-                let asset = probe_bytes(&source)
-                    .map_err(|error| RuntimeError::external("batch source probe", error))?;
-
-                match asset {
-                    SourceAsset::MotionPhoto { .. } => {
-                        let signature = source_signature(&item.input, &source)?;
-                        let output_video = item.output.with_extension("mov");
-                        if writer.is_none() {
-                            if let Some(path) = options.checkpoint_path.as_deref() {
-                                writer = Some(MotionPhotoCheckpointWriter::open(path)?);
-                            }
-                        }
-
-                        if options.reuse_existing {
-                            if let Some(prior) =
-                                checkpoint.reusable_item(&item.input, &signature)?
-                            {
-                                if prior.image == canonical_or_absolute(&item.output)?
-                                    && prior.video == canonical_or_absolute(&output_video)?
-                                {
-                                    if pair_matches_identifier(
-                                        &item.output,
-                                        &output_video,
-                                        &prior.asset_identifier,
-                                    ) {
-                                        if let Some(writer) = writer.as_mut() {
-                                            writer.append_item(
-                                                &item.input,
-                                                &item.output,
-                                                &output_video,
-                                                &signature,
-                                                CheckpointOutcome::SkippedExisting(
-                                                    &prior.asset_identifier,
-                                                ),
-                                            )?;
-                                        }
-                                        return Ok(BatchSuccess {
-                                            input: item.input.clone(),
-                                            outputs: vec![item.output.clone(), output_video],
-                                            kind: BatchAssetKind::LivePhoto,
-                                            disposition: BatchSuccessDisposition::SkippedExisting,
-                                        });
-                                    }
-                                    if item.output.exists() || output_video.exists() {
-                                        return Err(RuntimeError::new(
-                                            "batch resume provenance",
-                                            "checkpoint matches the source, but the existing HEIC/MOV pair no longer matches its recorded asset identifier; refusing to overwrite",
-                                        ));
-                                    }
-                                }
-                            }
-                            if item.output.exists() || output_video.exists() {
-                                return Err(RuntimeError::new(
-                                    "batch resume provenance",
-                                    "existing Live Photo output has no matching source provenance; refusing to reuse or overwrite",
-                                ));
-                            }
-                        } else if item.output.exists() || output_video.exists() {
-                            return Err(RuntimeError::new(
-                                "batch output",
-                                "output HEIC/MOV pair already exists; refusing to overwrite",
-                            ));
-                        }
-
-                        match self.convert_motion_photo_file(&source, &item.input, &item.output) {
-                            Ok(converted) => {
-                                if let Some(writer) = writer.as_mut() {
-                                    writer.append_item(
-                                        &item.input,
-                                        &converted.image,
-                                        &converted.video,
-                                        &signature,
-                                        CheckpointOutcome::Success(&converted.content_identifier),
-                                    )?;
-                                }
-                                Ok(BatchSuccess {
-                                    input: item.input.clone(),
-                                    outputs: vec![converted.image, converted.video],
-                                    kind: BatchAssetKind::LivePhoto,
-                                    disposition: BatchSuccessDisposition::Converted,
-                                })
-                            }
-                            Err(error) => {
-                                let detail = error.to_string();
-                                append_checkpoint_failure(
-                                    &mut writer,
-                                    &item.input,
-                                    &item.output,
-                                    &signature,
-                                    &detail,
-                                )?;
-                                Err(error)
-                            }
-                        }
-                    }
-                    SourceAsset::ProXdr { .. } => {
-                        if item.output.exists() {
-                            return Err(RuntimeError::new(
-                                "batch output",
-                                "output already exists; refusing to overwrite",
-                            ));
-                        }
-                        let converted =
-                            self.convert_proxdr_file(&source, &item.output, request, |_| {})?;
-                        Ok(BatchSuccess {
-                            input: item.input.clone(),
-                            outputs: vec![converted.output],
-                            kind: BatchAssetKind::ProXdr,
-                            disposition: BatchSuccessDisposition::Converted,
-                        })
-                    }
-                }
-            })();
-
-            match result {
-                Ok(success) => receipt.successes.push(success),
-                Err(error) => receipt.failures.push(BatchFailure {
-                    input: item.input,
-                    output: item.output,
-                    error: error.to_string(),
-                }),
-            }
+        let items = items.into_iter().collect::<Vec<_>>();
+        if items.is_empty() {
+            return BatchReceipt::default();
         }
-        receipt
+        let jobs = options.jobs.max(1).min(items.len());
+        let mut writer: Option<MotionPhotoCheckpointWriter> = None;
+        let mut outcomes = (0..items.len()).map(|_| None).collect::<Vec<_>>();
+
+        if jobs == 1 {
+            for (index, item) in items.iter().cloned().enumerate() {
+                let work = process_batch_item_with_options(
+                    self,
+                    item,
+                    request,
+                    &checkpoint,
+                    options.reuse_existing,
+                );
+                outcomes[index] = Some(finalize_work_result(
+                    work,
+                    &mut writer,
+                    options.checkpoint_path.as_deref(),
+                ));
+            }
+            return receipt_from_ordered(outcomes);
+        }
+
+        let next = AtomicUsize::new(0);
+        let (sender, receiver) = mpsc::sync_channel::<(usize, BatchWorkResult)>(jobs);
+        let reuse_existing = options.reuse_existing;
+        thread::scope(|scope| {
+            for _ in 0..jobs {
+                let sender = sender.clone();
+                let items = &items;
+                let checkpoint = &checkpoint;
+                let next = &next;
+                scope.spawn(move || {
+                    let runtime = PortableRuntime::new();
+                    loop {
+                        let index = next.fetch_add(1, Ordering::Relaxed);
+                        let Some(item) = items.get(index).cloned() else {
+                            break;
+                        };
+                        let work = process_batch_item_with_options(
+                            &runtime,
+                            item,
+                            request,
+                            checkpoint,
+                            reuse_existing,
+                        );
+                        if sender.send((index, work)).is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+            drop(sender);
+            for _ in 0..items.len() {
+                let (index, work) = receiver
+                    .recv()
+                    .expect("batch workers must return exactly one result per planned item");
+                outcomes[index] = Some(finalize_work_result(
+                    work,
+                    &mut writer,
+                    options.checkpoint_path.as_deref(),
+                ));
+            }
+        });
+        receipt_from_ordered(outcomes)
     }
 }
 

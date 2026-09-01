@@ -64,6 +64,13 @@ struct ConvertArgs {
     output: Option<PathBuf>,
 }
 
+fn default_batch_jobs() -> usize {
+    std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(1)
+        .min(4)
+}
+
 #[derive(Debug, Args)]
 struct BatchArgs {
     /// Explicit input file. Repeat to add multiple files.
@@ -91,6 +98,9 @@ struct BatchArgs {
     /// The compatibility state is stored at this path with `.motion-photo` appended.
     #[arg(long, value_name = "FILE")]
     checkpoint: Option<PathBuf>,
+    /// Maximum number of concurrent conversions. Zero is treated as one.
+    #[arg(long, default_value_t = default_batch_jobs(), value_name = "N")]
+    jobs: usize,
     /// Emit one machine-readable JSON receipt instead of human progress.
     #[arg(long)]
     json: bool,
@@ -452,6 +462,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
     let execution_options = BatchExecutionOptions {
         checkpoint_path,
         reuse_existing,
+        jobs: arguments.jobs.max(1),
     };
     let receipt =
         runtime.convert_batch_with_options(items, ConversionRequest::default(), &execution_options);
@@ -688,6 +699,7 @@ mod tests {
         assert!(!arguments.skip_existing);
         assert!(!arguments.resume);
         assert_eq!(arguments.checkpoint, None);
+        assert!(arguments.jobs >= 1 && arguments.jobs <= 4);
     }
 
     #[test]
@@ -710,6 +722,7 @@ mod tests {
             skip_existing: false,
             resume: false,
             checkpoint: None,
+            jobs: 1,
             json: false,
         };
         assert_eq!(
