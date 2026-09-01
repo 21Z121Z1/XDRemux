@@ -23,14 +23,46 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Wire execution module
+      - name: Refine and wire execution module
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path("crates/xdremux-engine/src/lib.rs")
-          text = path.read_text()
+          execution = Path("crates/xdremux-engine/src/execution.rs")
+          text = execution.read_text()
+          anchor = '''impl<BuildError, ValidationError, PublicationError> Error
+              for ExecutionError<BuildError, ValidationError, PublicationError>
+          where
+              BuildError: Error + 'static,
+              ValidationError: Error + 'static,
+              PublicationError: Error + 'static,
+          {
+          }
+          '''
+          addition = anchor + '''
+          pub type ExecutionResult<Published, BuildError, ValidationError, PublicationError> =
+              std::result::Result<
+                  ExecutionReceipt<Published>,
+                  ExecutionError<BuildError, ValidationError, PublicationError>,
+              >;
+          '''
+          if anchor not in text:
+              raise SystemExit("execution error impl anchor not found")
+          text = text.replace(anchor, addition, 1)
+          old_return = '''    mut observe: Observe,
+          ) -> std::result::Result<ExecutionReceipt<Publisher::Output>, ExecutionError<Builder::Error, Validator::Error, Publisher::Error>>
+          where'''
+          new_return = '''    mut observe: Observe,
+          ) -> ExecutionResult<Publisher::Output, Builder::Error, Validator::Error, Publisher::Error>
+          where'''
+          if old_return not in text:
+              raise SystemExit("execute_conversion return anchor not found")
+          text = text.replace(old_return, new_return, 1)
+          execution.write_text(text)
+
+          lib = Path("crates/xdremux-engine/src/lib.rs")
+          text = lib.read_text()
           old = "mod capabilities;\nmod source_profile;"
           new = "mod capabilities;\nmod execution;\nmod source_profile;"
           if old not in text:
@@ -45,13 +77,13 @@ jobs:
           '''
           addition = anchor + '''pub use execution::{
               execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
-              ExecutionReceipt, ExecutionStage,
+              ExecutionReceipt, ExecutionResult, ExecutionStage,
           };
           '''
           if anchor not in text:
               raise SystemExit("engine export anchor not found")
           text = text.replace(anchor, addition, 1)
-          path.write_text(text)
+          lib.write_text(text)
           PY
           cargo fmt --all
       - name: Verify engine execution contract
@@ -65,7 +97,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/xdremux-engine/src/lib.rs
+          git add crates/xdremux-engine/src/execution.rs crates/xdremux-engine/src/lib.rs
           git diff --cached --check
           git commit -m "feat(rust-engine): wire execution coordinator"
           git push origin HEAD:feat/rust-cli-unification
