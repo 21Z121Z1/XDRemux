@@ -21,6 +21,52 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
+      - name: Apply checked dimension conversion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('crates/xdremux-motion-photo/src/live_photo_mov.rs')
+          text = path.read_text()
+          anchor = '''pub fn write_live_photo_movie(
+              source: &[u8],
+              content_identifier: &str,
+              still_time_seconds: f64,
+              oppo_metadata: Option<&OppoMetadata>,
+          ) -> LivePhotoMovieResult<Vec<u8>> {'''
+          helper = '''fn exact_video_dimension(value: Option<i64>) -> Option<f32> {
+              let value = value?;
+              const MAX_EXACT_F32_INTEGER: i64 = 1 << 24;
+              if value <= 0 || value > MAX_EXACT_F32_INTEGER {
+                  return None;
+              }
+              Some(value as f32)
+          }
+
+          pub fn write_live_photo_movie(
+              source: &[u8],
+              content_identifier: &str,
+              still_time_seconds: f64,
+              oppo_metadata: Option<&OppoMetadata>,
+          ) -> LivePhotoMovieResult<Vec<u8>> {'''
+          if anchor not in text:
+              raise SystemExit('writer anchor not found')
+          text = text.replace(anchor, helper, 1)
+          old = '''        oppo_metadata.and_then(|metadata| {
+              Some((
+                  f32::try_from(metadata.video_width?).ok()?,
+                  f32::try_from(metadata.video_height?).ok()?,
+              ))
+          })'''
+          new = '''        oppo_metadata.and_then(|metadata| {
+              Some((
+                  exact_video_dimension(metadata.video_width)?,
+                  exact_video_dimension(metadata.video_height)?,
+              ))
+          })'''
+          if old not in text:
+              raise SystemExit('dimension conversion anchor not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Materialize lockfile and formatting
         run: |
           cargo generate-lockfile
