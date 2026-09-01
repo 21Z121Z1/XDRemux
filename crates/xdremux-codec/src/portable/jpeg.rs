@@ -69,15 +69,8 @@ mod tests {
     use std::path::PathBuf;
     use xdremux_engine::OperationCapability;
 
-    fn source_fixture() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/20260312_135609..heic")
-    }
-
-    fn fixture_gain_map_jpeg() -> Vec<u8> {
-        let source = fs::read(source_fixture()).expect("read public ProXDR fixture");
-        xdremux_container::extract(&source)
-            .expect("extract fixture private Gain Map JPEG")
-            .mask_jpeg_data
+    fn jpeg_fixture() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/20260312_135625..jpg")
     }
 
     #[test]
@@ -93,8 +86,8 @@ mod tests {
     }
 
     #[test]
-    fn decodes_real_private_gain_map_as_mono_and_rgb() {
-        let jpeg = fixture_gain_map_jpeg();
+    fn decodes_real_jpeg_with_trailing_motion_data_as_mono_and_rgb() {
+        let jpeg = fs::read(jpeg_fixture()).expect("read real JPEG fixture");
         let provider = ZuneJpegProvider::new();
 
         for format in [RasterPixelFormat::Mono8, RasterPixelFormat::Rgb8] {
@@ -103,7 +96,7 @@ mod tests {
                     data: jpeg.clone(),
                     format,
                 })
-                .expect("decode real private Gain Map JPEG");
+                .expect("decode real JPEG fixture");
             assert!(raster.width > 0);
             assert!(raster.height > 0);
             assert_eq!(raster.format, format);
