@@ -58,8 +58,11 @@ fn convert_command_executes_full_rust_proxdr_pipeline() {
     let converted = fs::read(&output).expect("CLI must atomically publish the output file");
     let structure =
         validate_gain_map_structure(&converted).expect("CLI output Gain Map graph must validate");
-    assert_eq!(structure.channel_count, 3);
-    assert_eq!(structure.chroma_sampling, ChromaSampling::Yuv444);
+    // The real Find X6 Pro LHDR fixture carries monochrome gain semantics. The CLI
+    // contract is to preserve that semantic channel count rather than force the old
+    // synthetic RGB444 test shape.
+    assert_eq!(structure.channel_count, 1);
+    assert_eq!(structure.chroma_sampling, ChromaSampling::Mono400);
     assert_eq!(structure.luma_bit_depth, 8);
     assert_eq!(structure.chroma_bit_depth, 8);
     assert!(structure.width > 0);
