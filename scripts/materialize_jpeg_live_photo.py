@@ -126,3 +126,21 @@ ensure_replace(
 """,
     "raw HEIF EXIF Rust-2021 guard",
 )
+ensure_replace(
+    raw_exif,
+    """    for raw in raw_entries.chunks_exact(12) {
+        entries.push(raw.try_into().expect("chunks_exact yields 12-byte entries"));
+    }
+""",
+    """    for raw in raw_entries.as_chunks::<12>().0 {
+        entries.push(*raw);
+    }
+""",
+    "raw EXIF fixed-size IFD chunks",
+)
+ensure_replace(
+    raw_exif,
+    "if output.len() % 2 != 0 {",
+    "if !output.len().is_multiple_of(2) {",
+    "raw EXIF even padding",
+)
