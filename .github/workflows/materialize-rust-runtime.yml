@@ -105,6 +105,10 @@ jobs:
               "assert_eq!(standard_heif_body(&source).unwrap().len(), body_len);",
               "assert_eq!(standard_heif_body(&source, body_len).unwrap().len(), body_len);",
           )
+          text = text.replace(
+              "use xdremux_format::isobmff::make_box;",
+              "use xdremux_format::isobmff::{make_box, MDAT};",
+          )
           path.write_text(text)
           PY
       - name: Materialize lockfile and format source
