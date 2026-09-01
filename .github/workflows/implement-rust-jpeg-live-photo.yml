@@ -42,7 +42,9 @@ jobs:
               "let value = std::str::from_utf8(text.as_ref())\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 text value\"))?\n                    .trim();":
               "let value = text.as_ref().trim();",
               "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?;":
-              "let name = local_name(element.name().as_ref());",
+              "let name = local_name(element.name().as_ref()).to_owned();",
+              "if active_field.as_deref() == Some(name) {":
+              "if active_field.as_deref() == Some(name.as_str()) {",
           }
           for old, new in replacements.items():
               if old not in text:
