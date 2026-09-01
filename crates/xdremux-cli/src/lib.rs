@@ -71,7 +71,10 @@ fn parse_cli(args: impl IntoIterator<Item = OsString>) -> Result<Cli, clap::Erro
 
 fn write_root_help(stdout: &mut impl Write) -> u8 {
     let mut command = Cli::command();
-    match command.write_long_help(&mut *stdout).and_then(|()| writeln!(stdout)) {
+    match command
+        .write_long_help(&mut *stdout)
+        .and_then(|()| writeln!(stdout))
+    {
         Ok(()) => 0,
         Err(_) => 1,
     }
@@ -326,7 +329,9 @@ mod tests {
         let mut stderr = Vec::new();
         assert_eq!(run_from(["convert"], &mut stdout, &mut stderr), 2);
         assert!(stdout.is_empty());
-        assert!(String::from_utf8(stderr).unwrap().contains("--input <INPUT>"));
+        assert!(String::from_utf8(stderr)
+            .unwrap()
+            .contains("--input <INPUT>"));
     }
 
     #[test]
