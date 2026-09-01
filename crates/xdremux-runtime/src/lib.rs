@@ -192,7 +192,13 @@ impl PortableRuntime {
         input: impl AsRef<Path>,
         output: impl AsRef<Path>,
     ) -> Result<LivePhotoFileReceipt> {
-        live_photo::convert_heif_motion_photo_file(source, input.as_ref(), output.as_ref())
+        live_photo::convert_motion_photo_file(
+            &self.jpeg,
+            &self.heif,
+            source,
+            input.as_ref(),
+            output.as_ref(),
+        )
     }
 }
 
