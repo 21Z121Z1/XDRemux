@@ -73,7 +73,12 @@ fn checked_add(value: usize, amount: usize, context: &'static str) -> Result<usi
         .ok_or_else(|| FormatError::overflow(context))
 }
 
-fn read_slice(data: &[u8], start: usize, len: usize, context: &'static str) -> Result<&[u8]> {
+fn read_slice<'a>(
+    data: &'a [u8],
+    start: usize,
+    len: usize,
+    context: &'static str,
+) -> Result<&'a [u8]> {
     let end = checked_add(start, len, context)?;
     data.get(start..end).ok_or(FormatError::UnexpectedEof {
         context,
@@ -114,8 +119,8 @@ fn parse_ifd(tiff: &[u8], offset: usize, order: ByteOrder, context: &'static str
     let trailer = read_slice(tiff, entries_end, 4, context)?;
     let raw_entries = read_slice(tiff, entries_start, entries_len, context)?;
     let mut entries = Vec::with_capacity(count);
-    for raw in raw_entries.chunks_exact(12) {
-        entries.push(raw.try_into().expect("chunks_exact yields 12-byte entries"));
+    for raw in raw_entries.as_chunks::<12>().0 {
+        entries.push(*raw);
     }
     Ok(Ifd {
         entries,
@@ -152,7 +157,7 @@ fn exif_ifd_pointer(ifd0: &Ifd, order: ByteOrder) -> Result<Option<(usize, u32)>
 }
 
 fn append_even_padding(output: &mut Vec<u8>) {
-    if output.len() % 2 != 0 {
+    if !output.len().is_multiple_of(2) {
         output.push(0);
     }
 }
@@ -270,7 +275,10 @@ pub fn jpeg_exif_tiff(jpeg: &[u8]) -> Result<Option<Vec<u8>>> {
         let payload = &jpeg[payload_start..segment_end];
         if marker == 0xe1 && payload.starts_with(EXIF_APP1_SIGNATURE) {
             if found.is_some() {
-                return Err(invalid(JPEG_CONTEXT, "multiple EXIF APP1 segments are ambiguous"));
+                return Err(invalid(
+                    JPEG_CONTEXT,
+                    "multiple EXIF APP1 segments are ambiguous",
+                ));
             }
             let tiff = payload[EXIF_APP1_SIGNATURE.len()..].to_vec();
             tiff_header(&tiff)?;
@@ -292,11 +300,11 @@ fn normalize_heif_exif_item(payload: &[u8]) -> Result<Vec<u8>> {
     let offset = usize::try_from(u32::from_be_bytes(payload[..4].try_into().unwrap()))
         .map_err(|_| FormatError::overflow("HEIF Exif TIFF offset"))?;
     for start in [offset, offset.saturating_add(4)] {
-        if let Some(tiff) = payload.get(start..)
-            && (tiff.starts_with(b"II") || tiff.starts_with(b"MM"))
-        {
-            tiff_header(tiff)?;
-            return Ok(tiff.to_vec());
+        if let Some(tiff) = payload.get(start..) {
+            if tiff.starts_with(b"II") || tiff.starts_with(b"MM") {
+                tiff_header(tiff)?;
+                return Ok(tiff.to_vec());
+            }
         }
     }
     Err(invalid(
@@ -313,7 +321,10 @@ pub fn heif_exif_tiff(heif: &[u8]) -> Result<Option<Vec<u8>>> {
         return Ok(None);
     };
     if metas.next().is_some() {
-        return Err(invalid("HEIF EXIF", "multiple top-level meta boxes are ambiguous"));
+        return Err(invalid(
+            "HEIF EXIF",
+            "multiple top-level meta boxes are ambiguous",
+        ));
     }
     let meta = parse_meta_box(heif, meta_header)?;
     let exif_items = meta
@@ -454,7 +465,10 @@ pub fn exif_makernote(tiff: &[u8]) -> Result<Option<Vec<u8>>> {
         return Ok(None);
     };
     if notes.len() != 1 {
-        return Err(invalid(TIFF_CONTEXT, "ExifIFD has multiple MakerNote entries"));
+        return Err(invalid(
+            TIFF_CONTEXT,
+            "ExifIFD has multiple MakerNote entries",
+        ));
     }
     let field_type = order.read_u16(&entry[2..4]);
     if field_type != TYPE_UNDEFINED {
@@ -483,7 +497,13 @@ mod tests {
         order.write_u32(8, &mut tiff);
         let exif_offset = 26_u32;
         let ifd0 = Ifd {
-            entries: vec![make_entry(order, EXIF_IFD_POINTER_TAG, TYPE_LONG, 1, exif_offset)],
+            entries: vec![make_entry(
+                order,
+                EXIF_IFD_POINTER_TAG,
+                TYPE_LONG,
+                1,
+                exif_offset,
+            )],
             next_ifd: 0,
         };
         append_ifd(&mut tiff, order, &ifd0).unwrap();
@@ -499,10 +519,17 @@ mod tests {
     #[test]
     fn replaces_makernote_without_interpreting_vendor_tags() {
         let original = tiff_with_opaque_vendor_entry();
-        let marker = original.windows(12).find(|entry| entry[..2] == 0x9286_u16.to_le_bytes()).unwrap().to_vec();
+        let marker = original
+            .windows(12)
+            .find(|entry| entry[..2] == 0x9286_u16.to_le_bytes())
+            .unwrap()
+            .to_vec();
         let note = b"Apple iOS opaque note";
         let patched = replace_exif_makernote(Some(&original), note).unwrap();
-        assert_eq!(exif_makernote(&patched).unwrap().as_deref(), Some(note.as_slice()));
+        assert_eq!(
+            exif_makernote(&patched).unwrap().as_deref(),
+            Some(note.as_slice())
+        );
         assert!(patched.windows(marker.len()).any(|window| window == marker));
     }
 
@@ -510,7 +537,10 @@ mod tests {
     fn creates_minimal_tiff_when_source_has_no_exif() {
         let note = b"Apple iOS minimal note";
         let tiff = replace_exif_makernote(None, note).unwrap();
-        assert_eq!(exif_makernote(&tiff).unwrap().as_deref(), Some(note.as_slice()));
+        assert_eq!(
+            exif_makernote(&tiff).unwrap().as_deref(),
+            Some(note.as_slice())
+        );
     }
 
     #[test]
@@ -522,6 +552,9 @@ mod tests {
         jpeg.extend_from_slice(&u16::try_from(payload.len() + 2).unwrap().to_be_bytes());
         jpeg.extend_from_slice(&payload);
         jpeg.extend_from_slice(&[0xff, 0xd9]);
-        assert_eq!(jpeg_exif_tiff(&jpeg).unwrap().as_deref(), Some(tiff.as_slice()));
+        assert_eq!(
+            jpeg_exif_tiff(&jpeg).unwrap().as_deref(),
+            Some(tiff.as_slice())
+        );
     }
 }

@@ -114,8 +114,8 @@ fn extract_xmp(jpeg: &[u8]) -> Result<Option<&[u8]>> {
     Ok(Some(&scan[start..end]))
 }
 
-fn local_name(name: &[u8]) -> &[u8] {
-    name.rsplit(|byte| *byte == b':').next().unwrap_or(name)
+fn local_name(name: &str) -> &str {
+    name.rsplit(':').next().unwrap_or(name)
 }
 
 fn attributes(element: &BytesStart<'_>) -> Result<BTreeMap<String, String>> {
@@ -123,8 +123,7 @@ fn attributes(element: &BytesStart<'_>) -> Result<BTreeMap<String, String>> {
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute
             .map_err(|_| MetadataError::invalid(XMP_CONTEXT, "malformed XML attribute"))?;
-        let key = std::str::from_utf8(local_name(attribute.key.as_ref()))
-            .map_err(|_| MetadataError::invalid(XMP_CONTEXT, "non-UTF-8 XML attribute name"))?;
+        let key = local_name(attribute.key.as_ref());
         let value = attribute
             .normalized_value(XmlVersion::Implicit1_0)
             .map_err(|_| MetadataError::invalid(XMP_CONTEXT, "invalid XML attribute value"))?;
@@ -189,9 +188,7 @@ fn parse_hdrgm_xmp(xmp: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
             .map_err(|_| MetadataError::invalid(XMP_CONTEXT, "malformed XML"))?
         {
             Event::Start(element) | Event::Empty(element) => {
-                let name = std::str::from_utf8(local_name(element.name().as_ref()))
-                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, "non-UTF-8 element name"))?
-                    .to_owned();
+                let name = local_name(element.name().as_ref()).to_owned();
                 for (key, value) in attributes(&element)? {
                     if is_numeric_field(&key) {
                         numeric.insert(key, parse_number_list(&value)?);
@@ -207,9 +204,7 @@ fn parse_hdrgm_xmp(xmp: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
                 let Some(field) = active_field.as_deref() else {
                     continue;
                 };
-                let value = std::str::from_utf8(text.as_ref())
-                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, "non-UTF-8 text value"))?
-                    .trim();
+                let value = text.as_ref().trim();
                 if value.is_empty() {
                     continue;
                 }
@@ -221,9 +216,8 @@ fn parse_hdrgm_xmp(xmp: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
                 }
             }
             Event::End(element) => {
-                let name = std::str::from_utf8(local_name(element.name().as_ref()))
-                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, "non-UTF-8 element name"))?;
-                if active_field.as_deref() == Some(name) {
+                let name = local_name(element.name().as_ref()).to_owned();
+                if active_field.as_deref() == Some(name.as_str()) {
                     active_field = None;
                 }
             }
@@ -301,7 +295,10 @@ fn is_numeric_field(name: &str) -> bool {
 }
 
 fn parse_boolean(value: &str) -> bool {
-    matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes")
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes"
+    )
 }
 
 struct Cursor<'a> {
@@ -527,9 +524,9 @@ fn parse_iso_jpeg(jpeg: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
                 .checked_add(1)
                 .ok_or_else(|| MetadataError::overflow(ISO_CONTEXT))?;
         }
-        let marker = *jpeg.get(cursor).ok_or_else(|| {
-            MetadataError::invalid(ISO_CONTEXT, "truncated JPEG marker")
-        })?;
+        let marker = *jpeg
+            .get(cursor)
+            .ok_or_else(|| MetadataError::invalid(ISO_CONTEXT, "truncated JPEG marker"))?;
         cursor = cursor
             .checked_add(1)
             .ok_or_else(|| MetadataError::overflow(ISO_CONTEXT))?;
@@ -542,9 +539,9 @@ fn parse_iso_jpeg(jpeg: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
         let length_end = cursor
             .checked_add(2)
             .ok_or_else(|| MetadataError::overflow(ISO_CONTEXT))?;
-        let length_bytes = jpeg.get(cursor..length_end).ok_or_else(|| {
-            MetadataError::invalid(ISO_CONTEXT, "truncated JPEG segment length")
-        })?;
+        let length_bytes = jpeg
+            .get(cursor..length_end)
+            .ok_or_else(|| MetadataError::invalid(ISO_CONTEXT, "truncated JPEG segment length"))?;
         let length = usize::from(u16::from_be_bytes([length_bytes[0], length_bytes[1]]));
         if length < 2 {
             return Err(MetadataError::invalid(
@@ -572,9 +569,7 @@ fn parse_iso_jpeg(jpeg: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
 /// Adobe hdrgm XMP is preferred when present, matching existing product
 /// semantics. ISO 21496-1 APP2 is the standards fallback used by newer Android
 /// encoders. A JPEG containing neither form is not considered a gain map.
-pub fn parse_ultrahdr_gain_map_metadata(
-    jpeg: &[u8],
-) -> Result<Option<UltraHdrGainMapMetadata>> {
+pub fn parse_ultrahdr_gain_map_metadata(jpeg: &[u8]) -> Result<Option<UltraHdrGainMapMetadata>> {
     if let Some(xmp) = extract_xmp(jpeg)? {
         if let Some(metadata) = parse_hdrgm_xmp(xmp)? {
             return Ok(Some(metadata));
@@ -599,7 +594,7 @@ mod tests {
         let channels = if flags & 0x01 != 0 { 3 } else { 1 };
         for channel in 0..channels {
             output.extend_from_slice(&0_i32.to_be_bytes());
-            output.extend_from_slice(&(1000_i32 + channel as i32 * 100).to_be_bytes());
+            output.extend_from_slice(&(1000_i32 + channel * 100).to_be_bytes());
             output.extend_from_slice(&1000_u32.to_be_bytes());
             output.extend_from_slice(&0_i32.to_be_bytes());
             output.extend_from_slice(&0_i32.to_be_bytes());

@@ -69,7 +69,9 @@ pub fn jpeg_image_end(data: &[u8], start: usize) -> Result<usize> {
         }
 
         if data.get(cursor) != Some(&0xff) {
-            return Err(invalid(format!("expected marker prefix at offset {cursor}")));
+            return Err(invalid(format!(
+                "expected marker prefix at offset {cursor}"
+            )));
         }
         while data.get(cursor) == Some(&0xff) {
             cursor = checked_add(cursor, 1, "JPEG marker offset")?;
@@ -130,7 +132,9 @@ pub fn jpeg_icc_profile(jpeg: &[u8]) -> Result<Option<Vec<u8>>> {
 
     while cursor < end {
         if jpeg.get(cursor) != Some(&0xff) {
-            return Err(invalid(format!("expected marker prefix at offset {cursor}")));
+            return Err(invalid(format!(
+                "expected marker prefix at offset {cursor}"
+            )));
         }
         while jpeg.get(cursor) == Some(&0xff) {
             cursor = checked_add(cursor, 1, "JPEG marker offset")?;
@@ -191,7 +195,9 @@ pub fn jpeg_icc_profile(jpeg: &[u8]) -> Result<Option<Vec<u8>>> {
         return Ok(None);
     };
     if chunks.iter().any(Option::is_none) {
-        return Err(invalid("JPEG ICC profile is missing one or more APP2 chunks"));
+        return Err(invalid(
+            "JPEG ICC profile is missing one or more APP2 chunks",
+        ));
     }
     let total = chunks.iter().try_fold(0usize, |sum, chunk| {
         sum.checked_add(chunk.as_ref().map_or(0, Vec::len))
@@ -237,7 +243,10 @@ mod tests {
         jpeg.extend_from_slice(&segment(0xe2, &second));
         jpeg.extend_from_slice(&segment(0xe2, &first));
         jpeg.extend_from_slice(&[0xff, 0xd9]);
-        assert_eq!(jpeg_icc_profile(&jpeg).unwrap().as_deref(), Some(b"hello world".as_slice()));
+        assert_eq!(
+            jpeg_icc_profile(&jpeg).unwrap().as_deref(),
+            Some(b"hello world".as_slice())
+        );
     }
 
     #[test]

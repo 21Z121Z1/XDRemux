@@ -40,12 +40,7 @@ impl LibHeifProvider {
         .map_err(CodecError::libheif)?;
         for channel in [Channel::R, Channel::G, Channel::B] {
             image
-                .create_plane(
-                    channel,
-                    request.raster.width,
-                    request.raster.height,
-                    8,
-                )
+                .create_plane(channel, request.raster.width, request.raster.height, 8)
                 .map_err(CodecError::libheif)?;
         }
         let planes = image.planes_mut();
@@ -59,21 +54,13 @@ impl LibHeifProvider {
             .b
             .ok_or_else(|| CodecError::invalid("libheif did not allocate primary B plane"))?;
         copy_primary_rgb_planes(
-            r.data,
-            r.stride,
-            g.data,
-            g.stride,
-            b.data,
-            b.stride,
-            request,
+            r.data, r.stride, g.data, g.stride, b.data, b.stride, request,
         )?;
 
         if let Some(icc) = &request.icc_profile {
+            let profile = ColorProfileRaw::new(color_profile_types::PROF, icc.clone());
             image
-                .set_raw_color_profile(ColorProfileRaw::new(
-                    color_profile_types::PROF,
-                    icc.clone(),
-                ))
+                .set_color_profile_raw(&profile)
                 .map_err(CodecError::libheif)?;
         }
 
@@ -84,12 +71,13 @@ impl LibHeifProvider {
         encoder
             .set_quality(EncoderQuality::Lossy(request.quality))
             .map_err(CodecError::libheif)?;
-        if encoder.parameters_names().iter().any(|name| name == "chroma") {
+        if encoder
+            .parameters_names()
+            .iter()
+            .any(|name| name == "chroma")
+        {
             encoder
-                .set_parameter_value(
-                    "chroma",
-                    EncoderParameterValue::String("420".to_owned()),
-                )
+                .set_parameter_value("chroma", EncoderParameterValue::String("420".to_owned()))
                 .map_err(CodecError::libheif)?;
         }
 
@@ -119,8 +107,8 @@ fn copy_primary_rgb_planes(
     request: &PrimaryHeifEncodeRequest,
 ) -> Result<()> {
     for y in 0..request.raster.height {
-        let y = usize::try_from(y)
-            .map_err(|_| CodecError::invalid("primary HEIF y exceeds usize"))?;
+        let y =
+            usize::try_from(y).map_err(|_| CodecError::invalid("primary HEIF y exceeds usize"))?;
         let source_row = y
             .checked_mul(request.raster.bytes_per_row)
             .ok_or_else(|| CodecError::invalid("primary source row offset overflows"))?;
@@ -152,7 +140,9 @@ fn copy_primary_rgb_planes(
 
 fn validate_primary_container(encoded: &[u8], width: u32, height: u32) -> Result<()> {
     let context = HeifContext::read_from_bytes(encoded).map_err(CodecError::libheif)?;
-    let handle = context.primary_image_handle().map_err(CodecError::libheif)?;
+    let handle = context
+        .primary_image_handle()
+        .map_err(CodecError::libheif)?;
     if handle.width() != width || handle.height() != height {
         return Err(CodecError::invalid(format!(
             "primary HEIF dimensions changed during encode: expected {width}x{height}, got {}x{}",
@@ -183,15 +173,23 @@ mod tests {
     fn encodes_primary_heif_that_libheif_can_decode() {
         let source = raster();
         let request = PrimaryHeifEncodeRequest::live_photo(source.clone(), None);
-        let encoded = LibHeifProvider::new().encode_primary_heif(&request).unwrap();
+        let encoded = LibHeifProvider::new()
+            .encode_primary_heif(&request)
+            .unwrap();
         let context = HeifContext::read_from_bytes(&encoded).unwrap();
         let handle = context.primary_image_handle().unwrap();
-        assert_eq!((handle.width(), handle.height()), (source.width, source.height));
+        assert_eq!(
+            (handle.width(), handle.height()),
+            (source.width, source.height)
+        );
         let lib = LibHeif::new_checked().unwrap();
         let decoded = lib
             .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
             .unwrap();
-        assert_eq!((decoded.width(), decoded.height()), (source.width, source.height));
+        assert_eq!(
+            (decoded.width(), decoded.height()),
+            (source.width, source.height)
+        );
     }
 
     #[test]

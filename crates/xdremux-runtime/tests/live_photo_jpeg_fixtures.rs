@@ -64,8 +64,9 @@ fn exercise(relative: &str, expect_gain_map: bool) {
         .expect("published movie must satisfy Live Photo contract");
 
     if expect_gain_map {
-        validate_gain_map_structure(&still)
-            .unwrap_or_else(|error| panic!("{relative}: final HEIF Gain Map graph invalid: {error}"));
+        validate_gain_map_structure(&still).unwrap_or_else(|error| {
+            panic!("{relative}: final HEIF Gain Map graph invalid: {error}")
+        });
     } else {
         assert!(
             validate_gain_map_structure(&still).is_err(),

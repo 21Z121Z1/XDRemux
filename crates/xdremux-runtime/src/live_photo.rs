@@ -21,11 +21,11 @@ use xdremux_metadata::{
     UltraHdrGainMapMetadata,
 };
 use xdremux_motion_photo::{
-    companion_video_path, media_mdat_payloads, normalize_embedded_video, parse_oppo_motion_photo,
-    publish_live_photo_pair, read_apple_content_identifier, read_live_photo_content_identifier,
-    reconcile_live_photo_pair, resolve_live_photo_still_time, validate_live_photo_movie,
-    write_live_photo_heif_still, write_live_photo_jpeg_metadata, write_live_photo_movie, ByteRange,
-    MotionPhotoAsset, MotionPhotoSourceKind,
+    build_live_photo_jpeg_exif, companion_video_path, media_mdat_payloads,
+    normalize_embedded_video, parse_oppo_motion_photo, publish_live_photo_pair,
+    read_apple_content_identifier, read_live_photo_content_identifier, reconcile_live_photo_pair,
+    resolve_live_photo_still_time, validate_live_photo_movie, write_live_photo_heif_still,
+    write_live_photo_movie, ByteRange, MotionPhotoAsset, MotionPhotoSourceKind,
 };
 
 use crate::{Result, RuntimeError};
@@ -261,8 +261,7 @@ fn assemble_jpeg_gain_map(
     }
     let encoded = heif
         .encode_gain_map_tiles(&GainMapTileEncodeRequest::reference_compatible(
-            decoded,
-            target,
+            decoded, target,
         ))
         .map_err(|error| RuntimeError::external("Ultra HDR HEVC Gain Map encode", error))?;
 
@@ -324,7 +323,10 @@ fn prepare_jpeg_still(
     let primary_end = jpeg_image_end(static_bytes, 0)
         .map_err(|error| RuntimeError::external("Motion Photo primary JPEG boundary", error))?;
     let primary = static_bytes.get(..primary_end).ok_or_else(|| {
-        RuntimeError::new("Motion Photo primary JPEG", "primary range is outside static resource")
+        RuntimeError::new(
+            "Motion Photo primary JPEG",
+            "primary range is outside static resource",
+        )
     })?;
     let raster = jpeg
         .decode_raster(&JpegRasterDecodeRequest {
@@ -334,11 +336,13 @@ fn prepare_jpeg_still(
         .map_err(|error| RuntimeError::external("Motion Photo primary JPEG decode", error))?;
     let icc_profile = jpeg_icc_profile(primary)
         .map_err(|error| RuntimeError::external("Motion Photo primary JPEG ICC", error))?;
-    let encoded_base = heif
-        .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(raster, icc_profile))
-        .map_err(|error| RuntimeError::external("Motion Photo primary HEIC encode", error))?;
-    let encoded_base = write_live_photo_jpeg_metadata(primary, encoded_base, content_identifier)
+    let exif_tiff = build_live_photo_jpeg_exif(primary, content_identifier)
         .map_err(|error| RuntimeError::external("Live Photo JPEG EXIF transfer", error))?;
+    let encoded_base = heif
+        .encode_primary_heif(
+            &PrimaryHeifEncodeRequest::live_photo(raster, icc_profile).with_exif_tiff(exif_tiff),
+        )
+        .map_err(|error| RuntimeError::external("Motion Photo primary HEIC encode", error))?;
 
     let gain = validated_gain_jpeg(static_bytes, primary_end, asset)?;
     match gain {
