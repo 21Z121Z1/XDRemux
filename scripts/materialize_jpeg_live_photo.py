@@ -25,6 +25,17 @@ def ensure_replace_all(path: Path, replacements: dict[str, str], label: str) -> 
         path.write_text(text)
 
 
+def replace_if_present(path: Path, old: str, new: str) -> None:
+    text = path.read_text()
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+
+
+def require_marker(path: Path, marker: str, label: str) -> None:
+    if marker not in path.read_text():
+        raise SystemExit(f"expected completed {label} marker not found: {marker!r}")
+
+
 metadata = Path("crates/xdremux-metadata/src/ultrahdr_jpeg.rs")
 ensure_replace_all(
     metadata,
@@ -48,7 +59,7 @@ ensure_replace_all(
 )
 
 runtime = Path("crates/xdremux-runtime/src/live_photo.rs")
-ensure_replace(
+replace_if_present(
     runtime,
     """    reconcile_live_photo_pair, resolve_live_photo_still_time, validate_live_photo_movie,
     write_live_photo_heif_still, write_live_photo_jpeg_metadata, write_live_photo_movie, ByteRange,
@@ -58,9 +69,8 @@ ensure_replace(
     validate_live_photo_movie, write_live_photo_heif_still, write_live_photo_movie, ByteRange,
     MotionPhotoAsset, MotionPhotoSourceKind,
 """,
-    "runtime Motion Photo import",
 )
-ensure_replace(
+replace_if_present(
     runtime,
     """    let encoded_base = heif
         .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(raster, icc_profile))
@@ -77,8 +87,9 @@ ensure_replace(
         )
         .map_err(|error| RuntimeError::external("Motion Photo primary HEIC encode", error))?;
 """,
-    "runtime JPEG primary encode",
 )
+require_marker(runtime, "build_live_photo_jpeg_exif", "runtime Motion Photo EXIF import")
+require_marker(runtime, ".with_exif_tiff(exif_tiff)", "runtime JPEG primary encode")
 
 primary = Path("crates/xdremux-codec/src/portable/primary_heif.rs")
 ensure_replace(
