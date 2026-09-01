@@ -74,15 +74,20 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add Cargo.lock crates/xdremux-format crates/xdremux-container crates/xdremux-metadata crates/xdremux-runtime/src/lib.rs crates/xdremux-runtime/src/oppo_compat.rs crates/xdremux-runtime/src/oppo_tail.rs
+          git add Cargo.lock crates/xdremux-format crates/xdremux-container crates/xdremux-metadata crates/xdremux-runtime
           git diff --cached --check
           if git diff --cached --quiet; then
             echo 'No generated or formatting changes to commit.'
           else
             git commit -m 'feat(rust): execute OPPO compatibility and camera tails'
-            git pull --rebase origin feat/rust-cli-unification
-            git push origin HEAD:feat/rust-cli-unification
           fi
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo 'Unexpected dirty working tree after materialization:' >&2
+            git status --short >&2
+            exit 1
+          fi
+          git pull --rebase origin feat/rust-cli-unification
+          git push origin HEAD:feat/rust-cli-unification
 
   verify-macos:
     needs: verify-and-materialize
