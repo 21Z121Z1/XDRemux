@@ -100,6 +100,22 @@ ensure_replace(
 """,
     "primary HEIF Rust-2021 EXIF guard",
 )
+ensure_replace(
+    primary,
+    """            image
+                .set_raw_color_profile(ColorProfileRaw::new(
+                    color_profile_types::PROF,
+                    icc.clone(),
+                ))
+                .map_err(CodecError::libheif)?;
+""",
+    """            let profile = ColorProfileRaw::new(color_profile_types::PROF, icc.clone());
+            image
+                .set_color_profile_raw(&profile)
+                .map_err(CodecError::libheif)?;
+""",
+    "libheif-rs 2.7 raw ICC API",
+)
 
 raw_exif = Path("crates/xdremux-format/src/exif_raw.rs")
 ensure_replace(
