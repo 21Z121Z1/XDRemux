@@ -27,31 +27,30 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("crates/xdremux-heif/src/native.rs")
           text = path.read_text()
 
-          old = '''    for chunk in payload[8..].chunks_exact(4) {
-              let brand: [u8; 4] = chunk.try_into().expect("chunks_exact returns four bytes");
-              if !brands.contains(&brand) {
-                  brands.push(brand);
-              }
-          }
-          '''
-          new = '''    let (source_brands, remainder) = payload[8..].as_chunks::<4>();
+          text, count = re.subn(
+              r"    for chunk in payload\[8\.\.\]\.chunks_exact\(4\) \{\n.*?\n    \}\n    for brand in brands",
+              """    let (source_brands, remainder) = payload[8..].as_chunks::<4>();
           debug_assert!(remainder.is_empty());
           for brand in source_brands {
               if !brands.contains(brand) {
                   brands.push(*brand);
               }
           }
-          '''
-          if old not in text:
-              raise SystemExit("expected build_ftyp brand loop not found")
-          text = text.replace(old, new, 1)
+          for brand in brands""",
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit("expected one build_ftyp brand loop")
 
           start = text.index("fn build_placeholder_locations(")
-          end = text.index("\n#[allow(clippy::too_many_arguments)]\nfn build_final_locations", start)
+          end = text.index("#[allow(clippy::too_many_arguments)]\nfn build_final_locations", start)
           replacement = '''#[derive(Debug, Clone, Copy)]
           struct AssemblyItemIds<'a> {
               tile_ids: &'a [u32],
@@ -122,28 +121,30 @@ jobs:
               entries.sort_by_key(|entry| entry.item_id);
               Ok(entries)
           }
+
           '''
           text = text[:start] + replacement + text[end:]
 
-          marker = "\n#[allow(clippy::too_many_arguments)]\nfn build_final_locations("
-          start = text.index(marker)
-          start_fn = start + len("\n#[allow(clippy::too_many_arguments)]\n")
-          end = text.index("\n#[allow(clippy::too_many_arguments)]\nfn build_meta", start_fn)
-          block = text[start_fn:end]
+          start = text.index("#[allow(clippy::too_many_arguments)]\nfn build_final_locations(")
+          end = text.index("#[allow(clippy::too_many_arguments)]\nfn build_meta", start)
+          block = text[start:end]
           sig_end = block.index(") -> Result<Vec<IlocEntry>> {") + len(") -> Result<Vec<IlocEntry>> {")
           body = block[sig_end:]
-          body = body.replace("new_mdat_data_start", "relocation.new_data_start")
-          body = body.replace("original_mdat_payload_len", "relocation.original_payload_len")
-          body = body.replace("tile_ids", "ids.tile_ids")
-          body = body.replace("gain_id", "ids.gain_id")
-          body = body.replace("tmap_id", "ids.tmap_id")
-          body = body.replace("xmp_id", "ids.xmp_id")
-          body = body.replace("gain_grid_offset", "layout.gain_grid_offset")
-          body = body.replace("gain_grid_length", "layout.gain_grid_length")
-          body = body.replace("tmap_offset", "layout.tmap_offset")
-          body = body.replace("tmap_length", "layout.tmap_length")
-          body = body.replace("xmp_offset", "layout.xmp_offset")
-          body = body.replace("xmp_length", "layout.xmp_length")
+          for old, new in [
+              ("new_mdat_data_start", "relocation.new_data_start"),
+              ("original_mdat_payload_len", "relocation.original_payload_len"),
+              ("tile_ids", "ids.tile_ids"),
+              ("gain_id", "ids.gain_id"),
+              ("tmap_id", "ids.tmap_id"),
+              ("xmp_id", "ids.xmp_id"),
+              ("gain_grid_offset", "layout.gain_grid_offset"),
+              ("gain_grid_length", "layout.gain_grid_length"),
+              ("tmap_offset", "layout.tmap_offset"),
+              ("tmap_length", "layout.tmap_length"),
+              ("xmp_offset", "layout.xmp_offset"),
+              ("xmp_length", "layout.xmp_length"),
+          ]:
+              body = body.replace(old, new)
           new_block = '''fn build_final_locations(
               source: &[u8],
               meta: &ParsedMeta,
@@ -153,24 +154,11 @@ jobs:
               layout: AppendedIdatLayout,
               gain: &DirectHevcGainMap<'_>,
           ) -> Result<Vec<IlocEntry>> {''' + body
-          text = text[:start] + "\n" + new_block + text[end:]
+          text = text[:start] + new_block + "\n" + text[end:]
 
-          old_call = '''    let placeholder_locations = build_placeholder_locations(
-              &meta,
-              &tile_ids,
-              gain_id,
-              tmap_id,
-              xmp_id,
-              gain_grid_offset,
-              gain_grid_length,
-              tmap_offset,
-              tmap_length,
-              xmp_offset,
-              xmp_length,
-              gain,
-          )?;
-          '''
-          new_call = '''    let ids = AssemblyItemIds {
+          start = text.index("    let placeholder_locations = build_placeholder_locations(")
+          end = text.index("    let placeholder_iloc =", start)
+          text = text[:start] + '''    let ids = AssemblyItemIds {
               tile_ids: &tile_ids,
               gain_id,
               tmap_id,
@@ -185,31 +173,11 @@ jobs:
               xmp_length,
           };
           let placeholder_locations = build_placeholder_locations(&meta, ids, idat_layout, gain)?;
-          '''
-          if old_call not in text:
-              raise SystemExit("expected placeholder call not found")
-          text = text.replace(old_call, new_call, 1)
+          ''' + text[end:]
 
-          old_call = '''    let final_locations = build_final_locations(
-              source,
-              &meta,
-              mdat,
-              new_mdat_data_start_u64,
-              original_mdat_payload.len(),
-              &tile_ids,
-              gain_id,
-              tmap_id,
-              xmp_id,
-              gain_grid_offset,
-              gain_grid_length,
-              tmap_offset,
-              tmap_length,
-              xmp_offset,
-              xmp_length,
-              gain,
-          )?;
-          '''
-          new_call = '''    let final_locations = build_final_locations(
+          start = text.index("    let final_locations = build_final_locations(")
+          end = text.index("    let final_iloc =", start)
+          text = text[:start] + '''    let final_locations = build_final_locations(
               source,
               &meta,
               mdat,
@@ -221,10 +189,7 @@ jobs:
               idat_layout,
               gain,
           )?;
-          '''
-          if old_call not in text:
-              raise SystemExit("expected final location call not found")
-          text = text.replace(old_call, new_call, 1)
+          ''' + text[end:]
 
           path.write_text(text)
           PY
