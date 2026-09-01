@@ -3,6 +3,7 @@
 mod android;
 mod error;
 mod heif;
+mod live_photo_mov;
 mod lpex;
 mod model;
 mod oppo;
@@ -14,6 +15,11 @@ mod topology;
 pub use android::parse_android_motion_photo;
 pub use error::{MotionPhotoError, Result};
 pub use heif::{is_heif_mime, resolve_heif_motion_photo_ranges};
+pub use live_photo_mov::{
+    media_mdat_payloads, oppo_live_photo_transform, read_live_photo_content_identifier,
+    read_live_photo_still_time, resolve_live_photo_still_time, validate_live_photo_movie,
+    write_live_photo_movie, LivePhotoMovieError, LivePhotoMovieResult,
+};
 pub use lpex::parse_first_lpex_object;
 pub use model::{
     ByteRange, MotionPhotoAsset, MotionPhotoItem, MotionPhotoSourceKind, OppoMetadata,
