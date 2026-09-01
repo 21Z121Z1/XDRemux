@@ -452,7 +452,11 @@ dependencies = [
 name = "xdremux-cli"
 version = "0.1.0"
 dependencies = [
+ "jpeg-encoder",
  "serde_json",
+ "xdremux-engine",
+ "xdremux-heif",
+ "xdremux-runtime",
  "xdremux-source",
 ]
 

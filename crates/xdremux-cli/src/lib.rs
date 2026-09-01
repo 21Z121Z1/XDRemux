@@ -232,12 +232,9 @@ fn run_convert(
 
     let output = output.unwrap_or_else(|| input.clone());
     let runtime = PortableRuntime::new();
-    if let Err(error) = runtime.convert_proxdr_file(
-        &source,
-        &output,
-        ConversionRequest::default(),
-        |_| {},
-    ) {
+    if let Err(error) =
+        runtime.convert_proxdr_file(&source, &output, ConversionRequest::default(), |_| {})
+    {
         let _ = writeln!(stderr, "error: {error}");
         return 1;
     }
