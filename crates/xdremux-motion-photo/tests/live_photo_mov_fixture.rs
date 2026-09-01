@@ -10,7 +10,7 @@ use xdremux_motion_photo::{
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
-        .join("fixtures/IMG20260710191114_ColorOS_16.jpg")
+        .join("fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg")
 }
 
 #[test]

@@ -5,8 +5,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 fixtures=(
-  "fixtures/20260312_135609..heic"
-  "fixtures/20260312_135610..heic"
+  "fixtures/motion-photo/samsung/heif-ultrahdr-01.heic"
+  "fixtures/motion-photo/samsung/heif-ultrahdr-02.heic"
 )
 
 cargo build --locked -p xdremux-metadata --bin xdremux-metadata-fixture

@@ -5,7 +5,7 @@ import XDRemuxAppleFeatures
 @testable import XDRemuxCLI
 
 final class MotionPhotoOutputSafetyTests: XCTestCase {
-    private let fixtureName = "IMG20260710191114_ColorOS_16.jpg"
+    private let fixtureName = "motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg"
 
     func testImplicitPlannerPreservesForeignSameBasenamePairAndConvertedOutputUsesNumberedNamespace() throws {
         let sourceFixture = try fixtureURL()

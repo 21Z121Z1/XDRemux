@@ -63,7 +63,8 @@ fn synthetic_uhdr_source(base: &[u8]) -> Vec<u8> {
 }
 
 fn public_heif_fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/20260312_135609..heic")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/motion-photo/samsung/heif-ultrahdr-01.heic")
 }
 
 #[test]

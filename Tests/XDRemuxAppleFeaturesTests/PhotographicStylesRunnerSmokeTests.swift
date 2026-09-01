@@ -13,7 +13,7 @@ final class PhotographicStylesRunnerSmokeTests: XCTestCase {
         let fixtureURL = URL(
             fileURLWithPath: environment["XDREMUX_STYLE_RUNNER_FIXTURE"]
                 ?? repositoryRoot
-                    .appendingPathComponent("fixtures/IMG20260801190843_ColorOS_16.jpg")
+                    .appendingPathComponent("fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg")
                     .path
         ).standardizedFileURL
         let outputRoot = URL(

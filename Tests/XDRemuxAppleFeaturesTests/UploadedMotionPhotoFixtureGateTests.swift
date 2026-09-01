@@ -29,7 +29,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
     private let fixtures: [FixtureSpec] = [
         // OPPO ColorOS 15 — one embedded HEVC Motion Photo stream, Ultra HDR still.
         .init(
-            filename: "IMG20250502131605.jpg",
+            filename: "motion-photo/oppo/coloros15-ultrahdr-01.jpg",
             sha256: "83a4f9f3c978f541e1255bff3bd89cffe0da182aef5558c1d9d081c41f4cdb01",
             sourceKind: .oppoLivePhoto,
             stillEnd: 5_212_915,
@@ -41,7 +41,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
             expectsGainMap: true
         ),
         .init(
-            filename: "IMG20250502131608.jpg",
+            filename: "motion-photo/oppo/coloros15-ultrahdr-02.jpg",
             sha256: "3f5cc79c1cf26f18acf22522964e7b8e009bf35b36c4c509d7618b1fd7cd6707",
             sourceKind: .oppoLivePhoto,
             stillEnd: 4_610_334,
@@ -53,7 +53,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
             expectsGainMap: true
         ),
         .init(
-            filename: "IMG20250819170327.jpg",
+            filename: "motion-photo/oppo/coloros15-ultrahdr-03.jpg",
             sha256: "20afbcfb3f6fbcd7ea7b2ca306b8208dbfd10eaeb7a9fb91cf86a5a9b21c3920",
             sourceKind: .oppoLivePhoto,
             stillEnd: 19_365_654,
@@ -68,7 +68,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
         // OPPO ColorOS 16 — the Android MotionPhoto resource contains two concatenated BMFF
         // streams. Stream 1 is the Apple paired video; Stream 2 is vendor preview data.
         .init(
-            filename: "IMG20260710191114_ColorOS_16.jpg",
+            filename: "motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg",
             sha256: "5b555b0fffcec9ffb64a082a0532822431b59fc0490b677cc557e9810b764e70",
             sourceKind: .oppoLivePhoto,
             stillEnd: 6_809_684,
@@ -80,7 +80,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
             expectsGainMap: true
         ),
         .init(
-            filename: "IMG20260801190843_ColorOS_16.jpg",
+            filename: "motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg",
             sha256: "15c19972c3328da9c4bfb8ad9134f92764c6c51827853f8118d5d2d986e967ff",
             sourceKind: .oppoLivePhoto,
             stillEnd: 13_591_436,
@@ -94,7 +94,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
 
         // Xiaomi Android Motion Photo V1, Ultra HDR JPEG static resource.
         .init(
-            filename: "MVIMG_20260419_151324_2_3..jpg",
+            filename: "motion-photo/xiaomi/android-v1-ultrahdr-01.jpg",
             sha256: "18f5d5b9243dec290626b446f6812d7bf41399bdc66d7feb794e562a9ffca4dc",
             sourceKind: .androidMotionPhotoV1,
             stillEnd: 9_541_876,
@@ -109,7 +109,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
         // Samsung JPEG Motion Photo V1. Samsung keeps another BMFF-looking vendor region inside
         // the static resource; the semantic Container directory selects the later true video start.
         .init(
-            filename: "20260312_135625..jpg",
+            filename: "motion-photo/samsung/jpeg-ultrahdr-01.jpg",
             sha256: "d95c3bfe772d681c3b7b4c33ab39f6a9da46517b3e88209fe263843dfa49cfa4",
             sourceKind: .androidMotionPhotoV1,
             stillEnd: 2_689_001,
@@ -121,7 +121,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
             expectsGainMap: true
         ),
         .init(
-            filename: "20260312_135627..jpg",
+            filename: "motion-photo/samsung/jpeg-ultrahdr-02.jpg",
             sha256: "c9e97669689fcc975f3d511cc15274b047c6b340d12c434fd04ceaa249bfee9b",
             sourceKind: .androidMotionPhotoV1,
             stillEnd: 2_690_459,
@@ -137,7 +137,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
         // data and must never be copied into the Apple paired MOV. R002/R003 are byte-identical
         // duplicates supplied in the same archive and are retained in the gate deliberately.
         .init(
-            filename: "20260312_135609..heic",
+            filename: "motion-photo/samsung/heif-ultrahdr-01.heic",
             sha256: "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
             sourceKind: .androidHeifMotionPhotoV1,
             stillEnd: 1_232_154,
@@ -149,7 +149,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
             expectsGainMap: true
         ),
         .init(
-            filename: "R002_20260312_135609..heic",
+            filename: "motion-photo/samsung/heif-ultrahdr-01-duplicate-r002.heic",
             sha256: "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
             sourceKind: .androidHeifMotionPhotoV1,
             stillEnd: 1_232_154,
@@ -161,7 +161,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
             expectsGainMap: true
         ),
         .init(
-            filename: "20260312_135610..heic",
+            filename: "motion-photo/samsung/heif-ultrahdr-02.heic",
             sha256: "d33f502276f0d8e8a0f49c9f5674ed1728812f7432f355a5a3325007fc780f1f",
             sourceKind: .androidHeifMotionPhotoV1,
             stillEnd: 1_217_171,
@@ -173,7 +173,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
             expectsGainMap: true
         ),
         .init(
-            filename: "R003_20260312_135610..heic",
+            filename: "motion-photo/samsung/heif-ultrahdr-02-duplicate-r003.heic",
             sha256: "d33f502276f0d8e8a0f49c9f5674ed1728812f7432f355a5a3325007fc780f1f",
             sourceKind: .androidHeifMotionPhotoV1,
             stillEnd: 1_217_171,
@@ -188,7 +188,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
         // vivo standard Motion Photo V1. These two supplied samples are SDR still resources rather
         // than Ultra HDR; they still exercise HEVC + AAC passthrough and generic vendor neutrality.
         .init(
-            filename: "IMG_20260620_160335..jpg",
+            filename: "motion-photo/vivo/android-v1-sdr-01.jpg",
             sha256: "f71104787d3ce236e5543a71cfc50f8208fd9acbaeef057178350dfbacecd277",
             sourceKind: .androidMotionPhotoV1,
             stillEnd: 3_307_962,
@@ -200,7 +200,7 @@ final class UploadedMotionPhotoFixtureGateTests: XCTestCase {
             expectsGainMap: false
         ),
         .init(
-            filename: "IMG_20260620_160410..jpg",
+            filename: "motion-photo/vivo/android-v1-sdr-02.jpg",
             sha256: "7a00f4a63b51abfde5d1a93bc08053b3f4f28222b2234212da030ab8ed12d321",
             sourceKind: .androidMotionPhotoV1,
             stillEnd: 3_036_474,

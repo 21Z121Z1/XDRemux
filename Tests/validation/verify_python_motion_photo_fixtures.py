@@ -36,20 +36,20 @@ class FixtureSpec:
 
 
 FIXTURES = (
-    FixtureSpec("IMG20250502131605.jpg", "83a4f9f3c978f541e1255bff3bd89cffe0da182aef5558c1d9d081c41f4cdb01", "oppoLivePhoto", 5_212_915, 5_212_915, 15_165_684, 1_469_600, 1, True),
-    FixtureSpec("IMG20250502131608.jpg", "3f5cc79c1cf26f18acf22522964e7b8e009bf35b36c4c509d7618b1fd7cd6707", "oppoLivePhoto", 4_610_334, 4_610_334, 13_359_471, 1_433_190, 1, True),
-    FixtureSpec("IMG20250819170327.jpg", "20afbcfb3f6fbcd7ea7b2ca306b8208dbfd10eaeb7a9fb91cf86a5a9b21c3920", "oppoLivePhoto", 19_365_654, 19_365_654, 30_680_658, 1_666_600, 1, True),
-    FixtureSpec("IMG20260710191114_ColorOS_16.jpg", "5b555b0fffcec9ffb64a082a0532822431b59fc0490b677cc557e9810b764e70", "oppoLivePhoto", 6_809_684, 6_809_684, 24_929_781, 1_533_287, 2, True, 23_211_122),
-    FixtureSpec("IMG20260801190843_ColorOS_16.jpg", "15c19972c3328da9c4bfb8ad9134f92764c6c51827853f8118d5d2d986e967ff", "oppoLivePhoto", 13_591_436, 13_591_436, 29_199_130, 1_298_732, 2, True, 27_234_826),
-    FixtureSpec("MVIMG_20260419_151324_2_3..jpg", "18f5d5b9243dec290626b446f6812d7bf41399bdc66d7feb794e562a9ffca4dc", "androidMotionPhotoV1", 9_541_876, 9_541_876, 10_550_148, 430_574, 1, True),
-    FixtureSpec("20260312_135625..jpg", "d95c3bfe772d681c3b7b4c33ab39f6a9da46517b3e88209fe263843dfa49cfa4", "androidMotionPhotoV1", 2_689_001, 2_689_001, 6_842_570, 1_573_888, 1, True),
-    FixtureSpec("20260312_135627..jpg", "c9e97669689fcc975f3d511cc15274b047c6b340d12c434fd04ceaa249bfee9b", "androidMotionPhotoV1", 2_690_459, 2_690_459, 3_752_096, 1_585_246, 1, True),
-    FixtureSpec("20260312_135609..heic", "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0", "androidHeifMotionPhotoV1", 1_232_154, 1_232_162, 5_181_667, 1_540_401, 1, True),
-    FixtureSpec("R002_20260312_135609..heic", "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0", "androidHeifMotionPhotoV1", 1_232_154, 1_232_162, 5_181_667, 1_540_401, 1, True),
-    FixtureSpec("20260312_135610..heic", "d33f502276f0d8e8a0f49c9f5674ed1728812f7432f355a5a3325007fc780f1f", "androidHeifMotionPhotoV1", 1_217_171, 1_217_179, 5_586_957, 2_518_658, 1, True),
-    FixtureSpec("R003_20260312_135610..heic", "d33f502276f0d8e8a0f49c9f5674ed1728812f7432f355a5a3325007fc780f1f", "androidHeifMotionPhotoV1", 1_217_171, 1_217_179, 5_586_957, 2_518_658, 1, True),
-    FixtureSpec("IMG_20260620_160335..jpg", "f71104787d3ce236e5543a71cfc50f8208fd9acbaeef057178350dfbacecd277", "androidMotionPhotoV1", 3_307_962, 3_307_962, 6_031_584, 1_333_944, 1, False),
-    FixtureSpec("IMG_20260620_160410..jpg", "7a00f4a63b51abfde5d1a93bc08053b3f4f28222b2234212da030ab8ed12d321", "androidMotionPhotoV1", 3_036_474, 3_036_474, 9_638_904, 838_055, 1, False),
+    FixtureSpec("motion-photo/oppo/coloros15-ultrahdr-01.jpg", "83a4f9f3c978f541e1255bff3bd89cffe0da182aef5558c1d9d081c41f4cdb01", "oppoLivePhoto", 5_212_915, 5_212_915, 15_165_684, 1_469_600, 1, True),
+    FixtureSpec("motion-photo/oppo/coloros15-ultrahdr-02.jpg", "3f5cc79c1cf26f18acf22522964e7b8e009bf35b36c4c509d7618b1fd7cd6707", "oppoLivePhoto", 4_610_334, 4_610_334, 13_359_471, 1_433_190, 1, True),
+    FixtureSpec("motion-photo/oppo/coloros15-ultrahdr-03.jpg", "20afbcfb3f6fbcd7ea7b2ca306b8208dbfd10eaeb7a9fb91cf86a5a9b21c3920", "oppoLivePhoto", 19_365_654, 19_365_654, 30_680_658, 1_666_600, 1, True),
+    FixtureSpec("motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg", "5b555b0fffcec9ffb64a082a0532822431b59fc0490b677cc557e9810b764e70", "oppoLivePhoto", 6_809_684, 6_809_684, 24_929_781, 1_533_287, 2, True, 23_211_122),
+    FixtureSpec("motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg", "15c19972c3328da9c4bfb8ad9134f92764c6c51827853f8118d5d2d986e967ff", "oppoLivePhoto", 13_591_436, 13_591_436, 29_199_130, 1_298_732, 2, True, 27_234_826),
+    FixtureSpec("motion-photo/xiaomi/android-v1-ultrahdr-01.jpg", "18f5d5b9243dec290626b446f6812d7bf41399bdc66d7feb794e562a9ffca4dc", "androidMotionPhotoV1", 9_541_876, 9_541_876, 10_550_148, 430_574, 1, True),
+    FixtureSpec("motion-photo/samsung/jpeg-ultrahdr-01.jpg", "d95c3bfe772d681c3b7b4c33ab39f6a9da46517b3e88209fe263843dfa49cfa4", "androidMotionPhotoV1", 2_689_001, 2_689_001, 6_842_570, 1_573_888, 1, True),
+    FixtureSpec("motion-photo/samsung/jpeg-ultrahdr-02.jpg", "c9e97669689fcc975f3d511cc15274b047c6b340d12c434fd04ceaa249bfee9b", "androidMotionPhotoV1", 2_690_459, 2_690_459, 3_752_096, 1_585_246, 1, True),
+    FixtureSpec("motion-photo/samsung/heif-ultrahdr-01.heic", "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0", "androidHeifMotionPhotoV1", 1_232_154, 1_232_162, 5_181_667, 1_540_401, 1, True),
+    FixtureSpec("motion-photo/samsung/heif-ultrahdr-01-duplicate-r002.heic", "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0", "androidHeifMotionPhotoV1", 1_232_154, 1_232_162, 5_181_667, 1_540_401, 1, True),
+    FixtureSpec("motion-photo/samsung/heif-ultrahdr-02.heic", "d33f502276f0d8e8a0f49c9f5674ed1728812f7432f355a5a3325007fc780f1f", "androidHeifMotionPhotoV1", 1_217_171, 1_217_179, 5_586_957, 2_518_658, 1, True),
+    FixtureSpec("motion-photo/samsung/heif-ultrahdr-02-duplicate-r003.heic", "d33f502276f0d8e8a0f49c9f5674ed1728812f7432f355a5a3325007fc780f1f", "androidHeifMotionPhotoV1", 1_217_171, 1_217_179, 5_586_957, 2_518_658, 1, True),
+    FixtureSpec("motion-photo/vivo/android-v1-sdr-01.jpg", "f71104787d3ce236e5543a71cfc50f8208fd9acbaeef057178350dfbacecd277", "androidMotionPhotoV1", 3_307_962, 3_307_962, 6_031_584, 1_333_944, 1, False),
+    FixtureSpec("motion-photo/vivo/android-v1-sdr-02.jpg", "7a00f4a63b51abfde5d1a93bc08053b3f4f28222b2234212da030ab8ed12d321", "androidMotionPhotoV1", 3_036_474, 3_036_474, 9_638_904, 838_055, 1, False),
 )
 
 
@@ -65,10 +65,13 @@ def index_fixtures(root: Path) -> dict[str, Path]:
     expected = {spec.filename for spec in FIXTURES}
     found: dict[str, Path] = {}
     for path in root.rglob("*"):
-        if path.is_file() and path.name in expected:
-            if path.name in found and path.resolve() != found[path.name].resolve():
-                raise RuntimeError(f"duplicate fixture filename: {path.name}")
-            found[path.name] = path
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if relative in expected:
+            if relative in found and path.resolve() != found[relative].resolve():
+                raise RuntimeError(f"duplicate fixture path: {relative}")
+            found[relative] = path
     missing = sorted(expected - set(found))
     if missing:
         raise RuntimeError("missing real Motion Photo fixtures: " + ", ".join(missing))

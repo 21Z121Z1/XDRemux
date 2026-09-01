@@ -28,7 +28,8 @@ const HDRGM_XMP: &[u8] = br#"<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <?xpacket end="w"?>"#;
 
 fn source_fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/20260312_135609..heic")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/motion-photo/samsung/heif-ultrahdr-01.heic")
 }
 
 fn rgb_raster(width: u32, height: u32) -> Raster8 {

@@ -19,15 +19,15 @@ final class UploadedMotionPhotoFixtureGateTestsVendorGeometry: XCTestCase {
         }
         let root = URL(fileURLWithPath: rootPath, isDirectory: true)
         let expectations: [ExpectedPlan] = [
-            .init(relativePath: "IMG20260710191114_ColorOS_16.jpg", kind: .colorOS16, auxiliaryCount: 1),
-            .init(relativePath: "IMG20260801190843_ColorOS_16.jpg", kind: .colorOS16, auxiliaryCount: 1),
-            .init(relativePath: "20260312_135609..heic", kind: .samsung, auxiliaryCount: 0),
-            .init(relativePath: "20260312_135610..heic", kind: .samsung, auxiliaryCount: 0),
-            .init(relativePath: "20260312_135625..jpg", kind: .samsung, auxiliaryCount: 0),
-            .init(relativePath: "20260312_135627..jpg", kind: .samsung, auxiliaryCount: 0),
-            .init(relativePath: "IMG20250502131605.jpg", kind: nil, auxiliaryCount: 0),
-            .init(relativePath: "IMG20250502131608.jpg", kind: nil, auxiliaryCount: 0),
-            .init(relativePath: "IMG20250819170327.jpg", kind: nil, auxiliaryCount: 0),
+            .init(relativePath: "motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg", kind: .colorOS16, auxiliaryCount: 1),
+            .init(relativePath: "motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg", kind: .colorOS16, auxiliaryCount: 1),
+            .init(relativePath: "motion-photo/samsung/heif-ultrahdr-01.heic", kind: .samsung, auxiliaryCount: 0),
+            .init(relativePath: "motion-photo/samsung/heif-ultrahdr-02.heic", kind: .samsung, auxiliaryCount: 0),
+            .init(relativePath: "motion-photo/samsung/jpeg-ultrahdr-01.jpg", kind: .samsung, auxiliaryCount: 0),
+            .init(relativePath: "motion-photo/samsung/jpeg-ultrahdr-02.jpg", kind: .samsung, auxiliaryCount: 0),
+            .init(relativePath: "motion-photo/oppo/coloros15-ultrahdr-01.jpg", kind: nil, auxiliaryCount: 0),
+            .init(relativePath: "motion-photo/oppo/coloros15-ultrahdr-02.jpg", kind: nil, auxiliaryCount: 0),
+            .init(relativePath: "motion-photo/oppo/coloros15-ultrahdr-03.jpg", kind: nil, auxiliaryCount: 0),
         ]
 
         for expected in expectations {

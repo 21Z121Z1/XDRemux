@@ -70,7 +70,8 @@ mod tests {
     use xdremux_engine::OperationCapability;
 
     fn jpeg_fixture() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/20260312_135625..jpg")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg")
     }
 
     #[test]

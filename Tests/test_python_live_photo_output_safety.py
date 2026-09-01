@@ -8,7 +8,7 @@ from xdremux_py.live_photo import LivePhotoConversionError, convert_motion_photo
 
 
 class PythonLivePhotoOutputSafetyTests(unittest.TestCase):
-    fixture_name = "IMG20260710191114_ColorOS_16.jpg"
+    fixture_name = "motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg"
 
     def fixture(self) -> Path:
         path = Path(__file__).resolve().parents[1] / "fixtures" / self.fixture_name

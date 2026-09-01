@@ -12,12 +12,12 @@ mkdir -p "$output_root"
 # fixture. R002/R003 are byte-identical duplicates of the two Samsung HEIF inputs and therefore do
 # not add device-level coverage.
 cases=(
-  "ColorOS16|IMG20260710191114_ColorOS_16.jpg"
-  "ColorOS16|IMG20260801190843_ColorOS_16.jpg"
-  "Samsung-JPEG|20260312_135625..jpg"
-  "Samsung-JPEG|20260312_135627..jpg"
-  "Samsung-HEIF|20260312_135609..heic"
-  "Samsung-HEIF|20260312_135610..heic"
+  "ColorOS16|motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg"
+  "ColorOS16|motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg"
+  "Samsung-JPEG|motion-photo/samsung/jpeg-ultrahdr-01.jpg"
+  "Samsung-JPEG|motion-photo/samsung/jpeg-ultrahdr-02.jpg"
+  "Samsung-HEIF|motion-photo/samsung/heif-ultrahdr-01.heic"
+  "Samsung-HEIF|motion-photo/samsung/heif-ultrahdr-02.heic"
 )
 
 sources_tsv="$output_root/sources.tsv"
@@ -32,9 +32,8 @@ for entry in "${cases[@]}"; do
     exit 1
   fi
 
-  stem="${filename%.*}"
-  # The supplied Samsung fixture names contain a deliberate extra dot before the extension. Keep
-  # the source filename untouched while using a filesystem-friendly output stem.
+  basename="${filename##*/}"
+  stem="${basename%.*}"
   output_stem="${stem%.}"
   case_dir="$output_root/$vendor/$output_stem"
   mkdir -p "$case_dir"
