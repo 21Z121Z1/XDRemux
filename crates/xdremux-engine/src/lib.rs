@@ -26,14 +26,6 @@ pub use source_profile::{
     gain_map_source_profile_from_jpeg,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum FamilyPreference {
-    #[default]
-    Auto,
-    X6,
-    X7,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceFamily {
     X6,
@@ -110,7 +102,6 @@ pub struct AppleFeatureRequest {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConversionRequest {
-    pub family: FamilyPreference,
     pub oppo_compatibility: OppoCompatibility,
     pub input_processing_branch: InputProcessingBranch,
     pub oppo_camera_tail: OppoCameraTail,
@@ -121,7 +112,6 @@ pub struct ConversionRequest {
 impl Default for ConversionRequest {
     fn default() -> Self {
         Self {
-            family: FamilyPreference::Auto,
             oppo_compatibility: OppoCompatibility::Off,
             input_processing_branch: InputProcessingBranch::Hybrid,
             oppo_camera_tail: OppoCameraTail::PreserveWithoutPrivateHdr,
@@ -361,11 +351,7 @@ pub fn plan_conversion(
     request: ConversionRequest,
     capabilities: &CapabilityInventory,
 ) -> Result<ConversionPlan> {
-    let effective_family = match request.family {
-        FamilyPreference::Auto => analysis.source_family,
-        FamilyPreference::X6 => SourceFamily::X6,
-        FamilyPreference::X7 => SourceFamily::X7,
-    };
+    let effective_family = analysis.source_family;
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
     let gain_map_target = resolve_product_gain_map_encode_profile(
         analysis.gain_map,
@@ -453,7 +439,6 @@ mod tests {
     #[test]
     fn defaults_match_current_swift_product_configuration() {
         let request = ConversionRequest::default();
-        assert_eq!(request.family, FamilyPreference::Auto);
         assert_eq!(request.oppo_compatibility, OppoCompatibility::Off);
         assert_eq!(
             request.input_processing_branch,
