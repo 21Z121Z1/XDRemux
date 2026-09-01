@@ -5,6 +5,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "crates/xdremux-classification/**"
       - "crates/xdremux-cli/**"
       - "crates/xdremux-runtime/**"
       - "crates/xdremux-source/**"
@@ -22,6 +23,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "crates/xdremux-classification/**"
       - "crates/xdremux-cli/**"
       - "crates/xdremux-runtime/**"
       - "crates/xdremux-source/**"
@@ -68,11 +70,11 @@ jobs:
             exit 1
           fi
       - name: Check formatting
-        run: cargo fmt --check -p xdremux-source -p xdremux-runtime -p xdremux-cli
+        run: cargo fmt --check -p xdremux-classification -p xdremux-source -p xdremux-runtime -p xdremux-cli
       - name: Lint canonical Rust CLI stack
-        run: cargo clippy --locked -p xdremux-source -p xdremux-runtime -p xdremux-cli --all-targets -- -D warnings
+        run: cargo clippy --locked -p xdremux-classification -p xdremux-source -p xdremux-runtime -p xdremux-cli --all-targets -- -D warnings
       - name: Test canonical Rust CLI stack
-        run: cargo test --locked -p xdremux-source -p xdremux-runtime -p xdremux-cli
+        run: cargo test --locked -p xdremux-classification -p xdremux-source -p xdremux-runtime -p xdremux-cli
       - name: Exercise real Rust CLI routes
         run: bash scripts/check_rust_cli_smoke.sh
       - name: Verify exact-head completion gate
@@ -81,7 +83,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-rust-cli-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Verify the canonical Rust source routing, ProXDR runtime, and xdremux CLI product entry point including functional media conversion",
+            "scope": "Verify the canonical Rust classification, source routing, ProXDR runtime, batch/categorize product surfaces, and xdremux CLI entry point including functional media conversion",
             "checks": [
               {
                 "name": "rust-workspace-lock",
@@ -92,7 +94,7 @@ jobs:
               {
                 "name": "rust-cli-stack-regressions",
                 "kind": "regression",
-                "command": ["cargo", "test", "--locked", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli"],
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-classification", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli"],
                 "timeout_seconds": 900
               },
               {
@@ -104,7 +106,7 @@ jobs:
               {
                 "name": "rust-cli-stack-clippy",
                 "kind": "static",
-                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli", "--all-targets", "--", "-D", "warnings"],
+                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-classification", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli", "--all-targets", "--", "-D", "warnings"],
                 "timeout_seconds": 900
               }
             ]
@@ -136,9 +138,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $triplet = "x64-windows"
+          # libheif-sys uses the MSVC static-runtime-compatible vcpkg triplet by default.
+          # Install the exact triplet it probes instead of a parallel dynamic x64-windows tree.
+          $triplet = "x64-windows-static-md"
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libheif[hevc]:$triplet"
           "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "VCPKG_DEFAULT_TRIPLET=$triplet" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -146,4 +151,4 @@ jobs:
       - name: Build canonical Rust CLI
         run: cargo build --locked -p xdremux-cli
       - name: Test portable Rust CLI conversion semantics
-        run: cargo test --locked -p xdremux-source -p xdremux-runtime -p xdremux-cli
+        run: cargo test --locked -p xdremux-classification -p xdremux-source -p xdremux-runtime -p xdremux-cli
