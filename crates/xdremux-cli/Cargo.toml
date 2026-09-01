@@ -14,7 +14,6 @@ xdremux-runtime = { path = "../xdremux-runtime" }
 xdremux-source = { path = "../xdremux-source" }
 
 [dev-dependencies]
-jpeg-encoder = "=0.7.1"
 xdremux-format = { path = "../xdremux-format" }
 xdremux-heif = { path = "../xdremux-heif" }
 
