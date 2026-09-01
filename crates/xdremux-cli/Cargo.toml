@@ -13,5 +13,9 @@ xdremux-engine = { path = "../xdremux-engine" }
 xdremux-runtime = { path = "../xdremux-runtime" }
 xdremux-source = { path = "../xdremux-source" }
 
+[dev-dependencies]
+jpeg-encoder = "=0.7.1"
+xdremux-heif = { path = "../xdremux-heif" }
+
 [lints]
 workspace = true
