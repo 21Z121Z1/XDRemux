@@ -26,10 +26,11 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Adapt Ultra HDR XMP parser to quick-xml 0.42 string API
+      - name: Materialize JPEG Live Photo compatibility fixes
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path('crates/xdremux-metadata/src/ultrahdr_jpeg.rs')
           text = path.read_text()
           replacements = {
@@ -50,9 +51,34 @@ jobs:
           }
           for old, new in replacements.items():
               if old not in text:
-                  raise SystemExit(f'expected parser fragment not found: {old[:80]!r}')
+                  raise SystemExit(f'expected metadata parser fragment not found: {old[:80]!r}')
               text = text.replace(old, new)
           path.write_text(text)
+
+          path = Path('crates/xdremux-motion-photo/src/live_photo_still.rs')
+          text = path.read_text()
+          old = '''    let source = source_jpeg.to_vec();
+    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)
+        .map_err(|error| LivePhotoStillError::external("read source JPEG EXIF", error))?;
+    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(
+        content_identifier,
+    )?));
+'''
+          new = '''    let source = source_jpeg.to_vec();
+    // Some Android vendors emit EXIF tags with non-standard field-type combinations.
+    // Preserve source EXIF when little_exif can parse it, but match the established
+    // portable product behavior by falling back to a clean metadata set when the
+    // vendor EXIF is not safely understood. The Live Photo pairing MakerNote remains
+    // mandatory either way.
+    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)
+        .unwrap_or_else(|_| Metadata::new());
+    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(
+        content_identifier,
+    )?));
+'''
+          if old not in text:
+              raise SystemExit('JPEG EXIF transfer fragment changed')
+          path.write_text(text.replace(old, new, 1))
           PY
       - name: Materialize deterministic Rust workspace state
         run: |
