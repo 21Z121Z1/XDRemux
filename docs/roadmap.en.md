@@ -2,61 +2,60 @@
 
 English | [简体中文](roadmap.md)
 
-This document defines the current migration plan from the released v1.4 Swift/Python line to the Rust product line. It also defines how the Photographic Styles research line can enter the product.
+This document defines the transition from the released v1.4 Swift/Python line to the Rust product line and the promotion path for Photographic Styles research.
 
-Use the [system architecture](architecture.en.md) for ownership and dependency rules. This roadmap records transition state and promotion gates.
+Use the [system architecture](architecture.en.md) for stable ownership and dependency rules. Use [`agent-map.json`](agent-map.json) for machine-readable branch/capability routing. This roadmap records stages and promotion gates, not volatile Git state.
 
 ## Goal
 
 The goal is not to translate every Swift or Python function into Rust.
 
-The goal is to preserve or improve the verified XDRemux product contracts while moving stable media semantics and product orchestration into a smaller, more explicit Rust architecture.
+The goal is to preserve or improve verified XDRemux product contracts while moving stable media semantics and product orchestration into a smaller, more explicit Rust architecture.
 
-The migration must reduce three forms of ambiguity:
+The transition must reduce four forms of ambiguity:
 
 - which layer owns a behavior;
-- which implementation is authoritative for a claim;
-- which evidence is required before a capability is promoted.
+- which implementation or evidence source is authoritative for a claim;
+- which evidence is required before a capability is promoted;
+- which current facts must be derived live instead of copied into prose.
 
-## Current branch roles
+## Dynamic-state rule
 
-| Branch | Role | Canonical for | Not canonical for | Retirement condition |
-| --- | --- | --- | --- | --- |
-| `main` | released v1.4 maintenance/reference | v1.4 public behavior and release artifacts | future Rust architecture | Rust release supersedes the relevant product contracts and v1.4 maintenance is no longer needed |
-| `feat/rust-xdremux-format` | active Rust rewrite | current Rust implementation work | released user behavior until a Rust release exists | rename or merge into the Rust release line after the rewrite reaches product readiness |
-| `codex/reverse-key1-oppo-solver` | Photographic Styles research | current research implementation and experiments on that branch | production defaults and released quality claims | useful research is promoted through explicit gates or archived as historical evidence |
+Do not maintain current `HEAD`, ahead/behind counts, complete workspace membership, changed-file lists, or current workflow results in this roadmap.
+
+Derive them from Git, code, manifests, and CI:
+
+```bash
+python3 scripts/agent_context.py status
+python3 scripts/agent_context.py capability adapter.codec
+```
+
+On the Rust branch, its `Cargo.toml` is authoritative for current workspace membership. A crate existing in the workspace means an implementation boundary exists; it does not mean its capability has passed promotion evidence.
+
+At the current architecture milestone, the semantic foundation reaches `xdremux-engine`, and `xdremux-codec` is the first concrete Layer 4 adapter boundary. Its providers must still earn capability promotion through their operation contracts and real runtime evidence.
+
+## Branch lifecycle
+
+The stable long-lived branch roles are stored in `docs/agent-map.json`:
+
+- `main`: released v1.4 reference and shared control-plane destination;
+- `feat/rust-xdremux-format`: active Rust migration implementation line;
+- `codex/reverse-key1-oppo-solver`: Photographic Styles research line.
 
 Branch names are references, not architecture. The Rust branch name is already narrower than its real scope.
 
-At the start of work on any long-lived branch, compare it with its intended base. Do not copy ahead/behind counts into normative documents because they become stale after every commit.
-
-## Current Rust foundation
-
-The Rust workspace currently contains:
-
-- `xdremux-format`;
-- `xdremux-metadata`;
-- `xdremux-hdr`;
-- `xdremux-container`;
-- `xdremux-heif`;
-- `xdremux-motion-photo`;
-- `xdremux-classification`;
-- `xdremux-engine`.
-
-The branch also contains Swift/Python-to-Rust conformance oracles and focused Rust CI workflows.
-
-This is already beyond a format-parser experiment. The next work should complete the architecture around this foundation instead of adding more direct function ports.
+Every long-lived branch must have four explicit facts: role, intended base, promotion gate, and retirement condition. Do not create another long-lived branch merely to represent an architecture layer.
 
 ## Migration invariant
 
-For each capability that moves to Rust, record these four items:
+For each capability that moves to Rust, record these four items in the PR, current contract, or active execution plan:
 
 1. the normalized contract;
 2. the old implementation or external evidence used as an oracle;
 3. the Rust owner;
 4. the promotion evidence.
 
-If one of these is missing, the migration is incomplete even when the Rust code compiles.
+If one item is missing, the migration is incomplete even when the Rust code compiles or a diagnostic workflow passes.
 
 ## Phase 1: freeze the v1.4 behavioral contract
 
@@ -64,10 +63,10 @@ Purpose: make the released Swift/Python line a bounded reference instead of an i
 
 Required work:
 
-- keep public documentation accurate for v1.4;
-- preserve the real Motion Photo fixture corpus and its hashes;
+- keep v1.4 public documentation accurate;
+- preserve the real Motion Photo fixture corpus and hashes;
 - preserve conversion-safety and publication regressions;
-- preserve the exact behaviors that Rust conformance checks need;
+- preserve behaviors needed as Rust conformance oracles;
 - correct released safety defects when necessary;
 - avoid unrelated large feature development on the old line.
 
@@ -78,14 +77,12 @@ Exit criteria:
 
 ## Phase 2: complete the pure Rust semantic core
 
-Purpose: finish Layers 1 through 3 of the architecture before product-shell expansion.
-
-The existing crates already cover most of the intended semantic partitions. New work should focus on missing contracts and composition, not crate count.
+Purpose: make Layers 1 through 3 explicit and independently testable before product-shell expansion.
 
 Required properties:
 
 - parsers fail closed on malformed bounds and lengths;
-- vendor metadata is converted into normalized semantic models;
+- vendor metadata becomes normalized semantic models;
 - Gain Map semantics are independent from container-writing side effects;
 - Motion Photo parsing produces stable topology/timing/payload models;
 - classification consumes normalized asset facts;
@@ -99,38 +96,41 @@ Exit criteria:
 - external-standard tests exist where the old implementation is not sufficient as a specification;
 - no required Rust semantic path depends on Swift or Python at runtime.
 
-## Phase 3: implement execution adapters without rebuilding a monolith
+## Phase 3: make plans executable through operation adapters
 
-Purpose: make the plans executable while keeping platform/library operations replaceable.
+Purpose: execute engine plans without rebuilding a platform monolith.
 
-The current engine already defines operation-scoped ports for raster decoding, Gain Map tile encoding, RAW processing, consumer validation, Photographic Styles, and Portrait. Keep that model.
+The engine already defines operation-scoped ports for raster decoding, Gain Map tile encoding, RAW processing, consumer validation, Photographic Styles, and Portrait. `xdremux-codec` is the first concrete provider boundary and demonstrates the intended dependency direction: provider → engine port, not engine → concrete provider.
 
 Required work:
 
-- provide concrete codec and platform adapters for operations required by standard HDR conversion;
-- define request/output types only when their stable boundary is understood;
+- validate concrete codec/provider capabilities against real runtime behavior, not only advertised library support;
+- provide the operations required by standard HDR conversion;
+- compose providers at a product composition root rather than storing adapter instances inside planning facts;
 - keep capability discovery factual and separate from policy;
 - test each adapter through its operation contract;
 - keep native or closed-framework code outside the pure semantic core.
 
-Do not introduce a universal platform backend. Do not make one adapter mandatory for unrelated operations.
+Provider probes may temporarily patch a CI checkout to characterize dependency behavior. Such probes are diagnostic only until their finding is encoded in the actual implementation/test contract.
 
 Exit criteria:
 
 - standard HDR plans can be executed end to end through explicit adapters;
-- missing capabilities fail with an explicit planner or composition error;
-- adapter-specific failures do not alter engine policy silently.
+- required provider capabilities pass reproducible operation-contract tests in the supported runtime environment;
+- missing capabilities fail with an explicit planner/composition error;
+- adapter-specific failures do not alter engine policy silently;
+- canonical provider tests do not depend on hidden CI-only source patches.
 
 ## Phase 4: restore complete asset and publication semantics
 
-Purpose: move from a correct still-image core to the complete XDRemux asset model.
+Purpose: move from a correct still-image path to the complete XDRemux asset model.
 
-Required work includes the v1.4 behaviors that are easy to lose in a rewrite:
+Required work includes v1.4 behaviors that are easy to lose in a rewrite:
 
 - Motion Photo cover-frame timing;
-- compressed video and audio passthrough where required;
+- compressed video/audio passthrough where required;
 - Apple Live Photo shared asset identity;
-- deterministic output naming rules;
+- deterministic output naming;
 - pair provenance;
 - collision handling;
 - crash-recoverable pair publication;
@@ -143,8 +143,8 @@ Exit criteria:
 
 - public Motion Photo fixtures pass the Rust path;
 - Live Photo pair identity and timing match the contract;
-- pair publication regressions cover crash/collision/provenance cases;
-- macOS PhotoKit or equivalent integration evidence validates generated pairs where the claim requires it.
+- pair-publication regressions cover crash/collision/provenance cases;
+- PhotoKit or equivalent integration evidence validates generated pairs where the claim requires it.
 
 ## Phase 5: add Apple-specific product adapters
 
@@ -162,115 +162,101 @@ Required work:
 Exit criteria:
 
 - Apple feature requests are explicit engine requirements;
-- a non-Apple composition can build and use the standard core without Apple frameworks;
+- a non-Apple composition can build/use the standard core without Apple frameworks;
 - Apple consumer and device evidence pass for each promoted feature.
 
 ## Phase 6: create the Rust product shell
 
-Purpose: make Rust the product line instead of a set of conformance crates.
+Purpose: make Rust the product line rather than a set of conformance crates.
 
 Required work:
 
 - expose a stable library composition root;
-- add the supported CLI surface only after engine request models are stable;
+- add the supported CLI surface after engine request models are stable;
 - map structured engine events to user output without putting terminal policy into the core;
-- preserve current output-safety semantics;
+- preserve output-safety semantics;
 - integrate the macOS app through a narrow library/FFI boundary if the app remains SwiftUI;
-- document packaging and release artifacts.
+- document reproducible packaging and release artifacts.
 
 Do not begin by duplicating every old CLI option. Promote options that correspond to supported engine contracts. Retire research-only or obsolete controls instead of automatically carrying them forward.
 
 Exit criteria:
 
-- standard conversion, Motion Photo/Live Photo, classification, and selected Apple features are reachable through the intended product entry points;
+- standard conversion, Motion Photo/Live Photo, classification, and selected Apple features are reachable through intended product entry points;
 - CLI and app do not reimplement media policy;
 - release packaging is reproducible and CI-bound to exact `HEAD`.
 
 ## Phase 7: Rust release promotion
 
-A Rust release can supersede v1.4 only when the exact release candidate satisfies all applicable evidence classes.
+A Rust release can supersede v1.4 only when the exact release candidate satisfies every applicable evidence gate.
 
 Minimum release evidence:
 
 - format/parser regression suite;
-- Rust semantic unit and integration tests;
+- Rust semantic unit/integration tests;
 - cross-implementation conformance vectors where useful;
 - public Motion Photo real-fixture gates;
 - standard HDR real-fixture conversion and container validation;
 - output-safety and publication regressions;
 - CLI/product integration tests;
-- Apple consumer/device evidence for every Apple feature included in the release;
+- Apple consumer/device evidence for every included Apple feature;
 - exact-HEAD completion receipt;
 - required GitHub Actions and CodeQL checks on the release candidate.
 
 A feature that cannot meet its evidence gate must be excluded, marked experimental, or explicitly scoped. It must not be silently accepted because the rest of the release is green.
 
+## Verification control-plane convergence
+
+During migration, focused workflows are useful because each Rust capability can evolve independently. They must not become the only way an agent can understand verification.
+
+Move toward these properties as Rust becomes the product line:
+
+- one documented repository-level Rust verification entry point for ordinary preflight;
+- focused capability checks remain callable independently;
+- workflow/check names communicate whether a check is required, promotion evidence, or diagnostic;
+- diagnostic probes are not required merge checks unless converted into stable contract tests;
+- the exact release/product gate composes the applicable capability checks rather than duplicating their logic.
+
+The goal is not fewer workflow files by itself. The goal is one unambiguous answer to “what evidence proves this change?”
+
 ## Photographic Styles research promotion
 
-The research branch follows a separate promotion ladder. Model accuracy work can proceed in parallel with the Rust rewrite, but product promotion is gated independently.
+The research line follows a separate promotion ladder. Model accuracy work can proceed in parallel with the Rust rewrite, but product promotion is gated independently.
 
-### Research state
-
-The current research line includes:
-
-- a primary-image model path;
-- optional RAW-derived linear RGB input;
-- optional Gain Map input;
-- explicit modality masks and modality dropout;
-- public synthetic/content-domain pretraining;
-- private native/teacher-labelled training support;
-- Core ML export and Swift research integration;
-- held-out, OOD, cascade, and consumer-oriented evaluation tools.
-
-These capabilities are research infrastructure. They are not equivalent to production validation.
-
-### Promotion gates
+Stable model contracts belong in model cards. Stable dataset/training/evaluation procedures belong in dedicated research documentation on the research line. Do not keep research protocol only in a general development guide or chat transcript.
 
 A model or learned component must pass these gates in order:
 
-1. **Data provenance**: every training/evaluation input has a known source, license or private-data status, identity hash, and label/teacher provenance.
+1. **Data provenance**: every training/evaluation input has a known source, license/private-data status, identity hash, and label/teacher provenance.
 2. **Leakage control**: calibration, training, held-out, and final locked sets do not share source sessions or derived copies in ways that invalidate the metric.
-3. **Primary-only robustness**: optional modalities improve results when present but their absence does not collapse the required ordinary-image path.
-4. **Held-out and OOD**: the candidate beats the current accepted baseline on predefined metrics and important device/content strata.
-5. **Consumer correlation**: lower parameter loss also improves the real renderer/consumer response that the product cares about.
-6. **Bounded uncertainty**: the product has a measurable reject/fallback rule for cases outside the model's supported envelope.
-7. **End-to-end product evidence**: actual generated assets pass container, native consumer, and device tests.
+3. **Primary-only robustness**: optional modalities improve results when present but their absence does not collapse the ordinary-image path.
+4. **Held-out and OOD**: the candidate beats the accepted baseline on predefined metrics and important device/content strata.
+5. **Consumer correlation**: lower parameter loss also improves the real renderer/consumer response the product cares about.
+6. **Bounded uncertainty**: the product has a measurable reject/fallback rule outside the supported envelope.
+7. **End-to-end product evidence**: generated assets pass container, native consumer, and device tests.
 8. **Operational budget**: runtime, memory, model size, and failure behavior fit the product target.
 
-Only after these gates pass can a model move from `research.styles-model` to an adapter or engine-visible production capability.
+Only after these gates pass can a learned component move from `research.styles-model` to a production adapter capability.
 
-The engine should consume the promoted capability through a stable adapter contract. It should not import training code or know how the model was trained.
+The engine consumes the promoted capability through a stable adapter contract. It does not import training code or know how the model was trained.
 
-## Branch lifecycle rules
+## Branch retirement and knowledge promotion
 
-Every long-lived branch must have four explicit facts in a current document or PR description:
-
-- role;
-- intended base;
-- promotion gate;
-- retirement condition.
-
-Before deleting a branch:
+Before deleting or replacing a long-lived branch:
 
 1. compare it with its intended destination;
-2. identify commits or contracts that do not exist elsewhere;
-3. promote useful current knowledge into code, tests, model cards, or normative documents;
-4. preserve dated experimental evidence as historical records when it remains useful;
-5. delete only after no stable contract depends on branch-only knowledge.
+2. identify commits, contracts, protocols, or evidence that do not exist elsewhere;
+3. promote stable knowledge into code, tests, model cards, research docs, or normative documents;
+4. preserve useful dated experiment evidence as historical records;
+5. confirm no stable contract depends on branch-only knowledge;
+6. only then retire the branch.
 
-A merged implementation is not enough if the reasoning, acceptance boundary, or provenance needed to maintain it exists only in an old PR or chat transcript.
+A merged implementation is not enough if the reasoning boundary, acceptance contract, or provenance needed to maintain it exists only in an old PR, mixed development guide, or chat transcript.
 
 ## Agent execution pattern
 
-For substantial migration work, use this compact task ledger in the PR description or working notes:
+For one bounded PR, use `.github/pull_request_template.md` as the compact task ledger.
 
-- **Target capability**: one or more identifiers from `architecture.en.md`.
-- **Base and branch**: exact refs and merge base.
-- **Current owner**: source files/crates that own the behavior today.
-- **Invariant**: the behavior that must remain true.
-- **Oracle/evidence**: standards, fixtures, v1.4 behavior, device result, or measured research baseline.
-- **Change boundary**: layers allowed to change.
-- **Acceptance checks**: commands/workflows required for promotion.
-- **Residual gaps**: facts not proven by the available environment.
+For work that spans sessions/PRs, use the [execution-plan contract](exec-plans/README.en.md). Do not create repository files only to store transient chain-of-thought or session scratch.
 
-Do not create repository files only to store transient chain-of-thought or session notes. Persist only decisions, contracts, provenance, reusable evidence, and plans that another maintainer or agent must recover later.
+The durable state that matters is: target capability, exact refs, invariant, evidence, decisions, ordered work, promotion state, residual gaps, and one resumable next action.
