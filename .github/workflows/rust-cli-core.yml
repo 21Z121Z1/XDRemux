@@ -97,3 +97,21 @@ jobs:
             --plan "$RUNNER_TEMP/xdremux-rust-cli-gate.json"
           python3 scripts/agent_completion_gate.py verify \
             ".codex/verification-receipts/$(git rev-parse HEAD).json"
+
+  portable-cli-build:
+    name: portable-cli-build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build canonical Rust CLI
+        run: cargo build --locked -p xdremux-cli
+      - name: Test portable source and CLI semantics
+        run: cargo test --locked -p xdremux-source -p xdremux-cli
