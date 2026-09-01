@@ -95,7 +95,7 @@ jobs:
       - name: Pin Python Live Photo MOV oracle
         run: |
           python3 -m unittest Tests.test_python_motion_photo -k pure_python_mov_writer_preserves_media_and_writes_live_photo_metadata
-          python3 -m unittest Tests.test_python_motion_photo -k strip_trailing_vendor_data
+          python3 -m unittest Tests.test_python_motion_photo -k trailing_vendor_bytes_are_removed_only_after_complete_bmff
       - name: Compare Swift, Rust, and Python Motion Photo contracts
         run: bash scripts/check_motion_photo_rust_conformance.sh
       - name: Verify cross-language completion gate
@@ -127,7 +127,7 @@ jobs:
               {
                 "name": "python-motion-video-normalization-oracle",
                 "kind": "regression",
-                "command": ["python3", "-m", "unittest", "Tests.test_python_motion_photo", "-k", "strip_trailing_vendor_data"],
+                "command": ["python3", "-m", "unittest", "Tests.test_python_motion_photo", "-k", "trailing_vendor_bytes_are_removed_only_after_complete_bmff"],
                 "timeout_seconds": 600
               },
               {
