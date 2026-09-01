@@ -1,11 +1,8 @@
-use std::collections::hash_map::RandomState;
 use std::fs::{self, OpenOptions};
-use std::hash::{BuildHasher, Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
+use uuid::Uuid;
 use xdremux_motion_photo::{
     companion_video_path, media_mdat_payloads, normalize_embedded_video, parse_oppo_motion_photo,
     publish_live_photo_pair, read_apple_content_identifier, read_live_photo_content_identifier,
@@ -14,8 +11,6 @@ use xdremux_motion_photo::{
 };
 
 use crate::{Result, RuntimeError};
-
-static CONTENT_IDENTIFIER_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LivePhotoFileReceipt {
@@ -38,52 +33,7 @@ fn range_slice<'a>(source: &'a [u8], range: ByteRange, context: &'static str) ->
 }
 
 fn generate_content_identifier() -> String {
-    // The identifier is a pairing key, not a security token. RandomState contributes
-    // per-process randomized keys while time, pid, and a monotonic counter prevent
-    // accidental reuse inside the same process. Set RFC 4122 version/variant bits so
-    // the external representation matches the UUID form produced by existing clients.
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let counter = CONTENT_IDENTIFIER_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let pid = std::process::id();
-
-    let mut first = RandomState::new().build_hasher();
-    now.hash(&mut first);
-    counter.hash(&mut first);
-    pid.hash(&mut first);
-
-    let mut second = RandomState::new().build_hasher();
-    counter.hash(&mut second);
-    now.rotate_left(37).hash(&mut second);
-    pid.hash(&mut second);
-
-    let mut bytes = [0_u8; 16];
-    bytes[..8].copy_from_slice(&first.finish().to_be_bytes());
-    bytes[8..].copy_from_slice(&second.finish().to_be_bytes());
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-    format!(
-        "{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
-        bytes[0],
-        bytes[1],
-        bytes[2],
-        bytes[3],
-        bytes[4],
-        bytes[5],
-        bytes[6],
-        bytes[7],
-        bytes[8],
-        bytes[9],
-        bytes[10],
-        bytes[11],
-        bytes[12],
-        bytes[13],
-        bytes[14],
-        bytes[15]
-    )
+    Uuid::new_v4().hyphenated().to_string().to_ascii_uppercase()
 }
 
 fn write_synced_new(path: &Path, data: &[u8]) -> Result<()> {
@@ -182,11 +132,9 @@ pub(crate) fn convert_heif_motion_photo_file(
     let embedded_video = range_slice(source, asset.video_resource_range, "Motion Photo video range")?;
     let normalized_video = normalize_embedded_video(embedded_video)
         .map_err(|error| RuntimeError::external("Motion Photo video normalization", error))?;
-    let still_time_seconds = resolve_live_photo_still_time(
-        normalized_video.data,
-        asset.presentation_timestamp_us,
-    )
-    .map_err(|error| RuntimeError::external("Live Photo still-time resolution", error))?;
+    let still_time_seconds =
+        resolve_live_photo_still_time(normalized_video.data, asset.presentation_timestamp_us)
+            .map_err(|error| RuntimeError::external("Live Photo still-time resolution", error))?;
 
     let content_identifier = generate_content_identifier();
     let still = write_live_photo_heif_still(static_heif, &content_identifier)
@@ -233,7 +181,7 @@ pub(crate) fn convert_heif_motion_photo_file(
 
     let (temporary_image, temporary_video) =
         temporary_pair_paths(output_image, &content_identifier)?;
-    let publish_result = (|| {
+    let publish_result: Result<()> = (|| {
         write_synced_new(&temporary_image, &still)?;
         write_synced_new(&temporary_video, &movie)?;
         publish_live_photo_pair(
@@ -266,14 +214,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn generated_pair_identifier_has_uuid_shape_and_version_bits() {
+    fn generated_pair_identifier_is_uuid_v4() {
         let value = generate_content_identifier();
-        assert_eq!(value.len(), 36);
-        assert_eq!(&value[8..9], "-");
-        assert_eq!(&value[13..14], "-");
-        assert_eq!(&value[18..19], "-");
-        assert_eq!(&value[23..24], "-");
-        assert_eq!(&value[14..15], "4");
-        assert!(matches!(value.as_bytes()[19], b'8' | b'9' | b'A' | b'B'));
+        let parsed = Uuid::parse_str(&value).expect("generated identifier must parse as UUID");
+        assert_eq!(parsed.get_version_num(), 4);
+        assert_eq!(value, value.to_ascii_uppercase());
     }
 }
