@@ -104,6 +104,12 @@ ensure_replace(
 raw_exif = Path("crates/xdremux-format/src/exif_raw.rs")
 ensure_replace(
     raw_exif,
+    "fn read_slice(data: &[u8], start: usize, len: usize, context: &'static str) -> Result<&[u8]> {",
+    "fn read_slice<'a>(data: &'a [u8], start: usize, len: usize, context: &'static str) -> Result<&'a [u8]> {",
+    "raw EXIF slice lifetime",
+)
+ensure_replace(
+    raw_exif,
     """        if let Some(tiff) = payload.get(start..)
             && (tiff.starts_with(b"II") || tiff.starts_with(b"MM"))
         {
