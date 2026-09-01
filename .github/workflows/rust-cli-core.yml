@@ -6,7 +6,14 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
       - "crates/xdremux-source/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-metadata/**"
+      - "crates/xdremux-format/**"
       - "crates/xdremux-container/**"
       - "crates/xdremux-motion-photo/**"
       - "scripts/check_rust_cli_smoke.sh"
@@ -16,7 +23,14 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
       - "crates/xdremux-source/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-metadata/**"
+      - "crates/xdremux-format/**"
       - "crates/xdremux-container/**"
       - "crates/xdremux-motion-photo/**"
       - "scripts/check_rust_cli_smoke.sh"
@@ -28,11 +42,15 @@ permissions:
 jobs:
   rust-cli-core:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Install portable HEVC provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
@@ -50,12 +68,12 @@ jobs:
             exit 1
           fi
       - name: Check formatting
-        run: cargo fmt --check -p xdremux-source -p xdremux-cli
-      - name: Lint Rust source routing and CLI
-        run: cargo clippy --locked -p xdremux-source -p xdremux-cli --all-targets -- -D warnings
-      - name: Test Rust source routing and CLI
-        run: cargo test --locked -p xdremux-source -p xdremux-cli
-      - name: Exercise real Rust CLI route
+        run: cargo fmt --check -p xdremux-source -p xdremux-runtime -p xdremux-cli
+      - name: Lint canonical Rust CLI stack
+        run: cargo clippy --locked -p xdremux-source -p xdremux-runtime -p xdremux-cli --all-targets -- -D warnings
+      - name: Test canonical Rust CLI stack
+        run: cargo test --locked -p xdremux-source -p xdremux-runtime -p xdremux-cli
+      - name: Exercise real Rust CLI routes
         run: bash scripts/check_rust_cli_smoke.sh
       - name: Verify exact-head completion gate
         shell: bash
@@ -63,7 +81,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-rust-cli-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Introduce the canonical Rust input-routing layer and the first real xdremux Rust CLI product entry point without moving source semantics into the CLI shell",
+            "scope": "Verify the canonical Rust source routing, ProXDR runtime, and xdremux CLI product entry point including functional media conversion",
             "checks": [
               {
                 "name": "rust-workspace-lock",
@@ -72,10 +90,10 @@ jobs:
                 "timeout_seconds": 600
               },
               {
-                "name": "rust-source-cli-regressions",
+                "name": "rust-cli-stack-regressions",
                 "kind": "regression",
-                "command": ["cargo", "test", "--locked", "-p", "xdremux-source", "-p", "xdremux-cli"],
-                "timeout_seconds": 600
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli"],
+                "timeout_seconds": 900
               },
               {
                 "name": "rust-cli-real-file-smoke",
@@ -84,10 +102,10 @@ jobs:
                 "timeout_seconds": 600
               },
               {
-                "name": "rust-source-cli-clippy",
+                "name": "rust-cli-stack-clippy",
                 "kind": "static",
-                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-source", "-p", "xdremux-cli", "--all-targets", "--", "-D", "warnings"],
-                "timeout_seconds": 600
+                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli", "--all-targets", "--", "-D", "warnings"],
+                "timeout_seconds": 900
               }
             ]
           }
@@ -105,13 +123,27 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+      - name: Install libheif + HEVC on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Install libheif + HEVC on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $triplet = "x64-windows"
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libheif[hevc]:$triplet"
+          "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
       - name: Build canonical Rust CLI
         run: cargo build --locked -p xdremux-cli
-      - name: Test portable source and CLI semantics
-        run: cargo test --locked -p xdremux-source -p xdremux-cli
+      - name: Test portable Rust CLI conversion semantics
+        run: cargo test --locked -p xdremux-source -p xdremux-runtime -p xdremux-cli
