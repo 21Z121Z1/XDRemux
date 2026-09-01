@@ -69,35 +69,21 @@ jobs:
               old_target = "let target = layout(ChromaSampling::Yuv420, 8);"
               if old_target not in block:
                   raise SystemExit(f"target anchor not found in {test_name}")
-              block = block.replace(
-                  old_target,
-                  "let target = layout(ChromaSampling::Yuv444, 8);",
-                  1,
-              )
+              block = block.replace(old_target, "let target = layout(ChromaSampling::Yuv444, 8);", 1)
               text = text[:start] + block + text[end:]
           lib.write_text(text)
 
           execution = Path("crates/xdremux-engine/src/execution.rs")
           text = execution.read_text()
-          old = '''    fn layout() -> GainMapCodecLayout {
-              GainMapCodecLayout {
-                  chroma: ChromaSampling::Yuv420,
-                  luma_bit_depth: 8,
-                  chroma_bit_depth: 8,
-              }
-          }
-          '''
-          new = '''    fn layout() -> GainMapCodecLayout {
-              GainMapCodecLayout {
-                  chroma: ChromaSampling::Yuv444,
-                  luma_bit_depth: 8,
-                  chroma_bit_depth: 8,
-              }
-          }
-          '''
-          if old not in text:
-              raise SystemExit("execution lifecycle capability fixture anchor not found")
-          execution.write_text(text.replace(old, new, 1))
+          marker = "    fn layout() -> GainMapCodecLayout {"
+          start = text.index(marker)
+          end = text.index("\n    }\n\n    fn analysis()", start) + len("\n    }")
+          block = text[start:end]
+          old_chroma = "chroma: ChromaSampling::Yuv420,"
+          if old_chroma not in block:
+              raise SystemExit("execution lifecycle capability fixture chroma anchor not found")
+          block = block.replace(old_chroma, "chroma: ChromaSampling::Yuv444,", 1)
+          execution.write_text(text[:start] + block + text[end:])
           PY
           cargo fmt --all
       - name: Verify engine product policy
