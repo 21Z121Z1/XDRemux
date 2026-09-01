@@ -1,7 +1,7 @@
 use xdremux_format::exif::read_item_payload;
 use xdremux_format::isobmff::{
-    make_box, make_iloc_box, parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, EXIF,
-    ILOC, MDAT, META,
+    make_iloc_box, parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, EXIF, ILOC,
+    MDAT, META,
 };
 
 use crate::oppo::{
@@ -26,6 +26,79 @@ fn one_top_level<'a>(
         ));
     }
     Ok(first)
+}
+
+fn source_size32(data: &[u8], header: &BoxHeader) -> Result<u32> {
+    let end = header
+        .box_start
+        .checked_add(4)
+        .ok_or_else(|| MetadataError::overflow("HEIF box size field"))?;
+    let bytes: [u8; 4] = data
+        .get(header.box_start..end)
+        .ok_or_else(|| MetadataError::invalid("HEIF box", "size field is outside source"))?
+        .try_into()
+        .map_err(|_| MetadataError::invalid("HEIF box", "size field is truncated"))?;
+    Ok(u32::from_be_bytes(bytes))
+}
+
+/// Rebuild a box without changing the source header representation.
+///
+/// File-backed `iloc` offsets are relative to absolute file positions. Preserving
+/// an 8-byte, 16-byte largesize, or size-zero header keeps the payload start
+/// stable while a metadata payload changes length, so the only relocation needed
+/// is the explicit UserComment byte delta handled below.
+fn rebuild_box_preserving_header(
+    data: &[u8],
+    header: &BoxHeader,
+    payload: &[u8],
+    context: &'static str,
+) -> Result<Vec<u8>> {
+    let size32 = source_size32(data, header)?;
+    match size32 {
+        0 => {
+            let total = payload
+                .len()
+                .checked_add(8)
+                .ok_or_else(|| MetadataError::overflow(context))?;
+            let mut output = Vec::with_capacity(total);
+            output.extend_from_slice(&0u32.to_be_bytes());
+            output.extend_from_slice(header.kind.as_bytes());
+            output.extend_from_slice(payload);
+            Ok(output)
+        }
+        1 => {
+            let total = payload
+                .len()
+                .checked_add(16)
+                .ok_or_else(|| MetadataError::overflow(context))?;
+            let total = u64::try_from(total).map_err(|_| MetadataError::overflow(context))?;
+            let mut output = Vec::with_capacity(
+                usize::try_from(total).map_err(|_| MetadataError::overflow(context))?,
+            );
+            output.extend_from_slice(&1u32.to_be_bytes());
+            output.extend_from_slice(header.kind.as_bytes());
+            output.extend_from_slice(&total.to_be_bytes());
+            output.extend_from_slice(payload);
+            Ok(output)
+        }
+        _ => {
+            let total = payload
+                .len()
+                .checked_add(8)
+                .ok_or_else(|| MetadataError::overflow(context))?;
+            let total = u32::try_from(total).map_err(|_| {
+                MetadataError::invalid(
+                    context,
+                    "rewritten payload no longer fits the source 32-bit box header",
+                )
+            })?;
+            let mut output = Vec::with_capacity(total as usize);
+            output.extend_from_slice(&total.to_be_bytes());
+            output.extend_from_slice(header.kind.as_bytes());
+            output.extend_from_slice(payload);
+            Ok(output)
+        }
+    }
 }
 
 fn current_oppo_tag_flags(data: &[u8]) -> Result<Option<u32>> {
@@ -105,10 +178,6 @@ pub fn patch_oppo_user_comment_in_heif(
             )
         })?;
 
-    let old_mdat_header_size = mdat_header
-        .data_start
-        .checked_sub(mdat_header.box_start)
-        .ok_or_else(|| MetadataError::overflow("OPPO mdat header size"))?;
     let mut mdat_payload = data
         .get(mdat_header.payload_range())
         .ok_or_else(|| MetadataError::invalid("OPPO HEIF mdat", "payload is outside source"))?
@@ -147,10 +216,7 @@ pub fn patch_oppo_user_comment_in_heif(
             else {
                 return Err(MetadataError::invalid(
                     "OPPO UserComment",
-                    format!(
-                        "patch crosses item {} extent boundary",
-                        entry.item_id
-                    ),
+                    format!("patch crosses item {} extent boundary", entry.item_id),
                 ));
             };
             extent.offset = adjusted_absolute.checked_sub(base_offset).ok_or_else(|| {
@@ -209,7 +275,8 @@ pub fn patch_oppo_user_comment_in_heif(
             "iloc box is missing",
         ));
     }
-    let rebuilt_meta = make_box(META, &meta_payload)?;
+    let rebuilt_meta =
+        rebuild_box_preserving_header(data, meta_header, &meta_payload, "OPPO HEIF meta")?;
     if rebuilt_meta.len() != meta_header.size {
         return Err(MetadataError::invalid(
             "OPPO HEIF meta",
@@ -217,15 +284,20 @@ pub fn patch_oppo_user_comment_in_heif(
         ));
     }
 
-    let rebuilt_mdat = make_box(MDAT, &mdat_payload)?;
-    let new_mdat_header_size = rebuilt_mdat
+    let rebuilt_mdat =
+        rebuild_box_preserving_header(data, mdat_header, &mdat_payload, "OPPO HEIF mdat")?;
+    let rebuilt_mdat_header_size = rebuilt_mdat
         .len()
         .checked_sub(mdat_payload.len())
         .ok_or_else(|| MetadataError::overflow("OPPO rebuilt mdat header size"))?;
-    if new_mdat_header_size != old_mdat_header_size {
+    let source_mdat_header_size = mdat_header
+        .data_start
+        .checked_sub(mdat_header.box_start)
+        .ok_or_else(|| MetadataError::overflow("OPPO source mdat header size"))?;
+    if rebuilt_mdat_header_size != source_mdat_header_size {
         return Err(MetadataError::invalid(
             "OPPO HEIF mdat",
-            "UserComment patch changed mdat header width",
+            "rewriter did not preserve source mdat header width",
         ));
     }
 
