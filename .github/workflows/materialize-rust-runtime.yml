@@ -109,6 +109,7 @@ jobs:
             crates/xdremux-runtime/tests/synthetic_uhdr.rs \
             crates/xdremux-cli/Cargo.toml \
             crates/xdremux-cli/src/lib.rs \
+            crates/xdremux-cli/tests/convert.rs \
             crates/xdremux-hdr/src/info.rs \
             crates/xdremux-hdr/src/lib.rs
           if git diff --cached --quiet; then
