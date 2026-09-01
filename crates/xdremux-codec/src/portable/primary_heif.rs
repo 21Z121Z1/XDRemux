@@ -24,6 +24,13 @@ impl LibHeifProvider {
                 "primary HEIF quality must be in the 0...100 range",
             ));
         }
+        if let Some(exif) = request.exif_tiff.as_ref()
+            && !(exif.starts_with(b"II") || exif.starts_with(b"MM"))
+        {
+            return Err(CodecError::invalid(
+                "primary HEIF EXIF must begin at a TIFF II/MM header",
+            ));
+        }
 
         let mut image = Image::new(
             request.raster.width,
@@ -100,9 +107,14 @@ impl LibHeifProvider {
         }
 
         let mut context = HeifContext::new().map_err(CodecError::libheif)?;
-        context
+        let handle = context
             .encode_image(&image, &mut encoder, None)
             .map_err(CodecError::libheif)?;
+        if let Some(exif) = request.exif_tiff.as_ref() {
+            context
+                .add_exif_metadata(&handle, exif)
+                .map_err(CodecError::libheif)?;
+        }
         let encoded = context.write_to_bytes().map_err(CodecError::libheif)?;
         validate_primary_container(&encoded, request.raster.width, request.raster.height)?;
         Ok(encoded)
@@ -206,5 +218,15 @@ mod tests {
             .unwrap();
         assert_eq!((decoded.width, decoded.height), (source.width, source.height));
         assert_eq!(decoded.format, RasterPixelFormat::Rgb8);
+    }
+
+    #[test]
+    fn rejects_non_tiff_exif_before_calling_libheif() {
+        let request = PrimaryHeifEncodeRequest::live_photo(raster(), None)
+            .with_exif_tiff(b"Exif\0\0not-a-tiff".to_vec());
+        let error = LibHeifProvider::new()
+            .encode_primary_heif(&request)
+            .expect_err("non-TIFF EXIF must fail before encode");
+        assert!(error.to_string().contains("TIFF II/MM"));
     }
 }
