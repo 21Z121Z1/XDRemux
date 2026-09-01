@@ -59,7 +59,22 @@ if "requested OPPO camera-tail policy is not wired into the Rust runtime yet" in
 if "if plan.oppo_camera_tail == OppoCameraTail::PreserveWithoutPrivateHdr" in text:
     raise SystemExit("legacy one-mode camera-tail append remains")
 
-# The runtime no longer calls these container helpers directly; policy lives in oppo_tail.rs.
-text = text.replace("    extract, is_oppo_private_hdr_tail_entry, pack_filtered_oppo_camera_tail, ExtractedLhdr,\n", "    extract, ExtractedLhdr,\n", 1)
+# Runtime policy moved behind dedicated modules; clean imports that were only
+# needed by the old inline implementation.
+text = text.replace(
+    "    extract, is_oppo_private_hdr_tail_entry, pack_filtered_oppo_camera_tail, ExtractedLhdr,\n",
+    "    extract, ExtractedLhdr,\n",
+    1,
+)
+text = text.replace(
+    "    InputProcessingBranch, OperationCapability, OppoCameraTail, OppoCompatibility, RasterDecoder,\n",
+    "    InputProcessingBranch, OperationCapability, OppoCompatibility, RasterDecoder,\n",
+    1,
+)
+
+if "is_oppo_private_hdr_tail_entry, pack_filtered_oppo_camera_tail" in text:
+    raise SystemExit("legacy container tail imports remain")
+if "OperationCapability, OppoCameraTail, OppoCompatibility" in text:
+    raise SystemExit("legacy engine camera-tail import remains")
 
 path.write_text(text)
