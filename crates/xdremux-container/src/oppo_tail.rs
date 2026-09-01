@@ -50,6 +50,12 @@ pub fn is_oppo_watermark_tail_entry(name: &str) -> bool {
     name.starts_with("watermark.") || OPPO_CAMERA_WATERMARK_AUXILIARY_ENTRY_NAMES.contains(&name)
 }
 
+pub fn is_oppo_compact_tail_entry(name: &str) -> bool {
+    is_oppo_watermark_tail_entry(name)
+        || is_oppo_portrait_editing_tail_entry(name)
+        || matches!(name, "hdr.transform.data" | "src.local.hdr.linear.mask")
+}
+
 fn manifest_version(manifest: &[Value], entry: &ManifestEntry) -> i64 {
     manifest
         .get(entry.json_order)
@@ -113,6 +119,82 @@ fn source_tail_tag(source: &[u8]) -> [u8; 4] {
         }
     }
     *b"jxrs"
+}
+
+/// Return the exact source bytes after the standard HEIF body.
+///
+/// This is the canonical implementation of the product's `preserve` policy:
+/// unknown vendor manifest fields and byte representation are retained rather
+/// than normalized through a decode/re-encode cycle.
+pub fn complete_oppo_camera_tail(
+    source: &[u8],
+    manifest_info: &ManifestInfo,
+) -> Result<Vec<u8>> {
+    source
+        .get(manifest_info.extension_start..)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| ContainerError::invalid("OPPO tail", "extension start is outside source"))
+}
+
+fn find_subslice(haystack: &[u8], needle: &[u8], range: std::ops::Range<usize>) -> Option<usize> {
+    if needle.is_empty() || range.start > range.end || range.end > haystack.len() {
+        return None;
+    }
+    haystack[range.clone()]
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|offset| range.start + offset)
+}
+
+/// Preserve the complete source tail but neutralize selected manifest entry names.
+///
+/// The payload bytes and footer stay byte-identical. Only the first byte inside
+/// the quoted JSON name token changes to `x`, matching the legacy Swift product
+/// contract for `preserve-no-uhdr` / `preserve-no-hdr`. Searching for the quoted
+/// token avoids patching a nested-name substring such as `local.hdr.*` inside
+/// `src.local.hdr.*`.
+pub fn neutralize_oppo_camera_tail_entries<F>(
+    source: &[u8],
+    manifest_info: &ManifestInfo,
+    mut neutralize: F,
+) -> Result<Vec<u8>>
+where
+    F: FnMut(&ManifestEntry) -> bool,
+{
+    let mut tail = complete_oppo_camera_tail(source, manifest_info)?;
+    let tail_start = manifest_info.extension_start;
+    let json_start = manifest_info
+        .json_start
+        .checked_sub(tail_start)
+        .ok_or_else(|| ContainerError::invalid("OPPO tail", "manifest starts before tail"))?;
+    let json_end = manifest_info
+        .json_end
+        .checked_sub(tail_start)
+        .ok_or_else(|| ContainerError::invalid("OPPO tail", "manifest ends before tail"))?;
+    if json_start >= json_end || json_end > tail.len() {
+        return Err(ContainerError::invalid(
+            "OPPO tail",
+            "manifest range is outside preserved tail",
+        ));
+    }
+
+    for entry in manifest_info.entries.iter().filter(|entry| neutralize(entry)) {
+        let quoted = format!("\"{}\"", entry.name).into_bytes();
+        let start = find_subslice(&tail, &quoted, json_start..json_end).ok_or_else(|| {
+            ContainerError::invalid(
+                "OPPO tail",
+                format!("unable to neutralize manifest entry {}", entry.name),
+            )
+        })?;
+        let first_name_byte = start
+            .checked_add(1)
+            .ok_or_else(|| ContainerError::invalid("OPPO tail", "entry name offset overflows"))?;
+        let byte = tail.get_mut(first_name_byte).ok_or_else(|| {
+            ContainerError::invalid("OPPO tail", "entry name token is truncated")
+        })?;
+        *byte = b'x';
+    }
+    Ok(tail)
 }
 
 /// Repack a filtered OPPO camera metadata tail without imposing product policy.
@@ -262,6 +344,36 @@ mod tests {
         assert!(is_oppo_portrait_editing_tail_entry("rear.depth"));
         assert!(is_oppo_watermark_tail_entry("watermark.logo"));
         assert!(is_oppo_watermark_tail_entry("color.space"));
+        assert!(is_oppo_compact_tail_entry("rear.depth"));
+        assert!(is_oppo_compact_tail_entry("hdr.transform.data"));
+        assert!(!is_oppo_compact_tail_entry("local.uhdr.gainmap.data"));
+    }
+
+    #[test]
+    fn preserve_returns_exact_post_extension_bytes() {
+        let (source, info) = synthetic_source();
+        assert_eq!(complete_oppo_camera_tail(&source, &info).unwrap(), source[4..]);
+    }
+
+    #[test]
+    fn neutralization_changes_only_quoted_manifest_name_byte() {
+        let (source, info) = synthetic_source();
+        let original = complete_oppo_camera_tail(&source, &info).unwrap();
+        let neutralized = neutralize_oppo_camera_tail_entries(&source, &info, |entry| {
+            is_oppo_private_hdr_tail_entry(&entry.name)
+        })
+        .unwrap();
+        assert_eq!(original.len(), neutralized.len());
+        let differences = original
+            .iter()
+            .zip(&neutralized)
+            .enumerate()
+            .filter(|(_, (left, right))| left != right)
+            .collect::<Vec<_>>();
+        assert_eq!(differences.len(), 1);
+        assert_eq!(*differences[0].1 .1, b'x');
+        assert!(String::from_utf8_lossy(&neutralized).contains("\"xocal.hdr.meta.data\""));
+        assert!(String::from_utf8_lossy(&neutralized).contains("\"watermark.logo\""));
     }
 
     #[test]
