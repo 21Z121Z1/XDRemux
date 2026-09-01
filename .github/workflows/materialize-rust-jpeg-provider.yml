@@ -1,0 +1,45 @@
+name: Materialize Rust JPEG provider lockfile
+
+on:
+  push:
+    branches:
+      - feat/rust-cli-unification
+    paths:
+      - ".github/workflows/materialize-rust-jpeg-provider.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - name: Install libheif HEVC provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Materialize dependency lockfile
+        run: cargo generate-lockfile
+      - name: Verify JPEG and HEVC provider layer
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --locked -p xdremux-codec --all-targets -- -D warnings
+          cargo test --locked -p xdremux-codec
+      - name: Commit lockfile only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git diff --cached --check
+          git commit -m "build(rust-codec): lock zune JPEG decoder"
+          git push origin HEAD:feat/rust-cli-unification
