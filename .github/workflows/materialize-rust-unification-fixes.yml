@@ -36,10 +36,282 @@ jobs:
 
           path = Path("crates/xdremux-heif/src/native.rs")
           text = path.read_text()
+          text = text.replace(
+              "use std::collections::BTreeMap;",
+              "use std::collections::{BTreeMap, BTreeSet};",
+              1,
+          )
+
+          helper_anchor = "fn ceil_div(value: u32, divisor: u32, context: &str) -> Result<u32> {"
+          helper = r'''fn canonical_gain_map_graph_ids(meta: &ParsedMeta) -> Result<BTreeSet<u32>> {
+              let tmap_ids = meta
+                  .iinf
+                  .entries
+                  .iter()
+                  .filter(|item| item.item_type == Some(TMAP))
+                  .map(|item| item.item_id)
+                  .collect::<Vec<_>>();
+              if tmap_ids.is_empty() {
+                  return Ok(BTreeSet::new());
+              }
+
+              let Some(iref) = meta.iref.as_ref() else {
+                  return Err(invalid(
+                      "source contains tmap items without iref; canonical replacement refuses to guess",
+                  ));
+              };
+              let roots = tmap_ids
+                  .iter()
+                  .copied()
+                  .filter(|tmap_id| {
+                      iref.entries.iter().any(|reference| {
+                          reference.kind == DIMG
+                              && reference.from_item_id == *tmap_id
+                              && reference.to_item_ids.contains(&meta.primary_item_id)
+                      })
+                  })
+                  .collect::<Vec<_>>();
+              let tmap_id = match roots.as_slice() {
+                  [only] => *only,
+                  [] => {
+                      return Err(invalid(
+                          "source contains tmap items but no canonical tmap -> primary dimg graph",
+                      ));
+                  }
+                  _ => {
+                      return Err(invalid(
+                          "source contains more than one canonical tmap -> primary graph",
+                      ));
+                  }
+              };
+
+              let mut removed = BTreeSet::from([tmap_id]);
+              loop {
+                  let previous_len = removed.len();
+                  for reference in &iref.entries {
+                      if reference.kind == DIMG && removed.contains(&reference.from_item_id) {
+                          for target in &reference.to_item_ids {
+                              if *target != meta.primary_item_id {
+                                  removed.insert(*target);
+                              }
+                          }
+                      }
+                  }
+                  if removed.len() == previous_len {
+                      break;
+                  }
+              }
+
+              for item in &meta.iinf.entries {
+                  if item.item_type == Some(MIME)
+                      && iref.entries.iter().any(|reference| {
+                          reference.kind == CDSC
+                              && reference.from_item_id == item.item_id
+                              && reference.to_item_ids.contains(&tmap_id)
+                      })
+                  {
+                      removed.insert(item.item_id);
+                  }
+              }
+              removed.remove(&meta.primary_item_id);
+              Ok(removed)
+          }
+
+          '''
+          if helper_anchor not in text:
+              raise SystemExit("ceil_div anchor not found")
+          text = text.replace(helper_anchor, helper + helper_anchor, 1)
+
+          text = text.replace(
+              '''    tmap_id: u32,
+          ) -> Result<Vec<u8>> {
+              let mut properties = meta.properties.iter().collect::<Vec<_>>();''',
+              '''    tmap_id: u32,
+              removed: &BTreeSet<u32>,
+          ) -> Result<Vec<u8>> {
+              let mut properties = meta.properties.iter().collect::<Vec<_>>();''',
+              1,
+          )
+          text = text.replace(
+              '''    let mut ipma_entries = meta.ipma.entries.clone();''',
+              '''    let mut ipma_entries = meta
+                  .ipma
+                  .entries
+                  .iter()
+                  .filter(|entry| !removed.contains(&entry.item_id))
+                  .cloned()
+                  .collect::<Vec<_>>();''',
+              1,
+          )
+
+          text = text.replace(
+              '''    xmp_id: u32,
+          ) -> Result<Vec<u8>> {
+              let mut entries = Vec::new();
+              for item in &meta.iinf.entries {
+                  entries.push(''',
+              '''    xmp_id: u32,
+              removed: &BTreeSet<u32>,
+          ) -> Result<Vec<u8>> {
+              let mut entries = Vec::new();
+              for item in &meta.iinf.entries {
+                  if removed.contains(&item.item_id) {
+                      continue;
+                  }
+                  entries.push(''',
+              1,
+          )
+
+          text = text.replace(
+              '''    xmp_id: u32,
+          ) -> Result<Vec<u8>> {
+              let mut entries = meta
+                  .iref
+                  .as_ref()
+                  .map_or_else(Vec::new, |iref| iref.entries.clone());''',
+              '''    xmp_id: u32,
+              removed: &BTreeSet<u32>,
+          ) -> Result<Vec<u8>> {
+              let mut entries = meta.iref.as_ref().map_or_else(Vec::new, |iref| {
+                  iref.entries
+                      .iter()
+                      .filter_map(|reference| {
+                          if removed.contains(&reference.from_item_id) {
+                              return None;
+                          }
+                          let to_item_ids = reference
+                              .to_item_ids
+                              .iter()
+                              .copied()
+                              .filter(|item_id| !removed.contains(item_id))
+                              .collect::<Vec<_>>();
+                          if to_item_ids.is_empty() {
+                              None
+                          } else {
+                              Some(IrefEntry {
+                                  kind: reference.kind,
+                                  from_item_id: reference.from_item_id,
+                                  to_item_ids,
+                              })
+                          }
+                      })
+                      .collect()
+              });''',
+              1,
+          )
+
+          text = text.replace(
+              '''    layout: AppendedIdatLayout,
+              gain: &DirectHevcGainMap<'_>,
+          ) -> Result<Vec<IlocEntry>> {
+              let mut entries = meta
+                  .iloc
+                  .entries
+                  .iter()
+                  .map(|entry| normalized_existing_location(entry, true))''',
+              '''    layout: AppendedIdatLayout,
+              gain: &DirectHevcGainMap<'_>,
+              removed: &BTreeSet<u32>,
+          ) -> Result<Vec<IlocEntry>> {
+              let mut entries = meta
+                  .iloc
+                  .entries
+                  .iter()
+                  .filter(|entry| !removed.contains(&entry.item_id))
+                  .map(|entry| normalized_existing_location(entry, true))''',
+              1,
+          )
+          text = text.replace(
+              '''    layout: AppendedIdatLayout,
+              gain: &DirectHevcGainMap<'_>,
+          ) -> Result<Vec<IlocEntry>> {
+              let old_mdat_start =''',
+              '''    layout: AppendedIdatLayout,
+              gain: &DirectHevcGainMap<'_>,
+              removed: &BTreeSet<u32>,
+          ) -> Result<Vec<IlocEntry>> {
+              let old_mdat_start =''',
+              1,
+          )
+          text = text.replace(
+              '''    for entry in &meta.iloc.entries {
+                  let mut normalized = normalized_existing_location(entry, false)?;''',
+              '''    for entry in &meta.iloc.entries {
+                  if removed.contains(&entry.item_id) {
+                      continue;
+                  }
+                  let mut normalized = normalized_existing_location(entry, false)?;''',
+              1,
+          )
 
           guard_start = text.index("    if ftyp.box_start != 0")
           guard_end = text.index("    let meta = parse_meta_box(source, meta_header)?;", guard_start)
           text = text[:guard_start] + text[guard_end:]
+          old_tmap_guard_start = text.index("    if meta\n        .iinf\n        .entries\n        .iter()")
+          old_tmap_guard_end = text.index("    let meta_children_start =", old_tmap_guard_start)
+          text = (
+              text[:old_tmap_guard_start]
+              + "    let removed_graph_ids = canonical_gain_map_graph_ids(&meta)?;\n"
+              + text[old_tmap_guard_end:]
+          )
+
+          text = text.replace(
+              '''    let original_max_item_id = meta
+                  .iinf
+                  .entries
+                  .iter()
+                  .map(|item| item.item_id)''',
+              '''    let original_max_item_id = meta
+                  .iinf
+                  .entries
+                  .iter()
+                  .filter(|item| !removed_graph_ids.contains(&item.item_id))
+                  .map(|item| item.item_id)''',
+              1,
+          )
+          text = text.replace(
+              '''    let iinf = build_iinf(source, &meta, &tile_ids, gain_id, tmap_id, xmp_id)?;''',
+              '''    let iinf = build_iinf(
+                  source,
+                  &meta,
+                  &tile_ids,
+                  gain_id,
+                  tmap_id,
+                  xmp_id,
+                  &removed_graph_ids,
+              )?;''',
+              1,
+          )
+          text = text.replace(
+              '''        gain_id,
+                  tmap_id,
+              )?;
+              let iref = build_iref(&meta, &tile_ids, gain_id, tmap_id, xmp_id)?;''',
+              '''        gain_id,
+                  tmap_id,
+                  &removed_graph_ids,
+              )?;
+              let iref = build_iref(
+                  &meta,
+                  &tile_ids,
+                  gain_id,
+                  tmap_id,
+                  xmp_id,
+                  &removed_graph_ids,
+              )?;''',
+              1,
+          )
+          text = text.replace(
+              '''    let placeholder_locations = build_placeholder_locations(&meta, ids, idat_layout, gain)?;''',
+              '''    let placeholder_locations = build_placeholder_locations(
+                  &meta,
+                  ids,
+                  idat_layout,
+                  gain,
+                  &removed_graph_ids,
+              )?;''',
+              1,
+          )
 
           layout_start = text.index("    let ftyp_part = build_ftyp(source, ftyp)?;")
           layout_end = text.index("    let final_locations = build_final_locations(", layout_start)
@@ -75,6 +347,16 @@ jobs:
 
           '''
           text = text[:layout_start] + layout + text[layout_end:]
+          text = text.replace(
+              '''        idat_layout,
+                  gain,
+              )?;''',
+              '''        idat_layout,
+                  gain,
+                  &removed_graph_ids,
+              )?;''',
+              1,
+          )
 
           output_start = text.index("    let after_mdat = source")
           output_end = text.index("\n\n    let structure =", output_start)
@@ -204,5 +486,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --check
-          git commit -m "fix(rust-heif): preserve source top-level layout"
+          git commit -m "fix(rust-heif): canonicalize existing gain-map graphs"
           git push origin HEAD:feat/rust-cli-unification
