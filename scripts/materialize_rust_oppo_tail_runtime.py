@@ -72,9 +72,18 @@ text = text.replace(
     1,
 )
 
+# Tests in this file still construct explicit plans. Keep that test-only use out
+# of the production import set so the normal library target stays warning-free.
+text = text.replace(
+    "oppo_camera_tail: OppoCameraTail::",
+    "oppo_camera_tail: xdremux_engine::OppoCameraTail::",
+)
+
 if "is_oppo_private_hdr_tail_entry, pack_filtered_oppo_camera_tail" in text:
     raise SystemExit("legacy container tail imports remain")
 if "OperationCapability, OppoCameraTail, OppoCompatibility" in text:
     raise SystemExit("legacy engine camera-tail import remains")
+if "oppo_camera_tail: OppoCameraTail::" in text:
+    raise SystemExit("unqualified test-only camera-tail reference remains")
 
 path.write_text(text)
