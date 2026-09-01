@@ -30,20 +30,22 @@ new_body = """        let body = standard_heif_body(
         };
         let assembly_body = patched_body.as_deref().unwrap_or(body);
 """
-if old_body in text:
+body_marker = "let assembly_body = patched_body.as_deref().unwrap_or(body);"
+if body_marker not in text:
+    if old_body not in text:
+        raise SystemExit("runtime source-body anchor not found")
     text = text.replace(old_body, new_body, 1)
-elif "let assembly_body = patched_body.as_deref().unwrap_or(body);" not in text:
-    raise SystemExit("runtime source-body anchor not found")
 
-text = text.replace(
-    """        let mut output = assemble_iso_gain_map_heif(
+old_call = """        let mut output = assemble_iso_gain_map_heif(
             body,
-""",
-    """        let mut output = assemble_iso_gain_map_heif(
+"""
+new_call = """        let mut output = assemble_iso_gain_map_heif(
             assembly_body,
-""",
-    1,
-)
+"""
+if new_call not in text:
+    if old_call not in text:
+        raise SystemExit("native assembly call anchor not found")
+    text = text.replace(old_call, new_call, 1)
 
 unsupported = """        if plan.oppo_compatibility != OppoCompatibility::Off {
             return Err(RuntimeError::new(
@@ -57,12 +59,16 @@ text = text.replace(unsupported, "", 1)
 for marker in (
     "mod oppo_compat;",
     "oppo_compat::patch_source_metadata(",
-    "let assembly_body = patched_body.as_deref().unwrap_or(body);",
+    body_marker,
     "assemble_iso_gain_map_heif(\n            assembly_body,",
 ):
     if marker not in text:
         raise SystemExit(f"portable OPPO runtime marker missing: {marker}")
+if text.count(body_marker) != 1:
+    raise SystemExit("OPPO runtime source patch was materialized more than once")
 if "OPPO-compatible output is not wired into the Rust runtime yet" in text:
     raise SystemExit("legacy blanket OPPO compatibility rejection remains")
+if old_call in text:
+    raise SystemExit("native assembly still consumes the unpatched source body")
 
 path.write_text(text)
