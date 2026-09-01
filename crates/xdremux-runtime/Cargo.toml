@@ -5,7 +5,10 @@ edition.workspace = true
 
 [dependencies]
 atomic-write-file = "=0.3.1"
+sha2 = "=0.11.0"
+tempfile = "=3.27.0"
 uuid = { version = "=1.26.0", features = ["v4"] }
+xdremux-classification = { path = "../xdremux-classification" }
 xdremux-codec = { path = "../xdremux-codec" }
 xdremux-container = { path = "../xdremux-container" }
 xdremux-engine = { path = "../xdremux-engine" }
