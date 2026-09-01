@@ -151,7 +151,6 @@
       "summary": "Photographic Styles learned proposals, provenance, uncertainty, and promotion evidence.",
       "rust_owner": [],
       "reference_owner": ["Models", "scripts"],
-      "reference_owner_branch": "codex/reverse-key1-oppo-solver",
       "evidence": ["data provenance", "held-out and OOD evaluation", "consumer A/B", "bounded fallback"]
     }
   ]
