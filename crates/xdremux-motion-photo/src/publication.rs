@@ -38,7 +38,9 @@ impl fmt::Display for PairPublicationError {
 
 impl Error for PairPublicationError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.source.as_ref().map(|error| error as &(dyn Error + 'static))
+        self.source
+            .as_ref()
+            .map(|error| error as &(dyn Error + 'static))
     }
 }
 
@@ -82,11 +84,15 @@ fn remove_stale_artifacts(image: &Path, video: &Path) -> PairPublicationResult<(
     let image_name = image
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| PairPublicationError::invalid("Live Photo image path has no UTF-8 file name"))?;
+        .ok_or_else(|| {
+            PairPublicationError::invalid("Live Photo image path has no UTF-8 file name")
+        })?;
     let video_name = video
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| PairPublicationError::invalid("Live Photo movie path has no UTF-8 file name"))?;
+        .ok_or_else(|| {
+            PairPublicationError::invalid("Live Photo movie path has no UTF-8 file name")
+        })?;
     let stem = image
         .file_stem()
         .and_then(|name| name.to_str())
@@ -103,7 +109,8 @@ fn remove_stale_artifacts(image: &Path, video: &Path) -> PairPublicationResult<(
     let entries = fs::read_dir(directory)
         .map_err(|error| PairPublicationError::io("could not inspect", directory, error))?;
     for entry in entries {
-        let entry = entry.map_err(|error| PairPublicationError::io("could not inspect", directory, error))?;
+        let entry = entry
+            .map_err(|error| PairPublicationError::io("could not inspect", directory, error))?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
         let is_backup = (name.starts_with(&format!(".{image_name}."))
@@ -198,11 +205,15 @@ pub fn publish_live_photo_pair(
     let image_name = final_image
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| PairPublicationError::invalid("Live Photo image path has no UTF-8 file name"))?;
+        .ok_or_else(|| {
+            PairPublicationError::invalid("Live Photo image path has no UTF-8 file name")
+        })?;
     let video_name = final_video
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| PairPublicationError::invalid("Live Photo movie path has no UTF-8 file name"))?;
+        .ok_or_else(|| {
+            PairPublicationError::invalid("Live Photo movie path has no UTF-8 file name")
+        })?;
     let image_backup = directory.join(format!(".{image_name}.{suffix}.backup"));
     let video_backup = directory.join(format!(".{video_name}.{suffix}.backup"));
     let had_image = final_image.exists();
@@ -251,10 +262,8 @@ mod tests {
     use std::fs;
 
     fn test_directory(name: &str) -> PathBuf {
-        let directory = std::env::temp_dir().join(format!(
-            "xdremux-motion-photo-{name}-{}",
-            unique_suffix()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("xdremux-motion-photo-{name}-{}", unique_suffix()));
         fs::create_dir_all(&directory).unwrap();
         directory
     }
@@ -285,9 +294,11 @@ mod tests {
         assert_eq!(fs::read(&video).unwrap(), b"new-video");
         assert!(!temporary_image.exists());
         assert!(!temporary_video.exists());
-        assert!(fs::read_dir(&directory)
+        assert!(fs::read_dir(&directory).unwrap().all(|entry| !entry
             .unwrap()
-            .all(|entry| !entry.unwrap().file_name().to_string_lossy().ends_with(".backup")));
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".backup")));
         fs::remove_dir_all(directory).unwrap();
     }
 

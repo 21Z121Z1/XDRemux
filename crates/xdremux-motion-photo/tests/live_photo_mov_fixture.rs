@@ -16,7 +16,11 @@ fn fixture_path() -> PathBuf {
 #[test]
 fn real_coloros_motion_video_rewrap_preserves_compressed_media() {
     let path = fixture_path();
-    assert!(path.is_file(), "missing versioned fixture {}", path.display());
+    assert!(
+        path.is_file(),
+        "missing versioned fixture {}",
+        path.display()
+    );
     let source = fs::read(&path).unwrap();
     let asset = parse_oppo_motion_photo(&source)
         .unwrap()
@@ -42,7 +46,10 @@ fn real_coloros_motion_video_rewrap_preserves_compressed_media() {
     );
     let video = normalized.data;
     let media_before = media_mdat_payloads(video).unwrap();
-    assert!(!media_before.is_empty(), "fixture primary stream must contain media mdat");
+    assert!(
+        !media_before.is_empty(),
+        "fixture primary stream must contain media mdat"
+    );
 
     let still_time = resolve_live_photo_still_time(video, asset.presentation_timestamp_us).unwrap();
     let output = write_live_photo_movie(
@@ -53,11 +60,6 @@ fn real_coloros_motion_video_rewrap_preserves_compressed_media() {
     )
     .unwrap();
 
-    validate_live_photo_movie(
-        &output,
-        "01234567-89AB-CDEF-0123-456789ABCDEF",
-        still_time,
-    )
-    .unwrap();
+    validate_live_photo_movie(&output, "01234567-89AB-CDEF-0123-456789ABCDEF", still_time).unwrap();
     assert_eq!(media_mdat_payloads(&output).unwrap(), media_before);
 }

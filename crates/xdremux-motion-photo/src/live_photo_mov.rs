@@ -82,7 +82,11 @@ fn top_level(data: &[u8]) -> LivePhotoMovieResult<Vec<BoxHeader>> {
     boxes(data, 0, data.len())
 }
 
-fn one<'a>(items: &'a [BoxHeader], kind: FourCC, context: &str) -> LivePhotoMovieResult<&'a BoxHeader> {
+fn one<'a>(
+    items: &'a [BoxHeader],
+    kind: FourCC,
+    context: &str,
+) -> LivePhotoMovieResult<&'a BoxHeader> {
     let mut matches = items.iter().filter(|item| item.kind == kind);
     let first = matches
         .next()
@@ -95,7 +99,12 @@ fn one<'a>(items: &'a [BoxHeader], kind: FourCC, context: &str) -> LivePhotoMovi
     Ok(first)
 }
 
-fn child(data: &[u8], parent: &BoxHeader, kind: FourCC, context: &str) -> LivePhotoMovieResult<BoxHeader> {
+fn child(
+    data: &[u8],
+    parent: &BoxHeader,
+    kind: FourCC,
+    context: &str,
+) -> LivePhotoMovieResult<BoxHeader> {
     boxes(data, parent.data_start, parent.data_end)?
         .into_iter()
         .find(|item| item.kind == kind)
@@ -106,28 +115,36 @@ fn read_u32(data: &[u8], offset: usize, context: &str) -> LivePhotoMovieResult<u
     let bytes = data
         .get(offset..offset + 4)
         .ok_or_else(|| LivePhotoMovieError::invalid(format!("truncated {context}")))?;
-    Ok(u32::from_be_bytes(bytes.try_into().expect("four-byte slice")))
+    Ok(u32::from_be_bytes(
+        bytes.try_into().expect("four-byte slice"),
+    ))
 }
 
 fn read_i32(data: &[u8], offset: usize, context: &str) -> LivePhotoMovieResult<i32> {
     let bytes = data
         .get(offset..offset + 4)
         .ok_or_else(|| LivePhotoMovieError::invalid(format!("truncated {context}")))?;
-    Ok(i32::from_be_bytes(bytes.try_into().expect("four-byte slice")))
+    Ok(i32::from_be_bytes(
+        bytes.try_into().expect("four-byte slice"),
+    ))
 }
 
 fn read_u64(data: &[u8], offset: usize, context: &str) -> LivePhotoMovieResult<u64> {
     let bytes = data
         .get(offset..offset + 8)
         .ok_or_else(|| LivePhotoMovieError::invalid(format!("truncated {context}")))?;
-    Ok(u64::from_be_bytes(bytes.try_into().expect("eight-byte slice")))
+    Ok(u64::from_be_bytes(
+        bytes.try_into().expect("eight-byte slice"),
+    ))
 }
 
 fn read_i64(data: &[u8], offset: usize, context: &str) -> LivePhotoMovieResult<i64> {
     let bytes = data
         .get(offset..offset + 8)
         .ok_or_else(|| LivePhotoMovieError::invalid(format!("truncated {context}")))?;
-    Ok(i64::from_be_bytes(bytes.try_into().expect("eight-byte slice")))
+    Ok(i64::from_be_bytes(
+        bytes.try_into().expect("eight-byte slice"),
+    ))
 }
 
 fn push_u16(output: &mut Vec<u8>, value: u16) {
@@ -151,7 +168,8 @@ fn push_u64(output: &mut Vec<u8>, value: u64) {
 }
 
 fn make_box_checked(kind: FourCC, payload: &[u8]) -> LivePhotoMovieResult<Vec<u8>> {
-    make_box(kind, payload).map_err(|error| LivePhotoMovieError::format("QuickTime box build", error))
+    make_box(kind, payload)
+        .map_err(|error| LivePhotoMovieError::format("QuickTime box build", error))
 }
 
 fn make_full_box_checked(
@@ -324,7 +342,9 @@ fn sample_pts_seconds(data: &[u8], track: &BoxHeader) -> LivePhotoMovieResult<Ve
             if value.is_finite() {
                 Ok(value)
             } else {
-                Err(LivePhotoMovieError::invalid("non-finite video presentation time"))
+                Err(LivePhotoMovieError::invalid(
+                    "non-finite video presentation time",
+                ))
             }
         })
         .collect()
@@ -365,7 +385,9 @@ pub fn resolve_live_photo_still_time(
                     .abs()
                     .total_cmp(&(right - requested).abs())
             })
-            .ok_or_else(|| LivePhotoMovieError::invalid("video track has no presentation samples"));
+            .ok_or_else(|| {
+                LivePhotoMovieError::invalid("video track has no presentation samples")
+            });
     }
 
     let midpoint = duration_seconds * 0.5;
@@ -426,7 +448,10 @@ fn normalized_scale(values: Option<&[f64]>) -> Option<(f64, f64)> {
     let values = values?;
     let first = *values.first()?;
     let second = values.get(1).copied().unwrap_or(first);
-    Some((normalized_axis_scale(first)?, normalized_axis_scale(second)?))
+    Some((
+        normalized_axis_scale(first)?,
+        normalized_axis_scale(second)?,
+    ))
 }
 
 fn normalize_homography(matrix: [f64; 9]) -> Option<[f64; 9]> {
@@ -538,7 +563,9 @@ fn quicktime_timestamp() -> LivePhotoMovieResult<u32> {
 
 fn rounded_u32(value: f64, context: &str) -> LivePhotoMovieResult<u32> {
     if !value.is_finite() || value < 0.0 || value.round() > f64::from(u32::MAX) {
-        return Err(LivePhotoMovieError::invalid(format!("{context} exceeds u32")));
+        return Err(LivePhotoMovieError::invalid(format!(
+            "{context} exceeds u32"
+        )));
     }
     Ok(value.round() as u32)
 }
@@ -553,7 +580,10 @@ fn metadata_track(
 ) -> LivePhotoMovieResult<(Vec<u8>, Vec<u8>)> {
     let sample = metadata_sample(transform, dimensions)?;
     let timestamp = quicktime_timestamp()?;
-    let empty_duration = rounded_u32(still_time_seconds * f64::from(movie_timescale), "metadata empty duration")?;
+    let empty_duration = rounded_u32(
+        still_time_seconds * f64::from(movie_timescale),
+        "metadata empty duration",
+    )?;
     let marker_duration = rounded_u32(
         f64::from(movie_timescale) / f64::from(METADATA_TIMESCALE),
         "metadata marker duration",
@@ -812,6 +842,15 @@ fn free_box_same_size(size: usize) -> LivePhotoMovieResult<Vec<u8>> {
     }
 }
 
+fn exact_video_dimension(value: Option<i64>) -> Option<f32> {
+    let value = value?;
+    const MAX_EXACT_F32_INTEGER: i64 = 1 << 24;
+    if value <= 0 || value > MAX_EXACT_F32_INTEGER {
+        return None;
+    }
+    Some(value as f32)
+}
+
 pub fn write_live_photo_movie(
     source: &[u8],
     content_identifier: &str,
@@ -835,7 +874,11 @@ pub fn write_live_photo_movie(
         .ok_or_else(|| LivePhotoMovieError::invalid("moov lies outside source"))?;
     let original_root = one(&top_level(original_moov)?, MOOV, "moov box")?.clone();
     let (timescale, _) = movie_timescale(original_moov, &original_root)?;
-    let tracks = boxes(original_moov, original_root.data_start, original_root.data_end)?;
+    let tracks = boxes(
+        original_moov,
+        original_root.data_start,
+        original_root.data_end,
+    )?;
     let max_track_id = tracks
         .iter()
         .filter(|item| item.kind == TRAK)
@@ -851,8 +894,8 @@ pub fn write_live_photo_movie(
     let dimensions = if transform.is_some() {
         oppo_metadata.and_then(|metadata| {
             Some((
-                f32::try_from(metadata.video_width?).ok()?,
-                f32::try_from(metadata.video_height?).ok()?,
+                exact_video_dimension(metadata.video_width)?,
+                exact_video_dimension(metadata.video_height)?,
             ))
         })
     } else {
@@ -907,17 +950,13 @@ pub fn write_live_photo_movie(
             })?;
             push_u32(&mut output, explicit_size);
             output.extend_from_slice(item.kind.as_bytes());
-            output.extend_from_slice(
-                source
-                    .get(item.data_start..item.data_end)
-                    .ok_or_else(|| LivePhotoMovieError::invalid("top-level box lies outside source"))?,
-            );
+            output.extend_from_slice(source.get(item.data_start..item.data_end).ok_or_else(
+                || LivePhotoMovieError::invalid("top-level box lies outside source"),
+            )?);
         } else {
-            output.extend_from_slice(
-                source
-                    .get(item.box_range())
-                    .ok_or_else(|| LivePhotoMovieError::invalid("top-level box lies outside source"))?,
-            );
+            output.extend_from_slice(source.get(item.box_range()).ok_or_else(|| {
+                LivePhotoMovieError::invalid("top-level box lies outside source")
+            })?);
         }
     }
     output.extend_from_slice(&marker_mdat);
@@ -929,7 +968,9 @@ pub fn write_live_photo_movie(
 fn parse_meta_children(data: &[u8], meta: &BoxHeader) -> LivePhotoMovieResult<Vec<BoxHeader>> {
     match boxes(data, meta.data_start, meta.data_end) {
         Ok(children) if !children.is_empty() => Ok(children),
-        _ if meta.data_start + 4 <= meta.data_end => boxes(data, meta.data_start + 4, meta.data_end),
+        _ if meta.data_start + 4 <= meta.data_end => {
+            boxes(data, meta.data_start + 4, meta.data_end)
+        }
         Ok(children) => Ok(children),
         Err(error) => Err(error),
     }
@@ -1087,9 +1128,8 @@ pub fn validate_live_photo_movie(
             "MOV content identifier mismatch",
         ));
     }
-    let actual = read_live_photo_still_time(data)?.ok_or_else(|| {
-        LivePhotoMovieError::invalid("MOV lacks still-image-time metadata track")
-    })?;
+    let actual = read_live_photo_still_time(data)?
+        .ok_or_else(|| LivePhotoMovieError::invalid("MOV lacks still-image-time metadata track"))?;
     let top = top_level(data)?;
     let moov = one(&top, MOOV, "active moov box")?;
     let (timescale, _) = movie_timescale(data, moov)?;
@@ -1189,7 +1229,9 @@ mod tests {
         let output = write_live_photo_movie(&source, "ABC-123", still_time, None).unwrap();
 
         assert_eq!(
-            read_live_photo_content_identifier(&output).unwrap().as_deref(),
+            read_live_photo_content_identifier(&output)
+                .unwrap()
+                .as_deref(),
             Some("ABC-123")
         );
         assert!((read_live_photo_still_time(&output).unwrap().unwrap() - 0.1).abs() < 1e-3);
@@ -1220,7 +1262,10 @@ mod tests {
         assert!(output
             .windows(transform_bytes.len())
             .any(|window| window == transform_bytes));
-        assert_eq!(media_mdat_payloads(&output).unwrap(), media_mdat_payloads(&source).unwrap());
+        assert_eq!(
+            media_mdat_payloads(&output).unwrap(),
+            media_mdat_payloads(&source).unwrap()
+        );
     }
 
     #[test]

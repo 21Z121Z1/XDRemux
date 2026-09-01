@@ -516,6 +516,7 @@ version = "0.1.0"
 dependencies = [
  "quick-xml",
  "serde_json",
+ "xdremux-format",
 ]
 
 [[package]]
