@@ -1,5 +1,8 @@
+import json
 from pathlib import Path
 import re
+import subprocess
+import sys
 import unittest
 
 
@@ -13,6 +16,7 @@ BILINGUAL_STEMS = (
     "docs/style-guide",
     "docs/architecture",
     "docs/roadmap",
+    "docs/exec-plans/README",
     "docs/cli",
     "docs/apple-features",
     "docs/development",
@@ -155,23 +159,69 @@ class PublicDocumentationTests(unittest.TestCase):
             self.assertIn("fixtures/", text)
             self.assertNotIn("Real samples are not in the repository", text)
 
+    def test_agent_map_is_valid_and_matches_architecture_capabilities(self) -> None:
+        agent_map_path = ROOT / "docs/agent-map.json"
+        self.assertTrue(agent_map_path.is_file())
+        agent_map = json.loads(agent_map_path.read_text(encoding="utf-8"))
+        self.assertEqual(agent_map["schema_version"], 1)
+
+        architecture = (ROOT / "docs/architecture.en.md").read_text(encoding="utf-8")
+        capabilities = agent_map["capabilities"]
+        identifiers = [item["id"] for item in capabilities]
+        self.assertEqual(len(identifiers), len(set(identifiers)))
+        for identifier in identifiers:
+            self.assertIn(f"`{identifier}`", architecture)
+
+        branch_roles = agent_map["branch_roles"]
+        for branch in (
+            "main",
+            "feat/rust-xdremux-format",
+            "codex/reverse-key1-oppo-solver",
+        ):
+            self.assertIn(branch, branch_roles)
+            metadata = branch_roles[branch]
+            for field in ("role", "intended_base", "promotion_gate", "retirement_condition"):
+                self.assertIn(field, metadata)
+
+        codec = next(item for item in capabilities if item["id"] == "adapter.codec")
+        self.assertIn("crates/xdremux-codec", codec["rust_owner"])
+
+    def test_agent_context_routes_capability_without_repository_scan(self) -> None:
+        helper = ROOT / "scripts/agent_context.py"
+        self.assertTrue(helper.is_file())
+        output = subprocess.check_output(
+            [sys.executable, str(helper), "capability", "engine.plan", "--json"],
+            cwd=ROOT,
+            text=True,
+        )
+        payload = json.loads(output)
+        self.assertEqual(payload["id"], "engine.plan")
+        self.assertEqual(payload["layer"], 3)
+        self.assertIn("crates/xdremux-engine", payload["rust_owner"])
+
     def test_agent_system_docs_publish_bootstrap_and_transition_contract(self) -> None:
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         architecture = (ROOT / "docs/architecture.en.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "docs/roadmap.en.md").read_text(encoding="utf-8")
+        validation = (ROOT / "docs/validation/README.en.md").read_text(encoding="utf-8")
+        execution_plans = (ROOT / "docs/exec-plans/README.en.md").read_text(encoding="utf-8")
         development = (ROOT / "docs/development.en.md").read_text(encoding="utf-8")
         pr_template = (ROOT / ".github/pull_request_template.md").read_text(encoding="utf-8")
 
-        for path in ("docs/architecture.en.md", "docs/roadmap.en.md"):
+        for path in (
+            "docs/architecture.en.md",
+            "docs/agent-map.json",
+            "docs/roadmap.en.md",
+            "docs/validation/README.en.md",
+            "docs/exec-plans/README.en.md",
+        ):
             self.assertIn(path, agents)
 
-        for capability in (
-            "format.binary",
-            "engine.plan",
-            "adapter.apple.styles",
-            "research.styles-model",
-        ):
-            self.assertIn(capability, architecture)
+        self.assertIn("scripts/agent_context.py status", agents)
+        self.assertIn("scripts/agent_context.py capability", agents)
+        self.assertIn("xdremux-codec", architecture)
+        self.assertIn("xdremux-codec", roadmap)
+        self.assertIn("Cargo.toml", roadmap)
 
         for migration_field in (
             "normalized contract",
@@ -180,12 +230,24 @@ class PublicDocumentationTests(unittest.TestCase):
         ):
             self.assertIn(migration_field, roadmap)
 
+        for evidence_role in ("Required gate", "Promotion evidence", "Diagnostic probe"):
+            self.assertIn(evidence_role, validation)
+
+        for plan_field in (
+            "Target capability / layer",
+            "Last verified HEAD",
+            "Residual gaps",
+            "Next action",
+        ):
+            self.assertIn(plan_field, execution_plans)
+
         for ledger_field in (
-            "Capability / layer:",
+            "Target capability / layer:",
             "Invariant that must remain true:",
-            "Exact `HEAD`:",
+            "Exact committed HEAD:",
             "Residual gaps",
             "Normalized contract:",
+            "Diagnostic probes used for discovery only:",
         ):
             self.assertIn(ledger_field, pr_template)
 
