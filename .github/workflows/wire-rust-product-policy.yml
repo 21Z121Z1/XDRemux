@@ -1,0 +1,97 @@
+name: Wire Rust product gain-map policy
+
+on:
+  push:
+    branches:
+      - feat/rust-cli-unification
+    paths:
+      - ".github/workflows/wire-rust-product-policy.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Wire canonical product policy
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/xdremux-engine/src/lib.rs")
+          text = path.read_text()
+          text = text.replace(
+              "mod execution;\nmod source_profile;",
+              "mod execution;\nmod product_policy;\nmod source_profile;",
+              1,
+          )
+          anchor = '''pub use execution::{
+              execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
+              ExecutionReceipt, ExecutionResult, ExecutionStage,
+          };
+          '''
+          addition = anchor + '''pub use product_policy::{
+              resolve_product_gain_map_encode_profile, wants_oppo_compatibility,
+          };
+          '''
+          if anchor not in text:
+              raise SystemExit("execution export anchor not found")
+          text = text.replace(anchor, addition, 1)
+
+          old = "    let gain_map_target = resolve_gain_map_encode_profile(analysis.gain_map, &gain_map_encoder)?;"
+          new = "    let gain_map_target = resolve_product_gain_map_encode_profile(\n        analysis.gain_map,\n        request.oppo_compatibility,\n        &gain_map_encoder,\n    )?;"
+          if old not in text:
+              raise SystemExit("planner target anchor not found")
+          text = text.replace(old, new, 1)
+
+          for test_name in [
+              "planner_requires_decoder_for_the_probed_source_codec",
+              "planner_rejects_requested_apple_feature_without_its_adapter",
+              "full_plan_preserves_base_and_declares_operation_capabilities",
+          ]:
+              start = text.index(f"    fn {test_name}()")
+              try:
+                  end = text.index("\n    #[test]", start + 1)
+              except ValueError:
+                  end = text.index("\n}", start)
+              block = text[start:end]
+              old_target = "let target = layout(ChromaSampling::Yuv420, 8);"
+              if old_target not in block:
+                  raise SystemExit(f"target anchor not found in {test_name}")
+              block = block.replace(
+                  old_target,
+                  "let target = layout(ChromaSampling::Yuv444, 8);",
+                  1,
+              )
+              text = text[:start] + block + text[end:]
+
+          path.write_text(text)
+          PY
+          cargo fmt --all
+      - name: Verify engine product policy
+        run: |
+          cargo metadata --locked --format-version 1 > /dev/null
+          cargo fmt --all -- --check
+          cargo clippy --locked -p xdremux-engine --all-targets -- -D warnings
+          cargo test --locked -p xdremux-engine
+          bash scripts/check_engine_plan_vectors.sh
+      - name: Commit verified engine source only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-engine/src/lib.rs crates/xdremux-engine/src/product_policy.rs
+          git diff --cached --check
+          git commit -m "fix(rust-engine): make output chroma a product policy"
+          git push origin HEAD:feat/rust-cli-unification
