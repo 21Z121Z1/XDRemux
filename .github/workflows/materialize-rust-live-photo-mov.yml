@@ -27,12 +27,7 @@ jobs:
           from pathlib import Path
           path = Path('crates/xdremux-motion-photo/src/live_photo_mov.rs')
           text = path.read_text()
-          anchor = '''pub fn write_live_photo_movie(
-              source: &[u8],
-              content_identifier: &str,
-              still_time_seconds: f64,
-              oppo_metadata: Option<&OppoMetadata>,
-          ) -> LivePhotoMovieResult<Vec<u8>> {'''
+          writer = 'pub fn write_live_photo_movie('
           helper = '''fn exact_video_dimension(value: Option<i64>) -> Option<f32> {
               let value = value?;
               const MAX_EXACT_F32_INTEGER: i64 = 1 << 24;
@@ -42,30 +37,20 @@ jobs:
               Some(value as f32)
           }
 
-          pub fn write_live_photo_movie(
-              source: &[u8],
-              content_identifier: &str,
-              still_time_seconds: f64,
-              oppo_metadata: Option<&OppoMetadata>,
-          ) -> LivePhotoMovieResult<Vec<u8>> {'''
-          if anchor not in text:
-              raise SystemExit('writer anchor not found')
-          text = text.replace(anchor, helper, 1)
-          old = '''        oppo_metadata.and_then(|metadata| {
-              Some((
-                  f32::try_from(metadata.video_width?).ok()?,
-                  f32::try_from(metadata.video_height?).ok()?,
-              ))
-          })'''
-          new = '''        oppo_metadata.and_then(|metadata| {
-              Some((
-                  exact_video_dimension(metadata.video_width)?,
-                  exact_video_dimension(metadata.video_height)?,
-              ))
-          })'''
-          if old not in text:
-              raise SystemExit('dimension conversion anchor not found')
-          path.write_text(text.replace(old, new, 1))
+          '''
+          if 'fn exact_video_dimension(' not in text:
+              if writer not in text:
+                  raise SystemExit('writer anchor not found')
+              text = text.replace(writer, helper + writer, 1)
+          replacements = {
+              'f32::try_from(metadata.video_width?).ok()?': 'exact_video_dimension(metadata.video_width)?',
+              'f32::try_from(metadata.video_height?).ok()?': 'exact_video_dimension(metadata.video_height)?',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'dimension token not found: {old}')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
           PY
       - name: Materialize lockfile and formatting
         run: |
