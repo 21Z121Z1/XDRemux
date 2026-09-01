@@ -6,8 +6,9 @@ on:
     branches: [feat/rust-cli-unification]
     paths:
       - .github/workflows/implement-rust-batch-jobs.yml
-      - scripts/materialize_rust_batch_jobs.py
       - scripts/materialize_rust_batch_jobs_contract.py
+      - crates/xdremux-runtime/src/batch.rs
+      - crates/xdremux-cli/src/lib.rs
       - crates/xdremux-cli/tests/batch_jobs.rs
 
 permissions:
@@ -34,10 +35,8 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Materialize bounded batch workers
+      - name: Enforce bounded batch jobs contract
         run: |
-          python3 scripts/materialize_rust_batch_jobs.py
-          python3 scripts/materialize_rust_batch_jobs.py
           python3 scripts/materialize_rust_batch_jobs_contract.py
           python3 scripts/materialize_rust_batch_jobs_contract.py
           cargo generate-lockfile
@@ -53,7 +52,7 @@ jobs:
           cargo test --locked -p xdremux-cli --test batch_resume -- --nocapture
           cargo test --locked -p xdremux-cli --test batch_jobs -- --nocapture
           cargo test --locked -p xdremux-cli --lib -- --nocapture
-      - name: Commit verified bounded batch wiring
+      - name: Commit verified bounded batch contract
         shell: bash
         run: |
           set -euo pipefail
@@ -64,7 +63,8 @@ jobs:
           if git diff --cached --quiet; then
             echo 'No generated or formatting changes to commit.'
           else
-            git commit -m 'feat(rust): add bounded parallel batch workers'
+            git commit -m 'fix(rust): enforce positive batch jobs'
+            git pull --rebase origin feat/rust-cli-unification
             git push origin HEAD:feat/rust-cli-unification
           fi
 
