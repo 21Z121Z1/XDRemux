@@ -2,6 +2,7 @@
 
 mod capabilities;
 mod execution;
+mod product_policy;
 mod source_profile;
 
 use std::collections::BTreeSet;
@@ -17,6 +18,7 @@ pub use execution::{
     execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
     ExecutionReceipt, ExecutionResult, ExecutionStage,
 };
+pub use product_policy::{resolve_product_gain_map_encode_profile, wants_oppo_compatibility};
 pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,
@@ -363,7 +365,11 @@ pub fn plan_conversion(
         FamilyPreference::X7 => SourceFamily::X7,
     };
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
-    let gain_map_target = resolve_gain_map_encode_profile(analysis.gain_map, &gain_map_encoder)?;
+    let gain_map_target = resolve_product_gain_map_encode_profile(
+        analysis.gain_map,
+        request.oppo_compatibility,
+        &gain_map_encoder,
+    )?;
     let effective_input_processing_branch = resolve_effective_input_processing_branch(
         request.input_processing_branch,
         request.oppo_camera_tail,
@@ -560,7 +566,7 @@ mod tests {
 
     #[test]
     fn planner_requires_decoder_for_the_probed_source_codec() {
-        let target = layout(ChromaSampling::Yuv420, 8);
+        let target = layout(ChromaSampling::Yuv444, 8);
         let capabilities =
             CapabilityInventory::new([OperationCapability::GainMapTileEncoder(target)]);
         let analysis = ConversionAnalysis {
@@ -579,7 +585,7 @@ mod tests {
 
     #[test]
     fn planner_rejects_requested_apple_feature_without_its_adapter() {
-        let target = layout(ChromaSampling::Yuv420, 8);
+        let target = layout(ChromaSampling::Yuv444, 8);
         let capabilities = capability_inventory([target]);
         let analysis = ConversionAnalysis {
             source_family: SourceFamily::X7,
@@ -618,7 +624,7 @@ mod tests {
             },
             ..ConversionRequest::default()
         };
-        let target = layout(ChromaSampling::Yuv420, 8);
+        let target = layout(ChromaSampling::Yuv444, 8);
         let capabilities = CapabilityInventory::new([
             OperationCapability::RasterDecoder(GainMapCodec::Jpeg),
             OperationCapability::GainMapTileEncoder(target),

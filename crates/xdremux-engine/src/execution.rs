@@ -153,7 +153,7 @@ mod tests {
 
     fn layout() -> GainMapCodecLayout {
         GainMapCodecLayout {
-            chroma: ChromaSampling::Yuv420,
+            chroma: ChromaSampling::Yuv444,
             luma_bit_depth: 8,
             chroma_bit_depth: 8,
         }

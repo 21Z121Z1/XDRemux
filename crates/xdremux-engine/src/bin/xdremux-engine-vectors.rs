@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("reject-10-to-8|{error}");
 
     let encoder_only = CapabilityInventory::new([OperationCapability::GainMapTileEncoder(layout(
-        ChromaSampling::Yuv420,
+        ChromaSampling::Yuv444,
         8,
     ))]);
     let error = plan_conversion(
@@ -127,7 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let error = plan_conversion(
         &analysis(Some(ChromaSampling::Yuv420), 8),
         styles_request,
-        &only_420,
+        &only_444,
     )
     .expect_err("Photographic Styles request must require its operation adapter");
     println!("missing-styles|{error}");
