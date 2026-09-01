@@ -30,8 +30,8 @@ fn tiny_rgb_jpeg() -> Vec<u8> {
 
 fn canonical_uhdr_info() -> [f32; 20] {
     [
-        1.0, 1.0, 1.0, 1.0, 4.926, 4.926, 4.926, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 4.926, 4.926, 0.0,
+        1.0, 1.0, 1.0, 1.0, 4.926, 4.926, 4.926, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        4.926, 4.926, 0.0,
     ]
 }
 
@@ -63,8 +63,7 @@ fn synthetic_uhdr_source(base: &[u8]) -> Vec<u8> {
 }
 
 fn public_heif_fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../fixtures/20260312_135609..heic")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/20260312_135609..heic")
 }
 
 #[test]

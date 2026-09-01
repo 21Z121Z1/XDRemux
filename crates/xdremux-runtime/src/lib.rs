@@ -21,7 +21,6 @@ use xdremux_engine::{
     InputProcessingBranch, OperationCapability, OppoCameraTail, OppoCompatibility, RasterDecoder,
     SourceFamily, SourceHdrMode, TmapFormat,
 };
-use xdremux_format::isobmff::{scan_top_level_boxes, MDAT};
 use xdremux_format::probe_jpeg_frame_profile;
 use xdremux_hdr::{
     make_private_gain_map_info_floats, reconstruct_gain_map, resolve,
@@ -282,7 +281,10 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
         let xmp_payload = make_hdrgm_xmp(&info_floats)
             .map_err(|error| RuntimeError::external("ISO Gain Map XMP", error))?;
 
-        let body = standard_heif_body(self.source)?;
+        let body = standard_heif_body(
+            self.source,
+            self.prepared.extracted.manifest_info.extension_start,
+        )?;
         let tiles = encoded
             .tiles
             .iter()
@@ -469,22 +471,22 @@ fn replicate_mono_to_rgb(raster: Raster8) -> Result<Raster8> {
     .map_err(|error| RuntimeError::external("Gain Map channel conformance", error))
 }
 
-fn standard_heif_body(source: &[u8]) -> Result<&[u8]> {
-    let top = scan_top_level_boxes(source)
-        .map_err(|error| RuntimeError::external("source HEIF scan", error))?;
-    let mut mdats = top.boxes.iter().filter(|header| header.kind == MDAT);
-    let mdat = mdats
-        .next()
-        .ok_or_else(|| RuntimeError::new("source HEIF scan", "source mdat is missing"))?;
-    if mdats.next().is_some() {
+fn standard_heif_body(source: &[u8], extension_start: usize) -> Result<&[u8]> {
+    if extension_start == 0 || extension_start > source.len() {
         return Err(RuntimeError::new(
-            "source HEIF scan",
-            "multiple top-level mdat boxes are not supported by the canonical runtime path",
+            "source HEIF boundary",
+            format!(
+                "parsed extension start {extension_start} is outside input length {}",
+                source.len()
+            ),
         ));
     }
-    source
-        .get(..mdat.data_end)
-        .ok_or_else(|| RuntimeError::new("source HEIF scan", "source mdat end exceeds input"))
+    source.get(..extension_start).ok_or_else(|| {
+        RuntimeError::new(
+            "source HEIF boundary",
+            "parsed extension boundary could not be sliced from input",
+        )
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -559,7 +561,7 @@ mod tests {
     use super::*;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
-    use xdremux_format::isobmff::make_box;
+    use xdremux_format::isobmff::{make_box, MDAT};
     use xdremux_format::FourCC;
 
     #[test]
@@ -568,7 +570,10 @@ mod tests {
         source.extend_from_slice(&make_box(MDAT, b"base").unwrap());
         let body_len = source.len();
         source.extend_from_slice(b"vendor-tail");
-        assert_eq!(standard_heif_body(&source).unwrap().len(), body_len);
+        assert_eq!(
+            standard_heif_body(&source, body_len).unwrap().len(),
+            body_len
+        );
     }
 
     #[test]
