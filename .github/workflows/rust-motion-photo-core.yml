@@ -18,6 +18,9 @@ on:
       - "Tests/test_python_motion_photo.py"
       - "Tests/test_python_motion_photo_oppo.py"
       - "xdremux_py/motion_photo.py"
+      - "xdremux_py/motion_video.py"
+      - "xdremux_py/live_photo_mov.py"
+      - "xdremux_py/live_photo_publish.py"
       - "scripts/check_motion_photo_oppo_python_rust.py"
       - "scripts/check_motion_photo_payload_python_rust.py"
       - "scripts/check_motion_photo_rust_conformance.sh"
@@ -39,6 +42,9 @@ on:
       - "Tests/test_python_motion_photo.py"
       - "Tests/test_python_motion_photo_oppo.py"
       - "xdremux_py/motion_photo.py"
+      - "xdremux_py/motion_video.py"
+      - "xdremux_py/live_photo_mov.py"
+      - "xdremux_py/live_photo_publish.py"
       - "scripts/check_motion_photo_oppo_python_rust.py"
       - "scripts/check_motion_photo_payload_python_rust.py"
       - "scripts/check_motion_photo_rust_conformance.sh"
@@ -64,6 +70,8 @@ jobs:
         run: cargo clippy --locked -p xdremux-motion-photo --all-targets -- -D warnings
       - name: Test Motion Photo core
         run: cargo test --locked -p xdremux-motion-photo
+      - name: Exercise real portable Live Photo MOV fixture
+        run: cargo test --locked -p xdremux-motion-photo --test live_photo_mov_fixture -- --nocapture
 
   motion-photo-conformance:
     runs-on: macos-latest
@@ -84,6 +92,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e .
+      - name: Pin Python Live Photo MOV oracle
+        run: |
+          python3 -m unittest Tests.test_python_motion_photo -k pure_python_mov_writer_preserves_media_and_writes_live_photo_metadata
+          python3 -m unittest Tests.test_python_motion_photo -k strip_trailing_vendor_data
       - name: Compare Swift, Rust, and Python Motion Photo contracts
         run: bash scripts/check_motion_photo_rust_conformance.sh
       - name: Verify cross-language completion gate
@@ -92,12 +104,30 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-motion-photo-conformance-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Port Android and legacy Motion Photo XMP parsing, normalized source/presentation models, checked resource ranges, HEIF mpvd extraction, OPPO LPEX metadata, OPPO fallback recovery, presentation sentinel handling, top-level OPPO orchestration, proven dual-stream topology, and bounded transactional payload extraction into the isolated Rust core without changing current Swift or corrected Python semantics",
+            "scope": "Port Android and legacy Motion Photo parsing, normalized source/presentation models, checked resource ranges, HEIF mpvd extraction, OPPO LPEX/fallback/sentinel/topology semantics, bounded payload extraction, embedded-video vendor-tail normalization, portable Live Photo QuickTime metadata writing with compressed media passthrough, and recoverable pair publication into Rust while preserving the current Swift and corrected Python contracts",
             "checks": [
               {
                 "name": "rust-motion-photo-regressions",
                 "kind": "regression",
                 "command": ["cargo", "test", "--locked", "-p", "xdremux-motion-photo"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "rust-live-photo-real-fixture",
+                "kind": "functional",
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-motion-photo", "--test", "live_photo_mov_fixture", "--", "--nocapture"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "python-live-photo-mov-oracle",
+                "kind": "regression",
+                "command": ["python3", "-m", "unittest", "Tests.test_python_motion_photo", "-k", "pure_python_mov_writer_preserves_media_and_writes_live_photo_metadata"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "python-motion-video-normalization-oracle",
+                "kind": "regression",
+                "command": ["python3", "-m", "unittest", "Tests.test_python_motion_photo", "-k", "strip_trailing_vendor_data"],
                 "timeout_seconds": 600
               },
               {
