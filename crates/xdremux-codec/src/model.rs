@@ -128,3 +128,27 @@ pub struct JpegRasterDecodeRequest {
     pub data: Vec<u8>,
     pub format: RasterPixelFormat,
 }
+
+/// Portable request for a complete single-image HEIC base rendition.
+///
+/// This is intentionally separate from Gain Map tile encoding: callers that
+/// transcode JPEG Motion Photo stills need one normal primary image container,
+/// while HDR conversion continues to preserve an already-compressed HEIF base.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrimaryHeifEncodeRequest {
+    pub raster: Raster8,
+    pub quality: u8,
+    pub icc_profile: Option<Vec<u8>>,
+}
+
+impl PrimaryHeifEncodeRequest {
+    pub const LIVE_PHOTO_QUALITY: u8 = 95;
+
+    pub fn live_photo(raster: Raster8, icc_profile: Option<Vec<u8>>) -> Self {
+        Self {
+            raster,
+            quality: Self::LIVE_PHOTO_QUALITY,
+            icc_profile,
+        }
+    }
+}
