@@ -2,9 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use xdremux_motion_photo::{
-    media_mdat_payloads, parse_oppo_motion_photo, resolve_live_photo_still_time,
-    resolve_video_stream_layout, validate_live_photo_movie, write_live_photo_movie,
-    MotionPhotoSourceKind,
+    media_mdat_payloads, normalize_embedded_video, parse_oppo_motion_photo,
+    resolve_live_photo_still_time, resolve_video_stream_layout, validate_live_photo_movie,
+    write_live_photo_movie, MotionPhotoSourceKind,
 };
 
 fn fixture_path() -> PathBuf {
@@ -34,7 +34,13 @@ fn real_coloros_motion_video_rewrap_preserves_compressed_media() {
     .unwrap();
     let start = usize::try_from(layout.primary.range.lower_bound).unwrap();
     let end = usize::try_from(layout.primary.range.upper_bound).unwrap();
-    let video = &source[start..end];
+    let embedded_video = &source[start..end];
+    let normalized = normalize_embedded_video(embedded_video).unwrap();
+    assert!(
+        normalized.removed_vendor_bytes > 0,
+        "ColorOS 16 fixture must keep exercising trailing vendor-byte normalization"
+    );
+    let video = normalized.data;
     let media_before = media_mdat_payloads(video).unwrap();
     assert!(!media_before.is_empty(), "fixture primary stream must contain media mdat");
 
