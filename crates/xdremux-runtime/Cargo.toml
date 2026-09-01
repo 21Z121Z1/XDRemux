@@ -13,5 +13,8 @@ xdremux-hdr = { path = "../xdremux-hdr" }
 xdremux-heif = { path = "../xdremux-heif" }
 xdremux-metadata = { path = "../xdremux-metadata" }
 
+[dev-dependencies]
+jpeg-encoder = "=0.7.1"
+
 [lints]
 workspace = true
