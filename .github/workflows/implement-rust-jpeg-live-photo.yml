@@ -1,4 +1,5 @@
 # This workflow is also the explicit bootstrap path for materializing Cargo.lock while the Rust product stack is under active unification.
+# It intentionally lets rustfmt materialize canonical source formatting before the read-only Rust CLI gate evaluates the branch.
 name: Verify Rust JPEG Live Photo slice
 
 on:
