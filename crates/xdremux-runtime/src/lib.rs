@@ -17,15 +17,15 @@ use xdremux_container::{
 use xdremux_engine::{
     detect_source_family, execute_conversion, gain_map_source_profile_from_jpeg, ArtifactBuilder,
     ArtifactPublisher, ArtifactValidator, CapabilityInventory, ConversionAnalysis, ConversionPlan,
-    ConversionRequest, ExecutionError, ExecutionReceipt, ExecutionStage, GainMapChannels,
-    GainMapTileEncoder, InputProcessingBranch, OperationCapability, OppoCameraTail,
-    OppoCompatibility, RasterDecoder, SourceFamily, SourceHdrMode, TmapFormat,
+    ConversionRequest, ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder,
+    InputProcessingBranch, OperationCapability, OppoCameraTail, OppoCompatibility, RasterDecoder,
+    SourceFamily, SourceHdrMode, TmapFormat,
 };
 use xdremux_format::isobmff::{scan_top_level_boxes, MDAT};
 use xdremux_format::probe_jpeg_frame_profile;
 use xdremux_hdr::{
-    make_private_gain_map_info_floats, reconstruct_gain_map, resolve, ExtractionMode as HdrExtractionMode,
-    Family as HdrFamily, GainMapRaster, ResolvedScale,
+    make_private_gain_map_info_floats, reconstruct_gain_map, resolve,
+    ExtractionMode as HdrExtractionMode, Family as HdrFamily, GainMapRaster, ResolvedScale,
 };
 use xdremux_heif::{
     assemble_iso_gain_map_heif, validate_gain_map_structure, DirectHevcGainMap,
@@ -448,8 +448,14 @@ fn replicate_mono_to_rgb(raster: Raster8) -> Result<Raster8> {
             data[output + 2] = value;
         }
     }
-    Raster8::new(raster.width, raster.height, row_bytes, RasterPixelFormat::Rgb8, data)
-        .map_err(|error| RuntimeError::external("Gain Map channel conformance", error))
+    Raster8::new(
+        raster.width,
+        raster.height,
+        row_bytes,
+        RasterPixelFormat::Rgb8,
+        data,
+    )
+    .map_err(|error| RuntimeError::external("Gain Map channel conformance", error))
 }
 
 fn standard_heif_body(source: &[u8]) -> Result<&[u8]> {
@@ -506,14 +512,19 @@ impl AtomicFilePublisher {
     }
 }
 
+fn publication_parent(output: &Path) -> &Path {
+    match output.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    }
+}
+
 impl ArtifactPublisher<Vec<u8>> for AtomicFilePublisher {
     type Output = PathBuf;
     type Error = RuntimeError;
 
     fn publish_artifact(&mut self, _plan: &ConversionPlan, artifact: Vec<u8>) -> Result<PathBuf> {
-        let parent = self.output.parent().ok_or_else(|| {
-            RuntimeError::new("atomic publication", "output path has no parent directory")
-        })?;
+        let parent = publication_parent(&self.output);
         if !parent.is_dir() {
             return Err(RuntimeError::new(
                 "atomic publication",
@@ -562,6 +573,15 @@ mod tests {
         let rgb = replicate_mono_to_rgb(raster).unwrap();
         assert_eq!(rgb.bytes_per_row, 6);
         assert_eq!(rgb.data, vec![1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]);
+    }
+
+    #[test]
+    fn relative_publication_uses_current_directory_parent() {
+        assert_eq!(publication_parent(Path::new("output.heic")), Path::new("."));
+        assert_eq!(
+            publication_parent(Path::new("artifacts/output.heic")),
+            Path::new("artifacts")
+        );
     }
 
     #[test]
