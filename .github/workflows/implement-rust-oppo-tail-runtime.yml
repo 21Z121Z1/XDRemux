@@ -6,8 +6,12 @@ on:
     branches: [feat/rust-cli-unification]
     paths:
       - .github/workflows/implement-rust-oppo-tail-runtime.yml
+      - scripts/materialize_rust_exif_user_comment_reader.py
+      - scripts/materialize_rust_oppo_structural_read.py
       - scripts/materialize_rust_oppo_compat_runtime.py
       - scripts/materialize_rust_oppo_tail_runtime.py
+      - crates/xdremux-format/src/exif_raw.rs
+      - crates/xdremux-format/src/lib.rs
       - crates/xdremux-container/src/oppo_tail.rs
       - crates/xdremux-container/src/lib.rs
       - crates/xdremux-metadata/src/oppo_heif.rs
@@ -42,18 +46,23 @@ jobs:
           components: rustfmt, clippy
       - name: Materialize OPPO product runtime
         run: |
+          python3 scripts/materialize_rust_exif_user_comment_reader.py
+          python3 scripts/materialize_rust_exif_user_comment_reader.py
+          python3 scripts/materialize_rust_oppo_structural_read.py
+          python3 scripts/materialize_rust_oppo_structural_read.py
           python3 scripts/materialize_rust_oppo_compat_runtime.py
           python3 scripts/materialize_rust_oppo_compat_runtime.py
           python3 scripts/materialize_rust_oppo_tail_runtime.py
           python3 scripts/materialize_rust_oppo_tail_runtime.py
           cargo generate-lockfile
-          cargo fmt -p xdremux-container -p xdremux-metadata -p xdremux-runtime
+          cargo fmt -p xdremux-format -p xdremux-container -p xdremux-metadata -p xdremux-runtime
           git diff --check
       - name: Lint OPPO product runtime
         run: |
-          cargo clippy --locked -p xdremux-container -p xdremux-metadata -p xdremux-engine -p xdremux-runtime --all-targets -- -D warnings
+          cargo clippy --locked -p xdremux-format -p xdremux-container -p xdremux-metadata -p xdremux-engine -p xdremux-runtime --all-targets -- -D warnings
       - name: Test OPPO compatibility and tail contracts
         run: |
+          cargo test --locked -p xdremux-format reads_only_the_referenced_user_comment_value -- --nocapture
           cargo test --locked -p xdremux-container oppo_tail -- --nocapture
           cargo test --locked -p xdremux-metadata oppo -- --nocapture
           cargo test --locked -p xdremux-runtime oppo_compat -- --nocapture
@@ -65,7 +74,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add Cargo.lock crates/xdremux-container crates/xdremux-metadata crates/xdremux-runtime/src/lib.rs crates/xdremux-runtime/src/oppo_compat.rs crates/xdremux-runtime/src/oppo_tail.rs
+          git add Cargo.lock crates/xdremux-format crates/xdremux-container crates/xdremux-metadata crates/xdremux-runtime/src/lib.rs crates/xdremux-runtime/src/oppo_compat.rs crates/xdremux-runtime/src/oppo_tail.rs
           git diff --cached --check
           if git diff --cached --quiet; then
             echo 'No generated or formatting changes to commit.'
