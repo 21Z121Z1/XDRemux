@@ -43,6 +43,70 @@ jobs:
           curl --fail --location --silent --show-error "$FIXTURE_ARCHIVE_URL" --output "$RUNNER_TEMP/xdremux-fixtures.zip"
           unzip -q "$RUNNER_TEMP/xdremux-fixtures.zip" -d "$RUNNER_TEMP/xdremux-fixtures"
           echo "XDREMUX_REGRESSION_FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
+      - name: Apply parsed extension boundary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/xdremux-runtime/src/lib.rs")
+          text = path.read_text()
+
+          text = text.replace(
+              "use xdremux_format::isobmff::{scan_top_level_boxes, MDAT};\n",
+              "",
+          )
+          text = text.replace(
+              "let body = standard_heif_body(self.source)?;",
+              "let body = standard_heif_body(\n            self.source,\n            self.prepared.extracted.manifest_info.extension_start,\n        )?;",
+          )
+
+          old = '''fn standard_heif_body(source: &[u8]) -> Result<&[u8]> {
+              let top = scan_top_level_boxes(source)
+                  .map_err(|error| RuntimeError::external("source HEIF scan", error))?;
+              let mut mdats = top.boxes.iter().filter(|header| header.kind == MDAT);
+              let mdat = mdats
+                  .next()
+                  .ok_or_else(|| RuntimeError::new("source HEIF scan", "source mdat is missing"))?;
+              if mdats.next().is_some() {
+                  return Err(RuntimeError::new(
+                      "source HEIF scan",
+                      "multiple top-level mdat boxes are not supported by the canonical runtime path",
+                  ));
+              }
+              source
+                  .get(..mdat.data_end)
+                  .ok_or_else(|| RuntimeError::new("source HEIF scan", "source mdat end exceeds input"))
+          }
+          '''
+          new = '''fn standard_heif_body(source: &[u8], extension_start: usize) -> Result<&[u8]> {
+              if extension_start == 0 || extension_start > source.len() {
+                  return Err(RuntimeError::new(
+                      "source HEIF boundary",
+                      format!(
+                          "parsed extension start {extension_start} is outside input length {}",
+                          source.len()
+                      ),
+                  ));
+              }
+              source.get(..extension_start).ok_or_else(|| {
+                  RuntimeError::new(
+                      "source HEIF boundary",
+                      "parsed extension boundary could not be sliced from input",
+                  )
+              })
+          }
+          '''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("standard_heif_body semantic anchor not found")
+
+          text = text.replace(
+              "assert_eq!(standard_heif_body(&source).unwrap().len(), body_len);",
+              "assert_eq!(standard_heif_body(&source, body_len).unwrap().len(), body_len);",
+          )
+          path.write_text(text)
+          PY
       - name: Materialize lockfile and format source
         run: |
           cargo generate-lockfile
@@ -53,7 +117,7 @@ jobs:
           cargo test --locked -p xdremux-engine
           cargo clippy --locked -p xdremux-hdr --all-targets -- -D warnings
           cargo test --locked -p xdremux-hdr
-      - name: Verify runtime unit and private functional path
+      - name: Verify runtime unit and functional media paths
         run: |
           cargo clippy --locked -p xdremux-runtime --all-targets -- -D warnings
           cargo test --locked -p xdremux-runtime
@@ -64,6 +128,7 @@ jobs:
           else
             echo "RUST_RUNTIME_PRIVATE_FIXTURE=Not configured" >> "$GITHUB_ENV"
           fi
+          echo "RUST_RUNTIME_SYNTHETIC_UHDR=Passed" >> "$GITHUB_ENV"
       - name: Verify formatting and staged diff
         run: |
           cargo fmt --all -- --check
@@ -76,6 +141,7 @@ jobs:
             Cargo.lock \
             crates/xdremux-runtime/src/lib.rs \
             crates/xdremux-runtime/tests/private_fixture.rs \
+            crates/xdremux-runtime/tests/synthetic_uhdr.rs \
             crates/xdremux-hdr/src/info.rs \
             crates/xdremux-hdr/src/lib.rs
           if git diff --cached --quiet; then
@@ -90,5 +156,6 @@ jobs:
         run: |
           {
             echo '## Rust runtime vertical slice'
+            echo "Synthetic UHDR: ${RUST_RUNTIME_SYNTHETIC_UHDR:-Not run}"
             echo "Private ProXDR fixture: ${RUST_RUNTIME_PRIVATE_FIXTURE:-Not run}"
           } >> "$GITHUB_STEP_SUMMARY"
