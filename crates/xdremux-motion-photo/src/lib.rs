@@ -24,7 +24,7 @@ pub use live_photo_mov::{
 };
 pub use live_photo_still::{
     build_apple_makernote, read_apple_content_identifier, write_live_photo_heif_still,
-    LivePhotoStillError, LivePhotoStillResult,
+    write_live_photo_jpeg_metadata, LivePhotoStillError, LivePhotoStillResult,
 };
 pub use lpex::parse_first_lpex_object;
 pub use model::{
