@@ -4,6 +4,7 @@ use std::fmt;
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
+use xdremux_format::{exif_makernote, heif_exif_tiff, jpeg_exif_tiff, replace_exif_makernote};
 
 const APPLE_MAKERNOTE_PREFIX: &[u8] = b"Apple iOS\0\0\x01MM";
 const APPLE_ASSET_IDENTIFIER_TAG: u16 = 0x0011;
@@ -149,52 +150,40 @@ fn apple_makernote_identifier(maker_note: &[u8]) -> LivePhotoStillResult<Option<
     Ok(None)
 }
 
+/// Read the Apple Live Photo ContentIdentifier without decoding unrelated EXIF tags.
+///
+/// Real Android files can contain vendor EXIF encodings that strict third-party
+/// semantic decoders reject. Pair validation only needs the structurally located
+/// MakerNote, so the rest of the TIFF graph remains opaque.
 pub fn read_apple_content_identifier(data: &[u8]) -> LivePhotoStillResult<Option<String>> {
-    let file = data.to_vec();
-    let metadata = Metadata::new_from_vec(&file, FileExtension::HEIF)
-        .map_err(|error| LivePhotoStillError::external("read HEIF EXIF", error))?;
-    let Some(tag) = metadata.get_tag(&ExifTag::MakerNote(Vec::new())).next() else {
+    let Some(tiff) = heif_exif_tiff(data)
+        .map_err(|error| LivePhotoStillError::external("read HEIF EXIF item", error))?
+    else {
         return Ok(None);
     };
-    let ExifTag::MakerNote(maker_note) = tag else {
-        return Err(LivePhotoStillError::new(
-            "HEIF MakerNote tag resolved to an unexpected EXIF variant",
-        ));
+    let Some(maker_note) = exif_makernote(&tiff)
+        .map_err(|error| LivePhotoStillError::external("read TIFF MakerNote", error))?
+    else {
+        return Ok(None);
     };
-    apple_makernote_identifier(maker_note)
+    apple_makernote_identifier(&maker_note)
 }
 
-/// Transfer ordinary JPEG EXIF metadata into a freshly encoded HEIF primary and
-/// replace only MakerNote with the minimal Apple Live Photo pairing identifier.
+/// Build raw TIFF EXIF for a JPEG-derived Live Photo still.
 ///
-/// Motion Photo XMP is deliberately not copied: the output is no longer an
-/// appended-video JPEG, so retaining the Android MotionPhoto directory would
-/// create two contradictory asset identities.
-pub fn write_live_photo_jpeg_metadata(
+/// The JPEG APP1 payload is preserved structurally. Only the ExifIFD MakerNote
+/// is replaced, so unknown Android vendor tags and their original value offsets
+/// never have to be decoded or reserialized. The returned bytes begin directly
+/// at the TIFF header, which is the input contract of libheif's EXIF writer.
+pub fn build_live_photo_jpeg_exif(
     source_jpeg: &[u8],
-    mut encoded_heif: Vec<u8>,
     content_identifier: &str,
 ) -> LivePhotoStillResult<Vec<u8>> {
-    let source = source_jpeg.to_vec();
-    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)
-        .map_err(|error| LivePhotoStillError::external("read source JPEG EXIF", error))?;
-    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(
-        content_identifier,
-    )?));
-    metadata
-        .write_to_vec(&mut encoded_heif, FileExtension::HEIF)
-        .map_err(|error| LivePhotoStillError::external("write Live Photo HEIF EXIF", error))?;
-
-    let expected = content_identifier.to_ascii_uppercase();
-    let actual = read_apple_content_identifier(&encoded_heif)?.ok_or_else(|| {
-        LivePhotoStillError::new("written JPEG-derived Live Photo HEIF is missing Apple asset identifier")
-    })?;
-    if actual != expected {
-        return Err(LivePhotoStillError::new(format!(
-            "written JPEG-derived Live Photo HEIF asset identifier mismatch: expected {expected}, found {actual}"
-        )));
-    }
-    Ok(encoded_heif)
+    let source_tiff = jpeg_exif_tiff(source_jpeg)
+        .map_err(|error| LivePhotoStillError::external("read source JPEG raw EXIF", error))?;
+    let maker_note = build_apple_makernote(content_identifier)?;
+    replace_exif_makernote(source_tiff.as_deref(), &maker_note)
+        .map_err(|error| LivePhotoStillError::external("replace JPEG EXIF MakerNote", error))
 }
 
 fn disable_motion_photo_flag(data: &mut [u8]) -> bool {
