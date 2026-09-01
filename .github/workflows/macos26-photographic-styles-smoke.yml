@@ -14,7 +14,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 60
     env:
-      XDREMUX_STYLE_RUNNER_FIXTURE: ${{ github.workspace }}/fixtures/IMG20260801190843_ColorOS_16.jpg
+      XDREMUX_STYLE_RUNNER_FIXTURE: ${{ github.workspace }}/fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg
       XDREMUX_STYLE_RUNNER_OUTPUT: ${{ github.workspace }}/artifacts/macos26-photographic-styles
     steps:
       - uses: actions/checkout@v7
@@ -44,7 +44,7 @@ jobs:
           {
             echo "## macOS 26 Live Photo + Photographic Styles smoke"
             echo
-            echo "Fixture: \`IMG20260801190843_ColorOS_16.jpg\`"
+            echo "Fixture: \`fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg\`"
             echo "Path: ColorOS 16 Motion Photo -> Apple Live Photo HEIC+MOV -> deterministic Live Photo validation -> Photographic Styles metadata -> NeutrinoCore consumer validation"
             echo
             echo "Hosted-runner scope: the smoke explicitly uses identity-fallback for key-1 coefficients. The product default remains constrained-solver; the hosted complete-Neutrino calibration renderer rejects SemanticStyle with NUError Code 9 (Unsupported)."
