@@ -142,11 +142,7 @@ fn prefixed_user_comment(data: &[u8]) -> Option<String> {
             if digits.parse::<u64>().is_err() {
                 continue;
             }
-            let canonical = if prefix[1] == b'p' {
-                "Oplus_"
-            } else {
-                "Oppo_"
-            };
+            let canonical = if prefix.len() == 6 { "Oplus_" } else { "Oppo_" };
             return Some(format!("{canonical}{digits}"));
         }
     }
@@ -666,7 +662,10 @@ mod tests {
         assert_eq!(receipt.copied(), 2);
         assert_eq!(receipt.failed(), 0);
         let directory = output.join("静态照片").join("人像");
-        assert_eq!(fs::read(directory.join("portrait.heic")).unwrap(), fs::read(&first).unwrap());
+        assert_eq!(
+            fs::read(directory.join("portrait.heic")).unwrap(),
+            fs::read(&first).unwrap()
+        );
         assert_eq!(
             fs::read(directory.join("portrait (2).heic")).unwrap(),
             fs::read(&second).unwrap()

@@ -65,9 +65,9 @@ fn nested_output_should_be_skipped(
     let Some(output_identity) = output_identity else {
         return false;
     };
-    fs::canonicalize(path)
-        .ok()
-        .is_some_and(|identity| identity == output_identity || identity.starts_with(output_identity))
+    fs::canonicalize(path).ok().is_some_and(|identity| {
+        identity == output_identity || identity.starts_with(output_identity)
+    })
 }
 
 fn discover_directory(
@@ -75,8 +75,12 @@ fn discover_directory(
     output_dir: &Path,
     inputs: &mut Vec<PathBuf>,
 ) -> Result<(), String> {
-    let root_identity = fs::canonicalize(root)
-        .map_err(|error| format!("could not resolve input directory {}: {error}", root.display()))?;
+    let root_identity = fs::canonicalize(root).map_err(|error| {
+        format!(
+            "could not resolve input directory {}: {error}",
+            root.display()
+        )
+    })?;
     let output_identity = fs::canonicalize(output_dir).ok();
     let in_place = root == output_dir
         || output_identity
@@ -258,7 +262,11 @@ pub(crate) fn run(
                 item.destination.display()
             );
             if item.error.is_some() {
-                let _ = writeln!(stderr, "error: {line}: {}", item.error.as_deref().unwrap_or(""));
+                let _ = writeln!(
+                    stderr,
+                    "error: {line}: {}",
+                    item.error.as_deref().unwrap_or("")
+                );
             } else {
                 let _ = writeln!(stdout, "{line}");
             }
@@ -306,7 +314,10 @@ mod tests {
             dry_run: true,
             json: false,
         };
-        assert_eq!(discover_inputs(&arguments).unwrap(), vec![root.join("source.heic")]);
+        assert_eq!(
+            discover_inputs(&arguments).unwrap(),
+            vec![root.join("source.heic")]
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }

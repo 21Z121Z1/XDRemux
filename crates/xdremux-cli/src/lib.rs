@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+mod categorize;
+
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -32,6 +34,8 @@ enum RootCommand {
     Convert(ConvertArgs),
     /// Convert a deterministic batch of supported assets.
     Batch(BatchArgs),
+    /// Classify photo assets and publish them into deterministic folders.
+    Categorize(categorize::CategorizeArgs),
 }
 
 #[derive(Debug, Args)]
@@ -559,6 +563,9 @@ where
         Ok(Cli {
             command: RootCommand::Batch(arguments),
         }) => run_batch(arguments, stdout, stderr),
+        Ok(Cli {
+            command: RootCommand::Categorize(arguments),
+        }) => categorize::run(arguments, stdout, stderr),
         Err(error) => write_clap_error(error, stdout, stderr),
     }
 }
@@ -593,6 +600,7 @@ mod tests {
         assert!(output.contains("inspect"));
         assert!(output.contains("convert"));
         assert!(output.contains("batch"));
+        assert!(output.contains("categorize"));
         assert!(stderr.is_empty());
     }
 

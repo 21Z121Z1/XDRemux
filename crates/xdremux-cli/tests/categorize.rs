@@ -51,7 +51,10 @@ fn categorize_command_copies_then_reports_duplicate_on_rerun() {
         value["items"][0]["classification"]["primary_capture_mode"],
         "portrait"
     );
-    let destination = output_dir.join("静态照片").join("人像").join("portrait.heic");
+    let destination = output_dir
+        .join("静态照片")
+        .join("人像")
+        .join("portrait.heic");
     assert_eq!(fs::read(&destination).unwrap(), fs::read(&input).unwrap());
 
     stdout.clear();

@@ -1,9 +1,11 @@
 #![forbid(unsafe_code)]
 
 mod batch;
+mod categorize;
 mod live_photo;
 
 pub use batch::{BatchAssetKind, BatchFailure, BatchItem, BatchReceipt, BatchSuccess};
+pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 pub use live_photo::LivePhotoFileReceipt;
 
 use std::error::Error;
