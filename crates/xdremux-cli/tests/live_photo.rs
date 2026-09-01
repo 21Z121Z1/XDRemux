@@ -3,22 +3,23 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use xdremux_heif::validate_gain_map_structure;
 use xdremux_motion_photo::{
     read_apple_content_identifier, read_live_photo_content_identifier, read_live_photo_still_time,
     validate_live_photo_movie,
 };
 
-fn fixture() -> PathBuf {
+fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../fixtures/motion-photo/samsung/heif-ultrahdr-01.heic")
+        .join("../../fixtures/motion-photo")
+        .join(relative)
 }
 
 fn arg(path: &Path) -> OsString {
     path.as_os_str().to_owned()
 }
 
-#[test]
-fn convert_command_executes_full_rust_live_photo_pipeline() {
+fn exercise(relative: &str, expect_gain_map: bool) {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -28,7 +29,7 @@ fn convert_command_executes_full_rust_live_photo_pipeline() {
         std::process::id()
     ));
     fs::create_dir_all(&dir).unwrap();
-    let input = fixture();
+    let input = fixture(relative);
     let image = dir.join("capture.heic");
     let movie = dir.join("capture.mov");
     let args = vec![
@@ -44,7 +45,7 @@ fn convert_command_executes_full_rust_live_photo_pipeline() {
     assert_eq!(
         code,
         0,
-        "CLI Live Photo conversion failed: {}",
+        "{relative}: CLI Live Photo conversion failed: {}",
         String::from_utf8_lossy(&stderr)
     );
     assert!(stderr.is_empty());
@@ -58,6 +59,20 @@ fn convert_command_executes_full_rust_live_photo_pipeline() {
     assert_eq!(still_id, movie_id);
     let still_time = read_live_photo_still_time(&video).unwrap().unwrap();
     validate_live_photo_movie(&video, &movie_id, still_time).unwrap();
+    if expect_gain_map {
+        validate_gain_map_structure(&still)
+            .unwrap_or_else(|error| panic!("{relative}: final Gain Map graph invalid: {error}"));
+    }
     assert!(String::from_utf8(stdout).unwrap().contains(" + "));
     fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn convert_command_executes_full_rust_heif_live_photo_pipeline() {
+    exercise("samsung/heif-ultrahdr-01.heic", false);
+}
+
+#[test]
+fn convert_command_executes_full_rust_jpeg_ultrahdr_live_photo_pipeline() {
+    exercise("samsung/jpeg-ultrahdr-01.jpg", true);
 }
