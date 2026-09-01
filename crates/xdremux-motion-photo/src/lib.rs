@@ -4,6 +4,7 @@ mod android;
 mod error;
 mod heif;
 mod live_photo_mov;
+mod live_photo_still;
 mod lpex;
 mod model;
 mod motion_video;
@@ -20,6 +21,10 @@ pub use live_photo_mov::{
     media_mdat_payloads, oppo_live_photo_transform, read_live_photo_content_identifier,
     read_live_photo_still_time, resolve_live_photo_still_time, validate_live_photo_movie,
     write_live_photo_movie, LivePhotoMovieError, LivePhotoMovieResult,
+};
+pub use live_photo_still::{
+    build_apple_makernote, read_apple_content_identifier, write_live_photo_heif_still,
+    LivePhotoStillError, LivePhotoStillResult,
 };
 pub use lpex::parse_first_lpex_object;
 pub use model::{
