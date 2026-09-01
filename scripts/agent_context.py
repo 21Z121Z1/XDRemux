@@ -39,7 +39,9 @@ def current_branch() -> str | None:
 
 
 def resolve_ref(name: str) -> str | None:
-    for candidate in (name, f"refs/heads/{name}", f"refs/remotes/origin/{name}"):
+    # Prefer the fetched remote-tracking ref when present. This still reflects
+    # local repository state; callers that require remote freshness must fetch.
+    for candidate in (f"refs/remotes/origin/{name}", f"refs/heads/{name}", name):
         if git("rev-parse", "--verify", "--quiet", f"{candidate}^{{commit}}", check=False):
             return candidate
     return None
@@ -60,15 +62,18 @@ def git_status(base_override: str | None) -> dict[str, Any]:
         "role": (role or {}).get("role", "unregistered"),
         "intended_base": intended_base,
         "base_ref": None,
+        "base_commit": None,
         "merge_base": None,
         "ahead": None,
         "behind": None,
+        "freshness": "Git divergence uses locally available refs; fetch before relying on remote freshness.",
     }
 
     if intended_base:
         base_ref = resolve_ref(intended_base)
         result["base_ref"] = base_ref
         if base_ref:
+            result["base_commit"] = git("rev-parse", f"{base_ref}^{{commit}}")
             result["merge_base"] = git("merge-base", base_ref, "HEAD")
             counts = git("rev-list", "--left-right", "--count", f"{base_ref}...HEAD").split()
             if len(counts) == 2:
@@ -96,18 +101,22 @@ def emit_status(args: argparse.Namespace) -> None:
     print(f"role: {status['role']}")
     if status["intended_base"]:
         print(f"intended base: {status['intended_base']}")
+    if status["base_ref"]:
+        print(f"base ref: {status['base_ref']} @ {status['base_commit']}")
     if status["merge_base"]:
         print(f"merge base: {status['merge_base']}")
         print(f"ahead/behind: +{status['ahead']} / -{status['behind']}")
     if status.get("base_note"):
         print(f"note: {status['base_note']}")
+    print(f"freshness: {status['freshness']}")
 
 
 def capability_by_id(identifier: str) -> dict[str, Any]:
-    for capability in load_map()["capabilities"]:
+    data = load_map()
+    for capability in data["capabilities"]:
         if capability["id"] == identifier:
             return capability
-    known = ", ".join(item["id"] for item in load_map()["capabilities"])
+    known = ", ".join(item["id"] for item in data["capabilities"])
     raise KeyError(f"unknown capability {identifier!r}; known capabilities: {known}")
 
 
@@ -145,7 +154,7 @@ def emit_branches(args: argparse.Namespace) -> None:
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
         description=(
-            "Derive current Git state and stable capability routing without scanning the whole repository."
+            "Derive local Git state and stable capability routing without scanning the whole repository."
         )
     )
     subparsers = root.add_subparsers(dest="command", required=True)
