@@ -1,0 +1,88 @@
+name: Materialize Rust runtime vertical slice
+
+on:
+  push:
+    branches: [feat/rust-cli-unification]
+    paths: [.github/workflows/materialize-rust-runtime.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - name: Install portable HEVC provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265 unzip
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Prepare private ProXDR fixture when configured
+        env:
+          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_REGRESSION_FIXTURE_ARCHIVE_URL }}
+        run: |
+          if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
+            echo "XDREMUX_REGRESSION_FIXTURE_ROOT=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
+          curl --fail --location --silent --show-error "$FIXTURE_ARCHIVE_URL" --output "$RUNNER_TEMP/xdremux-fixtures.zip"
+          unzip -q "$RUNNER_TEMP/xdremux-fixtures.zip" -d "$RUNNER_TEMP/xdremux-fixtures"
+          echo "XDREMUX_REGRESSION_FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
+      - name: Materialize lockfile and format source
+        run: |
+          cargo generate-lockfile
+          cargo fmt --all
+      - name: Verify engine and HDR prerequisites
+        run: |
+          cargo clippy --locked -p xdremux-engine --all-targets -- -D warnings
+          cargo test --locked -p xdremux-engine
+          cargo clippy --locked -p xdremux-hdr --all-targets -- -D warnings
+          cargo test --locked -p xdremux-hdr
+      - name: Verify runtime unit and private functional path
+        run: |
+          cargo clippy --locked -p xdremux-runtime --all-targets -- -D warnings
+          cargo test --locked -p xdremux-runtime
+          if [[ -n "${XDREMUX_REGRESSION_FIXTURE_ROOT:-}" ]] && [[ -f "$XDREMUX_REGRESSION_FIXTURE_ROOT/standard.heic" ]]; then
+            XDREMUX_REGRESSION_FIXTURE_ROOT="$XDREMUX_REGRESSION_FIXTURE_ROOT" \
+              cargo test --locked -p xdremux-runtime --test private_fixture -- --nocapture
+            echo "RUST_RUNTIME_PRIVATE_FIXTURE=Passed" >> "$GITHUB_ENV"
+          else
+            echo "RUST_RUNTIME_PRIVATE_FIXTURE=Not configured" >> "$GITHUB_ENV"
+          fi
+      - name: Verify formatting and staged diff
+        run: |
+          cargo fmt --all -- --check
+          git diff --check
+      - name: Commit verified runtime and lockfile
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            Cargo.lock \
+            crates/xdremux-runtime/src/lib.rs \
+            crates/xdremux-runtime/tests/private_fixture.rs \
+            crates/xdremux-hdr/src/info.rs \
+            crates/xdremux-hdr/src/lib.rs
+          if git diff --cached --quiet; then
+            echo 'No materialized changes to commit'
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m 'feat(rust-runtime): verify portable ProXDR execution'
+          git push origin HEAD:feat/rust-cli-unification
+      - name: Write summary
+        if: always()
+        run: |
+          {
+            echo '## Rust runtime vertical slice'
+            echo "Private ProXDR fixture: ${RUST_RUNTIME_PRIVATE_FIXTURE:-Not run}"
+          } >> "$GITHUB_STEP_SUMMARY"
