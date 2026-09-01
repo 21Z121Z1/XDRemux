@@ -122,3 +122,9 @@ pub struct HeifRasterDecodeRequest {
     pub data: Vec<u8>,
     pub format: RasterPixelFormat,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpegRasterDecodeRequest {
+    pub data: Vec<u8>,
+    pub format: RasterPixelFormat,
+}
