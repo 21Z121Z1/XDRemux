@@ -390,7 +390,10 @@ fn batch_output_candidate(input: &Path, parent: &Path, suffix: u32) -> Result<Pa
     Ok(parent.join(name))
 }
 
-fn plan_batch_items(inputs: &[PathBuf], output_dir: Option<&Path>) -> Result<Vec<BatchItem>, String> {
+fn plan_batch_items(
+    inputs: &[PathBuf],
+    output_dir: Option<&Path>,
+) -> Result<Vec<BatchItem>, String> {
     let mut reserved = inputs.iter().cloned().collect::<BTreeSet<_>>();
     let mut items = Vec::with_capacity(inputs.len());
 

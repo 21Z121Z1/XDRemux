@@ -16,10 +16,7 @@ fn unique_dir() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system time must be after epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!(
-        "xdremux-cli-batch-{}-{stamp}",
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("xdremux-cli-batch-{}-{stamp}", std::process::id()))
 }
 
 fn path_arg(path: &Path) -> OsString {
@@ -51,8 +48,7 @@ fn batch_command_is_deterministic_machine_readable_and_failure_isolating() {
     let code = xdremux_cli::run_from(args, &mut stdout, &mut stderr);
 
     assert_eq!(
-        code,
-        1,
+        code, 1,
         "one bad asset should make the batch partially fail without aborting the good conversion"
     );
     assert!(
