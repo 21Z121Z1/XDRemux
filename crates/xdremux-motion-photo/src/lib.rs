@@ -7,6 +7,7 @@ mod lpex;
 mod model;
 mod oppo;
 mod payload;
+mod publication;
 mod scanner;
 mod topology;
 
@@ -22,6 +23,10 @@ pub use oppo::{enrich_oppo_asset, parse_oppo_fallback, parse_oppo_motion_photo};
 pub use payload::{
     copy_payload_range, copy_payload_range_with_options, CopyResult, MotionPhotoCopyError,
     DEFAULT_COPY_BUFFER_SIZE, DEFAULT_MAX_PAYLOAD_BYTES,
+};
+pub use publication::{
+    companion_video_path, publish_live_photo_pair, reconcile_live_photo_pair,
+    PairPublicationError, PairPublicationResult,
 };
 pub use scanner::{ftyp_box_offsets, is_ftyp_box_start};
 pub use topology::{enrich_oppo_video_range, resolve_video_stream_layout};
