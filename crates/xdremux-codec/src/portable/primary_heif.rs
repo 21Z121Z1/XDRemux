@@ -24,12 +24,12 @@ impl LibHeifProvider {
                 "primary HEIF quality must be in the 0...100 range",
             ));
         }
-        if let Some(exif) = request.exif_tiff.as_ref()
-            && !(exif.starts_with(b"II") || exif.starts_with(b"MM"))
-        {
-            return Err(CodecError::invalid(
-                "primary HEIF EXIF must begin at a TIFF II/MM header",
-            ));
+        if let Some(exif) = request.exif_tiff.as_ref() {
+            if !(exif.starts_with(b"II") || exif.starts_with(b"MM")) {
+                return Err(CodecError::invalid(
+                    "primary HEIF EXIF must begin at a TIFF II/MM header",
+                ));
+            }
         }
 
         let mut image = Image::new(
@@ -48,34 +48,29 @@ impl LibHeifProvider {
                 )
                 .map_err(CodecError::libheif)?;
         }
-        {
-            let planes = image.planes_mut();
-            let r = planes
-                .r
-                .ok_or_else(|| CodecError::invalid("libheif did not allocate the R plane"))?;
-            let g = planes
-                .g
-                .ok_or_else(|| CodecError::invalid("libheif did not allocate the G plane"))?;
-            let b = planes
-                .b
-                .ok_or_else(|| CodecError::invalid("libheif did not allocate the B plane"))?;
-            copy_rgb_to_planes(
-                &request.raster,
-                r.data,
-                r.stride,
-                g.data,
-                g.stride,
-                b.data,
-                b.stride,
-            )?;
-        }
+        let planes = image.planes_mut();
+        let r = planes
+            .r
+            .ok_or_else(|| CodecError::invalid("libheif did not allocate primary R plane"))?;
+        let g = planes
+            .g
+            .ok_or_else(|| CodecError::invalid("libheif did not allocate primary G plane"))?;
+        let b = planes
+            .b
+            .ok_or_else(|| CodecError::invalid("libheif did not allocate primary B plane"))?;
+        copy_primary_rgb_planes(
+            r.data,
+            r.stride,
+            g.data,
+            g.stride,
+            b.data,
+            b.stride,
+            request,
+        )?;
 
-        if let Some(icc) = request.icc_profile.as_ref() {
-            if icc.is_empty() {
-                return Err(CodecError::invalid("primary HEIF ICC profile is empty"));
-            }
+        if let Some(icc) = &request.icc_profile {
             image
-                .set_color_profile_raw(&ColorProfileRaw::new(
+                .set_raw_color_profile(ColorProfileRaw::new(
                     color_profile_types::PROF,
                     icc.clone(),
                 ))
@@ -89,15 +84,7 @@ impl LibHeifProvider {
         encoder
             .set_quality(EncoderQuality::Lossy(request.quality))
             .map_err(CodecError::libheif)?;
-        // Apple-compatible stills conventionally use 4:2:0. Request it when the
-        // chosen HEVC encoder exposes the same stable parameter already verified
-        // by the Gain Map provider. The emitted container is decoded below, so an
-        // encoder that ignores or cannot honor the request still fails validation.
-        if encoder
-            .parameters_names()
-            .iter()
-            .any(|name| name == "chroma")
-        {
+        if encoder.parameters_names().iter().any(|name| name == "chroma") {
             encoder
                 .set_parameter_value(
                     "chroma",
@@ -122,42 +109,42 @@ impl LibHeifProvider {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn copy_rgb_to_planes(
-    source: &crate::Raster8,
+fn copy_primary_rgb_planes(
     r: &mut [u8],
     r_stride: usize,
     g: &mut [u8],
     g_stride: usize,
     b: &mut [u8],
     b_stride: usize,
+    request: &PrimaryHeifEncodeRequest,
 ) -> Result<()> {
-    let width = usize::try_from(source.width)
-        .map_err(|_| CodecError::invalid("primary HEIF width exceeds usize"))?;
-    let height = usize::try_from(source.height)
-        .map_err(|_| CodecError::invalid("primary HEIF height exceeds usize"))?;
-    for y in 0..height {
+    for y in 0..request.raster.height {
+        let y = usize::try_from(y)
+            .map_err(|_| CodecError::invalid("primary HEIF y exceeds usize"))?;
         let source_row = y
-            .checked_mul(source.bytes_per_row)
-            .ok_or_else(|| CodecError::invalid("primary HEIF source row overflows"))?;
+            .checked_mul(request.raster.bytes_per_row)
+            .ok_or_else(|| CodecError::invalid("primary source row offset overflows"))?;
         let r_row = y
             .checked_mul(r_stride)
-            .ok_or_else(|| CodecError::invalid("primary HEIF R row overflows"))?;
+            .ok_or_else(|| CodecError::invalid("primary R row offset overflows"))?;
         let g_row = y
             .checked_mul(g_stride)
-            .ok_or_else(|| CodecError::invalid("primary HEIF G row overflows"))?;
+            .ok_or_else(|| CodecError::invalid("primary G row offset overflows"))?;
         let b_row = y
             .checked_mul(b_stride)
-            .ok_or_else(|| CodecError::invalid("primary HEIF B row overflows"))?;
-        for x in 0..width {
-            let input = source_row
+            .ok_or_else(|| CodecError::invalid("primary B row offset overflows"))?;
+        for x in 0..request.raster.width {
+            let x = usize::try_from(x)
+                .map_err(|_| CodecError::invalid("primary HEIF x exceeds usize"))?;
+            let source = source_row
                 .checked_add(
                     x.checked_mul(3)
-                        .ok_or_else(|| CodecError::invalid("primary HEIF pixel offset overflows"))?,
+                        .ok_or_else(|| CodecError::invalid("primary RGB offset overflows"))?,
                 )
-                .ok_or_else(|| CodecError::invalid("primary HEIF pixel offset overflows"))?;
-            r[r_row + x] = source.data[input];
-            g[g_row + x] = source.data[input + 1];
-            b[b_row + x] = source.data[input + 2];
+                .ok_or_else(|| CodecError::invalid("primary RGB offset overflows"))?;
+            r[r_row + x] = request.raster.data[source];
+            g[g_row + x] = request.raster.data[source + 1];
+            b[b_row + x] = request.raster.data[source + 2];
         }
     }
     Ok(())
@@ -165,11 +152,9 @@ fn copy_rgb_to_planes(
 
 fn validate_primary_container(encoded: &[u8], width: u32, height: u32) -> Result<()> {
     let context = HeifContext::read_from_bytes(encoded).map_err(CodecError::libheif)?;
-    let handle = context
-        .primary_image_handle()
-        .map_err(CodecError::libheif)?;
+    let handle = context.primary_image_handle().map_err(CodecError::libheif)?;
     if handle.width() != width || handle.height() != height {
-        return Err(CodecError::InconsistentEncoderConfiguration(format!(
+        return Err(CodecError::invalid(format!(
             "primary HEIF dimensions changed during encode: expected {width}x{height}, got {}x{}",
             handle.width(),
             handle.height()
@@ -181,43 +166,32 @@ fn validate_primary_container(encoded: &[u8], width: u32, height: u32) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HeifRasterDecodeRequest, Raster8};
-    use xdremux_engine::RasterDecoder;
+    use crate::{Raster8, RasterPixelFormat};
 
     fn raster() -> Raster8 {
-        let width = 31_u32;
-        let height = 23_u32;
+        let width = 17_u32;
+        let height = 13_u32;
         let row = usize::try_from(width).unwrap() * 3;
         let mut data = vec![0_u8; row * usize::try_from(height).unwrap()];
-        for y in 0..usize::try_from(height).unwrap() {
-            for x in 0..usize::try_from(width).unwrap() {
-                let offset = y * row + x * 3;
-                data[offset] = (x * 7) as u8;
-                data[offset + 1] = (y * 9) as u8;
-                data[offset + 2] = ((x + y) * 5) as u8;
-            }
+        for (index, byte) in data.iter_mut().enumerate() {
+            *byte = (index % 251) as u8;
         }
         Raster8::new(width, height, row, RasterPixelFormat::Rgb8, data).unwrap()
     }
 
     #[test]
-    fn primary_heif_roundtrips_geometry_through_libheif() {
-        let provider = LibHeifProvider::new();
+    fn encodes_primary_heif_that_libheif_can_decode() {
         let source = raster();
-        let encoded = provider
-            .encode_primary_heif(&PrimaryHeifEncodeRequest::live_photo(
-                source.clone(),
-                None,
-            ))
+        let request = PrimaryHeifEncodeRequest::live_photo(source.clone(), None);
+        let encoded = LibHeifProvider::new().encode_primary_heif(&request).unwrap();
+        let context = HeifContext::read_from_bytes(&encoded).unwrap();
+        let handle = context.primary_image_handle().unwrap();
+        assert_eq!((handle.width(), handle.height()), (source.width, source.height));
+        let lib = LibHeif::new_checked().unwrap();
+        let decoded = lib
+            .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
             .unwrap();
-        let decoded = provider
-            .decode_raster(&HeifRasterDecodeRequest {
-                data: encoded,
-                format: RasterPixelFormat::Rgb8,
-            })
-            .unwrap();
-        assert_eq!((decoded.width, decoded.height), (source.width, source.height));
-        assert_eq!(decoded.format, RasterPixelFormat::Rgb8);
+        assert_eq!((decoded.width(), decoded.height()), (source.width, source.height));
     }
 
     #[test]
