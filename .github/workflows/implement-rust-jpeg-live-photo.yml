@@ -30,24 +30,16 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           path = Path('crates/xdremux-metadata/src/ultrahdr_jpeg.rs')
           text = path.read_text()
           replacements = {
-              "fn local_name(name: &[u8]) -> &[u8] {\n    name.rsplit(|byte| *byte == b':').next().unwrap_or(name)\n}":
-              "fn local_name(name: &str) -> &str {\n    name.rsplit(':').next().unwrap_or(name)\n}",
-              "let key = std::str::from_utf8(local_name(attribute.key.as_ref()))\n            .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 XML attribute name\"))?;":
-              "let key = local_name(attribute.key.as_ref());",
-              "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?\n                    .to_owned();":
-              "let name = local_name(element.name().as_ref()).to_owned();",
-              "let value = std::str::from_utf8(text.as_ref())\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 text value\"))?\n                    .trim();":
-              "let value = text.as_ref().trim();",
-              "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?;":
-              "let name = local_name(element.name().as_ref()).to_owned();",
-              "if active_field.as_deref() == Some(name) {":
-              "if active_field.as_deref() == Some(name.as_str()) {",
-              "1000_i32 + channel as i32 * 100":
-              "1000_i32 + channel * 100",
+              "fn local_name(name: &[u8]) -> &[u8] {\n    name.rsplit(|byte| *byte == b':').next().unwrap_or(name)\n}": "fn local_name(name: &str) -> &str {\n    name.rsplit(':').next().unwrap_or(name)\n}",
+              "let key = std::str::from_utf8(local_name(attribute.key.as_ref()))\n            .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 XML attribute name\"))?;": "let key = local_name(attribute.key.as_ref());",
+              "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?\n                    .to_owned();": "let name = local_name(element.name().as_ref()).to_owned();",
+              "let value = std::str::from_utf8(text.as_ref())\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 text value\"))?\n                    .trim();": "let value = text.as_ref().trim();",
+              "let name = std::str::from_utf8(local_name(element.name().as_ref()))\n                    .map_err(|_| MetadataError::invalid(XMP_CONTEXT, \"non-UTF-8 element name\"))?;": "let name = local_name(element.name().as_ref()).to_owned();",
+              "if active_field.as_deref() == Some(name) {": "if active_field.as_deref() == Some(name.as_str()) {",
+              "1000_i32 + channel as i32 * 100": "1000_i32 + channel * 100",
           }
           for old, new in replacements.items():
               if old not in text:
@@ -57,25 +49,8 @@ jobs:
 
           path = Path('crates/xdremux-motion-photo/src/live_photo_still.rs')
           text = path.read_text()
-          old = '''    let source = source_jpeg.to_vec();
-    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)
-        .map_err(|error| LivePhotoStillError::external("read source JPEG EXIF", error))?;
-    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(
-        content_identifier,
-    )?));
-'''
-          new = '''    let source = source_jpeg.to_vec();
-    // Some Android vendors emit EXIF tags with non-standard field-type combinations.
-    // Preserve source EXIF when little_exif can parse it, but match the established
-    // portable product behavior by falling back to a clean metadata set when the
-    // vendor EXIF is not safely understood. The Live Photo pairing MakerNote remains
-    // mandatory either way.
-    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)
-        .unwrap_or_else(|_| Metadata::new());
-    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(
-        content_identifier,
-    )?));
-'''
+          old = "    let source = source_jpeg.to_vec();\n    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)\n        .map_err(|error| LivePhotoStillError::external(\"read source JPEG EXIF\", error))?;\n    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(\n        content_identifier,\n    )?));\n"
+          new = "    let source = source_jpeg.to_vec();\n    // Android vendor EXIF can contain non-standard tag/type combinations. Preserve\n    // it when it is safely parseable; otherwise match the established portable\n    // behavior by starting from clean EXIF and still writing the mandatory Apple\n    // Live Photo pairing MakerNote.\n    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)\n        .unwrap_or_else(|_| Metadata::new());\n    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(\n        content_identifier,\n    )?));\n"
           if old not in text:
               raise SystemExit('JPEG EXIF transfer fragment changed')
           path.write_text(text.replace(old, new, 1))
