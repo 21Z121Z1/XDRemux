@@ -455,6 +455,7 @@ dependencies = [
  "jpeg-encoder",
  "serde_json",
  "xdremux-engine",
+ "xdremux-format",
  "xdremux-heif",
  "xdremux-runtime",
  "xdremux-source",
