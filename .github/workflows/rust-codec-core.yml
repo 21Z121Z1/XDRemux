@@ -38,7 +38,7 @@ jobs:
       - name: Install libheif HEVC provider
         run: |
           sudo apt-get update
-          sudo apt-get install -y libheif-dev libheif-plugin-x265
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
