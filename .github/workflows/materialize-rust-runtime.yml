@@ -3,7 +3,13 @@ name: Materialize Rust runtime vertical slice
 on:
   push:
     branches: [feat/rust-cli-unification]
-    paths: [.github/workflows/materialize-rust-runtime.yml]
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/xdremux-runtime/**
+      - crates/xdremux-hdr/src/info.rs
+      - crates/xdremux-hdr/src/lib.rs
+      - .github/workflows/materialize-rust-runtime.yml
 
 permissions:
   contents: write
