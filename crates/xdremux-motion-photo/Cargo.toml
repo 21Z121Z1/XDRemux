@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 quick-xml = "0.42"
 serde_json = "1.0"
+xdremux-format = { path = "../xdremux-format" }
 
 [lints]
 workspace = true
