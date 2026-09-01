@@ -43,3 +43,5 @@ assert report["stream_count"] == 1, report
 PY
 
 cargo run --locked --quiet -p xdremux-cli -- --help | grep -F "inspect <INPUT> [--json]" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- --help | grep -F "convert --input <INPUT>" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F "Convert one ProXDR image" >/dev/null
