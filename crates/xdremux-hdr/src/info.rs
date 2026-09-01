@@ -32,36 +32,40 @@ fn quantize_f32(value: f64) -> f64 {
 pub fn make_private_gain_map_info_floats(scale: &ResolvedScale) -> [f64; 20] {
     let mut output = [0.0_f64; 20];
 
-    for channel in 0..3 {
+    for (channel, slot) in output[..3].iter_mut().enumerate() {
         let gain_min = value_or_repeated(
             &scale.per_channel_gain_map_min,
             channel,
             scale.gain_map_min,
         );
-        output[channel] = quantize_f32(2.0_f64.powf(gain_min));
+        *slot = quantize_f32(2.0_f64.powf(gain_min));
     }
     output[3] = quantize_f32(1.0);
 
-    for channel in 0..3 {
+    for (channel, slot) in output[4..7].iter_mut().enumerate() {
         let gain_max = positive_value_or_fallback(
             &scale.per_channel_gain_map_max,
             channel,
             scale.gain_map_max,
         );
-        output[4 + channel] = quantize_f32(2.0_f64.powf(gain_max));
+        *slot = quantize_f32(2.0_f64.powf(gain_max));
     }
-    for channel in 0..3 {
-        output[7 + channel] = quantize_f32(value_or_repeated(
+    for (channel, slot) in output[7..10].iter_mut().enumerate() {
+        *slot = quantize_f32(value_or_repeated(
             &scale.per_channel_gamma,
             channel,
             scale.gamma,
         ));
-        output[10 + channel] = quantize_f32(value_or_repeated(
+    }
+    for (channel, slot) in output[10..13].iter_mut().enumerate() {
+        *slot = quantize_f32(value_or_repeated(
             &scale.per_channel_base_offset,
             channel,
             scale.epsilon_sdr,
         ));
-        output[13 + channel] = quantize_f32(value_or_repeated(
+    }
+    for (channel, slot) in output[13..16].iter_mut().enumerate() {
+        *slot = quantize_f32(value_or_repeated(
             &scale.per_channel_alternate_offset,
             channel,
             scale.epsilon_hdr,
