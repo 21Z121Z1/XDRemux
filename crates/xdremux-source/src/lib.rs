@@ -78,7 +78,10 @@ impl fmt::Display for SourceProbeError {
             }
             Self::MotionPhoto(source) => write!(formatter, "invalid Motion Photo: {source}"),
             Self::Unsupported(source) => {
-                write!(formatter, "unsupported input: no Motion Photo or ProXDR payload ({source})")
+                write!(
+                    formatter,
+                    "unsupported input: no Motion Photo or ProXDR payload ({source})"
+                )
             }
         }
     }

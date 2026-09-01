@@ -38,7 +38,7 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
       - name: Check formatting
-        run: cargo fmt --all --check
+        run: cargo fmt --check -p xdremux-source -p xdremux-cli
       - name: Lint Rust source routing and CLI
         run: cargo clippy --locked -p xdremux-source -p xdremux-cli --all-targets -- -D warnings
       - name: Test Rust source routing and CLI

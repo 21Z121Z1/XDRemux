@@ -48,7 +48,9 @@ fn parse_inspect(args: impl IntoIterator<Item = OsString>) -> Result<Command, Cl
             )));
         }
         if input.replace(PathBuf::from(arg)).is_some() {
-            return Err(CliError("inspect accepts exactly one input path".to_owned()));
+            return Err(CliError(
+                "inspect accepts exactly one input path".to_owned(),
+            ));
         }
     }
 
@@ -89,8 +91,16 @@ fn write_human(inspection: &SourceInspection, output: &mut impl Write) -> io::Re
             stream_count,
         } => {
             writeln!(output, "source-kind: {source_kind}")?;
-            writeln!(output, "still: offset={} length={}", still.offset, still.length)?;
-            writeln!(output, "video: offset={} length={}", video.offset, video.length)?;
+            writeln!(
+                output,
+                "still: offset={} length={}",
+                still.offset, still.length
+            )?;
+            writeln!(
+                output,
+                "video: offset={} length={}",
+                video.offset, video.length
+            )?;
             writeln!(output, "streams: {stream_count}")?;
             if let Some(value) = presentation_timestamp_us {
                 writeln!(output, "presentation-timestamp-us: {value}")?;
@@ -116,12 +126,7 @@ fn write_human(inspection: &SourceInspection, output: &mut impl Write) -> io::Re
     Ok(())
 }
 
-fn run_inspect(
-    input: PathBuf,
-    json: bool,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> u8 {
+fn run_inspect(input: PathBuf, json: bool, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
     let inspection = match inspect_path(&input) {
         Ok(value) => value,
         Err(error) => {
@@ -165,7 +170,11 @@ where
         },
         Ok(Command::Inspect { input, json }) => run_inspect(input, json, stdout, stderr),
         Err(error) => {
-            let _ = writeln!(stderr, "error: {}\n\nTry 'xdremux --help' for usage.", error.0);
+            let _ = writeln!(
+                stderr,
+                "error: {}\n\nTry 'xdremux --help' for usage.",
+                error.0
+            );
             2
         }
     }
@@ -180,7 +189,9 @@ mod tests {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
         assert_eq!(run_from(Vec::<&str>::new(), &mut stdout, &mut stderr), 0);
-        assert!(String::from_utf8(stdout).unwrap().contains("xdremux <COMMAND>"));
+        assert!(String::from_utf8(stdout)
+            .unwrap()
+            .contains("xdremux <COMMAND>"));
         assert!(stderr.is_empty());
     }
 
@@ -217,6 +228,8 @@ mod tests {
         let mut stderr = Vec::new();
         assert_eq!(run_from(["convert"], &mut stdout, &mut stderr), 2);
         assert!(stdout.is_empty());
-        assert!(String::from_utf8(stderr).unwrap().contains("unknown command: convert"));
+        assert!(String::from_utf8(stderr)
+            .unwrap()
+            .contains("unknown command: convert"));
     }
 }
