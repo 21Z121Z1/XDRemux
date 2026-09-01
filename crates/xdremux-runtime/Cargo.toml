@@ -1,0 +1,17 @@
+[package]
+name = "xdremux-runtime"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+atomic-write-file = "=0.3.1"
+xdremux-codec = { path = "../xdremux-codec" }
+xdremux-container = { path = "../xdremux-container" }
+xdremux-engine = { path = "../xdremux-engine" }
+xdremux-format = { path = "../xdremux-format" }
+xdremux-hdr = { path = "../xdremux-hdr" }
+xdremux-heif = { path = "../xdremux-heif" }
+xdremux-metadata = { path = "../xdremux-metadata" }
+
+[lints]
+workspace = true
