@@ -1,0 +1,263 @@
+use xdremux_format::exif::read_item_payload;
+use xdremux_format::isobmff::{
+    make_box, make_iloc_box, parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, EXIF,
+    ILOC, MDAT, META,
+};
+
+use crate::oppo::{
+    adjusted_extent_for_oppo_user_comment_patch, adjusted_oppo_user_comment_in_heif,
+    apply_oppo_user_comment_patch, find_oppo_tag_flag, target_oppo_tag_flags, OppoCompatibility,
+};
+use crate::{MetadataError, Result};
+
+fn one_top_level<'a>(
+    boxes: &'a [BoxHeader],
+    kind: xdremux_format::FourCC,
+    context: &'static str,
+) -> Result<&'a BoxHeader> {
+    let mut matches = boxes.iter().filter(|header| header.kind == kind);
+    let first = matches
+        .next()
+        .ok_or_else(|| MetadataError::invalid(context, "required top-level box is missing"))?;
+    if matches.next().is_some() {
+        return Err(MetadataError::invalid(
+            context,
+            "more than one top-level box is present",
+        ));
+    }
+    Ok(first)
+}
+
+fn current_oppo_tag_flags(data: &[u8]) -> Result<Option<u32>> {
+    let top = scan_top_level_boxes(data)?;
+    let Some(meta_header) = top.boxes.iter().find(|header| header.kind == META) else {
+        return Ok(None);
+    };
+    let meta = parse_meta_box(data, meta_header)?;
+    let Some(exif_item) = meta
+        .iinf
+        .entries
+        .iter()
+        .find(|item| item.item_type == Some(EXIF))
+    else {
+        return Ok(None);
+    };
+    let exif_entry = meta
+        .iloc
+        .entries
+        .iter()
+        .find(|entry| entry.item_id == exif_item.item_id)
+        .ok_or_else(|| {
+            MetadataError::invalid(
+                "OPPO UserComment",
+                format!("Exif item {} has no iloc entry", exif_item.item_id),
+            )
+        })?;
+    let payload = read_item_payload(data, exif_entry, meta.idat.as_ref())?;
+    Ok(find_oppo_tag_flag(&payload).map(|tag| tag.value))
+}
+
+/// Read the current OPPO routing flags from the source HEIF Exif item.
+pub fn oppo_tag_flags_in_heif(data: &[u8]) -> Result<Option<u32>> {
+    current_oppo_tag_flags(data)
+}
+
+/// Patch OPPO Exif routing flags while preserving a structurally consistent HEIF.
+///
+/// A UserComment may grow when a compatibility bit is introduced. The lower-level
+/// TIFF patcher therefore reports the byte delta. This function applies that delta
+/// to every affected file-backed `iloc` extent before publishing the new `mdat`.
+/// It deliberately owns only vendor metadata mutation; Gain Map graph construction
+/// remains in `xdremux-heif`.
+pub fn patch_oppo_user_comment_in_heif(
+    data: &[u8],
+    compatibility: OppoCompatibility,
+) -> Result<Vec<u8>> {
+    let Some(source_flags) = current_oppo_tag_flags(data)? else {
+        return Ok(data.to_vec());
+    };
+    let expected_flags = target_oppo_tag_flags(source_flags, compatibility);
+    if expected_flags == source_flags {
+        return Ok(data.to_vec());
+    }
+    let patched_comment = adjusted_oppo_user_comment_in_heif(data, compatibility)?
+        .ok_or_else(|| MetadataError::invalid("OPPO UserComment", "routing patch disappeared"))?;
+
+    let top = scan_top_level_boxes(data)?;
+    let meta_header = one_top_level(&top.boxes, META, "OPPO HEIF meta")?;
+    let mdat_header = one_top_level(&top.boxes, MDAT, "OPPO HEIF mdat")?;
+    let meta = parse_meta_box(data, meta_header)?;
+    let exif_item = meta
+        .iinf
+        .entries
+        .iter()
+        .find(|item| item.item_type == Some(EXIF))
+        .ok_or_else(|| MetadataError::invalid("OPPO UserComment", "Exif item is missing"))?;
+    let exif_entry = meta
+        .iloc
+        .entries
+        .iter()
+        .find(|entry| entry.item_id == exif_item.item_id)
+        .ok_or_else(|| {
+            MetadataError::invalid(
+                "OPPO UserComment",
+                format!("Exif item {} has no iloc entry", exif_item.item_id),
+            )
+        })?;
+
+    let old_mdat_header_size = mdat_header
+        .data_start
+        .checked_sub(mdat_header.box_start)
+        .ok_or_else(|| MetadataError::overflow("OPPO mdat header size"))?;
+    let mut mdat_payload = data
+        .get(mdat_header.payload_range())
+        .ok_or_else(|| MetadataError::invalid("OPPO HEIF mdat", "payload is outside source"))?
+        .to_vec();
+    let mdat_data_start = u64::try_from(mdat_header.data_start)
+        .map_err(|_| MetadataError::overflow("OPPO mdat data start"))?;
+    let patch = apply_oppo_user_comment_patch(
+        &mut mdat_payload,
+        mdat_data_start,
+        exif_entry,
+        &patched_comment,
+    )?
+    .ok_or_else(|| {
+        MetadataError::invalid(
+            "OPPO UserComment",
+            "Exif layout cannot be patched without guessing",
+        )
+    })?;
+
+    let mut relocated_entries = meta.iloc.entries.clone();
+    for entry in &mut relocated_entries {
+        if entry.construction_method != 0 {
+            continue;
+        }
+        let base_offset = entry.base_offset;
+        for extent in &mut entry.extents {
+            let absolute = base_offset
+                .checked_add(extent.offset)
+                .ok_or_else(|| MetadataError::overflow("OPPO iloc extent offset"))?;
+            let Some((adjusted_absolute, adjusted_length)) =
+                adjusted_extent_for_oppo_user_comment_patch(
+                    absolute,
+                    extent.length,
+                    Some(patch),
+                )?
+            else {
+                return Err(MetadataError::invalid(
+                    "OPPO UserComment",
+                    format!(
+                        "patch crosses item {} extent boundary",
+                        entry.item_id
+                    ),
+                ));
+            };
+            extent.offset = adjusted_absolute.checked_sub(base_offset).ok_or_else(|| {
+                MetadataError::invalid(
+                    "OPPO iloc relocation",
+                    format!("item {} moved before its base offset", entry.item_id),
+                )
+            })?;
+            extent.length = adjusted_length;
+        }
+    }
+
+    let rebuilt_iloc = make_iloc_box(
+        meta.iloc.version,
+        meta.iloc.offset_size,
+        meta.iloc.length_size,
+        meta.iloc.base_offset_size,
+        meta.iloc.index_size,
+        &relocated_entries,
+    )?;
+    let children_start = meta_header
+        .data_start
+        .checked_add(4)
+        .ok_or_else(|| MetadataError::overflow("OPPO meta child start"))?;
+    if children_start > meta_header.data_end {
+        return Err(MetadataError::invalid(
+            "OPPO HEIF meta",
+            "full-box header is truncated",
+        ));
+    }
+    let children = parse_boxes(data, children_start..meta_header.data_end)?;
+    let full_header = data
+        .get(meta_header.data_start..children_start)
+        .ok_or_else(|| MetadataError::invalid("OPPO HEIF meta", "full-box header is missing"))?;
+    let mut meta_payload = full_header.to_vec();
+    let mut replaced_iloc = false;
+    for child in &children {
+        if child.kind == ILOC {
+            if replaced_iloc {
+                return Err(MetadataError::invalid(
+                    "OPPO HEIF meta",
+                    "more than one iloc box is present",
+                ));
+            }
+            replaced_iloc = true;
+            meta_payload.extend_from_slice(&rebuilt_iloc);
+        } else {
+            meta_payload.extend_from_slice(data.get(child.box_range()).ok_or_else(|| {
+                MetadataError::invalid("OPPO HEIF meta", "child box is outside source")
+            })?);
+        }
+    }
+    if !replaced_iloc {
+        return Err(MetadataError::invalid(
+            "OPPO HEIF meta",
+            "iloc box is missing",
+        ));
+    }
+    let rebuilt_meta = make_box(META, &meta_payload)?;
+    if rebuilt_meta.len() != meta_header.size {
+        return Err(MetadataError::invalid(
+            "OPPO HEIF meta",
+            "iloc rewrite changed meta size; refusing to relocate unrelated top-level data",
+        ));
+    }
+
+    let rebuilt_mdat = make_box(MDAT, &mdat_payload)?;
+    let new_mdat_header_size = rebuilt_mdat
+        .len()
+        .checked_sub(mdat_payload.len())
+        .ok_or_else(|| MetadataError::overflow("OPPO rebuilt mdat header size"))?;
+    if new_mdat_header_size != old_mdat_header_size {
+        return Err(MetadataError::invalid(
+            "OPPO HEIF mdat",
+            "UserComment patch changed mdat header width",
+        ));
+    }
+
+    let trailing = data
+        .get(top.trailing_range.clone())
+        .ok_or_else(|| MetadataError::invalid("OPPO HEIF", "trailing bytes are outside source"))?;
+    let mut output = Vec::with_capacity(
+        data.len()
+            .checked_add_signed(patch.delta as isize)
+            .ok_or_else(|| MetadataError::overflow("OPPO patched HEIF size"))?,
+    );
+    for header in &top.boxes {
+        if header.kind == META {
+            output.extend_from_slice(&rebuilt_meta);
+        } else if header.kind == MDAT {
+            output.extend_from_slice(&rebuilt_mdat);
+        } else {
+            output.extend_from_slice(data.get(header.box_range()).ok_or_else(|| {
+                MetadataError::invalid("OPPO HEIF", "top-level box is outside source")
+            })?);
+        }
+    }
+    output.extend_from_slice(trailing);
+
+    let actual_flags = current_oppo_tag_flags(&output)?;
+    if actual_flags != Some(expected_flags) {
+        return Err(MetadataError::invalid(
+            "OPPO UserComment",
+            format!(
+                "post-write routing flags are {actual_flags:?}, expected {expected_flags}"
+            ),
+        ));
+    }
+    Ok(output)
+}
