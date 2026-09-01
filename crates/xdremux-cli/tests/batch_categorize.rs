@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
@@ -24,6 +24,28 @@ fn unique_dir() -> PathBuf {
         "xdremux-cli-batch-categorize-{}-{stamp}",
         std::process::id()
     ))
+}
+
+fn projected_file(root: &Path, asset_folder: &str, file_name: &str) -> PathBuf {
+    let asset_root = root.join(asset_folder);
+    let mut matches = Vec::new();
+    for entry in fs::read_dir(&asset_root).expect("asset-type directory must exist") {
+        let entry = entry.unwrap();
+        if !entry.file_type().unwrap().is_dir() {
+            continue;
+        }
+        let candidate = entry.path().join(file_name);
+        if candidate.is_file() {
+            matches.push(candidate);
+        }
+    }
+    assert_eq!(
+        matches.len(),
+        1,
+        "expected exactly one {file_name} below {}",
+        asset_root.display()
+    );
+    matches.pop().unwrap()
 }
 
 #[test]
@@ -57,17 +79,9 @@ fn batch_categorize_projects_final_outputs_before_conversion() {
     assert_eq!(report["succeeded"], 2);
     assert_eq!(report["failed"], 0);
 
-    let static_output = output
-        .join("静态照片")
-        .join("未分类")
-        .join("static.xdremux.heic");
-    let live_image = output
-        .join("实况照片")
-        .join("未分类")
-        .join("live.xdremux.heic");
+    let static_output = projected_file(&output, "静态照片", "static.xdremux.heic");
+    let live_image = projected_file(&output, "实况照片", "live.xdremux.heic");
     let live_video = live_image.with_extension("mov");
-    assert!(static_output.is_file(), "{}", static_output.display());
-    assert!(live_image.is_file(), "{}", live_image.display());
     assert!(live_video.is_file(), "{}", live_video.display());
     assert!(!output.join("static.xdremux.heic").exists());
     assert!(!output.join("live.xdremux.heic").exists());
@@ -80,10 +94,10 @@ fn batch_categorize_projects_final_outputs_before_conversion() {
         .collect::<Vec<_>>();
     assert!(output_strings
         .iter()
-        .any(|path| path.ends_with("静态照片/未分类/static.xdremux.heic") || path.ends_with("静态照片\\未分类\\static.xdremux.heic")));
+        .any(|path| path == &static_output.to_string_lossy()));
     assert!(output_strings
         .iter()
-        .any(|path| path.ends_with("实况照片/未分类/live.xdremux.heic") || path.ends_with("实况照片\\未分类\\live.xdremux.heic")));
+        .any(|path| path == &live_image.to_string_lossy()));
 
     fs::remove_dir_all(root).unwrap();
 }
