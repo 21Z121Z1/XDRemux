@@ -1,0 +1,12 @@
+[package]
+name = "xdremux-source"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+xdremux-container = { path = "../xdremux-container" }
+xdremux-motion-photo = { path = "../xdremux-motion-photo" }
+
+[lints]
+workspace = true

@@ -1,0 +1,81 @@
+name: Rust CLI core
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-source/**"
+      - "crates/xdremux-container/**"
+      - "crates/xdremux-motion-photo/**"
+      - "scripts/check_rust_cli_smoke.sh"
+      - ".github/workflows/rust-cli-core.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-source/**"
+      - "crates/xdremux-container/**"
+      - "crates/xdremux-motion-photo/**"
+      - "scripts/check_rust_cli_smoke.sh"
+      - ".github/workflows/rust-cli-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rust-cli-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint Rust source routing and CLI
+        run: cargo clippy --locked -p xdremux-source -p xdremux-cli --all-targets -- -D warnings
+      - name: Test Rust source routing and CLI
+        run: cargo test --locked -p xdremux-source -p xdremux-cli
+      - name: Exercise real Rust CLI route
+        run: bash scripts/check_rust_cli_smoke.sh
+      - name: Verify exact-head completion gate
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/xdremux-rust-cli-gate.json" <<'JSON'
+          {
+            "schema_version": 1,
+            "scope": "Introduce the canonical Rust input-routing layer and the first real xdremux Rust CLI product entry point without moving source semantics into the CLI shell",
+            "checks": [
+              {
+                "name": "rust-source-cli-regressions",
+                "kind": "regression",
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-source", "-p", "xdremux-cli"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "rust-cli-real-file-smoke",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_rust_cli_smoke.sh"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "rust-source-cli-clippy",
+                "kind": "static",
+                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-source", "-p", "xdremux-cli", "--all-targets", "--", "-D", "warnings"],
+                "timeout_seconds": 600
+              }
+            ]
+          }
+          JSON
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/main \
+            --plan "$RUNNER_TEMP/xdremux-rust-cli-gate.json"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/$(git rev-parse HEAD).json"
