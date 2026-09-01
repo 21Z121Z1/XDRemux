@@ -162,96 +162,109 @@ impl PortableRuntime {
         .map_err(runtime_execution_error)?;
         Ok(ByteConversionReceipt {
             plan: receipt.plan,
-            bytes: publisher.output.ok_or_else(|| {
-                RuntimeError::new("runtime execution", "publisher produced no output")
-            })?,
+            bytes: receipt.published,
         })
     }
 
     pub fn convert_proxdr_file<Observe>(
         &self,
         source: &[u8],
-        output: &Path,
+        output: impl AsRef<Path>,
         request: ConversionRequest,
         observe: Observe,
     ) -> Result<FileConversionReceipt>
     where
         Observe: FnMut(ExecutionStage),
     {
-        let converted = self.convert_proxdr_bytes(source, request, observe)?;
-        let parent = output.parent().unwrap_or_else(|| Path::new("."));
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .map_err(|error| RuntimeError::external("output directory", error))?;
-        }
-        let mut file = AtomicWriteFile::options()
-            .open(output)
-            .map_err(|error| RuntimeError::external("output open", error))?;
-        file.write_all(&converted.bytes)
-            .map_err(|error| RuntimeError::external("output write", error))?;
-        file.commit()
-            .map_err(|error| RuntimeError::external("output commit", error))?;
+        let prepared = self.analyze_proxdr(source)?;
+        let capabilities = self.capability_inventory()?;
+        let mut builder = ProXdrArtifactBuilder {
+            source,
+            prepared: &prepared,
+            jpeg: &self.jpeg,
+            heif: &self.heif,
+        };
+        let mut validator = IsoGainMapValidator;
+        let mut publisher = AtomicFilePublisher::new(output.as_ref().to_path_buf());
+        let receipt = execute_conversion(
+            &prepared.analysis,
+            request,
+            &capabilities,
+            &mut builder,
+            &mut validator,
+            &mut publisher,
+            observe,
+        )
+        .map_err(runtime_execution_error)?;
         Ok(FileConversionReceipt {
-            plan: converted.plan,
-            output: output.to_path_buf(),
+            plan: receipt.plan,
+            output: receipt.published,
         })
     }
 
     pub fn convert_motion_photo_file(
         &self,
         source: &[u8],
-        input: &Path,
-        output_image: &Path,
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
     ) -> Result<LivePhotoFileReceipt> {
-        live_photo::convert_motion_photo_file(&self.jpeg, &self.heif, source, input, output_image)
-    }
-
-    pub fn categorize_paths<I>(
-        &self,
-        inputs: I,
-        output_root: &Path,
-        operation: xdremux_classification::CategorizeOperation,
-        dry_run: bool,
-    ) -> CategorizeReceipt
-    where
-        I: IntoIterator<Item = PathBuf>,
-    {
-        categorize::categorize_paths(inputs, output_root, operation, dry_run)
+        live_photo::convert_motion_photo_file(
+            &self.jpeg,
+            &self.heif,
+            source,
+            input.as_ref(),
+            output.as_ref(),
+        )
     }
 }
 
-fn runtime_execution_error(error: ExecutionError) -> RuntimeError {
-    RuntimeError::new("runtime execution", error.to_string())
-}
-
-fn analyze_proxdr(source: &[u8]) -> Result<PreparedProXdr> {
-    let extracted = extract(source, ContainerExtractionMode::Lenient)
-        .map_err(|error| RuntimeError::external("OPPO container extraction", error))?;
-    let hdr = xdremux_hdr::extract(source, HdrExtractionMode::Lenient)
-        .map_err(|error| RuntimeError::external("HDR extraction", error))?;
-    let scale = resolve(hdr.metadata.as_ref())
-        .map_err(|error| RuntimeError::external("HDR metadata resolution", error))?;
-    let source_profile = gain_map_source_profile_from_jpeg(&extracted.gain_map_jpeg)
-        .map_err(|error| RuntimeError::external("gain-map source profile", error))?;
-    let source_hdr_mode = match hdr.family {
-        HdrFamily::Lhdr1 => SourceHdrMode::Lhdr1,
-        HdrFamily::Lhdr2 => SourceHdrMode::Lhdr2,
-        HdrFamily::Uhdr => SourceHdrMode::Uhdr,
-    };
+pub fn analyze_proxdr(source: &[u8]) -> Result<PreparedProXdr> {
+    let extracted = extract(source)
+        .map_err(|error| RuntimeError::external("ProXDR container analysis", error))?;
+    let frame = probe_jpeg_frame_profile(&extracted.mask_jpeg_data)
+        .map_err(|error| RuntimeError::external("private Gain Map JPEG profile", error))?;
+    let gain_map = gain_map_source_profile_from_jpeg(&frame)
+        .map_err(|error| RuntimeError::external("Gain Map source profile", error))?;
+    let hdr_mode = source_hdr_mode(extracted.mode);
+    let scale = resolve(&extracted.meta_floats, hdr_extraction_mode(extracted.mode))
+        .map_err(|error| RuntimeError::external("HDR scale resolution", error))?;
     let analysis = ConversionAnalysis {
-        source_family: detect_source_family(source),
-        source_hdr_mode,
-        source_gain_map: Some(source_profile),
-        source_tail: Some(OppoCameraTail {
-            available: extracted.oppo_tail.is_some(),
-            mode: SourceHdrMode::from(source_hdr_mode),
-        }),
+        source_family: detect_source_family(hdr_mode, &extracted.meta_floats),
+        hdr_mode,
+        gain_map,
     };
     Ok(PreparedProXdr {
         analysis,
         extracted,
         scale,
     })
+}
+
+fn source_hdr_mode(mode: ContainerExtractionMode) -> SourceHdrMode {
+    match mode {
+        ContainerExtractionMode::Lhdr => SourceHdrMode::Lhdr,
+        ContainerExtractionMode::Uhdr => SourceHdrMode::Uhdr,
+    }
+}
+
+fn hdr_extraction_mode(mode: ContainerExtractionMode) -> HdrExtractionMode {
+    match mode {
+        ContainerExtractionMode::Lhdr => HdrExtractionMode::Lhdr,
+        ContainerExtractionMode::Uhdr => HdrExtractionMode::Uhdr,
+    }
+}
+
+fn hdr_family(family: SourceFamily) -> HdrFamily {
+    match family {
+        SourceFamily::X6 => HdrFamily::X6,
+        SourceFamily::X7 => HdrFamily::X7,
+    }
+}
+
+fn runtime_execution_error(
+    error: ExecutionError<RuntimeError, RuntimeError, RuntimeError>,
+) -> RuntimeError {
+    RuntimeError::external("conversion execution", error)
 }
 
 struct ProXdrArtifactBuilder<'a> {
@@ -263,125 +276,400 @@ struct ProXdrArtifactBuilder<'a> {
 
 impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
     type Artifact = Vec<u8>;
+    type Error = RuntimeError;
 
-    fn build(
-        &mut self,
-        plan: &ConversionPlan,
-        _stage: ExecutionStage,
-    ) -> std::result::Result<Self::Artifact, ExecutionError> {
-        if plan.request.oppo_compatibility == OppoCompatibility::Enabled {
-            return Err(ExecutionError::unsupported(
-                "Rust runtime does not yet write OPPO-compatible output",
-            ));
-        }
-        if plan.input_processing_branch != InputProcessingBranch::Hybrid {
-            return Err(ExecutionError::unsupported(
-                "initial Rust runtime slice only implements the canonical hybrid processing branch",
-            ));
-        }
-        let gain_map = reconstruct_gain_map(
-            GainMapRaster::Rgb8 {
-                width: self.prepared.extracted.width,
-                height: self.prepared.extracted.height,
-                rgb: self.prepared.extracted.gain_map_rgb.clone(),
-            },
-            self.prepared.scale,
-        )
-        .map_err(|error| ExecutionError::build(error.to_string()))?;
-        let encoded = self
+    fn build_artifact(&mut self, plan: &ConversionPlan) -> Result<Self::Artifact> {
+        self.validate_supported_plan(plan)?;
+
+        let decoded = self
             .jpeg
-            .encode_gain_map(&GainMapTileEncodeRequest {
-                raster: Raster8 {
-                    width: gain_map.width,
-                    height: gain_map.height,
-                    channels: 3,
-                    bytes: gain_map.rgb,
+            .decode_raster(&JpegRasterDecodeRequest {
+                data: self.prepared.extracted.mask_jpeg_data.clone(),
+                format: match self.prepared.analysis.gain_map.channels {
+                    GainMapChannels::Mono => RasterPixelFormat::Mono8,
+                    GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
                 },
-                profile: plan.output_profile,
             })
-            .map_err(|error| ExecutionError::build(error.to_string()))?;
-        let base = self
+            .map_err(|error| RuntimeError::external("private Gain Map JPEG decode", error))?;
+        let raster = self.normalized_gain_map_raster(decoded, plan)?;
+        let encoded = self
             .heif
-            .encode_primary_heif(self.source)
-            .map_err(|error| ExecutionError::build(error.to_string()))?;
-        let tmap = match plan.output_tmap_format {
-            TmapFormat::AppleImageIoNative => make_apple_tmap_payload(&self.prepared.scale),
-            TmapFormat::StrictIso => make_strict_tmap_payload(&self.prepared.scale),
+            .encode_gain_map_tiles(&GainMapTileEncodeRequest::reference_compatible(
+                raster,
+                plan.gain_map_target,
+            ))
+            .map_err(|error| RuntimeError::external("HEVC Gain Map encode", error))?;
+
+        let info_floats = match self.prepared.extracted.mode {
+            ContainerExtractionMode::Uhdr => self.prepared.extracted.meta_floats.clone(),
+            ContainerExtractionMode::Lhdr => {
+                make_private_gain_map_info_floats(&self.prepared.scale).to_vec()
+            }
         };
-        let xmp = make_hdrgm_xmp(&self.prepared.scale);
-        let output = assemble_iso_gain_map_heif(&IsoGainMapAssembly {
-            primary_heif: base,
-            gain_map: DirectHevcGainMap {
-                width: encoded.width,
-                height: encoded.height,
-                rows: encoded.rows,
-                columns: encoded.columns,
-                channels: match encoded.channels {
+        let imageio_tmap = make_apple_tmap_payload(&info_floats)
+            .map_err(|error| RuntimeError::external("ISO Gain Map tmap", error))?;
+        let tmap_payload = match plan.tmap_format {
+            TmapFormat::ImageIo => imageio_tmap,
+            TmapFormat::Strict => make_strict_tmap_payload(&imageio_tmap)
+                .map_err(|error| RuntimeError::external("strict ISO Gain Map tmap", error))?,
+        };
+        let xmp_payload = make_hdrgm_xmp(&info_floats)
+            .map_err(|error| RuntimeError::external("ISO Gain Map XMP", error))?;
+
+        let body = standard_heif_body(
+            self.source,
+            self.prepared.extracted.manifest_info.extension_start,
+        )?;
+        let tiles = encoded
+            .tiles
+            .iter()
+            .map(|tile| GainMapTile {
+                payload: &tile.payload,
+                width: tile.width,
+                height: tile.height,
+            })
+            .collect::<Vec<_>>();
+        let gain_map = DirectHevcGainMap {
+            gain_map_width: encoded.gain_map_width,
+            gain_map_height: encoded.gain_map_height,
+            tile_width: encoded.tile_width,
+            tile_height: encoded.tile_height,
+            tiles: &tiles,
+            hvcc: &encoded.hvcc,
+            profile: HeifGainMapEncodeProfile {
+                channels: match encoded.profile.channels {
                     GainMapChannels::Mono => HeifGainMapChannels::Mono,
                     GainMapChannels::Rgb => HeifGainMapChannels::Rgb,
                 },
-                profile: HeifGainMapEncodeProfile {
-                    chroma: encoded.layout.chroma,
-                    luma_bit_depth: encoded.layout.luma_bit_depth,
-                    chroma_bit_depth: encoded.layout.chroma_bit_depth,
-                },
-                tiles: encoded
-                    .tiles
-                    .iter()
-                    .map(|tile| GainMapTile {
-                        width: tile.width,
-                        height: tile.height,
-                        hevc: tile.hevc.clone(),
-                        decoder_config: tile.decoder_config.clone(),
-                    })
-                    .collect(),
+                chroma: encoded.profile.layout.chroma,
+                luma_bit_depth: encoded.profile.layout.luma_bit_depth,
+                chroma_bit_depth: encoded.profile.layout.chroma_bit_depth,
             },
-            tmap_payload: tmap,
-            hdrgm_xmp: xmp,
-        })
-        .map_err(|error| ExecutionError::build(error.to_string()))?;
+        };
+        let mut output = assemble_iso_gain_map_heif(
+            body,
+            &IsoGainMapAssembly {
+                gain_map,
+                tmap_payload: &tmap_payload,
+                xmp_payload: &xmp_payload,
+            },
+        )
+        .map_err(|error| RuntimeError::external("native Rust HEIF assembly", error))?;
 
-        if let Some(tail) = self.prepared.extracted.oppo_tail.as_ref() {
-            if plan.request.source_tail_policy == xdremux_engine::SourceTailPolicy::CameraMetadata {
-                let filtered = pack_filtered_oppo_camera_tail(tail, is_oppo_private_hdr_tail_entry)
-                    .map_err(|error| ExecutionError::build(error.to_string()))?;
-                let mut result = output;
-                result.extend_from_slice(&filtered);
-                return Ok(result);
-            }
+        if plan.oppo_camera_tail == OppoCameraTail::PreserveWithoutPrivateHdr {
+            let tail = pack_filtered_oppo_camera_tail(
+                self.source,
+                &self.prepared.extracted.manifest_info,
+                self.prepared.extracted.data_base,
+                |entry| !is_oppo_private_hdr_tail_entry(&entry.name),
+            )
+            .map_err(|error| RuntimeError::external("OPPO camera tail", error))?;
+            output.extend_from_slice(&tail);
         }
         Ok(output)
     }
 }
 
-struct IsoGainMapValidator;
+impl ProXdrArtifactBuilder<'_> {
+    fn validate_supported_plan(&self, plan: &ConversionPlan) -> Result<()> {
+        if plan.oppo_compatibility != OppoCompatibility::Off {
+            return Err(RuntimeError::new(
+                "portable runtime",
+                "OPPO-compatible output is not wired into the Rust runtime yet",
+            ));
+        }
+        if plan.effective_input_processing_branch != InputProcessingBranch::Hybrid {
+            return Err(RuntimeError::new(
+                "portable runtime",
+                "the first Rust runtime slice supports the canonical Hybrid path only",
+            ));
+        }
+        if !matches!(
+            plan.oppo_camera_tail,
+            OppoCameraTail::Off | OppoCameraTail::PreserveWithoutPrivateHdr
+        ) {
+            return Err(RuntimeError::new(
+                "portable runtime",
+                "requested OPPO camera-tail policy is not wired into the Rust runtime yet",
+            ));
+        }
+        Ok(())
+    }
 
-impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator {
-    fn validate(
-        &mut self,
-        artifact: &Vec<u8>,
-        _plan: &ConversionPlan,
-        _stage: ExecutionStage,
-    ) -> std::result::Result<(), ExecutionError> {
-        validate_gain_map_structure(artifact)
-            .map(|_| ())
-            .map_err(|error| ExecutionError::validate(error.to_string()))
+    fn normalized_gain_map_raster(
+        &self,
+        decoded: Raster8,
+        plan: &ConversionPlan,
+    ) -> Result<Raster8> {
+        let normalized = match self.prepared.extracted.mode {
+            ContainerExtractionMode::Uhdr => decoded,
+            ContainerExtractionMode::Lhdr => {
+                if decoded.format != RasterPixelFormat::Mono8 {
+                    return Err(RuntimeError::new(
+                        "LHDR reconstruction",
+                        "LHDR private mask did not decode as monochrome",
+                    ));
+                }
+                let mask = GainMapRaster {
+                    width: usize::try_from(decoded.width).map_err(|_| {
+                        RuntimeError::new("LHDR reconstruction", "width exceeds usize")
+                    })?,
+                    height: usize::try_from(decoded.height).map_err(|_| {
+                        RuntimeError::new("LHDR reconstruction", "height exceeds usize")
+                    })?,
+                    bytes_per_row: decoded.bytes_per_row,
+                    channel_count: 1,
+                    data: decoded.data,
+                };
+                let (gain_map, _) = reconstruct_gain_map(
+                    &mask,
+                    hdr_family(plan.effective_family),
+                    &self.prepared.scale,
+                    &self.prepared.extracted.meta_floats,
+                )
+                .map_err(|error| RuntimeError::external("LHDR Gain Map reconstruction", error))?;
+                Raster8::new(
+                    u32::try_from(gain_map.width).map_err(|_| {
+                        RuntimeError::new("LHDR reconstruction", "width exceeds u32")
+                    })?,
+                    u32::try_from(gain_map.height).map_err(|_| {
+                        RuntimeError::new("LHDR reconstruction", "height exceeds u32")
+                    })?,
+                    gain_map.bytes_per_row,
+                    RasterPixelFormat::Mono8,
+                    gain_map.data,
+                )
+                .map_err(|error| RuntimeError::external("LHDR normalized raster", error))?
+            }
+        };
+        conform_raster_channels(normalized, plan.gain_map_target.channels)
     }
 }
 
-#[derive(Default)]
-struct MemoryPublisher {
-    output: Option<Vec<u8>>,
+fn conform_raster_channels(raster: Raster8, target: GainMapChannels) -> Result<Raster8> {
+    match (raster.format, target) {
+        (RasterPixelFormat::Mono8, GainMapChannels::Mono)
+        | (RasterPixelFormat::Rgb8, GainMapChannels::Rgb) => Ok(raster),
+        (RasterPixelFormat::Mono8, GainMapChannels::Rgb) => replicate_mono_to_rgb(raster),
+        (RasterPixelFormat::Rgb8, GainMapChannels::Mono) => Err(RuntimeError::new(
+            "Gain Map channel conformance",
+            "refusing to collapse an RGB Gain Map into monochrome",
+        )),
+    }
 }
 
+fn replicate_mono_to_rgb(raster: Raster8) -> Result<Raster8> {
+    raster
+        .validate()
+        .map_err(|error| RuntimeError::external("Gain Map channel conformance", error))?;
+    if raster.format != RasterPixelFormat::Mono8 {
+        return Err(RuntimeError::new(
+            "Gain Map channel conformance",
+            "replication requires a monochrome raster",
+        ));
+    }
+    let width = usize::try_from(raster.width)
+        .map_err(|_| RuntimeError::new("Gain Map channel conformance", "width exceeds usize"))?;
+    let height = usize::try_from(raster.height)
+        .map_err(|_| RuntimeError::new("Gain Map channel conformance", "height exceeds usize"))?;
+    let row_bytes = width.checked_mul(3).ok_or_else(|| {
+        RuntimeError::new("Gain Map channel conformance", "RGB row size overflows")
+    })?;
+    let mut data = vec![
+        0_u8;
+        row_bytes.checked_mul(height).ok_or_else(|| {
+            RuntimeError::new("Gain Map channel conformance", "RGB raster size overflows")
+        })?
+    ];
+    for y in 0..height {
+        let source_row = y.checked_mul(raster.bytes_per_row).ok_or_else(|| {
+            RuntimeError::new("Gain Map channel conformance", "source row overflows")
+        })?;
+        let output_row = y.checked_mul(row_bytes).ok_or_else(|| {
+            RuntimeError::new("Gain Map channel conformance", "output row overflows")
+        })?;
+        for x in 0..width {
+            let value = raster.data[source_row + x];
+            let output = output_row + x * 3;
+            data[output] = value;
+            data[output + 1] = value;
+            data[output + 2] = value;
+        }
+    }
+    Raster8::new(
+        raster.width,
+        raster.height,
+        row_bytes,
+        RasterPixelFormat::Rgb8,
+        data,
+    )
+    .map_err(|error| RuntimeError::external("Gain Map channel conformance", error))
+}
+
+fn standard_heif_body(source: &[u8], extension_start: usize) -> Result<&[u8]> {
+    if extension_start == 0 || extension_start > source.len() {
+        return Err(RuntimeError::new(
+            "source HEIF boundary",
+            format!(
+                "parsed extension start {extension_start} is outside input length {}",
+                source.len()
+            ),
+        ));
+    }
+    source.get(..extension_start).ok_or_else(|| {
+        RuntimeError::new(
+            "source HEIF boundary",
+            "parsed extension boundary could not be sliced from input",
+        )
+    })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct IsoGainMapValidator;
+
+impl ArtifactValidator<Vec<u8>> for IsoGainMapValidator {
+    type Error = RuntimeError;
+
+    fn validate_artifact(&mut self, _plan: &ConversionPlan, artifact: &Vec<u8>) -> Result<()> {
+        validate_gain_map_structure(artifact)
+            .map(|_| ())
+            .map_err(|error| RuntimeError::external("ISO Gain Map validation", error))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MemoryPublisher;
+
 impl ArtifactPublisher<Vec<u8>> for MemoryPublisher {
-    fn publish(
-        &mut self,
-        artifact: Vec<u8>,
-        _plan: &ConversionPlan,
-        _stage: ExecutionStage,
-    ) -> std::result::Result<(), ExecutionError> {
-        self.output = Some(artifact);
-        Ok(())
+    type Output = Vec<u8>;
+    type Error = RuntimeError;
+
+    fn publish_artifact(&mut self, _plan: &ConversionPlan, artifact: Vec<u8>) -> Result<Vec<u8>> {
+        Ok(artifact)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AtomicFilePublisher {
+    output: PathBuf,
+}
+
+impl AtomicFilePublisher {
+    pub fn new(output: PathBuf) -> Self {
+        Self { output }
+    }
+}
+
+fn publication_parent(output: &Path) -> &Path {
+    match output.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    }
+}
+
+impl ArtifactPublisher<Vec<u8>> for AtomicFilePublisher {
+    type Output = PathBuf;
+    type Error = RuntimeError;
+
+    fn publish_artifact(&mut self, _plan: &ConversionPlan, artifact: Vec<u8>) -> Result<PathBuf> {
+        let parent = publication_parent(&self.output);
+        if !parent.is_dir() {
+            return Err(RuntimeError::new(
+                "atomic publication",
+                format!("output parent is not a directory: {}", parent.display()),
+            ));
+        }
+        let mut file = AtomicWriteFile::open(&self.output)
+            .map_err(|error| RuntimeError::external("atomic publication open", error))?;
+        file.write_all(&artifact)
+            .map_err(|error| RuntimeError::external("atomic publication write", error))?;
+        file.sync_all()
+            .map_err(|error| RuntimeError::external("atomic publication sync", error))?;
+        file.commit()
+            .map_err(|error| RuntimeError::external("atomic publication commit", error))?;
+        Ok(self.output.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use xdremux_format::isobmff::{make_box, MDAT};
+    use xdremux_format::FourCC;
+
+    #[test]
+    fn standard_heif_body_drops_post_mdat_vendor_tail() {
+        let mut source = make_box(FourCC::new(*b"ftyp"), b"heic").unwrap();
+        source.extend_from_slice(&make_box(MDAT, b"base").unwrap());
+        let body_len = source.len();
+        source.extend_from_slice(b"vendor-tail");
+        assert_eq!(
+            standard_heif_body(&source, body_len).unwrap().len(),
+            body_len
+        );
+    }
+
+    #[test]
+    fn mono_replication_preserves_logical_pixels_not_padding() {
+        let raster = Raster8::new(
+            2,
+            2,
+            4,
+            RasterPixelFormat::Mono8,
+            vec![1, 2, 99, 99, 3, 4, 88, 88],
+        )
+        .unwrap();
+        let rgb = replicate_mono_to_rgb(raster).unwrap();
+        assert_eq!(rgb.bytes_per_row, 6);
+        assert_eq!(rgb.data, vec![1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]);
+    }
+
+    #[test]
+    fn relative_publication_uses_current_directory_parent() {
+        assert_eq!(publication_parent(Path::new("output.heic")), Path::new("."));
+        assert_eq!(
+            publication_parent(Path::new("artifacts/output.heic")),
+            Path::new("artifacts")
+        );
+    }
+
+    #[test]
+    fn atomic_publisher_replaces_destination_only_on_commit() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "xdremux-runtime-{}-{unique}.heic",
+            std::process::id()
+        ));
+        fs::write(&path, b"old").unwrap();
+        let mut publisher = AtomicFilePublisher::new(path.clone());
+        let plan = ConversionPlan {
+            effective_family: SourceFamily::X7,
+            requested_input_processing_branch: InputProcessingBranch::Hybrid,
+            effective_input_processing_branch: InputProcessingBranch::Hybrid,
+            base_strategy: xdremux_engine::BaseStrategy::PreserveCompressed,
+            gain_map_target: xdremux_engine::GainMapEncodeProfile {
+                width: 1,
+                height: 1,
+                channels: GainMapChannels::Mono,
+                layout: xdremux_engine::GainMapCodecLayout {
+                    chroma: xdremux_format::ChromaSampling::Mono400,
+                    luma_bit_depth: 8,
+                    chroma_bit_depth: 8,
+                },
+            },
+            container_writer: xdremux_engine::ContainerWriter::Rust,
+            oppo_compatibility: OppoCompatibility::Off,
+            oppo_camera_tail: OppoCameraTail::Off,
+            tmap_format: TmapFormat::ImageIo,
+            required_capabilities: Vec::new(),
+        };
+        publisher.publish_artifact(&plan, b"new".to_vec()).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"new");
+        fs::remove_file(path).unwrap();
     }
 }

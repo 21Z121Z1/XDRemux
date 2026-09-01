@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod categorize;
+mod validate;
 
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
@@ -39,6 +40,8 @@ enum RootCommand {
     Batch(BatchArgs),
     /// Classify photo assets and publish them into deterministic folders.
     Categorize(categorize::CategorizeArgs),
+    /// Validate one canonical output without converting it.
+    Validate(validate::ValidateArgs),
 }
 
 #[derive(Debug, Args)]
@@ -555,6 +558,9 @@ where
         Ok(Cli {
             command: RootCommand::Categorize(arguments),
         }) => categorize::run(arguments, stdout, stderr),
+        Ok(Cli {
+            command: RootCommand::Validate(arguments),
+        }) => validate::run(arguments, stdout, stderr),
         Err(error) => write_clap_error(error, stdout, stderr),
     }
 }
