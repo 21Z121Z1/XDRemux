@@ -12,6 +12,7 @@ xdremux-format = { path = "../xdremux-format" }
 xdremux-hdr = { path = "../xdremux-hdr" }
 xdremux-heif = { path = "../xdremux-heif" }
 xdremux-metadata = { path = "../xdremux-metadata" }
+xdremux-motion-photo = { path = "../xdremux-motion-photo" }
 
 [dev-dependencies]
 jpeg-encoder = "=0.7.1"
