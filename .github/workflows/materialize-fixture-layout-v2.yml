@@ -1,0 +1,130 @@
+name: Materialize vendor-organized fixture layout v2
+
+on:
+  push:
+    branches: [feat/rust-cli-unification]
+    paths:
+      - .github/workflows/materialize-fixture-layout-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Migrate fixture corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          mapping = {
+              "IMG20250502131605.jpg": "motion-photo/oppo/coloros15-ultrahdr-01.jpg",
+              "IMG20250502131608.jpg": "motion-photo/oppo/coloros15-ultrahdr-02.jpg",
+              "IMG20250819170327.jpg": "motion-photo/oppo/coloros15-ultrahdr-03.jpg",
+              "IMG20260710191114_ColorOS_16.jpg": "motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg",
+              "IMG20260801190843_ColorOS_16.jpg": "motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg",
+              "MVIMG_20260419_151324_2_3..jpg": "motion-photo/xiaomi/android-v1-ultrahdr-01.jpg",
+              "R002_20260312_135609..heic": "motion-photo/samsung/heif-ultrahdr-01-duplicate-r002.heic",
+              "R003_20260312_135610..heic": "motion-photo/samsung/heif-ultrahdr-02-duplicate-r003.heic",
+              "20260312_135625..jpg": "motion-photo/samsung/jpeg-ultrahdr-01.jpg",
+              "20260312_135627..jpg": "motion-photo/samsung/jpeg-ultrahdr-02.jpg",
+              "20260312_135609..heic": "motion-photo/samsung/heif-ultrahdr-01.heic",
+              "20260312_135610..heic": "motion-photo/samsung/heif-ultrahdr-02.heic",
+              "IMG_20260620_160335..jpg": "motion-photo/vivo/android-v1-sdr-01.jpg",
+              "IMG_20260620_160410..jpg": "motion-photo/vivo/android-v1-sdr-02.jpg",
+          }
+          ordered = sorted(mapping.items(), key=lambda pair: len(pair[0]), reverse=True)
+          root = Path("fixtures")
+          for old, new in mapping.items():
+              src, dst = root / old, root / new
+              if not src.is_file():
+                  raise SystemExit(f"missing fixture before migration: {src}")
+              dst.parent.mkdir(parents=True, exist_ok=True)
+              subprocess.run(["git", "mv", str(src), str(dst)], check=True)
+
+          binary_suffixes = {".jpg", ".jpeg", ".heic", ".heif", ".mov", ".mp4", ".png", ".zip"}
+          for raw in subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0"):
+              if not raw:
+                  continue
+              path = Path(raw.decode())
+              if not path.is_file() or path.suffix.lower() in binary_suffixes:
+                  continue
+              try:
+                  text = path.read_text()
+              except UnicodeDecodeError:
+                  continue
+              updated = text
+              for old, new in ordered:
+                  updated = updated.replace(old, new)
+              if updated != text:
+                  path.write_text(updated)
+
+          py = Path("Tests/validation/verify_python_motion_photo_fixtures.py")
+          text = py.read_text()
+          old = '''    for path in root.rglob("*"):\n        if path.is_file() and path.name in expected:\n            if path.name in found and path.resolve() != found[path.name].resolve():\n                raise RuntimeError(f"duplicate fixture filename: {path.name}")\n            found[path.name] = path\n'''
+          new = '''    for path in root.rglob("*"):\n        if not path.is_file():\n            continue\n        relative = path.relative_to(root).as_posix()\n        if relative in expected:\n            if relative in found and path.resolve() != found[relative].resolve():\n                raise RuntimeError(f"duplicate fixture path: {relative}")\n            found[relative] = path\n'''
+          if old not in text:
+              raise SystemExit("Python fixture index contract changed")
+          py.write_text(text.replace(old, new))
+
+          bundle = Path("scripts/build_live_photo_device_validation.sh")
+          text = bundle.read_text()
+          old = '''  stem="${filename%.*}"\n  # The supplied Samsung fixture names contain a deliberate extra dot before the extension. Keep\n  # the source filename untouched while using a filesystem-friendly output stem.\n  output_stem="${stem%.}"\n'''
+          new = '''  basename="${filename##*/}"\n  stem="${basename%.*}"\n  output_stem="${stem%.}"\n'''
+          if old not in text:
+              raise SystemExit("device-validation output stem contract changed")
+          bundle.write_text(text.replace(old, new))
+          PY
+          cargo fmt --all
+          git diff --check
+          test -z "$(find fixtures -maxdepth 1 -type f \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.heic' -o -name '*.heif' \) -print -quit)"
+      - name: Verify byte identities and migrated paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd fixtures && sha256sum -c SHA256SUMS)
+          python3 - <<'PY'
+          from pathlib import Path
+          expected = {
+              "fixtures/motion-photo/oppo/coloros15-ultrahdr-01.jpg",
+              "fixtures/motion-photo/oppo/coloros15-ultrahdr-02.jpg",
+              "fixtures/motion-photo/oppo/coloros15-ultrahdr-03.jpg",
+              "fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg",
+              "fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg",
+              "fixtures/motion-photo/xiaomi/android-v1-ultrahdr-01.jpg",
+              "fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg",
+              "fixtures/motion-photo/samsung/jpeg-ultrahdr-02.jpg",
+              "fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+              "fixtures/motion-photo/samsung/heif-ultrahdr-01-duplicate-r002.heic",
+              "fixtures/motion-photo/samsung/heif-ultrahdr-02.heic",
+              "fixtures/motion-photo/samsung/heif-ultrahdr-02-duplicate-r003.heic",
+              "fixtures/motion-photo/vivo/android-v1-sdr-01.jpg",
+              "fixtures/motion-photo/vivo/android-v1-sdr-02.jpg",
+          }
+          actual = {p.as_posix() for p in Path("fixtures/motion-photo").rglob("*") if p.is_file()}
+          if actual != expected:
+              raise SystemExit(f"fixture layout mismatch: missing={sorted(expected-actual)} extra={sorted(actual-expected)}")
+          PY
+      - name: Commit migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/materialize-fixture-layout.yml .github/workflows/materialize-fixture-layout-v2.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(fixtures): organize media corpus by vendor"
+          git push origin HEAD:feat/rust-cli-unification
