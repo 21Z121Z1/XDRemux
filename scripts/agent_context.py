@@ -120,9 +120,20 @@ def capability_by_id(identifier: str) -> dict[str, Any]:
     raise KeyError(f"unknown capability {identifier!r}; known capabilities: {known}")
 
 
+def routed_capability(identifier: str) -> dict[str, Any]:
+    data = load_map()
+    capability = capability_by_id(identifier).copy()
+    context = data["path_context"]
+    capability["rust_owner_branch"] = context["rust_owner_branch"]
+    capability["reference_owner_branch"] = capability.get(
+        "reference_owner_branch", context["released_reference_branch"]
+    )
+    return capability
+
+
 def emit_capability(args: argparse.Namespace) -> None:
     try:
-        capability = capability_by_id(args.identifier)
+        capability = routed_capability(args.identifier)
     except KeyError as error:
         raise SystemExit(str(error)) from error
 
@@ -136,8 +147,10 @@ def emit_capability(args: argparse.Namespace) -> None:
         layer = f"{layer} (+ {capability['secondary_layer']})"
     print(f"layer: {layer}")
     print(f"summary: {capability['summary']}")
-    print("Rust owner: " + (", ".join(capability["rust_owner"]) or "not promoted"))
-    print("reference owner: " + (", ".join(capability["reference_owner"]) or "none"))
+    rust_owner = ", ".join(capability["rust_owner"]) or "not promoted"
+    print(f"Rust owner [{capability['rust_owner_branch']}]: {rust_owner}")
+    reference_owner = ", ".join(capability["reference_owner"]) or "none"
+    print(f"reference owner [{capability['reference_owner_branch']}]: {reference_owner}")
     print("evidence: " + "; ".join(capability["evidence"]))
 
 
