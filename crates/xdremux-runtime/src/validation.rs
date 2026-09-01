@@ -40,7 +40,7 @@ pub struct LivePhotoValidationReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(tag = "kind", rename_all = "kebab-case")]
+#[serde(tag = "kind", content = "value", rename_all = "kebab-case")]
 pub enum ValidationReport {
     IsoHdrHeif(IsoHdrValidationReport),
     LivePhoto(LivePhotoValidationReport),
