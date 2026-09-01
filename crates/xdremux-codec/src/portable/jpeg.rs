@@ -1,8 +1,6 @@
-use zune_jpeg::zune_core::{
-    bytestream::ZCursor, colorspace::ColorSpace, options::DecoderOptions,
-};
-use zune_jpeg::JpegDecoder;
 use xdremux_engine::{GainMapCodec, RasterDecoder, RasterDecoderCapabilities};
+use zune_jpeg::zune_core::{bytestream::ZCursor, colorspace::ColorSpace, options::DecoderOptions};
+use zune_jpeg::JpegDecoder;
 
 use crate::{CodecError, JpegRasterDecodeRequest, Raster8, RasterPixelFormat, Result};
 
@@ -26,20 +24,18 @@ impl ZuneJpegProvider {
         let options = DecoderOptions::default()
             .set_strict_mode(true)
             .jpeg_set_out_colorspace(output_colorspace);
-        let mut decoder = JpegDecoder::new_with_options(
-            ZCursor::new(request.data.as_slice()),
-            options,
-        );
+        let mut decoder =
+            JpegDecoder::new_with_options(ZCursor::new(request.data.as_slice()), options);
         let data = decoder
             .decode()
             .map_err(|error| CodecError::invalid(format!("JPEG decode failed: {error}")))?;
         let (width, height) = decoder
             .dimensions()
             .ok_or_else(|| CodecError::invalid("JPEG decoder returned no dimensions"))?;
-        let width = u32::try_from(width)
-            .map_err(|_| CodecError::invalid("JPEG width exceeds u32"))?;
-        let height = u32::try_from(height)
-            .map_err(|_| CodecError::invalid("JPEG height exceeds u32"))?;
+        let width =
+            u32::try_from(width).map_err(|_| CodecError::invalid("JPEG width exceeds u32"))?;
+        let height =
+            u32::try_from(height).map_err(|_| CodecError::invalid("JPEG height exceeds u32"))?;
         let bytes_per_row = usize::try_from(width)
             .ok()
             .and_then(|value| value.checked_mul(request.format.bytes_per_pixel()))
@@ -93,9 +89,7 @@ mod tests {
 
         let mut inventory = xdremux_engine::CapabilityInventory::default();
         inventory.advertise_raster_decoder(&provider);
-        assert!(inventory.supports(OperationCapability::RasterDecoder(
-            GainMapCodec::Jpeg
-        )));
+        assert!(inventory.supports(OperationCapability::RasterDecoder(GainMapCodec::Jpeg)));
     }
 
     #[test]
