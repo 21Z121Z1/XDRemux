@@ -1,0 +1,71 @@
+name: Wire Rust engine execution coordinator
+
+on:
+  push:
+    branches:
+      - feat/rust-cli-unification
+    paths:
+      - ".github/workflows/patch-engine-execution.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Wire execution module
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/xdremux-engine/src/lib.rs")
+          text = path.read_text()
+          old = "mod capabilities;\nmod source_profile;"
+          new = "mod capabilities;\nmod execution;\nmod source_profile;"
+          if old not in text:
+              raise SystemExit("engine module anchor not found")
+          text = text.replace(old, new, 1)
+
+          anchor = '''pub use capabilities::{
+              CapabilityInventory, ConsumerValidator, GainMapTileEncoder, OperationCapability,
+              PhotographicStylesAdapter, PlatformCapability, PortraitAdapter, RasterDecoder,
+              RasterDecoderCapabilities, RawProcessor,
+          };
+          '''
+          addition = anchor + '''pub use execution::{
+              execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
+              ExecutionReceipt, ExecutionStage,
+          };
+          '''
+          if anchor not in text:
+              raise SystemExit("engine export anchor not found")
+          text = text.replace(anchor, addition, 1)
+          path.write_text(text)
+          PY
+          cargo fmt --all
+      - name: Verify engine execution contract
+        run: |
+          cargo metadata --locked --format-version 1 > /dev/null
+          cargo fmt --all -- --check
+          cargo clippy --locked -p xdremux-engine --all-targets -- -D warnings
+          cargo test --locked -p xdremux-engine
+      - name: Commit source only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-engine/src/lib.rs
+          git diff --cached --check
+          git commit -m "feat(rust-engine): wire execution coordinator"
+          git push origin HEAD:feat/rust-cli-unification
