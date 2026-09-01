@@ -1,0 +1,243 @@
+name: Native HEIF structural cleanup
+
+on:
+  push:
+    branches:
+      - feat/rust-cli-unification
+    paths:
+      - ".github/workflows/native-heif-clippy-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Refactor assembly layout plumbing
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/xdremux-heif/src/native.rs")
+          text = path.read_text()
+
+          old = '''    for chunk in payload[8..].chunks_exact(4) {
+              let brand: [u8; 4] = chunk.try_into().expect("chunks_exact returns four bytes");
+              if !brands.contains(&brand) {
+                  brands.push(brand);
+              }
+          }
+          '''
+          new = '''    let (source_brands, remainder) = payload[8..].as_chunks::<4>();
+          debug_assert!(remainder.is_empty());
+          for brand in source_brands {
+              if !brands.contains(brand) {
+                  brands.push(*brand);
+              }
+          }
+          '''
+          if old not in text:
+              raise SystemExit("expected build_ftyp brand loop not found")
+          text = text.replace(old, new, 1)
+
+          start = text.index("fn build_placeholder_locations(")
+          end = text.index("\n#[allow(clippy::too_many_arguments)]\nfn build_final_locations", start)
+          replacement = '''#[derive(Debug, Clone, Copy)]
+          struct AssemblyItemIds<'a> {
+              tile_ids: &'a [u32],
+              gain_id: u32,
+              tmap_id: u32,
+              xmp_id: u32,
+          }
+
+          #[derive(Debug, Clone, Copy)]
+          struct AppendedIdatLayout {
+              gain_grid_offset: u64,
+              gain_grid_length: u64,
+              tmap_offset: u64,
+              tmap_length: u64,
+              xmp_offset: u64,
+              xmp_length: u64,
+          }
+
+          #[derive(Debug, Clone, Copy)]
+          struct MdatRelocation {
+              new_data_start: u64,
+              original_payload_len: usize,
+          }
+
+          fn build_placeholder_locations(
+              meta: &ParsedMeta,
+              ids: AssemblyItemIds<'_>,
+              layout: AppendedIdatLayout,
+              gain: &DirectHevcGainMap<'_>,
+          ) -> Result<Vec<IlocEntry>> {
+              let mut entries = meta
+                  .iloc
+                  .entries
+                  .iter()
+                  .map(|entry| normalized_existing_location(entry, true))
+                  .collect::<Result<Vec<_>>>()?;
+              for (tile_id, tile) in ids.tile_ids.iter().copied().zip(gain.tiles.iter().copied()) {
+                  entries.push(IlocEntry {
+                      item_id: tile_id,
+                      construction_method: 0,
+                      data_reference_index: 0,
+                      base_offset: 0,
+                      extents: vec![IlocExtent {
+                          index: None,
+                          offset: 0,
+                          length: u64::try_from(tile.payload.len())
+                              .map_err(|_| invalid("HEVC tile length exceeds u64"))?,
+                      }],
+                  });
+              }
+              for (item_id, offset, length) in [
+                  (ids.gain_id, layout.gain_grid_offset, layout.gain_grid_length),
+                  (ids.tmap_id, layout.tmap_offset, layout.tmap_length),
+                  (ids.xmp_id, layout.xmp_offset, layout.xmp_length),
+              ] {
+                  entries.push(IlocEntry {
+                      item_id,
+                      construction_method: 1,
+                      data_reference_index: 0,
+                      base_offset: 0,
+                      extents: vec![IlocExtent {
+                          index: None,
+                          offset,
+                          length,
+                      }],
+                  });
+              }
+              entries.sort_by_key(|entry| entry.item_id);
+              Ok(entries)
+          }
+          '''
+          text = text[:start] + replacement + text[end:]
+
+          marker = "\n#[allow(clippy::too_many_arguments)]\nfn build_final_locations("
+          start = text.index(marker)
+          start_fn = start + len("\n#[allow(clippy::too_many_arguments)]\n")
+          end = text.index("\n#[allow(clippy::too_many_arguments)]\nfn build_meta", start_fn)
+          block = text[start_fn:end]
+          sig_end = block.index(") -> Result<Vec<IlocEntry>> {") + len(") -> Result<Vec<IlocEntry>> {")
+          body = block[sig_end:]
+          body = body.replace("new_mdat_data_start", "relocation.new_data_start")
+          body = body.replace("original_mdat_payload_len", "relocation.original_payload_len")
+          body = body.replace("tile_ids", "ids.tile_ids")
+          body = body.replace("gain_id", "ids.gain_id")
+          body = body.replace("tmap_id", "ids.tmap_id")
+          body = body.replace("xmp_id", "ids.xmp_id")
+          body = body.replace("gain_grid_offset", "layout.gain_grid_offset")
+          body = body.replace("gain_grid_length", "layout.gain_grid_length")
+          body = body.replace("tmap_offset", "layout.tmap_offset")
+          body = body.replace("tmap_length", "layout.tmap_length")
+          body = body.replace("xmp_offset", "layout.xmp_offset")
+          body = body.replace("xmp_length", "layout.xmp_length")
+          new_block = '''fn build_final_locations(
+              source: &[u8],
+              meta: &ParsedMeta,
+              mdat: &BoxHeader,
+              relocation: MdatRelocation,
+              ids: AssemblyItemIds<'_>,
+              layout: AppendedIdatLayout,
+              gain: &DirectHevcGainMap<'_>,
+          ) -> Result<Vec<IlocEntry>> {''' + body
+          text = text[:start] + "\n" + new_block + text[end:]
+
+          old_call = '''    let placeholder_locations = build_placeholder_locations(
+              &meta,
+              &tile_ids,
+              gain_id,
+              tmap_id,
+              xmp_id,
+              gain_grid_offset,
+              gain_grid_length,
+              tmap_offset,
+              tmap_length,
+              xmp_offset,
+              xmp_length,
+              gain,
+          )?;
+          '''
+          new_call = '''    let ids = AssemblyItemIds {
+              tile_ids: &tile_ids,
+              gain_id,
+              tmap_id,
+              xmp_id,
+          };
+          let idat_layout = AppendedIdatLayout {
+              gain_grid_offset,
+              gain_grid_length,
+              tmap_offset,
+              tmap_length,
+              xmp_offset,
+              xmp_length,
+          };
+          let placeholder_locations = build_placeholder_locations(&meta, ids, idat_layout, gain)?;
+          '''
+          if old_call not in text:
+              raise SystemExit("expected placeholder call not found")
+          text = text.replace(old_call, new_call, 1)
+
+          old_call = '''    let final_locations = build_final_locations(
+              source,
+              &meta,
+              mdat,
+              new_mdat_data_start_u64,
+              original_mdat_payload.len(),
+              &tile_ids,
+              gain_id,
+              tmap_id,
+              xmp_id,
+              gain_grid_offset,
+              gain_grid_length,
+              tmap_offset,
+              tmap_length,
+              xmp_offset,
+              xmp_length,
+              gain,
+          )?;
+          '''
+          new_call = '''    let final_locations = build_final_locations(
+              source,
+              &meta,
+              mdat,
+              MdatRelocation {
+                  new_data_start: new_mdat_data_start_u64,
+                  original_payload_len: original_mdat_payload.len(),
+              },
+              ids,
+              idat_layout,
+              gain,
+          )?;
+          '''
+          if old_call not in text:
+              raise SystemExit("expected final location call not found")
+          text = text.replace(old_call, new_call, 1)
+
+          path.write_text(text)
+          PY
+          cargo fmt --all
+          cargo clippy -p xdremux-heif --all-targets -- -D warnings
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-heif/src/native.rs
+          git commit -m "refactor(rust-heif): structure native assembly layout"
+          git push origin HEAD:feat/rust-cli-unification
