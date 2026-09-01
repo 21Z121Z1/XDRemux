@@ -9,6 +9,8 @@ path = "src/main.rs"
 
 [dependencies]
 serde_json = "1"
+xdremux-engine = { path = "../xdremux-engine" }
+xdremux-runtime = { path = "../xdremux-runtime" }
 xdremux-source = { path = "../xdremux-source" }
 
 [lints]
