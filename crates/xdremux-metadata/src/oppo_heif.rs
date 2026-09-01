@@ -1,11 +1,11 @@
-use xdremux_format::exif::read_item_payload;
 use xdremux_format::isobmff::{
-    make_iloc_box, parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, EXIF, ILOC,
-    MDAT, META,
+    make_iloc_box, parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, EXIF, ILOC, MDAT,
+    META,
 };
+use xdremux_format::{exif_user_comment, heif_exif_tiff};
 
 use crate::oppo::{
-    adjusted_extent_for_oppo_user_comment_patch, adjusted_oppo_user_comment_in_heif,
+    adjusted_extent_for_oppo_user_comment_patch, adjusted_oppo_user_comment,
     apply_oppo_user_comment_patch, find_oppo_tag_flag, target_oppo_tag_flags, OppoCompatibility,
 };
 use crate::{MetadataError, Result};
@@ -102,32 +102,13 @@ fn rebuild_box_preserving_header(
 }
 
 fn current_oppo_tag_flags(data: &[u8]) -> Result<Option<u32>> {
-    let top = scan_top_level_boxes(data)?;
-    let Some(meta_header) = top.boxes.iter().find(|header| header.kind == META) else {
+    let Some(tiff) = heif_exif_tiff(data)? else {
         return Ok(None);
     };
-    let meta = parse_meta_box(data, meta_header)?;
-    let Some(exif_item) = meta
-        .iinf
-        .entries
-        .iter()
-        .find(|item| item.item_type == Some(EXIF))
-    else {
+    let Some(comment) = exif_user_comment(&tiff)? else {
         return Ok(None);
     };
-    let exif_entry = meta
-        .iloc
-        .entries
-        .iter()
-        .find(|entry| entry.item_id == exif_item.item_id)
-        .ok_or_else(|| {
-            MetadataError::invalid(
-                "OPPO UserComment",
-                format!("Exif item {} has no iloc entry", exif_item.item_id),
-            )
-        })?;
-    let payload = read_item_payload(data, exif_entry, meta.idat.as_ref())?;
-    Ok(find_oppo_tag_flag(&payload).map(|tag| tag.value))
+    Ok(find_oppo_tag_flag(&comment).map(|tag| tag.value))
 }
 
 /// Read the current OPPO routing flags from the source HEIF Exif item.
@@ -153,7 +134,11 @@ pub fn patch_oppo_user_comment_in_heif(
     if expected_flags == source_flags {
         return Ok(data.to_vec());
     }
-    let patched_comment = adjusted_oppo_user_comment_in_heif(data, compatibility)?
+    let tiff = heif_exif_tiff(data)?
+        .ok_or_else(|| MetadataError::invalid("OPPO UserComment", "Exif TIFF is missing"))?;
+    let comment = exif_user_comment(&tiff)?
+        .ok_or_else(|| MetadataError::invalid("OPPO UserComment", "UserComment is missing"))?;
+    let patched_comment = adjusted_oppo_user_comment(&comment, compatibility)?
         .ok_or_else(|| MetadataError::invalid("OPPO UserComment", "routing patch disappeared"))?;
 
     let top = scan_top_level_boxes(data)?;
@@ -208,11 +193,7 @@ pub fn patch_oppo_user_comment_in_heif(
                 .checked_add(extent.offset)
                 .ok_or_else(|| MetadataError::overflow("OPPO iloc extent offset"))?;
             let Some((adjusted_absolute, adjusted_length)) =
-                adjusted_extent_for_oppo_user_comment_patch(
-                    absolute,
-                    extent.length,
-                    Some(patch),
-                )?
+                adjusted_extent_for_oppo_user_comment_patch(absolute, extent.length, Some(patch))?
             else {
                 return Err(MetadataError::invalid(
                     "OPPO UserComment",
@@ -326,9 +307,7 @@ pub fn patch_oppo_user_comment_in_heif(
     if actual_flags != Some(expected_flags) {
         return Err(MetadataError::invalid(
             "OPPO UserComment",
-            format!(
-                "post-write routing flags are {actual_flags:?}, expected {expected_flags}"
-            ),
+            format!("post-write routing flags are {actual_flags:?}, expected {expected_flags}"),
         ));
     }
     Ok(output)

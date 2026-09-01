@@ -126,10 +126,7 @@ fn source_tail_tag(source: &[u8]) -> [u8; 4] {
 /// This is the canonical implementation of the product's `preserve` policy:
 /// unknown vendor manifest fields and byte representation are retained rather
 /// than normalized through a decode/re-encode cycle.
-pub fn complete_oppo_camera_tail(
-    source: &[u8],
-    manifest_info: &ManifestInfo,
-) -> Result<Vec<u8>> {
+pub fn complete_oppo_camera_tail(source: &[u8], manifest_info: &ManifestInfo) -> Result<Vec<u8>> {
     source
         .get(manifest_info.extension_start..)
         .map(ToOwned::to_owned)
@@ -178,7 +175,11 @@ where
         ));
     }
 
-    for entry in manifest_info.entries.iter().filter(|entry| neutralize(entry)) {
+    for entry in manifest_info
+        .entries
+        .iter()
+        .filter(|entry| neutralize(entry))
+    {
         let quoted = format!("\"{}\"", entry.name).into_bytes();
         let start = find_subslice(&tail, &quoted, json_start..json_end).ok_or_else(|| {
             ContainerError::invalid(
@@ -189,9 +190,9 @@ where
         let first_name_byte = start
             .checked_add(1)
             .ok_or_else(|| ContainerError::invalid("OPPO tail", "entry name offset overflows"))?;
-        let byte = tail.get_mut(first_name_byte).ok_or_else(|| {
-            ContainerError::invalid("OPPO tail", "entry name token is truncated")
-        })?;
+        let byte = tail
+            .get_mut(first_name_byte)
+            .ok_or_else(|| ContainerError::invalid("OPPO tail", "entry name token is truncated"))?;
         *byte = b'x';
     }
     Ok(tail)
@@ -352,7 +353,10 @@ mod tests {
     #[test]
     fn preserve_returns_exact_post_extension_bytes() {
         let (source, info) = synthetic_source();
-        assert_eq!(complete_oppo_camera_tail(&source, &info).unwrap(), source[4..]);
+        assert_eq!(
+            complete_oppo_camera_tail(&source, &info).unwrap(),
+            source[4..]
+        );
     }
 
     #[test]

@@ -31,9 +31,8 @@ pub(crate) fn build_tail(
             filtered(&mut preserve)
         }
         OppoCameraTail::Compact => {
-            let mut preserve = |entry: &xdremux_container::ManifestEntry| {
-                is_oppo_compact_tail_entry(&entry.name)
-            };
+            let mut preserve =
+                |entry: &xdremux_container::ManifestEntry| is_oppo_compact_tail_entry(&entry.name);
             filtered(&mut preserve)
         }
         OppoCameraTail::Preserve => complete_oppo_camera_tail(source, &extracted.manifest_info)
@@ -63,17 +62,17 @@ pub(crate) fn build_tail(
             };
             filtered(&mut preserve)
         }
-        OppoCameraTail::PreserveNoUhdr => neutralize_oppo_camera_tail_entries(
-            source,
-            &extracted.manifest_info,
-            |entry| is_oppo_private_uhdr_tail_entry(&entry.name),
-        )
-        .map_err(|error| RuntimeError::external("OPPO camera tail", error)),
-        OppoCameraTail::PreserveNoHdr => neutralize_oppo_camera_tail_entries(
-            source,
-            &extracted.manifest_info,
-            |entry| is_oppo_private_hdr_tail_entry(&entry.name),
-        )
-        .map_err(|error| RuntimeError::external("OPPO camera tail", error)),
+        OppoCameraTail::PreserveNoUhdr => {
+            neutralize_oppo_camera_tail_entries(source, &extracted.manifest_info, |entry| {
+                is_oppo_private_uhdr_tail_entry(&entry.name)
+            })
+            .map_err(|error| RuntimeError::external("OPPO camera tail", error))
+        }
+        OppoCameraTail::PreserveNoHdr => {
+            neutralize_oppo_camera_tail_entries(source, &extracted.manifest_info, |entry| {
+                is_oppo_private_hdr_tail_entry(&entry.name)
+            })
+            .map_err(|error| RuntimeError::external("OPPO camera tail", error))
+        }
     }
 }

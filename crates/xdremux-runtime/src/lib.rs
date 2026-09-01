@@ -4,6 +4,8 @@ mod batch;
 mod batch_checkpoint;
 mod categorize;
 mod live_photo;
+mod oppo_compat;
+mod oppo_tail;
 mod validation;
 
 pub use batch::{
@@ -30,16 +32,13 @@ use xdremux_codec::{
     GainMapTileEncodeRequest, JpegRasterDecodeRequest, LibHeifProvider, Raster8, RasterPixelFormat,
     ZuneJpegProvider,
 };
-use xdremux_container::{
-    extract, is_oppo_private_hdr_tail_entry, pack_filtered_oppo_camera_tail, ExtractedLhdr,
-    ExtractionMode as ContainerExtractionMode,
-};
+use xdremux_container::{extract, ExtractedLhdr, ExtractionMode as ContainerExtractionMode};
 use xdremux_engine::{
     detect_source_family, execute_conversion, gain_map_source_profile_from_jpeg, ArtifactBuilder,
     ArtifactPublisher, ArtifactValidator, CapabilityInventory, ConversionAnalysis, ConversionPlan,
     ConversionRequest, ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder,
-    InputProcessingBranch, OperationCapability, OppoCameraTail, OppoCompatibility, RasterDecoder,
-    SourceFamily, SourceHdrMode, TmapFormat,
+    InputProcessingBranch, OperationCapability, OppoCompatibility, RasterDecoder, SourceFamily,
+    SourceHdrMode, TmapFormat,
 };
 use xdremux_format::probe_jpeg_frame_profile;
 use xdremux_hdr::{
@@ -320,6 +319,15 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
             self.source,
             self.prepared.extracted.manifest_info.extension_start,
         )?;
+        let patched_body = if plan.oppo_compatibility == OppoCompatibility::Off {
+            None
+        } else {
+            Some(oppo_compat::patch_source_metadata(
+                body,
+                plan.oppo_compatibility,
+            )?)
+        };
+        let assembly_body = patched_body.as_deref().unwrap_or(body);
         let tiles = encoded
             .tiles
             .iter()
@@ -347,7 +355,7 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
             },
         };
         let mut output = assemble_iso_gain_map_heif(
-            body,
+            assembly_body,
             &IsoGainMapAssembly {
                 gain_map,
                 tmap_payload: &tmap_payload,
@@ -356,41 +364,19 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
         )
         .map_err(|error| RuntimeError::external("native Rust HEIF assembly", error))?;
 
-        if plan.oppo_camera_tail == OppoCameraTail::PreserveWithoutPrivateHdr {
-            let tail = pack_filtered_oppo_camera_tail(
-                self.source,
-                &self.prepared.extracted.manifest_info,
-                self.prepared.extracted.data_base,
-                |entry| !is_oppo_private_hdr_tail_entry(&entry.name),
-            )
-            .map_err(|error| RuntimeError::external("OPPO camera tail", error))?;
-            output.extend_from_slice(&tail);
-        }
+        let tail =
+            oppo_tail::build_tail(self.source, &self.prepared.extracted, plan.oppo_camera_tail)?;
+        output.extend_from_slice(&tail);
         Ok(output)
     }
 }
 
 impl ProXdrArtifactBuilder<'_> {
     fn validate_supported_plan(&self, plan: &ConversionPlan) -> Result<()> {
-        if plan.oppo_compatibility != OppoCompatibility::Off {
-            return Err(RuntimeError::new(
-                "portable runtime",
-                "OPPO-compatible output is not wired into the Rust runtime yet",
-            ));
-        }
         if plan.effective_input_processing_branch != InputProcessingBranch::Hybrid {
             return Err(RuntimeError::new(
                 "portable runtime",
                 "the first Rust runtime slice supports the canonical Hybrid path only",
-            ));
-        }
-        if !matches!(
-            plan.oppo_camera_tail,
-            OppoCameraTail::Off | OppoCameraTail::PreserveWithoutPrivateHdr
-        ) {
-            return Err(RuntimeError::new(
-                "portable runtime",
-                "requested OPPO camera-tail policy is not wired into the Rust runtime yet",
             ));
         }
         Ok(())
@@ -664,7 +650,7 @@ mod tests {
             },
             container_writer: xdremux_engine::ContainerWriter::Rust,
             oppo_compatibility: OppoCompatibility::Off,
-            oppo_camera_tail: OppoCameraTail::Off,
+            oppo_camera_tail: xdremux_engine::OppoCameraTail::Off,
             tmap_format: TmapFormat::ImageIo,
             required_capabilities: Vec::new(),
         };
