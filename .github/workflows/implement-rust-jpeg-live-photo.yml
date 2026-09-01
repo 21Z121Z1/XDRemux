@@ -5,6 +5,7 @@ on:
     branches: [feat/rust-cli-unification]
     paths:
       - .github/workflows/implement-rust-jpeg-live-photo.yml
+      - scripts/materialize_jpeg_live_photo.py
 
 permissions:
   contents: write
