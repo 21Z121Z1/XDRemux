@@ -18,7 +18,9 @@ pub use execution::{
     execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
     ExecutionReceipt, ExecutionResult, ExecutionStage,
 };
-pub use product_policy::{resolve_product_gain_map_encode_profile, wants_oppo_compatibility};
+pub use product_policy::{
+    detect_source_family, resolve_product_gain_map_encode_profile, wants_oppo_compatibility,
+};
 pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,

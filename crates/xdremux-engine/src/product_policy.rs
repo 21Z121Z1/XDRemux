@@ -102,7 +102,10 @@ mod tests {
 
     #[test]
     fn source_family_policy_matches_current_product_boundary() {
-        assert_eq!(detect_source_family(SourceHdrMode::Uhdr, &[]), SourceFamily::X7);
+        assert_eq!(
+            detect_source_family(SourceHdrMode::Uhdr, &[]),
+            SourceFamily::X7
+        );
         assert_eq!(
             detect_source_family(SourceHdrMode::Lhdr, &[2.999]),
             SourceFamily::X6
