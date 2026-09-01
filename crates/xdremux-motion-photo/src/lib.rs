@@ -23,8 +23,8 @@ pub use live_photo_mov::{
     write_live_photo_movie, LivePhotoMovieError, LivePhotoMovieResult,
 };
 pub use live_photo_still::{
-    build_apple_makernote, read_apple_content_identifier, write_live_photo_heif_still,
-    write_live_photo_jpeg_metadata, LivePhotoStillError, LivePhotoStillResult,
+    build_apple_makernote, build_live_photo_jpeg_exif, read_apple_content_identifier,
+    write_live_photo_heif_still, LivePhotoStillError, LivePhotoStillResult,
 };
 pub use lpex::parse_first_lpex_object;
 pub use model::{
