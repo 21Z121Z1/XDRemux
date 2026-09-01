@@ -1,13 +1,15 @@
 #![forbid(unsafe_code)]
 
-use std::ffi::OsString;
+use std::collections::BTreeSet;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use clap::{error::ErrorKind, Args, CommandFactory, Parser, Subcommand};
+use serde_json::json;
 use xdremux_engine::ConversionRequest;
-use xdremux_runtime::PortableRuntime;
+use xdremux_runtime::{BatchAssetKind, BatchItem, PortableRuntime};
 use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
 
 #[derive(Debug, Parser)]
@@ -28,6 +30,8 @@ enum RootCommand {
     Inspect(InspectArgs),
     /// Convert one supported source with the unified Rust engine/runtime.
     Convert(ConvertArgs),
+    /// Convert a deterministic batch of supported assets.
+    Batch(BatchArgs),
 }
 
 #[derive(Debug, Args)]
@@ -48,6 +52,27 @@ struct ConvertArgs {
     /// Output HEIC; ProXDR defaults in-place, Motion Photo chooses a new pair.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+struct BatchArgs {
+    /// Explicit input file. Repeat to add multiple files.
+    #[arg(long = "input", value_name = "FILE")]
+    inputs: Vec<PathBuf>,
+    /// Discover HEIC/HEIF/JPEG inputs in a directory. Repeat to add multiple roots.
+    #[arg(long = "input-dir", value_name = "DIR")]
+    input_dirs: Vec<PathBuf>,
+    /// Recurse below each input directory. Symlinks are never followed.
+    #[arg(long)]
+    recursive: bool,
+    /// Place generated HEIC outputs in this directory.
+    ///
+    /// When omitted, each output is written beside its source with an .xdremux suffix.
+    #[arg(long, value_name = "DIR")]
+    output_dir: Option<PathBuf>,
+    /// Emit one machine-readable JSON receipt instead of human progress.
+    #[arg(long)]
+    json: bool,
 }
 
 fn write_clap_error(error: clap::Error, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
@@ -237,6 +262,280 @@ fn run_convert(
     0
 }
 
+fn is_hidden_batch_artifact(path: &Path) -> bool {
+    path.file_name()
+        .and_then(OsStr::to_str)
+        .is_some_and(|name| name.starts_with('.'))
+}
+
+fn is_supported_batch_candidate(path: &Path) -> bool {
+    path.extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "heic" | "heif" | "jpg" | "jpeg"
+            )
+        })
+}
+
+fn is_generated_batch_output(path: &Path) -> bool {
+    path.file_stem()
+        .and_then(OsStr::to_str)
+        .is_some_and(|stem| {
+            stem.ends_with(".xdremux")
+                || stem.rsplit_once(".xdremux (").is_some_and(|(_, suffix)| {
+                    suffix
+                        .strip_suffix(')')
+                        .is_some_and(|value| value.parse::<u32>().is_ok())
+                })
+        })
+}
+
+fn discover_directory(
+    root: &Path,
+    recursive: bool,
+    inputs: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        let entries = fs::read_dir(&directory).map_err(|error| {
+            format!(
+                "could not read input directory {}: {error}",
+                directory.display()
+            )
+        })?;
+        let mut entries = entries
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|error| {
+                format!(
+                    "could not enumerate input directory {}: {error}",
+                    directory.display()
+                )
+            })?;
+        entries.sort_by_key(|entry| entry.path());
+
+        for entry in entries {
+            let file_type = entry.file_type().map_err(|error| {
+                format!(
+                    "could not inspect directory entry {}: {error}",
+                    entry.path().display()
+                )
+            })?;
+            let path = entry.path();
+            if is_hidden_batch_artifact(&path) {
+                continue;
+            }
+            if file_type.is_file() {
+                if is_supported_batch_candidate(&path) && !is_generated_batch_output(&path) {
+                    inputs.push(path);
+                }
+            } else if recursive && file_type.is_dir() {
+                pending.push(path);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn discover_batch_inputs(arguments: &BatchArgs) -> Result<Vec<PathBuf>, String> {
+    if arguments.inputs.is_empty() && arguments.input_dirs.is_empty() {
+        return Err("batch requires at least one --input or --input-dir".to_owned());
+    }
+
+    let mut inputs = Vec::new();
+    for path in &arguments.inputs {
+        if !path.is_file() {
+            return Err(format!("input file not found: {}", path.display()));
+        }
+        inputs.push(path.clone());
+    }
+
+    for directory in &arguments.input_dirs {
+        if !directory.is_dir() {
+            return Err(format!(
+                "input directory not found: {}",
+                directory.display()
+            ));
+        }
+        discover_directory(directory, arguments.recursive, &mut inputs)?;
+    }
+
+    inputs.sort();
+    let mut seen = BTreeSet::new();
+    let mut unique = Vec::with_capacity(inputs.len());
+    for path in inputs {
+        let identity = fs::canonicalize(&path)
+            .map_err(|error| format!("could not resolve input {}: {error}", path.display()))?;
+        if seen.insert(identity) {
+            unique.push(path);
+        }
+    }
+    if unique.is_empty() {
+        return Err("batch discovery found no supported input files".to_owned());
+    }
+    Ok(unique)
+}
+
+fn batch_output_candidate(input: &Path, parent: &Path, suffix: u32) -> Result<PathBuf, String> {
+    let stem = input
+        .file_stem()
+        .ok_or_else(|| format!("input has no file stem: {}", input.display()))?;
+    let mut name = stem.to_os_string();
+    name.push(".xdremux");
+    if suffix > 1 {
+        name.push(format!(" ({suffix})"));
+    }
+    name.push(".heic");
+    Ok(parent.join(name))
+}
+
+fn plan_batch_items(inputs: &[PathBuf], output_dir: Option<&Path>) -> Result<Vec<BatchItem>, String> {
+    let mut reserved = inputs.iter().cloned().collect::<BTreeSet<_>>();
+    let mut items = Vec::with_capacity(inputs.len());
+
+    for input in inputs {
+        let parent = match output_dir {
+            Some(directory) => directory.to_path_buf(),
+            None => input
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."))
+                .to_path_buf(),
+        };
+
+        let mut suffix = 1_u32;
+        let output = loop {
+            let candidate = batch_output_candidate(input, &parent, suffix)?;
+            let companion = candidate.with_extension("mov");
+            if candidate != *input
+                && !reserved.contains(&candidate)
+                && !reserved.contains(&companion)
+                && !candidate.exists()
+                && !companion.exists()
+            {
+                reserved.insert(candidate.clone());
+                reserved.insert(companion);
+                break candidate;
+            }
+            suffix = suffix
+                .checked_add(1)
+                .ok_or_else(|| format!("exhausted output suffixes for {}", input.display()))?;
+        };
+        items.push(BatchItem::new(input.clone(), output));
+    }
+    Ok(items)
+}
+
+fn batch_kind_name(kind: BatchAssetKind) -> &'static str {
+    match kind {
+        BatchAssetKind::ProXdr => "pro-xdr",
+        BatchAssetKind::LivePhoto => "live-photo",
+    }
+}
+
+fn path_json(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+const BATCH_RECEIPT_SCHEMA_VERSION: u32 = 1;
+
+fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+    let inputs = match discover_batch_inputs(&arguments) {
+        Ok(inputs) => inputs,
+        Err(error) => {
+            let _ = writeln!(stderr, "error: {error}");
+            return 2;
+        }
+    };
+    let items = match plan_batch_items(&inputs, arguments.output_dir.as_deref()) {
+        Ok(items) => items,
+        Err(error) => {
+            let _ = writeln!(stderr, "error: {error}");
+            return 2;
+        }
+    };
+
+    let runtime = PortableRuntime::new();
+    let receipt = runtime.convert_batch(items, ConversionRequest::default());
+
+    if arguments.json {
+        let successes = receipt
+            .successes
+            .iter()
+            .map(|success| {
+                json!({
+                    "input": path_json(&success.input),
+                    "kind": batch_kind_name(success.kind),
+                    "outputs": success.outputs.iter().map(|path| path_json(path)).collect::<Vec<_>>(),
+                })
+            })
+            .collect::<Vec<_>>();
+        let failures = receipt
+            .failures
+            .iter()
+            .map(|failure| {
+                json!({
+                    "input": path_json(&failure.input),
+                    "output": path_json(&failure.output),
+                    "error": failure.error.as_str(),
+                })
+            })
+            .collect::<Vec<_>>();
+        let value = json!({
+            "schema_version": BATCH_RECEIPT_SCHEMA_VERSION,
+            "command": "batch",
+            "processed": receipt.processed(),
+            "succeeded": receipt.succeeded(),
+            "failed": receipt.failed(),
+            "successes": successes,
+            "failures": failures,
+        });
+        match serde_json::to_writer_pretty(&mut *stdout, &value)
+            .map_err(io::Error::other)
+            .and_then(|()| writeln!(stdout))
+        {
+            Ok(()) => {}
+            Err(error) => {
+                let _ = writeln!(stderr, "error: could not write batch JSON: {error}");
+                return 1;
+            }
+        }
+    } else {
+        for success in &receipt.successes {
+            let outputs = success
+                .outputs
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(" + ");
+            let _ = writeln!(
+                stdout,
+                "converted: {} -> {outputs}",
+                success.input.display()
+            );
+        }
+        for failure in &receipt.failures {
+            let _ = writeln!(
+                stderr,
+                "error: {} -> {}: {}",
+                failure.input.display(),
+                failure.output.display(),
+                failure.error
+            );
+        }
+        let _ = writeln!(
+            stdout,
+            "batch: {} processed, {} succeeded, {} failed",
+            receipt.processed(),
+            receipt.succeeded(),
+            receipt.failed()
+        );
+    }
+
+    u8::from(!receipt.is_success())
+}
+
 pub fn run_from<I, S>(args: I, stdout: &mut impl Write, stderr: &mut impl Write) -> u8
 where
     I: IntoIterator<Item = S>,
@@ -254,6 +553,9 @@ where
         Ok(Cli {
             command: RootCommand::Convert(arguments),
         }) => run_convert(arguments.input, arguments.output, stdout, stderr),
+        Ok(Cli {
+            command: RootCommand::Batch(arguments),
+        }) => run_batch(arguments, stdout, stderr),
         Err(error) => write_clap_error(error, stdout, stderr),
     }
 }
@@ -261,9 +563,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn parse(args: &[&str]) -> Cli {
         parse_cli(args.iter().map(OsString::from)).expect("arguments should parse")
+    }
+
+    fn unique_dir(label: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "xdremux-cli-{label}-{}-{stamp}",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -275,6 +589,7 @@ mod tests {
         assert!(output.contains("Commands:"));
         assert!(output.contains("inspect"));
         assert!(output.contains("convert"));
+        assert!(output.contains("batch"));
         assert!(stderr.is_empty());
     }
 
@@ -332,6 +647,94 @@ mod tests {
         assert!(String::from_utf8(stderr)
             .unwrap()
             .contains("--input <INPUT>"));
+    }
+
+    #[test]
+    fn batch_requires_a_source() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        assert_eq!(run_from(["batch"], &mut stdout, &mut stderr), 2);
+        assert!(stdout.is_empty());
+        assert!(String::from_utf8(stderr)
+            .unwrap()
+            .contains("at least one --input or --input-dir"));
+    }
+
+    #[test]
+    fn batch_accepts_repeatable_inputs() {
+        let command = parse(&[
+            "batch",
+            "--input",
+            "a.heic",
+            "--input",
+            "b.jpg",
+            "--output-dir",
+            "out",
+        ]);
+        let RootCommand::Batch(arguments) = command.command else {
+            panic!("expected batch command");
+        };
+        assert_eq!(
+            arguments.inputs,
+            vec![PathBuf::from("a.heic"), PathBuf::from("b.jpg")]
+        );
+        assert_eq!(arguments.output_dir, Some(PathBuf::from("out")));
+    }
+
+    #[test]
+    fn batch_discovery_is_non_recursive_by_default_and_recursive_on_request() {
+        let root = unique_dir("discovery");
+        let nested = root.join("nested");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(root.join("A.HEIC"), b"a").unwrap();
+        fs::write(root.join("ignore.txt"), b"x").unwrap();
+        fs::write(root.join(".hidden.heic"), b"x").unwrap();
+        fs::write(root.join("old.xdremux.heic"), b"x").unwrap();
+        fs::write(root.join("old.xdremux (2).heic"), b"x").unwrap();
+        fs::write(nested.join("B.jpg"), b"b").unwrap();
+
+        let flat = BatchArgs {
+            inputs: Vec::new(),
+            input_dirs: vec![root.clone()],
+            recursive: false,
+            output_dir: None,
+            json: false,
+        };
+        assert_eq!(
+            discover_batch_inputs(&flat).unwrap(),
+            vec![root.join("A.HEIC")]
+        );
+
+        let recursive = BatchArgs {
+            recursive: true,
+            ..flat
+        };
+        assert_eq!(
+            discover_batch_inputs(&recursive).unwrap(),
+            vec![root.join("A.HEIC"), nested.join("B.jpg")]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn batch_output_planning_is_source_safe_and_reserves_live_photo_companions() {
+        let root = unique_dir("planning");
+        fs::create_dir_all(&root).unwrap();
+        let a = root.join("capture.heic");
+        let b = root.join("capture.jpg");
+        fs::write(&a, b"a").unwrap();
+        fs::write(&b, b"b").unwrap();
+
+        let plan = plan_batch_items(&[a.clone(), b.clone()], Some(&root)).unwrap();
+        assert_eq!(plan.len(), 2);
+        assert_ne!(plan[0].output, a);
+        assert_ne!(plan[1].output, b);
+        assert_ne!(plan[0].output, plan[1].output);
+        assert_ne!(
+            plan[0].output.with_extension("mov"),
+            plan[1].output.with_extension("mov")
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
