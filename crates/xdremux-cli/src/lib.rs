@@ -1,20 +1,32 @@
 #![forbid(unsafe_code)]
 
 use std::ffi::{OsStr, OsString};
+use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use xdremux_source::{inspect_path, SourceAsset, SourceInspection};
+use xdremux_engine::ConversionRequest;
+use xdremux_runtime::PortableRuntime;
+use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
 
-const HELP: &str = "XDRemux Rust CLI\n\nUsage:\n  xdremux <COMMAND>\n\nCommands:\n  inspect <INPUT> [--json]  Inspect the canonical Rust input route\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version\n";
+const HELP: &str = "XDRemux Rust CLI\n\nUsage:\n  xdremux <COMMAND>\n\nCommands:\n  inspect <INPUT> [--json]                 Inspect the canonical Rust input route\n  convert --input <INPUT> [--output <OUT>] Convert ProXDR through the unified Rust runtime\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version\n";
 const INSPECT_HELP: &str = "Inspect one input without converting it.\n\nUsage:\n  xdremux inspect <INPUT> [--json]\n\nOptions:\n      --json  Emit the stable machine-readable inspection schema\n  -h, --help  Print help\n";
+const CONVERT_HELP: &str = "Convert one ProXDR image with the unified Rust engine/runtime.\n\nUsage:\n  xdremux convert --input <INPUT> [--output <OUTPUT>]\n\nOptions:\n      --input <INPUT>    Input ProXDR HEIC\n      --output <OUTPUT>  Output HEIC; defaults to the input path for in-place replacement\n  -h, --help             Print help\n";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Command {
     Help,
     Version,
     InspectHelp,
-    Inspect { input: PathBuf, json: bool },
+    ConvertHelp,
+    Inspect {
+        input: PathBuf,
+        json: bool,
+    },
+    Convert {
+        input: PathBuf,
+        output: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +70,43 @@ fn parse_inspect(args: impl IntoIterator<Item = OsString>) -> Result<Command, Cl
     Ok(Command::Inspect { input, json })
 }
 
+fn parse_convert(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliError> {
+    let mut args = args.into_iter();
+    let mut input = None;
+    let mut output = None;
+
+    while let Some(arg) = args.next() {
+        if is(&arg, "--help") || is(&arg, "-h") {
+            return Ok(Command::ConvertHelp);
+        }
+        if is(&arg, "--input") {
+            let value = args
+                .next()
+                .ok_or_else(|| CliError("--input requires a path".to_owned()))?;
+            if input.replace(PathBuf::from(value)).is_some() {
+                return Err(CliError("--input may be specified only once".to_owned()));
+            }
+            continue;
+        }
+        if is(&arg, "--output") {
+            let value = args
+                .next()
+                .ok_or_else(|| CliError("--output requires a path".to_owned()))?;
+            if output.replace(PathBuf::from(value)).is_some() {
+                return Err(CliError("--output may be specified only once".to_owned()));
+            }
+            continue;
+        }
+        return Err(CliError(format!(
+            "unknown convert argument: {}",
+            arg.to_string_lossy()
+        )));
+    }
+
+    let input = input.ok_or_else(|| CliError("convert requires --input <PATH>".to_owned()))?;
+    Ok(Command::Convert { input, output })
+}
+
 fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliError> {
     let mut args = args.into_iter();
     let Some(command) = args.next() else {
@@ -71,6 +120,9 @@ fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, Cl
     }
     if is(&command, "inspect") {
         return parse_inspect(args);
+    }
+    if is(&command, "convert") {
+        return parse_convert(args);
     }
     Err(CliError(format!(
         "unknown command: {}",
@@ -149,6 +201,64 @@ fn run_inspect(input: PathBuf, json: bool, stdout: &mut impl Write, stderr: &mut
     0
 }
 
+fn run_convert(
+    input: PathBuf,
+    output: Option<PathBuf>,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
+    let source = match fs::read(&input) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = writeln!(stderr, "error: could not read {}: {error}", input.display());
+            return 1;
+        }
+    };
+
+    let asset = match probe_bytes(&source) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = writeln!(stderr, "error: {error}");
+            return 1;
+        }
+    };
+    if matches!(asset, SourceAsset::MotionPhoto { .. }) {
+        let _ = writeln!(
+            stderr,
+            "error: Motion Photo conversion is not wired into the unified Rust runtime yet"
+        );
+        return 1;
+    }
+
+    let output = output.unwrap_or_else(|| input.clone());
+    let runtime = PortableRuntime::new();
+    if let Err(error) = runtime.convert_proxdr_file(
+        &source,
+        &output,
+        ConversionRequest::default(),
+        |_| {},
+    ) {
+        let _ = writeln!(stderr, "error: {error}");
+        return 1;
+    }
+
+    let result = if output == input {
+        writeln!(stdout, "converted: {} (in place)", input.display())
+    } else {
+        writeln!(
+            stdout,
+            "converted: {} -> {}",
+            input.display(),
+            output.display()
+        )
+    };
+    if let Err(error) = result {
+        let _ = writeln!(stderr, "error: could not write output: {error}");
+        return 1;
+    }
+    0
+}
+
 pub fn run_from<I, S>(args: I, stdout: &mut impl Write, stderr: &mut impl Write) -> u8
 where
     I: IntoIterator<Item = S>,
@@ -168,7 +278,12 @@ where
             Ok(()) => 0,
             Err(_) => 1,
         },
+        Ok(Command::ConvertHelp) => match write!(stdout, "{CONVERT_HELP}") {
+            Ok(()) => 0,
+            Err(_) => 1,
+        },
         Ok(Command::Inspect { input, json }) => run_inspect(input, json, stdout, stderr),
+        Ok(Command::Convert { input, output }) => run_convert(input, output, stdout, stderr),
         Err(error) => {
             let _ = writeln!(
                 stderr,
@@ -189,9 +304,9 @@ mod tests {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
         assert_eq!(run_from(Vec::<&str>::new(), &mut stdout, &mut stderr), 0);
-        assert!(String::from_utf8(stdout)
-            .unwrap()
-            .contains("xdremux <COMMAND>"));
+        let output = String::from_utf8(stdout).unwrap();
+        assert!(output.contains("xdremux <COMMAND>"));
+        assert!(output.contains("convert --input <INPUT>"));
         assert!(stderr.is_empty());
     }
 
@@ -223,13 +338,63 @@ mod tests {
     }
 
     #[test]
-    fn unknown_command_is_a_usage_error() {
+    fn convert_defaults_to_in_place_publication() {
+        let command = parse_command(
+            ["convert", "--input", "capture.heic"]
+                .into_iter()
+                .map(OsString::from),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            Command::Convert {
+                input: PathBuf::from("capture.heic"),
+                output: None,
+            }
+        );
+    }
+
+    #[test]
+    fn convert_accepts_explicit_output() {
+        let command = parse_command(
+            [
+                "convert",
+                "--input",
+                "capture.heic",
+                "--output",
+                "converted.heic",
+            ]
+            .into_iter()
+            .map(OsString::from),
+        )
+        .unwrap();
+        assert_eq!(
+            command,
+            Command::Convert {
+                input: PathBuf::from("capture.heic"),
+                output: Some(PathBuf::from("converted.heic")),
+            }
+        );
+    }
+
+    #[test]
+    fn convert_requires_named_input() {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
         assert_eq!(run_from(["convert"], &mut stdout, &mut stderr), 2);
+        assert!(String::from_utf8(stderr)
+            .unwrap()
+            .contains("convert requires --input <PATH>"));
+    }
+
+    #[test]
+    fn unknown_command_is_a_usage_error() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        assert_eq!(run_from(["frobnicate"], &mut stdout, &mut stderr), 2);
         assert!(stdout.is_empty());
         assert!(String::from_utf8(stderr)
             .unwrap()
-            .contains("unknown command: convert"));
+            .contains("unknown command: frobnicate"));
     }
 }
