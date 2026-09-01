@@ -6,6 +6,7 @@ mod heif;
 mod live_photo_mov;
 mod lpex;
 mod model;
+mod motion_video;
 mod oppo;
 mod payload;
 mod publication;
@@ -25,6 +26,7 @@ pub use model::{
     ByteRange, MotionPhotoAsset, MotionPhotoItem, MotionPhotoSourceKind, OppoMetadata,
     PresentationSource, VideoStream, VideoStreamLayout, VideoStreamRole,
 };
+pub use motion_video::{normalize_embedded_video, standalone_bmff_length, NormalizedVideo};
 pub use oppo::{enrich_oppo_asset, parse_oppo_fallback, parse_oppo_motion_photo};
 pub use payload::{
     copy_payload_range, copy_payload_range_with_options, CopyResult, MotionPhotoCopyError,
