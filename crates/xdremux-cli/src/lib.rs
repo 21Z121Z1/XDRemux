@@ -71,6 +71,16 @@ fn default_batch_jobs() -> usize {
         .min(4)
 }
 
+fn parse_batch_jobs(raw: &str) -> Result<usize, String> {
+    let jobs = raw
+        .parse::<usize>()
+        .map_err(|error| format!("invalid --jobs value {raw:?}: {error}"))?;
+    if jobs == 0 {
+        return Err("--jobs must be greater than zero".to_owned());
+    }
+    Ok(jobs)
+}
+
 #[derive(Debug, Args)]
 struct BatchArgs {
     /// Explicit input file. Repeat to add multiple files.
@@ -98,8 +108,16 @@ struct BatchArgs {
     /// The compatibility state is stored at this path with `.motion-photo` appended.
     #[arg(long, value_name = "FILE")]
     checkpoint: Option<PathBuf>,
-    /// Maximum number of concurrent conversions. Zero is treated as one.
-    #[arg(long, default_value_t = default_batch_jobs(), value_name = "N")]
+    /// File converted assets by asset type and primary capture mode.
+    #[arg(long)]
+    categorize: bool,
+    /// Maximum number of concurrent conversions; must be greater than zero.
+    #[arg(
+        long,
+        default_value_t = default_batch_jobs(),
+        value_name = "N",
+        value_parser = parse_batch_jobs
+    )]
     jobs: usize,
     /// Emit one machine-readable JSON receipt instead of human progress.
     #[arg(long)]
@@ -449,6 +467,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         output_dir: arguments.output_dir.clone(),
         checkpoint_path: checkpoint_path.clone(),
         reuse_existing,
+        categorize_output: arguments.categorize,
     };
     let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,
@@ -462,7 +481,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
     let execution_options = BatchExecutionOptions {
         checkpoint_path,
         reuse_existing,
-        jobs: arguments.jobs.max(1),
+        jobs: arguments.jobs,
     };
     let receipt =
         runtime.convert_batch_with_options(items, ConversionRequest::default(), &execution_options);
@@ -667,6 +686,26 @@ mod tests {
     }
 
     #[test]
+    fn batch_rejects_zero_jobs_as_usage_error() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        assert_eq!(
+            run_from(
+                ["batch", "--input", "capture.heic", "--jobs", "0"],
+                &mut stdout,
+                &mut stderr,
+            ),
+            2
+        );
+        assert!(stdout.is_empty());
+        let error = String::from_utf8(stderr).unwrap();
+        assert!(
+            error.contains("--jobs must be greater than zero"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn batch_requires_a_source() {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
@@ -699,6 +738,7 @@ mod tests {
         assert!(!arguments.skip_existing);
         assert!(!arguments.resume);
         assert_eq!(arguments.checkpoint, None);
+        assert!(!arguments.categorize);
         assert!(arguments.jobs >= 1 && arguments.jobs <= 4);
     }
 
@@ -722,6 +762,7 @@ mod tests {
             skip_existing: false,
             resume: false,
             checkpoint: None,
+            categorize: false,
             jobs: 1,
             json: false,
         };

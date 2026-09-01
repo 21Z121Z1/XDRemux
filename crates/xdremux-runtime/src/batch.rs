@@ -16,6 +16,7 @@ use crate::batch_checkpoint::{
     canonical_or_absolute, source_signature, CheckpointOutcome, MotionPhotoCheckpoint,
     MotionPhotoCheckpointWriter, SourceSignature,
 };
+use crate::categorize::classification_relative_directory;
 use crate::{PortableRuntime, Result, RuntimeError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +39,7 @@ pub struct BatchPlanOptions {
     pub output_dir: Option<PathBuf>,
     pub checkpoint_path: Option<PathBuf>,
     pub reuse_existing: bool,
+    pub categorize_output: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -190,7 +192,7 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
     let mut items = Vec::with_capacity(inputs.len());
 
     for input in inputs {
-        let parent = match options.output_dir.as_deref() {
+        let mut parent = match options.output_dir.as_deref() {
             Some(directory) => directory.to_path_buf(),
             None => input
                 .parent()
@@ -198,6 +200,9 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
                 .unwrap_or_else(|| Path::new("."))
                 .to_path_buf(),
         };
+        if options.categorize_output {
+            parent.push(classification_relative_directory(input)?);
+        }
 
         if let Some(prior) = checkpoint
             .as_ref()

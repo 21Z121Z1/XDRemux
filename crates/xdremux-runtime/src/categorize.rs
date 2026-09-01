@@ -247,6 +247,19 @@ fn inferred_asset_type(data: &[u8]) -> PhotoAssetType {
     }
 }
 
+pub(crate) fn classification_relative_directory(source: &Path) -> Result<PathBuf> {
+    let bytes = fs::read(source)
+        .map_err(|error| RuntimeError::external("batch categorization input read", error))?;
+    let asset_type = inferred_asset_type(&bytes);
+    let classification = classify_user_comment_with_context(
+        extract_user_comment(&bytes).as_deref(),
+        asset_type,
+        detect_capabilities(&bytes),
+    );
+    let [asset_type, capture_mode] = classification.relative_directory_components();
+    Ok(PathBuf::from(asset_type).join(capture_mode))
+}
+
 fn fingerprint_path(path: &Path) -> Result<ResourceFingerprint> {
     let mut file = File::open(path)
         .map_err(|error| RuntimeError::external("categorization fingerprint open", error))?;
