@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: rust-cli-unification-writer
+  cancel-in-progress: false
+
 jobs:
   verify-and-materialize:
     runs-on: ubuntu-latest
