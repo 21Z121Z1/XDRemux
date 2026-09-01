@@ -164,6 +164,39 @@ pub fn read_apple_content_identifier(data: &[u8]) -> LivePhotoStillResult<Option
     apple_makernote_identifier(maker_note)
 }
 
+/// Transfer ordinary JPEG EXIF metadata into a freshly encoded HEIF primary and
+/// replace only MakerNote with the minimal Apple Live Photo pairing identifier.
+///
+/// Motion Photo XMP is deliberately not copied: the output is no longer an
+/// appended-video JPEG, so retaining the Android MotionPhoto directory would
+/// create two contradictory asset identities.
+pub fn write_live_photo_jpeg_metadata(
+    source_jpeg: &[u8],
+    mut encoded_heif: Vec<u8>,
+    content_identifier: &str,
+) -> LivePhotoStillResult<Vec<u8>> {
+    let source = source_jpeg.to_vec();
+    let mut metadata = Metadata::new_from_vec(&source, FileExtension::JPEG)
+        .map_err(|error| LivePhotoStillError::external("read source JPEG EXIF", error))?;
+    metadata.set_tag(ExifTag::MakerNote(build_apple_makernote(
+        content_identifier,
+    )?));
+    metadata
+        .write_to_vec(&mut encoded_heif, FileExtension::HEIF)
+        .map_err(|error| LivePhotoStillError::external("write Live Photo HEIF EXIF", error))?;
+
+    let expected = content_identifier.to_ascii_uppercase();
+    let actual = read_apple_content_identifier(&encoded_heif)?.ok_or_else(|| {
+        LivePhotoStillError::new("written JPEG-derived Live Photo HEIF is missing Apple asset identifier")
+    })?;
+    if actual != expected {
+        return Err(LivePhotoStillError::new(format!(
+            "written JPEG-derived Live Photo HEIF asset identifier mismatch: expected {expected}, found {actual}"
+        )));
+    }
+    Ok(encoded_heif)
+}
+
 fn disable_motion_photo_flag(data: &mut [u8]) -> bool {
     const PATTERNS: &[&[u8]] = &[
         b"Camera:MotionPhoto=\"1\"",
