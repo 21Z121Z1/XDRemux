@@ -10,7 +10,8 @@ use xdremux_motion_photo::{
 use xdremux_source::{probe_bytes, SourceAsset};
 
 use crate::batch_checkpoint::{
-    source_signature, MotionPhotoCheckpoint, MotionPhotoCheckpointWriter, SourceSignature,
+    source_signature, CheckpointOutcome, MotionPhotoCheckpoint, MotionPhotoCheckpointWriter,
+    SourceSignature,
 };
 use crate::{PortableRuntime, Result, RuntimeError};
 
@@ -273,10 +274,8 @@ fn append_checkpoint_failure(
         source,
         output,
         &output.with_extension("mov"),
-        "failure",
         signature,
-        None,
-        Some(error),
+        CheckpointOutcome::Failure(error),
     )
 }
 
@@ -315,8 +314,7 @@ impl PortableRuntime {
                 })
             }
             SourceAsset::ProXdr { .. } => {
-                let receipt =
-                    self.convert_proxdr_file(&source, &item.output, request, |_| {})?;
+                let receipt = self.convert_proxdr_file(&source, &item.output, request, |_| {})?;
                 Ok(BatchSuccess {
                     input: item.input.clone(),
                     outputs: vec![receipt.output],
@@ -400,10 +398,13 @@ impl PortableRuntime {
                         }
 
                         if options.reuse_existing {
-                            if let Some(prior) = checkpoint.reusable_item(&item.input, &signature)? {
-                                if prior.image == std::path::absolute(&item.output).map_err(|error| {
-                                    RuntimeError::external("batch resume output path", error)
-                                })?
+                            if let Some(prior) =
+                                checkpoint.reusable_item(&item.input, &signature)?
+                            {
+                                if prior.image
+                                    == std::path::absolute(&item.output).map_err(|error| {
+                                        RuntimeError::external("batch resume output path", error)
+                                    })?
                                     && prior.video
                                         == std::path::absolute(&output_video).map_err(|error| {
                                             RuntimeError::external("batch resume video path", error)
@@ -419,10 +420,10 @@ impl PortableRuntime {
                                                 &item.input,
                                                 &item.output,
                                                 &output_video,
-                                                "skipped_existing",
                                                 &signature,
-                                                Some(&prior.asset_identifier),
-                                                None,
+                                                CheckpointOutcome::SkippedExisting(
+                                                    &prior.asset_identifier,
+                                                ),
                                             )?;
                                         }
                                         return Ok(BatchSuccess {
@@ -460,10 +461,8 @@ impl PortableRuntime {
                                         &item.input,
                                         &converted.image,
                                         &converted.video,
-                                        "success",
                                         &signature,
-                                        Some(&converted.content_identifier),
-                                        None,
+                                        CheckpointOutcome::Success(&converted.content_identifier),
                                     )?;
                                 }
                                 Ok(BatchSuccess {

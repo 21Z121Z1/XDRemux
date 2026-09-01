@@ -979,6 +979,8 @@ version = "0.1.0"
 dependencies = [
  "atomic-write-file",
  "jpeg-encoder",
+ "serde",
+ "serde_json",
  "sha2",
  "tempfile",
  "uuid",

@@ -24,11 +24,7 @@ struct CheckpointItem {
     kind: String,
     #[serde(rename = "inputPath", alias = "input_path")]
     input_path: String,
-    #[serde(
-        rename = "sourceRelativePath",
-        alias = "relative_source_path",
-        default
-    )]
+    #[serde(rename = "sourceRelativePath", alias = "relative_source_path", default)]
     source_relative_path: Option<String>,
     #[serde(rename = "outputImagePath", alias = "output_image_path")]
     output_image_path: String,
@@ -50,7 +46,10 @@ struct CheckpointItem {
 impl CheckpointItem {
     fn reusable(&self, signature: &SourceSignature) -> bool {
         matches!(self.status.as_str(), "success" | "skipped_existing")
-            && self.asset_identifier.as_deref().is_some_and(|value| !value.is_empty())
+            && self
+                .asset_identifier
+                .as_deref()
+                .is_some_and(|value| !value.is_empty())
             && self.input_size == Some(signature.size)
             && self.input_sha256.as_deref() == Some(signature.sha256.as_str())
     }
@@ -65,7 +64,9 @@ impl MotionPhotoCheckpoint {
     pub(crate) fn load(path: &Path) -> Result<Self> {
         let file = match File::open(path) {
             Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Self::default()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Self::default())
+            }
             Err(error) => {
                 return Err(RuntimeError::external(
                     "Motion Photo checkpoint open",
@@ -138,17 +139,54 @@ pub(crate) struct ReusableMotionPhoto {
     pub asset_identifier: String,
 }
 
+pub(crate) enum CheckpointOutcome<'a> {
+    Success(&'a str),
+    SkippedExisting(&'a str),
+    Failure(&'a str),
+}
+
+impl CheckpointOutcome<'_> {
+    fn status(&self) -> &'static str {
+        match self {
+            Self::Success(_) => "success",
+            Self::SkippedExisting(_) => "skipped_existing",
+            Self::Failure(_) => "failure",
+        }
+    }
+
+    fn asset_identifier(&self) -> Option<&str> {
+        match self {
+            Self::Success(identifier) | Self::SkippedExisting(identifier) => Some(identifier),
+            Self::Failure(_) => None,
+        }
+    }
+
+    fn error(&self) -> Option<&str> {
+        match self {
+            Self::Failure(error) => Some(error),
+            Self::Success(_) | Self::SkippedExisting(_) => None,
+        }
+    }
+}
+
 pub(crate) struct MotionPhotoCheckpointWriter {
     file: File,
 }
 
 impl MotionPhotoCheckpointWriter {
     pub(crate) fn open(path: &Path) -> Result<Self> {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-            fs::create_dir_all(parent)
-                .map_err(|error| RuntimeError::external("Motion Photo checkpoint directory", error))?;
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            fs::create_dir_all(parent).map_err(|error| {
+                RuntimeError::external("Motion Photo checkpoint directory", error)
+            })?;
         }
-        let new_file = !path.exists() || fs::metadata(path).map(|value| value.len() == 0).unwrap_or(true);
+        let new_file = !path.exists()
+            || fs::metadata(path)
+                .map(|value| value.len() == 0)
+                .unwrap_or(true);
         let file = OpenOptions::new()
             .create(true)
             .append(true)
@@ -183,10 +221,8 @@ impl MotionPhotoCheckpointWriter {
         source: &Path,
         image: &Path,
         video: &Path,
-        status: &str,
         signature: &SourceSignature,
-        asset_identifier: Option<&str>,
-        error: Option<&str>,
+        outcome: CheckpointOutcome<'_>,
     ) -> Result<()> {
         let input = canonical_existing(source)?;
         let output_image = canonical_or_absolute(image)?;
@@ -197,12 +233,12 @@ impl MotionPhotoCheckpointWriter {
             source_relative_path: None,
             output_image_path: path_string(&output_image),
             output_video_path: path_string(&output_video),
-            status: status.to_owned(),
+            status: outcome.status().to_owned(),
             input_size: Some(signature.size),
             input_mtime_ns: signature.mtime_ns,
             input_sha256: Some(signature.sha256.clone()),
-            asset_identifier: asset_identifier.map(ToOwned::to_owned),
-            error: error.map(ToOwned::to_owned),
+            asset_identifier: outcome.asset_identifier().map(ToOwned::to_owned),
+            error: outcome.error().map(ToOwned::to_owned),
         };
         let value = serde_json::to_value(item)
             .map_err(|error| RuntimeError::external("Motion Photo checkpoint encode", error))?;
@@ -299,10 +335,8 @@ mod tests {
                 &source,
                 &image,
                 &video,
-                "success",
                 &signature,
-                Some("ASSET-ID"),
-                None,
+                CheckpointOutcome::Success("ASSET-ID"),
             )
             .unwrap();
         drop(writer);
@@ -337,10 +371,8 @@ mod tests {
                 &source,
                 &image,
                 &video,
-                "success",
                 &original,
-                Some("ASSET-ID"),
-                None,
+                CheckpointOutcome::Success("ASSET-ID"),
             )
             .unwrap();
         drop(writer);

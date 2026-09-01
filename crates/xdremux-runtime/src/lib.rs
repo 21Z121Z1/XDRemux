@@ -1,10 +1,18 @@
 #![forbid(unsafe_code)]
 
 mod batch;
+mod batch_checkpoint;
 mod categorize;
 mod live_photo;
 
-pub use batch::{BatchAssetKind, BatchFailure, BatchItem, BatchReceipt, BatchSuccess};
+pub use batch::{
+    plan_batch_items, BatchAssetKind, BatchExecutionOptions, BatchFailure, BatchItem,
+    BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition,
+};
+pub use batch_checkpoint::{
+    motion_photo_checkpoint_path, DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME,
+    MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION,
+};
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 pub use live_photo::LivePhotoFileReceipt;
 

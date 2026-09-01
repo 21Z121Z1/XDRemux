@@ -11,7 +11,10 @@ use std::path::{Path, PathBuf};
 use clap::{error::ErrorKind, Args, CommandFactory, Parser, Subcommand};
 use serde_json::json;
 use xdremux_engine::ConversionRequest;
-use xdremux_runtime::{BatchAssetKind, BatchItem, PortableRuntime};
+use xdremux_runtime::{
+    motion_photo_checkpoint_path, plan_batch_items, BatchAssetKind, BatchExecutionOptions,
+    BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
+};
 use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
 
 #[derive(Debug, Parser)]
@@ -74,6 +77,17 @@ struct BatchArgs {
     /// When omitted, each output is written beside its source with an .xdremux suffix.
     #[arg(long, value_name = "DIR")]
     output_dir: Option<PathBuf>,
+    /// Reuse a completed Live Photo pair only when durable source provenance matches.
+    #[arg(long)]
+    skip_existing: bool,
+    /// Resume completed Live Photo work from the durable checkpoint and retry remaining items.
+    #[arg(long)]
+    resume: bool,
+    /// Shared Swift/Python/Rust Motion Photo checkpoint base path.
+    ///
+    /// The compatibility state is stored at this path with `.motion-photo` appended.
+    #[arg(long, value_name = "FILE")]
+    checkpoint: Option<PathBuf>,
     /// Emit one machine-readable JSON receipt instead of human progress.
     #[arg(long)]
     json: bool,
@@ -381,64 +395,15 @@ fn discover_batch_inputs(arguments: &BatchArgs) -> Result<Vec<PathBuf>, String> 
     Ok(unique)
 }
 
-fn batch_output_candidate(input: &Path, parent: &Path, suffix: u32) -> Result<PathBuf, String> {
-    let stem = input
-        .file_stem()
-        .ok_or_else(|| format!("input has no file stem: {}", input.display()))?;
-    let mut name = stem.to_os_string();
-    name.push(".xdremux");
-    if suffix > 1 {
-        name.push(format!(" ({suffix})"));
-    }
-    name.push(".heic");
-    Ok(parent.join(name))
-}
-
-fn plan_batch_items(
-    inputs: &[PathBuf],
-    output_dir: Option<&Path>,
-) -> Result<Vec<BatchItem>, String> {
-    let mut reserved = inputs.iter().cloned().collect::<BTreeSet<_>>();
-    let mut items = Vec::with_capacity(inputs.len());
-
-    for input in inputs {
-        let parent = match output_dir {
-            Some(directory) => directory.to_path_buf(),
-            None => input
-                .parent()
-                .filter(|parent| !parent.as_os_str().is_empty())
-                .unwrap_or_else(|| Path::new("."))
-                .to_path_buf(),
-        };
-
-        let mut suffix = 1_u32;
-        let output = loop {
-            let candidate = batch_output_candidate(input, &parent, suffix)?;
-            let companion = candidate.with_extension("mov");
-            if candidate != *input
-                && !reserved.contains(&candidate)
-                && !reserved.contains(&companion)
-                && !candidate.exists()
-                && !companion.exists()
-            {
-                reserved.insert(candidate.clone());
-                reserved.insert(companion);
-                break candidate;
-            }
-            suffix = suffix
-                .checked_add(1)
-                .ok_or_else(|| format!("exhausted output suffixes for {}", input.display()))?;
-        };
-        items.push(BatchItem::new(input.clone(), output));
-    }
-    Ok(items)
-}
-
 fn batch_kind_name(kind: BatchAssetKind) -> &'static str {
     match kind {
         BatchAssetKind::ProXdr => "pro-xdr",
         BatchAssetKind::LivePhoto => "live-photo",
     }
+}
+
+fn batch_disposition_name(disposition: BatchSuccessDisposition) -> &'static str {
+    disposition.as_str()
 }
 
 fn path_json(path: &Path) -> String {
@@ -455,7 +420,24 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
             return 2;
         }
     };
-    let items = match plan_batch_items(&inputs, arguments.output_dir.as_deref()) {
+    let reuse_existing = arguments.skip_existing || arguments.resume;
+    let checkpoint_path = motion_photo_checkpoint_path(
+        arguments.output_dir.as_deref(),
+        arguments.checkpoint.as_deref(),
+    );
+    if reuse_existing && checkpoint_path.is_none() {
+        let _ = writeln!(
+            stderr,
+            "error: --skip-existing/--resume requires --output-dir or --checkpoint for durable provenance"
+        );
+        return 2;
+    }
+    let plan_options = BatchPlanOptions {
+        output_dir: arguments.output_dir.clone(),
+        checkpoint_path: checkpoint_path.clone(),
+        reuse_existing,
+    };
+    let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,
         Err(error) => {
             let _ = writeln!(stderr, "error: {error}");
@@ -464,7 +446,12 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
     };
 
     let runtime = PortableRuntime::new();
-    let receipt = runtime.convert_batch(items, ConversionRequest::default());
+    let execution_options = BatchExecutionOptions {
+        checkpoint_path,
+        reuse_existing,
+    };
+    let receipt =
+        runtime.convert_batch_with_options(items, ConversionRequest::default(), &execution_options);
 
     if arguments.json {
         let successes = receipt
@@ -474,6 +461,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
                 json!({
                     "input": path_json(&success.input),
                     "kind": batch_kind_name(success.kind),
+                    "status": batch_disposition_name(success.disposition),
                     "outputs": success.outputs.iter().map(|path| path_json(path)).collect::<Vec<_>>(),
                 })
             })
@@ -494,6 +482,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
             "command": "batch",
             "processed": receipt.processed(),
             "succeeded": receipt.succeeded(),
+            "skipped_existing": receipt.skipped_existing(),
             "failed": receipt.failed(),
             "successes": successes,
             "failures": failures,
@@ -690,6 +679,9 @@ mod tests {
             vec![PathBuf::from("a.heic"), PathBuf::from("b.jpg")]
         );
         assert_eq!(arguments.output_dir, Some(PathBuf::from("out")));
+        assert!(!arguments.skip_existing);
+        assert!(!arguments.resume);
+        assert_eq!(arguments.checkpoint, None);
     }
 
     #[test]
@@ -709,6 +701,9 @@ mod tests {
             input_dirs: vec![root.clone()],
             recursive: false,
             output_dir: None,
+            skip_existing: false,
+            resume: false,
+            checkpoint: None,
             json: false,
         };
         assert_eq!(
@@ -736,7 +731,14 @@ mod tests {
         fs::write(&a, b"a").unwrap();
         fs::write(&b, b"b").unwrap();
 
-        let plan = plan_batch_items(&[a.clone(), b.clone()], Some(&root)).unwrap();
+        let plan = plan_batch_items(
+            &[a.clone(), b.clone()],
+            &BatchPlanOptions {
+                output_dir: Some(root.clone()),
+                ..BatchPlanOptions::default()
+            },
+        )
+        .unwrap();
         assert_eq!(plan.len(), 2);
         assert_ne!(plan[0].output, a);
         assert_ne!(plan[1].output, b);
