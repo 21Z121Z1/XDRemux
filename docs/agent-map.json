@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "purpose": "Machine-readable routing metadata for repository agents. Stable architecture remains in docs/architecture.en.md; live Git state is derived at runtime.",
+  "canonical_documents": {
+    "architecture": "docs/architecture.en.md",
+    "roadmap": "docs/roadmap.en.md",
+    "validation": "docs/validation/README.en.md",
+    "execution_plans": "docs/exec-plans/README.en.md",
+    "agent_contract": "AGENTS.md"
+  },
+  "branch_roles": {
+    "main": {
+      "role": "released-reference",
+      "intended_base": null,
+      "canonical_for": ["v1.4 released behavior", "public documentation", "release artifacts", "shared architecture and validation contracts"],
+      "not_canonical_for": ["future Rust implementation state", "research promotion claims"],
+      "promotion_gate": "protected-main exact-HEAD checks plus release-specific evidence",
+      "retirement_condition": "Rust release supersedes the relevant product contracts and v1.4 maintenance is no longer required"
+    },
+    "feat/rust-xdremux-format": {
+      "role": "rust-migration",
+      "intended_base": "main",
+      "canonical_for": ["current Rust implementation facts on this branch"],
+      "not_canonical_for": ["released user behavior before a Rust release", "repository-wide stable architecture"],
+      "promotion_gate": "per-capability migration evidence and Rust release promotion gates in docs/roadmap.en.md",
+      "retirement_condition": "promoted into the Rust release line or renamed after the rewrite becomes the product line"
+    },
+    "codex/reverse-key1-oppo-solver": {
+      "role": "photographic-styles-research",
+      "intended_base": "main",
+      "canonical_for": ["current Photographic Styles research implementation and measured artifacts on this branch"],
+      "not_canonical_for": ["production defaults", "released quality claims", "repository-wide stable architecture"],
+      "promotion_gate": "research.styles-model promotion ladder in docs/roadmap.en.md",
+      "retirement_condition": "useful research is promoted through explicit gates or archived as historical evidence"
+    }
+  },
+  "capabilities": [
+    {
+      "id": "format.binary",
+      "layer": 1,
+      "summary": "Bounds-safe binary access, FourCC, ISO-BMFF primitives, Exif/TIFF, and structural parsing.",
+      "rust_owner": ["crates/xdremux-format"],
+      "reference_owner": ["Sources/XDRemuxCore/HEIF", "Sources/XDRemuxCore/Metadata"],
+      "evidence": ["parser/constructor vectors", "malformed-input regressions"]
+    },
+    {
+      "id": "format.heif",
+      "layer": 1,
+      "secondary_layer": 5,
+      "summary": "HEIF structure parsing and output construction without product policy.",
+      "rust_owner": ["crates/xdremux-heif", "crates/xdremux-format"],
+      "reference_owner": ["Sources/XDRemuxCore/HEIF"],
+      "evidence": ["structural conformance", "real output inspection"]
+    },
+    {
+      "id": "metadata.vendor-hdr",
+      "layer": 2,
+      "summary": "Vendor HDR metadata extraction and normalization.",
+      "rust_owner": ["crates/xdremux-metadata", "crates/xdremux-container"],
+      "reference_owner": ["Sources/XDRemuxCore/Metadata"],
+      "evidence": ["fixture extraction", "cross-implementation vectors"]
+    },
+    {
+      "id": "hdr.gain-map",
+      "layer": 2,
+      "summary": "Gain Map semantics, reconstruction, EDR parameters, and storage-independent meaning.",
+      "rust_owner": ["crates/xdremux-hdr"],
+      "reference_owner": ["Sources/XDRemuxCore/HDR"],
+      "evidence": ["formula parity", "image and metadata validation"]
+    },
+    {
+      "id": "media.motion-photo",
+      "layer": 2,
+      "summary": "Motion Photo topology, timing, payload, and vendor metadata.",
+      "rust_owner": ["crates/xdremux-motion-photo"],
+      "reference_owner": ["Sources/XDRemuxCore/MotionPhoto"],
+      "evidence": ["versioned vendor fixtures", "topology and timing tests"]
+    },
+    {
+      "id": "media.live-photo",
+      "layer": 5,
+      "summary": "Live Photo pair identity, timing, resource passthrough, provenance, and safe pair publication.",
+      "rust_owner": [],
+      "reference_owner": ["Sources/XDRemuxCore/MotionPhoto"],
+      "evidence": ["pair identity and timing", "PhotoKit or device evidence", "publication regressions"]
+    },
+    {
+      "id": "asset.classification",
+      "layer": 2,
+      "summary": "Asset-aware classification facts and stable tag semantics.",
+      "rust_owner": ["crates/xdremux-classification"],
+      "reference_owner": ["Sources/XDRemuxCore/Conversion"],
+      "evidence": ["classification contract fixtures"]
+    },
+    {
+      "id": "engine.plan",
+      "layer": 3,
+      "summary": "Deterministic request + normalized facts + capability inventory to explicit conversion plan.",
+      "rust_owner": ["crates/xdremux-engine"],
+      "reference_owner": ["Sources/XDRemuxCore/Conversion"],
+      "evidence": ["request/analysis/plan vectors", "missing-capability regressions"]
+    },
+    {
+      "id": "adapter.codec",
+      "layer": 4,
+      "summary": "Concrete raster decode and Gain Map tile encode providers behind engine operation ports.",
+      "rust_owner": ["crates/xdremux-codec"],
+      "reference_owner": ["Sources/XDRemuxCore/Conversion", "Sources/XDRemuxAppleFeatures"],
+      "evidence": ["capability advertisement", "codec payload tests", "real provider round trips"]
+    },
+    {
+      "id": "adapter.apple.styles",
+      "layer": 4,
+      "summary": "Apple-only Photographic Styles behavior behind an explicit adapter contract.",
+      "rust_owner": [],
+      "reference_owner": ["Sources/XDRemuxAppleFeatures"],
+      "evidence": ["native renderer or consumer evidence", "device evidence"]
+    },
+    {
+      "id": "adapter.apple.portrait",
+      "layer": 4,
+      "summary": "Apple-only Portrait behavior behind an explicit adapter contract.",
+      "rust_owner": [],
+      "reference_owner": ["Sources/XDRemuxAppleFeatures"],
+      "evidence": ["native consumer evidence", "device evidence"]
+    },
+    {
+      "id": "product.cli",
+      "layer": 6,
+      "summary": "CLI request translation, localized output, progress, and exit contracts.",
+      "rust_owner": [],
+      "reference_owner": ["Sources/XDRemuxCLI", "xdremux_py"],
+      "evidence": ["parser and routing tests", "output and exit-contract tests"]
+    },
+    {
+      "id": "product.app",
+      "layer": 6,
+      "summary": "macOS application composition without re-owning media semantics.",
+      "rust_owner": [],
+      "reference_owner": ["apps/macos/XDRemuxApp"],
+      "evidence": ["app integration", "UI workflow evidence"]
+    },
+    {
+      "id": "research.styles-model",
+      "layer": "research",
+      "summary": "Photographic Styles learned proposals, provenance, uncertainty, and promotion evidence.",
+      "rust_owner": [],
+      "reference_owner": ["Models", "scripts"],
+      "evidence": ["data provenance", "held-out and OOD evaluation", "consumer A/B", "bounded fallback"]
+    }
+  ]
+}
