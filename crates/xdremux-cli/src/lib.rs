@@ -1,133 +1,80 @@
 #![forbid(unsafe_code)]
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+use clap::{error::ErrorKind, Args, CommandFactory, Parser, Subcommand};
 use xdremux_engine::ConversionRequest;
 use xdremux_runtime::PortableRuntime;
 use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
 
-const HELP: &str = "XDRemux Rust CLI\n\nUsage:\n  xdremux <COMMAND>\n\nCommands:\n  inspect <INPUT> [--json]                 Inspect the canonical Rust input route\n  convert --input <INPUT> [--output <OUT>] Convert through the unified Rust runtime\n\nOptions:\n  -h, --help     Print help\n  -V, --version  Print version\n";
-const INSPECT_HELP: &str = "Inspect one input without converting it.\n\nUsage:\n  xdremux inspect <INPUT> [--json]\n\nOptions:\n      --json  Emit the stable machine-readable inspection schema\n  -h, --help  Print help\n";
-const CONVERT_HELP: &str = "Convert one supported source with the unified Rust engine/runtime.\n\nUsage:\n  xdremux convert --input <INPUT> [--output <OUTPUT>]\n\nOptions:\n      --input <INPUT>    Input ProXDR HEIC or supported Motion Photo\n      --output <OUTPUT>  Output HEIC; ProXDR defaults in-place, Motion Photo chooses a new pair\n  -h, --help             Print help\n";
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Command {
-    Help,
-    Version,
-    InspectHelp,
-    ConvertHelp,
-    Inspect {
-        input: PathBuf,
-        json: bool,
-    },
-    Convert {
-        input: PathBuf,
-        output: Option<PathBuf>,
-    },
+#[derive(Debug, Parser)]
+#[command(
+    name = "xdremux",
+    version,
+    about = "Convert and inspect ProXDR and Motion Photo assets with the canonical Rust runtime.",
+    disable_help_subcommand = true
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: RootCommand,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct CliError(String);
-
-fn is(arg: &OsStr, expected: &str) -> bool {
-    arg == OsStr::new(expected)
+#[derive(Debug, Subcommand)]
+enum RootCommand {
+    /// Inspect one input without converting it.
+    Inspect(InspectArgs),
+    /// Convert one supported source with the unified Rust engine/runtime.
+    Convert(ConvertArgs),
 }
 
-fn parse_inspect(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliError> {
-    let mut input = None;
-    let mut json = false;
-    let mut options = true;
-
-    for arg in args {
-        if options && is(&arg, "--") {
-            options = false;
-            continue;
-        }
-        if options && (is(&arg, "--help") || is(&arg, "-h")) {
-            return Ok(Command::InspectHelp);
-        }
-        if options && is(&arg, "--json") {
-            json = true;
-            continue;
-        }
-        if options && arg.to_string_lossy().starts_with('-') {
-            return Err(CliError(format!(
-                "unknown inspect option: {}",
-                arg.to_string_lossy()
-            )));
-        }
-        if input.replace(PathBuf::from(arg)).is_some() {
-            return Err(CliError(
-                "inspect accepts exactly one input path".to_owned(),
-            ));
-        }
-    }
-
-    let input = input.ok_or_else(|| CliError("inspect requires an input path".to_owned()))?;
-    Ok(Command::Inspect { input, json })
+#[derive(Debug, Args)]
+struct InspectArgs {
+    /// Input ProXDR HEIC or supported Motion Photo.
+    #[arg(value_name = "INPUT")]
+    input: PathBuf,
+    /// Emit the stable machine-readable inspection schema.
+    #[arg(long)]
+    json: bool,
 }
 
-fn parse_convert(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliError> {
-    let mut args = args.into_iter();
-    let mut input = None;
-    let mut output = None;
-
-    while let Some(arg) = args.next() {
-        if is(&arg, "--help") || is(&arg, "-h") {
-            return Ok(Command::ConvertHelp);
-        }
-        if is(&arg, "--input") {
-            let value = args
-                .next()
-                .ok_or_else(|| CliError("--input requires a path".to_owned()))?;
-            if input.replace(PathBuf::from(value)).is_some() {
-                return Err(CliError("--input may be specified only once".to_owned()));
-            }
-            continue;
-        }
-        if is(&arg, "--output") {
-            let value = args
-                .next()
-                .ok_or_else(|| CliError("--output requires a path".to_owned()))?;
-            if output.replace(PathBuf::from(value)).is_some() {
-                return Err(CliError("--output may be specified only once".to_owned()));
-            }
-            continue;
-        }
-        return Err(CliError(format!(
-            "unknown convert argument: {}",
-            arg.to_string_lossy()
-        )));
-    }
-
-    let input = input.ok_or_else(|| CliError("convert requires --input <PATH>".to_owned()))?;
-    Ok(Command::Convert { input, output })
+#[derive(Debug, Args)]
+struct ConvertArgs {
+    /// Input ProXDR HEIC or supported Motion Photo.
+    #[arg(long, value_name = "INPUT")]
+    input: PathBuf,
+    /// Output HEIC; ProXDR defaults in-place, Motion Photo chooses a new pair.
+    #[arg(long, value_name = "OUTPUT")]
+    output: Option<PathBuf>,
 }
 
-fn parse_command(args: impl IntoIterator<Item = OsString>) -> Result<Command, CliError> {
-    let mut args = args.into_iter();
-    let Some(command) = args.next() else {
-        return Ok(Command::Help);
+fn write_clap_error(error: clap::Error, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+    let kind = error.kind();
+    let code = u8::try_from(error.exit_code()).unwrap_or(2);
+    let rendered = error.to_string();
+    let result = if matches!(kind, ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) {
+        write!(stdout, "{rendered}")
+    } else {
+        write!(stderr, "{rendered}")
     };
-    if is(&command, "--help") || is(&command, "-h") {
-        return Ok(Command::Help);
+    if result.is_err() {
+        return 1;
     }
-    if is(&command, "--version") || is(&command, "-V") {
-        return Ok(Command::Version);
+    code
+}
+
+fn parse_cli(args: impl IntoIterator<Item = OsString>) -> Result<Cli, clap::Error> {
+    Cli::try_parse_from(std::iter::once(OsString::from("xdremux")).chain(args))
+}
+
+fn write_root_help(stdout: &mut impl Write) -> u8 {
+    let mut command = Cli::command();
+    match command.write_long_help(&mut *stdout).and_then(|()| writeln!(stdout)) {
+        Ok(()) => 0,
+        Err(_) => 1,
     }
-    if is(&command, "inspect") {
-        return parse_inspect(args);
-    }
-    if is(&command, "convert") {
-        return parse_convert(args);
-    }
-    Err(CliError(format!(
-        "unknown command: {}",
-        command.to_string_lossy()
-    )))
 }
 
 fn write_human(inspection: &SourceInspection, output: &mut impl Write) -> io::Result<()> {
@@ -292,34 +239,19 @@ where
     I: IntoIterator<Item = S>,
     S: Into<OsString>,
 {
-    let args = args.into_iter().map(Into::into);
-    match parse_command(args) {
-        Ok(Command::Help) => match write!(stdout, "{HELP}") {
-            Ok(()) => 0,
-            Err(_) => 1,
-        },
-        Ok(Command::Version) => match writeln!(stdout, "xdremux {}", env!("CARGO_PKG_VERSION")) {
-            Ok(()) => 0,
-            Err(_) => 1,
-        },
-        Ok(Command::InspectHelp) => match write!(stdout, "{INSPECT_HELP}") {
-            Ok(()) => 0,
-            Err(_) => 1,
-        },
-        Ok(Command::ConvertHelp) => match write!(stdout, "{CONVERT_HELP}") {
-            Ok(()) => 0,
-            Err(_) => 1,
-        },
-        Ok(Command::Inspect { input, json }) => run_inspect(input, json, stdout, stderr),
-        Ok(Command::Convert { input, output }) => run_convert(input, output, stdout, stderr),
-        Err(error) => {
-            let _ = writeln!(
-                stderr,
-                "error: {}\n\nTry 'xdremux --help' for usage.",
-                error.0
-            );
-            2
-        }
+    let args = args.into_iter().map(Into::into).collect::<Vec<_>>();
+    if args.is_empty() {
+        return write_root_help(stdout);
+    }
+
+    match parse_cli(args) {
+        Ok(Cli {
+            command: RootCommand::Inspect(arguments),
+        }) => run_inspect(arguments.input, arguments.json, stdout, stderr),
+        Ok(Cli {
+            command: RootCommand::Convert(arguments),
+        }) => run_convert(arguments.input, arguments.output, stdout, stderr),
+        Err(error) => write_clap_error(error, stdout, stderr),
     }
 }
 
@@ -327,14 +259,19 @@ where
 mod tests {
     use super::*;
 
+    fn parse(args: &[&str]) -> Cli {
+        parse_cli(args.iter().map(OsString::from)).expect("arguments should parse")
+    }
+
     #[test]
     fn no_arguments_prints_help() {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
         assert_eq!(run_from(Vec::<&str>::new(), &mut stdout, &mut stderr), 0);
         let output = String::from_utf8(stdout).unwrap();
-        assert!(output.contains("xdremux <COMMAND>"));
-        assert!(output.contains("convert --input <INPUT>"));
+        assert!(output.contains("Commands:"));
+        assert!(output.contains("inspect"));
+        assert!(output.contains("convert"));
         assert!(stderr.is_empty());
     }
 
@@ -343,66 +280,44 @@ mod tests {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
         assert_eq!(run_from(["inspect"], &mut stdout, &mut stderr), 2);
-        assert!(String::from_utf8(stderr)
-            .unwrap()
-            .contains("inspect requires an input path"));
+        assert!(stdout.is_empty());
+        assert!(String::from_utf8(stderr).unwrap().contains("<INPUT>"));
     }
 
     #[test]
     fn double_dash_allows_paths_that_start_with_dash() {
-        let command = parse_command(
-            ["inspect", "--", "-capture.jpg"]
-                .into_iter()
-                .map(OsString::from),
-        )
-        .unwrap();
-        assert_eq!(
-            command,
-            Command::Inspect {
-                input: PathBuf::from("-capture.jpg"),
-                json: false,
-            }
-        );
+        let command = parse(&["inspect", "--", "-capture.jpg"]);
+        let RootCommand::Inspect(arguments) = command.command else {
+            panic!("expected inspect command");
+        };
+        assert_eq!(arguments.input, PathBuf::from("-capture.jpg"));
+        assert!(!arguments.json);
     }
 
     #[test]
     fn convert_defaults_to_in_place_publication() {
-        let command = parse_command(
-            ["convert", "--input", "capture.heic"]
-                .into_iter()
-                .map(OsString::from),
-        )
-        .unwrap();
-        assert_eq!(
-            command,
-            Command::Convert {
-                input: PathBuf::from("capture.heic"),
-                output: None,
-            }
-        );
+        let command = parse(&["convert", "--input", "capture.heic"]);
+        let RootCommand::Convert(arguments) = command.command else {
+            panic!("expected convert command");
+        };
+        assert_eq!(arguments.input, PathBuf::from("capture.heic"));
+        assert_eq!(arguments.output, None);
     }
 
     #[test]
     fn convert_accepts_explicit_output() {
-        let command = parse_command(
-            [
-                "convert",
-                "--input",
-                "capture.heic",
-                "--output",
-                "converted.heic",
-            ]
-            .into_iter()
-            .map(OsString::from),
-        )
-        .unwrap();
-        assert_eq!(
-            command,
-            Command::Convert {
-                input: PathBuf::from("capture.heic"),
-                output: Some(PathBuf::from("converted.heic")),
-            }
-        );
+        let command = parse(&[
+            "convert",
+            "--input",
+            "capture.heic",
+            "--output",
+            "converted.heic",
+        ]);
+        let RootCommand::Convert(arguments) = command.command else {
+            panic!("expected convert command");
+        };
+        assert_eq!(arguments.input, PathBuf::from("capture.heic"));
+        assert_eq!(arguments.output, Some(PathBuf::from("converted.heic")));
     }
 
     #[test]
@@ -410,9 +325,19 @@ mod tests {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
         assert_eq!(run_from(["convert"], &mut stdout, &mut stderr), 2);
-        assert!(String::from_utf8(stderr)
-            .unwrap()
-            .contains("convert requires --input <PATH>"));
+        assert!(stdout.is_empty());
+        assert!(String::from_utf8(stderr).unwrap().contains("--input <INPUT>"));
+    }
+
+    #[test]
+    fn help_and_version_are_successful_control_flow() {
+        for arguments in [["--help"], ["--version"]] {
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            assert_eq!(run_from(arguments, &mut stdout, &mut stderr), 0);
+            assert!(!stdout.is_empty());
+            assert!(stderr.is_empty());
+        }
     }
 
     #[test]
@@ -421,8 +346,11 @@ mod tests {
         let mut stderr = Vec::new();
         assert_eq!(run_from(["frobnicate"], &mut stdout, &mut stderr), 2);
         assert!(stdout.is_empty());
-        assert!(String::from_utf8(stderr)
-            .unwrap()
-            .contains("unknown command: frobnicate"));
+        assert!(String::from_utf8(stderr).unwrap().contains("frobnicate"));
+    }
+
+    #[test]
+    fn clap_command_definition_is_internally_consistent() {
+        Cli::command().debug_assert();
     }
 }
