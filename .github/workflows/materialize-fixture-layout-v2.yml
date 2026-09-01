@@ -21,7 +21,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
-      - name: Migrate fixture corpus
+      - name: Migrate fixture corpus outside workflow files
         shell: bash
         run: |
           set -euo pipefail
@@ -60,6 +60,8 @@ jobs:
                   continue
               path = Path(raw.decode())
               if not path.is_file() or path.suffix.lower() in binary_suffixes:
+                  continue
+              if path.parts[:2] == (".github", "workflows"):
                   continue
               try:
                   text = path.read_text()
@@ -117,15 +119,16 @@ jobs:
           if actual != expected:
               raise SystemExit(f"fixture layout mismatch: missing={sorted(expected-actual)} extra={sorted(actual-expected)}")
           PY
-      - name: Commit migration
+          echo 'Workflow files still requiring path migration:'
+          git grep -l -E 'IMG2025|IMG2026|MVIMG_2026|20260312_|R002_|R003_' -- '.github/workflows/*.yml' || true
+      - name: Commit media and non-workflow path migration
         shell: bash
         run: |
           set -euo pipefail
-          git rm -f .github/workflows/materialize-fixture-layout.yml .github/workflows/materialize-fixture-layout-v2.yml
           git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add -A ':!.github/workflows/*.yml'
           git commit -m "chore(fixtures): organize media corpus by vendor"
           git push origin HEAD:feat/rust-cli-unification
           git push origin --delete tmp || true
