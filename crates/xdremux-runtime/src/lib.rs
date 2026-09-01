@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 
+mod batch;
 mod live_photo;
 
+pub use batch::{BatchAssetKind, BatchFailure, BatchItem, BatchReceipt, BatchSuccess};
 pub use live_photo::LivePhotoFileReceipt;
 
 use std::error::Error;
