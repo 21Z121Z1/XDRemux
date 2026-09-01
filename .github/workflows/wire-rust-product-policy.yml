@@ -84,6 +84,37 @@ jobs:
               raise SystemExit("execution lifecycle capability fixture chroma anchor not found")
           block = block.replace(old_chroma, "chroma: ChromaSampling::Yuv444,", 1)
           execution.write_text(text[:start] + block + text[end:])
+
+          vectors = Path("crates/xdremux-engine/src/bin/xdremux-engine-vectors.rs")
+          text = vectors.read_text()
+          old = '''    let encoder_only = CapabilityInventory::new([OperationCapability::GainMapTileEncoder(layout(
+              ChromaSampling::Yuv420,
+              8,
+          ))]);'''
+          new = '''    let encoder_only = CapabilityInventory::new([OperationCapability::GainMapTileEncoder(layout(
+              ChromaSampling::Yuv444,
+              8,
+          ))]);'''
+          if old not in text:
+              raise SystemExit("missing-decoder vector encoder anchor not found")
+          text = text.replace(old, new, 1)
+          old = '''        &only_420,
+          )
+          .expect_err("Photographic Styles request must require its operation adapter");'''
+          new = '''        &only_444,
+          )
+          .expect_err("Photographic Styles request must require its operation adapter");'''
+          if old not in text:
+              raise SystemExit("missing-styles vector capability anchor not found")
+          vectors.write_text(text.replace(old, new, 1))
+
+          check = Path("scripts/check_engine_plan_vectors.sh")
+          text = check.read_text()
+          old = "preserve-420|family=X7|requested=Hybrid|effective=Hybrid|chroma=Yuv420|depth=8"
+          new = "preserve-420|family=X7|requested=Hybrid|effective=Hybrid|chroma=Yuv444|depth=8"
+          if old not in text:
+              raise SystemExit("planner vector expectation anchor not found")
+          check.write_text(text.replace(old, new, 1))
           PY
           cargo fmt --all
       - name: Verify engine product policy
@@ -98,7 +129,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/xdremux-engine/src/lib.rs crates/xdremux-engine/src/product_policy.rs crates/xdremux-engine/src/execution.rs
+          git add \
+            crates/xdremux-engine/src/lib.rs \
+            crates/xdremux-engine/src/product_policy.rs \
+            crates/xdremux-engine/src/execution.rs \
+            crates/xdremux-engine/src/bin/xdremux-engine-vectors.rs \
+            scripts/check_engine_plan_vectors.sh
           git diff --cached --check
           git commit -m "fix(rust-engine): make output chroma a product policy"
           git push origin HEAD:feat/rust-cli-unification
