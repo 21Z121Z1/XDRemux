@@ -10,6 +10,9 @@ trap 'rm -rf "$WORKDIR"' EXIT
 
 FIXTURE="$WORKDIR/motion.jpg"
 REPORT="$WORKDIR/report.json"
+CATEGORIZE_INPUT="$WORKDIR/portrait.heic"
+CATEGORIZE_OUTPUT="$WORKDIR/categorized"
+CATEGORIZE_REPORT="$WORKDIR/categorize.json"
 
 python3 - "$FIXTURE" <<'PY'
 from pathlib import Path
@@ -42,6 +45,29 @@ assert report["video"]["length"] > 0, report
 assert report["stream_count"] == 1, report
 PY
 
+printf 'synthetic metadata Oplus_16 payload' > "$CATEGORIZE_INPUT"
+cargo run --locked --quiet -p xdremux-cli -- categorize \
+  --input "$CATEGORIZE_INPUT" \
+  --output-dir "$CATEGORIZE_OUTPUT" \
+  --dry-run \
+  --json > "$CATEGORIZE_REPORT"
+
+python3 - "$CATEGORIZE_REPORT" "$CATEGORIZE_OUTPUT" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+report = json.loads(Path(sys.argv[1]).read_text())
+output = Path(sys.argv[2])
+assert report["schema_version"] == 1, report
+assert report["command"] == "categorize", report
+assert report["processed"] == 1, report
+assert report["dry_run"] == 1, report
+assert report["failed"] == 0, report
+assert report["items"][0]["classification"]["primary_capture_mode"] == "portrait", report
+assert not output.exists(), output
+PY
+
 cargo run --locked --quiet -p xdremux-cli -- --help | grep -F "canonical Rust runtime" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- inspect --help | grep -F "Inspect one input" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F -- "--input <INPUT>" >/dev/null
@@ -49,3 +75,6 @@ cargo run --locked --quiet -p xdremux-cli -- convert --help | grep -F "Convert o
 cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F "Convert a deterministic batch" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--input-dir <DIR>" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- batch --help | grep -F -- "--recursive" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F "Classify photo assets" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F -- "--output-dir <DIR>" >/dev/null
+cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F -- "--dry-run" >/dev/null
