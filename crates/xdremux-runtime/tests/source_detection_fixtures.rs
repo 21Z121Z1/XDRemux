@@ -14,7 +14,10 @@ fn fixture(relative: impl AsRef<Path>) -> PathBuf {
 fn analyze(relative: impl AsRef<Path>) -> PreparedProXdr {
     let path = fixture(relative);
     let source = fs::read(&path).unwrap_or_else(|error| {
-        panic!("real ProXDR fixture {} should exist: {error}", path.display())
+        panic!(
+            "real ProXDR fixture {} should exist: {error}",
+            path.display()
+        )
     });
     PortableRuntime::new()
         .analyze_proxdr(&source)
