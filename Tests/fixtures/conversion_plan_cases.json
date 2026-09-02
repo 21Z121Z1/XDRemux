@@ -49,8 +49,7 @@
     "apple_portrait": true
   },
   {
-    "name": "explicit-x6-iso-graph",
-    "family": "x6",
+    "name": "iso-graph-system-decoded",
     "oppo_compatibility": "iso-graph",
     "oppo_camera_tail": "off",
     "input_processing_branch": "system-decoded"
