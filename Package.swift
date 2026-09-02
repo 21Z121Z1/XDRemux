@@ -9,10 +9,10 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
-        // Swift is no longer a second XDRemux product stack. Keep only the
-        // Apple platform capability library public while its implementation is
-        // migrated behind Rust-owned capability contracts.
-        .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"])
+        // Swift does not own a second XDRemux product stack. These are platform
+        // capability artifacts consumed by the Rust-owned product.
+        .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"]),
+        .executable(name: "xdremux-apple-adapter", targets: ["XDRemuxAppleAdapter"])
     ],
     dependencies: [
         .package(
@@ -39,9 +39,8 @@ let package = Package(
                 .copy("Resources/ApplePlatform")
             ]
         ),
-        // Internal process boundary for Apple-only capabilities. The protocol is
-        // owned by the Rust runtime; this target reports capability facts and,
-        // in later migration slices, executes narrowly scoped Apple operations.
+        // Process boundary for Apple-only capabilities. It is a distributable
+        // platform component, not a user-facing CLI or a business-policy owner.
         .executableTarget(
             name: "XDRemuxAppleAdapter",
             dependencies: ["XDRemuxAppleFeatures"],
