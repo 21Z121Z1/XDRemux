@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use xdremux_engine::{
     AppleAuxiliaryKind, AppleAuxiliaryPayload, AppleGainMapFacts, AppleImageAuxiliaryFacts,
-    AppleMetadataValue, AppleSemanticRole, OperationCapability,
+    AppleL8Mask, AppleMetadataValue, AppleSemanticRole, OperationCapability,
 };
 use xdremux_format::FourCC;
 
@@ -20,14 +20,6 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 const VISION_TIMEOUT: Duration = Duration::from_secs(300);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 const MAX_SEMANTIC_MASK_BYTES: usize = 128 * 1024 * 1024;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AppleSemanticMask {
-    pub role: AppleSemanticRole,
-    pub width: u32,
-    pub height: u32,
-    pub pixels: Vec<u8>,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct AppleImageProperties {
@@ -207,7 +199,7 @@ impl AppleAdapterClient {
         input: &Path,
         roles: &[AppleSemanticRole],
         orientation: Option<u32>,
-    ) -> Result<Vec<AppleSemanticMask>> {
+    ) -> Result<BTreeMap<AppleSemanticRole, AppleL8Mask>> {
         if roles.is_empty() {
             return Err(RuntimeError::new(
                 "Apple Vision semantic mattes",
@@ -244,20 +236,13 @@ impl AppleAdapterClient {
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
         validate_schema(response.schema_version)?;
 
-        let mut observed = BTreeSet::new();
-        let mut masks = Vec::with_capacity(response.semantic_masks.len());
+        let mut masks = BTreeMap::new();
         for wire in response.semantic_masks {
             let role = parse_semantic_role(&wire.role)?;
             if !expected.contains(&role) {
                 return Err(RuntimeError::new(
                     "Apple Vision semantic mattes",
                     format!("adapter returned unrequested role {:?}", role),
-                ));
-            }
-            if !observed.insert(role) {
-                return Err(RuntimeError::new(
-                    "Apple Vision semantic mattes",
-                    format!("adapter returned duplicate role {:?}", role),
                 ));
             }
             if FourCC::new(wire.pixel_format.to_be_bytes()) != FourCC::new(*b"L008") {
@@ -311,14 +296,17 @@ impl AppleAdapterClient {
             let pixels = fs::read(&path).map_err(|error| {
                 RuntimeError::external("Apple Vision semantic mask read", error)
             })?;
-            masks.push(AppleSemanticMask {
-                role,
-                width: wire.width,
-                height: wire.height,
-                pixels,
-            });
+            let mask = AppleL8Mask::new(wire.width, wire.height, pixels)
+                .map_err(|error| RuntimeError::external("Apple Vision semantic mask", error))?;
+            if masks.insert(role, mask).is_some() {
+                return Err(RuntimeError::new(
+                    "Apple Vision semantic mattes",
+                    format!("adapter returned duplicate role {:?}", role),
+                ));
+            }
         }
 
+        let observed = masks.keys().copied().collect::<BTreeSet<_>>();
         if observed != expected {
             let missing = expected.difference(&observed).copied().collect::<Vec<_>>();
             return Err(RuntimeError::new(
@@ -326,7 +314,6 @@ impl AppleAdapterClient {
                 format!("adapter omitted required roles: {missing:?}"),
             ));
         }
-        masks.sort_by_key(|mask| mask.role);
         Ok(masks)
     }
 
