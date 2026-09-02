@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod apple;
+mod apple_portrait;
 mod capabilities;
 mod execution;
 mod product_policy;
@@ -12,6 +13,10 @@ use xdremux_format::ChromaSampling;
 
 pub use apple::{
     AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleSemanticRole, APPLE_PORTRAIT_SEMANTIC_ROLES,
+};
+pub use apple_portrait::{
+    AppleRendDocument, AppleRendError, AppleRendRecord, AppleXhlrbControlOutput,
+    APPLE_XHLRB_DYNAMIC_RECORD_IDS,
 };
 pub use capabilities::{
     CapabilityInventory, GainMapTileEncoder, OperationCapability, RasterDecoder,
