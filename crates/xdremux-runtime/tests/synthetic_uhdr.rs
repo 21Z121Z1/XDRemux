@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use jpeg_encoder::{ColorType, Encoder};
-use xdremux_engine::{ConversionRequest, GainMapChannels, OppoCameraTail};
+use xdremux_engine::{ConversionRequest, GainMapChannels};
 use xdremux_format::ChromaSampling;
 use xdremux_heif::validate_gain_map_structure;
 use xdremux_runtime::PortableRuntime;
@@ -72,13 +72,9 @@ fn portable_runtime_converts_synthetic_uhdr_end_to_end() {
     let base = fs::read(public_heif_fixture()).expect("versioned HEIF fixture must be readable");
     let source = synthetic_uhdr_source(&base);
     let runtime = PortableRuntime::new();
-    let request = ConversionRequest {
-        oppo_camera_tail: OppoCameraTail::Off,
-        ..ConversionRequest::default()
-    };
 
     let receipt = runtime
-        .convert_proxdr_bytes(&source, request, |_| {})
+        .convert_proxdr_bytes(&source, ConversionRequest::default(), |_| {})
         .expect("Rust-only synthetic UHDR conversion must succeed");
 
     assert_eq!(receipt.plan.gain_map_target.channels, GainMapChannels::Rgb);
