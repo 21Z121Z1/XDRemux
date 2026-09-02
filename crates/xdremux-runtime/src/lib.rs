@@ -6,6 +6,7 @@ mod batch;
 mod batch_checkpoint;
 mod categorize;
 mod live_photo;
+mod oppo_portrait;
 mod oppo_tail;
 mod validation;
 
@@ -19,6 +20,7 @@ pub use batch_checkpoint::{
 };
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 pub use live_photo::LivePhotoFileReceipt;
+pub use oppo_portrait::ApplePortraitSourcePreflight;
 pub use validation::{
     validate_media_file, IsoHdrValidationReport, LivePhotoValidationReport, ValidationReport,
 };
@@ -145,6 +147,15 @@ impl PortableRuntime {
     ) -> Result<xdremux_engine::AppleImageAuxiliaryFacts> {
         apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
             .imageio_auxiliary_facts(input.as_ref())
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn preflight_apple_portrait_source(
+        &self,
+        executable: impl AsRef<Path>,
+        source: &[u8],
+    ) -> Result<ApplePortraitSourcePreflight> {
+        oppo_portrait::prepare_apple_portrait_source(executable.as_ref(), source)
     }
 
     pub fn analyze_proxdr(&self, source: &[u8]) -> Result<PreparedProXdr> {
