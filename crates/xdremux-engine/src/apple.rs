@@ -32,6 +32,50 @@ impl AppleImageAuxiliaryFacts {
     }
 }
 
+/// Semantic image resources used by Apple photo features.
+///
+/// Product code deals in these roles. Framework class names and selectors stay
+/// behind the Apple adapter so the Rust engine does not encode SPI spellings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AppleSemanticRole {
+    Person,
+    Skin,
+    Hair,
+    Teeth,
+    Glasses,
+    Sky,
+}
+
+/// API surface currently required to obtain one semantic role on Apple systems.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppleVisionApiSurface {
+    Public,
+    PrivateSpi,
+}
+
+impl AppleSemanticRole {
+    pub const fn vision_api_surface(self) -> AppleVisionApiSurface {
+        match self {
+            Self::Person => AppleVisionApiSurface::Public,
+            Self::Skin | Self::Hair | Self::Teeth | Self::Glasses | Self::Sky => {
+                AppleVisionApiSurface::PrivateSpi
+            }
+        }
+    }
+}
+
+/// Semantic resources required by the current Apple Photos Portrait contract.
+///
+/// This is product policy. The adapter is given these roles explicitly rather
+/// than choosing a feature profile itself.
+pub const APPLE_PORTRAIT_SEMANTIC_ROLES: [AppleSemanticRole; 5] = [
+    AppleSemanticRole::Person,
+    AppleSemanticRole::Skin,
+    AppleSemanticRole::Hair,
+    AppleSemanticRole::Teeth,
+    AppleSemanticRole::Glasses,
+];
+
 /// ImageIO observations about one ISO Gain Map auxiliary image.
 ///
 /// The platform adapter reports the raw FourCC and geometry. Product policy
@@ -75,6 +119,32 @@ mod tests {
             ..complete
         };
         assert!(!missing_glasses.satisfies_portrait_editing());
+    }
+
+    #[test]
+    fn portrait_semantic_contract_is_explicit_and_stable() {
+        assert_eq!(
+            APPLE_PORTRAIT_SEMANTIC_ROLES,
+            [
+                AppleSemanticRole::Person,
+                AppleSemanticRole::Skin,
+                AppleSemanticRole::Hair,
+                AppleSemanticRole::Teeth,
+                AppleSemanticRole::Glasses,
+            ]
+        );
+        assert_eq!(
+            AppleSemanticRole::Person.vision_api_surface(),
+            AppleVisionApiSurface::Public
+        );
+        for role in [
+            AppleSemanticRole::Skin,
+            AppleSemanticRole::Hair,
+            AppleSemanticRole::Teeth,
+            AppleSemanticRole::Glasses,
+        ] {
+            assert_eq!(role.vision_api_surface(), AppleVisionApiSurface::PrivateSpi);
+        }
     }
 
     #[test]
