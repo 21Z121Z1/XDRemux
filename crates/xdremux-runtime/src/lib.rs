@@ -36,7 +36,7 @@ use xdremux_engine::{
     execute_conversion, gain_map_source_profile_from_jpeg, ArtifactBuilder, ArtifactPublisher,
     ArtifactValidator, CapabilityInventory, ConversionAnalysis, ConversionPlan, ConversionRequest,
     ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder, OperationCapability,
-    OutputIntent, RasterDecoder,
+    RasterDecoder,
 };
 use xdremux_format::probe_jpeg_frame_profile;
 use xdremux_hdr::{
@@ -550,6 +550,7 @@ mod tests {
     use super::*;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use xdremux_engine::OutputIntent;
     use xdremux_format::isobmff::{make_box, MDAT};
     use xdremux_format::FourCC;
 
