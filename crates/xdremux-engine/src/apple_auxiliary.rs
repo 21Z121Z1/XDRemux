@@ -166,7 +166,7 @@ pub fn build_apple_portrait_disparity_payload(
         ),
         numbers(
             "depthData:ExtrinsicMatrix",
-            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
         ),
         numbers(
             "depthData:LensDistortionCoefficients",
@@ -292,8 +292,7 @@ fn validate_data_size(
 }
 
 fn base64_standard(data: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     let mut output = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
@@ -302,13 +301,9 @@ fn base64_standard(data: &[u8]) -> String {
         let third = chunk.get(2).copied().unwrap_or(0);
 
         output.push(ALPHABET[usize::from(first >> 2)] as char);
-        output.push(
-            ALPHABET[usize::from(((first & 0x03) << 4) | (second >> 4))] as char,
-        );
+        output.push(ALPHABET[usize::from(((first & 0x03) << 4) | (second >> 4))] as char);
         if chunk.len() > 1 {
-            output.push(
-                ALPHABET[usize::from(((second & 0x0f) << 2) | (third >> 6))] as char,
-            );
+            output.push(ALPHABET[usize::from(((second & 0x0f) << 2) | (third >> 6))] as char);
         } else {
             output.push('=');
         }
@@ -367,6 +362,18 @@ mod tests {
         })
     }
 
+    fn metadata_numbers<'a>(payload: &'a AppleAuxiliaryPayload, path: &str) -> Option<&'a [f64]> {
+        payload.metadata.iter().find_map(|tag| {
+            if tag.path != path {
+                return None;
+            }
+            match &tag.value {
+                AppleMetadataValue::Numbers(value) => Some(value.as_slice()),
+                AppleMetadataValue::Text(_) => None,
+            }
+        })
+    }
+
     #[test]
     fn standard_base64_matches_rfc_4648_vectors() {
         for (input, expected) in [
@@ -393,14 +400,9 @@ mod tests {
             near: 1.0,
             pixels_le_f16: vec![0; 8],
         };
-        let payload = build_apple_portrait_disparity_payload(
-            disparity,
-            6,
-            &calibration,
-            b"REND",
-            2.8,
-        )
-        .expect("depth payload");
+        let payload =
+            build_apple_portrait_disparity_payload(disparity, 6, &calibration, b"REND", 2.8)
+                .expect("depth payload");
 
         assert_eq!(payload.kind, AppleAuxiliaryKind::Disparity);
         assert_eq!(payload.description.width, 2);
@@ -420,6 +422,10 @@ mod tests {
         assert_eq!(
             metadata_text(&payload, "depthData:DepthDataVersion"),
             Some("65541")
+        );
+        assert_eq!(
+            metadata_numbers(&payload, "depthData:ExtrinsicMatrix"),
+            Some(&[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0][..])
         );
         assert_eq!(
             metadata_text(&payload, "depthBlurEffect:RenderingParameters"),
