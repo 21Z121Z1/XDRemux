@@ -70,12 +70,12 @@ jobs:
             exit 1
           fi
       - name: Check formatting
-        run: cargo fmt --check -p xdremux-classification -p xdremux-source -p xdremux-runtime -p xdremux-cli
+        run: cargo fmt --check -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
       - name: Lint canonical Rust CLI stack
-        run: cargo clippy --locked -p xdremux-classification -p xdremux-source -p xdremux-runtime -p xdremux-cli --all-targets -- -D warnings
+        run: cargo clippy --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli --all-targets -- -D warnings
       - name: Test canonical Rust CLI stack
-        run: cargo test --locked -p xdremux-classification -p xdremux-source -p xdremux-runtime -p xdremux-cli
-      - name: Exercise real Rust CLI routes
+        run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
+      - name: Exercise real Rust CLI routes and product intents
         run: bash scripts/check_rust_cli_smoke.sh
       - name: Verify exact-head completion gate
         shell: bash
@@ -83,7 +83,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-rust-cli-gate.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Verify the canonical Rust classification, source routing, ProXDR runtime, batch/categorize product surfaces, and xdremux CLI entry point including functional media conversion",
+            "scope": "Verify the canonical Rust engine policy, classification, source routing, ProXDR runtime, batch/categorize product surfaces, and xdremux CLI entry point including real OPPO Gallery intent conversion",
             "checks": [
               {
                 "name": "rust-workspace-lock",
@@ -94,19 +94,19 @@ jobs:
               {
                 "name": "rust-cli-stack-regressions",
                 "kind": "regression",
-                "command": ["cargo", "test", "--locked", "-p", "xdremux-classification", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli"],
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-classification", "-p", "xdremux-engine", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli"],
                 "timeout_seconds": 900
               },
               {
                 "name": "rust-cli-real-file-smoke",
                 "kind": "integration",
                 "command": ["bash", "scripts/check_rust_cli_smoke.sh"],
-                "timeout_seconds": 600
+                "timeout_seconds": 900
               },
               {
                 "name": "rust-cli-stack-clippy",
                 "kind": "static",
-                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-classification", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli", "--all-targets", "--", "-D", "warnings"],
+                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-classification", "-p", "xdremux-engine", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli", "--all-targets", "--", "-D", "warnings"],
                 "timeout_seconds": 900
               }
             ]
@@ -151,4 +151,4 @@ jobs:
       - name: Build canonical Rust CLI
         run: cargo build --locked -p xdremux-cli
       - name: Test portable Rust CLI conversion semantics
-        run: cargo test --locked -p xdremux-classification -p xdremux-source -p xdremux-runtime -p xdremux-cli
+        run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
