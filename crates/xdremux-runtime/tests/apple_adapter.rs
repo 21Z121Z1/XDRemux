@@ -160,7 +160,7 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
             .expect("Rust-owned semantic matte must be directly payload-ready");
     }
 
-    assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
+    assert!((1.0..=32.0).contains(&preflight.simulated_aperture));
 
     // One Rust-owned operation now defines the full Portrait auxiliary set.
     // The short REND value is sufficient here because this integration test
@@ -190,12 +190,7 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     let temporary = tempfile::tempdir().expect("create Portrait output directory");
     let iso_base = temporary.path().join("portrait-iso-base.heic");
     runtime
-        .convert_proxdr_file(
-            &source,
-            &iso_base,
-            ConversionRequest::default(),
-            |_| {},
-        )
+        .convert_proxdr_file(&source, &iso_base, ConversionRequest::default(), |_| {})
         .expect("Rust runtime must build the ISO HDR base before Apple auxiliaries");
     let base_facts = runtime
         .apple_image_auxiliary_facts(&executable, &iso_base)
