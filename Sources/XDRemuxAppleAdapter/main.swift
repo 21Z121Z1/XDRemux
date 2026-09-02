@@ -10,6 +10,7 @@ private struct AdapterRequest: Decodable {
     let outputPath: String?
     let roles: [String]?
     let orientation: UInt32?
+    let auxiliaryPayloads: [AuxiliaryPayloadRequest]?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -18,7 +19,43 @@ private struct AdapterRequest: Decodable {
         case outputPath = "output_path"
         case roles
         case orientation
+        case auxiliaryPayloads = "auxiliary_payloads"
     }
+}
+
+private struct AuxiliaryPayloadRequest: Decodable {
+    let kind: String
+    let dataPath: String
+    let width: UInt32
+    let height: UInt32
+    let bytesPerRow: UInt32
+    let pixelFormat: UInt32
+    let orientation: UInt32?
+    let namespaces: [MetadataNamespaceRequest]
+    let metadata: [MetadataTagRequest]
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case dataPath = "data_path"
+        case width
+        case height
+        case bytesPerRow = "bytes_per_row"
+        case pixelFormat = "pixel_format"
+        case orientation
+        case namespaces
+        case metadata
+    }
+}
+
+private struct MetadataNamespaceRequest: Decodable {
+    let uri: String
+    let prefix: String
+}
+
+private struct MetadataTagRequest: Decodable {
+    let path: String
+    let text: String?
+    let numbers: [Double]?
 }
 
 private struct AuxiliaryFacts: Encodable {
@@ -177,6 +214,113 @@ private func imageIOImageProperties(inputPath: String) -> ImageProperties {
     )
 }
 
+private func auxiliaryType(for kind: String) -> CFString {
+    switch kind {
+    case "disparity":
+        return kCGImageAuxiliaryDataTypeDisparity
+    case "portrait-effects-matte":
+        return kCGImageAuxiliaryDataTypePortraitEffectsMatte
+    case "skin-matte":
+        return kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte
+    case "hair-matte":
+        return kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte
+    case "teeth-matte":
+        return kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte
+    case "glasses-matte":
+        return kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte
+    case "sky-matte":
+        return kCGImageAuxiliaryDataTypeSemanticSegmentationSkyMatte
+    default:
+        fail("unsupported ImageIO auxiliary kind \(kind)")
+    }
+}
+
+private func makeAuxiliaryMetadata(_ payload: AuxiliaryPayloadRequest) -> CGMutableImageMetadata {
+    let metadata = CGImageMetadataCreateMutable()
+    for namespace in payload.namespaces {
+        var error: Unmanaged<CFError>?
+        guard CGImageMetadataRegisterNamespaceForPrefix(
+            metadata,
+            namespace.uri as CFString,
+            namespace.prefix as CFString,
+            &error
+        ) else {
+            let detail = error.map { String(describing: $0.takeRetainedValue()) } ?? "unknown error"
+            fail("unable to register metadata namespace \(namespace.prefix): \(detail)")
+        }
+    }
+
+    for tag in payload.metadata {
+        let value: CFTypeRef
+        switch (tag.text, tag.numbers) {
+        case let (text?, nil):
+            value = text as CFString
+        case let (nil, numbers?):
+            value = numbers.map(NSNumber.init(value:)) as CFArray
+        default:
+            fail("metadata tag \(tag.path) must contain exactly one value representation")
+        }
+        guard CGImageMetadataSetValueWithPath(metadata, nil, tag.path as CFString, value) else {
+            fail("unable to set metadata \(tag.path)")
+        }
+    }
+    return metadata
+}
+
+private func imageIOWriteAuxiliary(
+    inputPath: String,
+    outputPath: String,
+    payloads: [AuxiliaryPayloadRequest]
+) throws {
+    guard !payloads.isEmpty else {
+        fail("imageio-write-auxiliary requires at least one auxiliary payload")
+    }
+    let inputURL = URL(fileURLWithPath: inputPath)
+    let outputURL = URL(fileURLWithPath: outputPath)
+    guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
+          let sourceType = CGImageSourceGetType(source),
+          let destination = CGImageDestinationCreateWithURL(
+              outputURL as CFURL,
+              sourceType,
+              1,
+              nil
+          ) else {
+        fail("ImageIO cannot create auxiliary destination for \(outputPath)", status: 1)
+    }
+
+    let imageOptions: [CFString: Any] = [
+        kCGImageDestinationPreserveGainMap: true,
+    ]
+    CGImageDestinationAddImageFromSource(destination, source, 0, imageOptions as CFDictionary)
+
+    for payload in payloads {
+        let data = try Data(contentsOf: URL(fileURLWithPath: payload.dataPath), options: [.mappedIfSafe])
+        var description: [CFString: Any] = [
+            kCGImagePropertyWidth: NSNumber(value: payload.width),
+            kCGImagePropertyHeight: NSNumber(value: payload.height),
+            kCGImagePropertyBytesPerRow: NSNumber(value: payload.bytesPerRow),
+            kCGImagePropertyPixelFormat: NSNumber(value: payload.pixelFormat),
+        ]
+        if let orientation = payload.orientation {
+            description[kCGImagePropertyOrientation] = NSNumber(value: orientation)
+        }
+        let auxiliary: [CFString: Any] = [
+            kCGImageAuxiliaryDataInfoData: data as CFData,
+            kCGImageAuxiliaryDataInfoDataDescription: description as CFDictionary,
+            kCGImageAuxiliaryDataInfoMetadata: makeAuxiliaryMetadata(payload),
+        ]
+        CGImageDestinationAddAuxiliaryDataInfo(
+            destination,
+            auxiliaryType(for: payload.kind),
+            auxiliary as CFDictionary
+        )
+    }
+
+    guard CGImageDestinationFinalize(destination) else {
+        fail("ImageIO cannot finalize auxiliary destination \(outputPath)", status: 1)
+    }
+}
+
 do {
     let input = FileHandle.standardInput.readDataToEndOfFile()
     guard !input.isEmpty else {
@@ -253,6 +397,25 @@ do {
                 roles: roles,
                 orientationOverride: request.orientation
             )
+        )
+    case "imageio-write-auxiliary":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let payloads = request.auxiliaryPayloads, !payloads.isEmpty else {
+            fail("imageio-write-auxiliary requires input_path, output_path, and auxiliary_payloads")
+        }
+        try imageIOWriteAuxiliary(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            payloads: payloads
+        )
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil
         )
     default:
         fail("unsupported apple adapter operation \(request.operation)")
