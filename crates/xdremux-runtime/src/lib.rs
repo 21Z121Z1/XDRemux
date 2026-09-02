@@ -10,6 +10,8 @@ mod oppo_portrait;
 mod oppo_tail;
 mod validation;
 
+#[cfg(target_os = "macos")]
+pub use apple_adapter::AppleSemanticMask;
 pub use batch::{
     plan_batch_items, BatchAssetKind, BatchExecutionOptions, BatchFailure, BatchItem,
     BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition,
@@ -147,6 +149,21 @@ impl PortableRuntime {
     ) -> Result<xdremux_engine::AppleImageAuxiliaryFacts> {
         apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
             .imageio_auxiliary_facts(input.as_ref())
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn apple_portrait_semantic_masks(
+        &self,
+        executable: impl AsRef<Path>,
+        input: impl AsRef<Path>,
+        orientation: Option<u32>,
+    ) -> Result<Vec<AppleSemanticMask>> {
+        apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
+            .vision_semantic_mattes(
+                input.as_ref(),
+                &xdremux_engine::APPLE_PORTRAIT_SEMANTIC_ROLES,
+                orientation,
+            )
     }
 
     #[cfg(target_os = "macos")]
