@@ -76,6 +76,18 @@ impl crate::PortableRuntime {
         operations.extend(apple);
         Ok(xdremux_engine::CapabilityInventory::new(operations))
     }
+
+    /// Ask the Apple platform adapter only for ImageIO observations.
+    ///
+    /// Whether those observations satisfy a product feature remains an engine
+    /// policy decision (`AppleImageAuxiliaryFacts::satisfies_portrait_editing`).
+    pub fn apple_image_auxiliary_facts(
+        &self,
+        executable: &Path,
+        input: &Path,
+    ) -> Result<xdremux_engine::AppleImageAuxiliaryFacts> {
+        apple_adapter::AppleAdapterClient::new(executable).imageio_auxiliary_facts(input)
+    }
 }
 
 fn chroma_sampling_name(value: ChromaSampling) -> &'static str {
