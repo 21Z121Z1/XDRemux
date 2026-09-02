@@ -10,7 +10,5 @@ pub use edr::{
     KneePointResult, ResolvedScale,
 };
 pub use error::{HdrError, Result};
-pub use gainmap::{
-    gain_map_parameters, reconstruct_gain_map, Family, GainMapParams, GainMapRaster,
-};
+pub use gainmap::{gain_map_parameters, reconstruct_gain_map, GainMapParams, GainMapRaster};
 pub use info::make_private_gain_map_info_floats;
