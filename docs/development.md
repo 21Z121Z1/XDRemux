@@ -2,7 +2,7 @@
 
 [English](development.en.md) | 简体中文
 
-XDRemux 只有一个产品核心：Rust workspace。新的产品行为必须进入 Rust。Swift 只作为迁移期 Apple 平台能力层，Python 只作为迁移验证和研究工具，不再构成第二套 XDRemux runtime。
+XDRemux 只有一个产品核心：Rust workspace。新的产品行为必须进入 Rust。Swift 在迁移期间只作为 Apple 平台能力层，Python 只作为迁移验证和研究工具，不再构成第二套 XDRemux runtime。
 
 面向用户的命令行行为见 [CLI 参考](cli.md)。
 
@@ -39,9 +39,9 @@ portable providers + platform adapters
 
 | Crate | 职责 |
 | --- | --- |
-| `xdremux-cli` | 唯一公开 CLI 和命令契约。 |
+| `xdremux-cli` | 唯一面向用户的公开 CLI 和命令契约。 |
 | `xdremux-runtime` | 文件系统执行、publication、批处理可靠性、恢复以及平台能力协调。 |
-| `xdremux-engine` | 产品意图、转换规划、能力要求和 orchestration。 |
+| `xdremux-engine` | 产品意图、转换规划、能力要求、平台无关事实和 orchestration。 |
 | `xdremux-source` / `xdremux-classification` | 输入探测、资产身份和分类。 |
 | `xdremux-motion-photo` | Motion Photo 解析和 Live Photo 媒体语义。 |
 | `xdremux-hdr` / `xdremux-metadata` | HDR / Gain Map 数学和 metadata primitive。 |
@@ -51,15 +51,20 @@ portable providers + platform adapters
 
 ## Apple 平台能力
 
-`Sources/XDRemuxAppleFeatures/` 在摄影风格、人像、RAW、Vision、Core ML、AVFoundation 等 Apple framework 能力迁入 Rust capability model 期间继续保留。
+`Sources/XDRemuxAppleFeatures/` 在摄影风格、人像、RAW、Vision、Core ML、AVFoundation 等 Apple framework 行为被压缩成 Rust-owned contract 背后的平台能力期间继续保留。
 
-目标架构是一个窄平台 adapter：
+边界刻意保持很窄：
 
-- Rust 持有 request、result、policy、routing、命名、分类、HDR 行为、Motion Photo 行为、batch 行为和 fallback 决策；
-- Apple 层只调用 Apple framework 并返回 capability result；
-- 不要再向 Swift 添加跨平台产品 policy。
+- Rust 持有 request、result、policy、routing、命名、分类、HDR 行为、Motion Photo 行为、batch 行为、validation policy 和 fallback 决策；
+- Apple 代码只调用 Apple framework，并返回由 Rust 语义定义的 observation 或 operation result；
+- 不要再向 Swift 添加跨平台产品 policy；
+- 当 adapter 可以返回更底层的 framework fact、再由 Rust 决策时，不要让 Swift 返回“可转换”“人像有效”之类业务结论。
 
-需要进程内 Rust/Swift interop 时，优先使用稳定 C ABI。FFI 所需的 unsafe 代码应隔离在边界层，不要进入安全的 engine/runtime crate。
+`xdremux-apple-adapter` 是随产品分发的平台组件，不是用户 CLI。当前 CLI/runtime 边界采用有版本号的 JSON helper protocol，进程生命周期有界，机器可读 stdout 与诊断 stderr 分离。transport 由 `xdremux-runtime` 持有；`xdremux-engine` 不知道 process、path、JSON、Swift 或 XPC。
+
+对于 sandboxed macOS App，如果 Apple capability process 需要独立 sandbox、entitlement、lifecycle 或 crash isolation，优先使用 XPC。transport 必须可以替换，而不改变 engine 或公开 CLI 语义。只有某项 capability 确实从进程内互操作获益时才使用 C ABI；不要仅仅为了避开 helper process，就把 FFI 设成默认架构。
+
+ImageIO auxiliary-resource probing 是第一项迁移后的真实 operation。Swift adapter 只报告 Gain Map、disparity、Portrait Effects Matte、semantic matte 等 framework observation；是否满足 Portrait 编辑资源契约由 Rust 决定。
 
 `CoreImageRAWDiagnostics` 继续作为开发者专用 Swift target：
 
@@ -89,13 +94,14 @@ python -m unittest discover -s Tests -v
 | 路径 | 用途 |
 | --- | --- |
 | `crates/` | Canonical Rust 产品栈。 |
-| `Sources/XDRemuxAppleFeatures/` | Apple capability 实现和迁移期验证。 |
+| `Sources/XDRemuxAppleAdapter/` | Rust runtime 消费的版本化 Apple 平台进程 adapter。 |
+| `Sources/XDRemuxAppleFeatures/` | Apple framework capability 实现和迁移期验证。 |
 | `Sources/XDRemuxCore/` | 仅在 replacement evidence 尚未完成时保留的 legacy Swift core。 |
 | `Sources/XDRemuxCLI/` | 仅在 Apple 迁移工作仍有引用时保留的 legacy Swift CLI。 |
 | `Sources/CoreImageRAWDiagnostics/` | 开发者 RAW 诊断。 |
 | `xdremux_py/` | 迁移 oracle 和研究/训练工具；没有产品 CLI。 |
 | `apps/macos/XDRemuxApp/` | 产品栈迁移期间的 macOS SwiftUI App。 |
-| `Tests/` | Rust/Swift/Python 验收测试和 validation harness。 |
+| `Tests/` | Canonical 与迁移期验收测试和 validation harness。 |
 | `fixtures/` | strict gate 使用的版本化真实媒体 fixture。 |
 | `scripts/` | 构建、评估、迁移和验收工具。 |
 | `docs/` | 当前指导文档和历史研究记录。 |
@@ -103,11 +109,9 @@ python -m unittest discover -s Tests -v
 
 Legacy Swift/Python 代码今后只应接受迁移、conformance、安全修复或删除工作。新的用户可见行为进入 Rust。
 
-## Apple 辅助进程
+## Apple helper 生命周期
 
-部分 Apple 功能会编译或运行 package resource 中的 helper program。
-
-helper toolchain 根据源码内容生成 hash，并缓存兼容构建结果。helper 调用应保持有界；协议需要时，机器可读 stdout 必须与诊断输出分离。
+helper 调用必须有界，机器可读 stdout 必须与诊断输出分离，并且必须显式回收子进程。不要让 transport 细节泄漏到 engine model。
 
 Apple 私有 API 兼容性必须在运行时检查。runtime method signature 不符合已支持 ABI 时，不要按假定 ABI 调用私有 Objective-C selector。
 
