@@ -145,7 +145,7 @@ mod tests {
     use super::*;
     use crate::{
         GainMapChannels, GainMapCodec, GainMapCodecLayout, GainMapSourceProfile,
-        GainMapStorageProfile, OperationCapability, SourceHdrMode,
+        GainMapStorageProfile, OperationCapability,
     };
     use std::cell::Cell;
     use std::io;
@@ -161,7 +161,6 @@ mod tests {
 
     fn analysis() -> ConversionAnalysis {
         ConversionAnalysis {
-            hdr_mode: SourceHdrMode::Uhdr,
             gain_map: GainMapSourceProfile {
                 width: 64,
                 height: 32,
