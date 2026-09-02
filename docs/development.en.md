@@ -2,7 +2,7 @@
 
 English | [简体中文](development.md)
 
-XDRemux has one product core: the Rust workspace. New product behavior belongs in Rust. Swift is an Apple platform capability layer during migration, and Python is migration/research tooling rather than a second XDRemux runtime.
+XDRemux has one product core: the Rust workspace. The only public CLI is the Rust `xdremux` binary. New product behavior belongs in Rust. Swift is an Apple platform capability layer during migration, and Python is migration/research tooling rather than a second XDRemux runtime.
 
 For user-facing command-line behavior, see the [CLI reference](cli.en.md).
 
