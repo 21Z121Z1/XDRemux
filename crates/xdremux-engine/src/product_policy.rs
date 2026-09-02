@@ -2,33 +2,28 @@ use xdremux_format::ChromaSampling;
 
 use crate::{
     validate_source_profile, GainMapChannels, GainMapCodecLayout, GainMapEncodeProfile,
-    GainMapEncoderCapabilities, GainMapSourceProfile, OppoCompatibility, PlannerError, Result,
+    GainMapEncoderCapabilities, GainMapSourceProfile, OutputIntent, PlannerError, Result,
 };
 
-pub const fn wants_oppo_compatibility(compatibility: OppoCompatibility) -> bool {
-    !matches!(compatibility, OppoCompatibility::Off)
-}
-
-/// Resolve the product output profile rather than merely preserving source JPEG
-/// sampling. This is the canonical policy boundary shared by every front end.
+/// Resolve the product output profile rather than preserving private source JPEG
+/// sampling mechanically.
 ///
-/// High-spec output keeps monochrome Gain Maps as 4:0:0 and promotes RGB to
-/// 4:4:4. OPPO-compatible output is RGB 4:2:0, including LHDR masks whose luma
-/// is replicated by the execution layer before encoding.
+/// Standard output keeps monochrome Gain Maps as 4:0:0 and promotes RGB to
+/// 4:4:4. OPPO Gallery output is RGB 4:2:0, including LHDR masks whose luma is
+/// replicated by the runtime before encoding.
 pub fn resolve_product_gain_map_encode_profile(
     source: GainMapSourceProfile,
-    compatibility: OppoCompatibility,
+    output: OutputIntent,
     encoder: &GainMapEncoderCapabilities,
 ) -> Result<GainMapEncodeProfile> {
     validate_source_profile(source)?;
 
-    let (channels, chroma) = if wants_oppo_compatibility(compatibility) {
-        (GainMapChannels::Rgb, ChromaSampling::Yuv420)
-    } else {
-        match source.channels {
+    let (channels, chroma) = match output {
+        OutputIntent::Standard => match source.channels {
             GainMapChannels::Mono => (GainMapChannels::Mono, ChromaSampling::Mono400),
             GainMapChannels::Rgb => (GainMapChannels::Rgb, ChromaSampling::Yuv444),
-        }
+        },
+        OutputIntent::OppoGallery => (GainMapChannels::Rgb, ChromaSampling::Yuv420),
     };
     let layout = GainMapCodecLayout {
         chroma,
@@ -83,10 +78,10 @@ mod tests {
     }
 
     #[test]
-    fn high_spec_rgb_output_is_444_even_when_private_jpeg_is_420() {
+    fn standard_rgb_output_is_444_even_when_private_jpeg_is_420() {
         let target = resolve_product_gain_map_encode_profile(
             source(GainMapChannels::Rgb, ChromaSampling::Yuv420),
-            OppoCompatibility::Off,
+            OutputIntent::Standard,
             &encoder(),
         )
         .unwrap();
@@ -95,10 +90,10 @@ mod tests {
     }
 
     #[test]
-    fn high_spec_mono_output_stays_mono400() {
+    fn standard_mono_output_stays_mono400() {
         let target = resolve_product_gain_map_encode_profile(
             source(GainMapChannels::Mono, ChromaSampling::Mono400),
-            OppoCompatibility::Off,
+            OutputIntent::Standard,
             &encoder(),
         )
         .unwrap();
@@ -107,10 +102,10 @@ mod tests {
     }
 
     #[test]
-    fn oppo_compatibility_requires_rgb420_even_for_lhdr_mono() {
+    fn oppo_gallery_output_requires_rgb420_even_for_lhdr_mono() {
         let target = resolve_product_gain_map_encode_profile(
             source(GainMapChannels::Mono, ChromaSampling::Mono400),
-            OppoCompatibility::On,
+            OutputIntent::OppoGallery,
             &encoder(),
         )
         .unwrap();
@@ -124,7 +119,7 @@ mod tests {
         assert_eq!(
             resolve_product_gain_map_encode_profile(
                 source(GainMapChannels::Rgb, ChromaSampling::Yuv420),
-                OppoCompatibility::Off,
+                OutputIntent::Standard,
                 &only_420,
             ),
             Err(PlannerError::UnsupportedGainMapLayout(layout(
