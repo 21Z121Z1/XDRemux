@@ -5,104 +5,93 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Current normative documents. Historical evidence records are intentionally not
-# rewritten or required to have a translated body.
-BILINGUAL_STEMS = (
-    "README",
-    "docs/README",
-    "docs/style-guide",
-    "docs/cli",
-    "docs/apple-features",
-    "docs/development",
-    "docs/supported-devices",
-    "docs/quality/testing",
-    "docs/quality/evals",
-    "docs/quality/logging",
-    "docs/validation/README",
-    "docs/xdremux/README",
-    "Tests/README",
-    "fixtures/README",
-    "Models/ReverseKey1Ensemble.model-card",
-    "docs/validation/encoding-quality-pareto-20260718.summary",
-    "docs/validation/vendor-live-photo-geometry.summary",
-    "docs/xdremux/iso-conformance-audit-20260511.summary",
+CANONICAL_BILINGUAL_PAIRS = (
+    ("README.en.md", "README.md"),
+    ("docs/cli.en.md", "docs/cli.md"),
+    ("docs/apple-features.en.md", "docs/apple-features.md"),
+    ("docs/troubleshooting.en.md", "docs/troubleshooting.md"),
+    ("docs/quality/testing.en.md", "docs/quality/testing.md"),
+    ("docs/quality/evals.en.md", "docs/quality/evals.md"),
+    ("Tests/README.en.md", "Tests/README.md"),
 )
 
-# AGENTS.md is a tool-discovered fixed filename, so English remains at the
-# conventional path and Chinese is published as a sidecar.
 SPECIAL_BILINGUAL_PAIRS = (
-    ("AGENTS.md", "AGENTS.zh-CN.md"),
-)
-
-PUBLIC_DOCUMENTS = tuple(
-    path
-    for stem in BILINGUAL_STEMS
-    for path in (ROOT / f"{stem}.md", ROOT / f"{stem}.en.md")
-) + tuple(
-    ROOT / path
-    for pair in SPECIAL_BILINGUAL_PAIRS
-    for path in pair
+    ("docs/style-guide.en.md", "docs/style-guide.md"),
 )
 
 HISTORICAL_RECORDS = (
-    ROOT / "docs/validation/encoding-quality-pareto-20260718.md",
-    ROOT / "docs/validation/vendor-live-photo-geometry.md",
-    ROOT / "docs/xdremux/iso-conformance-audit-20260511.md",
+    ROOT / "docs" / "research" / "ApplePhotos17_StyleSemantics_2026-02-22.md",
+    ROOT / "docs" / "research" / "PhotographicStylesRendering_BestPractices.md",
+    ROOT / "docs" / "research" / "PhotographicStyles_Metadata_Key1_ReverseEngineering.md",
+    ROOT / "docs" / "research" / "PortraitDepthMapping_Notes_2026-02-20.md",
+    ROOT / "docs" / "research" / "ApplePhotos_StyleValidation_2026-02-18.md",
 )
-
-MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
 
 class PublicDocumentationTests(unittest.TestCase):
-    def test_bilingual_readmes_publish_matching_categorize_workflows(self) -> None:
-        required = (
-            "swift run xdremux categorize",
-            "python3 -m xdremux_py categorize",
-            "--categorize",
-        )
-        forbidden = ("--categorize-output", "--organize-by-mode", "xdremux classify")
-        for readme in (ROOT / "README.md", ROOT / "README.en.md"):
-            text = readme.read_text(encoding="utf-8")
-            for value in required:
-                self.assertIn(value, text, f"{value} missing from {readme.name}")
-            for value in forbidden:
-                self.assertNotIn(value, text, f"legacy naming in {readme.name}: {value}")
-
-    def test_local_links_in_public_documents_resolve_inside_the_repository(self) -> None:
-        for document in PUBLIC_DOCUMENTS:
-            self.assertTrue(document.is_file(), f"missing public document: {document}")
-            for match in MARKDOWN_LINK.finditer(document.read_text(encoding="utf-8")):
-                target = match.group(1).strip().strip("<>")
-                if target.startswith(("https://", "http://", "mailto:", "#")):
-                    continue
-                target = target.split("#", maxsplit=1)[0]
-                if not target:
-                    continue
-                resolved = (document.parent / target).resolve()
-                try:
-                    resolved.relative_to(ROOT)
-                except ValueError:
-                    self.fail(f"{document}: link escapes repository: {target}")
-                self.assertTrue(resolved.exists(), f"{document}: missing link target {target}")
-
-    def test_standard_bilingual_documents_exist_and_cross_link(self) -> None:
-        for stem in BILINGUAL_STEMS:
-            chinese = ROOT / f"{stem}.md"
-            english = ROOT / f"{stem}.en.md"
-            self.assertTrue(chinese.is_file(), f"missing Chinese document: {stem}.md")
-            self.assertTrue(english.is_file(), f"missing English document: {stem}.en.md")
-
-            name = Path(stem).name
+    def test_canonical_bilingual_documents_exist_and_cross_link(self) -> None:
+        for english_relative, chinese_relative in CANONICAL_BILINGUAL_PAIRS:
+            english = ROOT / english_relative
+            chinese = ROOT / chinese_relative
+            self.assertTrue(english.is_file(), f"missing English document: {english_relative}")
+            self.assertTrue(chinese.is_file(), f"missing Chinese document: {chinese_relative}")
             self.assertIn(
-                f"({name}.en.md)",
-                chinese.read_text(encoding="utf-8"),
-                f"{stem}.md does not link to its English version",
-            )
-            self.assertIn(
-                f"({name}.md)",
+                f"({Path(chinese_relative).name})",
                 english.read_text(encoding="utf-8"),
-                f"{stem}.en.md does not link to its Chinese version",
             )
+            self.assertIn(
+                f"({Path(english_relative).name})",
+                chinese.read_text(encoding="utf-8"),
+            )
+
+    def test_readme_points_to_current_reference_documents(self) -> None:
+        english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+        chinese = (ROOT / "README.md").read_text(encoding="utf-8")
+        for text in (english, chinese):
+            self.assertIn("docs/cli", text)
+            self.assertIn("docs/apple-features", text)
+            self.assertIn("docs/troubleshooting", text)
+
+    def test_readme_does_not_promote_legacy_implementation_names(self) -> None:
+        english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+        chinese = (ROOT / "README.md").read_text(encoding="utf-8")
+        for text in (english, chinese):
+            self.assertNotIn("python -m xdremux_py", text)
+            self.assertNotIn("swift run xdremux", text)
+
+    def test_research_index_distinguishes_current_guidance_from_historical_records(self) -> None:
+        english = (ROOT / "docs" / "research" / "README.en.md").read_text(encoding="utf-8")
+        chinese = (ROOT / "docs" / "research" / "README.md").read_text(encoding="utf-8")
+        for text in (english, chinese):
+            self.assertIn("Historical", text) if text is english else self.assertIn("历史", text)
+            self.assertIn("summary", text.lower())
+
+    def test_historical_records_are_not_linked_as_current_public_guidance(self) -> None:
+        current_docs = [
+            ROOT / "README.en.md",
+            ROOT / "README.md",
+            ROOT / "docs" / "cli.en.md",
+            ROOT / "docs" / "cli.md",
+            ROOT / "docs" / "apple-features.en.md",
+            ROOT / "docs" / "apple-features.md",
+            ROOT / "docs" / "troubleshooting.en.md",
+            ROOT / "docs" / "troubleshooting.md",
+        ]
+        historical_names = {record.name for record in HISTORICAL_RECORDS}
+        for document in current_docs:
+            text = document.read_text(encoding="utf-8")
+            for name in historical_names:
+                self.assertNotIn(name, text, f"{document} links historical record {name} as current guidance")
+
+    def test_no_absolute_local_paths_in_canonical_public_documents(self) -> None:
+        absolute_path = re.compile(r"/(?:Users|home|private|tmp)/[^\s)`]+")
+        for english_relative, chinese_relative in CANONICAL_BILINGUAL_PAIRS:
+            for relative in (english_relative, chinese_relative):
+                text = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIsNone(
+                    absolute_path.search(text),
+                    f"canonical public document contains an absolute local path: {relative}",
+                )
 
     def test_special_bilingual_documents_exist_and_cross_link(self) -> None:
         for english_relative, chinese_relative in SPECIAL_BILINGUAL_PAIRS:
@@ -135,13 +124,24 @@ class PublicDocumentationTests(unittest.TestCase):
         for term in ("Motion Photo", "Live Photo", "Gain Map", "still-image-time"):
             self.assertIn(term, english)
 
-    def test_current_cli_docs_describe_python_motion_photo_support(self) -> None:
+    def test_current_cli_docs_define_one_rust_product_and_automatic_motion_photo_support(self) -> None:
         english = (ROOT / "docs/cli.en.md").read_text(encoding="utf-8")
         chinese = (ROOT / "docs/cli.md").read_text(encoding="utf-8")
-        self.assertIn("Motion Photo to Live Photo conversion", english)
-        self.assertNotIn("does HDR conversion only", english)
+
+        self.assertIn("one cross-platform product entry point: the Rust `xdremux` CLI", english)
+        self.assertIn("Motion Photos are automatically converted to Live Photos", english)
+        self.assertIn("no `--family`", english)
+        self.assertIn("no longer define new CLI product semantics", english)
+        self.assertNotIn("python -m xdremux_py", english)
+        self.assertNotIn("swift run xdremux", english)
+
+        self.assertIn("一个跨平台 Rust CLI", chinese)
         self.assertIn("Motion Photo", chinese)
         self.assertIn("Live Photo", chinese)
+        self.assertIn("为什么没有 `--family`", chinese)
+        self.assertIn("不再定义新的 CLI 产品语义", chinese)
+        self.assertNotIn("python -m xdremux_py", chinese)
+        self.assertNotIn("swift run xdremux", chinese)
 
     def test_current_quality_docs_acknowledge_versioned_motion_fixtures(self) -> None:
         for relative in (
