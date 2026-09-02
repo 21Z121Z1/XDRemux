@@ -660,7 +660,7 @@ fn build_iref(
     entries.push(IrefEntry {
         kind: AUXL,
         from_item_id: gain_id,
-        to_item_ids: vec![meta.primary_item_id],
+        to_item_ids: vec![meta.primary_item_id, tmap_id],
     });
     entries.push(IrefEntry {
         kind: CDSC,
