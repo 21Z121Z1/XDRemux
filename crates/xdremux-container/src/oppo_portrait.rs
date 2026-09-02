@@ -1,6 +1,7 @@
-use crate::{ContainerError, Result};
+use crate::{portrait_blocks, ContainerError, Result};
 
 const CONFIG_CONTEXT: &str = "rear.depth.config";
+const SOURCE_CONTEXT: &str = "OPPO portrait source";
 const MAX_DIMENSION: i32 = 16_384;
 const BLUR_SAMPLE_COUNT: usize = 32;
 const FACE_KEYPOINT_COUNT: usize = 296;
@@ -49,12 +50,28 @@ pub struct OppoPortraitConfig {
     pub faces: Vec<OppoPortraitFace>,
 }
 
+/// Portable OPPO portrait payloads required before any Apple-specific work.
+///
+/// The Apple layer may derive additional facts from `source_image`, but it does
+/// not need to know manifest entry names or re-parse the producer config.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OppoPortraitSource {
+    pub source_image: Vec<u8>,
+    pub compressed_depth: Vec<u8>,
+    pub config: OppoPortraitConfig,
+    pub private_gain_map_info: Option<Vec<u8>>,
+}
+
 fn truncated(field: &str) -> ContainerError {
     ContainerError::invalid(CONFIG_CONTEXT, format!("truncated at {field}"))
 }
 
 fn invalid(field: &str) -> ContainerError {
     ContainerError::invalid(CONFIG_CONTEXT, format!("invalid {field}"))
+}
+
+fn missing_source_block(name: &str) -> ContainerError {
+    ContainerError::invalid(SOURCE_CONTEXT, format!("missing {name}"))
 }
 
 fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[u8; N]> {
@@ -277,6 +294,32 @@ pub fn parse_oppo_portrait_config(data: &[u8]) -> Result<OppoPortraitConfig> {
     })
 }
 
+/// Extract the portable OPPO portrait source contract from one camera HEIC.
+///
+/// The three required blocks are a source-format invariant. Optional private
+/// Gain Map metadata remains optional because ImageIO can recover it from the
+/// embedded `src.image` on Apple platforms.
+pub fn extract_oppo_portrait_source(data: &[u8]) -> Result<OppoPortraitSource> {
+    let mut blocks = portrait_blocks(data)?;
+    let source_image = blocks
+        .remove("src.image")
+        .ok_or_else(|| missing_source_block("src.image"))?;
+    let compressed_depth = blocks
+        .remove("rear.depth")
+        .ok_or_else(|| missing_source_block("rear.depth"))?;
+    let config_bytes = blocks
+        .remove("rear.depth.config")
+        .ok_or_else(|| missing_source_block("rear.depth.config"))?;
+    let config = parse_oppo_portrait_config(&config_bytes)?;
+
+    Ok(OppoPortraitSource {
+        source_image,
+        compressed_depth,
+        config,
+        private_gain_map_info: blocks.remove("local.uhdr.gainmap.info"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -305,6 +348,13 @@ mod tests {
         put_i32(&mut data, 276, 20);
         put_i32(&mut data, 280, 0);
         data
+    }
+
+    fn fixture(name: &str) -> Vec<u8> {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/proxdr/oppo/find-x9-ultra")
+            .join(name);
+        fs::read(path).expect("read committed ProXDR fixture")
     }
 
     #[test]
@@ -384,17 +434,18 @@ mod tests {
     }
 
     #[test]
-    fn parses_committed_find_x9_ultra_portrait_config() {
-        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic");
-        let source = fs::read(fixture).expect("read committed portrait fixture");
-        let blocks = crate::portrait_blocks(&source).expect("extract OPPO portrait blocks");
-        let config = blocks
-            .get("rear.depth.config")
-            .expect("fixture contains rear.depth.config");
-        let parsed = parse_oppo_portrait_config(config).expect("parse real OPPO portrait config");
-        assert!((1.0..=4.0).contains(&parsed.version));
-        assert!(parsed.processing_width > 0);
-        assert!(parsed.processing_height > 0);
+    fn extracts_typed_source_from_committed_portrait_fixture() {
+        let source = extract_oppo_portrait_source(&fixture("uhdr-portrait-01.heic"))
+            .expect("extract real OPPO portrait source");
+        assert!(!source.source_image.is_empty());
+        assert!(!source.compressed_depth.is_empty());
+        assert!((1.0..=4.0).contains(&source.config.version));
+        assert!(source.config.processing_width > 0);
+        assert!(source.config.processing_height > 0);
+    }
+
+    #[test]
+    fn rejects_committed_non_portrait_fixture_as_portrait_source() {
+        assert!(extract_oppo_portrait_source(&fixture("uhdr-hr-01.heic")).is_err());
     }
 }
