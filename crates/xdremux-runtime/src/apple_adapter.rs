@@ -17,9 +17,9 @@ use crate::{Result, RuntimeError};
 
 const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 1;
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
-const VISION_TIMEOUT: Duration = Duration::from_secs(300);
+const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
-const MAX_SEMANTIC_MASK_BYTES: usize = 128 * 1024 * 1024;
+const MAX_APPLE_L8_MASK_BYTES: usize = 128 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct AppleImageProperties {
@@ -194,6 +194,91 @@ impl AppleAdapterClient {
         validate_schema(response.schema_version)
     }
 
+    pub(super) fn coreimage_edge_preserve_upsample_l8(
+        &self,
+        guide: &Path,
+        small_mask: &AppleL8Mask,
+        target_width: u32,
+        target_height: u32,
+        spatial_sigma: f32,
+        luma_sigma: f32,
+    ) -> Result<AppleL8Mask> {
+        let small_bytes = checked_l8_byte_count(
+            small_mask.width,
+            small_mask.height,
+            "Apple CoreImage L8 input",
+        )?;
+        if small_mask.pixels.len() != small_bytes {
+            return Err(RuntimeError::new(
+                "Apple CoreImage L8 input",
+                format!(
+                    "mask has {} bytes; expected {small_bytes}",
+                    small_mask.pixels.len()
+                ),
+            ));
+        }
+        let target_bytes = checked_l8_byte_count(
+            target_width,
+            target_height,
+            "Apple CoreImage L8 output",
+        )?;
+        if !spatial_sigma.is_finite()
+            || spatial_sigma <= 0.0
+            || !luma_sigma.is_finite()
+            || luma_sigma <= 0.0
+        {
+            return Err(RuntimeError::new(
+                "Apple CoreImage L8 upsample",
+                "spatial and luma sigma must be finite and positive",
+            ));
+        }
+
+        let sidecars = tempfile::tempdir()
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 sidecars", error))?;
+        let small_path = sidecars.path().join("small.l8");
+        let output_path = sidecars.path().join("output.l8");
+        fs::write(&small_path, &small_mask.pixels)
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 input write", error))?;
+
+        let request = CoreImageEdgePreserveUpsampleRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "coreimage-edge-preserve-upsample-l8",
+            input_path: input_path(guide)?,
+            output_path: input_path(&output_path)?,
+            edge_preserve_upsample: EdgePreserveUpsampleWire {
+                small_mask_path: input_path(&small_path)?,
+                small_width: small_mask.width,
+                small_height: small_mask.height,
+                target_width,
+                target_height,
+                spatial_sigma,
+                luma_sigma,
+            },
+        };
+        let request = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        let output = self.invoke(&request, APPLE_COMPUTE_TIMEOUT)?;
+        let response: AckResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+
+        let metadata = fs::metadata(&output_path)
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 output metadata", error))?;
+        if metadata.len() != u64::try_from(target_bytes).unwrap_or(u64::MAX) {
+            return Err(RuntimeError::new(
+                "Apple CoreImage L8 output",
+                format!(
+                    "sidecar has {} bytes; expected {target_bytes}",
+                    metadata.len()
+                ),
+            ));
+        }
+        let pixels = fs::read(&output_path)
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 output read", error))?;
+        AppleL8Mask::new(target_width, target_height, pixels)
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 output", error))
+    }
+
     pub(super) fn vision_semantic_mattes(
         &self,
         input: &Path,
@@ -230,7 +315,7 @@ impl AppleAdapterClient {
                 ),
                 orientation,
             },
-            VISION_TIMEOUT,
+            APPLE_COMPUTE_TIMEOUT,
         )?;
         let response: SemanticResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
@@ -270,7 +355,7 @@ impl AppleAdapterClient {
                         format!("role {:?} geometry overflows", role),
                     )
                 })?;
-            if expected_bytes > MAX_SEMANTIC_MASK_BYTES {
+            if expected_bytes > MAX_APPLE_L8_MASK_BYTES {
                 return Err(RuntimeError::new(
                     "Apple Vision semantic mattes",
                     format!("role {:?} exceeds semantic mask safety limit", role),
@@ -402,6 +487,27 @@ impl AppleAdapterClient {
     }
 }
 
+fn checked_l8_byte_count(width: u32, height: u32, context: &'static str) -> Result<usize> {
+    if width == 0 || height == 0 {
+        return Err(RuntimeError::new(context, "mask geometry must be non-zero"));
+    }
+    let bytes = usize::try_from(width)
+        .ok()
+        .and_then(|width| {
+            usize::try_from(height)
+                .ok()
+                .and_then(|height| width.checked_mul(height))
+        })
+        .ok_or_else(|| RuntimeError::new(context, "mask geometry overflows"))?;
+    if bytes > MAX_APPLE_L8_MASK_BYTES {
+        return Err(RuntimeError::new(
+            context,
+            "mask exceeds 128 MiB safety limit",
+        ));
+    }
+    Ok(bytes)
+}
+
 fn input_path(input: &Path) -> Result<String> {
     input.to_str().map(ToOwned::to_owned).ok_or_else(|| {
         RuntimeError::new(
@@ -516,6 +622,26 @@ struct WriteAuxiliaryRequest {
     input_path: String,
     output_path: String,
     auxiliary_payloads: Vec<AuxiliaryPayloadWire>,
+}
+
+#[derive(Debug, Serialize)]
+struct CoreImageEdgePreserveUpsampleRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    edge_preserve_upsample: EdgePreserveUpsampleWire,
+}
+
+#[derive(Debug, Serialize)]
+struct EdgePreserveUpsampleWire {
+    small_mask_path: String,
+    small_width: u32,
+    small_height: u32,
+    target_width: u32,
+    target_height: u32,
+    spatial_sigma: f32,
+    luma_sigma: f32,
 }
 
 #[derive(Debug, Serialize)]
