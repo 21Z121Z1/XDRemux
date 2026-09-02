@@ -1,24 +1,43 @@
-name: Python Motion Photo Live Photo Gate
+name: Python Motion Photo migration oracle
 
 on:
   workflow_dispatch:
-  pull_request:
+  push:
     paths:
+      - "pyproject.toml"
       - "xdremux_py/**"
       - "Tests/test_python_motion_photo.py"
       - "Tests/test_python_live_photo_portability.py"
       - "Tests/test_python_live_photo_output_safety.py"
+      - "Tests/test_python_live_photo_batch_reliability.py"
+      - "Tests/test_product_ownership.py"
+      - "Tests/validation/verify_python_motion_photo_fixtures.py"
+      - "Tests/XDRemuxAppleFeaturesTests/PythonLivePhotoOutputGateTests.swift"
+      - "fixtures/**"
+      - ".github/workflows/python-motion-photo-real-fixtures.yml"
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "xdremux_py/**"
+      - "Tests/test_python_motion_photo.py"
+      - "Tests/test_python_live_photo_portability.py"
+      - "Tests/test_python_live_photo_output_safety.py"
+      - "Tests/test_python_live_photo_batch_reliability.py"
+      - "Tests/test_product_ownership.py"
       - "Tests/validation/verify_python_motion_photo_fixtures.py"
       - "Tests/XDRemuxAppleFeaturesTests/PythonLivePhotoOutputGateTests.swift"
       - "fixtures/**"
       - ".github/workflows/python-motion-photo-real-fixtures.yml"
 
 concurrency:
-  group: python-motion-photo-live-photo-${{ github.event.pull_request.number || github.ref }}
+  group: python-motion-photo-migration-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  portable-python:
+  portable-oracle:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -29,7 +48,7 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install Python package
+      - name: Install migration tooling
         shell: bash
         run: |
           python -m pip install --upgrade pip
@@ -42,12 +61,12 @@ jobs:
           print("pillow-heif", pillow_heif.__version__)
           PY
 
-      - name: Run portable Python tests
+      - name: Run Python oracle tests
         shell: bash
         run: |
           python -m unittest discover -s Tests -p 'test_*.py' -v
 
-      - name: Convert all repository fixtures on Linux with pure Python
+      - name: Convert repository fixtures through migration oracle
         shell: bash
         run: |
           python Tests/validation/verify_python_motion_photo_fixtures.py \
@@ -55,8 +74,8 @@ jobs:
             --output-root "$RUNNER_TEMP/xdremux-python-live-photo-output" \
             --manifest "$RUNNER_TEMP/xdremux-python-live-photo-manifest.json"
 
-  apple-compatibility-oracle:
-    needs: portable-python
+  apple-acceptance-oracle:
+    needs: portable-oracle
     runs-on: macos-latest
     timeout-minutes: 75
     steps:
@@ -70,7 +89,7 @@ jobs:
             echo "runner_os=$(sw_vers -productVersion)"
             echo "runner_build=$(sw_vers -buildVersion)"
             echo "arch=$(uname -m)"
-            echo "conversion_runtime=pure Python; Apple frameworks are validation-only"
+            echo "conversion_runtime=Python migration oracle; Apple frameworks are validation-only"
           } | tee artifacts/python-live-photo-runner.txt
           echo "FIXTURE_ROOT=$GITHUB_WORKSPACE/fixtures" >> "$GITHUB_ENV"
           echo "PYTHON_OUTPUT_ROOT=$RUNNER_TEMP/xdremux-python-live-photo-output" >> "$GITHUB_ENV"
@@ -81,16 +100,16 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install Python package
+      - name: Install migration tooling
         shell: bash
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e .
 
-      - name: Convert all repository fixtures with pure Python
+      - name: Produce oracle outputs from real fixtures
         shell: bash
         run: |
-          echo "::group::Pure Python Samsung / Xiaomi / OPPO / vivo conversion"
+          echo "::group::Python migration oracle fixture conversion"
           python Tests/validation/verify_python_motion_photo_fixtures.py \
             --fixture-root "$FIXTURE_ROOT" \
             --output-root "$PYTHON_OUTPUT_ROOT" \
@@ -99,7 +118,7 @@ jobs:
           echo "::endgroup::"
           cp "$PYTHON_MANIFEST" artifacts/python-live-photo-manifest.json
 
-      - name: Validate Python outputs with macOS PhotoKit
+      - name: Validate oracle outputs with macOS PhotoKit
         shell: bash
         run: |
           echo "::group::Apple compatibility oracle"
@@ -108,26 +127,27 @@ jobs:
             2>&1 | tee artifacts/python-live-photo-photokit.log
           echo "::endgroup::"
 
-      - name: Write gate summary
+      - name: Write oracle summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## Python Motion Photo → Apple Live Photo Gate"
+            echo "## Python Motion Photo migration oracle"
             echo
-            echo "- Linux real-fixture conversion: required before this job"
-            echo "- macOS conversion runtime: pure Python/container code"
-            echo "- Apple frameworks: final structural/PhotoKit acceptance oracle only"
+            echo "- Purpose: temporary replacement evidence for the canonical Rust product"
+            echo "- Linux real-fixture conversion: required before Apple acceptance"
+            echo "- Apple frameworks: structural/PhotoKit acceptance only"
+            echo "- Product CLI ownership: Rust only"
             if [[ -f artifacts/python-live-photo-manifest.json ]]; then
               echo "- Real fixture manifest: produced"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload gate evidence
+      - name: Upload oracle evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: python-motion-photo-live-photo-evidence
+          name: python-motion-photo-migration-oracle-evidence
           if-no-files-found: error
           retention-days: 14
           path: |
