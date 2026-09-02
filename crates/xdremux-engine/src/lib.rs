@@ -10,7 +10,10 @@ use std::collections::BTreeSet;
 
 use xdremux_format::ChromaSampling;
 
-pub use apple::{AppleGainMapFacts, AppleImageAuxiliaryFacts};
+pub use apple::{
+    AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleSemanticRole, AppleVisionApiSurface,
+    APPLE_PORTRAIT_SEMANTIC_ROLES,
+};
 pub use capabilities::{
     CapabilityInventory, GainMapTileEncoder, OperationCapability, RasterDecoder,
     RasterDecoderCapabilities,
