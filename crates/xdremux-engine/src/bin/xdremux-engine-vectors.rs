@@ -50,27 +50,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         layout(ChromaSampling::Yuv444, 8),
     ]);
     let plan = plan_conversion(
-        &analysis(
-            GainMapChannels::Rgb,
-            Some(ChromaSampling::Yuv420),
-            8,
-        ),
+        &analysis(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         ConversionRequest::default(),
         &direct,
     )?;
     println!(
         "standard-rgb420|output={:?}|chroma={:?}|depth={}",
-        plan.output,
-        plan.gain_map_target.layout.chroma,
-        plan.gain_map_target.layout.luma_bit_depth
+        plan.output, plan.gain_map_target.layout.chroma, plan.gain_map_target.layout.luma_bit_depth
     );
 
     let plan = plan_conversion(
-        &analysis(
-            GainMapChannels::Mono,
-            Some(ChromaSampling::Mono400),
-            8,
-        ),
+        &analysis(GainMapChannels::Mono, Some(ChromaSampling::Mono400), 8),
         ConversionRequest::oppo_gallery_compatible(),
         &direct,
     )?;
@@ -84,11 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let only_420 = capabilities([layout(ChromaSampling::Yuv420, 8)]);
     let error = plan_conversion(
-        &analysis(
-            GainMapChannels::Rgb,
-            Some(ChromaSampling::Yuv444),
-            8,
-        ),
+        &analysis(GainMapChannels::Rgb, Some(ChromaSampling::Yuv444), 8),
         ConversionRequest::default(),
         &only_420,
     )
@@ -97,11 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let only_444 = capabilities([layout(ChromaSampling::Yuv444, 8)]);
     let error = plan_conversion(
-        &analysis(
-            GainMapChannels::Rgb,
-            Some(ChromaSampling::Yuv444),
-            10,
-        ),
+        &analysis(GainMapChannels::Rgb, Some(ChromaSampling::Yuv444), 10),
         ConversionRequest::default(),
         &only_444,
     )
@@ -113,11 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         8,
     ))]);
     let error = plan_conversion(
-        &analysis(
-            GainMapChannels::Rgb,
-            Some(ChromaSampling::Yuv420),
-            8,
-        ),
+        &analysis(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         ConversionRequest::default(),
         &encoder_only,
     )
@@ -132,11 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..ConversionRequest::default()
     };
     let error = plan_conversion(
-        &analysis(
-            GainMapChannels::Rgb,
-            Some(ChromaSampling::Yuv420),
-            8,
-        ),
+        &analysis(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         styles_request,
         &only_444,
     )
