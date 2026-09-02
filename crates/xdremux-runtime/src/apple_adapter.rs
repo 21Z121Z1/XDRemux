@@ -459,12 +459,12 @@ fn auxiliary_kind_wire(kind: AppleAuxiliaryKind) -> Result<&'static str> {
         AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Teeth) => Ok("teeth-matte"),
         AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Glasses) => Ok("glasses-matte"),
         AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Sky) => Ok("sky-matte"),
-        AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Person) => Err(
-            RuntimeError::new(
+        AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Person) => {
+            Err(RuntimeError::new(
                 "Apple adapter protocol",
                 "person mask has no ImageIO semantic matte auxiliary type",
-            ),
-        ),
+            ))
+        }
     }
 }
 
