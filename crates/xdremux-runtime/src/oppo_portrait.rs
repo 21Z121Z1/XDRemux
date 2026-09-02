@@ -148,6 +148,7 @@ fn orientation(properties: &AppleImageProperties) -> Option<u8> {
         .and_then(|value| u8::try_from(value).ok())
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn resolve_simulated_aperture(
     config_version: f32,
     current_f_number: Option<f32>,
