@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use xdremux_engine::{GainMapChannels, GainMapCodec, SourceHdrMode};
+use xdremux_container::ExtractionMode;
+use xdremux_engine::{GainMapChannels, GainMapCodec};
 use xdremux_format::ChromaSampling;
 use xdremux_runtime::{PortableRuntime, PreparedProXdr};
 
@@ -34,7 +35,7 @@ fn assert_jpeg8(prepared: &PreparedProXdr) {
 fn find_x6_lhdr_source_is_monochrome_jpeg8() {
     let prepared = analyze("find-x6-pro/lhdr-v1-01.heic");
 
-    assert_eq!(prepared.analysis.hdr_mode, SourceHdrMode::Lhdr);
+    assert_eq!(prepared.extracted.mode, ExtractionMode::Lhdr);
     assert_eq!(prepared.analysis.gain_map.channels, GainMapChannels::Mono);
     assert_eq!(
         prepared.analysis.gain_map.storage.chroma,
@@ -47,7 +48,7 @@ fn find_x6_lhdr_source_is_monochrome_jpeg8() {
 fn find_x7_lhdr_source_is_monochrome_jpeg8() {
     let prepared = analyze("find-x7-ultra/lhdr-v2-01.heic");
 
-    assert_eq!(prepared.analysis.hdr_mode, SourceHdrMode::Lhdr);
+    assert_eq!(prepared.extracted.mode, ExtractionMode::Lhdr);
     assert_eq!(prepared.analysis.gain_map.channels, GainMapChannels::Mono);
     assert_eq!(
         prepared.analysis.gain_map.storage.chroma,
@@ -60,7 +61,7 @@ fn find_x7_lhdr_source_is_monochrome_jpeg8() {
 fn find_x9_uhdr_source_is_rgb_jpeg8() {
     let prepared = analyze("find-x9-ultra/uhdr-hr-01.heic");
 
-    assert_eq!(prepared.analysis.hdr_mode, SourceHdrMode::Uhdr);
+    assert_eq!(prepared.extracted.mode, ExtractionMode::Uhdr);
     assert_eq!(prepared.analysis.gain_map.channels, GainMapChannels::Rgb);
     assert_ne!(
         prepared.analysis.gain_map.storage.chroma,
