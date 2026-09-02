@@ -10,8 +10,6 @@ mod oppo_portrait;
 mod oppo_tail;
 mod validation;
 
-#[cfg(target_os = "macos")]
-pub use apple_adapter::AppleSemanticMask;
 pub use batch::{
     plan_batch_items, BatchAssetKind, BatchExecutionOptions, BatchFailure, BatchItem,
     BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition,
@@ -169,7 +167,9 @@ impl PortableRuntime {
         executable: impl AsRef<Path>,
         input: impl AsRef<Path>,
         orientation: Option<u32>,
-    ) -> Result<Vec<AppleSemanticMask>> {
+    ) -> Result<
+        std::collections::BTreeMap<xdremux_engine::AppleSemanticRole, xdremux_engine::AppleL8Mask>,
+    > {
         apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
             .vision_semantic_mattes(
                 input.as_ref(),
