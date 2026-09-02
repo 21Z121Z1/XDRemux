@@ -81,7 +81,7 @@ fn rust_owned_auxiliary_manifest_round_trips_through_imageio() {
 }
 
 #[test]
-fn rust_owns_oppo_portrait_source_preflight_around_imageio_observations() {
+fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() {
     let Some(executable) = adapter_executable() else {
         return;
     };
@@ -117,18 +117,20 @@ fn rust_owns_oppo_portrait_source_preflight_around_imageio_observations() {
     );
     assert!(preflight.disparity.near > preflight.disparity.far);
 
-    match (&preflight.depth.portrait, &preflight.subject_prior) {
-        (Some(_), Some(prior)) => {
-            assert_eq!(prior.width, preflight.base_width / 2);
-            assert_eq!(prior.height, preflight.base_height / 2);
-            assert_eq!(
-                prior.pixels.len(),
-                usize::try_from(prior.width).unwrap() * usize::try_from(prior.height).unwrap()
-            );
-        }
-        (None, None) => {}
-        _ => panic!("Rust preflight must preserve producer portrait-plane availability"),
-    }
+    let matte = &preflight.portrait_effects_matte;
+    assert_eq!(matte.width, preflight.base_width / 2);
+    assert_eq!(matte.height, preflight.base_height / 2);
+    assert_eq!(
+        matte.pixels.len(),
+        usize::try_from(matte.width).unwrap() * usize::try_from(matte.height).unwrap()
+    );
+    assert!(!preflight.subject_prior_used || preflight.depth.portrait.is_some());
+    build_apple_portrait_effects_matte_payload(
+        matte.width,
+        matte.height,
+        matte.pixels.clone(),
+    )
+    .expect("Rust-owned fused person matte must be directly payload-ready");
 
     assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
 }

@@ -194,6 +194,83 @@ impl AppleAdapterClient {
         validate_schema(response.schema_version)
     }
 
+    pub(super) fn coreimage_render_l8(
+        &self,
+        mask: &AppleL8Mask,
+        target_width: u32,
+        target_height: u32,
+        orientation: u8,
+    ) -> Result<AppleL8Mask> {
+        let source_bytes = checked_l8_byte_count(
+            mask.width,
+            mask.height,
+            "Apple CoreImage L8 render input",
+        )?;
+        if mask.pixels.len() != source_bytes {
+            return Err(RuntimeError::new(
+                "Apple CoreImage L8 render input",
+                format!(
+                    "mask has {} bytes; expected {source_bytes}",
+                    mask.pixels.len()
+                ),
+            ));
+        }
+        if !(1..=8).contains(&orientation) {
+            return Err(RuntimeError::new(
+                "Apple CoreImage L8 render",
+                format!("orientation {orientation} is outside 1 through 8"),
+            ));
+        }
+        let target_bytes = checked_l8_byte_count(
+            target_width,
+            target_height,
+            "Apple CoreImage L8 render output",
+        )?;
+
+        let sidecars = tempfile::tempdir()
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 sidecars", error))?;
+        let mask_path = sidecars.path().join("input.l8");
+        let output_path = sidecars.path().join("output.l8");
+        fs::write(&mask_path, &mask.pixels)
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 input write", error))?;
+
+        let request = CoreImageRenderL8Request {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "coreimage-render-l8",
+            output_path: input_path(&output_path)?,
+            render_l8: RenderL8Wire {
+                mask_path: input_path(&mask_path)?,
+                source_width: mask.width,
+                source_height: mask.height,
+                target_width,
+                target_height,
+                orientation,
+            },
+        };
+        let request = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        let output = self.invoke(&request, APPLE_COMPUTE_TIMEOUT)?;
+        let response: AckResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+
+        let metadata = fs::metadata(&output_path)
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 output metadata", error))?;
+        if metadata.len() != u64::try_from(target_bytes).unwrap_or(u64::MAX) {
+            return Err(RuntimeError::new(
+                "Apple CoreImage L8 render output",
+                format!(
+                    "sidecar has {} bytes; expected {target_bytes}",
+                    metadata.len()
+                ),
+            ));
+        }
+        let pixels = fs::read(&output_path)
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 output read", error))?;
+        AppleL8Mask::new(target_width, target_height, pixels)
+            .map_err(|error| RuntimeError::external("Apple CoreImage L8 render output", error))
+    }
+
     pub(super) fn coreimage_edge_preserve_upsample_l8(
         &self,
         guide: &Path,
@@ -619,6 +696,24 @@ struct WriteAuxiliaryRequest {
     input_path: String,
     output_path: String,
     auxiliary_payloads: Vec<AuxiliaryPayloadWire>,
+}
+
+#[derive(Debug, Serialize)]
+struct CoreImageRenderL8Request {
+    schema_version: u32,
+    operation: &'static str,
+    output_path: String,
+    render_l8: RenderL8Wire,
+}
+
+#[derive(Debug, Serialize)]
+struct RenderL8Wire {
+    mask_path: String,
+    source_width: u32,
+    source_height: u32,
+    target_width: u32,
+    target_height: u32,
+    orientation: u8,
 }
 
 #[derive(Debug, Serialize)]

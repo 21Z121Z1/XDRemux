@@ -12,6 +12,7 @@ private struct AdapterRequest: Decodable {
     let orientation: UInt32?
     let auxiliaryPayloads: [AuxiliaryPayloadRequest]?
     let edgePreserveUpsample: EdgePreserveUpsampleRequest?
+    let renderL8: RenderL8Request?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -22,6 +23,7 @@ private struct AdapterRequest: Decodable {
         case orientation
         case auxiliaryPayloads = "auxiliary_payloads"
         case edgePreserveUpsample = "edge_preserve_upsample"
+        case renderL8 = "render_l8"
     }
 }
 
@@ -42,6 +44,24 @@ private struct EdgePreserveUpsampleRequest: Decodable {
         case targetHeight = "target_height"
         case spatialSigma = "spatial_sigma"
         case lumaSigma = "luma_sigma"
+    }
+}
+
+private struct RenderL8Request: Decodable {
+    let maskPath: String
+    let sourceWidth: UInt32
+    let sourceHeight: UInt32
+    let targetWidth: UInt32
+    let targetHeight: UInt32
+    let orientation: UInt32
+
+    enum CodingKeys: String, CodingKey {
+        case maskPath = "mask_path"
+        case sourceWidth = "source_width"
+        case sourceHeight = "source_height"
+        case targetWidth = "target_width"
+        case targetHeight = "target_height"
+        case orientation
     }
 }
 
@@ -419,6 +439,28 @@ do {
                 roles: roles,
                 orientationOverride: request.orientation
             )
+        )
+    case "coreimage-render-l8":
+        guard let outputPath = request.outputPath, !outputPath.isEmpty,
+              let configuration = request.renderL8 else {
+            fail("coreimage-render-l8 requires output_path and render_l8")
+        }
+        try renderL8(
+            maskPath: configuration.maskPath,
+            outputPath: outputPath,
+            sourceWidth: Int(configuration.sourceWidth),
+            sourceHeight: Int(configuration.sourceHeight),
+            targetWidth: Int(configuration.targetWidth),
+            targetHeight: Int(configuration.targetHeight),
+            orientationRaw: configuration.orientation
+        )
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil
         )
     case "coreimage-edge-preserve-upsample-l8":
         guard let inputPath = request.inputPath, !inputPath.isEmpty,

@@ -21,7 +21,8 @@ use std::path::Path;
 #[cfg(target_os = "macos")]
 use xdremux_engine::{
     build_apple_portrait_disparity, derive_apple_portrait_camera_calibration,
-    resolve_apple_portrait_base_orientation, ApplePortraitCaptureFacts, ApplePortraitImageGeometry,
+    fuse_apple_portrait_person_mask, resolve_apple_portrait_base_orientation,
+    ApplePortraitCaptureFacts, ApplePortraitImageGeometry, AppleSemanticRole,
 };
 
 #[cfg(target_os = "macos")]
@@ -47,7 +48,8 @@ pub struct ApplePortraitSourcePreflight {
     pub base_orientation: u8,
     pub camera_calibration: ApplePortraitCameraCalibration,
     pub disparity: ApplePortraitDisparity,
-    pub subject_prior: Option<AppleL8Mask>,
+    pub portrait_effects_matte: AppleL8Mask,
+    pub subject_prior_used: bool,
     pub simulated_aperture: f64,
 }
 
@@ -304,18 +306,19 @@ pub(crate) fn prepare_apple_portrait_source(
     )
     .map_err(|error| RuntimeError::external("Apple Portrait disparity", error))?;
 
-    // The producer's portrait plane is a low-resolution subject topology prior.
-    // Rust owns whether and how this prior participates in Portrait. Core Image
-    // is used only for the platform-specific edge-preserving upsample primitive.
+    let target_width = split.base_width / 2;
+    let target_height = split.base_height / 2;
+    if target_width == 0 || target_height == 0 {
+        return Err(RuntimeError::new(
+            "Apple Portrait semantic matte",
+            "half-resolution target geometry is invalid",
+        ));
+    }
+
+    // The producer's portrait plane is only a topology prior. Rust owns whether
+    // it participates in the final Portrait Effects Matte; Core Image only
+    // executes the edge-preserving resize primitive.
     let subject_prior = if let Some(portrait_plane) = depth.portrait.as_ref() {
-        let target_width = split.base_width / 2;
-        let target_height = split.base_height / 2;
-        if target_width == 0 || target_height == 0 {
-            return Err(RuntimeError::new(
-                "Apple Portrait subject prior",
-                "half-resolution target geometry is invalid",
-            ));
-        }
         let small_mask = AppleL8Mask::new(
             depth.header.width,
             depth.header.height,
@@ -333,6 +336,29 @@ pub(crate) fn prepare_apple_portrait_source(
     } else {
         None
     };
+
+    // Vision reports the native person matte. Rust chooses the orientation and
+    // target geometry, then asks Core Image to reproduce the legacy stored-pixel
+    // transform before applying Rust-owned prior fusion policy.
+    let mut vision_masks = adapter.vision_semantic_mattes(
+        source_image_file.path(),
+        &[AppleSemanticRole::Person],
+        Some(u32::from(base_orientation)),
+    )?;
+    let native_person = vision_masks.remove(&AppleSemanticRole::Person).ok_or_else(|| {
+        RuntimeError::new(
+            "Apple Portrait person matte",
+            "Vision omitted the requested person matte",
+        )
+    })?;
+    let rendered_person = adapter.coreimage_render_l8(
+        &native_person,
+        target_width,
+        target_height,
+        base_orientation,
+    )?;
+    let person_fusion = fuse_apple_portrait_person_mask(&rendered_person, subject_prior.as_ref())
+        .map_err(|error| RuntimeError::external("Apple Portrait person fusion", error))?;
 
     let simulated_aperture = resolve_simulated_aperture(
         source.config.version,
@@ -353,7 +379,8 @@ pub(crate) fn prepare_apple_portrait_source(
         base_orientation,
         camera_calibration,
         disparity,
-        subject_prior,
+        portrait_effects_matte: person_fusion.mask,
+        subject_prior_used: person_fusion.used_prior,
         simulated_aperture,
     })
 }
