@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use xdremux_engine::OperationCapability;
+use xdremux_engine::{build_apple_portrait_effects_matte_payload, OperationCapability};
 use xdremux_runtime::PortableRuntime;
 
 const ADAPTER_TEST_EXECUTABLE: &str = "XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE";
@@ -55,6 +55,29 @@ fn swift_adapter_advertises_only_apple_operation_facts() {
     assert!(!facts.teeth_matte);
     assert!(!facts.glasses_matte);
     assert!(!facts.satisfies_portrait_editing());
+}
+
+#[test]
+fn rust_owned_auxiliary_manifest_round_trips_through_imageio() {
+    let Some(executable) = adapter_executable() else {
+        return;
+    };
+    let input = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic");
+    let temporary = tempfile::tempdir().expect("create ImageIO output directory");
+    let output = temporary.path().join("auxiliary-round-trip.heic");
+    let payload = build_apple_portrait_effects_matte_payload(2, 2, vec![0, 64, 128, 255])
+        .expect("build Rust-owned portrait effects matte payload");
+
+    let runtime = PortableRuntime::new();
+    runtime
+        .apple_write_auxiliary_payloads(&executable, &input, &output, &[payload])
+        .expect("Swift adapter must execute the Rust-owned ImageIO auxiliary manifest");
+    let facts = runtime
+        .apple_image_auxiliary_facts(&executable, &output)
+        .expect("ImageIO must expose the written auxiliary resource");
+
+    assert!(facts.portrait_effects_matte);
 }
 
 #[test]
