@@ -1,8 +1,7 @@
 use std::{collections::HashMap, env, fs, process};
 
 use xdremux_hdr::{
-    reconstruct_gain_map, resolve, ExtractionMode, Family, GainMapParams, GainMapRaster,
-    ResolvedScale,
+    reconstruct_gain_map, resolve, ExtractionMode, GainMapParams, GainMapRaster, ResolvedScale,
 };
 
 fn bits(value: f64) -> String {
@@ -61,13 +60,8 @@ fn scale_for(
 }
 
 fn emit(name: &str, raster: &GainMapRaster, params: &GainMapParams) {
-    let family = match params.family {
-        Family::Auto => "auto",
-        Family::X6 => "x6",
-        Family::X7 => "x7",
-    };
     println!(
-        "gainmap\t{name}\t{}\t{}\t{}\t{}\t{family}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+        "gainmap\t{name}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
         raster.width,
         raster.height,
         raster.bytes_per_row,
@@ -118,13 +112,13 @@ fn run(path: &str) -> Result<(), String> {
         ("modern-all-bytes", "modern-precomputed-f32-source"),
     ] {
         let (scale, meta) = scale_for(&cases, source_name)?;
-        let (raster, params) = reconstruct_gain_map(&all_bytes_mask(), Family::X7, &scale, &meta)
+        let (raster, params) = reconstruct_gain_map(&all_bytes_mask(), &scale, &meta)
             .map_err(|error| format!("{output_name}: {error}"))?;
         emit(output_name, &raster, &params);
     }
 
     let (scale, meta) = scale_for(&cases, "modern-precomputed-f32-source")?;
-    let (raster, params) = reconstruct_gain_map(&padded_mask(), Family::X7, &scale, &meta)
+    let (raster, params) = reconstruct_gain_map(&padded_mask(), &scale, &meta)
         .map_err(|error| format!("padded-stride: {error}"))?;
     emit("padded-stride", &raster, &params);
 
