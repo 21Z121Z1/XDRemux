@@ -39,6 +39,14 @@ let package = Package(
                 .copy("Resources/ApplePlatform")
             ]
         ),
+        // Internal process boundary for Apple-only capabilities. The protocol is
+        // owned by the Rust runtime; this target reports capability facts and,
+        // in later migration slices, executes narrowly scoped Apple operations.
+        .executableTarget(
+            name: "XDRemuxAppleAdapter",
+            dependencies: ["XDRemuxAppleFeatures"],
+            path: "Sources/XDRemuxAppleAdapter"
+        ),
         // Migration-only executable target. It is intentionally not a public
         // package product; the Rust `xdremux` binary owns the CLI contract.
         .executableTarget(
