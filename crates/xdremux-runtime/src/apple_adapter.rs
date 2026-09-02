@@ -5,7 +5,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use xdremux_engine::{AppleImageAuxiliaryFacts, OperationCapability};
+use xdremux_engine::{AppleGainMapFacts, AppleImageAuxiliaryFacts, OperationCapability};
+use xdremux_format::FourCC;
 
 use crate::{Result, RuntimeError};
 
@@ -77,12 +78,7 @@ impl AppleAdapterClient {
     }
 
     pub(super) fn imageio_auxiliary_facts(&self, input: &Path) -> Result<AppleImageAuxiliaryFacts> {
-        let input_path = input.to_str().ok_or_else(|| {
-            RuntimeError::new(
-                "Apple adapter protocol",
-                "input path is not valid UTF-8 for the JSON transport",
-            )
-        })?;
+        let input_path = input_path(input)?;
         let output = self.invoke_request(AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
             operation: "imageio-auxiliary-facts",
@@ -92,6 +88,23 @@ impl AppleAdapterClient {
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
         validate_schema(response.schema_version)?;
         Ok(response.auxiliary.into())
+    }
+
+    pub(super) fn imageio_gain_map_facts(&self, input: &Path) -> Result<AppleGainMapFacts> {
+        let input_path = input_path(input)?;
+        let output = self.invoke_request(AdapterRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-gain-map-facts",
+            input_path: Some(input_path),
+        })?;
+        let response: GainMapResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        Ok(AppleGainMapFacts {
+            pixel_format: FourCC::new(response.gain_map.pixel_format.to_be_bytes()),
+            width: response.gain_map.width,
+            height: response.gain_map.height,
+        })
     }
 
     fn invoke_request(&self, request: AdapterRequest<'_>) -> Result<Vec<u8>> {
@@ -172,6 +185,15 @@ impl AppleAdapterClient {
     }
 }
 
+fn input_path(input: &Path) -> Result<&str> {
+    input.to_str().ok_or_else(|| {
+        RuntimeError::new(
+            "Apple adapter protocol",
+            "input path is not valid UTF-8 for the JSON transport",
+        )
+    })
+}
+
 #[derive(Debug, Serialize)]
 struct AdapterRequest<'a> {
     schema_version: u32,
@@ -190,6 +212,19 @@ struct CapabilitiesResponse {
 struct AuxiliaryResponse {
     schema_version: u32,
     auxiliary: AuxiliaryWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct GainMapResponse {
+    schema_version: u32,
+    gain_map: GainMapWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct GainMapWire {
+    pixel_format: u32,
+    width: u32,
+    height: u32,
 }
 
 #[derive(Debug, Deserialize)]
