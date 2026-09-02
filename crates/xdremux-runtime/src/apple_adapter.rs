@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -5,14 +7,26 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use xdremux_engine::{AppleGainMapFacts, AppleImageAuxiliaryFacts, OperationCapability};
+use xdremux_engine::{
+    AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleSemanticRole, OperationCapability,
+};
 use xdremux_format::FourCC;
 
 use crate::{Result, RuntimeError};
 
 const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 1;
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+const VISION_TIMEOUT: Duration = Duration::from_secs(300);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
+const MAX_SEMANTIC_MASK_BYTES: usize = 128 * 1024 * 1024;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppleSemanticMask {
+    pub role: AppleSemanticRole,
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct AppleAdapterCapabilities {
@@ -50,8 +64,11 @@ impl AppleAdapterClient {
     pub(super) fn capabilities(&self) -> Result<AppleAdapterCapabilities> {
         let output = self.invoke_request(AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
-            operation: "capabilities",
+            operation: "capabilities".to_owned(),
             input_path: None,
+            output_path: None,
+            roles: None,
+            orientation: None,
         })?;
         let response: CapabilitiesResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
@@ -78,11 +95,13 @@ impl AppleAdapterClient {
     }
 
     pub(super) fn imageio_auxiliary_facts(&self, input: &Path) -> Result<AppleImageAuxiliaryFacts> {
-        let input_path = input_path(input)?;
         let output = self.invoke_request(AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
-            operation: "imageio-auxiliary-facts",
-            input_path: Some(input_path),
+            operation: "imageio-auxiliary-facts".to_owned(),
+            input_path: Some(input_path(input)?),
+            output_path: None,
+            roles: None,
+            orientation: None,
         })?;
         let response: AuxiliaryResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
@@ -91,11 +110,13 @@ impl AppleAdapterClient {
     }
 
     pub(super) fn imageio_gain_map_facts(&self, input: &Path) -> Result<AppleGainMapFacts> {
-        let input_path = input_path(input)?;
         let output = self.invoke_request(AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
-            operation: "imageio-gain-map-facts",
-            input_path: Some(input_path),
+            operation: "imageio-gain-map-facts".to_owned(),
+            input_path: Some(input_path(input)?),
+            output_path: None,
+            roles: None,
+            orientation: None,
         })?;
         let response: GainMapResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
@@ -107,13 +128,143 @@ impl AppleAdapterClient {
         })
     }
 
-    fn invoke_request(&self, request: AdapterRequest<'_>) -> Result<Vec<u8>> {
-        let request = serde_json::to_vec(&request)
-            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
-        self.invoke(&request)
+    pub(super) fn vision_semantic_mattes(
+        &self,
+        input: &Path,
+        roles: &[AppleSemanticRole],
+        orientation: Option<u32>,
+    ) -> Result<Vec<AppleSemanticMask>> {
+        if roles.is_empty() {
+            return Err(RuntimeError::new(
+                "Apple Vision semantic mattes",
+                "requested role set is empty",
+            ));
+        }
+        let expected = roles.iter().copied().collect::<BTreeSet<_>>();
+        if expected.len() != roles.len() {
+            return Err(RuntimeError::new(
+                "Apple Vision semantic mattes",
+                "requested role set contains duplicates",
+            ));
+        }
+
+        let output_directory = tempfile::tempdir()
+            .map_err(|error| RuntimeError::external("Apple Vision temporary directory", error))?;
+        let output = self.invoke_request_with_timeout(
+            AdapterRequest {
+                schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+                operation: "vision-semantic-mattes".to_owned(),
+                input_path: Some(input_path(input)?),
+                output_path: Some(input_path(output_directory.path())?),
+                roles: Some(roles.iter().map(|role| semantic_role_wire(*role).to_owned()).collect()),
+                orientation,
+            },
+            VISION_TIMEOUT,
+        )?;
+        let response: SemanticResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+
+        let mut observed = BTreeSet::new();
+        let mut masks = Vec::with_capacity(response.semantic_masks.len());
+        for wire in response.semantic_masks {
+            let role = parse_semantic_role(&wire.role)?;
+            if !expected.contains(&role) {
+                return Err(RuntimeError::new(
+                    "Apple Vision semantic mattes",
+                    format!("adapter returned unrequested role {:?}", role),
+                ));
+            }
+            if !observed.insert(role) {
+                return Err(RuntimeError::new(
+                    "Apple Vision semantic mattes",
+                    format!("adapter returned duplicate role {:?}", role),
+                ));
+            }
+            if FourCC::new(wire.pixel_format.to_be_bytes()) != FourCC::new(*b"L008") {
+                return Err(RuntimeError::new(
+                    "Apple Vision semantic mattes",
+                    format!("role {:?} is not L008", role),
+                ));
+            }
+            if wire.width == 0 || wire.height == 0 {
+                return Err(RuntimeError::new(
+                    "Apple Vision semantic mattes",
+                    format!("role {:?} has zero geometry", role),
+                ));
+            }
+            let expected_bytes = usize::try_from(wire.width)
+                .ok()
+                .and_then(|width| {
+                    usize::try_from(wire.height)
+                        .ok()
+                        .and_then(|height| width.checked_mul(height))
+                })
+                .ok_or_else(|| {
+                    RuntimeError::new(
+                        "Apple Vision semantic mattes",
+                        format!("role {:?} geometry overflows", role),
+                    )
+                })?;
+            if expected_bytes > MAX_SEMANTIC_MASK_BYTES {
+                return Err(RuntimeError::new(
+                    "Apple Vision semantic mattes",
+                    format!("role {:?} exceeds semantic mask safety limit", role),
+                ));
+            }
+            let path = output_directory
+                .path()
+                .join(format!("{}.l8", semantic_role_wire(role)));
+            let metadata = fs::metadata(&path).map_err(|error| {
+                RuntimeError::external("Apple Vision semantic mask metadata", error)
+            })?;
+            if metadata.len() != u64::try_from(expected_bytes).unwrap_or(u64::MAX) {
+                return Err(RuntimeError::new(
+                    "Apple Vision semantic mattes",
+                    format!(
+                        "role {:?} has {} bytes; expected {}",
+                        role,
+                        metadata.len(),
+                        expected_bytes
+                    ),
+                ));
+            }
+            let pixels = fs::read(&path)
+                .map_err(|error| RuntimeError::external("Apple Vision semantic mask read", error))?;
+            masks.push(AppleSemanticMask {
+                role,
+                width: wire.width,
+                height: wire.height,
+                pixels,
+            });
+        }
+
+        if observed != expected {
+            let missing = expected.difference(&observed).copied().collect::<Vec<_>>();
+            return Err(RuntimeError::new(
+                "Apple Vision semantic mattes",
+                format!("adapter omitted required roles: {missing:?}"),
+            ));
+        }
+        masks.sort_by_key(|mask| mask.role);
+        Ok(masks)
     }
 
-    fn invoke(&self, request: &[u8]) -> Result<Vec<u8>> {
+    fn invoke_request(&self, request: AdapterRequest) -> Result<Vec<u8>> {
+        self.invoke_request_with_timeout(request, self.timeout)
+    }
+
+    fn invoke_request_with_timeout(
+        &self,
+        request: AdapterRequest,
+        timeout: Duration,
+    ) -> Result<Vec<u8>> {
+        let request = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        self.invoke(&request, timeout)
+    }
+
+    fn invoke(&self, request: &[u8], timeout: Duration) -> Result<Vec<u8>> {
         let mut child = Command::new(&self.executable)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -138,7 +289,7 @@ impl AppleAdapterClient {
         let stdout_reader = thread::spawn(move || read_all(stdout));
         let stderr_reader = thread::spawn(move || read_all(stderr));
 
-        let deadline = Instant::now() + self.timeout;
+        let deadline = Instant::now() + timeout;
         let status = loop {
             match child
                 .try_wait()
@@ -152,18 +303,13 @@ impl AppleAdapterClient {
                     let _ = join_reader(stderr_reader, "stderr");
                     return Err(RuntimeError::new(
                         "Apple adapter timeout",
-                        format!(
-                            "{} exceeded {} ms",
-                            self.executable.display(),
-                            self.timeout.as_millis()
-                        ),
+                        format!("{} exceeded {} ms", self.executable.display(), timeout.as_millis()),
                     ));
                 }
                 None => thread::sleep(POLL_INTERVAL),
             }
         };
 
-        // Keep lifecycle ownership here even after `try_wait` reports success.
         child
             .wait()
             .map_err(|error| RuntimeError::external("Apple adapter reap", error))?;
@@ -185,21 +331,56 @@ impl AppleAdapterClient {
     }
 }
 
-fn input_path(input: &Path) -> Result<&str> {
-    input.to_str().ok_or_else(|| {
-        RuntimeError::new(
+fn input_path(input: &Path) -> Result<String> {
+    input
+        .to_str()
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "Apple adapter protocol",
+                "path is not valid UTF-8 for the JSON transport",
+            )
+        })
+}
+
+fn semantic_role_wire(role: AppleSemanticRole) -> &'static str {
+    match role {
+        AppleSemanticRole::Person => "person",
+        AppleSemanticRole::Skin => "skin",
+        AppleSemanticRole::Hair => "hair",
+        AppleSemanticRole::Teeth => "teeth",
+        AppleSemanticRole::Glasses => "glasses",
+        AppleSemanticRole::Sky => "sky",
+    }
+}
+
+fn parse_semantic_role(role: &str) -> Result<AppleSemanticRole> {
+    match role {
+        "person" => Ok(AppleSemanticRole::Person),
+        "skin" => Ok(AppleSemanticRole::Skin),
+        "hair" => Ok(AppleSemanticRole::Hair),
+        "teeth" => Ok(AppleSemanticRole::Teeth),
+        "glasses" => Ok(AppleSemanticRole::Glasses),
+        "sky" => Ok(AppleSemanticRole::Sky),
+        other => Err(RuntimeError::new(
             "Apple adapter protocol",
-            "input path is not valid UTF-8 for the JSON transport",
-        )
-    })
+            format!("unknown semantic role {other:?}"),
+        )),
+    }
 }
 
 #[derive(Debug, Serialize)]
-struct AdapterRequest<'a> {
+struct AdapterRequest {
     schema_version: u32,
-    operation: &'a str,
+    operation: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    input_path: Option<&'a str>,
+    input_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    roles: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    orientation: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -221,10 +402,24 @@ struct GainMapResponse {
 }
 
 #[derive(Debug, Deserialize)]
+struct SemanticResponse {
+    schema_version: u32,
+    semantic_masks: Vec<SemanticMaskWire>,
+}
+
+#[derive(Debug, Deserialize)]
 struct GainMapWire {
     pixel_format: u32,
     width: u32,
     height: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct SemanticMaskWire {
+    role: String,
+    width: u32,
+    height: u32,
+    pixel_format: u32,
 }
 
 #[derive(Debug, Deserialize)]
