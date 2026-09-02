@@ -2,101 +2,114 @@
 
 [English](development.en.md) | 简体中文
 
-修改 XDRemux、集成 Swift package 或构建 macOS App 时使用本文档。
+XDRemux 只有一个产品核心：Rust workspace。新的产品行为必须进入 Rust。Swift 只作为迁移期 Apple 平台能力层，Python 只作为迁移验证和研究工具，不再构成第二套 XDRemux runtime。
 
-命令行用法见 [CLI 参考](cli.md)。
+面向用户的命令行行为见 [CLI 参考](cli.md)。
 
-## 工具链
+## Canonical 开发流程
 
-Package manifest 当前设置：
-
-- Swift tools version 6.0；
-- 最低平台 macOS 15；
-- package 默认 localization 为 `en`。
-
-当前 targets 使用 Swift language mode 5。
-
-构建和测试：
+产品改动使用 Rust workspace：
 
 ```bash
-swift build
-swift test
-python3 -m unittest discover -s Tests -v
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo run -p xdremux-cli -- --help
 ```
 
-## Swift package 产品
+Canonical 产品栈为：
 
-| 产品 | 类型 | 用途 |
-| --- | --- | --- |
-| `XDRemuxCore` | library | HDR 转换、HEIF/ISO-BMFF、metadata、Motion Photo 解析、分类和共享验证。 |
-| `XDRemuxAppleFeatures` | library | Apple Live Photo、摄影风格、Apple 人像和 Apple 特有分析。 |
-| `xdremux` | executable | Swift 命令行界面。 |
+```text
+xdremux-cli
+    ↓
+xdremux-runtime
+    ↓
+xdremux-engine
+    ↓
+source / classification
+motion-photo / hdr / metadata
+container / heif / codec / format
+    ↓
+portable providers + platform adapters
+```
 
-`CoreImageRAWDiagnostics` 是开发者诊断 target，不是公开 package product。
+产品意图应停留在这座抽象塔的上层。除非某个 codec、camera-tail、源代际、routing 或 container 选择对应明确不同的用户结果，否则不要把它暴露成用户选项。
 
-构建：
+## Rust workspace 所有权
+
+| Crate | 职责 |
+| --- | --- |
+| `xdremux-cli` | 唯一公开 CLI 和命令契约。 |
+| `xdremux-runtime` | 文件系统执行、publication、批处理可靠性、恢复以及平台能力协调。 |
+| `xdremux-engine` | 产品意图、转换规划、能力要求和 orchestration。 |
+| `xdremux-source` / `xdremux-classification` | 输入探测、资产身份和分类。 |
+| `xdremux-motion-photo` | Motion Photo 解析和 Live Photo 媒体语义。 |
+| `xdremux-hdr` / `xdremux-metadata` | HDR / Gain Map 数学和 metadata primitive。 |
+| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Container、HEIF、codec、JPEG/EXIF/TIFF/ISOBMFF primitive。 |
+
+下层 crate 可以提供格式 primitive，但这不意味着它成为一个产品模式。是否使用该 primitive 由 runtime 和 engine 决定。
+
+## Apple 平台能力
+
+`Sources/XDRemuxAppleFeatures/` 在摄影风格、人像、RAW、Vision、Core ML、AVFoundation 等 Apple framework 能力迁入 Rust capability model 期间继续保留。
+
+目标架构是一个窄平台 adapter：
+
+- Rust 持有 request、result、policy、routing、命名、分类、HDR 行为、Motion Photo 行为、batch 行为和 fallback 决策；
+- Apple 层只调用 Apple framework 并返回 capability result；
+- 不要再向 Swift 添加跨平台产品 policy。
+
+需要进程内 Rust/Swift interop 时，优先使用稳定 C ABI。FFI 所需的 unsafe 代码应隔离在边界层，不要进入安全的 engine/runtime crate。
+
+`CoreImageRAWDiagnostics` 继续作为开发者专用 Swift target：
 
 ```bash
 swift build --target CoreImageRAWDiagnostics
 ```
 
-## Package 集成
+Swift tests 仍可用于 Apple capability 验收和迁移 oracle，但它们不再定义 canonical CLI 契约。
 
-把仓库加入 package dependency：
+## Python 工具
 
-```swift
-dependencies: [
-    .package(
-        url: "https://github.com/21Z121Z1/XDRemux.git",
-        branch: "main"
-    )
-]
+Python package 需要 Python 3.11 或更高版本，仅保留用于迁移期 conformance、真实 fixture oracle 和研究/训练流程。它不再安装 CLI，也不得定义新的产品语义。
+
+只有 Python oracle 或研究流程需要时才安装：
+
+```bash
+python -m pip install -e .
+python -m unittest discover -s Tests -v
 ```
 
-标准转换链路使用 `XDRemuxCore`。
+当前依赖包括 `pillow-heif`、`Pillow`、`numpy` 和 `piexif`。可选 `training` dependency 会加入 PyTorch。
 
-```swift
-import XDRemuxCore
-
-let input = InputSource(url: inputURL)
-let request = ConversionRequest(
-    input: input,
-    output: OutputTarget.file(outputURL).destination(for: input),
-    configuration: ConversionConfiguration()
-)
-
-let result = try ConversionEngine.convert(request)
-```
-
-Apple 特有转换引擎使用 `XDRemuxAppleFeatures`。
-
-当前 package 文档没有稳定 release tag 契约。依赖 `main` 可能收到 API 变化。
+训练和评估脚本可以继续使用 Python，因为它们属于研究工具，而不是第二套 XDRemux 实现。
 
 ## 仓库结构
 
 | 路径 | 用途 |
 | --- | --- |
-| `Sources/XDRemuxCore/` | 核心转换和格式逻辑。 |
-| `Sources/XDRemuxAppleFeatures/` | Apple 特有转换和验证。 |
-| `Sources/XDRemuxCLI/` | Swift CLI 参数解析和命令路由。 |
-| `Sources/CoreImageRAWDiagnostics/` | 开发者 RAW 诊断 target。 |
-| `xdremux_py/` | 跨平台 Python 实现。 |
-| `apps/macos/XDRemuxApp/` | macOS SwiftUI App。 |
-| `Tests/` | Swift 测试、Python policy test 和验证 harness。 |
-| `fixtures/` | strict CI gate 使用的版本化真实 Motion Photo fixture。 |
-| `scripts/` | 构建、评估和验收工具。 |
-| `docs/` | 当前文档和历史验证记录。 |
+| `crates/` | Canonical Rust 产品栈。 |
+| `Sources/XDRemuxAppleFeatures/` | Apple capability 实现和迁移期验证。 |
+| `Sources/XDRemuxCore/` | 仅在 replacement evidence 尚未完成时保留的 legacy Swift core。 |
+| `Sources/XDRemuxCLI/` | 仅在 Apple 迁移工作仍有引用时保留的 legacy Swift CLI。 |
+| `Sources/CoreImageRAWDiagnostics/` | 开发者 RAW 诊断。 |
+| `xdremux_py/` | 迁移 oracle 和研究/训练工具；没有产品 CLI。 |
+| `apps/macos/XDRemuxApp/` | 产品栈迁移期间的 macOS SwiftUI App。 |
+| `Tests/` | Rust/Swift/Python 验收测试和 validation harness。 |
+| `fixtures/` | strict gate 使用的版本化真实媒体 fixture。 |
+| `scripts/` | 构建、评估、迁移和验收工具。 |
+| `docs/` | 当前指导文档和历史研究记录。 |
 | `Models/` | 可选研究模型和模型文档。 |
+
+Legacy Swift/Python 代码今后只应接受迁移、conformance、安全修复或删除工作。新的用户可见行为进入 Rust。
 
 ## Apple 辅助进程
 
 部分 Apple 功能会编译或运行 package resource 中的 helper program。
 
-helper toolchain 根据源码内容生成 hash，并缓存兼容的构建结果。实现会限制 helper 调用时长，并在协议要求时把机器可读 stdout 和诊断输出分离。
+helper toolchain 根据源码内容生成 hash，并缓存兼容构建结果。helper 调用应保持有界；协议需要时，机器可读 stdout 必须与诊断输出分离。
 
 Apple 私有 API 兼容性必须在运行时检查。runtime method signature 不符合已支持 ABI 时，不要按假定 ABI 调用私有 Objective-C selector。
-
-当前 macOS 27 摄影风格响应 helper 会在调用前检查已知 initializer 和 style-apply ABI 形状。
 
 ## macOS App
 
@@ -113,45 +126,10 @@ scripts/build_and_run.sh logs
 scripts/build_and_run.sh clean
 ```
 
-App 直接链接 Swift package，不把 CLI 当作核心转换子进程。
-
-## Python package
-
-Python package 需要 Python 3.11 或更高版本。
-
-运行时依赖包括：
-
-- `pillow-heif`；
-- `Pillow`；
-- `numpy`；
-- `piexif`。
-
-可选 `training` dependency 会加入 PyTorch。
-
-安装后的命令是 `xdremux-py`。仓库本地入口是 `python3 -m xdremux_py`。
+迁移期间 App 仍可能链接 Swift package。不要把这一依赖解释为 Swift 继续拥有 canonical conversion policy；可复用的产品行为应优先迁入 Rust。
 
 ## 调试和研究控制
 
 仓库存在用于编码诊断、scratch 保留、style rendering 和研究模型选择的环境变量。
 
-除非产品行为需要，不要把研究环境变量加入普通用户命令。
-
-如果测试和当前产品链路都不依赖某个研究开关，不要把它写成稳定公开接口。
-
-可选 Reverse Key 1 模型有独立[模型卡](../Models/ReverseKey1Ensemble.model-card.md)。
-
-## Completion gate
-
-仓库 Agent 在声称工作完成前，必须验证准确的已提交 `HEAD`。
-
-验收 runbook 见 [validation/README.md](validation/README.md)。
-
-默认使用与修改范围匹配的验证。纯文档修改不需要完整真实照片矩阵。转换核心修改除了静态检查，还需要 functional evidence。
-
-completion receipt 会绑定 commit、base commit、changed path 和 clean worktree。之后的 tracked edit 会让 receipt 失效。
-
-## 文档修改
-
-当前技术文档遵循[技术写作规范](style-guide.md)。
-
-代码修改改变已记录的命令、输出规则、格式契约或验收边界时，先更新英文文档，再更新对应中文翻译。
+除非产品行为确实需要，不要把研究环境变量加入普通用户命令。如果 canonical Rust 产品路径和测试都不依赖某个研究开关，就不要把它写成稳定公开接口。
