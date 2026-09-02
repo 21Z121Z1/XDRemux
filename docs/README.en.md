@@ -8,18 +8,18 @@ All current technical documents use the writing policy in the [technical writing
 
 ## User documentation
 
-- [CLI reference](cli.en.md): commands, options, output paths, and exit behavior.
-- [Apple features](apple-features.en.md): Photographic Styles, Apple Portrait, and supported combinations.
+- [CLI reference](cli.en.md): the canonical Rust command contract, options, output paths, and exit behavior.
+- [Apple features](apple-features.en.md): Photographic Styles, Apple Portrait, and the current platform-capability migration boundary.
 - [Supported devices](supported-devices.en.md): ProXDR capture compatibility and its limits.
 
 ## Developer documentation
 
-- [Development and builds](development.en.md): package products, repository layout, app builds, and integration.
+- [Development and builds](development.en.md): Rust product ownership, repository architecture, Apple adapter boundaries, and build/test workflow.
 - [Testing policy](quality/testing.en.md): required evidence for a change.
 - [Regression and real-sample verification](quality/evals.en.md): reusable test and fixture gates.
 - [Output policy](quality/logging.en.md): stdout, stderr, JSON output, and error-text rules.
 - [Validation runbook](validation/README.en.md): completion-gate plans and evidence classes.
-- [Test suite guide](../Tests/README.en.md): Swift and Python test entry points.
+- [Test suite guide](../Tests/README.en.md): canonical and migration-time test suites.
 - [Fixture guide](../fixtures/README.en.md): versioned Motion Photo fixtures and identity rules.
 
 ## Technical implementation
@@ -29,7 +29,7 @@ All current technical documents use the writing policy in the [technical writing
 
 ## Historical records
 
-The following files are evidence records. They describe a specific repository state or a specific experiment. They are not current product specifications.
+The following files are evidence records. They describe a specific repository state or experiment. They are not current product specifications.
 
 - ISO conformance audit, 2026-05-11: [current-language summary](xdremux/iso-conformance-audit-20260511.summary.en.md) | [original record](xdremux/iso-conformance-audit-20260511.md)
 - Encoding quality and size audit, 2026-07-18: [current-language summary](validation/encoding-quality-pareto-20260718.summary.en.md) | [original record](validation/encoding-quality-pareto-20260718.md)
