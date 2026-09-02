@@ -39,11 +39,12 @@ let package = Package(
                 .copy("Resources/ApplePlatform")
             ]
         ),
-        // Process boundary for Apple-only capabilities. It is a distributable
-        // platform component, not a user-facing CLI or a business-policy owner.
+        // Process boundary for Apple-only framework calls. The adapter is kept
+        // dependency-free from migration Swift business modules so its build
+        // graph matches the intended final architecture.
         .executableTarget(
             name: "XDRemuxAppleAdapter",
-            dependencies: ["XDRemuxAppleFeatures"],
+            dependencies: [],
             path: "Sources/XDRemuxAppleAdapter"
         ),
         // Migration-only executable target. It is intentionally not a public
