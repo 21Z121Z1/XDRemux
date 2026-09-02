@@ -4,7 +4,6 @@ mod batch;
 mod batch_checkpoint;
 mod categorize;
 mod live_photo;
-mod oppo_compat;
 mod oppo_tail;
 mod validation;
 
@@ -36,8 +35,8 @@ use xdremux_container::{extract, ExtractedLhdr, ExtractionMode as ContainerExtra
 use xdremux_engine::{
     execute_conversion, gain_map_source_profile_from_jpeg, ArtifactBuilder, ArtifactPublisher,
     ArtifactValidator, CapabilityInventory, ConversionAnalysis, ConversionPlan, ConversionRequest,
-    ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder, InputProcessingBranch,
-    OperationCapability, OppoCompatibility, RasterDecoder, SourceHdrMode, TmapFormat,
+    ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder, OperationCapability,
+    OutputIntent, RasterDecoder,
 };
 use xdremux_format::probe_jpeg_frame_profile;
 use xdremux_hdr::{
@@ -49,7 +48,7 @@ use xdremux_heif::{
     GainMapChannels as HeifGainMapChannels, GainMapEncodeProfile as HeifGainMapEncodeProfile,
     GainMapTile, IsoGainMapAssembly,
 };
-use xdremux_metadata::{make_apple_tmap_payload, make_hdrgm_xmp, make_strict_tmap_payload};
+use xdremux_metadata::{make_apple_tmap_payload, make_hdrgm_xmp};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeError {
@@ -216,10 +215,6 @@ impl PortableRuntime {
     }
 
     /// Convert a Motion Photo while enforcing product-intent applicability.
-    ///
-    /// OPPO Gallery compatibility changes the still-image Gain Map graph and
-    /// vendor metadata. A Motion Photo conversion has a distinct Live Photo
-    /// publication contract, so silently ignoring that intent would be unsafe.
     pub fn convert_motion_photo_file_with_request(
         &self,
         source: &[u8],
@@ -244,22 +239,14 @@ pub fn analyze_proxdr(source: &[u8]) -> Result<PreparedProXdr> {
         .map_err(|error| RuntimeError::external("private Gain Map JPEG profile", error))?;
     let gain_map = gain_map_source_profile_from_jpeg(&frame)
         .map_err(|error| RuntimeError::external("Gain Map source profile", error))?;
-    let hdr_mode = source_hdr_mode(extracted.mode);
     let scale = resolve(&extracted.meta_floats, hdr_extraction_mode(extracted.mode))
         .map_err(|error| RuntimeError::external("HDR scale resolution", error))?;
-    let analysis = ConversionAnalysis { hdr_mode, gain_map };
+    let analysis = ConversionAnalysis { gain_map };
     Ok(PreparedProXdr {
         analysis,
         extracted,
         scale,
     })
-}
-
-fn source_hdr_mode(mode: ContainerExtractionMode) -> SourceHdrMode {
-    match mode {
-        ContainerExtractionMode::Lhdr => SourceHdrMode::Lhdr,
-        ContainerExtractionMode::Uhdr => SourceHdrMode::Uhdr,
-    }
 }
 
 fn hdr_extraction_mode(mode: ContainerExtractionMode) -> HdrExtractionMode {
@@ -287,8 +274,6 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
     type Error = RuntimeError;
 
     fn build_artifact(&mut self, plan: &ConversionPlan) -> Result<Self::Artifact> {
-        self.validate_supported_plan(plan)?;
-
         let decoded = self
             .jpeg
             .decode_raster(&JpegRasterDecodeRequest {
@@ -314,13 +299,8 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
                 make_private_gain_map_info_floats(&self.prepared.scale).to_vec()
             }
         };
-        let imageio_tmap = make_apple_tmap_payload(&info_floats)
+        let tmap_payload = make_apple_tmap_payload(&info_floats)
             .map_err(|error| RuntimeError::external("ISO Gain Map tmap", error))?;
-        let tmap_payload = match plan.tmap_format {
-            TmapFormat::ImageIo => imageio_tmap,
-            TmapFormat::Strict => make_strict_tmap_payload(&imageio_tmap)
-                .map_err(|error| RuntimeError::external("strict ISO Gain Map tmap", error))?,
-        };
         let xmp_payload = make_hdrgm_xmp(&info_floats)
             .map_err(|error| RuntimeError::external("ISO Gain Map XMP", error))?;
 
@@ -328,15 +308,6 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
             self.source,
             self.prepared.extracted.manifest_info.extension_start,
         )?;
-        let patched_body = if plan.oppo_compatibility == OppoCompatibility::Off {
-            None
-        } else {
-            Some(oppo_compat::patch_source_metadata(
-                body,
-                plan.oppo_compatibility,
-            )?)
-        };
-        let assembly_body = patched_body.as_deref().unwrap_or(body);
         let tiles = encoded
             .tiles
             .iter()
@@ -364,7 +335,7 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
             },
         };
         let mut output = assemble_iso_gain_map_heif(
-            assembly_body,
+            body,
             &IsoGainMapAssembly {
                 gain_map,
                 tmap_payload: &tmap_payload,
@@ -373,24 +344,13 @@ impl ArtifactBuilder for ProXdrArtifactBuilder<'_> {
         )
         .map_err(|error| RuntimeError::external("native Rust HEIF assembly", error))?;
 
-        let tail =
-            oppo_tail::build_tail(self.source, &self.prepared.extracted, plan.oppo_camera_tail)?;
+        let tail = oppo_tail::build_tail(self.source, &self.prepared.extracted, plan.output)?;
         output.extend_from_slice(&tail);
         Ok(output)
     }
 }
 
 impl ProXdrArtifactBuilder<'_> {
-    fn validate_supported_plan(&self, plan: &ConversionPlan) -> Result<()> {
-        if plan.effective_input_processing_branch != InputProcessingBranch::Hybrid {
-            return Err(RuntimeError::new(
-                "portable runtime",
-                "the first Rust runtime slice supports the canonical Hybrid path only",
-            ));
-        }
-        Ok(())
-    }
-
     fn normalized_gain_map_raster(
         &self,
         decoded: Raster8,
@@ -642,9 +602,7 @@ mod tests {
         fs::write(&path, b"old").unwrap();
         let mut publisher = AtomicFilePublisher::new(path.clone());
         let plan = ConversionPlan {
-            requested_input_processing_branch: InputProcessingBranch::Hybrid,
-            effective_input_processing_branch: InputProcessingBranch::Hybrid,
-            base_strategy: xdremux_engine::BaseStrategy::PreserveCompressed,
+            output: OutputIntent::Standard,
             gain_map_target: xdremux_engine::GainMapEncodeProfile {
                 width: 1,
                 height: 1,
@@ -655,10 +613,6 @@ mod tests {
                     chroma_bit_depth: 8,
                 },
             },
-            container_writer: xdremux_engine::ContainerWriter::Rust,
-            oppo_compatibility: OppoCompatibility::Off,
-            oppo_camera_tail: xdremux_engine::OppoCameraTail::Off,
-            tmap_format: TmapFormat::ImageIo,
             required_capabilities: Vec::new(),
         };
         publisher.publish_artifact(&plan, b"new".to_vec()).unwrap();
