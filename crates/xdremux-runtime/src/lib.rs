@@ -34,16 +34,15 @@ use xdremux_codec::{
 };
 use xdremux_container::{extract, ExtractedLhdr, ExtractionMode as ContainerExtractionMode};
 use xdremux_engine::{
-    detect_source_family, execute_conversion, gain_map_source_profile_from_jpeg, ArtifactBuilder,
-    ArtifactPublisher, ArtifactValidator, CapabilityInventory, ConversionAnalysis, ConversionPlan,
-    ConversionRequest, ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder,
-    InputProcessingBranch, OperationCapability, OppoCompatibility, RasterDecoder, SourceFamily,
-    SourceHdrMode, TmapFormat,
+    execute_conversion, gain_map_source_profile_from_jpeg, ArtifactBuilder, ArtifactPublisher,
+    ArtifactValidator, CapabilityInventory, ConversionAnalysis, ConversionPlan, ConversionRequest,
+    ExecutionError, ExecutionStage, GainMapChannels, GainMapTileEncoder, InputProcessingBranch,
+    OperationCapability, OppoCompatibility, RasterDecoder, SourceHdrMode, TmapFormat,
 };
 use xdremux_format::probe_jpeg_frame_profile;
 use xdremux_hdr::{
     make_private_gain_map_info_floats, reconstruct_gain_map, resolve,
-    ExtractionMode as HdrExtractionMode, Family as HdrFamily, GainMapRaster, ResolvedScale,
+    ExtractionMode as HdrExtractionMode, GainMapRaster, ResolvedScale,
 };
 use xdremux_heif::{
     assemble_iso_gain_map_heif, validate_gain_map_structure, DirectHevcGainMap,
@@ -248,11 +247,7 @@ pub fn analyze_proxdr(source: &[u8]) -> Result<PreparedProXdr> {
     let hdr_mode = source_hdr_mode(extracted.mode);
     let scale = resolve(&extracted.meta_floats, hdr_extraction_mode(extracted.mode))
         .map_err(|error| RuntimeError::external("HDR scale resolution", error))?;
-    let analysis = ConversionAnalysis {
-        source_family: detect_source_family(hdr_mode, &extracted.meta_floats),
-        hdr_mode,
-        gain_map,
-    };
+    let analysis = ConversionAnalysis { hdr_mode, gain_map };
     Ok(PreparedProXdr {
         analysis,
         extracted,
@@ -271,13 +266,6 @@ fn hdr_extraction_mode(mode: ContainerExtractionMode) -> HdrExtractionMode {
     match mode {
         ContainerExtractionMode::Lhdr => HdrExtractionMode::Lhdr,
         ContainerExtractionMode::Uhdr => HdrExtractionMode::Uhdr,
-    }
-}
-
-fn hdr_family(family: SourceFamily) -> HdrFamily {
-    match family {
-        SourceFamily::X6 => HdrFamily::X6,
-        SourceFamily::X7 => HdrFamily::X7,
     }
 }
 
@@ -430,7 +418,6 @@ impl ProXdrArtifactBuilder<'_> {
                 };
                 let (gain_map, _) = reconstruct_gain_map(
                     &mask,
-                    hdr_family(plan.effective_family),
                     &self.prepared.scale,
                     &self.prepared.extracted.meta_floats,
                 )
@@ -655,7 +642,6 @@ mod tests {
         fs::write(&path, b"old").unwrap();
         let mut publisher = AtomicFilePublisher::new(path.clone());
         let plan = ConversionPlan {
-            effective_family: SourceFamily::X7,
             requested_input_processing_branch: InputProcessingBranch::Hybrid,
             effective_input_processing_branch: InputProcessingBranch::Hybrid,
             base_strategy: xdremux_engine::BaseStrategy::PreserveCompressed,
