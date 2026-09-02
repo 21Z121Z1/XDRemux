@@ -3,6 +3,7 @@
 mod error;
 mod extractor;
 mod oppo_portrait;
+mod oppo_portrait_focus;
 mod oppo_tail;
 
 pub use error::{ContainerError, Result};
@@ -14,6 +15,12 @@ pub use oppo_portrait::{
     extract_oppo_portrait_source, parse_oppo_portrait_config, parse_oppo_portrait_depth,
     OppoPortraitConfig, OppoPortraitDepth, OppoPortraitDepthHeader, OppoPortraitFace,
     OppoPortraitSource,
+};
+pub use oppo_portrait_focus::{
+    oppo_portrait_blur_response, oppo_portrait_focus_branch, oppo_portrait_focus_histogram,
+    select_oppo_portrait_focus, OppoPortraitBlurResponse, OppoPortraitBlurSample,
+    OppoPortraitFocusBranch, OppoPortraitFocusError, OppoPortraitFocusRegion,
+    OppoPortraitFocusSelection, OppoPortraitZoomRegion,
 };
 pub use oppo_tail::{
     complete_oppo_camera_tail, is_oppo_compact_tail_entry, is_oppo_portrait_editing_tail_entry,
