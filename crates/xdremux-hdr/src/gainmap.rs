@@ -1,12 +1,5 @@
 use crate::{get_knee_point_result, HdrError, ResolvedScale, Result};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Family {
-    Auto,
-    X6,
-    X7,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GainMapRaster {
     pub width: usize,
@@ -18,7 +11,6 @@ pub struct GainMapRaster {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GainMapParams {
-    pub family: Family,
     pub knee: f64,
     pub knee_range: f64,
     pub headroom_scale: f64,
@@ -28,7 +20,6 @@ pub struct GainMapParams {
 }
 
 pub fn gain_map_parameters(
-    family: Family,
     scale: &ResolvedScale,
     meta_floats: &[f64],
 ) -> Result<GainMapParams> {
@@ -82,7 +73,6 @@ pub fn gain_map_parameters(
     }
 
     Ok(GainMapParams {
-        family,
         knee,
         knee_range,
         headroom_scale,
@@ -94,12 +84,11 @@ pub fn gain_map_parameters(
 
 pub fn reconstruct_gain_map(
     mask: &GainMapRaster,
-    family: Family,
     scale: &ResolvedScale,
     meta_floats: &[f64],
 ) -> Result<(GainMapRaster, GainMapParams)> {
     validate_mask(mask)?;
-    let params = gain_map_parameters(family, scale, meta_floats)?;
+    let params = gain_map_parameters(scale, meta_floats)?;
 
     let lut0 = make_lut(1001, |x| x.powf(0.625));
     let lut1 = make_lut(1001, |x| x.powf(2.2));
@@ -258,7 +247,7 @@ mod tests {
             channel_count: 1,
             data: vec![0; 599],
         };
-        assert!(reconstruct_gain_map(&short, Family::X7, &scale, &meta).is_err());
+        assert!(reconstruct_gain_map(&short, &scale, &meta).is_err());
 
         let rgb = GainMapRaster {
             width: 1,
@@ -267,7 +256,7 @@ mod tests {
             channel_count: 3,
             data: vec![0; 4],
         };
-        assert!(reconstruct_gain_map(&rgb, Family::X7, &scale, &meta).is_err());
+        assert!(reconstruct_gain_map(&rgb, &scale, &meta).is_err());
     }
 
     #[test]
@@ -280,7 +269,7 @@ mod tests {
             channel_count: 1,
             data: vec![128; 600],
         };
-        let (output, _) = reconstruct_gain_map(&mask, Family::X7, &scale, &meta).unwrap();
+        let (output, _) = reconstruct_gain_map(&mask, &scale, &meta).unwrap();
         assert_eq!(output.bytes_per_row, 512);
         assert_eq!(output.data.len(), 1024);
         assert!(output.data[257..512].iter().all(|byte| *byte == 0));
@@ -301,7 +290,7 @@ mod tests {
             channel_count: 1,
             data,
         };
-        let (output, _) = reconstruct_gain_map(&mask, Family::X7, &scale, &meta).unwrap();
+        let (output, _) = reconstruct_gain_map(&mask, &scale, &meta).unwrap();
         assert_eq!(output.data[6], 1);
     }
 }
