@@ -83,11 +83,7 @@ fn read_bool_byte(data: &[u8], offset: usize, field: &str) -> Result<bool> {
         .ok_or_else(|| truncated(field))
 }
 
-fn read_i32_array<const N: usize>(
-    data: &[u8],
-    offset: usize,
-    field: &str,
-) -> Result<[i32; N]> {
+fn read_i32_array<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[i32; N]> {
     let mut values = [0_i32; N];
     for (index, value) in values.iter_mut().enumerate() {
         let byte_offset = offset
@@ -98,11 +94,7 @@ fn read_i32_array<const N: usize>(
     Ok(values)
 }
 
-fn read_f32_array<const N: usize>(
-    data: &[u8],
-    offset: usize,
-    field: &str,
-) -> Result<[f32; N]> {
+fn read_f32_array<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[f32; N]> {
     let mut values = [0.0_f32; N];
     for (index, value) in values.iter_mut().enumerate() {
         let byte_offset = offset
@@ -164,7 +156,11 @@ pub fn parse_oppo_portrait_config(data: &[u8]) -> Result<OppoPortraitConfig> {
         let aperture = read_f32_le(data, 292, "current f-number")?;
         current_f_number = (1.0..=64.0).contains(&aperture).then_some(aperture);
         let distance = read_i32_le(data, 296, "object distance")?;
-        object_distance = (distance > 0).then(|| positive_u32(distance, "object distance")).transpose()?;
+        object_distance = if distance > 0 {
+            Some(positive_u32(distance, "object distance")?)
+        } else {
+            None
+        };
         tele_master = Some(read_bool_byte(data, 300, "tele-master flag")?);
         let _ = read_i32_le(data, 304, "reference EV")?;
         let _ = read_i32_le(data, 308, "minimum EV")?;
@@ -214,9 +210,10 @@ pub fn parse_oppo_portrait_config(data: &[u8]) -> Result<OppoPortraitConfig> {
                 "v4 face table is invalid or truncated",
             ));
         }
+        let face_count = usize::try_from(face_count).map_err(|_| invalid("face count"))?;
 
-        faces.reserve(usize::try_from(face_count).unwrap_or_default());
-        for face_index in 0..usize::try_from(face_count).unwrap_or_default() {
+        faces.reserve(face_count);
+        for face_index in 0..face_count {
             let rectangle_offset = 420 + face_index * 16;
             let angle_offset = 580 + face_index * 4;
             let keypoint_x_offset = 620 + face_index * FACE_KEYPOINT_COUNT * 4;
@@ -314,7 +311,10 @@ mod tests {
     fn parses_version_one_without_inventing_newer_fields() {
         let config = parse_oppo_portrait_config(&base_config(1.0, 284)).unwrap();
         assert_eq!(config.version, 1.0);
-        assert_eq!((config.processing_width, config.processing_height), (900, 1200));
+        assert_eq!(
+            (config.processing_width, config.processing_height),
+            (900, 1200)
+        );
         assert_eq!((config.focus_x, config.focus_y), (300, 500));
         assert_eq!(config.current_blur_strength, 20);
         assert_eq!(config.current_f_number, None);
