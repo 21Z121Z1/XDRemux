@@ -1,27 +1,26 @@
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use xdremux_engine::{CapabilityInventory, OperationCapability};
+use xdremux_engine::OperationCapability;
 
 use crate::{Result, RuntimeError};
 
-pub const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 1;
-pub const APPLE_ADAPTER_ENV: &str = "XDREMUX_APPLE_ADAPTER";
+const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 1;
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AppleAdapterCapabilities {
-    pub photographic_styles: bool,
-    pub portrait: bool,
+pub(super) struct AppleAdapterCapabilities {
+    photographic_styles: bool,
+    portrait: bool,
 }
 
 impl AppleAdapterCapabilities {
-    pub fn operation_capabilities(&self) -> Vec<OperationCapability> {
+    pub(super) fn operation_capabilities(&self) -> Vec<OperationCapability> {
         let mut capabilities = Vec::with_capacity(2);
         if self.photographic_styles {
             capabilities.push(OperationCapability::PhotographicStylesAdapter);
@@ -31,49 +30,23 @@ impl AppleAdapterCapabilities {
         }
         capabilities
     }
-
-    pub fn inventory(&self) -> CapabilityInventory {
-        CapabilityInventory::new(self.operation_capabilities())
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AppleAdapterClient {
+pub(super) struct AppleAdapterClient {
     executable: PathBuf,
     timeout: Duration,
 }
 
 impl AppleAdapterClient {
-    pub fn new(executable: impl Into<PathBuf>) -> Self {
+    pub(super) fn new(executable: impl Into<PathBuf>) -> Self {
         Self {
             executable: executable.into(),
             timeout: DEFAULT_TIMEOUT,
         }
     }
 
-    pub fn from_environment() -> Result<Option<Self>> {
-        let Some(value) = std::env::var_os(APPLE_ADAPTER_ENV) else {
-            return Ok(None);
-        };
-        if value.is_empty() {
-            return Err(RuntimeError::new(
-                "Apple adapter configuration",
-                format!("{APPLE_ADAPTER_ENV} is set but empty"),
-            ));
-        }
-        Ok(Some(Self::new(PathBuf::from(value))))
-    }
-
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = timeout;
-        self
-    }
-
-    pub fn executable(&self) -> &Path {
-        &self.executable
-    }
-
-    pub fn capabilities(&self) -> Result<AppleAdapterCapabilities> {
+    pub(super) fn capabilities(&self) -> Result<AppleAdapterCapabilities> {
         let request = AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
             operation: "capabilities",
@@ -163,8 +136,7 @@ impl AppleAdapterClient {
             }
         };
 
-        // `try_wait` reaps the child on supported platforms once the status is
-        // available, but `wait` remains safe and keeps lifecycle ownership here.
+        // Keep lifecycle ownership here even after `try_wait` reports success.
         child
             .wait()
             .map_err(|error| RuntimeError::external("Apple adapter reap", error))?;
