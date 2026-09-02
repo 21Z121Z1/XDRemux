@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use xdremux_format::isobmff::{
-    make_box, make_iloc_box, make_iref_box, parse_boxes, parse_iref, parse_meta_box,
-    scan_top_level_boxes, BoxHeader, IlocEntry, IrefBox, IrefEntry, ParsedMeta, ILOC, IPMA, IPRP,
-    IREF, IROT, ISPE, MDAT, META,
+    make_box, make_iloc_box, make_iref_box, parse_boxes, parse_meta_box, scan_top_level_boxes,
+    BoxHeader, IlocEntry, IrefBox, IrefEntry, ParsedMeta, ILOC, IPMA, IPRP, IREF, IROT, ISPE, MDAT,
+    META,
 };
 use xdremux_format::FourCC;
 
@@ -671,7 +671,9 @@ pub fn assemble_iso_gain_map_heif(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use xdremux_format::isobmff::{make_ipma_box, parse_ipma, IpmaAssociation, IpmaEntry};
+    use xdremux_format::isobmff::{
+        make_ipma_box, parse_ipma, parse_iref, IpmaAssociation, IpmaEntry,
+    };
 
     #[test]
     fn essential_normalization_changes_only_requested_associations() {
