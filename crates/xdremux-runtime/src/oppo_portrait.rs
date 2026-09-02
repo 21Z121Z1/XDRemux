@@ -148,22 +148,26 @@ fn orientation(properties: &AppleImageProperties) -> Option<u8> {
         .and_then(|value| u8::try_from(value).ok())
 }
 
-#[cfg(target_os = "macos")]
 fn resolve_simulated_aperture(
-    config: &OppoPortraitConfig,
-    input: &AppleImageProperties,
-    base: &AppleImageProperties,
+    config_version: f32,
+    current_f_number: Option<f32>,
+    input_f_number: Option<f64>,
+    base_f_number: Option<f64>,
 ) -> f64 {
-    if let Some(value) = config
-        .current_f_number
-        .map(f64::from)
-        .filter(|value| value.is_finite() && (1.0..=64.0).contains(value))
-    {
-        return value;
+    if (config_version - 4.0).abs() < 0.001 {
+        if let Some(value) = current_f_number
+            .map(f64::from)
+            .filter(|value| value.is_finite() && (1.0..=32.0).contains(value))
+        {
+            return value;
+        }
     }
 
-    positive(input.f_number, base.f_number)
-        .filter(|value| (1.0..=32.0).contains(value))
+    input_f_number
+        .filter(|value| value.is_finite() && (1.0..=32.0).contains(value))
+        .or_else(|| {
+            base_f_number.filter(|value| value.is_finite() && (1.0..=32.0).contains(value))
+        })
         .unwrap_or(1.4)
 }
 
@@ -293,8 +297,12 @@ pub(crate) fn prepare_apple_portrait_source(
         depth.header.disparity_exponentiation,
     )
     .map_err(|error| RuntimeError::external("Apple Portrait disparity", error))?;
-    let simulated_aperture =
-        resolve_simulated_aperture(&source.config, &input_properties, &base_properties);
+    let simulated_aperture = resolve_simulated_aperture(
+        source.config.version,
+        source.config.current_f_number,
+        input_properties.f_number,
+        base_properties.f_number,
+    );
 
     Ok(ApplePortraitSourcePreflight {
         base_jpeg: split.base_jpeg,
@@ -354,6 +362,27 @@ mod tests {
             usize::try_from(depth.header.width).unwrap()
                 * usize::try_from(depth.header.height).unwrap()
         );
+    }
+
+    #[test]
+    fn simulated_aperture_matches_the_swift_oracle_precedence() {
+        assert_eq!(
+            resolve_simulated_aperture(4.0, Some(2.8), Some(1.7), Some(1.9)),
+            2.8
+        );
+        assert_eq!(
+            resolve_simulated_aperture(3.0, Some(2.8), Some(1.7), Some(1.9)),
+            1.7
+        );
+        assert_eq!(
+            resolve_simulated_aperture(4.0, Some(48.0), Some(1.7), Some(1.9)),
+            1.7
+        );
+        assert_eq!(
+            resolve_simulated_aperture(4.0, None, Some(f64::NAN), Some(2.0)),
+            2.0
+        );
+        assert_eq!(resolve_simulated_aperture(4.0, None, None, None), 1.4);
     }
 
     #[test]
