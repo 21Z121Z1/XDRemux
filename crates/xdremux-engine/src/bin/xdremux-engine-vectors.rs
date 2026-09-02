@@ -1,8 +1,8 @@
 use xdremux_engine::{
     plan_conversion, AppleFeatureRequest, CapabilityInventory, ConversionAnalysis,
     ConversionRequest, GainMapChannels, GainMapCodec, GainMapCodecLayout, GainMapSourceProfile,
-    GainMapStorageProfile, InputProcessingBranch, OperationCapability, OppoCameraTail,
-    SourceFamily, SourceHdrMode, TmapFormat,
+    GainMapStorageProfile, InputProcessingBranch, OperationCapability, OppoCameraTail, SourceHdrMode,
+    TmapFormat,
 };
 use xdremux_format::ChromaSampling;
 
@@ -16,7 +16,6 @@ fn layout(chroma: ChromaSampling, bit_depth: u8) -> GainMapCodecLayout {
 
 fn analysis(chroma: Option<ChromaSampling>, bit_depth: u8) -> ConversionAnalysis {
     ConversionAnalysis {
-        source_family: SourceFamily::X7,
         hdr_mode: SourceHdrMode::Uhdr,
         gain_map: GainMapSourceProfile {
             width: 1024,
@@ -53,8 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &direct,
     )?;
     println!(
-        "preserve-420|family={:?}|requested={:?}|effective={:?}|chroma={:?}|depth={}",
-        plan.effective_family,
+        "preserve-420|requested={:?}|effective={:?}|chroma={:?}|depth={}",
         plan.requested_input_processing_branch,
         plan.effective_input_processing_branch,
         plan.gain_map_target.layout.chroma,
