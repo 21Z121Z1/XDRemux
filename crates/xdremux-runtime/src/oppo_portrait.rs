@@ -2,15 +2,15 @@ use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
 use xdremux_engine::AppleGainMapFacts;
 
 #[cfg(any(target_os = "macos", test))]
-use std::io::Read;
+use crate::{Result, RuntimeError};
 #[cfg(any(target_os = "macos", test))]
 use ruzstd::decoding::StreamingDecoder;
+#[cfg(any(target_os = "macos", test))]
+use std::io::Read;
 #[cfg(any(target_os = "macos", test))]
 use xdremux_container::{extract_oppo_portrait_source, parse_oppo_portrait_depth};
 #[cfg(any(target_os = "macos", test))]
 use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
-#[cfg(any(target_os = "macos", test))]
-use crate::{Result, RuntimeError};
 
 #[cfg(target_os = "macos")]
 use std::io::Write;
