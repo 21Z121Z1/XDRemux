@@ -18,72 +18,17 @@ pub use execution::{
     execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
     ExecutionReceipt, ExecutionResult, ExecutionStage,
 };
-pub use product_policy::{resolve_product_gain_map_encode_profile, wants_oppo_compatibility};
+pub use product_policy::resolve_product_gain_map_encode_profile;
 pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SourceHdrMode {
-    Lhdr,
-    Uhdr,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum InputProcessingBranch {
-    System,
-    SystemDecoded,
+pub enum OutputIntent {
     #[default]
-    Hybrid,
-    Passthrough,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum TmapFormat {
-    Strict,
-    #[default]
-    ImageIo,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum OppoCompatibility {
-    Auto,
-    Iso,
-    IsoNoLocal,
-    IsoGraph,
-    On,
-    Tail,
-    #[default]
-    Off,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum OppoCameraTail {
-    Off,
-    Watermark,
-    Compact,
-    Preserve,
-    PreserveWithoutPortrait,
-    PreserveWithoutPortraitOrPrivateHdr,
-    PreserveWithoutPrivateUhdr,
-    #[default]
-    PreserveWithoutPrivateHdr,
-    PreserveNoUhdr,
-    PreserveNoHdr,
-}
-
-impl OppoCameraTail {
-    pub const fn forces_hybrid_branch(self) -> bool {
-        matches!(
-            self,
-            Self::Preserve
-                | Self::PreserveWithoutPortrait
-                | Self::PreserveWithoutPortraitOrPrivateHdr
-                | Self::PreserveWithoutPrivateUhdr
-                | Self::PreserveWithoutPrivateHdr
-        )
-    }
+    Standard,
+    OppoGallery,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -92,42 +37,29 @@ pub struct AppleFeatureRequest {
     pub portrait: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ConversionRequest {
-    pub oppo_compatibility: OppoCompatibility,
-    pub input_processing_branch: InputProcessingBranch,
-    pub oppo_camera_tail: OppoCameraTail,
-    pub tmap_format: TmapFormat,
+    pub output: OutputIntent,
     pub apple_features: AppleFeatureRequest,
-}
-
-impl Default for ConversionRequest {
-    fn default() -> Self {
-        Self {
-            oppo_compatibility: OppoCompatibility::Off,
-            input_processing_branch: InputProcessingBranch::Hybrid,
-            oppo_camera_tail: OppoCameraTail::PreserveWithoutPrivateHdr,
-            tmap_format: TmapFormat::ImageIo,
-            apple_features: AppleFeatureRequest::default(),
-        }
-    }
 }
 
 impl ConversionRequest {
     /// Product intent for output that remains recognizable by OPPO Gallery.
     ///
-    /// The public product surface deliberately exposes one intent rather than
-    /// the internal routing/tail knobs. Engine policy owns the exact mapping.
-    pub fn oppo_gallery_compatible() -> Self {
+    /// Source layout, routing bits, camera-tail handling and codec policy are
+    /// implementation details resolved by the engine/runtime from this intent.
+    pub const fn oppo_gallery_compatible() -> Self {
         Self {
-            oppo_compatibility: OppoCompatibility::Auto,
-            oppo_camera_tail: OppoCameraTail::Preserve,
-            ..Self::default()
+            output: OutputIntent::OppoGallery,
+            apple_features: AppleFeatureRequest {
+                photographic_styles: false,
+                portrait: false,
+            },
         }
     }
 
     pub const fn requests_oppo_gallery_compatibility(self) -> bool {
-        !matches!(self.oppo_compatibility, OppoCompatibility::Off)
+        matches!(self.output, OutputIntent::OppoGallery)
     }
 }
 
@@ -205,32 +137,15 @@ impl GainMapEncoderCapabilities {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BaseStrategy {
-    PreserveCompressed,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContainerWriter {
-    Rust,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionAnalysis {
-    pub hdr_mode: SourceHdrMode,
     pub gain_map: GainMapSourceProfile,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionPlan {
-    pub requested_input_processing_branch: InputProcessingBranch,
-    pub effective_input_processing_branch: InputProcessingBranch,
-    pub base_strategy: BaseStrategy,
+    pub output: OutputIntent,
     pub gain_map_target: GainMapEncodeProfile,
-    pub container_writer: ContainerWriter,
-    pub oppo_compatibility: OppoCompatibility,
-    pub oppo_camera_tail: OppoCameraTail,
-    pub tmap_format: TmapFormat,
     pub required_capabilities: Vec<OperationCapability>,
 }
 
@@ -270,18 +185,6 @@ impl std::fmt::Display for PlannerError {
 impl std::error::Error for PlannerError {}
 
 pub type Result<T> = std::result::Result<T, PlannerError>;
-
-pub fn resolve_effective_input_processing_branch(
-    requested: InputProcessingBranch,
-    tail: OppoCameraTail,
-    tmap_format: TmapFormat,
-) -> InputProcessingBranch {
-    if tail.forces_hybrid_branch() || tmap_format == TmapFormat::Strict {
-        InputProcessingBranch::Hybrid
-    } else {
-        requested
-    }
-}
 
 fn validate_source_profile(source: GainMapSourceProfile) -> Result<()> {
     if source.width == 0 || source.height == 0 {
@@ -360,16 +263,8 @@ pub fn plan_conversion(
     capabilities: &CapabilityInventory,
 ) -> Result<ConversionPlan> {
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
-    let gain_map_target = resolve_product_gain_map_encode_profile(
-        analysis.gain_map,
-        request.oppo_compatibility,
-        &gain_map_encoder,
-    )?;
-    let effective_input_processing_branch = resolve_effective_input_processing_branch(
-        request.input_processing_branch,
-        request.oppo_camera_tail,
-        request.tmap_format,
-    );
+    let gain_map_target =
+        resolve_product_gain_map_encode_profile(analysis.gain_map, request.output, &gain_map_encoder)?;
 
     let mut required_capabilities = vec![
         OperationCapability::RasterDecoder(analysis.gain_map.storage.codec),
@@ -388,14 +283,8 @@ pub fn plan_conversion(
     }
 
     Ok(ConversionPlan {
-        requested_input_processing_branch: request.input_processing_branch,
-        effective_input_processing_branch,
-        base_strategy: BaseStrategy::PreserveCompressed,
+        output: request.output,
         gain_map_target,
-        container_writer: ContainerWriter::Rust,
-        oppo_compatibility: request.oppo_compatibility,
-        oppo_camera_tail: request.oppo_camera_tail,
-        tmap_format: request.tmap_format,
         required_capabilities,
     })
 }
@@ -403,21 +292,6 @@ pub fn plan_conversion(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn oppo_gallery_intent_owns_internal_compatibility_policy() {
-        let request = ConversionRequest::oppo_gallery_compatible();
-        assert!(request.requests_oppo_gallery_compatibility());
-        assert_eq!(request.oppo_compatibility, OppoCompatibility::Auto);
-        assert_eq!(request.oppo_camera_tail, OppoCameraTail::Preserve);
-        assert_eq!(
-            request.input_processing_branch,
-            InputProcessingBranch::Hybrid
-        );
-        assert_eq!(request.tmap_format, TmapFormat::ImageIo);
-        assert_eq!(request.apple_features, AppleFeatureRequest::default());
-        assert!(!ConversionRequest::default().requests_oppo_gallery_compatibility());
-    }
 
     fn layout(chroma: ChromaSampling, bit_depth: u8) -> GainMapCodecLayout {
         GainMapCodecLayout {
@@ -458,56 +332,14 @@ mod tests {
     }
 
     #[test]
-    fn defaults_match_current_swift_product_configuration() {
-        let request = ConversionRequest::default();
-        assert_eq!(request.oppo_compatibility, OppoCompatibility::Off);
-        assert_eq!(
-            request.input_processing_branch,
-            InputProcessingBranch::Hybrid
-        );
-        assert_eq!(
-            request.oppo_camera_tail,
-            OppoCameraTail::PreserveWithoutPrivateHdr
-        );
-        assert_eq!(request.tmap_format, TmapFormat::ImageIo);
-        assert_eq!(request.apple_features, AppleFeatureRequest::default());
-    }
+    fn request_exposes_product_intent_only() {
+        assert_eq!(ConversionRequest::default().output, OutputIntent::Standard);
+        assert!(!ConversionRequest::default().requests_oppo_gallery_compatibility());
 
-    #[test]
-    fn current_swift_tail_and_strict_tmap_rules_force_hybrid() {
-        let forcing_tails = [
-            OppoCameraTail::Preserve,
-            OppoCameraTail::PreserveWithoutPortrait,
-            OppoCameraTail::PreserveWithoutPortraitOrPrivateHdr,
-            OppoCameraTail::PreserveWithoutPrivateUhdr,
-            OppoCameraTail::PreserveWithoutPrivateHdr,
-        ];
-        for tail in forcing_tails {
-            assert_eq!(
-                resolve_effective_input_processing_branch(
-                    InputProcessingBranch::Passthrough,
-                    tail,
-                    TmapFormat::ImageIo,
-                ),
-                InputProcessingBranch::Hybrid
-            );
-        }
-        assert_eq!(
-            resolve_effective_input_processing_branch(
-                InputProcessingBranch::Passthrough,
-                OppoCameraTail::Off,
-                TmapFormat::Strict,
-            ),
-            InputProcessingBranch::Hybrid
-        );
-        assert_eq!(
-            resolve_effective_input_processing_branch(
-                InputProcessingBranch::Passthrough,
-                OppoCameraTail::Off,
-                TmapFormat::ImageIo,
-            ),
-            InputProcessingBranch::Passthrough
-        );
+        let request = ConversionRequest::oppo_gallery_compatible();
+        assert_eq!(request.output, OutputIntent::OppoGallery);
+        assert!(request.requests_oppo_gallery_compatibility());
+        assert_eq!(request.apple_features, AppleFeatureRequest::default());
     }
 
     #[test]
@@ -578,7 +410,6 @@ mod tests {
         let capabilities =
             CapabilityInventory::new([OperationCapability::GainMapTileEncoder(target)]);
         let analysis = ConversionAnalysis {
-            hdr_mode: SourceHdrMode::Uhdr,
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         };
 
@@ -595,7 +426,6 @@ mod tests {
         let target = layout(ChromaSampling::Yuv444, 8);
         let capabilities = capability_inventory([target]);
         let analysis = ConversionAnalysis {
-            hdr_mode: SourceHdrMode::Uhdr,
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         };
         let request = ConversionRequest {
@@ -615,14 +445,11 @@ mod tests {
     }
 
     #[test]
-    fn full_plan_preserves_base_and_declares_operation_capabilities() {
+    fn plan_contains_only_execution_relevant_decisions() {
         let analysis = ConversionAnalysis {
-            hdr_mode: SourceHdrMode::Uhdr,
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         };
         let request = ConversionRequest {
-            input_processing_branch: InputProcessingBranch::Passthrough,
-            oppo_camera_tail: OppoCameraTail::Off,
             apple_features: AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: false,
@@ -637,12 +464,7 @@ mod tests {
         ]);
         let plan = plan_conversion(&analysis, request, &capabilities).unwrap();
 
-        assert_eq!(plan.base_strategy, BaseStrategy::PreserveCompressed);
-        assert_eq!(plan.container_writer, ContainerWriter::Rust);
-        assert_eq!(
-            plan.effective_input_processing_branch,
-            InputProcessingBranch::Passthrough
-        );
+        assert_eq!(plan.output, OutputIntent::Standard);
         assert_eq!(plan.gain_map_target.layout, target);
         assert_eq!(
             plan.required_capabilities,
