@@ -8,9 +8,7 @@ mod product_tmap;
 pub mod ultrahdr_jpeg;
 
 pub use error::{MetadataError, Result};
-pub use iso21496::{
-    make_hdrgm_xmp, make_imageio_native_tmap_payload, make_strict_tmap_payload,
-};
+pub use iso21496::{make_hdrgm_xmp, make_imageio_native_tmap_payload, make_strict_tmap_payload};
 pub use oppo::{
     adjusted_extent_for_oppo_user_comment_patch, adjusted_oppo_user_comment,
     adjusted_oppo_user_comment_in_heif, apply_oppo_user_comment_patch, find_oppo_tag_flag,
