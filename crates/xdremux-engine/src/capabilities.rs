@@ -3,25 +3,18 @@ use std::error::Error;
 
 use crate::{GainMapCodec, GainMapCodecLayout, GainMapEncoderCapabilities};
 
-/// One operation the conversion planner may require from an external adapter.
+/// One operation the conversion planner may require from the composed runtime.
 ///
-/// This is deliberately operation-scoped rather than backend-scoped. A single
-/// concrete adapter may implement several ports, and one conversion may combine
-/// capabilities from several adapters.
+/// This is a fact set, not an execution interface. Add a new execution port only
+/// when a real request/result contract exists; do not model hypothetical
+/// backends in advance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OperationCapability {
     RasterDecoder(GainMapCodec),
     GainMapTileEncoder(GainMapCodecLayout),
-    RawProcessor,
-    ConsumerValidator,
     PhotographicStylesAdapter,
     PortraitAdapter,
 }
-
-/// Compatibility name for callers that still use the earlier planner term.
-/// New code should prefer `OperationCapability`: these requirements are not
-/// inherently platform-specific.
-pub type PlatformCapability = OperationCapability;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct RasterDecoderCapabilities {
@@ -44,11 +37,10 @@ impl RasterDecoderCapabilities {
     }
 }
 
-/// Planner-facing inventory of capabilities available at the composition root.
+/// Planner-facing inventory of operations available at the composition root.
 ///
-/// It contains facts only: no adapter pointers and no execution state. This
-/// keeps policy deterministic and prevents the inventory from becoming a
-/// disguised monolithic `Backend` object.
+/// It contains facts only: no adapter pointers and no execution state. Concrete
+/// providers expose their capabilities, and the runtime composes this inventory.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CapabilityInventory {
     operations: BTreeSet<OperationCapability>,
@@ -98,64 +90,13 @@ impl CapabilityInventory {
             }
         }))
     }
-
-    pub fn advertise_gain_map_tile_encoder<T>(&mut self, encoder: &T)
-    where
-        T: GainMapTileEncoder + ?Sized,
-    {
-        let capabilities = encoder.gain_map_encoder_capabilities();
-        self.operations.extend(
-            capabilities
-                .iter()
-                .map(OperationCapability::GainMapTileEncoder),
-        );
-    }
-
-    pub fn advertise_raster_decoder<T>(&mut self, decoder: &T)
-    where
-        T: RasterDecoder + ?Sized,
-    {
-        let capabilities = decoder.raster_decoder_capabilities();
-        self.operations
-            .extend(capabilities.iter().map(OperationCapability::RasterDecoder));
-    }
-
-    pub fn advertise_raw_processor<T>(&mut self, _processor: &T)
-    where
-        T: RawProcessor + ?Sized,
-    {
-        self.operations.insert(OperationCapability::RawProcessor);
-    }
-
-    pub fn advertise_consumer_validator<T>(&mut self, _validator: &T)
-    where
-        T: ConsumerValidator + ?Sized,
-    {
-        self.operations
-            .insert(OperationCapability::ConsumerValidator);
-    }
-
-    pub fn advertise_photographic_styles_adapter<T>(&mut self, _adapter: &T)
-    where
-        T: PhotographicStylesAdapter + ?Sized,
-    {
-        self.operations
-            .insert(OperationCapability::PhotographicStylesAdapter);
-    }
-
-    pub fn advertise_portrait_adapter<T>(&mut self, _adapter: &T)
-    where
-        T: PortraitAdapter + ?Sized,
-    {
-        self.operations.insert(OperationCapability::PortraitAdapter);
-    }
 }
 
 /// Outgoing port for encoding normalized Gain Map raster data into HEVC tiles.
 ///
-/// Request/output payloads stay associated with the adapter for now so the
-/// engine does not prematurely standardize a file IPC or in-process pixel ABI.
-/// The planner depends only on the advertised codec layouts.
+/// Request/output payloads stay associated with the provider so the engine does
+/// not prematurely standardize a file IPC or in-process pixel ABI. The planner
+/// depends only on advertised codec layouts.
 pub trait GainMapTileEncoder {
     type Request;
     type Output;
@@ -183,54 +124,6 @@ pub trait RasterDecoder {
     ) -> std::result::Result<Self::Output, Self::Error>;
 }
 
-/// Outgoing port for platform or library RAW processing.
-pub trait RawProcessor {
-    type Request;
-    type Output;
-    type Error: Error;
-
-    fn process_raw(
-        &self,
-        request: &Self::Request,
-    ) -> std::result::Result<Self::Output, Self::Error>;
-}
-
-/// Outgoing port for consumer-specific validation such as ImageIO or Photos.
-pub trait ConsumerValidator {
-    type Request;
-    type Output;
-    type Error: Error;
-
-    fn validate_consumer(
-        &self,
-        request: &Self::Request,
-    ) -> std::result::Result<Self::Output, Self::Error>;
-}
-
-/// Apple-only outgoing port for Photographic Styles behavior.
-pub trait PhotographicStylesAdapter {
-    type Request;
-    type Output;
-    type Error: Error;
-
-    fn apply_photographic_styles(
-        &self,
-        request: &Self::Request,
-    ) -> std::result::Result<Self::Output, Self::Error>;
-}
-
-/// Apple-only outgoing port for Portrait behavior.
-pub trait PortraitAdapter {
-    type Request;
-    type Output;
-    type Error: Error;
-
-    fn apply_portrait(
-        &self,
-        request: &Self::Request,
-    ) -> std::result::Result<Self::Output, Self::Error>;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,9 +142,9 @@ mod tests {
 
     impl Error for MockError {}
 
-    struct MockAppleAdapter;
+    struct MockCodecProvider;
 
-    impl GainMapTileEncoder for MockAppleAdapter {
+    impl GainMapTileEncoder for MockCodecProvider {
         type Request = ();
         type Output = ();
         type Error = MockError;
@@ -272,7 +165,7 @@ mod tests {
         }
     }
 
-    impl RasterDecoder for MockAppleAdapter {
+    impl RasterDecoder for MockCodecProvider {
         type Request = ();
         type Output = ();
         type Error = MockError;
@@ -289,73 +182,36 @@ mod tests {
         }
     }
 
-    impl PhotographicStylesAdapter for MockAppleAdapter {
-        type Request = ();
-        type Output = ();
-        type Error = MockError;
-
-        fn apply_photographic_styles(
-            &self,
-            _request: &Self::Request,
-        ) -> std::result::Result<Self::Output, Self::Error> {
-            Ok(())
-        }
-    }
-
-    struct MockValidator;
-
-    impl ConsumerValidator for MockValidator {
-        type Request = ();
-        type Output = ();
-        type Error = MockError;
-
-        fn validate_consumer(
-            &self,
-            _request: &Self::Request,
-        ) -> std::result::Result<Self::Output, Self::Error> {
-            Ok(())
-        }
-    }
-
     #[test]
-    fn independent_ports_compose_into_one_inventory_without_backend_trait() {
-        let apple = MockAppleAdapter;
-        let validator = MockValidator;
-        let mut inventory = CapabilityInventory::default();
-        inventory.advertise_gain_map_tile_encoder(&apple);
-        inventory.advertise_raster_decoder(&apple);
-        inventory.advertise_photographic_styles_adapter(&apple);
-        inventory.advertise_consumer_validator(&validator);
-
+    fn inventory_is_only_a_set_of_composed_operation_facts() {
         let layout = GainMapCodecLayout {
             chroma: ChromaSampling::Yuv420,
             luma_bit_depth: 8,
             chroma_bit_depth: 8,
         };
+        let inventory = CapabilityInventory::new([
+            OperationCapability::GainMapTileEncoder(layout),
+            OperationCapability::RasterDecoder(GainMapCodec::Jpeg),
+            OperationCapability::PhotographicStylesAdapter,
+        ]);
+
         assert!(inventory.supports(OperationCapability::GainMapTileEncoder(layout)));
         assert!(inventory.supports(OperationCapability::RasterDecoder(GainMapCodec::Jpeg)));
         assert!(inventory.supports(OperationCapability::PhotographicStylesAdapter));
-        assert!(inventory.supports(OperationCapability::ConsumerValidator));
         assert!(!inventory.supports(OperationCapability::PortraitAdapter));
-        assert!(!inventory.supports(OperationCapability::RawProcessor));
     }
 
     #[test]
-    fn operation_ports_remain_individually_dyn_compatible() {
+    fn concrete_codec_ports_remain_individually_dyn_compatible() {
         fn accept_encoder(
             _port: &dyn GainMapTileEncoder<Request = (), Output = (), Error = MockError>,
         ) {
         }
         fn accept_decoder(_port: &dyn RasterDecoder<Request = (), Output = (), Error = MockError>) {
         }
-        fn accept_styles(
-            _port: &dyn PhotographicStylesAdapter<Request = (), Output = (), Error = MockError>,
-        ) {
-        }
 
-        let apple = MockAppleAdapter;
-        accept_encoder(&apple);
-        accept_decoder(&apple);
-        accept_styles(&apple);
+        let provider = MockCodecProvider;
+        accept_encoder(&provider);
+        accept_decoder(&provider);
     }
 }
