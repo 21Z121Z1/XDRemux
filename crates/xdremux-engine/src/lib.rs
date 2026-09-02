@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 use xdremux_format::ChromaSampling;
 
 pub use apple::{
-    AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleSemanticRole, AppleVisionApiSurface,
+    AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleSemanticRole,
     APPLE_PORTRAIT_SEMANTIC_ROLES,
 };
 pub use capabilities::{
