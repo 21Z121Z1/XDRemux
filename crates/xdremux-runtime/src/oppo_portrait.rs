@@ -1,5 +1,7 @@
 use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
-use xdremux_engine::{AppleGainMapFacts, ApplePortraitCameraCalibration, ApplePortraitDisparity};
+use xdremux_engine::{
+    AppleGainMapFacts, AppleL8Mask, ApplePortraitCameraCalibration, ApplePortraitDisparity,
+};
 
 #[cfg(any(target_os = "macos", test))]
 use crate::{Result, RuntimeError};
@@ -27,6 +29,10 @@ use crate::apple_adapter::{AppleAdapterClient, AppleImageProperties};
 
 #[cfg(any(target_os = "macos", test))]
 const MAX_DECODED_PORTRAIT_DEPTH_BYTES: u64 = 256 * 1024 * 1024;
+#[cfg(target_os = "macos")]
+const OPPO_PORTRAIT_PRIOR_SPATIAL_SIGMA: f32 = 3.0;
+#[cfg(target_os = "macos")]
+const OPPO_PORTRAIT_PRIOR_LUMA_SIGMA: f32 = 0.15;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ApplePortraitSourcePreflight {
@@ -41,6 +47,7 @@ pub struct ApplePortraitSourcePreflight {
     pub base_orientation: u8,
     pub camera_calibration: ApplePortraitCameraCalibration,
     pub disparity: ApplePortraitDisparity,
+    pub subject_prior: Option<AppleL8Mask>,
     pub simulated_aperture: f64,
 }
 
@@ -296,6 +303,37 @@ pub(crate) fn prepare_apple_portrait_source(
         depth.header.disparity_exponentiation,
     )
     .map_err(|error| RuntimeError::external("Apple Portrait disparity", error))?;
+
+    // The producer's portrait plane is a low-resolution subject topology prior.
+    // Rust owns whether and how this prior participates in Portrait. Core Image
+    // is used only for the platform-specific edge-preserving upsample primitive.
+    let subject_prior = if let Some(portrait_plane) = depth.portrait.as_ref() {
+        let target_width = split.base_width / 2;
+        let target_height = split.base_height / 2;
+        if target_width == 0 || target_height == 0 {
+            return Err(RuntimeError::new(
+                "Apple Portrait subject prior",
+                "half-resolution target geometry is invalid",
+            ));
+        }
+        let small_mask = AppleL8Mask::new(
+            depth.header.width,
+            depth.header.height,
+            portrait_plane.clone(),
+        )
+        .map_err(|error| RuntimeError::external("OPPO Portrait subject prior", error))?;
+        Some(adapter.coreimage_edge_preserve_upsample_l8(
+            source_image_file.path(),
+            &small_mask,
+            target_width,
+            target_height,
+            OPPO_PORTRAIT_PRIOR_SPATIAL_SIGMA,
+            OPPO_PORTRAIT_PRIOR_LUMA_SIGMA,
+        )?)
+    } else {
+        None
+    };
+
     let simulated_aperture = resolve_simulated_aperture(
         source.config.version,
         source.config.current_f_number,
@@ -315,6 +353,7 @@ pub(crate) fn prepare_apple_portrait_source(
         base_orientation,
         camera_calibration,
         disparity,
+        subject_prior,
         simulated_aperture,
     })
 }
