@@ -1,5 +1,9 @@
 use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
-use xdremux_engine::AppleGainMapFacts;
+use xdremux_engine::{
+    AppleGainMapFacts, ApplePortraitCameraCalibration, ApplePortraitCaptureFacts,
+    ApplePortraitDisparity, ApplePortraitImageGeometry, build_apple_portrait_disparity,
+    derive_apple_portrait_camera_calibration, resolve_apple_portrait_base_orientation,
+};
 
 #[cfg(any(target_os = "macos", test))]
 use crate::{Result, RuntimeError};
@@ -18,7 +22,7 @@ use std::io::Write;
 use std::path::Path;
 
 #[cfg(target_os = "macos")]
-use crate::apple_adapter::AppleAdapterClient;
+use crate::apple_adapter::{AppleAdapterClient, AppleImageProperties};
 
 #[cfg(any(target_os = "macos", test))]
 const MAX_DECODED_PORTRAIT_DEPTH_BYTES: u64 = 256 * 1024 * 1024;
@@ -33,6 +37,10 @@ pub struct ApplePortraitSourcePreflight {
     pub base_width: u32,
     pub base_height: u32,
     pub gain_map: AppleGainMapFacts,
+    pub base_orientation: u8,
+    pub camera_calibration: ApplePortraitCameraCalibration,
+    pub disparity: ApplePortraitDisparity,
+    pub simulated_aperture: f64,
 }
 
 #[cfg(any(target_os = "macos", test))]
@@ -118,29 +126,82 @@ fn decode_oppo_portrait_depth(compressed: &[u8]) -> Result<OppoPortraitDepth> {
 }
 
 #[cfg(target_os = "macos")]
+fn positive(primary: Option<f64>, fallback: Option<f64>) -> Option<f64> {
+    primary
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .or_else(|| fallback.filter(|value| value.is_finite() && *value > 0.0))
+}
+
+#[cfg(target_os = "macos")]
+fn nonempty_string(primary: Option<&str>, fallback: Option<&str>) -> Option<String> {
+    primary
+        .filter(|value| !value.is_empty())
+        .or_else(|| fallback.filter(|value| !value.is_empty()))
+        .map(ToOwned::to_owned)
+}
+
+#[cfg(target_os = "macos")]
+fn orientation(properties: &AppleImageProperties) -> Option<u8> {
+    properties
+        .orientation
+        .and_then(|value| u8::try_from(value).ok())
+}
+
+#[cfg(target_os = "macos")]
+fn resolve_simulated_aperture(
+    config: &OppoPortraitConfig,
+    input: &AppleImageProperties,
+    base: &AppleImageProperties,
+) -> f64 {
+    if let Some(value) = config
+        .current_f_number
+        .map(f64::from)
+        .filter(|value| value.is_finite() && (1.0..=64.0).contains(value))
+    {
+        return value;
+    }
+
+    positive(input.f_number, base.f_number)
+        .filter(|value| (1.0..=32.0).contains(value))
+        .unwrap_or(1.4)
+}
+
+#[cfg(target_os = "macos")]
 pub(crate) fn prepare_apple_portrait_source(
     adapter_executable: &Path,
-    source: &[u8],
+    input: &[u8],
 ) -> Result<ApplePortraitSourcePreflight> {
-    let source = extract_oppo_portrait_source(source)
+    let source = extract_oppo_portrait_source(input)
         .map_err(|error| RuntimeError::external("OPPO Portrait source extraction", error))?;
     let split = split_portrait_source_image(&source.source_image)?;
     let depth = decode_oppo_portrait_depth(&source.compressed_depth)?;
 
-    let mut image_file = tempfile::Builder::new()
+    let mut source_image_file = tempfile::Builder::new()
         .prefix("xdremux-portrait-src-")
         .suffix(".jpg")
         .tempfile()
         .map_err(|error| RuntimeError::external("Portrait src.image temporary file", error))?;
-    image_file
+    source_image_file
         .write_all(&source.source_image)
         .map_err(|error| RuntimeError::external("Portrait src.image temporary write", error))?;
-    image_file
+    source_image_file
         .flush()
         .map_err(|error| RuntimeError::external("Portrait src.image temporary flush", error))?;
 
-    let gain_map = AppleAdapterClient::new(adapter_executable.to_path_buf())
-        .imageio_gain_map_facts(image_file.path())?;
+    let mut input_file = tempfile::Builder::new()
+        .prefix("xdremux-portrait-input-")
+        .suffix(".heic")
+        .tempfile()
+        .map_err(|error| RuntimeError::external("Portrait input temporary file", error))?;
+    input_file
+        .write_all(input)
+        .map_err(|error| RuntimeError::external("Portrait input temporary write", error))?;
+    input_file
+        .flush()
+        .map_err(|error| RuntimeError::external("Portrait input temporary flush", error))?;
+
+    let adapter = AppleAdapterClient::new(adapter_executable.to_path_buf());
+    let gain_map = adapter.imageio_gain_map_facts(source_image_file.path())?;
     if !gain_map.supports_portrait_source() {
         return Err(RuntimeError::new(
             "Apple Portrait source",
@@ -160,6 +221,83 @@ pub(crate) fn prepare_apple_portrait_source(
         ));
     }
 
+    let input_properties = adapter.imageio_image_properties(input_file.path())?;
+    let base_properties = adapter.imageio_image_properties(source_image_file.path())?;
+    if !base_properties.width.eq(&split.base_width) || !base_properties.height.eq(&split.base_height) {
+        return Err(RuntimeError::new(
+            "Apple Portrait source",
+            format!(
+                "ImageIO base geometry {}x{} does not match JPEG {}x{}",
+                base_properties.width,
+                base_properties.height,
+                split.base_width,
+                split.base_height
+            ),
+        ));
+    }
+
+    let physical_focal_length_mm = positive(
+        input_properties.focal_length_mm,
+        base_properties.focal_length_mm,
+    )
+    .ok_or_else(|| {
+        RuntimeError::new(
+            "Apple Portrait calibration",
+            "EXIF FocalLength is required on the input or portrait base image",
+        )
+    })?;
+    let equivalent_focal_length_mm = positive(
+        input_properties.focal_length_in_35mm_film,
+        base_properties.focal_length_in_35mm_film,
+    )
+    .ok_or_else(|| {
+        RuntimeError::new(
+            "Apple Portrait calibration",
+            "EXIF FocalLengthIn35mmFilm is required on the input or portrait base image",
+        )
+    })?;
+    let capture_facts = ApplePortraitCaptureFacts {
+        physical_focal_length_mm,
+        equivalent_focal_length_mm,
+        digital_zoom_ratio: positive(
+            input_properties.digital_zoom_ratio,
+            base_properties.digital_zoom_ratio,
+        ),
+        lens_model: nonempty_string(
+            input_properties.lens_model.as_deref(),
+            base_properties.lens_model.as_deref(),
+        ),
+        base_width: split.base_width,
+        base_height: split.base_height,
+    };
+    let camera_calibration = derive_apple_portrait_camera_calibration(&capture_facts)
+        .map_err(|error| RuntimeError::external("Apple Portrait calibration", error))?;
+
+    let base_orientation = resolve_apple_portrait_base_orientation(
+        Some(ApplePortraitImageGeometry {
+            width: input_properties.width,
+            height: input_properties.height,
+            orientation: orientation(&input_properties),
+        }),
+        ApplePortraitImageGeometry {
+            width: split.base_width,
+            height: split.base_height,
+            orientation: orientation(&base_properties),
+        },
+    )
+    .map_err(|error| RuntimeError::external("Apple Portrait orientation", error))?;
+
+    let disparity = build_apple_portrait_disparity(
+        &depth.ranks,
+        depth.header.width,
+        depth.header.height,
+        depth.header.rank_disparity_scale,
+        depth.header.disparity_exponentiation,
+    )
+    .map_err(|error| RuntimeError::external("Apple Portrait disparity", error))?;
+    let simulated_aperture =
+        resolve_simulated_aperture(&source.config, &input_properties, &base_properties);
+
     Ok(ApplePortraitSourcePreflight {
         base_jpeg: split.base_jpeg,
         gain_map_jpeg: split.gain_map_jpeg,
@@ -169,6 +307,10 @@ pub(crate) fn prepare_apple_portrait_source(
         base_width: split.base_width,
         base_height: split.base_height,
         gain_map,
+        base_orientation,
+        camera_calibration,
+        disparity,
+        simulated_aperture,
     })
 }
 
