@@ -99,7 +99,8 @@ impl OppoPortraitDepthHeader {
         if maximum <= minimum {
             return None;
         }
-        let normalized = (rank / 255.0).clamp(0.0, 1.0)
+        let normalized = (rank / 255.0)
+            .clamp(0.0, 1.0)
             .powi(i32::from(self.disparity_exponentiation));
         let internal_disparity = 65_535.0 - (minimum + normalized * (maximum - minimum));
         if !internal_disparity.is_finite() || internal_disparity < 0.0 {
@@ -458,7 +459,11 @@ pub fn parse_oppo_portrait_depth(data: &[u8]) -> Result<OppoPortraitDepth> {
 
     let plane_size = usize::try_from(width)
         .ok()
-        .and_then(|width| usize::try_from(height).ok().and_then(|height| width.checked_mul(height)))
+        .and_then(|width| {
+            usize::try_from(height)
+                .ok()
+                .and_then(|height| width.checked_mul(height))
+        })
         .ok_or_else(|| depth_invalid("rank plane size overflows"))?;
     let rank_end = DEPTH_HEADER_BYTES
         .checked_add(plane_size)
@@ -503,7 +508,8 @@ pub fn parse_oppo_portrait_depth(data: &[u8]) -> Result<OppoPortraitDepth> {
         auxiliary_width: positive_optional_u32(0x188),
         auxiliary_height: positive_optional_u32(0x18c),
         model_output_present: data[0x190] != 0,
-        scene_class: read_i32_le_at(data, 0x1b0).ok_or_else(|| depth_invalid("missing scene class"))?,
+        scene_class: read_i32_le_at(data, 0x1b0)
+            .ok_or_else(|| depth_invalid("missing scene class"))?,
         object_distance: positive_optional_i32(0x1b4),
         aec_lux_index: finite_optional(0x1b8),
         app_zoom_ratio,
