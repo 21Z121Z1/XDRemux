@@ -60,8 +60,9 @@ fn split_portrait_source_image(source_image: &[u8]) -> Result<SplitPortraitSourc
         .to_vec();
     let base_profile = probe_jpeg_frame_profile(&base_jpeg)
         .map_err(|error| RuntimeError::external("Portrait src.image base JPEG profile", error))?;
-    let gain_profile = probe_jpeg_frame_profile(&gain_map_jpeg)
-        .map_err(|error| RuntimeError::external("Portrait src.image Gain Map JPEG profile", error))?;
+    let gain_profile = probe_jpeg_frame_profile(&gain_map_jpeg).map_err(|error| {
+        RuntimeError::external("Portrait src.image Gain Map JPEG profile", error)
+    })?;
 
     Ok(SplitPortraitSourceImage {
         base_jpeg,
