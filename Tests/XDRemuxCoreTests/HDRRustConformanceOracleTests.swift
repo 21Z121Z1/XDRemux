@@ -132,7 +132,6 @@ final class HDRRustConformanceOracleTests: XCTestCase {
             String(raster.height),
             String(raster.bytesPerRow),
             String(raster.channelCount),
-            params.family.rawValue,
             bits(params.knee),
             bits(params.kneeRange),
             bits(params.headroomScale),
