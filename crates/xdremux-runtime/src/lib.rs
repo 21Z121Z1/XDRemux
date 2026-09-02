@@ -152,6 +152,18 @@ impl PortableRuntime {
     }
 
     #[cfg(target_os = "macos")]
+    pub fn apple_write_auxiliary_payloads(
+        &self,
+        executable: impl AsRef<Path>,
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        payloads: &[xdremux_engine::AppleAuxiliaryPayload],
+    ) -> Result<()> {
+        apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
+            .imageio_write_auxiliary(input.as_ref(), output.as_ref(), payloads)
+    }
+
+    #[cfg(target_os = "macos")]
     pub fn apple_portrait_semantic_masks(
         &self,
         executable: impl AsRef<Path>,
