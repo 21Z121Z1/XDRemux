@@ -1,3 +1,5 @@
+use xdremux_format::FourCC;
+
 /// Apple consumer facts reported by a platform capability adapter.
 ///
 /// These are observations, not platform policy. The adapter reports what
@@ -30,6 +32,27 @@ impl AppleImageAuxiliaryFacts {
     }
 }
 
+/// ImageIO observations about one ISO Gain Map auxiliary image.
+///
+/// The platform adapter reports the raw FourCC and geometry. Product policy
+/// such as which pixel formats are accepted for Portrait remains in Rust.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AppleGainMapFacts {
+    pub pixel_format: FourCC,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl AppleGainMapFacts {
+    pub fn supports_portrait_source(self) -> bool {
+        matches!(self.pixel_format.as_bytes(), b"444f" | b"L008")
+    }
+
+    pub const fn has_geometry(self, width: u32, height: u32) -> bool {
+        self.width == width && self.height == height
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,5 +75,25 @@ mod tests {
             ..complete
         };
         assert!(!missing_glasses.satisfies_portrait_editing());
+    }
+
+    #[test]
+    fn portrait_source_gain_map_policy_accepts_only_observed_apple_formats() {
+        for pixel_format in [FourCC::new(*b"444f"), FourCC::new(*b"L008")] {
+            let facts = AppleGainMapFacts {
+                pixel_format,
+                width: 1024,
+                height: 768,
+            };
+            assert!(facts.supports_portrait_source());
+            assert!(facts.has_geometry(1024, 768));
+        }
+
+        let unsupported = AppleGainMapFacts {
+            pixel_format: FourCC::new(*b"420f"),
+            width: 1024,
+            height: 768,
+        };
+        assert!(!unsupported.supports_portrait_source());
     }
 }
