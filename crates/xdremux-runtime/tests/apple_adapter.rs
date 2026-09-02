@@ -72,7 +72,9 @@ fn rust_owns_oppo_portrait_source_preflight_around_imageio_observations() {
 
     assert!(!preflight.base_jpeg.is_empty());
     assert!(!preflight.gain_map_jpeg.is_empty());
-    assert!(!preflight.compressed_depth.is_empty());
+    assert!(preflight.depth.header.width > 0);
+    assert!(preflight.depth.header.height > 0);
+    assert!(!preflight.depth.ranks.is_empty());
     assert!(preflight.base_width > 0);
     assert!(preflight.base_height > 0);
     assert!(preflight.gain_map.supports_portrait_source());
