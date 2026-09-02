@@ -111,7 +111,7 @@ pub fn build_apple_portrait_disparity_payload(
     disparity: ApplePortraitDisparity,
     orientation: u8,
     calibration: &ApplePortraitCameraCalibration,
-    rendering_parameters_base64: &str,
+    rendering_parameters: &[u8],
     simulated_aperture: f64,
 ) -> Result<AppleAuxiliaryPayload, AppleAuxiliaryError> {
     if !(1..=8).contains(&orientation) {
@@ -120,7 +120,7 @@ pub fn build_apple_portrait_disparity_payload(
     if !simulated_aperture.is_finite() || !(1.0..=32.0).contains(&simulated_aperture) {
         return Err(AppleAuxiliaryError::InvalidSimulatedAperture);
     }
-    if rendering_parameters_base64.is_empty() {
+    if rendering_parameters.is_empty() {
         return Err(AppleAuxiliaryError::MissingRenderingParameters);
     }
 
@@ -166,7 +166,7 @@ pub fn build_apple_portrait_disparity_payload(
         ),
         numbers(
             "depthData:ExtrinsicMatrix",
-            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
         ),
         numbers(
             "depthData:LensDistortionCoefficients",
@@ -178,7 +178,7 @@ pub fn build_apple_portrait_disparity_payload(
         ),
         text(
             "depthBlurEffect:RenderingParameters",
-            rendering_parameters_base64,
+            base64_standard(rendering_parameters),
         ),
         text(
             "depthBlurEffect:SimulatedAperture",
@@ -291,6 +291,36 @@ fn validate_data_size(
     Ok(())
 }
 
+fn base64_standard(data: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    let mut output = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let first = chunk[0];
+        let second = chunk.get(1).copied().unwrap_or(0);
+        let third = chunk.get(2).copied().unwrap_or(0);
+
+        output.push(ALPHABET[usize::from(first >> 2)] as char);
+        output.push(
+            ALPHABET[usize::from(((first & 0x03) << 4) | (second >> 4))] as char,
+        );
+        if chunk.len() > 1 {
+            output.push(
+                ALPHABET[usize::from(((second & 0x0f) << 2) | (third >> 6))] as char,
+            );
+        } else {
+            output.push('=');
+        }
+        if chunk.len() > 2 {
+            output.push(ALPHABET[usize::from(third & 0x3f)] as char);
+        } else {
+            output.push('=');
+        }
+    }
+    output
+}
+
 fn text(path: &'static str, value: impl Into<String>) -> AppleMetadataTag {
     AppleMetadataTag {
         path,
@@ -338,6 +368,21 @@ mod tests {
     }
 
     #[test]
+    fn standard_base64_matches_rfc_4648_vectors() {
+        for (input, expected) in [
+            (b"".as_slice(), ""),
+            (b"f".as_slice(), "Zg=="),
+            (b"fo".as_slice(), "Zm8="),
+            (b"foo".as_slice(), "Zm9v"),
+            (b"foob".as_slice(), "Zm9vYg=="),
+            (b"fooba".as_slice(), "Zm9vYmE="),
+            (b"foobar".as_slice(), "Zm9vYmFy"),
+        ] {
+            assert_eq!(base64_standard(input), expected);
+        }
+    }
+
+    #[test]
     fn disparity_payload_matches_the_legacy_imageio_contract() {
         let calibration = calibration();
         assert_eq!(calibration.profile, ApplePortraitLensProfileId::Tele3x);
@@ -348,9 +393,14 @@ mod tests {
             near: 1.0,
             pixels_le_f16: vec![0; 8],
         };
-        let payload =
-            build_apple_portrait_disparity_payload(disparity, 6, &calibration, "UkVORA==", 2.8)
-                .expect("depth payload");
+        let payload = build_apple_portrait_disparity_payload(
+            disparity,
+            6,
+            &calibration,
+            b"REND",
+            2.8,
+        )
+        .expect("depth payload");
 
         assert_eq!(payload.kind, AppleAuxiliaryKind::Disparity);
         assert_eq!(payload.description.width, 2);
@@ -438,7 +488,7 @@ mod tests {
                 invalid_disparity,
                 1,
                 &calibration,
-                "UkVORA==",
+                b"REND",
                 2.8,
             ),
             Err(AppleAuxiliaryError::DataSizeMismatch {
