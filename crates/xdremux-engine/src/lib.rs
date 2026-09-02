@@ -18,19 +18,11 @@ pub use execution::{
     execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
     ExecutionReceipt, ExecutionResult, ExecutionStage,
 };
-pub use product_policy::{
-    detect_source_family, resolve_product_gain_map_encode_profile, wants_oppo_compatibility,
-};
+pub use product_policy::{resolve_product_gain_map_encode_profile, wants_oppo_compatibility};
 pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SourceFamily {
-    X6,
-    X7,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceHdrMode {
@@ -225,14 +217,12 @@ pub enum ContainerWriter {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionAnalysis {
-    pub source_family: SourceFamily,
     pub hdr_mode: SourceHdrMode,
     pub gain_map: GainMapSourceProfile,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConversionPlan {
-    pub effective_family: SourceFamily,
     pub requested_input_processing_branch: InputProcessingBranch,
     pub effective_input_processing_branch: InputProcessingBranch,
     pub base_strategy: BaseStrategy,
@@ -369,7 +359,6 @@ pub fn plan_conversion(
     request: ConversionRequest,
     capabilities: &CapabilityInventory,
 ) -> Result<ConversionPlan> {
-    let effective_family = analysis.source_family;
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
     let gain_map_target = resolve_product_gain_map_encode_profile(
         analysis.gain_map,
@@ -399,7 +388,6 @@ pub fn plan_conversion(
     }
 
     Ok(ConversionPlan {
-        effective_family,
         requested_input_processing_branch: request.input_processing_branch,
         effective_input_processing_branch,
         base_strategy: BaseStrategy::PreserveCompressed,
@@ -590,7 +578,6 @@ mod tests {
         let capabilities =
             CapabilityInventory::new([OperationCapability::GainMapTileEncoder(target)]);
         let analysis = ConversionAnalysis {
-            source_family: SourceFamily::X7,
             hdr_mode: SourceHdrMode::Uhdr,
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         };
@@ -608,7 +595,6 @@ mod tests {
         let target = layout(ChromaSampling::Yuv444, 8);
         let capabilities = capability_inventory([target]);
         let analysis = ConversionAnalysis {
-            source_family: SourceFamily::X7,
             hdr_mode: SourceHdrMode::Uhdr,
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         };
@@ -631,7 +617,6 @@ mod tests {
     #[test]
     fn full_plan_preserves_base_and_declares_operation_capabilities() {
         let analysis = ConversionAnalysis {
-            source_family: SourceFamily::X7,
             hdr_mode: SourceHdrMode::Uhdr,
             gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
         };
@@ -652,7 +637,6 @@ mod tests {
         ]);
         let plan = plan_conversion(&analysis, request, &capabilities).unwrap();
 
-        assert_eq!(plan.effective_family, SourceFamily::X7);
         assert_eq!(plan.base_strategy, BaseStrategy::PreserveCompressed);
         assert_eq!(plan.container_writer, ContainerWriter::Rust);
         assert_eq!(
