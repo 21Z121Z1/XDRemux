@@ -286,17 +286,66 @@ fn static_rendering_profile(profile: ApplePortraitLensProfileId) -> &'static [u8
     }
 }
 
-/// Build the per-image Apple Portrait rendering parameters from the canonical
-/// Rust-owned static lens profile and recovered XHLRB dynamic controls.
+fn scene_activation(
+    focus_disparity: f64,
+    disparity_span: f64,
+    gain_map_headroom: f64,
+    aec_lux_index: Option<f64>,
+    near_object_detected: bool,
+) -> Result<f64, AppleRendError> {
+    for (name, value) in [
+        ("focus_disparity", focus_disparity),
+        ("disparity_span", disparity_span),
+        ("gain_map_headroom", gain_map_headroom),
+    ] {
+        if !value.is_finite() {
+            return Err(AppleRendError::NonFiniteControlInput(name));
+        }
+    }
+    if aec_lux_index.is_some_and(|value| !value.is_finite()) {
+        return Err(AppleRendError::NonFiniteControlInput("aec_lux_index"));
+    }
+
+    let focus_normalized = if disparity_span > 0.0 {
+        (focus_disparity / disparity_span).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let headroom_normalized = (gain_map_headroom.max(0.0) / 4.0).clamp(0.0, 1.0);
+    let lux_normalized = aec_lux_index
+        .map(|lux| lux.max(0.0).ln_1p() / 4097.0_f64.ln())
+        .unwrap_or(0.5)
+        .clamp(0.0, 1.0);
+    let near_boost = if near_object_detected { 1.15 } else { 1.0 };
+    let fitted_primary_gain = (0.02
+        + 0.17 * focus_normalized
+        + 0.04 * headroom_normalized
+        + 0.02 * lux_normalized)
+        * near_boost;
+    Ok(fitted_primary_gain.clamp(0.005, 0.25) / 0.25)
+}
+
+/// Build the per-image Apple Portrait rendering parameters from Rust-owned
+/// source facts, the canonical static lens profile, and recovered XHLRB logic.
 pub fn build_apple_portrait_rendering_parameters(
     profile: ApplePortraitLensProfileId,
-    scene_activation: f64,
+    focus_disparity: f64,
+    disparity_span: f64,
     gain_map_headroom: f64,
+    aec_lux_index: Option<f64>,
+    near_object_detected: bool,
 ) -> Result<Vec<u8>, AppleRendError> {
     let static_profile = AppleRendDocument::parse(static_rendering_profile(profile))?;
+    let activation = scene_activation(
+        focus_disparity,
+        disparity_span,
+        gain_map_headroom,
+        aec_lux_index,
+        near_object_detected,
+    )?;
     let dynamic = AppleXhlrbControlOutput::make(
         matches!(profile, ApplePortraitLensProfileId::Main1x),
-        scene_activation,
+        activation,
         gain_map_headroom,
     )?;
     static_profile
@@ -492,6 +541,30 @@ mod tests {
     }
 
     #[test]
+    fn scene_activation_matches_the_swift_oracle_formula() {
+        let activation = scene_activation(0.5, 1.0, 2.0, None, false).unwrap();
+        let expected = (0.02 + 0.17 * 0.5 + 0.04 * 0.5 + 0.02 * 0.5) / 0.25;
+        assert!((activation - expected).abs() < 1e-12);
+
+        let near = scene_activation(0.5, 1.0, 2.0, None, true).unwrap();
+        assert!(near > activation);
+        assert_eq!(scene_activation(1.0, 0.0, 0.0, None, false).unwrap(), 0.12);
+        assert_eq!(scene_activation(100.0, 1.0, 100.0, Some(4096.0), true).unwrap(), 1.0);
+    }
+
+    #[test]
+    fn scene_activation_rejects_non_finite_inputs() {
+        assert_eq!(
+            scene_activation(f64::NAN, 1.0, 1.0, None, false),
+            Err(AppleRendError::NonFiniteControlInput("focus_disparity"))
+        );
+        assert_eq!(
+            scene_activation(0.5, 1.0, 1.0, Some(f64::INFINITY), false),
+            Err(AppleRendError::NonFiniteControlInput("aec_lux_index"))
+        );
+    }
+
+    #[test]
     fn rendering_parameters_add_dynamic_records_for_every_lens_profile() {
         for profile in [
             ApplePortraitLensProfileId::Main1x,
@@ -499,8 +572,15 @@ mod tests {
             ApplePortraitLensProfileId::Tele3x,
             ApplePortraitLensProfileId::Tetraprism5x,
         ] {
-            let bytes = build_apple_portrait_rendering_parameters(profile, 0.5, 2.0)
-                .expect("build rendering parameters");
+            let bytes = build_apple_portrait_rendering_parameters(
+                profile,
+                0.5,
+                1.0,
+                2.0,
+                None,
+                false,
+            )
+            .expect("build rendering parameters");
             let document = AppleRendDocument::parse(&bytes).expect("parse rendering parameters");
             let identifiers = document
                 .records()
