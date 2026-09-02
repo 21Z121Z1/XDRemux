@@ -1,12 +1,15 @@
-use std::io::Read;
-
-use ruzstd::decoding::StreamingDecoder;
-use xdremux_container::{
-    extract_oppo_portrait_source, parse_oppo_portrait_depth, OppoPortraitConfig, OppoPortraitDepth,
-};
+use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
 use xdremux_engine::AppleGainMapFacts;
-use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
 
+#[cfg(any(target_os = "macos", test))]
+use std::io::Read;
+#[cfg(any(target_os = "macos", test))]
+use ruzstd::decoding::StreamingDecoder;
+#[cfg(any(target_os = "macos", test))]
+use xdremux_container::{extract_oppo_portrait_source, parse_oppo_portrait_depth};
+#[cfg(any(target_os = "macos", test))]
+use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
+#[cfg(any(target_os = "macos", test))]
 use crate::{Result, RuntimeError};
 
 #[cfg(target_os = "macos")]
@@ -17,6 +20,7 @@ use std::path::Path;
 #[cfg(target_os = "macos")]
 use crate::apple_adapter::AppleAdapterClient;
 
+#[cfg(any(target_os = "macos", test))]
 const MAX_DECODED_PORTRAIT_DEPTH_BYTES: u64 = 256 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,6 +35,7 @@ pub struct ApplePortraitSourcePreflight {
     pub gain_map: AppleGainMapFacts,
 }
 
+#[cfg(any(target_os = "macos", test))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SplitPortraitSourceImage {
     base_jpeg: Vec<u8>,
@@ -41,6 +46,7 @@ struct SplitPortraitSourceImage {
     gain_map_height: u32,
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn split_portrait_source_image(source_image: &[u8]) -> Result<SplitPortraitSourceImage> {
     let base_end = jpeg_image_end(source_image, 0)
         .map_err(|error| RuntimeError::external("Portrait src.image base JPEG", error))?;
@@ -81,6 +87,7 @@ fn split_portrait_source_image(source_image: &[u8]) -> Result<SplitPortraitSourc
     })
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn decode_oppo_portrait_depth(compressed: &[u8]) -> Result<OppoPortraitDepth> {
     if compressed.is_empty() {
         return Err(RuntimeError::new(
@@ -210,11 +217,13 @@ mod tests {
     }
 
     #[test]
-    fn rejects_single_jpeg_as_portrait_source_image() {
-        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg");
-        let jpeg = fs::read(fixture).expect("read JPEG fixture");
-        assert!(split_portrait_source_image(&jpeg).is_err());
+    fn rejects_one_jpeg_from_the_portrait_pair_as_a_complete_source_image() {
+        let source = portrait_fixture();
+        let source = extract_oppo_portrait_source(&source).expect("extract OPPO portrait source");
+        let split = split_portrait_source_image(&source.source_image)
+            .expect("split adjacent base/Gain Map JPEGs");
+
+        assert!(split_portrait_source_image(&split.base_jpeg).is_err());
     }
 
     #[test]
