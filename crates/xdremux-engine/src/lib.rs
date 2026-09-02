@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod apple;
 mod capabilities;
 mod execution;
 mod product_policy;
@@ -9,6 +10,7 @@ use std::collections::BTreeSet;
 
 use xdremux_format::ChromaSampling;
 
+pub use apple::AppleImageAuxiliaryFacts;
 pub use capabilities::{
     CapabilityInventory, ConsumerValidator, GainMapTileEncoder, OperationCapability,
     PhotographicStylesAdapter, PlatformCapability, PortraitAdapter, RasterDecoder,
