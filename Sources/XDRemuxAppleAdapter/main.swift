@@ -53,11 +53,34 @@ private struct GainMapFacts: Encodable {
     }
 }
 
+private struct ImageProperties: Encodable {
+    let width: Int
+    let height: Int
+    let orientation: UInt32?
+    let focalLengthMM: Double?
+    let focalLengthIn35mmFilm: Double?
+    let digitalZoomRatio: Double?
+    let lensModel: String?
+    let fNumber: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case width
+        case height
+        case orientation
+        case focalLengthMM = "focal_length_mm"
+        case focalLengthIn35mmFilm = "focal_length_in_35mm_film"
+        case digitalZoomRatio = "digital_zoom_ratio"
+        case lensModel = "lens_model"
+        case fNumber = "f_number"
+    }
+}
+
 private struct AdapterResponse: Encodable {
     let schemaVersion: Int
     let capabilities: [String]?
     let auxiliary: AuxiliaryFacts?
     let gainMap: GainMapFacts?
+    let imageProperties: ImageProperties?
     let semanticMasks: [VisionSemanticMaskFacts]?
 
     enum CodingKeys: String, CodingKey {
@@ -65,6 +88,7 @@ private struct AdapterResponse: Encodable {
         case capabilities
         case auxiliary
         case gainMap = "gain_map"
+        case imageProperties = "image_properties"
         case semanticMasks = "semantic_masks"
     }
 }
@@ -130,6 +154,29 @@ private func imageIOGainMapFacts(inputPath: String) -> GainMapFacts {
     return GainMapFacts(pixelFormat: rawPixelFormat, width: width, height: height)
 }
 
+private func imageIOImageProperties(inputPath: String) -> ImageProperties {
+    let inputURL = URL(fileURLWithPath: inputPath)
+    guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
+          let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+          let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+          let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
+          width > 0,
+          height > 0 else {
+        fail("ImageIO cannot read image properties from \(inputPath)", status: 1)
+    }
+    let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
+    return ImageProperties(
+        width: width,
+        height: height,
+        orientation: (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value,
+        focalLengthMM: (exif[kCGImagePropertyExifFocalLength] as? NSNumber)?.doubleValue,
+        focalLengthIn35mmFilm: (exif[kCGImagePropertyExifFocalLenIn35mmFilm] as? NSNumber)?.doubleValue,
+        digitalZoomRatio: (exif[kCGImagePropertyExifDigitalZoomRatio] as? NSNumber)?.doubleValue,
+        lensModel: exif[kCGImagePropertyExifLensModel] as? String,
+        fNumber: (exif[kCGImagePropertyExifFNumber] as? NSNumber)?.doubleValue
+    )
+}
+
 do {
     let input = FileHandle.standardInput.readDataToEndOfFile()
     guard !input.isEmpty else {
@@ -149,6 +196,7 @@ do {
             capabilities: ["photographic-styles", "portrait"],
             auxiliary: nil,
             gainMap: nil,
+            imageProperties: nil,
             semanticMasks: nil
         )
     case "imageio-auxiliary-facts":
@@ -160,6 +208,7 @@ do {
             capabilities: nil,
             auxiliary: imageIOAuxiliaryFacts(inputPath: inputPath),
             gainMap: nil,
+            imageProperties: nil,
             semanticMasks: nil
         )
     case "imageio-gain-map-facts":
@@ -171,6 +220,19 @@ do {
             capabilities: nil,
             auxiliary: nil,
             gainMap: imageIOGainMapFacts(inputPath: inputPath),
+            imageProperties: nil,
+            semanticMasks: nil
+        )
+    case "imageio-image-properties":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty else {
+            fail("imageio-image-properties requires input_path")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: imageIOImageProperties(inputPath: inputPath),
             semanticMasks: nil
         )
     case "vision-semantic-mattes":
@@ -184,6 +246,7 @@ do {
             capabilities: nil,
             auxiliary: nil,
             gainMap: nil,
+            imageProperties: nil,
             semanticMasks: try generateVisionSemanticMattes(
                 inputPath: inputPath,
                 outputPath: outputPath,
