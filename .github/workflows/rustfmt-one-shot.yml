@@ -20,17 +20,31 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
+      - name: Scope test-only import correctly
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/xdremux-heif/src/canonical.rs")
+          text = path.read_text()
+          old_top = "make_box, make_iloc_box, make_iref_box, parse_boxes, parse_iref, parse_meta_box,"
+          new_top = "make_box, make_iloc_box, make_iref_box, parse_boxes, parse_meta_box,"
+          old_test = "use xdremux_format::isobmff::{make_ipma_box, parse_ipma, IpmaAssociation, IpmaEntry};"
+          new_test = "use xdremux_format::isobmff::{make_ipma_box, parse_ipma, parse_iref, IpmaAssociation, IpmaEntry};"
+          if old_top not in text or old_test not in text:
+              raise SystemExit("expected canonical.rs import anchors not found")
+          path.write_text(text.replace(old_top, new_top, 1).replace(old_test, new_test, 1))
+          PY
       - name: Format Rust workspace
         run: cargo fmt --all
-      - name: Commit mechanical formatting
+      - name: Commit mechanical cleanup
         run: |
           if git diff --quiet; then
-            echo "No formatting changes needed"
+            echo "No cleanup changes needed"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- '*.rs'
           git diff --cached --check
-          git commit -m "style: apply rustfmt"
+          git commit -m "style: scope test-only HEIF import"
           git push origin HEAD:feat/rust-cli-unification
