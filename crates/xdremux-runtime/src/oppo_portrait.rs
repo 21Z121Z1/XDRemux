@@ -1,0 +1,160 @@
+use xdremux_container::{extract_oppo_portrait_source, OppoPortraitConfig};
+use xdremux_engine::AppleGainMapFacts;
+use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
+
+use crate::{Result, RuntimeError};
+
+#[cfg(target_os = "macos")]
+use std::io::Write;
+#[cfg(target_os = "macos")]
+use std::path::Path;
+
+#[cfg(target_os = "macos")]
+use crate::apple_adapter::AppleAdapterClient;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApplePortraitSourcePreflight {
+    pub base_jpeg: Vec<u8>,
+    pub gain_map_jpeg: Vec<u8>,
+    pub compressed_depth: Vec<u8>,
+    pub config: OppoPortraitConfig,
+    pub private_gain_map_info: Option<Vec<u8>>,
+    pub base_width: u32,
+    pub base_height: u32,
+    pub gain_map: AppleGainMapFacts,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SplitPortraitSourceImage {
+    base_jpeg: Vec<u8>,
+    gain_map_jpeg: Vec<u8>,
+    base_width: u32,
+    base_height: u32,
+    gain_map_width: u32,
+    gain_map_height: u32,
+}
+
+fn split_portrait_source_image(source_image: &[u8]) -> Result<SplitPortraitSourceImage> {
+    let base_end = jpeg_image_end(source_image, 0)
+        .map_err(|error| RuntimeError::external("Portrait src.image base JPEG", error))?;
+    let second_marker_end = base_end.checked_add(3).ok_or_else(|| {
+        RuntimeError::new("Portrait src.image", "second JPEG marker offset overflows")
+    })?;
+    if source_image.get(base_end..second_marker_end) != Some(&[0xff, 0xd8, 0xff]) {
+        return Err(RuntimeError::new(
+            "Portrait src.image",
+            "does not contain adjacent base and Gain Map JPEGs",
+        ));
+    }
+
+    jpeg_image_end(source_image, base_end)
+        .map_err(|error| RuntimeError::external("Portrait src.image Gain Map JPEG", error))?;
+
+    let base_jpeg = source_image
+        .get(..base_end)
+        .ok_or_else(|| RuntimeError::new("Portrait src.image", "base JPEG is out of bounds"))?
+        .to_vec();
+    let gain_map_jpeg = source_image
+        .get(base_end..)
+        .ok_or_else(|| RuntimeError::new("Portrait src.image", "Gain Map JPEG is out of bounds"))?
+        .to_vec();
+    let base_profile = probe_jpeg_frame_profile(&base_jpeg)
+        .map_err(|error| RuntimeError::external("Portrait src.image base JPEG profile", error))?;
+    let gain_profile = probe_jpeg_frame_profile(&gain_map_jpeg)
+        .map_err(|error| RuntimeError::external("Portrait src.image Gain Map JPEG profile", error))?;
+
+    Ok(SplitPortraitSourceImage {
+        base_jpeg,
+        gain_map_jpeg,
+        base_width: u32::from(base_profile.width),
+        base_height: u32::from(base_profile.height),
+        gain_map_width: u32::from(gain_profile.width),
+        gain_map_height: u32::from(gain_profile.height),
+    })
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn prepare_apple_portrait_source(
+    adapter_executable: &Path,
+    source: &[u8],
+) -> Result<ApplePortraitSourcePreflight> {
+    let source = extract_oppo_portrait_source(source)
+        .map_err(|error| RuntimeError::external("OPPO Portrait source extraction", error))?;
+    let split = split_portrait_source_image(&source.source_image)?;
+
+    let mut image_file = tempfile::Builder::new()
+        .prefix("xdremux-portrait-src-")
+        .suffix(".jpg")
+        .tempfile()
+        .map_err(|error| RuntimeError::external("Portrait src.image temporary file", error))?;
+    image_file
+        .write_all(&source.source_image)
+        .map_err(|error| RuntimeError::external("Portrait src.image temporary write", error))?;
+    image_file
+        .flush()
+        .map_err(|error| RuntimeError::external("Portrait src.image temporary flush", error))?;
+
+    let gain_map = AppleAdapterClient::new(adapter_executable.to_path_buf())
+        .imageio_gain_map_facts(image_file.path())?;
+    if !gain_map.supports_portrait_source() {
+        return Err(RuntimeError::new(
+            "Apple Portrait source",
+            format!(
+                "unsupported ImageIO Gain Map pixel format {}",
+                gain_map.pixel_format
+            ),
+        ));
+    }
+    if !gain_map.has_geometry(split.gain_map_width, split.gain_map_height) {
+        return Err(RuntimeError::new(
+            "Apple Portrait source",
+            format!(
+                "ImageIO Gain Map geometry {}x{} does not match JPEG {}x{}",
+                gain_map.width, gain_map.height, split.gain_map_width, split.gain_map_height
+            ),
+        ));
+    }
+
+    Ok(ApplePortraitSourcePreflight {
+        base_jpeg: split.base_jpeg,
+        gain_map_jpeg: split.gain_map_jpeg,
+        compressed_depth: source.compressed_depth,
+        config: source.config,
+        private_gain_map_info: source.private_gain_map_info,
+        base_width: split.base_width,
+        base_height: split.base_height,
+        gain_map,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn splits_committed_portrait_source_with_hardened_jpeg_boundaries() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic");
+        let source = fs::read(fixture).expect("read committed portrait fixture");
+        let source = extract_oppo_portrait_source(&source).expect("extract OPPO portrait source");
+        let split = split_portrait_source_image(&source.source_image)
+            .expect("split adjacent base/Gain Map JPEGs");
+
+        assert!(split.base_width > 0);
+        assert!(split.base_height > 0);
+        assert!(split.gain_map_width > 0);
+        assert!(split.gain_map_height > 0);
+        assert_eq!(split.base_jpeg.get(..2), Some(&[0xff, 0xd8][..]));
+        assert_eq!(split.gain_map_jpeg.get(..2), Some(&[0xff, 0xd8][..]));
+    }
+
+    #[test]
+    fn rejects_single_jpeg_as_portrait_source_image() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg");
+        let jpeg = fs::read(fixture).expect("read JPEG fixture");
+        assert!(split_portrait_source_image(&jpeg).is_err());
+    }
+}
