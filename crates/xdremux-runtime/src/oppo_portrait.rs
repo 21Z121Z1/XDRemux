@@ -165,9 +165,7 @@ fn resolve_simulated_aperture(
 
     input_f_number
         .filter(|value| value.is_finite() && (1.0..=32.0).contains(value))
-        .or_else(|| {
-            base_f_number.filter(|value| value.is_finite() && (1.0..=32.0).contains(value))
-        })
+        .or_else(|| base_f_number.filter(|value| value.is_finite() && (1.0..=32.0).contains(value)))
         .unwrap_or(1.4)
 }
 

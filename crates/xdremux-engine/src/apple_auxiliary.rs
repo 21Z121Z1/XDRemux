@@ -18,11 +18,10 @@ pub const APPLE_PORTRAIT_LIGHTING_EFFECT_NAMESPACE: AppleMetadataNamespace =
         uri: "http://ns.apple.com/portraitLightingEffect/1.0/",
         prefix: "portraitLightingEffect",
     };
-pub const APPLE_PORTRAIT_EFFECTS_MATTE_NAMESPACE: AppleMetadataNamespace =
-    AppleMetadataNamespace {
-        uri: "http://ns.apple.com/portraitEffectsMatte/1.0/",
-        prefix: "portraitEffectsMatte",
-    };
+pub const APPLE_PORTRAIT_EFFECTS_MATTE_NAMESPACE: AppleMetadataNamespace = AppleMetadataNamespace {
+    uri: "http://ns.apple.com/portraitEffectsMatte/1.0/",
+    prefix: "portraitEffectsMatte",
+};
 pub const APPLE_SEMANTIC_SEGMENTATION_MATTE_NAMESPACE: AppleMetadataNamespace =
     AppleMetadataNamespace {
         uri: "http://ns.apple.com/semanticSegmentationMatte/1.0/",
@@ -93,9 +92,8 @@ impl fmt::Display for AppleAuxiliaryError {
             Self::InvalidOrientation(value) => {
                 write!(formatter, "Apple auxiliary orientation {value} is invalid")
             }
-            Self::InvalidSimulatedAperture => formatter.write_str(
-                "Apple Portrait simulated aperture must be finite and between 1 and 32",
-            ),
+            Self::InvalidSimulatedAperture => formatter
+                .write_str("Apple Portrait simulated aperture must be finite and between 1 and 32"),
             Self::MissingRenderingParameters => {
                 formatter.write_str("Apple Portrait rendering parameters are empty")
             }
@@ -350,14 +348,9 @@ mod tests {
             near: 1.0,
             pixels_le_f16: vec![0; 8],
         };
-        let payload = build_apple_portrait_disparity_payload(
-            disparity,
-            6,
-            &calibration,
-            "UkVORA==",
-            2.8,
-        )
-        .expect("depth payload");
+        let payload =
+            build_apple_portrait_disparity_payload(disparity, 6, &calibration, "UkVORA==", 2.8)
+                .expect("depth payload");
 
         assert_eq!(payload.kind, AppleAuxiliaryKind::Disparity);
         assert_eq!(payload.description.width, 2);
@@ -408,13 +401,9 @@ mod tests {
             Some("65537")
         );
 
-        let hair = build_apple_semantic_matte_payload(
-            AppleSemanticRole::Hair,
-            2,
-            2,
-            vec![4, 3, 2, 1],
-        )
-        .expect("hair matte");
+        let hair =
+            build_apple_semantic_matte_payload(AppleSemanticRole::Hair, 2, 2, vec![4, 3, 2, 1])
+                .expect("hair matte");
         assert_eq!(
             hair.kind,
             AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Hair)
@@ -427,12 +416,7 @@ mod tests {
             Some("65536")
         );
         assert_eq!(
-            build_apple_semantic_matte_payload(
-                AppleSemanticRole::Person,
-                1,
-                1,
-                vec![255]
-            ),
+            build_apple_semantic_matte_payload(AppleSemanticRole::Person, 1, 1, vec![255]),
             Err(AppleAuxiliaryError::UnsupportedSemanticRole(
                 AppleSemanticRole::Person
             ))
