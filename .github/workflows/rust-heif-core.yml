@@ -24,10 +24,126 @@ on:
       - "scripts/check_heif_conformance.sh"
       - ".github/workflows/rust-heif-core.yml"
 
+# Temporarily write-enabled for the one-shot source migration below. Restored
+# immediately after the migration commit lands.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  heif-dinf-migration:
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Patch canonical DataInformation contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/xdremux-heif/src/native.rs')
+          text = path.read_text()
+
+          const_anchor = 'const CDSC: FourCC = FourCC::new(*b"cdsc");\n'
+          const_replacement = '''const CDSC: FourCC = FourCC::new(*b"cdsc");
+const HDLR: FourCC = FourCC::new(*b"hdlr");
+const DINF: FourCC = FourCC::new(*b"dinf");
+const DREF: FourCC = FourCC::new(*b"dref");
+const URL_: FourCC = FourCC::new(*b"url ");
+'''
+          if const_anchor not in text:
+              raise SystemExit('native.rs FourCC anchor not found')
+          text = text.replace(const_anchor, const_replacement, 1)
+
+          auxc_anchor = '''fn make_auxc_box() -> Result<Vec<u8>> {
+    Ok(make_full_box(AUXC, 0, 0, ISO_21496_AUX_TYPE)?)
+}
+'''
+          auxc_replacement = '''fn make_auxc_box() -> Result<Vec<u8>> {
+    Ok(make_full_box(AUXC, 0, 0, ISO_21496_AUX_TYPE)?)
+}
+
+fn make_dinf_box() -> Result<Vec<u8>> {
+    let url = make_full_box(URL_, 0, 1, &[])?;
+    let mut dref_payload = Vec::with_capacity(4 + url.len());
+    dref_payload.extend_from_slice(&1_u32.to_be_bytes());
+    dref_payload.extend_from_slice(&url);
+    let dref = make_full_box(DREF, 0, 0, &dref_payload)?;
+    Ok(make_box(DINF, &dref)?)
+}
+'''
+          if auxc_anchor not in text:
+              raise SystemExit('native.rs auxC anchor not found')
+          text = text.replace(auxc_anchor, auxc_replacement, 1)
+
+          meta_anchor = '''    let mut payload = full_header.to_vec();
+    let mut saw_iref = false;
+    let mut saw_idat = false;
+    for header in meta_children {
+        if header.kind == IINF {
+'''
+          meta_replacement = '''    let mut payload = full_header.to_vec();
+    let has_dinf = meta_children.iter().any(|header| header.kind == DINF);
+    let mut inserted_dinf = has_dinf;
+    let mut saw_iref = false;
+    let mut saw_idat = false;
+    for header in meta_children {
+        if header.kind == HDLR {
+            payload.extend_from_slice(raw_box(source, header, "meta child")?);
+            if !has_dinf {
+                payload.extend_from_slice(&make_dinf_box()?);
+                inserted_dinf = true;
+            }
+        } else if header.kind == IINF {
+'''
+          if meta_anchor not in text:
+              raise SystemExit('native.rs build_meta anchor not found')
+          text = text.replace(meta_anchor, meta_replacement, 1)
+
+          tail_anchor = '''    if !saw_iref {
+        payload.extend_from_slice(iref);
+    }
+    if !saw_idat {
+        payload.extend_from_slice(idat);
+    }
+    Ok(make_box(META, &payload)?)
+}
+'''
+          tail_replacement = '''    if !inserted_dinf {
+        return Err(invalid("source meta has no hdlr for canonical dinf insertion"));
+    }
+    if !saw_iref {
+        payload.extend_from_slice(iref);
+    }
+    if !saw_idat {
+        payload.extend_from_slice(idat);
+    }
+    Ok(make_box(META, &payload)?)
+}
+'''
+          if tail_anchor not in text:
+              raise SystemExit('native.rs build_meta tail anchor not found')
+          text = text.replace(tail_anchor, tail_replacement, 1)
+          path.write_text(text)
+          PY
+          cargo fmt --all
+          cargo fmt --all -- --check
+          cargo clippy --locked -p xdremux-heif --all-targets -- -D warnings
+          cargo test --locked -p xdremux-heif
+          git diff --check
+      - name: Commit migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-heif/src/native.rs
+          git commit -m "fix(heif): restore canonical data information box"
+          git push origin HEAD:feat/rust-cli-unification
+
   heif-core:
     runs-on: ubuntu-latest
     timeout-minutes: 15
