@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod apple;
+mod apple_auxiliary;
 mod apple_portrait;
 mod apple_portrait_geometry;
 mod capabilities;
@@ -14,6 +15,14 @@ use xdremux_format::ChromaSampling;
 
 pub use apple::{
     AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleSemanticRole, APPLE_PORTRAIT_SEMANTIC_ROLES,
+};
+pub use apple_auxiliary::{
+    build_apple_portrait_disparity_payload, build_apple_portrait_effects_matte_payload,
+    build_apple_semantic_matte_payload, AppleAuxiliaryDescription, AppleAuxiliaryError,
+    AppleAuxiliaryKind, AppleAuxiliaryPayload, AppleMetadataNamespace, AppleMetadataTag,
+    AppleMetadataValue, APPLE_DEPTH_BLUR_EFFECT_NAMESPACE, APPLE_DEPTH_DATA_NAMESPACE,
+    APPLE_PORTRAIT_EFFECTS_MATTE_NAMESPACE, APPLE_PORTRAIT_LIGHTING_EFFECT_NAMESPACE,
+    APPLE_SEMANTIC_SEGMENTATION_MATTE_NAMESPACE,
 };
 pub use apple_portrait::{
     AppleRendDocument, AppleRendError, AppleRendRecord, AppleXhlrbControlOutput,
