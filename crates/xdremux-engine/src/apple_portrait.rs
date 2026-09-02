@@ -2,9 +2,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fmt;
 
+use crate::apple_portrait_geometry::ApplePortraitLensProfileId;
+
 const REND_HEADER_BYTES: usize = 16;
 const REND_RECORD_BYTES: usize = 8;
 const REND_MAGIC: [u8; 4] = *b"REND";
+const REND_MAIN_1X: &[u8] = include_bytes!("../assets/apple-portrait/rend-main-1x.rend");
+const REND_FUSION_2X: &[u8] = include_bytes!("../assets/apple-portrait/rend-fusion-2x.rend");
+const REND_TELE_3X: &[u8] = include_bytes!("../assets/apple-portrait/rend-tele-3x.rend");
+const REND_TETRAPRISM_5X: &[u8] =
+    include_bytes!("../assets/apple-portrait/rend-tetraprism-5x.rend");
 
 /// Dynamic REND record identifiers controlled by the recovered XHLRB logic.
 pub const APPLE_XHLRB_DYNAMIC_RECORD_IDS: [u16; 14] = [
@@ -270,6 +277,33 @@ impl AppleXhlrbControlOutput {
     }
 }
 
+fn static_rendering_profile(profile: ApplePortraitLensProfileId) -> &'static [u8] {
+    match profile {
+        ApplePortraitLensProfileId::Main1x => REND_MAIN_1X,
+        ApplePortraitLensProfileId::Fusion2x => REND_FUSION_2X,
+        ApplePortraitLensProfileId::Tele3x => REND_TELE_3X,
+        ApplePortraitLensProfileId::Tetraprism5x => REND_TETRAPRISM_5X,
+    }
+}
+
+/// Build the per-image Apple Portrait rendering parameters from the canonical
+/// Rust-owned static lens profile and recovered XHLRB dynamic controls.
+pub fn build_apple_portrait_rendering_parameters(
+    profile: ApplePortraitLensProfileId,
+    scene_activation: f64,
+    gain_map_headroom: f64,
+) -> Result<Vec<u8>, AppleRendError> {
+    let static_profile = AppleRendDocument::parse(static_rendering_profile(profile))?;
+    let dynamic = AppleXhlrbControlOutput::make(
+        matches!(profile, ApplePortraitLensProfileId::Main1x),
+        scene_activation,
+        gain_map_headroom,
+    )?;
+    static_profile
+        .replacing(dynamic.records().iter().copied())?
+        .serialized(true)
+}
+
 fn validate_records(records: &[AppleRendRecord]) -> Result<(), AppleRendError> {
     let mut identifiers = BTreeSet::new();
     for record in records {
@@ -437,5 +471,45 @@ mod tests {
                 .and_then(|record| record.float_value()),
             Some(0.125)
         );
+    }
+
+    #[test]
+    fn committed_static_profiles_are_byte_stable_and_exclude_dynamic_records() {
+        for profile in [
+            ApplePortraitLensProfileId::Main1x,
+            ApplePortraitLensProfileId::Fusion2x,
+            ApplePortraitLensProfileId::Tele3x,
+            ApplePortraitLensProfileId::Tetraprism5x,
+        ] {
+            let bytes = static_rendering_profile(profile);
+            let document = AppleRendDocument::parse(bytes).expect("parse static REND profile");
+            assert_eq!(document.serialized(false).unwrap(), bytes);
+            assert!(document.records().iter().all(|record| {
+                !APPLE_XHLRB_DYNAMIC_RECORD_IDS.contains(&record.identifier)
+            }));
+        }
+    }
+
+    #[test]
+    fn rendering_parameters_add_dynamic_records_for_every_lens_profile() {
+        for profile in [
+            ApplePortraitLensProfileId::Main1x,
+            ApplePortraitLensProfileId::Fusion2x,
+            ApplePortraitLensProfileId::Tele3x,
+            ApplePortraitLensProfileId::Tetraprism5x,
+        ] {
+            let bytes = build_apple_portrait_rendering_parameters(profile, 0.5, 2.0)
+                .expect("build rendering parameters");
+            let document = AppleRendDocument::parse(&bytes).expect("parse rendering parameters");
+            let identifiers = document
+                .records()
+                .iter()
+                .map(|record| record.identifier)
+                .collect::<BTreeSet<_>>();
+            assert!(APPLE_XHLRB_DYNAMIC_RECORD_IDS
+                .iter()
+                .all(|identifier| identifiers.contains(identifier)));
+            assert_eq!(document.serialized(true).unwrap(), bytes);
+        }
     }
 }
