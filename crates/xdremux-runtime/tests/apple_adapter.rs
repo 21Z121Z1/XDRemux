@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use xdremux_engine::{
     build_apple_portrait_effects_matte_payload, build_apple_semantic_matte_payload,
-    AppleAuxiliaryKind, AppleSemanticRole, OperationCapability,
+    AppleAuxiliaryKind, AppleSemanticRole, ConversionRequest, OperationCapability,
 };
 use xdremux_runtime::PortableRuntime;
 
@@ -170,7 +170,10 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
         .into_auxiliary_payloads("UkVORA==")
         .expect("assemble complete Rust-owned Portrait auxiliary manifest");
     assert_eq!(
-        payloads.iter().map(|payload| payload.kind).collect::<Vec<_>>(),
+        payloads
+            .iter()
+            .map(|payload| payload.kind)
+            .collect::<Vec<_>>(),
         vec![
             AppleAuxiliaryKind::Disparity,
             AppleAuxiliaryKind::PortraitEffectsMatte,
@@ -181,13 +184,39 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
         ]
     );
 
+    // Portrait resources are attached to the canonical Rust HDR product, not
+    // directly to the producer-specific OPPO source container. This mirrors the
+    // real product graph and gives ImageIO an ISO Gain Map to preserve.
     let temporary = tempfile::tempdir().expect("create Portrait output directory");
-    let output = temporary.path().join("portrait-complete-auxiliary-set.heic");
+    let iso_base = temporary.path().join("portrait-iso-base.heic");
     runtime
-        .apple_write_auxiliary_payloads(&executable, &fixture, &output, &payloads)
+        .convert_proxdr_file(
+            &source,
+            &iso_base,
+            ConversionRequest::default(),
+            |_| {},
+        )
+        .expect("Rust runtime must build the ISO HDR base before Apple auxiliaries");
+    let base_facts = runtime
+        .apple_image_auxiliary_facts(&executable, &iso_base)
+        .expect("ImageIO must inspect the Rust ISO HDR base");
+    assert!(base_facts.iso_gain_map, "base facts: {base_facts:?}");
+
+    let output = temporary
+        .path()
+        .join("portrait-complete-auxiliary-set.heic");
+    runtime
+        .apple_write_auxiliary_payloads(&executable, &iso_base, &output, &payloads)
         .expect("generic ImageIO writer must accept the complete Rust-owned Portrait manifest");
     let facts = runtime
         .apple_image_auxiliary_facts(&executable, &output)
         .expect("ImageIO must report the written Portrait auxiliary set");
+    assert!(facts.iso_gain_map, "facts: {facts:?}");
+    assert!(facts.disparity, "facts: {facts:?}");
+    assert!(facts.portrait_effects_matte, "facts: {facts:?}");
+    assert!(facts.skin_matte, "facts: {facts:?}");
+    assert!(facts.hair_matte, "facts: {facts:?}");
+    assert!(facts.teeth_matte, "facts: {facts:?}");
+    assert!(facts.glasses_matte, "facts: {facts:?}");
     assert!(facts.satisfies_portrait_editing());
 }
