@@ -45,7 +45,10 @@ jobs:
           echo "::endgroup::"
           echo "RUST_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
           echo "::group::Swift Apple migration build"
-          swift build 2>&1 | tee artifacts/swift-build.log
+          swift build --target XDRemuxCLI 2>&1 | tee artifacts/swift-build.log
+          SWIFT_ORACLE_CLI="$(swift build --show-bin-path)/XDRemuxCLI"
+          test -x "$SWIFT_ORACLE_CLI"
+          echo "SWIFT_ORACLE_CLI=$SWIFT_ORACLE_CLI" >> "$GITHUB_ENV"
           echo "::endgroup::"
           echo "APPLE_ORACLE_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
 
@@ -56,7 +59,7 @@ jobs:
           swift test 2>&1 | tee artifacts/swift-test.log
           echo "::endgroup::"
           echo "::group::Architecture policy tests"
-          python3 -m unittest Tests.test_swift_app_architecture 2>&1 | tee artifacts/architecture-tests.log
+          python3 -m unittest Tests.test_swift_app_architecture Tests.test_product_ownership 2>&1 | tee artifacts/architecture-tests.log
           echo "::endgroup::"
           echo "MIGRATION_TEST_RESULT=Passed" >> "$GITHUB_ENV"
 
@@ -147,12 +150,12 @@ jobs:
           echo "OPPO_FIXTURE_RESULT=Passed (Rust)" >> "$GITHUB_ENV"
           echo "::endgroup::"
           echo "::group::Apple feature migration-oracle fixture conversions"
-          .build/debug/xdremux convert --apple-photographic-styles \
+          "$SWIFT_ORACLE_CLI" convert --apple-photographic-styles \
             --debug-dir artifacts/diagnostics/apple-styles \
             --input "$FIXTURE_ROOT/apple-styles.heic" --output artifacts/fixtures/apple-styles.heic \
             > artifacts/fixtures/apple-styles.log 2> artifacts/fixtures/apple-styles.stderr
           echo "APPLE_STYLES_RESULT=Passed (Swift oracle)" >> "$GITHUB_ENV"
-          .build/debug/xdremux convert --apple-portrait \
+          "$SWIFT_ORACLE_CLI" convert --apple-portrait \
             --debug-dir artifacts/diagnostics/apple-portrait \
             --input "$FIXTURE_ROOT/apple-portrait.heic" --output artifacts/fixtures/apple-portrait.heic \
             > artifacts/fixtures/apple-portrait.log 2> artifacts/fixtures/apple-portrait.stderr
@@ -175,9 +178,9 @@ jobs:
             --validate-only --input artifacts/fixtures/oppo.heic --expected-pixel-format 420f
           echo "::endgroup::"
           echo "::group::Apple migration-oracle validation"
-          .build/debug/xdremux validate-apple --input artifacts/fixtures/apple-styles.heic \
+          "$SWIFT_ORACLE_CLI" validate-apple --input artifacts/fixtures/apple-styles.heic \
             > artifacts/fixtures/apple-styles-validation.json
-          .build/debug/xdremux validate-portrait --input artifacts/fixtures/apple-portrait.heic \
+          "$SWIFT_ORACLE_CLI" validate-portrait --input artifacts/fixtures/apple-portrait.heic \
             > artifacts/fixtures/apple-portrait-validation.json
           echo "::endgroup::"
           echo "CONTAINER_VALIDATION_RESULT=Passed" >> "$GITHUB_ENV"
