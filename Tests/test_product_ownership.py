@@ -21,6 +21,15 @@ class ProductOwnershipTests(unittest.TestCase):
         ):
             self.assertFalse((ROOT / relative).exists(), f"legacy Python product entry point returned: {relative}")
 
+    def test_swift_package_publishes_only_the_apple_capability_library(self) -> None:
+        manifest = (ROOT / "Package.swift").read_text(encoding="utf-8")
+        self.assertIn('.library(name: "XDRemuxAppleFeatures"', manifest)
+        self.assertNotIn('.library(name: "XDRemuxCore"', manifest)
+        self.assertNotIn('.executable(name: "xdremux"', manifest)
+        self.assertIn('name: "XDRemuxCore"', manifest)
+        self.assertIn('name: "XDRemuxCLI"', manifest)
+        self.assertIn("Migration-only", manifest)
+
     def test_development_docs_name_rust_as_the_only_product_core(self) -> None:
         english = (ROOT / "docs/development.en.md").read_text(encoding="utf-8")
         chinese = (ROOT / "docs/development.md").read_text(encoding="utf-8")
