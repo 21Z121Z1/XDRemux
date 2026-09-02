@@ -28,6 +28,18 @@ pub struct AppleSemanticMask {
     pub pixels: Vec<u8>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct AppleImageProperties {
+    pub width: u32,
+    pub height: u32,
+    pub orientation: Option<u32>,
+    pub focal_length_mm: Option<f64>,
+    pub focal_length_in_35mm_film: Option<f64>,
+    pub digital_zoom_ratio: Option<f64>,
+    pub lens_model: Option<String>,
+    pub f_number: Option<f64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct AppleAdapterCapabilities {
     photographic_styles: bool,
@@ -126,6 +138,27 @@ impl AppleAdapterClient {
             width: response.gain_map.width,
             height: response.gain_map.height,
         })
+    }
+
+    pub(super) fn imageio_image_properties(&self, input: &Path) -> Result<AppleImageProperties> {
+        let output = self.invoke_request(AdapterRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-image-properties".to_owned(),
+            input_path: Some(input_path(input)?),
+            output_path: None,
+            roles: None,
+            orientation: None,
+        })?;
+        let response: ImagePropertiesResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        if response.image_properties.width == 0 || response.image_properties.height == 0 {
+            return Err(RuntimeError::new(
+                "Apple adapter protocol",
+                "ImageIO image properties contain zero geometry",
+            ));
+        }
+        Ok(response.image_properties.into())
     }
 
     pub(super) fn vision_semantic_mattes(
@@ -409,6 +442,12 @@ struct GainMapResponse {
 }
 
 #[derive(Debug, Deserialize)]
+struct ImagePropertiesResponse {
+    schema_version: u32,
+    image_properties: ImagePropertiesWire,
+}
+
+#[derive(Debug, Deserialize)]
 struct SemanticResponse {
     schema_version: u32,
     semantic_masks: Vec<SemanticMaskWire>,
@@ -419,6 +458,33 @@ struct GainMapWire {
     pixel_format: u32,
     width: u32,
     height: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ImagePropertiesWire {
+    width: u32,
+    height: u32,
+    orientation: Option<u32>,
+    focal_length_mm: Option<f64>,
+    focal_length_in_35mm_film: Option<f64>,
+    digital_zoom_ratio: Option<f64>,
+    lens_model: Option<String>,
+    f_number: Option<f64>,
+}
+
+impl From<ImagePropertiesWire> for AppleImageProperties {
+    fn from(value: ImagePropertiesWire) -> Self {
+        Self {
+            width: value.width,
+            height: value.height,
+            orientation: value.orientation,
+            focal_length_mm: value.focal_length_mm,
+            focal_length_in_35mm_film: value.focal_length_in_35mm_film,
+            digital_zoom_ratio: value.digital_zoom_ratio,
+            lens_model: value.lens_model,
+            f_number: value.f_number,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -482,4 +548,24 @@ fn join_reader(
             RuntimeError::new("Apple adapter output", format!("{stream} reader panicked"))
         })?
         .map_err(|error| RuntimeError::external("Apple adapter output", error))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_properties_wire_is_platform_facts_only() {
+        let response: ImagePropertiesResponse = serde_json::from_slice(
+            br#"{"schema_version":1,"image_properties":{"width":4032,"height":3024,"orientation":6,"focal_length_mm":8.67,"focal_length_in_35mm_film":48,"digital_zoom_ratio":2,"lens_model":"OPPO camera 24mm","f_number":1.8}}"#,
+        )
+        .unwrap();
+        assert_eq!(response.schema_version, 1);
+        let properties: AppleImageProperties = response.image_properties.into();
+        assert_eq!(properties.width, 4032);
+        assert_eq!(properties.height, 3024);
+        assert_eq!(properties.orientation, Some(6));
+        assert_eq!(properties.focal_length_in_35mm_film, Some(48.0));
+        assert_eq!(properties.lens_model.as_deref(), Some("OPPO camera 24mm"));
+    }
 }
