@@ -8,7 +8,8 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use xdremux_engine::{
-    AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleSemanticRole, OperationCapability,
+    AppleAuxiliaryKind, AppleAuxiliaryPayload, AppleGainMapFacts, AppleImageAuxiliaryFacts,
+    AppleMetadataValue, AppleSemanticRole, OperationCapability,
 };
 use xdremux_format::FourCC;
 
@@ -159,6 +160,46 @@ impl AppleAdapterClient {
             ));
         }
         Ok(response.image_properties.into())
+    }
+
+    pub(super) fn imageio_write_auxiliary(
+        &self,
+        input: &Path,
+        output: &Path,
+        payloads: &[AppleAuxiliaryPayload],
+    ) -> Result<()> {
+        if payloads.is_empty() {
+            return Err(RuntimeError::new(
+                "Apple ImageIO auxiliary write",
+                "auxiliary payload set is empty",
+            ));
+        }
+
+        let sidecars = tempfile::tempdir().map_err(|error| {
+            RuntimeError::external("Apple ImageIO auxiliary sidecar directory", error)
+        })?;
+        let mut wire_payloads = Vec::with_capacity(payloads.len());
+        for (index, payload) in payloads.iter().enumerate() {
+            let sidecar = sidecars.path().join(format!("auxiliary-{index}.bin"));
+            fs::write(&sidecar, &payload.data).map_err(|error| {
+                RuntimeError::external("Apple ImageIO auxiliary sidecar write", error)
+            })?;
+            wire_payloads.push(auxiliary_payload_wire(payload, &sidecar)?);
+        }
+
+        let request = WriteAuxiliaryRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-write-auxiliary",
+            input_path: input_path(input)?,
+            output_path: input_path(output)?,
+            auxiliary_payloads: wire_payloads,
+        };
+        let request = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        let output = self.invoke(&request, self.timeout)?;
+        let response: AckResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)
     }
 
     pub(super) fn vision_semantic_mattes(
@@ -409,6 +450,64 @@ fn parse_semantic_role(role: &str) -> Result<AppleSemanticRole> {
     }
 }
 
+fn auxiliary_kind_wire(kind: AppleAuxiliaryKind) -> Result<&'static str> {
+    match kind {
+        AppleAuxiliaryKind::Disparity => Ok("disparity"),
+        AppleAuxiliaryKind::PortraitEffectsMatte => Ok("portrait-effects-matte"),
+        AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Skin) => Ok("skin-matte"),
+        AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Hair) => Ok("hair-matte"),
+        AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Teeth) => Ok("teeth-matte"),
+        AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Glasses) => Ok("glasses-matte"),
+        AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Sky) => Ok("sky-matte"),
+        AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Person) => Err(
+            RuntimeError::new(
+                "Apple adapter protocol",
+                "person mask has no ImageIO semantic matte auxiliary type",
+            ),
+        ),
+    }
+}
+
+fn auxiliary_payload_wire(
+    payload: &AppleAuxiliaryPayload,
+    data_path: &Path,
+) -> Result<AuxiliaryPayloadWire> {
+    let metadata = payload
+        .metadata
+        .iter()
+        .map(|tag| match &tag.value {
+            AppleMetadataValue::Text(value) => MetadataTagWire {
+                path: tag.path.to_owned(),
+                text: Some(value.clone()),
+                numbers: None,
+            },
+            AppleMetadataValue::Numbers(values) => MetadataTagWire {
+                path: tag.path.to_owned(),
+                text: None,
+                numbers: Some(values.clone()),
+            },
+        })
+        .collect();
+    Ok(AuxiliaryPayloadWire {
+        kind: auxiliary_kind_wire(payload.kind)?.to_owned(),
+        data_path: input_path(data_path)?,
+        width: payload.description.width,
+        height: payload.description.height,
+        bytes_per_row: payload.description.bytes_per_row,
+        pixel_format: u32::from_be_bytes(*payload.description.pixel_format.as_bytes()),
+        orientation: payload.description.orientation.map(u32::from),
+        namespaces: payload
+            .namespaces
+            .iter()
+            .map(|namespace| MetadataNamespaceWire {
+                uri: namespace.uri.to_owned(),
+                prefix: namespace.prefix.to_owned(),
+            })
+            .collect(),
+        metadata,
+    })
+}
+
 #[derive(Debug, Serialize)]
 struct AdapterRequest {
     schema_version: u32,
@@ -421,6 +520,49 @@ struct AdapterRequest {
     roles: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     orientation: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+struct WriteAuxiliaryRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    auxiliary_payloads: Vec<AuxiliaryPayloadWire>,
+}
+
+#[derive(Debug, Serialize)]
+struct AuxiliaryPayloadWire {
+    kind: String,
+    data_path: String,
+    width: u32,
+    height: u32,
+    bytes_per_row: u32,
+    pixel_format: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    orientation: Option<u32>,
+    namespaces: Vec<MetadataNamespaceWire>,
+    metadata: Vec<MetadataTagWire>,
+}
+
+#[derive(Debug, Serialize)]
+struct MetadataNamespaceWire {
+    uri: String,
+    prefix: String,
+}
+
+#[derive(Debug, Serialize)]
+struct MetadataTagWire {
+    path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    numbers: Option<Vec<f64>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AckResponse {
+    schema_version: u32,
 }
 
 #[derive(Debug, Deserialize)]
