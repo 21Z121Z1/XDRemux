@@ -1,4 +1,5 @@
 name: HEIF dinf one-shot
+# Temporary migration helper. Removed after the Rust source commit lands.
 
 on:
   push:
