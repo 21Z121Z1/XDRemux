@@ -11,6 +11,10 @@ use xdremux_motion_photo::{
 
 use crate::{Result, RuntimeError};
 
+#[cfg(target_os = "macos")]
+#[path = "apple_adapter.rs"]
+mod apple_adapter;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct IsoHdrValidationReport {
     pub input: PathBuf,
@@ -52,6 +56,25 @@ impl ValidationReport {
             Self::IsoHdrHeif(_) => "iso-hdr-heif",
             Self::LivePhoto(_) => "live-photo",
         }
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl crate::PortableRuntime {
+    /// Merge Apple-only capability facts into the portable runtime inventory.
+    ///
+    /// The helper transport stays private to the runtime so switching from a
+    /// child process to XPC later does not change engine or CLI contracts.
+    pub fn capability_inventory_with_apple_adapter(
+        &self,
+        executable: &Path,
+    ) -> Result<xdremux_engine::CapabilityInventory> {
+        let apple = apple_adapter::AppleAdapterClient::new(executable)
+            .capabilities()?
+            .operation_capabilities();
+        let mut operations = self.capability_inventory()?.iter().collect::<Vec<_>>();
+        operations.extend(apple);
+        Ok(xdremux_engine::CapabilityInventory::new(operations))
     }
 }
 
