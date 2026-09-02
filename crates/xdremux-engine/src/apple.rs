@@ -1,7 +1,3 @@
-#[path = "apple_portrait.rs"]
-mod portrait;
-pub(crate) use portrait::{AppleRendDocument, AppleRendError, AppleRendRecord, AppleXhlrbControlOutput};
-
 use xdremux_format::FourCC;
 
 /// Apple consumer facts reported by a platform capability adapter.
