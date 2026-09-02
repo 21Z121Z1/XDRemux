@@ -3,17 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "xdremux-py"
-description = "Convert OPPO/OnePlus/realme ProXDR photos to ISO 21496-1 HDR HEIC"
+name = "xdremux-python-tools"
+description = "Migration-time conformance and research tooling for XDRemux"
 readme = "README.md"
 requires-python = ">=3.11"
 dynamic = ["version"]
 keywords = ["heic", "hdr", "gain-map", "iso21496", "proxdr", "oppo"]
 classifiers = [
-    "Environment :: Console",
-    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+    "Topic :: Software Development :: Testing",
 ]
 dependencies = [
     "pillow-heif>=0.15.0",
@@ -29,21 +28,13 @@ training = [
 
 [project.urls]
 Homepage = "https://github.com/21Z121Z1/XDRemux"
-Documentation = "https://github.com/21Z121Z1/XDRemux/blob/main/docs/cli.md"
-
-# The Swift package product already owns the `xdremux` command name, so the
-# Python front end installs as `xdremux-py`.
-[project.scripts]
-xdremux-py = "xdremux_py.cli:main"
-
-[project.entry-points."pipx.run"]
-xdremux-py = "xdremux_py.cli:main"
+Documentation = "https://github.com/21Z121Z1/XDRemux/blob/main/docs/development.md"
 
 [tool.hatch.version]
 path = "xdremux_py/__init__.py"
 
-# Flat layout on purpose: CI and the validation scripts run from the repository
-# root without installing anything, which a src/ layout would break.
+# Flat layout on purpose: CI and validation scripts run from the repository
+# root without installing a second XDRemux product entry point.
 [tool.hatch.build.targets.wheel]
 packages = ["xdremux_py"]
 
