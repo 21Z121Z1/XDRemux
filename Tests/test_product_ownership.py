@@ -48,6 +48,23 @@ class ProductOwnershipTests(unittest.TestCase):
         self.assertNotIn("安装后的命令是 `xdremux-py`", chinese)
         self.assertNotIn("标准转换链路使用 `XDRemuxCore`", chinese)
 
+    def test_apple_adapter_is_wired_only_at_runtime_composition_root(self) -> None:
+        runtime_source = ROOT / "crates/xdremux-runtime/src"
+        root = (runtime_source / "lib.rs").read_text(encoding="utf-8")
+        self.assertIn("mod apple_adapter;", root)
+        self.assertNotIn("pub mod apple_adapter;", root)
+
+        hidden_import = '#[path = "apple_adapter.rs"]'
+        for source in sorted(runtime_source.glob("*.rs")):
+            if source.name in {"lib.rs", "apple_adapter.rs"}:
+                continue
+            text = source.read_text(encoding="utf-8")
+            self.assertNotIn(
+                hidden_import,
+                text,
+                f"Apple adapter composition must stay visible in runtime/src/lib.rs, not {source.name}",
+            )
+
     def test_canonical_rust_cli_still_exists(self) -> None:
         self.assertTrue((ROOT / "crates/xdremux-cli/Cargo.toml").is_file())
         self.assertTrue((ROOT / "crates/xdremux-runtime/Cargo.toml").is_file())
