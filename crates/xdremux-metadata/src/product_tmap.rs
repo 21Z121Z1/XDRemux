@@ -19,8 +19,8 @@ mod tests {
     fn product_payload_restores_iso_reserved_bytes() {
         let ratio = 4.926108360290527;
         let info = [
-            1.0, 1.0, 1.0, 1.0, ratio, ratio, ratio, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, ratio, ratio, 0.0,
+            1.0, 1.0, 1.0, 1.0, ratio, ratio, ratio, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            1.0, ratio, ratio, 0.0,
         ];
         let native = iso21496::make_apple_tmap_payload(&info).unwrap();
         let product = make_apple_tmap_payload(&info).unwrap();
