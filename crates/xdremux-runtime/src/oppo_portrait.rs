@@ -70,14 +70,14 @@ impl ApplePortraitSourcePreflight {
     /// receives only these generic payloads and performs the framework write.
     pub fn into_auxiliary_payloads(
         self,
-        rendering_parameters_base64: &str,
+        rendering_parameters: &[u8],
     ) -> std::result::Result<Vec<AppleAuxiliaryPayload>, AppleAuxiliaryError> {
         let mut payloads = Vec::with_capacity(6);
         payloads.push(build_apple_portrait_disparity_payload(
             self.disparity,
             self.base_orientation,
             &self.camera_calibration,
-            rendering_parameters_base64,
+            rendering_parameters,
             self.simulated_aperture,
         )?);
         payloads.push(build_apple_portrait_effects_matte_payload(
