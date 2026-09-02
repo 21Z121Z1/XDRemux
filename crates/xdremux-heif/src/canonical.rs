@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use xdremux_format::isobmff::{
     make_box, make_iloc_box, make_iref_box, parse_boxes, parse_iref, parse_meta_box,
-    scan_top_level_boxes, BoxHeader, IlocEntry, IrefBox, IrefEntry, ParsedMeta, ILOC, IPMA,
-    IPRP, IREF, IROT, ISPE, MDAT, META,
+    scan_top_level_boxes, BoxHeader, IlocEntry, IrefBox, IrefEntry, ParsedMeta, ILOC, IPMA, IPRP,
+    IREF, IROT, ISPE, MDAT, META,
 };
 use xdremux_format::FourCC;
 
@@ -232,9 +232,7 @@ fn build_consumer_iref(
     let mut entries = source
         .entries
         .iter()
-        .filter(|reference| {
-            !(reference.kind == AUXL && reference.from_item_id == gain_map_item_id)
-        })
+        .filter(|reference| !(reference.kind == AUXL && reference.from_item_id == gain_map_item_id))
         .cloned()
         .collect::<Vec<_>>();
     entries.push(IrefEntry {
@@ -259,7 +257,11 @@ fn build_consumer_iref(
         .map_err(|error| invalid(format!("canonical ImageIO iref: {error}")))
 }
 
-fn make_altr_entity_group_box(group_id: u32, tmap_item_id: u32, primary_item_id: u32) -> Result<Vec<u8>> {
+fn make_altr_entity_group_box(
+    group_id: u32,
+    tmap_item_id: u32,
+    primary_item_id: u32,
+) -> Result<Vec<u8>> {
     let mut payload = vec![0, 0, 0, 0];
     payload.extend_from_slice(&group_id.to_be_bytes());
     payload.extend_from_slice(&2_u32.to_be_bytes());
@@ -282,7 +284,12 @@ fn preserved_entity_group_payload(
             continue;
         }
 
-        let group_id = read_u32_at(source, child.data_start + 4, child.data_end, "entity group ID")?;
+        let group_id = read_u32_at(
+            source,
+            child.data_start + 4,
+            child.data_end,
+            "entity group ID",
+        )?;
         let entity_count = usize::try_from(read_u32_at(
             source,
             child.data_start + 8,
@@ -313,14 +320,22 @@ fn preserved_entity_group_payload(
         let mut entities = Vec::with_capacity(entity_count);
         let mut offset = entities_start;
         for _ in 0..entity_count {
-            entities.push(read_u32(source, &mut offset, entities_end, "altr entity ID")?);
+            entities.push(read_u32(
+                source,
+                &mut offset,
+                entities_end,
+                "altr entity ID",
+            )?);
         }
 
         // The native assembler has already removed the previous gain-map graph.
         // An old altr whose entities no longer exist is therefore stale; keep
         // every unrelated valid group byte-for-byte and replace only that stale
         // alternate-rendering relationship.
-        if entities.iter().all(|item_id| valid_item_ids.contains(item_id)) {
+        if entities
+            .iter()
+            .all(|item_id| valid_item_ids.contains(item_id))
+        {
             payload.extend_from_slice(raw);
         }
     }
@@ -431,10 +446,10 @@ fn relocated_iloc_entries(
     mdat: &BoxHeader,
     delta: i128,
 ) -> Result<Vec<IlocEntry>> {
-    let mdat_start = u64::try_from(mdat.data_start)
-        .map_err(|_| invalid("mdat data offset exceeds u64"))?;
-    let mdat_end = u64::try_from(mdat.data_end)
-        .map_err(|_| invalid("mdat end offset exceeds u64"))?;
+    let mdat_start =
+        u64::try_from(mdat.data_start).map_err(|_| invalid("mdat data offset exceeds u64"))?;
+    let mdat_end =
+        u64::try_from(mdat.data_end).map_err(|_| invalid("mdat end offset exceeds u64"))?;
     let mut entries = meta.iloc.entries.clone();
 
     for entry in &mut entries {
@@ -445,7 +460,9 @@ fn relocated_iloc_entries(
             let absolute = entry
                 .base_offset
                 .checked_add(extent.offset)
-                .ok_or_else(|| invalid(format!("item {} extent offset overflows", entry.item_id)))?;
+                .ok_or_else(|| {
+                    invalid(format!("item {} extent offset overflows", entry.item_id))
+                })?;
             let end = absolute
                 .checked_add(extent.length)
                 .ok_or_else(|| invalid(format!("item {} extent end overflows", entry.item_id)))?;
@@ -595,8 +612,7 @@ fn validate_consumer_graph(data: &[u8], structure: &GainMapStructure) -> Result<
         iref.entries.iter().any(|reference| {
             reference.kind == AUXL
                 && reference.from_item_id == structure.gain_map_item_id
-                && reference.to_item_ids
-                    == vec![structure.primary_item_id, structure.tmap_item_id]
+                && reference.to_item_ids == vec![structure.primary_item_id, structure.tmap_item_id]
         })
     });
     if !auxl_ok {
@@ -655,9 +671,7 @@ pub fn assemble_iso_gain_map_heif(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use xdremux_format::isobmff::{
-        make_ipma_box, parse_ipma, IpmaAssociation, IpmaEntry,
-    };
+    use xdremux_format::isobmff::{make_ipma_box, parse_ipma, IpmaAssociation, IpmaEntry};
 
     #[test]
     fn essential_normalization_changes_only_requested_associations() {
@@ -725,9 +739,21 @@ mod tests {
         let encoded = make_altr_entity_group_box(12, 10, 1).unwrap();
         let child = parse_boxes(&encoded, 0..encoded.len()).unwrap().remove(0);
         assert_eq!(child.kind, ALTR);
-        assert_eq!(read_u32_at(&encoded, child.data_start + 4, child.data_end, "group").unwrap(), 12);
-        assert_eq!(read_u32_at(&encoded, child.data_start + 8, child.data_end, "count").unwrap(), 2);
-        assert_eq!(read_u32_at(&encoded, child.data_start + 12, child.data_end, "tmap").unwrap(), 10);
-        assert_eq!(read_u32_at(&encoded, child.data_start + 16, child.data_end, "primary").unwrap(), 1);
+        assert_eq!(
+            read_u32_at(&encoded, child.data_start + 4, child.data_end, "group").unwrap(),
+            12
+        );
+        assert_eq!(
+            read_u32_at(&encoded, child.data_start + 8, child.data_end, "count").unwrap(),
+            2
+        );
+        assert_eq!(
+            read_u32_at(&encoded, child.data_start + 12, child.data_end, "tmap").unwrap(),
+            10
+        );
+        assert_eq!(
+            read_u32_at(&encoded, child.data_start + 16, child.data_end, "primary").unwrap(),
+            1
+        );
     }
 }
