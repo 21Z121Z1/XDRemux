@@ -2,6 +2,11 @@ name: XDRemux Completion Gate
 
 on:
   pull_request:
+  # Bootstrap this new gate on its migration branch. Once this workflow lands on
+  # main, pull_request is the normal pre-merge trigger and this branch entry can
+  # be removed with the migration branch itself.
+  push:
+    branches: [feat/rust-cli-unification]
 
 permissions:
   contents: read
@@ -11,10 +16,13 @@ jobs:
     name: canonical-product
     runs-on: macos-latest
     timeout-minutes: 75
+    env:
+      XDREMUX_GATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      XDREMUX_GATE_BASE: ${{ github.event.pull_request.base.ref || 'main' }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ env.XDREMUX_GATE_SHA }}
           fetch-depth: 0
 
       - name: Install portable HEVC provider
@@ -92,7 +100,7 @@ jobs:
         shell: bash
         run: |
           python3 scripts/agent_completion_gate.py run \
-            --base origin/${{ github.event.pull_request.base.ref }} \
+            --base "origin/$XDREMUX_GATE_BASE" \
             --plan "$RUNNER_TEMP/xdremux-completion-plan.json"
           python3 scripts/agent_completion_gate.py verify \
             ".codex/verification-receipts/$(git rev-parse HEAD).json"
@@ -101,7 +109,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: xdremux-completion-receipt-${{ github.event.pull_request.head.sha }}
+          name: xdremux-completion-receipt-${{ env.XDREMUX_GATE_SHA }}
           path: .codex/verification-receipts/*.json
           if-no-files-found: warn
           retention-days: 14
