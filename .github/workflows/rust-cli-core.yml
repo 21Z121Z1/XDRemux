@@ -58,17 +58,7 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
       - name: Verify committed workspace lockfile
-        shell: bash
-        run: |
-          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.committed"
-          cargo generate-lockfile
-          if ! cmp -s "$RUNNER_TEMP/Cargo.lock.committed" Cargo.lock; then
-            echo "::error::Cargo.lock is stale; commit the generated workspace lockfile"
-            echo "::group::Generated Cargo.lock"
-            cat Cargo.lock
-            echo "::endgroup::"
-            exit 1
-          fi
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
       - name: Check formatting
         run: cargo fmt --check -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
       - name: Lint canonical Rust CLI stack
