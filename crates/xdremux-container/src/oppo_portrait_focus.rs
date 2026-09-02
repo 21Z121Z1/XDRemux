@@ -248,11 +248,17 @@ pub fn select_oppo_portrait_focus(
     source_height: u32,
     focus: OppoPortraitFocusRegion,
 ) -> Result<OppoPortraitFocusSelection, OppoPortraitFocusError> {
-    if source_width == 0 || source_height == 0 || depth.header.width == 0 || depth.header.height == 0 {
+    if source_width == 0
+        || source_height == 0
+        || depth.header.width == 0
+        || depth.header.height == 0
+    {
         return Err(OppoPortraitFocusError::InvalidGeometry);
     }
-    let width = usize::try_from(depth.header.width).map_err(|_| OppoPortraitFocusError::InvalidGeometry)?;
-    let height = usize::try_from(depth.header.height).map_err(|_| OppoPortraitFocusError::InvalidGeometry)?;
+    let width =
+        usize::try_from(depth.header.width).map_err(|_| OppoPortraitFocusError::InvalidGeometry)?;
+    let height = usize::try_from(depth.header.height)
+        .map_err(|_| OppoPortraitFocusError::InvalidGeometry)?;
     let expected = width
         .checked_mul(height)
         .ok_or(OppoPortraitFocusError::InvalidGeometry)?;
@@ -268,10 +274,8 @@ pub fn select_oppo_portrait_focus(
         }
         let x0 = i64::from(rectangle[0]).clamp(0, source_width_i64);
         let y0 = i64::from(rectangle[1]).clamp(0, source_height_i64);
-        let x1 = (i64::from(rectangle[0]) + i64::from(rectangle[2]))
-            .clamp(x0, source_width_i64);
-        let y1 = (i64::from(rectangle[1]) + i64::from(rectangle[3]))
-            .clamp(y0, source_height_i64);
+        let x1 = (i64::from(rectangle[0]) + i64::from(rectangle[2])).clamp(x0, source_width_i64);
+        let y1 = (i64::from(rectangle[1]) + i64::from(rectangle[3])).clamp(y0, source_height_i64);
         if x1 <= x0 || y1 <= y0 {
             return None;
         }
@@ -478,7 +482,8 @@ pub fn select_oppo_portrait_focus(
     let mad = deviations[deviations.len() / 2];
     let acceptance = candidates.len() as f64 / (candidates.len() + rejected).max(1) as f64;
     let confidence = (acceptance * (1.0 - mad / 128.0)).clamp(0.0, 1.0);
-    let producer_exact = branch == OppoPortraitFocusBranch::CenterRegion || exact_full_image_histogram;
+    let producer_exact =
+        branch == OppoPortraitFocusBranch::CenterRegion || exact_full_image_histogram;
 
     Ok(OppoPortraitFocusSelection {
         branch,
@@ -543,8 +548,24 @@ mod tests {
     #[test]
     fn focus_dispatch_matches_recovered_swift_regression_vectors() {
         let vectors = [
-            (false, 3, 1, true, true, false, OppoPortraitFocusBranch::TappedFace),
-            (false, 3, 1, false, true, false, OppoPortraitFocusBranch::PortraitFace),
+            (
+                false,
+                3,
+                1,
+                true,
+                true,
+                false,
+                OppoPortraitFocusBranch::TappedFace,
+            ),
+            (
+                false,
+                3,
+                1,
+                false,
+                true,
+                false,
+                OppoPortraitFocusBranch::PortraitFace,
+            ),
             (
                 false,
                 3,
@@ -554,8 +575,24 @@ mod tests {
                 false,
                 OppoPortraitFocusBranch::PortraitWithoutFace,
             ),
-            (false, 3, 2, false, true, false, OppoPortraitFocusBranch::CenterRegion),
-            (false, 3, 3, false, true, true, OppoPortraitFocusBranch::PetRegion),
+            (
+                false,
+                3,
+                2,
+                false,
+                true,
+                false,
+                OppoPortraitFocusBranch::CenterRegion,
+            ),
+            (
+                false,
+                3,
+                3,
+                false,
+                true,
+                true,
+                OppoPortraitFocusBranch::PetRegion,
+            ),
             (
                 false,
                 3,
@@ -574,10 +611,42 @@ mod tests {
                 false,
                 OppoPortraitFocusBranch::DisparityHistogram,
             ),
-            (true, 0, 1, true, true, false, OppoPortraitFocusBranch::NearObject),
-            (true, 2, 3, false, true, true, OppoPortraitFocusBranch::PetRegion),
-            (true, 2, 2, false, true, false, OppoPortraitFocusBranch::CenterRegion),
-            (true, 1, 3, false, true, true, OppoPortraitFocusBranch::CenterRegion),
+            (
+                true,
+                0,
+                1,
+                true,
+                true,
+                false,
+                OppoPortraitFocusBranch::NearObject,
+            ),
+            (
+                true,
+                2,
+                3,
+                false,
+                true,
+                true,
+                OppoPortraitFocusBranch::PetRegion,
+            ),
+            (
+                true,
+                2,
+                2,
+                false,
+                true,
+                false,
+                OppoPortraitFocusBranch::CenterRegion,
+            ),
+            (
+                true,
+                1,
+                3,
+                false,
+                true,
+                true,
+                OppoPortraitFocusBranch::CenterRegion,
+            ),
         ];
         for (near, scene, roi, face, portrait, pet, expected) in vectors {
             assert_eq!(
