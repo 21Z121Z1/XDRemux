@@ -14,7 +14,8 @@ use std::collections::BTreeSet;
 use xdremux_format::ChromaSampling;
 
 pub use apple::{
-    AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleSemanticRole, APPLE_PORTRAIT_SEMANTIC_ROLES,
+    fuse_apple_portrait_person_mask, AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleL8Mask,
+    AppleL8MaskError, ApplePortraitPersonFusion, AppleSemanticRole, APPLE_PORTRAIT_SEMANTIC_ROLES,
 };
 pub use apple_auxiliary::{
     build_apple_portrait_disparity_payload, build_apple_portrait_effects_matte_payload,
