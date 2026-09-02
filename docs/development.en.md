@@ -2,7 +2,7 @@
 
 English | [简体中文](development.md)
 
-XDRemux has one product core: the Rust workspace. New product behavior belongs in Rust. Swift is a migration-time Apple capability layer, and Python is migration/research tooling rather than a second XDRemux runtime.
+XDRemux has one product core: the Rust workspace. New product behavior belongs in Rust. Swift is an Apple platform capability layer during migration, and Python is migration/research tooling rather than a second XDRemux runtime.
 
 For user-facing command-line behavior, see the [CLI reference](cli.en.md).
 
@@ -39,9 +39,9 @@ Keep product intent at the top of this stack. Do not expose codec, camera-tail, 
 
 | Crate | Responsibility |
 | --- | --- |
-| `xdremux-cli` | The only public CLI and command contract. |
+| `xdremux-cli` | The only public user CLI and command contract. |
 | `xdremux-runtime` | Filesystem execution, publication, batch reliability, recovery, and platform capability coordination. |
-| `xdremux-engine` | Product intent, conversion planning, capability requirements, and orchestration. |
+| `xdremux-engine` | Product intent, conversion planning, capability requirements, platform-independent facts, and orchestration. |
 | `xdremux-source` / `xdremux-classification` | Source probing, asset identity, and classification. |
 | `xdremux-motion-photo` | Motion Photo parsing and Live Photo media semantics. |
 | `xdremux-hdr` / `xdremux-metadata` | HDR/Gain Map math and metadata primitives. |
@@ -51,15 +51,20 @@ A lower crate may provide a format primitive without making it a product mode. R
 
 ## Apple platform capabilities
 
-`Sources/XDRemuxAppleFeatures/` remains while Photographic Styles, Portrait, RAW, Vision, Core ML, AVFoundation, and other Apple-framework capabilities are migrated behind the Rust capability model.
+`Sources/XDRemuxAppleFeatures/` remains while Photographic Styles, Portrait, RAW, Vision, Core ML, AVFoundation, and other Apple-framework behavior is reduced to platform capabilities behind Rust-owned contracts.
 
-The target architecture is a narrow platform adapter:
+The boundary is intentionally narrow:
 
-- Rust owns requests, results, policy, routing, naming, classification, HDR behavior, Motion Photo behavior, batch behavior, and fallback decisions.
-- The Apple layer calls Apple frameworks and returns capability results.
+- Rust owns requests, results, policy, routing, naming, classification, HDR behavior, Motion Photo behavior, batch behavior, validation policy, and fallback decisions.
+- Apple code calls Apple frameworks and returns observations or operation results defined by Rust semantics.
 - Do not add new cross-platform product policy to Swift.
+- Do not return business conclusions such as “convertible” or “valid portrait” when the adapter can return lower-level framework facts and Rust can decide the policy.
 
-Use a stable C ABI for the Rust/Swift boundary where direct in-process interoperability is required. Keep FFI-specific unsafe code isolated from the safe engine/runtime crates.
+`xdremux-apple-adapter` is a distributable platform component, not a user CLI. The current CLI/runtime boundary is a versioned JSON helper protocol with bounded process lifetime and separate machine-readable stdout/diagnostic stderr. `xdremux-runtime` owns that transport; `xdremux-engine` does not know about processes, paths, JSON, Swift, or XPC.
+
+For a sandboxed macOS app, prefer XPC when the Apple capability process needs separate sandboxing, entitlements, lifecycle, or crash isolation. The transport must remain replaceable without changing engine or public CLI semantics. Use an in-process C ABI only for a capability that actually benefits from direct in-process interoperability; do not make FFI the default architecture merely to avoid a helper process.
+
+ImageIO auxiliary-resource probing is the first migrated operation. The Swift adapter reports only framework observations such as Gain Map, disparity, Portrait Effects Matte, and semantic mattes. Rust owns the rule that decides whether those facts satisfy the Portrait editing contract.
 
 `CoreImageRAWDiagnostics` remains a developer-only Swift target:
 
@@ -67,7 +72,7 @@ Use a stable C ABI for the Rust/Swift boundary where direct in-process interoper
 swift build --target CoreImageRAWDiagnostics
 ```
 
-Swift tests are still useful for Apple capability acceptance and migration oracles, but they are not the canonical CLI contract.
+Swift tests remain useful for Apple capability acceptance and migration oracles, but they do not define the canonical CLI contract.
 
 ## Python tooling
 
@@ -89,13 +94,14 @@ Training and evaluation scripts may remain in Python because they are research t
 | Path | Purpose |
 | --- | --- |
 | `crates/` | Canonical Rust product stack. |
-| `Sources/XDRemuxAppleFeatures/` | Apple capability implementation and migration-time validation. |
+| `Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
+| `Sources/XDRemuxAppleFeatures/` | Apple framework capability implementation and migration-time validation. |
 | `Sources/XDRemuxCore/` | Legacy Swift core retained only while replacement evidence is incomplete. |
 | `Sources/XDRemuxCLI/` | Legacy Swift CLI retained only while Apple migration work still references it. |
 | `Sources/CoreImageRAWDiagnostics/` | Developer RAW diagnostics. |
 | `xdremux_py/` | Migration oracles and research/training tooling; no product CLI. |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI app during product-stack migration. |
-| `Tests/` | Rust/Swift/Python acceptance tests and validation harnesses. |
+| `Tests/` | Canonical and migration-time acceptance tests and validation harnesses. |
 | `fixtures/` | Versioned real media fixtures used by strict gates. |
 | `scripts/` | Build, evaluation, migration, and acceptance utilities. |
 | `docs/` | Current guidance and historical research records. |
@@ -103,11 +109,9 @@ Training and evaluation scripts may remain in Python because they are research t
 
 Legacy Swift/Python code should receive only migration, conformance, safety, or deletion work. New user-visible behavior belongs in Rust.
 
-## Apple helper processes
+## Apple helper lifecycle
 
-Some Apple-feature operations compile or run helper programs from package resources.
-
-The helper toolchain hashes source content and caches compatible built tools. Keep helper invocations bounded and keep machine-readable stdout separate from diagnostics when the protocol requires it.
+A helper invocation must be bounded, must keep machine-readable stdout separate from diagnostics, and must explicitly reap the child process. Do not let transport concerns leak into engine models.
 
 Private Apple API compatibility must be checked at runtime. Do not call a private Objective-C selector with an assumed ABI when the runtime method signature does not match a supported form.
 
