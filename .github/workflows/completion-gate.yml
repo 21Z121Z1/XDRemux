@@ -2,26 +2,31 @@ name: XDRemux Completion Gate
 
 on:
   pull_request:
-    paths:
-      - "Package.swift"
-      - "pyproject.toml"
-      - "Sources/**"
-      - "xdremux/**"
-      - "xdremux_py/**"
-      - "apps/macos/XDRemuxApp/Sources/**"
-      - "Tests/**"
-      - "scripts/**"
-      - ".github/workflows/completion-gate.yml"
+
+permissions:
+  contents: read
 
 jobs:
   exact-head:
+    name: canonical-product
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      - name: Install portable HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
 
       - name: Write exact-HEAD verification plan
         shell: bash
@@ -29,42 +34,54 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-completion-plan.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Repository simplification: public package surface, declarative CLI parsing, retired compatibility entry points, and regression coverage",
+            "scope": "Canonical Rust XDRemux product stack plus migration-only Apple platform capability build",
             "checks": [
               {
-                "name": "swift-package-build",
+                "name": "rust-workspace-lock",
                 "kind": "static",
-                "command": ["swift", "build"],
+                "command": ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "rust-workspace-format",
+                "kind": "static",
+                "command": ["/bin/zsh", "-lc", "cargo fmt --all -- --check"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "rust-workspace-clippy",
+                "kind": "static",
+                "command": ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
+                "timeout_seconds": 1800
+              },
+              {
+                "name": "rust-workspace-tests",
+                "kind": "regression",
+                "command": ["cargo", "test", "--workspace", "--locked"],
+                "timeout_seconds": 2400
+              },
+              {
+                "name": "canonical-rust-cli-entrypoint",
+                "kind": "functional",
+                "command": ["/bin/zsh", "-lc", "set -euo pipefail; cargo build --locked -p xdremux-cli; CLI=target/debug/xdremux; $CLI --help >/dev/null; for command in inspect convert batch categorize validate; do $CLI $command --help >/dev/null; done; for command in convert batch; do help=$($CLI $command --help); print -r -- $help | grep -F -- '--oppo-compatible' >/dev/null; if print -r -- $help | grep -E -- '(^|[[:space:]])--family([=[:space:]]|$)|(^|[[:space:]])--oppo-compat([=[:space:]]|$)|--oppo-camera-tail|--input-processing|--tmap-format'; then exit 1; fi; done; bash scripts/check_rust_cli_smoke.sh"],
                 "timeout_seconds": 1200
               },
               {
+                "name": "apple-capability-adapter-build",
+                "kind": "migration",
+                "command": ["swift", "build", "--target", "XDRemuxAppleFeatures"],
+                "timeout_seconds": 1800
+              },
+              {
                 "name": "raw-diagnostics-target-build",
-                "kind": "static",
+                "kind": "migration",
                 "command": ["swift", "build", "--target", "CoreImageRAWDiagnostics"],
                 "timeout_seconds": 900
-              },
-              {
-                "name": "public-package-surface",
-                "kind": "static",
-                "command": ["/bin/zsh", "-lc", "python3 - <<'PY'\nimport json, subprocess\npackage = json.loads(subprocess.check_output(['swift', 'package', 'dump-package'], text=True))\nproducts = {item['name'] for item in package['products']}\nexpected = {'XDRemuxCore', 'XDRemuxAppleFeatures', 'xdremux'}\nassert products == expected, (products, expected)\nPY"],
-                "timeout_seconds": 300
-              },
-              {
-                "name": "swift-regression-suite",
-                "kind": "regression",
-                "command": ["swift", "test"],
-                "timeout_seconds": 1800
               },
               {
                 "name": "repository-policy-regressions",
                 "kind": "regression",
                 "command": ["python3", "-m", "unittest", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_swift_app_architecture"],
-                "timeout_seconds": 300
-              },
-              {
-                "name": "canonical-cli-entrypoint-smoke",
-                "kind": "functional",
-                "command": ["/bin/zsh", "-lc", "set -euo pipefail; test ! -e xdremux/swift-cli/XDRemux.swift; test ! -e xdremux/python/XDRemux.py; .build/debug/xdremux --help >/dev/null; for command in convert batch categorize validate-apple validate-portrait portrait-self-test; do .build/debug/xdremux $command --help >/dev/null; done; set +e; .build/debug/xdremux convert >/dev/null 2>&1; exit_code=$?; set -e; test $exit_code -eq 64"],
                 "timeout_seconds": 300
               }
             ]
