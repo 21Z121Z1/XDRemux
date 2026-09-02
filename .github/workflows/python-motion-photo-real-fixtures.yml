@@ -6,27 +6,33 @@ on:
     paths:
       - "pyproject.toml"
       - "xdremux_py/**"
-      - "Tests/test_python_motion_photo.py"
-      - "Tests/test_python_live_photo_portability.py"
-      - "Tests/test_python_live_photo_output_safety.py"
+      - "Tests/test_apple_makernote_ifd.py"
       - "Tests/test_python_live_photo_batch_reliability.py"
+      - "Tests/test_python_live_photo_output_safety.py"
+      - "Tests/test_python_live_photo_portability.py"
+      - "Tests/test_python_live_photo_publish.py"
+      - "Tests/test_python_motion_photo.py"
+      - "Tests/test_python_motion_photo_oppo.py"
       - "Tests/test_product_ownership.py"
       - "Tests/validation/verify_python_motion_photo_fixtures.py"
       - "Tests/XDRemuxAppleFeaturesTests/PythonLivePhotoOutputGateTests.swift"
-      - "fixtures/**"
+      - "fixtures/motion-photo/**"
       - ".github/workflows/python-motion-photo-real-fixtures.yml"
   pull_request:
     paths:
       - "pyproject.toml"
       - "xdremux_py/**"
-      - "Tests/test_python_motion_photo.py"
-      - "Tests/test_python_live_photo_portability.py"
-      - "Tests/test_python_live_photo_output_safety.py"
+      - "Tests/test_apple_makernote_ifd.py"
       - "Tests/test_python_live_photo_batch_reliability.py"
+      - "Tests/test_python_live_photo_output_safety.py"
+      - "Tests/test_python_live_photo_portability.py"
+      - "Tests/test_python_live_photo_publish.py"
+      - "Tests/test_python_motion_photo.py"
+      - "Tests/test_python_motion_photo_oppo.py"
       - "Tests/test_product_ownership.py"
       - "Tests/validation/verify_python_motion_photo_fixtures.py"
       - "Tests/XDRemuxAppleFeaturesTests/PythonLivePhotoOutputGateTests.swift"
-      - "fixtures/**"
+      - "fixtures/motion-photo/**"
       - ".github/workflows/python-motion-photo-real-fixtures.yml"
 
 concurrency:
@@ -61,10 +67,18 @@ jobs:
           print("pillow-heif", pillow_heif.__version__)
           PY
 
-      - name: Run Python oracle tests
+      - name: Run owned Python oracle tests
         shell: bash
         run: |
-          python -m unittest discover -s Tests -p 'test_*.py' -v
+          python -m unittest -v \
+            Tests.test_apple_makernote_ifd \
+            Tests.test_python_live_photo_batch_reliability \
+            Tests.test_python_live_photo_output_safety \
+            Tests.test_python_live_photo_portability \
+            Tests.test_python_live_photo_publish \
+            Tests.test_python_motion_photo \
+            Tests.test_python_motion_photo_oppo \
+            Tests.test_product_ownership
 
       - name: Convert repository fixtures through migration oracle
         shell: bash
