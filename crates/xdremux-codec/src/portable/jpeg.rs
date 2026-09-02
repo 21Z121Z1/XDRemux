@@ -81,9 +81,8 @@ mod tests {
         assert!(capabilities.supports(GainMapCodec::Jpeg));
         assert!(!capabilities.supports(GainMapCodec::Hevc));
 
-        let inventory = CapabilityInventory::new([OperationCapability::RasterDecoder(
-            GainMapCodec::Jpeg,
-        )]);
+        let inventory =
+            CapabilityInventory::new([OperationCapability::RasterDecoder(GainMapCodec::Jpeg)]);
         assert!(inventory.supports(OperationCapability::RasterDecoder(GainMapCodec::Jpeg)));
     }
 
