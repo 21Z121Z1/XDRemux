@@ -1,6 +1,5 @@
 import Foundation
 import ImageIO
-import XDRemuxAppleFeatures
 
 private let schemaVersion = 1
 
@@ -144,8 +143,7 @@ do {
     let response: AdapterResponse
     switch request.operation {
     case "capabilities":
-        // This target links XDRemuxAppleFeatures. Advertising these facts does
-        // not choose a conversion path; the Rust engine remains policy owner.
+        // Advertise framework reachability only. Product planning remains Rust-owned.
         response = AdapterResponse(
             schemaVersion: schemaVersion,
             capabilities: ["photographic-styles", "portrait"],
