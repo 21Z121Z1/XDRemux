@@ -23,7 +23,7 @@ use xdremux_engine::{
     build_apple_portrait_disparity, derive_apple_portrait_camera_calibration,
     fuse_apple_portrait_hair_mask, fuse_apple_portrait_person_mask,
     resolve_apple_portrait_base_orientation, ApplePortraitCaptureFacts, ApplePortraitImageGeometry,
-    AppleSemanticRole,
+    AppleSemanticRole, APPLE_PORTRAIT_SEMANTIC_ROLES,
 };
 
 #[cfg(target_os = "macos")]
@@ -51,8 +51,11 @@ pub struct ApplePortraitSourcePreflight {
     pub disparity: ApplePortraitDisparity,
     pub portrait_effects_matte: AppleL8Mask,
     pub subject_prior_used: bool,
+    pub skin_matte: AppleL8Mask,
     pub hair_matte: AppleL8Mask,
     pub hair_prior_added_high_confidence: bool,
+    pub teeth_matte: AppleL8Mask,
+    pub glasses_matte: AppleL8Mask,
     pub simulated_aperture: f64,
 }
 
@@ -359,12 +362,13 @@ pub(crate) fn prepare_apple_portrait_source(
         None
     };
 
-    // Vision reports native semantic observations. Rust chooses the requested
-    // roles, orientation and target geometry, then Core Image reproduces the
-    // legacy stored-pixel transform before Rust-owned fusion policy runs.
+    // Vision reports native semantic observations. Rust chooses the complete
+    // Portrait role set, orientation and target geometry. Core Image only
+    // reproduces the stored-pixel transform; product validity and fusion remain
+    // Rust-owned.
     let mut vision_masks = adapter.vision_semantic_mattes(
         source_image_file.path(),
-        &[AppleSemanticRole::Person, AppleSemanticRole::Hair],
+        &APPLE_PORTRAIT_SEMANTIC_ROLES,
         Some(u32::from(base_orientation)),
     )?;
     let native_person = vision_masks
@@ -381,22 +385,32 @@ pub(crate) fn prepare_apple_portrait_source(
             "Vision returned no credible person foreground",
         ));
     }
-    let native_hair = vision_masks
-        .remove(&AppleSemanticRole::Hair)
-        .ok_or_else(|| {
-            RuntimeError::new(
-                "Apple Portrait hair matte",
-                "Vision omitted the requested hair matte",
-            )
-        })?;
     let rendered_person = adapter.coreimage_render_l8(
         &native_person,
         target_width,
         target_height,
         base_orientation,
     )?;
-    let rendered_hair =
-        adapter.coreimage_render_l8(&native_hair, target_width, target_height, base_orientation)?;
+
+    let mut render_role = |role| -> Result<AppleL8Mask> {
+        let native = vision_masks.remove(&role).ok_or_else(|| {
+            RuntimeError::new(
+                "Apple Portrait semantic matte",
+                format!("Vision omitted the requested {role:?} matte"),
+            )
+        })?;
+        adapter.coreimage_render_l8(
+            &native,
+            target_width,
+            target_height,
+            base_orientation,
+        )
+    };
+    let rendered_skin = render_role(AppleSemanticRole::Skin)?;
+    let rendered_hair = render_role(AppleSemanticRole::Hair)?;
+    let rendered_teeth = render_role(AppleSemanticRole::Teeth)?;
+    let rendered_glasses = render_role(AppleSemanticRole::Glasses)?;
+
     let person_fusion =
         fuse_apple_portrait_person_mask(&rendered_person, subject_prior.as_ref())
             .map_err(|error| RuntimeError::external("Apple Portrait person fusion", error))?;
@@ -425,8 +439,11 @@ pub(crate) fn prepare_apple_portrait_source(
         disparity,
         portrait_effects_matte: person_fusion.mask,
         subject_prior_used: person_fusion.used_prior,
+        skin_matte: rendered_skin,
         hair_matte: hair_fusion.mask,
         hair_prior_added_high_confidence: hair_fusion.prior_added_high_confidence,
+        teeth_matte: rendered_teeth,
+        glasses_matte: rendered_glasses,
         simulated_aperture,
     })
 }

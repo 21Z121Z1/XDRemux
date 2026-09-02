@@ -120,24 +120,21 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     );
     assert!(preflight.disparity.near > preflight.disparity.far);
 
-    let matte = &preflight.portrait_effects_matte;
-    assert_eq!(matte.width, preflight.base_width / 2);
-    assert_eq!(matte.height, preflight.base_height / 2);
+    let portrait = &preflight.portrait_effects_matte;
+    assert_eq!(portrait.width, preflight.base_width / 2);
+    assert_eq!(portrait.height, preflight.base_height / 2);
     assert_eq!(
-        matte.pixels.len(),
-        usize::try_from(matte.width).unwrap() * usize::try_from(matte.height).unwrap()
+        portrait.pixels.len(),
+        usize::try_from(portrait.width).unwrap() * usize::try_from(portrait.height).unwrap()
     );
     assert!(!preflight.subject_prior_used || preflight.depth.portrait.is_some());
-    build_apple_portrait_effects_matte_payload(matte.width, matte.height, matte.pixels.clone())
-        .expect("Rust-owned fused person matte must be directly payload-ready");
+    build_apple_portrait_effects_matte_payload(
+        portrait.width,
+        portrait.height,
+        portrait.pixels.clone(),
+    )
+    .expect("Rust-owned fused person matte must be directly payload-ready");
 
-    let hair = &preflight.hair_matte;
-    assert_eq!(hair.width, preflight.base_width / 2);
-    assert_eq!(hair.height, preflight.base_height / 2);
-    assert_eq!(
-        hair.pixels.len(),
-        usize::try_from(hair.width).unwrap() * usize::try_from(hair.height).unwrap()
-    );
     assert!(
         !preflight.hair_prior_added_high_confidence
             || preflight
@@ -146,13 +143,21 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
                 .as_ref()
                 .is_some_and(|plane| plane.iter().any(|&pixel| pixel != 0))
     );
-    build_apple_semantic_matte_payload(
-        AppleSemanticRole::Hair,
-        hair.width,
-        hair.height,
-        hair.pixels.clone(),
-    )
-    .expect("Rust-owned fused hair matte must be directly payload-ready");
+    for (role, matte) in [
+        (AppleSemanticRole::Skin, &preflight.skin_matte),
+        (AppleSemanticRole::Hair, &preflight.hair_matte),
+        (AppleSemanticRole::Teeth, &preflight.teeth_matte),
+        (AppleSemanticRole::Glasses, &preflight.glasses_matte),
+    ] {
+        assert_eq!(matte.width, preflight.base_width / 2);
+        assert_eq!(matte.height, preflight.base_height / 2);
+        assert_eq!(
+            matte.pixels.len(),
+            usize::try_from(matte.width).unwrap() * usize::try_from(matte.height).unwrap()
+        );
+        build_apple_semantic_matte_payload(role, matte.width, matte.height, matte.pixels.clone())
+            .expect("Rust-owned semantic matte must be directly payload-ready");
+    }
 
     assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
 }
