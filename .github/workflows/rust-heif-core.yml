@@ -28,6 +28,138 @@ permissions:
   contents: read
 
 jobs:
+  imageio-hdr-diagnostic:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install portable HEVC provider
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build canonical Rust CLI
+        run: cargo build --locked -p xdremux-cli
+      - name: Write ephemeral Swift oracle diff test
+        shell: bash
+        run: |
+          cat > Tests/XDRemuxCoreTests/ImageIOHDRDiagnosticTests.swift <<'SWIFT'
+          import Foundation
+          import XCTest
+          @testable import XDRemuxCore
+
+          final class ImageIOHDRDiagnosticTests: XCTestCase {
+              private func run(_ executable: String, _ arguments: [String]) throws {
+                  let process = Process()
+                  process.executableURL = URL(fileURLWithPath: executable)
+                  process.arguments = arguments
+                  let output = Pipe()
+                  process.standardOutput = output
+                  process.standardError = output
+                  try process.run()
+                  process.waitUntilExit()
+                  let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                  if !text.isEmpty { print(text) }
+                  XCTAssertEqual(process.terminationStatus, 0, "process failed: \(executable) \(arguments)")
+              }
+
+              private func brands(_ data: Data, _ ftyp: ISOBMFFBox) -> [String] {
+                  guard ftyp.dataEnd - ftyp.dataStart >= 8 else { return [] }
+                  var result: [String] = []
+                  var pos = ftyp.dataStart + 8
+                  while pos + 4 <= ftyp.dataEnd {
+                      result.append(String(data: data.subdata(in: pos..<pos + 4), encoding: .isoLatin1) ?? "????")
+                      pos += 4
+                  }
+                  return result
+              }
+
+              private func summary(_ label: String, _ url: URL) throws {
+                  let data = try Data(contentsOf: url)
+                  let top = isobmffBoxes(in: data, start: 0, end: data.count)
+                  guard let ftyp = top.first(where: { $0.type == "ftyp" }),
+                        let meta = top.first(where: { $0.type == "meta" }) else {
+                      XCTFail("\(label): ftyp/meta missing")
+                      return
+                  }
+                  let children = isobmffBoxes(in: data, start: meta.dataStart + 4, end: meta.dataEnd)
+                  guard let iinf = children.first(where: { $0.type == "iinf" }),
+                        let iloc = children.first(where: { $0.type == "iloc" }),
+                        let iprp = children.first(where: { $0.type == "iprp" }) else {
+                      XCTFail("\(label): iinf/iloc/iprp missing")
+                      return
+                  }
+                  let itemInfo = parseISOBMFFItemInfos(data, iinf)
+                  let items = Dictionary(uniqueKeysWithValues: itemInfo.items.map { ($0.itemID, $0.type) })
+                  let locations = try parseISOBMFFILoc(data, iloc)
+                  let locationByID = Dictionary(uniqueKeysWithValues: locations.map { ($0.itemID, $0) })
+                  let idat = children.first(where: { $0.type == "idat" })
+                  let props = try parseISOBMFFIPCOProps(data, iprp)
+                  let iprpChildren = isobmffBoxes(in: data, start: iprp.dataStart, end: iprp.dataEnd)
+                  let ipmaBox = try XCTUnwrap(iprpChildren.first(where: { $0.type == "ipma" }))
+                  let ipma = try parseISOBMFFIPMA(data, ipmaBox)
+                  let iref = parseISOBMFFIRefs(data, children.first(where: { $0.type == "iref" }))
+
+                  print("DIAG \(label) imageio=\(ConversionEngine.isValidISOGainMapOutput(url)) bytes=\(data.count)")
+                  print("DIAG \(label) top=\(top.map(\\.type)) brands=\(brands(data, ftyp))")
+                  print("DIAG \(label) items=\(itemInfo.items.map { "\($0.itemID):\($0.type):flags=\($0.flags)" }.sorted())")
+                  for entry in ipma.entries.sorted(by: { $0.itemID < $1.itemID }) {
+                      let decoded = entry.associations.map { raw -> String in
+                          let wide = ipma.flags & 1 != 0
+                          let essential = wide ? (raw & 0x8000 != 0) : (raw & 0x80 != 0)
+                          let index = wide ? (raw & 0x7fff) : (raw & 0x7f)
+                          return "\(index):\(props.types[index] ?? "?"):\(essential ? "E" : "N")"
+                      }
+                      print("DIAG \(label) ipma item=\(entry.itemID):\(items[entry.itemID] ?? "?") \(decoded)")
+                  }
+                  for ref in iref.refs.sorted(by: { ($0.type, $0.from) < ($1.type, $1.from) }) {
+                      print("DIAG \(label) iref \(ref.type) \(ref.from):\(items[ref.from] ?? "?") -> \(ref.to.map { "\($0):\(items[$0] ?? "?")" })")
+                  }
+                  if let grpl = children.first(where: { $0.type == "grpl" }) {
+                      for group in isobmffBoxes(in: data, start: grpl.dataStart, end: grpl.dataEnd) {
+                          let bytes = data.subdata(in: group.dataStart..<group.dataEnd).map { String(format: "%02x", $0) }.joined()
+                          print("DIAG \(label) grpl \(group.type) payload=\(bytes)")
+                      }
+                  } else {
+                      print("DIAG \(label) grpl missing")
+                  }
+                  for item in itemInfo.items where item.type == "tmap" {
+                      if let entry = locationByID[item.itemID] {
+                          let payload = try itemPayload(in: data, entry: entry, idat: idat)
+                          print("DIAG \(label) tmap id=\(item.itemID) len=\(payload.count) hex=\(payload.map { String(format: "%02x", $0) }.joined())")
+                      }
+                  }
+              }
+
+              func testOracleAndRustFinalContainerDiff() throws {
+                  let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                  let input = root.appendingPathComponent("fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic")
+                  let temp = FileManager.default.temporaryDirectory.appendingPathComponent("xdremux-imageio-diag-\(UUID().uuidString)", isDirectory: true)
+                  try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+                  defer { try? FileManager.default.removeItem(at: temp) }
+                  let oracle = temp.appendingPathComponent("swift-oracle.heic")
+                  let rust = temp.appendingPathComponent("rust.heic")
+
+                  _ = try XDRemuxProductCore.convert(
+                      inputURL: input,
+                      outputURL: oracle,
+                      familyPreference: .auto,
+                      debugRootURL: nil
+                  )
+                  let cli = root.appendingPathComponent("target/debug/xdremux").path
+                  try run(cli, ["convert", "--input", input.path, "--output", rust.path])
+
+                  try summary("SWIFT", oracle)
+                  try summary("RUST", rust)
+                  XCTAssertTrue(ConversionEngine.isValidISOGainMapOutput(oracle), "Swift migration oracle must remain ImageIO-readable")
+              }
+          }
+          SWIFT
+      - name: Run oracle versus Rust structural diff
+        run: swift test --filter ImageIOHDRDiagnosticTests/testOracleAndRustFinalContainerDiff
+
   heif-core:
     runs-on: ubuntu-latest
     timeout-minutes: 15
