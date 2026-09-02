@@ -48,7 +48,8 @@ let package = Package(
             path: "Sources/XDRemuxAppleAdapter"
         ),
         // Migration-only executable target. It is intentionally not a public
-        // package product; the Rust `xdremux` binary owns the CLI contract.
+        // package product and is not a user-facing CLI; the Rust `xdremux`
+        // binary owns the CLI contract.
         .executableTarget(
             name: "XDRemuxCLI",
             dependencies: [
