@@ -116,5 +116,19 @@ fn rust_owns_oppo_portrait_source_preflight_around_imageio_observations() {
             * 2
     );
     assert!(preflight.disparity.near > preflight.disparity.far);
+
+    match (&preflight.depth.portrait, &preflight.subject_prior) {
+        (Some(_), Some(prior)) => {
+            assert_eq!(prior.width, preflight.base_width / 2);
+            assert_eq!(prior.height, preflight.base_height / 2);
+            assert_eq!(
+                prior.pixels.len(),
+                usize::try_from(prior.width).unwrap() * usize::try_from(prior.height).unwrap()
+            );
+        }
+        (None, None) => {}
+        _ => panic!("Rust preflight must preserve producer portrait-plane availability"),
+    }
+
     assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
 }
