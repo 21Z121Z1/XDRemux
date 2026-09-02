@@ -25,5 +25,8 @@ if sorted(capabilities) != ["photographic-styles", "portrait"]:
     raise SystemExit(f"unexpected Apple adapter capabilities: {capabilities!r}")
 PY
 
+TEST_INPUT="$PWD/fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg"
+test -f "$TEST_INPUT"
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$ADAPTER" \
+XDREMUX_APPLE_ADAPTER_TEST_INPUT="$TEST_INPUT" \
   cargo test --locked -p xdremux-runtime --test apple_adapter
