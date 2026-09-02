@@ -256,7 +256,7 @@ fn horizontal_maximum(row: &[u8], radius: usize, output: &mut [u8]) {
 
     let mut deque = VecDeque::with_capacity(radius.saturating_mul(2).saturating_add(1));
     let mut next = 0_usize;
-    for x in 0..row.len() {
+    for (x, destination) in output.iter_mut().enumerate() {
         let right = x.saturating_add(radius).min(row.len() - 1);
         while next <= right {
             while deque.back().is_some_and(|&index| row[index] <= row[next]) {
@@ -270,7 +270,7 @@ fn horizontal_maximum(row: &[u8], radius: usize, output: &mut [u8]) {
         while deque.front().is_some_and(|&index| index < left) {
             deque.pop_front();
         }
-        output[x] = row[*deque.front().expect("non-empty morphology window")];
+        *destination = row[*deque.front().expect("non-empty morphology window")];
     }
 }
 
