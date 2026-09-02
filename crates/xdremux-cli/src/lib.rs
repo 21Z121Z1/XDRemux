@@ -54,6 +54,23 @@ struct InspectArgs {
     json: bool,
 }
 
+#[derive(Debug, Args, Default)]
+struct ProductConversionArgs {
+    /// Preserve compatibility with OPPO Gallery when converting ProXDR still images.
+    #[arg(long)]
+    oppo_compatible: bool,
+}
+
+impl ProductConversionArgs {
+    fn request(&self) -> ConversionRequest {
+        if self.oppo_compatible {
+            ConversionRequest::oppo_gallery_compatible()
+        } else {
+            ConversionRequest::default()
+        }
+    }
+}
+
 #[derive(Debug, Args)]
 struct ConvertArgs {
     /// Input ProXDR HEIC or supported Motion Photo.
@@ -62,6 +79,8 @@ struct ConvertArgs {
     /// Output HEIC; ProXDR defaults in-place, Motion Photo chooses a new pair.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
+    #[command(flatten)]
+    product: ProductConversionArgs,
 }
 
 fn default_batch_jobs() -> usize {
@@ -111,6 +130,8 @@ struct BatchArgs {
     /// File converted assets by asset type and primary capture mode.
     #[arg(long)]
     categorize: bool,
+    #[command(flatten)]
+    product: ProductConversionArgs,
     /// Maximum number of concurrent conversions; must be greater than zero.
     #[arg(
         long,
@@ -245,12 +266,10 @@ fn default_motion_photo_output(input: &Path) -> PathBuf {
     }
 }
 
-fn run_convert(
-    input: PathBuf,
-    output: Option<PathBuf>,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> u8 {
+fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+    let request = arguments.product.request();
+    let input = arguments.input;
+    let output = arguments.output;
     let source = match fs::read(&input) {
         Ok(value) => value,
         Err(error) => {
@@ -270,7 +289,8 @@ fn run_convert(
     let result = match asset {
         SourceAsset::MotionPhoto { .. } => {
             let output = output.unwrap_or_else(|| default_motion_photo_output(&input));
-            match runtime.convert_motion_photo_file(&source, &input, &output) {
+            match runtime.convert_motion_photo_file_with_request(&source, &input, &output, request)
+            {
                 Ok(receipt) => writeln!(
                     stdout,
                     "converted: {} -> {} + {}",
@@ -286,9 +306,7 @@ fn run_convert(
         }
         SourceAsset::ProXdr { .. } => {
             let output = output.unwrap_or_else(|| input.clone());
-            if let Err(error) =
-                runtime.convert_proxdr_file(&source, &output, ConversionRequest::default(), |_| {})
-            {
+            if let Err(error) = runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
                 let _ = writeln!(stderr, "error: {error}");
                 return 1;
             }
@@ -484,7 +502,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         jobs: arguments.jobs,
     };
     let receipt =
-        runtime.convert_batch_with_options(items, ConversionRequest::default(), &execution_options);
+        runtime.convert_batch_with_options(items, arguments.product.request(), &execution_options);
 
     if arguments.json {
         let successes = receipt
@@ -581,7 +599,7 @@ where
         }) => run_inspect(arguments.input, arguments.json, stdout, stderr),
         Ok(Cli {
             command: RootCommand::Convert(arguments),
-        }) => run_convert(arguments.input, arguments.output, stdout, stderr),
+        }) => run_convert(arguments, stdout, stderr),
         Ok(Cli {
             command: RootCommand::Batch(arguments),
         }) => run_batch(arguments, stdout, stderr),
@@ -656,6 +674,18 @@ mod tests {
         };
         assert_eq!(arguments.input, PathBuf::from("capture.heic"));
         assert_eq!(arguments.output, None);
+        assert!(!arguments.product.oppo_compatible);
+    }
+
+    #[test]
+    fn convert_accepts_oppo_gallery_product_intent() {
+        let command = parse(&["convert", "--input", "capture.heic", "--oppo-compatible"]);
+        let RootCommand::Convert(arguments) = command.command else {
+            panic!("expected convert command");
+        };
+        assert!(arguments.product.oppo_compatible);
+        let request = arguments.product.request();
+        assert!(request.requests_oppo_gallery_compatibility());
     }
 
     #[test]
@@ -739,7 +769,21 @@ mod tests {
         assert!(!arguments.resume);
         assert_eq!(arguments.checkpoint, None);
         assert!(!arguments.categorize);
+        assert!(!arguments.product.oppo_compatible);
         assert!(arguments.jobs >= 1 && arguments.jobs <= 4);
+    }
+
+    #[test]
+    fn batch_accepts_oppo_gallery_product_intent() {
+        let command = parse(&["batch", "--input", "a.heic", "--oppo-compatible"]);
+        let RootCommand::Batch(arguments) = command.command else {
+            panic!("expected batch command");
+        };
+        assert!(arguments.product.oppo_compatible);
+        assert!(arguments
+            .product
+            .request()
+            .requests_oppo_gallery_compatibility());
     }
 
     #[test]
@@ -763,6 +807,7 @@ mod tests {
             resume: false,
             checkpoint: None,
             categorize: false,
+            product: ProductConversionArgs::default(),
             jobs: 1,
             json: false,
         };
@@ -828,6 +873,31 @@ mod tests {
         assert_eq!(run_from(["frobnicate"], &mut stdout, &mut stderr), 2);
         assert!(stdout.is_empty());
         assert!(String::from_utf8(stderr).unwrap().contains("frobnicate"));
+    }
+
+    #[test]
+    fn conversion_help_exposes_intent_not_internal_policy() {
+        for command in ["convert", "batch"] {
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            assert_eq!(run_from([command, "--help"], &mut stdout, &mut stderr), 0);
+            assert!(stderr.is_empty());
+            let help = String::from_utf8(stdout).unwrap();
+            assert!(help.contains("--oppo-compatible"), "{help}");
+            for internal in [
+                "--family",
+                "--oppo-compat ",
+                "--oppo-camera-tail",
+                "--input-processing",
+                "--tmap-format",
+            ] {
+                assert!(
+                    !help.contains(internal),
+                    "internal option {internal} leaked into {command} help:
+{help}"
+                );
+            }
+        }
     }
 
     #[test]

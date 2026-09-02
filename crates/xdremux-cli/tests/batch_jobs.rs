@@ -55,8 +55,14 @@ fn bounded_parallel_batch_keeps_receipts_ordered_and_checkpoint_reusable() {
     assert_eq!(first["skipped_existing"], 0);
     assert_eq!(first["failed"], 0);
     let first_successes = first["successes"].as_array().unwrap();
-    assert!(first_successes[0]["input"].as_str().unwrap().ends_with("a.jpg"));
-    assert!(first_successes[1]["input"].as_str().unwrap().ends_with("b.jpg"));
+    assert!(first_successes[0]["input"]
+        .as_str()
+        .unwrap()
+        .ends_with("a.jpg"));
+    assert!(first_successes[1]["input"]
+        .as_str()
+        .unwrap()
+        .ends_with("b.jpg"));
 
     let a_heic = output.join("a.xdremux.heic");
     let a_mov = output.join("a.xdremux.mov");
@@ -77,8 +83,14 @@ fn bounded_parallel_batch_keeps_receipts_ordered_and_checkpoint_reusable() {
     assert_eq!(resumed["skipped_existing"], 2);
     assert_eq!(resumed["failed"], 0);
     let resumed_successes = resumed["successes"].as_array().unwrap();
-    assert!(resumed_successes[0]["input"].as_str().unwrap().ends_with("a.jpg"));
-    assert!(resumed_successes[1]["input"].as_str().unwrap().ends_with("b.jpg"));
+    assert!(resumed_successes[0]["input"]
+        .as_str()
+        .unwrap()
+        .ends_with("a.jpg"));
+    assert!(resumed_successes[1]["input"]
+        .as_str()
+        .unwrap()
+        .ends_with("b.jpg"));
 
     let after = [
         fs::read(&a_heic).unwrap(),
@@ -90,7 +102,10 @@ fn bounded_parallel_batch_keeps_receipts_ordered_and_checkpoint_reusable() {
 
     let checkpoint = output.join(".xdremux-motion-photo-checkpoint.jsonl");
     let state = fs::read_to_string(checkpoint).unwrap();
-    assert!(state.lines().count() >= 5, "header + two success + two skip records expected");
+    assert!(
+        state.lines().count() >= 5,
+        "header + two success + two skip records expected"
+    );
 
     fs::remove_dir_all(root).unwrap();
 }

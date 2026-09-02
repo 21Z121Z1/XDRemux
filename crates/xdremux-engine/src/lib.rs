@@ -121,6 +121,24 @@ impl Default for ConversionRequest {
     }
 }
 
+impl ConversionRequest {
+    /// Product intent for output that remains recognizable by OPPO Gallery.
+    ///
+    /// The public product surface deliberately exposes one intent rather than
+    /// the internal routing/tail knobs. Engine policy owns the exact mapping.
+    pub fn oppo_gallery_compatible() -> Self {
+        Self {
+            oppo_compatibility: OppoCompatibility::Auto,
+            oppo_camera_tail: OppoCameraTail::Preserve,
+            ..Self::default()
+        }
+    }
+
+    pub const fn requests_oppo_gallery_compatibility(self) -> bool {
+        !matches!(self.oppo_compatibility, OppoCompatibility::Off)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GainMapChannels {
     Mono,
@@ -397,6 +415,21 @@ pub fn plan_conversion(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn oppo_gallery_intent_owns_internal_compatibility_policy() {
+        let request = ConversionRequest::oppo_gallery_compatible();
+        assert!(request.requests_oppo_gallery_compatibility());
+        assert_eq!(request.oppo_compatibility, OppoCompatibility::Auto);
+        assert_eq!(request.oppo_camera_tail, OppoCameraTail::Preserve);
+        assert_eq!(
+            request.input_processing_branch,
+            InputProcessingBranch::Hybrid
+        );
+        assert_eq!(request.tmap_format, TmapFormat::ImageIo);
+        assert_eq!(request.apple_features, AppleFeatureRequest::default());
+        assert!(!ConversionRequest::default().requests_oppo_gallery_compatibility());
+    }
 
     fn layout(chroma: ChromaSampling, bit_depth: u8) -> GainMapCodecLayout {
         GainMapCodecLayout {

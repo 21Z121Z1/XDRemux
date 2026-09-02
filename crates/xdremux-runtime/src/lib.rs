@@ -215,6 +215,27 @@ impl PortableRuntime {
             output.as_ref(),
         )
     }
+
+    /// Convert a Motion Photo while enforcing product-intent applicability.
+    ///
+    /// OPPO Gallery compatibility changes the still-image Gain Map graph and
+    /// vendor metadata. A Motion Photo conversion has a distinct Live Photo
+    /// publication contract, so silently ignoring that intent would be unsafe.
+    pub fn convert_motion_photo_file_with_request(
+        &self,
+        source: &[u8],
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        request: ConversionRequest,
+    ) -> Result<LivePhotoFileReceipt> {
+        if request.requests_oppo_gallery_compatibility() {
+            return Err(RuntimeError::new(
+                "Motion Photo conversion",
+                "OPPO-compatible output applies to ProXDR still images and cannot be combined with Motion Photo conversion",
+            ));
+        }
+        self.convert_motion_photo_file(source, input, output)
+    }
 }
 
 pub fn analyze_proxdr(source: &[u8]) -> Result<PreparedProXdr> {

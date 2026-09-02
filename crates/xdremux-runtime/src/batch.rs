@@ -408,7 +408,12 @@ fn process_batch_item_with_options(
                     ));
                 }
 
-                match runtime.convert_motion_photo_file(&source, &item.input, &item.output) {
+                match runtime.convert_motion_photo_file_with_request(
+                    &source,
+                    &item.input,
+                    &item.output,
+                    request,
+                ) {
                     Ok(converted) => {
                         checkpoint_event = Some(BatchCheckpointEvent {
                             source: item.input.clone(),
