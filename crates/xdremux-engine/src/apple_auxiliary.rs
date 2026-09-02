@@ -425,7 +425,7 @@ mod tests {
         );
         assert_eq!(
             metadata_numbers(&payload, "depthData:ExtrinsicMatrix"),
-            Some(&[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0][..])
+            Some(&[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0][..])
         );
         assert_eq!(
             metadata_text(&payload, "depthBlurEffect:RenderingParameters"),
