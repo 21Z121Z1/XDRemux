@@ -34,8 +34,9 @@ impl AppleImageAuxiliaryFacts {
 
 /// Semantic image resources used by Apple photo features.
 ///
-/// Product code deals in these roles. Framework class names and selectors stay
-/// behind the Apple adapter so the Rust engine does not encode SPI spellings.
+/// Product code deals in these roles. Framework class names, selectors, and
+/// whether a role currently requires public API or SPI stay behind the Apple
+/// adapter and are not part of Rust product policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AppleSemanticRole {
     Person,
@@ -44,24 +45,6 @@ pub enum AppleSemanticRole {
     Teeth,
     Glasses,
     Sky,
-}
-
-/// API surface currently required to obtain one semantic role on Apple systems.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AppleVisionApiSurface {
-    Public,
-    PrivateSpi,
-}
-
-impl AppleSemanticRole {
-    pub const fn vision_api_surface(self) -> AppleVisionApiSurface {
-        match self {
-            Self::Person => AppleVisionApiSurface::Public,
-            Self::Skin | Self::Hair | Self::Teeth | Self::Glasses | Self::Sky => {
-                AppleVisionApiSurface::PrivateSpi
-            }
-        }
-    }
 }
 
 /// Semantic resources required by the current Apple Photos Portrait contract.
@@ -133,18 +116,6 @@ mod tests {
                 AppleSemanticRole::Glasses,
             ]
         );
-        assert_eq!(
-            AppleSemanticRole::Person.vision_api_surface(),
-            AppleVisionApiSurface::Public
-        );
-        for role in [
-            AppleSemanticRole::Skin,
-            AppleSemanticRole::Hair,
-            AppleSemanticRole::Teeth,
-            AppleSemanticRole::Glasses,
-        ] {
-            assert_eq!(role.vision_api_surface(), AppleVisionApiSurface::PrivateSpi);
-        }
     }
 
     #[test]
