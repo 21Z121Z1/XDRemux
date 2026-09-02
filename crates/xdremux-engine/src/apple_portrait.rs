@@ -484,9 +484,10 @@ mod tests {
             let bytes = static_rendering_profile(profile);
             let document = AppleRendDocument::parse(bytes).expect("parse static REND profile");
             assert_eq!(document.serialized(false).unwrap(), bytes);
-            assert!(document.records().iter().all(|record| {
-                !APPLE_XHLRB_DYNAMIC_RECORD_IDS.contains(&record.identifier)
-            }));
+            assert!(document
+                .records()
+                .iter()
+                .all(|record| { !APPLE_XHLRB_DYNAMIC_RECORD_IDS.contains(&record.identifier) }));
         }
     }
 
