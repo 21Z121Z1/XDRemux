@@ -12,9 +12,8 @@ use xdremux_format::ChromaSampling;
 
 pub use apple::AppleImageAuxiliaryFacts;
 pub use capabilities::{
-    CapabilityInventory, ConsumerValidator, GainMapTileEncoder, OperationCapability,
-    PhotographicStylesAdapter, PlatformCapability, PortraitAdapter, RasterDecoder,
-    RasterDecoderCapabilities, RawProcessor,
+    CapabilityInventory, GainMapTileEncoder, OperationCapability, RasterDecoder,
+    RasterDecoderCapabilities,
 };
 pub use execution::{
     execute_conversion, ArtifactBuilder, ArtifactPublisher, ArtifactValidator, ExecutionError,
