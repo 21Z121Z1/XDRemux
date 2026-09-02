@@ -36,4 +36,6 @@ trap 'rm -rf "$TEST_TARGET"' EXIT
 CARGO_TARGET_DIR="$TEST_TARGET" \
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$ADAPTER" \
 XDREMUX_APPLE_ADAPTER_TEST_INPUT="$TEST_INPUT" \
-  cargo test --locked -p xdremux-runtime --test apple_adapter
+  cargo test --locked -p xdremux-runtime \
+    --test apple_adapter \
+    --test apple_portrait_rend
