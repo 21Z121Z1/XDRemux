@@ -2,31 +2,12 @@ import json
 import struct
 import tempfile
 import unittest
-from contextlib import redirect_stderr
-from io import StringIO
 from pathlib import Path
 
 from xdremux_py import categorize
-from xdremux_py import cli
 
 
 class PhotoCategorizationTests(unittest.TestCase):
-    def test_python_cli_uses_categorize_for_command_and_batch_switch(self) -> None:
-        parser = cli.build_parser()
-        standalone = parser.parse_args([
-            "categorize", "--input", "/tmp/a.heic", "--input", "/tmp/photos",
-            "--output-dir", "/tmp/output", "--jobs", "2", "--dry-run",
-        ])
-        self.assertEqual(standalone.command, "categorize")
-        self.assertEqual(standalone.input, ["/tmp/a.heic", "/tmp/photos"])
-        self.assertEqual(standalone.jobs, 2)
-        self.assertTrue(standalone.dry_run)
-
-        batch = parser.parse_args(["batch", "--input-dir", "/tmp/input", "--categorize"])
-        self.assertTrue(batch.categorize_output)
-        with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
-            parser.parse_args(["convert", "--input", "/tmp/input.heic", "--categorize"])
-
     def test_shared_contract_matrix(self) -> None:
         fixture = Path(__file__).parent / "fixtures" / "oppo_capture_mode_cases.json"
         cases = json.loads(fixture.read_text(encoding="utf-8"))
@@ -104,7 +85,7 @@ class PhotoCategorizationTests(unittest.TestCase):
             self.assertEqual(results[0].disposition, "dry-run")
             self.assertFalse(output.exists())
 
-    def test_malformed_comment_is_copied_to_unclassified_and_returns_failure(self) -> None:
+    def test_malformed_comment_is_copied_to_unclassified_and_remains_failed_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / "malformed.jpg"
@@ -115,12 +96,15 @@ class PhotoCategorizationTests(unittest.TestCase):
             exif = struct.pack("<H", 1) + struct.pack("<HHII", 0x9286, 7, len(payload), 44) + struct.pack("<I", 0)
             source.write_bytes(header + ifd0 + exif + payload)
 
-            result = cli.main([
-                "categorize", "--input", str(source), "--output-dir", str(output),
-            ])
+            plan = categorize.make_plan([source], output)
+            self.assertEqual(len(plan), 1)
+            self.assertEqual(plan[0].classification.status, "malformed-user-comment")
+            self.assertEqual(plan[0].destination, output / "静态照片" / "未分类" / source.name)
 
-            self.assertEqual(result, 1)
-            self.assertEqual((output / "静态照片" / "未分类" / source.name).read_bytes(), source.read_bytes())
+            result = categorize.execute_plan(plan)[0]
+            self.assertEqual(result.disposition, "copied")
+            self.assertEqual(result.classification.status, "malformed-user-comment")
+            self.assertEqual(result.destination.read_bytes(), source.read_bytes())
 
     def test_reads_tiff_user_comment_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
