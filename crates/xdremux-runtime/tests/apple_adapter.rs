@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use xdremux_engine::{
     build_apple_portrait_effects_matte_payload, build_apple_semantic_matte_payload,
-    AppleSemanticRole, OperationCapability,
+    AppleAuxiliaryKind, AppleSemanticRole, OperationCapability,
 };
 use xdremux_runtime::PortableRuntime;
 
@@ -90,9 +90,10 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     };
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic");
-    let source = fs::read(fixture).expect("read committed OPPO portrait fixture");
+    let source = fs::read(&fixture).expect("read committed OPPO portrait fixture");
 
-    let preflight = PortableRuntime::new()
+    let runtime = PortableRuntime::new();
+    let preflight = runtime
         .preflight_apple_portrait_source(&executable, &source)
         .expect("Rust-owned Portrait preflight must accept the committed fixture");
 
@@ -160,4 +161,33 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     }
 
     assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
+
+    // One Rust-owned operation now defines the full Portrait auxiliary set.
+    // The short REND string is sufficient here because this integration test
+    // verifies the generic ImageIO transport and required resource kinds; the
+    // recovered per-image REND policy is tested independently in the engine.
+    let payloads = preflight
+        .into_auxiliary_payloads("UkVORA==")
+        .expect("assemble complete Rust-owned Portrait auxiliary manifest");
+    assert_eq!(
+        payloads.iter().map(|payload| payload.kind).collect::<Vec<_>>(),
+        vec![
+            AppleAuxiliaryKind::Disparity,
+            AppleAuxiliaryKind::PortraitEffectsMatte,
+            AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Skin),
+            AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Hair),
+            AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Teeth),
+            AppleAuxiliaryKind::SemanticSegmentation(AppleSemanticRole::Glasses),
+        ]
+    );
+
+    let temporary = tempfile::tempdir().expect("create Portrait output directory");
+    let output = temporary.path().join("portrait-complete-auxiliary-set.heic");
+    runtime
+        .apple_write_auxiliary_payloads(&executable, &fixture, &output, &payloads)
+        .expect("generic ImageIO writer must accept the complete Rust-owned Portrait manifest");
+    let facts = runtime
+        .apple_image_auxiliary_facts(&executable, &output)
+        .expect("ImageIO must report the written Portrait auxiliary set");
+    assert!(facts.satisfies_portrait_editing());
 }

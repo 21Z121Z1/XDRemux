@@ -1,6 +1,9 @@
 use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
 use xdremux_engine::{
+    build_apple_portrait_disparity_payload, build_apple_portrait_effects_matte_payload,
+    build_apple_semantic_matte_payload, AppleAuxiliaryError, AppleAuxiliaryPayload,
     AppleGainMapFacts, AppleL8Mask, ApplePortraitCameraCalibration, ApplePortraitDisparity,
+    AppleSemanticRole,
 };
 
 #[cfg(any(target_os = "macos", test))]
@@ -23,7 +26,7 @@ use xdremux_engine::{
     build_apple_portrait_disparity, derive_apple_portrait_camera_calibration,
     fuse_apple_portrait_hair_mask, fuse_apple_portrait_person_mask,
     resolve_apple_portrait_base_orientation, ApplePortraitCaptureFacts, ApplePortraitImageGeometry,
-    AppleSemanticRole, APPLE_PORTRAIT_SEMANTIC_ROLES,
+    APPLE_PORTRAIT_SEMANTIC_ROLES,
 };
 
 #[cfg(target_os = "macos")]
@@ -57,6 +60,46 @@ pub struct ApplePortraitSourcePreflight {
     pub teeth_matte: AppleL8Mask,
     pub glasses_matte: AppleL8Mask,
     pub simulated_aperture: f64,
+}
+
+impl ApplePortraitSourcePreflight {
+    /// Consume a completed Rust-owned Portrait preflight into the exact
+    /// auxiliary resource set required by Apple Photos Portrait editing.
+    ///
+    /// ImageIO is deliberately absent from this contract: the platform adapter
+    /// receives only these generic payloads and performs the framework write.
+    pub fn into_auxiliary_payloads(
+        self,
+        rendering_parameters_base64: &str,
+    ) -> std::result::Result<Vec<AppleAuxiliaryPayload>, AppleAuxiliaryError> {
+        let mut payloads = Vec::with_capacity(6);
+        payloads.push(build_apple_portrait_disparity_payload(
+            self.disparity,
+            self.base_orientation,
+            &self.camera_calibration,
+            rendering_parameters_base64,
+            self.simulated_aperture,
+        )?);
+        payloads.push(build_apple_portrait_effects_matte_payload(
+            self.portrait_effects_matte.width,
+            self.portrait_effects_matte.height,
+            self.portrait_effects_matte.pixels,
+        )?);
+        for (role, matte) in [
+            (AppleSemanticRole::Skin, self.skin_matte),
+            (AppleSemanticRole::Hair, self.hair_matte),
+            (AppleSemanticRole::Teeth, self.teeth_matte),
+            (AppleSemanticRole::Glasses, self.glasses_matte),
+        ] {
+            payloads.push(build_apple_semantic_matte_payload(
+                role,
+                matte.width,
+                matte.height,
+                matte.pixels,
+            )?);
+        }
+        Ok(payloads)
+    }
 }
 
 #[cfg(any(target_os = "macos", test))]
