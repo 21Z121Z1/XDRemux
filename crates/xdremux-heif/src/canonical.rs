@@ -1,17 +1,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use xdremux_format::isobmff::{
-    parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, ParsedMeta, COLR, IPMA, IPRP,
-    IROT, ISPE, META,
+    parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, ParsedMeta, IPMA, IPRP, IROT,
+    ISPE, META,
 };
 use xdremux_format::FourCC;
 
-use crate::direct::DirectHevcGainMap;
 use crate::error::{HeifError, Result};
 use crate::native::{self, IsoGainMapAssembly};
 
 const PIXI: FourCC = FourCC::new(*b"pixi");
 const AUXC: FourCC = FourCC::new(*b"auxC");
+const COLR: FourCC = FourCC::new(*b"colr");
 
 fn invalid(message: impl Into<String>) -> HeifError {
     HeifError::invalid(message)
