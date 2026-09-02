@@ -506,69 +506,6 @@ fn receipt_from_ordered(outcomes: Vec<Option<OrderedBatchOutcome>>) -> BatchRece
 }
 
 impl PortableRuntime {
-    fn convert_batch_item(
-        &self,
-        item: &BatchItem,
-        request: ConversionRequest,
-    ) -> Result<BatchSuccess> {
-        if item.input == item.output {
-            return Err(RuntimeError::new(
-                "batch output",
-                "batch conversion never overwrites its source",
-            ));
-        }
-        if item.output.exists() {
-            return Err(RuntimeError::new(
-                "batch output",
-                "output already exists; refusing to overwrite",
-            ));
-        }
-        create_output_parent(&item.output)?;
-        let source = fs::read(&item.input)
-            .map_err(|error| RuntimeError::external("batch input read", error))?;
-        let asset = probe_bytes(&source)
-            .map_err(|error| RuntimeError::external("batch source probe", error))?;
-
-        match asset {
-            SourceAsset::MotionPhoto { .. } => {
-                let receipt = self.convert_motion_photo_file(&source, &item.input, &item.output)?;
-                Ok(BatchSuccess {
-                    input: item.input.clone(),
-                    outputs: vec![receipt.image, receipt.video],
-                    kind: BatchAssetKind::LivePhoto,
-                    disposition: BatchSuccessDisposition::Converted,
-                })
-            }
-            SourceAsset::ProXdr { .. } => {
-                let receipt = self.convert_proxdr_file(&source, &item.output, request, |_| {})?;
-                Ok(BatchSuccess {
-                    input: item.input.clone(),
-                    outputs: vec![receipt.output],
-                    kind: BatchAssetKind::ProXdr,
-                    disposition: BatchSuccessDisposition::Converted,
-                })
-            }
-        }
-    }
-
-    pub fn convert_batch<I>(&self, items: I, request: ConversionRequest) -> BatchReceipt
-    where
-        I: IntoIterator<Item = BatchItem>,
-    {
-        let mut receipt = BatchReceipt::default();
-        for item in items {
-            match self.convert_batch_item(&item, request) {
-                Ok(success) => receipt.successes.push(success),
-                Err(error) => receipt.failures.push(BatchFailure {
-                    input: item.input,
-                    output: item.output,
-                    error: error.to_string(),
-                }),
-            }
-        }
-        receipt
-    }
-
     pub fn convert_batch_with_options<I>(
         &self,
         items: I,
