@@ -1,8 +1,7 @@
 use xdremux_engine::{
     plan_conversion, AppleFeatureRequest, CapabilityInventory, ConversionAnalysis,
     ConversionRequest, GainMapChannels, GainMapCodec, GainMapCodecLayout, GainMapSourceProfile,
-    GainMapStorageProfile, InputProcessingBranch, OperationCapability, OppoCameraTail, SourceHdrMode,
-    TmapFormat,
+    GainMapStorageProfile, OperationCapability,
 };
 use xdremux_format::ChromaSampling;
 
@@ -14,13 +13,16 @@ fn layout(chroma: ChromaSampling, bit_depth: u8) -> GainMapCodecLayout {
     }
 }
 
-fn analysis(chroma: Option<ChromaSampling>, bit_depth: u8) -> ConversionAnalysis {
+fn analysis(
+    channels: GainMapChannels,
+    chroma: Option<ChromaSampling>,
+    bit_depth: u8,
+) -> ConversionAnalysis {
     ConversionAnalysis {
-        hdr_mode: SourceHdrMode::Uhdr,
         gain_map: GainMapSourceProfile {
             width: 1024,
             height: 768,
-            channels: GainMapChannels::Rgb,
+            channels,
             storage: GainMapStorageProfile {
                 codec: GainMapCodec::Jpeg,
                 chroma,
@@ -43,60 +45,63 @@ fn capabilities(layouts: impl IntoIterator<Item = GainMapCodecLayout>) -> Capabi
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let direct = capabilities([
+        layout(ChromaSampling::Mono400, 8),
         layout(ChromaSampling::Yuv420, 8),
         layout(ChromaSampling::Yuv444, 8),
     ]);
     let plan = plan_conversion(
-        &analysis(Some(ChromaSampling::Yuv420), 8),
+        &analysis(
+            GainMapChannels::Rgb,
+            Some(ChromaSampling::Yuv420),
+            8,
+        ),
         ConversionRequest::default(),
         &direct,
     )?;
     println!(
-        "preserve-420|requested={:?}|effective={:?}|chroma={:?}|depth={}",
-        plan.requested_input_processing_branch,
-        plan.effective_input_processing_branch,
+        "standard-rgb420|output={:?}|chroma={:?}|depth={}",
+        plan.output,
         plan.gain_map_target.layout.chroma,
         plan.gain_map_target.layout.luma_bit_depth
     );
 
-    let only_444 = capabilities([layout(ChromaSampling::Yuv444, 8)]);
     let plan = plan_conversion(
-        &analysis(Some(ChromaSampling::Yuv422), 8),
-        ConversionRequest::default(),
-        &only_444,
+        &analysis(
+            GainMapChannels::Mono,
+            Some(ChromaSampling::Mono400),
+            8,
+        ),
+        ConversionRequest::oppo_gallery_compatible(),
+        &direct,
     )?;
     println!(
-        "promote-422|chroma={:?}|depth={}",
-        plan.gain_map_target.layout.chroma, plan.gain_map_target.layout.luma_bit_depth
-    );
-
-    let request = ConversionRequest {
-        input_processing_branch: InputProcessingBranch::Passthrough,
-        oppo_camera_tail: OppoCameraTail::Off,
-        tmap_format: TmapFormat::Strict,
-        ..ConversionRequest::default()
-    };
-    let plan = plan_conversion(
-        &analysis(Some(ChromaSampling::Yuv444), 8),
-        request,
-        &only_444,
-    )?;
-    println!(
-        "strict-tmap|requested={:?}|effective={:?}",
-        plan.requested_input_processing_branch, plan.effective_input_processing_branch
+        "oppo-mono|output={:?}|channels={:?}|chroma={:?}|depth={}",
+        plan.output,
+        plan.gain_map_target.channels,
+        plan.gain_map_target.layout.chroma,
+        plan.gain_map_target.layout.luma_bit_depth
     );
 
     let only_420 = capabilities([layout(ChromaSampling::Yuv420, 8)]);
     let error = plan_conversion(
-        &analysis(Some(ChromaSampling::Yuv444), 8),
+        &analysis(
+            GainMapChannels::Rgb,
+            Some(ChromaSampling::Yuv444),
+            8,
+        ),
         ConversionRequest::default(),
         &only_420,
     )
-    .expect_err("444 must never silently downconvert to 420");
+    .expect_err("444 standard output must never silently downconvert to 420");
     println!("reject-444-to-420|{error}");
 
+    let only_444 = capabilities([layout(ChromaSampling::Yuv444, 8)]);
     let error = plan_conversion(
-        &analysis(Some(ChromaSampling::Yuv444), 10),
+        &analysis(
+            GainMapChannels::Rgb,
+            Some(ChromaSampling::Yuv444),
+            10,
+        ),
         ConversionRequest::default(),
         &only_444,
     )
@@ -108,7 +113,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         8,
     ))]);
     let error = plan_conversion(
-        &analysis(Some(ChromaSampling::Yuv420), 8),
+        &analysis(
+            GainMapChannels::Rgb,
+            Some(ChromaSampling::Yuv420),
+            8,
+        ),
         ConversionRequest::default(),
         &encoder_only,
     )
@@ -123,7 +132,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..ConversionRequest::default()
     };
     let error = plan_conversion(
-        &analysis(Some(ChromaSampling::Yuv420), 8),
+        &analysis(
+            GainMapChannels::Rgb,
+            Some(ChromaSampling::Yuv420),
+            8,
+        ),
         styles_request,
         &only_444,
     )
