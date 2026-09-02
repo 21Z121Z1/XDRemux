@@ -90,6 +90,21 @@ impl AppleL8Mask {
             pixels,
         })
     }
+
+    /// Legacy Apple-feature product rule for accepting sparse semantic masks.
+    ///
+    /// A percentage threshold incorrectly rejects distant people and other
+    /// genuinely sparse semantics. Sixteen high-confidence pixels is the
+    /// smallest producer-proven floor and exactly matches the retired Swift
+    /// implementation.
+    pub fn has_credible_foreground(&self) -> bool {
+        self.pixels
+            .iter()
+            .filter(|&&pixel| pixel >= 128)
+            .take(16)
+            .count()
+            >= 16
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -416,6 +431,15 @@ mod tests {
             AppleL8Mask::new(0, 2, Vec::new()),
             Err(AppleL8MaskError::InvalidGeometry)
         );
+    }
+
+    #[test]
+    fn credible_foreground_requires_sixteen_high_confidence_pixels() {
+        let mut fifteen = vec![128_u8; 16];
+        fifteen[15] = 127;
+        assert!(!mask(16, 1, fifteen).has_credible_foreground());
+        assert!(mask(16, 1, vec![128; 16]).has_credible_foreground());
+        assert!(!mask(16, 1, vec![127; 16]).has_credible_foreground());
     }
 
     #[test]

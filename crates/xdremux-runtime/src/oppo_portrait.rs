@@ -375,6 +375,12 @@ pub(crate) fn prepare_apple_portrait_source(
                 "Vision omitted the requested person matte",
             )
         })?;
+    if !native_person.has_credible_foreground() {
+        return Err(RuntimeError::new(
+            "Apple Portrait unavailable",
+            "Vision returned no credible person foreground",
+        ));
+    }
     let native_hair = vision_masks
         .remove(&AppleSemanticRole::Hair)
         .ok_or_else(|| {
