@@ -55,12 +55,16 @@ jobs:
           for command in convert batch; do
             cargo run --locked -q -p xdremux-cli -- "$command" --help > "/tmp/$command-help.txt"
             grep -F -- '--oppo-compatible' "/tmp/$command-help.txt" >/dev/null
-            for forbidden in --family --oppo-compat --oppo-camera-tail --input-processing --tmap-format; do
+            for forbidden in --family --oppo-camera-tail --input-processing --tmap-format; do
               if grep -F -- "$forbidden" "/tmp/$command-help.txt"; then
                 echo "internal policy option $forbidden leaked into $command" >&2
                 exit 1
               fi
             done
+            if grep -E -- '(^|[[:space:]])--oppo-compat([=[:space:]]|$)' "/tmp/$command-help.txt"; then
+              echo "internal policy option --oppo-compat leaked into $command" >&2
+              exit 1
+            fi
           done
       - name: Lint unified product path
         run: |
