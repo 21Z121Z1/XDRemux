@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use xdremux_heif::validate_gain_map_structure;
@@ -8,6 +9,8 @@ use xdremux_motion_photo::{
     read_apple_content_identifier, read_live_photo_content_identifier, read_live_photo_still_time,
     validate_live_photo_movie,
 };
+
+static NEXT_TEMP_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
 fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -24,8 +27,9 @@ fn exercise(relative: &str, expect_gain_map: bool) {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
+    let sequence = NEXT_TEMP_DIRECTORY.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!(
-        "xdremux-cli-live-photo-{}-{stamp}",
+        "xdremux-cli-live-photo-{}-{stamp}-{sequence}",
         std::process::id()
     ));
     fs::create_dir_all(&dir).unwrap();
