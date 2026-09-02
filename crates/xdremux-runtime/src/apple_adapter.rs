@@ -201,11 +201,8 @@ impl AppleAdapterClient {
         target_height: u32,
         orientation: u8,
     ) -> Result<AppleL8Mask> {
-        let source_bytes = checked_l8_byte_count(
-            mask.width,
-            mask.height,
-            "Apple CoreImage L8 render input",
-        )?;
+        let source_bytes =
+            checked_l8_byte_count(mask.width, mask.height, "Apple CoreImage L8 render input")?;
         if mask.pixels.len() != source_bytes {
             return Err(RuntimeError::new(
                 "Apple CoreImage L8 render input",

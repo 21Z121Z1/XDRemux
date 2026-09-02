@@ -345,20 +345,23 @@ pub(crate) fn prepare_apple_portrait_source(
         &[AppleSemanticRole::Person],
         Some(u32::from(base_orientation)),
     )?;
-    let native_person = vision_masks.remove(&AppleSemanticRole::Person).ok_or_else(|| {
-        RuntimeError::new(
-            "Apple Portrait person matte",
-            "Vision omitted the requested person matte",
-        )
-    })?;
+    let native_person = vision_masks
+        .remove(&AppleSemanticRole::Person)
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "Apple Portrait person matte",
+                "Vision omitted the requested person matte",
+            )
+        })?;
     let rendered_person = adapter.coreimage_render_l8(
         &native_person,
         target_width,
         target_height,
         base_orientation,
     )?;
-    let person_fusion = fuse_apple_portrait_person_mask(&rendered_person, subject_prior.as_ref())
-        .map_err(|error| RuntimeError::external("Apple Portrait person fusion", error))?;
+    let person_fusion =
+        fuse_apple_portrait_person_mask(&rendered_person, subject_prior.as_ref())
+            .map_err(|error| RuntimeError::external("Apple Portrait person fusion", error))?;
 
     let simulated_aperture = resolve_simulated_aperture(
         source.config.version,

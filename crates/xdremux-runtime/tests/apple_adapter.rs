@@ -125,12 +125,8 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
         usize::try_from(matte.width).unwrap() * usize::try_from(matte.height).unwrap()
     );
     assert!(!preflight.subject_prior_used || preflight.depth.portrait.is_some());
-    build_apple_portrait_effects_matte_payload(
-        matte.width,
-        matte.height,
-        matte.pixels.clone(),
-    )
-    .expect("Rust-owned fused person matte must be directly payload-ready");
+    build_apple_portrait_effects_matte_payload(matte.width, matte.height, matte.pixels.clone())
+        .expect("Rust-owned fused person matte must be directly payload-ready");
 
     assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
 }
