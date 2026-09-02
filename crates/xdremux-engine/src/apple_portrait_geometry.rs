@@ -51,11 +51,11 @@ pub const APPLE_PORTRAIT_MAIN_1X_PROFILE: ApplePortraitLensProfile = ApplePortra
     maximum_validated_equivalent_focal_length_mm: 44.0,
     reference_width: 4032,
     reference_height: 3024,
-    focal_length_pixels: 2860.378_906_25,
-    principal_point_x: 2010.311_035_156_25,
-    principal_point_y: 1525.014_038_085_937_5,
-    distortion_center_x: 2017.552_734_375,
-    distortion_center_y: 1523.492_919_921_875,
+    focal_length_pixels: 2_860.378_906_25,
+    principal_point_x: 2_010.311_035_156_25,
+    principal_point_y: 1_525.014_038_085_937_5,
+    distortion_center_x: 2_017.552_734_375,
+    distortion_center_y: 1_523.492_919_921_875,
     pixel_size_mm: 0.002_440,
     distortion_coefficients: [
         0.0,
@@ -65,7 +65,7 @@ pub const APPLE_PORTRAIT_MAIN_1X_PROFILE: ApplePortraitLensProfile = ApplePortra
         -0.000_004_621_016_614_692_053,
         0.000_001_959_401_970_452_745_4,
         -0.000_000_045_183_909_946_899_8,
-        0.000_000_000_314_308_579_163_480_32,
+        0.000_000_000_314_308_579_163_480_3,
     ],
     inverse_distortion_coefficients: [
         0.0,
@@ -85,11 +85,11 @@ pub const APPLE_PORTRAIT_FUSION_2X_PROFILE: ApplePortraitLensProfile = ApplePort
     maximum_validated_equivalent_focal_length_mm: 59.0,
     reference_width: 4032,
     reference_height: 3024,
-    focal_length_pixels: 5666.130_371_093_75,
-    principal_point_x: 2001.774_414_062_5,
-    principal_point_y: 1543.746_093_75,
-    distortion_center_x: 2008.567_138_671_875,
-    distortion_center_y: 1553.952_880_859_375,
+    focal_length_pixels: 5_666.130_371_093_75,
+    principal_point_x: 2_001.774_414_062_5,
+    principal_point_y: 1_543.746_093_75,
+    distortion_center_x: 2_008.567_138_671_875,
+    distortion_center_y: 1_553.952_880_859_375,
     pixel_size_mm: 0.001_219_999_976_456_165_3,
     distortion_coefficients: [
         0.0,
@@ -119,11 +119,11 @@ pub const APPLE_PORTRAIT_TELE_3X_PROFILE: ApplePortraitLensProfile = ApplePortra
     maximum_validated_equivalent_focal_length_mm: 134.0,
     reference_width: 4032,
     reference_height: 3024,
-    focal_length_pixels: 9169.129_882_812_5,
-    principal_point_x: 2023.225_585_937_5,
-    principal_point_y: 1536.472_656_25,
-    distortion_center_x: 2066.858_398_437_5,
-    distortion_center_y: 1557.304_565_429_687_5,
+    focal_length_pixels: 9_169.129_882_812_5,
+    principal_point_x: 2_023.225_585_937_5,
+    principal_point_y: 1_536.472_656_25,
+    distortion_center_x: 2_066.858_398_437_5,
+    distortion_center_y: 1_557.304_565_429_687_5,
     pixel_size_mm: 0.001_000_000_047_497_451_3,
     distortion_coefficients: [
         0.0,
@@ -155,10 +155,10 @@ pub const APPLE_PORTRAIT_TETRAPRISM_5X_PROFILE: ApplePortraitLensProfile =
         reference_width: 4032,
         reference_height: 3024,
         focal_length_pixels: 14_235.533_203_125,
-        principal_point_x: 2012.309_082_031_25,
-        principal_point_y: 1589.007_568_359_375,
-        distortion_center_x: 2027.138_183_593_75,
-        distortion_center_y: 1567.147_583_007_812_5,
+        principal_point_x: 2_012.309_082_031_25,
+        principal_point_y: 1_589.007_568_359_375,
+        distortion_center_x: 2_027.138_183_593_75,
+        distortion_center_y: 1_567.147_583_007_812_5,
         pixel_size_mm: 0.001_120_000_029_914_081,
         distortion_coefficients: [
             0.0,
@@ -642,7 +642,7 @@ mod tests {
         assert_eq!(calibration.digital_zoom_ratio, 2.0);
         assert_eq!(calibration.reference_width, 4032);
         assert_eq!(calibration.reference_height, 3024);
-        assert_eq!(calibration.focal_length_pixels, 5666.130_371_093_75);
+        assert_eq!(calibration.focal_length_pixels, 5_666.130_371_093_75);
         assert!(!calibration.profile_saturated());
     }
 
