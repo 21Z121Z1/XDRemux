@@ -34,7 +34,7 @@ jobs:
           cat > "$RUNNER_TEMP/xdremux-completion-plan.json" <<'JSON'
           {
             "schema_version": 1,
-            "scope": "Canonical Rust XDRemux product stack plus migration-only Apple platform capability build",
+            "scope": "Canonical Rust XDRemux product stack plus migration-only Apple platform capability adapter",
             "checks": [
               {
                 "name": "rust-workspace-lock",
@@ -67,9 +67,9 @@ jobs:
                 "timeout_seconds": 1200
               },
               {
-                "name": "apple-capability-adapter-build",
-                "kind": "static",
-                "command": ["swift", "build", "--target", "XDRemuxAppleFeatures"],
+                "name": "apple-capability-adapter-handshake",
+                "kind": "functional",
+                "command": ["bash", "scripts/check_apple_adapter_handshake.sh"],
                 "timeout_seconds": 1800
               },
               {
@@ -81,7 +81,7 @@ jobs:
               {
                 "name": "repository-policy-regressions",
                 "kind": "regression",
-                "command": ["python3", "-m", "unittest", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_swift_app_architecture"],
+                "command": ["python3", "-m", "unittest", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_swift_app_architecture"],
                 "timeout_seconds": 300
               }
             ]
