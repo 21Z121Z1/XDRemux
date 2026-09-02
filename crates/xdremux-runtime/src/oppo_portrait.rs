@@ -1,4 +1,9 @@
-use xdremux_container::{extract_oppo_portrait_source, OppoPortraitConfig};
+use std::io::Read;
+
+use ruzstd::decoding::StreamingDecoder;
+use xdremux_container::{
+    extract_oppo_portrait_source, parse_oppo_portrait_depth, OppoPortraitConfig, OppoPortraitDepth,
+};
 use xdremux_engine::AppleGainMapFacts;
 use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
 
@@ -12,11 +17,13 @@ use std::path::Path;
 #[cfg(target_os = "macos")]
 use crate::apple_adapter::AppleAdapterClient;
 
+const MAX_DECODED_PORTRAIT_DEPTH_BYTES: u64 = 256 * 1024 * 1024;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ApplePortraitSourcePreflight {
     pub base_jpeg: Vec<u8>,
     pub gain_map_jpeg: Vec<u8>,
-    pub compressed_depth: Vec<u8>,
+    pub depth: OppoPortraitDepth,
     pub config: OppoPortraitConfig,
     pub private_gain_map_info: Option<Vec<u8>>,
     pub base_width: u32,
@@ -74,6 +81,35 @@ fn split_portrait_source_image(source_image: &[u8]) -> Result<SplitPortraitSourc
     })
 }
 
+fn decode_oppo_portrait_depth(compressed: &[u8]) -> Result<OppoPortraitDepth> {
+    if compressed.is_empty() {
+        return Err(RuntimeError::new(
+            "OPPO Portrait depth",
+            "compressed rear.depth is empty",
+        ));
+    }
+
+    let decoder = StreamingDecoder::new(compressed)
+        .map_err(|error| RuntimeError::external("OPPO Portrait zstd decoder", error))?;
+    let mut bounded = decoder.take(MAX_DECODED_PORTRAIT_DEPTH_BYTES + 1);
+    let mut decoded = Vec::new();
+    bounded
+        .read_to_end(&mut decoded)
+        .map_err(|error| RuntimeError::external("OPPO Portrait zstd decode", error))?;
+    if u64::try_from(decoded.len()).unwrap_or(u64::MAX) > MAX_DECODED_PORTRAIT_DEPTH_BYTES {
+        return Err(RuntimeError::new(
+            "OPPO Portrait depth",
+            format!(
+                "decoded rear.depth exceeds {} MiB safety limit",
+                MAX_DECODED_PORTRAIT_DEPTH_BYTES / (1024 * 1024)
+            ),
+        ));
+    }
+
+    parse_oppo_portrait_depth(&decoded)
+        .map_err(|error| RuntimeError::external("OPPO Portrait depth parse", error))
+}
+
 #[cfg(target_os = "macos")]
 pub(crate) fn prepare_apple_portrait_source(
     adapter_executable: &Path,
@@ -82,6 +118,7 @@ pub(crate) fn prepare_apple_portrait_source(
     let source = extract_oppo_portrait_source(source)
         .map_err(|error| RuntimeError::external("OPPO Portrait source extraction", error))?;
     let split = split_portrait_source_image(&source.source_image)?;
+    let depth = decode_oppo_portrait_depth(&source.compressed_depth)?;
 
     let mut image_file = tempfile::Builder::new()
         .prefix("xdremux-portrait-src-")
@@ -119,7 +156,7 @@ pub(crate) fn prepare_apple_portrait_source(
     Ok(ApplePortraitSourcePreflight {
         base_jpeg: split.base_jpeg,
         gain_map_jpeg: split.gain_map_jpeg,
-        compressed_depth: source.compressed_depth,
+        depth,
         config: source.config,
         private_gain_map_info: source.private_gain_map_info,
         base_width: split.base_width,
@@ -134,11 +171,15 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    #[test]
-    fn splits_committed_portrait_source_with_hardened_jpeg_boundaries() {
+    fn portrait_fixture() -> Vec<u8> {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic");
-        let source = fs::read(fixture).expect("read committed portrait fixture");
+        fs::read(fixture).expect("read committed portrait fixture")
+    }
+
+    #[test]
+    fn splits_committed_portrait_source_with_hardened_jpeg_boundaries() {
+        let source = portrait_fixture();
         let source = extract_oppo_portrait_source(&source).expect("extract OPPO portrait source");
         let split = split_portrait_source_image(&source.source_image)
             .expect("split adjacent base/Gain Map JPEGs");
@@ -152,10 +193,32 @@ mod tests {
     }
 
     #[test]
+    fn decodes_committed_portrait_depth_without_external_zstd() {
+        let source = portrait_fixture();
+        let source = extract_oppo_portrait_source(&source).expect("extract OPPO portrait source");
+        let depth = decode_oppo_portrait_depth(&source.compressed_depth)
+            .expect("decode and parse OPPO Portrait depth");
+
+        assert!(depth.header.width > 0);
+        assert!(depth.header.height > 0);
+        assert!(!depth.ranks.is_empty());
+        assert_eq!(
+            depth.ranks.len(),
+            usize::try_from(depth.header.width).unwrap()
+                * usize::try_from(depth.header.height).unwrap()
+        );
+    }
+
+    #[test]
     fn rejects_single_jpeg_as_portrait_source_image() {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg");
         let jpeg = fs::read(fixture).expect("read JPEG fixture");
         assert!(split_portrait_source_image(&jpeg).is_err());
+    }
+
+    #[test]
+    fn rejects_empty_compressed_depth() {
+        assert!(decode_oppo_portrait_depth(&[]).is_err());
     }
 }
