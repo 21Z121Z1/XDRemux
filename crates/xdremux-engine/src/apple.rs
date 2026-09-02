@@ -259,10 +259,7 @@ fn horizontal_maximum(row: &[u8], radius: usize, output: &mut [u8]) {
     for x in 0..row.len() {
         let right = x.saturating_add(radius).min(row.len() - 1);
         while next <= right {
-            while deque
-                .back()
-                .is_some_and(|&index| row[index] <= row[next])
-            {
+            while deque.back().is_some_and(|&index| row[index] <= row[next]) {
                 deque.pop_back();
             }
             deque.push_back(next);
