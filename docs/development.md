@@ -2,7 +2,7 @@
 
 [English](development.en.md) | 简体中文
 
-XDRemux 只有一个产品核心：Rust workspace。新的产品行为必须进入 Rust。Swift 在迁移期间只作为 Apple 平台能力层，Python 只作为迁移验证和研究工具，不再构成第二套 XDRemux runtime。
+XDRemux 只有一个产品核心：Rust workspace。唯一公开 CLI 是 Rust `xdremux` 二进制程序。新的产品行为必须进入 Rust。Swift 在迁移期间只作为 Apple 平台能力层，Python 只作为迁移验证和研究工具，不再构成第二套 XDRemux runtime。
 
 面向用户的命令行行为见 [CLI 参考](cli.md)。
 
