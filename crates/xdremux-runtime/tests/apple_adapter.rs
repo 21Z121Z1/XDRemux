@@ -79,4 +79,19 @@ fn rust_owns_oppo_portrait_source_preflight_around_imageio_observations() {
     assert!(preflight.base_height > 0);
     assert!(preflight.gain_map.supports_portrait_source());
     assert!((1.0..=4.0).contains(&preflight.config.version));
+
+    assert!((1..=8).contains(&preflight.base_orientation));
+    assert!(preflight.camera_calibration.reference_width > 0);
+    assert!(preflight.camera_calibration.reference_height > 0);
+    assert!(preflight.camera_calibration.focal_length_pixels > 0.0);
+    assert_eq!(preflight.disparity.width, preflight.depth.header.width);
+    assert_eq!(preflight.disparity.height, preflight.depth.header.height);
+    assert_eq!(
+        preflight.disparity.pixels_le_f16.len(),
+        usize::try_from(preflight.depth.header.width).unwrap()
+            * usize::try_from(preflight.depth.header.height).unwrap()
+            * 2
+    );
+    assert!(preflight.disparity.near > preflight.disparity.far);
+    assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
 }
