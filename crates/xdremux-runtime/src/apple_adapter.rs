@@ -217,11 +217,8 @@ impl AppleAdapterClient {
                 ),
             ));
         }
-        let target_bytes = checked_l8_byte_count(
-            target_width,
-            target_height,
-            "Apple CoreImage L8 output",
-        )?;
+        let target_bytes =
+            checked_l8_byte_count(target_width, target_height, "Apple CoreImage L8 output")?;
         if !spatial_sigma.is_finite()
             || spatial_sigma <= 0.0
             || !luma_sigma.is_finite()
