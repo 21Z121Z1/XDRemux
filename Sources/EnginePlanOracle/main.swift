@@ -3,7 +3,6 @@ import XDRemuxCore
 
 private struct PlanCase: Decodable {
     let name: String
-    let family: String?
     let oppoCompatibility: String?
     let inputProcessingBranch: String?
     let oppoCameraTail: String?
@@ -13,7 +12,6 @@ private struct PlanCase: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case name
-        case family
         case oppoCompatibility = "oppo_compatibility"
         case inputProcessingBranch = "input_processing_branch"
         case oppoCameraTail = "oppo_camera_tail"
@@ -25,7 +23,6 @@ private struct PlanCase: Decodable {
 
 private struct NormalizedPlan: Codable {
     let name: String
-    let family: String
     let oppoCompatibility: String
     let requestedInputProcessingBranch: String
     let effectiveInputProcessingBranch: String
@@ -63,12 +60,6 @@ private func parse<T: RawRepresentable>(
 
 private func normalize(_ testCase: PlanCase) throws -> NormalizedPlan {
     var configuration = ConversionConfiguration()
-    configuration.family = try parse(
-        testCase.family,
-        default: configuration.family,
-        caseName: testCase.name,
-        field: "family"
-    )
     configuration.oppoCompatibility = try parse(
         testCase.oppoCompatibility,
         default: configuration.oppoCompatibility,
@@ -106,7 +97,6 @@ private func normalize(_ testCase: PlanCase) throws -> NormalizedPlan {
 
     return NormalizedPlan(
         name: testCase.name,
-        family: configuration.family.rawValue,
         oppoCompatibility: configuration.oppoCompatibility.rawValue,
         requestedInputProcessingBranch: configuration.inputProcessingBranch.rawValue,
         effectiveInputProcessingBranch: effectiveBranch.rawValue,
