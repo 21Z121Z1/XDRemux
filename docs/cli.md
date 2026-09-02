@@ -2,7 +2,7 @@
 
 [English](cli.en.md) | 简体中文
 
-XDRemux 的产品入口是一个跨平台 Rust CLI：`xdremux`。输入格式、Motion Photo 与普通 ProXDR、以及 ProXDR 源代际都由程序自动识别；用户不需要选择 `family` 或底层处理分支。
+XDRemux 的产品入口是一个跨平台 Rust CLI：`xdremux`。输入类型、Motion Photo / ProXDR 路由以及 HDR / Gain Map 源结构都由程序自动识别；标准转换不要求用户选择格式、设备代际或底层处理策略。
 
 Swift 和 Python 实现目前仅作为迁移期的 conformance oracle、Apple 平台能力实现或研究/训练工具，不再定义新的 CLI 产品语义。
 
@@ -52,7 +52,7 @@ xdremux convert \
   --oppo-compatible
 ```
 
-`--oppo-compatible` 表示“生成 OPPO Gallery 兼容输出”，不是要求用户选择具体的 Gain Map、routing flag、camera tail 或处理 backend。XDRemux 会根据输入自动选择内部策略。
+`--oppo-compatible` 表示“生成 OPPO Gallery 兼容输出”。XDRemux 会根据输入和目标结果自动选择内部 Gain Map 编码、metadata routing 和平台能力。
 
 OPPO-compatible 目前只适用于 ProXDR 静态照片，不能和 Motion Photo → Live Photo 转换组合。遇到这种组合时 CLI 会明确失败，而不会静默忽略参数。
 
@@ -106,7 +106,7 @@ xdremux inspect IMG_001.heic
 xdremux inspect IMG_001.heic --json
 ```
 
-`inspect` 用于观察自动识别后的事实，例如资产类型、HDR 模式、Gain Map 数据量、Motion Photo 视频范围和 presentation timestamp。它不是转换策略配置入口。
+`inspect` 用于观察从源文件自动解析出的事实，例如资产类型、HDR 模式、Gain Map 数据量、Motion Photo 视频范围和 presentation timestamp。它不是转换策略配置入口。
 
 ## `validate`
 
@@ -117,18 +117,11 @@ xdremux validate output.heic --json
 
 `validate` 自动识别并验证 ISO HDR HEIF 或 Live Photo pair，适合脚本和 CI 在转换后做独立检查。
 
-## 为什么没有 `--family`
+## 产品意图与实现细节
 
-X6/X7 是源文件分析结果，不是用户意图。Rust engine 会根据 HDR 模式和源 metadata 自动检测需要使用的重建语义，因此 CLI 不提供 `--family auto|x6|x7`，canonical `ConversionRequest` 也不允许调用者覆盖检测结果。
+普通 CLI 只暴露会改变用户所需结果的产品意图。源结构识别、重建算法、Gain Map layout、metadata routing、camera tail 和 codec/backend 选择由 engine/runtime 根据输入与平台能力决定，不要求最终用户配置。
 
-同样，以下实现细节不属于普通产品 CLI：
-
-- `oppo-compat` 的细粒度 routing mode；
-- camera-tail 策略；
-- input-processing backend；
-- tmap serialization mode。
-
-这些策略由 engine/runtime 根据用户选择的产品目标和平台 capability 决定。需要诊断内部决策时，应通过 `inspect`、结构化日志或开发测试观察，而不是要求最终用户配置实现细节。
+需要排障时，应通过 `inspect`、结构化日志和开发测试观察自动决策，而不是把内部策略重新变成命令行参数。
 
 ## 退出状态
 
