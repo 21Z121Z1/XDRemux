@@ -36,15 +36,29 @@ private struct AuxiliaryFacts: Encodable {
     }
 }
 
+private struct GainMapFacts: Encodable {
+    let pixelFormat: UInt32
+    let width: Int
+    let height: Int
+
+    enum CodingKeys: String, CodingKey {
+        case pixelFormat = "pixel_format"
+        case width
+        case height
+    }
+}
+
 private struct AdapterResponse: Encodable {
     let schemaVersion: Int
     let capabilities: [String]?
     let auxiliary: AuxiliaryFacts?
+    let gainMap: GainMapFacts?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case capabilities
         case auxiliary
+        case gainMap = "gain_map"
     }
 }
 
@@ -73,6 +87,42 @@ private func imageIOAuxiliaryFacts(inputPath: String) -> AuxiliaryFacts {
     )
 }
 
+private func fourCC(_ string: String) -> UInt32? {
+    let bytes = Array(string.utf8)
+    guard bytes.count == 4 else { return nil }
+    return bytes.reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+}
+
+private func pixelFormat(_ value: Any?) -> UInt32? {
+    if let number = value as? NSNumber {
+        return number.uint32Value
+    }
+    if let string = value as? String {
+        return fourCC(string)
+    }
+    return nil
+}
+
+private func imageIOGainMapFacts(inputPath: String) -> GainMapFacts {
+    let inputURL = URL(fileURLWithPath: inputPath)
+    guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
+          CGImageSourceCreateImageAtIndex(source, 0, nil) != nil,
+          let auxiliary = CGImageSourceCopyAuxiliaryDataInfoAtIndex(
+              source,
+              0,
+              kCGImageAuxiliaryDataTypeISOGainMap
+          ) as? [CFString: Any],
+          let description = auxiliary[kCGImageAuxiliaryDataInfoDataDescription] as? [CFString: Any],
+          let rawPixelFormat = pixelFormat(description[kCGImagePropertyPixelFormat]),
+          let width = (description[kCGImagePropertyWidth] as? NSNumber)?.intValue,
+          let height = (description[kCGImagePropertyHeight] as? NSNumber)?.intValue,
+          width > 0,
+          height > 0 else {
+        fail("ImageIO cannot read ISO Gain Map facts from \(inputPath)", status: 1)
+    }
+    return GainMapFacts(pixelFormat: rawPixelFormat, width: width, height: height)
+}
+
 do {
     let input = FileHandle.standardInput.readDataToEndOfFile()
     guard !input.isEmpty else {
@@ -91,7 +141,8 @@ do {
         response = AdapterResponse(
             schemaVersion: schemaVersion,
             capabilities: ["photographic-styles", "portrait"],
-            auxiliary: nil
+            auxiliary: nil,
+            gainMap: nil
         )
     case "imageio-auxiliary-facts":
         guard let inputPath = request.inputPath, !inputPath.isEmpty else {
@@ -100,7 +151,18 @@ do {
         response = AdapterResponse(
             schemaVersion: schemaVersion,
             capabilities: nil,
-            auxiliary: imageIOAuxiliaryFacts(inputPath: inputPath)
+            auxiliary: imageIOAuxiliaryFacts(inputPath: inputPath),
+            gainMap: nil
+        )
+    case "imageio-gain-map-facts":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty else {
+            fail("imageio-gain-map-facts requires input_path")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: imageIOGainMapFacts(inputPath: inputPath)
         )
     default:
         fail("unsupported apple adapter operation \(request.operation)")
