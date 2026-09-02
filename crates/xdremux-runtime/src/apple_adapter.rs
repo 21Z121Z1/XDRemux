@@ -1,11 +1,11 @@
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use xdremux_engine::OperationCapability;
+use xdremux_engine::{AppleImageAuxiliaryFacts, OperationCapability};
 
 use crate::{Result, RuntimeError};
 
@@ -47,24 +47,14 @@ impl AppleAdapterClient {
     }
 
     pub(super) fn capabilities(&self) -> Result<AppleAdapterCapabilities> {
-        let request = AdapterRequest {
+        let output = self.invoke_request(AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
             operation: "capabilities",
-        };
-        let request = serde_json::to_vec(&request)
-            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
-        let output = self.invoke(&request)?;
-        let response: AdapterResponse = serde_json::from_slice(&output)
+            input_path: None,
+        })?;
+        let response: CapabilitiesResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
-        if response.schema_version != APPLE_ADAPTER_SCHEMA_VERSION {
-            return Err(RuntimeError::new(
-                "Apple adapter protocol",
-                format!(
-                    "unsupported schema_version {}; expected {}",
-                    response.schema_version, APPLE_ADAPTER_SCHEMA_VERSION
-                ),
-            ));
-        }
+        validate_schema(response.schema_version)?;
 
         let mut photographic_styles = false;
         let mut portrait = false;
@@ -84,6 +74,30 @@ impl AppleAdapterClient {
             photographic_styles,
             portrait,
         })
+    }
+
+    pub(super) fn imageio_auxiliary_facts(&self, input: &Path) -> Result<AppleImageAuxiliaryFacts> {
+        let input_path = input.to_str().ok_or_else(|| {
+            RuntimeError::new(
+                "Apple adapter protocol",
+                "input path is not valid UTF-8 for the JSON transport",
+            )
+        })?;
+        let output = self.invoke_request(AdapterRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-auxiliary-facts",
+            input_path: Some(input_path),
+        })?;
+        let response: AuxiliaryResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        Ok(response.auxiliary.into())
+    }
+
+    fn invoke_request(&self, request: AdapterRequest<'_>) -> Result<Vec<u8>> {
+        let request = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        self.invoke(&request)
     }
 
     fn invoke(&self, request: &[u8]) -> Result<Vec<u8>> {
@@ -162,12 +176,57 @@ impl AppleAdapterClient {
 struct AdapterRequest<'a> {
     schema_version: u32,
     operation: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input_path: Option<&'a str>,
 }
 
 #[derive(Debug, Deserialize)]
-struct AdapterResponse {
+struct CapabilitiesResponse {
     schema_version: u32,
     capabilities: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AuxiliaryResponse {
+    schema_version: u32,
+    auxiliary: AuxiliaryWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct AuxiliaryWire {
+    iso_gain_map: bool,
+    disparity: bool,
+    portrait_effects_matte: bool,
+    skin_matte: bool,
+    hair_matte: bool,
+    teeth_matte: bool,
+    glasses_matte: bool,
+}
+
+impl From<AuxiliaryWire> for AppleImageAuxiliaryFacts {
+    fn from(value: AuxiliaryWire) -> Self {
+        Self {
+            iso_gain_map: value.iso_gain_map,
+            disparity: value.disparity,
+            portrait_effects_matte: value.portrait_effects_matte,
+            skin_matte: value.skin_matte,
+            hair_matte: value.hair_matte,
+            teeth_matte: value.teeth_matte,
+            glasses_matte: value.glasses_matte,
+        }
+    }
+}
+
+fn validate_schema(schema_version: u32) -> Result<()> {
+    if schema_version != APPLE_ADAPTER_SCHEMA_VERSION {
+        return Err(RuntimeError::new(
+            "Apple adapter protocol",
+            format!(
+                "unsupported schema_version {schema_version}; expected {APPLE_ADAPTER_SCHEMA_VERSION}"
+            ),
+        ));
+    }
+    Ok(())
 }
 
 fn read_all(mut reader: impl Read) -> std::io::Result<Vec<u8>> {
