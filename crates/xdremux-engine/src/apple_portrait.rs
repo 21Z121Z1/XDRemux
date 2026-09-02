@@ -317,11 +317,9 @@ fn scene_activation(
         .unwrap_or(0.5)
         .clamp(0.0, 1.0);
     let near_boost = if near_object_detected { 1.15 } else { 1.0 };
-    let fitted_primary_gain = (0.02
-        + 0.17 * focus_normalized
-        + 0.04 * headroom_normalized
-        + 0.02 * lux_normalized)
-        * near_boost;
+    let fitted_primary_gain =
+        (0.02 + 0.17 * focus_normalized + 0.04 * headroom_normalized + 0.02 * lux_normalized)
+            * near_boost;
     Ok(fitted_primary_gain.clamp(0.005, 0.25) / 0.25)
 }
 
@@ -549,7 +547,10 @@ mod tests {
         let near = scene_activation(0.5, 1.0, 2.0, None, true).unwrap();
         assert!(near > activation);
         assert_eq!(scene_activation(1.0, 0.0, 0.0, None, false).unwrap(), 0.12);
-        assert_eq!(scene_activation(100.0, 1.0, 100.0, Some(4096.0), true).unwrap(), 1.0);
+        assert_eq!(
+            scene_activation(100.0, 1.0, 100.0, Some(4096.0), true).unwrap(),
+            1.0
+        );
     }
 
     #[test]
@@ -572,15 +573,9 @@ mod tests {
             ApplePortraitLensProfileId::Tele3x,
             ApplePortraitLensProfileId::Tetraprism5x,
         ] {
-            let bytes = build_apple_portrait_rendering_parameters(
-                profile,
-                0.5,
-                1.0,
-                2.0,
-                None,
-                false,
-            )
-            .expect("build rendering parameters");
+            let bytes =
+                build_apple_portrait_rendering_parameters(profile, 0.5, 1.0, 2.0, None, false)
+                    .expect("build rendering parameters");
             let document = AppleRendDocument::parse(&bytes).expect("parse rendering parameters");
             let identifiers = document
                 .records()
