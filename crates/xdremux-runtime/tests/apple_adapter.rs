@@ -163,11 +163,11 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
 
     // One Rust-owned operation now defines the full Portrait auxiliary set.
-    // The short REND string is sufficient here because this integration test
+    // The short REND value is sufficient here because this integration test
     // verifies the generic ImageIO transport and required resource kinds; the
     // recovered per-image REND policy is tested independently in the engine.
     let payloads = preflight
-        .into_auxiliary_payloads("UkVORA==")
+        .into_auxiliary_payloads(b"REND")
         .expect("assemble complete Rust-owned Portrait auxiliary manifest");
     assert_eq!(
         payloads
