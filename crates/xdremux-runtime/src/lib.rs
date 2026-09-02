@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+#[cfg(target_os = "macos")]
+mod apple_adapter;
 mod batch;
 mod batch_checkpoint;
 mod categorize;
@@ -122,6 +124,27 @@ impl PortableRuntime {
             xdremux_engine::GainMapCodec::Jpeg,
         ));
         Ok(CapabilityInventory::new(operations))
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn capability_inventory_with_apple_adapter(
+        &self,
+        executable: impl AsRef<Path>,
+    ) -> Result<CapabilityInventory> {
+        let mut operations = self.capability_inventory()?.iter().collect::<Vec<_>>();
+        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
+        operations.extend(adapter.capabilities()?.operation_capabilities());
+        Ok(CapabilityInventory::new(operations))
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn apple_image_auxiliary_facts(
+        &self,
+        executable: impl AsRef<Path>,
+        input: impl AsRef<Path>,
+    ) -> Result<xdremux_engine::AppleImageAuxiliaryFacts> {
+        apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
+            .imageio_auxiliary_facts(input.as_ref())
     }
 
     pub fn analyze_proxdr(&self, source: &[u8]) -> Result<PreparedProXdr> {
