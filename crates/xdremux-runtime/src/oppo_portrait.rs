@@ -344,12 +344,9 @@ pub(crate) fn prepare_apple_portrait_source(
         .as_ref()
         .filter(|plane| plane.iter().any(|&pixel| pixel != 0))
     {
-        let small_mask = AppleL8Mask::new(
-            depth.header.width,
-            depth.header.height,
-            hair_plane.clone(),
-        )
-        .map_err(|error| RuntimeError::external("OPPO Portrait hair prior", error))?;
+        let small_mask =
+            AppleL8Mask::new(depth.header.width, depth.header.height, hair_plane.clone())
+                .map_err(|error| RuntimeError::external("OPPO Portrait hair prior", error))?;
         Some(adapter.coreimage_edge_preserve_upsample_l8(
             source_image_file.path(),
             &small_mask,
@@ -392,21 +389,14 @@ pub(crate) fn prepare_apple_portrait_source(
         target_height,
         base_orientation,
     )?;
-    let rendered_hair = adapter.coreimage_render_l8(
-        &native_hair,
-        target_width,
-        target_height,
-        base_orientation,
-    )?;
+    let rendered_hair =
+        adapter.coreimage_render_l8(&native_hair, target_width, target_height, base_orientation)?;
     let person_fusion =
         fuse_apple_portrait_person_mask(&rendered_person, subject_prior.as_ref())
             .map_err(|error| RuntimeError::external("Apple Portrait person fusion", error))?;
-    let hair_fusion = fuse_apple_portrait_hair_mask(
-        &rendered_hair,
-        hair_prior.as_ref(),
-        &person_fusion.mask,
-    )
-    .map_err(|error| RuntimeError::external("Apple Portrait hair fusion", error))?;
+    let hair_fusion =
+        fuse_apple_portrait_hair_mask(&rendered_hair, hair_prior.as_ref(), &person_fusion.mask)
+            .map_err(|error| RuntimeError::external("Apple Portrait hair fusion", error))?;
 
     let simulated_aperture = resolve_simulated_aperture(
         source.config.version,
