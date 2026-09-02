@@ -19,10 +19,7 @@ pub struct GainMapParams {
     pub knee_source: &'static str,
 }
 
-pub fn gain_map_parameters(
-    scale: &ResolvedScale,
-    meta_floats: &[f64],
-) -> Result<GainMapParams> {
+pub fn gain_map_parameters(scale: &ResolvedScale, meta_floats: &[f64]) -> Result<GainMapParams> {
     if !scale.edr_scale.is_finite() || scale.edr_scale <= 0.0 {
         return Err(HdrError::invalid(
             "gain map params",
