@@ -182,6 +182,8 @@ fn join_reader(
 ) -> Result<Vec<u8>> {
     reader
         .join()
-        .map_err(|_| RuntimeError::new("Apple adapter output", format!("{stream} reader panicked")))?
+        .map_err(|_| {
+            RuntimeError::new("Apple adapter output", format!("{stream} reader panicked"))
+        })?
         .map_err(|error| RuntimeError::external("Apple adapter output", error))
 }
