@@ -1,9 +1,5 @@
 use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
-use xdremux_engine::{
-    build_apple_portrait_disparity, derive_apple_portrait_camera_calibration,
-    resolve_apple_portrait_base_orientation, AppleGainMapFacts, ApplePortraitCameraCalibration,
-    ApplePortraitCaptureFacts, ApplePortraitDisparity, ApplePortraitImageGeometry,
-};
+use xdremux_engine::{AppleGainMapFacts, ApplePortraitCameraCalibration, ApplePortraitDisparity};
 
 #[cfg(any(target_os = "macos", test))]
 use crate::{Result, RuntimeError};
@@ -20,6 +16,11 @@ use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
 use std::io::Write;
 #[cfg(target_os = "macos")]
 use std::path::Path;
+#[cfg(target_os = "macos")]
+use xdremux_engine::{
+    build_apple_portrait_disparity, derive_apple_portrait_camera_calibration,
+    resolve_apple_portrait_base_orientation, ApplePortraitCaptureFacts, ApplePortraitImageGeometry,
+};
 
 #[cfg(target_os = "macos")]
 use crate::apple_adapter::{AppleAdapterClient, AppleImageProperties};
