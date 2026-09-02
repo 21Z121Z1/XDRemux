@@ -67,7 +67,7 @@ mod tests {
     use super::*;
     use std::fs;
     use std::path::PathBuf;
-    use xdremux_engine::OperationCapability;
+    use xdremux_engine::{CapabilityInventory, OperationCapability};
 
     fn jpeg_fixture() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -81,8 +81,9 @@ mod tests {
         assert!(capabilities.supports(GainMapCodec::Jpeg));
         assert!(!capabilities.supports(GainMapCodec::Hevc));
 
-        let mut inventory = xdremux_engine::CapabilityInventory::default();
-        inventory.advertise_raster_decoder(&provider);
+        let inventory = CapabilityInventory::new([OperationCapability::RasterDecoder(
+            GainMapCodec::Jpeg,
+        )]);
         assert!(inventory.supports(OperationCapability::RasterDecoder(GainMapCodec::Jpeg)));
     }
 
