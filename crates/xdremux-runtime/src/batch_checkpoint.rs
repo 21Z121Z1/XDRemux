@@ -303,32 +303,19 @@ fn path_string(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    fn unique_dir() -> PathBuf {
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!(
-            "xdremux-batch-checkpoint-{}-{stamp}",
-            std::process::id()
-        ))
-    }
 
     #[test]
     fn truncated_tail_record_never_grants_reuse() {
-        let root = unique_dir();
-        fs::create_dir_all(&root).unwrap();
-        let source = root.join("source.jpg");
-        let image = root.join("source.heic");
-        let video = root.join("source.mov");
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.jpg");
+        let image = root.path().join("source.heic");
+        let video = root.path().join("source.mov");
         fs::write(&source, b"source").unwrap();
         fs::write(&image, b"image").unwrap();
         fs::write(&video, b"video").unwrap();
         let bytes = fs::read(&source).unwrap();
         let signature = source_signature(&source, &bytes).unwrap();
-        let checkpoint = root.join("state.jsonl");
+        let checkpoint = root.path().join("state.jsonl");
         let mut writer = MotionPhotoCheckpointWriter::open(&checkpoint).unwrap();
         writer
             .append_item(
@@ -349,22 +336,20 @@ mod tests {
         let prior = loaded.reusable_item(&source, &signature).unwrap().unwrap();
         assert_eq!(prior.asset_identifier, "ASSET-ID");
         assert_eq!(prior.image, fs::canonicalize(image).unwrap());
-        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn changed_source_digest_invalidates_reuse_even_when_mtime_is_irrelevant() {
-        let root = unique_dir();
-        fs::create_dir_all(&root).unwrap();
-        let source = root.join("source.jpg");
-        let image = root.join("source.heic");
-        let video = root.join("source.mov");
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.jpg");
+        let image = root.path().join("source.heic");
+        let video = root.path().join("source.mov");
         fs::write(&source, b"source-a").unwrap();
         fs::write(&image, b"image").unwrap();
         fs::write(&video, b"video").unwrap();
         let original_bytes = fs::read(&source).unwrap();
         let original = source_signature(&source, &original_bytes).unwrap();
-        let checkpoint = root.join("state.jsonl");
+        let checkpoint = root.path().join("state.jsonl");
         let mut writer = MotionPhotoCheckpointWriter::open(&checkpoint).unwrap();
         writer
             .append_item(
@@ -382,6 +367,5 @@ mod tests {
         let changed = source_signature(&source, &changed_bytes).unwrap();
         let loaded = MotionPhotoCheckpoint::load(&checkpoint).unwrap();
         assert!(loaded.reusable_item(&source, &changed).unwrap().is_none());
-        fs::remove_dir_all(root).unwrap();
     }
 }
