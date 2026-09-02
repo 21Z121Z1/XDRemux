@@ -2,11 +2,13 @@ use crate::{portrait_blocks, ContainerError, Result};
 
 const CONFIG_CONTEXT: &str = "rear.depth.config";
 const SOURCE_CONTEXT: &str = "OPPO portrait source";
+const DEPTH_CONTEXT: &str = "decoded rear.depth";
 const MAX_DIMENSION: i32 = 16_384;
 const BLUR_SAMPLE_COUNT: usize = 32;
 const FACE_KEYPOINT_COUNT: usize = 296;
 const MAX_FACE_COUNT: i32 = 10;
 const V4_MINIMUM_BYTES: usize = 27_260;
+const DEPTH_HEADER_BYTES: usize = 0x300;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OppoPortraitFace {
@@ -62,6 +64,87 @@ pub struct OppoPortraitSource {
     pub private_gain_map_info: Option<Vec<u8>>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct OppoPortraitDepthHeader {
+    pub width: u32,
+    pub height: u32,
+    pub rank_disparity_scale: f32,
+    pub focal_length_pixels: f32,
+    pub stereo_baseline: f32,
+    pub hair_plane_present: bool,
+    pub portrait_plane_present: bool,
+    pub pet_plane_present: bool,
+    pub near_object_detected: bool,
+    pub near_object_confidence: Option<f32>,
+    pub plant_object_state: u8,
+    pub disparity_minimum: u16,
+    pub disparity_maximum: u16,
+    pub disparity_exponentiation: u8,
+    pub auxiliary_width: Option<u32>,
+    pub auxiliary_height: Option<u32>,
+    pub model_output_present: bool,
+    pub scene_class: i32,
+    pub object_distance: Option<u32>,
+    pub aec_lux_index: Option<f32>,
+    pub app_zoom_ratio: Option<f32>,
+}
+
+impl OppoPortraitDepthHeader {
+    pub fn native_float_depth(&self, rank: f64) -> Option<f64> {
+        if !rank.is_finite() || !(1..=2).contains(&self.disparity_exponentiation) {
+            return None;
+        }
+        let minimum = f64::from(self.disparity_minimum);
+        let maximum = f64::from(self.disparity_maximum);
+        if maximum <= minimum {
+            return None;
+        }
+        let normalized = (rank / 255.0).clamp(0.0, 1.0)
+            .powi(i32::from(self.disparity_exponentiation));
+        let internal_disparity = 65_535.0 - (minimum + normalized * (maximum - minimum));
+        if !internal_disparity.is_finite() || internal_disparity < 0.0 {
+            return None;
+        }
+        let denominator = (internal_disparity * f64::from(self.rank_disparity_scale)).max(0.00001);
+        Some(
+            (f64::from(self.focal_length_pixels) * f64::from(self.stereo_baseline) / denominator)
+                .min(140_000.0),
+        )
+    }
+
+    pub fn rank_for_native_float_depth(&self, depth: f64) -> Option<f64> {
+        if !depth.is_finite()
+            || depth <= 0.0
+            || self.rank_disparity_scale <= 0.0
+            || self.focal_length_pixels <= 0.0
+            || self.stereo_baseline <= 0.0
+            || !(1..=2).contains(&self.disparity_exponentiation)
+        {
+            return None;
+        }
+        let minimum = f64::from(self.disparity_minimum);
+        let maximum = f64::from(self.disparity_maximum);
+        if maximum <= minimum {
+            return None;
+        }
+        let internal_disparity =
+            (f64::from(self.focal_length_pixels) * f64::from(self.stereo_baseline) / depth)
+                / f64::from(self.rank_disparity_scale);
+        let normalized = (65_535.0 - internal_disparity - minimum) / (maximum - minimum);
+        let exponent = 1.0 / f64::from(self.disparity_exponentiation);
+        Some(255.0 * normalized.clamp(0.0, 1.0).powf(exponent))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OppoPortraitDepth {
+    pub header: OppoPortraitDepthHeader,
+    pub ranks: Vec<u8>,
+    pub hair: Option<Vec<u8>>,
+    pub portrait: Option<Vec<u8>>,
+    pub pet: Option<Vec<u8>>,
+}
+
 fn truncated(field: &str) -> ContainerError {
     ContainerError::invalid(CONFIG_CONTEXT, format!("truncated at {field}"))
 }
@@ -74,6 +157,10 @@ fn missing_source_block(name: &str) -> ContainerError {
     ContainerError::invalid(SOURCE_CONTEXT, format!("missing {name}"))
 }
 
+fn depth_invalid(detail: impl Into<String>) -> ContainerError {
+    ContainerError::invalid(DEPTH_CONTEXT, detail)
+}
+
 fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[u8; N]> {
     data.get(offset..)
         .and_then(|remaining| remaining.first_chunk::<N>())
@@ -83,6 +170,30 @@ fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result
 
 fn read_i32_le(data: &[u8], offset: usize, field: &str) -> Result<i32> {
     Ok(i32::from_le_bytes(read_bytes(data, offset, field)?))
+}
+
+fn read_u16_le_at(data: &[u8], offset: usize) -> Option<u16> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<2>())
+        .map(|bytes| u16::from_le_bytes(*bytes))
+}
+
+fn read_u32_le_at(data: &[u8], offset: usize) -> Option<u32> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<4>())
+        .map(|bytes| u32::from_le_bytes(*bytes))
+}
+
+fn read_i32_le_at(data: &[u8], offset: usize) -> Option<i32> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<4>())
+        .map(|bytes| i32::from_le_bytes(*bytes))
+}
+
+fn read_f32_raw_le_at(data: &[u8], offset: usize) -> Option<f32> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<4>())
+        .map(|bytes| f32::from_le_bytes(*bytes))
 }
 
 fn read_f32_le(data: &[u8], offset: usize, field: &str) -> Result<f32> {
@@ -320,6 +431,114 @@ pub fn extract_oppo_portrait_source(data: &[u8]) -> Result<OppoPortraitSource> {
     })
 }
 
+/// Parse the decompressed OPPO `rear.depth` producer record and its same-sized
+/// semantic planes. Decompression is intentionally outside this function so the
+/// binary contract is independent of compression transport.
+pub fn parse_oppo_portrait_depth(data: &[u8]) -> Result<OppoPortraitDepth> {
+    if data.len() < DEPTH_HEADER_BYTES {
+        return Err(depth_invalid("shorter than its 768-byte header"));
+    }
+
+    let width = read_u32_le_at(data, 0).ok_or_else(|| depth_invalid("missing width"))?;
+    let height = read_u32_le_at(data, 4).ok_or_else(|| depth_invalid("missing height"))?;
+    if width == 0 || height == 0 || width > 16_384 || height > 16_384 {
+        return Err(depth_invalid("header dimensions are invalid"));
+    }
+
+    let required_positive_f32 = |offset, field| -> Result<f32> {
+        let value = read_f32_raw_le_at(data, offset).ok_or_else(|| depth_invalid(field))?;
+        if !value.is_finite() || value <= 0.0 {
+            return Err(depth_invalid(format!("invalid {field}")));
+        }
+        Ok(value)
+    };
+    let rank_disparity_scale = required_positive_f32(0x18, "rank disparity scale")?;
+    let focal_length_pixels = required_positive_f32(0x1c, "focal length")?;
+    let stereo_baseline = required_positive_f32(0x20, "stereo baseline")?;
+
+    let plane_size = usize::try_from(width)
+        .ok()
+        .and_then(|width| usize::try_from(height).ok().and_then(|height| width.checked_mul(height)))
+        .ok_or_else(|| depth_invalid("rank plane size overflows"))?;
+    let rank_end = DEPTH_HEADER_BYTES
+        .checked_add(plane_size)
+        .ok_or_else(|| depth_invalid("rank plane end overflows"))?;
+    if rank_end > data.len() {
+        return Err(depth_invalid("rank plane is truncated"));
+    }
+
+    let disparity_minimum =
+        read_u16_le_at(data, 0x2e).ok_or_else(|| depth_invalid("missing disparity minimum"))?;
+    let disparity_maximum =
+        read_u16_le_at(data, 0x30).ok_or_else(|| depth_invalid("missing disparity maximum"))?;
+    let disparity_exponentiation = data[0x32];
+    if !(1..=2).contains(&disparity_exponentiation) || disparity_maximum <= disparity_minimum {
+        return Err(depth_invalid("quantization range is invalid"));
+    }
+
+    let finite_optional = |offset| {
+        read_f32_raw_le_at(data, offset).and_then(|value| value.is_finite().then_some(value))
+    };
+    let positive_optional_u32 = |offset| read_u32_le_at(data, offset).filter(|value| *value > 0);
+    let positive_optional_i32 = |offset| {
+        read_i32_le_at(data, offset).and_then(|value| u32::try_from(value).ok().filter(|v| *v > 0))
+    };
+    let app_zoom_ratio = finite_optional(0x1bc).filter(|value| *value > 0.0);
+
+    let header = OppoPortraitDepthHeader {
+        width,
+        height,
+        rank_disparity_scale,
+        focal_length_pixels,
+        stereo_baseline,
+        hair_plane_present: data[0x24] != 0,
+        portrait_plane_present: data[0x25] != 0,
+        pet_plane_present: data[0x26] != 0,
+        near_object_detected: data[0x27] != 0,
+        near_object_confidence: finite_optional(0x28),
+        plant_object_state: data[0x2c],
+        disparity_minimum,
+        disparity_maximum,
+        disparity_exponentiation,
+        auxiliary_width: positive_optional_u32(0x188),
+        auxiliary_height: positive_optional_u32(0x18c),
+        model_output_present: data[0x190] != 0,
+        scene_class: read_i32_le_at(data, 0x1b0).ok_or_else(|| depth_invalid("missing scene class"))?,
+        object_distance: positive_optional_i32(0x1b4),
+        aec_lux_index: finite_optional(0x1b8),
+        app_zoom_ratio,
+    };
+
+    let ranks = data[DEPTH_HEADER_BYTES..rank_end].to_vec();
+    let mut cursor = rank_end;
+    let mut consume_plane = |present: bool, name: &str| -> Result<Option<Vec<u8>>> {
+        if !present {
+            return Ok(None);
+        }
+        let end = cursor
+            .checked_add(plane_size)
+            .ok_or_else(|| depth_invalid(format!("{name} plane end overflows")))?;
+        let plane = data
+            .get(cursor..end)
+            .ok_or_else(|| depth_invalid(format!("too short for flagged {name} plane")))?
+            .to_vec();
+        cursor = end;
+        Ok(Some(plane))
+    };
+
+    let hair = consume_plane(header.hair_plane_present, "hair")?;
+    let portrait = consume_plane(header.portrait_plane_present, "portrait")?;
+    let pet = consume_plane(header.pet_plane_present, "pet")?;
+
+    Ok(OppoPortraitDepth {
+        header,
+        ranks,
+        hair,
+        portrait,
+        pet,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,6 +546,14 @@ mod tests {
     use std::path::PathBuf;
 
     fn put_i32(data: &mut [u8], offset: usize, value: i32) {
+        data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn put_u16(data: &mut [u8], offset: usize, value: u16) {
+        data[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn put_u32(data: &mut [u8], offset: usize, value: u32) {
         data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
     }
 
@@ -347,6 +574,37 @@ mod tests {
         }
         put_i32(&mut data, 276, 20);
         put_i32(&mut data, 280, 0);
+        data
+    }
+
+    fn depth_record(exponentiation: u8, semantic_planes: usize) -> Vec<u8> {
+        let width = 16_u32;
+        let height = 16_u32;
+        let plane_size = usize::try_from(width * height).unwrap();
+        let mut data = vec![0_u8; DEPTH_HEADER_BYTES + plane_size * (1 + semantic_planes)];
+        put_u32(&mut data, 0, width);
+        put_u32(&mut data, 4, height);
+        put_f32(&mut data, 0x18, 0.00345042);
+        put_f32(&mut data, 0x1c, 4098.0234);
+        put_f32(&mut data, 0x20, 38.844524);
+        put_f32(&mut data, 0x28, 0.75);
+        data[0x2c] = 3;
+        put_u16(&mut data, 0x2e, 11_560);
+        put_u16(&mut data, 0x30, 38_858);
+        data[0x32] = exponentiation;
+        put_u32(&mut data, 0x188, 32);
+        put_u32(&mut data, 0x18c, 24);
+        data[0x190] = 1;
+        put_i32(&mut data, 0x1b0, 3);
+        put_i32(&mut data, 0x1b4, 102);
+        put_f32(&mut data, 0x1b8, 324.54495);
+        put_f32(&mut data, 0x1bc, 6.0);
+        for (index, value) in data[DEPTH_HEADER_BYTES..DEPTH_HEADER_BYTES + plane_size]
+            .iter_mut()
+            .enumerate()
+        {
+            *value = (index % 256) as u8;
+        }
         data
     }
 
@@ -424,7 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_non_finite_or_truncated_records() {
+    fn rejects_non_finite_or_truncated_config_records() {
         let mut invalid_version = base_config(1.0, 284);
         put_f32(&mut invalid_version, 0, f32::NAN);
         assert!(parse_oppo_portrait_config(&invalid_version).is_err());
@@ -447,5 +705,52 @@ mod tests {
     #[test]
     fn rejects_committed_non_portrait_fixture_as_portrait_source() {
         assert!(extract_oppo_portrait_source(&fixture("uhdr-hr-01.heic")).is_err());
+    }
+
+    #[test]
+    fn parses_depth_header_and_flagged_planes() {
+        let plane_size = 16 * 16;
+        let mut data = depth_record(1, 3);
+        data[0x24] = 1;
+        data[0x25] = 1;
+        data[0x26] = 1;
+        let hair_start = DEPTH_HEADER_BYTES + plane_size;
+        let portrait_start = hair_start + plane_size;
+        let pet_start = portrait_start + plane_size;
+        data[hair_start..portrait_start].fill(11);
+        data[portrait_start..pet_start].fill(22);
+        data[pet_start..pet_start + plane_size].fill(33);
+
+        let depth = parse_oppo_portrait_depth(&data).unwrap();
+        assert_eq!((depth.header.width, depth.header.height), (16, 16));
+        assert_eq!(depth.header.scene_class, 3);
+        assert_eq!(depth.header.object_distance, Some(102));
+        assert_eq!(depth.header.app_zoom_ratio, Some(6.0));
+        assert_eq!(depth.ranks.len(), plane_size);
+        assert_eq!(depth.hair.as_ref().unwrap()[0], 11);
+        assert_eq!(depth.portrait.as_ref().unwrap()[0], 22);
+        assert_eq!(depth.pet.as_ref().unwrap()[0], 33);
+    }
+
+    #[test]
+    fn depth_rank_mapping_matches_producer_round_trip() {
+        for exponentiation in [1_u8, 2_u8] {
+            let depth = parse_oppo_portrait_depth(&depth_record(exponentiation, 0)).unwrap();
+            for rank in [0.0, 1.0, 63.5, 127.0, 191.5, 254.0, 255.0] {
+                let native = depth.header.native_float_depth(rank).unwrap();
+                let reconstructed = depth.header.rank_for_native_float_depth(native).unwrap();
+                assert!((reconstructed - rank).abs() <= 1e-5);
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_depth_quantization_and_missing_flagged_plane() {
+        let mut invalid = depth_record(3, 0);
+        assert!(parse_oppo_portrait_depth(&invalid).is_err());
+
+        invalid = depth_record(1, 0);
+        invalid[0x24] = 1;
+        assert!(parse_oppo_portrait_depth(&invalid).is_err());
     }
 }
