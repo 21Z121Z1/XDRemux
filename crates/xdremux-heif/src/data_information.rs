@@ -256,14 +256,23 @@ mod tests {
             .unwrap()
             .remove(0);
         assert_eq!(dref_header.kind, DREF);
-        assert_eq!(&dinf[dref_header.data_start..dref_header.data_start + 4], &[0, 0, 0, 0]);
-        assert_eq!(&dinf[dref_header.data_start + 4..dref_header.data_start + 8], &1_u32.to_be_bytes());
+        assert_eq!(
+            &dinf[dref_header.data_start..dref_header.data_start + 4],
+            &[0, 0, 0, 0]
+        );
+        assert_eq!(
+            &dinf[dref_header.data_start + 4..dref_header.data_start + 8],
+            &1_u32.to_be_bytes()
+        );
 
         let url_start = dref_header.data_start + 8;
         let url_header = parse_boxes(&dinf, url_start..dref_header.data_end)
             .unwrap()
             .remove(0);
         assert_eq!(url_header.kind, URL_);
-        assert_eq!(&dinf[url_header.data_start..url_header.data_end], &[0, 0, 0, 1]);
+        assert_eq!(
+            &dinf[url_header.data_start..url_header.data_end],
+            &[0, 0, 0, 1]
+        );
     }
 }
