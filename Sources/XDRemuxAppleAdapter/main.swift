@@ -11,6 +11,7 @@ private struct AdapterRequest: Decodable {
     let roles: [String]?
     let orientation: UInt32?
     let auxiliaryPayloads: [AuxiliaryPayloadRequest]?
+    let edgePreserveUpsample: EdgePreserveUpsampleRequest?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -20,6 +21,27 @@ private struct AdapterRequest: Decodable {
         case roles
         case orientation
         case auxiliaryPayloads = "auxiliary_payloads"
+        case edgePreserveUpsample = "edge_preserve_upsample"
+    }
+}
+
+private struct EdgePreserveUpsampleRequest: Decodable {
+    let smallMaskPath: String
+    let smallWidth: UInt32
+    let smallHeight: UInt32
+    let targetWidth: UInt32
+    let targetHeight: UInt32
+    let spatialSigma: Float
+    let lumaSigma: Float
+
+    enum CodingKeys: String, CodingKey {
+        case smallMaskPath = "small_mask_path"
+        case smallWidth = "small_width"
+        case smallHeight = "small_height"
+        case targetWidth = "target_width"
+        case targetHeight = "target_height"
+        case spatialSigma = "spatial_sigma"
+        case lumaSigma = "luma_sigma"
     }
 }
 
@@ -397,6 +419,33 @@ do {
                 roles: roles,
                 orientationOverride: request.orientation
             )
+        )
+    case "coreimage-edge-preserve-upsample-l8":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let configuration = request.edgePreserveUpsample else {
+            fail(
+                "coreimage-edge-preserve-upsample-l8 requires input_path, output_path, and edge_preserve_upsample"
+            )
+        }
+        try edgePreserveUpsampleL8(
+            guidePath: inputPath,
+            smallMaskPath: configuration.smallMaskPath,
+            outputPath: outputPath,
+            smallWidth: Int(configuration.smallWidth),
+            smallHeight: Int(configuration.smallHeight),
+            targetWidth: Int(configuration.targetWidth),
+            targetHeight: Int(configuration.targetHeight),
+            spatialSigma: configuration.spatialSigma,
+            lumaSigma: configuration.lumaSigma
+        )
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil
         )
     case "imageio-write-auxiliary":
         guard let inputPath = request.inputPath, !inputPath.isEmpty,
