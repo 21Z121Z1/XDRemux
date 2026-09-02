@@ -21,8 +21,9 @@ use std::path::Path;
 #[cfg(target_os = "macos")]
 use xdremux_engine::{
     build_apple_portrait_disparity, derive_apple_portrait_camera_calibration,
-    fuse_apple_portrait_person_mask, resolve_apple_portrait_base_orientation,
-    ApplePortraitCaptureFacts, ApplePortraitImageGeometry, AppleSemanticRole,
+    fuse_apple_portrait_hair_mask, fuse_apple_portrait_person_mask,
+    resolve_apple_portrait_base_orientation, ApplePortraitCaptureFacts, ApplePortraitImageGeometry,
+    AppleSemanticRole,
 };
 
 #[cfg(target_os = "macos")]
@@ -50,6 +51,8 @@ pub struct ApplePortraitSourcePreflight {
     pub disparity: ApplePortraitDisparity,
     pub portrait_effects_matte: AppleL8Mask,
     pub subject_prior_used: bool,
+    pub hair_matte: AppleL8Mask,
+    pub hair_prior_added_high_confidence: bool,
     pub simulated_aperture: f64,
 }
 
@@ -315,9 +318,9 @@ pub(crate) fn prepare_apple_portrait_source(
         ));
     }
 
-    // The producer's portrait plane is only a topology prior. Rust owns whether
-    // it participates in the final Portrait Effects Matte; Core Image only
-    // executes the edge-preserving resize primitive.
+    // Producer semantic planes are topology priors only. Rust owns whether they
+    // participate in final Apple mattes; Core Image executes only the shared
+    // edge-preserving resize primitive.
     let subject_prior = if let Some(portrait_plane) = depth.portrait.as_ref() {
         let small_mask = AppleL8Mask::new(
             depth.header.width,
@@ -336,13 +339,35 @@ pub(crate) fn prepare_apple_portrait_source(
     } else {
         None
     };
+    let hair_prior = if let Some(hair_plane) = depth
+        .hair
+        .as_ref()
+        .filter(|plane| plane.iter().any(|&pixel| pixel != 0))
+    {
+        let small_mask = AppleL8Mask::new(
+            depth.header.width,
+            depth.header.height,
+            hair_plane.clone(),
+        )
+        .map_err(|error| RuntimeError::external("OPPO Portrait hair prior", error))?;
+        Some(adapter.coreimage_edge_preserve_upsample_l8(
+            source_image_file.path(),
+            &small_mask,
+            target_width,
+            target_height,
+            OPPO_PORTRAIT_PRIOR_SPATIAL_SIGMA,
+            OPPO_PORTRAIT_PRIOR_LUMA_SIGMA,
+        )?)
+    } else {
+        None
+    };
 
-    // Vision reports the native person matte. Rust chooses the orientation and
-    // target geometry, then asks Core Image to reproduce the legacy stored-pixel
-    // transform before applying Rust-owned prior fusion policy.
+    // Vision reports native semantic observations. Rust chooses the requested
+    // roles, orientation and target geometry, then Core Image reproduces the
+    // legacy stored-pixel transform before Rust-owned fusion policy runs.
     let mut vision_masks = adapter.vision_semantic_mattes(
         source_image_file.path(),
-        &[AppleSemanticRole::Person],
+        &[AppleSemanticRole::Person, AppleSemanticRole::Hair],
         Some(u32::from(base_orientation)),
     )?;
     let native_person = vision_masks
@@ -353,8 +378,22 @@ pub(crate) fn prepare_apple_portrait_source(
                 "Vision omitted the requested person matte",
             )
         })?;
+    let native_hair = vision_masks
+        .remove(&AppleSemanticRole::Hair)
+        .ok_or_else(|| {
+            RuntimeError::new(
+                "Apple Portrait hair matte",
+                "Vision omitted the requested hair matte",
+            )
+        })?;
     let rendered_person = adapter.coreimage_render_l8(
         &native_person,
+        target_width,
+        target_height,
+        base_orientation,
+    )?;
+    let rendered_hair = adapter.coreimage_render_l8(
+        &native_hair,
         target_width,
         target_height,
         base_orientation,
@@ -362,6 +401,12 @@ pub(crate) fn prepare_apple_portrait_source(
     let person_fusion =
         fuse_apple_portrait_person_mask(&rendered_person, subject_prior.as_ref())
             .map_err(|error| RuntimeError::external("Apple Portrait person fusion", error))?;
+    let hair_fusion = fuse_apple_portrait_hair_mask(
+        &rendered_hair,
+        hair_prior.as_ref(),
+        &person_fusion.mask,
+    )
+    .map_err(|error| RuntimeError::external("Apple Portrait hair fusion", error))?;
 
     let simulated_aperture = resolve_simulated_aperture(
         source.config.version,
@@ -384,6 +429,8 @@ pub(crate) fn prepare_apple_portrait_source(
         disparity,
         portrait_effects_matte: person_fusion.mask,
         subject_prior_used: person_fusion.used_prior,
+        hair_matte: hair_fusion.mask,
+        hair_prior_added_high_confidence: hair_fusion.prior_added_high_confidence,
         simulated_aperture,
     })
 }

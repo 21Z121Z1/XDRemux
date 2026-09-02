@@ -3,7 +3,10 @@
 use std::fs;
 use std::path::PathBuf;
 
-use xdremux_engine::{build_apple_portrait_effects_matte_payload, OperationCapability};
+use xdremux_engine::{
+    build_apple_portrait_effects_matte_payload, build_apple_semantic_matte_payload,
+    AppleSemanticRole, OperationCapability,
+};
 use xdremux_runtime::PortableRuntime;
 
 const ADAPTER_TEST_EXECUTABLE: &str = "XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE";
@@ -127,6 +130,29 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     assert!(!preflight.subject_prior_used || preflight.depth.portrait.is_some());
     build_apple_portrait_effects_matte_payload(matte.width, matte.height, matte.pixels.clone())
         .expect("Rust-owned fused person matte must be directly payload-ready");
+
+    let hair = &preflight.hair_matte;
+    assert_eq!(hair.width, preflight.base_width / 2);
+    assert_eq!(hair.height, preflight.base_height / 2);
+    assert_eq!(
+        hair.pixels.len(),
+        usize::try_from(hair.width).unwrap() * usize::try_from(hair.height).unwrap()
+    );
+    assert!(
+        !preflight.hair_prior_added_high_confidence
+            || preflight
+                .depth
+                .hair
+                .as_ref()
+                .is_some_and(|plane| plane.iter().any(|&pixel| pixel != 0))
+    );
+    build_apple_semantic_matte_payload(
+        AppleSemanticRole::Hair,
+        hair.width,
+        hair.height,
+        hair.pixels.clone(),
+    )
+    .expect("Rust-owned fused hair matte must be directly payload-ready");
 
     assert!((1.0..=64.0).contains(&preflight.simulated_aperture));
 }

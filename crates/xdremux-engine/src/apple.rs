@@ -141,9 +141,7 @@ pub fn fuse_apple_portrait_person_mask(
         });
     };
     validate_mask(prior)?;
-    if vision.width != prior.width || vision.height != prior.height {
-        return Err(AppleL8MaskError::GeometryMismatch);
-    }
+    ensure_same_geometry(vision, prior)?;
 
     let mut overlap = 0_usize;
     let mut prior_support = 0_usize;
@@ -184,6 +182,63 @@ pub fn fuse_apple_portrait_person_mask(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApplePortraitHairFusion {
+    pub mask: AppleL8Mask,
+    /// Whether the OPPO prior added at least one >=128 pixel that Vision had
+    /// below 128. Low-confidence prior changes are preserved even when false,
+    /// matching the legacy producer policy exactly.
+    pub prior_added_high_confidence: bool,
+}
+
+/// Fuse a Vision hair matte with the OPPO hair topology prior.
+///
+/// The OPPO prior may supplement Vision only inside the already fused person
+/// matte. This keeps producer hair topology from leaking into background pixels
+/// while preserving Vision as the high-resolution boundary source.
+pub fn fuse_apple_portrait_hair_mask(
+    vision: &AppleL8Mask,
+    prior: Option<&AppleL8Mask>,
+    person: &AppleL8Mask,
+) -> Result<ApplePortraitHairFusion, AppleL8MaskError> {
+    validate_mask(vision)?;
+    validate_mask(person)?;
+    ensure_same_geometry(vision, person)?;
+
+    let Some(prior) = prior else {
+        return Ok(ApplePortraitHairFusion {
+            mask: vision.clone(),
+            prior_added_high_confidence: false,
+        });
+    };
+    validate_mask(prior)?;
+    ensure_same_geometry(vision, prior)?;
+
+    let mut prior_added_high_confidence = false;
+    let pixels = vision
+        .pixels
+        .iter()
+        .zip(&prior.pixels)
+        .zip(&person.pixels)
+        .map(|((&vision_pixel, &prior_pixel), &person_pixel)| {
+            let fused = vision_pixel.max(prior_pixel.min(person_pixel));
+            if vision_pixel < 128 && fused >= 128 {
+                prior_added_high_confidence = true;
+            }
+            fused
+        })
+        .collect();
+
+    Ok(ApplePortraitHairFusion {
+        mask: AppleL8Mask {
+            width: vision.width,
+            height: vision.height,
+            pixels,
+        },
+        prior_added_high_confidence,
+    })
+}
+
 fn mask_len(width: u32, height: u32) -> Result<usize, AppleL8MaskError> {
     if width == 0 || height == 0 {
         return Err(AppleL8MaskError::InvalidGeometry);
@@ -205,6 +260,13 @@ fn validate_mask(mask: &AppleL8Mask) -> Result<(), AppleL8MaskError> {
             expected,
             actual: mask.pixels.len(),
         });
+    }
+    Ok(())
+}
+
+fn ensure_same_geometry(left: &AppleL8Mask, right: &AppleL8Mask) -> Result<(), AppleL8MaskError> {
+    if left.width != right.width || left.height != right.height {
+        return Err(AppleL8MaskError::GeometryMismatch);
     }
     Ok(())
 }
@@ -397,6 +459,48 @@ mod tests {
         assert!(fusion.used_prior);
         assert_eq!(fusion.mask.pixels[index(9, 7, 3)], 200);
         assert_eq!(fusion.mask.pixels[index(9, 8, 8)], 0);
+    }
+
+    #[test]
+    fn portrait_hair_without_prior_is_vision_only() {
+        let vision = mask(2, 2, vec![0, 64, 128, 255]);
+        let person = mask(2, 2, vec![255; 4]);
+
+        let fusion = fuse_apple_portrait_hair_mask(&vision, None, &person).unwrap();
+        assert_eq!(fusion.mask, vision);
+        assert!(!fusion.prior_added_high_confidence);
+    }
+
+    #[test]
+    fn portrait_hair_prior_is_gated_by_fused_person_matte() {
+        let vision = mask(2, 2, vec![0, 0, 180, 0]);
+        let prior = mask(2, 2, vec![255, 255, 255, 64]);
+        let person = mask(2, 2, vec![255, 0, 200, 255]);
+
+        let fusion = fuse_apple_portrait_hair_mask(&vision, Some(&prior), &person).unwrap();
+        assert_eq!(fusion.mask.pixels, vec![255, 0, 200, 64]);
+        assert!(fusion.prior_added_high_confidence);
+    }
+
+    #[test]
+    fn portrait_hair_preserves_low_confidence_prior_without_claiming_acceptance() {
+        let vision = mask(2, 2, vec![0, 10, 20, 30]);
+        let prior = mask(2, 2, vec![100, 90, 80, 70]);
+        let person = mask(2, 2, vec![100; 4]);
+
+        let fusion = fuse_apple_portrait_hair_mask(&vision, Some(&prior), &person).unwrap();
+        assert_eq!(fusion.mask.pixels, vec![100, 90, 80, 70]);
+        assert!(!fusion.prior_added_high_confidence);
+    }
+
+    #[test]
+    fn portrait_hair_requires_shared_geometry() {
+        let vision = mask(2, 2, vec![0; 4]);
+        let person = mask(1, 4, vec![0; 4]);
+        assert_eq!(
+            fuse_apple_portrait_hair_mask(&vision, None, &person),
+            Err(AppleL8MaskError::GeometryMismatch)
+        );
     }
 
     #[test]
