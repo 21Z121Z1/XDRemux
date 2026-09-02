@@ -8,8 +8,8 @@ const REND_MAGIC: [u8; 4] = *b"REND";
 
 /// Dynamic REND record identifiers controlled by the recovered XHLRB logic.
 pub const APPLE_XHLRB_DYNAMIC_RECORD_IDS: [u16; 14] = [
-    0x0190, 0x0191, 0x0192, 0x0193, 0x0194, 0x0195, 0x0196, 0x0197, 0x0198, 0x0199,
-    0x01c2, 0x01c3, 0x01c4, 0x01c5,
+    0x0190, 0x0191, 0x0192, 0x0193, 0x0194, 0x0195, 0x0196, 0x0197, 0x0198, 0x0199, 0x01c2, 0x01c3,
+    0x01c4, 0x01c5,
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,7 +36,10 @@ impl fmt::Display for AppleRendError {
                 "REND record 0x{identifier:04x} uses unsupported type {value_type}"
             ),
             Self::DuplicateIdentifier(identifier) => {
-                write!(formatter, "REND contains duplicate record 0x{identifier:04x}")
+                write!(
+                    formatter,
+                    "REND contains duplicate record 0x{identifier:04x}"
+                )
             }
             Self::NonFiniteControlInput(name) => {
                 write!(formatter, "XHLRB control input {name} must be finite")
@@ -110,8 +113,8 @@ impl AppleRendDocument {
             return Err(AppleRendError::InvalidHeader);
         }
 
-        let declared_length = usize::try_from(read_u32_le(data, 8)?)
-            .map_err(|_| AppleRendError::InvalidLength)?;
+        let declared_length =
+            usize::try_from(read_u32_le(data, 8)?).map_err(|_| AppleRendError::InvalidLength)?;
         if declared_length != data.len()
             || declared_length < REND_HEADER_BYTES
             || !(declared_length - REND_HEADER_BYTES).is_multiple_of(REND_RECORD_BYTES)
@@ -161,7 +164,8 @@ impl AppleRendDocument {
             .checked_mul(REND_RECORD_BYTES)
             .and_then(|bytes| bytes.checked_add(REND_HEADER_BYTES))
             .ok_or(AppleRendError::InvalidLength)?;
-        let declared_length = u32::try_from(payload_bytes).map_err(|_| AppleRendError::InvalidLength)?;
+        let declared_length =
+            u32::try_from(payload_bytes).map_err(|_| AppleRendError::InvalidLength)?;
 
         let mut output = Vec::with_capacity(payload_bytes);
         output.extend_from_slice(&REND_MAGIC);
@@ -252,7 +256,10 @@ impl AppleXhlrbControlOutput {
                 float(0x0199, 0.0),
                 float(0x01c2, 8.0 * secondary_activation),
                 float(0x01c3, maximum_obscene_weight_gain * secondary_activation),
-                float(0x01c4, maximum_obscene_intensity_gain * secondary_activation),
+                float(
+                    0x01c4,
+                    maximum_obscene_intensity_gain * secondary_activation,
+                ),
                 float(0x01c5, headroom),
             ],
         })
@@ -366,7 +373,13 @@ mod tests {
         let headroom = 3.466_976_881_027_221_7;
         let output = AppleXhlrbControlOutput::make(false, 1.0, headroom).unwrap();
         let records = output.records();
-        assert_eq!(records.map(|record| record.identifier), APPLE_XHLRB_DYNAMIC_RECORD_IDS);
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.identifier)
+                .collect::<Vec<_>>(),
+            APPLE_XHLRB_DYNAMIC_RECORD_IDS.to_vec()
+        );
         assert_eq!(records[0].integer_value(), Some(50));
         assert_eq!(records[1].float_value(), Some(0.25));
         assert_eq!(records[2].float_value(), Some(12.0));
