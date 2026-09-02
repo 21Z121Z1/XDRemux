@@ -21,11 +21,11 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
-      - name: Normalize Rust workspace
+      - name: Normalize Portrait engine migration
         shell: bash
         run: |
           set -euo pipefail
-          cargo check --workspace
+          cargo check -p xdremux-engine
           cargo fmt --all
           if git diff --quiet; then
             exit 0
