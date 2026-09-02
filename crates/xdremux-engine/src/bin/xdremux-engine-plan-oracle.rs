@@ -10,7 +10,6 @@ use xdremux_engine::{
 #[derive(Debug, Deserialize)]
 struct PlanCase {
     name: String,
-    family: Option<String>,
     oppo_compatibility: Option<String>,
     input_processing_branch: Option<String>,
     oppo_camera_tail: Option<String>,
@@ -23,7 +22,6 @@ struct PlanCase {
 #[serde(rename_all = "camelCase")]
 struct NormalizedPlan {
     name: String,
-    family: String,
     oppo_compatibility: String,
     requested_input_processing_branch: String,
     effective_input_processing_branch: String,
@@ -37,14 +35,6 @@ fn invalid_value(case_name: &str, field: &str, value: &str) -> io::Error {
         io::ErrorKind::InvalidData,
         format!("invalid {field} '{value}' in case {case_name}"),
     )
-}
-
-fn parse_family(value: Option<&str>, case_name: &str) -> io::Result<String> {
-    let value = value.unwrap_or("auto");
-    match value {
-        "auto" | "x6" | "x7" => Ok(value.to_owned()),
-        _ => Err(invalid_value(case_name, "family", value)),
-    }
 }
 
 fn parse_oppo_compatibility(value: Option<&str>, case_name: &str) -> io::Result<String> {
@@ -133,7 +123,6 @@ fn tmap_format_name(value: TmapFormat) -> &'static str {
 }
 
 fn normalize(test_case: &PlanCase) -> io::Result<NormalizedPlan> {
-    let family = parse_family(test_case.family.as_deref(), &test_case.name)?;
     let oppo_compatibility =
         parse_oppo_compatibility(test_case.oppo_compatibility.as_deref(), &test_case.name)?;
     let requested_input_processing_branch = parse_input_processing_branch(
@@ -158,7 +147,6 @@ fn normalize(test_case: &PlanCase) -> io::Result<NormalizedPlan> {
 
     Ok(NormalizedPlan {
         name: test_case.name.clone(),
-        family,
         oppo_compatibility,
         requested_input_processing_branch: input_processing_branch_name(
             requested_input_processing_branch,
