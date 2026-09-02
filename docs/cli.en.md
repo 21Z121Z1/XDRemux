@@ -2,7 +2,7 @@
 
 English | [简体中文](cli.md)
 
-XDRemux has one cross-platform product entry point: the Rust `xdremux` CLI. Input format, Motion Photo versus ordinary ProXDR, and the ProXDR source generation are detected automatically. Users do not select a `family` or an internal processing branch.
+XDRemux has one cross-platform product entry point: the Rust `xdremux` CLI. Input type, Motion Photo / ProXDR routing, and HDR / Gain Map source structure are detected automatically. Standard conversion does not require users to choose a format, device generation, or low-level processing policy.
 
 The Swift and Python implementations remain only as migration-time conformance oracles, Apple platform capability implementations, or research/training tooling. They no longer define new CLI product semantics.
 
@@ -52,7 +52,7 @@ xdremux convert \
   --oppo-compatible
 ```
 
-`--oppo-compatible` means “produce output for OPPO Gallery.” It does not ask the user to choose a Gain Map layout, routing flag, camera-tail policy, or processing backend. XDRemux selects those internal policies from the input and requested product outcome.
+`--oppo-compatible` means “produce output for OPPO Gallery.” XDRemux selects the internal Gain Map encoding, metadata routing, and platform capabilities from the input and requested product outcome.
 
 OPPO-compatible output currently applies only to ProXDR still images and cannot be combined with Motion Photo → Live Photo conversion. Such a request fails explicitly instead of silently ignoring the option.
 
@@ -106,7 +106,7 @@ xdremux inspect IMG_001.heic
 xdremux inspect IMG_001.heic --json
 ```
 
-`inspect` reports facts discovered from the source, such as asset kind, HDR mode, Gain Map data, Motion Photo video range, and presentation timestamp. It is not a conversion-policy configuration surface.
+`inspect` reports facts parsed automatically from the source, such as asset kind, HDR mode, Gain Map data, Motion Photo video range, and presentation timestamp. It is not a conversion-policy configuration surface.
 
 ## `validate`
 
@@ -117,18 +117,11 @@ xdremux validate output.heic --json
 
 `validate` automatically recognizes and validates either ISO HDR HEIF or a Live Photo pair. It is suitable for independent post-conversion checks in scripts and CI.
 
-## Why there is no `--family`
+## Product intent versus implementation detail
 
-X6/X7 is a fact derived from the source, not a user intent. The Rust engine selects the reconstruction semantics from the HDR mode and source metadata, so the CLI does not expose `--family auto|x6|x7`, and the canonical `ConversionRequest` does not allow callers to override the detected generation.
+The normal CLI exposes only product intents that change the result a user actually wants. Source recognition, reconstruction algorithms, Gain Map layout, metadata routing, camera-tail handling, and codec/backend selection are engine/runtime decisions derived from the input and available platform capabilities.
 
-Likewise, these implementation details are not part of the normal product CLI:
-
-- fine-grained `oppo-compat` routing modes;
-- camera-tail policies;
-- input-processing backends;
-- tmap serialization modes.
-
-The engine/runtime chooses them from the requested product outcome and available platform capabilities. Internal decisions should be observed through `inspect`, structured diagnostics, or development tests instead of requiring end users to configure implementation details.
+For diagnostics, observe those automatic decisions through `inspect`, structured logs, and development tests rather than turning internal policy back into command-line configuration.
 
 ## Exit status
 
