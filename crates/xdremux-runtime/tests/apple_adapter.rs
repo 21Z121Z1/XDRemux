@@ -15,7 +15,11 @@ fn swift_adapter_advertises_only_apple_operation_facts() {
         return;
     };
     let executable = PathBuf::from(executable);
-    assert!(executable.is_file(), "missing Apple adapter: {}", executable.display());
+    assert!(
+        executable.is_file(),
+        "missing Apple adapter: {}",
+        executable.display()
+    );
 
     let inventory = PortableRuntime::new()
         .capability_inventory_with_apple_adapter(&executable)
