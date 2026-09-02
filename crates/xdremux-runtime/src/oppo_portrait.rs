@@ -399,12 +399,7 @@ pub(crate) fn prepare_apple_portrait_source(
                 format!("Vision omitted the requested {role:?} matte"),
             )
         })?;
-        adapter.coreimage_render_l8(
-            &native,
-            target_width,
-            target_height,
-            base_orientation,
-        )
+        adapter.coreimage_render_l8(&native, target_width, target_height, base_orientation)
     };
     let rendered_skin = render_role(AppleSemanticRole::Skin)?;
     let rendered_hair = render_role(AppleSemanticRole::Hair)?;
