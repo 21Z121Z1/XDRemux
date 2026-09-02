@@ -67,14 +67,6 @@ let package = Package(
             dependencies: ["XDRemuxCore"],
             path: "Sources/MetadataConformanceOracle"
         ),
-        // Migration-only plan oracle. It exercises the exact pure planning
-        // helpers still used by the Swift product path while Rust becomes the
-        // canonical policy owner. It is not a public product target.
-        .executableTarget(
-            name: "EnginePlanOracle",
-            dependencies: ["XDRemuxCore"],
-            path: "Sources/EnginePlanOracle"
-        ),
         .testTarget(
             name: "XDRemuxCoreTests",
             dependencies: ["XDRemuxCore"],
