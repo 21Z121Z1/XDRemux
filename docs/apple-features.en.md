@@ -2,130 +2,94 @@
 
 English | [简体中文](apple-features.md)
 
-XDRemux has Apple-specific conversion paths for Photographic Styles, Apple Portrait, and Apple Live Photo metadata.
+Photographic Styles and Apple Portrait are the remaining major Apple-specific ownership migration in XDRemux. They are not a second product stack.
 
-These paths are separate from the standard ISO HDR path. Some combinations are supported, and some combinations are rejected before output is written.
+The canonical public product is the Rust `xdremux` CLI. The legacy Swift Apple implementation remains only as a migration oracle and as the current implementation of platform capabilities that still require ImageIO, Core Image, Vision, Core ML, AVFoundation, or other Apple frameworks.
+
+## Current availability
+
+Standard HDR, OPPO-compatible output, Motion Photo → Live Photo, batch processing, categorization, inspection, and portable validation belong to the canonical Rust product.
+
+Photographic Styles and Apple Portrait are not yet exposed as stable commands/options by the canonical Rust CLI. Do not use legacy Swift-only switches as a specification for new product behavior.
+
+The migration is complete only when Rust owns the feature request/result models, routing, fallback, validation policy, and publication lifecycle, while Apple-native code performs only the framework operations requested by Rust.
 
 ## Platform boundary
 
-The Swift package requires macOS 15 or later.
+The target structure is:
 
-Apple-specific analysis and rendering use Apple platform frameworks and helper processes. The normal cross-platform Python converter does not generate Photographic Styles or Apple Portrait data.
-
-OPPO-compatible HDR output and Apple-specific editing output are mutually exclusive.
-
-## Photographic Styles
-
-Enable Photographic Styles with:
-
-```bash
-xdremux convert \
-  --apple-photographic-styles \
-  --input IMG_001.heic \
-  --output IMG_001_styles.heic
+```text
+xdremux CLI
+    ↓
+Rust runtime
+    ↓
+Rust engine policy
+    ↓
+portable providers + Apple platform adapter
+                         ↓
+          ImageIO / Core Image / Vision /
+          Core ML / AVFoundation / ...
 ```
 
-When Photographic Styles is enabled and no producer is selected, the CLI uses `constrained-solver`.
+`xdremux-apple-adapter` is a distributable platform component consumed by the Rust product. It is not a user CLI and does not own product policy.
 
-The parser also accepts:
+The CLI/runtime implementation currently uses a versioned, bounded helper-process protocol. A sandboxed macOS app may use XPC when separate entitlements, sandboxing, lifecycle, or crash isolation are required. Transport is intentionally private to the runtime so that changing helper transport does not change engine or CLI semantics.
 
-- `--apple-style-data-producer constrained-solver`
-- `--apple-style-data-producer learn-node`
-- `--apple-style-data-producer identity-fallback`
-- `--apple-styles-raw-dng <file>`
+## Rust-owned policy
 
-The producer option and RAW DNG option require `--apple-photographic-styles`.
+Rust already models the user-level Apple feature intent as two facts: Photographic Styles and Portrait. It does not expose the old Swift producer, donor, backend, or research controls as product configuration.
 
-`learn-node` and `identity-fallback` are diagnostic or research controls. Do not treat them as the normal product default.
+The first real Apple adapter operation is ImageIO auxiliary-resource probing. The adapter reports observations such as:
 
-A supplied RAW DNG must match the source photo requirements enforced by the pipeline. The conversion rejects an unusable optional RAW input instead of silently applying unrelated RAW data.
+- ISO Gain Map presence;
+- disparity presence;
+- Portrait Effects Matte presence;
+- skin, hair, teeth, and glasses semantic matte presence.
 
-### Validation boundary
+The adapter does not answer a business-level question such as “is this a valid portrait output?”. `xdremux-engine` owns that decision through `AppleImageAuxiliaryFacts` and the Portrait resource contract.
 
-The Photographic Styles pipeline validates its generated HEIC structure and its Apple style resources with repository validators and native Apple components where the host supports them.
+This pattern should be used for the remaining migration: return the narrowest useful framework fact or operation result, then keep policy in Rust.
 
-Private Apple interfaces can change between macOS releases. The repository includes runtime ABI checks for the private selectors used by the style-response tools. Unsupported private ABI shapes fail with a compatibility error instead of being invoked with an assumed function signature.
+## Photographic Styles migration
 
-Offline structural validation is not the same as a complete import-edit-save-reopen test on every Apple Photos version. Treat a device-dependent editing claim as device-dependent evidence.
+The legacy Swift implementation still contains substantial style-generation and Apple-framework behavior, including semantic analysis, Core ML paths, constrained style-data generation, and Apple-specific consumer validation.
 
-## Apple Portrait
+Do not mechanically port its command-line controls or internal producer selection into Rust. The migration should instead split the implementation into narrowly scoped platform operations, for example framework analysis or model execution, while Rust owns feature routing and product defaults.
 
-Enable Apple Portrait with:
+Research-only producers, model experiments, donor diagnostics, and RAW experiments remain research tooling. They do not define the public CLI contract.
 
-```bash
-xdremux convert \
-  --apple-portrait \
-  --input IMG_001.heic \
-  --output IMG_001_portrait.heic
-```
+## Apple Portrait migration
 
-The source must contain the portrait resources required by the conversion pipeline. A normal non-portrait photo does not automatically become a portrait photo.
+The legacy Swift Portrait pipeline still performs Apple-framework decoding/writing and contains policy that is being removed from Swift.
 
-The conversion can use source depth, focus, aperture, semantic, and restore-original resources when they are present and valid.
+The first policy slice has already moved conceptually to Rust: ImageIO reports auxiliary-resource facts, and Rust decides whether the complete resource set satisfies the Portrait editing contract.
 
-Supported portrait JPEG inputs are accepted only through the Apple Portrait path. The output is HEIC.
+Continue migrating Portrait in the same direction. OPPO block parsing, JPEG/container logic, Gain Map policy, feature routing, output naming, and validation policy belong in Rust. Only operations that genuinely require Apple frameworks remain in the Apple capability layer.
 
-A successful portrait conversion can emit a portrait manifest next to the output. The manifest records the resources and decisions used by the conversion. It is diagnostic data and is not imported into Apple Photos.
+## Live Photo
 
-## Photographic Styles + Apple Portrait
+Normal Motion Photo → Live Photo conversion is already a Rust product capability and should not be routed back through the legacy Swift Apple feature engine.
 
-Static-photo conversion can enable both options:
+If a future combined feature requires applying an Apple-only operation to a Live Photo still, Rust must continue to own the Live Photo asset lifecycle, pair identity, publication, and validation ordering. The Apple adapter should receive only the narrow platform operation it needs to perform.
 
-```bash
-xdremux convert \
-  --apple-photographic-styles \
-  --apple-portrait \
-  --input IMG_001.heic \
-  --output IMG_001_apple.heic
-```
+## Compatibility rules
 
-When Styles is enabled, the Apple feature engine runs the Photographic Styles pipeline. The Styles pipeline owns the combined Styles + Portrait output contract.
+Product-level compatibility rules belong in Rust. Examples include whether OPPO-compatible output can be combined with an Apple editing feature, whether a source asset contains the resources required for Portrait editing, and how a combined request is published atomically.
 
-If a source does not contain the required portrait data, do not assume that a combined request can produce valid portrait editing data.
+Do not encode those decisions into the adapter protocol merely because the old Swift implementation currently makes them.
 
-## Motion Photo + Photographic Styles
+## Validation and acceptance
 
-The current Swift CLI has a separate single-file bridge for this combination:
+Use three distinct evidence classes:
 
-```bash
-xdremux convert \
-  --apple-photographic-styles \
-  --input IMG_001.jpg \
-  --output IMG_001_apple.heic
-```
-
-This path first converts the Motion Photo to an Apple Live Photo pair. It then generates Photographic Styles on the Live Photo still and verifies that the Live Photo asset identifier remains valid.
-
-This combination does not support Apple Portrait in the same pass.
-
-This combination is not the same as plain Motion Photo conversion. The hosted style-rich path does not use PhotoKit loading as a write gate because some hosted macOS versions do not complete that display-object request for external style-rich HEIC resources. The deterministic Live Photo validator and the Photographic Styles validator remain required before publication.
-
-Plain Motion Photo conversion continues to use its own Live Photo validation path.
-
-## Unsupported combinations
-
-The CLI rejects these combinations:
-
-- Apple features + OPPO-compatible output.
-- Plain Motion Photo + Apple Portrait.
-- Motion Photo + Photographic Styles + Apple Portrait.
-- Style producer selection without `--apple-photographic-styles`.
-- Styles RAW DNG input without `--apple-photographic-styles`.
-
-## Research controls
-
-The repository contains environment variables and optional model paths for style research.
-
-A research control can change solver behavior or validation scope. Do not describe a research result as the default product result unless the default code path uses the same configuration.
-
-The optional `ReverseKey1Ensemble` model is documented in the [model card](../Models/ReverseKey1Ensemble.model-card.en.md).
-
-## Acceptance
-
-Use three separate evidence classes:
-
-1. Structural evidence proves that the HEIF resources and metadata are present and parseable.
-2. Native framework evidence proves that the tested macOS framework accepts the generated resources.
+1. Structural evidence proves that HEIF/MOV resources and metadata are present and parseable.
+2. Native framework evidence proves that the tested Apple framework accepts or exposes the expected resources.
 3. Device evidence proves behavior in a specific Apple Photos version on a real device.
 
-Do not replace device evidence with structural evidence when the product claim is about interactive Apple Photos editing.
+Structural evidence does not replace device evidence for an interactive Apple Photos editing claim.
+
+The canonical completion gate requires the Rust workspace and a real Rust → Apple adapter handshake on macOS. Feature-specific replacement gates should be added as Apple operations migrate. Keep the legacy Swift implementation only until the corresponding replacement evidence is complete.
+
+## Research material
+
+The repository still contains style research code and optional models such as `ReverseKey1Ensemble`. These are research/training assets rather than product modes. See the [model card](../Models/ReverseKey1Ensemble.model-card.en.md) where relevant.
