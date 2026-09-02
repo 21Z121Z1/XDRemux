@@ -27,6 +27,13 @@ PY
 
 TEST_INPUT="$PWD/fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg"
 test -f "$TEST_INPUT"
+
+# This gate proves the committed Rust source can actually compose with the
+# Swift adapter. Use a fresh target directory so a restored Cargo cache cannot
+# make an uncompiled or previously different runtime source appear green.
+TEST_TARGET="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-apple-adapter.XXXXXX")"
+trap 'rm -rf "$TEST_TARGET"' EXIT
+CARGO_TARGET_DIR="$TEST_TARGET" \
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$ADAPTER" \
 XDREMUX_APPLE_ADAPTER_TEST_INPUT="$TEST_INPUT" \
   cargo test --locked -p xdremux-runtime --test apple_adapter
