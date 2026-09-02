@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import XDRemuxAppleFeatures
 
 private let schemaVersion = 1
@@ -6,26 +7,70 @@ private let schemaVersion = 1
 private struct AdapterRequest: Decodable {
     let schemaVersion: Int
     let operation: String
+    let inputPath: String?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case operation
+        case inputPath = "input_path"
+    }
+}
+
+private struct AuxiliaryFacts: Encodable {
+    let isoGainMap: Bool
+    let disparity: Bool
+    let portraitEffectsMatte: Bool
+    let skinMatte: Bool
+    let hairMatte: Bool
+    let teethMatte: Bool
+    let glassesMatte: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case isoGainMap = "iso_gain_map"
+        case disparity
+        case portraitEffectsMatte = "portrait_effects_matte"
+        case skinMatte = "skin_matte"
+        case hairMatte = "hair_matte"
+        case teethMatte = "teeth_matte"
+        case glassesMatte = "glasses_matte"
     }
 }
 
 private struct AdapterResponse: Encodable {
     let schemaVersion: Int
-    let capabilities: [String]
+    let capabilities: [String]?
+    let auxiliary: AuxiliaryFacts?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case capabilities
+        case auxiliary
     }
 }
 
 private func fail(_ message: String, status: Int32 = 2) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
     exit(status)
+}
+
+private func hasAuxiliary(_ type: CFString, source: CGImageSource) -> Bool {
+    CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, type) != nil
+}
+
+private func imageIOAuxiliaryFacts(inputPath: String) -> AuxiliaryFacts {
+    let inputURL = URL(fileURLWithPath: inputPath)
+    guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil) else {
+        fail("ImageIO cannot open input \(inputPath)", status: 1)
+    }
+    return AuxiliaryFacts(
+        isoGainMap: hasAuxiliary(kCGImageAuxiliaryDataTypeISOGainMap, source: source),
+        disparity: hasAuxiliary(kCGImageAuxiliaryDataTypeDisparity, source: source),
+        portraitEffectsMatte: hasAuxiliary(kCGImageAuxiliaryDataTypePortraitEffectsMatte, source: source),
+        skinMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte, source: source),
+        hairMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte, source: source),
+        teethMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte, source: source),
+        glassesMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte, source: source)
+    )
 }
 
 do {
@@ -37,16 +82,30 @@ do {
     guard request.schemaVersion == schemaVersion else {
         fail("unsupported apple adapter schema_version \(request.schemaVersion)")
     }
-    guard request.operation == "capabilities" else {
+
+    let response: AdapterResponse
+    switch request.operation {
+    case "capabilities":
+        // This target links XDRemuxAppleFeatures. Advertising these facts does
+        // not choose a conversion path; the Rust engine remains policy owner.
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: ["photographic-styles", "portrait"],
+            auxiliary: nil
+        )
+    case "imageio-auxiliary-facts":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty else {
+            fail("imageio-auxiliary-facts requires input_path")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: imageIOAuxiliaryFacts(inputPath: inputPath)
+        )
+    default:
         fail("unsupported apple adapter operation \(request.operation)")
     }
 
-    // This target links XDRemuxAppleFeatures. Advertising these facts does not
-    // choose a conversion path; the Rust engine remains the policy owner.
-    let response = AdapterResponse(
-        schemaVersion: schemaVersion,
-        capabilities: ["photographic-styles", "portrait"]
-    )
     var encoded = try JSONEncoder().encode(response)
     encoded.append(0x0A)
     FileHandle.standardOutput.write(encoded)
