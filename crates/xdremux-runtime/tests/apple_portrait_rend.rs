@@ -81,7 +81,8 @@ fn source_derived_rend_round_trips_through_the_rust_owned_portrait_manifest() {
     let rend = AppleRendDocument::parse(&rendering_parameters)
         .expect("Rust-generated Portrait REND must parse");
     assert_eq!(
-        rend.serialized(true).expect("serialize Rust-generated REND"),
+        rend.serialized(true)
+            .expect("serialize Rust-generated REND"),
         rendering_parameters
     );
 
