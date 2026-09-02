@@ -1,0 +1,33 @@
+name: Temporary lockfile refresh
+
+on:
+  push:
+    branches:
+      - feat/rust-cli-unification
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Generate canonical Cargo.lock
+        run: cargo generate-lockfile
+      - name: Commit generated lockfile
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Cargo.lock
+          git commit -m "build: refresh Cargo.lock"
+          git push origin HEAD:feat/rust-cli-unification
