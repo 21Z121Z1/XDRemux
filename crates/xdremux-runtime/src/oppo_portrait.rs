@@ -1,8 +1,8 @@
 use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
 use xdremux_engine::{
-    AppleGainMapFacts, ApplePortraitCameraCalibration, ApplePortraitCaptureFacts,
-    ApplePortraitDisparity, ApplePortraitImageGeometry, build_apple_portrait_disparity,
-    derive_apple_portrait_camera_calibration, resolve_apple_portrait_base_orientation,
+    build_apple_portrait_disparity, derive_apple_portrait_camera_calibration,
+    resolve_apple_portrait_base_orientation, AppleGainMapFacts, ApplePortraitCameraCalibration,
+    ApplePortraitCaptureFacts, ApplePortraitDisparity, ApplePortraitImageGeometry,
 };
 
 #[cfg(any(target_os = "macos", test))]
@@ -223,15 +223,12 @@ pub(crate) fn prepare_apple_portrait_source(
 
     let input_properties = adapter.imageio_image_properties(input_file.path())?;
     let base_properties = adapter.imageio_image_properties(source_image_file.path())?;
-    if !base_properties.width.eq(&split.base_width) || !base_properties.height.eq(&split.base_height) {
+    if base_properties.width != split.base_width || base_properties.height != split.base_height {
         return Err(RuntimeError::new(
             "Apple Portrait source",
             format!(
                 "ImageIO base geometry {}x{} does not match JPEG {}x{}",
-                base_properties.width,
-                base_properties.height,
-                split.base_width,
-                split.base_height
+                base_properties.width, base_properties.height, split.base_width, split.base_height
             ),
         ));
     }
