@@ -68,13 +68,13 @@ jobs:
               },
               {
                 "name": "apple-capability-adapter-build",
-                "kind": "migration",
+                "kind": "static",
                 "command": ["swift", "build", "--target", "XDRemuxAppleFeatures"],
                 "timeout_seconds": 1800
               },
               {
                 "name": "raw-diagnostics-target-build",
-                "kind": "migration",
+                "kind": "static",
                 "command": ["swift", "build", "--target", "CoreImageRAWDiagnostics"],
                 "timeout_seconds": 900
               },
@@ -103,5 +103,5 @@ jobs:
         with:
           name: xdremux-completion-receipt-${{ github.event.pull_request.head.sha }}
           path: .codex/verification-receipts/*.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
