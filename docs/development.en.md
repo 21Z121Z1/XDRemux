@@ -2,101 +2,114 @@
 
 English | [简体中文](development.md)
 
-Use this document when you change XDRemux, integrate its Swift package, or build the macOS app.
+XDRemux has one product core: the Rust workspace. New product behavior belongs in Rust. Swift is a migration-time Apple capability layer, and Python is migration/research tooling rather than a second XDRemux runtime.
 
-For command-line use, see the [CLI reference](cli.en.md).
+For user-facing command-line behavior, see the [CLI reference](cli.en.md).
 
-## Toolchain
+## Canonical development loop
 
-The package manifest sets:
-
-- Swift tools version 6.0;
-- minimum platform macOS 15;
-- package default localization `en`.
-
-The package currently uses Swift language mode 5 for its targets.
-
-Build and test:
+Use the Rust workspace for product changes:
 
 ```bash
-swift build
-swift test
-python3 -m unittest discover -s Tests -v
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo run -p xdremux-cli -- --help
 ```
 
-## Swift package products
+The canonical product stack is:
 
-| Product | Type | Purpose |
-| --- | --- | --- |
-| `XDRemuxCore` | library | HDR conversion, HEIF/ISO-BMFF work, metadata, Motion Photo parsing, classification, and shared validation. |
-| `XDRemuxAppleFeatures` | library | Apple Live Photo, Photographic Styles, Apple Portrait, and Apple-specific analysis. |
-| `xdremux` | executable | Swift command-line interface. |
+```text
+xdremux-cli
+    ↓
+xdremux-runtime
+    ↓
+xdremux-engine
+    ↓
+source / classification
+motion-photo / hdr / metadata
+container / heif / codec / format
+    ↓
+portable providers + platform adapters
+```
 
-`CoreImageRAWDiagnostics` is a developer-only executable target. It is not a public package product.
+Keep product intent at the top of this stack. Do not expose codec, camera-tail, source-generation, routing, or container implementation choices as user options unless they represent a distinct user outcome.
 
-Build it with:
+## Rust workspace ownership
+
+| Crate | Responsibility |
+| --- | --- |
+| `xdremux-cli` | The only public CLI and command contract. |
+| `xdremux-runtime` | Filesystem execution, publication, batch reliability, recovery, and platform capability coordination. |
+| `xdremux-engine` | Product intent, conversion planning, capability requirements, and orchestration. |
+| `xdremux-source` / `xdremux-classification` | Source probing, asset identity, and classification. |
+| `xdremux-motion-photo` | Motion Photo parsing and Live Photo media semantics. |
+| `xdremux-hdr` / `xdremux-metadata` | HDR/Gain Map math and metadata primitives. |
+| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Container, HEIF, codec, JPEG/EXIF/TIFF/ISOBMFF primitives. |
+
+A lower crate may provide a format primitive without making it a product mode. Runtime and engine own the decision to use that primitive.
+
+## Apple platform capabilities
+
+`Sources/XDRemuxAppleFeatures/` remains while Photographic Styles, Portrait, RAW, Vision, Core ML, AVFoundation, and other Apple-framework capabilities are migrated behind the Rust capability model.
+
+The target architecture is a narrow platform adapter:
+
+- Rust owns requests, results, policy, routing, naming, classification, HDR behavior, Motion Photo behavior, batch behavior, and fallback decisions.
+- The Apple layer calls Apple frameworks and returns capability results.
+- Do not add new cross-platform product policy to Swift.
+
+Use a stable C ABI for the Rust/Swift boundary where direct in-process interoperability is required. Keep FFI-specific unsafe code isolated from the safe engine/runtime crates.
+
+`CoreImageRAWDiagnostics` remains a developer-only Swift target:
 
 ```bash
 swift build --target CoreImageRAWDiagnostics
 ```
 
-## Package integration
+Swift tests are still useful for Apple capability acceptance and migration oracles, but they are not the canonical CLI contract.
 
-Add the repository as a package dependency:
+## Python tooling
 
-```swift
-dependencies: [
-    .package(
-        url: "https://github.com/21Z121Z1/XDRemux.git",
-        branch: "main"
-    )
-]
+The Python package requires Python 3.11 or newer and is retained for migration-time conformance, real-fixture oracles, and research/training workflows. It does not install a CLI and must not define new product semantics.
+
+Install the tooling only when a Python oracle or research workflow requires it:
+
+```bash
+python -m pip install -e .
+python -m unittest discover -s Tests -v
 ```
 
-Use `XDRemuxCore` when you need the standard conversion pipeline.
+Runtime dependencies currently include `pillow-heif`, `Pillow`, `numpy`, and `piexif`. The optional `training` dependency adds PyTorch.
 
-```swift
-import XDRemuxCore
-
-let input = InputSource(url: inputURL)
-let request = ConversionRequest(
-    input: input,
-    output: OutputTarget.file(outputURL).destination(for: input),
-    configuration: ConversionConfiguration()
-)
-
-let result = try ConversionEngine.convert(request)
-```
-
-Use `XDRemuxAppleFeatures` for Apple-specific conversion engines.
-
-There is no stable release tag contract in the current package documentation. A dependency on `main` can receive API changes.
+Training and evaluation scripts may remain in Python because they are research tooling, not a second XDRemux implementation.
 
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `Sources/XDRemuxCore/` | Core conversion and format logic. |
-| `Sources/XDRemuxAppleFeatures/` | Apple-specific conversion and validation. |
-| `Sources/XDRemuxCLI/` | Swift CLI parser and command routing. |
-| `Sources/CoreImageRAWDiagnostics/` | Developer RAW diagnostic target. |
-| `xdremux_py/` | Cross-platform Python implementation. |
-| `apps/macos/XDRemuxApp/` | macOS SwiftUI app. |
-| `Tests/` | Swift tests, Python policy tests, and validation harnesses. |
-| `fixtures/` | Versioned real Motion Photo fixtures used by strict CI gates. |
-| `scripts/` | Build, evaluation, and acceptance utilities. |
-| `docs/` | Current documentation and historical validation records. |
+| `crates/` | Canonical Rust product stack. |
+| `Sources/XDRemuxAppleFeatures/` | Apple capability implementation and migration-time validation. |
+| `Sources/XDRemuxCore/` | Legacy Swift core retained only while replacement evidence is incomplete. |
+| `Sources/XDRemuxCLI/` | Legacy Swift CLI retained only while Apple migration work still references it. |
+| `Sources/CoreImageRAWDiagnostics/` | Developer RAW diagnostics. |
+| `xdremux_py/` | Migration oracles and research/training tooling; no product CLI. |
+| `apps/macos/XDRemuxApp/` | macOS SwiftUI app during product-stack migration. |
+| `Tests/` | Rust/Swift/Python acceptance tests and validation harnesses. |
+| `fixtures/` | Versioned real media fixtures used by strict gates. |
+| `scripts/` | Build, evaluation, migration, and acceptance utilities. |
+| `docs/` | Current guidance and historical research records. |
 | `Models/` | Optional research models and model documentation. |
+
+Legacy Swift/Python code should receive only migration, conformance, safety, or deletion work. New user-visible behavior belongs in Rust.
 
 ## Apple helper processes
 
 Some Apple-feature operations compile or run helper programs from package resources.
 
-The helper toolchain hashes source content and caches compatible built tools. The implementation uses bounded helper invocations and separates machine-readable stdout from diagnostics where the helper protocol requires it.
+The helper toolchain hashes source content and caches compatible built tools. Keep helper invocations bounded and keep machine-readable stdout separate from diagnostics when the protocol requires it.
 
 Private Apple API compatibility must be checked at runtime. Do not call a private Objective-C selector with an assumed ABI when the runtime method signature does not match a supported form.
-
-The macOS 27 compatibility path in the style-response helper checks known initializer and style-apply ABI shapes before calling them.
 
 ## macOS app
 
@@ -113,45 +126,10 @@ scripts/build_and_run.sh logs
 scripts/build_and_run.sh clean
 ```
 
-The app links the Swift package. It does not use the CLI as a subprocess for core conversion.
-
-## Python package
-
-The Python package requires Python 3.11 or newer.
-
-Runtime dependencies include:
-
-- `pillow-heif`;
-- `Pillow`;
-- `numpy`;
-- `piexif`.
-
-The optional `training` dependency adds PyTorch.
-
-The installed console command is `xdremux-py`. The repository-local entry point is `python3 -m xdremux_py`.
+During migration, the app may still link Swift package code. Do not treat that dependency as ownership of the canonical conversion policy; move reusable product behavior into Rust first.
 
 ## Debug and research controls
 
 Environment variables exist for encoding diagnostics, scratch retention, style rendering, and research model selection.
 
-Do not add a research environment variable to a normal user command unless the product behavior requires it.
-
-Do not document a research switch as a stable public interface unless tests and the current product path depend on it.
-
-The optional Reverse Key 1 model has a separate [model card](../Models/ReverseKey1Ensemble.model-card.en.md).
-
-## Completion gate
-
-Repository agents must validate the exact committed `HEAD` before they claim completion.
-
-The acceptance runbook is in [validation/README.en.md](validation/README.en.md).
-
-Use targeted evidence. A documentation-only change does not need the full real-photo matrix. A conversion-core change needs functional evidence in addition to static checks.
-
-The completion receipt is bound to the commit, base commit, changed paths, and clean worktree. A later tracked edit invalidates the receipt.
-
-## Documentation changes
-
-Current technical documentation follows the [technical writing guide](style-guide.en.md).
-
-When a code change alters a documented command, output rule, format contract, or acceptance boundary, update the English document first and then update its Chinese translation.
+Do not add a research environment variable to a normal user command unless the product behavior requires it. Do not document a research switch as a stable public interface unless the canonical Rust product path and tests depend on it.
