@@ -25,9 +25,48 @@ on:
       - ".github/workflows/rust-heif-core.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  migrate-imageio-auxl:
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-cli-unification
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Patch canonical ISO Gain Map auxl graph
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/xdremux-heif/src/native.rs")
+          text = path.read_text()
+          old = """    entries.push(IrefEntry {\n        kind: AUXL,\n        from_item_id: gain_id,\n        to_item_ids: vec![meta.primary_item_id],\n    });\n"""
+          new = """    entries.push(IrefEntry {\n        kind: AUXL,\n        from_item_id: gain_id,\n        to_item_ids: vec![meta.primary_item_id, tmap_id],\n    });\n"""
+          if text.count(old) != 1:
+              raise SystemExit("expected exactly one canonical auxl reference")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          cargo fmt --all --check
+          cargo clippy --locked -p xdremux-heif --all-targets -- -D warnings
+          cargo test --locked -p xdremux-heif
+          git diff --check
+      - name: Commit graph fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/xdremux-heif/src/native.rs
+          git commit -m "fix(heif): link gain map auxl to tmap"
+          git push origin HEAD:feat/rust-cli-unification
+
   heif-core:
     runs-on: ubuntu-latest
     timeout-minutes: 15
