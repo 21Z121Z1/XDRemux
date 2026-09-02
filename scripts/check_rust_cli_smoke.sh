@@ -13,6 +13,8 @@ REPORT="$WORKDIR/report.json"
 CATEGORIZE_INPUT="$WORKDIR/portrait.heic"
 CATEGORIZE_OUTPUT="$WORKDIR/categorized"
 CATEGORIZE_REPORT="$WORKDIR/categorize.json"
+OPPO_SOURCE="fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic"
+OPPO_OUTPUT="$WORKDIR/oppo-compatible.heic"
 
 python3 - "$FIXTURE" <<'PY'
 from pathlib import Path
@@ -83,3 +85,30 @@ cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F -- "--o
 cargo run --locked --quiet -p xdremux-cli -- categorize --help | grep -F -- "--dry-run" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- validate --help | grep -F "Validate one canonical output" >/dev/null
 cargo run --locked --quiet -p xdremux-cli -- validate --help | grep -F -- "--json" >/dev/null
+
+for command in convert batch; do
+    help="$(cargo run --locked --quiet -p xdremux-cli -- "$command" --help)"
+    grep -F -- "--oppo-compatible" <<<"$help" >/dev/null
+    for forbidden in --family --oppo-camera-tail --input-processing --tmap-format; do
+        if grep -F -- "$forbidden" <<<"$help" >/dev/null; then
+            echo "internal policy option $forbidden leaked into $command help" >&2
+            exit 1
+        fi
+    done
+    if grep -E -- '(^|[[:space:]])--oppo-compat([=[:space:]]|$)' <<<"$help" >/dev/null; then
+        echo "internal policy option --oppo-compat leaked into $command help" >&2
+        exit 1
+    fi
+done
+
+# Exercise the public OPPO Gallery intent through the actual CLI, not only the
+# runtime API. This fixture also proves source generation is inferred rather
+# than supplied by a family override.
+test -s "$OPPO_SOURCE"
+cargo run --locked --quiet -p xdremux-cli -- convert \
+    --input "$OPPO_SOURCE" \
+    --output "$OPPO_OUTPUT" \
+    --oppo-compatible
+
+test -s "$OPPO_OUTPUT"
+cargo run --locked --quiet -p xdremux-cli -- validate "$OPPO_OUTPUT" >/dev/null
