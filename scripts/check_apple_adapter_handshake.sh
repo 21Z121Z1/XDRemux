@@ -6,8 +6,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 2
 fi
 
-swift build --target XDRemuxAppleAdapter
-ADAPTER="$(swift build --show-bin-path)/XDRemuxAppleAdapter"
+swift build --product xdremux-apple-adapter
+ADAPTER="$(swift build --show-bin-path)/xdremux-apple-adapter"
 test -x "$ADAPTER"
 
 RESPONSE="$(printf '%s\n' '{"schema_version":1,"operation":"capabilities"}' | "$ADAPTER")"
