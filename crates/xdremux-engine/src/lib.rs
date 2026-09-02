@@ -25,8 +25,8 @@ pub use apple_auxiliary::{
     APPLE_SEMANTIC_SEGMENTATION_MATTE_NAMESPACE,
 };
 pub use apple_portrait::{
-    AppleRendDocument, AppleRendError, AppleRendRecord, AppleXhlrbControlOutput,
-    APPLE_XHLRB_DYNAMIC_RECORD_IDS,
+    build_apple_portrait_rendering_parameters, AppleRendDocument, AppleRendError, AppleRendRecord,
+    AppleXhlrbControlOutput, APPLE_XHLRB_DYNAMIC_RECORD_IDS,
 };
 pub use apple_portrait_geometry::{
     apple_portrait_lens_profile, build_apple_portrait_disparity,
