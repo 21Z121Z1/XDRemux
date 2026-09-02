@@ -124,24 +124,28 @@ class PublicDocumentationTests(unittest.TestCase):
         for term in ("Motion Photo", "Live Photo", "Gain Map", "still-image-time"):
             self.assertIn(term, english)
 
-    def test_current_cli_docs_define_one_rust_product_and_automatic_motion_photo_support(self) -> None:
+    def test_current_cli_docs_define_one_rust_product_and_automatic_source_handling(self) -> None:
         english = (ROOT / "docs/cli.en.md").read_text(encoding="utf-8")
         chinese = (ROOT / "docs/cli.md").read_text(encoding="utf-8")
 
         self.assertIn("one cross-platform product entry point: the Rust `xdremux` CLI", english)
+        self.assertIn("detected automatically", english)
         self.assertIn("Motion Photos are automatically converted to Live Photos", english)
-        self.assertIn("no `--family`", english)
+        self.assertIn("--oppo-compatible", english)
         self.assertIn("no longer define new CLI product semantics", english)
         self.assertNotIn("python -m xdremux_py", english)
         self.assertNotIn("swift run xdremux", english)
+        self.assertNotIn("Why there is no `--family`", english)
 
         self.assertIn("一个跨平台 Rust CLI", chinese)
+        self.assertIn("自动识别", chinese)
         self.assertIn("Motion Photo", chinese)
         self.assertIn("Live Photo", chinese)
-        self.assertIn("为什么没有 `--family`", chinese)
+        self.assertIn("--oppo-compatible", chinese)
         self.assertIn("不再定义新的 CLI 产品语义", chinese)
         self.assertNotIn("python -m xdremux_py", chinese)
         self.assertNotIn("swift run xdremux", chinese)
+        self.assertNotIn("为什么没有 `--family`", chinese)
 
     def test_current_quality_docs_acknowledge_versioned_motion_fixtures(self) -> None:
         for relative in (
