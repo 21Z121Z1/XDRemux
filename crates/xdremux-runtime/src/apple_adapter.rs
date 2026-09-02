@@ -156,7 +156,12 @@ impl AppleAdapterClient {
                 operation: "vision-semantic-mattes".to_owned(),
                 input_path: Some(input_path(input)?),
                 output_path: Some(input_path(output_directory.path())?),
-                roles: Some(roles.iter().map(|role| semantic_role_wire(*role).to_owned()).collect()),
+                roles: Some(
+                    roles
+                        .iter()
+                        .map(|role| semantic_role_wire(*role).to_owned())
+                        .collect(),
+                ),
                 orientation,
             },
             VISION_TIMEOUT,
@@ -229,8 +234,9 @@ impl AppleAdapterClient {
                     ),
                 ));
             }
-            let pixels = fs::read(&path)
-                .map_err(|error| RuntimeError::external("Apple Vision semantic mask read", error))?;
+            let pixels = fs::read(&path).map_err(|error| {
+                RuntimeError::external("Apple Vision semantic mask read", error)
+            })?;
             masks.push(AppleSemanticMask {
                 role,
                 width: wire.width,
@@ -303,7 +309,11 @@ impl AppleAdapterClient {
                     let _ = join_reader(stderr_reader, "stderr");
                     return Err(RuntimeError::new(
                         "Apple adapter timeout",
-                        format!("{} exceeded {} ms", self.executable.display(), timeout.as_millis()),
+                        format!(
+                            "{} exceeded {} ms",
+                            self.executable.display(),
+                            timeout.as_millis()
+                        ),
                     ));
                 }
                 None => thread::sleep(POLL_INTERVAL),
@@ -332,15 +342,12 @@ impl AppleAdapterClient {
 }
 
 fn input_path(input: &Path) -> Result<String> {
-    input
-        .to_str()
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| {
-            RuntimeError::new(
-                "Apple adapter protocol",
-                "path is not valid UTF-8 for the JSON transport",
-            )
-        })
+    input.to_str().map(ToOwned::to_owned).ok_or_else(|| {
+        RuntimeError::new(
+            "Apple adapter protocol",
+            "path is not valid UTF-8 for the JSON transport",
+        )
+    })
 }
 
 fn semantic_role_wire(role: AppleSemanticRole) -> &'static str {
