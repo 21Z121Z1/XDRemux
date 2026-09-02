@@ -2,6 +2,7 @@
 
 mod error;
 mod extractor;
+mod oppo_portrait;
 mod oppo_tail;
 
 pub use error::{ContainerError, Result};
@@ -9,6 +10,7 @@ pub use extractor::{
     extract, portrait_blocks, ExtractedLhdr, ExtractionMode, LocalHdrInfo, ManifestEntry,
     ManifestInfo,
 };
+pub use oppo_portrait::{parse_oppo_portrait_config, OppoPortraitConfig, OppoPortraitFace};
 pub use oppo_tail::{
     complete_oppo_camera_tail, is_oppo_compact_tail_entry, is_oppo_portrait_editing_tail_entry,
     is_oppo_private_hdr_tail_entry, is_oppo_private_uhdr_tail_entry, is_oppo_watermark_tail_entry,
