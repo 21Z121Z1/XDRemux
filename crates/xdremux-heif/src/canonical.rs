@@ -195,11 +195,9 @@ fn normalize_consumer_associations(data: &mut [u8]) -> Result<()> {
             .find(|entry| entry.item_id == item_id)
             .ok_or_else(|| invalid(format!("item {item_id} disappeared after normalization")))?;
         for property_index in required {
-            if !entry
-                .associations
-                .iter()
-                .any(|association| association.property_index == property_index && association.essential)
-            {
+            if !entry.associations.iter().any(|association| {
+                association.property_index == property_index && association.essential
+            }) {
                 return Err(invalid(format!(
                     "item {item_id} property {property_index} is not essential after normalization"
                 )));
