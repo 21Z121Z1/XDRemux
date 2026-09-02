@@ -261,7 +261,11 @@ impl ApplePortraitDisparity {
         self.width * 2
     }
 
-    pub fn focus_disparity(&self, rank: f64, exponentiation: u8) -> Result<f64, ApplePortraitGeometryError> {
+    pub fn focus_disparity(
+        &self,
+        rank: f64,
+        exponentiation: u8,
+    ) -> Result<f64, ApplePortraitGeometryError> {
         focus_disparity(rank, f64::from(self.near - self.far), exponentiation)
     }
 }
@@ -281,7 +285,9 @@ impl fmt::Display for ApplePortraitGeometryError {
             Self::InvalidCaptureFact(name) => {
                 write!(formatter, "Apple Portrait capture fact {name} is invalid")
             }
-            Self::InvalidGeometry => formatter.write_str("Apple Portrait image geometry is invalid"),
+            Self::InvalidGeometry => {
+                formatter.write_str("Apple Portrait image geometry is invalid")
+            }
             Self::InvalidDisparityScale => {
                 formatter.write_str("Apple Portrait disparity scale must be finite and positive")
             }
@@ -398,10 +404,11 @@ pub fn derive_apple_portrait_camera_calibration(
     let render_equivalent_focal_length_mm = facts
         .equivalent_focal_length_mm
         .min(profile.maximum_validated_equivalent_focal_length_mm);
-    let crop_scale =
-        profile.anchor_equivalent_focal_length_mm / render_equivalent_focal_length_mm;
-    let reference_width = rounded_multiple_of_four(f64::from(profile.reference_width) * crop_scale)?;
-    let reference_height = rounded_multiple_of_four(f64::from(profile.reference_height) * crop_scale)?;
+    let crop_scale = profile.anchor_equivalent_focal_length_mm / render_equivalent_focal_length_mm;
+    let reference_width =
+        rounded_multiple_of_four(f64::from(profile.reference_width) * crop_scale)?;
+    let reference_height =
+        rounded_multiple_of_four(f64::from(profile.reference_height) * crop_scale)?;
     let crop_offset_x = (f64::from(profile.reference_width) - f64::from(reference_width)) / 2.0;
     let crop_offset_y = (f64::from(profile.reference_height) - f64::from(reference_height)) / 2.0;
 
@@ -484,9 +491,7 @@ pub fn build_apple_portrait_disparity(
         return Err(ApplePortraitGeometryError::InvalidDisparityScale);
     }
     if !(1..=2).contains(&exponentiation) {
-        return Err(ApplePortraitGeometryError::UnsupportedDisparityExponentiation(
-            exponentiation,
-        ));
+        return Err(ApplePortraitGeometryError::UnsupportedDisparityExponentiation(exponentiation));
     }
     let expected = usize::try_from(width)
         .ok()
@@ -531,9 +536,7 @@ pub fn focus_disparity(
         return Err(ApplePortraitGeometryError::InvalidDisparityScale);
     }
     if !(1..=2).contains(&exponentiation) {
-        return Err(ApplePortraitGeometryError::UnsupportedDisparityExponentiation(
-            exponentiation,
-        ));
+        return Err(ApplePortraitGeometryError::UnsupportedDisparityExponentiation(exponentiation));
     }
     let normalized = (rank / 255.0)
         .clamp(0.0, 1.0)
