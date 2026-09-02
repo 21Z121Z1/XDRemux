@@ -24,6 +24,7 @@ class PythonLivePhotoOutputSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="xdremux-py-output-safety-") as tmp:
             root = Path(tmp)
             source = root / self.fixture_name
+            source.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(self.fixture(), source)
             foreign_image = source.with_suffix(".heic")
             foreign_video = source.with_suffix(".mov")
@@ -44,6 +45,7 @@ class PythonLivePhotoOutputSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="xdremux-py-explicit-output-safety-") as tmp:
             root = Path(tmp)
             source = root / self.fixture_name
+            source.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(self.fixture(), source)
             output_image = root / "user-owned.heic"
             output_video = root / "user-owned.mov"
