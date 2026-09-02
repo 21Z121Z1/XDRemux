@@ -263,8 +263,11 @@ pub fn plan_conversion(
     capabilities: &CapabilityInventory,
 ) -> Result<ConversionPlan> {
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
-    let gain_map_target =
-        resolve_product_gain_map_encode_profile(analysis.gain_map, request.output, &gain_map_encoder)?;
+    let gain_map_target = resolve_product_gain_map_encode_profile(
+        analysis.gain_map,
+        request.output,
+        &gain_map_encoder,
+    )?;
 
     let mut required_capabilities = vec![
         OperationCapability::RasterDecoder(analysis.gain_map.storage.codec),
