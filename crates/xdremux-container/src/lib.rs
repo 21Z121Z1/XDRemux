@@ -11,7 +11,8 @@ pub use extractor::{
     ManifestInfo,
 };
 pub use oppo_portrait::{
-    extract_oppo_portrait_source, parse_oppo_portrait_config, OppoPortraitConfig, OppoPortraitFace,
+    extract_oppo_portrait_source, parse_oppo_portrait_config, parse_oppo_portrait_depth,
+    OppoPortraitConfig, OppoPortraitDepth, OppoPortraitDepthHeader, OppoPortraitFace,
     OppoPortraitSource,
 };
 pub use oppo_tail::{
