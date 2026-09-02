@@ -8,11 +8,17 @@ private struct AdapterRequest: Decodable {
     let schemaVersion: Int
     let operation: String
     let inputPath: String?
+    let outputPath: String?
+    let roles: [String]?
+    let orientation: UInt32?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case operation
         case inputPath = "input_path"
+        case outputPath = "output_path"
+        case roles
+        case orientation
     }
 }
 
@@ -53,12 +59,14 @@ private struct AdapterResponse: Encodable {
     let capabilities: [String]?
     let auxiliary: AuxiliaryFacts?
     let gainMap: GainMapFacts?
+    let semanticMasks: [VisionSemanticMaskFacts]?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case capabilities
         case auxiliary
         case gainMap = "gain_map"
+        case semanticMasks = "semantic_masks"
     }
 }
 
@@ -142,7 +150,8 @@ do {
             schemaVersion: schemaVersion,
             capabilities: ["photographic-styles", "portrait"],
             auxiliary: nil,
-            gainMap: nil
+            gainMap: nil,
+            semanticMasks: nil
         )
     case "imageio-auxiliary-facts":
         guard let inputPath = request.inputPath, !inputPath.isEmpty else {
@@ -152,7 +161,8 @@ do {
             schemaVersion: schemaVersion,
             capabilities: nil,
             auxiliary: imageIOAuxiliaryFacts(inputPath: inputPath),
-            gainMap: nil
+            gainMap: nil,
+            semanticMasks: nil
         )
     case "imageio-gain-map-facts":
         guard let inputPath = request.inputPath, !inputPath.isEmpty else {
@@ -162,7 +172,26 @@ do {
             schemaVersion: schemaVersion,
             capabilities: nil,
             auxiliary: nil,
-            gainMap: imageIOGainMapFacts(inputPath: inputPath)
+            gainMap: imageIOGainMapFacts(inputPath: inputPath),
+            semanticMasks: nil
+        )
+    case "vision-semantic-mattes":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let roles = request.roles, !roles.isEmpty else {
+            fail("vision-semantic-mattes requires input_path, output_path, and roles")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            semanticMasks: try generateVisionSemanticMattes(
+                inputPath: inputPath,
+                outputPath: outputPath,
+                roles: roles,
+                orientationOverride: request.orientation
+            )
         )
     default:
         fail("unsupported apple adapter operation \(request.operation)")
