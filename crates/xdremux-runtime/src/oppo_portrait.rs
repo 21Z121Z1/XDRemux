@@ -367,7 +367,7 @@ mod tests {
     fn simulated_aperture_matches_the_swift_oracle_precedence() {
         assert_eq!(
             resolve_simulated_aperture(4.0, Some(2.8), Some(1.7), Some(1.9)),
-            2.8
+            f64::from(2.8_f32)
         );
         assert_eq!(
             resolve_simulated_aperture(3.0, Some(2.8), Some(1.7), Some(1.9)),
