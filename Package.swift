@@ -9,9 +9,10 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
-        .library(name: "XDRemuxCore", targets: ["XDRemuxCore"]),
-        .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"]),
-        .executable(name: "xdremux", targets: ["XDRemuxCLI"])
+        // Swift is no longer a second XDRemux product stack. Keep only the
+        // Apple platform capability library public while its implementation is
+        // migrated behind Rust-owned capability contracts.
+        .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"])
     ],
     dependencies: [
         .package(
@@ -20,6 +21,9 @@ let package = Package(
         )
     ],
     targets: [
+        // Migration-only internal target. The canonical cross-platform core is
+        // the Rust workspace; this target remains while AppleFeatures and old
+        // conformance tests still depend on established Swift implementations.
         .target(
             name: "XDRemuxCore",
             path: "Sources/XDRemuxCore",
@@ -35,6 +39,8 @@ let package = Package(
                 .copy("Resources/ApplePlatform")
             ]
         ),
+        // Migration-only executable target. It is intentionally not a public
+        // package product; the Rust `xdremux` binary owns the CLI contract.
         .executableTarget(
             name: "XDRemuxCLI",
             dependencies: [
