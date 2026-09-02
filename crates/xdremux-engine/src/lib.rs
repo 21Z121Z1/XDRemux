@@ -38,6 +38,12 @@ pub struct AppleFeatureRequest {
     pub portrait: bool,
 }
 
+impl AppleFeatureRequest {
+    pub const fn any(self) -> bool {
+        self.photographic_styles || self.portrait
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ConversionRequest {
     pub output: OutputIntent,
@@ -154,6 +160,7 @@ pub struct ConversionPlan {
 pub enum PlannerError {
     InvalidGainMapProfile(&'static str),
     UnsupportedGainMapLayout(GainMapCodecLayout),
+    IncompatibleProductIntents(&'static str),
     MissingOperationCapabilities(Vec<OperationCapability>),
 }
 
@@ -168,6 +175,9 @@ impl std::fmt::Display for PlannerError {
                     f,
                     "no encoder capability preserves Gain Map layout {layout:?}"
                 )
+            }
+            Self::IncompatibleProductIntents(message) => {
+                write!(f, "incompatible product intents: {message}")
             }
             Self::MissingOperationCapabilities(capabilities) => {
                 f.write_str("missing required operation capabilities: ")?;
@@ -263,6 +273,12 @@ pub fn plan_conversion(
     request: ConversionRequest,
     capabilities: &CapabilityInventory,
 ) -> Result<ConversionPlan> {
+    if request.requests_oppo_gallery_compatibility() && request.apple_features.any() {
+        return Err(PlannerError::IncompatibleProductIntents(
+            "Apple features cannot be combined with OPPO Gallery compatibility",
+        ));
+    }
+
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
     let gain_map_target = resolve_product_gain_map_encode_profile(
         analysis.gain_map,
@@ -344,6 +360,7 @@ mod tests {
         assert_eq!(request.output, OutputIntent::OppoGallery);
         assert!(request.requests_oppo_gallery_compatibility());
         assert_eq!(request.apple_features, AppleFeatureRequest::default());
+        assert!(!request.apple_features.any());
     }
 
     #[test]
@@ -406,6 +423,46 @@ mod tests {
             &only_420,
         )
         .is_err());
+    }
+
+    #[test]
+    fn planner_rejects_apple_features_with_oppo_gallery_compatibility() {
+        let target = layout(ChromaSampling::Yuv420, 8);
+        let capabilities = CapabilityInventory::new([
+            OperationCapability::RasterDecoder(GainMapCodec::Jpeg),
+            OperationCapability::GainMapTileEncoder(target),
+            OperationCapability::PhotographicStylesAdapter,
+            OperationCapability::PortraitAdapter,
+        ]);
+        let analysis = ConversionAnalysis {
+            gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+        };
+
+        for apple_features in [
+            AppleFeatureRequest {
+                photographic_styles: true,
+                portrait: false,
+            },
+            AppleFeatureRequest {
+                photographic_styles: false,
+                portrait: true,
+            },
+            AppleFeatureRequest {
+                photographic_styles: true,
+                portrait: true,
+            },
+        ] {
+            let request = ConversionRequest {
+                output: OutputIntent::OppoGallery,
+                apple_features,
+            };
+            assert_eq!(
+                plan_conversion(&analysis, request, &capabilities),
+                Err(PlannerError::IncompatibleProductIntents(
+                    "Apple features cannot be combined with OPPO Gallery compatibility",
+                ))
+            );
+        }
     }
 
     #[test]
