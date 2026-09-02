@@ -1,4 +1,8 @@
-"""Photo asset classification and folder projection shared by the Python CLI."""
+"""Migration-time photo classification oracle and folder projection helpers.
+
+The canonical product implementation lives in the Rust classification/runtime stack.
+This module remains only for conformance evidence while Python migration oracles exist.
+"""
 
 from __future__ import annotations
 
@@ -218,442 +222,389 @@ class FolderProjection:
                 return candidate
         # "Normal" is a presentation fallback only when OPPO metadata parsed cleanly and there are
         # no completely unknown bits. Known-but-unmapped flags retain the historical normal folder.
-        if classification.metadata_status == "ok" and classification.tag_flags is not None and classification.unknown_flags == 0:
+        if classification.vendor is CameraVendor.OPPO and classification.metadata_status == "ok" and classification.unknown_flags == 0:
             return CaptureMode.NORMAL
         return None
 
-    @staticmethod
-    def relative_directory(classification: Classification, asset_type: AssetType | None = None) -> Path:
-        resolved_asset_type = asset_type or classification.asset_type
-        mode = FolderProjection.primary_capture_mode(classification)
-        leaf = mode.folder_name if mode is not None else UNCLASSIFIED_FOLDER_NAME
-        return Path(resolved_asset_type.folder_name) / leaf
+    @classmethod
+    def relative_directory(cls, classification: Classification) -> Path:
+        mode = cls.primary_capture_mode(classification)
+        mode_folder = mode.folder_name if mode is not None else UNCLASSIFIED_FOLDER_NAME
+        return Path(classification.asset_type.folder_name) / mode_folder
 
 
-SUPPORTED_EXTENSIONS = {".heic", ".heif", ".jpg", ".jpeg"}
-COMMENT_PATTERN = re.compile(rb"(?:Oplus|Oppo)_[0-9]+", re.IGNORECASE)
-JSON_TAG_PATTERN = re.compile(rb'"oplustag"\s*:\s*"?([0-9]+)"?', re.IGNORECASE)
+def parse_oppo_tag_flag(user_comment: str | None) -> OppoFlagEvidence | None:
+    if not user_comment:
+        return None
+    stripped = user_comment.strip().rstrip("\x00")
+    value: int | None = None
+
+    if stripped.startswith("{"):
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            for key, raw_value in parsed.items():
+                if str(key).lower() == "oplustag":
+                    try:
+                        value = int(raw_value)
+                    except (TypeError, ValueError):
+                        return None
+                    break
+
+    if value is None:
+        matched = re.search(r"(?i)(?:oplus|oppo)_([0-9]+)", stripped)
+        if matched is None:
+            return None
+        value = int(matched.group(1))
+
+    recognized = value & MAPPED_FLAGS_MASK
+    known_unmapped = value & (KNOWN_FLAGS_MASK & ~MAPPED_FLAGS_MASK)
+    unknown = value & ~KNOWN_FLAGS_MASK
+    return OppoFlagEvidence(
+        raw_flags=value,
+        recognized_flags=recognized,
+        known_unmapped_flags=known_unmapped,
+        unknown_flags=unknown,
+    )
 
 
-@dataclass(frozen=True)
-class CategorizationItem:
-    source: Path
-    destination: Path
-    classification: Classification
-    disposition: str
-    error: str | None = None
-
-
-
-def classify_user_comment(raw: str | None) -> Classification:
-    if raw is None or not raw.strip():
-        return Classification(raw, None, 0, 0, 0, frozenset(), "missing-user-comment")
-    normalized = raw.strip()
-    flags = _parse_flags(normalized)
-    if flags is None:
-        return Classification(normalized, None, 0, 0, 0, frozenset(), "malformed-user-comment")
-
-    recognized = flags & MAPPED_FLAGS_MASK
-    known_unmapped = flags & KNOWN_FLAGS_MASK & ~MAPPED_FLAGS_MASK
-    unknown = flags & ~KNOWN_FLAGS_MASK
-    modes = frozenset(mode for mode in MODE_PRIORITY if flags & mode.bit)
+def classify_user_comment(
+    user_comment: str | None,
+    *,
+    asset_type: AssetType = AssetType.STATIC_PHOTO,
+    capabilities: Iterable[PhotoCapability] = (),
+) -> Classification:
+    evidence = parse_oppo_tag_flag(user_comment)
+    capture_modes: frozenset[CaptureMode]
+    if evidence is None:
+        capture_modes = frozenset()
+    else:
+        capture_modes = frozenset(mode for mode in MODE_PRIORITY if evidence.recognized_flags & mode.bit)
+    status = "ok" if evidence is not None else ("missing-user-comment" if user_comment is None else "malformed-user-comment")
     return Classification(
-        normalized,
-        flags,
-        recognized,
-        known_unmapped,
-        unknown,
-        modes,
-        "ok",
-        vendor=CameraVendor.OPPO,
+        raw_user_comment=user_comment,
+        tag_flags=evidence.raw_flags if evidence is not None else None,
+        recognized_flags=evidence.recognized_flags if evidence is not None else 0,
+        known_unmapped_flags=evidence.known_unmapped_flags if evidence is not None else 0,
+        unknown_flags=evidence.unknown_flags if evidence is not None else 0,
+        capture_modes=capture_modes,
+        metadata_status=status,
+        asset_type=asset_type,
+        capabilities=frozenset(capabilities),
+        vendor=CameraVendor.OPPO if evidence is not None else None,
     )
 
 
-
-def classify_asset(asset: PhotoAsset) -> Classification:
-    """Classify the primary image while preserving the asset-level resource identity."""
-    return classify_path(asset.primary_image, asset.asset_type)
-
-
-def classify_path(path: Path, asset_type: AssetType | None = None) -> Classification:
-    resolved_asset_type = asset_type or infer_asset_type(path)
-    try:
-        raw = extract_user_comment(path)
-        data = path.read_bytes()
-    except OSError:
-        return Classification(None, None, 0, 0, 0, frozenset(), "unreadable-image", asset_type=resolved_asset_type)
-    base = classify_user_comment(raw)
-    return replace(
-        base,
-        asset_type=resolved_asset_type,
-        capabilities=frozenset(_detect_capabilities(data)),
-    )
+def _decode_user_comment(raw: bytes) -> str | None:
+    prefixes = (b"ASCII\x00\x00\x00", b"UNICODE\x00", b"JIS\x00\x00\x00\x00\x00")
+    payload = raw
+    if raw.startswith(prefixes[0]):
+        payload = raw[len(prefixes[0]):]
+    elif raw.startswith(prefixes[1]):
+        payload = raw[len(prefixes[1]):]
+        try:
+            return payload.decode("utf-16-be", errors="replace").rstrip("\x00")
+        except UnicodeDecodeError:
+            return None
+    elif raw.startswith(prefixes[2]):
+        payload = raw[len(prefixes[2]):]
+    return payload.decode("utf-8", errors="replace").rstrip("\x00")
 
 
+def _read_tiff_value(data: bytes, base: int, endian: str, entry_offset: int) -> bytes | None:
+    if entry_offset + 12 > len(data):
+        return None
+    tag, field_type, count, value_or_offset = struct.unpack_from(endian + "HHII", data, entry_offset)
+    if tag != 0x9286 or field_type != 7 or count == 0:
+        return None
+    if count <= 4:
+        return data[entry_offset + 8 : entry_offset + 8 + count]
+    absolute = base + value_or_offset
+    end = absolute + count
+    if absolute < base or end > len(data):
+        return None
+    return data[absolute:end]
 
 
-def infer_asset_type(path: Path) -> AssetType:
-    suffix = Path(path).suffix.lower()
-    if suffix not in {".jpg", ".jpeg", ".heic", ".heif"}:
-        return AssetType.STATIC_PHOTO
-    try:
-        from .motion_photo import MotionPhotoError, parse_motion_photo
-    except (ImportError, ValueError):
-        return AssetType.STATIC_PHOTO
-    try:
-        return AssetType.LIVE_PHOTO if parse_motion_photo(Path(path)) is not None else AssetType.STATIC_PHOTO
-    except (OSError, MotionPhotoError):
-        return AssetType.STATIC_PHOTO
-
-def _detect_capabilities(data: bytes) -> set[PhotoCapability]:
-    """Emit only capabilities backed by container evidence understood by both implementations."""
-    capabilities: set[PhotoCapability] = set()
-    has_private_gain_map = (
-        b'"local.uhdr.gainmap.data"' in data
-        or b'"local.uhdr.gainmap.info"' in data
-    )
-    if has_private_gain_map:
-        capabilities.update({PhotoCapability.PROXDR, PhotoCapability.GAIN_MAP, PhotoCapability.HDR})
-    if b'\"rear.depth\"' in data and b'\"rear.depth.config\"' in data:
-        capabilities.add(PhotoCapability.DEPTH)
-    return capabilities
-
+def _extract_user_comment_from_tiff(data: bytes, base: int = 0) -> str | None:
+    if base < 0 or base + 8 > len(data):
+        return None
+    byte_order = data[base:base + 2]
+    if byte_order == b"II":
+        endian = "<"
+    elif byte_order == b"MM":
+        endian = ">"
+    else:
+        return None
+    if struct.unpack_from(endian + "H", data, base + 2)[0] != 42:
+        return None
+    ifd0_offset = base + struct.unpack_from(endian + "I", data, base + 4)[0]
+    if ifd0_offset + 2 > len(data):
+        return None
+    count = struct.unpack_from(endian + "H", data, ifd0_offset)[0]
+    exif_ifd_offset: int | None = None
+    for index in range(count):
+        entry = ifd0_offset + 2 + index * 12
+        if entry + 12 > len(data):
+            return None
+        tag, field_type, value_count, value_or_offset = struct.unpack_from(endian + "HHII", data, entry)
+        if tag == 0x9286:
+            raw = _read_tiff_value(data, base, endian, entry)
+            return _decode_user_comment(raw) if raw is not None else None
+        if tag == 0x8769 and field_type == 4 and value_count == 1:
+            exif_ifd_offset = base + value_or_offset
+    if exif_ifd_offset is None or exif_ifd_offset + 2 > len(data):
+        return None
+    exif_count = struct.unpack_from(endian + "H", data, exif_ifd_offset)[0]
+    for index in range(exif_count):
+        entry = exif_ifd_offset + 2 + index * 12
+        raw = _read_tiff_value(data, base, endian, entry)
+        if raw is not None:
+            return _decode_user_comment(raw)
+    return None
 
 
 def extract_user_comment(path: Path) -> str | None:
-    exif_bytes: bytes | None = None
-    suffix = path.suffix.lower()
-    try:
-        if suffix in {".heic", ".heif"}:
-            from pillow_heif import open_heif
-            heif = open_heif(str(path), convert_hdr_to_8bit=False)
-            primary = heif[0] if hasattr(heif, "__getitem__") else heif
-            exif_bytes = primary.info.get("exif")
-        else:
-            from PIL import Image
-            with Image.open(path) as image:
-                exif_bytes = image.info.get("exif")
-                if exif_bytes is None:
-                    exif = image.getexif()
-                    try:
-                        value = exif.get_ifd(0x8769).get(0x9286)
-                    except (KeyError, TypeError):
-                        value = None
-                    decoded = _decode_user_comment_value(value)
-                    if decoded:
-                        return decoded
-    except Exception:
-        exif_bytes = None
-
-    if exif_bytes:
-        decoded = _extract_tiff_user_comment(exif_bytes)
-        if decoded:
-            return decoded
-
-    data = path.read_bytes()
-    decoded = _extract_tiff_user_comment(data)
-    if decoded:
-        return decoded
-    match = COMMENT_PATTERN.search(data)
-    if match:
-        return match.group(0).decode("ascii")
-    json_match = JSON_TAG_PATTERN.search(data)
-    if json_match:
-        return '{"oplustag":"' + json_match.group(1).decode("ascii") + '"}'
-    return None
-
-
-
-def collect_inputs(inputs: Iterable[Path], output_dir: Path) -> list[Path]:
-    input_paths = [Path(item) for item in inputs]
-    excluded = output_dir.resolve(strict=False)
-    collected: dict[str, Path] = {}
-    in_place_skip_roots = (
-        {asset.folder_name for asset in AssetType}
-        | {mode.folder_name for mode in CaptureMode}
-    )
-    for source in input_paths:
-        if not source.exists():
-            raise FileNotFoundError(f"input not found: {source}")
-        candidates = [source] if source.is_file() else source.rglob("*")
-        for candidate in candidates:
-            resolved = candidate.resolve(strict=False)
-            if resolved == excluded or excluded in resolved.parents:
+    data = Path(path).read_bytes()
+    # JPEG APP1 Exif.
+    if data.startswith(b"\xff\xd8"):
+        position = 2
+        while position + 4 <= len(data) and data[position] == 0xFF:
+            marker = data[position + 1]
+            position += 2
+            if marker in (0xD8, 0xD9) or 0xD0 <= marker <= 0xD7:
                 continue
-            if not candidate.is_file() or candidate.suffix.lower() not in SUPPORTED_EXTENSIONS:
-                continue
-            skip = False
-            for input_root in input_paths:
-                if not input_root.is_dir():
-                    continue
-                try:
-                    relative = candidate.relative_to(input_root)
-                except ValueError:
-                    continue
-                if len(relative.parts) > 1 and relative.parts[0] in in_place_skip_roots:
-                    skip = True
-                    break
-            if not skip:
-                collected[str(resolved)] = candidate
-    return [collected[key] for key in sorted(collected)]
-
-
-LivePhotoPairValidator = Callable[[Path, Path], bool]
-
-
-def _companion_video(path: Path) -> Path | None:
-    stem = path.stem
-    try:
-        candidates = sorted(
-            (
-                candidate
-                for candidate in path.parent.iterdir()
-                if candidate.is_file()
-                and candidate.suffix.lower() == ".mov"
-                and candidate.stem == stem
-            ),
-            key=lambda candidate: candidate.name,
-        )
-    except OSError:
-        return None
-    return candidates[0] if candidates else None
-
-
-def _portable_live_photo_pair_validator(image: Path, video: Path) -> bool:
-    try:
-        from . import live_photo
-        return live_photo.existing_pair_is_valid(image, video)
-    except Exception:
-        return False
-
-
-def _resolved_asset(source: Path, pair_validator: LivePhotoPairValidator) -> PhotoAsset:
-    companion = _companion_video(source)
-    if companion is not None and pair_validator(source, companion):
-        return PhotoAsset.live_photo(source, companion)
-    if infer_asset_type(source) is AssetType.LIVE_PHOTO:
-        return PhotoAsset(
-            asset_id=str(source.resolve(strict=False)),
-            asset_type=AssetType.LIVE_PHOTO,
-            resources=(PhotoResource(source, ResourceRole.PRIMARY_IMAGE),),
-        )
-    return PhotoAsset.static_photo(source)
-
-
-def make_plan(
-    inputs: Iterable[Path],
-    output_dir: Path,
-    live_photo_pair_validator: LivePhotoPairValidator | None = None,
-) -> list[CategorizationItem]:
-    """Plan by user-visible photo asset while publishing one item per physical resource.
-
-    A same-basename MOV is never claimed on filename alone. The portable Live Photo validator must
-    confirm the HEIC/JPEG and MOV content identifiers before both resources enter one PhotoAsset.
-    """
-    pair_validator = live_photo_pair_validator or _portable_live_photo_pair_validator
-    reserved: dict[Path, tuple[Path, str]] = {}
-    items: list[CategorizationItem] = []
-    for source in collect_inputs(inputs, output_dir):
-        asset = _resolved_asset(source, pair_validator)
-        classification = classify_asset(asset)
-        directory = output_dir / FolderProjection.relative_directory(classification)
-        digests = {resource.path: _sha256(resource.path) for resource in asset.resources}
-        sequence = 1
-        while True:
-            candidates = [
-                (resource, _sequenced_destination(directory, resource.path.name, sequence))
-                for resource in asset.resources
-            ]
-            dispositions: dict[Path, str] = {}
-            conflict = False
-            for resource, destination in candidates:
-                digest = digests[resource.path]
-                prior = reserved.get(destination)
-                if prior is not None:
-                    if prior[1] == digest:
-                        dispositions[resource.path] = "duplicate"
-                    else:
-                        conflict = True
-                        break
-                elif destination.exists():
-                    if _files_match(resource.path, destination):
-                        dispositions[resource.path] = "duplicate"
-                    else:
-                        conflict = True
-                        break
-                else:
-                    dispositions[resource.path] = "copy"
-            if conflict:
-                sequence += 1
-                continue
-
-            for resource, destination in candidates:
-                digest = digests[resource.path]
-                reserved.setdefault(destination, (destination, digest))
-                items.append(
-                    CategorizationItem(
-                        resource.path,
-                        destination,
-                        classification,
-                        dispositions.get(resource.path, "copy"),
-                    )
-                )
-            break
-    return items
-
-
-
-def execute_plan(items: list[CategorizationItem], jobs: int = 4, dry_run: bool = False) -> list[CategorizationItem]:
-    def execute(item: CategorizationItem) -> CategorizationItem:
-        if item.disposition == "duplicate":
-            return item
-        if dry_run:
-            return replace(item, disposition="dry-run")
-        try:
-            _copy_atomically(item.source, item.destination)
-            return replace(item, disposition="copied")
-        except OSError as exc:
-            return replace(item, disposition="failed", error=str(exc))
-
-    with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
-        return list(pool.map(execute, items))
-
-
-
-def batch_destinations(
-    files: list[Path],
-    output_dir: Path,
-    asset_type: AssetType | None = None,
-) -> dict[Path, Path]:
-    reserved: set[Path] = set()
-    result: dict[Path, Path] = {}
-    for source in sorted(files, key=lambda item: str(item.resolve(strict=False))):
-        classification = classify_path(source, asset_type)
-        directory = output_dir / FolderProjection.relative_directory(classification, asset_type)
-        sequence = 1
-        while True:
-            destination = _sequenced_destination(directory, source.with_suffix(".heic").name, sequence)
-            if destination not in reserved:
-                reserved.add(destination)
-                result[source] = destination
+            if position + 2 > len(data):
                 break
-            sequence += 1
-    return result
+            length = int.from_bytes(data[position:position + 2], "big")
+            if length < 2 or position + length > len(data):
+                break
+            payload = data[position + 2:position + length]
+            if marker == 0xE1 and payload.startswith(b"Exif\x00\x00"):
+                parsed = _extract_user_comment_from_tiff(payload, 6)
+                if parsed is not None:
+                    return parsed
+            position += length
+    parsed = _extract_user_comment_from_tiff(data, 0)
+    if parsed is not None:
+        return parsed
 
+    # HEIF Exif can be stored in an item payload. Search for a TIFF header and parse candidates.
+    for signature in (b"II*\x00", b"MM\x00*"):
+        start = 0
+        while True:
+            index = data.find(signature, start)
+            if index < 0:
+                break
+            parsed = _extract_user_comment_from_tiff(data, index)
+            if parsed is not None:
+                return parsed
+            start = index + 1
 
-
-def classification_contract(classification: Classification) -> dict[str, object]:
-    """Canonical cross-runtime representation used by golden tests and future JSON surfaces."""
-    mode = classification.mode
-    return {
-        "asset_type": classification.asset_type.key,
-        "capture_modes": [candidate.key for candidate in MODE_PRIORITY if candidate in classification.capture_modes],
-        "primary_capture_mode": mode.key if mode is not None else None,
-        "folder": mode.folder_name if mode is not None else UNCLASSIFIED_FOLDER_NAME,
-        "metadata_status": classification.metadata_status,
-        "recognized_flags": classification.recognized_flags,
-        "known_unmapped_flags": classification.known_unmapped_flags,
-        "unknown_flags": classification.unknown_flags,
-        "tags": list(classification.tags),
-    }
-
-
-
-def _parse_flags(raw: str) -> int | None:
-    try:
-        parsed = json.loads(raw)
-        if isinstance(parsed, dict):
-            value = next((value for key, value in parsed.items() if key.lower() == "oplustag"), None)
-            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
-                return value
-            if isinstance(value, str) and value.strip().isdigit():
-                return int(value.strip())
-    except (ValueError, TypeError):
-        pass
-    normalized = raw.replace("\x00", "")
-    match = re.search(r"(?:oplus|oppo)_([0-9]+)", normalized, re.IGNORECASE)
-    return int(match.group(1)) if match else None
-
-
-
-def _decode_user_comment_value(value: object) -> str | None:
-    if isinstance(value, str):
-        return value.strip("\x00")
-    if isinstance(value, bytes):
-        payload = value[8:] if len(value) >= 8 else value
-        return payload.decode("utf-8", errors="replace").strip("\x00")
+    # Migration fallback for legacy fixtures and vendor metadata that is not exposed as a normal
+    # Exif item yet. Keep this evidence-only path explicit instead of treating it as generic Exif.
+    matched = re.search(rb"(?i)(?:Oplus|Oppo)_([0-9]+)", data)
+    if matched is not None:
+        return matched.group(0).decode("ascii")
+    json_tag = re.search(rb'(?i)"oplustag"\s*:\s*"?([0-9]+)"?', data)
+    if json_tag is not None:
+        return f"Oplus_{json_tag.group(1).decode('ascii')}"
     return None
 
 
-
-def _extract_tiff_user_comment(exif_bytes: bytes) -> str | None:
-    data = exif_bytes
-    if len(data) >= 10 and data[:4] == b"\x00\x00\x00\x06" and data[4:10] == b"Exif\x00\x00":
-        data = data[10:]
-    elif data.startswith(b"Exif\x00\x00"):
-        data = data[6:]
-    if len(data) < 8 or data[:2] not in {b"II", b"MM"}:
-        return None
-    endian = "<" if data[:2] == b"II" else ">"
-    if struct.unpack_from(endian + "H", data, 2)[0] != 42:
-        return None
-    pending = [struct.unpack_from(endian + "I", data, 4)[0]]
-    visited: set[int] = set()
-    while pending:
-        offset = pending.pop()
-        if offset in visited or offset + 2 > len(data):
-            continue
-        visited.add(offset)
-        count = struct.unpack_from(endian + "H", data, offset)[0]
-        if count > 4096:
-            return None
-        for index in range(count):
-            entry = offset + 2 + index * 12
-            if entry + 12 > len(data):
-                return None
-            tag, field_type = struct.unpack_from(endian + "HH", data, entry)
-            value_count = struct.unpack_from(endian + "I", data, entry + 4)[0]
-            value_offset = struct.unpack_from(endian + "I", data, entry + 8)[0]
-            if tag in {0x8769, 0x8825}:
-                pending.append(value_offset)
-            if tag == 0x9286 and field_type == 7:
-                start = entry + 8 if value_count <= 4 else value_offset
-                end = start + value_count
-                if end <= len(data):
-                    return _decode_user_comment_value(data[start:end])
-    return None
+def _probe_capabilities(path: Path) -> frozenset[PhotoCapability]:
+    data = path.read_bytes()
+    capabilities: set[PhotoCapability] = set()
+    if b"local.lhdr.gainmap" in data or b"local.uhdr.gainmap" in data:
+        capabilities.update((PhotoCapability.PROXDR, PhotoCapability.GAIN_MAP, PhotoCapability.HDR))
+    if b"rear.depth" in data and b"rear.depth.config" in data:
+        capabilities.add(PhotoCapability.DEPTH)
+    return frozenset(capabilities)
 
 
+def classify_path(path: Path, *, asset_type: AssetType = AssetType.STATIC_PHOTO) -> Classification:
+    return classify_user_comment(
+        extract_user_comment(path),
+        asset_type=asset_type,
+        capabilities=_probe_capabilities(path),
+    )
 
-def _sequenced_destination(directory: Path, name: str, sequence: int) -> Path:
-    if sequence == 1:
-        return directory / name
-    source = Path(name)
-    return directory / f"{source.stem} ({sequence}){source.suffix}"
 
+def collect_inputs(inputs: Iterable[Path], output_dir: Path | None = None) -> list[Path]:
+    output_root = output_dir.resolve(strict=False) if output_dir is not None else None
+    collected: set[Path] = set()
+    for raw in inputs:
+        path = Path(raw)
+        if not path.exists():
+            raise FileNotFoundError(path)
+        candidates = path.rglob("*") if path.is_dir() else (path,)
+        for candidate in candidates:
+            if not candidate.is_file() or candidate.suffix.lower() not in {".jpg", ".jpeg", ".heic", ".heif"}:
+                continue
+            resolved = candidate.resolve(strict=False)
+            if output_root is not None and (resolved == output_root or output_root in resolved.parents):
+                continue
+            if any(parent.name in FolderProjection.root_folder_names for parent in resolved.parents):
+                continue
+            collected.add(candidate)
+    return sorted(collected, key=lambda item: str(item.resolve(strict=False)))
 
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
             digest.update(chunk)
     return digest.hexdigest()
 
 
+@dataclass(frozen=True)
+class PlanItem:
+    source: Path
+    destination: Path
+    classification: Classification
+    disposition: str
+    asset_id: str = ""
+    role: ResourceRole = ResourceRole.PRIMARY_IMAGE
 
-def _files_match(left: Path, right: Path) -> bool:
-    return left.stat().st_size == right.stat().st_size and _sha256(left) == _sha256(right)
 
+@dataclass(frozen=True)
+class ExecutionResult:
+    source: Path
+    destination: Path
+    classification: Classification
+    disposition: str
+    error: str | None = None
+    asset_id: str = ""
+    role: ResourceRole = ResourceRole.PRIMARY_IMAGE
+
+
+def _resolved_asset(
+    image: Path,
+    live_photo_pair_validator: Callable[[Path, Path], bool] | None,
+) -> PhotoAsset:
+    video = image.with_suffix(".mov")
+    if video.is_file() and live_photo_pair_validator is not None and live_photo_pair_validator(image, video):
+        return PhotoAsset.live_photo(image, video)
+    return PhotoAsset.static_photo(image)
+
+
+def make_plan(
+    inputs: Iterable[Path],
+    output_dir: Path,
+    *,
+    live_photo_pair_validator: Callable[[Path, Path], bool] | None = None,
+) -> list[PlanItem]:
+    output_dir = Path(output_dir)
+    source_files = collect_inputs(inputs, output_dir)
+    resources_to_skip: set[Path] = set()
+    plans: list[PlanItem] = []
+
+    for source in source_files:
+        if source in resources_to_skip:
+            continue
+        asset = _resolved_asset(source, live_photo_pair_validator)
+        for resource in asset.resources:
+            resources_to_skip.add(resource.path)
+        classification = classify_path(asset.primary_image, asset_type=asset.asset_type)
+        relative_directory = FolderProjection.relative_directory(classification)
+        resource_fingerprints = {resource.path: _sha256(resource.path) for resource in asset.resources}
+        sequence = 1
+        while True:
+            conflicts = False
+            resource_destinations: dict[Path, Path] = {}
+            for resource in asset.resources:
+                stem = resource.path.stem if sequence == 1 else f"{resource.path.stem} ({sequence})"
+                candidate = output_dir / relative_directory / f"{stem}{resource.path.suffix.lower()}"
+                resource_destinations[resource.path] = candidate
+                if candidate.exists() and _sha256(candidate) != resource_fingerprints[resource.path]:
+                    conflicts = True
+            if not conflicts:
+                break
+            sequence += 1
+
+        for resource in asset.resources:
+            destination = resource_destinations[resource.path]
+            disposition = (
+                "duplicate"
+                if destination.exists() and _sha256(destination) == resource_fingerprints[resource.path]
+                else "copy"
+            )
+            plans.append(
+                PlanItem(
+                    source=resource.path,
+                    destination=destination,
+                    classification=classification,
+                    disposition=disposition,
+                    asset_id=asset.asset_id,
+                    role=resource.role,
+                )
+            )
+    return plans
 
 
 def _copy_atomically(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=".xdremux-categorize-", dir=destination.parent)
-    os.close(descriptor)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", dir=destination.parent)
+    os.close(fd)
     temporary = Path(temporary_name)
     try:
         shutil.copy2(source, temporary)
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def execute_plan(plan: Iterable[PlanItem], jobs: int = 1, dry_run: bool = False) -> list[ExecutionResult]:
+    items = list(plan)
+    if dry_run:
+        return [
+            ExecutionResult(
+                item.source,
+                item.destination,
+                item.classification,
+                "dry-run" if item.disposition != "duplicate" else "duplicate",
+                asset_id=item.asset_id,
+                role=item.role,
+            )
+            for item in items
+        ]
+
+    def run(item: PlanItem) -> ExecutionResult:
+        if item.disposition == "duplicate":
+            return ExecutionResult(
+                item.source,
+                item.destination,
+                item.classification,
+                "duplicate",
+                asset_id=item.asset_id,
+                role=item.role,
+            )
+        try:
+            _copy_atomically(item.source, item.destination)
+            return ExecutionResult(
+                item.source,
+                item.destination,
+                item.classification,
+                "copied",
+                asset_id=item.asset_id,
+                role=item.role,
+            )
+        except Exception as error:  # pragma: no cover - platform/filesystem dependent
+            return ExecutionResult(
+                item.source,
+                item.destination,
+                item.classification,
+                "failed",
+                str(error),
+                asset_id=item.asset_id,
+                role=item.role,
+            )
+
+    with ThreadPoolExecutor(max_workers=max(1, jobs)) as executor:
+        return list(executor.map(run, items))
