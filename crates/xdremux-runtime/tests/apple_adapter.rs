@@ -37,7 +37,7 @@ fn swift_adapter_advertises_only_apple_operation_facts() {
         return;
     };
     let facts = runtime
-        .apple_image_auxiliary_facts(&executable, &PathBuf::from(input))
+        .apple_image_auxiliary_facts(&executable, PathBuf::from(input))
         .expect("Rust runtime must decode ImageIO auxiliary facts from the Swift adapter");
 
     // This public Samsung Ultra HDR Motion Photo is not an Apple Portrait asset.
