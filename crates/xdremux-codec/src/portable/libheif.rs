@@ -82,18 +82,6 @@ impl LibHeifProvider {
                 let origin_y = row
                     .checked_mul(request.tile_size)
                     .ok_or_else(|| CodecError::invalid("tile y offset overflows"))?;
-                let logical_width = request
-                    .raster
-                    .width
-                    .checked_sub(origin_x)
-                    .ok_or_else(|| CodecError::invalid("tile x offset exceeds raster"))?
-                    .min(request.tile_size);
-                let logical_height = request
-                    .raster
-                    .height
-                    .checked_sub(origin_y)
-                    .ok_or_else(|| CodecError::invalid("tile y offset exceeds raster"))?
-                    .min(request.tile_size);
                 let encoded = encode_tile_container(request, origin_x, origin_y)?;
                 let item = extract_primary_hevc_item(&encoded)?;
                 validate_encoded_profile(&item.hvcc, request.target.layout)?;
@@ -110,8 +98,8 @@ impl LibHeifProvider {
                 }
                 tiles.push(EncodedHevcTile {
                     payload: item.payload,
-                    width: logical_width,
-                    height: logical_height,
+                    width: request.tile_size,
+                    height: request.tile_size,
                 });
             }
         }
@@ -702,6 +690,27 @@ mod tests {
         );
         assert_eq!(request.tile_size, 512);
         assert_eq!(request.quality, 90);
+    }
+
+    #[test]
+    fn edge_tiles_report_padded_coded_geometry() {
+        let raster = rgb_raster(257, 257);
+        let request = GainMapTileEncodeRequest {
+            target: target(257, 257, ChromaSampling::Yuv444),
+            raster,
+            tile_size: 256,
+            quality: 90,
+        };
+        let encoded = LibHeifProvider::new()
+            .encode_gain_map_tiles(&request)
+            .unwrap();
+        assert_eq!((encoded.gain_map_width, encoded.gain_map_height), (257, 257));
+        assert_eq!((encoded.tile_width, encoded.tile_height), (256, 256));
+        assert_eq!(encoded.tiles.len(), 4);
+        assert!(encoded
+            .tiles
+            .iter()
+            .all(|tile| (tile.width, tile.height) == (256, 256)));
     }
 
     #[test]

@@ -3,20 +3,51 @@ name: Rust CLI core
 on:
   push:
     paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-classification/**"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-source/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-metadata/**"
+      - "crates/xdremux-format/**"
+      - "crates/xdremux-container/**"
+      - "crates/xdremux-motion-photo/**"
+      - "scripts/check_rust_cli_smoke.sh"
+      - ".github/workflows/rust-cli-core.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-classification/**"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-source/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-metadata/**"
+      - "crates/xdremux-format/**"
+      - "crates/xdremux-container/**"
+      - "crates/xdremux-motion-photo/**"
+      - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/rust-cli-core.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  migrate-padded-edge-tiles:
-    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+  rust-cli-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: feat/rust-cli-unification
           fetch-depth: 0
       - name: Install portable HEVC provider
         run: |
@@ -26,106 +57,88 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Fix coded edge-tile geometry
+      - name: Verify committed workspace lockfile
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+      - name: Check formatting
+        run: cargo fmt --check -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
+      - name: Lint canonical Rust CLI stack
+        run: cargo clippy --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli --all-targets -- -D warnings
+      - name: Test canonical Rust CLI stack
+        run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
+      - name: Exercise real Rust CLI routes and product intents
+        run: bash scripts/check_rust_cli_smoke.sh
+      - name: Verify exact-head completion gate
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("crates/xdremux-codec/src/portable/libheif.rs")
-          text = path.read_text()
-          old = '''                let logical_width = request
-                    .raster
-                    .width
-                    .checked_sub(origin_x)
-                    .ok_or_else(|| CodecError::invalid("tile x offset exceeds raster"))?
-                    .min(request.tile_size);
-                let logical_height = request
-                    .raster
-                    .height
-                    .checked_sub(origin_y)
-                    .ok_or_else(|| CodecError::invalid("tile y offset exceeds raster"))?
-                    .min(request.tile_size);
-'''
-          if text.count(old) != 1:
-              raise SystemExit("logical edge-size block not found exactly once")
-          text = text.replace(old, "", 1)
-          old = '''                tiles.push(EncodedHevcTile {
-                    payload: item.payload,
-                    width: logical_width,
-                    height: logical_height,
-                });
-'''
-          new = '''                tiles.push(EncodedHevcTile {
-                    payload: item.payload,
-                    width: request.tile_size,
-                    height: request.tile_size,
-                });
-'''
-          if text.count(old) != 1:
-              raise SystemExit("encoded tile geometry block not found exactly once")
-          text = text.replace(old, new, 1)
-          anchor = '''    #[test]
-    fn libheif_rgb444_tile_roundtrips_through_raster_decoder() {
-'''
-          test = '''    #[test]
-    fn edge_tiles_report_padded_coded_geometry() {
-        let raster = rgb_raster(257, 257);
-        let request = GainMapTileEncodeRequest {
-            target: target(257, 257, ChromaSampling::Yuv444),
-            raster,
-            tile_size: 256,
-            quality: 90,
-        };
-        let encoded = LibHeifProvider::new()
-            .encode_gain_map_tiles(&request)
-            .unwrap();
-        assert_eq!((encoded.gain_map_width, encoded.gain_map_height), (257, 257));
-        assert_eq!((encoded.tile_width, encoded.tile_height), (256, 256));
-        assert_eq!(encoded.tiles.len(), 4);
-        assert!(encoded
-            .tiles
-            .iter()
-            .all(|tile| (tile.width, tile.height) == (256, 256)));
-    }
+          cat > "$RUNNER_TEMP/xdremux-rust-cli-gate.json" <<'JSON'
+          {
+            "schema_version": 1,
+            "scope": "Verify the canonical Rust engine policy, classification, source routing, ProXDR runtime, batch/categorize product surfaces, and xdremux CLI entry point including real OPPO Gallery intent conversion",
+            "checks": [
+              {
+                "name": "rust-workspace-lock",
+                "kind": "static",
+                "command": ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"],
+                "timeout_seconds": 600
+              },
+              {
+                "name": "rust-cli-stack-regressions",
+                "kind": "regression",
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-classification", "-p", "xdremux-engine", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli"],
+                "timeout_seconds": 900
+              },
+              {
+                "name": "rust-cli-real-file-smoke",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_rust_cli_smoke.sh"],
+                "timeout_seconds": 900
+              },
+              {
+                "name": "rust-cli-stack-clippy",
+                "kind": "static",
+                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-classification", "-p", "xdremux-engine", "-p", "xdremux-source", "-p", "xdremux-runtime", "-p", "xdremux-cli", "--all-targets", "--", "-D", "warnings"],
+                "timeout_seconds": 900
+              }
+            ]
+          }
+          JSON
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/feat/rust-xdremux-format \
+            --plan "$RUNNER_TEMP/xdremux-rust-cli-gate.json"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/$(git rev-parse HEAD).json"
 
-    #[test]
-    fn libheif_rgb444_tile_roundtrips_through_raster_decoder() {
-'''
-          if text.count(anchor) != 1:
-              raise SystemExit("codec test anchor not found exactly once")
-          path.write_text(text.replace(anchor, test, 1))
-
-          model = Path("crates/xdremux-codec/src/model.rs")
-          model_text = model.read_text()
-          old = '''pub struct EncodedHevcTile {
-    pub payload: Vec<u8>,
-    pub width: u32,
-    pub height: u32,
-}
-'''
-          new = '''pub struct EncodedHevcTile {
-    pub payload: Vec<u8>,
-    /// Coded storage width of this tile. Grid edge cropping belongs to the
-    /// parent grid item, so padded edge tiles retain the full tile width here.
-    pub width: u32,
-    /// Coded storage height of this tile; see `width`.
-    pub height: u32,
-}
-'''
-          if model_text.count(old) != 1:
-              raise SystemExit("EncodedHevcTile model anchor not found exactly once")
-          model.write_text(model_text.replace(old, new, 1))
-          PY
-          cargo fmt --all
-          cargo fmt --all -- --check
-          cargo clippy --locked -p xdremux-codec --all-targets -- -D warnings
-          cargo test --locked -p xdremux-codec
-          git diff --check
-      - name: Commit codec fix
+  portable-cli-build:
+    name: portable-cli-build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install libheif + HEVC on macOS
+        if: runner.os == 'macOS'
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/xdremux-codec/src/model.rs crates/xdremux-codec/src/portable/libheif.rs
-          git commit -m "fix(codec): preserve padded HEIF tile geometry"
-          git push origin HEAD:feat/rust-cli-unification
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Install libheif + HEVC on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # libheif-sys uses the MSVC static-runtime-compatible vcpkg triplet by default.
+          # Install the exact triplet it probes instead of a parallel dynamic x64-windows tree.
+          $triplet = "x64-windows-static-md"
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libheif[hevc]:$triplet"
+          "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "VCPKG_DEFAULT_TRIPLET=$triplet" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build canonical Rust CLI
+        run: cargo build --locked -p xdremux-cli
+      - name: Test portable Rust CLI conversion semantics
+        run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli

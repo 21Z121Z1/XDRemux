@@ -101,7 +101,10 @@ impl GainMapTileEncodeRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncodedHevcTile {
     pub payload: Vec<u8>,
+    /// Coded storage width of this tile. Grid edge cropping belongs to the
+    /// parent grid item, so padded edge tiles retain the full tile width here.
     pub width: u32,
+    /// Coded storage height of this tile; see `width`.
     pub height: u32,
 }
 
