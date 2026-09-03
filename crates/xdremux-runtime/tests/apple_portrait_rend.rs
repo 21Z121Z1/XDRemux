@@ -55,7 +55,10 @@ fn source_derived_rend_round_trips_through_the_rust_owned_portrait_manifest() {
         encoded_rend.starts_with("UkVORA"),
         "base64 REND must begin with the REND magic"
     );
-    assert!(encoded_rend.len() > 100, "REND payload is unexpectedly short");
+    assert!(
+        encoded_rend.len() > 100,
+        "REND payload is unexpectedly short"
+    );
 
     // Attach the Rust-owned Portrait resources to the canonical Rust HDR base,
     // then ask ImageIO only to perform the platform write and factual probe.
