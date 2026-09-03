@@ -108,6 +108,21 @@ pub struct EncodedHevcTile {
     pub height: u32,
 }
 
+/// One primary HEVC item extracted from a complete HEIF container.
+///
+/// The item payload and hvcC record are kept together because an ISO-BMFF
+/// graph cannot safely reuse one without the other. Higher layers can use
+/// this for a resource-oriented remux (for example, the Apple Photographic
+/// Styles Linear Thumbnail) without reaching into libheif's container model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncodedHevcResource {
+    pub payload: Vec<u8>,
+    /// HEVCDecoderConfigurationRecord payload without the outer hvcC box.
+    pub hvcc: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncodedGainMapTiles {
     pub gain_map_width: u32,

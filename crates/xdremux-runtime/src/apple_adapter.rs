@@ -43,6 +43,24 @@ pub struct AppleStylePropertiesFacts {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct AppleVideoToolboxMain10Facts {
+    pub width: u32,
+    pub height: u32,
+    pub annex_b_length: usize,
+    pub hvcc_length: usize,
+}
+
+pub(super) struct AppleVideoToolboxMain10Encode<'a> {
+    pub input: &'a Path,
+    pub output_annex_b: &'a Path,
+    pub output_hvcc: &'a Path,
+    pub width: u32,
+    pub height: u32,
+    pub bytes_per_row: u32,
+    pub quality: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct AppleAdapterCapabilities {
     photographic_styles: bool,
     portrait: bool,
@@ -108,6 +126,10 @@ impl AppleAdapterClient {
             photographic_styles,
             portrait,
         })
+    }
+
+    pub(super) fn supports_photographic_styles(&self) -> Result<bool> {
+        Ok(self.capabilities()?.photographic_styles)
     }
 
     pub(super) fn imageio_auxiliary_facts(&self, input: &Path) -> Result<AppleImageAuxiliaryFacts> {
@@ -224,6 +246,76 @@ impl AppleAdapterClient {
             return Err(RuntimeError::new(
                 "Apple semantic Styles validation",
                 "private Apple consumer changed Rust-owned key-1 style data",
+            ));
+        }
+        Ok(facts)
+    }
+
+    /// Ask VideoToolbox for the one Apple-specific codec primitive required by
+    /// the Styles graph. Raster ownership, resource selection, and HEIF graph
+    /// assembly remain in Rust; this operation only writes the framework's
+    /// Annex-B and hvcC outputs to caller-provided staging paths.
+    pub(super) fn videotoolbox_encode_main10(
+        &self,
+        encode: &AppleVideoToolboxMain10Encode<'_>,
+    ) -> Result<AppleVideoToolboxMain10Facts> {
+        if encode.width == 0 || encode.height == 0 {
+            return Err(RuntimeError::new(
+                "Apple VideoToolbox Main10 encode",
+                "raster geometry must be non-zero",
+            ));
+        }
+        let minimum_row = encode.width.checked_mul(3).ok_or_else(|| {
+            RuntimeError::new(
+                "Apple VideoToolbox Main10 encode",
+                "RGB8 row geometry overflows",
+            )
+        })?;
+        if encode.bytes_per_row < minimum_row {
+            return Err(RuntimeError::new(
+                "Apple VideoToolbox Main10 encode",
+                "RGB8 row is shorter than width * 3",
+            ));
+        }
+        if !encode.quality.is_finite() || !(0.0..=1.0).contains(&encode.quality) {
+            return Err(RuntimeError::new(
+                "Apple VideoToolbox Main10 encode",
+                "quality must be finite and within 0 through 1",
+            ));
+        }
+        let wire_request = VideoToolboxMain10Request {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "videotoolbox-encode-main10",
+            input_path: input_path(encode.input)?,
+            output_path: input_path(encode.output_annex_b)?,
+            video_toolbox_main10: VideoToolboxMain10Wire {
+                raw_width: encode.width,
+                raw_height: encode.height,
+                raw_bytes_per_row: encode.bytes_per_row,
+                quality: encode.quality,
+                hvcc_path: input_path(encode.output_hvcc)?,
+            },
+        };
+        let request = serde_json::to_vec(&wire_request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        let output = self.invoke(&request, APPLE_COMPUTE_TIMEOUT)?;
+        let response: VideoToolboxMain10Response = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        let facts = AppleVideoToolboxMain10Facts {
+            width: response.video_toolbox_main10.width,
+            height: response.video_toolbox_main10.height,
+            annex_b_length: response.video_toolbox_main10.annex_b_length,
+            hvcc_length: response.video_toolbox_main10.hvcc_length,
+        };
+        if facts.width != encode.width
+            || facts.height != encode.height
+            || facts.annex_b_length == 0
+            || facts.hvcc_length == 0
+        {
+            return Err(RuntimeError::new(
+                "Apple VideoToolbox Main10 encode",
+                format!("adapter returned invalid output facts: {facts:?}"),
             ));
         }
         Ok(facts)
@@ -846,6 +938,24 @@ struct AdapterRequest {
 }
 
 #[derive(Debug, Serialize)]
+struct VideoToolboxMain10Request {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    video_toolbox_main10: VideoToolboxMain10Wire,
+}
+
+#[derive(Debug, Serialize)]
+struct VideoToolboxMain10Wire {
+    raw_width: u32,
+    raw_height: u32,
+    raw_bytes_per_row: u32,
+    quality: f64,
+    hvcc_path: String,
+}
+
+#[derive(Debug, Serialize)]
 struct EncodeSourceImageRequest {
     schema_version: u32,
     operation: &'static str,
@@ -981,6 +1091,20 @@ struct ImagePropertiesResponse {
 struct StylePropertiesResponse {
     schema_version: u32,
     style_properties: StylePropertiesWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct VideoToolboxMain10Response {
+    schema_version: u32,
+    video_toolbox_main10: VideoToolboxMain10WireResponse,
+}
+
+#[derive(Debug, Deserialize)]
+struct VideoToolboxMain10WireResponse {
+    width: u32,
+    height: u32,
+    annex_b_length: usize,
+    hvcc_length: usize,
 }
 
 #[derive(Debug, Deserialize)]

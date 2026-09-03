@@ -481,6 +481,35 @@ fn process_batch_item_with_options(
                             "Apple Portrait requires macOS ImageIO/Vision/Core Image capabilities",
                         ));
                     }
+                } else if request.apple_features.photographic_styles {
+                    #[cfg(target_os = "macos")]
+                    {
+                        let adapter = apple_adapter_executable.ok_or_else(|| {
+                            RuntimeError::new(
+                                "Photographic Styles conversion",
+                                "the macOS Apple adapter executable was not resolved",
+                            )
+                        })?;
+                        let receipt = runtime.convert_apple_photographic_styles_file(
+                            adapter,
+                            &source,
+                            &item.output,
+                        )?;
+                        return Ok(BatchSuccess {
+                            input: item.input.clone(),
+                            outputs: vec![receipt.output],
+                            kind: BatchAssetKind::ProXdr,
+                            disposition: BatchSuccessDisposition::Converted,
+                        });
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        let _ = apple_adapter_executable;
+                        return Err(RuntimeError::new(
+                            "Photographic Styles conversion",
+                            "Photographic Styles requires macOS ImageIO/Vision capabilities",
+                        ));
+                    }
                 } else {
                     runtime.convert_proxdr_file(&source, &item.output, request, |_| {})?
                 };

@@ -65,6 +65,18 @@ pub const APPLE_PORTRAIT_SEMANTIC_ROLES: [AppleSemanticRole; 5] = [
     AppleSemanticRole::Glasses,
 ];
 
+/// Semantic resources required by the Rust-owned Photographic Styles path.
+///
+/// This mirrors Apple's Styles-only semantic contract: a person/skin pair is
+/// present when Vision finds a credible human subject, alongside the sky
+/// matte. The adapter receives this explicit role set; it never chooses the
+/// product profile itself.
+pub const APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES: [AppleSemanticRole; 3] = [
+    AppleSemanticRole::Person,
+    AppleSemanticRole::Skin,
+    AppleSemanticRole::Sky,
+];
+
 /// One tightly packed linear 8-bit matte.
 ///
 /// Apple Vision exposes semantic mattes as one-component 8-bit pixel buffers.

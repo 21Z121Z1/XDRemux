@@ -17,7 +17,8 @@ use xdremux_format::ChromaSampling;
 pub use apple::{
     fuse_apple_portrait_hair_mask, fuse_apple_portrait_person_mask, AppleGainMapFacts,
     AppleImageAuxiliaryFacts, AppleL8Mask, AppleL8MaskError, ApplePortraitHairFusion,
-    ApplePortraitPersonFusion, AppleSemanticRole, APPLE_PORTRAIT_SEMANTIC_ROLES,
+    ApplePortraitPersonFusion, AppleSemanticRole, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+    APPLE_PORTRAIT_SEMANTIC_ROLES,
 };
 pub use apple_auxiliary::{
     build_apple_portrait_disparity_payload, build_apple_portrait_effects_matte_payload,
@@ -30,16 +31,16 @@ pub use apple_auxiliary::{
 pub use apple_photographic_styles::{
     apple_style_data_apply_coefficient_deltas, apple_style_data_from_coefficient_deltas,
     apple_style_data_from_parameters, apple_style_data_sha256, apple_style_face_exposure_boost,
-    apple_style_fit_global_polynomial, apple_style_identity_data, apple_style_light_map,
-    apple_style_polynomial_basis, apple_style_property_list, apple_style_solve_refinement_update,
-    resolve_apple_style_scene_type, validate_apple_style_data, AppleStyleDataError,
-    AppleStyleDataFacts, AppleStyleDistribution, AppleStyleLightMapRequest,
-    AppleStylePropertyListRequest, AppleStyleSampledJacobian, AppleStyleScalarRow,
-    AppleStyleSceneClass, AppleStyleSceneDecision, AppleStyleSceneScores, AppleStyleStatistics,
-    APPLE_STYLE_BLOCK_VALUE_COUNT, APPLE_STYLE_BYTE_COUNT, APPLE_STYLE_CHANNEL_COUNT,
-    APPLE_STYLE_GRID_HEIGHT, APPLE_STYLE_GRID_WIDTH, APPLE_STYLE_IDENTITY_SHA256,
-    APPLE_STYLE_LIGHT_MAP_BYTE_COUNT, APPLE_STYLE_LIGHT_MAP_SIDE, APPLE_STYLE_PLANE_COUNT,
-    APPLE_STYLE_POLYNOMIAL_COUNT, APPLE_STYLE_REFINEMENT_EPSILON,
+    apple_style_fit_global_polynomial, apple_style_identity_data,
+    apple_style_identity_global_tone_curve, apple_style_light_map, apple_style_polynomial_basis,
+    apple_style_property_list, apple_style_solve_refinement_update, resolve_apple_style_scene_type,
+    validate_apple_style_data, AppleStyleDataError, AppleStyleDataFacts, AppleStyleDistribution,
+    AppleStyleLightMapRequest, AppleStylePropertyListRequest, AppleStyleSampledJacobian,
+    AppleStyleScalarRow, AppleStyleSceneClass, AppleStyleSceneDecision, AppleStyleSceneScores,
+    AppleStyleStatistics, APPLE_STYLE_BLOCK_VALUE_COUNT, APPLE_STYLE_BYTE_COUNT,
+    APPLE_STYLE_CHANNEL_COUNT, APPLE_STYLE_GRID_HEIGHT, APPLE_STYLE_GRID_WIDTH,
+    APPLE_STYLE_IDENTITY_SHA256, APPLE_STYLE_LIGHT_MAP_BYTE_COUNT, APPLE_STYLE_LIGHT_MAP_SIDE,
+    APPLE_STYLE_PLANE_COUNT, APPLE_STYLE_POLYNOMIAL_COUNT, APPLE_STYLE_REFINEMENT_EPSILON,
     APPLE_STYLE_REFINEMENT_MAX_PIXELS, APPLE_STYLE_REFINEMENT_PARAMETER_COUNT,
     APPLE_STYLE_TILE_COUNT,
 };

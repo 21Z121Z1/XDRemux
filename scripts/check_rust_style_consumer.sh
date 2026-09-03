@@ -13,64 +13,90 @@ swift build --product xdremux-apple-adapter
 adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
 test -x "$adapter"
 
+cargo build --locked -p xdremux-cli
+cli="$repo_root/target/debug/xdremux"
+test -x "$cli"
+
+# This is a real Rust product-path check. The fixture is a checked-in ProXDR
+# source; no Swift product writer or legacy Styles runner is used to produce
+# the output under test.
+fixture="$repo_root/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic"
+test -s "$fixture"
+
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-rust-style-consumer.XXXXXX")"
 trap 'rm -rf "$test_root"' EXIT
-oracle_output="$test_root/oracle"
-mkdir -p "$oracle_output"
+output="$test_root/rust-styles.heic"
+inspect="$test_root/inspect.json"
 
-# The existing Swift smoke is used only as a temporary fixture producer. It
-# deliberately selects the deterministic identity producer on this hosted
-# machine, so this command is not solver or product-path acceptance evidence.
-XDREMUX_STYLE_RUNNER_OUTPUT="$oracle_output" \
-  swift test --filter PhotographicStylesRunnerSmokeTests
+XDREMUX_APPLE_ADAPTER="$adapter" \
+  "$cli" convert --input "$fixture" --output "$output" --apple-styles
+test -s "$output"
 
-style_metadata="$test_root/style-metadata.bplist"
-style_data="$test_root/expected-rust-identity-style-data.bin"
-python3 - "$oracle_output/coloros16-live-styles.heic" "$style_metadata" "$style_data" <<'PY'
-import hashlib
-import importlib.util
+# The canonical Rust validator checks the ISO Gain Map graph and publication
+# shape. It is intentionally kept separate from the Apple consumer facts
+# below.
+"$cli" validate "$output" >/dev/null
+
+python3 - "$adapter" "$output" <<'PY'
+import json
+import subprocess
 import sys
-from pathlib import Path
 
-source_path, metadata_path, style_data_path = sys.argv[1:]
-spec = importlib.util.spec_from_file_location("inspect_oppo_heif", "scripts/inspect_oppo_heif.py")
-module = importlib.util.module_from_spec(spec)
-assert spec.loader is not None
-spec.loader.exec_module(module)
-source = Path(source_path).read_bytes()
-meta = next(box for box in module.boxes(source, 0, len(source)) if box["type"] == "meta")
-children = {box["type"]: box for box in module.boxes(source, meta["payload_start"] + 4, meta["end"])}
-items = module.parse_iinf(source, children["iinf"])
-locations = module.parse_iloc(source, children["iloc"])
-idat = children.get("idat")
-for item_id, item in items.items():
-    if item.get("type") == "uri ":
-        metadata = module.payload_for_item(source, locations[item_id], idat)
-        Path(metadata_path).write_bytes(metadata)
-        break
-else:
-    raise SystemExit("Styles smoke output has no uri style metadata item")
+adapter, output = sys.argv[1:]
 
-# This is the same fixed identity layout validated by xdremux-engine. The
-# script uses it only as an expected byte fixture for the Rust protocol test.
-block = b"".join((b"\x00\x00" if index not in {3, 7, 11} else b"\x00\x3c") for index in range(30))
-style_data = block * (12 * 9 * 8)
-if len(style_data) != 51840:
-    raise SystemExit(f"unexpected identity style-data length: {len(style_data)}")
-expected_sha = "43e0ae73508cc10684d4be708fa1d19f3b55b8de15cb8e3544ef16300db91dbe"
-if hashlib.sha256(style_data).hexdigest() != expected_sha:
-    raise SystemExit("identity style-data fixture does not match the Rust layout digest")
-Path(style_data_path).write_bytes(style_data)
-print(f"rust-style-fixtures: metadata={len(metadata)} style_data={len(style_data)}")
+def request(operation):
+    payload = json.dumps(
+        {
+            "schema_version": 1,
+            "operation": operation,
+            "input_path": output,
+        }
+    ).encode() + b"\n"
+    result = subprocess.run(
+        [adapter], input=payload, check=True, capture_output=True
+    )
+    return json.loads(result.stdout)
+
+auxiliary = request("imageio-auxiliary-facts")["auxiliary"]
+required = [
+    "iso_gain_map",
+    "portrait_effects_matte",
+    "skin_matte",
+]
+missing = [key for key in required if auxiliary.get(key) is not True]
+if missing:
+    raise SystemExit(
+        f"{output}: missing ImageIO Styles consumer facts {missing}: {auxiliary!r}"
+    )
+
+gain_map = request("imageio-gain-map-facts")["gain_map"]
+if gain_map["width"] <= 0 or gain_map["height"] <= 0:
+    raise SystemExit(f"{output}: invalid ImageIO gain-map facts: {gain_map!r}")
+print(
+    "rust-styles-consumer-pass: "
+    f"iso_gain_map={auxiliary['iso_gain_map']} "
+    f"portrait_effects_matte={auxiliary['portrait_effects_matte']} "
+    f"skin_matte={auxiliary['skin_matte']} "
+    f"gain_map={gain_map['width']}x{gain_map['height']}"
+)
 PY
 
-test_input="$repo_root/fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg"
-test -f "$test_input"
-CARGO_TARGET_DIR="$test_root/cargo-target" \
-XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
-XDREMUX_APPLE_ADAPTER_TEST_INPUT="$test_input" \
-XDREMUX_APPLE_STYLE_METADATA_INPUT="$style_metadata" \
-XDREMUX_APPLE_STYLE_DATA_EXPECTED="$style_data" \
-  cargo test --locked -p xdremux-runtime --test apple_adapter
+python3 scripts/inspect_oppo_heif.py "$output" --json > "$inspect"
+python3 - "$inspect" <<'PY'
+import json
+import sys
 
-echo "PASS Rust Styles metadata consumer bridge"
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+items = report["items"]
+if not any(item["type"] == "uri " for item in items):
+    raise SystemExit("Rust Styles output has no URI metadata item")
+if not any(item["type"] == "grid" for item in items):
+    raise SystemExit("Rust Styles output has no auxiliary grid item")
+if not report["references"]:
+    raise SystemExit("Rust Styles output has no item references")
+print(
+    "rust-styles-graph-pass: "
+    f"items={len(items)} references={len(report['references'])}"
+)
+PY

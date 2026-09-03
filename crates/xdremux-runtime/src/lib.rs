@@ -2,6 +2,8 @@
 
 #[cfg(target_os = "macos")]
 mod apple_adapter;
+#[cfg(target_os = "macos")]
+mod apple_styles;
 mod batch;
 mod batch_checkpoint;
 mod categorize;
@@ -179,6 +181,20 @@ impl PortableRuntime {
     ) -> Result<AppleStylePropertiesFacts> {
         apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
             .semantic_style_properties_facts(metadata, expected_style_data)
+    }
+
+    /// Convert a ProXDR source into a Rust-assembled Photographic Styles
+    /// graph. The Apple adapter is restricted to Vision/ImageIO primitives;
+    /// Rust owns the resource policy, metadata, graph, validation, and
+    /// atomic publication transaction.
+    #[cfg(target_os = "macos")]
+    pub fn convert_apple_photographic_styles_file(
+        &self,
+        executable: impl AsRef<Path>,
+        source: &[u8],
+        output: impl AsRef<Path>,
+    ) -> Result<PhotographicStylesFileReceipt> {
+        apple_styles::convert_file(self, executable, source, output)
     }
 
     #[cfg(target_os = "macos")]
@@ -431,6 +447,12 @@ impl PortableRuntime {
             return Err(RuntimeError::new(
                 "Motion Photo conversion",
                 "OPPO-compatible output applies to ProXDR still images and cannot be combined with Motion Photo conversion",
+            ));
+        }
+        if request.apple_features.any() {
+            return Err(RuntimeError::new(
+                "Motion Photo conversion",
+                "Apple Portrait and Photographic Styles intents apply to ProXDR still images and cannot be combined with Motion Photo conversion",
             ));
         }
         self.convert_motion_photo_file(source, input, output)

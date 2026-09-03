@@ -197,6 +197,35 @@ pub fn apple_style_identity_data() -> Vec<u8> {
     result
 }
 
+/// Build the protocol identity global-tone-curve resource.
+///
+/// The curve is the 257-entry little-endian table used by the established
+/// Apple producer: a two-byte count followed by 256 sRGB-encoded samples and
+/// one terminal sample. It is a portable resource construction rule, so it
+/// belongs beside the rest of the Rust-owned Styles metadata policy rather
+/// than in the Apple adapter.
+pub fn apple_style_identity_global_tone_curve() -> Vec<u8> {
+    let mut output = Vec::with_capacity(516);
+    output.extend_from_slice(&257_u16.to_le_bytes());
+    for index in 0..256 {
+        let linear = f64::from(index) / 255.0;
+        let encoded = if linear <= 0.003_130_8 {
+            linear * 12.92
+        } else {
+            1.055 * linear.powf(1.0 / 2.4) - 0.055
+        };
+        let value = (encoded.clamp(0.0, 1.0) * 65_534.0).round() as u16;
+        let value = match index {
+            0 => 0,
+            255 => 65_534,
+            _ => value,
+        };
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+    output.extend_from_slice(&65_534_u16.to_le_bytes());
+    output
+}
+
 /// Return a stable lowercase SHA-256 digest for a style payload.
 pub fn apple_style_data_sha256(data: &[u8]) -> String {
     let digest = Sha256::digest(data);
@@ -1347,6 +1376,21 @@ mod tests {
                 assert_eq!(value, expected);
             }
         }
+    }
+
+    #[test]
+    fn identity_global_tone_curve_matches_257_sample_wire_contract() {
+        let curve = apple_style_identity_global_tone_curve();
+        assert_eq!(curve.len(), 516);
+        assert_eq!(&curve[..2], &257_u16.to_le_bytes());
+        let samples = curve[2..]
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        assert_eq!(samples.len(), 257);
+        assert_eq!(samples.first(), Some(&0));
+        assert_eq!(samples.last(), Some(&65_534));
+        assert!(samples.windows(2).all(|pair| pair[0] <= pair[1]));
     }
 
     #[test]

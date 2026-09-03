@@ -22,6 +22,10 @@ const AUXC: FourCC = FourCC::new(*b"auxC");
 const DIMG: FourCC = FourCC::new(*b"dimg");
 const AUXL: FourCC = FourCC::new(*b"auxl");
 const CDSC: FourCC = FourCC::new(*b"cdsc");
+const HDLR: FourCC = FourCC::new(*b"hdlr");
+const DINF: FourCC = FourCC::new(*b"dinf");
+const PITM: FourCC = FourCC::new(*b"pitm");
+const GRPL: FourCC = FourCC::new(*b"grpl");
 
 const STYLE_METADATA_URI: &[u8] = b"tag:apple.com,2023:photo:metadata:styles";
 const STYLE_DELTA_AUX_TYPE: &[u8] = b"tag:apple.com,2023:photo:aux:styledeltamap";
@@ -194,16 +198,29 @@ fn find_style_graph_roots(meta: &ParsedMeta) -> Result<(u32, u32)> {
             candidates.insert(reference.from_item_id);
         }
     }
-    let gain_id = match candidates.into_iter().collect::<Vec<_>>().as_slice() {
+    // ImageIO may add an auxiliary item that also references the primary and
+    // tmap roots (for example, a Vision sky matte). The Gain Map item is the
+    // grid among those candidates; accepting every auxl source would make a
+    // valid source ambiguous as soon as a semantic resource is present.
+    let gain_grid_candidates = candidates
+        .into_iter()
+        .filter(|item_id| {
+            meta.iinf
+                .entries
+                .iter()
+                .any(|item| item.item_id == *item_id && item.item_type == Some(GRID))
+        })
+        .collect::<Vec<_>>();
+    let gain_id = match gain_grid_candidates.as_slice() {
         [only] => *only,
         [] => {
             return Err(invalid(
-                "Photographic Styles source has no unambiguous Gain Map item",
+                "Photographic Styles source has no unambiguous Gain Map grid item",
             ));
         }
         _ => {
             return Err(invalid(
-                "Photographic Styles source has multiple Gain Map candidates",
+                "Photographic Styles source has multiple Gain Map grid candidates",
             ));
         }
     };
@@ -223,6 +240,51 @@ fn associated_property_index(meta: &ParsedMeta, item_id: u32, kind: FourCC) -> O
             .filter(|property| property.kind == kind)
             .map(|_| association.property_index)
     })
+}
+
+fn style_delta_color_property_index(meta: &ParsedMeta) -> Result<u16> {
+    if let Some(index) = associated_property_index(meta, meta.primary_item_id, COLR) {
+        return Ok(index);
+    }
+
+    // A Rust-authored ISO Gain Map base can leave the primary grid with only
+    // its geometry association. Its primary color profile is still carried by
+    // the grid's hvc1 children. Reuse that exact source property for the Style
+    // Delta resources; this preserves the producer's color contract without
+    // inventing a platform-specific profile in the container layer.
+    let mut candidates = BTreeSet::new();
+    if let Some(iref) = meta.iref.as_ref() {
+        for reference in &iref.entries {
+            if reference.kind != DIMG || reference.from_item_id != meta.primary_item_id {
+                continue;
+            }
+            for item_id in &reference.to_item_ids {
+                let is_primary_component = meta
+                    .iinf
+                    .entries
+                    .iter()
+                    .any(|item| item.item_id == *item_id && item.item_type == Some(HVC1));
+                if !is_primary_component {
+                    continue;
+                }
+                if let Some(index) = associated_property_index(meta, *item_id, COLR) {
+                    candidates.insert(index);
+                }
+            }
+        }
+    }
+    match candidates.len() {
+        1 => candidates
+            .into_iter()
+            .next()
+            .ok_or_else(|| invalid("Style Delta source color property disappeared")),
+        0 => Err(invalid(
+            "Photographic Styles source has no verifiable primary color property",
+        )),
+        _ => Err(invalid(
+            "Photographic Styles source has ambiguous primary color properties",
+        )),
+    }
 }
 
 fn append_property(output: &mut Vec<u8>, next_index: &mut u16, raw: &[u8]) -> Result<u16> {
@@ -307,12 +369,7 @@ fn build_iprp(
     let mut next_property_index = u16::try_from(properties.len() + 1)
         .map_err(|_| invalid("source HEIF property count exceeds u16"))?;
 
-    let primary_color_index = associated_property_index(meta, meta.primary_item_id, COLR)
-        .ok_or_else(|| {
-            invalid(
-                "Photographic Styles requires a primary colr property; refusing to synthesize an unverified color space",
-            )
-        })?;
+    let primary_color_index = style_delta_color_property_index(meta)?;
     let delta_hvcc_index = append_property(
         &mut ipco_payload,
         &mut next_property_index,
@@ -347,7 +404,11 @@ fn build_iprp(
     let identity_irot_index = append_property(
         &mut ipco_payload,
         &mut next_property_index,
-        &make_full_box(IROT, 0, 0, &[0])?,
+        // `irot` is a one-byte item property, not a FullBox.  Apple native
+        // Styles files use the ISO-BMFF wire form `size + "irot" + angle`;
+        // adding version/flags here changes the property payload to five
+        // bytes and makes ImageIO reject the otherwise valid Styles graph.
+        &make_box(IROT, &[0])?,
     )?;
     let linear_hvcc_index = append_property(
         &mut ipco_payload,
@@ -420,6 +481,10 @@ fn build_iprp(
         associations: vec![
             IpmaAssociation {
                 property_index: linear_ispe_index,
+                // Native Apple Styles files mark the Linear Thumbnail's
+                // geometry as essential. The decoder and auxiliary type are
+                // not sufficient for ImageIO to admit the item without its
+                // declared raster dimensions.
                 essential: true,
             },
             IpmaAssociation {
@@ -577,6 +642,34 @@ fn find_tmap_id(meta: &ParsedMeta) -> Result<u32> {
         ));
     }
     Ok(id)
+}
+
+fn entity_group_ids(source: &[u8], children: &[BoxHeader]) -> Result<Vec<u32>> {
+    let mut group_ids = Vec::new();
+    for grpl in children.iter().filter(|header| header.kind == GRPL) {
+        for group in parse_boxes(source, grpl.payload_range())? {
+            // Entity-group boxes are FullBoxes. The group identifier follows
+            // their four-byte version/flags field. Count every group type,
+            // matching Apple's writer, because a group ID occupies the same
+            // namespace as the item IDs used by the appended Styles graph.
+            let group_id_start = group
+                .data_start
+                .checked_add(4)
+                .ok_or_else(|| invalid("entity group ID offset overflows"))?;
+            let group_id_end = group_id_start
+                .checked_add(4)
+                .ok_or_else(|| invalid("entity group ID range overflows"))?;
+            let bytes = source
+                .get(group_id_start..group_id_end)
+                .ok_or_else(|| invalid("entity group ID is truncated"))?;
+            group_ids.push(u32::from_be_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| invalid("entity group ID has invalid width"))?,
+            ));
+        }
+    }
+    Ok(group_ids)
 }
 
 fn existing_idat_payload<'a>(source: &'a [u8], meta: &ParsedMeta) -> Result<&'a [u8]> {
@@ -873,7 +966,22 @@ fn build_meta(
     let mut payload = full_header.to_vec();
     let mut saw_iref = false;
     let mut saw_idat = false;
-    for header in children {
+    // Keep the child order emitted by Apple's Styles writer. ISO-BMFF does
+    // not require this ordering, but ImageIO's Styles consumer has accepted
+    // the native sequence consistently: iloc/iinf/pitm precede the
+    // properties and data/reference boxes. Unknown children remain in their
+    // original relative order after the known sequence.
+    let canonical_order = [HDLR, DINF, ILOC, IINF, PITM, IPRP, IDAT, IREF, GRPL];
+    let mut ordered_children = Vec::with_capacity(children.len());
+    for kind in canonical_order {
+        ordered_children.extend(children.iter().filter(|header| header.kind == kind));
+    }
+    ordered_children.extend(
+        children
+            .iter()
+            .filter(|header| !canonical_order.contains(&header.kind)),
+    );
+    for header in ordered_children {
         match header.kind {
             IINF => payload.extend_from_slice(iinf),
             ILOC => payload.extend_from_slice(iloc),
@@ -942,6 +1050,7 @@ pub fn assemble_photographic_styles_heif(
                 std::iter::once(entry.from_item_id).chain(entry.to_item_ids.iter().copied())
             })
         }))
+        .chain(entity_group_ids(source, &meta_children)?)
         .max()
         .ok_or_else(|| invalid("Photographic Styles source contains no item IDs"))?;
     let mut next_item_id = existing_maximum_id
@@ -1339,8 +1448,18 @@ mod tests {
         .unwrap();
         let pitm = make_pitm_box(0, PRIMARY_ID).unwrap();
         let idat = make_box(IDAT, &idat_payload).unwrap();
+        let mut altr_payload = vec![0, 0, 0, 0];
+        altr_payload.extend_from_slice(&5_u32.to_be_bytes());
+        altr_payload.extend_from_slice(&2_u32.to_be_bytes());
+        altr_payload.extend_from_slice(&TMAP_ID.to_be_bytes());
+        altr_payload.extend_from_slice(&PRIMARY_ID.to_be_bytes());
+        let grpl = make_box(
+            GRPL,
+            &make_box(FourCC::new(*b"altr"), &altr_payload).unwrap(),
+        )
+        .unwrap();
         let mut meta_payload = vec![0, 0, 0, 0];
-        for part in [pitm, iinf, iloc, iprp, iref, idat] {
+        for part in [pitm, iinf, iloc, iprp, iref, idat, grpl] {
             meta_payload.extend_from_slice(&part);
         }
         [
@@ -1370,6 +1489,37 @@ mod tests {
     }
 
     #[test]
+    fn derives_primary_color_from_grid_components_when_grid_has_geometry_only() {
+        let source = fixture();
+        let top = scan_top_level_boxes(&source).unwrap();
+        let meta_header = one_top_level(&top.boxes, META, "fixture meta").unwrap();
+        let mut meta = parse_meta_box(&source, meta_header).unwrap();
+        meta.ipma
+            .entries
+            .iter_mut()
+            .find(|entry| entry.item_id == PRIMARY_ID)
+            .unwrap()
+            .associations
+            .retain(|association| association.property_index != 2);
+        meta.ipma
+            .entries
+            .iter_mut()
+            .find(|entry| entry.item_id == TILE_ID)
+            .unwrap()
+            .associations
+            .push(IpmaAssociation {
+                property_index: 2,
+                essential: true,
+            });
+        meta.iref.as_mut().unwrap().entries.push(IrefEntry {
+            kind: DIMG,
+            from_item_id: PRIMARY_ID,
+            to_item_ids: vec![TILE_ID],
+        });
+        assert_eq!(style_delta_color_property_index(&meta).unwrap(), 2);
+    }
+
+    #[test]
     fn appends_rust_resources_and_preserves_source_mdat_prefix() {
         let output =
             assemble_photographic_styles_heif(&fixture(), &assembly(b"bplist00test")).unwrap();
@@ -1379,6 +1529,16 @@ mod tests {
         let meta_header = one_top_level(&top.boxes, META, "output meta").unwrap();
         let meta = parse_meta_box(&output, meta_header).unwrap();
         assert_eq!(meta.iinf.entries.len(), 4 + 33);
+        assert!(!meta.iinf.entries.iter().any(|item| item.item_id == 5));
+        assert_eq!(
+            meta.iinf
+                .entries
+                .iter()
+                .map(|item| item.item_id)
+                .filter(|item_id| *item_id > TILE_ID)
+                .min(),
+            Some(6)
+        );
         assert!(meta
             .iinf
             .entries

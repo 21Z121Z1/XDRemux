@@ -11,8 +11,8 @@ use xdremux_format::isobmff::{parse_boxes, parse_meta_box, scan_top_level_boxes,
 use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};
 
 use crate::{
-    CodecError, EncodedGainMapTiles, EncodedHevcTile, GainMapTileEncodeRequest,
-    HeifRasterDecodeRequest, Raster8, RasterPixelFormat, Result,
+    CodecError, EncodedGainMapTiles, EncodedHevcResource, EncodedHevcTile,
+    GainMapTileEncodeRequest, HeifRasterDecodeRequest, Raster8, RasterPixelFormat, Result,
 };
 
 const HVC1: FourCC = FourCC::new(*b"hvc1");
@@ -24,6 +24,28 @@ pub struct LibHeifProvider;
 impl LibHeifProvider {
     pub const fn new() -> Self {
         Self
+    }
+
+    /// Extract the primary HEVC item and its dimensions from a complete HEIF.
+    ///
+    /// This is intentionally a codec-level operation. The caller receives
+    /// only validated compressed-resource facts and remains responsible for
+    /// deciding which ISO-BMFF item graph, if any, should reference them.
+    pub fn extract_primary_hevc_resource(&self, source: &[u8]) -> Result<EncodedHevcResource> {
+        if source.is_empty() {
+            return Err(CodecError::invalid("HEIF resource input is empty"));
+        }
+        let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
+        let handle = context
+            .primary_image_handle()
+            .map_err(CodecError::libheif)?;
+        let item = extract_primary_hevc_item(source)?;
+        Ok(EncodedHevcResource {
+            payload: item.payload,
+            hvcc: item.hvcc,
+            width: handle.width(),
+            height: handle.height(),
+        })
     }
 
     pub fn verified_encoder_layouts() -> [GainMapCodecLayout; 3] {

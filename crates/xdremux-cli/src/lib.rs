@@ -57,25 +57,35 @@ struct InspectArgs {
 #[derive(Debug, Args, Default)]
 struct ProductConversionArgs {
     /// Preserve compatibility with OPPO Gallery when converting ProXDR still images.
-    #[arg(long, conflicts_with = "apple_portrait")]
+    #[arg(long, conflicts_with_all = ["apple_portrait", "apple_styles"])]
     oppo_compatible: bool,
     /// Preserve Apple Portrait editing resources when converting an OPPO Portrait still.
-    #[arg(long, conflicts_with = "oppo_compatible")]
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_styles"])]
     apple_portrait: bool,
+    /// Attach the Rust-owned Photographic Styles graph to a ProXDR still.
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait"])]
+    apple_styles: bool,
 }
 
 impl ProductConversionArgs {
     fn request(&self) -> ConversionRequest {
-        match (self.oppo_compatible, self.apple_portrait) {
-            (true, false) => ConversionRequest::oppo_gallery_compatible(),
-            (false, true) => ConversionRequest {
+        match (self.oppo_compatible, self.apple_portrait, self.apple_styles) {
+            (true, false, false) => ConversionRequest::oppo_gallery_compatible(),
+            (false, true, false) => ConversionRequest {
                 apple_features: AppleFeatureRequest {
                     portrait: true,
                     ..AppleFeatureRequest::default()
                 },
                 ..ConversionRequest::default()
             },
-            (false, false) | (true, true) => ConversionRequest::default(),
+            (false, false, true) => ConversionRequest {
+                apple_features: AppleFeatureRequest {
+                    photographic_styles: true,
+                    ..AppleFeatureRequest::default()
+                },
+                ..ConversionRequest::default()
+            },
+            _ => ConversionRequest::default(),
         }
     }
 }
@@ -304,7 +314,7 @@ fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
         .cloned()
         .ok_or_else(|| {
             format!(
-                "Apple Portrait requires the bundled xdremux-apple-adapter; searched {}. Install it beside xdremux or set XDREMUX_APPLE_ADAPTER for a deployed helper",
+                "Apple features require the bundled xdremux-apple-adapter; searched {}. Install it beside xdremux or set XDREMUX_APPLE_ADAPTER for a deployed helper",
                 candidates
                     .iter()
                     .map(|candidate| candidate.display().to_string())
@@ -317,6 +327,7 @@ fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
 fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
     let request = arguments.product.request();
     let apple_portrait = arguments.product.apple_portrait;
+    let apple_styles = arguments.product.apple_styles;
     let input = arguments.input;
     let output = arguments.output;
     let source = match fs::read(&input) {
@@ -337,10 +348,10 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
     let runtime = PortableRuntime::new();
     let result = match asset {
         SourceAsset::MotionPhoto { .. } => {
-            if apple_portrait {
+            if apple_portrait || apple_styles {
                 let _ = writeln!(
                     stderr,
-                    "error: --apple-portrait applies to OPPO Portrait still inputs and cannot be combined with Motion Photo conversion"
+                    "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion"
                 );
                 return 1;
             }
@@ -393,6 +404,41 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
                     let _ = writeln!(
                         stderr,
                         "error: --apple-portrait requires macOS ImageIO/Vision/Core Image capabilities"
+                    );
+                    return 1;
+                }
+            } else if apple_styles {
+                #[cfg(target_os = "macos")]
+                {
+                    let adapter = match resolve_apple_adapter_executable() {
+                        Ok(path) => path,
+                        Err(error) => {
+                            let _ = writeln!(stderr, "error: {error}");
+                            return 1;
+                        }
+                    };
+                    match runtime.convert_apple_photographic_styles_file(&adapter, &source, &output)
+                    {
+                        Ok(receipt) if receipt.output == input => {
+                            writeln!(stdout, "converted: {} (in place)", input.display())
+                        }
+                        Ok(receipt) => writeln!(
+                            stdout,
+                            "converted: {} -> {}",
+                            input.display(),
+                            receipt.output.display()
+                        ),
+                        Err(error) => {
+                            let _ = writeln!(stderr, "error: {error}");
+                            return 1;
+                        }
+                    }
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let _ = writeln!(
+                        stderr,
+                        "error: --apple-styles requires macOS ImageIO/Vision capabilities"
                     );
                     return 1;
                 }
@@ -588,28 +634,29 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
     };
 
     let runtime = PortableRuntime::new();
-    let apple_adapter_executable = if arguments.product.apple_portrait {
-        #[cfg(target_os = "macos")]
-        {
-            match resolve_apple_adapter_executable() {
-                Ok(path) => Some(path),
-                Err(error) => {
-                    let _ = writeln!(stderr, "error: {error}");
-                    return 1;
+    let apple_adapter_executable =
+        if arguments.product.apple_portrait || arguments.product.apple_styles {
+            #[cfg(target_os = "macos")]
+            {
+                match resolve_apple_adapter_executable() {
+                    Ok(path) => Some(path),
+                    Err(error) => {
+                        let _ = writeln!(stderr, "error: {error}");
+                        return 1;
+                    }
                 }
             }
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = writeln!(
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = writeln!(
                 stderr,
-                "error: --apple-portrait requires macOS ImageIO/Vision/Core Image capabilities"
+                "error: Apple feature intents require macOS ImageIO/Vision/Core Image capabilities"
             );
-            return 1;
-        }
-    } else {
-        None
-    };
+                return 1;
+            }
+        } else {
+            None
+        };
     let execution_options = BatchExecutionOptions {
         checkpoint_path,
         reuse_existing,

@@ -18,6 +18,7 @@ private struct AdapterRequest: Decodable {
     let metadataSourcePath: String?
     let lossyQuality: Double?
     let primaryMetadataXMPPath: String?
+    let videoToolboxMain10: VideoToolboxMain10Request?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -32,6 +33,7 @@ private struct AdapterRequest: Decodable {
         case metadataSourcePath = "metadata_source_path"
         case lossyQuality = "lossy_quality"
         case primaryMetadataXMPPath = "primary_metadata_xmp_path"
+        case videoToolboxMain10 = "video_toolbox_main10"
     }
 }
 
@@ -188,6 +190,7 @@ private struct AdapterResponse: Encodable {
     let imageProperties: ImageProperties?
     let semanticMasks: [VisionSemanticMaskFacts]?
     let styleProperties: StylePropertiesFacts?
+    let videoToolboxMain10: VideoToolboxMain10Facts?
 
     init(
         schemaVersion: Int,
@@ -196,7 +199,8 @@ private struct AdapterResponse: Encodable {
         gainMap: GainMapFacts?,
         imageProperties: ImageProperties?,
         semanticMasks: [VisionSemanticMaskFacts]?,
-        styleProperties: StylePropertiesFacts? = nil
+        styleProperties: StylePropertiesFacts? = nil,
+        videoToolboxMain10: VideoToolboxMain10Facts? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.capabilities = capabilities
@@ -205,6 +209,7 @@ private struct AdapterResponse: Encodable {
         self.imageProperties = imageProperties
         self.semanticMasks = semanticMasks
         self.styleProperties = styleProperties
+        self.videoToolboxMain10 = videoToolboxMain10
     }
 
     enum CodingKeys: String, CodingKey {
@@ -215,6 +220,7 @@ private struct AdapterResponse: Encodable {
         case imageProperties = "image_properties"
         case semanticMasks = "semantic_masks"
         case styleProperties = "style_properties"
+        case videoToolboxMain10 = "video_toolbox_main10"
     }
 }
 
@@ -683,6 +689,25 @@ do {
             styleProperties: try semanticStylePropertiesFacts(
                 inputPath: inputPath,
                 readbackPath: outputPath
+            )
+        )
+    case "videotoolbox-encode-main10":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let configuration = request.videoToolboxMain10 else {
+            fail("videotoolbox-encode-main10 requires input_path, output_path, and video_toolbox_main10")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            videoToolboxMain10: try encodeVideoToolboxMain10(
+                inputPath: inputPath,
+                outputPath: outputPath,
+                configuration: configuration
             )
         )
     case "vision-semantic-mattes":
