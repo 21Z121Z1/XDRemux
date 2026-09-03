@@ -1,6 +1,6 @@
 use libheif_rs::{
     Channel, ColorSpace, CompressionFormat, EncoderParameterValue, EncoderQuality, HeifContext,
-    Image, LibHeif, RgbChroma,
+    Image, ImageHandle, LibHeif, RgbChroma,
 };
 use xdremux_engine::{
     CapabilityInventory, GainMapChannels, GainMapCodec, GainMapCodecLayout,
@@ -46,6 +46,27 @@ impl LibHeifProvider {
             width: handle.width(),
             height: handle.height(),
         })
+    }
+
+    /// Decode one image item by its ISO-BMFF item ID.
+    ///
+    /// Styles and semantic analysis need the source Gain Map as a separate
+    /// raster while the primary item remains the display base. Keeping item
+    /// selection here avoids making the runtime guess through the primary
+    /// image API or reimplementing libheif's grid decoder.
+    pub fn decode_item_raster(
+        &self,
+        source: &[u8],
+        item_id: u32,
+        format: RasterPixelFormat,
+    ) -> Result<Raster8> {
+        if source.is_empty() {
+            return Err(CodecError::invalid("HEIF item decode input is empty"));
+        }
+        let context = HeifContext::read_from_bytes(source).map_err(CodecError::libheif)?;
+        let handle = context.image_handle(item_id).map_err(CodecError::libheif)?;
+        let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
+        self.decode_handle(&lib, &handle, format)
     }
 
     pub fn verified_encoder_layouts() -> [GainMapCodecLayout; 3] {
@@ -146,10 +167,19 @@ impl LibHeifProvider {
             .primary_image_handle()
             .map_err(CodecError::libheif)?;
         let lib = LibHeif::new_checked().map_err(CodecError::libheif)?;
-        match request.format {
+        self.decode_handle(&lib, &handle, request.format)
+    }
+
+    fn decode_handle(
+        &self,
+        lib: &LibHeif,
+        handle: &ImageHandle,
+        format: RasterPixelFormat,
+    ) -> Result<Raster8> {
+        match format {
             RasterPixelFormat::Mono8 => {
                 let image = lib
-                    .decode(&handle, ColorSpace::Monochrome, None)
+                    .decode(handle, ColorSpace::Monochrome, None)
                     .map_err(CodecError::libheif)?;
                 let plane = image.planes().y.ok_or_else(|| {
                     CodecError::invalid("decoded monochrome image has no Y plane")
@@ -168,7 +198,7 @@ impl LibHeifProvider {
             }
             RasterPixelFormat::Rgb8 => {
                 let image = lib
-                    .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
+                    .decode(handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
                     .map_err(CodecError::libheif)?;
                 let plane = image.planes().interleaved.ok_or_else(|| {
                     CodecError::invalid("decoded RGB image has no interleaved plane")

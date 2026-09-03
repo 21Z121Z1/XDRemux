@@ -251,6 +251,51 @@ impl AppleAdapterClient {
         Ok(facts)
     }
 
+    /// Return Vision's scene confidence observations. Scene thresholds,
+    /// priority, and the resulting Styles scene type remain Rust policy.
+    pub(super) fn vision_scene_scores(
+        &self,
+        input: &Path,
+    ) -> Result<xdremux_engine::AppleStyleSceneScores> {
+        let output = self.invoke_request_with_timeout(
+            AdapterRequest {
+                schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+                operation: "vision-scene-classification".to_owned(),
+                input_path: Some(input_path(input)?),
+                output_path: None,
+                roles: None,
+                orientation: None,
+                metadata_source_path: None,
+                lossy_quality: None,
+            },
+            APPLE_COMPUTE_TIMEOUT,
+        )?;
+        let response: SceneClassificationResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        let scores = response.scene_classification;
+        let scores = xdremux_engine::AppleStyleSceneScores {
+            food: scores.food,
+            sunset: scores.sunset,
+            indoor: scores.indoor,
+            outdoor: scores.outdoor,
+        };
+        for (name, value) in [
+            ("food", scores.food),
+            ("sunset", scores.sunset),
+            ("indoor", scores.indoor),
+            ("outdoor", scores.outdoor),
+        ] {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(RuntimeError::new(
+                    "Apple Vision scene classification",
+                    format!("{name} confidence is outside 0 through 1: {value}"),
+                ));
+            }
+        }
+        Ok(scores)
+    }
+
     /// Ask VideoToolbox for the one Apple-specific codec primitive required by
     /// the Styles graph. Raster ownership, resource selection, and HEIF graph
     /// assembly remain in Rust; this operation only writes the framework's
@@ -1132,6 +1177,20 @@ impl From<StylePropertiesWire> for AppleStylePropertiesFacts {
 struct SemanticResponse {
     schema_version: u32,
     semantic_masks: Vec<SemanticMaskWire>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SceneClassificationResponse {
+    schema_version: u32,
+    scene_classification: SceneClassificationWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct SceneClassificationWire {
+    food: f64,
+    sunset: f64,
+    indoor: f64,
+    outdoor: f64,
 }
 
 #[derive(Debug, Deserialize)]

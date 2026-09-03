@@ -191,6 +191,7 @@ private struct AdapterResponse: Encodable {
     let semanticMasks: [VisionSemanticMaskFacts]?
     let styleProperties: StylePropertiesFacts?
     let videoToolboxMain10: VideoToolboxMain10Facts?
+    let sceneClassification: VisionSceneClassificationFacts?
 
     init(
         schemaVersion: Int,
@@ -200,7 +201,8 @@ private struct AdapterResponse: Encodable {
         imageProperties: ImageProperties?,
         semanticMasks: [VisionSemanticMaskFacts]?,
         styleProperties: StylePropertiesFacts? = nil,
-        videoToolboxMain10: VideoToolboxMain10Facts? = nil
+        videoToolboxMain10: VideoToolboxMain10Facts? = nil,
+        sceneClassification: VisionSceneClassificationFacts? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.capabilities = capabilities
@@ -210,6 +212,7 @@ private struct AdapterResponse: Encodable {
         self.semanticMasks = semanticMasks
         self.styleProperties = styleProperties
         self.videoToolboxMain10 = videoToolboxMain10
+        self.sceneClassification = sceneClassification
     }
 
     enum CodingKeys: String, CodingKey {
@@ -221,6 +224,7 @@ private struct AdapterResponse: Encodable {
         case semanticMasks = "semantic_masks"
         case styleProperties = "style_properties"
         case videoToolboxMain10 = "video_toolbox_main10"
+        case sceneClassification = "scene_classification"
     }
 }
 
@@ -728,6 +732,19 @@ do {
                 roles: roles,
                 orientationOverride: request.orientation
             )
+        )
+    case "vision-scene-classification":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty else {
+            fail("vision-scene-classification requires input_path")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            sceneClassification: try classifyVisionScene(inputPath: inputPath)
         )
     case "coreimage-render-l8":
         guard let outputPath = request.outputPath, !outputPath.isEmpty,
