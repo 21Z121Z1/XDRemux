@@ -6,18 +6,24 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/**"
+      - "Sources/XDRemuxAppleAdapter/**"
       - "apps/macos/XDRemuxApp/Sources/**"
       - "Tests/test_performance_design.py"
+      - "scripts/benchmark_rust_product.py"
       - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   push:
-    branches: [main]
+    branches:
+      - main
+      - feat/rust-cli-unification
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/**"
+      - "Sources/XDRemuxAppleAdapter/**"
       - "apps/macos/XDRemuxApp/Sources/**"
       - "Tests/test_performance_design.py"
+      - "scripts/benchmark_rust_product.py"
       - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   workflow_dispatch:
@@ -32,12 +38,24 @@ concurrency:
 jobs:
   rust-performance:
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+
+      - name: Record benchmark environment
+        shell: bash
+        run: |
+          mkdir -p artifacts/performance
+          {
+            echo "head=$(git rev-parse HEAD)"
+            sw_vers
+            echo "arch=$(uname -m)"
+            xcodebuild -version
+            swift --version
+          } | tee artifacts/performance/environment.txt
 
       - name: Install portable HEVC provider
         shell: bash
@@ -53,9 +71,15 @@ jobs:
       - name: Build optimized Rust product
         shell: bash
         run: |
-          mkdir -p artifacts/performance
           cargo build --locked --workspace --all-targets --release \
             2>&1 | tee artifacts/performance/rust-release-build.log
+
+      - name: Build release Apple primitive adapter
+        shell: bash
+        run: |
+          swift build -c release --product xdremux-apple-adapter \
+            2>&1 | tee artifacts/performance/apple-adapter-build.log
+          echo "XDREMUX_PERF_APPLE_ADAPTER=$(swift build -c release --show-bin-path)/xdremux-apple-adapter" >> "$GITHUB_ENV"
 
       - name: Check Rust performance design invariants
         shell: bash
@@ -72,6 +96,17 @@ jobs:
         run: |
           bash scripts/check_rust_cli_smoke.sh \
             2>&1 | tee artifacts/performance/rust-cli-smoke.log
+
+      - name: Measure representative end-to-end product workloads
+        shell: bash
+        run: |
+          python3 scripts/benchmark_rust_product.py \
+            --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
+            --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
+            --warmup 1 \
+            --iterations 5 \
+            --output artifacts/performance/product-benchmark.json \
+            2>&1 | tee artifacts/performance/product-benchmark.log
 
       - name: Build and run macOS app model integration
         shell: bash
@@ -111,7 +146,7 @@ jobs:
           )
           plan = {
               "schema_version": 1,
-              "scope": "Canonical Rust product release build, performance design invariants, and macOS app integration",
+              "scope": "Canonical Rust product release build, performance evidence, design invariants, and macOS app integration",
               "checks": [
                   {
                       "name": "rust-release-build",
@@ -165,14 +200,27 @@ jobs:
           {
             echo "## XDRemux Rust performance and design"
             echo
-            echo "The workflow measures the canonical Rust release build and test path, then checks the bounded solver/data-movement invariants and app integration."
-            echo "It does not treat the retired Swift implementation as a performance oracle."
+            echo "The workflow measures representative end-to-end release CLI workloads. Timed regions include source I/O, parsing, codec work, publication, and Apple adapter/framework overhead where applicable."
+            echo "Measurements are evidence only until repeated stable-runner samples justify committed regression budgets."
             echo
-            echo '```text'
-            grep -hE "(test result:|passed|failed|rust-cli|Performance)" \
-              artifacts/performance/*.log 2>/dev/null || true
-            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          if [[ -s artifacts/performance/product-benchmark.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/performance/product-benchmark.json").read_text())
+          print("| workload | median | p95 | max RSS | median input throughput |")
+          print("| --- | ---: | ---: | ---: | ---: |")
+          for case in report["cases"]:
+              print(
+                  f"| {case['name']} | {case['median_wall_seconds']:.3f}s | "
+                  f"{case['p95_wall_seconds']:.3f}s | "
+                  f"{case['max_peak_rss_bytes'] / (1024 * 1024):.1f} MiB | "
+                  f"{case['median_input_mib_per_second']:.1f} MiB/s |"
+              )
+          PY
+          fi
 
       - name: Upload performance measurements
         if: always()
