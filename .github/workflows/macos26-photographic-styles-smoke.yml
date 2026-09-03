@@ -11,6 +11,8 @@ on:
       - "crates/xdremux-runtime/src/apple_styles.rs"
       - "crates/xdremux-runtime/tests/apple_adapter.rs"
       - "crates/xdremux-heif/**"
+      - "scripts/check_apple_adapter_handshake.sh"
+      - "scripts/check_rust_cli_apple_portrait.sh"
       - "scripts/check_rust_style_consumer.sh"
       - "Tests/test_rust_apple_semantic_policy.py"
       - ".github/workflows/macos26-photographic-styles-smoke.yml"
@@ -27,6 +29,8 @@ on:
       - "crates/xdremux-runtime/src/apple_styles.rs"
       - "crates/xdremux-runtime/tests/apple_adapter.rs"
       - "crates/xdremux-heif/**"
+      - "scripts/check_apple_adapter_handshake.sh"
+      - "scripts/check_rust_cli_apple_portrait.sh"
       - "scripts/check_rust_style_consumer.sh"
       - "Tests/test_rust_apple_semantic_policy.py"
       - ".github/workflows/macos26-photographic-styles-smoke.yml"
@@ -42,7 +46,7 @@ concurrency:
 jobs:
   apple-adapter-integration:
     runs-on: macos-26
-    timeout-minutes: 75
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
@@ -78,12 +82,26 @@ jobs:
           python3 -m unittest Tests.test_rust_apple_semantic_policy \
             2>&1 | tee artifacts/macos26-apple-adapter/semantic-policy.log
 
-      - name: Run Rust-driven Apple adapter consumer gate
+      - name: Verify versioned Apple adapter handshake
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/check_apple_adapter_handshake.sh \
+            2>&1 | tee artifacts/macos26-apple-adapter/handshake.log
+
+      - name: Run Rust-driven Portrait consumer gate
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/check_rust_cli_apple_portrait.sh \
+            2>&1 | tee artifacts/macos26-apple-adapter/portrait-consumer.log
+
+      - name: Run Rust-driven Styles consumer gate
         shell: bash
         run: |
           set -o pipefail
           bash scripts/check_rust_style_consumer.sh \
-            2>&1 | tee artifacts/macos26-apple-adapter/rust-consumer.log
+            2>&1 | tee artifacts/macos26-apple-adapter/styles-consumer.log
 
       - name: Write summary
         if: always()
@@ -92,8 +110,8 @@ jobs:
           {
             echo "## macOS 26 Rust Apple adapter integration"
             echo
-            echo "This gate builds the versioned Swift Apple adapter and drives it through the canonical Rust product path at the exact checked-out head."
-            echo "Rust owns source analysis, product policy, Styles scene semantics, graph assembly, validation, and publication."
+            echo "This gate builds the versioned Swift Apple adapter and drives its handshake, Portrait, and Photographic Styles primitives through the canonical Rust product path at the exact checked-out head."
+            echo "Rust owns source analysis, product policy, Styles scene semantics, Portrait synthesis, graph assembly, validation, and publication."
             echo "Swift is limited to Apple framework primitives and raw framework observations."
             echo
             echo "This is framework integration evidence, not Apple Photos device acceptance or visual-equivalence evidence."
