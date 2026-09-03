@@ -18,6 +18,9 @@ pub const APPLE_STYLE_BYTE_COUNT: usize =
     APPLE_STYLE_BLOCK_VALUE_COUNT * APPLE_STYLE_TILE_COUNT * APPLE_STYLE_VALUE_BYTE_COUNT;
 pub const APPLE_STYLE_IDENTITY_SHA256: &str =
     "43e0ae73508cc10684d4be708fa1d19f3b55b8de15cb8e3544ef16300db91dbe";
+pub const APPLE_STYLE_REFINEMENT_PARAMETER_COUNT: usize = 12;
+pub const APPLE_STYLE_REFINEMENT_MAX_PIXELS: usize = 50_000;
+pub const APPLE_STYLE_REFINEMENT_EPSILON: f64 = 1.0 / 32.0;
 
 const IDENTITY_INDICES: [usize; 3] = [3, 7, 11];
 const DIRECT_PARAMETER_INDICES: [usize; 6] = [0, 1, 2, 3, 7, 11];
@@ -57,6 +60,21 @@ pub enum AppleStyleDataError {
     NonFiniteValue {
         index: usize,
     },
+    InvalidRgbRaster {
+        actual: usize,
+    },
+    InvalidRefinementParameter {
+        actual: usize,
+        expected: usize,
+    },
+    InvalidRefinementStep,
+    InvalidScalarRow {
+        index: usize,
+    },
+    InvalidJacobianSampleCount {
+        actual: usize,
+        expected: usize,
+    },
     SingularSystem,
 }
 
@@ -88,6 +106,25 @@ impl fmt::Display for AppleStyleDataError {
             Self::NonFiniteValue { index } => write!(
                 formatter,
                 "Apple Photographic Styles Float16 value {index} is not finite"
+            ),
+            Self::InvalidRgbRaster { actual } => write!(
+                formatter,
+                "Apple Photographic Styles RGB raster has {actual} values; expected a non-empty multiple of 3"
+            ),
+            Self::InvalidRefinementParameter { actual, expected } => write!(
+                formatter,
+                "Apple Photographic Styles refinement parameter {actual} is outside 0..{expected}"
+            ),
+            Self::InvalidRefinementStep => formatter.write_str(
+                "Apple Photographic Styles refinement Jacobian step must be finite and non-zero",
+            ),
+            Self::InvalidScalarRow { index } => write!(
+                formatter,
+                "Apple Photographic Styles scalar constraint row {index} is invalid"
+            ),
+            Self::InvalidJacobianSampleCount { actual, expected } => write!(
+                formatter,
+                "Apple Photographic Styles sampled Jacobian has {actual} values; expected {expected}"
             ),
             Self::SingularSystem => {
                 formatter.write_str("Apple Photographic Styles polynomial system is singular")
@@ -293,6 +330,225 @@ pub fn apple_style_fit_global_polynomial(
         }
     }
     Ok(coefficients)
+}
+
+/// Parameter-major finite-difference observations consumed by the constrained
+/// style refinement solve.
+///
+/// The Apple renderer is allowed to produce the perturbed rasters, but it does
+/// not own the sampling or solve policy. Keeping the sampled storage here also
+/// preserves the Swift implementation's bounded-memory contract: at most
+/// `APPLE_STYLE_REFINEMENT_MAX_PIXELS` pixels are retained by the Jacobian.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AppleStyleSampledJacobian {
+    rgb_value_count: usize,
+    pub pixel_stride: usize,
+    pub sample_count: usize,
+    values: Vec<f32>,
+}
+
+impl AppleStyleSampledJacobian {
+    /// Allocate the exact sample grid used by the refinement solver.
+    pub fn new(rgb_value_count: usize) -> Result<Self, AppleStyleDataError> {
+        if rgb_value_count < 3 || !rgb_value_count.is_multiple_of(3) {
+            return Err(AppleStyleDataError::InvalidRgbRaster {
+                actual: rgb_value_count,
+            });
+        }
+        let pixel_count = rgb_value_count / 3;
+        let pixel_stride = (pixel_count / APPLE_STYLE_REFINEMENT_MAX_PIXELS).max(1);
+        let sampled_pixel_count = (pixel_count - 1) / pixel_stride + 1;
+        let sample_count = sampled_pixel_count * 3;
+        Ok(Self {
+            rgb_value_count,
+            pixel_stride,
+            sample_count,
+            values: vec![0.0; sample_count * APPLE_STYLE_REFINEMENT_PARAMETER_COUNT],
+        })
+    }
+
+    /// Populate one parameter column from a renderer perturbation and return
+    /// its sampled derivative RMS in the renderer's native 8-bit domain.
+    pub fn populate_parameter(
+        &mut self,
+        parameter: usize,
+        rendered_rgb: &[f32],
+        current_rgb: &[f32],
+        step: f64,
+    ) -> Result<f64, AppleStyleDataError> {
+        if parameter >= APPLE_STYLE_REFINEMENT_PARAMETER_COUNT {
+            return Err(AppleStyleDataError::InvalidRefinementParameter {
+                actual: parameter,
+                expected: APPLE_STYLE_REFINEMENT_PARAMETER_COUNT,
+            });
+        }
+        if rendered_rgb.len() != current_rgb.len()
+            || rendered_rgb.len() != self.rgb_value_count
+            || rendered_rgb.len() < 3
+            || !rendered_rgb.len().is_multiple_of(3)
+            || !rendered_rgb.iter().all(|value| value.is_finite())
+            || !current_rgb.iter().all(|value| value.is_finite())
+        {
+            return Err(AppleStyleDataError::InvalidRasterPair);
+        }
+        if !step.is_finite() || step == 0.0 {
+            return Err(AppleStyleDataError::InvalidRefinementStep);
+        }
+        let float_step = step as f32;
+        if !float_step.is_finite() || float_step == 0.0 {
+            return Err(AppleStyleDataError::InvalidRefinementStep);
+        }
+
+        let pixel_count = current_rgb.len() / 3;
+        let parameter_base = parameter * self.sample_count;
+        let mut sampled = 0;
+        let mut squared = 0.0_f64;
+        for pixel in (0..pixel_count).step_by(self.pixel_stride) {
+            let base = pixel * 3;
+            for channel in 0..3 {
+                let derivative =
+                    (rendered_rgb[base + channel] - current_rgb[base + channel]) / float_step;
+                self.values[parameter_base + sampled] = derivative;
+                squared += f64::from(derivative) * f64::from(derivative);
+                sampled += 1;
+            }
+        }
+        if sampled != self.sample_count {
+            return Err(AppleStyleDataError::InvalidJacobianSampleCount {
+                actual: sampled,
+                expected: self.sample_count,
+            });
+        }
+        Ok((squared / self.sample_count.max(1) as f64).sqrt())
+    }
+
+    fn derivative(&self, parameter: usize, sample: usize) -> f32 {
+        self.values[parameter * self.sample_count + sample]
+    }
+}
+
+/// One optional scalar response constraint added to the sampled RGB normal
+/// equations. The fixed-size derivative prevents a caller from supplying a
+/// second, differently-sized solver parameter vector.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStyleScalarRow {
+    pub derivative: [f64; APPLE_STYLE_REFINEMENT_PARAMETER_COUNT],
+    pub residual: f64,
+    pub weight: f64,
+}
+
+/// Solve one bounded constrained-polynomial refinement update.
+///
+/// This is the policy half of the Swift `solveUpdate` implementation. A
+/// platform adapter may render the finite-difference candidates and report
+/// scalar observations, while Rust owns deterministic sampling, Huber weights,
+/// normalization, ridge regularization, linear solving, and update bounds.
+pub fn apple_style_solve_refinement_update(
+    current_rgb: &[f32],
+    target_rgb: &[f32],
+    jacobian: &AppleStyleSampledJacobian,
+    scalar_rows: &[AppleStyleScalarRow],
+) -> Result<Vec<f64>, AppleStyleDataError> {
+    if current_rgb.len() != target_rgb.len()
+        || current_rgb.len() < 3
+        || !current_rgb.len().is_multiple_of(3)
+        || !current_rgb.iter().all(|value| value.is_finite())
+        || !target_rgb.iter().all(|value| value.is_finite())
+    {
+        return Err(AppleStyleDataError::InvalidRasterPair);
+    }
+    if jacobian.rgb_value_count != current_rgb.len() {
+        return Err(AppleStyleDataError::InvalidRasterPair);
+    }
+    let sampled_pixel_count = (current_rgb.len() / 3 - 1) / jacobian.pixel_stride + 1;
+    let expected_sample_count = sampled_pixel_count * 3;
+    if jacobian.sample_count != expected_sample_count {
+        return Err(AppleStyleDataError::InvalidJacobianSampleCount {
+            actual: jacobian.sample_count,
+            expected: expected_sample_count,
+        });
+    }
+    for (index, row) in scalar_rows.iter().enumerate() {
+        if !row.derivative.iter().all(|value| value.is_finite())
+            || !row.residual.is_finite()
+            || !row.weight.is_finite()
+            || row.weight < 0.0
+        {
+            return Err(AppleStyleDataError::InvalidScalarRow { index });
+        }
+    }
+
+    let count = APPLE_STYLE_REFINEMENT_PARAMETER_COUNT;
+    let mut normal = vec![0.0_f64; count * count];
+    let mut gradient = vec![0.0_f64; count];
+    let mut sample_count = 0_usize;
+    let mut sample_ordinal = 0_usize;
+    for pixel in (0..current_rgb.len() / 3).step_by(jacobian.pixel_stride) {
+        for channel in 0..3 {
+            let sample = pixel * 3 + channel;
+            let residual = f64::from(target_rgb[sample] - current_rgb[sample]);
+            let huber_weight = (12.0 / 12.0_f64.max(residual.abs())).min(1.0);
+            sample_count += 1;
+            for row in 0..count {
+                let row_value = f64::from(jacobian.derivative(row, sample_ordinal));
+                gradient[row] += huber_weight * row_value * residual;
+                for column in row..count {
+                    normal[row * count + column] += huber_weight
+                        * row_value
+                        * f64::from(jacobian.derivative(column, sample_ordinal));
+                }
+            }
+            sample_ordinal += 1;
+        }
+    }
+    if sample_ordinal != jacobian.sample_count {
+        return Err(AppleStyleDataError::InvalidJacobianSampleCount {
+            actual: sample_ordinal,
+            expected: jacobian.sample_count,
+        });
+    }
+
+    // Mean-scale the pixel block so scalar-response rows have
+    // sample-count-independent weights. The pure pixel solution is unchanged
+    // because the linear system is scale invariant.
+    if sample_count > 0 {
+        let normalization = 1.0 / sample_count as f64;
+        for row in 0..count {
+            gradient[row] *= normalization;
+            for column in row..count {
+                normal[row * count + column] *= normalization;
+            }
+        }
+    }
+    for scalar in scalar_rows {
+        for row in 0..count {
+            gradient[row] += scalar.weight * scalar.derivative[row] * scalar.residual;
+            for column in row..count {
+                normal[row * count + column] +=
+                    scalar.weight * scalar.derivative[row] * scalar.derivative[column];
+            }
+        }
+    }
+    for row in 0..count {
+        for column in 0..row {
+            normal[row * count + column] = normal[column * count + row];
+        }
+    }
+    let trace = (0..count)
+        .map(|index| normal[index * count + index])
+        .sum::<f64>();
+    let ridge = (trace / count as f64 * 1e-6).max(1e-9);
+    for index in 0..count {
+        normal[index * count + index] += ridge;
+    }
+    let mut solution = solve_linear_system(&normal, &gradient)?;
+    for value in &mut solution {
+        *value = value.clamp(
+            -APPLE_STYLE_REFINEMENT_EPSILON,
+            APPLE_STYLE_REFINEMENT_EPSILON,
+        );
+    }
+    Ok(solution)
 }
 
 /// Serialize bounded coefficient deltas over the verified identity payload.
@@ -596,5 +852,93 @@ mod tests {
             fitted,
             apple_style_fit_global_polynomial(&source, &target).unwrap()
         );
+    }
+
+    #[test]
+    fn sampled_jacobian_recovers_bounded_refinement_update() {
+        let current = vec![128.0_f32; 12];
+        let mut jacobian = AppleStyleSampledJacobian::new(current.len()).unwrap();
+        let expected = (0..APPLE_STYLE_REFINEMENT_PARAMETER_COUNT)
+            .map(|index| 0.001 * (index + 1) as f64)
+            .collect::<Vec<_>>();
+
+        for parameter in 0..APPLE_STYLE_REFINEMENT_PARAMETER_COUNT {
+            let mut rendered = current.clone();
+            rendered[parameter] += 1.0;
+            let derivative_rms = jacobian
+                .populate_parameter(parameter, &rendered, &current, 1.0)
+                .unwrap();
+            assert!((derivative_rms - (1.0 / 12.0_f64).sqrt()).abs() < 1e-6);
+        }
+
+        let target = current
+            .iter()
+            .enumerate()
+            .map(|(index, value)| *value + expected[index] as f32)
+            .collect::<Vec<_>>();
+        let fitted =
+            apple_style_solve_refinement_update(&[128.0; 12], &target, &jacobian, &[]).unwrap();
+        assert_eq!(fitted.len(), APPLE_STYLE_REFINEMENT_PARAMETER_COUNT);
+        for (actual, expected) in fitted.iter().zip(expected) {
+            assert!((actual - expected).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn refinement_scalar_rows_are_typed_and_updates_are_clamped() {
+        let current = vec![128.0_f32; 12];
+        let mut jacobian = AppleStyleSampledJacobian::new(current.len()).unwrap();
+        for parameter in 0..APPLE_STYLE_REFINEMENT_PARAMETER_COUNT {
+            let mut rendered = current.clone();
+            rendered[parameter] += 1.0;
+            jacobian
+                .populate_parameter(parameter, &rendered, &current, 1.0)
+                .unwrap();
+        }
+        let mut derivative = [0.0_f64; APPLE_STYLE_REFINEMENT_PARAMETER_COUNT];
+        derivative[0] = 1.0;
+        let row = AppleStyleScalarRow {
+            derivative,
+            residual: 1.0,
+            weight: 1.0,
+        };
+        let update =
+            apple_style_solve_refinement_update(&current, &current, &jacobian, &[row]).unwrap();
+        assert_eq!(update[0], APPLE_STYLE_REFINEMENT_EPSILON);
+        assert!(update[1..].iter().all(|value| value.abs() < 1e-6));
+    }
+
+    #[test]
+    fn refinement_inputs_fail_closed() {
+        assert!(matches!(
+            AppleStyleSampledJacobian::new(2),
+            Err(AppleStyleDataError::InvalidRgbRaster { actual: 2 })
+        ));
+        let current = vec![128.0_f32; 12];
+        let mut jacobian = AppleStyleSampledJacobian::new(current.len()).unwrap();
+        assert!(matches!(
+            jacobian.populate_parameter(
+                APPLE_STYLE_REFINEMENT_PARAMETER_COUNT,
+                &current,
+                &current,
+                1.0,
+            ),
+            Err(AppleStyleDataError::InvalidRefinementParameter { .. })
+        ));
+        assert!(matches!(
+            jacobian.populate_parameter(0, &current, &current, 0.0),
+            Err(AppleStyleDataError::InvalidRefinementStep)
+        ));
+        let mut derivative = [0.0_f64; APPLE_STYLE_REFINEMENT_PARAMETER_COUNT];
+        derivative[0] = f64::NAN;
+        let invalid_row = AppleStyleScalarRow {
+            derivative,
+            residual: 0.0,
+            weight: 1.0,
+        };
+        assert!(matches!(
+            apple_style_solve_refinement_update(&current, &current, &jacobian, &[invalid_row]),
+            Err(AppleStyleDataError::InvalidScalarRow { index: 0 })
+        ));
     }
 }
