@@ -5,6 +5,7 @@ mod data_information;
 mod direct;
 pub mod error;
 mod native;
+mod styles;
 mod validation;
 
 pub use direct::{
@@ -16,6 +17,7 @@ pub use error::{HeifError, Result};
 // directly, replaces an existing canonical gain-map graph when present, and
 // does not depend on a Python/Swift-generated intermediate graph.
 pub use native::IsoGainMapAssembly;
+pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};
 pub use validation::{validate_gain_map_structure, GainMapStructure};
 
 pub fn assemble_iso_gain_map_heif(
