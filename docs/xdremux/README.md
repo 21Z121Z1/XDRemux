@@ -2,15 +2,15 @@
 
 [English](README.en.md) | 简体中文
 
-本目录索引 XDRemux 当前稳定的实现契约。
+本目录索引 XDRemux 当前稳定的实现契约。Rust workspace 是唯一产品实现；Swift 只保留明确受限的 Apple primitive adapter。
 
 普通使用见[项目 README](../../README.md)，命令行为见 [CLI 参考](../cli.md)。
 
 ## 当前架构
 
-### `XDRemuxCore`
+### Rust workspace
 
-`XDRemuxCore` 负责不需要 Apple feature layer 的格式和转换逻辑。
+Rust `xdremux` CLI 和 workspace crate 负责全部产品语义、格式转换、分类、批处理、Motion Photo 路由、验证和发布。
 
 当前职责包括：
 
@@ -19,25 +19,24 @@
 - HEIF 和 ISO-BMFF 解析与写入；
 - Motion Photo 解析和资源提取；
 - 源 metadata 和分类；
-- 核心转换链路共享的输出验证。
+- 核心转换链路共享的输出验证；
+- Apple Portrait / Photographic Styles 的跨平台 policy、manifest 和 transaction orchestration。
 
-### `XDRemuxAppleFeatures`
+### Apple capability boundary
 
-`XDRemuxAppleFeatures` 负责 Apple 特有转换和验证。
+`Sources/XDRemuxAppleAdapter/` 是 Rust runtime 调用的最小 Apple framework primitive adapter。
 
 当前职责包括：
 
-- Motion Photo → Apple Live Photo；
-- Live Photo 静态照片和 MOV 写入；
-- Live Photo timing 和 asset identity；
-- Live Photo writer 使用的厂商几何 policy；
-- 摄影风格；
-- Apple 人像；
-- Apple 特有 native helper 集成。
+- 调用 ImageIO、Vision、CoreImage、VideoToolbox 等 Apple framework；
+- 返回 Rust 定义协议中的 framework facts；
+- 写入或探测 Rust 已规划的 Apple-specific resource。
+
+原来的 Swift product target 已删除。Swift 侧只剩 `Sources/XDRemuxAppleAdapter/`，不得承载 product policy。
 
 ### CLI 层
 
-`Sources/XDRemuxCLI/` 负责用户命令解析和路由。
+`crates/xdremux-cli/` 负责唯一用户命令解析和路由。
 
 CLI 会在普通 HDR 命令链路前自动路由支持的 Motion Photo 输入。
 
@@ -45,9 +44,9 @@ Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](
 
 ### Python 实现
 
-`xdremux_py/` 是独立的跨平台实现。
+`xdremux_py/` 只包含研究/训练工具。
 
-它支持标准 HDR 转换、Motion Photo → Live Photo 和分类，不实现摄影风格或 Apple 人像生成。
+它不参与 Rust runtime，不定义正式 conversion path，也不作为 CI canonical correctness source。
 
 ## 稳定媒体契约
 

@@ -108,10 +108,12 @@ case "$COMMAND" in
   build)
     ;;
   --verify|verify)
-    swift build
-    swift test
+    cargo fmt --all -- --check
+    cargo clippy --locked --workspace --all-targets -- -D warnings
+    cargo test --locked --workspace --all-targets
+    swift build --product xdremux-apple-adapter
     python3 -m unittest discover -s Tests -p "test_*.py"
-    ;;
+  ;;
   --telemetry|telemetry)
     log show --predicate 'subsystem == "com.proxdr.XDRemuxApp"' --last 15m --info || true
     ;;

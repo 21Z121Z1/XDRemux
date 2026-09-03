@@ -1,0 +1,137 @@
+name: macOS 26 Rust Apple adapter integration
+
+on:
+  pull_request:
+    paths:
+      - "Package.swift"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "crates/xdremux-engine/src/apple_*.rs"
+      - "crates/xdremux-engine/src/lib.rs"
+      - "crates/xdremux-runtime/src/apple_*.rs"
+      - "crates/xdremux-runtime/src/apple_styles.rs"
+      - "crates/xdremux-runtime/tests/apple_adapter.rs"
+      - "crates/xdremux-heif/**"
+      - "scripts/check_apple_adapter_handshake.sh"
+      - "scripts/check_rust_cli_apple_portrait.sh"
+      - "scripts/check_rust_style_consumer.sh"
+      - "scripts/build_apple_device_validation.sh"
+      - "Tests/test_rust_apple_semantic_policy.py"
+      - ".github/workflows/macos26-photographic-styles-smoke.yml"
+  push:
+    branches:
+      - main
+      - feat/rust-cli-unification
+    paths:
+      - "Package.swift"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "crates/xdremux-engine/src/apple_*.rs"
+      - "crates/xdremux-engine/src/lib.rs"
+      - "crates/xdremux-runtime/src/apple_*.rs"
+      - "crates/xdremux-runtime/src/apple_styles.rs"
+      - "crates/xdremux-runtime/tests/apple_adapter.rs"
+      - "crates/xdremux-heif/**"
+      - "scripts/check_apple_adapter_handshake.sh"
+      - "scripts/check_rust_cli_apple_portrait.sh"
+      - "scripts/check_rust_style_consumer.sh"
+      - "scripts/build_apple_device_validation.sh"
+      - "Tests/test_rust_apple_semantic_policy.py"
+      - ".github/workflows/macos26-photographic-styles-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xdremux-apple-adapter-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple-adapter-integration:
+    runs-on: macos-26
+    timeout-minutes: 105
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Record runner environment
+        shell: bash
+        run: |
+          mkdir -p artifacts/macos26-apple-adapter
+          {
+            echo "head=$(git rev-parse HEAD)"
+            sw_vers
+            echo "arch=$(uname -m)"
+            xcodebuild -version
+            swift --version
+          } | tee artifacts/macos26-apple-adapter/runner.txt
+
+      - name: Install portable HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Check Rust-owned Apple semantic policy
+        shell: bash
+        run: |
+          python3 -m unittest Tests.test_rust_apple_semantic_policy \
+            2>&1 | tee artifacts/macos26-apple-adapter/semantic-policy.log
+
+      - name: Verify versioned Apple adapter handshake
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/check_apple_adapter_handshake.sh \
+            2>&1 | tee artifacts/macos26-apple-adapter/handshake.log
+
+      - name: Run Rust-driven Portrait consumer gate
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/check_rust_cli_apple_portrait.sh \
+            2>&1 | tee artifacts/macos26-apple-adapter/portrait-consumer.log
+
+      - name: Run Rust-driven Styles consumer gate
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/check_rust_style_consumer.sh \
+            2>&1 | tee artifacts/macos26-apple-adapter/styles-consumer.log
+
+      - name: Build manual Apple Photos acceptance bundle
+        shell: bash
+        run: |
+          bash scripts/build_apple_device_validation.sh \
+            artifacts/macos26-apple-adapter/device-validation \
+            2>&1 | tee artifacts/macos26-apple-adapter/device-validation-build.log
+
+      - name: Write summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## macOS 26 Rust Apple adapter integration"
+            echo
+            echo "This gate builds the versioned Swift Apple adapter and drives its handshake, Portrait, and Photographic Styles primitives through the canonical Rust product path at the exact checked-out head."
+            echo "Rust owns source analysis, product policy, Styles scene semantics, Portrait synthesis, graph assembly, validation, and publication."
+            echo "Swift is limited to Apple framework primitives and raw framework observations."
+            echo
+            echo "A SHA-bound device-validation bundle is produced for manual Apple Photos testing. Its manifest deliberately leaves device acceptance fields false/null."
+            echo "This workflow is framework/offline integration evidence, not Apple Photos device acceptance or visual-equivalence evidence."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Apple adapter evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos26-rust-apple-adapter
+          if-no-files-found: warn
+          retention-days: 14
+          path: artifacts/macos26-apple-adapter/

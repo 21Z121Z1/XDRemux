@@ -57,236 +57,26 @@ enum AppStrings {
     static let statusFailed = "失败"
     static let statusCancelled = "已取消"
 
-    static let inputHDRType = "输入 HDR 类型"
-    static let inputHDRTypeHelp = "选择源文件的 HDR 数据布局。自动模式会根据文件内容选择 X6 或 X7 / UHDR 路径。"
-    static let familyAuto = "自动识别"
-    static let familyX6 = "X6 / LHDR"
-    static let familyX7 = "X7 / UHDR"
-
-    static let inputProcessing = "输入处理"
-    static let inputProcessingHelp = "控制 base image 和 gain map 在转换过程中由系统重建、混合写回，还是尽量保留原始增益图。"
-    static let inputProcessingSystem = "系统重建"
-    static let inputProcessingSystemHelp = "让 ImageIO 接管 base image 和 gain map 的重打包过程；系统可能会重新编码图像数据。"
-    static let inputProcessingSystemDecoded = "系统解码重建"
-    static let inputProcessingSystemDecodedHelp = "先解码主图再由 ImageIO 重编码；仅用于 10-bit 主图兼容性诊断。"
-    static let inputProcessingHybrid = "混合模式"
-    static let inputProcessingHybridHelp = "先让系统重建，再只取系统重新编码为 HEVC Rext 的 gain map，写回原始容器结构。"
-    static let inputProcessingPassthrough = "保留原始增益图"
-    static let inputProcessingPassthroughHelp = "不让系统重编码 gain map；直接重建符合 ISO 标准的 ISOBMFF box 来保留原始增益图数据。"
-
-    static let tmapFormatLabel = "ISO tmap 格式"
-    static let tmapFormatStrict = "严格 ISO 145B"
-    static let tmapFormatImageIO = "ImageIO 142B"
-    static let tmapFormatStrictHelp = "实验性写入 ISO 21496-1 三通道 145-byte GainMapMetadata。Find X9 Ultra 实测会导致相册 Exif 解析和编辑组件异常，不建议正式输出。"
-    static let tmapFormatImageIOHelp = "默认保留 Apple ImageIO 生成的 142-byte 兼容形式；Find X9 Ultra 相册 Exif、编辑和 HDR 兼容性更好。"
-
-    static let oppoCompatLabel = "[实验性] OPPO 相册 HDR 兼容层"
-    static let oppoCompatHelp = "默认输出标准 ISO HDR，并在源数据允许时保留最高 4:4:4/HEVC RExt Gain Map；开启后改为 OPPO 相册可消费的 Main Still 4:2:0。相机私有尾由下方选项独立控制。"
-    static let oppoCompatAuto = "自动"
-    static let oppoCompatISO = "标准 HDR 位"
-    static let oppoCompatISONoLocal = "标准 HDR（清除 LHDR）"
-    static let oppoCompatISOGraph = "仅 ISO 图"
-    static let oppoCompatOn = "开启"
-    static let oppoCompatTail = "兼容开启"
-    static let oppoCompatOff = "关闭"
-    static let oppoCompatAutoHelp = "按所选 tmap 格式写入 PQ tmap 颜色，并保持源 OPPO tagflags 不变；私有尾部由下方选项独立控制。"
-    static let oppoCompatISOHelp = "清除 OPLUS_UHDR 私有路由位并设置标准 ULTRA_HDR 位；用于验证 Gallery 的标准 ISO HDR 路径。"
-    static let oppoCompatISONoLocalHelp = "清除 OPLUS_UHDR 与 LOCAL_HDR，并设置标准 ULTRA_HDR；仅用于 Main10/LHDR 路由诊断。"
-    static let oppoCompatISOGraphHelp = "清除 OPLUS_UHDR 和 ULTRA_HDR 两种 HDR 位，仅依赖 ISO tmap/Gain Map 图触发；用于诊断，不建议正式输出。"
-    static let oppoCompatOnHelp = "输出 Main Still 4:2:0，并在 Exif UserComment 设置 OPPO 私有 UHDR activation bit；仅用于明确的路由测试。"
-    static let oppoCompatTailHelp = "兼容旧命令名；行为等同于开启。相机尾部仍由下方选项控制。"
-    static let oppoCompatOffHelp = "从原始高规格源生成 profile 4/4:4:4 Gain Map；已经降采样为 4:2:0 的输入不能反向升级。"
+    static let standardHDR = "标准 ISO HDR"
     static let oppoGalleryCompatibility = "输出 OPPO 相册兼容格式"
-    static let oppoGalleryCompatibilityHelp = "默认关闭：输出标准 ISO HDR，保留非 HDR 厂商尾部，并保留原始单通道或未降采样三通道的 4:4:4/RExt。开启时输出 Main Still Picture 4:2:0 Gain Map，并保留完整 OPPO 私有尾部。"
-    static let preservePortraitEditingData = "保留人像后期数据"
-    static let preservePortraitEditingDataHelp = "关闭时删除 depth、src.image、mask、mesh 和 crop 等大体积后期资源；默认模式继续排除私有 HDR 尾部，水印、大师模式和其他厂商元数据仍会保留。"
+    static let oppoGalleryCompatibilityShort = "OPPO 兼容 HDR"
+    static let oppoGalleryCompatibilityHelp = "默认关闭并输出标准 ISO HDR；开启后交给 Rust 的 OPPO compatibility intent，生成 OPPO 相册可消费的 Main Still 4:2:0 Gain Map。"
     static let applePhotographicStyles = "Apple 摄影风格"
     static let applePhotographicStylesHelp = "从当前照片生成可逆 StyleEngine 系数、Linear Thumbnail、语义蒙版和 Style Delta；不读取 Apple donor 照片。需要当前 macOS 的私有 Apple Learn/Vision 运行时。"
     static let applePortrait = "Apple 人像编辑"
     static let applePortraitHelp = "使用 OPPO 景深数据与当前照片的 Vision person、skin、hair、teeth、glasses 分割结果生成 Apple 人像辅助项目。非人像照片仍可单独输出摄影风格。"
     static let appleFeaturesOppoIncompatibleHelp = "Apple 输出与 OPPO 相册兼容层互斥；先关闭 OPPO 相册兼容格式。"
-    static let oppoCameraTailLabel = "[实验性] OPPO 相机尾部"
-    static let oppoCameraTailHelp = "控制是否复制 OPPO Camera FileExtendedContainer 中的水印、大师模式、人像/景深条目；这和 HDR gain map 兼容层相互独立。"
-    static let oppoCameraTailOff = "关闭"
-    static let oppoCameraTailWatermark = "水印"
-    static let oppoCameraTailCompact = "紧凑景深"
-    static let oppoCameraTailPreserve = "完整保留"
-    static let oppoCameraTailPreserveWithoutPortrait = "不保留人像后期数据"
-    static let oppoCameraTailPreserveWithoutPortraitOrPrivateHDR = "不保留人像和私有 HDR 数据"
-    static let oppoCameraTailPreserveWithoutPrivateUHDR = "移除私有 UHDR 数据"
-    static let oppoCameraTailPreserveWithoutPrivateHDR = "移除全部私有 HDR 数据"
-    static let oppoCameraTailPreserveNoUHDR = "停用私有 UHDR"
-    static let oppoCameraTailPreserveNoHDR = "停用 HDR 尾"
-    static let oppoCameraTailOffHelp = "不追加 OPPO 相机私有尾部，保持默认 ISO 输出行为。"
-    static let oppoCameraTailWatermarkHelp = "只追加水印相关 FileExtendedContainer 条目，保留 watermark.*、大师模式 preset 和拍摄参数，不复制大型景深/source/gainmap 私有块。"
-    static let oppoCameraTailCompactHelp = "在水印基础上追加已验证的人像/景深紧凑尾部，并按真实 JSON-to-EOF span 写入 jxrs footer。"
-    static let oppoCameraTailPreserveHelp = "强制使用保留源主图与非 HDR item 的混合写入路径；重建 ISO 21496-1 HDR 图后，逐字节复制源文件 mdat 之后的完整 OPPO/QTI/FileExtendedContainer 尾部，保留景深、水印、原图、编辑、实况和未知数据。"
-    static let oppoCameraTailPreserveWithoutPortraitHelp = "保留水印、大师模式、HDR、UserComment 和其他厂商数据，仅移除景深、蒙版、网格和恢复原图等大体积人像后期资源。"
-    static let oppoCameraTailPreserveWithoutPortraitOrPrivateHDRHelp = "移除人像后期资源以及 local.uhdr.*、local.hdr.*、src.local.hdr.* 和 hdr.*，保留水印、大师模式和其他非 HDR 厂商数据。"
-    static let oppoCameraTailPreserveWithoutPrivateUHDRHelp = "物理移除 local.uhdr.gainmap.data/info，保留人像、水印和其他非目标条目；仅用于设备验证。"
-    static let oppoCameraTailPreserveWithoutPrivateHDRHelp = "默认策略：物理移除 local.uhdr.*、local.hdr.*、src.local.hdr.* 和 hdr.*，保留人像、水印、大师模式和其他非 HDR 厂商数据。"
-    static let oppoCameraTailPreserveNoUHDRHelp = "完整保留尾长、payload、offset、大师模式和未知数据，仅把 local.uhdr.gainmap.data/info 在 manifest 中等长改名，停用私有 UHDR reader。"
-    static let oppoCameraTailPreserveNoHDRHelp = "在完整保留其他业务数据的前提下，等长停用 local.uhdr.*、hdr.*、local.hdr.* 和 src.local.hdr.* manifest key。"
     static let skipExisting = "跳过已有有效输出"
-    static let skipExistingHelp = "目标文件已经满足当前 ISO gain map 与 OPPO 相机尾部设置时不重复转换。"
+    static let skipExistingHelp = "目标文件已经满足当前 Rust validation contract 时不重复转换。"
     static let categorizeOutput = "按拍摄模式分类输出"
     static let categorizeOutputHelp = "根据源照片的 OPPO UserComment，将转换结果写入普通拍照、大师模式、专业模式、人像等子目录；无法可靠识别的文件保留在输出根目录。"
     static let concurrentJobs = "并发任务"
     static let outputFileSuffix = "输出文件后缀"
     static let outputFileSuffixHelp = "未设置输出目录时，在原目录用这个后缀生成新文件。"
     static let outputDirectory = "输出目录"
-    static let debugOutputDirectory = "调试输出目录"
     static let done = "完成"
     static let useOriginalDirectory = "使用原目录"
-    static let doNotWriteDebugFiles = "不写调试文件"
     static let chooseDirectory = "选择目录"
     static let clear = "清除"
 
-    /// Reasons a single file can fail, in the language the rest of the window
-    /// uses. `XDRemuxError.description` stays English because `XDRemuxCore` is a
-    /// public Swift Package; localization belongs here, at the presentation
-    /// layer, not in the shared module's error type.
-    static func failureReason(for error: XDRemuxError) -> String {
-        switch error {
-        case .notAProXDRPhoto:
-            return "这不是 ProXDR 照片：文件里没有 Local HDR 数据，可能是普通 HEIC，或者拍摄时没开 ProXDR。"
-        case .alreadyConverted:
-            return "已经转换过了：文件已带 ISO 21496-1 Gain Map，再转一次不会有任何变化。"
-        case .portraitPrerequisitesMissing:
-            return "这不是 OPPO 人像照片：缺少 Apple 人像功能需要的景深数据。"
-        case .qtiMarkerNotFound, .manifestNotFound:
-            return "文件里没有 OPPO Local HDR 数据。"
-        case .invalidLHDR:
-            return "照片的 ProXDR HDR 数据已损坏或无法读取。"
-        case .unableToDecodeMask:
-            return "无法解码照片内的 ProXDR 增益图。"
-        case .unableToLoadBaseImage:
-            return "无法解码照片的 SDR 主图。"
-        case .inputNotFound:
-            return "找不到源文件，可能已被移动或删除。"
-        case .unableToRead:
-            return "无法读取源文件，请检查文件权限。"
-        case .unableToCreateDirectory, .outputParentIsNotDirectory:
-            return "无法创建输出目录，请换一个位置。"
-        case .unableToCreateDestination, .unableToFinalizeDestination:
-            return "无法写入输出文件，请检查磁盘空间和写入权限。"
-        case .outputPathCollision:
-            return "两个源文件会写到同一个输出路径，请改用不同的输出目录或后缀。"
-        case .outputVerificationFailed:
-            return "转换结果没有 ISO Gain Map，已被拒绝，原文件未改动。"
-        case .gainMapPixelFormatMismatch:
-            return "转换结果的 Gain Map 像素格式不符合预期。"
-        case .invalidContainer:
-            return "HEIC 容器结构无法解析。"
-        case .appleFeatureRuntimeUnavailable:
-            return "当前 macOS 缺少 Apple 功能需要的运行时组件。"
-        case .appleFeatureConversionFailed:
-            return "Apple 功能转换失败。"
-        default:
-            return error.description
-        }
-    }
-}
-extension OppoCompatibility {
-    var appTitle: String {
-        switch self {
-        case .auto: return AppStrings.oppoCompatAuto
-        case .iso: return AppStrings.oppoCompatISO
-        case .isoNoLocal: return AppStrings.oppoCompatISONoLocal
-        case .isoGraph: return AppStrings.oppoCompatISOGraph
-        case .on: return AppStrings.oppoCompatOn
-        case .tail: return AppStrings.oppoCompatTail
-        case .off: return AppStrings.oppoCompatOff
-        }
-    }
-
-    var appHelp: String {
-        switch self {
-        case .auto: return AppStrings.oppoCompatAutoHelp
-        case .iso: return AppStrings.oppoCompatISOHelp
-        case .isoNoLocal: return AppStrings.oppoCompatISONoLocalHelp
-        case .isoGraph: return AppStrings.oppoCompatISOGraphHelp
-        case .on: return AppStrings.oppoCompatOnHelp
-        case .tail: return AppStrings.oppoCompatTailHelp
-        case .off: return AppStrings.oppoCompatOffHelp
-        }
-    }
-}
-
-extension TmapFormat {
-    var appTitle: String {
-        switch self {
-        case .strict: return AppStrings.tmapFormatStrict
-        case .imageIO: return AppStrings.tmapFormatImageIO
-        }
-    }
-
-    var appHelp: String {
-        switch self {
-        case .strict: return AppStrings.tmapFormatStrictHelp
-        case .imageIO: return AppStrings.tmapFormatImageIOHelp
-        }
-    }
-}
-
-extension OppoCameraTail {
-    var appTitle: String {
-        switch self {
-        case .off: return AppStrings.oppoCameraTailOff
-        case .watermark: return AppStrings.oppoCameraTailWatermark
-        case .compact: return AppStrings.oppoCameraTailCompact
-        case .preserve: return AppStrings.oppoCameraTailPreserve
-        case .preserveWithoutPortrait: return AppStrings.oppoCameraTailPreserveWithoutPortrait
-        case .preserveWithoutPortraitOrPrivateHDR: return AppStrings.oppoCameraTailPreserveWithoutPortraitOrPrivateHDR
-        case .preserveWithoutPrivateUHDR: return AppStrings.oppoCameraTailPreserveWithoutPrivateUHDR
-        case .preserveWithoutPrivateHDR: return AppStrings.oppoCameraTailPreserveWithoutPrivateHDR
-        case .preserveNoUHDR: return AppStrings.oppoCameraTailPreserveNoUHDR
-        case .preserveNoHDR: return AppStrings.oppoCameraTailPreserveNoHDR
-        }
-    }
-
-    var appHelp: String {
-        switch self {
-        case .off: return AppStrings.oppoCameraTailOffHelp
-        case .watermark: return AppStrings.oppoCameraTailWatermarkHelp
-        case .compact: return AppStrings.oppoCameraTailCompactHelp
-        case .preserve: return AppStrings.oppoCameraTailPreserveHelp
-        case .preserveWithoutPortrait: return AppStrings.oppoCameraTailPreserveWithoutPortraitHelp
-        case .preserveWithoutPortraitOrPrivateHDR: return AppStrings.oppoCameraTailPreserveWithoutPortraitOrPrivateHDRHelp
-        case .preserveWithoutPrivateUHDR: return AppStrings.oppoCameraTailPreserveWithoutPrivateUHDRHelp
-        case .preserveWithoutPrivateHDR: return AppStrings.oppoCameraTailPreserveWithoutPrivateHDRHelp
-        case .preserveNoUHDR: return AppStrings.oppoCameraTailPreserveNoUHDRHelp
-        case .preserveNoHDR: return AppStrings.oppoCameraTailPreserveNoHDRHelp
-        }
-    }
-}
-
-extension Family {
-    var appTitle: String {
-        switch self {
-        case .auto: return AppStrings.familyAuto
-        case .x6: return AppStrings.familyX6
-        case .x7: return AppStrings.familyX7
-        }
-    }
-}
-
-extension InputProcessingBranch {
-    var appTitle: String {
-        switch self {
-        case .system: return AppStrings.inputProcessingSystem
-        case .systemDecoded: return AppStrings.inputProcessingSystemDecoded
-        case .hybrid: return AppStrings.inputProcessingHybrid
-        case .passthrough: return AppStrings.inputProcessingPassthrough
-        }
-    }
-
-    var appHelp: String {
-        switch self {
-        case .system: return AppStrings.inputProcessingSystemHelp
-        case .systemDecoded: return AppStrings.inputProcessingSystemDecodedHelp
-        case .hybrid: return AppStrings.inputProcessingHybridHelp
-        case .passthrough: return AppStrings.inputProcessingPassthroughHelp
-        }
-    }
 }

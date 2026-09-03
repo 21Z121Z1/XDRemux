@@ -2,23 +2,23 @@
 
 [English](README.en.md) | 简体中文
 
-本目录包含 Swift package test、Python 仓库 policy test 和可复用 validation harness。
+本目录包含 Rust 产品 policy test、Python 仓库 policy test 和可复用 validation harness。
 
-## Swift 测试
+## Rust 测试
 
-在仓库根目录运行全部 Swift package test：
+在仓库根目录运行 canonical 产品 test：
 
 ```bash
-swift test
+cargo test --workspace --locked
 ```
 
-主要 test target：
+Swift package 只包含 Apple primitive adapter。运行 macOS consumer check 时构建它：
 
-| Target | 范围 |
-| --- | --- |
-| `XDRemuxCoreTests` | 转换 model、HEIF/ISO-BMFF、Motion Photo 解析、验证、分类和文件生命周期。 |
-| `XDRemuxAppleFeaturesTests` | Live Photo、摄影风格、Apple 人像、native helper 兼容性和性能契约。 |
-| `XDRemuxCLITests` | CLI 解析、batch 行为、Motion Photo 路由和输出安全。 |
+```bash
+swift build --product xdremux-apple-adapter
+```
+
+公开 CLI 的解析、转换、batch、Motion Photo、分类、Portrait、Styles、验证和输出安全测试位于 Rust workspace。
 
 ## Python 仓库测试
 
@@ -28,7 +28,7 @@ swift test
 python3 -m unittest discover -s Tests -v
 ```
 
-这些测试包括 Python 转换器行为，以及检查 Swift 源码、文档、fixture 或架构的仓库 policy。
+这些测试覆盖仓库 policy、文档、App 架构以及可选的研究/训练 package；它们不是产品转换实现。
 
 源码检查类 policy test 属于 static evidence，不能替代 functional conversion test。
 
@@ -38,13 +38,9 @@ python3 -m unittest discover -s Tests -v
 
 例如：
 
-- `verify_swift_cli_sample.py`
-- `verify_python_motion_photo_fixtures.py`
+- `check_rust_motion_photo_real_fixtures.sh`
 - `verify_error_messages.sh`
 - `verify_batch_categorize_idempotence.sh`
-- `verify_categorization_cross_implementation.py`
-- `verify_categorized_batch_outputs.py`
-- `verify_apple_feature_artifact_lifecycle.py`
 - `verify_macos_app_model_tests.sh`
 
 如何选择 harness 见[回归和真实样本验证](../docs/quality/evals.md)。

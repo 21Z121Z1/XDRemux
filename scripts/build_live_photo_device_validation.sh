@@ -3,21 +3,32 @@ set -euo pipefail
 
 fixture_root="${1:-fixtures}"
 output_root="${2:-artifacts/live-photo-device-validation}"
+cli="${XDREMUX_CLI:-target/debug/xdremux}"
 
-rm -rf "$output_root"
+if [[ -e "$output_root" ]] && [[ -n "$(find "$output_root" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
+  echo "refusing to overwrite a non-empty device-validation directory: $output_root" >&2
+  exit 1
+fi
 mkdir -p "$output_root"
 
-# Keep this list deliberately narrow. The device-validation bundle is for the vendor paths whose
-# Live Photo geometry is under active validation, not a mirror of every generic Motion Photo
-# fixture. R002/R003 are byte-identical duplicates of the two Samsung HEIF inputs and therefore do
-# not add device-level coverage.
+if [[ ! -x "$cli" ]]; then
+  cargo build --locked -q -p xdremux-cli
+fi
+if [[ ! -x "$cli" ]]; then
+  echo "Rust CLI was not built at $cli" >&2
+  exit 1
+fi
+
+# Keep this list deliberately narrow. The device-validation bundle is for the
+# vendor paths whose Live Photo geometry is under active validation, not a
+# mirror of every generic Motion Photo fixture.
 cases=(
-  "ColorOS16|IMG20260710191114_ColorOS_16.jpg"
-  "ColorOS16|IMG20260801190843_ColorOS_16.jpg"
-  "Samsung-JPEG|20260312_135625..jpg"
-  "Samsung-JPEG|20260312_135627..jpg"
-  "Samsung-HEIF|20260312_135609..heic"
-  "Samsung-HEIF|20260312_135610..heic"
+  "ColorOS16|motion-photo/oppo/coloros16-dualstream-ultrahdr-01.jpg"
+  "ColorOS16|motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg"
+  "Samsung-JPEG|motion-photo/samsung/jpeg-ultrahdr-01.jpg"
+  "Samsung-JPEG|motion-photo/samsung/jpeg-ultrahdr-02.jpg"
+  "Samsung-HEIF|motion-photo/samsung/heif-ultrahdr-01.heic"
+  "Samsung-HEIF|motion-photo/samsung/heif-ultrahdr-02.heic"
 )
 
 sources_tsv="$output_root/sources.tsv"
@@ -32,32 +43,31 @@ for entry in "${cases[@]}"; do
     exit 1
   fi
 
-  stem="${filename%.*}"
-  # The supplied Samsung fixture names contain a deliberate extra dot before the extension. Keep
-  # the source filename untouched while using a filesystem-friendly output stem.
-  output_stem="${stem%.}"
-  case_dir="$output_root/$vendor/$output_stem"
+  basename="${filename##*/}"
+  stem="${basename%.*}"
+  case_dir="$output_root/$vendor/$stem"
   mkdir -p "$case_dir"
 
-  output_heic="$case_dir/$output_stem.heic"
-  output_mov="$case_dir/$output_stem.mov"
+  output_heic="$case_dir/$stem.heic"
+  output_mov="$case_dir/$stem.mov"
+  before_sha="$(shasum -a 256 "$source" | awk '{print $1}')"
 
-  # The preceding real-fixture CI gate already exercises the same production converter through
-  # PhotoKit for all 14 repository fixtures. Repeating PHLivePhoto loading once per downloadable
-  # artifact is both redundant and susceptible to runner lifecycle timeouts. This dedicated test
-  # harness calls AppleLivePhotoConversionEngine with requirePhotoKitValidation=false while keeping
-  # every other production validation, including compressed sample byte equality.
-  XDREMUX_DEVICE_VALIDATION_SOURCE="$source" \
-  XDREMUX_DEVICE_VALIDATION_OUTPUT="$output_heic" \
-    swift test --filter LivePhotoDeviceValidationBundleTests \
-      2>&1 | tee "$case_dir/conversion.log"
+  "$cli" convert --input "$source" --output "$output_heic" >"$case_dir/conversion.log" 2>&1
+  "$cli" validate "$output_heic" >"$case_dir/still-validation.txt"
+  "$cli" validate "$output_mov" >"$case_dir/movie-validation.txt"
+  after_sha="$(shasum -a 256 "$source" | awk '{print $1}')"
+  if [[ "$before_sha" != "$after_sha" ]]; then
+    echo "Rust conversion modified its source fixture: $source" >&2
+    exit 1
+  fi
 
   if [[ ! -s "$output_heic" || ! -s "$output_mov" ]]; then
     echo "converter did not produce a complete Live Photo pair for $filename" >&2
     exit 1
   fi
-
-  printf '%s\t%s\t%s\n' "$vendor" "$filename" "$output_stem" >> "$sources_tsv"
+  grep -q '^valid: live-photo$' "$case_dir/still-validation.txt"
+  grep -q '^valid: live-photo$' "$case_dir/movie-validation.txt"
+  printf '%s\t%s\t%s\n' "$vendor" "$filename" "$stem" >> "$sources_tsv"
 done
 
 python3 - "$fixture_root" "$output_root" <<'PY'
@@ -78,6 +88,7 @@ def sha256(path: pathlib.Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
 
 rows = []
 with (output_root / "sources.tsv").open("r", encoding="utf-8") as stream:
@@ -106,7 +117,7 @@ with (output_root / "sources.tsv").open("r", encoding="utf-8") as stream:
 
 manifest = {
     "schema_version": 1,
-    "purpose": "Real-device Apple Photos validation for XDRemux Motion Photo conversion",
+    "purpose": "Rust-produced Live Photo pairs for manual Apple Photos/device validation",
     "pair_count": len(rows),
     "pairs": rows,
 }
@@ -117,30 +128,14 @@ manifest = {
 
 readme = """# Live Photo device-validation bundle
 
-Each leaf directory contains one same-basename `.heic` + `.mov` pair produced by XDRemux from a
-real repository fixture. The converter writes the shared Live Photo asset identifier and
-still-image-time metadata; the MOV path uses compressed-sample passthrough rather than video
-re-encoding.
+Each leaf directory contains one same-basename .heic + .mov pair produced by the Rust
+xdremux CLI from a real repository fixture. The converter writes the shared Live Photo asset
+identifier and still-image-time metadata; the MOV path uses compressed-sample passthrough rather
+than video re-encoding.
 
-This archive is intentionally limited to the active ColorOS 16 and Samsung validation corpus.
-`R002_...` and `R003_...` are omitted because they are byte-identical duplicates of the included
-Samsung HEIF fixtures.
-
-The CI lane first validates all 14 real fixtures through PhotoKit. Pair generation then reuses the
-same production converter with only the repeated PhotoKit load disabled; structural metadata,
-gain-map preservation, source immutability, and exact compressed video/audio sample checks remain
-enforced by the production validator.
-
-## Import for device testing
-
-A Live Photo is a paired resource, not a single standalone file format. Keep each `.heic` and
-`.mov` together and with the same basename. The most reliable manual route is to select both files
-for one pair together in macOS Photos, confirm that Photos recognizes one Live Photo asset, and
-then sync it to the iPhone through iCloud Photos or AirDrop from Photos. If a PhotoKit-based XDRemux
-importer is available, it can instead add the two paired resources directly on the device.
-
-`manifest.json` records the source identity and SHA-256 of every generated resource so a device
-observation can be tied back to the exact CI output.
+This archive is an offline/structural preparation step. It does not claim that Photos, PhotoKit,
+or a physical device accepted the pair. Keep the two resources together when importing them into
+Photos or a device, and record any consumer observation against manifest.json.
 """
 (output_root / "README.md").write_text(readme, encoding="utf-8")
 PY

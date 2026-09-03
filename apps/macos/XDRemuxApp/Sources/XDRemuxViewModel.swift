@@ -4,7 +4,6 @@ import Observation
 import ImageIO
 import UniformTypeIdentifiers
 import AppKit
-import XDRemuxCore
 
 enum AppState: Equatable {
     case idle
@@ -249,8 +248,25 @@ final class XDRemuxViewModel {
         currentFileName = "正在扫描 HEIC 文件..."
 
         let classifiedURLs = await Task.detached(priority: .userInitiated) {
-            Self.collectHEICURLs(from: urls).map { url in
-                (url, PhotoCategorizationEngine.classify(at: url))
+            let discovered = Self.collectHEICURLs(from: urls)
+            let classifications: [String: PhotoClassification]
+            do {
+                classifications = Dictionary(
+                    uniqueKeysWithValues: try RustCLIClient.classify(inputs: discovered)
+                        .map { ($0.id, $0.classification) }
+                )
+            } catch {
+                classifications = [:]
+            }
+            return discovered.map { url in
+                (
+                    url,
+                    classifications[Self.pathKey(url)] ?? PhotoClassification(
+                        assetType: .staticPhoto,
+                        mode: nil,
+                        status: .unreadableImage
+                    )
+                )
             }
         }.value
 
@@ -403,7 +419,6 @@ final class XDRemuxViewModel {
     ) throws -> OutputPreparationDisposition {
         var config = ConversionConfig()
         config.skipExisting = skipExisting
-        config.oppoCameraTail = .off
         return try prepareOutputForConversion(inputURL: inputURL, outputURL: outputURL, config: config)
     }
 
@@ -803,7 +818,7 @@ final class XDRemuxViewModel {
             kCGImageSourceShouldCache: false
         ] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else {
-            throw XDRemuxError.unableToLoadBaseImage(url)
+            throw AppImageError.unableToLoad(url)
         }
         let thumbnailOptions = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -811,16 +826,16 @@ final class XDRemuxViewModel {
             kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
         ] as CFDictionary
         guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
-            throw XDRemuxError.unableToLoadBaseImage(url)
+            throw AppImageError.unableToLoad(url)
         }
 
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
-            throw XDRemuxError.unableToWriteDebugAsset(url)
+            throw AppImageError.unableToWrite(url)
         }
         CGImageDestinationAddImage(destination, thumbnail, nil)
         guard CGImageDestinationFinalize(destination) else {
-            throw XDRemuxError.unableToWriteDebugAsset(url)
+            throw AppImageError.unableToWrite(url)
         }
         return data as Data
     }
@@ -854,8 +869,8 @@ final class XDRemuxViewModel {
     }
 
     nonisolated private static func describe(_ error: Error) -> String {
-        if let error = error as? XDRemuxError {
-            return AppStrings.failureReason(for: error)
+        if let error = error as? RustCLIClient.ClientError {
+            return error.description
         }
         return String(describing: error)
     }

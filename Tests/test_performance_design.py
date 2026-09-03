@@ -1,6 +1,7 @@
 from pathlib import Path
 import unittest
 
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -8,50 +9,74 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
     def source(self, relative: str) -> str:
         return (ROOT / relative).read_text(encoding="utf-8")
 
-    def test_gain_map_hot_loop_borrows_mask_storage(self) -> None:
-        source = self.source("Sources/XDRemuxCore/HDR/HDRPipeline.swift")
-        self.assertNotIn("let maskBytes = [UInt8](mask.data)", source)
-        self.assertIn("mask.data.withUnsafeBytes { inputRawBuffer in", source)
+    def test_styles_solver_and_resource_policy_are_in_rust(self) -> None:
+        source = self.source("crates/xdremux-runtime/src/apple_styles.rs")
+        for marker in (
+            "apple_style_fit_global_polynomial",
+            "apple_style_monotonic_global_tone_curve",
+            "apple_style_property_list",
+            "assemble_photographic_styles_heif",
+        ):
+            self.assertIn(marker, source)
+        self.assertNotIn("Command::new", source)
+        self.assertNotIn("swift", source.lower())
+        self.assertNotIn("python", source.lower())
 
-    def test_raw_tiff_reader_keeps_data_storage(self) -> None:
-        source = self.source("Sources/XDRemuxCore/RAW/CoreImageRAW.swift")
-        self.assertNotIn("let bytes = [UInt8](data)", source)
-        self.assertIn("let bytes: Data", source)
+    def test_rust_style_solver_keeps_sampled_jacobian_bounded(self) -> None:
+        source = self.source("crates/xdremux-engine/src/apple_photographic_styles.rs")
+        self.assertIn("APPLE_STYLE_REFINEMENT_MAX_PIXELS", source)
+        self.assertIn("SampledJacobian", source)
+        self.assertIn("Huber", source)
 
-    def test_style_jacobian_is_sampled_and_flat(self) -> None:
-        source = self.source(
-            "Sources/XDRemuxAppleFeatures/PhotographicStyles/ConstrainedPolynomialStyleDataProducer.swift"
+    def test_apple_core_image_context_is_process_scoped(self) -> None:
+        source = self.source("Sources/XDRemuxAppleAdapter/CoreImageL8.swift")
+        self.assertIn("private let coreImageContext = CIContext", source)
+        self.assertEqual(source.count("CIContext(options:"), 1)
+        self.assertIn("coreImageContext.render(", source)
+
+    def test_apple_main10_prefers_hardware_without_requiring_it(self) -> None:
+        source = self.source("Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift")
+        self.assertIn(
+            "kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: true",
+            source,
         )
-        self.assertNotIn("var derivatives: [[Float]]", source)
-        self.assertNotIn("zip(rendered.rgb, currentRaster.rgb).map", source)
-        self.assertIn("private struct SampledJacobian", source)
-        self.assertIn("var values: [Float]", source)
-        self.assertNotIn("let derivativeRasters = try Self.render", source)
-        self.assertNotIn("let initializationRasters = try Self.render", source)
-        self.assertNotIn("let lineSearchRasters = try Self.render", source)
-        self.assertNotIn("Self.metrics(rendered, target).dictionary", source)
-        self.assertIn("try Self.executeRenderRequests", source)
-        self.assertNotIn("var renderCache: [String: Raster]", source)
-
-    def test_style_candidate_does_not_copy_whole_heic_in_swift(self) -> None:
-        source = self.source(
-            "Sources/XDRemuxAppleFeatures/PhotographicStyles/ConstrainedPolynomialStyleDataProducer.swift"
+        self.assertNotIn(
+            "kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder",
+            source,
         )
-        self.assertNotIn("var output = source", source)
-        self.assertIn("fileManager.copyItem(at: heicURL, to: outputURL)", source)
-        self.assertIn("try handle.seek(toOffset: UInt64(styleOffset))", source)
-        self.assertIn("permissions & 0o200 == 0", source)
-        self.assertIn(".posixPermissions: permissions | 0o200", source)
+        self.assertIn("kVTCompressionPropertyKey_UsingHardwareAcceleratedVideoEncoder", source)
+        self.assertIn("kVTCompressionPropertyKey_EncoderID", source)
+        self.assertIn('case usingHardwareAcceleratedEncoder = "using_hardware_accelerated_encoder"', source)
+        self.assertIn('case encoderID = "encoder_id"', source)
 
-    def test_direct_raster_encoder_uses_raw_transport(self) -> None:
-        wrapper = self.source("Sources/XDRemuxCore/HEIF/DirectTiledHEVCGainMapEncoder.swift")
-        helper = self.source("Sources/XDRemuxCore/Resources/Native/apple_vt_hevc_encoder.swift")
-        self.assertNotIn("CGImageDestinationCreateWithData", wrapper)
-        self.assertIn('pathExtension: "raw"', wrapper)
-        self.assertNotIn("let bytes = [UInt8](annexB)", wrapper)
-        self.assertIn("Data(contentsOf: annexBURL, options: [.mappedIfSafe])", wrapper)
-        self.assertIn("RawRasterDescriptor", helper)
-        self.assertIn("Data(contentsOf: url, options: [.mappedIfSafe])", helper)
+        benchmark = self.source("scripts/benchmark_apple_videotoolbox_primitive.py")
+        self.assertIn('"hardware_acceleration_allowed": True', benchmark)
+        self.assertIn('"hardware_accelerated_samples"', benchmark)
+        self.assertIn('"observed_encoder_ids"', benchmark)
+
+    def test_hdr_benchmarks_distinguish_source_family_and_output_profile(self) -> None:
+        benchmark = self.source("scripts/benchmark_rust_product.py")
+        for case in (
+            "hdr-lhdr-mono400",
+            "hdr-uhdr-rgb444",
+            "oppo-compatible-lhdr-rgb420",
+            "oppo-compatible-uhdr-rgb420",
+        ):
+            self.assertIn(case, benchmark)
+        self.assertNotIn('"standard-hdr"', benchmark)
+        self.assertIn('codec_path="portable-libheif"', benchmark)
+
+        codec_benchmark = self.source(
+            "crates/xdremux-codec/src/bin/xdremux-codec-gainmap-bench.rs"
+        )
+        for profile in ("mono400", "rgb444", "rgb420"):
+            self.assertIn(f'"{profile}"', codec_benchmark)
+        self.assertIn("encode_gain_map_tiles(&request)", codec_benchmark)
+
+        workflow = self.source(".github/workflows/performance.yml")
+        self.assertIn("Measure isolated portable Gain Map codec primitives", workflow)
+        self.assertIn("GitHub Actions hosted macOS 26 (arm64)", workflow)
+        self.assertIn("not treated as an RGB 4:4:4 Gain Map backend", workflow)
 
     def test_app_queue_status_projection_avoids_filter_arrays(self) -> None:
         source = self.source("apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift")

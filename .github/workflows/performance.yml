@@ -1,20 +1,40 @@
-name: XDRemux Performance
+name: XDRemux Rust Performance and Design
 
 on:
   pull_request:
     paths:
-      - "Sources/**/*.swift"
-      - "apps/macos/XDRemuxApp/Sources/**/*.swift"
-      - "Tests/**/*Performance*.swift"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "apps/macos/XDRemuxApp/Sources/**"
+      - "benchmarks/macos26-arm64-product-baseline.json"
       - "Tests/test_performance_design.py"
+      - "Tests/test_performance_budget.py"
+      - "scripts/benchmark_rust_product.py"
+      - "scripts/benchmark_apple_videotoolbox_primitive.py"
+      - "scripts/characterize_apple_adapter_launches.py"
+      - "scripts/check_performance_budget.py"
+      - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   push:
-    branches: [main]
+    branches:
+      - main
+      - feat/rust-cli-unification
     paths:
-      - "Sources/**/*.swift"
-      - "apps/macos/XDRemuxApp/Sources/**/*.swift"
-      - "Tests/**/*Performance*.swift"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "apps/macos/XDRemuxApp/Sources/**"
+      - "benchmarks/macos26-arm64-product-baseline.json"
       - "Tests/test_performance_design.py"
+      - "Tests/test_performance_budget.py"
+      - "scripts/benchmark_rust_product.py"
+      - "scripts/benchmark_apple_videotoolbox_primitive.py"
+      - "scripts/characterize_apple_adapter_launches.py"
+      - "scripts/check_performance_budget.py"
+      - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   workflow_dispatch:
 
@@ -22,72 +42,337 @@ permissions:
   contents: read
 
 concurrency:
-  group: xdremux-performance-${{ github.event.pull_request.number || github.ref }}
+  group: xdremux-performance-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  release-performance:
+  rust-performance:
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
-      - name: Build optimized package
-        run: swift build -c release
-
-      - name: Enforce allocation-shape regressions
-        run: python3 -m unittest Tests.test_performance_design
-
-      - name: Verify optimized-path semantics
-        run: |
-          swift test -c release --filter PerformanceDesignTests
-          swift test -c release --filter PerformanceDesignCoreTests
-
-      - name: Measure sampled Jacobian
+      - name: Record benchmark environment
         shell: bash
-        env:
-          XDREMUX_RUN_PERFORMANCE_MEASUREMENTS: "1"
         run: |
           mkdir -p artifacts/performance
-          set -o pipefail
-          swift test -c release \
-            --filter PerformanceMeasurementTests/testSampledJacobianReleasePerformance \
-            2>&1 | tee artifacts/performance/sampled-jacobian.log
+          {
+            echo "runner_provider=GitHub Actions hosted runner"
+            echo "runs_on=macos-26"
+            echo "head=$(git rev-parse HEAD)"
+            sw_vers
+            echo "arch=$(uname -m)"
+            xcodebuild -version
+            swift --version
+          } | tee artifacts/performance/environment.txt
 
-      - name: Measure legacy full-raster reference
+      - name: Install portable HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Build optimized Rust product
+        shell: bash
+        run: |
+          cargo build --locked --workspace --all-targets --release \
+            2>&1 | tee artifacts/performance/rust-release-build.log
+
+      - name: Build release Apple primitive adapter
+        shell: bash
+        run: |
+          swift build -c release --product xdremux-apple-adapter \
+            2>&1 | tee artifacts/performance/apple-adapter-build.log
+          echo "XDREMUX_PERF_APPLE_ADAPTER=$(swift build -c release --show-bin-path)/xdremux-apple-adapter" >> "$GITHUB_ENV"
+
+      - name: Check Rust performance design invariants
+        shell: bash
+        run: |
+          python3 -m unittest \
+            Tests.test_performance_design \
+            Tests.test_performance_budget \
+            2>&1 | tee artifacts/performance/design-policy.log
+          cargo test --locked --workspace --all-targets --release \
+            2>&1 | tee artifacts/performance/rust-release-tests.log
+
+      - name: Exercise optimized product routes
         shell: bash
         env:
-          XDREMUX_RUN_PERFORMANCE_MEASUREMENTS: "1"
+          XDREMUX_CLI: ${{ github.workspace }}/target/release/xdremux
         run: |
-          set -o pipefail
-          swift test -c release \
-            --filter PerformanceMeasurementTests/testLegacyFullDerivativeReferencePerformance \
-            2>&1 | tee artifacts/performance/legacy-full-derivative.log
+          bash scripts/check_rust_cli_smoke.sh \
+            2>&1 | tee artifacts/performance/rust-cli-smoke.log
+
+      - name: Measure representative end-to-end product workloads
+        shell: bash
+        run: |
+          python3 scripts/benchmark_rust_product.py \
+            --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
+            --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
+            --warmup 1 \
+            --iterations 5 \
+            --output artifacts/performance/product-benchmark.json \
+            2>&1 | tee artifacts/performance/product-benchmark.log
+
+      - name: Measure isolated portable Gain Map codec primitives
+        shell: bash
+        run: |
+          "$GITHUB_WORKSPACE/target/release/xdremux-codec-gainmap-bench" \
+            --width 1024 \
+            --height 768 \
+            --warmup 1 \
+            --iterations 5 \
+            > artifacts/performance/gain-map-codec.json
+          cat artifacts/performance/gain-map-codec.json
+
+      - name: Measure Apple VideoToolbox primitive separately
+        shell: bash
+        run: |
+          python3 scripts/benchmark_apple_videotoolbox_primitive.py \
+            --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
+            --width 1024 \
+            --height 768 \
+            --warmup 1 \
+            --iterations 5 \
+            --output artifacts/performance/apple-videotoolbox-main10.json \
+            2>&1 | tee artifacts/performance/apple-videotoolbox-main10.log
+
+      - name: Characterize Apple adapter process lifecycle
+        shell: bash
+        run: |
+          python3 scripts/characterize_apple_adapter_launches.py \
+            --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
+            --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
+            --output artifacts/performance/apple-adapter-launches.json \
+            2>&1 | tee artifacts/performance/apple-adapter-launches.log
+
+      - name: Enforce stable-runner performance regression budget
+        shell: bash
+        run: |
+          python3 scripts/check_performance_budget.py \
+            --baseline benchmarks/macos26-arm64-product-baseline.json \
+            --benchmark artifacts/performance/product-benchmark.json \
+            --launches artifacts/performance/apple-adapter-launches.json \
+            --expected-head "$(git rev-parse HEAD)" \
+            2>&1 | tee artifacts/performance/regression-budget.log
+
+      - name: Build and run macOS app model integration
+        shell: bash
+        env:
+          XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremux-app-model-tests
+        run: |
+          xcodebuild \
+            -quiet \
+            -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \
+            -scheme XDRemuxAppModelTests \
+            -configuration Debug \
+            -derivedDataPath "$XDREMUX_DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          XDREMUX_CLI="$GITHUB_WORKSPACE/target/release/xdremux" \
+            "$XDREMUX_DERIVED_DATA/Build/Products/Debug/XDRemuxAppModelTests" \
+            2>&1 | tee artifacts/performance/app-model.log
+
+      - name: Run exact-HEAD Rust completion gate
+        shell: bash
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          runner_temp = os.environ["RUNNER_TEMP"]
+          head = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"], text=True
+          ).strip()
+          app_build = (
+              "xcodebuild -quiet "
+              "-project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj "
+              "-scheme XDRemuxAppModelTests -configuration Debug "
+              f"-derivedDataPath '{runner_temp}/xdremux-gate-app' "
+              "CODE_SIGNING_ALLOWED=NO build && "
+              f"XDREMUX_CLI='$GITHUB_WORKSPACE/target/release/xdremux' "
+              f"'{runner_temp}/xdremux-gate-app/Build/Products/Debug/XDRemuxAppModelTests'"
+          )
+          plan = {
+              "schema_version": 1,
+              "scope": "Canonical Rust product release build, performance regression evidence, design invariants, and macOS app integration",
+              "checks": [
+                  {
+                      "name": "rust-release-build",
+                      "kind": "static",
+                      "command": ["cargo", "build", "--locked", "--workspace", "--all-targets", "--release"],
+                      "timeout_seconds": 1800,
+                  },
+                  {
+                      "name": "rust-release-regressions",
+                      "kind": "regression",
+                      "command": ["cargo", "test", "--locked", "--workspace", "--all-targets", "--release"],
+                      "timeout_seconds": 2400,
+                  },
+                  {
+                      "name": "performance-design-policy",
+                      "kind": "regression",
+                      "command": [
+                          "python3", "-m", "unittest",
+                          "Tests.test_performance_design",
+                          "Tests.test_performance_budget",
+                      ],
+                      "timeout_seconds": 120,
+                  },
+                  {
+                      "name": "performance-regression-budget",
+                      "kind": "regression",
+                      "command": [
+                          "python3", "scripts/check_performance_budget.py",
+                          "--baseline", "benchmarks/macos26-arm64-product-baseline.json",
+                          "--benchmark", "artifacts/performance/product-benchmark.json",
+                          "--launches", "artifacts/performance/apple-adapter-launches.json",
+                          "--expected-head", head,
+                      ],
+                      "timeout_seconds": 120,
+                  },
+                  {
+                      "name": "rust-cli-release-smoke",
+                      "kind": "integration",
+                      "command": ["bash", "scripts/check_rust_cli_smoke.sh"],
+                      "timeout_seconds": 900,
+                  },
+                  {
+                      "name": "macos-app-model-integration",
+                      "kind": "integration",
+                      "command": ["/bin/bash", "-lc", app_build],
+                      "timeout_seconds": 1200,
+                  },
+              ],
+          }
+          Path("/tmp/xdremux-agent-verification.json").write_text(
+              json.dumps(plan, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+          python3 scripts/agent_completion_gate.py run \
+            --base origin/main \
+            --plan /tmp/xdremux-agent-verification.json
+          HEAD_SHA="$(git rev-parse HEAD)"
+          python3 scripts/agent_completion_gate.py verify \
+            ".codex/verification-receipts/${HEAD_SHA}.json"
+          cp ".codex/verification-receipts/${HEAD_SHA}.json" \
+            artifacts/performance/completion-receipt.json
 
       - name: Write performance summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## XDRemux Release Performance"
+            echo "## XDRemux Rust performance and design"
             echo
-            echo "Release build and semantic design tests are hard checks."
-            echo "Sampled and legacy reference measurements run in separate XCTest processes so peak-memory metrics are not contaminated by allocator high-water marks from the other implementation."
-            echo "The main XDRemux CI workflow owns package, app, policy, and merge-gate validation; this workflow measures only the performance-specific surface."
+            echo "Runner: GitHub Actions hosted macOS 26 (arm64). These are not local-device measurements."
+            echo "Product E2E timings include source I/O, parsing, Gain Map decode/reconstruction, codec work, HEIF assembly/publication, and Apple adapter/framework overhead where applicable."
+            echo "Standard HDR uses the portable Rust/libheif Gain Map encoder even on macOS; the Apple VideoToolbox Main10 primitive belongs to the Photographic Styles Linear Thumbnail path and is not treated as an RGB 4:4:4 Gain Map backend."
+            echo "The committed macOS 26 arm64 reference is a regression baseline, not a performance target; committed tolerances absorb normal hosted-runner noise while structural helper-launch maxima remain hard limits."
             echo
-            echo '```text'
-            grep -hE "(PerformanceMeasurementTests|measured|average:|Test Case.*passed|Test Case.*failed)" \
-              artifacts/performance/*.log 2>/dev/null || true
-            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          if [[ -s artifacts/performance/product-benchmark.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/performance/product-benchmark.json").read_text())
+          print("### End-to-end product workloads")
+          print()
+          print("| workload | source | Gain Map | codec path | median | p95 | max RSS |")
+          print("| --- | --- | --- | --- | ---: | ---: | ---: |")
+          for case in report["cases"]:
+              source = case.get("source_family") or "—"
+              channels = case.get("gain_map_channels")
+              chroma = case.get("gain_map_chroma")
+              gain_map = f"{channels}/{chroma}" if channels and chroma else "—"
+              codec_path = case.get("codec_path") or "—"
+              print(
+                  f"| {case['name']} | {source} | {gain_map} | {codec_path} | "
+                  f"{case['median_wall_seconds']:.3f}s | "
+                  f"{case['p95_wall_seconds']:.3f}s | "
+                  f"{case['max_peak_rss_bytes'] / (1024 * 1024):.1f} MiB |"
+              )
+          PY
+          fi
+          if [[ -s artifacts/performance/gain-map-codec.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/performance/gain-map-codec.json").read_text())
+          print()
+          print("### Isolated portable Gain Map encoder")
+          print()
+          print(f"Synthetic smooth raster: {report['width']}×{report['height']}; timing covers LibHeifProvider::encode_gain_map_tiles only.")
+          print()
+          print("| profile | raw raster | tiles | encoded resource | median | p95 |")
+          print("| --- | ---: | ---: | ---: | ---: | ---: |")
+          for case in report["cases"]:
+              print(
+                  f"| {case['channels']}/{case['chroma']} | "
+                  f"{case['raw_raster_bytes'] / (1024 * 1024):.2f} MiB | "
+                  f"{case['tile_count']} | "
+                  f"{case['encoded_resource_bytes'] / 1024:.1f} KiB | "
+                  f"{case['median_seconds']:.3f}s | {case['p95_seconds']:.3f}s |"
+              )
+          PY
+          fi
+          if [[ -s artifacts/performance/apple-videotoolbox-main10.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/performance/apple-videotoolbox-main10.json").read_text())
+          profile = report["storage_profile"]
+          print()
+          print("### Apple VideoToolbox primitive (separate contract)")
+          print()
+          print("This is the Photographic Styles Linear Thumbnail Main10 primitive. It includes helper launch, RGB→BGRA staging, VT session creation, encode, and file I/O; it is not an RGB 4:4:4 UHDR Gain Map comparison.")
+          print()
+          print("| operation | storage | raw raster | encoded resource | median | p95 |")
+          print("| --- | --- | ---: | ---: | ---: | ---: |")
+          print(
+              f"| {report['operation']} | Main10 {profile['chroma']} "
+              f"{profile['luma_bit_depth']}-bit | "
+              f"{report['raw_raster_bytes'] / (1024 * 1024):.2f} MiB | "
+              f"{report['encoded_resource_bytes'] / 1024:.1f} KiB | "
+              f"{report['median_seconds']:.3f}s | {report['p95_seconds']:.3f}s |"
+          )
+          PY
+          fi
+          if [[ -s artifacts/performance/apple-adapter-launches.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/performance/apple-adapter-launches.json").read_text())
+          print()
+          print("### Apple adapter process lifecycle")
+          print()
+          print("| workload | helper launches per conversion |")
+          print("| --- | ---: |")
+          for name, count in report["cases"].items():
+              print(f"| {name} | {count} |")
+          PY
+          fi
 
       - name: Upload performance measurements
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: xdremux-release-performance
+          name: xdremux-rust-performance
           if-no-files-found: warn
           retention-days: 14
           path: artifacts/performance/

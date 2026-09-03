@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
-import XDRemuxCore
 
 struct PhotoCategorizationView: View {
     let viewModel: PhotoCategorizationViewModel

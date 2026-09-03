@@ -1,7 +1,9 @@
 version: 2
 
 updates:
-  - package-ecosystem: github-actions
+  # Rust is the canonical XDRemux product stack. Keep Cargo first so product
+  # dependency drift is reviewed before platform-adapter or research tooling.
+  - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
@@ -10,11 +12,11 @@ updates:
       timezone: Etc/UTC
     open-pull-requests-limit: 5
     groups:
-      actions:
+      rust-crates:
         patterns:
           - "*"
 
-  - package-ecosystem: swift
+  - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
@@ -23,16 +25,32 @@ updates:
       timezone: Etc/UTC
     open-pull-requests-limit: 5
     groups:
-      swift-packages:
+      actions:
         patterns:
           - "*"
 
-  - package-ecosystem: pip
+  # Swift is intentionally limited to the Apple framework primitive adapter
+  # and macOS app integration; it is not a second product implementation.
+  - package-ecosystem: swift
     directory: /
     schedule:
       interval: weekly
       day: monday
       time: "04:30"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    groups:
+      swift-packages:
+        patterns:
+          - "*"
+
+  # Python remains research/training and repository tooling only.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:45"
       timezone: Etc/UTC
     open-pull-requests-limit: 5
     groups:

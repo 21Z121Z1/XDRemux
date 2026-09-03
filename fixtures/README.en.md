@@ -1,55 +1,47 @@
-# Real Motion Photo Fixtures
+# Real Media Fixtures
 
 English | [简体中文](README.md)
 
-This directory contains the real Motion Photo inputs used by strict Swift and pure-Python CI gates.
+This directory contains immutable real-device media inputs used to validate XDRemux's portable Rust implementation and Apple framework consumer boundaries.
+
+## Layout
+
+- `motion-photo/<vendor>/...` contains Android Motion Photo inputs across JPEG and HEIC/HEIF layouts.
+- `proxdr/<vendor>/<device>/...` contains original vendor ProXDR HEIC inputs used to exercise HDR extraction, family detection, Gain Map reconstruction, HEIF assembly, and CLI conversion.
+
+Paths are part of the fixture contract. Prefer stable capability-oriented names over capture timestamps. A vendor or device directory records the provenance of a test input; it is not a product allow-list.
 
 ## Identity contract
 
-The media files are committed byte-for-byte as test fixtures.
+Media files are committed byte-for-byte. `SHA256SUMS` is the canonical identity manifest for every versioned real-media fixture in this directory.
 
-`SHA256SUMS` is the canonical identity manifest.
-
-A strict fixture test must reject a file whose bytes do not match the recorded digest.
-
-Do not rewrite a fixture to normalize metadata if the test depends on its original container layout.
+A strict real-fixture gate must reject a file whose bytes do not match its recorded digest. Do not rewrite a source fixture to normalize metadata, orientation, container layout, vendor tails, or embedded resources when those bytes are part of the behavior being tested.
 
 ## Data retained in fixtures
 
-A real fixture can contain:
+A real fixture can contain EXIF, capture timestamps, vendor metadata, embedded motion-video resources, HDR Gain Maps, portrait data, orientation data, local-HDR metadata, and other source payloads needed by parsers and validators. These are part of the original test input.
 
-- EXIF;
-- capture timestamps;
-- vendor metadata;
-- embedded motion-video resources;
-- Gain Maps;
-- orientation data;
-- other source payloads required by the parser or validator.
+Do not assume that a committed real photo is sanitized merely because it is stored under `fixtures/`.
 
-These resources are part of the test input.
+## Current coverage
 
-Do not assume that a committed real photo is sanitized only because it is in a test directory.
+The Motion Photo corpus covers Samsung, Xiaomi, OPPO, and vivo samples, including JPEG and HEIC/HEIF containers.
 
-## Coverage
-
-The current corpus contains multiple Android Motion Photo implementations and both JPEG and HEIC/HEIF layouts.
-
-The public documentation does not use this corpus as a vendor allow-list. A fixture proves behavior for that file structure and test case.
+The ProXDR corpus currently covers OPPO Find X6 Pro LHDR v1, Find X7 Ultra LHDR v2 including XPAN, and Find X9 Ultra UHDR samples including high-resolution, Master, and Portrait captures. These fixtures are intended to expose format and product-policy differences, not to imply support for every capture mode on every device.
 
 ## Generated output
 
-Generated Live Photo HEIC/MOV files are temporary test or workflow artifacts.
-
-Do not commit generated conversion output to this directory unless a future test explicitly defines it as a versioned golden artifact.
+Generated ISO HDR HEIC and Live Photo HEIC/MOV files are temporary test or workflow artifacts. Do not commit converted output here unless a future test explicitly defines it as a versioned golden artifact.
 
 ## Adding a fixture
 
-When you add a real fixture:
+When adding a real fixture:
 
 1. Confirm that it can be published in the repository.
-2. Add the original file without byte modification.
-3. Add its SHA-256 digest to `SHA256SUMS`.
-4. Add or update a test that states what the fixture proves.
-5. Do not infer unrelated device support from one fixture.
+2. Commit the original file without byte modification.
+3. Place it under the appropriate capability/vendor/device hierarchy.
+4. Add its SHA-256 digest to `SHA256SUMS`.
+5. Add or update a test that states exactly what the fixture proves.
+6. Do not infer unrelated device support from one fixture.
 
 The repository testing policy is in [docs/quality/testing.en.md](../docs/quality/testing.en.md).

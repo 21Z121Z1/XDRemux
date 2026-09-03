@@ -9,63 +9,19 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
-        .library(name: "XDRemuxCore", targets: ["XDRemuxCore"]),
-        .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"]),
-        .executable(name: "xdremux", targets: ["XDRemuxCLI"])
+        // The Rust workspace owns the product stack. Swift publishes only the
+        // framework adapter needed by the Rust runtime.
+        .executable(name: "xdremux-apple-adapter", targets: ["XDRemuxAppleAdapter"])
     ],
-    dependencies: [
-        .package(
-            url: "https://github.com/apple/swift-argument-parser",
-            from: "1.8.2"
-        )
-    ],
+    dependencies: [],
     targets: [
-        .target(
-            name: "XDRemuxCore",
-            path: "Sources/XDRemuxCore",
-            resources: [
-                .copy("Resources/Native")
-            ]
-        ),
-        .target(
-            name: "XDRemuxAppleFeatures",
-            dependencies: ["XDRemuxCore"],
-            path: "Sources/XDRemuxAppleFeatures",
-            resources: [
-                .copy("Resources/ApplePlatform")
-            ]
-        ),
+        // Process boundary for Apple-only framework calls. The adapter is
+        // dependency-free from product business modules so its build graph
+        // matches the final architecture.
         .executableTarget(
-            name: "XDRemuxCLI",
-            dependencies: [
-                "XDRemuxCore",
-                "XDRemuxAppleFeatures",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ],
-            path: "Sources/XDRemuxCLI"
-        ),
-        // Developer-only diagnostic executable. Keeping it as a target means it
-        // remains buildable with `swift build --target CoreImageRAWDiagnostics`
-        // without vending it as part of XDRemux's public package product surface.
-        .executableTarget(
-            name: "CoreImageRAWDiagnostics",
-            dependencies: ["XDRemuxCore"],
-            path: "Sources/CoreImageRAWDiagnostics"
-        ),
-        .testTarget(
-            name: "XDRemuxCoreTests",
-            dependencies: ["XDRemuxCore"],
-            path: "Tests/XDRemuxCoreTests"
-        ),
-        .testTarget(
-            name: "XDRemuxAppleFeaturesTests",
-            dependencies: ["XDRemuxAppleFeatures"],
-            path: "Tests/XDRemuxAppleFeaturesTests"
-        ),
-        .testTarget(
-            name: "XDRemuxCLITests",
-            dependencies: ["XDRemuxCLI"],
-            path: "Tests/XDRemuxCLITests"
+            name: "XDRemuxAppleAdapter",
+            dependencies: [],
+            path: "Sources/XDRemuxAppleAdapter"
         )
     ],
     swiftLanguageModes: [.v5]

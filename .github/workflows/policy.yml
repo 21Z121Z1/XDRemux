@@ -1,0 +1,53 @@
+name: XDRemux Policy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "AGENTS.md"
+      - "scripts/agent_completion_gate.py"
+      - "Tests/validation/test_agent_completion_gate.py"
+      - "Tests/test_public_documentation.py"
+      - ".github/workflows/**"
+      - "docs/validation/README.md"
+      - "docs/development.md"
+      - "docs/development.en.md"
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "scripts/agent_completion_gate.py"
+      - "Tests/validation/test_agent_completion_gate.py"
+      - "Tests/test_public_documentation.py"
+      - ".github/workflows/**"
+      - "docs/validation/README.md"
+      - "docs/development.md"
+      - "docs/development.en.md"
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run completion-gate policy tests
+        run: python3 -m unittest Tests.validation.test_agent_completion_gate
+
+      - name: Run public documentation tests
+        run: python3 -m unittest Tests.test_public_documentation
+
+      - name: Write policy summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## XDRemux Policy"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            if [[ "${{ job.status }}" == "success" ]]; then
+              echo "| Acceptance policy tests | Passed |"
+            else
+              echo "| Acceptance policy tests | Failed |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

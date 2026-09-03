@@ -1,0 +1,43 @@
+name: Rust conversion engine
+
+on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-format/**"
+      - "scripts/check_engine_plan_vectors.sh"
+      - ".github/workflows/rust-engine-core.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-format/**"
+      - "scripts/check_engine_plan_vectors.sh"
+      - ".github/workflows/rust-engine-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  engine-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint conversion engine
+        run: cargo clippy --locked -p xdremux-engine --all-targets -- -D warnings
+      - name: Test conversion engine
+        run: cargo test --locked -p xdremux-engine
+      - name: Exercise product planning vectors
+        run: bash scripts/check_engine_plan_vectors.sh

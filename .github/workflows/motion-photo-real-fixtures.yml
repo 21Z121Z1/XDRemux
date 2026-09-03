@@ -1,35 +1,49 @@
-name: Motion Photo Real Fixture Gate
+name: Rust Motion Photo real fixtures
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-motion-photo/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-format/**"
+      - "fixtures/SHA256SUMS"
+      - "fixtures/motion-photo/**"
+      - "scripts/check_rust_motion_photo_real_fixtures.sh"
+      - "scripts/build_live_photo_device_validation.sh"
+      - ".github/workflows/motion-photo-real-fixtures.yml"
   pull_request:
     paths:
-      - "Sources/XDRemuxCore/MotionPhoto/**"
-      - "Sources/XDRemuxAppleFeatures/LivePhoto/**"
-      - "Sources/XDRemuxCLI/Commands/MotionPhoto*.swift"
-      - "Tests/**/*MotionPhoto*.swift"
-      - "Tests/**/*LivePhoto*.swift"
-      - "fixtures/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-motion-photo/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-format/**"
+      - "fixtures/SHA256SUMS"
+      - "fixtures/motion-photo/**"
+      - "scripts/check_rust_motion_photo_real_fixtures.sh"
       - "scripts/build_live_photo_device_validation.sh"
       - ".github/workflows/motion-photo-real-fixtures.yml"
 
 permissions:
   contents: read
 
-concurrency:
-  group: motion-photo-real-fixtures-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   real-motion-photo-fixtures:
     runs-on: macos-latest
-    timeout-minutes: 60
-    env:
-      FIXTURE_ROOT: ${{ github.workspace }}/fixtures
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Record macOS runner
         shell: bash
@@ -41,91 +55,46 @@ jobs:
             echo "arch=$(uname -m)"
           } | tee artifacts/motion-photo-runner.txt
 
-      - name: Verify repository fixture inventory
+      - name: Install portable HEVC provider
         shell: bash
         run: |
-          python3 - <<'PY'
-          from hashlib import sha256
-          from pathlib import Path
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
 
-          root = Path("fixtures")
-          expected = []
-          for line in (root / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
-              if not line.strip():
-                  continue
-              digest, name = line.split(maxsplit=1)
-              expected.append((digest, name.strip()))
-          if len(expected) != 14:
-              raise SystemExit(f"expected 14 fixture identities, found {len(expected)}")
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
 
-          status = Path("artifacts/motion-photo-real-fixture-status.txt")
-          with status.open("w", encoding="utf-8") as stream:
-              for digest, name in expected:
-                  path = root / name
-                  if not path.is_file():
-                      stream.write(f"{name}=MISSING\n")
-                      raise SystemExit(f"repository fixture is missing: {name}")
-                  actual = sha256(path.read_bytes()).hexdigest()
-                  if actual != digest:
-                      stream.write(f"{name}=SHA256_MISMATCH\n")
-                      raise SystemExit(
-                          f"repository fixture SHA-256 mismatch: {name}: {actual}"
-                      )
-                  stream.write(f"{name}=present\n")
-          PY
-
-      - name: Characterize and convert every supplied Motion Photo
+      - name: Check Rust Motion Photo package
         shell: bash
-        env:
-          XDREMUX_MOTION_PHOTO_FIXTURE_ROOT: ${{ env.FIXTURE_ROOT }}
         run: |
-          echo "::group::Real Samsung / Xiaomi / OPPO / vivo Motion Photo gate"
-          swift test --filter UploadedMotionPhotoFixtureGateTests \
-            2>&1 | tee artifacts/motion-photo-real-fixtures.log
-          echo "::endgroup::"
-          echo "tests=passed" >> artifacts/motion-photo-real-fixture-status.txt
-          echo "photoKit=passed" >> artifacts/motion-photo-real-fixture-status.txt
+          cargo fmt --all --check
+          cargo clippy --locked -p xdremux-motion-photo -p xdremux-runtime -p xdremux-cli --all-targets -- -D warnings
+          cargo test --locked -p xdremux-motion-photo -p xdremux-runtime -p xdremux-cli
 
-      - name: Build importable ColorOS 16 and Samsung Live Photo pairs
+      - name: Convert and validate every supplied fixture through Rust
+        shell: bash
+        run: |
+          bash scripts/check_rust_motion_photo_real_fixtures.sh \
+            "$GITHUB_WORKSPACE/fixtures" \
+            "$GITHUB_WORKSPACE/artifacts/rust-motion-photo-real"
+
+      - name: Prepare manual device-validation pairs
         shell: bash
         run: |
           bash scripts/build_live_photo_device_validation.sh \
-            "$FIXTURE_ROOT" \
-            artifacts/live-photo-device-validation
+            "$GITHUB_WORKSPACE/fixtures" \
+            "$GITHUB_WORKSPACE/artifacts/live-photo-device-validation"
 
-      - name: Run historical OPPO characterization when present
-        shell: bash
-        env:
-          XDREMUX_MOTION_PHOTO_FIXTURE_ROOT: ${{ env.FIXTURE_ROOT }}
-        run: |
-          C15="$(find "$FIXTURE_ROOT" -type f -name 'IMG20250425184722.jpg' -print -quit)"
-          C16="$(find "$FIXTURE_ROOT" -type f -name 'IMG20250901181353.jpg' -print -quit)"
-          if [[ -z "$C15" && -z "$C16" ]]; then
-            echo "historical_oppo=not-present" >> artifacts/motion-photo-real-fixture-status.txt
-            exit 0
-          fi
-          swift test --filter RealMotionPhotoFixtureTests \
-            2>&1 | tee artifacts/motion-photo-historical-oppo.log
-          echo "historical_oppo=passed" >> artifacts/motion-photo-real-fixture-status.txt
-
-      - name: Upload real-fixture evidence
+      - name: Upload Rust real-fixture evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: motion-photo-real-fixture-evidence
+          name: rust-motion-photo-real-fixture-evidence
           if-no-files-found: error
           retention-days: 14
           path: |
             artifacts/motion-photo-runner.txt
-            artifacts/motion-photo-real-fixture-status.txt
-            artifacts/motion-photo-real-fixtures.log
-            artifacts/motion-photo-historical-oppo.log
-
-      - name: Upload device-validation Live Photo pairs
-        if: success()
-        uses: actions/upload-artifact@v7
-        with:
-          name: live-photo-device-validation-${{ github.sha }}
-          if-no-files-found: error
-          retention-days: 1
-          path: artifacts/live-photo-device-validation
+            artifacts/rust-motion-photo-real/
+            artifacts/live-photo-device-validation/

@@ -1,0 +1,11 @@
+[package]
+name = "xdremux-heif"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+xdremux-format = { path = "../xdremux-format" }
+
+[lints]
+workspace = true
