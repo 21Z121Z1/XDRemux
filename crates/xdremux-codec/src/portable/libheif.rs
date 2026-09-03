@@ -704,7 +704,10 @@ mod tests {
         let encoded = LibHeifProvider::new()
             .encode_gain_map_tiles(&request)
             .unwrap();
-        assert_eq!((encoded.gain_map_width, encoded.gain_map_height), (257, 257));
+        assert_eq!(
+            (encoded.gain_map_width, encoded.gain_map_height),
+            (257, 257)
+        );
         assert_eq!((encoded.tile_width, encoded.tile_height), (256, 256));
         assert_eq!(encoded.tiles.len(), 4);
         assert!(encoded
