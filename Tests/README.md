@@ -18,7 +18,8 @@ swift test
 | --- | --- |
 | `XDRemuxCoreTests` | 转换 model、HEIF/ISO-BMFF、Motion Photo 解析、验证、分类和文件生命周期。 |
 | `XDRemuxAppleFeaturesTests` | Live Photo、摄影风格、Apple 人像、native helper 兼容性和性能契约。 |
-| `XDRemuxCLITests` | CLI 解析、batch 行为、Motion Photo 路由和输出安全。 |
+
+公开 CLI 的解析、batch、Motion Photo 路由和输出安全测试位于 Rust workspace；Swift targets 只保留迁移期 Apple capability oracle。
 
 ## Python 仓库测试
 

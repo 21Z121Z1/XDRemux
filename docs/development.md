@@ -51,7 +51,7 @@ portable providers + platform adapters
 
 ## Apple 平台能力
 
-`Sources/XDRemuxAppleFeatures/` 在摄影风格、人像、RAW、Vision、Core ML、AVFoundation 等 Apple framework 行为被压缩成 Rust-owned contract 背后的平台能力期间继续保留。
+`Sources/XDRemuxAppleFeatures/` 仅在摄影风格、人像、RAW、Vision、Core ML、AVFoundation 等历史行为尚未完成 Rust consumer parity 审计期间作为迁移 oracle 保留。新产品行为不得进入这个 target。
 
 边界刻意保持很窄：
 
@@ -60,7 +60,7 @@ portable providers + platform adapters
 - 不要再向 Swift 添加跨平台产品 policy；
 - 当 adapter 可以返回更底层的 framework fact、再由 Rust 决策时，不要让 Swift 返回“可转换”“人像有效”之类业务结论。
 
-`xdremux-apple-adapter` 是随产品分发的平台组件，不是用户 CLI。当前 CLI/runtime 边界采用有版本号的 JSON helper protocol，进程生命周期有界，机器可读 stdout 与诊断 stderr 分离。transport 由 `xdremux-runtime` 持有；`xdremux-engine` 不知道 process、path、JSON、Swift 或 XPC。
+`xdremux-apple-adapter` 是随产品分发的平台组件，不是用户 CLI。当前 CLI/runtime 边界采用有版本号的 JSON helper protocol，进程生命周期有界，机器可读 stdout 与诊断 stderr 分离。transport 由 `xdremux-runtime` 持有；`xdremux-engine` 不知道 process、path、JSON、Swift 或 XPC。macOS App 同样只调用 Rust `xdremux`，不链接 Swift conversion target。
 
 对于 sandboxed macOS App，如果 Apple capability process 需要独立 sandbox、entitlement、lifecycle 或 crash isolation，优先使用 XPC。transport 必须可以替换，而不改变 engine 或公开 CLI 语义。只有某项 capability 确实从进程内互操作获益时才使用 C ABI；不要仅仅为了避开 helper process，就把 FFI 设成默认架构。
 
@@ -95,9 +95,8 @@ python -m unittest discover -s Tests -v
 | --- | --- |
 | `crates/` | Canonical Rust 产品栈。 |
 | `Sources/XDRemuxAppleAdapter/` | Rust runtime 消费的版本化 Apple 平台进程 adapter。 |
-| `Sources/XDRemuxAppleFeatures/` | Apple framework capability 实现和迁移期验证。 |
+| `Sources/XDRemuxAppleFeatures/` | 尚未删除的迁移 oracle；不属于公开 product。 |
 | `Sources/XDRemuxCore/` | 仅在 replacement evidence 尚未完成时保留的 legacy Swift core。 |
-| `Sources/XDRemuxCLI/` | 仅在 Apple 迁移工作仍有引用时保留的 legacy Swift CLI。 |
 | `Sources/CoreImageRAWDiagnostics/` | 开发者 RAW 诊断。 |
 | `xdremux_py/` | 迁移 oracle 和研究/训练工具；没有产品 CLI。 |
 | `apps/macos/XDRemuxApp/` | 产品栈迁移期间的 macOS SwiftUI App。 |
@@ -130,7 +129,7 @@ scripts/build_and_run.sh logs
 scripts/build_and_run.sh clean
 ```
 
-迁移期间 App 仍可能链接 Swift package。不要把这一依赖解释为 Swift 继续拥有 canonical conversion policy；可复用的产品行为应优先迁入 Rust。
+App 通过 Rust CLI 传输用户 intent 和分类请求；SwiftUI 层只保留 presentation state、队列和回执翻译。不要把迁移 oracle target 重新接回 app。
 
 ## 调试和研究控制
 

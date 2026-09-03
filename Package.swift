@@ -9,17 +9,11 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
-        // Swift does not own a second XDRemux product stack. These are platform
-        // capability artifacts consumed by the Rust-owned product.
-        .library(name: "XDRemuxAppleFeatures", targets: ["XDRemuxAppleFeatures"]),
+        // The Rust workspace owns the product stack. Swift publishes only the
+        // framework adapter needed by the Rust runtime.
         .executable(name: "xdremux-apple-adapter", targets: ["XDRemuxAppleAdapter"])
     ],
-    dependencies: [
-        .package(
-            url: "https://github.com/apple/swift-argument-parser",
-            from: "1.8.2"
-        )
-    ],
+    dependencies: [],
     targets: [
         // Migration-only internal target. The canonical cross-platform core is
         // the Rust workspace; this target remains while AppleFeatures and old
@@ -46,18 +40,6 @@ let package = Package(
             name: "XDRemuxAppleAdapter",
             dependencies: [],
             path: "Sources/XDRemuxAppleAdapter"
-        ),
-        // Migration-only executable target. It is intentionally not a public
-        // package product and is not a user-facing CLI; the Rust `xdremux`
-        // binary owns the CLI contract.
-        .executableTarget(
-            name: "XDRemuxCLI",
-            dependencies: [
-                "XDRemuxCore",
-                "XDRemuxAppleFeatures",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ],
-            path: "Sources/XDRemuxCLI"
         ),
         // Developer-only diagnostic executable. Keeping it as a target means it
         // remains buildable with `swift build --target CoreImageRAWDiagnostics`
@@ -91,11 +73,6 @@ let package = Package(
             name: "XDRemuxAppleFeaturesTests",
             dependencies: ["XDRemuxAppleFeatures"],
             path: "Tests/XDRemuxAppleFeaturesTests"
-        ),
-        .testTarget(
-            name: "XDRemuxCLITests",
-            dependencies: ["XDRemuxCLI"],
-            path: "Tests/XDRemuxCLITests"
         )
     ],
     swiftLanguageModes: [.v5]

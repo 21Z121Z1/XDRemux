@@ -51,7 +51,7 @@ A lower crate may provide a format primitive without making it a product mode. R
 
 ## Apple platform capabilities
 
-`Sources/XDRemuxAppleFeatures/` remains while Photographic Styles, Portrait, RAW, Vision, Core ML, AVFoundation, and other Apple-framework behavior is reduced to platform capabilities behind Rust-owned contracts.
+`Sources/XDRemuxAppleFeatures/` remains only as a migration oracle while Photographic Styles, Portrait, RAW, Vision, Core ML, AVFoundation, and other historical Apple-framework behavior is audited for Rust consumer parity. New product behavior must not enter this target.
 
 The boundary is intentionally narrow:
 
@@ -60,7 +60,7 @@ The boundary is intentionally narrow:
 - Do not add new cross-platform product policy to Swift.
 - Do not return business conclusions such as “convertible” or “valid portrait” when the adapter can return lower-level framework facts and Rust can decide the policy.
 
-`xdremux-apple-adapter` is a distributable platform component, not a user CLI. The current CLI/runtime boundary is a versioned JSON helper protocol with bounded process lifetime and separate machine-readable stdout/diagnostic stderr. `xdremux-runtime` owns that transport; `xdremux-engine` does not know about processes, paths, JSON, Swift, or XPC.
+`xdremux-apple-adapter` is a distributable platform component, not a user CLI. The current CLI/runtime boundary is a versioned JSON helper protocol with bounded process lifetime and separate machine-readable stdout/diagnostic stderr. `xdremux-runtime` owns that transport; `xdremux-engine` does not know about processes, paths, JSON, Swift, or XPC. The macOS app also invokes the Rust `xdremux` binary and does not link the Swift conversion targets.
 
 For a sandboxed macOS app, prefer XPC when the Apple capability process needs separate sandboxing, entitlements, lifecycle, or crash isolation. The transport must remain replaceable without changing engine or public CLI semantics. Use an in-process C ABI only for a capability that actually benefits from direct in-process interoperability; do not make FFI the default architecture merely to avoid a helper process.
 
@@ -95,9 +95,8 @@ Training and evaluation scripts may remain in Python because they are research t
 | --- | --- |
 | `crates/` | Canonical Rust product stack. |
 | `Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
-| `Sources/XDRemuxAppleFeatures/` | Apple framework capability implementation and migration-time validation. |
+| `Sources/XDRemuxAppleFeatures/` | Undeleted migration oracle; not a public product. |
 | `Sources/XDRemuxCore/` | Legacy Swift core retained only while replacement evidence is incomplete. |
-| `Sources/XDRemuxCLI/` | Legacy Swift CLI retained only while Apple migration work still references it. |
 | `Sources/CoreImageRAWDiagnostics/` | Developer RAW diagnostics. |
 | `xdremux_py/` | Migration oracles and research/training tooling; no product CLI. |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI app during product-stack migration. |
@@ -117,7 +116,7 @@ Private Apple API compatibility must be checked at runtime. Do not call a privat
 
 ## macOS app
 
-The app is in `apps/macos/XDRemuxApp/`.
+The app is in `apps/macos/XDRemuxApp/`. It invokes the Rust CLI for product work and keeps only presentation state, queue management, and receipt translation in Swift.
 
 Common commands:
 

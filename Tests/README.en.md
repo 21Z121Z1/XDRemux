@@ -18,7 +18,8 @@ Main test targets:
 | --- | --- |
 | `XDRemuxCoreTests` | Conversion models, HEIF/ISO-BMFF behavior, Motion Photo parsing, validation, classification, and file lifecycle. |
 | `XDRemuxAppleFeaturesTests` | Live Photo, Photographic Styles, Apple Portrait, native-helper compatibility, and performance contracts. |
-| `XDRemuxCLITests` | CLI parsing, batch behavior, Motion Photo routing, and output safety. |
+
+The public CLI parsing, batch, Motion Photo routing, and output-safety tests live in the Rust workspace; Swift targets remain only as migration-time Apple capability oracles.
 
 ## Python repository tests
 
