@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
@@ -90,6 +91,8 @@ pub enum AppleStyleDataError {
     NonFiniteLightMapValue {
         index: usize,
     },
+    InvalidPropertyListInput,
+    PropertyListOverflow,
     SingularSystem,
 }
 
@@ -159,6 +162,12 @@ impl fmt::Display for AppleStyleDataError {
                 formatter,
                 "Apple Photographic Styles serialized light-map value {index} is not finite"
             ),
+            Self::InvalidPropertyListInput => {
+                formatter.write_str("Apple Photographic Styles property-list input is invalid")
+            }
+            Self::PropertyListOverflow => {
+                formatter.write_str("Apple Photographic Styles property-list size overflows")
+            }
             Self::SingularSystem => {
                 formatter.write_str("Apple Photographic Styles polynomial system is singular")
             }
@@ -771,6 +780,405 @@ pub fn apple_style_light_map(
     Ok(output)
 }
 
+/// The nine-number distribution stored for each style statistics channel.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStyleDistribution {
+    pub black_point: f64,
+    pub high_key: f64,
+    pub p02: f64,
+    pub p10: f64,
+    pub p25: f64,
+    pub p50: f64,
+    pub p75: f64,
+    pub p98: f64,
+    pub white_point: f64,
+}
+
+/// The fixed statistics dictionary consumed by the Apple style property-list
+/// contract. An explicit field for every producer channel makes omissions
+/// impossible at the call site and keeps the metadata schema out of Swift.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStyleStatistics {
+    pub linear_gtc_image: AppleStyleDistribution,
+    pub linear_image: AppleStyleDistribution,
+    pub linear_image_person_segment_based: AppleStyleDistribution,
+    pub linear_image_skin_based: AppleStyleDistribution,
+    pub tone_mapped_image: AppleStyleDistribution,
+    pub tone_mapped_image_blue_channel_skin_based: AppleStyleDistribution,
+    pub tone_mapped_image_green_channel_skin_based: AppleStyleDistribution,
+    pub tone_mapped_image_person_segment_based: AppleStyleDistribution,
+    pub tone_mapped_image_red_channel_skin_based: AppleStyleDistribution,
+    pub tone_mapped_image_skin_based: AppleStyleDistribution,
+}
+
+/// Typed input for the version-15 Apple Photographic Styles metadata object.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStylePropertyListRequest<'a> {
+    pub style_data: &'a [u8],
+    pub global_tone_curve: &'a [u8],
+    pub baseline_exposure: f64,
+    pub scene_type: u8,
+    pub statistics: &'a AppleStyleStatistics,
+    pub people_ratio: f64,
+    pub person_masks_valid_hint: f64,
+    pub skin_ratio: f64,
+    pub tone_light_map: &'a [u8],
+    pub linear_light_map: &'a [u8],
+    pub base_gain: f64,
+    pub linear_gain: f64,
+    pub original_range_min: f64,
+    pub original_range_max: f64,
+    pub face_exposure_boost: f64,
+}
+
+/// Synthesize the binary property list carried by the Styles MIME item.
+///
+/// `PropertyListSerialization` is a platform primitive for consuming this
+/// object, not a product-policy boundary. Rust validates every fixed-size
+/// resource, constructs the complete key schema, and emits a deterministic
+/// binary plist without delegating metadata synthesis to Swift.
+pub fn apple_style_property_list(
+    request: &AppleStylePropertyListRequest<'_>,
+) -> Result<Vec<u8>, AppleStyleDataError> {
+    validate_apple_style_data(request.style_data)?;
+    if request.global_tone_curve.len() != 516
+        || request.tone_light_map.len() != APPLE_STYLE_LIGHT_MAP_BYTE_COUNT
+        || request.linear_light_map.len() != APPLE_STYLE_LIGHT_MAP_BYTE_COUNT
+        || request.scene_type > 3
+        || !(0.0..=1.0).contains(&request.people_ratio)
+        || !(-1.0..=1.0).contains(&request.person_masks_valid_hint)
+        || !(0.0..=1.0).contains(&request.skin_ratio)
+        || !request.baseline_exposure.is_finite()
+        || !request.base_gain.is_finite()
+        || !request.linear_gain.is_finite()
+        || !request.original_range_min.is_finite()
+        || !request.original_range_max.is_finite()
+        || request.original_range_min > request.original_range_max
+        || !request.face_exposure_boost.is_finite()
+    {
+        return Err(AppleStyleDataError::InvalidPropertyListInput);
+    }
+    validate_style_statistics(request.statistics)?;
+
+    let statistics = style_statistics_value(request.statistics);
+    let root = plist_dictionary([
+        ("0", PlistValue::Integer(15)),
+        ("1", PlistValue::Data(request.style_data.to_vec())),
+        ("2", PlistValue::Bool(true)),
+        ("3", PlistValue::Data(request.global_tone_curve.to_vec())),
+        ("4", PlistValue::Real(request.baseline_exposure)),
+        ("5", PlistValue::Integer(u64::from(request.scene_type))),
+        ("6", statistics),
+        (
+            "7",
+            plist_dictionary([
+                ("PeopleRatio", PlistValue::Real(request.people_ratio)),
+                (
+                    "PersonMasksValidHint",
+                    PlistValue::Real(request.person_masks_valid_hint),
+                ),
+                ("SkinRatio", PlistValue::Real(request.skin_ratio)),
+            ]),
+        ),
+        ("c", PlistValue::Data(request.tone_light_map.to_vec())),
+        ("d", PlistValue::Data(request.linear_light_map.to_vec())),
+        ("e", PlistValue::Integer(32)),
+        ("f", PlistValue::Integer(32)),
+        ("g", PlistValue::Integer(0x4C30_3068)),
+        ("h", PlistValue::Real(request.base_gain)),
+        (
+            "i",
+            plist_dictionary([
+                ("Gain", PlistValue::Real(request.linear_gain)),
+                (
+                    "OriginalRangeMin",
+                    PlistValue::Real(request.original_range_min),
+                ),
+                (
+                    "OriginalRangeMax",
+                    PlistValue::Real(request.original_range_max),
+                ),
+            ]),
+        ),
+        ("j", PlistValue::Real(request.face_exposure_boost)),
+        ("k", PlistValue::Bool(false)),
+    ]);
+    serialize_binary_plist(root)
+}
+
+fn validate_style_statistics(statistics: &AppleStyleStatistics) -> Result<(), AppleStyleDataError> {
+    let distributions = [
+        statistics.linear_gtc_image,
+        statistics.linear_image,
+        statistics.linear_image_person_segment_based,
+        statistics.linear_image_skin_based,
+        statistics.tone_mapped_image,
+        statistics.tone_mapped_image_blue_channel_skin_based,
+        statistics.tone_mapped_image_green_channel_skin_based,
+        statistics.tone_mapped_image_person_segment_based,
+        statistics.tone_mapped_image_red_channel_skin_based,
+        statistics.tone_mapped_image_skin_based,
+    ];
+    for distribution in distributions {
+        let values = [
+            distribution.black_point,
+            distribution.high_key,
+            distribution.p02,
+            distribution.p10,
+            distribution.p25,
+            distribution.p50,
+            distribution.p75,
+            distribution.p98,
+            distribution.white_point,
+        ];
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(AppleStyleDataError::InvalidPropertyListInput);
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum PlistValue {
+    Bool(bool),
+    Integer(u64),
+    Real(f64),
+    String(String),
+    Data(Vec<u8>),
+    Dictionary(BTreeMap<String, PlistValue>),
+}
+
+fn plist_dictionary<const N: usize>(entries: [(&str, PlistValue); N]) -> PlistValue {
+    PlistValue::Dictionary(
+        entries
+            .into_iter()
+            .map(|(key, value)| (key.to_owned(), value))
+            .collect(),
+    )
+}
+
+fn distribution_value(distribution: AppleStyleDistribution) -> PlistValue {
+    plist_dictionary([
+        ("blackPoint", PlistValue::Real(distribution.black_point)),
+        ("highKey", PlistValue::Real(distribution.high_key)),
+        ("p02", PlistValue::Real(distribution.p02)),
+        ("p10", PlistValue::Real(distribution.p10)),
+        ("p25", PlistValue::Real(distribution.p25)),
+        ("p50", PlistValue::Real(distribution.p50)),
+        ("p75", PlistValue::Real(distribution.p75)),
+        ("p98", PlistValue::Real(distribution.p98)),
+        ("whitePoint", PlistValue::Real(distribution.white_point)),
+    ])
+}
+
+fn style_statistics_value(statistics: &AppleStyleStatistics) -> PlistValue {
+    plist_dictionary([
+        (
+            "LinearGTCImage",
+            distribution_value(statistics.linear_gtc_image),
+        ),
+        ("LinearImage", distribution_value(statistics.linear_image)),
+        (
+            "LinearImagePersonSegmentBased",
+            distribution_value(statistics.linear_image_person_segment_based),
+        ),
+        (
+            "LinearImageSkinBased",
+            distribution_value(statistics.linear_image_skin_based),
+        ),
+        (
+            "ToneMappedImage",
+            distribution_value(statistics.tone_mapped_image),
+        ),
+        (
+            "ToneMappedImageBlueChannelSkinBased",
+            distribution_value(statistics.tone_mapped_image_blue_channel_skin_based),
+        ),
+        (
+            "ToneMappedImageGreenChannelSkinBased",
+            distribution_value(statistics.tone_mapped_image_green_channel_skin_based),
+        ),
+        (
+            "ToneMappedImagePersonSegmentBased",
+            distribution_value(statistics.tone_mapped_image_person_segment_based),
+        ),
+        (
+            "ToneMappedImageRedChannelSkinBased",
+            distribution_value(statistics.tone_mapped_image_red_channel_skin_based),
+        ),
+        (
+            "ToneMappedImageSkinBased",
+            distribution_value(statistics.tone_mapped_image_skin_based),
+        ),
+    ])
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum PlistObject {
+    Bool(bool),
+    Integer(u64),
+    Real(f64),
+    String(String),
+    Data(Vec<u8>),
+    Dictionary(Vec<(usize, usize)>),
+}
+
+fn serialize_binary_plist(root: PlistValue) -> Result<Vec<u8>, AppleStyleDataError> {
+    let mut objects = Vec::new();
+    let top_object = collect_plist_object(root, &mut objects)?;
+    let object_ref_size = integer_width(
+        u64::try_from(objects.len().saturating_sub(1))
+            .map_err(|_| AppleStyleDataError::PropertyListOverflow)?,
+    );
+    let mut output = b"bplist00".to_vec();
+    let mut offsets = Vec::with_capacity(objects.len());
+    for object in &objects {
+        offsets.push(
+            u64::try_from(output.len()).map_err(|_| AppleStyleDataError::PropertyListOverflow)?,
+        );
+        encode_plist_object(object, object_ref_size, &mut output)?;
+    }
+    let offset_table_offset =
+        u64::try_from(output.len()).map_err(|_| AppleStyleDataError::PropertyListOverflow)?;
+    let largest_offset = offset_table_offset.max(offsets.last().copied().unwrap_or(0));
+    let offset_int_size = integer_width(largest_offset);
+    for offset in offsets {
+        write_fixed_width(&mut output, offset, offset_int_size);
+    }
+
+    output.extend_from_slice(&[0; 6]);
+    output.push(offset_int_size as u8);
+    output.push(object_ref_size as u8);
+    output.extend_from_slice(
+        &u64::try_from(objects.len())
+            .map_err(|_| AppleStyleDataError::PropertyListOverflow)?
+            .to_be_bytes(),
+    );
+    output.extend_from_slice(
+        &u64::try_from(top_object)
+            .map_err(|_| AppleStyleDataError::PropertyListOverflow)?
+            .to_be_bytes(),
+    );
+    output.extend_from_slice(&offset_table_offset.to_be_bytes());
+    Ok(output)
+}
+
+fn collect_plist_object(
+    value: PlistValue,
+    objects: &mut Vec<PlistObject>,
+) -> Result<usize, AppleStyleDataError> {
+    let object = match value {
+        PlistValue::Bool(value) => PlistObject::Bool(value),
+        PlistValue::Integer(value) => PlistObject::Integer(value),
+        PlistValue::Real(value) => PlistObject::Real(value),
+        PlistValue::String(value) => PlistObject::String(value),
+        PlistValue::Data(value) => PlistObject::Data(value),
+        PlistValue::Dictionary(entries) => {
+            let mut references = Vec::with_capacity(entries.len());
+            for (key, value) in entries {
+                let key_index = collect_plist_object(PlistValue::String(key), objects)?;
+                let value_index = collect_plist_object(value, objects)?;
+                references.push((key_index, value_index));
+            }
+            PlistObject::Dictionary(references)
+        }
+    };
+    let index = objects.len();
+    objects.push(object);
+    Ok(index)
+}
+
+fn encode_plist_object(
+    object: &PlistObject,
+    object_ref_size: usize,
+    output: &mut Vec<u8>,
+) -> Result<(), AppleStyleDataError> {
+    match object {
+        PlistObject::Bool(value) => output.push(if *value { 0x09 } else { 0x08 }),
+        PlistObject::Integer(value) => encode_integer_object(*value, output),
+        PlistObject::Real(value) => {
+            output.push(0x23);
+            output.extend_from_slice(&value.to_bits().to_be_bytes());
+        }
+        PlistObject::String(value) => encode_string_object(value, output)?,
+        PlistObject::Data(value) => {
+            encode_count_marker(0x40, value.len(), output)?;
+            output.extend_from_slice(value);
+        }
+        PlistObject::Dictionary(references) => {
+            encode_count_marker(0xD0, references.len(), output)?;
+            for (key, _) in references {
+                write_fixed_width(
+                    output,
+                    u64::try_from(*key).map_err(|_| AppleStyleDataError::PropertyListOverflow)?,
+                    object_ref_size,
+                );
+            }
+            for (_, value) in references {
+                write_fixed_width(
+                    output,
+                    u64::try_from(*value).map_err(|_| AppleStyleDataError::PropertyListOverflow)?,
+                    object_ref_size,
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn encode_integer_object(value: u64, output: &mut Vec<u8>) {
+    let width = integer_width(value);
+    output.push(0x10 | width.trailing_zeros() as u8);
+    write_fixed_width(output, value, width);
+}
+
+fn encode_string_object(value: &str, output: &mut Vec<u8>) -> Result<(), AppleStyleDataError> {
+    if value.is_ascii() {
+        encode_count_marker(0x50, value.len(), output)?;
+        output.extend_from_slice(value.as_bytes());
+    } else {
+        let utf16 = value.encode_utf16().collect::<Vec<_>>();
+        encode_count_marker(0x60, utf16.len(), output)?;
+        for unit in utf16 {
+            output.extend_from_slice(&unit.to_be_bytes());
+        }
+    }
+    Ok(())
+}
+
+fn encode_count_marker(
+    marker: u8,
+    count: usize,
+    output: &mut Vec<u8>,
+) -> Result<(), AppleStyleDataError> {
+    if count < 15 {
+        output.push(marker | count as u8);
+    } else {
+        output.push(marker | 0x0f);
+        encode_integer_object(
+            u64::try_from(count).map_err(|_| AppleStyleDataError::PropertyListOverflow)?,
+            output,
+        );
+    }
+    Ok(())
+}
+
+fn integer_width(value: u64) -> usize {
+    if value <= u64::from(u8::MAX) {
+        1
+    } else if value <= u64::from(u16::MAX) {
+        2
+    } else if value <= u64::from(u32::MAX) {
+        4
+    } else {
+        8
+    }
+}
+
+fn write_fixed_width(output: &mut Vec<u8>, value: u64, width: usize) {
+    output.extend_from_slice(&value.to_be_bytes()[8 - width..]);
+}
+
 /// Serialize bounded coefficient deltas over the verified identity payload.
 pub fn apple_style_data_from_coefficient_deltas(
     coefficient_deltas: &[f64],
@@ -1334,6 +1742,146 @@ mod tests {
         assert!(matches!(
             apple_style_light_map(&invalid_sample),
             Err(AppleStyleDataError::InvalidLightMapSample { index: 0 })
+        ));
+    }
+
+    #[test]
+    fn property_list_serialization_emits_complete_deterministic_contract() {
+        let distribution = AppleStyleDistribution {
+            black_point: 0.01,
+            high_key: 0.99,
+            p02: 0.02,
+            p10: 0.10,
+            p25: 0.25,
+            p50: 0.50,
+            p75: 0.75,
+            p98: 0.98,
+            white_point: 1.0,
+        };
+        let statistics = AppleStyleStatistics {
+            linear_gtc_image: distribution,
+            linear_image: distribution,
+            linear_image_person_segment_based: distribution,
+            linear_image_skin_based: distribution,
+            tone_mapped_image: distribution,
+            tone_mapped_image_blue_channel_skin_based: distribution,
+            tone_mapped_image_green_channel_skin_based: distribution,
+            tone_mapped_image_person_segment_based: distribution,
+            tone_mapped_image_red_channel_skin_based: distribution,
+            tone_mapped_image_skin_based: distribution,
+        };
+        let global_tone_curve = vec![0x34_u8; 516];
+        let tone_light_map = vec![0x12_u8; APPLE_STYLE_LIGHT_MAP_BYTE_COUNT];
+        let linear_light_map = vec![0x56_u8; APPLE_STYLE_LIGHT_MAP_BYTE_COUNT];
+        let request = AppleStylePropertyListRequest {
+            style_data: &apple_style_identity_data(),
+            global_tone_curve: &global_tone_curve,
+            baseline_exposure: 4.0,
+            scene_type: 2,
+            statistics: &statistics,
+            people_ratio: 0.25,
+            person_masks_valid_hint: -1.0,
+            skin_ratio: 0.10,
+            tone_light_map: &tone_light_map,
+            linear_light_map: &linear_light_map,
+            base_gain: 1.25,
+            linear_gain: 5.0,
+            original_range_min: 0.0,
+            original_range_max: 4.0,
+            face_exposure_boost: 1.1,
+        };
+        let first = apple_style_property_list(&request).unwrap();
+        let second = apple_style_property_list(&request).unwrap();
+        assert_eq!(first, second);
+        assert!(first.starts_with(b"bplist00"));
+        assert!(first
+            .windows(APPLE_STYLE_BYTE_COUNT)
+            .any(|window| { window == request.style_data }));
+        for key in [
+            b"LinearGTCImage".as_slice(),
+            b"LinearImage".as_slice(),
+            b"ToneMappedImage".as_slice(),
+            b"PeopleRatio".as_slice(),
+            b"OriginalRangeMax".as_slice(),
+        ] {
+            assert!(first.windows(key.len()).any(|window| window == key));
+        }
+        let trailer = first.len() - 32;
+        let object_count = u64::from_be_bytes(first[trailer + 8..trailer + 16].try_into().unwrap());
+        let top_object = u64::from_be_bytes(first[trailer + 16..trailer + 24].try_into().unwrap());
+        let offset_table =
+            u64::from_be_bytes(first[trailer + 24..trailer + 32].try_into().unwrap());
+        assert!(object_count > 1);
+        assert_eq!(top_object, object_count - 1);
+        assert!(offset_table < trailer as u64);
+    }
+
+    #[test]
+    fn property_list_rejects_incomplete_resources_and_nonfinite_statistics() {
+        let distribution = AppleStyleDistribution {
+            black_point: 0.0,
+            high_key: 1.0,
+            p02: 0.0,
+            p10: 0.1,
+            p25: 0.25,
+            p50: 0.5,
+            p75: 0.75,
+            p98: 0.98,
+            white_point: 1.0,
+        };
+        let statistics = AppleStyleStatistics {
+            linear_gtc_image: distribution,
+            linear_image: distribution,
+            linear_image_person_segment_based: distribution,
+            linear_image_skin_based: distribution,
+            tone_mapped_image: distribution,
+            tone_mapped_image_blue_channel_skin_based: distribution,
+            tone_mapped_image_green_channel_skin_based: distribution,
+            tone_mapped_image_person_segment_based: distribution,
+            tone_mapped_image_red_channel_skin_based: distribution,
+            tone_mapped_image_skin_based: distribution,
+        };
+        let mut invalid_distribution = distribution;
+        invalid_distribution.p50 = f64::NAN;
+        let invalid_statistics = AppleStyleStatistics {
+            linear_gtc_image: invalid_distribution,
+            ..statistics
+        };
+        let style_data = apple_style_identity_data();
+        let global_tone_curve = vec![0_u8; 516];
+        let light_map = vec![0_u8; APPLE_STYLE_LIGHT_MAP_BYTE_COUNT];
+        let valid = AppleStylePropertyListRequest {
+            style_data: &style_data,
+            global_tone_curve: &global_tone_curve,
+            baseline_exposure: 4.0,
+            scene_type: 0,
+            statistics: &statistics,
+            people_ratio: 0.0,
+            person_masks_valid_hint: -1.0,
+            skin_ratio: 0.0,
+            tone_light_map: &light_map,
+            linear_light_map: &light_map,
+            base_gain: 1.0,
+            linear_gain: 4.0,
+            original_range_min: 0.0,
+            original_range_max: 1.0,
+            face_exposure_boost: 1.0,
+        };
+        let invalid_curve = AppleStylePropertyListRequest {
+            global_tone_curve: &global_tone_curve[..515],
+            ..valid
+        };
+        assert!(matches!(
+            apple_style_property_list(&invalid_curve),
+            Err(AppleStyleDataError::InvalidPropertyListInput)
+        ));
+        let invalid_stats = AppleStylePropertyListRequest {
+            statistics: &invalid_statistics,
+            ..valid
+        };
+        assert!(matches!(
+            apple_style_property_list(&invalid_stats),
+            Err(AppleStyleDataError::InvalidPropertyListInput)
         ));
     }
 }
