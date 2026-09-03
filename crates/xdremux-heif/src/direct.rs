@@ -880,8 +880,8 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
 
     let mut output_refs = Vec::new();
     for reference in &refs.entries {
-        if (reference.kind == DIMG && reference.from_item_id == gain_map_id)
-            || (reference.kind == DIMG && reference.from_item_id == tmap_id)
+        if reference.kind == DIMG
+            && (reference.from_item_id == gain_map_id || reference.from_item_id == tmap_id)
             || reference.kind == AUXL
             || xmp_id.is_some_and(|id| reference.from_item_id == id)
         {
