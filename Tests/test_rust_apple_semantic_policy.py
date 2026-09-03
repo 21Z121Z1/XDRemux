@@ -59,6 +59,20 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
         ):
             self.assertNotIn(legacy_swift_policy, ADAPTER)
 
+    def test_person_segmentation_quality_is_a_fixed_primitive_contract(self) -> None:
+        self.assertIn("personSegmentationPrimitiveQuality", ADAPTER)
+        self.assertIn(
+            "personRequest?.qualityLevel = personSegmentationPrimitiveQuality",
+            ADAPTER,
+        )
+        self.assertNotIn("personRequest?.qualityLevel = .accurate", ADAPTER)
+        self.assertNotIn("personRequest?.qualityLevel = .balanced", ADAPTER)
+        self.assertNotIn("personRequest?.qualityLevel = .fast", ADAPTER)
+        self.assertIn(
+            "versioned Rust-owned adapter request must carry that selection",
+            ADAPTER,
+        )
+
     def test_rust_runtime_composes_adapter_at_one_boundary(self) -> None:
         lib = (ROOT / "crates" / "xdremux-runtime" / "src" / "lib.rs").read_text(
             encoding="utf-8"
