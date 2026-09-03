@@ -24,6 +24,7 @@ pub use oppo_portrait::ApplePortraitSourcePreflight;
 pub use validation::{
     validate_media_file, IsoHdrValidationReport, LivePhotoValidationReport, ValidationReport,
 };
+pub use xdremux_heif::PhotographicStylesAssembly;
 
 use std::error::Error;
 use std::fmt;
@@ -51,9 +52,9 @@ use xdremux_hdr::{
     ExtractionMode as HdrExtractionMode, GainMapRaster, ResolvedScale,
 };
 use xdremux_heif::{
-    assemble_iso_gain_map_heif, validate_gain_map_structure, DirectHevcGainMap,
-    GainMapChannels as HeifGainMapChannels, GainMapEncodeProfile as HeifGainMapEncodeProfile,
-    GainMapTile, IsoGainMapAssembly,
+    assemble_iso_gain_map_heif, assemble_photographic_styles_heif, validate_gain_map_structure,
+    DirectHevcGainMap, GainMapChannels as HeifGainMapChannels,
+    GainMapEncodeProfile as HeifGainMapEncodeProfile, GainMapTile, IsoGainMapAssembly,
 };
 use xdremux_metadata::{make_apple_portrait_focus_xmp, make_apple_tmap_payload, make_hdrgm_xmp};
 
@@ -105,6 +106,11 @@ pub struct ByteConversionReceipt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileConversionReceipt {
     pub plan: ConversionPlan,
+    pub output: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotographicStylesFileReceipt {
     pub output: PathBuf,
 }
 
@@ -415,6 +421,25 @@ impl PortableRuntime {
             ));
         }
         self.convert_motion_photo_file(source, input, output)
+    }
+
+    /// Publish a Rust-assembled Photographic Styles graph as one atomic file.
+    ///
+    /// Product policy and all style resources are prepared by the caller's
+    /// Rust engine path. This runtime operation owns the final graph assembly
+    /// and publication boundary; it never invokes the legacy Swift Styles
+    /// pipeline or a Python subprocess.
+    pub fn assemble_photographic_styles_file(
+        &self,
+        source: &[u8],
+        output: impl AsRef<Path>,
+        assembly: &PhotographicStylesAssembly<'_>,
+    ) -> Result<PhotographicStylesFileReceipt> {
+        let bytes = assemble_photographic_styles_heif(source, assembly)
+            .map_err(|error| RuntimeError::external("Rust Photographic Styles assembly", error))?;
+        let mut publisher = AtomicFilePublisher::new(output.as_ref().to_path_buf());
+        let published = publisher.publish_bytes(bytes)?;
+        Ok(PhotographicStylesFileReceipt { output: published })
     }
 }
 
