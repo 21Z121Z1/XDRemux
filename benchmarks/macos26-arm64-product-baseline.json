@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "purpose": "Regression reference for the canonical Rust product on the hosted macOS 26 arm64 runner. This is not a performance target.",
+  "source_head": "5c568b6ed2a9facad152509066e2449db709e548",
+  "runner": {
+    "os": "macOS 26",
+    "arch": "arm64"
+  },
+  "tolerances": {
+    "wall_fraction": 0.35,
+    "wall_absolute_seconds": 0.25,
+    "rss_fraction": 0.25,
+    "rss_absolute_mib": 32.0
+  },
+  "cases": {
+    "standard-hdr": {
+      "median_wall_seconds": 9.687,
+      "p95_wall_seconds": 11.133,
+      "max_peak_rss_mib": 120.6
+    },
+    "oppo-compatible": {
+      "median_wall_seconds": 8.757,
+      "p95_wall_seconds": 10.069,
+      "max_peak_rss_mib": 116.4
+    },
+    "motion-jpeg": {
+      "median_wall_seconds": 8.432,
+      "p95_wall_seconds": 8.628,
+      "max_peak_rss_mib": 313.6
+    },
+    "motion-heif": {
+      "median_wall_seconds": 0.143,
+      "p95_wall_seconds": 0.184,
+      "max_peak_rss_mib": 27.5
+    },
+    "batch-3": {
+      "median_wall_seconds": 21.280,
+      "p95_wall_seconds": 21.726,
+      "max_peak_rss_mib": 259.1
+    },
+    "apple-portrait": {
+      "median_wall_seconds": 4.789,
+      "p95_wall_seconds": 6.789,
+      "max_peak_rss_mib": 821.2
+    },
+    "apple-styles": {
+      "median_wall_seconds": 6.972,
+      "p95_wall_seconds": 8.416,
+      "max_peak_rss_mib": 777.3
+    }
+  },
+  "apple_adapter_process_launches": {
+    "apple-portrait": 17,
+    "apple-styles": 7
+  }
+}
