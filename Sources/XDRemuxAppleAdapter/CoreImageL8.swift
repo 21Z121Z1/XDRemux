@@ -4,6 +4,12 @@ import CoreImage.CIFilterBuiltins
 import Foundation
 import ImageIO
 
+// CIContext owns heavyweight render state (for example Metal command queues and
+// compiled-kernel caches). Keep one adapter-scoped context so a persistent
+// helper can reuse that state across primitive requests. Product policy stays
+// in Rust; this is only Apple framework execution state.
+private let coreImageContext = CIContext(options: [.cacheIntermediates: false])
+
 private func tightL8ByteCount(width: Int, height: Int, context: String) throws -> Int {
     guard width > 0, height > 0 else {
         throw NSError(
@@ -63,7 +69,6 @@ private func writeTightL8(
     let byteCount = try tightL8ByteCount(width: width, height: height, context: context)
     let bounds = CGRect(x: 0, y: 0, width: width, height: height)
     var rendered = Data(count: byteCount)
-    let coreImageContext = CIContext(options: [.cacheIntermediates: false])
     rendered.withUnsafeMutableBytes { bytes in
         guard let baseAddress = bytes.baseAddress else { return }
         coreImageContext.render(
