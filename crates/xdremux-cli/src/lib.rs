@@ -141,7 +141,7 @@ struct BatchArgs {
     /// Resume completed Live Photo work from the durable checkpoint and retry remaining items.
     #[arg(long)]
     resume: bool,
-    /// Shared Swift/Python/Rust Motion Photo checkpoint base path.
+    /// Durable Motion Photo checkpoint base path.
     ///
     /// The compatibility state is stored at this path with `.motion-photo` appended.
     #[arg(long, value_name = "FILE")]
@@ -597,6 +597,12 @@ fn path_json(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
+fn human_batch_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string())
+}
+
 const BATCH_RECEIPT_SCHEMA_VERSION: u32 = 1;
 
 fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
@@ -727,9 +733,8 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         for failure in &receipt.failures {
             let _ = writeln!(
                 stderr,
-                "error: {} -> {}: {}",
-                failure.input.display(),
-                failure.output.display(),
+                "error: failed: {}: {}",
+                human_batch_name(&failure.input),
                 failure.error
             );
         }
@@ -1067,6 +1072,15 @@ mod tests {
             plan[1].output.with_extension("mov")
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn batch_failure_human_name_does_not_leak_workspace_paths() {
+        assert_eq!(
+            human_batch_name(Path::new("/temporary/workspace/bad.heic")),
+            "bad.heic"
+        );
+        assert_eq!(human_batch_name(Path::new("bad.heic")), "bad.heic");
     }
 
     #[test]
