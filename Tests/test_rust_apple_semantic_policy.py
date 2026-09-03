@@ -14,6 +14,7 @@ ADAPTER = "\n".join(
     path.read_text(encoding="utf-8")
     for path in sorted((ROOT / "Sources" / "XDRemuxAppleAdapter").glob("*.swift"))
 )
+ADAPTER_NORMALIZED = " ".join(ADAPTER.split())
 
 
 class RustAppleSemanticPolicyTests(unittest.TestCase):
@@ -70,7 +71,7 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
         self.assertNotIn("personRequest?.qualityLevel = .fast", ADAPTER)
         self.assertIn(
             "versioned Rust-owned adapter request must carry that selection",
-            ADAPTER,
+            ADAPTER_NORMALIZED,
         )
 
     def test_rust_runtime_composes_adapter_at_one_boundary(self) -> None:
