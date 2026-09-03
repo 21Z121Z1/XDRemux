@@ -10,6 +10,7 @@ on:
       - "apps/macos/XDRemuxApp/Sources/**"
       - "Tests/test_performance_design.py"
       - "scripts/benchmark_rust_product.py"
+      - "scripts/characterize_apple_adapter_launches.py"
       - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   push:
@@ -24,6 +25,7 @@ on:
       - "apps/macos/XDRemuxApp/Sources/**"
       - "Tests/test_performance_design.py"
       - "scripts/benchmark_rust_product.py"
+      - "scripts/characterize_apple_adapter_launches.py"
       - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   workflow_dispatch:
@@ -107,6 +109,15 @@ jobs:
             --iterations 5 \
             --output artifacts/performance/product-benchmark.json \
             2>&1 | tee artifacts/performance/product-benchmark.log
+
+      - name: Characterize Apple adapter process lifecycle
+        shell: bash
+        run: |
+          python3 scripts/characterize_apple_adapter_launches.py \
+            --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
+            --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
+            --output artifacts/performance/apple-adapter-launches.json \
+            2>&1 | tee artifacts/performance/apple-adapter-launches.log
 
       - name: Build and run macOS app model integration
         shell: bash
@@ -219,6 +230,21 @@ jobs:
                   f"{case['max_peak_rss_bytes'] / (1024 * 1024):.1f} MiB | "
                   f"{case['median_input_mib_per_second']:.1f} MiB/s |"
               )
+          PY
+          fi
+          if [[ -s artifacts/performance/apple-adapter-launches.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/performance/apple-adapter-launches.json").read_text())
+          print()
+          print("### Apple adapter process lifecycle")
+          print()
+          print("| workload | helper launches per conversion |")
+          print("| --- | ---: |")
+          for name, count in report["cases"].items():
+              print(f"| {name} | {count} |")
           PY
           fi
 
