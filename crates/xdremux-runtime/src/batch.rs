@@ -47,6 +47,9 @@ pub struct BatchExecutionOptions {
     pub checkpoint_path: Option<PathBuf>,
     pub reuse_existing: bool,
     pub jobs: usize,
+    /// Resolved Apple capability helper for Rust-owned Apple feature intents.
+    /// The public CLI supplies this only for a packaged macOS deployment.
+    pub apple_adapter_executable: Option<PathBuf>,
 }
 
 impl Default for BatchExecutionOptions {
@@ -55,6 +58,7 @@ impl Default for BatchExecutionOptions {
             checkpoint_path: None,
             reuse_existing: false,
             jobs: 1,
+            apple_adapter_executable: None,
         }
     }
 }
@@ -341,6 +345,7 @@ fn process_batch_item_with_options(
     request: ConversionRequest,
     checkpoint: &MotionPhotoCheckpoint,
     reuse_existing: bool,
+    apple_adapter_executable: Option<&Path>,
 ) -> BatchWorkResult {
     let mut checkpoint_event = None;
     let result: Result<BatchSuccess> = (|| {
@@ -450,8 +455,35 @@ fn process_batch_item_with_options(
                         "output already exists; refusing to overwrite",
                     ));
                 }
-                let converted =
-                    runtime.convert_proxdr_file(&source, &item.output, request, |_| {})?;
+                let converted = if request.apple_features.portrait {
+                    #[cfg(target_os = "macos")]
+                    {
+                        let adapter = apple_adapter_executable.ok_or_else(|| {
+                            RuntimeError::new(
+                                "Apple Portrait conversion",
+                                "the macOS Apple adapter executable was not resolved",
+                            )
+                        })?;
+                        let receipt =
+                            runtime.convert_apple_portrait_file(adapter, &source, &item.output)?;
+                        return Ok(BatchSuccess {
+                            input: item.input.clone(),
+                            outputs: vec![receipt.output],
+                            kind: BatchAssetKind::ProXdr,
+                            disposition: BatchSuccessDisposition::Converted,
+                        });
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        let _ = apple_adapter_executable;
+                        return Err(RuntimeError::new(
+                            "Apple Portrait conversion",
+                            "Apple Portrait requires macOS ImageIO/Vision/Core Image capabilities",
+                        ));
+                    }
+                } else {
+                    runtime.convert_proxdr_file(&source, &item.output, request, |_| {})?
+                };
                 Ok(BatchSuccess {
                     input: item.input.clone(),
                     outputs: vec![converted.output],
@@ -550,6 +582,7 @@ impl PortableRuntime {
                     request,
                     &checkpoint,
                     options.reuse_existing,
+                    options.apple_adapter_executable.as_deref(),
                 );
                 outcomes[index] = Some(finalize_work_result(
                     work,
@@ -563,12 +596,14 @@ impl PortableRuntime {
         let next = AtomicUsize::new(0);
         let (sender, receiver) = mpsc::sync_channel::<(usize, BatchWorkResult)>(jobs);
         let reuse_existing = options.reuse_existing;
+        let apple_adapter_executable = options.apple_adapter_executable.clone();
         thread::scope(|scope| {
             for _ in 0..jobs {
                 let sender = sender.clone();
                 let items = &items;
                 let checkpoint = &checkpoint;
                 let next = &next;
+                let apple_adapter_executable = apple_adapter_executable.clone();
                 scope.spawn(move || {
                     let runtime = PortableRuntime::new();
                     loop {
@@ -582,6 +617,7 @@ impl PortableRuntime {
                             request,
                             checkpoint,
                             reuse_existing,
+                            apple_adapter_executable.as_deref(),
                         );
                         if sender.send((index, work)).is_err() {
                             break;

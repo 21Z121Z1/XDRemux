@@ -81,6 +81,12 @@ jobs:
                 "timeout_seconds": 1800
               },
               {
+                "name": "rust-driven-apple-portrait-cli",
+                "kind": "functional",
+                "command": ["bash", "scripts/check_rust_cli_apple_portrait.sh"],
+                "timeout_seconds": 2400
+              },
+              {
                 "name": "raw-diagnostics-target-build",
                 "kind": "static",
                 "command": ["swift", "build", "--target", "CoreImageRAWDiagnostics"],

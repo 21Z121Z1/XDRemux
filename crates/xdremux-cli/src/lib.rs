@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use clap::{error::ErrorKind, Args, CommandFactory, Parser, Subcommand};
 use serde_json::json;
-use xdremux_engine::ConversionRequest;
+use xdremux_engine::{AppleFeatureRequest, ConversionRequest};
 use xdremux_runtime::{
     motion_photo_checkpoint_path, plan_batch_items, BatchAssetKind, BatchExecutionOptions,
     BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
@@ -57,16 +57,25 @@ struct InspectArgs {
 #[derive(Debug, Args, Default)]
 struct ProductConversionArgs {
     /// Preserve compatibility with OPPO Gallery when converting ProXDR still images.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "apple_portrait")]
     oppo_compatible: bool,
+    /// Preserve Apple Portrait editing resources when converting an OPPO Portrait still.
+    #[arg(long, conflicts_with = "oppo_compatible")]
+    apple_portrait: bool,
 }
 
 impl ProductConversionArgs {
     fn request(&self) -> ConversionRequest {
-        if self.oppo_compatible {
-            ConversionRequest::oppo_gallery_compatible()
-        } else {
-            ConversionRequest::default()
+        match (self.oppo_compatible, self.apple_portrait) {
+            (true, false) => ConversionRequest::oppo_gallery_compatible(),
+            (false, true) => ConversionRequest {
+                apple_features: AppleFeatureRequest {
+                    portrait: true,
+                    ..AppleFeatureRequest::default()
+                },
+                ..ConversionRequest::default()
+            },
+            (false, false) | (true, true) => ConversionRequest::default(),
         }
     }
 }
@@ -266,8 +275,48 @@ fn default_motion_photo_output(input: &Path) -> PathBuf {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
+    if let Some(raw) = std::env::var_os("XDREMUX_APPLE_ADAPTER") {
+        let path = PathBuf::from(raw);
+        if path.is_file() {
+            return Ok(path);
+        }
+        return Err(format!(
+            "XDREMUX_APPLE_ADAPTER does not point to a file: {}",
+            path.display()
+        ));
+    }
+
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("could not locate the xdremux executable: {error}"))?;
+    let parent = executable
+        .parent()
+        .ok_or_else(|| "xdremux executable has no parent directory".to_owned())?;
+    let candidates = [
+        parent.join("xdremux-apple-adapter"),
+        parent.join("../libexec/xdremux-apple-adapter"),
+        parent.join("../Helpers/xdremux-apple-adapter"),
+    ];
+    candidates
+        .iter()
+        .find(|candidate| candidate.is_file())
+        .cloned()
+        .ok_or_else(|| {
+            format!(
+                "Apple Portrait requires the bundled xdremux-apple-adapter; searched {}. Install it beside xdremux or set XDREMUX_APPLE_ADAPTER for a deployed helper",
+                candidates
+                    .iter()
+                    .map(|candidate| candidate.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        })
+}
+
 fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
     let request = arguments.product.request();
+    let apple_portrait = arguments.product.apple_portrait;
     let input = arguments.input;
     let output = arguments.output;
     let source = match fs::read(&input) {
@@ -288,6 +337,13 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
     let runtime = PortableRuntime::new();
     let result = match asset {
         SourceAsset::MotionPhoto { .. } => {
+            if apple_portrait {
+                let _ = writeln!(
+                    stderr,
+                    "error: --apple-portrait applies to OPPO Portrait still inputs and cannot be combined with Motion Photo conversion"
+                );
+                return 1;
+            }
             let output = output.unwrap_or_else(|| default_motion_photo_output(&input));
             match runtime.convert_motion_photo_file_with_request(&source, &input, &output, request)
             {
@@ -306,19 +362,55 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
         }
         SourceAsset::ProXdr { .. } => {
             let output = output.unwrap_or_else(|| input.clone());
-            if let Err(error) = runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
-                let _ = writeln!(stderr, "error: {error}");
-                return 1;
-            }
-            if output == input {
-                writeln!(stdout, "converted: {} (in place)", input.display())
+            if apple_portrait {
+                #[cfg(target_os = "macos")]
+                {
+                    let adapter = match resolve_apple_adapter_executable() {
+                        Ok(path) => path,
+                        Err(error) => {
+                            let _ = writeln!(stderr, "error: {error}");
+                            return 1;
+                        }
+                    };
+                    match runtime.convert_apple_portrait_file(&adapter, &source, &output) {
+                        Ok(receipt) if receipt.output == input => {
+                            writeln!(stdout, "converted: {} (in place)", input.display())
+                        }
+                        Ok(receipt) => writeln!(
+                            stdout,
+                            "converted: {} -> {}",
+                            input.display(),
+                            receipt.output.display()
+                        ),
+                        Err(error) => {
+                            let _ = writeln!(stderr, "error: {error}");
+                            return 1;
+                        }
+                    }
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let _ = writeln!(
+                        stderr,
+                        "error: --apple-portrait requires macOS ImageIO/Vision/Core Image capabilities"
+                    );
+                    return 1;
+                }
             } else {
-                writeln!(
-                    stdout,
-                    "converted: {} -> {}",
-                    input.display(),
-                    output.display()
-                )
+                if let Err(error) = runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
+                    let _ = writeln!(stderr, "error: {error}");
+                    return 1;
+                }
+                if output == input {
+                    writeln!(stdout, "converted: {} (in place)", input.display())
+                } else {
+                    writeln!(
+                        stdout,
+                        "converted: {} -> {}",
+                        input.display(),
+                        output.display()
+                    )
+                }
             }
         }
     };
@@ -496,10 +588,33 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
     };
 
     let runtime = PortableRuntime::new();
+    let apple_adapter_executable = if arguments.product.apple_portrait {
+        #[cfg(target_os = "macos")]
+        {
+            match resolve_apple_adapter_executable() {
+                Ok(path) => Some(path),
+                Err(error) => {
+                    let _ = writeln!(stderr, "error: {error}");
+                    return 1;
+                }
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = writeln!(
+                stderr,
+                "error: --apple-portrait requires macOS ImageIO/Vision/Core Image capabilities"
+            );
+            return 1;
+        }
+    } else {
+        None
+    };
     let execution_options = BatchExecutionOptions {
         checkpoint_path,
         reuse_existing,
         jobs: arguments.jobs,
+        apple_adapter_executable,
     };
     let receipt =
         runtime.convert_batch_with_options(items, arguments.product.request(), &execution_options);
@@ -770,6 +885,7 @@ mod tests {
         assert_eq!(arguments.checkpoint, None);
         assert!(!arguments.categorize);
         assert!(!arguments.product.oppo_compatible);
+        assert!(!arguments.product.apple_portrait);
         assert!(arguments.jobs >= 1 && arguments.jobs <= 4);
     }
 
@@ -784,6 +900,57 @@ mod tests {
             .product
             .request()
             .requests_oppo_gallery_compatibility());
+    }
+
+    #[test]
+    fn conversion_accepts_apple_portrait_product_intent() {
+        for command in ["convert", "batch"] {
+            let arguments = vec![command, "--input", "capture.heic", "--apple-portrait"];
+            let parsed = parse(&arguments);
+            match parsed.command {
+                RootCommand::Convert(arguments) => {
+                    assert!(arguments.product.apple_portrait);
+                    assert!(arguments.product.request().apple_features.portrait);
+                    assert!(!arguments
+                        .product
+                        .request()
+                        .requests_oppo_gallery_compatibility());
+                }
+                RootCommand::Batch(arguments) => {
+                    assert!(arguments.product.apple_portrait);
+                    assert!(arguments.product.request().apple_features.portrait);
+                    assert!(!arguments
+                        .product
+                        .request()
+                        .requests_oppo_gallery_compatibility());
+                }
+                _ => panic!("expected {command} command"),
+            }
+        }
+    }
+
+    #[test]
+    fn apple_portrait_and_oppo_compatibility_are_incompatible_usage() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        assert_eq!(
+            run_from(
+                [
+                    "convert",
+                    "--input",
+                    "capture.heic",
+                    "--apple-portrait",
+                    "--oppo-compatible",
+                ],
+                &mut stdout,
+                &mut stderr,
+            ),
+            2
+        );
+        assert!(stdout.is_empty());
+        assert!(String::from_utf8(stderr)
+            .unwrap()
+            .contains("cannot be used with"));
     }
 
     #[test]
@@ -884,6 +1051,7 @@ mod tests {
             assert!(stderr.is_empty());
             let help = String::from_utf8(stdout).unwrap();
             assert!(help.contains("--oppo-compatible"), "{help}");
+            assert!(help.contains("--apple-portrait"), "{help}");
             for internal in [
                 "--family",
                 "--oppo-compat ",
