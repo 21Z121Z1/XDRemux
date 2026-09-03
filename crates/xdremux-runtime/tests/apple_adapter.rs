@@ -106,6 +106,7 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     assert!(preflight.base_height > 0);
     assert!(preflight.gain_map.supports_portrait_source());
     assert!((1.0..=4.0).contains(&preflight.config.version));
+    assert!(preflight.private_gain_map_info.is_some());
 
     assert!((1..=8).contains(&preflight.base_orientation));
     assert!(preflight.camera_calibration.reference_width > 0);
@@ -162,12 +163,11 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
 
     assert!((1.0..=32.0).contains(&preflight.simulated_aperture));
 
-    // One Rust-owned operation now defines the full Portrait auxiliary set.
-    // The short REND value is sufficient here because this integration test
-    // verifies the generic ImageIO transport and required resource kinds; the
-    // recovered per-image REND policy is tested independently in the engine.
+    // A completed preflight now owns the per-image REND and the complete
+    // auxiliary manifest. No caller-supplied rendering policy crosses this
+    // boundary; ImageIO receives only the final generic resources.
     let payloads = preflight
-        .into_auxiliary_payloads(b"REND")
+        .into_auxiliary_payloads()
         .expect("assemble complete Rust-owned Portrait auxiliary manifest");
     assert_eq!(
         payloads
