@@ -34,6 +34,26 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertEqual(source.count("CIContext(options:"), 1)
         self.assertIn("coreImageContext.render(", source)
 
+    def test_apple_main10_prefers_hardware_without_requiring_it(self) -> None:
+        source = self.source("Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift")
+        self.assertIn(
+            "kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: true",
+            source,
+        )
+        self.assertNotIn(
+            "kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder",
+            source,
+        )
+        self.assertIn("kVTCompressionPropertyKey_UsingHardwareAcceleratedVideoEncoder", source)
+        self.assertIn("kVTCompressionPropertyKey_EncoderID", source)
+        self.assertIn('case usingHardwareAcceleratedEncoder = "using_hardware_accelerated_encoder"', source)
+        self.assertIn('case encoderID = "encoder_id"', source)
+
+        benchmark = self.source("scripts/benchmark_apple_videotoolbox_primitive.py")
+        self.assertIn('"hardware_acceleration_allowed": True', benchmark)
+        self.assertIn('"hardware_accelerated_samples"', benchmark)
+        self.assertIn('"observed_encoder_ids"', benchmark)
+
     def test_hdr_benchmarks_distinguish_source_family_and_output_profile(self) -> None:
         benchmark = self.source("scripts/benchmark_rust_product.py")
         for case in (
