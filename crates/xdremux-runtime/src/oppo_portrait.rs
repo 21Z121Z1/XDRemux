@@ -1,7 +1,8 @@
 use crate::{Result, RuntimeError};
+#[cfg(target_os = "macos")]
+use xdremux_container::select_oppo_portrait_focus;
 use xdremux_container::{
-    select_oppo_portrait_focus, OppoPortraitConfig, OppoPortraitDepth, OppoPortraitFocusRegion,
-    OppoPortraitFocusSelection,
+    OppoPortraitConfig, OppoPortraitDepth, OppoPortraitFocusRegion, OppoPortraitFocusSelection,
 };
 use xdremux_engine::{
     build_apple_portrait_disparity_payload, build_apple_portrait_effects_matte_payload,
@@ -133,6 +134,7 @@ impl ApplePortraitSourcePreflight {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn producer_focus_region(
     config: &OppoPortraitConfig,
     base_width: u32,

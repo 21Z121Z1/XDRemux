@@ -1722,7 +1722,7 @@ mod tests {
         assert_eq!(facts.identity_residual_maximum_absolute, 0.0);
         assert!(facts.complete_identity);
         assert_eq!(apple_style_data_sha256(&data), APPLE_STYLE_IDENTITY_SHA256);
-        for tile in data.chunks_exact(APPLE_STYLE_BLOCK_VALUE_COUNT * 2) {
+        for tile in data.as_chunks::<{ APPLE_STYLE_BLOCK_VALUE_COUNT * 2 }>().0 {
             for index in 0..APPLE_STYLE_BLOCK_VALUE_COUNT {
                 let offset = index * 2;
                 let value = f16::from_le_bytes([tile[offset], tile[offset + 1]]).to_f32();
@@ -1742,8 +1742,10 @@ mod tests {
         assert_eq!(curve.len(), 516);
         assert_eq!(&curve[..2], &257_u16.to_le_bytes());
         let samples = curve[2..]
-            .chunks_exact(2)
-            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|chunk| u16::from_le_bytes(*chunk))
             .collect::<Vec<_>>();
         assert_eq!(samples.len(), 257);
         assert_eq!(samples.first(), Some(&0));
@@ -1833,9 +1835,13 @@ mod tests {
             apple_style_data_from_parameters(&[0.01, -0.02, 0.03, 0.04, -0.05, 0.06]).unwrap();
         let facts = validate_apple_style_data(&data).unwrap();
         assert!(!facts.complete_identity);
-        let first = data.chunks_exact(2).take(APPLE_STYLE_BLOCK_VALUE_COUNT);
+        let first = data
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .take(APPLE_STYLE_BLOCK_VALUE_COUNT);
         let values = first
-            .map(|bytes| f16::from_le_bytes([bytes[0], bytes[1]]).to_f32())
+            .map(|bytes| f16::from_le_bytes(*bytes).to_f32())
             .collect::<Vec<_>>();
         assert_eq!(values[0], f16::from_f32(0.01).to_f32());
         assert_eq!(values[1], f16::from_f32(-0.02).to_f32());

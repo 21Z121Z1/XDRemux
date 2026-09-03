@@ -60,7 +60,9 @@ use xdremux_heif::{
     DirectHevcGainMap, GainMapChannels as HeifGainMapChannels,
     GainMapEncodeProfile as HeifGainMapEncodeProfile, GainMapTile, IsoGainMapAssembly,
 };
-use xdremux_metadata::{make_apple_portrait_focus_xmp, make_apple_tmap_payload, make_hdrgm_xmp};
+#[cfg(target_os = "macos")]
+use xdremux_metadata::make_apple_portrait_focus_xmp;
+use xdremux_metadata::{make_apple_tmap_payload, make_hdrgm_xmp};
 
 #[cfg(target_os = "macos")]
 const APPLE_PORTRAIT_BASE_QUALITY: f64 = 0.9;
