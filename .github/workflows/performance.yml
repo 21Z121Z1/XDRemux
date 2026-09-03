@@ -12,6 +12,7 @@ on:
       - "Tests/test_performance_design.py"
       - "Tests/test_performance_budget.py"
       - "scripts/benchmark_rust_product.py"
+      - "scripts/benchmark_apple_videotoolbox_primitive.py"
       - "scripts/characterize_apple_adapter_launches.py"
       - "scripts/check_performance_budget.py"
       - "scripts/check_rust_cli_smoke.sh"
@@ -30,6 +31,7 @@ on:
       - "Tests/test_performance_design.py"
       - "Tests/test_performance_budget.py"
       - "scripts/benchmark_rust_product.py"
+      - "scripts/benchmark_apple_videotoolbox_primitive.py"
       - "scripts/characterize_apple_adapter_launches.py"
       - "scripts/check_performance_budget.py"
       - "scripts/check_rust_cli_smoke.sh"
@@ -130,6 +132,18 @@ jobs:
             --iterations 5 \
             > artifacts/performance/gain-map-codec.json
           cat artifacts/performance/gain-map-codec.json
+
+      - name: Measure Apple VideoToolbox primitive separately
+        shell: bash
+        run: |
+          python3 scripts/benchmark_apple_videotoolbox_primitive.py \
+            --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
+            --width 1024 \
+            --height 768 \
+            --warmup 1 \
+            --iterations 5 \
+            --output artifacts/performance/apple-videotoolbox-main10.json \
+            2>&1 | tee artifacts/performance/apple-videotoolbox-main10.log
 
       - name: Characterize Apple adapter process lifecycle
         shell: bash
@@ -313,6 +327,29 @@ jobs:
                   f"{case['encoded_resource_bytes'] / 1024:.1f} KiB | "
                   f"{case['median_seconds']:.3f}s | {case['p95_seconds']:.3f}s |"
               )
+          PY
+          fi
+          if [[ -s artifacts/performance/apple-videotoolbox-main10.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/performance/apple-videotoolbox-main10.json").read_text())
+          profile = report["storage_profile"]
+          print()
+          print("### Apple VideoToolbox primitive (separate contract)")
+          print()
+          print("This is the Photographic Styles Linear Thumbnail Main10 primitive. It includes helper launch, RGB→BGRA staging, VT session creation, encode, and file I/O; it is not an RGB 4:4:4 UHDR Gain Map comparison.")
+          print()
+          print("| operation | storage | raw raster | encoded resource | median | p95 |")
+          print("| --- | --- | ---: | ---: | ---: | ---: |")
+          print(
+              f"| {report['operation']} | Main10 {profile['chroma']} "
+              f"{profile['luma_bit_depth']}-bit | "
+              f"{report['raw_raster_bytes'] / (1024 * 1024):.2f} MiB | "
+              f"{report['encoded_resource_bytes'] / 1024:.1f} KiB | "
+              f"{report['median_seconds']:.3f}s | {report['p95_seconds']:.3f}s |"
+          )
           PY
           fi
           if [[ -s artifacts/performance/apple-adapter-launches.json ]]; then
