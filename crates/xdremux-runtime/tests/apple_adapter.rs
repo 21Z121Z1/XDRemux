@@ -11,6 +11,8 @@ use xdremux_runtime::PortableRuntime;
 
 const ADAPTER_TEST_EXECUTABLE: &str = "XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE";
 const ADAPTER_TEST_INPUT: &str = "XDREMUX_APPLE_ADAPTER_TEST_INPUT";
+const STYLE_METADATA_INPUT: &str = "XDREMUX_APPLE_STYLE_METADATA_INPUT";
+const STYLE_DATA_EXPECTED: &str = "XDREMUX_APPLE_STYLE_DATA_EXPECTED";
 
 fn adapter_executable() -> Option<PathBuf> {
     let executable = PathBuf::from(std::env::var_os(ADAPTER_TEST_EXECUTABLE)?);
@@ -81,6 +83,32 @@ fn rust_owned_auxiliary_manifest_round_trips_through_imageio() {
         .expect("ImageIO must expose the written auxiliary resource");
 
     assert!(facts.portrait_effects_matte);
+}
+
+#[test]
+fn rust_client_round_trips_styles_metadata_through_apple_consumer() {
+    let Some(executable) = adapter_executable() else {
+        return;
+    };
+    let Some(metadata) = std::env::var_os(STYLE_METADATA_INPUT) else {
+        // The normal workspace pass has no private Styles metadata fixture.
+        // The macOS Styles consumer gate supplies one from a real producer
+        // output and keeps this protocol check opt-in and reproducible.
+        return;
+    };
+    let Some(expected) = std::env::var_os(STYLE_DATA_EXPECTED) else {
+        panic!("{STYLE_DATA_EXPECTED} is required with {STYLE_METADATA_INPUT}");
+    };
+    let metadata = fs::read(metadata).expect("read Styles metadata fixture");
+    let expected = fs::read(expected).expect("read expected Rust-owned style data");
+    let facts = PortableRuntime::new()
+        .apple_semantic_style_properties_facts(&executable, &metadata, &expected)
+        .expect("Rust adapter client must round-trip Styles metadata through Neutrino");
+    assert!(facts.framework_loaded);
+    assert!(facts.class_available);
+    assert!(facts.parse_succeeded);
+    assert_eq!(facts.style_data_length, expected.len());
+    assert!(facts.readback_written);
 }
 
 #[test]

@@ -1,6 +1,7 @@
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
+import Darwin
 
 private let schemaVersion = 1
 
@@ -163,6 +164,22 @@ private struct ImageProperties: Encodable {
     }
 }
 
+private struct StylePropertiesFacts: Encodable {
+    let frameworkLoaded: Bool
+    let classAvailable: Bool
+    let parseSucceeded: Bool
+    let styleDataLength: Int
+    let readbackWritten: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case frameworkLoaded = "framework_loaded"
+        case classAvailable = "class_available"
+        case parseSucceeded = "parse_succeeded"
+        case styleDataLength = "style_data_length"
+        case readbackWritten = "readback_written"
+    }
+}
+
 private struct AdapterResponse: Encodable {
     let schemaVersion: Int
     let capabilities: [String]?
@@ -170,6 +187,25 @@ private struct AdapterResponse: Encodable {
     let gainMap: GainMapFacts?
     let imageProperties: ImageProperties?
     let semanticMasks: [VisionSemanticMaskFacts]?
+    let styleProperties: StylePropertiesFacts?
+
+    init(
+        schemaVersion: Int,
+        capabilities: [String]?,
+        auxiliary: AuxiliaryFacts?,
+        gainMap: GainMapFacts?,
+        imageProperties: ImageProperties?,
+        semanticMasks: [VisionSemanticMaskFacts]?,
+        styleProperties: StylePropertiesFacts? = nil
+    ) {
+        self.schemaVersion = schemaVersion
+        self.capabilities = capabilities
+        self.auxiliary = auxiliary
+        self.gainMap = gainMap
+        self.imageProperties = imageProperties
+        self.semanticMasks = semanticMasks
+        self.styleProperties = styleProperties
+    }
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -178,6 +214,7 @@ private struct AdapterResponse: Encodable {
         case gainMap = "gain_map"
         case imageProperties = "image_properties"
         case semanticMasks = "semantic_masks"
+        case styleProperties = "style_properties"
     }
 }
 
@@ -271,6 +308,90 @@ private func imageIOImageProperties(inputPath: String) -> ImageProperties {
         digitalZoomRatio: (exif[kCGImagePropertyExifDigitalZoomRatio] as? NSNumber)?.doubleValue,
         lensModel: exif[kCGImagePropertyExifLensModel] as? String,
         fNumber: (exif[kCGImagePropertyExifFNumber] as? NSNumber)?.doubleValue
+    )
+}
+
+private typealias SemanticStyleFactory = @convention(c) (
+    AnyObject,
+    Selector,
+    AnyObject,
+    UnsafeMutablePointer<NSError?>?
+) -> AnyObject?
+
+private typealias ObjectiveCObjectGetter = @convention(c) (
+    AnyObject,
+    Selector
+) -> AnyObject?
+
+private func semanticStylePropertiesFacts(
+    inputPath: String,
+    readbackPath: String
+) throws -> StylePropertiesFacts {
+    let metadata = try Data(
+        contentsOf: URL(fileURLWithPath: inputPath),
+        options: [.mappedIfSafe]
+    )
+    let framework = dlopen(
+        "/System/Library/PrivateFrameworks/NeutrinoCore.framework/NeutrinoCore",
+        RTLD_NOW
+    )
+    defer {
+        if let framework {
+            dlclose(framework)
+        }
+    }
+    guard let framework else {
+        return StylePropertiesFacts(
+            frameworkLoaded: false,
+            classAvailable: false,
+            parseSucceeded: false,
+            styleDataLength: 0,
+            readbackWritten: false
+        )
+    }
+    _ = framework
+    let propertiesClass: AnyClass? = NSClassFromString("_NUSemanticStyleProperties")
+    guard let propertiesClass,
+          let messageSymbol = dlsym(framework, "objc_msgSend") else {
+        return StylePropertiesFacts(
+            frameworkLoaded: true,
+            classAvailable: propertiesClass != nil,
+            parseSucceeded: false,
+            styleDataLength: 0,
+            readbackWritten: false
+        )
+    }
+
+    let factory = unsafeBitCast(messageSymbol, to: SemanticStyleFactory.self)
+    var error: NSError?
+    let properties = factory(
+        propertiesClass as AnyObject,
+        NSSelectorFromString("semanticStylePropertiesFromImageMetadata:error:"),
+        metadata as NSData,
+        &error
+    )
+    guard let properties,
+          let getterSymbol = dlsym(framework, "objc_msgSend") else {
+        return StylePropertiesFacts(
+            frameworkLoaded: true,
+            classAvailable: true,
+            parseSucceeded: false,
+            styleDataLength: 0,
+            readbackWritten: false
+        )
+    }
+    let getter = unsafeBitCast(getterSymbol, to: ObjectiveCObjectGetter.self)
+    let styleData = getter(properties, NSSelectorFromString("styleData")) as? NSData
+    let readbackWritten = styleData?.write(
+        toFile: readbackPath,
+        atomically: true
+    ) ?? false
+    return StylePropertiesFacts(
+        frameworkLoaded: true,
+        classAvailable: true,
+        parseSucceeded: styleData != nil,
+        styleDataLength: styleData?.length ?? 0,
+        readbackWritten: readbackWritten
     )
 }
 
@@ -546,6 +667,23 @@ do {
             gainMap: nil,
             imageProperties: imageIOImageProperties(inputPath: inputPath),
             semanticMasks: nil
+        )
+    case "semantic-style-properties-facts":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty else {
+            fail("semantic-style-properties-facts requires input_path and output_path")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            styleProperties: try semanticStylePropertiesFacts(
+                inputPath: inputPath,
+                readbackPath: outputPath
+            )
         )
     case "vision-semantic-mattes":
         guard let inputPath = request.inputPath, !inputPath.isEmpty,

@@ -10,6 +10,8 @@ mod oppo_portrait;
 mod oppo_tail;
 mod validation;
 
+#[cfg(target_os = "macos")]
+pub use apple_adapter::AppleStylePropertiesFacts;
 pub use batch::{
     plan_batch_items, BatchAssetKind, BatchExecutionOptions, BatchFailure, BatchItem,
     BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition,
@@ -166,6 +168,17 @@ impl PortableRuntime {
     ) -> Result<xdremux_engine::AppleImageAuxiliaryFacts> {
         apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
             .imageio_auxiliary_facts(input.as_ref())
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn apple_semantic_style_properties_facts(
+        &self,
+        executable: impl AsRef<Path>,
+        metadata: &[u8],
+        expected_style_data: &[u8],
+    ) -> Result<AppleStylePropertiesFacts> {
+        apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf())
+            .semantic_style_properties_facts(metadata, expected_style_data)
     }
 
     #[cfg(target_os = "macos")]

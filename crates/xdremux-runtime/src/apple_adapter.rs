@@ -34,6 +34,15 @@ pub(super) struct AppleImageProperties {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppleStylePropertiesFacts {
+    pub framework_loaded: bool,
+    pub class_available: bool,
+    pub parse_succeeded: bool,
+    pub style_data_length: usize,
+    pub readback_written: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct AppleAdapterCapabilities {
     photographic_styles: bool,
     portrait: bool,
@@ -160,6 +169,64 @@ impl AppleAdapterClient {
             ));
         }
         Ok(response.image_properties.into())
+    }
+
+    /// Ask the private Apple metadata consumer to parse a Rust-produced Styles
+    /// property list and round-trip its key-1 style data. The adapter reports
+    /// framework facts; Rust owns the expected bytes and acceptance policy.
+    pub(super) fn semantic_style_properties_facts(
+        &self,
+        metadata: &[u8],
+        expected_style_data: &[u8],
+    ) -> Result<AppleStylePropertiesFacts> {
+        if metadata.is_empty() || expected_style_data.is_empty() {
+            return Err(RuntimeError::new(
+                "Apple semantic Styles validation",
+                "metadata and expected style data must be non-empty",
+            ));
+        }
+        let sidecars = tempfile::tempdir().map_err(|error| {
+            RuntimeError::external("Apple semantic Styles sidecar directory", error)
+        })?;
+        let metadata_path = sidecars.path().join("style-metadata.bplist");
+        let readback_path = sidecars.path().join("style-data-readback.bin");
+        fs::write(&metadata_path, metadata)
+            .map_err(|error| RuntimeError::external("Apple semantic Styles metadata", error))?;
+        let output = self.invoke_request(AdapterRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "semantic-style-properties-facts".to_owned(),
+            input_path: Some(input_path(&metadata_path)?),
+            output_path: Some(input_path(&readback_path)?),
+            roles: None,
+            orientation: None,
+            metadata_source_path: None,
+            lossy_quality: None,
+        })?;
+        let response: StylePropertiesResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)?;
+        let facts: AppleStylePropertiesFacts = response.style_properties.into();
+        if !facts.framework_loaded || !facts.class_available || !facts.parse_succeeded {
+            return Err(RuntimeError::new(
+                "Apple semantic Styles validation",
+                format!("private Apple consumer did not accept Styles metadata: {facts:?}"),
+            ));
+        }
+        if facts.style_data_length != expected_style_data.len() || !facts.readback_written {
+            return Err(RuntimeError::new(
+                "Apple semantic Styles validation",
+                format!("private Apple consumer returned incomplete style data: {facts:?}"),
+            ));
+        }
+        let readback = fs::read(&readback_path)
+            .map_err(|error| RuntimeError::external("Apple semantic Styles readback", error))?;
+        if readback != expected_style_data {
+            return Err(RuntimeError::new(
+                "Apple semantic Styles validation",
+                "private Apple consumer changed Rust-owned key-1 style data",
+            ));
+        }
+        Ok(facts)
     }
 
     pub(super) fn imageio_write_auxiliary(
@@ -908,6 +975,33 @@ struct GainMapResponse {
 struct ImagePropertiesResponse {
     schema_version: u32,
     image_properties: ImagePropertiesWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct StylePropertiesResponse {
+    schema_version: u32,
+    style_properties: StylePropertiesWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct StylePropertiesWire {
+    framework_loaded: bool,
+    class_available: bool,
+    parse_succeeded: bool,
+    style_data_length: usize,
+    readback_written: bool,
+}
+
+impl From<StylePropertiesWire> for AppleStylePropertiesFacts {
+    fn from(value: StylePropertiesWire) -> Self {
+        Self {
+            framework_loaded: value.framework_loaded,
+            class_available: value.class_available,
+            parse_succeeded: value.parse_succeeded,
+            style_data_length: value.style_data_length,
+            readback_written: value.readback_written,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
