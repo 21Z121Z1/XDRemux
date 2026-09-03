@@ -477,30 +477,29 @@ struct XDRemuxAppModelTests {
     private static func testIndependentAppleFeatureConfiguration() throws {
         var config = ConversionConfig()
         config.applePhotographicStyles = true
-        config.applePortrait = true
 
         try expect(config.appleFeaturesEnabled, "either Apple capability should activate the shared writer")
-        let input = URL(fileURLWithPath: "/tmp/input.heic")
-        let output = URL(fileURLWithPath: "/tmp/output.heic")
-        let request = AppConversionEngine.requestForTesting(
-            inputURL: input,
-            outputURL: output,
-            config: config
+        let stylesArguments = try RustCLIClient.productArgumentsForTesting(config: config)
+        try expect(
+            stylesArguments == ["--apple-styles"],
+            "Styles intent must map to the canonical Rust CLI"
         )
-        try expect(request.configuration.applePhotographicStyles, "App must preserve the Styles capability")
-        try expect(request.configuration.applePortrait, "App must preserve the independent Portrait capability")
-        try expect(request.input.url == input, "App must create one shared input source")
-        try expect(request.output.url == output, "combined mode must produce one final HEIC")
 
-        config.applePortrait = false
-        let stylesOnly = AppConversionEngine.requestForTesting(
-            inputURL: input,
-            outputURL: output,
-            config: config
+        config.applePhotographicStyles = false
+        config.applePortrait = true
+        let portraitArguments = try RustCLIClient.productArgumentsForTesting(config: config)
+        try expect(
+            portraitArguments == ["--apple-portrait"],
+            "Portrait intent must map to the canonical Rust CLI"
         )
-        try expect(stylesOnly.configuration.applePhotographicStyles, "Styles must not depend on Portrait")
-        try expect(!stylesOnly.configuration.applePortrait, "Portrait must stay independently disabled")
 
+        config.applePhotographicStyles = true
+        try expect(
+            (try? RustCLIClient.productArgumentsForTesting(config: config)) == nil,
+            "the app must not silently collapse two incompatible Rust product intents"
+        )
+
+        config.applePhotographicStyles = false
         config.applePortrait = true
         config.oppoGalleryCompatibilityEnabled = true
         try expect(!config.applePhotographicStyles && !config.applePortrait, "enabling OPPO compatibility must clear incompatible Apple capabilities")

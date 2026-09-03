@@ -1,9 +1,6 @@
 name: XDRemuxApp
 options:
   bundleIdPrefix: com.proxdr
-packages:
-  XDRemux:
-    path: ../../..
 targets:
   XDRemuxApp:
     type: application
@@ -12,11 +9,6 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
-    dependencies:
-      - package: XDRemux
-        product: XDRemuxCore
-      - package: XDRemux
-        product: XDRemuxAppleFeatures
     settings:
       CODE_SIGN_STYLE: Automatic
       CODE_SIGN_IDENTITY: "-"
@@ -37,11 +29,6 @@ targets:
           - VisualEffectView.swift
           - XDRemuxApp.swift
       - path: Tests/XDRemuxAppModelTests.swift
-    dependencies:
-      - package: XDRemux
-        product: XDRemuxCore
-      - package: XDRemux
-        product: XDRemuxAppleFeatures
     settings:
       CODE_SIGN_IDENTITY: "-"
   XDRemuxAppConversionSmoke:
@@ -58,10 +45,5 @@ targets:
           - XDRemuxApp.swift
           - XDRemuxViewModel.swift
       - path: Tests/XDRemuxAppConversionSmoke.swift
-    dependencies:
-      - package: XDRemux
-        product: XDRemuxCore
-      - package: XDRemux
-        product: XDRemuxAppleFeatures
     settings:
       CODE_SIGN_IDENTITY: "-"

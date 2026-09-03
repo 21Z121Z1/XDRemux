@@ -16,28 +16,31 @@ CI_WORKFLOW = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="ut
 
 
 class SwiftAppArchitectureTests(unittest.TestCase):
-    def test_app_uses_shared_modules_without_cli_subprocess_rpc(self) -> None:
+    def test_app_uses_rust_cli_without_swift_conversion_engines(self) -> None:
         combined = "\n".join(APP_SOURCES.values())
-        for forbidden in ("import XDRemuxCLI", "CommandLine.arguments", "Process()"):
+        for forbidden in (
+            "import XDRemuxCLI",
+            "ConversionEngine.convert(request)",
+            "AppleFeatureConversionEngine.convert(request)",
+        ):
             self.assertNotIn(forbidden, combined)
-        self.assertIn("import XDRemuxCore", BRIDGE)
-        self.assertIn("import XDRemuxAppleFeatures", BRIDGE)
-        self.assertIn("ConversionEngine.convert(request)", BRIDGE)
-        self.assertIn("AppleFeatureConversionEngine.convert(request)", BRIDGE)
+        self.assertIn("Process()", APP_SOURCES["RustCLIClient.swift"])
+        self.assertIn("RustCLIClient.convert", BRIDGE)
+        self.assertIn("RustCLIClient.isValidOutput", BRIDGE)
 
-    def test_categorization_ui_uses_the_shared_core_engine(self) -> None:
+    def test_categorization_ui_uses_rust_cli_receipts(self) -> None:
         model = APP_SOURCES["PhotoCategorizationViewModel.swift"]
         view = APP_SOURCES["PhotoCategorizationView.swift"]
         queue = APP_SOURCES["XDRemuxViewModel.swift"]
         for source in (model, view, queue):
-            self.assertIn("import XDRemuxCore", source)
-        self.assertIn("PhotoCategorizationEngine.makePlan", model)
-        self.assertIn("PhotoCategorizationEngine.execute", model)
-        self.assertIn("PhotoCategorizationEngine.classify", queue)
+            self.assertNotIn("import XDRemuxCore", source)
+            self.assertNotIn("import XDRemuxAppleFeatures", source)
+        self.assertIn("RustCLIClient.categorize", model)
+        self.assertIn("RustCLIClient.classify", queue)
 
-    def test_app_and_model_tools_depend_on_shared_package_products(self) -> None:
-        self.assertIn("product: XDRemuxCore", PROJECT)
-        self.assertIn("product: XDRemuxAppleFeatures", PROJECT)
+    def test_app_and_model_tools_have_no_swift_product_dependencies(self) -> None:
+        self.assertNotIn("product: XDRemuxCore", PROJECT)
+        self.assertNotIn("product: XDRemuxAppleFeatures", PROJECT)
         self.assertIn("XDRemuxAppModelTests:", PROJECT)
         self.assertIn("XDRemuxAppConversionSmoke:", PROJECT)
         self.assertIn("PhotoCategorizationView.swift", PROJECT)

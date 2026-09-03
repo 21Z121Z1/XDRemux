@@ -84,7 +84,8 @@ jobs:
             -configuration Debug \
             -derivedDataPath "$RUNNER_TEMP/xdremux-app-model-tests" \
             build
-          "$RUNNER_TEMP/xdremux-app-model-tests/Build/Products/Debug/XDRemuxAppModelTests"
+          XDREMUX_CLI="$GITHUB_WORKSPACE/target/debug/xdremux" \
+            "$RUNNER_TEMP/xdremux-app-model-tests/Build/Products/Debug/XDRemuxAppModelTests"
           echo "::endgroup::"
           echo "MACOS_APP_RESULT=Passed" >> "$GITHUB_ENV"
 
