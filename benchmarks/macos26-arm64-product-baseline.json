@@ -1,8 +1,10 @@
 {
   "schema_version": 1,
-  "purpose": "Regression reference for the canonical Rust product on the hosted macOS 26 arm64 runner. This is not a performance target.",
+  "purpose": "Regression reference for the canonical Rust product on the hosted macOS 26 arm64 runner. This is not a performance target. HDR cases are keyed by source family and resolved Gain Map layout; new LHDR cases remain observation-only until repeated stable-runner samples justify a committed reference.",
   "source_head": "5c568b6ed2a9facad152509066e2449db709e548",
   "runner": {
+    "provider": "GitHub Actions hosted runner",
+    "runs_on": "macos-26",
     "os": "macOS 26",
     "arch": "arm64"
   },
@@ -13,12 +15,12 @@
     "rss_absolute_mib": 32.0
   },
   "cases": {
-    "standard-hdr": {
+    "hdr-uhdr-rgb444": {
       "median_wall_seconds": 9.687,
       "p95_wall_seconds": 11.133,
       "max_peak_rss_mib": 120.6
     },
-    "oppo-compatible": {
+    "oppo-compatible-uhdr-rgb420": {
       "median_wall_seconds": 8.757,
       "p95_wall_seconds": 10.069,
       "max_peak_rss_mib": 116.4
