@@ -85,10 +85,12 @@ impl ApplePortraitSourcePreflight {
         let disparity_span = f64::from(self.disparity.near - self.disparity.far);
         let focus_disparity = self
             .disparity
-            .focus_disparity(focus.selected_rank, self.depth.header.disparity_exponentiation)
+            .focus_disparity(
+                focus.selected_rank,
+                self.depth.header.disparity_exponentiation,
+            )
             .map_err(|error| RuntimeError::external("Apple Portrait focus disparity", error))?;
-        let gain_map_headroom =
-            private_gain_map_headroom(self.private_gain_map_info.as_deref())?;
+        let gain_map_headroom = private_gain_map_headroom(self.private_gain_map_info.as_deref())?;
         let rendering_parameters = build_apple_portrait_rendering_parameters(
             self.camera_calibration.profile,
             focus_disparity,
@@ -129,8 +131,8 @@ impl ApplePortraitSourcePreflight {
             payloads.push(
                 build_apple_semantic_matte_payload(role, matte.width, matte.height, matte.pixels)
                     .map_err(|error| {
-                        RuntimeError::external("Apple Portrait semantic matte payload", error)
-                    })?,
+                    RuntimeError::external("Apple Portrait semantic matte payload", error)
+                })?,
             );
         }
         Ok(payloads)
@@ -637,7 +639,10 @@ mod tests {
         let offset = PRIVATE_GAIN_MAP_ALTERNATE_HEADROOM_INDEX * std::mem::size_of::<f32>();
         info[offset..offset + 4].copy_from_slice(&ratio.to_le_bytes());
         let actual = private_gain_map_headroom(Some(&info)).expect("derive Gain Map headroom");
-        assert!((actual - expected).abs() < 1e-5, "actual={actual} expected={expected}");
+        assert!(
+            (actual - expected).abs() < 1e-5,
+            "actual={actual} expected={expected}"
+        );
         assert!(private_gain_map_headroom(None).is_err());
         assert!(private_gain_map_headroom(Some(&info[..info.len() - 1])).is_err());
     }
