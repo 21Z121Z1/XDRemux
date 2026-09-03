@@ -419,7 +419,6 @@ final class XDRemuxViewModel {
     ) throws -> OutputPreparationDisposition {
         var config = ConversionConfig()
         config.skipExisting = skipExisting
-        config.oppoCameraTail = .off
         return try prepareOutputForConversion(inputURL: inputURL, outputURL: outputURL, config: config)
     }
 

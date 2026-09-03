@@ -122,6 +122,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 85CB44165E48F2F8587BA77E /* Build configuration list for PBXNativeTarget "XDRemuxApp" */;
 			buildPhases = (
+				E29EBA8FAD16B27F56212699 /* Embed Rust product and Apple adapter */,
 				80BA6548CDA15D10C2CBFABB /* Sources */,
 				7852DCF60575A9880B4F9988 /* Resources */,
 			);
@@ -198,6 +199,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		E29EBA8FAD16B27F56212699 /* Embed Rust product and Apple adapter */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Rust product and Apple adapter";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nrepo_root=\"$(cd \"${PROJECT_DIR}/../../..\" && pwd)\"\ncase \"${CONFIGURATION}\" in\n  Release)\n    swift_configuration=release\n    rust_binary=\"${repo_root}/target/release/xdremux\"\n    cargo_profile=release\n    ;;\n  *)\n    swift_configuration=debug\n    rust_binary=\"${repo_root}/target/debug/xdremux\"\n    cargo_profile=debug\n    ;;\nesac\n\ncd \"${repo_root}\"\nif [[ \"${cargo_profile}\" == \"release\" ]]; then\n  cargo build --locked -p xdremux-cli --release\nelse\n  cargo build --locked -p xdremux-cli\nfi\nswift build -c \"${swift_configuration}\" --product xdremux-apple-adapter\nadapter_binary=\"$(swift build -c \"${swift_configuration}\" --show-bin-path)/xdremux-apple-adapter\"\n\nhelper_directory=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nmkdir -p \"${helper_directory}\"\ncp \"${rust_binary}\" \"${helper_directory}/xdremux\"\ncp \"${adapter_binary}\" \"${helper_directory}/xdremux-apple-adapter\"\nchmod 755 \"${helper_directory}/xdremux\" \"${helper_directory}/xdremux-apple-adapter\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		80BA6548CDA15D10C2CBFABB /* Sources */ = {

@@ -45,6 +45,14 @@ class SwiftAppArchitectureTests(unittest.TestCase):
         self.assertIn("XDRemuxAppConversionSmoke:", PROJECT)
         self.assertIn("PhotoCategorizationView.swift", PROJECT)
 
+    def test_app_build_bundles_the_rust_product_and_adapter(self) -> None:
+        self.assertIn("Embed Rust product and Apple adapter", PROJECT)
+        self.assertIn("cargo build --locked -p xdremux-cli", PROJECT)
+        self.assertIn("--product xdremux-apple-adapter", PROJECT)
+        self.assertIn("${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers", PROJECT)
+        self.assertIn("cp \"${rust_binary}\" \"${helper_directory}/xdremux\"", PROJECT)
+        self.assertIn("cp \"${adapter_binary}\" \"${helper_directory}/xdremux-apple-adapter\"", PROJECT)
+
     def test_ci_runs_architecture_and_app_model_checks(self) -> None:
         self.assertIn("python3 -m unittest Tests.test_swift_app_architecture", CI_WORKFLOW)
         self.assertIn("-scheme XDRemuxApp", CI_WORKFLOW)

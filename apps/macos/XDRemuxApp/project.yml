@@ -9,6 +9,40 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+    preBuildScripts:
+      - name: Embed Rust product and Apple adapter
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+
+          repo_root="$(cd "${PROJECT_DIR}/../../.." && pwd)"
+          case "${CONFIGURATION}" in
+            Release)
+              swift_configuration=release
+              rust_binary="${repo_root}/target/release/xdremux"
+              cargo_profile=release
+              ;;
+            *)
+              swift_configuration=debug
+              rust_binary="${repo_root}/target/debug/xdremux"
+              cargo_profile=debug
+              ;;
+          esac
+
+          cd "${repo_root}"
+          if [[ "${cargo_profile}" == "release" ]]; then
+            cargo build --locked -p xdremux-cli --release
+          else
+            cargo build --locked -p xdremux-cli
+          fi
+          swift build -c "${swift_configuration}" --product xdremux-apple-adapter
+          adapter_binary="$(swift build -c "${swift_configuration}" --show-bin-path)/xdremux-apple-adapter"
+
+          helper_directory="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers"
+          mkdir -p "${helper_directory}"
+          cp "${rust_binary}" "${helper_directory}/xdremux"
+          cp "${adapter_binary}" "${helper_directory}/xdremux-apple-adapter"
+          chmod 755 "${helper_directory}/xdremux" "${helper_directory}/xdremux-apple-adapter"
     settings:
       CODE_SIGN_STYLE: Automatic
       CODE_SIGN_IDENTITY: "-"

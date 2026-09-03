@@ -232,9 +232,18 @@ struct ContentView: View {
 
     private var configSummary: String {
         let output = viewModel.config.outputDirectory?.lastPathComponent ?? viewModel.config.fileNameSuffix
-        let oppo = "\(AppStrings.oppoCompatLabel): \(viewModel.config.oppoCompatibility.appTitle)"
-        let cameraTail = "\(AppStrings.oppoCameraTailLabel): \(viewModel.config.oppoCameraTail.appTitle)"
-        return "\(viewModel.config.family.appTitle) / \(viewModel.config.inputProcessingBranch.appTitle) / \(oppo) / \(cameraTail) / \(output)"
+        var intents = [String]()
+        if viewModel.config.oppoGalleryCompatibilityEnabled {
+            intents.append(AppStrings.oppoGalleryCompatibilityShort)
+        }
+        if viewModel.config.applePhotographicStyles {
+            intents.append(AppStrings.applePhotographicStyles)
+        }
+        if viewModel.config.applePortrait {
+            intents.append(AppStrings.applePortrait)
+        }
+        let intentSummary = intents.isEmpty ? AppStrings.standardHDR : intents.joined(separator: "、")
+        return "\(intentSummary) / \(output)"
     }
 
     private func stateTitle(counts: ConversionQueueStatusCounts) -> String {
@@ -853,12 +862,6 @@ private struct SettingsView: View {
                 SettingExplanation(AppStrings.oppoGalleryCompatibilityHelp)
 
                 Toggle(
-                    AppStrings.preservePortraitEditingData,
-                    isOn: $viewModel.config.preservesPortraitEditingData
-                )
-                SettingExplanation(AppStrings.preservePortraitEditingDataHelp)
-
-                Toggle(
                     AppStrings.applePhotographicStyles,
                     isOn: $viewModel.config.applePhotographicStyles
                 )
@@ -925,14 +928,6 @@ private struct SettingsView: View {
                     )
                 }
 
-                LabeledContent(AppStrings.debugOutputDirectory) {
-                    directoryControl(
-                        url: viewModel.config.debugDirectory,
-                        emptyText: AppStrings.doNotWriteDebugFiles,
-                        choose: chooseDebugDirectory,
-                        clear: { viewModel.config.debugDirectory = nil }
-                    )
-                }
             }
             .formStyle(.grouped)
         }
@@ -965,12 +960,6 @@ private struct SettingsView: View {
         if let url = chooseDirectory() {
             viewModel.config.outputDirectory = url
             viewModel.refreshOutputURLsForPendingItems()
-        }
-    }
-
-    private func chooseDebugDirectory() {
-        if let url = chooseDirectory() {
-            viewModel.config.debugDirectory = url
         }
     }
 

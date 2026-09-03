@@ -4,101 +4,25 @@ import Foundation
 // owned by the Rust CLI; the app keeps only the values needed to render a
 // queue, bind settings, and decode the CLI's stable JSON receipts.
 
-enum Family: String, CaseIterable, Identifiable, Sendable, Equatable {
-    case auto
-    case x6
-    case x7
-
-    var id: String { rawValue }
-}
-
-enum InputProcessingBranch: String, CaseIterable, Identifiable, Sendable, Equatable {
-    case system
-    case systemDecoded = "system-decoded"
-    case hybrid
-    case passthrough
-
-    var id: String { rawValue }
-}
-
-enum TmapFormat: String, CaseIterable, Identifiable, Sendable, Equatable {
-    case strict
-    case imageIO = "imageio"
-
-    var id: String { rawValue }
-}
-
-enum OppoCompatibility: String, CaseIterable, Identifiable, Sendable, Equatable {
-    case auto
-    case iso
-    case isoNoLocal = "iso-no-local"
-    case isoGraph = "iso-graph"
-    case on
-    case tail
-    case off
-
-    var id: String { rawValue }
-    var wantsOppoCompat: Bool { self != .off }
-}
-
-enum OppoCameraTail: String, CaseIterable, Identifiable, Sendable, Equatable {
-    case off
-    case watermark
-    case compact
-    case preserve
-    case preserveWithoutPortrait = "preserve-without-portrait"
-    case preserveWithoutPortraitOrPrivateHDR = "preserve-without-portrait-or-private-hdr"
-    case preserveWithoutPrivateUHDR = "preserve-without-private-uhdr"
-    case preserveWithoutPrivateHDR = "preserve-without-private-hdr"
-    case preserveNoUHDR = "preserve-no-uhdr"
-    case preserveNoHDR = "preserve-no-hdr"
-
-    var id: String { rawValue }
-}
-
 struct ConversionConfig: Sendable, Equatable {
-    var family: Family = .auto
     var outputDirectory: URL?
-    var oppoCompatibility: OppoCompatibility = .off
-    var inputProcessingBranch: InputProcessingBranch = .hybrid
-    var oppoCameraTail: OppoCameraTail = .preserveWithoutPrivateHDR
-    var tmapFormat: TmapFormat = .imageIO
-    var debugDirectory: URL?
     var fileNameSuffix = "_iso"
     var skipExisting = true
-    var maxConcurrentJobs = min(ProcessInfo.processInfo.activeProcessorCount, 4)
+    var maxConcurrentJobs = max(1, min(ProcessInfo.processInfo.activeProcessorCount, 4))
     var categorizeOutputByCaptureMode = false
     var applePhotographicStyles = false
     var applePortrait = false
-    var appleStylesRawDNGURL: URL?
 
     var appleFeaturesEnabled: Bool {
         applePhotographicStyles || applePortrait
     }
 
-    var oppoGalleryCompatibilityEnabled: Bool {
-        get { oppoCompatibility.wantsOppoCompat }
-        set {
-            oppoCompatibility = newValue ? .auto : .off
-            if newValue {
+    var oppoGalleryCompatibilityEnabled = false {
+        didSet {
+            if oppoGalleryCompatibilityEnabled {
                 applePhotographicStyles = false
                 applePortrait = false
             }
-            oppoCameraTail = preservesPortraitEditingData
-                ? (newValue ? .preserve : .preserveWithoutPrivateHDR)
-                : (newValue ? .preserveWithoutPortrait : .preserveWithoutPortraitOrPrivateHDR)
-        }
-    }
-
-    var preservesPortraitEditingData: Bool {
-        get {
-            oppoCameraTail != .preserveWithoutPortrait
-                && oppoCameraTail != .preserveWithoutPortraitOrPrivateHDR
-        }
-        set {
-            oppoCameraTail = newValue
-                ? (oppoCompatibility.wantsOppoCompat ? .preserve : .preserveWithoutPrivateHDR)
-                : (oppoCompatibility.wantsOppoCompat ? .preserveWithoutPortrait : .preserveWithoutPortraitOrPrivateHDR)
         }
     }
 }

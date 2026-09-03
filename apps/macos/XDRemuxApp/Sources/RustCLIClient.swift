@@ -157,9 +157,9 @@ enum RustCLIClient {
                 "Portrait 和 Photographic Styles 目前必须分别执行。"
             )
         }
-        if config.appleStylesRawDNGURL != nil {
+        if config.oppoGalleryCompatibilityEnabled && config.appleFeaturesEnabled {
             throw ClientError.unsupportedConfiguration(
-                "Rust product path 尚未接收外部 RAW sidecar；请先关闭 RAW 辅助输入。"
+                "OPPO 相册兼容格式不能与 Apple 功能同时使用。"
             )
         }
 
