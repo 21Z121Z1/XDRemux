@@ -10,13 +10,13 @@ swift build --product xdremux-apple-adapter
 ADAPTER="$(swift build --show-bin-path)/xdremux-apple-adapter"
 test -x "$ADAPTER"
 
-RESPONSE="$(printf '%s\n' '{"schema_version":1,"operation":"capabilities"}' | "$ADAPTER")"
+RESPONSE="$(printf '%s\n' '{"schema_version":2,"operation":"capabilities"}' | "$ADAPTER")"
 python3 - "$RESPONSE" <<'PY'
 import json
 import sys
 
 response = json.loads(sys.argv[1])
-if response.get("schema_version") != 1:
+if response.get("schema_version") != 2:
     raise SystemExit(f"unexpected Apple adapter schema: {response!r}")
 capabilities = response.get("capabilities")
 if not isinstance(capabilities, list):
