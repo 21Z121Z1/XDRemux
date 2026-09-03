@@ -5,6 +5,7 @@ mod apple_auxiliary;
 mod apple_photographic_styles;
 mod apple_portrait;
 mod apple_portrait_geometry;
+mod apple_scene;
 mod capabilities;
 mod execution;
 mod product_policy;
@@ -61,6 +62,9 @@ pub use apple_portrait_geometry::{
     ApplePortraitNormalizedFocusRegion, APPLE_PORTRAIT_FUSION_2X_PROFILE,
     APPLE_PORTRAIT_MAIN_1X_PROFILE, APPLE_PORTRAIT_TELE_3X_PROFILE,
     APPLE_PORTRAIT_TETRAPRISM_5X_PROFILE,
+};
+pub use apple_scene::{
+    apple_style_scene_scores_from_vision_observations, AppleVisionClassificationObservation,
 };
 pub use capabilities::{
     CapabilityInventory, GainMapTileEncoder, OperationCapability, RasterDecoder,

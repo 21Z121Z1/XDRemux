@@ -8,14 +8,16 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use xdremux_engine::{
-    AppleAuxiliaryKind, AppleAuxiliaryPayload, AppleGainMapFacts, AppleImageAuxiliaryFacts,
-    AppleL8Mask, AppleMetadataValue, AppleSemanticRole, OperationCapability,
+    apple_style_scene_scores_from_vision_observations, AppleAuxiliaryKind, AppleAuxiliaryPayload,
+    AppleGainMapFacts, AppleImageAuxiliaryFacts, AppleL8Mask, AppleMetadataValue,
+    AppleSemanticRole, AppleStyleSceneScores, AppleVisionClassificationObservation,
+    OperationCapability,
 };
 use xdremux_format::FourCC;
 
 use crate::{Result, RuntimeError};
 
-const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 1;
+const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -251,12 +253,10 @@ impl AppleAdapterClient {
         Ok(facts)
     }
 
-    /// Return Vision's scene confidence observations. Scene thresholds,
-    /// priority, and the resulting Styles scene type remain Rust policy.
-    pub(super) fn vision_scene_scores(
-        &self,
-        input: &Path,
-    ) -> Result<xdremux_engine::AppleStyleSceneScores> {
+    /// Return raw Vision classification facts and derive the four XDRemux scene
+    /// confidence buckets in Rust. Vision identifiers are platform output;
+    /// identifier grouping, thresholds, priority, and scene type are product policy.
+    pub(super) fn vision_scene_scores(&self, input: &Path) -> Result<AppleStyleSceneScores> {
         let output = self.invoke_request_with_timeout(
             AdapterRequest {
                 schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
@@ -273,27 +273,7 @@ impl AppleAdapterClient {
         let response: SceneClassificationResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
         validate_schema(response.schema_version)?;
-        let scores = response.scene_classification;
-        let scores = xdremux_engine::AppleStyleSceneScores {
-            food: scores.food,
-            sunset: scores.sunset,
-            indoor: scores.indoor,
-            outdoor: scores.outdoor,
-        };
-        for (name, value) in [
-            ("food", scores.food),
-            ("sunset", scores.sunset),
-            ("indoor", scores.indoor),
-            ("outdoor", scores.outdoor),
-        ] {
-            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                return Err(RuntimeError::new(
-                    "Apple Vision scene classification",
-                    format!("{name} confidence is outside 0 through 1: {value}"),
-                ));
-            }
-        }
-        Ok(scores)
+        scene_scores_from_wire(response.scene_classification)
     }
 
     /// Ask VideoToolbox for the one Apple-specific codec primitive required by
@@ -1187,10 +1167,54 @@ struct SceneClassificationResponse {
 
 #[derive(Debug, Deserialize)]
 struct SceneClassificationWire {
-    food: f64,
-    sunset: f64,
-    indoor: f64,
-    outdoor: f64,
+    observations: Vec<SceneObservationWire>,
+    request_class: String,
+    revision: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct SceneObservationWire {
+    identifier: String,
+    confidence: f64,
+}
+
+fn scene_scores_from_wire(wire: SceneClassificationWire) -> Result<AppleStyleSceneScores> {
+    if wire.request_class != "VNClassifyImageRequest" {
+        return Err(RuntimeError::new(
+            "Apple adapter protocol",
+            format!("unexpected Vision request class {:?}", wire.request_class),
+        ));
+    }
+    if wire.revision == 0 {
+        return Err(RuntimeError::new(
+            "Apple adapter protocol",
+            "Vision request revision must be non-zero",
+        ));
+    }
+    let mut observations = Vec::with_capacity(wire.observations.len());
+    for observation in wire.observations {
+        if observation.identifier.is_empty() {
+            return Err(RuntimeError::new(
+                "Apple adapter protocol",
+                "Vision classification returned an empty identifier",
+            ));
+        }
+        if !observation.confidence.is_finite() || !(0.0..=1.0).contains(&observation.confidence) {
+            return Err(RuntimeError::new(
+                "Apple Vision scene classification",
+                format!(
+                    "confidence for {:?} is outside 0 through 1: {}",
+                    observation.identifier, observation.confidence
+                ),
+            ));
+        }
+        observations.push(AppleVisionClassificationObservation::new(
+            observation.identifier,
+            observation.confidence,
+        ));
+    }
+    apple_style_scene_scores_from_vision_observations(&observations)
+        .map_err(|error| RuntimeError::new("Apple Vision scene policy", error.to_string()))
 }
 
 #[derive(Debug, Deserialize)]
@@ -1299,15 +1323,42 @@ mod tests {
     #[test]
     fn image_properties_wire_is_platform_facts_only() {
         let response: ImagePropertiesResponse = serde_json::from_slice(
-            br#"{"schema_version":1,"image_properties":{"width":4032,"height":3024,"orientation":6,"focal_length_mm":8.67,"focal_length_in_35mm_film":48,"digital_zoom_ratio":2,"lens_model":"OPPO camera 24mm","f_number":1.8}}"#,
+            br#"{"schema_version":2,"image_properties":{"width":4032,"height":3024,"orientation":6,"focal_length_mm":8.67,"focal_length_in_35mm_film":48,"digital_zoom_ratio":2,"lens_model":"OPPO camera 24mm","f_number":1.8}}"#,
         )
         .unwrap();
-        assert_eq!(response.schema_version, 1);
+        assert_eq!(response.schema_version, 2);
         let properties: AppleImageProperties = response.image_properties.into();
         assert_eq!(properties.width, 4032);
         assert_eq!(properties.height, 3024);
         assert_eq!(properties.orientation, Some(6));
         assert_eq!(properties.focal_length_in_35mm_film, Some(48.0));
         assert_eq!(properties.lens_model.as_deref(), Some("OPPO camera 24mm"));
+    }
+
+    #[test]
+    fn scene_classification_wire_is_raw_and_rust_owns_bucketing() {
+        let response: SceneClassificationResponse = serde_json::from_slice(
+            br#"{"schema_version":2,"scene_classification":{"observations":[{"identifier":"meal","confidence":0.31},{"identifier":"dish","confidence":0.74},{"identifier":"sunrise","confidence":0.42},{"identifier":"room","confidence":0.55},{"identifier":"outdoor","confidence":0.63},{"identifier":"cat","confidence":0.99}],"request_class":"VNClassifyImageRequest","revision":3}}"#,
+        )
+        .unwrap();
+        let scores = scene_scores_from_wire(response.scene_classification).unwrap();
+        assert_eq!(scores.food, 0.74);
+        assert_eq!(scores.sunset, 0.42);
+        assert_eq!(scores.indoor, 0.55);
+        assert_eq!(scores.outdoor, 0.63);
+    }
+
+    #[test]
+    fn scene_classification_wire_rejects_invalid_platform_confidence() {
+        let wire = SceneClassificationWire {
+            observations: vec![SceneObservationWire {
+                identifier: "food".to_owned(),
+                confidence: 1.5,
+            }],
+            request_class: "VNClassifyImageRequest".to_owned(),
+            revision: 3,
+        };
+        let error = scene_scores_from_wire(wire).unwrap_err();
+        assert!(error.to_string().contains("outside 0 through 1"));
     }
 }

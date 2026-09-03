@@ -3,35 +3,26 @@ import Foundation
 import ImageIO
 import Vision
 
-/// Factual Vision output for the Rust-owned Photographic Styles scene policy.
-/// The adapter reports confidence buckets only; it never chooses the Styles
-/// scene type or applies product thresholds.
+/// One factual Vision classification observation. The adapter reports the
+/// framework identifier and confidence verbatim; XDRemux semantic grouping is
+/// Rust-owned product policy.
+struct VisionClassificationObservationFacts: Encodable {
+    let identifier: String
+    let confidence: Double
+}
+
+/// Factual `VNClassifyImageRequest` output for the Rust-owned Photographic
+/// Styles scene policy. No XDRemux categories or thresholds live in Swift.
 struct VisionSceneClassificationFacts: Encodable {
-    let food: Double
-    let sunset: Double
-    let indoor: Double
-    let outdoor: Double
+    let observations: [VisionClassificationObservationFacts]
     let requestClass: String
     let revision: Int
 
     enum CodingKeys: String, CodingKey {
-        case food
-        case sunset
-        case indoor
-        case outdoor
+        case observations
         case requestClass = "request_class"
         case revision
     }
-}
-
-private func maximumConfidence(
-    _ observations: [VNClassificationObservation],
-    identifiers: Set<String>
-) -> Double {
-    observations
-        .filter { identifiers.contains($0.identifier) }
-        .map { Double($0.confidence) }
-        .max() ?? 0
 }
 
 func classifyVisionScene(inputPath: String) throws -> VisionSceneClassificationFacts {
@@ -41,7 +32,7 @@ func classifyVisionScene(inputPath: String) throws -> VisionSceneClassificationF
         throw NSError(
             domain: "XDRemuxAppleAdapter",
             code: 30,
-            userInfo: [NSLocalizedDescriptionKey: "Vision cannot decode input (inputPath)"]
+            userInfo: [NSLocalizedDescriptionKey: "Vision cannot decode input \(inputPath)"]
         )
     }
     let request = VNClassifyImageRequest()
@@ -49,10 +40,12 @@ func classifyVisionScene(inputPath: String) throws -> VisionSceneClassificationF
     try handler.perform([request])
     let observations = request.results ?? []
     return VisionSceneClassificationFacts(
-        food: maximumConfidence(observations, identifiers: ["food", "meal", "dish"]),
-        sunset: maximumConfidence(observations, identifiers: ["sunset", "sunrise", "dusk"]),
-        indoor: maximumConfidence(observations, identifiers: ["indoor", "interior", "room"]),
-        outdoor: maximumConfidence(observations, identifiers: ["outdoor"]),
+        observations: observations.map {
+            VisionClassificationObservationFacts(
+                identifier: $0.identifier,
+                confidence: Double($0.confidence)
+            )
+        },
         requestClass: "VNClassifyImageRequest",
         revision: request.revision
     )

@@ -3,7 +3,7 @@ import ImageIO
 import UniformTypeIdentifiers
 import Darwin
 
-private let schemaVersion = 1
+private let schemaVersion = 2
 
 private struct AdapterRequest: Decodable {
     let schemaVersion: Int
