@@ -161,7 +161,7 @@ def output_record(path: Path, facts: dict[str, object]) -> dict[str, object]:
 
 
 manifest = {
-    "schema_version": 1,
+    "manifest_schema_version": 1,
     "purpose": "Rust-produced Apple feature outputs for manual Photos/device acceptance",
     "source": {
         "path": str(source.relative_to(Path.cwd())),
