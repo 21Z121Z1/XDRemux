@@ -462,8 +462,8 @@ impl PortableRuntime {
     ///
     /// Product policy and all style resources are prepared by the caller's
     /// Rust engine path. This runtime operation owns the final graph assembly
-    /// and publication boundary; it never invokes the legacy Swift Styles
-    /// pipeline or a Python subprocess.
+    /// and publication boundary; it never invokes a second product pipeline
+    /// or a subprocess for product policy.
     pub fn assemble_photographic_styles_file(
         &self,
         source: &[u8],

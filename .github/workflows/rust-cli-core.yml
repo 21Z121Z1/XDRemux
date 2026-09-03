@@ -18,6 +18,7 @@ on:
       - "crates/xdremux-container/**"
       - "crates/xdremux-motion-photo/**"
       - "scripts/check_rust_cli_smoke.sh"
+      - "scripts/check_rust_motion_photo_real_fixtures.sh"
       - ".github/workflows/rust-cli-core.yml"
   pull_request:
     paths:
@@ -36,6 +37,7 @@ on:
       - "crates/xdremux-container/**"
       - "crates/xdremux-motion-photo/**"
       - "scripts/check_rust_cli_smoke.sh"
+      - "scripts/check_rust_motion_photo_real_fixtures.sh"
       - ".github/workflows/rust-cli-core.yml"
 
 permissions:
@@ -103,7 +105,7 @@ jobs:
           }
           JSON
           python3 scripts/agent_completion_gate.py run \
-            --base origin/feat/rust-xdremux-format \
+            --base origin/main \
             --plan "$RUNNER_TEMP/xdremux-rust-cli-gate.json"
           python3 scripts/agent_completion_gate.py verify \
             ".codex/verification-receipts/$(git rev-parse HEAD).json"

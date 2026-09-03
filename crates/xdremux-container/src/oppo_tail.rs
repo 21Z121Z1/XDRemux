@@ -146,7 +146,7 @@ fn find_subslice(haystack: &[u8], needle: &[u8], range: std::ops::Range<usize>) 
 /// Preserve the complete source tail but neutralize selected manifest entry names.
 ///
 /// The payload bytes and footer stay byte-identical. Only the first byte inside
-/// the quoted JSON name token changes to `x`, matching the legacy Swift product
+/// the quoted JSON name token changes to `x`, matching the established producer
 /// contract for `preserve-no-uhdr` / `preserve-no-hdr`. Searching for the quoted
 /// token avoids patching a nested-name substring such as `local.hdr.*` inside
 /// `src.local.hdr.*`.

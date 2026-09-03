@@ -10,7 +10,7 @@ fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 /// Detects only capabilities backed by container evidence that the existing
-/// Swift and Python classification contracts both understand.
+/// The shared classification contract used by product and research fixtures.
 pub fn detect_capabilities(data: &[u8]) -> BTreeSet<PhotoCapability> {
     let mut capabilities = BTreeSet::new();
     let has_private_gain_map = contains_bytes(data, br#""local.uhdr.gainmap.data""#)

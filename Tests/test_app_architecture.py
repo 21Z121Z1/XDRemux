@@ -8,7 +8,7 @@ APP_SOURCES = {
     path.name: path.read_text(encoding="utf-8")
     for path in sorted(APP_SOURCE_ROOT.glob("*.swift"))
 }
-BRIDGE = APP_SOURCES["XDRemuxCore.swift"]
+BRIDGE = APP_SOURCES["RustAppConversionBridge.swift"]
 PROJECT = (ROOT / "apps" / "macos" / "XDRemuxApp" / "project.yml").read_text(
     encoding="utf-8"
 )
@@ -22,6 +22,8 @@ class SwiftAppArchitectureTests(unittest.TestCase):
             "import XDRemuxCLI",
             "ConversionEngine.convert(request)",
             "AppleFeatureConversionEngine.convert(request)",
+            "import XDRemuxCore",
+            "import XDRemuxAppleFeatures",
         ):
             self.assertNotIn(forbidden, combined)
         self.assertIn("Process()", APP_SOURCES["RustCLIClient.swift"])
@@ -41,6 +43,7 @@ class SwiftAppArchitectureTests(unittest.TestCase):
     def test_app_and_model_tools_have_no_swift_product_dependencies(self) -> None:
         self.assertNotIn("product: XDRemuxCore", PROJECT)
         self.assertNotIn("product: XDRemuxAppleFeatures", PROJECT)
+        self.assertIn("xdremux-apple-adapter", PROJECT)
         self.assertIn("XDRemuxAppModelTests:", PROJECT)
         self.assertIn("XDRemuxAppConversionSmoke:", PROJECT)
         self.assertIn("PhotoCategorizationView.swift", PROJECT)
@@ -54,7 +57,7 @@ class SwiftAppArchitectureTests(unittest.TestCase):
         self.assertIn("cp \"${adapter_binary}\" \"${helper_directory}/xdremux-apple-adapter\"", PROJECT)
 
     def test_ci_runs_architecture_and_app_model_checks(self) -> None:
-        self.assertIn("python3 -m unittest Tests.test_swift_app_architecture", CI_WORKFLOW)
+        self.assertIn("python3 -m unittest Tests.test_app_architecture", CI_WORKFLOW)
         self.assertIn("-scheme XDRemuxApp", CI_WORKFLOW)
         self.assertIn("-scheme XDRemuxAppModelTests", CI_WORKFLOW)
         self.assertIn("CODE_SIGNING_ALLOWED=NO", CI_WORKFLOW)

@@ -2,7 +2,7 @@
 
 [English](development.en.md) | 简体中文
 
-XDRemux 只有一个产品核心：Rust workspace。唯一公开 CLI 是 Rust `xdremux` 二进制程序。新的产品行为必须进入 Rust。Swift 在迁移期间只作为 Apple 平台能力层，Python 只作为迁移验证和研究工具，不再构成第二套 XDRemux runtime。
+XDRemux 只有一个产品核心：Rust workspace。唯一公开 CLI 是 Rust `xdremux` 二进制程序。新的产品行为必须进入 Rust。Swift 只保留 Apple framework adapter，Python 只保留研究/训练工具，不再构成第二套 XDRemux runtime。
 
 面向用户的命令行行为见 [CLI 参考](cli.md)。
 
@@ -51,7 +51,7 @@ portable providers + platform adapters
 
 ## Apple 平台能力
 
-`Sources/XDRemuxAppleFeatures/` 仅在摄影风格、人像、RAW、Vision、Core ML、AVFoundation 等历史行为尚未完成 Rust consumer parity 审计期间作为迁移 oracle 保留。新产品行为不得进入这个 target。
+`Sources/XDRemuxAppleAdapter/` 是唯一保留的 Swift package source，只包含 Rust 无法跨平台调用的 Apple framework primitive。原 Swift conversion/core/oracle target 已删除；新的产品行为不得进入 Swift。
 
 边界刻意保持很窄：
 
@@ -60,32 +60,26 @@ portable providers + platform adapters
 - 不要再向 Swift 添加跨平台产品 policy；
 - 当 adapter 可以返回更底层的 framework fact、再由 Rust 决策时，不要让 Swift 返回“可转换”“人像有效”之类业务结论。
 
-`xdremux-apple-adapter` 是随产品分发的平台组件，不是用户 CLI。当前 CLI/runtime 边界采用有版本号的 JSON helper protocol，进程生命周期有界，机器可读 stdout 与诊断 stderr 分离。transport 由 `xdremux-runtime` 持有；`xdremux-engine` 不知道 process、path、JSON、Swift 或 XPC。macOS App 同样只调用 Rust `xdremux`，不链接 Swift conversion target。
+`xdremux-apple-adapter` 是随产品分发的平台组件，不是用户 CLI。当前 CLI/runtime 边界采用有版本号的 JSON helper protocol，进程生命周期有界，机器可读 stdout 与诊断 stderr 分离。transport 由 `xdremux-runtime` 持有；`xdremux-engine` 不知道 process、path、JSON、Swift 或 XPC。macOS App 同样只调用 Rust `xdremux`，不链接 Swift product code。
 
 对于 sandboxed macOS App，如果 Apple capability process 需要独立 sandbox、entitlement、lifecycle 或 crash isolation，优先使用 XPC。transport 必须可以替换，而不改变 engine 或公开 CLI 语义。只有某项 capability 确实从进程内互操作获益时才使用 C ABI；不要仅仅为了避开 helper process，就把 FFI 设成默认架构。
 
 ImageIO auxiliary-resource probing 是第一项迁移后的真实 operation。Swift adapter 只报告 Gain Map、disparity、Portrait Effects Matte、semantic matte 等 framework observation；是否满足 Portrait 编辑资源契约由 Rust 决定。
 
-`CoreImageRAWDiagnostics` 继续作为开发者专用 Swift target：
-
-```bash
-swift build --target CoreImageRAWDiagnostics
-```
-
-Swift tests 仍可用于 Apple capability 验收和迁移 oracle，但它们不再定义 canonical CLI 契约。
+SwiftPM 只包含 adapter executable。它的构建验证 platform primitive boundary；产品契约由 Rust tests 和 Rust-driven consumer checks 定义。
 
 ## Python 工具
 
-Python package 需要 Python 3.11 或更高版本，仅保留用于迁移期 conformance、真实 fixture oracle 和研究/训练流程。它不再安装 CLI，也不得定义新的产品语义。
+Python package 需要 Python 3.11 或更高版本，只包含研究/训练代码。它不安装 CLI、不参与 runtime，也不得定义产品语义。
 
-只有 Python oracle 或研究流程需要时才安装：
+只有 Python 研究流程需要时才安装；它不再安装 CLI：
 
 ```bash
 python -m pip install -e .
-python -m unittest discover -s Tests -v
+python -m unittest Tests.test_apple_reverse_key1_training
 ```
 
-当前依赖包括 `pillow-heif`、`Pillow`、`numpy` 和 `piexif`。可选 `training` dependency 会加入 PyTorch。
+研究依赖包括 `Pillow` 和 `numpy`。可选 `training` dependency 会加入 PyTorch。
 
 训练和评估脚本可以继续使用 Python，因为它们属于研究工具，而不是第二套 XDRemux 实现。
 
@@ -95,18 +89,15 @@ python -m unittest discover -s Tests -v
 | --- | --- |
 | `crates/` | Canonical Rust 产品栈。 |
 | `Sources/XDRemuxAppleAdapter/` | Rust runtime 消费的版本化 Apple 平台进程 adapter。 |
-| `Sources/XDRemuxAppleFeatures/` | 尚未删除的迁移 oracle；不属于公开 product。 |
-| `Sources/XDRemuxCore/` | 仅在 replacement evidence 尚未完成时保留的 legacy Swift core。 |
-| `Sources/CoreImageRAWDiagnostics/` | 开发者 RAW 诊断。 |
-| `xdremux_py/` | 迁移 oracle 和研究/训练工具；没有产品 CLI。 |
-| `apps/macos/XDRemuxApp/` | 产品栈迁移期间的 macOS SwiftUI App。 |
-| `Tests/` | Canonical 与迁移期验收测试和 validation harness。 |
+| `xdremux_py/` | 研究/训练工具；没有产品 CLI 或 converter。 |
+| `apps/macos/XDRemuxApp/` | 调用 Rust CLI 的 macOS SwiftUI presentation shell。 |
+| `Tests/` | Rust acceptance policy test 和 validation harness。 |
 | `fixtures/` | strict gate 使用的版本化真实媒体 fixture。 |
 | `scripts/` | 构建、评估、迁移和验收工具。 |
 | `docs/` | 当前指导文档和历史研究记录。 |
 | `Models/` | 可选研究模型和模型文档。 |
 
-Legacy Swift/Python 代码今后只应接受迁移、conformance、安全修复或删除工作。新的用户可见行为进入 Rust。
+新的用户可见行为进入 Rust。Swift 改动必须保持 framework primitive 边界，Python 改动必须保持研究工具边界。
 
 ## Apple helper 生命周期
 
@@ -129,7 +120,7 @@ scripts/build_and_run.sh logs
 scripts/build_and_run.sh clean
 ```
 
-App 通过 Rust CLI 传输用户 intent 和分类请求；SwiftUI 层只保留 presentation state、队列和回执翻译。不要把迁移 oracle target 重新接回 app。
+App 通过 Rust CLI 传输用户 intent 和分类请求；SwiftUI 层只保留 presentation state、队列和回执翻译。Rust CLI 与 Apple adapter 以 helper 形式随 app 打包。
 
 ## 调试和研究控制
 

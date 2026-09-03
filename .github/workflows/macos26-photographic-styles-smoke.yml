@@ -1,4 +1,4 @@
-name: macOS 26 Photographic Styles Smoke
+name: macOS 26 Rust Photographic Styles smoke
 
 on:
   push:
@@ -12,64 +12,56 @@ permissions:
 jobs:
   photographic-styles-smoke:
     runs-on: macos-26
-    timeout-minutes: 60
-    env:
-      XDREMUX_STYLE_RUNNER_FIXTURE: ${{ github.workspace }}/fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg
-      XDREMUX_STYLE_RUNNER_OUTPUT: ${{ github.workspace }}/artifacts/macos26-photographic-styles
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
 
       - name: Record runner environment
         shell: bash
         run: |
-          mkdir -p "$XDREMUX_STYLE_RUNNER_OUTPUT"
+          mkdir -p artifacts/macos26-photographic-styles
           {
             sw_vers
             echo "arch=$(uname -m)"
             xcodebuild -version
             swift --version
-          } | tee "$XDREMUX_STYLE_RUNNER_OUTPUT/runner.txt"
+          } | tee artifacts/macos26-photographic-styles/runner.txt
 
-      - name: Convert Motion Photo with Photographic Styles and validate
+      - name: Install portable HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Run the Rust-driven Styles consumer gate
         shell: bash
         run: |
           set -o pipefail
-          swift test --filter PhotographicStylesRunnerSmokeTests \
-            2>&1 | tee "$XDREMUX_STYLE_RUNNER_OUTPUT/swift-test.log"
+          bash scripts/check_rust_style_consumer.sh \
+            2>&1 | tee artifacts/macos26-photographic-styles/rust-consumer.log
 
       - name: Write summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## macOS 26 Live Photo + Photographic Styles smoke"
+            echo "## macOS 26 Rust Photographic Styles smoke"
             echo
-            echo "Fixture: \`fixtures/motion-photo/oppo/coloros16-dualstream-ultrahdr-02.jpg\`"
-            echo "Path: ColorOS 16 Motion Photo -> Apple Live Photo HEIC+MOV -> deterministic Live Photo validation -> Photographic Styles metadata -> NeutrinoCore consumer validation"
-            echo
-            echo "Hosted-runner scope: the smoke explicitly uses identity-fallback for key-1 coefficients. The product default remains constrained-solver; the hosted complete-Neutrino calibration renderer rejects SemanticStyle with NUError Code 9 (Unsupported)."
-            echo "The hosted PHLivePhoto display-object loader is also not a hard gate for style-rich external pairs; separate 30 s and 120 s probes produced no final callback."
-            echo
-            if [[ -f "$XDREMUX_STYLE_RUNNER_OUTPUT/smoke-summary.json" ]]; then
-              echo '```json'
-              cat "$XDREMUX_STYLE_RUNNER_OUTPUT/smoke-summary.json"
-              echo '```'
-            else
-              echo "No success summary was produced; inspect the uploaded test log."
-            fi
+            echo "The Rust CLI owns source analysis, Styles policy, graph assembly, validation, and publication."
+            echo "The Swift process is used only for Apple Vision/ImageIO/VideoToolbox primitive observations."
+            echo "Structural and ImageIO consumer facts do not claim visual equivalence or Photos device acceptance."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload final outputs and receipts
+      - name: Upload Styles evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: macos26-live-photo-photographic-styles
+          name: macos26-rust-photographic-styles
           if-no-files-found: warn
-          retention-days: 1
-          path: |
-            artifacts/macos26-photographic-styles/coloros16-live-styles.heic
-            artifacts/macos26-photographic-styles/coloros16-live-styles.mov
-            artifacts/macos26-photographic-styles/validation.json
-            artifacts/macos26-photographic-styles/smoke-summary.json
-            artifacts/macos26-photographic-styles/runner.txt
-            artifacts/macos26-photographic-styles/swift-test.log
+          retention-days: 14
+          path: artifacts/macos26-photographic-styles/

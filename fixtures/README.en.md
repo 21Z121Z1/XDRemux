@@ -2,7 +2,7 @@
 
 English | [简体中文](README.md)
 
-This directory contains immutable real-device media inputs used to validate XDRemux's portable Rust implementation and migration oracles.
+This directory contains immutable real-device media inputs used to validate XDRemux's portable Rust implementation and Apple framework consumer boundaries.
 
 ## Layout
 

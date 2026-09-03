@@ -10,7 +10,7 @@
 
 | 层级 | 常用命令或来源 | 能证明什么 |
 | --- | --- | --- |
-| Unit 和 contract | `swift test` | Swift model、parser、格式和 Apple feature 契约。 |
+| Unit 和 contract | `cargo test --workspace --locked` | Rust 产品、parser、格式、Apple feature policy 和 transaction 契约。 |
 | 仓库 policy | `python3 -m unittest discover -s Tests -v` | 跨文件 policy、Python 行为、文档和架构契约。 |
 | 真实 fixture | `fixtures/` 和 `Tests/validation/` | 版本化或提供的真实媒体行为。 |
 | 原生框架 | macOS validation job | 被测试的 ImageIO、PhotoKit 或其他 Apple framework 行为。 |
@@ -43,7 +43,7 @@ parser test 不是真机测试。
 
 它们的准确字节属于测试契约。`fixtures/SHA256SUMS` 是文件身份 manifest。
 
-严格 Swift 和纯 Python CI gate 使用这些 fixture 测试多种 JPEG 和 HEIC/HEIF Motion Photo 布局。
+严格 Rust CI gate 使用这些 fixture 测试多种 JPEG 和 HEIC/HEIF Motion Photo 布局。
 
 不要再把所有真实样本描述为 private。部分旧 ProXDR、只可真机验证和 Apple feature 样本仍可能位于仓库之外或保持私有。
 

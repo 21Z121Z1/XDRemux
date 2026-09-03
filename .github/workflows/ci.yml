@@ -52,16 +52,24 @@ jobs:
           echo "::endgroup::"
           echo "APPLE_ADAPTER_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
 
-      - name: "[2/5] Run migration and architecture tests"
+      - name: "[2/5] Run Rust product and architecture tests"
         shell: bash
         run: |
-          echo "::group::Swift migration-oracle tests"
-          swift test 2>&1 | tee artifacts/swift-test.log
+          echo "::group::Rust workspace tests"
+          cargo test --locked --workspace --all-targets 2>&1 | tee artifacts/rust-workspace-test.log
           echo "::endgroup::"
           echo "::group::Architecture policy tests"
-          python3 -m unittest Tests.test_swift_app_architecture Tests.test_product_ownership 2>&1 | tee artifacts/architecture-tests.log
+          python3 -m unittest Tests.test_app_architecture \
+            Tests.test_product_ownership \
+            Tests.test_public_documentation \
+            Tests.test_categorization_documentation \
+            Tests.test_performance_design \
+            Tests.test_rust_artifact_lifecycle \
+            Tests.test_rust_apple_semantic_policy \
+            Tests.test_rust_portrait_translation \
+            2>&1 | tee artifacts/architecture-tests.log
           echo "::endgroup::"
-          echo "MIGRATION_TEST_RESULT=Passed" >> "$GITHUB_ENV"
+          echo "RUST_PRODUCT_TEST_RESULT=Passed" >> "$GITHUB_ENV"
 
       - name: "[3/5] Build macOS App"
         shell: bash
@@ -90,8 +98,8 @@ jobs:
           echo "MACOS_APP_RESULT=Passed" >> "$GITHUB_ENV"
 
       # This bundle is the pre-existing private ProXDR / Apple feature regression fixture set.
-      # Every product conversion below is driven by the canonical Rust CLI. Swift remains only in
-      # the separate migration-oracle test step until its replacement evidence is complete.
+      # Every product conversion below is driven by the canonical Rust CLI. Swift is used only as
+      # the Apple framework primitive adapter for consumer facts.
       - name: Prepare private fixtures
         shell: bash
         env:
@@ -106,7 +114,7 @@ jobs:
           ditto -x -k "$RUNNER_TEMP/xdremux-fixtures.zip" "$RUNNER_TEMP/xdremux-fixtures"
           echo "FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
 
-      - name: Run private Motion Photo migration oracle
+      - name: Run private Motion Photo Rust conversion check
         shell: bash
         run: |
           if [[ -z "${FIXTURE_ROOT:-}" ]]; then
@@ -119,15 +127,21 @@ jobs:
             echo "MOTION_PHOTO_REAL_RESULT=Fixtures not present" >> "$GITHUB_ENV"
             exit 0
           fi
-          echo "::group::Legacy Swift OPPO Motion Photo characterization oracle"
-          XDREMUX_MOTION_PHOTO_FIXTURE_ROOT="$FIXTURE_ROOT" \
-            swift test --filter RealMotionPhotoFixtureTests 2>&1 | tee artifacts/motion-photo-real-fixtures.log
+          echo "::group::Canonical Rust OPPO Motion Photo conversion"
+          mkdir -p artifacts/motion-photo
+          converted=0
+          for source in "$C15" "$C16"; do
+            [[ -n "$source" ]] || continue
+            stem="$(basename "$source" .jpg)"
+            output="artifacts/motion-photo/${stem}.heic"
+            target/debug/xdremux convert --input "$source" --output "$output" \
+              2>&1 | tee "artifacts/motion-photo/${stem}.log"
+            target/debug/xdremux validate "$output" > "artifacts/motion-photo/${stem}-still-validation.txt"
+            target/debug/xdremux validate "${output%.heic}.mov" > "artifacts/motion-photo/${stem}-video-validation.txt"
+            converted=$((converted + 1))
+          done
           echo "::endgroup::"
-          if [[ -n "$C15" && -n "$C16" ]]; then
-            echo "MOTION_PHOTO_REAL_RESULT=Passed oracle (ColorOS 15 + 16)" >> "$GITHUB_ENV"
-          else
-            echo "MOTION_PHOTO_REAL_RESULT=Passed available oracle fixture; one generation absent" >> "$GITHUB_ENV"
-          fi
+          echo "MOTION_PHOTO_REAL_RESULT=Passed Rust conversion for ${converted} fixture(s)" >> "$GITHUB_ENV"
 
       - name: "[4/5] Run fixture conversions"
         shell: bash
@@ -173,10 +187,10 @@ jobs:
           echo "::group::Portable output validation"
           target/debug/xdremux validate artifacts/fixtures/standard.heic >/dev/null
           target/debug/xdremux validate artifacts/fixtures/oppo.heic >/dev/null
-          python3 Tests/validation/verify_swift_cli_sample.py \
-            --validate-only --input artifacts/fixtures/standard.heic --expected-pixel-format 444f
-          python3 Tests/validation/verify_swift_cli_sample.py \
-            --validate-only --input artifacts/fixtures/oppo.heic --expected-pixel-format 420f
+          target/debug/xdremux validate artifacts/fixtures/standard.heic \
+            > artifacts/fixtures/standard-validation.txt
+          target/debug/xdremux validate artifacts/fixtures/oppo.heic \
+            > artifacts/fixtures/oppo-validation.txt
           echo "::endgroup::"
           echo "::group::Rust-driven Apple consumer validation"
           target/debug/xdremux validate artifacts/fixtures/apple-styles.heic \
@@ -243,9 +257,9 @@ jobs:
             echo "|---|---|"
             echo "| Canonical Rust CLI build | ${RUST_BUILD_RESULT:-Failed} |"
             echo "| Apple capability adapter build | ${APPLE_ADAPTER_BUILD_RESULT:-Failed} |"
-            echo "| Migration/oracle tests | ${MIGRATION_TEST_RESULT:-Not run} |"
+            echo "| Rust product and architecture tests | ${RUST_PRODUCT_TEST_RESULT:-Not run} |"
             echo "| macOS App build | ${MACOS_APP_RESULT:-Not run} |"
-            echo "| Legacy Motion Photo oracle | ${MOTION_PHOTO_REAL_RESULT:-Not run} |"
+            echo "| Rust Motion Photo fixture conversion | ${MOTION_PHOTO_REAL_RESULT:-Not run} |"
             echo "| Standard ISO fixture | ${STANDARD_FIXTURE_RESULT:-Not run} |"
             echo "| OPPO compatibility fixture | ${OPPO_FIXTURE_RESULT:-Not run} |"
             echo "| Apple styles fixture | ${APPLE_STYLES_RESULT:-Not run} |"

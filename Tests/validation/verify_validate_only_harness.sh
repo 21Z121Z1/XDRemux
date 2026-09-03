@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 #
-# ci.yml validates already-produced fixture outputs with
-# `verify_swift_cli_sample.py --validate-only`. That mode must assert the
-# gain-map pixel format of an existing file without converting it, and it must
-# actually fail on a mismatch — a validator that always passes is worse than
-# none.
+# The Rust `validate` command is read-only. It must accept a produced output,
+# reject malformed input, and emit a stable JSON report when requested.
 #
 # usage: verify_validate_only_harness.sh <sample.heic>
 
@@ -17,15 +14,17 @@ fi
 
 SAMPLE="$1"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CLI="$ROOT_DIR/.build/debug/xdremux"
-HARNESS="$ROOT_DIR/Tests/validation/verify_swift_cli_sample.py"
+CLI="${XDREMUX_CLI:-$ROOT_DIR/target/debug/xdremux}"
 
 if [[ ! -f "$SAMPLE" ]]; then
   echo "sample not found: $SAMPLE" >&2
   exit 2
 fi
 if [[ ! -x "$CLI" ]]; then
-  echo "Swift CLI not built: $CLI (run swift build first)" >&2
+  cargo build --locked -q -p xdremux-cli
+fi
+if [[ ! -x "$CLI" ]]; then
+  echo "Rust CLI not built: $CLI (run cargo build -p xdremux-cli first)" >&2
   exit 2
 fi
 
@@ -37,28 +36,22 @@ OUTPUT="$WORK/converted.heic"
 
 cd "$ROOT_DIR"
 
-echo "== matching pixel format must pass =="
-python3 "$HARNESS" --validate-only --input "$OUTPUT" --expected-pixel-format L008
+echo "== a canonical output must pass =="
+"$CLI" validate "$OUTPUT"
 
-echo "== mismatching pixel format must fail =="
+echo "== malformed input must fail =="
+printf 'not a canonical output\n' > "$WORK/malformed.heic"
 set +e
-python3 "$HARNESS" --validate-only --input "$OUTPUT" --expected-pixel-format 420v >/dev/null 2>&1
-MISMATCH_STATUS=$?
+"$CLI" validate "$WORK/malformed.heic" >/dev/null 2>&1
+MALFORMED_STATUS=$?
 set -e
-if ((MISMATCH_STATUS == 0)); then
-  echo "--validate-only accepted the wrong pixel format" >&2
+if ((MALFORMED_STATUS == 0)); then
+  echo "validate accepted malformed input" >&2
   exit 1
 fi
 
-echo "== --validate-only must reject conversion-only flags =="
-set +e
-python3 "$HARNESS" --validate-only --in-place --input "$OUTPUT" \
-  --expected-pixel-format L008 >/dev/null 2>&1
-COMBINED_STATUS=$?
-set -e
-if ((COMBINED_STATUS == 0)); then
-  echo "--validate-only accepted --in-place, which performs a conversion" >&2
-  exit 1
-fi
+echo "== JSON validation must also pass without writing =="
+"$CLI" validate "$OUTPUT" --json >/dev/null
+test -f "$OUTPUT"
 
-echo "--validate-only behaves correctly on pass, mismatch, and misuse"
+echo "Rust validate behaves correctly on pass, malformed input, and JSON output"

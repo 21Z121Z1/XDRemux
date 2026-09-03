@@ -1,20 +1,24 @@
-name: XDRemux Performance
+name: XDRemux Rust Performance and Design
 
 on:
   pull_request:
     paths:
-      - "Sources/**/*.swift"
-      - "apps/macos/XDRemuxApp/Sources/**/*.swift"
-      - "Tests/**/*Performance*.swift"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "apps/macos/XDRemuxApp/Sources/**"
       - "Tests/test_performance_design.py"
+      - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   push:
     branches: [main]
     paths:
-      - "Sources/**/*.swift"
-      - "apps/macos/XDRemuxApp/Sources/**/*.swift"
-      - "Tests/**/*Performance*.swift"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "apps/macos/XDRemuxApp/Sources/**"
       - "Tests/test_performance_design.py"
+      - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   workflow_dispatch:
 
@@ -26,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  release-performance:
+  rust-performance:
     runs-on: macos-26
     timeout-minutes: 90
     steps:
@@ -35,39 +39,58 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Build optimized package
-        run: swift build -c release
-
-      - name: Enforce allocation-shape regressions
-        run: python3 -m unittest Tests.test_performance_design
-
-      - name: Verify optimized-path semantics
-        run: |
-          swift test -c release --filter PerformanceDesignTests
-          swift test -c release --filter PerformanceDesignCoreTests
-
-      - name: Measure sampled Jacobian
+      - name: Install portable HEVC provider
         shell: bash
-        env:
-          XDREMUX_RUN_PERFORMANCE_MEASUREMENTS: "1"
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Build optimized Rust product
+        shell: bash
         run: |
           mkdir -p artifacts/performance
-          set -o pipefail
-          swift test -c release \
-            --filter PerformanceMeasurementTests/testSampledJacobianReleasePerformance \
-            2>&1 | tee artifacts/performance/sampled-jacobian.log
+          cargo build --locked --workspace --all-targets --release \
+            2>&1 | tee artifacts/performance/rust-release-build.log
 
-      - name: Measure legacy full-raster reference
+      - name: Check Rust performance design invariants
+        shell: bash
+        run: |
+          python3 -m unittest Tests.test_performance_design \
+            2>&1 | tee artifacts/performance/design-policy.log
+          cargo test --locked --workspace --all-targets --release \
+            2>&1 | tee artifacts/performance/rust-release-tests.log
+
+      - name: Exercise optimized product routes
         shell: bash
         env:
-          XDREMUX_RUN_PERFORMANCE_MEASUREMENTS: "1"
+          XDREMUX_CLI: ${{ github.workspace }}/target/release/xdremux
         run: |
-          set -o pipefail
-          swift test -c release \
-            --filter PerformanceMeasurementTests/testLegacyFullDerivativeReferencePerformance \
-            2>&1 | tee artifacts/performance/legacy-full-derivative.log
+          bash scripts/check_rust_cli_smoke.sh \
+            2>&1 | tee artifacts/performance/rust-cli-smoke.log
 
-      - name: Run HEAD-bound completion gate
+      - name: Build and run macOS app model integration
+        shell: bash
+        env:
+          XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremux-app-model-tests
+        run: |
+          xcodebuild \
+            -quiet \
+            -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \
+            -scheme XDRemuxAppModelTests \
+            -configuration Debug \
+            -derivedDataPath "$XDREMUX_DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          XDREMUX_CLI="$GITHUB_WORKSPACE/target/release/xdremux" \
+            "$XDREMUX_DERIVED_DATA/Build/Products/Debug/XDRemuxAppModelTests" \
+            2>&1 | tee artifacts/performance/app-model.log
+
+      - name: Run exact-HEAD Rust completion gate
         shell: bash
         run: |
           git fetch origin main:refs/remotes/origin/main
@@ -81,35 +104,43 @@ jobs:
               "xcodebuild -quiet "
               "-project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj "
               "-scheme XDRemuxAppModelTests -configuration Debug "
-              f"-derivedDataPath '{runner_temp}/xdremux-gate-app' build && "
+              f"-derivedDataPath '{runner_temp}/xdremux-gate-app' "
+              "CODE_SIGNING_ALLOWED=NO build && "
+              f"XDREMUX_CLI='$GITHUB_WORKSPACE/target/release/xdremux' "
               f"'{runner_temp}/xdremux-gate-app/Build/Products/Debug/XDRemuxAppModelTests'"
           )
           plan = {
               "schema_version": 1,
-              "scope": "Swift performance-by-design refactor",
+              "scope": "Canonical Rust product release build, performance design invariants, and macOS app integration",
               "checks": [
                   {
-                      "name": "allocation-shape regressions",
+                      "name": "rust-release-build",
+                      "kind": "static",
+                      "command": ["cargo", "build", "--locked", "--workspace", "--all-targets", "--release"],
+                      "timeout_seconds": 1800,
+                  },
+                  {
+                      "name": "rust-release-regressions",
+                      "kind": "regression",
+                      "command": ["cargo", "test", "--locked", "--workspace", "--all-targets", "--release"],
+                      "timeout_seconds": 2400,
+                  },
+                  {
+                      "name": "performance-design-policy",
                       "kind": "regression",
                       "command": ["python3", "-m", "unittest", "Tests.test_performance_design"],
                       "timeout_seconds": 120,
                   },
                   {
-                      "name": "full Swift Release suite",
-                      "kind": "functional",
-                      "command": ["swift", "test", "-c", "release"],
-                      "timeout_seconds": 2400,
+                      "name": "rust-cli-release-smoke",
+                      "kind": "integration",
+                      "command": ["bash", "scripts/check_rust_cli_smoke.sh"],
+                      "timeout_seconds": 900,
                   },
                   {
-                      "name": "macOS app model integration",
+                      "name": "macos-app-model-integration",
                       "kind": "integration",
                       "command": ["/bin/bash", "-lc", app_build],
-                      "timeout_seconds": 1200,
-                  },
-                  {
-                      "name": "Release package build",
-                      "kind": "static",
-                      "command": ["swift", "build", "-c", "release"],
                       "timeout_seconds": 1200,
                   },
               ],
@@ -132,14 +163,13 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## XDRemux Release Performance"
+            echo "## XDRemux Rust performance and design"
             echo
-            echo "Hard gates enforce the optimized storage/data-movement shape and semantic equivalence."
-            echo "Sampled and legacy reference measurements run in separate XCTest processes so peak-memory metrics are not contaminated by allocator high-water marks from the other implementation."
-            echo "The completion gate is bound to the exact checked-out HEAD and verifies regression, functional, integration, Release-build, diff-cleanliness, and unchanged-HEAD evidence."
+            echo "The workflow measures the canonical Rust release build and test path, then checks the bounded solver/data-movement invariants and app integration."
+            echo "It does not treat the retired Swift implementation as a performance oracle."
             echo
             echo '```text'
-            grep -hE "(PerformanceMeasurementTests|measured|average:|Test Case.*passed|Test Case.*failed)" \
+            grep -hE "(test result:|passed|failed|rust-cli|Performance)" \
               artifacts/performance/*.log 2>/dev/null || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -148,7 +178,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: xdremux-release-performance
+          name: xdremux-rust-performance
           if-no-files-found: warn
           retention-days: 14
           path: artifacts/performance/

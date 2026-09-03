@@ -1001,7 +1001,7 @@ fn build_meta(
 }
 
 /// Construct an ISO 21496 tiled HEVC Gain Map graph directly from an ordinary
-/// source HEIF. No Python, Swift, ImageIO, or temporary JPEG Gain Map graph is
+/// source HEIF. No external language implementation, ImageIO, or temporary JPEG Gain Map graph is
 /// required. The compressed base item data is preserved byte-for-byte.
 pub fn assemble_iso_gain_map_heif(
     source: &[u8],

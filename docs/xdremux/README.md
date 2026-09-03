@@ -2,7 +2,7 @@
 
 [English](README.en.md) | 简体中文
 
-本目录索引 XDRemux 当前稳定的实现契约。Rust workspace 是唯一产品实现；Swift target 只在明确标记的迁移 oracle 或 Apple primitive adapter 边界内保留。
+本目录索引 XDRemux 当前稳定的实现契约。Rust workspace 是唯一产品实现；Swift 只保留明确受限的 Apple primitive adapter。
 
 普通使用见[项目 README](../../README.md)，命令行为见 [CLI 参考](../cli.md)。
 
@@ -32,7 +32,7 @@ Rust `xdremux` CLI 和 workspace crate 负责全部产品语义、格式转换�
 - 返回 Rust 定义协议中的 framework facts；
 - 写入或探测 Rust 已规划的 Apple-specific resource。
 
-`Sources/XDRemuxCore/` 和 `Sources/XDRemuxAppleFeatures/` 目前只作为待删除的迁移 oracle 保留，不是产品入口，也不应承载新的 product policy。
+原来的 Swift product target 已删除。Swift 侧只剩 `Sources/XDRemuxAppleAdapter/`，不得承载 product policy。
 
 ### CLI 层
 
@@ -44,7 +44,7 @@ Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](
 
 ### Python 实现
 
-`xdremux_py/` 只允许作为迁移 oracle、fixture 工具和研究/训练工具存在。
+`xdremux_py/` 只包含研究/训练工具。
 
 它不参与 Rust runtime，不定义正式 conversion path，也不作为 CI canonical correctness source。
 

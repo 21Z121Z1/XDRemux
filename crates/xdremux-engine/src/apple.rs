@@ -109,8 +109,8 @@ impl AppleL8Mask {
     ///
     /// A percentage threshold incorrectly rejects distant people and other
     /// genuinely sparse semantics. Sixteen high-confidence pixels is the
-    /// smallest producer-proven floor and exactly matches the retired Swift
-    /// implementation.
+    /// smallest producer-proven floor and preserves the established producer
+    /// contract.
     pub fn has_credible_foreground(&self) -> bool {
         self.pixels
             .iter()
@@ -153,7 +153,7 @@ pub struct ApplePortraitPersonFusion {
 
 /// Fuse a Vision person matte with the OPPO subject topology prior.
 ///
-/// This is the product policy recovered from the legacy Swift implementation:
+/// This is the product policy recovered from the established producer contract:
 /// an OPPO prior is accepted only when it has meaningful overlap with Vision.
 /// Accepted prior pixels are clipped to a circularly dilated Vision support
 /// region before taking the per-pixel maximum. The Apple adapter is therefore

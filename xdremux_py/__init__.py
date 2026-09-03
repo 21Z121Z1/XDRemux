@@ -1,8 +1,6 @@
-"""XDRemux — cross-platform ProXDR to ISO 21496-1 HDR HEIC conversion.
+"""Research and training helpers for the Rust XDRemux product.
 
-``cli`` is the command-line front end, ``pipeline`` performs conversion, and the
-remaining modules implement container parsing, EDR math, gain map
-reconstruction, and HEIF I/O.
+The Python package intentionally contains no product CLI or conversion runtime.
 """
 
 __version__ = "1.4.0"

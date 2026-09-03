@@ -2,7 +2,7 @@
 
 English | [简体中文](README.md)
 
-This directory indexes stable implementation contracts for XDRemux. The Rust workspace is the only product implementation; Swift targets remain only at explicitly marked migration-oracle or Apple-primitive boundaries.
+This directory indexes stable implementation contracts for XDRemux. The Rust workspace is the only product implementation; Swift contains only the explicitly bounded Apple primitive adapter.
 
 Use the [project README](../../README.en.md) for normal use and the [CLI reference](../cli.en.md) for command behavior.
 
@@ -32,7 +32,7 @@ Current responsibilities include:
 - returning framework facts through the Rust-defined protocol;
 - writing or probing Apple-specific resources already planned by Rust.
 
-`Sources/XDRemuxCore/` and `Sources/XDRemuxAppleFeatures/` remain only as migration oracles pending deletion. They are not product entry points and must not receive new product policy.
+The former Swift product targets have been removed. Only `Sources/XDRemuxAppleAdapter/` remains on the Swift side, and it must not receive product policy.
 
 ### CLI layer
 
@@ -42,9 +42,9 @@ The CLI automatically routes supported Motion Photo inputs before the normal HDR
 
 The Motion Photo and normal HDR paths have different output-safety rules. See the [CLI reference](../cli.en.md).
 
-### Python implementation
+### Python research tooling
 
-`xdremux_py/` may remain only as migration-oracle, fixture, and research/training tooling.
+`xdremux_py/` contains only research/training tooling.
 
 It does not participate in the Rust runtime, define a formal conversion path, or serve as the canonical CI correctness source.
 

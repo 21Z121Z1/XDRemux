@@ -2,24 +2,23 @@
 
 English | [简体中文](README.md)
 
-This directory contains Swift package tests, Python repository-policy tests, and reusable validation harnesses.
+This directory contains Rust product-policy tests, Python repository-policy tests, and reusable validation harnesses.
 
-## Swift tests
+## Rust tests
 
-Run all Swift package tests from the repository root:
+Run the canonical product tests from the repository root:
 
 ```bash
-swift test
+cargo test --workspace --locked
 ```
 
-Main test targets:
+The Swift package contains only the Apple primitive adapter. Build it when running macOS consumer checks:
 
-| Target | Scope |
-| --- | --- |
-| `XDRemuxCoreTests` | Conversion models, HEIF/ISO-BMFF behavior, Motion Photo parsing, validation, classification, and file lifecycle. |
-| `XDRemuxAppleFeaturesTests` | Live Photo, Photographic Styles, Apple Portrait, native-helper compatibility, and performance contracts. |
+```bash
+swift build --product xdremux-apple-adapter
+```
 
-The public CLI parsing, batch, Motion Photo routing, and output-safety tests live in the Rust workspace; Swift targets remain only as migration-time Apple capability oracles.
+The public CLI parsing, conversion, batch, Motion Photo, classification, Portrait, Styles, validation, and output-safety tests live in the Rust workspace.
 
 ## Python repository tests
 
@@ -29,7 +28,7 @@ Run:
 python3 -m unittest discover -s Tests -v
 ```
 
-These tests include Python converter behavior and repository policies that inspect Swift source, documentation, fixtures, or architecture.
+These tests cover repository policies, documentation, app architecture, and the optional research/training package. They are not a product conversion implementation.
 
 A source-inspection policy test is static evidence. It is not a replacement for a functional conversion test.
 
@@ -39,13 +38,9 @@ Reusable harnesses are in `Tests/validation/`.
 
 Examples include:
 
-- `verify_swift_cli_sample.py`
-- `verify_python_motion_photo_fixtures.py`
+- `check_rust_motion_photo_real_fixtures.sh`
 - `verify_error_messages.sh`
 - `verify_batch_categorize_idempotence.sh`
-- `verify_categorization_cross_implementation.py`
-- `verify_categorized_batch_outputs.py`
-- `verify_apple_feature_artifact_lifecycle.py`
 - `verify_macos_app_model_tests.sh`
 
 Use the [regression and real-sample guide](../docs/quality/evals.en.md) to select a harness.

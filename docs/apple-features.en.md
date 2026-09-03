@@ -2,17 +2,17 @@
 
 English | [简体中文](apple-features.md)
 
-Photographic Styles and Apple Portrait are the remaining major Apple-specific ownership migration in XDRemux. They are not a second product stack.
+Photographic Styles and Apple Portrait are Rust-owned product intents in XDRemux. They are not a second product stack.
 
-The canonical public product is the Rust `xdremux` CLI. The legacy Swift Apple implementation remains only as a migration oracle and as the current implementation of platform capabilities that still require ImageIO, Core Image, Vision, Core ML, AVFoundation, or other Apple frameworks.
+The canonical public product is the Rust `xdremux` CLI. The Swift target is only the Apple framework adapter for operations that cannot be performed portably, such as ImageIO consumer probing, Vision observations, and VideoToolbox encoding.
 
 ## Current availability
 
 Standard HDR, OPPO-compatible output, Motion Photo → Live Photo, batch processing, categorization, inspection, and portable validation belong to the canonical Rust product.
 
-Photographic Styles and Apple Portrait are not yet exposed as stable commands/options by the canonical Rust CLI. Do not use legacy Swift-only switches as a specification for new product behavior.
+Photographic Styles and Apple Portrait are expressed as `convert`/`batch` product intents. They do not create Apple-specific CLI subcommands, and low-level adapter or solver controls are not part of the public contract.
 
-The migration is complete only when Rust owns the feature request/result models, routing, fallback, validation policy, and publication lifecycle, while Apple-native code performs only the framework operations requested by Rust.
+Rust owns the feature request/result models, routing, fallback, validation policy, metadata synthesis, assembly, and publication lifecycle. Apple-native code performs only the framework operations requested by Rust and returns factual observations.
 
 ## Platform boundary
 
@@ -52,23 +52,17 @@ This pattern should be used for the remaining migration: return the narrowest us
 
 ## Photographic Styles migration
 
-The legacy Swift implementation still contains substantial style-generation and Apple-framework behavior, including semantic analysis, Core ML paths, constrained style-data generation, and Apple-specific consumer validation.
+Rust owns style-generation semantics, constrained search, source-bound policy, key1/property-list synthesis, graph assembly, validation policy, and publication. The adapter is limited to framework observations or encoding primitives requested by the Rust runtime.
 
-Do not mechanically port its command-line controls or internal producer selection into Rust. The migration should instead split the implementation into narrowly scoped platform operations, for example framework analysis or model execution, while Rust owns feature routing and product defaults.
-
-Research-only producers, model experiments, donor diagnostics, and RAW experiments remain research tooling. They do not define the public CLI contract.
+Research-only producers, model experiments, donor diagnostics, and RAW experiments remain research tooling. They do not define the public CLI contract or provide a second runtime.
 
 ## Apple Portrait migration
 
-The legacy Swift Portrait pipeline still performs Apple-framework decoding/writing and contains policy that is being removed from Swift.
-
-The first policy slice has already moved conceptually to Rust: ImageIO reports auxiliary-resource facts, and Rust decides whether the complete resource set satisfies the Portrait editing contract.
-
-Continue migrating Portrait in the same direction. OPPO block parsing, JPEG/container logic, Gain Map policy, feature routing, output naming, and validation policy belong in Rust. Only operations that genuinely require Apple frameworks remain in the Apple capability layer.
+Rust owns Portrait preflight, OPPO block parsing, focus/orientation policy, JPEG/container logic, Gain Map policy, REND generation, auxiliary-manifest construction, feature routing, output naming, validation policy, and atomic publication. ImageIO reports auxiliary-resource facts and the adapter performs only the Apple framework operations required by the Rust transaction.
 
 ## Live Photo
 
-Normal Motion Photo → Live Photo conversion is already a Rust product capability and should not be routed back through the legacy Swift Apple feature engine.
+Normal Motion Photo → Live Photo conversion is already a Rust product capability and should not be routed through the Apple capability adapter.
 
 If a future combined feature requires applying an Apple-only operation to a Live Photo still, Rust must continue to own the Live Photo asset lifecycle, pair identity, publication, and validation ordering. The Apple adapter should receive only the narrow platform operation it needs to perform.
 
@@ -88,7 +82,7 @@ Use three distinct evidence classes:
 
 Structural evidence does not replace device evidence for an interactive Apple Photos editing claim.
 
-The canonical completion gate requires the Rust workspace and a real Rust → Apple adapter handshake on macOS. Feature-specific replacement gates should be added as Apple operations migrate. Keep the legacy Swift implementation only until the corresponding replacement evidence is complete.
+The canonical completion gate requires the Rust workspace and a real Rust → Apple adapter handshake on macOS. Feature-specific gates drive the Rust CLI and then query Apple consumer facts. Structural and native-framework evidence do not by themselves claim visual equivalence or Photos device acceptance.
 
 ## Research material
 

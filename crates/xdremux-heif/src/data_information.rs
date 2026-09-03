@@ -24,7 +24,7 @@ fn raw_box<'a>(source: &'a [u8], header: &BoxHeader, context: &str) -> Result<&'
 fn make_dinf_box() -> Result<Vec<u8>> {
     // ISO-BMFF's self-contained data reference: one `url ` entry with flag 1.
     // This is the same minimal DataInformation graph used by the proven
-    // ImageIO-compatible Swift writer; it introduces no Apple product policy.
+    // ImageIO-compatible resource writer; it introduces no Apple product policy.
     let url = make_full_box(URL_, 0, 1, &[])?;
     let mut dref_payload = Vec::with_capacity(4 + url.len());
     dref_payload.extend_from_slice(&1_u32.to_be_bytes());

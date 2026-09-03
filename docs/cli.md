@@ -4,7 +4,7 @@
 
 XDRemux 的产品入口是一个跨平台 Rust CLI：`xdremux`。输入类型、Motion Photo / ProXDR 路由以及 HDR / Gain Map 源结构都由程序自动识别；标准转换不要求用户选择格式、设备代际或底层处理策略。
 
-Swift 和 Python 实现目前仅作为迁移期的 conformance oracle、Apple 平台能力实现或研究/训练工具，不再定义新的 CLI 产品语义。
+Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 只作为研究/训练工具。它们都不是第二套 XDRemux 实现，不再定义新的 CLI 产品语义或产品 policy。
 
 ## 命令
 
@@ -131,8 +131,8 @@ xdremux validate output.heic --json
 
 `inspect --json`、`batch --json`、`categorize --json` 和 `validate --json` 提供稳定的结构化输出。默认输出仍以人类可读性为主。
 
-## Apple 功能迁移状态
+## Apple 功能所有权
 
-Photographic Styles 和 Portrait 正在从独立 Swift 业务实现迁移为 Rust engine 所拥有的 capability contract。最终架构中 Rust 负责 policy、orchestration、数据模型和 CLI；Apple-native 代码只负责调用 Core Image、Vision、Core ML、AVFoundation 等平台 API。
+Photographic Styles 和 Portrait 通过 `convert` 与 `batch` 的 intent 请求。Rust 负责 policy、orchestration、数据模型、metadata、assembly、validation 和 publication。`xdremux-apple-adapter` 只调用 ImageIO、Vision、Core Image、Core ML、VideoToolbox 等平台 API，并返回事实 observation 或 primitive operation 结果。
 
-在这项迁移完成并通过 macOS integration gate 前，旧 Swift Apple 功能仍保留为迁移 oracle，不应据此重新向 Rust CLI 暴露底层 Swift 参数。
+Rust 驱动的 macOS gate 会验证结构输出和已测试的 native consumer facts。视觉等价和 Photos 交互行为仍属于独立的真机结论，不能从 parser 或 adapter probe 成功推导出来。

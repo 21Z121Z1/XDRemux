@@ -24,12 +24,27 @@ class ProductOwnershipTests(unittest.TestCase):
     def test_swift_package_vends_only_apple_platform_artifacts(self) -> None:
         manifest = (ROOT / "Package.swift").read_text(encoding="utf-8")
         self.assertIn('.executable(name: "xdremux-apple-adapter"', manifest)
-        self.assertNotIn('.library(name: "XDRemuxCore"', manifest)
-        self.assertNotIn('.executable(name: "xdremux"', manifest)
-        self.assertNotIn('name: "XDRemuxCLI"', manifest)
-        self.assertNotIn("swift-argument-parser", manifest)
-        self.assertIn('name: "XDRemuxAppleFeatures"', manifest)
-        self.assertIn("migration", manifest.lower())
+        for legacy in (
+            "XDRemuxCore",
+            "XDRemuxAppleFeatures",
+            "XDRemuxCLI",
+            "FormatConformanceOracle",
+            "MetadataConformanceOracle",
+            "CoreImageRAWDiagnostics",
+            "swift-argument-parser",
+        ):
+            self.assertNotIn(legacy, manifest)
+
+    def test_swift_sources_are_limited_to_the_framework_adapter(self) -> None:
+        source_root = ROOT / "Sources"
+        swift_sources = sorted(source_root.rglob("*.swift"))
+        self.assertTrue(swift_sources)
+        self.assertTrue(all("XDRemuxAppleAdapter" in path.parts for path in swift_sources))
+
+    def test_python_package_contains_only_research_tooling(self) -> None:
+        package_root = ROOT / "xdremux_py"
+        allowed = {"__init__.py", "apple_reverse_key1_training.py"}
+        self.assertEqual({path.name for path in package_root.glob("*.py")}, allowed)
 
     def test_development_docs_name_rust_as_the_only_product_core(self) -> None:
         english = (ROOT / "docs/development.en.md").read_text(encoding="utf-8")
@@ -39,13 +54,13 @@ class ProductOwnershipTests(unittest.TestCase):
         self.assertIn("The only public CLI", english)
         self.assertIn("It does not install a CLI", english)
         self.assertNotIn("The installed console command is `xdremux-py`", english)
-        self.assertNotIn("Use `XDRemuxCore` when you need the standard conversion pipeline", english)
+        self.assertNotIn("XDRemuxCore", english)
 
         self.assertIn("只有一个产品核心：Rust workspace", chinese)
         self.assertIn("唯一公开 CLI", chinese)
         self.assertIn("它不再安装 CLI", chinese)
         self.assertNotIn("安装后的命令是 `xdremux-py`", chinese)
-        self.assertNotIn("标准转换链路使用 `XDRemuxCore`", chinese)
+        self.assertNotIn("XDRemuxCore", chinese)
 
     def test_apple_adapter_is_wired_only_at_runtime_composition_root(self) -> None:
         runtime_source = ROOT / "crates/xdremux-runtime/src"

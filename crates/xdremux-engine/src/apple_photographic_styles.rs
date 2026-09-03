@@ -249,7 +249,7 @@ pub fn apple_style_identity_global_tone_curve() -> Vec<u8> {
 /// and reconstructed HDR luminance distributions.
 ///
 /// The constants are the bounded behavior-equivalent calibration already
-/// documented by the Swift migration oracle. They describe a source-derived
+/// documented by the producer contract. They describe a source-derived
 /// proxy for the unavailable camera-time LTMDigitalGain; they are not a donor
 /// image or a scene-independent identity fallback.
 #[allow(clippy::excessive_precision)]
@@ -717,7 +717,7 @@ pub fn apple_style_fit_global_polynomial(
 ///
 /// The Apple renderer is allowed to produce the perturbed rasters, but it does
 /// not own the sampling or solve policy. Keeping the sampled storage here also
-/// preserves the Swift implementation's bounded-memory contract: at most
+/// preserves the bounded-memory contract: at most
 /// `APPLE_STYLE_REFINEMENT_MAX_PIXELS` pixels are retained by the Jacobian.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppleStyleSampledJacobian {
@@ -819,7 +819,7 @@ pub struct AppleStyleScalarRow {
 
 /// Solve one bounded constrained-polynomial refinement update.
 ///
-/// This is the policy half of the Swift `solveUpdate` implementation. A
+/// This is the policy half of the constrained refinement contract. A
 /// platform adapter may render the finite-difference candidates and report
 /// scalar observations, while Rust owns deterministic sampling, Huber weights,
 /// normalization, ridge regularization, linear solving, and update bounds.
@@ -1183,7 +1183,7 @@ pub fn apple_style_distribution(values: &[f32]) -> AppleStyleDistribution {
 
 /// The fixed statistics dictionary consumed by the Apple style property-list
 /// contract. An explicit field for every producer channel makes omissions
-/// impossible at the call site and keeps the metadata schema out of Swift.
+/// impossible at the call site and keeps the metadata schema in Rust.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AppleStyleStatistics {
     pub linear_gtc_image: AppleStyleDistribution,
@@ -1223,7 +1223,7 @@ pub struct AppleStylePropertyListRequest<'a> {
 /// `PropertyListSerialization` is a platform primitive for consuming this
 /// object, not a product-policy boundary. Rust validates every fixed-size
 /// resource, constructs the complete key schema, and emits a deterministic
-/// binary plist without delegating metadata synthesis to Swift.
+/// binary plist without delegating metadata synthesis to the platform adapter.
 pub fn apple_style_property_list(
     request: &AppleStylePropertyListRequest<'_>,
 ) -> Result<Vec<u8>, AppleStyleDataError> {

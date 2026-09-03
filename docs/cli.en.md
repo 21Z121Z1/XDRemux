@@ -4,7 +4,7 @@ English | [简体中文](cli.md)
 
 XDRemux has one cross-platform product entry point: the Rust `xdremux` CLI. Input type, Motion Photo / ProXDR routing, and HDR / Gain Map source structure are detected automatically. Standard conversion does not require users to choose a format, device generation, or low-level processing policy.
 
-The Swift and Python implementations remain only as migration-time conformance oracles, Apple platform capability implementations, or research/training tooling. They no longer define new CLI product semantics.
+The Swift package is only the Apple platform capability adapter, and the remaining Python package is research/training tooling. Neither provides a second XDRemux runtime; they no longer define new CLI product semantics or a source of CLI product policy.
 
 ## Commands
 
@@ -131,8 +131,8 @@ Success, help, and version output use `0`. Runtime conversion or validation fail
 
 `inspect --json`, `batch --json`, `categorize --json`, and `validate --json` provide stable structured output. Human-readable output remains the default.
 
-## Apple feature migration status
+## Apple feature ownership
 
-Photographic Styles and Portrait are being migrated from independent Swift business implementations into capability contracts owned by the Rust engine. In the final architecture Rust owns policy, orchestration, data models, and the CLI; Apple-native code only invokes platform APIs such as Core Image, Vision, Core ML, and AVFoundation.
+Photographic Styles and Portrait are requested through the `convert` and `batch` intents. Rust owns policy, orchestration, data models, metadata, assembly, validation, and publication. `xdremux-apple-adapter` only invokes platform APIs such as ImageIO, Vision, Core Image, Core ML, and VideoToolbox and returns factual observations or primitive-operation results.
 
-Until that migration passes the macOS integration gate, the old Swift Apple implementation remains a migration oracle. Its low-level parameters should not be reintroduced into the Rust CLI.
+The Rust-driven macOS gates prove structural output and the tested native consumer facts. Visual equivalence and interactive Photos behavior remain separate device-level claims and must not be inferred from a successful parser or adapter probe.

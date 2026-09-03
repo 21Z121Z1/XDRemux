@@ -1011,7 +1011,7 @@ fn build_meta(
 /// Add a Rust-produced Photographic Styles graph to an existing ISO HDR HEIF.
 ///
 /// This operation is deliberately resource-oriented: it does not invoke a
-/// solver, renderer, ImageIO, or a legacy Swift/Python implementation. The
+/// solver, renderer, ImageIO, or an external product implementation. The
 /// caller must supply the metadata and compressed resources, while Rust owns
 /// the graph policy, item IDs, references, offset relocation, and structural
 /// publication bytes.

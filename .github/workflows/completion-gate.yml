@@ -59,13 +59,13 @@ jobs:
               {
                 "name": "rust-workspace-clippy",
                 "kind": "static",
-                "command": ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
+                "command": ["cargo", "clippy", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"],
                 "timeout_seconds": 1800
               },
               {
                 "name": "rust-workspace-tests",
                 "kind": "regression",
-                "command": ["cargo", "test", "--workspace", "--locked"],
+                "command": ["cargo", "test", "--workspace", "--all-targets", "--locked"],
                 "timeout_seconds": 2400
               },
               {
@@ -93,15 +93,21 @@ jobs:
                 "timeout_seconds": 2400
               },
               {
-                "name": "raw-diagnostics-target-build",
-                "kind": "static",
-                "command": ["swift", "build", "--target", "CoreImageRAWDiagnostics"],
-                "timeout_seconds": 900
+                "name": "rust-component-conformance",
+                "kind": "integration",
+                "command": ["/bin/bash", "-lc", "set -euo pipefail; bash scripts/check_classification_conformance.sh; bash scripts/check_container_conformance.sh; bash scripts/check_format_conformance.sh; bash scripts/check_format_constructor_conformance.sh; bash scripts/check_hdr_edr_conformance.sh; bash scripts/check_hdr_gainmap_conformance.sh; bash scripts/check_heif_conformance.sh; bash scripts/check_metadata_conformance.sh; bash scripts/check_motion_photo_rust_conformance.sh"],
+                "timeout_seconds": 3600
+              },
+              {
+                "name": "rust-motion-photo-real-fixtures",
+                "kind": "functional",
+                "command": ["bash", "scripts/check_rust_motion_photo_real_fixtures.sh"],
+                "timeout_seconds": 3600
               },
               {
                 "name": "repository-policy-regressions",
                 "kind": "regression",
-                "command": ["python3", "-m", "unittest", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_swift_app_architecture"],
+                "command": ["python3", "-m", "unittest", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_app_architecture", "Tests.test_performance_design", "Tests.test_rust_artifact_lifecycle", "Tests.test_rust_apple_semantic_policy", "Tests.test_rust_portrait_translation"],
                 "timeout_seconds": 300
               }
             ]

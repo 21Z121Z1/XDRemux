@@ -29,7 +29,7 @@ const CDSC: FourCC = FourCC::new(*b"cdsc");
 const GRPL: FourCC = FourCC::new(*b"grpl");
 const ALTR: FourCC = FourCC::new(*b"altr");
 
-// Exact property bytes used by the current Swift writer. Keeping these local to
+// Exact property bytes required by the current consumer contract. Keeping these local to
 // the writer avoids broadening the already-sealed xdremux-format contract.
 const COLR_SRGB_BOX: &[u8] = &[
     0x00, 0x00, 0x00, 0x13, 0x63, 0x6f, 0x6c, 0x72, 0x6e, 0x63, 0x6c, 0x78, 0x00, 0x02, 0x00, 0x02,
@@ -395,7 +395,7 @@ fn resolved_extents(entry: &IlocEntry) -> Result<Vec<(u64, u64)>> {
         .collect()
 }
 
-/// Replaces the private JPEG Gain Map graph produced by the Swift passthrough
+/// Replaces the private JPEG Gain Map graph produced by the source passthrough
 /// stage with an HEVC tiled grid. The encoded tile samples and hvcC record are
 /// supplied by the caller; this function performs no image or codec work.
 pub fn replace_private_jpeg_gain_map_with_hevc_tiles(

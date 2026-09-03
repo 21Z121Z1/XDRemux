@@ -41,7 +41,7 @@ const STYLE_LINEAR_LIGHT_MAP_MAXIMUM: f32 = 0.758_300_8;
 
 // Apple ImageIO accepts the Styles auxiliary graph only when these resources
 // use the Main10 4:2:0 contract. These bytes are the checked-in neutral Style
-// Delta protocol resource already validated by the Swift migration oracle
+// Delta protocol resource already validated by the native consumer probe
 // (VideoToolbox Main10, 0.5 RGB, keyframe-only). They are a protocol fixture,
 // not a photo-specific payload or a product fallback.
 const NEUTRAL_STYLE_DELTA_ITEM_PAYLOAD: &[u8] = &[
@@ -1141,7 +1141,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn identity_statistics_match_swift_percentile_contract() {
+    fn identity_statistics_match_percentile_contract() {
         let values = [0.0, 0.25, 0.5, 0.75, 1.0];
         let distribution = xdremux_engine::apple_style_distribution(&values);
         assert_eq!(distribution.black_point, 0.005);
@@ -1159,7 +1159,7 @@ mod tests {
     }
 
     #[test]
-    fn semantic_matte_dimensions_match_swift_scaffold_fit_for_all_orientation_classes() {
+    fn semantic_matte_dimensions_match_scaffold_fit_for_all_orientation_classes() {
         assert_eq!(
             semantic_matte_dimensions(3064, 4080, 1, 2016).unwrap(),
             (1514, 2016)

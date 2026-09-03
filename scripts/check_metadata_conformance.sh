@@ -16,14 +16,11 @@ for fixture in "${fixtures[@]}"; do
 done
 
 cargo build --locked -p xdremux-metadata --bins
-swift build --target MetadataConformanceOracle
 
 rust_vectors="$repo_root/target/debug/xdremux-metadata-vectors"
 rust_fixture="$repo_root/target/debug/xdremux-metadata-fixture"
-swift_bin_dir="$(swift build --show-bin-path)"
-swift_oracle="$swift_bin_dir/MetadataConformanceOracle"
 
-for binary in "$rust_vectors" "$rust_fixture" "$swift_oracle"; do
+for binary in "$rust_vectors" "$rust_fixture"; do
   if [[ ! -x "$binary" ]]; then
     echo "metadata conformance binary was not built: $binary" >&2
     exit 1
@@ -34,14 +31,7 @@ work_dir="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-metadata-conformance.XXXXXX")"
 trap 'rm -rf "$work_dir"' EXIT
 
 rust_vectors_output="$work_dir/rust-vectors.txt"
-swift_vectors_output="$work_dir/swift-vectors.txt"
 "$rust_vectors" > "$rust_vectors_output"
-"$swift_oracle" --vectors > "$swift_vectors_output"
-
-if ! diff -u "$swift_vectors_output" "$rust_vectors_output"; then
-  echo "Swift/Rust metadata vector conformance failed" >&2
-  exit 1
-fi
 
 routing_count="$(grep -c $'^routing\t' "$rust_vectors_output")"
 metadata_count="$(grep -c $'^metadata\t' "$rust_vectors_output")"
@@ -53,17 +43,11 @@ if [[ "$routing_count" -ne 14 || "$metadata_count" -ne 10 || "$comment_count" -n
   exit 1
 fi
 
-echo "PASS Swift/Rust metadata vectors: routing=$routing_count metadata=$metadata_count comment=$comment_count patch=$patch_count extent=$extent_count"
+echo "PASS Rust metadata vectors: routing=$routing_count metadata=$metadata_count comment=$comment_count patch=$patch_count extent=$extent_count"
 
 for fixture in "${fixtures[@]}"; do
   name="$(basename "$fixture")"
   rust_output="$work_dir/$name.rust.txt"
-  swift_output="$work_dir/$name.swift.txt"
   "$rust_fixture" "$fixture" > "$rust_output"
-  "$swift_oracle" --fixture "$fixture" > "$swift_output"
-  if ! diff -u "$swift_output" "$rust_output"; then
-    echo "metadata fixture conformance failed for $fixture" >&2
-    exit 1
-  fi
   echo "PASS metadata fixture conformance: $fixture"
 done

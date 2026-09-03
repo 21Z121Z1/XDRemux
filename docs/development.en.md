@@ -2,7 +2,7 @@
 
 English | [简体中文](development.md)
 
-XDRemux has one product core: the Rust workspace. The only public CLI is the Rust `xdremux` binary. New product behavior belongs in Rust. Swift is an Apple platform capability layer during migration, and Python is migration/research tooling rather than a second XDRemux runtime.
+XDRemux has one product core: the Rust workspace. The only public CLI is the Rust `xdremux` binary. New product behavior belongs in Rust. Swift is limited to the Apple framework adapter, and Python is research/training tooling rather than a second XDRemux runtime.
 
 For user-facing command-line behavior, see the [CLI reference](cli.en.md).
 
@@ -51,7 +51,7 @@ A lower crate may provide a format primitive without making it a product mode. R
 
 ## Apple platform capabilities
 
-`Sources/XDRemuxAppleFeatures/` remains only as a migration oracle while Photographic Styles, Portrait, RAW, Vision, Core ML, AVFoundation, and other historical Apple-framework behavior is audited for Rust consumer parity. New product behavior must not enter this target.
+`Sources/XDRemuxAppleAdapter/` is the only Swift package source. It contains the Apple framework primitives that the Rust runtime cannot call portably. The former Swift conversion/core/oracle targets have been removed; new product behavior must not enter Swift.
 
 The boundary is intentionally narrow:
 
@@ -60,34 +60,28 @@ The boundary is intentionally narrow:
 - Do not add new cross-platform product policy to Swift.
 - Do not return business conclusions such as “convertible” or “valid portrait” when the adapter can return lower-level framework facts and Rust can decide the policy.
 
-`xdremux-apple-adapter` is a distributable platform component, not a user CLI. The current CLI/runtime boundary is a versioned JSON helper protocol with bounded process lifetime and separate machine-readable stdout/diagnostic stderr. `xdremux-runtime` owns that transport; `xdremux-engine` does not know about processes, paths, JSON, Swift, or XPC. The macOS app also invokes the Rust `xdremux` binary and does not link the Swift conversion targets.
+`xdremux-apple-adapter` is a distributable platform component, not a user CLI. The current CLI/runtime boundary is a versioned JSON helper protocol with bounded process lifetime and separate machine-readable stdout/diagnostic stderr. `xdremux-runtime` owns that transport; `xdremux-engine` does not know about processes, paths, JSON, Swift, or XPC. The macOS app also invokes the Rust `xdremux` binary and does not link Swift product code.
 
 For a sandboxed macOS app, prefer XPC when the Apple capability process needs separate sandboxing, entitlements, lifecycle, or crash isolation. The transport must remain replaceable without changing engine or public CLI semantics. Use an in-process C ABI only for a capability that actually benefits from direct in-process interoperability; do not make FFI the default architecture merely to avoid a helper process.
 
 ImageIO auxiliary-resource probing is the first migrated operation. The Swift adapter reports only framework observations such as Gain Map, disparity, Portrait Effects Matte, and semantic mattes. Rust owns the rule that decides whether those facts satisfy the Portrait editing contract.
 
-`CoreImageRAWDiagnostics` remains a developer-only Swift target:
-
-```bash
-swift build --target CoreImageRAWDiagnostics
-```
-
-Swift tests remain useful for Apple capability acceptance and migration oracles, but they do not define the canonical CLI contract.
+SwiftPM contains only the adapter executable. Its build verifies the platform primitive boundary; Rust tests and Rust-driven consumer checks define the product contract.
 
 ## Python tooling
 
-The Python package requires Python 3.11 or newer and is retained for migration-time conformance, real-fixture oracles, and research/training workflows. It does not install a CLI and must not define new product semantics.
+The Python package requires Python 3.11 or newer and contains only research/training code. It does not install a CLI, participate in the runtime, or define product semantics.
 
-Install the tooling only when a Python oracle or research workflow requires it:
+Install the tooling only when a Python research workflow requires it:
 
 ```bash
 python -m pip install -e .
-python -m unittest discover -s Tests -v
+python -m unittest Tests.test_apple_reverse_key1_training
 ```
 
-Runtime dependencies currently include `pillow-heif`, `Pillow`, `numpy`, and `piexif`. The optional `training` dependency adds PyTorch.
+Research dependencies currently include `Pillow` and `numpy`. The optional `training` dependency adds PyTorch.
 
-Training and evaluation scripts may remain in Python because they are research tooling, not a second XDRemux implementation.
+Training and evaluation scripts may remain in the Python research package because they are tooling, not a second XDRemux implementation.
 
 ## Repository layout
 
@@ -95,18 +89,15 @@ Training and evaluation scripts may remain in Python because they are research t
 | --- | --- |
 | `crates/` | Canonical Rust product stack. |
 | `Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
-| `Sources/XDRemuxAppleFeatures/` | Undeleted migration oracle; not a public product. |
-| `Sources/XDRemuxCore/` | Legacy Swift core retained only while replacement evidence is incomplete. |
-| `Sources/CoreImageRAWDiagnostics/` | Developer RAW diagnostics. |
-| `xdremux_py/` | Migration oracles and research/training tooling; no product CLI. |
-| `apps/macos/XDRemuxApp/` | macOS SwiftUI app during product-stack migration. |
-| `Tests/` | Canonical and migration-time acceptance tests and validation harnesses. |
+| `xdremux_py/` | Research/training tooling; no product CLI or converter. |
+| `apps/macos/XDRemuxApp/` | macOS SwiftUI presentation shell that invokes the Rust CLI. |
+| `Tests/` | Rust acceptance policy tests and validation harnesses. |
 | `fixtures/` | Versioned real media fixtures used by strict gates. |
 | `scripts/` | Build, evaluation, migration, and acceptance utilities. |
 | `docs/` | Current guidance and historical research records. |
 | `Models/` | Optional research models and model documentation. |
 
-Legacy Swift/Python code should receive only migration, conformance, safety, or deletion work. New user-visible behavior belongs in Rust.
+New user-visible behavior belongs in Rust. Swift changes must remain framework primitives, and Python changes must remain research tooling.
 
 ## Apple helper lifecycle
 
@@ -129,7 +120,7 @@ scripts/build_and_run.sh logs
 scripts/build_and_run.sh clean
 ```
 
-During migration, the app may still link Swift package code. Do not treat that dependency as ownership of the canonical conversion policy; move reusable product behavior into Rust first.
+The app bundles the Rust CLI and Apple adapter as helpers. It owns presentation state and receipt translation only; conversion policy remains in Rust.
 
 ## Debug and research controls
 

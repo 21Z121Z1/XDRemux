@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xdremux-python-tools"
-description = "Migration-time conformance and research tooling for XDRemux"
+description = "Research and training tooling for XDRemux"
 readme = "README.md"
 requires-python = ">=3.11"
 dynamic = ["version"]
@@ -15,10 +15,8 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 dependencies = [
-    "pillow-heif>=0.15.0",
     "Pillow>=11.0.0",
     "numpy>=2.0.0",
-    "piexif>=1.1.3",
 ]
 
 [project.optional-dependencies]
@@ -33,8 +31,8 @@ Documentation = "https://github.com/21Z121Z1/XDRemux/blob/main/docs/development.
 [tool.hatch.version]
 path = "xdremux_py/__init__.py"
 
-# Flat layout on purpose: CI and validation scripts run from the repository
-# root without installing a second XDRemux product entry point.
+# Flat layout on purpose: research scripts run from the repository root without
+# installing a second XDRemux product entry point.
 [tool.hatch.build.targets.wheel]
 packages = ["xdremux_py"]
 
@@ -42,7 +40,8 @@ packages = ["xdremux_py"]
 # and xdremux/README.md. docs/ is VCS-ignored and cannot be packaged.
 [tool.hatch.build.targets.sdist]
 include = [
-    "/xdremux_py",
+    "/xdremux_py/__init__.py",
+    "/xdremux_py/apple_reverse_key1_training.py",
     "/README.md",
     "/README.en.md",
 ]

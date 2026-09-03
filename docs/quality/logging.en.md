@@ -8,7 +8,7 @@ For command options, see the [CLI reference](../cli.en.md).
 
 ## Human-readable output
 
-Normal Swift and Python conversion commands print human-readable progress.
+The Rust CLI prints human-readable progress for normal product commands.
 
 Use stdout for normal progress and result lines.
 
@@ -18,11 +18,12 @@ Do not add a second general logging protocol unless the CLI contract explicitly 
 
 ## Machine-readable commands
 
-The Swift commands below write JSON to stdout:
+The Rust commands below write JSON to stdout:
 
-- `validate-apple`
-- `validate-portrait`
-- `portrait-self-test`
+- `inspect --json`
+- `batch --json`
+- `categorize --json`
+- `validate --json`
 
 Do not mix unrelated progress text into the JSON stdout stream of these commands.
 
@@ -40,36 +41,21 @@ Do not replace a critical thrown error with an unstructured `print` and then con
 
 ## Exit status
 
-Swift and Python do not use the same parser implementation.
-
-For Swift:
-
-- normal success uses `0`;
-- runtime failures use `1`;
-- Swift Argument Parser owns parser-level usage exits;
-- Motion Photo pre-routing failures caught by `main.swift` use `1`.
-
-For Python:
-
-- normal success uses `0`;
-- runtime command failures use `1`;
-- `argparse` parser-level usage errors use `2`.
-
-Do not publish one shared numeric exit table unless both implementations actually share that behavior.
+The Rust CLI uses `0` for success/help/version, `1` for runtime conversion or validation failures, and `2` for command-line syntax or usage errors. Do not invent a second product exit-code contract in the adapter or research tooling.
 
 ## Diagnostics
 
-Some conversion paths print diagnostic lines that identify the selected implementation path.
+Some conversion paths print diagnostic lines that identify selected source facts or product outcomes.
 
 Tests can depend on exact diagnostic text. Search for assertions before changing a diagnostic string.
 
 `--debug-dir` can retain diagnostic artifacts for supported conversion paths.
 
-Apple feature failures can also retain evidence or helper output when their implementation requires it.
+Apple capability failures can also retain evidence or helper output when the platform operation requires it.
 
 ## Library boundary
 
-`XDRemuxCore` is a library. It should expose structured results, warnings, and errors instead of depending on terminal formatting.
+The Rust runtime and crates are libraries. They should expose structured results, warnings, and errors instead of depending on terminal formatting.
 
 Terminal formatting and localization belong at the CLI or app presentation layer.
 

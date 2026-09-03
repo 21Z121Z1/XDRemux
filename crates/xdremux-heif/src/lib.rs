@@ -16,7 +16,7 @@ pub use direct::{
 pub use error::{HeifError, Result};
 // Canonical portable final-file assembly. It consumes an ordinary source HEIF
 // directly, replaces an existing canonical gain-map graph when present, and
-// does not depend on a Python/Swift-generated intermediate graph.
+// does not depend on an externally generated intermediate graph.
 pub use native::IsoGainMapAssembly;
 pub use semantic::{merge_apple_semantic_auxiliary_heif, transplant_apple_semantic_auxiliary_heif};
 pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};

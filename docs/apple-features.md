@@ -2,17 +2,17 @@
 
 [English](apple-features.en.md) | 简体中文
 
-摄影风格和 Apple 人像是 XDRemux 当前剩余最大的 Apple 特有所有权迁移块。它们不是第二套产品栈。
+摄影风格和 Apple 人像已经是 XDRemux 中由 Rust 持有的产品 intent。它们不是第二套产品栈。
 
-Canonical 公开产品是 Rust `xdremux` CLI。旧 Swift Apple 实现只作为迁移 oracle，以及目前仍需要 ImageIO、Core Image、Vision、Core ML、AVFoundation 等 Apple framework 的平台能力实现继续存在。
+Canonical 公开产品是 Rust `xdremux` CLI。Swift target 只作为无法跨平台完成的 Apple framework adapter，例如 ImageIO consumer probing、Vision observation 和 VideoToolbox encoding。
 
 ## 当前可用性
 
 标准 HDR、OPPO 兼容输出、Motion Photo → Live Photo、batch、分类、inspect 和 portable validation 已属于 canonical Rust 产品。
 
-摄影风格和 Apple 人像目前还没有作为稳定命令/参数暴露在 canonical Rust CLI 中。不要把 legacy Swift-only 参数当成新的产品规范。
+摄影风格和 Apple 人像通过 `convert`/`batch` 的产品 intent 表达，不新增 Apple 专用 CLI 子命令，也不把 adapter 或 solver 的底层控制暴露为公开契约。
 
-只有在 Rust 持有 feature request/result model、routing、fallback、validation policy 和 publication lifecycle，而 Apple-native 代码只执行 Rust 请求的平台 operation 时，Apple feature ownership migration 才算完成。
+Rust 持有 feature request/result model、routing、fallback、validation policy、metadata synthesis、assembly 和 publication lifecycle。Apple-native 代码只执行 Rust 请求的平台 operation，并返回事实 observation。
 
 ## 平台边界
 
@@ -52,23 +52,17 @@ adapter 不回答“这是不是有效人像输出”这类业务问题。该判
 
 ## 摄影风格迁移
 
-旧 Swift 实现仍包含大量 style generation 和 Apple-framework 行为，包括 semantic analysis、Core ML 路径、constrained style-data generation 和 Apple-specific consumer validation。
+Rust 持有 style generation 语义、constrained search、source-bound policy、key1/property-list synthesis、graph assembly、validation policy 和 publication。adapter 只执行 Rust runtime 请求的 framework observation 或 encoding primitive。
 
-不要把它现有的命令行参数或内部 producer selection 机械移植进 Rust。应把实现拆成窄平台 operation，例如 framework analysis 或 model execution，而 feature routing 和产品默认值由 Rust 持有。
-
-研究型 producer、model experiment、donor diagnostic 和 RAW experiment 继续作为 research tooling，不定义公开 CLI 契约。
+研究型 producer、model experiment、donor diagnostic 和 RAW experiment 继续作为 research tooling，不定义公开 CLI 契约，也不构成第二套 runtime。
 
 ## Apple 人像迁移
 
-旧 Swift Portrait pipeline 仍执行 Apple-framework decoding/writing，并且还包含正在从 Swift 移出的 policy。
-
-第一块 policy 已开始转移到 Rust：ImageIO 只报告 auxiliary-resource facts，由 Rust 判断完整 resource set 是否满足 Portrait editing contract。
-
-后续继续按同一方向迁移。OPPO block parsing、JPEG/container logic、Gain Map policy、feature routing、output naming 和 validation policy 属于 Rust；只有确实需要 Apple framework 的 operation 留在 Apple capability layer。
+Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy、JPEG/container logic、Gain Map policy、REND generation、auxiliary-manifest construction、feature routing、output naming、validation policy 和 atomic publication。ImageIO 只报告 auxiliary-resource facts，adapter 只执行 Rust transaction 要求的 Apple framework operation。
 
 ## Live Photo
 
-普通 Motion Photo → Live Photo 已经是 Rust 产品能力，不应重新绕回 legacy Swift Apple feature engine。
+普通 Motion Photo → Live Photo 已经是 Rust 产品能力，不应绕回 Apple capability adapter。
 
 如果未来组合功能需要对 Live Photo 静态照片执行 Apple-only operation，Rust 仍必须持有 Live Photo asset lifecycle、pair identity、publication 和 validation ordering。Apple adapter 只接收它真正需要执行的窄平台 operation。
 
@@ -88,7 +82,7 @@ adapter 不回答“这是不是有效人像输出”这类业务问题。该判
 
 涉及 Apple Photos 交互式编辑的结论，不能用结构证据替代真机证据。
 
-Canonical completion gate 要求 Rust workspace 和真实 Rust → Apple adapter handshake 在 macOS 上通过。每迁移一个 Apple operation，应补对应 replacement gate。只有 replacement evidence 完成后，才删除相应 legacy Swift 实现。
+Canonical completion gate 要求 Rust workspace 和真实 Rust → Apple adapter handshake 在 macOS 上通过。feature-specific gate 驱动 Rust CLI 后查询 Apple consumer facts。结构和 native-framework evidence 本身不等于 visual equivalence 或 Photos 真机验收。
 
 ## 研究材料
 
