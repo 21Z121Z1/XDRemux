@@ -5,9 +5,14 @@ The benchmark intentionally measures end-to-end process behavior rather than
 isolated helpers. It therefore includes source I/O, parsing, codec work,
 publication, and (for Apple features) adapter process/framework overhead.
 
+HDR cases name both the source family and the resolved product Gain Map layout.
+This is deliberate: Standard LHDR is monochrome 4:0:0 while Standard UHDR is
+RGB 4:4:4, and OPPO-compatible output is RGB 4:2:0 for both source families.
+Those workloads are not interchangeable performance samples.
+
 This script records evidence; it does not invent a regression budget. Commit a
 baseline only after repeated runs on a stable runner demonstrate normal
-variance, then add a separate comparison gate.
+variance, then add or update the separate comparison gate.
 """
 
 from __future__ import annotations
@@ -19,7 +24,6 @@ import os
 from pathlib import Path
 import platform
 import re
-import shutil
 import statistics
 import subprocess
 import sys
@@ -41,6 +45,10 @@ class Case:
     args: tuple[str, ...]
     expected: tuple[str, ...]
     apple: bool = False
+    source_family: str | None = None
+    gain_map_channels: str | None = None
+    gain_map_chroma: str | None = None
+    codec_path: str | None = None
 
     @property
     def input_bytes(self) -> int:
@@ -91,35 +99,72 @@ def run_timed(command: list[str], env: dict[str, str]) -> tuple[float, int, str,
 
 
 def cases(cli: Path, apple_adapter: Path | None) -> list[Case]:
-    proxdr = ROOT / "fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic"
+    del cli  # The CLI path belongs to execution, not workload identity.
+    lhdr = ROOT / "fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-01.heic"
+    uhdr = ROOT / "fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic"
     portrait = ROOT / "fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic"
-    proxdr2 = ROOT / "fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v1-01.heic"
+    uhdr2 = ROOT / "fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v1-01.heic"
     jpeg_motion = ROOT / "fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg"
     heif_motion = ROOT / "fixtures/motion-photo/samsung/heif-ultrahdr-01.heic"
-    required = (proxdr, portrait, proxdr2, jpeg_motion, heif_motion)
+    required = (lhdr, uhdr, portrait, uhdr2, jpeg_motion, heif_motion)
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
         raise RuntimeError(f"benchmark fixtures are missing: {missing}")
 
     result = [
         Case(
-            "standard-hdr",
-            (proxdr,),
-            ("convert", "--input", str(proxdr), "--output", "{work}/output.heic"),
+            "hdr-lhdr-mono400",
+            (lhdr,),
+            ("convert", "--input", str(lhdr), "--output", "{work}/output.heic"),
             ("output.heic",),
+            source_family="lhdr",
+            gain_map_channels="mono",
+            gain_map_chroma="400",
+            codec_path="portable-libheif",
         ),
         Case(
-            "oppo-compatible",
-            (proxdr,),
+            "hdr-uhdr-rgb444",
+            (uhdr,),
+            ("convert", "--input", str(uhdr), "--output", "{work}/output.heic"),
+            ("output.heic",),
+            source_family="uhdr",
+            gain_map_channels="rgb",
+            gain_map_chroma="444",
+            codec_path="portable-libheif",
+        ),
+        Case(
+            "oppo-compatible-lhdr-rgb420",
+            (lhdr,),
             (
                 "convert",
                 "--input",
-                str(proxdr),
+                str(lhdr),
                 "--output",
                 "{work}/output.heic",
                 "--oppo-compatible",
             ),
             ("output.heic",),
+            source_family="lhdr",
+            gain_map_channels="rgb",
+            gain_map_chroma="420",
+            codec_path="portable-libheif",
+        ),
+        Case(
+            "oppo-compatible-uhdr-rgb420",
+            (uhdr,),
+            (
+                "convert",
+                "--input",
+                str(uhdr),
+                "--output",
+                "{work}/output.heic",
+                "--oppo-compatible",
+            ),
+            ("output.heic",),
+            source_family="uhdr",
+            gain_map_channels="rgb",
+            gain_map_chroma="420",
+            codec_path="portable-libheif",
         ),
         Case(
             "motion-jpeg",
@@ -135,15 +180,15 @@ def cases(cli: Path, apple_adapter: Path | None) -> list[Case]:
         ),
         Case(
             "batch-3",
-            (proxdr, portrait, proxdr2),
+            (uhdr, portrait, uhdr2),
             (
                 "batch",
                 "--input",
-                str(proxdr),
+                str(uhdr),
                 "--input",
                 str(portrait),
                 "--input",
-                str(proxdr2),
+                str(uhdr2),
                 "--output-dir",
                 "{work}/batch",
                 "--jobs",
@@ -169,6 +214,8 @@ def cases(cli: Path, apple_adapter: Path | None) -> list[Case]:
                     ),
                     ("portrait.heic",),
                     apple=True,
+                    source_family="uhdr",
+                    codec_path="product-e2e-with-apple-adapter",
                 ),
                 Case(
                     "apple-styles",
@@ -183,6 +230,8 @@ def cases(cli: Path, apple_adapter: Path | None) -> list[Case]:
                     ),
                     ("styles.heic",),
                     apple=True,
+                    source_family="uhdr",
+                    codec_path="product-e2e-with-apple-adapter",
                 ),
             ]
         )
@@ -228,7 +277,12 @@ def measure_case(
     median_wall = statistics.median(wall)
     return {
         "name": case.name,
+        "measurement_layer": "product-e2e",
         "apple": case.apple,
+        "source_family": case.source_family,
+        "gain_map_channels": case.gain_map_channels,
+        "gain_map_chroma": case.gain_map_chroma,
+        "codec_path": case.codec_path,
         "input_bytes": case.input_bytes,
         "iterations": iterations,
         "samples": samples,
@@ -275,6 +329,7 @@ def main() -> int:
 
     report: dict[str, object] = {
         "schema_version": 1,
+        "measurement_layer": "product-e2e",
         "head": git_head(),
         "platform": platform.platform(),
         "machine": platform.machine(),
