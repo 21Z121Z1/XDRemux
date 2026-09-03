@@ -28,6 +28,7 @@ APPLE_PROTOCOL_CLIENTS = tuple(
         "scripts/check_rust_cli_apple_portrait.sh",
         "scripts/check_rust_style_consumer.sh",
         "scripts/build_apple_device_validation.sh",
+        "scripts/benchmark_apple_videotoolbox_primitive.py",
     )
 )
 
