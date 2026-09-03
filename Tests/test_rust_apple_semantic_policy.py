@@ -22,7 +22,7 @@ ADAPTER = "\n".join(
     for path in sorted((ROOT / "Sources" / "XDRemuxAppleAdapter").glob("*.swift"))
 )
 APPLE_PROTOCOL_CLIENTS = tuple(
-    (ROOT / path).read_text(encoding="utf-8")
+    (path, (ROOT / path).read_text(encoding="utf-8"))
     for path in (
         "scripts/check_apple_adapter_handshake.sh",
         "scripts/check_rust_cli_apple_portrait.sh",
@@ -123,15 +123,23 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
             f'"schema_version":{rust_version - 1}',
             f'"schema_version": {rust_version - 1}',
         )
-        for client in APPLE_PROTOCOL_CLIENTS:
+        for path, client in APPLE_PROTOCOL_CLIENTS:
+            declares_current_constant = re.search(
+                rf"\bSCHEMA_VERSION\s*=\s*{rust_version}\b", client
+            ) is not None
             self.assertTrue(
-                any(pattern in client for pattern in compact_patterns),
-                "Apple protocol client does not declare the runtime/helper schema version",
+                declares_current_constant
+                or any(pattern in client for pattern in compact_patterns),
+                f"Apple protocol client {path} does not declare the runtime/helper schema version",
             )
             if rust_version > 1:
+                declares_stale_constant = re.search(
+                    rf"\bSCHEMA_VERSION\s*=\s*{rust_version - 1}\b", client
+                ) is not None
                 self.assertFalse(
-                    any(pattern in client for pattern in stale_patterns),
-                    "Apple protocol client still contains the immediately previous schema version",
+                    declares_stale_constant
+                    or any(pattern in client for pattern in stale_patterns),
+                    f"Apple protocol client {path} still contains the immediately previous schema version",
                 )
 
     def test_rust_runtime_composes_adapter_at_one_boundary(self) -> None:
