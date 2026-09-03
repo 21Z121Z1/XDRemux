@@ -1,9 +1,8 @@
 use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
 use xdremux_engine::{
     build_apple_portrait_disparity_payload, build_apple_portrait_effects_matte_payload,
-    build_apple_semantic_matte_payload, AppleAuxiliaryError, AppleAuxiliaryPayload,
-    AppleGainMapFacts, AppleL8Mask, ApplePortraitCameraCalibration, ApplePortraitDisparity,
-    AppleSemanticRole,
+    build_apple_semantic_matte_payload, AppleAuxiliaryPayload, AppleGainMapFacts, AppleL8Mask,
+    ApplePortraitCameraCalibration, ApplePortraitDisparity, AppleSemanticRole,
 };
 
 #[cfg(any(target_os = "macos", test))]
@@ -13,7 +12,12 @@ use ruzstd::decoding::StreamingDecoder;
 #[cfg(any(target_os = "macos", test))]
 use std::io::Read;
 #[cfg(any(target_os = "macos", test))]
-use xdremux_container::{extract_oppo_portrait_source, parse_oppo_portrait_depth};
+use xdremux_container::{
+    extract_oppo_portrait_source, parse_oppo_portrait_depth, select_oppo_portrait_focus,
+    OppoPortraitFocusRegion,
+};
+#[cfg(any(target_os = "macos", test))]
+use xdremux_engine::build_apple_portrait_rendering_parameters;
 #[cfg(any(target_os = "macos", test))]
 use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
 
@@ -34,6 +38,10 @@ use crate::apple_adapter::{AppleAdapterClient, AppleImageProperties};
 
 #[cfg(any(target_os = "macos", test))]
 const MAX_DECODED_PORTRAIT_DEPTH_BYTES: u64 = 256 * 1024 * 1024;
+#[cfg(any(target_os = "macos", test))]
+const PRIVATE_GAIN_MAP_INFO_BYTES: usize = 20 * std::mem::size_of::<f32>();
+#[cfg(any(target_os = "macos", test))]
+const PRIVATE_GAIN_MAP_ALTERNATE_HEADROOM_INDEX: usize = 17;
 #[cfg(target_os = "macos")]
 const OPPO_PORTRAIT_PRIOR_SPATIAL_SIGMA: f32 = 3.0;
 #[cfg(target_os = "macos")]
@@ -66,40 +74,139 @@ impl ApplePortraitSourcePreflight {
     /// Consume a completed Rust-owned Portrait preflight into the exact
     /// auxiliary resource set required by Apple Photos Portrait editing.
     ///
-    /// ImageIO is deliberately absent from this contract: the platform adapter
-    /// receives only these generic payloads and performs the framework write.
-    pub fn into_auxiliary_payloads(
-        self,
-        rendering_parameters: &[u8],
-    ) -> std::result::Result<Vec<AppleAuxiliaryPayload>, AppleAuxiliaryError> {
+    /// The caller supplies no REND or Apple product policy. Rust derives the
+    /// producer focus state, Gain Map headroom and per-image rendering
+    /// parameters, while ImageIO remains only the platform writer.
+    #[cfg(any(target_os = "macos", test))]
+    pub fn into_auxiliary_payloads(self) -> Result<Vec<AppleAuxiliaryPayload>> {
+        let focus_region = producer_focus_region(&self.config, self.base_width, self.base_height)?;
+        let focus = select_oppo_portrait_focus(
+            &self.depth,
+            &self.config,
+            self.base_width,
+            self.base_height,
+            focus_region,
+        )
+        .map_err(|error| RuntimeError::external("Apple Portrait focus selection", error))?;
+        let disparity_span = f64::from(self.disparity.near - self.disparity.far);
+        let focus_disparity = self
+            .disparity
+            .focus_disparity(focus.selected_rank, self.depth.header.disparity_exponentiation)
+            .map_err(|error| RuntimeError::external("Apple Portrait focus disparity", error))?;
+        let gain_map_headroom =
+            private_gain_map_headroom(self.private_gain_map_info.as_deref())?;
+        let rendering_parameters = build_apple_portrait_rendering_parameters(
+            self.camera_calibration.profile,
+            focus_disparity,
+            disparity_span,
+            gain_map_headroom,
+            self.config.aec_lux_index.map(f64::from),
+            self.depth.header.near_object_detected,
+        )
+        .map_err(|error| RuntimeError::external("Apple Portrait REND", error))?;
+
         let mut payloads = Vec::with_capacity(6);
-        payloads.push(build_apple_portrait_disparity_payload(
-            self.disparity,
-            self.base_orientation,
-            &self.camera_calibration,
-            rendering_parameters,
-            self.simulated_aperture,
-        )?);
-        payloads.push(build_apple_portrait_effects_matte_payload(
-            self.portrait_effects_matte.width,
-            self.portrait_effects_matte.height,
-            self.portrait_effects_matte.pixels,
-        )?);
+        payloads.push(
+            build_apple_portrait_disparity_payload(
+                self.disparity,
+                self.base_orientation,
+                &self.camera_calibration,
+                &rendering_parameters,
+                self.simulated_aperture,
+            )
+            .map_err(|error| RuntimeError::external("Apple Portrait disparity payload", error))?,
+        );
+        payloads.push(
+            build_apple_portrait_effects_matte_payload(
+                self.portrait_effects_matte.width,
+                self.portrait_effects_matte.height,
+                self.portrait_effects_matte.pixels,
+            )
+            .map_err(|error| {
+                RuntimeError::external("Apple Portrait effects matte payload", error)
+            })?,
+        );
         for (role, matte) in [
             (AppleSemanticRole::Skin, self.skin_matte),
             (AppleSemanticRole::Hair, self.hair_matte),
             (AppleSemanticRole::Teeth, self.teeth_matte),
             (AppleSemanticRole::Glasses, self.glasses_matte),
         ] {
-            payloads.push(build_apple_semantic_matte_payload(
-                role,
-                matte.width,
-                matte.height,
-                matte.pixels,
-            )?);
+            payloads.push(
+                build_apple_semantic_matte_payload(role, matte.width, matte.height, matte.pixels)
+                    .map_err(|error| {
+                        RuntimeError::external("Apple Portrait semantic matte payload", error)
+                    })?,
+            );
         }
         Ok(payloads)
     }
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn producer_focus_region(
+    config: &OppoPortraitConfig,
+    base_width: u32,
+    base_height: u32,
+) -> Result<OppoPortraitFocusRegion> {
+    if base_width == 0 || base_height == 0 {
+        return Err(RuntimeError::new(
+            "Apple Portrait focus",
+            "base image geometry is invalid",
+        ));
+    }
+    let x = f64::from(config.focus_x) / f64::from(base_width);
+    let y = f64::from(config.focus_y) / f64::from(base_height);
+    if !(0.0..1.0).contains(&x) || !(0.0..1.0).contains(&y) {
+        return Err(RuntimeError::new(
+            "Apple Portrait focus",
+            "OPPO producer focus point is outside the portrait base image",
+        ));
+    }
+    Ok(OppoPortraitFocusRegion {
+        x,
+        y,
+        width: 0.12,
+        height: 0.12,
+    })
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn private_gain_map_headroom(private_info: Option<&[u8]>) -> Result<f64> {
+    let private_info = private_info.ok_or_else(|| {
+        RuntimeError::new(
+            "Apple Portrait Gain Map headroom",
+            "private local.uhdr.gainmap.info is unavailable",
+        )
+    })?;
+    if private_info.len() != PRIVATE_GAIN_MAP_INFO_BYTES {
+        return Err(RuntimeError::new(
+            "Apple Portrait Gain Map headroom",
+            format!(
+                "private gain info has {} bytes; expected {PRIVATE_GAIN_MAP_INFO_BYTES}",
+                private_info.len()
+            ),
+        ));
+    }
+    let offset = PRIVATE_GAIN_MAP_ALTERNATE_HEADROOM_INDEX * std::mem::size_of::<f32>();
+    let raw: [u8; 4] = private_info[offset..offset + 4]
+        .try_into()
+        .expect("validated private gain-info length");
+    let alternate_headroom_ratio = f64::from(f32::from_le_bytes(raw));
+    if !alternate_headroom_ratio.is_finite() || alternate_headroom_ratio <= 0.0 {
+        return Err(RuntimeError::new(
+            "Apple Portrait Gain Map headroom",
+            "private alternate headroom ratio must be finite and positive",
+        ));
+    }
+    let headroom = alternate_headroom_ratio.max(1.0).log2().max(0.0);
+    if !headroom.is_finite() {
+        return Err(RuntimeError::new(
+            "Apple Portrait Gain Map headroom",
+            "derived Gain Map headroom is not finite",
+        ));
+    }
+    Ok(headroom)
 }
 
 #[cfg(any(target_os = "macos", test))]
@@ -528,6 +635,33 @@ mod tests {
             usize::try_from(depth.header.width).unwrap()
                 * usize::try_from(depth.header.height).unwrap()
         );
+    }
+
+    #[test]
+    fn private_gain_map_headroom_matches_the_swift_stop_mapping() {
+        let expected = 3.466_976_881_027_221_7_f64;
+        let ratio = 2.0_f32.powf(expected as f32);
+        let mut info = vec![0_u8; PRIVATE_GAIN_MAP_INFO_BYTES];
+        let offset = PRIVATE_GAIN_MAP_ALTERNATE_HEADROOM_INDEX * std::mem::size_of::<f32>();
+        info[offset..offset + 4].copy_from_slice(&ratio.to_le_bytes());
+        let actual = private_gain_map_headroom(Some(&info)).expect("derive Gain Map headroom");
+        assert!((actual - expected).abs() < 1e-5, "actual={actual} expected={expected}");
+        assert!(private_gain_map_headroom(None).is_err());
+        assert!(private_gain_map_headroom(Some(&info[..info.len() - 1])).is_err());
+    }
+
+    #[test]
+    fn producer_focus_region_uses_the_stored_oppo_focus_point() {
+        let source = portrait_fixture();
+        let source = extract_oppo_portrait_source(&source).expect("extract OPPO portrait source");
+        let split = split_portrait_source_image(&source.source_image)
+            .expect("split adjacent base/Gain Map JPEGs");
+        let focus = producer_focus_region(&source.config, split.base_width, split.base_height)
+            .expect("resolve producer focus region");
+        assert!((0.0..1.0).contains(&focus.x));
+        assert!((0.0..1.0).contains(&focus.y));
+        assert_eq!(focus.width, 0.12);
+        assert_eq!(focus.height, 0.12);
     }
 
     #[test]
