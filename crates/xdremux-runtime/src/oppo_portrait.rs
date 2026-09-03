@@ -152,11 +152,30 @@ fn producer_focus_region(
             "OPPO producer focus point is outside the portrait base image",
         ));
     }
+    let rectangle = config
+        .focus_rectangle
+        .filter(|_| config.focus_rectangle_is_valid);
+    let width = rectangle
+        .and_then(|rectangle| {
+            let delta = i64::from(rectangle[2]).checked_sub(i64::from(rectangle[0]))?;
+            let value = delta.unsigned_abs() as f64 / f64::from(base_width);
+            value.is_finite().then_some(value)
+        })
+        .unwrap_or(0.12)
+        .clamp(0.02, 1.0);
+    let height = rectangle
+        .and_then(|rectangle| {
+            let delta = i64::from(rectangle[3]).checked_sub(i64::from(rectangle[1]))?;
+            let value = delta.unsigned_abs() as f64 / f64::from(base_height);
+            value.is_finite().then_some(value)
+        })
+        .unwrap_or(0.12)
+        .clamp(0.02, 1.0);
     Ok(OppoPortraitFocusRegion {
         x,
         y,
-        width: 0.12,
-        height: 0.12,
+        width,
+        height,
     })
 }
 
@@ -659,12 +678,37 @@ mod tests {
         let source = extract_oppo_portrait_source(&source).expect("extract OPPO portrait source");
         let split = split_portrait_source_image(&source.source_image)
             .expect("split adjacent base/Gain Map JPEGs");
-        let focus = producer_focus_region(&source.config, split.base_width, split.base_height)
+        let mut config = source.config;
+        config.focus_rectangle = None;
+        config.focus_rectangle_is_valid = false;
+        let focus = producer_focus_region(&config, split.base_width, split.base_height)
             .expect("resolve producer focus region");
-        assert!((0.0..1.0).contains(&focus.x));
-        assert!((0.0..1.0).contains(&focus.y));
+        assert_eq!(
+            focus.x,
+            f64::from(config.focus_x) / f64::from(split.base_width)
+        );
+        assert_eq!(
+            focus.y,
+            f64::from(config.focus_y) / f64::from(split.base_height)
+        );
         assert_eq!(focus.width, 0.12);
         assert_eq!(focus.height, 0.12);
+    }
+
+    #[test]
+    fn producer_focus_region_uses_valid_focus_rectangle_dimensions() {
+        let source = portrait_fixture();
+        let source = extract_oppo_portrait_source(&source).expect("extract OPPO portrait source");
+        let split = split_portrait_source_image(&source.source_image)
+            .expect("split adjacent base/Gain Map JPEGs");
+        let mut config = source.config;
+        config.focus_rectangle = Some([10, 20, 110, 220]);
+        config.focus_rectangle_is_valid = true;
+
+        let focus = producer_focus_region(&config, split.base_width, split.base_height)
+            .expect("resolve producer focus region with rectangle");
+        assert!((focus.width - 100.0 / f64::from(split.base_width)).abs() < 1e-12);
+        assert!((focus.height - 200.0 / f64::from(split.base_height)).abs() < 1e-12);
     }
 
     #[test]

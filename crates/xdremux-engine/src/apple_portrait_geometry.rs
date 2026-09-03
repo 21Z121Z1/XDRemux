@@ -247,6 +247,21 @@ pub struct ApplePortraitImageGeometry {
     pub orientation: Option<u8>,
 }
 
+/// A normalized Portrait focus point and its associated region.
+///
+/// The point coordinates follow the legacy producer contract: `x` and `y`
+/// identify the focus point, while `width` and `height` describe the region
+/// around that point. This is intentionally separate from the container
+/// module's storage-space ROI type so the EXIF transform stays in the Rust
+/// product geometry layer.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ApplePortraitNormalizedFocusRegion {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ApplePortraitDisparity {
     pub width: u32,
@@ -274,6 +289,7 @@ impl ApplePortraitDisparity {
 pub enum ApplePortraitGeometryError {
     InvalidCaptureFact(&'static str),
     InvalidGeometry,
+    InvalidOrientation(u8),
     InvalidDisparityScale,
     UnsupportedDisparityExponentiation(u8),
     RankPlaneSizeMismatch { expected: usize, actual: usize },
@@ -287,6 +303,12 @@ impl fmt::Display for ApplePortraitGeometryError {
             }
             Self::InvalidGeometry => {
                 formatter.write_str("Apple Portrait image geometry is invalid")
+            }
+            Self::InvalidOrientation(value) => {
+                write!(
+                    formatter,
+                    "Apple Portrait EXIF orientation {value} is invalid"
+                )
             }
             Self::InvalidDisparityScale => {
                 formatter.write_str("Apple Portrait disparity scale must be finite and positive")
@@ -475,6 +497,70 @@ pub fn resolve_apple_portrait_base_orientation(
     } else {
         Ok(6)
     }
+}
+
+/// Transform a display-space focus region into the source-image storage space.
+///
+/// This is the complete orientation mapping used by the legacy Vision fallback
+/// (`rawFocusRect`). Configured OPPO focus points are already in storage
+/// coordinates and must not pass through this function. Keeping the two domains
+/// typed by the call site prevents a mirrored or rotated source from being
+/// transformed twice.
+pub fn transform_apple_portrait_focus_region(
+    region: ApplePortraitNormalizedFocusRegion,
+    orientation: u8,
+) -> Result<ApplePortraitNormalizedFocusRegion, ApplePortraitGeometryError> {
+    if !(1..=8).contains(&orientation) {
+        return Err(ApplePortraitGeometryError::InvalidOrientation(orientation));
+    }
+    for value in [region.x, region.y, region.width, region.height] {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(ApplePortraitGeometryError::InvalidGeometry);
+        }
+    }
+
+    let transformed = match orientation {
+        1 => region,
+        2 => ApplePortraitNormalizedFocusRegion {
+            x: 1.0 - region.x,
+            ..region
+        },
+        3 => ApplePortraitNormalizedFocusRegion {
+            x: 1.0 - region.x,
+            y: 1.0 - region.y,
+            ..region
+        },
+        4 => ApplePortraitNormalizedFocusRegion {
+            y: 1.0 - region.y,
+            ..region
+        },
+        5 => ApplePortraitNormalizedFocusRegion {
+            x: region.y,
+            y: region.x,
+            width: region.height,
+            height: region.width,
+        },
+        6 => ApplePortraitNormalizedFocusRegion {
+            x: region.y,
+            y: 1.0 - region.x,
+            width: region.height,
+            height: region.width,
+        },
+        7 => ApplePortraitNormalizedFocusRegion {
+            x: 1.0 - region.y,
+            y: 1.0 - region.x,
+            width: region.height,
+            height: region.width,
+        },
+        8 => ApplePortraitNormalizedFocusRegion {
+            x: 1.0 - region.y,
+            y: region.x,
+            width: region.height,
+            height: region.width,
+        },
+        _ => unreachable!("orientation range validated above"),
+    };
+    Ok(transformed)
 }
 
 pub fn build_apple_portrait_disparity(
@@ -698,6 +784,61 @@ mod tests {
             .unwrap(),
             6
         );
+    }
+
+    #[test]
+    fn focus_orientation_transform_matches_all_eight_producer_mappings() {
+        let input = ApplePortraitNormalizedFocusRegion {
+            x: 0.2,
+            y: 0.3,
+            width: 0.1,
+            height: 0.25,
+        };
+        let expected = [
+            (0.2, 0.3, 0.1, 0.25),
+            (0.8, 0.3, 0.1, 0.25),
+            (0.8, 0.7, 0.1, 0.25),
+            (0.2, 0.7, 0.1, 0.25),
+            (0.3, 0.2, 0.25, 0.1),
+            (0.3, 0.8, 0.25, 0.1),
+            (0.7, 0.8, 0.25, 0.1),
+            (0.7, 0.2, 0.25, 0.1),
+        ];
+        for (orientation, (x, y, width, height)) in (1_u8..=8).zip(expected) {
+            let actual = transform_apple_portrait_focus_region(input, orientation).unwrap();
+            assert!((actual.x - x).abs() < 1e-12, "orientation {orientation}");
+            assert!((actual.y - y).abs() < 1e-12, "orientation {orientation}");
+            assert!(
+                (actual.width - width).abs() < 1e-12,
+                "orientation {orientation}"
+            );
+            assert!(
+                (actual.height - height).abs() < 1e-12,
+                "orientation {orientation}"
+            );
+        }
+    }
+
+    #[test]
+    fn focus_orientation_transform_rejects_invalid_input() {
+        let region = ApplePortraitNormalizedFocusRegion {
+            x: 0.2,
+            y: 0.3,
+            width: 0.1,
+            height: 0.25,
+        };
+        assert!(matches!(
+            transform_apple_portrait_focus_region(region, 0),
+            Err(ApplePortraitGeometryError::InvalidOrientation(0))
+        ));
+        assert!(transform_apple_portrait_focus_region(
+            ApplePortraitNormalizedFocusRegion {
+                x: f64::NAN,
+                ..region
+            },
+            6
+        )
+        .is_err());
     }
 
     #[test]

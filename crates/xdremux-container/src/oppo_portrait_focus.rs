@@ -324,6 +324,12 @@ pub fn select_oppo_portrait_focus(
     let exact_full_image_histogram =
         branch == OppoPortraitFocusBranch::DisparityHistogram || exact_pet_histogram_fallback;
 
+    let centered_focus_roi = || OppoPortraitFocusRegion {
+        x: (focus.x - focus.width / 2.0).max(0.0),
+        y: (focus.y - focus.height / 2.0).max(0.0),
+        width: focus.width.min(1.0),
+        height: focus.height.min(1.0),
+    };
     let mut source_roi = if branch == OppoPortraitFocusBranch::CenterRegion {
         let x0 = focus_depth_x.saturating_sub(2);
         let y0 = focus_depth_y.saturating_sub(2);
@@ -356,13 +362,19 @@ pub fn select_oppo_portrait_focus(
                     .filter(|_| config.focus_rectangle_is_valid)
                     .and_then(normalized_ltwh)
             })
-            .unwrap_or(focus)
+            .or_else(|| {
+                config
+                    .focus_rectangle
+                    .filter(|_| config.focus_rectangle_is_valid)
+                    .and_then(normalized_ltwh)
+            })
+            .unwrap_or_else(centered_focus_roi)
     } else {
         config
             .focus_rectangle
             .filter(|_| config.focus_rectangle_is_valid)
             .and_then(normalized_ltwh)
-            .unwrap_or(focus)
+            .unwrap_or_else(centered_focus_roi)
     };
     source_roi = source_roi.normalized();
 
@@ -694,6 +706,37 @@ mod tests {
         assert!(selection.roi_is_producer_exact);
         assert!(selection.statistic_is_producer_exact);
         assert!(selection.selected_rank.is_finite());
+    }
+
+    #[test]
+    fn no_rectangle_focus_fallback_centers_roi_on_focus_point() {
+        let depth = OppoPortraitDepth {
+            header: header(1),
+            ranks: vec![128; 16 * 16],
+            hair: None,
+            portrait: Some(vec![255; 16 * 16]),
+            pet: None,
+        };
+        let config = config_with_focus(12, 10, 1);
+        let selection = select_oppo_portrait_focus(
+            &depth,
+            &config,
+            16,
+            16,
+            OppoPortraitFocusRegion {
+                x: 0.75,
+                y: 0.625,
+                width: 0.2,
+                height: 0.16,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(selection.branch, OppoPortraitFocusBranch::PortraitFace);
+        assert!((selection.source_roi.x - 0.65).abs() < 1e-12);
+        assert!((selection.source_roi.y - 0.545).abs() < 1e-12);
+        assert!((selection.source_roi.width - 0.2).abs() < 1e-12);
+        assert!((selection.source_roi.height - 0.16).abs() < 1e-12);
     }
 
     #[test]

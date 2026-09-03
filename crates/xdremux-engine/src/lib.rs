@@ -34,10 +34,12 @@ pub use apple_portrait_geometry::{
     apple_portrait_lens_profile, build_apple_portrait_disparity,
     derive_apple_portrait_camera_calibration, focus_disparity,
     optical_equivalent_focal_length_from_lens_model, resolve_apple_portrait_base_orientation,
-    ApplePortraitCameraCalibration, ApplePortraitCaptureFacts, ApplePortraitDisparity,
-    ApplePortraitGeometryError, ApplePortraitImageGeometry, ApplePortraitLensProfile,
-    ApplePortraitLensProfileId, APPLE_PORTRAIT_FUSION_2X_PROFILE, APPLE_PORTRAIT_MAIN_1X_PROFILE,
-    APPLE_PORTRAIT_TELE_3X_PROFILE, APPLE_PORTRAIT_TETRAPRISM_5X_PROFILE,
+    transform_apple_portrait_focus_region, ApplePortraitCameraCalibration,
+    ApplePortraitCaptureFacts, ApplePortraitDisparity, ApplePortraitGeometryError,
+    ApplePortraitImageGeometry, ApplePortraitLensProfile, ApplePortraitLensProfileId,
+    ApplePortraitNormalizedFocusRegion, APPLE_PORTRAIT_FUSION_2X_PROFILE,
+    APPLE_PORTRAIT_MAIN_1X_PROFILE, APPLE_PORTRAIT_TELE_3X_PROFILE,
+    APPLE_PORTRAIT_TETRAPRISM_5X_PROFILE,
 };
 pub use capabilities::{
     CapabilityInventory, GainMapTileEncoder, OperationCapability, RasterDecoder,
