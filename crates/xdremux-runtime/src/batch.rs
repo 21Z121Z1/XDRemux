@@ -13,8 +13,8 @@ use xdremux_motion_photo::{
 use xdremux_source::{probe_bytes, SourceAsset};
 
 use crate::batch_checkpoint::{
-    canonical_or_absolute, source_signature, CheckpointOutcome, MotionPhotoCheckpoint,
-    MotionPhotoCheckpointWriter, SourceSignature,
+    canonical_or_absolute, source_signature, source_signature_path, CheckpointOutcome,
+    MotionPhotoCheckpoint, MotionPhotoCheckpointWriter, SourceSignature,
 };
 use crate::categorize::classification_relative_directory;
 use crate::{PortableRuntime, Result, RuntimeError};
@@ -162,9 +162,7 @@ fn reusable_planned_output(
     input: &Path,
     parent: &Path,
 ) -> Result<Option<PathBuf>> {
-    let bytes = fs::read(input)
-        .map_err(|error| RuntimeError::external("batch resume source read", error))?;
-    let signature = source_signature(input, &bytes)?;
+    let signature = source_signature_path(input)?;
     let Some(prior) = checkpoint.reusable_item(input, &signature)? else {
         return Ok(None);
     };

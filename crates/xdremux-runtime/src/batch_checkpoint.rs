@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -11,6 +11,7 @@ use crate::{Result, RuntimeError};
 
 pub const MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION: u32 = 2;
 pub const DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME: &str = ".xdremux-motion-photo-checkpoint.jsonl";
+const SOURCE_HASH_BUFFER_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceSignature {
@@ -258,6 +259,22 @@ pub fn motion_photo_checkpoint_path(
     output_dir.map(|directory| directory.join(DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME))
 }
 
+fn mtime_ns(metadata: &fs::Metadata) -> Option<u64> {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .and_then(|duration| u64::try_from(duration.as_nanos()).ok())
+}
+
+fn digest_hex(digest: impl AsRef<[u8]>) -> String {
+    digest
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 pub(crate) fn source_signature(path: &Path, bytes: &[u8]) -> Result<SourceSignature> {
     let metadata = fs::metadata(path)
         .map_err(|error| RuntimeError::external("batch source metadata", error))?;
@@ -268,19 +285,58 @@ pub(crate) fn source_signature(path: &Path, bytes: &[u8]) -> Result<SourceSignat
             "source size changed while it was being read",
         ));
     }
-    let mtime_ns = metadata
-        .modified()
-        .ok()
-        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
-        .and_then(|duration| u64::try_from(duration.as_nanos()).ok());
-    let sha256 = Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
     Ok(SourceSignature {
         size,
-        mtime_ns,
-        sha256,
+        mtime_ns: mtime_ns(&metadata),
+        sha256: digest_hex(Sha256::digest(bytes)),
+    })
+}
+
+/// Compute durable source provenance without allocating a buffer proportional
+/// to the media file. Planning only needs size, mtime and SHA-256, so hashing
+/// directly from the file keeps memory bounded even for Motion Photos with a
+/// large video tail.
+pub(crate) fn source_signature_path(path: &Path) -> Result<SourceSignature> {
+    let mut file = File::open(path)
+        .map_err(|error| RuntimeError::external("batch source provenance open", error))?;
+    let before = file
+        .metadata()
+        .map_err(|error| RuntimeError::external("batch source provenance metadata", error))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; SOURCE_HASH_BUFFER_BYTES];
+    let mut observed_size = 0_u64;
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|error| RuntimeError::external("batch source provenance read", error))?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+        observed_size = observed_size
+            .checked_add(u64::try_from(count).map_err(|_| {
+                RuntimeError::new("batch source provenance", "read size exceeds u64")
+            })?)
+            .ok_or_else(|| {
+                RuntimeError::new("batch source provenance", "source size overflows u64")
+            })?;
+    }
+    let after = file
+        .metadata()
+        .map_err(|error| RuntimeError::external("batch source provenance metadata", error))?;
+    if before.len() != observed_size
+        || after.len() != observed_size
+        || mtime_ns(&before) != mtime_ns(&after)
+    {
+        return Err(RuntimeError::new(
+            "batch source provenance",
+            "source changed while its signature was being streamed",
+        ));
+    }
+    Ok(SourceSignature {
+        size: observed_size,
+        mtime_ns: mtime_ns(&after),
+        sha256: digest_hex(hasher.finalize()),
     })
 }
 
@@ -303,6 +359,21 @@ fn path_string(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn streamed_signature_matches_in_memory_signature_for_large_input() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.bin");
+        let payload = (0..SOURCE_HASH_BUFFER_BYTES * 3 + 137)
+            .map(|index| (index % 251) as u8)
+            .collect::<Vec<_>>();
+        fs::write(&source, &payload).unwrap();
+
+        let in_memory = source_signature(&source, &payload).unwrap();
+        let streamed = source_signature_path(&source).unwrap();
+        assert_eq!(streamed, in_memory);
+        assert_eq!(streamed.size, u64::try_from(payload.len()).unwrap());
+    }
 
     #[test]
     fn truncated_tail_record_never_grants_reuse() {
