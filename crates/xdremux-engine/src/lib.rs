@@ -2,6 +2,7 @@
 
 mod apple;
 mod apple_auxiliary;
+mod apple_photographic_styles;
 mod apple_portrait;
 mod apple_portrait_geometry;
 mod capabilities;
@@ -25,6 +26,15 @@ pub use apple_auxiliary::{
     AppleMetadataValue, APPLE_DEPTH_BLUR_EFFECT_NAMESPACE, APPLE_DEPTH_DATA_NAMESPACE,
     APPLE_PORTRAIT_EFFECTS_MATTE_NAMESPACE, APPLE_PORTRAIT_LIGHTING_EFFECT_NAMESPACE,
     APPLE_SEMANTIC_SEGMENTATION_MATTE_NAMESPACE,
+};
+pub use apple_photographic_styles::{
+    apple_style_data_apply_coefficient_deltas, apple_style_data_from_coefficient_deltas,
+    apple_style_data_from_parameters, apple_style_data_sha256, apple_style_identity_data,
+    apple_style_polynomial_basis, validate_apple_style_data, AppleStyleDataError,
+    AppleStyleDataFacts, APPLE_STYLE_BLOCK_VALUE_COUNT, APPLE_STYLE_BYTE_COUNT,
+    APPLE_STYLE_CHANNEL_COUNT, APPLE_STYLE_GRID_HEIGHT, APPLE_STYLE_GRID_WIDTH,
+    APPLE_STYLE_IDENTITY_SHA256, APPLE_STYLE_PLANE_COUNT, APPLE_STYLE_POLYNOMIAL_COUNT,
+    APPLE_STYLE_TILE_COUNT,
 };
 pub use apple_portrait::{
     build_apple_portrait_rendering_parameters, AppleRendDocument, AppleRendError, AppleRendRecord,
