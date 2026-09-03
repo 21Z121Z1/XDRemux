@@ -69,9 +69,7 @@ fn settings() -> Result<Settings, String> {
             "--width" => result.width = parse_positive_u32(args.next(), "--width")?,
             "--height" => result.height = parse_positive_u32(args.next(), "--height")?,
             "--warmup" => result.warmup = parse_usize(args.next(), "--warmup", true)?,
-            "--iterations" => {
-                result.iterations = parse_usize(args.next(), "--iterations", false)?
-            }
+            "--iterations" => result.iterations = parse_usize(args.next(), "--iterations", false)?,
             "-h" | "--help" => return Err(usage().to_owned()),
             other => return Err(format!("unknown argument {other:?}\n{}", usage())),
         }
