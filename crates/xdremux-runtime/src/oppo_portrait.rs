@@ -1,23 +1,20 @@
-use xdremux_container::{OppoPortraitConfig, OppoPortraitDepth};
+use crate::{Result, RuntimeError};
+use xdremux_container::{
+    select_oppo_portrait_focus, OppoPortraitConfig, OppoPortraitDepth, OppoPortraitFocusRegion,
+};
 use xdremux_engine::{
     build_apple_portrait_disparity_payload, build_apple_portrait_effects_matte_payload,
-    build_apple_semantic_matte_payload, AppleAuxiliaryPayload, AppleGainMapFacts, AppleL8Mask,
-    ApplePortraitCameraCalibration, ApplePortraitDisparity, AppleSemanticRole,
+    build_apple_portrait_rendering_parameters, build_apple_semantic_matte_payload,
+    AppleAuxiliaryPayload, AppleGainMapFacts, AppleL8Mask, ApplePortraitCameraCalibration,
+    ApplePortraitDisparity, AppleSemanticRole,
 };
 
-#[cfg(any(target_os = "macos", test))]
-use crate::{Result, RuntimeError};
 #[cfg(any(target_os = "macos", test))]
 use ruzstd::decoding::StreamingDecoder;
 #[cfg(any(target_os = "macos", test))]
 use std::io::Read;
 #[cfg(any(target_os = "macos", test))]
-use xdremux_container::{
-    extract_oppo_portrait_source, parse_oppo_portrait_depth, select_oppo_portrait_focus,
-    OppoPortraitFocusRegion,
-};
-#[cfg(any(target_os = "macos", test))]
-use xdremux_engine::build_apple_portrait_rendering_parameters;
+use xdremux_container::{extract_oppo_portrait_source, parse_oppo_portrait_depth};
 #[cfg(any(target_os = "macos", test))]
 use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
 
@@ -38,9 +35,7 @@ use crate::apple_adapter::{AppleAdapterClient, AppleImageProperties};
 
 #[cfg(any(target_os = "macos", test))]
 const MAX_DECODED_PORTRAIT_DEPTH_BYTES: u64 = 256 * 1024 * 1024;
-#[cfg(any(target_os = "macos", test))]
 const PRIVATE_GAIN_MAP_INFO_BYTES: usize = 20 * std::mem::size_of::<f32>();
-#[cfg(any(target_os = "macos", test))]
 const PRIVATE_GAIN_MAP_ALTERNATE_HEADROOM_INDEX: usize = 17;
 #[cfg(target_os = "macos")]
 const OPPO_PORTRAIT_PRIOR_SPATIAL_SIGMA: f32 = 3.0;
@@ -77,7 +72,6 @@ impl ApplePortraitSourcePreflight {
     /// The caller supplies no REND or Apple product policy. Rust derives the
     /// producer focus state, Gain Map headroom and per-image rendering
     /// parameters, while ImageIO remains only the platform writer.
-    #[cfg(any(target_os = "macos", test))]
     pub fn into_auxiliary_payloads(self) -> Result<Vec<AppleAuxiliaryPayload>> {
         let focus_region = producer_focus_region(&self.config, self.base_width, self.base_height)?;
         let focus = select_oppo_portrait_focus(
@@ -143,7 +137,6 @@ impl ApplePortraitSourcePreflight {
     }
 }
 
-#[cfg(any(target_os = "macos", test))]
 fn producer_focus_region(
     config: &OppoPortraitConfig,
     base_width: u32,
@@ -171,7 +164,6 @@ fn producer_focus_region(
     })
 }
 
-#[cfg(any(target_os = "macos", test))]
 fn private_gain_map_headroom(private_info: Option<&[u8]>) -> Result<f64> {
     let private_info = private_info.ok_or_else(|| {
         RuntimeError::new(
