@@ -5,7 +5,9 @@ This is intentionally not compared as an alternative UHDR Gain Map encoder.
 The current primitive belongs to the Photographic Styles Linear Thumbnail path
 and is validated as Main10 / YUV 4:2:0 / 10-bit. Timings include one-shot helper
 launch, RGB8->BGRA staging, VTCompressionSession setup, encode, and output file
-writes. A future persistent-helper benchmark can separate transport startup.
+writes. The adapter explicitly allows hardware acceleration and reports the
+actual encoder selection as framework facts; software fallback remains valid.
+A future persistent-helper benchmark can separate transport startup.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,7 +88,7 @@ def run_once(
     width: int,
     height: int,
     quality: float,
-) -> tuple[float, int, dict[str, int | str]]:
+) -> tuple[float, int, dict[str, int | str], dict[str, Any]]:
     request = {
         "schema_version": SCHEMA_VERSION,
         "operation": "videotoolbox-encode-main10",
@@ -124,6 +127,17 @@ def run_once(
         raise RuntimeError("Apple adapter omitted video_toolbox_main10 facts")
     if facts.get("width") != width or facts.get("height") != height:
         raise RuntimeError(f"Apple adapter changed raster geometry: {facts!r}")
+    if facts.get("hardware_acceleration_allowed") is not True:
+        raise RuntimeError(
+            "VideoToolbox primitive did not preserve the hardware-acceleration preference"
+        )
+    hardware_used = facts.get("using_hardware_accelerated_encoder")
+    if hardware_used is not None and not isinstance(hardware_used, bool):
+        raise RuntimeError(f"invalid hardware encoder fact: {hardware_used!r}")
+    encoder_id = facts.get("encoder_id")
+    if encoder_id is not None and not isinstance(encoder_id, str):
+        raise RuntimeError(f"invalid VideoToolbox encoder_id fact: {encoder_id!r}")
+
     annex = annex_path.read_bytes()
     hvcc = hvcc_path.read_bytes()
     if not annex or not hvcc:
@@ -138,7 +152,12 @@ def run_once(
         "chroma_bit_depth": 10,
     }:
         raise RuntimeError(f"unexpected VideoToolbox Main10 storage profile: {profile!r}")
-    return elapsed, len(annex) + len(hvcc), profile
+    encoder_facts = {
+        "hardware_acceleration_allowed": True,
+        "using_hardware_accelerated_encoder": hardware_used,
+        "encoder_id": encoder_id,
+    }
+    return elapsed, len(annex) + len(hvcc), profile, encoder_facts
 
 
 def main() -> int:
@@ -164,6 +183,7 @@ def main() -> int:
 
     raster = smooth_rgb(args.width, args.height)
     samples: list[float] = []
+    encoder_samples: list[dict[str, Any]] = []
     encoded_bytes = 0
     profile: dict[str, int | str] | None = None
     with tempfile.TemporaryDirectory(prefix="xdremux-vt-bench-") as raw_work:
@@ -173,7 +193,7 @@ def main() -> int:
         for index in range(args.warmup + args.iterations):
             annex_path = work / f"sample-{index}.hevc"
             hvcc_path = work / f"sample-{index}.hvcc"
-            elapsed, encoded_bytes, observed_profile = run_once(
+            elapsed, encoded_bytes, observed_profile, encoder_facts = run_once(
                 adapter,
                 input_path,
                 annex_path,
@@ -185,14 +205,35 @@ def main() -> int:
             profile = observed_profile
             if index >= args.warmup:
                 samples.append(elapsed)
+                encoder_samples.append(encoder_facts)
 
     assert profile is not None
+    observed_encoder_ids = sorted(
+        {
+            sample["encoder_id"]
+            for sample in encoder_samples
+            if isinstance(sample.get("encoder_id"), str)
+        }
+    )
+    hardware_sample_count = sum(
+        sample.get("using_hardware_accelerated_encoder") is True
+        for sample in encoder_samples
+    )
+    unknown_hardware_sample_count = sum(
+        sample.get("using_hardware_accelerated_encoder") is None
+        for sample in encoder_samples
+    )
     report = {
         "schema_version": 1,
         "measurement_layer": "apple-adapter-primitive-e2e",
         "head": git_head(),
         "operation": "videotoolbox-encode-main10",
         "contract": "photographic-styles-linear-thumbnail",
+        "hardware_acceleration_allowed": True,
+        "hardware_accelerated_samples": hardware_sample_count,
+        "unknown_hardware_acceleration_samples": unknown_hardware_sample_count,
+        "observed_encoder_ids": observed_encoder_ids,
+        "encoder_samples": encoder_samples,
         "includes_helper_launch": True,
         "includes_rgb_to_bgra_staging": True,
         "includes_session_creation": True,
@@ -214,7 +255,9 @@ def main() -> int:
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(
         f"VideoToolbox Main10 adapter primitive: median={report['median_seconds']:.3f}s "
-        f"p95={report['p95_seconds']:.3f}s profile={profile}",
+        f"p95={report['p95_seconds']:.3f}s profile={profile} "
+        f"hardware_samples={hardware_sample_count}/{args.iterations} "
+        f"encoder_ids={observed_encoder_ids}",
         flush=True,
     )
     return 0
