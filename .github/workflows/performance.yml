@@ -58,6 +58,8 @@ jobs:
         run: |
           mkdir -p artifacts/performance
           {
+            echo "runner_provider=GitHub Actions hosted runner"
+            echo "runs_on=macos-26"
             echo "head=$(git rev-parse HEAD)"
             sw_vers
             echo "arch=$(uname -m)"
@@ -117,6 +119,17 @@ jobs:
             --iterations 5 \
             --output artifacts/performance/product-benchmark.json \
             2>&1 | tee artifacts/performance/product-benchmark.log
+
+      - name: Measure isolated portable Gain Map codec primitives
+        shell: bash
+        run: |
+          "$GITHUB_WORKSPACE/target/release/xdremux-codec-gainmap-bench" \
+            --width 1024 \
+            --height 768 \
+            --warmup 1 \
+            --iterations 5 \
+            > artifacts/performance/gain-map-codec.json
+          cat artifacts/performance/gain-map-codec.json
 
       - name: Characterize Apple adapter process lifecycle
         shell: bash
@@ -249,7 +262,9 @@ jobs:
           {
             echo "## XDRemux Rust performance and design"
             echo
-            echo "The workflow measures representative end-to-end release CLI workloads. Timed regions include source I/O, parsing, codec work, publication, and Apple adapter/framework overhead where applicable."
+            echo "Runner: GitHub Actions hosted macOS 26 (arm64). These are not local-device measurements."
+            echo "Product E2E timings include source I/O, parsing, Gain Map decode/reconstruction, codec work, HEIF assembly/publication, and Apple adapter/framework overhead where applicable."
+            echo "Standard HDR uses the portable Rust/libheif Gain Map encoder even on macOS; the Apple VideoToolbox Main10 primitive belongs to the Photographic Styles Linear Thumbnail path and is not treated as an RGB 4:4:4 Gain Map backend."
             echo "The committed macOS 26 arm64 reference is a regression baseline, not a performance target; committed tolerances absorb normal hosted-runner noise while structural helper-launch maxima remain hard limits."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
@@ -259,14 +274,44 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("artifacts/performance/product-benchmark.json").read_text())
-          print("| workload | median | p95 | max RSS | median input throughput |")
-          print("| --- | ---: | ---: | ---: | ---: |")
+          print("### End-to-end product workloads")
+          print()
+          print("| workload | source | Gain Map | codec path | median | p95 | max RSS |")
+          print("| --- | --- | --- | --- | ---: | ---: | ---: |")
+          for case in report["cases"]:
+              source = case.get("source_family") or "—"
+              channels = case.get("gain_map_channels")
+              chroma = case.get("gain_map_chroma")
+              gain_map = f"{channels}/{chroma}" if channels and chroma else "—"
+              codec_path = case.get("codec_path") or "—"
+              print(
+                  f"| {case['name']} | {source} | {gain_map} | {codec_path} | "
+                  f"{case['median_wall_seconds']:.3f}s | "
+                  f"{case['p95_wall_seconds']:.3f}s | "
+                  f"{case['max_peak_rss_bytes'] / (1024 * 1024):.1f} MiB |"
+              )
+          PY
+          fi
+          if [[ -s artifacts/performance/gain-map-codec.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("artifacts/performance/gain-map-codec.json").read_text())
+          print()
+          print("### Isolated portable Gain Map encoder")
+          print()
+          print(f"Synthetic smooth raster: {report['width']}×{report['height']}; timing covers LibHeifProvider::encode_gain_map_tiles only.")
+          print()
+          print("| profile | raw raster | tiles | encoded resource | median | p95 |")
+          print("| --- | ---: | ---: | ---: | ---: | ---: |")
           for case in report["cases"]:
               print(
-                  f"| {case['name']} | {case['median_wall_seconds']:.3f}s | "
-                  f"{case['p95_wall_seconds']:.3f}s | "
-                  f"{case['max_peak_rss_bytes'] / (1024 * 1024):.1f} MiB | "
-                  f"{case['median_input_mib_per_second']:.1f} MiB/s |"
+                  f"| {case['channels']}/{case['chroma']} | "
+                  f"{case['raw_raster_bytes'] / (1024 * 1024):.2f} MiB | "
+                  f"{case['tile_count']} | "
+                  f"{case['encoded_resource_bytes'] / 1024:.1f} KiB | "
+                  f"{case['median_seconds']:.3f}s | {case['p95_seconds']:.3f}s |"
               )
           PY
           fi
