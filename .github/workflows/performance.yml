@@ -8,9 +8,12 @@ on:
       - "crates/**"
       - "Sources/XDRemuxAppleAdapter/**"
       - "apps/macos/XDRemuxApp/Sources/**"
+      - "benchmarks/macos26-arm64-product-baseline.json"
       - "Tests/test_performance_design.py"
+      - "Tests/test_performance_budget.py"
       - "scripts/benchmark_rust_product.py"
       - "scripts/characterize_apple_adapter_launches.py"
+      - "scripts/check_performance_budget.py"
       - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   push:
@@ -23,9 +26,12 @@ on:
       - "crates/**"
       - "Sources/XDRemuxAppleAdapter/**"
       - "apps/macos/XDRemuxApp/Sources/**"
+      - "benchmarks/macos26-arm64-product-baseline.json"
       - "Tests/test_performance_design.py"
+      - "Tests/test_performance_budget.py"
       - "scripts/benchmark_rust_product.py"
       - "scripts/characterize_apple_adapter_launches.py"
+      - "scripts/check_performance_budget.py"
       - "scripts/check_rust_cli_smoke.sh"
       - ".github/workflows/performance.yml"
   workflow_dispatch:
@@ -86,7 +92,9 @@ jobs:
       - name: Check Rust performance design invariants
         shell: bash
         run: |
-          python3 -m unittest Tests.test_performance_design \
+          python3 -m unittest \
+            Tests.test_performance_design \
+            Tests.test_performance_budget \
             2>&1 | tee artifacts/performance/design-policy.log
           cargo test --locked --workspace --all-targets --release \
             2>&1 | tee artifacts/performance/rust-release-tests.log
@@ -119,6 +127,16 @@ jobs:
             --output artifacts/performance/apple-adapter-launches.json \
             2>&1 | tee artifacts/performance/apple-adapter-launches.log
 
+      - name: Enforce stable-runner performance regression budget
+        shell: bash
+        run: |
+          python3 scripts/check_performance_budget.py \
+            --baseline benchmarks/macos26-arm64-product-baseline.json \
+            --benchmark artifacts/performance/product-benchmark.json \
+            --launches artifacts/performance/apple-adapter-launches.json \
+            --expected-head "$(git rev-parse HEAD)" \
+            2>&1 | tee artifacts/performance/regression-budget.log
+
       - name: Build and run macOS app model integration
         shell: bash
         env:
@@ -144,8 +162,12 @@ jobs:
           import json
           import os
           from pathlib import Path
+          import subprocess
 
           runner_temp = os.environ["RUNNER_TEMP"]
+          head = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"], text=True
+          ).strip()
           app_build = (
               "xcodebuild -quiet "
               "-project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj "
@@ -157,7 +179,7 @@ jobs:
           )
           plan = {
               "schema_version": 1,
-              "scope": "Canonical Rust product release build, performance evidence, design invariants, and macOS app integration",
+              "scope": "Canonical Rust product release build, performance regression evidence, design invariants, and macOS app integration",
               "checks": [
                   {
                       "name": "rust-release-build",
@@ -174,7 +196,23 @@ jobs:
                   {
                       "name": "performance-design-policy",
                       "kind": "regression",
-                      "command": ["python3", "-m", "unittest", "Tests.test_performance_design"],
+                      "command": [
+                          "python3", "-m", "unittest",
+                          "Tests.test_performance_design",
+                          "Tests.test_performance_budget",
+                      ],
+                      "timeout_seconds": 120,
+                  },
+                  {
+                      "name": "performance-regression-budget",
+                      "kind": "regression",
+                      "command": [
+                          "python3", "scripts/check_performance_budget.py",
+                          "--baseline", "benchmarks/macos26-arm64-product-baseline.json",
+                          "--benchmark", "artifacts/performance/product-benchmark.json",
+                          "--launches", "artifacts/performance/apple-adapter-launches.json",
+                          "--expected-head", head,
+                      ],
                       "timeout_seconds": 120,
                   },
                   {
@@ -212,7 +250,7 @@ jobs:
             echo "## XDRemux Rust performance and design"
             echo
             echo "The workflow measures representative end-to-end release CLI workloads. Timed regions include source I/O, parsing, codec work, publication, and Apple adapter/framework overhead where applicable."
-            echo "Measurements are evidence only until repeated stable-runner samples justify committed regression budgets."
+            echo "The committed macOS 26 arm64 reference is a regression baseline, not a performance target; committed tolerances absorb normal hosted-runner noise while structural helper-launch maxima remain hard limits."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           if [[ -s artifacts/performance/product-benchmark.json ]]; then
