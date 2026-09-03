@@ -1,30 +1,43 @@
-name: XDRemux macOS Integration
+name: XDRemux Rust Product Integration
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "**/*.md"
-      - "Tests/test_public_documentation.py"
-      - "AGENTS.md"
-      - "scripts/agent_completion_gate.py"
-      - "Tests/validation/test_agent_completion_gate.py"
-      - ".github/workflows/**"
   pull_request:
     paths-ignore:
       - "**/*.md"
-      - "Tests/test_public_documentation.py"
-      - "AGENTS.md"
-      - "scripts/agent_completion_gate.py"
-      - "Tests/validation/test_agent_completion_gate.py"
-      - ".github/workflows/**"
+  push:
+    branches:
+      - main
+      - feat/rust-cli-unification
+    paths-ignore:
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xdremux-product-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  macos:
-    runs-on: macos-latest
-    timeout-minutes: 90
+  macos-product:
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD"
+          mkdir -p artifacts/product-integration
+          printf 'head=%s\n' "$actual" | tee artifacts/product-integration/head.txt
 
       - name: Install portable HEVC provider
         shell: bash
@@ -35,31 +48,43 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          components: rustfmt, clippy
 
-      - name: "[1/5] Build Rust product and Apple capability adapter"
+      - name: Verify locked workspace and formatting
         shell: bash
         run: |
-          mkdir -p artifacts
-          echo "::group::Canonical Rust CLI build"
-          cargo build --locked -p xdremux-cli 2>&1 | tee artifacts/rust-cli-build.log
-          echo "::endgroup::"
-          echo "RUST_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
-          echo "::group::Apple capability adapter build"
-          swift build --product xdremux-apple-adapter 2>&1 | tee artifacts/apple-adapter-build.log
-          APPLE_ADAPTER="$(swift build --show-bin-path)/xdremux-apple-adapter"
-          test -x "$APPLE_ADAPTER"
-          echo "APPLE_ADAPTER=$APPLE_ADAPTER" >> "$GITHUB_ENV"
-          echo "::endgroup::"
-          echo "APPLE_ADAPTER_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo fmt --all -- --check
 
-      - name: "[2/5] Run Rust product and architecture tests"
+      - name: Lint canonical Rust product stack
         shell: bash
         run: |
-          echo "::group::Rust workspace tests"
-          cargo test --locked --workspace --all-targets 2>&1 | tee artifacts/rust-workspace-test.log
-          echo "::endgroup::"
-          echo "::group::Architecture policy tests"
-          python3 -m unittest Tests.test_app_architecture \
+          cargo clippy --locked --workspace --all-targets -- --deny warnings \
+            2>&1 | tee artifacts/product-integration/clippy.log
+
+      - name: Test canonical Rust product stack
+        shell: bash
+        run: |
+          cargo test --locked --workspace --all-targets \
+            2>&1 | tee artifacts/product-integration/rust-tests.log
+
+      - name: Build canonical CLI and Apple primitive adapter
+        shell: bash
+        run: |
+          cargo build --locked -p xdremux-cli \
+            2>&1 | tee artifacts/product-integration/rust-cli-build.log
+          swift build --product xdremux-apple-adapter \
+            2>&1 | tee artifacts/product-integration/apple-adapter-build.log
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          test -x "$adapter"
+          echo "XDREMUX_CI_APPLE_ADAPTER=$adapter" >> "$GITHUB_ENV"
+
+      - name: Run ownership and repository policy regressions
+        shell: bash
+        run: |
+          python3 -m unittest \
+            Tests.validation.test_agent_completion_gate \
+            Tests.test_app_architecture \
             Tests.test_product_ownership \
             Tests.test_public_documentation \
             Tests.test_categorization_documentation \
@@ -67,22 +92,46 @@ jobs:
             Tests.test_rust_artifact_lifecycle \
             Tests.test_rust_apple_semantic_policy \
             Tests.test_rust_portrait_translation \
-            2>&1 | tee artifacts/architecture-tests.log
-          echo "::endgroup::"
-          echo "RUST_PRODUCT_TEST_RESULT=Passed" >> "$GITHUB_ENV"
+            2>&1 | tee artifacts/product-integration/policy-tests.log
 
-      - name: "[3/5] Build macOS App"
+      - name: Exercise canonical public CLI routes
+        shell: bash
+        run: |
+          bash scripts/check_rust_cli_smoke.sh \
+            2>&1 | tee artifacts/product-integration/rust-cli-smoke.log
+
+      # Keep Apple framework execution behind shared, versioned test clients.
+      # Do not duplicate adapter request JSON in workflow YAML; doing so allowed
+      # stale schema-v1 clients to survive the schema-v2 ownership migration.
+      - name: Verify Apple adapter handshake
+        shell: bash
+        run: |
+          bash scripts/check_apple_adapter_handshake.sh \
+            2>&1 | tee artifacts/product-integration/apple-handshake.log
+
+      - name: Verify Rust-driven Apple Portrait path
+        shell: bash
+        run: |
+          bash scripts/check_rust_cli_apple_portrait.sh \
+            2>&1 | tee artifacts/product-integration/apple-portrait.log
+
+      - name: Verify Rust-driven Photographic Styles path
+        shell: bash
+        run: |
+          bash scripts/check_rust_style_consumer.sh \
+            2>&1 | tee artifacts/product-integration/apple-styles.log
+
+      - name: Build and exercise macOS app against Rust CLI
         shell: bash
         env:
-          XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremuxapp-derived
+          XDREMUX_DERIVED_DATA: ${{ runner.temp }}/xdremux-app-model-tests
         run: |
-          echo "::group::macOS App build"
           xcodebuild \
             -quiet \
             -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \
             -scheme XDRemuxApp \
             -configuration Debug \
-            -derivedDataPath "$XDREMUX_DERIVED_DATA" \
+            -derivedDataPath "$RUNNER_TEMP/xdremux-app" \
             CODE_SIGNING_ALLOWED=NO \
             build
           xcodebuild \
@@ -90,179 +139,31 @@ jobs:
             -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \
             -scheme XDRemuxAppModelTests \
             -configuration Debug \
-            -derivedDataPath "$RUNNER_TEMP/xdremux-app-model-tests" \
+            -derivedDataPath "$XDREMUX_DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
             build
           XDREMUX_CLI="$GITHUB_WORKSPACE/target/debug/xdremux" \
-            "$RUNNER_TEMP/xdremux-app-model-tests/Build/Products/Debug/XDRemuxAppModelTests"
-          echo "::endgroup::"
-          echo "MACOS_APP_RESULT=Passed" >> "$GITHUB_ENV"
+            "$XDREMUX_DERIVED_DATA/Build/Products/Debug/XDRemuxAppModelTests" \
+            2>&1 | tee artifacts/product-integration/app-model.log
 
-      # This bundle is the pre-existing private ProXDR / Apple feature regression fixture set.
-      # Every product conversion below is driven by the canonical Rust CLI. Swift is used only as
-      # the Apple framework primitive adapter for consumer facts.
-      - name: Prepare private fixtures
-        shell: bash
-        env:
-          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_REGRESSION_FIXTURE_ARCHIVE_URL }}
-        run: |
-          if [[ -z "$FIXTURE_ARCHIVE_URL" ]]; then
-            echo "FIXTURE_ROOT=" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
-          curl --fail --location --silent --show-error "$FIXTURE_ARCHIVE_URL" --output "$RUNNER_TEMP/xdremux-fixtures.zip"
-          ditto -x -k "$RUNNER_TEMP/xdremux-fixtures.zip" "$RUNNER_TEMP/xdremux-fixtures"
-          echo "FIXTURE_ROOT=$RUNNER_TEMP/xdremux-fixtures" >> "$GITHUB_ENV"
-
-      - name: Run private Motion Photo Rust conversion check
-        shell: bash
-        run: |
-          if [[ -z "${FIXTURE_ROOT:-}" ]]; then
-            echo "MOTION_PHOTO_REAL_RESULT=Not configured" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          C15="$(find "$FIXTURE_ROOT" -type f -name 'IMG20250425184722.jpg' -print -quit)"
-          C16="$(find "$FIXTURE_ROOT" -type f -name 'IMG20250901181353.jpg' -print -quit)"
-          if [[ -z "$C15" && -z "$C16" ]]; then
-            echo "MOTION_PHOTO_REAL_RESULT=Fixtures not present" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          echo "::group::Canonical Rust OPPO Motion Photo conversion"
-          mkdir -p artifacts/motion-photo
-          converted=0
-          for source in "$C15" "$C16"; do
-            [[ -n "$source" ]] || continue
-            stem="$(basename "$source" .jpg)"
-            output="artifacts/motion-photo/${stem}.heic"
-            target/debug/xdremux convert --input "$source" --output "$output" \
-              2>&1 | tee "artifacts/motion-photo/${stem}.log"
-            target/debug/xdremux validate "$output" > "artifacts/motion-photo/${stem}-still-validation.txt"
-            target/debug/xdremux validate "${output%.heic}.mov" > "artifacts/motion-photo/${stem}-video-validation.txt"
-            converted=$((converted + 1))
-          done
-          echo "::endgroup::"
-          echo "MOTION_PHOTO_REAL_RESULT=Passed Rust conversion for ${converted} fixture(s)" >> "$GITHUB_ENV"
-
-      - name: "[4/5] Run fixture conversions"
-        shell: bash
-        run: |
-          mkdir -p artifacts/fixtures artifacts/diagnostics
-          if [[ -z "${FIXTURE_ROOT:-}" ]]; then
-            echo "STANDARD_FIXTURE_RESULT=Not configured" >> "$GITHUB_ENV"
-            echo "OPPO_FIXTURE_RESULT=Not configured" >> "$GITHUB_ENV"
-            echo "APPLE_STYLES_RESULT=Not configured" >> "$GITHUB_ENV"
-            echo "APPLE_PORTRAIT_RESULT=Not configured" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          echo "::group::Canonical Rust portable fixture conversions"
-          target/debug/xdremux convert \
-            --input "$FIXTURE_ROOT/standard.heic" --output artifacts/fixtures/standard.heic \
-            > artifacts/fixtures/standard.log 2> artifacts/fixtures/standard.stderr
-          echo "STANDARD_FIXTURE_RESULT=Passed (Rust)" >> "$GITHUB_ENV"
-          target/debug/xdremux convert --oppo-compatible \
-            --input "$FIXTURE_ROOT/oppo.heic" --output artifacts/fixtures/oppo.heic \
-            > artifacts/fixtures/oppo.log 2> artifacts/fixtures/oppo.stderr
-          echo "OPPO_FIXTURE_RESULT=Passed (Rust)" >> "$GITHUB_ENV"
-          echo "::endgroup::"
-          echo "::group::Canonical Rust Apple feature fixture conversions"
-          XDREMUX_APPLE_ADAPTER="$APPLE_ADAPTER" \
-            target/debug/xdremux convert --apple-styles \
-            --input "$FIXTURE_ROOT/apple-styles.heic" --output artifacts/fixtures/apple-styles.heic \
-            > artifacts/fixtures/apple-styles.log 2> artifacts/fixtures/apple-styles.stderr
-          echo "APPLE_STYLES_RESULT=Passed (Rust + adapter)" >> "$GITHUB_ENV"
-          XDREMUX_APPLE_ADAPTER="$APPLE_ADAPTER" \
-            target/debug/xdremux convert --apple-portrait \
-            --input "$FIXTURE_ROOT/apple-portrait.heic" --output artifacts/fixtures/apple-portrait.heic \
-            > artifacts/fixtures/apple-portrait.log 2> artifacts/fixtures/apple-portrait.stderr
-          echo "APPLE_PORTRAIT_RESULT=Passed (Rust + adapter)" >> "$GITHUB_ENV"
-          echo "::endgroup::"
-
-      - name: "[5/5] Validate output containers"
-        shell: bash
-        run: |
-          if [[ -z "${FIXTURE_ROOT:-}" ]]; then
-            echo "CONTAINER_VALIDATION_RESULT=Not configured" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          echo "::group::Portable output validation"
-          target/debug/xdremux validate artifacts/fixtures/standard.heic >/dev/null
-          target/debug/xdremux validate artifacts/fixtures/oppo.heic >/dev/null
-          target/debug/xdremux validate artifacts/fixtures/standard.heic \
-            > artifacts/fixtures/standard-validation.txt
-          target/debug/xdremux validate artifacts/fixtures/oppo.heic \
-            > artifacts/fixtures/oppo-validation.txt
-          echo "::endgroup::"
-          echo "::group::Rust-driven Apple consumer validation"
-          target/debug/xdremux validate artifacts/fixtures/apple-styles.heic \
-            > artifacts/fixtures/apple-styles-validation.txt
-          target/debug/xdremux validate artifacts/fixtures/apple-portrait.heic \
-            > artifacts/fixtures/apple-portrait-validation.txt
-          python3 - "$APPLE_ADAPTER" \
-            artifacts/fixtures/apple-styles.heic artifacts/fixtures/apple-portrait.heic <<'PY'
-          import json
-          import subprocess
-          import sys
-
-          adapter, styles, portrait = sys.argv[1:]
-
-          def facts(path):
-              request = json.dumps({
-                  "schema_version": 1,
-                  "operation": "imageio-auxiliary-facts",
-                  "input_path": path,
-              }).encode() + b"\n"
-              result = subprocess.run(
-                  [adapter], input=request, check=True, capture_output=True
-              )
-              return json.loads(result.stdout)["auxiliary"]
-
-          for path, required in (
-              (styles, ["iso_gain_map", "portrait_effects_matte", "skin_matte"]),
-              (portrait, ["iso_gain_map", "disparity", "portrait_effects_matte", "skin_matte"]),
-          ):
-              observed = facts(path)
-              missing = [key for key in required if observed.get(key) is not True]
-              if missing:
-                  raise SystemExit(f"{path}: missing Apple consumer facts {missing}: {observed!r}")
-              print(f"rust-apple-consumer-pass: {path}")
-          PY
-          echo "::endgroup::"
-          echo "CONTAINER_VALIDATION_RESULT=Passed" >> "$GITHUB_ENV"
-
-      - name: Annotate failure
-        if: failure()
-        shell: bash
-        run: echo "::error file=.github/workflows/ci.yml::XDRemux macOS integration failed; download the diagnostic artifact for complete logs"
-
-      - name: Upload failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: xdremux-macos-integration-diagnostics
-          if-no-files-found: ignore
-          retention-days: 7
-          path: |
-            artifacts/
-            ${{ runner.temp }}/xdremuxapp-derived/Logs/XDRemux/build.log
-            ${{ runner.temp }}/xdremuxapp-derived/Logs/XDRemux/*.xcresult
-            ${{ runner.temp }}/xdremux-app-model-tests/Logs/Test/*.xcresult
-
-      - name: Write CI summary
+      - name: Write integration summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## XDRemux macOS integration"
-            echo "| Check | Result |"
-            echo "|---|---|"
-            echo "| Canonical Rust CLI build | ${RUST_BUILD_RESULT:-Failed} |"
-            echo "| Apple capability adapter build | ${APPLE_ADAPTER_BUILD_RESULT:-Failed} |"
-            echo "| Rust product and architecture tests | ${RUST_PRODUCT_TEST_RESULT:-Not run} |"
-            echo "| macOS App build | ${MACOS_APP_RESULT:-Not run} |"
-            echo "| Rust Motion Photo fixture conversion | ${MOTION_PHOTO_REAL_RESULT:-Not run} |"
-            echo "| Standard ISO fixture | ${STANDARD_FIXTURE_RESULT:-Not run} |"
-            echo "| OPPO compatibility fixture | ${OPPO_FIXTURE_RESULT:-Not run} |"
-            echo "| Apple styles fixture | ${APPLE_STYLES_RESULT:-Not run} |"
-            echo "| Apple portrait fixture | ${APPLE_PORTRAIT_RESULT:-Not run} |"
-            echo "| Output validation | ${CONTAINER_VALIDATION_RESULT:-Not run} |"
+            echo "## XDRemux canonical Rust product integration"
+            echo
+            echo "The checked-out commit is the exact pull-request head or push SHA."
+            echo "The public CLI, product policy, media runtime, Apple primitive adapter, Portrait, Styles, and macOS app bridge are exercised without a second Swift/Python product implementation."
+            echo
+            echo "Windows portability, real fixture suites, performance measurements, completion receipts, and device-only Apple Photos acceptance remain separate evidence classes."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: xdremux-rust-product-integration
+          if-no-files-found: warn
+          retention-days: 14
+          path: artifacts/product-integration/
