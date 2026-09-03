@@ -15,7 +15,9 @@ on:
       - "Tests/test_rust_apple_semantic_policy.py"
       - ".github/workflows/macos26-photographic-styles-smoke.yml"
   push:
-    branches: [main]
+    branches:
+      - main
+      - feat/rust-cli-unification
     paths:
       - "Package.swift"
       - "Sources/XDRemuxAppleAdapter/**"
@@ -90,7 +92,7 @@ jobs:
           {
             echo "## macOS 26 Rust Apple adapter integration"
             echo
-            echo "This gate builds the versioned Swift Apple adapter and drives it through the canonical Rust product path at the exact PR head."
+            echo "This gate builds the versioned Swift Apple adapter and drives it through the canonical Rust product path at the exact checked-out head."
             echo "Rust owns source analysis, product policy, Styles scene semantics, graph assembly, validation, and publication."
             echo "Swift is limited to Apple framework primitives and raw framework observations."
             echo
