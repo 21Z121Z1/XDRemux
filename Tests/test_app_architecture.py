@@ -57,7 +57,11 @@ class SwiftAppArchitectureTests(unittest.TestCase):
         self.assertIn("cp \"${adapter_binary}\" \"${helper_directory}/xdremux-apple-adapter\"", PROJECT)
 
     def test_ci_runs_architecture_and_app_model_checks(self) -> None:
-        self.assertIn("python3 -m unittest Tests.test_app_architecture", CI_WORKFLOW)
+        marker = "- name: Run ownership and repository policy regressions"
+        self.assertIn(marker, CI_WORKFLOW)
+        policy_step = CI_WORKFLOW.split(marker, 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("python3 -m unittest", policy_step)
+        self.assertIn("Tests.test_app_architecture", policy_step)
         self.assertIn("-scheme XDRemuxApp", CI_WORKFLOW)
         self.assertIn("-scheme XDRemuxAppModelTests", CI_WORKFLOW)
         self.assertIn("CODE_SIGNING_ALLOWED=NO", CI_WORKFLOW)
