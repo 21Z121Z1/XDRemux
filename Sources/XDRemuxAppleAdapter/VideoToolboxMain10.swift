@@ -28,12 +28,18 @@ struct VideoToolboxMain10Facts: Encodable {
     let height: Int
     let annexBLength: Int
     let hvccLength: Int
+    let hardwareAccelerationAllowed: Bool
+    let usingHardwareAcceleratedEncoder: Bool?
+    let encoderID: String?
 
     enum CodingKeys: String, CodingKey {
         case width
         case height
         case annexBLength = "annex_b_length"
         case hvccLength = "hvcc_length"
+        case hardwareAccelerationAllowed = "hardware_acceleration_allowed"
+        case usingHardwareAcceleratedEncoder = "using_hardware_accelerated_encoder"
+        case encoderID = "encoder_id"
     }
 }
 
@@ -56,6 +62,37 @@ private func checkMain10Status(_ status: OSStatus, _ message: String) throws {
     guard status == noErr else {
         throw main10Error("\(message): OSStatus \(status)", status: status)
     }
+}
+
+private func copyMain10SessionProperty(
+    _ session: VTCompressionSession,
+    key: CFString
+) -> CFTypeRef? {
+    var value: CFTypeRef?
+    let status = VTSessionCopyProperty(
+        session,
+        key: key,
+        allocator: kCFAllocatorDefault,
+        valueOut: &value
+    )
+    return status == noErr ? value : nil
+}
+
+private func main10HardwareEncoderUsed(_ session: VTCompressionSession) -> Bool? {
+    guard let value = copyMain10SessionProperty(
+        session,
+        key: kVTCompressionPropertyKey_UsingHardwareAcceleratedVideoEncoder
+    ) else {
+        return nil
+    }
+    return (value as? NSNumber)?.boolValue
+}
+
+private func main10EncoderID(_ session: VTCompressionSession) -> String? {
+    copyMain10SessionProperty(
+        session,
+        key: kVTCompressionPropertyKey_EncoderID
+    ) as? String
 }
 
 private func appendMain10StartCode(_ data: inout Data) {
@@ -304,6 +341,9 @@ func encodeVideoToolboxMain10(
         bytesPerRow: bytesPerRow
     )
     let state = Main10EncoderState()
+    let encoderSpecification: CFDictionary = [
+        kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: true,
+    ] as CFDictionary
     let imageBufferAttributes: CFDictionary = [
         kCVPixelBufferPixelFormatTypeKey: CVPixelBufferGetPixelFormatType(pixelBuffer),
         kCVPixelBufferWidthKey: width,
@@ -318,7 +358,7 @@ func encodeVideoToolboxMain10(
             width: Int32(width),
             height: Int32(height),
             codecType: kCMVideoCodecType_HEVC,
-            encoderSpecification: nil,
+            encoderSpecification: encoderSpecification,
             imageBufferAttributes: imageBufferAttributes,
             compressedDataAllocator: nil,
             outputCallback: main10CompressionCallback,
@@ -413,12 +453,17 @@ func encodeVideoToolboxMain10(
     guard !state.hvcc.isEmpty else {
         throw main10Error("VideoToolbox format description did not expose an hvcC atom")
     }
+    let usingHardwareAcceleratedEncoder = main10HardwareEncoderUsed(session)
+    let encoderID = main10EncoderID(session)
     try state.annexB.write(to: URL(fileURLWithPath: outputPath), options: [.atomic])
     try state.hvcc.write(to: URL(fileURLWithPath: configuration.hvccPath), options: [.atomic])
     return VideoToolboxMain10Facts(
         width: width,
         height: height,
         annexBLength: state.annexB.count,
-        hvccLength: state.hvcc.count
+        hvccLength: state.hvcc.count,
+        hardwareAccelerationAllowed: true,
+        usingHardwareAcceleratedEncoder: usingHardwareAcceleratedEncoder,
+        encoderID: encoderID
     )
 }
