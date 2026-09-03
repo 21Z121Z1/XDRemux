@@ -14,6 +14,7 @@ on:
       - "scripts/check_apple_adapter_handshake.sh"
       - "scripts/check_rust_cli_apple_portrait.sh"
       - "scripts/check_rust_style_consumer.sh"
+      - "scripts/build_apple_device_validation.sh"
       - "Tests/test_rust_apple_semantic_policy.py"
       - ".github/workflows/macos26-photographic-styles-smoke.yml"
   push:
@@ -32,6 +33,7 @@ on:
       - "scripts/check_apple_adapter_handshake.sh"
       - "scripts/check_rust_cli_apple_portrait.sh"
       - "scripts/check_rust_style_consumer.sh"
+      - "scripts/build_apple_device_validation.sh"
       - "Tests/test_rust_apple_semantic_policy.py"
       - ".github/workflows/macos26-photographic-styles-smoke.yml"
   workflow_dispatch:
@@ -46,7 +48,7 @@ concurrency:
 jobs:
   apple-adapter-integration:
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 105
     steps:
       - uses: actions/checkout@v7
         with:
@@ -103,6 +105,13 @@ jobs:
           bash scripts/check_rust_style_consumer.sh \
             2>&1 | tee artifacts/macos26-apple-adapter/styles-consumer.log
 
+      - name: Build manual Apple Photos acceptance bundle
+        shell: bash
+        run: |
+          bash scripts/build_apple_device_validation.sh \
+            artifacts/macos26-apple-adapter/device-validation \
+            2>&1 | tee artifacts/macos26-apple-adapter/device-validation-build.log
+
       - name: Write summary
         if: always()
         shell: bash
@@ -114,7 +123,8 @@ jobs:
             echo "Rust owns source analysis, product policy, Styles scene semantics, Portrait synthesis, graph assembly, validation, and publication."
             echo "Swift is limited to Apple framework primitives and raw framework observations."
             echo
-            echo "This is framework integration evidence, not Apple Photos device acceptance or visual-equivalence evidence."
+            echo "A SHA-bound device-validation bundle is produced for manual Apple Photos testing. Its manifest deliberately leaves device acceptance fields false/null."
+            echo "This workflow is framework/offline integration evidence, not Apple Photos device acceptance or visual-equivalence evidence."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Apple adapter evidence
