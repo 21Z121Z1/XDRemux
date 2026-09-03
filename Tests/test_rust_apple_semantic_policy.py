@@ -21,7 +21,6 @@ ADAPTER = "\n".join(
     path.read_text(encoding="utf-8")
     for path in sorted((ROOT / "Sources" / "XDRemuxAppleAdapter").glob("*.swift"))
 )
-ADAPTER_NORMALIZED = " ".join(ADAPTER.split())
 APPLE_PROTOCOL_CLIENTS = tuple(
     (ROOT / path).read_text(encoding="utf-8")
     for path in (
@@ -77,18 +76,30 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
             self.assertNotIn(legacy_swift_policy, ADAPTER)
 
     def test_person_segmentation_quality_is_a_fixed_primitive_contract(self) -> None:
-        self.assertIn("personSegmentationPrimitiveQuality", ADAPTER)
-        self.assertIn(
-            "personRequest?.qualityLevel = personSegmentationPrimitiveQuality",
+        declaration = re.search(
+            r"private\s+let\s+personSegmentationPrimitiveQuality\s*:\s*"
+            r"VNGeneratePersonSegmentationRequest\.QualityLevel\s*=\s*\.accurate\b",
             ADAPTER,
         )
-        self.assertNotIn("personRequest?.qualityLevel = .accurate", ADAPTER)
-        self.assertNotIn("personRequest?.qualityLevel = .balanced", ADAPTER)
-        self.assertNotIn("personRequest?.qualityLevel = .fast", ADAPTER)
-        self.assertIn(
-            "versioned Rust-owned adapter request must carry that selection",
-            ADAPTER_NORMALIZED,
+        self.assertIsNotNone(
+            declaration,
+            "the Apple primitive must pin person segmentation to one explicit quality",
         )
+
+        assignments = re.findall(
+            r"personRequest\?\.qualityLevel\s*=\s*([A-Za-z_][A-Za-z0-9_.]*)",
+            ADAPTER,
+        )
+        self.assertEqual(
+            assignments,
+            ["personSegmentationPrimitiveQuality"],
+            "Swift must not select person segmentation quality dynamically",
+        )
+        for direct_quality in (".accurate", ".balanced", ".fast"):
+            self.assertNotIn(
+                f"personRequest?.qualityLevel = {direct_quality}",
+                ADAPTER,
+            )
 
     def test_adapter_schema_version_is_atomic_across_runtime_helper_and_clients(self) -> None:
         rust_match = re.search(
