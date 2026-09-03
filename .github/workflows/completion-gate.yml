@@ -87,6 +87,12 @@ jobs:
                 "timeout_seconds": 2400
               },
               {
+                "name": "rust-driven-apple-styles-consumer",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_rust_style_consumer.sh"],
+                "timeout_seconds": 2400
+              },
+              {
                 "name": "raw-diagnostics-target-build",
                 "kind": "static",
                 "command": ["swift", "build", "--target", "CoreImageRAWDiagnostics"],

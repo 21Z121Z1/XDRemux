@@ -36,7 +36,7 @@ jobs:
         with:
           toolchain: stable
 
-      - name: "[1/5] Build Rust product and Apple migration oracle"
+      - name: "[1/5] Build Rust product and Apple capability adapter"
         shell: bash
         run: |
           mkdir -p artifacts
@@ -44,13 +44,13 @@ jobs:
           cargo build --locked -p xdremux-cli 2>&1 | tee artifacts/rust-cli-build.log
           echo "::endgroup::"
           echo "RUST_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
-          echo "::group::Swift Apple migration build"
-          swift build --target XDRemuxCLI 2>&1 | tee artifacts/swift-build.log
-          SWIFT_ORACLE_CLI="$(swift build --show-bin-path)/XDRemuxCLI"
-          test -x "$SWIFT_ORACLE_CLI"
-          echo "SWIFT_ORACLE_CLI=$SWIFT_ORACLE_CLI" >> "$GITHUB_ENV"
+          echo "::group::Apple capability adapter build"
+          swift build --product xdremux-apple-adapter 2>&1 | tee artifacts/apple-adapter-build.log
+          APPLE_ADAPTER="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          test -x "$APPLE_ADAPTER"
+          echo "APPLE_ADAPTER=$APPLE_ADAPTER" >> "$GITHUB_ENV"
           echo "::endgroup::"
-          echo "APPLE_ORACLE_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
+          echo "APPLE_ADAPTER_BUILD_RESULT=Passed" >> "$GITHUB_ENV"
 
       - name: "[2/5] Run migration and architecture tests"
         shell: bash
@@ -89,8 +89,8 @@ jobs:
           echo "MACOS_APP_RESULT=Passed" >> "$GITHUB_ENV"
 
       # This bundle is the pre-existing private ProXDR / Apple feature regression fixture set.
-      # Portable conversion is exercised through the canonical Rust CLI below. Swift remains only
-      # where Apple feature ownership has not yet moved behind the Rust capability adapter.
+      # Every product conversion below is driven by the canonical Rust CLI. Swift remains only in
+      # the separate migration-oracle test step until its replacement evidence is complete.
       - name: Prepare private fixtures
         shell: bash
         env:
@@ -149,17 +149,17 @@ jobs:
             > artifacts/fixtures/oppo.log 2> artifacts/fixtures/oppo.stderr
           echo "OPPO_FIXTURE_RESULT=Passed (Rust)" >> "$GITHUB_ENV"
           echo "::endgroup::"
-          echo "::group::Apple feature migration-oracle fixture conversions"
-          "$SWIFT_ORACLE_CLI" convert --apple-photographic-styles \
-            --debug-dir artifacts/diagnostics/apple-styles \
+          echo "::group::Canonical Rust Apple feature fixture conversions"
+          XDREMUX_APPLE_ADAPTER="$APPLE_ADAPTER" \
+            target/debug/xdremux convert --apple-styles \
             --input "$FIXTURE_ROOT/apple-styles.heic" --output artifacts/fixtures/apple-styles.heic \
             > artifacts/fixtures/apple-styles.log 2> artifacts/fixtures/apple-styles.stderr
-          echo "APPLE_STYLES_RESULT=Passed (Swift oracle)" >> "$GITHUB_ENV"
-          "$SWIFT_ORACLE_CLI" convert --apple-portrait \
-            --debug-dir artifacts/diagnostics/apple-portrait \
+          echo "APPLE_STYLES_RESULT=Passed (Rust + adapter)" >> "$GITHUB_ENV"
+          XDREMUX_APPLE_ADAPTER="$APPLE_ADAPTER" \
+            target/debug/xdremux convert --apple-portrait \
             --input "$FIXTURE_ROOT/apple-portrait.heic" --output artifacts/fixtures/apple-portrait.heic \
             > artifacts/fixtures/apple-portrait.log 2> artifacts/fixtures/apple-portrait.stderr
-          echo "APPLE_PORTRAIT_RESULT=Passed (Swift oracle)" >> "$GITHUB_ENV"
+          echo "APPLE_PORTRAIT_RESULT=Passed (Rust + adapter)" >> "$GITHUB_ENV"
           echo "::endgroup::"
 
       - name: "[5/5] Validate output containers"
@@ -177,11 +177,40 @@ jobs:
           python3 Tests/validation/verify_swift_cli_sample.py \
             --validate-only --input artifacts/fixtures/oppo.heic --expected-pixel-format 420f
           echo "::endgroup::"
-          echo "::group::Apple migration-oracle validation"
-          "$SWIFT_ORACLE_CLI" validate-apple --input artifacts/fixtures/apple-styles.heic \
-            > artifacts/fixtures/apple-styles-validation.json
-          "$SWIFT_ORACLE_CLI" validate-portrait --input artifacts/fixtures/apple-portrait.heic \
-            > artifacts/fixtures/apple-portrait-validation.json
+          echo "::group::Rust-driven Apple consumer validation"
+          target/debug/xdremux validate artifacts/fixtures/apple-styles.heic \
+            > artifacts/fixtures/apple-styles-validation.txt
+          target/debug/xdremux validate artifacts/fixtures/apple-portrait.heic \
+            > artifacts/fixtures/apple-portrait-validation.txt
+          python3 - "$APPLE_ADAPTER" \
+            artifacts/fixtures/apple-styles.heic artifacts/fixtures/apple-portrait.heic <<'PY'
+          import json
+          import subprocess
+          import sys
+
+          adapter, styles, portrait = sys.argv[1:]
+
+          def facts(path):
+              request = json.dumps({
+                  "schema_version": 1,
+                  "operation": "imageio-auxiliary-facts",
+                  "input_path": path,
+              }).encode() + b"\n"
+              result = subprocess.run(
+                  [adapter], input=request, check=True, capture_output=True
+              )
+              return json.loads(result.stdout)["auxiliary"]
+
+          for path, required in (
+              (styles, ["iso_gain_map", "portrait_effects_matte", "skin_matte"]),
+              (portrait, ["iso_gain_map", "disparity", "portrait_effects_matte", "skin_matte"]),
+          ):
+              observed = facts(path)
+              missing = [key for key in required if observed.get(key) is not True]
+              if missing:
+                  raise SystemExit(f"{path}: missing Apple consumer facts {missing}: {observed!r}")
+              print(f"rust-apple-consumer-pass: {path}")
+          PY
           echo "::endgroup::"
           echo "CONTAINER_VALIDATION_RESULT=Passed" >> "$GITHUB_ENV"
 
@@ -212,7 +241,7 @@ jobs:
             echo "| Check | Result |"
             echo "|---|---|"
             echo "| Canonical Rust CLI build | ${RUST_BUILD_RESULT:-Failed} |"
-            echo "| Apple migration-oracle build | ${APPLE_ORACLE_BUILD_RESULT:-Failed} |"
+            echo "| Apple capability adapter build | ${APPLE_ADAPTER_BUILD_RESULT:-Failed} |"
             echo "| Migration/oracle tests | ${MIGRATION_TEST_RESULT:-Not run} |"
             echo "| macOS App build | ${MACOS_APP_RESULT:-Not run} |"
             echo "| Legacy Motion Photo oracle | ${MOTION_PHOTO_REAL_RESULT:-Not run} |"
