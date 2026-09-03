@@ -21,6 +21,9 @@ pub const APPLE_STYLE_IDENTITY_SHA256: &str =
 pub const APPLE_STYLE_REFINEMENT_PARAMETER_COUNT: usize = 12;
 pub const APPLE_STYLE_REFINEMENT_MAX_PIXELS: usize = 50_000;
 pub const APPLE_STYLE_REFINEMENT_EPSILON: f64 = 1.0 / 32.0;
+pub const APPLE_STYLE_LIGHT_MAP_SIDE: usize = 32;
+pub const APPLE_STYLE_LIGHT_MAP_BYTE_COUNT: usize =
+    APPLE_STYLE_LIGHT_MAP_SIDE * APPLE_STYLE_LIGHT_MAP_SIDE * 2;
 
 const IDENTITY_INDICES: [usize; 3] = [3, 7, 11];
 const DIRECT_PARAMETER_INDICES: [usize; 6] = [0, 1, 2, 3, 7, 11];
@@ -75,6 +78,18 @@ pub enum AppleStyleDataError {
         actual: usize,
         expected: usize,
     },
+    InvalidSceneScore {
+        class: AppleStyleSceneClass,
+        value: f64,
+    },
+    InvalidLightMapInput,
+    InvalidLightMapSample {
+        index: usize,
+    },
+    InvalidOrientation(u8),
+    NonFiniteLightMapValue {
+        index: usize,
+    },
     SingularSystem,
 }
 
@@ -125,6 +140,24 @@ impl fmt::Display for AppleStyleDataError {
             Self::InvalidJacobianSampleCount { actual, expected } => write!(
                 formatter,
                 "Apple Photographic Styles sampled Jacobian has {actual} values; expected {expected}"
+            ),
+            Self::InvalidSceneScore { class, value } => write!(
+                formatter,
+                "Apple Photographic Styles {class:?} scene score {value} is outside 0 through 1"
+            ),
+            Self::InvalidLightMapInput => formatter.write_str(
+                "Apple Photographic Styles light-map input dimensions or numeric bounds are invalid",
+            ),
+            Self::InvalidLightMapSample { index } => write!(
+                formatter,
+                "Apple Photographic Styles light-map sample {index} is not finite"
+            ),
+            Self::InvalidOrientation(value) => {
+                write!(formatter, "Apple Photographic Styles orientation {value} is invalid")
+            }
+            Self::NonFiniteLightMapValue { index } => write!(
+                formatter,
+                "Apple Photographic Styles serialized light-map value {index} is not finite"
             ),
             Self::SingularSystem => {
                 formatter.write_str("Apple Photographic Styles polynomial system is singular")
@@ -551,6 +584,193 @@ pub fn apple_style_solve_refinement_update(
     Ok(solution)
 }
 
+/// The four public Vision score buckets consumed by Apple's scene-type policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppleStyleSceneClass {
+    Food,
+    Sunset,
+    Indoor,
+    Outdoor,
+}
+
+/// Vision observations passed from a platform primitive to the Rust scene
+/// policy. Scores are confidence values and therefore must already be in 0..1.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStyleSceneScores {
+    pub food: f64,
+    pub sunset: f64,
+    pub indoor: f64,
+    pub outdoor: f64,
+}
+
+/// The product-level scene choice used in the style property-list contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AppleStyleSceneDecision {
+    pub scene_type: u8,
+    pub selected_class: Option<AppleStyleSceneClass>,
+    pub native_default_applied: bool,
+}
+
+/// Resolve the current iPhone scene-type priority in Rust.
+///
+/// Vision classification is a platform observation. The thresholds and
+/// priority are product policy and remain portable here: food, sunset, indoor,
+/// outdoor, then the native default scene type 0.
+pub fn resolve_apple_style_scene_type(
+    scores: AppleStyleSceneScores,
+) -> Result<AppleStyleSceneDecision, AppleStyleDataError> {
+    for (class, value) in [
+        (AppleStyleSceneClass::Food, scores.food),
+        (AppleStyleSceneClass::Sunset, scores.sunset),
+        (AppleStyleSceneClass::Indoor, scores.indoor),
+        (AppleStyleSceneClass::Outdoor, scores.outdoor),
+    ] {
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(AppleStyleDataError::InvalidSceneScore { class, value });
+        }
+    }
+
+    let (scene_type, selected_class) = if scores.food >= 0.08 {
+        (1, Some(AppleStyleSceneClass::Food))
+    } else if scores.sunset >= 0.08 {
+        (3, Some(AppleStyleSceneClass::Sunset))
+    } else if scores.indoor >= 0.15 {
+        (0, Some(AppleStyleSceneClass::Indoor))
+    } else if scores.outdoor >= 0.15 {
+        (2, Some(AppleStyleSceneClass::Outdoor))
+    } else {
+        (0, None)
+    };
+    Ok(AppleStyleSceneDecision {
+        scene_type,
+        selected_class,
+        native_default_applied: selected_class.is_none(),
+    })
+}
+
+/// Derive the source-dependent face exposure boost used by the style plist.
+/// Missing or non-positive medians deliberately resolve to the neutral value;
+/// the caller still has to provide a credible person observation.
+pub fn apple_style_face_exposure_boost(
+    global_median: f64,
+    person_median: f64,
+    has_credible_person: bool,
+) -> Result<f64, AppleStyleDataError> {
+    if !global_median.is_finite()
+        || !person_median.is_finite()
+        || global_median < 0.0
+        || person_median < 0.0
+    {
+        return Err(AppleStyleDataError::InvalidLightMapInput);
+    }
+    if has_credible_person && global_median > 0.0 && person_median > 0.0 {
+        Ok((global_median / person_median).sqrt().clamp(1.0, 2.5))
+    } else {
+        Ok(1.0)
+    }
+}
+
+/// Typed source and bounds for one source-derived style light map.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppleStyleLightMapRequest<'a> {
+    pub luma: &'a [f32],
+    pub width: usize,
+    pub height: usize,
+    pub value_scale: f32,
+    pub value_offset: f32,
+    pub output_minimum: f32,
+    pub output_maximum: f32,
+    pub storage_orientation: u8,
+}
+
+/// Build one source-derived 32x32 Float16 light map in primary-item storage
+/// order. The aggregation grid and all eight EXIF orientation mappings match
+/// the existing producer contract; non-finite source samples fail closed.
+pub fn apple_style_light_map(
+    request: &AppleStyleLightMapRequest<'_>,
+) -> Result<Vec<u8>, AppleStyleDataError> {
+    let expected_count = request
+        .width
+        .checked_mul(request.height)
+        .ok_or(AppleStyleDataError::InvalidLightMapInput)?;
+    if request.width == 0
+        || request.height == 0
+        || request.luma.len() != expected_count
+        || !request.value_scale.is_finite()
+        || !request.value_offset.is_finite()
+        || !request.output_minimum.is_finite()
+        || !request.output_maximum.is_finite()
+        || request.output_minimum > request.output_maximum
+        || !(1..=8).contains(&request.storage_orientation)
+    {
+        if !(1..=8).contains(&request.storage_orientation) {
+            return Err(AppleStyleDataError::InvalidOrientation(
+                request.storage_orientation,
+            ));
+        }
+        return Err(AppleStyleDataError::InvalidLightMapInput);
+    }
+    if let Some(index) = request.luma.iter().position(|value| !value.is_finite()) {
+        return Err(AppleStyleDataError::InvalidLightMapSample { index });
+    }
+
+    let side = APPLE_STYLE_LIGHT_MAP_SIDE;
+    let mut presentation = vec![f16::from_f32(0.0); side * side];
+    for target_y in 0..side {
+        let y0 = target_y * request.height / side;
+        let y1 = (target_y + 1)
+            .checked_mul(request.height)
+            .ok_or(AppleStyleDataError::InvalidLightMapInput)?
+            / side;
+        let y1 = y1.max(y0 + 1).min(request.height);
+        for target_x in 0..side {
+            let x0 = target_x * request.width / side;
+            let x1 = (target_x + 1)
+                .checked_mul(request.width)
+                .ok_or(AppleStyleDataError::InvalidLightMapInput)?
+                / side;
+            let x1 = x1.max(x0 + 1).min(request.width);
+            let mut sum = 0.0_f64;
+            let mut count = 0_usize;
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    sum += f64::from(request.luma[y * request.width + x]);
+                    count += 1;
+                }
+            }
+            let average = (sum / count as f64) as f32;
+            let scaled = (average * request.value_scale + request.value_offset)
+                .clamp(request.output_minimum, request.output_maximum);
+            let encoded = f16::from_f32(scaled);
+            if !encoded.to_f32().is_finite() {
+                return Err(AppleStyleDataError::NonFiniteLightMapValue {
+                    index: target_y * side + target_x,
+                });
+            }
+            presentation[target_y * side + target_x] = encoded;
+        }
+    }
+
+    let mut output = Vec::with_capacity(APPLE_STYLE_LIGHT_MAP_BYTE_COUNT);
+    for storage_y in 0..side {
+        for storage_x in 0..side {
+            let (display_x, display_y) = match request.storage_orientation {
+                1 => (storage_x, storage_y),
+                2 => (side - 1 - storage_x, storage_y),
+                3 => (side - 1 - storage_x, side - 1 - storage_y),
+                4 => (storage_x, side - 1 - storage_y),
+                5 => (storage_y, storage_x),
+                6 => (side - 1 - storage_y, storage_x),
+                7 => (side - 1 - storage_y, side - 1 - storage_x),
+                8 => (storage_y, side - 1 - storage_x),
+                _ => unreachable!("orientation was validated above"),
+            };
+            output.extend_from_slice(&presentation[display_y * side + display_x].to_le_bytes());
+        }
+    }
+    Ok(output)
+}
+
 /// Serialize bounded coefficient deltas over the verified identity payload.
 pub fn apple_style_data_from_coefficient_deltas(
     coefficient_deltas: &[f64],
@@ -939,6 +1159,181 @@ mod tests {
         assert!(matches!(
             apple_style_solve_refinement_update(&current, &current, &jacobian, &[invalid_row]),
             Err(AppleStyleDataError::InvalidScalarRow { index: 0 })
+        ));
+    }
+
+    #[test]
+    fn scene_policy_preserves_priority_and_native_default() {
+        let food = resolve_apple_style_scene_type(AppleStyleSceneScores {
+            food: 0.08,
+            sunset: 1.0,
+            indoor: 1.0,
+            outdoor: 1.0,
+        })
+        .unwrap();
+        assert_eq!(food.scene_type, 1);
+        assert_eq!(food.selected_class, Some(AppleStyleSceneClass::Food));
+        assert!(!food.native_default_applied);
+
+        let sunset = resolve_apple_style_scene_type(AppleStyleSceneScores {
+            food: 0.0,
+            sunset: 0.08,
+            indoor: 1.0,
+            outdoor: 1.0,
+        })
+        .unwrap();
+        assert_eq!(sunset.scene_type, 3);
+        assert_eq!(sunset.selected_class, Some(AppleStyleSceneClass::Sunset));
+
+        let indoor = resolve_apple_style_scene_type(AppleStyleSceneScores {
+            food: 0.0,
+            sunset: 0.0,
+            indoor: 0.15,
+            outdoor: 1.0,
+        })
+        .unwrap();
+        assert_eq!(indoor.scene_type, 0);
+        assert_eq!(indoor.selected_class, Some(AppleStyleSceneClass::Indoor));
+        assert!(!indoor.native_default_applied);
+
+        let outdoor = resolve_apple_style_scene_type(AppleStyleSceneScores {
+            food: 0.0,
+            sunset: 0.0,
+            indoor: 0.0,
+            outdoor: 0.15,
+        })
+        .unwrap();
+        assert_eq!(outdoor.scene_type, 2);
+        assert_eq!(outdoor.selected_class, Some(AppleStyleSceneClass::Outdoor));
+
+        let default_scene = resolve_apple_style_scene_type(AppleStyleSceneScores {
+            food: 0.079,
+            sunset: 0.079,
+            indoor: 0.149,
+            outdoor: 0.149,
+        })
+        .unwrap();
+        assert_eq!(default_scene.scene_type, 0);
+        assert_eq!(default_scene.selected_class, None);
+        assert!(default_scene.native_default_applied);
+        assert!(matches!(
+            resolve_apple_style_scene_type(AppleStyleSceneScores {
+                food: f64::NAN,
+                sunset: 0.0,
+                indoor: 0.0,
+                outdoor: 0.0,
+            }),
+            Err(AppleStyleDataError::InvalidSceneScore {
+                class: AppleStyleSceneClass::Food,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn face_exposure_boost_matches_swift_formula_and_neutral_fallback() {
+        assert_eq!(
+            apple_style_face_exposure_boost(4.0, 1.0, true).unwrap(),
+            2.0
+        );
+        assert_eq!(
+            apple_style_face_exposure_boost(4.0, 1.0, false).unwrap(),
+            1.0
+        );
+        assert_eq!(
+            apple_style_face_exposure_boost(0.0, 0.0, true).unwrap(),
+            1.0
+        );
+        assert!(matches!(
+            apple_style_face_exposure_boost(-1.0, 1.0, true),
+            Err(AppleStyleDataError::InvalidLightMapInput)
+        ));
+    }
+
+    #[test]
+    fn light_map_storage_orientation_matches_all_eight_exif_mappings() {
+        let side = APPLE_STYLE_LIGHT_MAP_SIDE;
+        let luma = (0..side * side)
+            .map(|value| value as f32)
+            .collect::<Vec<_>>();
+        let expected_corners = [
+            [0.0, 31.0, 992.0, 1023.0],
+            [31.0, 0.0, 1023.0, 992.0],
+            [1023.0, 992.0, 31.0, 0.0],
+            [992.0, 1023.0, 0.0, 31.0],
+            [0.0, 992.0, 31.0, 1023.0],
+            [31.0, 1023.0, 0.0, 992.0],
+            [1023.0, 31.0, 992.0, 0.0],
+            [992.0, 0.0, 1023.0, 31.0],
+        ];
+        for orientation in 1..=8 {
+            let request = AppleStyleLightMapRequest {
+                luma: &luma,
+                width: side,
+                height: side,
+                value_scale: 1.0,
+                value_offset: 0.0,
+                output_minimum: 0.0,
+                output_maximum: 2_000.0,
+                storage_orientation: orientation,
+            };
+            let data = apple_style_light_map(&request).unwrap();
+            assert_eq!(data.len(), APPLE_STYLE_LIGHT_MAP_BYTE_COUNT);
+            let corners = [(0, 0), (side - 1, 0), (0, side - 1), (side - 1, side - 1)];
+            for (corner_index, (x, y)) in corners.into_iter().enumerate() {
+                let offset = (y * side + x) * 2;
+                let value = f16::from_le_bytes([data[offset], data[offset + 1]]).to_f32();
+                assert_eq!(
+                    value,
+                    expected_corners[usize::from(orientation - 1)][corner_index]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn light_map_rejects_invalid_geometry_orientation_and_samples() {
+        let empty = AppleStyleLightMapRequest {
+            luma: &[],
+            width: 0,
+            height: 0,
+            value_scale: 1.0,
+            value_offset: 0.0,
+            output_minimum: 0.0,
+            output_maximum: 1.0,
+            storage_orientation: 1,
+        };
+        assert!(matches!(
+            apple_style_light_map(&empty),
+            Err(AppleStyleDataError::InvalidLightMapInput)
+        ));
+        let invalid_orientation = AppleStyleLightMapRequest {
+            luma: &[0.0],
+            width: 1,
+            height: 1,
+            value_scale: 1.0,
+            value_offset: 0.0,
+            output_minimum: 0.0,
+            output_maximum: 1.0,
+            storage_orientation: 9,
+        };
+        assert!(matches!(
+            apple_style_light_map(&invalid_orientation),
+            Err(AppleStyleDataError::InvalidOrientation(9))
+        ));
+        let invalid_sample = AppleStyleLightMapRequest {
+            luma: &[f32::NAN],
+            width: 1,
+            height: 1,
+            value_scale: 1.0,
+            value_offset: 0.0,
+            output_minimum: 0.0,
+            output_maximum: 1.0,
+            storage_orientation: 1,
+        };
+        assert!(matches!(
+            apple_style_light_map(&invalid_sample),
+            Err(AppleStyleDataError::InvalidLightMapSample { index: 0 })
         ));
     }
 }

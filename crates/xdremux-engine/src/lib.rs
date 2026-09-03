@@ -29,14 +29,18 @@ pub use apple_auxiliary::{
 };
 pub use apple_photographic_styles::{
     apple_style_data_apply_coefficient_deltas, apple_style_data_from_coefficient_deltas,
-    apple_style_data_from_parameters, apple_style_data_sha256, apple_style_fit_global_polynomial,
-    apple_style_identity_data, apple_style_polynomial_basis, apple_style_solve_refinement_update,
-    validate_apple_style_data, AppleStyleDataError, AppleStyleDataFacts, AppleStyleSampledJacobian,
-    AppleStyleScalarRow, APPLE_STYLE_BLOCK_VALUE_COUNT, APPLE_STYLE_BYTE_COUNT,
-    APPLE_STYLE_CHANNEL_COUNT, APPLE_STYLE_GRID_HEIGHT, APPLE_STYLE_GRID_WIDTH,
-    APPLE_STYLE_IDENTITY_SHA256, APPLE_STYLE_PLANE_COUNT, APPLE_STYLE_POLYNOMIAL_COUNT,
-    APPLE_STYLE_REFINEMENT_EPSILON, APPLE_STYLE_REFINEMENT_MAX_PIXELS,
-    APPLE_STYLE_REFINEMENT_PARAMETER_COUNT, APPLE_STYLE_TILE_COUNT,
+    apple_style_data_from_parameters, apple_style_data_sha256, apple_style_face_exposure_boost,
+    apple_style_fit_global_polynomial, apple_style_identity_data, apple_style_light_map,
+    apple_style_polynomial_basis, apple_style_solve_refinement_update,
+    resolve_apple_style_scene_type, validate_apple_style_data, AppleStyleDataError,
+    AppleStyleDataFacts, AppleStyleLightMapRequest, AppleStyleSampledJacobian, AppleStyleScalarRow,
+    AppleStyleSceneClass, AppleStyleSceneDecision, AppleStyleSceneScores,
+    APPLE_STYLE_BLOCK_VALUE_COUNT, APPLE_STYLE_BYTE_COUNT, APPLE_STYLE_CHANNEL_COUNT,
+    APPLE_STYLE_GRID_HEIGHT, APPLE_STYLE_GRID_WIDTH, APPLE_STYLE_IDENTITY_SHA256,
+    APPLE_STYLE_LIGHT_MAP_BYTE_COUNT, APPLE_STYLE_LIGHT_MAP_SIDE, APPLE_STYLE_PLANE_COUNT,
+    APPLE_STYLE_POLYNOMIAL_COUNT, APPLE_STYLE_REFINEMENT_EPSILON,
+    APPLE_STYLE_REFINEMENT_MAX_PIXELS, APPLE_STYLE_REFINEMENT_PARAMETER_COUNT,
+    APPLE_STYLE_TILE_COUNT,
 };
 pub use apple_portrait::{
     build_apple_portrait_rendering_parameters, AppleRendDocument, AppleRendError, AppleRendRecord,
