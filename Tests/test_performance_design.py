@@ -34,6 +34,30 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertEqual(source.count("CIContext(options:"), 1)
         self.assertIn("coreImageContext.render(", source)
 
+    def test_hdr_benchmarks_distinguish_source_family_and_output_profile(self) -> None:
+        benchmark = self.source("scripts/benchmark_rust_product.py")
+        for case in (
+            "hdr-lhdr-mono400",
+            "hdr-uhdr-rgb444",
+            "oppo-compatible-lhdr-rgb420",
+            "oppo-compatible-uhdr-rgb420",
+        ):
+            self.assertIn(case, benchmark)
+        self.assertNotIn('"standard-hdr"', benchmark)
+        self.assertIn('codec_path="portable-libheif"', benchmark)
+
+        codec_benchmark = self.source(
+            "crates/xdremux-codec/src/bin/xdremux-codec-gainmap-bench.rs"
+        )
+        for profile in ("mono400", "rgb444", "rgb420"):
+            self.assertIn(f'"{profile}"', codec_benchmark)
+        self.assertIn("encode_gain_map_tiles(&request)", codec_benchmark)
+
+        workflow = self.source(".github/workflows/performance.yml")
+        self.assertIn("Measure isolated portable Gain Map codec primitives", workflow)
+        self.assertIn("GitHub Actions hosted macOS 26 (arm64)", workflow)
+        self.assertIn("not treated as an RGB 4:4:4 Gain Map backend", workflow)
+
     def test_app_queue_status_projection_avoids_filter_arrays(self) -> None:
         source = self.source("apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift")
         self.assertNotIn("queue.filter { $0.status.isTerminal }.count", source)
