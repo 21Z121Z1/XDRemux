@@ -44,6 +44,8 @@ pub enum AppleStyleDataError {
         actual: usize,
         expected: usize,
     },
+    InvalidRasterPair,
+    InvalidBasisInput,
     NonFiniteCoefficient {
         index: usize,
     },
@@ -55,6 +57,7 @@ pub enum AppleStyleDataError {
     NonFiniteValue {
         index: usize,
     },
+    SingularSystem,
 }
 
 impl fmt::Display for AppleStyleDataError {
@@ -68,6 +71,12 @@ impl fmt::Display for AppleStyleDataError {
                 formatter,
                 "Apple Photographic Styles coefficient vector has {actual} values; expected {expected}"
             ),
+            Self::InvalidRasterPair => formatter.write_str(
+                "Apple Photographic Styles polynomial fit requires matching finite RGB rasters",
+            ),
+            Self::InvalidBasisInput => {
+                formatter.write_str("Apple Photographic Styles polynomial basis input is not finite")
+            }
             Self::NonFiniteCoefficient { index } => write!(
                 formatter,
                 "Apple Photographic Styles coefficient {index} is not finite"
@@ -80,6 +89,9 @@ impl fmt::Display for AppleStyleDataError {
                 formatter,
                 "Apple Photographic Styles Float16 value {index} is not finite"
             ),
+            Self::SingularSystem => {
+                formatter.write_str("Apple Photographic Styles polynomial system is singular")
+            }
         }
     }
 }
@@ -163,7 +175,7 @@ pub fn apple_style_polynomial_basis(
     blue: f32,
 ) -> Result<[f32; APPLE_STYLE_POLYNOMIAL_COUNT], AppleStyleDataError> {
     if !red.is_finite() || !green.is_finite() || !blue.is_finite() {
-        return Err(AppleStyleDataError::NonFiniteCoefficient { index: 0 });
+        return Err(AppleStyleDataError::InvalidBasisInput);
     }
     Ok([
         1.0,
@@ -177,6 +189,110 @@ pub fn apple_style_polynomial_basis(
         green * blue,
         blue * blue,
     ])
+}
+
+/// Fit the bounded global quadratic style transform used to initialize the
+/// constrained solver.
+///
+/// The renderer remains a platform primitive, but this policy is pure numeric
+/// work: sample the RGB pair deterministically, run three Huber-weighted IRLS
+/// passes, add the same trace-scaled ridge, and clamp each coefficient to the
+/// verified key-1 bounds. Keeping it here means a future Apple adapter can
+/// provide observations without owning a second solver.
+pub fn apple_style_fit_global_polynomial(
+    source_rgb8: &[f32],
+    target_rgb8: &[f32],
+) -> Result<Vec<f64>, AppleStyleDataError> {
+    if source_rgb8.len() != target_rgb8.len()
+        || source_rgb8.len() < APPLE_STYLE_CHANNEL_COUNT
+        || !source_rgb8.len().is_multiple_of(APPLE_STYLE_CHANNEL_COUNT)
+        || !source_rgb8.iter().all(|value| value.is_finite())
+        || !target_rgb8.iter().all(|value| value.is_finite())
+    {
+        return Err(AppleStyleDataError::InvalidRasterPair);
+    }
+
+    let pixel_count = source_rgb8.len() / APPLE_STYLE_CHANNEL_COUNT;
+    let pixel_stride = (pixel_count / 100_000).max(1);
+    let sampled_pixel_count = (pixel_count - 1) / pixel_stride + 1;
+    let basis_values = (0..sampled_pixel_count)
+        .map(|sampled_pixel| {
+            let source_offset = sampled_pixel * pixel_stride * APPLE_STYLE_CHANNEL_COUNT;
+            let red = f64::from(source_rgb8[source_offset]) / 255.0;
+            let green = f64::from(source_rgb8[source_offset + 1]) / 255.0;
+            let blue = f64::from(source_rgb8[source_offset + 2]) / 255.0;
+            [
+                1.0,
+                red,
+                green,
+                blue,
+                red * red,
+                red * green,
+                red * blue,
+                green * green,
+                green * blue,
+                blue * blue,
+            ]
+        })
+        .collect::<Vec<_>>();
+
+    let mut coefficients = vec![0.0_f64; APPLE_STYLE_BLOCK_VALUE_COUNT];
+    for _ in 0..3 {
+        for output in 0..APPLE_STYLE_CHANNEL_COUNT {
+            let mut normal =
+                vec![0.0_f64; APPLE_STYLE_POLYNOMIAL_COUNT * APPLE_STYLE_POLYNOMIAL_COUNT];
+            let mut right_hand_side = vec![0.0_f64; APPLE_STYLE_POLYNOMIAL_COUNT];
+            for (sampled_pixel, basis) in basis_values.iter().enumerate() {
+                let source_offset = sampled_pixel * pixel_stride * APPLE_STYLE_CHANNEL_COUNT;
+                let source_value = source_rgb8[source_offset + output];
+                let target_value = target_rgb8[source_offset + output];
+                let observed = f64::from(target_value - source_value) / 255.0;
+                let predicted = basis
+                    .iter()
+                    .enumerate()
+                    .map(|(term, value)| {
+                        value * coefficients[term * APPLE_STYLE_CHANNEL_COUNT + output]
+                    })
+                    .sum::<f64>();
+                let residual = observed - predicted;
+                let huber_threshold = 4.0_f64 / 255.0;
+                let mut weight = (huber_threshold / huber_threshold.max(residual.abs())).min(1.0);
+                if source_value <= 2.0 || source_value >= 253.0 {
+                    weight *= 0.25;
+                }
+                for row in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
+                    let row_value = basis[row];
+                    right_hand_side[row] += weight * row_value * observed;
+                    for column in row..APPLE_STYLE_POLYNOMIAL_COUNT {
+                        normal[row * APPLE_STYLE_POLYNOMIAL_COUNT + column] +=
+                            weight * row_value * basis[column];
+                    }
+                }
+            }
+
+            for row in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
+                for column in 0..row {
+                    normal[row * APPLE_STYLE_POLYNOMIAL_COUNT + column] =
+                        normal[column * APPLE_STYLE_POLYNOMIAL_COUNT + row];
+                }
+            }
+            let trace = (0..APPLE_STYLE_POLYNOMIAL_COUNT)
+                .map(|term| normal[term * APPLE_STYLE_POLYNOMIAL_COUNT + term])
+                .sum::<f64>();
+            let ridge = (trace / APPLE_STYLE_POLYNOMIAL_COUNT as f64 * 1e-5).max(1e-9);
+            for term in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
+                normal[term * APPLE_STYLE_POLYNOMIAL_COUNT + term] +=
+                    ridge * f64::from((term >= 4) as u8 * 9 + 1);
+            }
+            let solution = solve_linear_system(&normal, &right_hand_side)?;
+            for (term, value) in solution.into_iter().enumerate() {
+                let coefficient_index = term * APPLE_STYLE_CHANNEL_COUNT + output;
+                let bound = coefficient_bound(coefficient_index);
+                coefficients[coefficient_index] = value.clamp(-bound, bound);
+            }
+        }
+    }
+    Ok(coefficients)
 }
 
 /// Serialize bounded coefficient deltas over the verified identity payload.
@@ -251,11 +367,7 @@ fn validate_coefficient_deltas(values: &[f64]) -> Result<(), AppleStyleDataError
         if !value.is_finite() {
             return Err(AppleStyleDataError::NonFiniteCoefficient { index });
         }
-        let bound = if index / APPLE_STYLE_CHANNEL_COUNT >= 4 {
-            QUADRATIC_BOUND
-        } else {
-            LINEAR_BOUND
-        };
+        let bound = coefficient_bound(index);
         if value.abs() > bound + 1e-9 {
             return Err(AppleStyleDataError::CoefficientOutOfBounds {
                 index,
@@ -265,6 +377,62 @@ fn validate_coefficient_deltas(values: &[f64]) -> Result<(), AppleStyleDataError
         }
     }
     Ok(())
+}
+
+fn coefficient_bound(index: usize) -> f64 {
+    if index / APPLE_STYLE_CHANNEL_COUNT >= 4 {
+        QUADRATIC_BOUND
+    } else {
+        LINEAR_BOUND
+    }
+}
+
+fn solve_linear_system(matrix: &[f64], vector: &[f64]) -> Result<Vec<f64>, AppleStyleDataError> {
+    let count = vector.len();
+    if matrix.len() != count * count {
+        return Err(AppleStyleDataError::SingularSystem);
+    }
+    let mut augmented = (0..count)
+        .map(|row| {
+            let mut values = matrix[row * count..(row + 1) * count].to_vec();
+            values.push(vector[row]);
+            values
+        })
+        .collect::<Vec<_>>();
+    for pivot in 0..count {
+        let best = (pivot..count)
+            .max_by(|left, right| {
+                augmented[*left][pivot]
+                    .abs()
+                    .total_cmp(&augmented[*right][pivot].abs())
+            })
+            .ok_or(AppleStyleDataError::SingularSystem)?;
+        if augmented[best][pivot].abs() <= 1e-12 {
+            return Err(AppleStyleDataError::SingularSystem);
+        }
+        if best != pivot {
+            augmented.swap(best, pivot);
+        }
+        let divisor = augmented[pivot][pivot];
+        for value in augmented[pivot][pivot..=count].iter_mut() {
+            *value /= divisor;
+        }
+        let pivot_values = augmented[pivot].clone();
+        let (before, pivot_and_after) = augmented.split_at_mut(pivot);
+        let (_, after) = pivot_and_after
+            .split_first_mut()
+            .ok_or(AppleStyleDataError::SingularSystem)?;
+        for row_values in before.iter_mut().chain(after.iter_mut()) {
+            let factor = row_values[pivot];
+            for (value, pivot_value) in row_values[pivot..=count]
+                .iter_mut()
+                .zip(pivot_values[pivot..=count].iter())
+            {
+                *value -= factor * pivot_value;
+            }
+        }
+    }
+    Ok(augmented.into_iter().map(|row| row[count]).collect())
 }
 
 #[cfg(test)]
@@ -347,6 +515,14 @@ mod tests {
             apple_style_data_apply_coefficient_deltas(&apple_style_identity_data(), &[0.0; 11]),
             Err(AppleStyleDataError::InvalidCoefficientCount { .. })
         ));
+        assert!(matches!(
+            apple_style_fit_global_polynomial(&[], &[]),
+            Err(AppleStyleDataError::InvalidRasterPair)
+        ));
+        assert!(matches!(
+            apple_style_fit_global_polynomial(&[0.0, 0.0, 0.0], &[f32::NAN, 0.0, 0.0]),
+            Err(AppleStyleDataError::InvalidRasterPair)
+        ));
     }
 
     #[test]
@@ -361,5 +537,64 @@ mod tests {
         assert_eq!(first, last);
         let value = f16::from_le_bytes([first[6], first[7]]).to_f32();
         assert_eq!(value, f16::from_f32(1.01).to_f32());
+    }
+
+    #[test]
+    fn global_polynomial_fit_recovers_a_bounded_known_transform() {
+        let mut expected = vec![0.0_f64; APPLE_STYLE_BLOCK_VALUE_COUNT];
+        for output in 0..APPLE_STYLE_CHANNEL_COUNT {
+            expected[output] = [0.010, -0.008, 0.006][output];
+            expected[APPLE_STYLE_CHANNEL_COUNT + output] = [0.008, -0.005, 0.004][output];
+            expected[2 * APPLE_STYLE_CHANNEL_COUNT + output] = [-0.006, 0.007, -0.003][output];
+            expected[3 * APPLE_STYLE_CHANNEL_COUNT + output] = [0.005, 0.004, -0.007][output];
+            expected[4 * APPLE_STYLE_CHANNEL_COUNT + output] = [0.002, -0.001, 0.001][output];
+            expected[5 * APPLE_STYLE_CHANNEL_COUNT + output] = [-0.001, 0.002, -0.001][output];
+            expected[6 * APPLE_STYLE_CHANNEL_COUNT + output] = [0.001, -0.001, 0.002][output];
+            expected[7 * APPLE_STYLE_CHANNEL_COUNT + output] = [0.002, 0.001, -0.002][output];
+            expected[8 * APPLE_STYLE_CHANNEL_COUNT + output] = [-0.002, 0.001, 0.001][output];
+            expected[9 * APPLE_STYLE_CHANNEL_COUNT + output] = [0.001, -0.002, 0.001][output];
+        }
+
+        let mut source = Vec::with_capacity(512 * APPLE_STYLE_CHANNEL_COUNT);
+        let mut target = Vec::with_capacity(512 * APPLE_STYLE_CHANNEL_COUNT);
+        for pixel in 0..512 {
+            let source_pixel = [
+                16.0 + (pixel * 37 % 220) as f32,
+                17.0 + (pixel * 53 % 219) as f32,
+                18.0 + (pixel * 71 % 218) as f32,
+            ];
+            source.extend_from_slice(&source_pixel);
+            let basis = apple_style_polynomial_basis(
+                source_pixel[0] / 255.0,
+                source_pixel[1] / 255.0,
+                source_pixel[2] / 255.0,
+            )
+            .unwrap();
+            for output in 0..APPLE_STYLE_CHANNEL_COUNT {
+                let delta = basis
+                    .iter()
+                    .enumerate()
+                    .map(|(term, value)| {
+                        f64::from(*value) * expected[term * APPLE_STYLE_CHANNEL_COUNT + output]
+                    })
+                    .sum::<f64>();
+                target.push(source_pixel[output] + (delta * 255.0) as f32);
+            }
+        }
+
+        let fitted = apple_style_fit_global_polynomial(&source, &target).unwrap();
+        assert_eq!(fitted.len(), APPLE_STYLE_BLOCK_VALUE_COUNT);
+        for (index, value) in fitted.iter().copied().enumerate() {
+            assert!(value.is_finite());
+            assert!(value.abs() <= coefficient_bound(index) + 1e-9);
+            assert!(
+                (value - expected[index]).abs() < 2e-3,
+                "coefficient {index}"
+            );
+        }
+        assert_eq!(
+            fitted,
+            apple_style_fit_global_polynomial(&source, &target).unwrap()
+        );
     }
 }

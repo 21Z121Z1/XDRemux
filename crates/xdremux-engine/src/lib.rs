@@ -29,12 +29,12 @@ pub use apple_auxiliary::{
 };
 pub use apple_photographic_styles::{
     apple_style_data_apply_coefficient_deltas, apple_style_data_from_coefficient_deltas,
-    apple_style_data_from_parameters, apple_style_data_sha256, apple_style_identity_data,
-    apple_style_polynomial_basis, validate_apple_style_data, AppleStyleDataError,
-    AppleStyleDataFacts, APPLE_STYLE_BLOCK_VALUE_COUNT, APPLE_STYLE_BYTE_COUNT,
-    APPLE_STYLE_CHANNEL_COUNT, APPLE_STYLE_GRID_HEIGHT, APPLE_STYLE_GRID_WIDTH,
-    APPLE_STYLE_IDENTITY_SHA256, APPLE_STYLE_PLANE_COUNT, APPLE_STYLE_POLYNOMIAL_COUNT,
-    APPLE_STYLE_TILE_COUNT,
+    apple_style_data_from_parameters, apple_style_data_sha256, apple_style_fit_global_polynomial,
+    apple_style_identity_data, apple_style_polynomial_basis, validate_apple_style_data,
+    AppleStyleDataError, AppleStyleDataFacts, APPLE_STYLE_BLOCK_VALUE_COUNT,
+    APPLE_STYLE_BYTE_COUNT, APPLE_STYLE_CHANNEL_COUNT, APPLE_STYLE_GRID_HEIGHT,
+    APPLE_STYLE_GRID_WIDTH, APPLE_STYLE_IDENTITY_SHA256, APPLE_STYLE_PLANE_COUNT,
+    APPLE_STYLE_POLYNOMIAL_COUNT, APPLE_STYLE_TILE_COUNT,
 };
 pub use apple_portrait::{
     build_apple_portrait_rendering_parameters, AppleRendDocument, AppleRendError, AppleRendRecord,
