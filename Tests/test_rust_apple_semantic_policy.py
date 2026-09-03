@@ -24,6 +24,11 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
             "apple_style_fit_global_polynomial",
             "apple_style_monotonic_global_tone_curve",
             "resolve_apple_style_scene_type",
+            "apple_style_scene_scores_from_vision_observations",
+            "FOOD_IDENTIFIERS",
+            "SUNSET_IDENTIFIERS",
+            "INDOOR_IDENTIFIERS",
+            "OUTDOOR_IDENTIFIERS",
         ):
             self.assertIn(marker, ENGINE + RUNTIME)
 
@@ -34,10 +39,25 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
             "output_mode",
             "ConversionPlan",
             "ConversionRequest",
+            "maximumConfidence",
         ):
             self.assertNotIn(forbidden, ADAPTER)
-        for marker in ("imageio", "Vision", "VideoToolbox", "capabilities"):
+        for marker in (
+            "imageio",
+            "Vision",
+            "VideoToolbox",
+            "capabilities",
+            "VisionClassificationObservationFacts",
+        ):
             self.assertIn(marker, ADAPTER)
+
+    def test_vision_scene_alias_policy_does_not_live_in_swift(self) -> None:
+        for legacy_swift_policy in (
+            '["food", "meal", "dish"]',
+            '["sunset", "sunrise", "dusk"]',
+            '["indoor", "interior", "room"]',
+        ):
+            self.assertNotIn(legacy_swift_policy, ADAPTER)
 
     def test_rust_runtime_composes_adapter_at_one_boundary(self) -> None:
         lib = (ROOT / "crates" / "xdremux-runtime" / "src" / "lib.rs").read_text(

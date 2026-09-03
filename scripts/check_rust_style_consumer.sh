@@ -56,7 +56,7 @@ adapter, *outputs = sys.argv[1:]
 def request(operation, path):
     payload = json.dumps(
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "operation": operation,
             "input_path": path,
         }

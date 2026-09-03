@@ -1,31 +1,63 @@
-name: macOS 26 Rust Photographic Styles smoke
+name: macOS 26 Rust Apple adapter integration
 
 on:
+  pull_request:
+    paths:
+      - "Package.swift"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "crates/xdremux-engine/src/apple_*.rs"
+      - "crates/xdremux-engine/src/lib.rs"
+      - "crates/xdremux-runtime/src/apple_*.rs"
+      - "crates/xdremux-runtime/src/apple_styles.rs"
+      - "crates/xdremux-runtime/tests/apple_adapter.rs"
+      - "crates/xdremux-heif/**"
+      - "scripts/check_rust_style_consumer.sh"
+      - "Tests/test_rust_apple_semantic_policy.py"
+      - ".github/workflows/macos26-photographic-styles-smoke.yml"
   push:
-    branches:
-      - test/macos26-photographic-styles-smoke
+    branches: [main]
+    paths:
+      - "Package.swift"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "crates/xdremux-engine/src/apple_*.rs"
+      - "crates/xdremux-engine/src/lib.rs"
+      - "crates/xdremux-runtime/src/apple_*.rs"
+      - "crates/xdremux-runtime/src/apple_styles.rs"
+      - "crates/xdremux-runtime/tests/apple_adapter.rs"
+      - "crates/xdremux-heif/**"
+      - "scripts/check_rust_style_consumer.sh"
+      - "Tests/test_rust_apple_semantic_policy.py"
+      - ".github/workflows/macos26-photographic-styles-smoke.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: xdremux-apple-adapter-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  photographic-styles-smoke:
+  apple-adapter-integration:
     runs-on: macos-26
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Record runner environment
         shell: bash
         run: |
-          mkdir -p artifacts/macos26-photographic-styles
+          mkdir -p artifacts/macos26-apple-adapter
           {
+            echo "head=$(git rev-parse HEAD)"
             sw_vers
             echo "arch=$(uname -m)"
             xcodebuild -version
             swift --version
-          } | tee artifacts/macos26-photographic-styles/runner.txt
+          } | tee artifacts/macos26-apple-adapter/runner.txt
 
       - name: Install portable HEVC provider
         shell: bash
@@ -38,30 +70,38 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Run the Rust-driven Styles consumer gate
+      - name: Check Rust-owned Apple semantic policy
+        shell: bash
+        run: |
+          python3 -m unittest Tests.test_rust_apple_semantic_policy \
+            2>&1 | tee artifacts/macos26-apple-adapter/semantic-policy.log
+
+      - name: Run Rust-driven Apple adapter consumer gate
         shell: bash
         run: |
           set -o pipefail
           bash scripts/check_rust_style_consumer.sh \
-            2>&1 | tee artifacts/macos26-photographic-styles/rust-consumer.log
+            2>&1 | tee artifacts/macos26-apple-adapter/rust-consumer.log
 
       - name: Write summary
         if: always()
         shell: bash
         run: |
           {
-            echo "## macOS 26 Rust Photographic Styles smoke"
+            echo "## macOS 26 Rust Apple adapter integration"
             echo
-            echo "The Rust CLI owns source analysis, Styles policy, graph assembly, validation, and publication."
-            echo "The Swift process is used only for Apple Vision/ImageIO/VideoToolbox primitive observations."
-            echo "Structural and ImageIO consumer facts do not claim visual equivalence or Photos device acceptance."
+            echo "This gate builds the versioned Swift Apple adapter and drives it through the canonical Rust product path at the exact PR head."
+            echo "Rust owns source analysis, product policy, Styles scene semantics, graph assembly, validation, and publication."
+            echo "Swift is limited to Apple framework primitives and raw framework observations."
+            echo
+            echo "This is framework integration evidence, not Apple Photos device acceptance or visual-equivalence evidence."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Styles evidence
+      - name: Upload Apple adapter evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: macos26-rust-photographic-styles
+          name: macos26-rust-apple-adapter
           if-no-files-found: warn
           retention-days: 14
-          path: artifacts/macos26-photographic-styles/
+          path: artifacts/macos26-apple-adapter/
