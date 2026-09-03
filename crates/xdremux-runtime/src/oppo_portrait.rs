@@ -1,6 +1,7 @@
 use crate::{Result, RuntimeError};
 use xdremux_container::{
     select_oppo_portrait_focus, OppoPortraitConfig, OppoPortraitDepth, OppoPortraitFocusRegion,
+    OppoPortraitFocusSelection,
 };
 use xdremux_engine::{
     build_apple_portrait_disparity_payload, build_apple_portrait_effects_matte_payload,
@@ -48,6 +49,8 @@ pub struct ApplePortraitSourcePreflight {
     pub gain_map_jpeg: Vec<u8>,
     pub depth: OppoPortraitDepth,
     pub config: OppoPortraitConfig,
+    pub focus_region: OppoPortraitFocusRegion,
+    pub focus: OppoPortraitFocusSelection,
     pub private_gain_map_info: Option<Vec<u8>>,
     pub base_width: u32,
     pub base_height: u32,
@@ -73,20 +76,11 @@ impl ApplePortraitSourcePreflight {
     /// producer focus state, Gain Map headroom and per-image rendering
     /// parameters, while ImageIO remains only the platform writer.
     pub fn into_auxiliary_payloads(self) -> Result<Vec<AppleAuxiliaryPayload>> {
-        let focus_region = producer_focus_region(&self.config, self.base_width, self.base_height)?;
-        let focus = select_oppo_portrait_focus(
-            &self.depth,
-            &self.config,
-            self.base_width,
-            self.base_height,
-            focus_region,
-        )
-        .map_err(|error| RuntimeError::external("Apple Portrait focus selection", error))?;
         let disparity_span = f64::from(self.disparity.near - self.disparity.far);
         let focus_disparity = self
             .disparity
             .focus_disparity(
-                focus.selected_rank,
+                self.focus.selected_rank,
                 self.depth.header.disparity_exponentiation,
             )
             .map_err(|error| RuntimeError::external("Apple Portrait focus disparity", error))?;
@@ -447,6 +441,16 @@ pub(crate) fn prepare_apple_portrait_source(
     )
     .map_err(|error| RuntimeError::external("Apple Portrait orientation", error))?;
 
+    let focus_region = producer_focus_region(&source.config, split.base_width, split.base_height)?;
+    let focus = select_oppo_portrait_focus(
+        &depth,
+        &source.config,
+        split.base_width,
+        split.base_height,
+        focus_region,
+    )
+    .map_err(|error| RuntimeError::external("Apple Portrait focus selection", error))?;
+
     let disparity = build_apple_portrait_disparity(
         &depth.ranks,
         depth.header.width,
@@ -569,6 +573,8 @@ pub(crate) fn prepare_apple_portrait_source(
         gain_map_jpeg: split.gain_map_jpeg,
         depth,
         config: source.config,
+        focus_region,
+        focus,
         private_gain_map_info: source.private_gain_map_info,
         base_width: split.base_width,
         base_height: split.base_height,

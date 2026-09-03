@@ -1,5 +1,6 @@
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 
 private let schemaVersion = 1
 
@@ -13,6 +14,9 @@ private struct AdapterRequest: Decodable {
     let auxiliaryPayloads: [AuxiliaryPayloadRequest]?
     let edgePreserveUpsample: EdgePreserveUpsampleRequest?
     let renderL8: RenderL8Request?
+    let metadataSourcePath: String?
+    let lossyQuality: Double?
+    let primaryMetadataXMPPath: String?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -24,6 +28,9 @@ private struct AdapterRequest: Decodable {
         case auxiliaryPayloads = "auxiliary_payloads"
         case edgePreserveUpsample = "edge_preserve_upsample"
         case renderL8 = "render_l8"
+        case metadataSourcePath = "metadata_source_path"
+        case lossyQuality = "lossy_quality"
+        case primaryMetadataXMPPath = "primary_metadata_xmp_path"
     }
 }
 
@@ -108,6 +115,7 @@ private struct AuxiliaryFacts: Encodable {
     let hairMatte: Bool
     let teethMatte: Bool
     let glassesMatte: Bool
+    let focusMetadata: Bool
 
     enum CodingKeys: String, CodingKey {
         case isoGainMap = "iso_gain_map"
@@ -117,6 +125,7 @@ private struct AuxiliaryFacts: Encodable {
         case hairMatte = "hair_matte"
         case teethMatte = "teeth_matte"
         case glassesMatte = "glasses_matte"
+        case focusMetadata = "focus_metadata"
     }
 }
 
@@ -181,6 +190,14 @@ private func hasAuxiliary(_ type: CFString, source: CGImageSource) -> Bool {
     CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, type) != nil
 }
 
+private func hasFocusMetadata(source: CGImageSource) -> Bool {
+    guard let metadata = CGImageSourceCopyMetadataAtIndex(source, 0, nil),
+          let xmp = CGImageMetadataCreateXMPData(metadata, nil) as Data? else {
+        return false
+    }
+    return xmp.range(of: Data("<mwg-rs:Type>Focus</mwg-rs:Type>".utf8)) != nil
+}
+
 private func imageIOAuxiliaryFacts(inputPath: String) -> AuxiliaryFacts {
     let inputURL = URL(fileURLWithPath: inputPath)
     guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil) else {
@@ -193,7 +210,8 @@ private func imageIOAuxiliaryFacts(inputPath: String) -> AuxiliaryFacts {
         skinMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationSkinMatte, source: source),
         hairMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationHairMatte, source: source),
         teethMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationTeethMatte, source: source),
-        glassesMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte, source: source)
+        glassesMatte: hasAuxiliary(kCGImageAuxiliaryDataTypeSemanticSegmentationGlassesMatte, source: source),
+        focusMetadata: hasFocusMetadata(source: source)
     )
 }
 
@@ -363,6 +381,114 @@ private func imageIOWriteAuxiliary(
     }
 }
 
+private func imageIOEncodeSourceImage(
+    inputPath: String,
+    outputPath: String,
+    lossyQuality: Double
+) throws {
+    guard lossyQuality.isFinite, (0.0...1.0).contains(lossyQuality) else {
+        fail("imageio-encode-source-image requires lossy_quality from 0 through 1")
+    }
+    let inputURL = URL(fileURLWithPath: inputPath)
+    let outputURL = URL(fileURLWithPath: outputPath)
+    guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
+          let destination = CGImageDestinationCreateWithURL(
+              outputURL as CFURL,
+              UTType.heic.identifier as CFString,
+              1,
+              nil
+          ) else {
+        fail("ImageIO cannot create source-image destination for \(outputPath)", status: 1)
+    }
+
+    let imageOptions: [CFString: Any] = [
+        kCGImageDestinationPreserveGainMap: true,
+        kCGImageDestinationLossyCompressionQuality: lossyQuality,
+    ]
+    CGImageDestinationAddImageFromSource(destination, source, 0, imageOptions as CFDictionary)
+    guard CGImageDestinationFinalize(destination) else {
+        fail("ImageIO cannot finalize source-image destination \(outputPath)", status: 1)
+    }
+}
+
+private func imageIOMergeMetadata(
+    inputPath: String,
+    metadataSourcePath: String,
+    outputPath: String
+) throws {
+    let inputURL = URL(fileURLWithPath: inputPath)
+    let metadataSourceURL = URL(fileURLWithPath: metadataSourcePath)
+    let outputURL = URL(fileURLWithPath: outputPath)
+    guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
+          let sourceType = CGImageSourceGetType(source),
+          let destination = CGImageDestinationCreateWithURL(
+              outputURL as CFURL,
+              sourceType,
+              1,
+              nil
+          ) else {
+        fail("ImageIO cannot create metadata destination for \(outputPath)", status: 1)
+    }
+
+    var options: [CFString: Any] = [:]
+    if let metadataSource = CGImageSourceCreateWithURL(metadataSourceURL as CFURL, nil),
+       let metadata = CGImageSourceCopyMetadataAtIndex(metadataSource, 0, nil) {
+        options[kCGImageDestinationMetadata] = metadata
+        options[kCGImageDestinationMergeMetadata] = true
+    }
+    var error: Unmanaged<CFError>?
+    let copied = CGImageDestinationCopyImageSource(
+        destination,
+        source,
+        options.isEmpty ? nil : options as CFDictionary,
+        &error
+    )
+    guard copied else {
+        let detail = error.map { String(describing: $0.takeRetainedValue()) } ?? "unknown error"
+        fail("ImageIO cannot merge source metadata into \(outputPath): \(detail)", status: 1)
+    }
+}
+
+private func imageIOMergeXMP(
+    inputPath: String,
+    xmpPath: String,
+    outputPath: String
+) throws {
+    let xmp = try Data(contentsOf: URL(fileURLWithPath: xmpPath), options: [.mappedIfSafe])
+    guard let metadata = CGImageMetadataCreateFromXMPData(xmp as CFData) else {
+        fail("ImageIO cannot parse XMP metadata \(xmpPath)", status: 1)
+    }
+
+    let inputURL = URL(fileURLWithPath: inputPath)
+    let outputURL = URL(fileURLWithPath: outputPath)
+    guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
+          let sourceType = CGImageSourceGetType(source),
+          let destination = CGImageDestinationCreateWithURL(
+              outputURL as CFURL,
+              sourceType,
+              1,
+              nil
+          ) else {
+        fail("ImageIO cannot create XMP destination for \(outputPath)", status: 1)
+    }
+
+    let options: [CFString: Any] = [
+        kCGImageDestinationMetadata: metadata,
+        kCGImageDestinationMergeMetadata: true,
+    ]
+    var error: Unmanaged<CFError>?
+    let copied = CGImageDestinationCopyImageSource(
+        destination,
+        source,
+        options as CFDictionary,
+        &error
+    )
+    guard copied else {
+        let detail = error.map { String(describing: $0.takeRetainedValue()) } ?? "unknown error"
+        fail("ImageIO cannot merge XMP metadata into \(outputPath): \(detail)", status: 1)
+    }
+}
+
 do {
     let input = FileHandle.standardInput.readDataToEndOfFile()
     guard !input.isEmpty else {
@@ -499,6 +625,63 @@ do {
             inputPath: inputPath,
             outputPath: outputPath,
             payloads: payloads
+        )
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil
+        )
+    case "imageio-encode-source-image":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let lossyQuality = request.lossyQuality else {
+            fail("imageio-encode-source-image requires input_path, output_path, and lossy_quality")
+        }
+        try imageIOEncodeSourceImage(
+            inputPath: inputPath,
+            outputPath: outputPath,
+            lossyQuality: lossyQuality
+        )
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil
+        )
+    case "imageio-merge-metadata":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let metadataSourcePath = request.metadataSourcePath, !metadataSourcePath.isEmpty else {
+            fail("imageio-merge-metadata requires input_path, output_path, and metadata_source_path")
+        }
+        try imageIOMergeMetadata(
+            inputPath: inputPath,
+            metadataSourcePath: metadataSourcePath,
+            outputPath: outputPath
+        )
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil
+        )
+    case "imageio-merge-xmp":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let xmpPath = request.primaryMetadataXMPPath, !xmpPath.isEmpty else {
+            fail("imageio-merge-xmp requires input_path, output_path, and primary_metadata_xmp_path")
+        }
+        try imageIOMergeXMP(
+            inputPath: inputPath,
+            xmpPath: xmpPath,
+            outputPath: outputPath
         )
         response = AdapterResponse(
             schemaVersion: schemaVersion,

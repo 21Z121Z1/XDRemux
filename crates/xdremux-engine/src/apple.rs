@@ -18,6 +18,7 @@ pub struct AppleImageAuxiliaryFacts {
     pub hair_matte: bool,
     pub teeth_matte: bool,
     pub glasses_matte: bool,
+    pub focus_metadata: bool,
 }
 
 impl AppleImageAuxiliaryFacts {
@@ -33,6 +34,7 @@ impl AppleImageAuxiliaryFacts {
             && self.hair_matte
             && self.teeth_matte
             && self.glasses_matte
+            && self.focus_metadata
     }
 }
 
@@ -394,6 +396,7 @@ mod tests {
             hair_matte: true,
             teeth_matte: true,
             glasses_matte: true,
+            focus_metadata: true,
         };
         assert!(complete.satisfies_portrait_editing());
 

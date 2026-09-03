@@ -76,5 +76,41 @@ fn source_derived_rend_round_trips_through_the_rust_owned_portrait_manifest() {
         .expect("ImageIO must report the final auxiliary resources");
 
     assert!(facts.iso_gain_map, "facts: {facts:?}");
-    assert!(facts.satisfies_portrait_editing(), "facts: {facts:?}");
+    assert!(
+        !facts.focus_metadata,
+        "the low-level manifest test intentionally does not write primary Focus XMP: {facts:?}"
+    );
+    assert!(!facts.satisfies_portrait_editing(), "facts: {facts:?}");
+}
+
+#[test]
+fn canonical_portrait_file_transaction_publishes_only_after_rust_and_imageio_validation() {
+    let Some(executable) = adapter_executable() else {
+        return;
+    };
+
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic");
+    let source = fs::read(&fixture).expect("read committed OPPO portrait fixture");
+    let temporary = tempfile::tempdir().expect("create Portrait output directory");
+    let output = temporary.path().join("portrait-canonical.heic");
+
+    let receipt = PortableRuntime::new()
+        .convert_apple_portrait_file(&executable, &source, &output)
+        .expect("Rust must own the complete Portrait file transaction");
+
+    assert_eq!(receipt.output, output);
+    assert!(receipt.auxiliary.satisfies_portrait_editing());
+    assert!(output.is_file());
+    assert!(xdremux_heif::validate_gain_map_structure(
+        &fs::read(&output).expect("read canonical Portrait output")
+    )
+    .is_ok());
+    assert_eq!(
+        fs::read_dir(temporary.path())
+            .expect("list Portrait output directory")
+            .count(),
+        1,
+        "staging files must not escape the transaction"
+    );
 }

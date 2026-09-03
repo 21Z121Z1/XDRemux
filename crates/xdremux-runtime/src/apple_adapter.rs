@@ -74,6 +74,8 @@ impl AppleAdapterClient {
             output_path: None,
             roles: None,
             orientation: None,
+            metadata_source_path: None,
+            lossy_quality: None,
         })?;
         let response: CapabilitiesResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
@@ -107,6 +109,8 @@ impl AppleAdapterClient {
             output_path: None,
             roles: None,
             orientation: None,
+            metadata_source_path: None,
+            lossy_quality: None,
         })?;
         let response: AuxiliaryResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
@@ -122,6 +126,8 @@ impl AppleAdapterClient {
             output_path: None,
             roles: None,
             orientation: None,
+            metadata_source_path: None,
+            lossy_quality: None,
         })?;
         let response: GainMapResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
@@ -141,6 +147,8 @@ impl AppleAdapterClient {
             output_path: None,
             roles: None,
             orientation: None,
+            metadata_source_path: None,
+            lossy_quality: None,
         })?;
         let response: ImagePropertiesResponse = serde_json::from_slice(&output)
             .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
@@ -186,6 +194,84 @@ impl AppleAdapterClient {
             output_path: input_path(output)?,
             auxiliary_payloads: wire_payloads,
         };
+        let request = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        let output = self.invoke(&request, self.timeout)?;
+        let response: AckResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)
+    }
+
+    /// Ask ImageIO to encode an adjacent base/Gain Map source image as HEIF.
+    ///
+    /// The Rust runtime owns source selection, metadata policy, and quality.
+    /// The adapter only performs the framework operation that preserves the
+    /// source Gain Map while creating an HEIF carrier.
+    pub(super) fn imageio_encode_source_image(
+        &self,
+        source_image: &Path,
+        output: &Path,
+        lossy_quality: f64,
+    ) -> Result<()> {
+        if !lossy_quality.is_finite() || !(0.0..=1.0).contains(&lossy_quality) {
+            return Err(RuntimeError::new(
+                "Apple ImageIO source-image encode",
+                "lossy quality must be finite and within 0 through 1",
+            ));
+        }
+        let request = EncodeSourceImageRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-encode-source-image",
+            input_path: input_path(source_image)?,
+            output_path: input_path(output)?,
+            lossy_quality,
+        };
+        let request = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
+        let output = self.invoke(&request, self.timeout)?;
+        let response: AckResponse = serde_json::from_slice(&output)
+            .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+        validate_schema(response.schema_version)
+    }
+
+    pub(super) fn imageio_merge_metadata(
+        &self,
+        input: &Path,
+        metadata_source: &Path,
+        output: &Path,
+    ) -> Result<()> {
+        let request = MergeMetadataRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-merge-metadata",
+            input_path: input_path(input)?,
+            output_path: input_path(output)?,
+            metadata_source_path: input_path(metadata_source)?,
+        };
+        self.invoke_ack(request)
+    }
+
+    pub(super) fn imageio_merge_xmp_metadata(
+        &self,
+        input: &Path,
+        xmp: &[u8],
+        output: &Path,
+    ) -> Result<()> {
+        let sidecar = tempfile::tempdir()
+            .map_err(|error| RuntimeError::external("Apple ImageIO XMP sidecar", error))?;
+        let xmp_path = sidecar.path().join("primary-metadata.xmp");
+        fs::write(&xmp_path, xmp)
+            .map_err(|error| RuntimeError::external("Apple ImageIO XMP sidecar write", error))?;
+        let request = XmpMergeRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-merge-xmp",
+            input_path: input_path(input)?,
+            output_path: input_path(output)?,
+            primary_metadata_xmp_path: input_path(&xmp_path)?,
+        };
+        self.invoke_ack(request)
+    }
+
+    fn invoke_ack<T: Serialize>(&self, request: T) -> Result<()> {
         let request = serde_json::to_vec(&request)
             .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
         let output = self.invoke(&request, self.timeout)?;
@@ -385,6 +471,8 @@ impl AppleAdapterClient {
                         .collect(),
                 ),
                 orientation,
+                metadata_source_path: None,
+                lossy_quality: None,
             },
             APPLE_COMPUTE_TIMEOUT,
         )?;
@@ -684,6 +772,19 @@ struct AdapterRequest {
     roles: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     orientation: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata_source_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lossy_quality: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct EncodeSourceImageRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    lossy_quality: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -693,6 +794,24 @@ struct WriteAuxiliaryRequest {
     input_path: String,
     output_path: String,
     auxiliary_payloads: Vec<AuxiliaryPayloadWire>,
+}
+
+#[derive(Debug, Serialize)]
+struct MergeMetadataRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    metadata_source_path: String,
+}
+
+#[derive(Debug, Serialize)]
+struct XmpMergeRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    primary_metadata_xmp_path: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -848,6 +967,7 @@ struct AuxiliaryWire {
     hair_matte: bool,
     teeth_matte: bool,
     glasses_matte: bool,
+    focus_metadata: bool,
 }
 
 impl From<AuxiliaryWire> for AppleImageAuxiliaryFacts {
@@ -860,6 +980,7 @@ impl From<AuxiliaryWire> for AppleImageAuxiliaryFacts {
             hair_matte: value.hair_matte,
             teeth_matte: value.teeth_matte,
             glasses_matte: value.glasses_matte,
+            focus_metadata: value.focus_metadata,
         }
     }
 }

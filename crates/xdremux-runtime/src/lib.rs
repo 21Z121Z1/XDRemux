@@ -30,6 +30,9 @@ use std::fmt;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+#[cfg(target_os = "macos")]
+use std::fs;
+
 use atomic_write_file::AtomicWriteFile;
 use xdremux_codec::{
     GainMapTileEncodeRequest, JpegRasterDecodeRequest, LibHeifProvider, Raster8, RasterPixelFormat,
@@ -52,7 +55,10 @@ use xdremux_heif::{
     GainMapChannels as HeifGainMapChannels, GainMapEncodeProfile as HeifGainMapEncodeProfile,
     GainMapTile, IsoGainMapAssembly,
 };
-use xdremux_metadata::{make_apple_tmap_payload, make_hdrgm_xmp};
+use xdremux_metadata::{make_apple_portrait_focus_xmp, make_apple_tmap_payload, make_hdrgm_xmp};
+
+#[cfg(target_os = "macos")]
+const APPLE_PORTRAIT_BASE_QUALITY: f64 = 0.9;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeError {
@@ -100,6 +106,13 @@ pub struct ByteConversionReceipt {
 pub struct FileConversionReceipt {
     pub plan: ConversionPlan,
     pub output: PathBuf,
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApplePortraitFileReceipt {
+    pub output: PathBuf,
+    pub auxiliary: xdremux_engine::AppleImageAuxiliaryFacts,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -185,6 +198,116 @@ impl PortableRuntime {
         source: &[u8],
     ) -> Result<ApplePortraitSourcePreflight> {
         oppo_portrait::prepare_apple_portrait_source(executable.as_ref(), source)
+    }
+
+    /// Convert an OPPO Portrait source through one Rust-owned file transaction.
+    ///
+    /// Rust selects and derives every product artifact, while the Apple
+    /// adapter only performs ImageIO encoding/writing and returns factual
+    /// consumer observations. All framework output stays in a sibling staging
+    /// directory until structural and ImageIO validation both pass.
+    #[cfg(target_os = "macos")]
+    pub fn convert_apple_portrait_file(
+        &self,
+        executable: impl AsRef<Path>,
+        source: &[u8],
+        output: impl AsRef<Path>,
+    ) -> Result<ApplePortraitFileReceipt> {
+        let output = output.as_ref();
+        let parent = publication_parent(output);
+        if !parent.is_dir() {
+            return Err(RuntimeError::new(
+                "Apple Portrait publication",
+                format!("output parent is not a directory: {}", parent.display()),
+            ));
+        }
+
+        let staging = tempfile::Builder::new()
+            .prefix(".xdremux-portrait-")
+            .tempdir_in(parent)
+            .map_err(|error| RuntimeError::external("Apple Portrait staging", error))?;
+        let input_path = staging.path().join("input.heic");
+        fs::write(&input_path, source)
+            .map_err(|error| RuntimeError::external("Apple Portrait input staging", error))?;
+
+        let preflight = self.preflight_apple_portrait_source(executable.as_ref(), source)?;
+        let expected_gain_map = preflight.gain_map;
+        let mut source_image = preflight.base_jpeg.clone();
+        source_image.extend_from_slice(&preflight.gain_map_jpeg);
+        if source_image.is_empty() {
+            return Err(RuntimeError::new(
+                "Apple Portrait source",
+                "extracted adjacent base/Gain Map JPEG source is empty",
+            ));
+        }
+        let source_image_path = staging.path().join("source-image.jpg");
+        fs::write(&source_image_path, source_image)
+            .map_err(|error| RuntimeError::external("Apple Portrait source staging", error))?;
+
+        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
+        let carrier_path = staging.path().join("carrier.heic");
+        adapter.imageio_encode_source_image(
+            &source_image_path,
+            &carrier_path,
+            APPLE_PORTRAIT_BASE_QUALITY,
+        )?;
+
+        let metadata_carrier_path = staging.path().join("carrier-metadata.heic");
+        adapter.imageio_merge_metadata(&carrier_path, &input_path, &metadata_carrier_path)?;
+
+        let carrier_gain_map = adapter.imageio_gain_map_facts(&metadata_carrier_path)?;
+        if carrier_gain_map != expected_gain_map {
+            return Err(RuntimeError::new(
+                "Apple Portrait Gain Map carrier",
+                format!(
+                    "ImageIO changed source Gain Map facts from {:?} to {:?}",
+                    expected_gain_map, carrier_gain_map
+                ),
+            ));
+        }
+        let carrier_facts = adapter.imageio_auxiliary_facts(&metadata_carrier_path)?;
+        if !carrier_facts.iso_gain_map {
+            return Err(RuntimeError::new(
+                "Apple Portrait Gain Map carrier",
+                "ImageIO did not expose the encoded carrier as an ISO Gain Map",
+            ));
+        }
+
+        let focus_xmp = make_apple_portrait_focus_xmp(
+            preflight.base_width,
+            preflight.base_height,
+            preflight.focus_region.x,
+            preflight.focus_region.y,
+            preflight.focus_region.width,
+            preflight.focus_region.height,
+        )
+        .map_err(|error| RuntimeError::external("Apple Portrait Focus XMP", error))?;
+        let payloads = preflight.into_auxiliary_payloads()?;
+        let assembled_path = staging.path().join("assembled.heic");
+        adapter.imageio_write_auxiliary(&metadata_carrier_path, &assembled_path, &payloads)?;
+
+        let output_path = staging.path().join("validated.heic");
+        adapter.imageio_merge_xmp_metadata(&assembled_path, &focus_xmp, &output_path)?;
+
+        let facts = adapter.imageio_auxiliary_facts(&output_path)?;
+        if !facts.satisfies_portrait_editing() {
+            return Err(RuntimeError::new(
+                "Apple Portrait consumer validation",
+                format!("ImageIO did not expose the complete Portrait resource set: {facts:?}"),
+            ));
+        }
+        let bytes = fs::read(&output_path)
+            .map_err(|error| RuntimeError::external("Apple Portrait output read", error))?;
+        validate_gain_map_structure(&bytes).map_err(|error| {
+            RuntimeError::external("Apple Portrait structural validation", error)
+        })?;
+
+        let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
+        let published = publisher.publish_bytes(bytes)?;
+        Ok(ApplePortraitFileReceipt {
+            output: published,
+            auxiliary: facts,
+        })
     }
 
     pub fn analyze_proxdr(&self, source: &[u8]) -> Result<PreparedProXdr> {
@@ -575,20 +698,8 @@ impl AtomicFilePublisher {
     pub fn new(output: PathBuf) -> Self {
         Self { output }
     }
-}
 
-fn publication_parent(output: &Path) -> &Path {
-    match output.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    }
-}
-
-impl ArtifactPublisher<Vec<u8>> for AtomicFilePublisher {
-    type Output = PathBuf;
-    type Error = RuntimeError;
-
-    fn publish_artifact(&mut self, _plan: &ConversionPlan, artifact: Vec<u8>) -> Result<PathBuf> {
+    pub fn publish_bytes(&mut self, artifact: Vec<u8>) -> Result<PathBuf> {
         let parent = publication_parent(&self.output);
         if !parent.is_dir() {
             return Err(RuntimeError::new(
@@ -605,6 +716,22 @@ impl ArtifactPublisher<Vec<u8>> for AtomicFilePublisher {
         file.commit()
             .map_err(|error| RuntimeError::external("atomic publication commit", error))?;
         Ok(self.output.clone())
+    }
+}
+
+fn publication_parent(output: &Path) -> &Path {
+    match output.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    }
+}
+
+impl ArtifactPublisher<Vec<u8>> for AtomicFilePublisher {
+    type Output = PathBuf;
+    type Error = RuntimeError;
+
+    fn publish_artifact(&mut self, _plan: &ConversionPlan, artifact: Vec<u8>) -> Result<PathBuf> {
+        self.publish_bytes(artifact)
     }
 }
 

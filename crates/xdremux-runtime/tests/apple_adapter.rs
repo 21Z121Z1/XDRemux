@@ -213,5 +213,6 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     assert!(facts.hair_matte, "facts: {facts:?}");
     assert!(facts.teeth_matte, "facts: {facts:?}");
     assert!(facts.glasses_matte, "facts: {facts:?}");
-    assert!(facts.satisfies_portrait_editing());
+    assert!(!facts.focus_metadata, "low-level writer facts: {facts:?}");
+    assert!(!facts.satisfies_portrait_editing());
 }
