@@ -1,0 +1,72 @@
+name: Palette HEIC Compatibility Probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/build_palette_heic_probe.py"
+      - "Tests/test_palette_heic_probe.py"
+      - ".github/workflows/palette-heic-probe.yml"
+      - "fixtures/IMG20260710191114_ColorOS_16.jpg"
+
+permissions:
+  contents: read
+
+jobs:
+  build-probe:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run focused probe tests
+        shell: bash
+        run: |
+          python3 Tests/test_palette_heic_probe.py
+
+      - name: Build HEIC base from ColorOS 16 fixture
+        shell: bash
+        run: |
+          mkdir -p artifacts/palette-heic-probe
+          SOURCE="fixtures/IMG20260710191114_ColorOS_16.jpg"
+          BASE="artifacts/palette-heic-probe/base.heic"
+          sips -s format heic "$SOURCE" --out "$BASE"
+          test -s "$BASE"
+          file "$BASE" | tee artifacts/palette-heic-probe/base-file.txt
+          sips -g pixelWidth -g pixelHeight "$BASE" | tee artifacts/palette-heic-probe/base-image.txt
+
+      - name: Carry Palette and BasicTone context
+        shell: bash
+        run: |
+          python3 scripts/build_palette_heic_probe.py \
+            --source fixtures/IMG20260710191114_ColorOS_16.jpg \
+            --base-heic artifacts/palette-heic-probe/base.heic \
+            --output artifacts/palette-heic-probe/palette-context-probe.heic \
+            --report artifacts/palette-heic-probe/palette-context-report.json
+
+      - name: Validate generated candidate structure
+        shell: bash
+        run: |
+          CANDIDATE="artifacts/palette-heic-probe/palette-context-probe.heic"
+          test -s "$CANDIDATE"
+          file "$CANDIDATE" | tee artifacts/palette-heic-probe/candidate-file.txt
+          sips -g pixelWidth -g pixelHeight "$CANDIDATE" | tee artifacts/palette-heic-probe/candidate-image.txt
+          python3 scripts/inspect_oppo_heif.py "$CANDIDATE" \
+            > artifacts/palette-heic-probe/candidate-inspection.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("artifacts/palette-heic-probe/palette-context-report.json").read_text())
+          print("selected:", ", ".join(report["candidate_contains"]))
+          print("basic tone present:", ", ".join(report["basic_tone_entries_present"]) or "none")
+          print("basic tone missing:", ", ".join(report["basic_tone_entries_missing"]) or "none")
+          print("device acceptance:", report["device_acceptance"])
+          PY
+
+      - name: Upload probe artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: palette-heic-compatibility-probe
+          if-no-files-found: error
+          path: artifacts/palette-heic-probe/
