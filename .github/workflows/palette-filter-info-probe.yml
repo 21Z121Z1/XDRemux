@@ -1,0 +1,91 @@
+name: Palette metadata compatibility probe
+
+on:
+  push:
+    paths:
+      - "scripts/build_palette_filter_info_probe.py"
+      - "Tests/test_palette_filter_info_probe.py"
+      - ".github/workflows/palette-filter-info-probe.yml"
+      - "fixtures/proxdr/**"
+      - "fixtures/SHA256SUMS"
+  pull_request:
+    paths:
+      - "scripts/build_palette_filter_info_probe.py"
+      - "Tests/test_palette_filter_info_probe.py"
+      - ".github/workflows/palette-filter-info-probe.yml"
+      - "fixtures/proxdr/**"
+      - "fixtures/SHA256SUMS"
+
+permissions:
+  contents: read
+
+jobs:
+  build-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify focused unit tests
+        run: python3 Tests/test_palette_filter_info_probe.py
+
+      - name: Verify canonical source fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd fixtures
+          grep 'proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic$' SHA256SUMS | sha256sum -c -
+
+      - name: Build metadata candidates from native ProXDR HEIC
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/palette-filter-info-probe
+          python3 scripts/build_palette_filter_info_probe.py \
+            --source fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic \
+            --outdir artifacts/palette-filter-info-probe
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build canonical Rust inspector
+        run: cargo build --locked -p xdremux-cli
+
+      - name: Validate source and candidates through Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=artifacts/palette-filter-info-probe
+          target/debug/xdremux inspect fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic --json > "$ROOT/source-inspect.json"
+          for path in "$ROOT"/palette-*.heic; do
+            name="$(basename "$path" .heic)"
+            target/debug/xdremux inspect "$path" --json > "$ROOT/$name-inspect.json"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('artifacts/palette-filter-info-probe')
+          src = json.loads((root / 'source-inspect.json').read_text())
+          for name in ('palette-prefix', 'palette-semantic'):
+              cand = json.loads((root / f'{name}-inspect.json').read_text())
+              assert src['kind'] == cand['kind'] == 'pro-xdr'
+              assert src['hdr_mode'] == cand['hdr_mode']
+              assert src['gain_map_bytes'] == cand['gain_map_bytes']
+          print('Rust ProXDR inspection preserved for both candidates')
+          PY
+
+      - name: Record artifact identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts/palette-filter-info-probe
+          sha256sum *.heic *.json > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload compatibility probes
+        uses: actions/upload-artifact@v7
+        with:
+          name: palette-filter-info-probe
+          if-no-files-found: error
+          path: artifacts/palette-filter-info-probe/
