@@ -22,7 +22,7 @@ jobs:
       - name: Run focused probe tests
         shell: bash
         run: |
-          python3 Tests/test_palette_heic_probe.py
+          PYTHONPATH="$PWD" python3 Tests/test_palette_heic_probe.py
 
       - name: Build HEIC base from ColorOS 16 fixture
         shell: bash
@@ -38,7 +38,7 @@ jobs:
       - name: Carry Palette and BasicTone context
         shell: bash
         run: |
-          python3 scripts/build_palette_heic_probe.py \
+          PYTHONPATH="$PWD" python3 scripts/build_palette_heic_probe.py \
             --source fixtures/IMG20260710191114_ColorOS_16.jpg \
             --base-heic artifacts/palette-heic-probe/base.heic \
             --output artifacts/palette-heic-probe/palette-context-probe.heic \
@@ -51,7 +51,7 @@ jobs:
           test -s "$CANDIDATE"
           file "$CANDIDATE" | tee artifacts/palette-heic-probe/candidate-file.txt
           sips -g pixelWidth -g pixelHeight "$CANDIDATE" | tee artifacts/palette-heic-probe/candidate-image.txt
-          python3 scripts/inspect_oppo_heif.py "$CANDIDATE" \
+          PYTHONPATH="$PWD" python3 scripts/inspect_oppo_heif.py "$CANDIDATE" \
             > artifacts/palette-heic-probe/candidate-inspection.json
           python3 - <<'PY'
           import json
