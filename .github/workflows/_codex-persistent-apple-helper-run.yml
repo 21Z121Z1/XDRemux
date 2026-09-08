@@ -1,0 +1,98 @@
+name: Codex persistent Apple helper runner
+
+on:
+  push:
+    branches: [codex/persistent-apple-helper]
+
+permissions:
+  contents: write
+
+jobs:
+  implement-and-verify:
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/persistent-apple-helper
+          fetch-depth: 0
+
+      - name: Install portable HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Apply persistent transport implementation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/_codex-persistent-apple-helper.yml').read_text(encoding='utf-8').splitlines()
+          start = source.index("          python3 - <<'PY'") + 1
+          end = source.index("          PY", start)
+          extracted = []
+          for line in source[start:end]:
+              if line.startswith('          '):
+                  line = line[10:]
+              extracted.append(line)
+          Path('/tmp/xdremux-persistent-apple-helper.py').write_text(
+              '\n'.join(extracted) + '\n', encoding='utf-8'
+          )
+          PY
+          python3 /tmp/xdremux-persistent-apple-helper.py
+          cargo fmt --all
+          git diff --check
+
+      - name: Run targeted regression checks
+        shell: bash
+        run: |
+          python3 -m unittest Tests.test_performance_design Tests.test_performance_budget
+          cargo test --locked -p xdremux-runtime --all-targets --release
+
+      - name: Build Apple adapter and canonical CLI
+        shell: bash
+        run: |
+          swift build -c release --product xdremux-apple-adapter
+          cargo build --locked -p xdremux-cli --release
+          echo "XDREMUX_PROTOTYPE_APPLE_ADAPTER=$(swift build -c release --show-bin-path)/xdremux-apple-adapter" >> "$GITHUB_ENV"
+
+      - name: Exercise Rust-driven Apple product paths
+        shell: bash
+        run: |
+          export XDREMUX_APPLE_ADAPTER="$XDREMUX_PROTOTYPE_APPLE_ADAPTER"
+          bash scripts/check_rust_cli_apple_portrait.sh
+          bash scripts/check_rust_style_consumer.sh
+
+      - name: Require one helper launch per conversion
+        shell: bash
+        run: |
+          python3 scripts/characterize_apple_adapter_launches.py \
+            --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
+            --apple-adapter "$XDREMUX_PROTOTYPE_APPLE_ADAPTER" \
+            --output "$RUNNER_TEMP/apple-adapter-launches.json"
+          python3 -c 'import json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"apple-adapter-launches.json"; r=json.loads(p.read_text()); expected={"apple-portrait":1,"apple-styles":1}; assert r.get("cases")==expected, r.get("cases"); print(r["cases"])'
+
+      - name: Commit verified implementation to prototype branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            Sources/XDRemuxAppleAdapter/main.swift \
+            crates/xdremux-runtime/src/apple_adapter.rs \
+            crates/xdremux-runtime/src/oppo_portrait.rs \
+            crates/xdremux-runtime/src/lib.rs \
+            scripts/characterize_apple_adapter_launches.py \
+            benchmarks/macos26-arm64-product-baseline.json \
+            Tests/test_performance_budget.py \
+            Tests/test_performance_design.py
+          git diff --cached --check
+          git commit -m "perf(apple): reuse persistent adapter session"
+          git push origin HEAD:codex/persistent-apple-helper
