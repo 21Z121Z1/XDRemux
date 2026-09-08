@@ -45,8 +45,41 @@ jobs:
           script = '\n'.join(extracted) + '\n'
           script, client_blocks = re.subn(r"\nold_client = '''.*?'''\.replace\(\"          \", \"\"\)\n", "\n", script, count=1, flags=re.S)
           script, reader_blocks = re.subn(r"\nold_readers = r'''.*?'''\n", "\n", script, count=1, flags=re.S)
-          if client_blocks != 1 or reader_blocks != 1:
-              raise SystemExit(f'prototype extraction blocks: client={client_blocks}, readers={reader_blocks}')
+          perf_test = '\n'.join([
+              '    def test_apple_adapter_transport_is_persistent_bounded_and_fail_closed(self) -> None:',
+              '        rust = self.source("crates/xdremux-runtime/src/apple_adapter.rs")',
+              '        swift = self.source("Sources/XDRemuxAppleAdapter/main.swift")',
+              '        lifecycle = self.source("scripts/characterize_apple_adapter_launches.py")',
+              '        for marker in (',
+              '            "--persistent-json-lines",',
+              '            "MAX_APPLE_ADAPTER_FRAME_BYTES",',
+              '            "recv_timeout",',
+              '            "child.kill()",',
+              '            "child.wait()",',
+              '        ):',
+              '            self.assertIn(marker, rust)',
+              '        self.assertNotIn("POLL_INTERVAL", rust)',
+              '        for marker in (',
+              '            "--persistent-json-lines",',
+              '            "maxTransportFrameBytes",',
+              '            "read(upToCount:",',
+              '            "runOneShotTransport",',
+              '            "runPersistentTransport",',
+              '        ):',
+              '            self.assertIn(marker, swift)',
+              '        self.assertIn("exec ", lifecycle)',
+              '        self.assertIn(\'"$@"\', lifecycle)',
+              '',
+          ]) + '\n'
+          script, perf_blocks = re.subn(
+              r"\npersistent_test = '''.*?'''\n",
+              "\npersistent_test = " + repr(perf_test) + "\n",
+              script,
+              count=1,
+              flags=re.S,
+          )
+          if client_blocks != 1 or reader_blocks != 1 or perf_blocks != 1:
+              raise SystemExit(f'prototype extraction blocks: client={client_blocks}, readers={reader_blocks}, perf={perf_blocks}')
           client_call = 'text = replace_once(text, old_client, new_client, "apple adapter client/session")'
           client_splice = '\n'.join([
               'client_start = text.index("#[derive(Debug, Clone, PartialEq, Eq)]\\npub(super) struct AppleAdapterClient")',
