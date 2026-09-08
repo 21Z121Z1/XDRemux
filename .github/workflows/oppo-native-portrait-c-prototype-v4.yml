@@ -33,6 +33,7 @@ jobs:
         run: |
           python3 scripts/fix_prototype_oppo_native_portrait_c.py
           python3 scripts/prototype_oppo_native_portrait_c.py
+          python3 scripts/prototype_oppo_native_portrait_c_test_compat.py
           cargo fmt --all
           git diff --check
 
@@ -108,6 +109,7 @@ jobs:
             crates/xdremux-runtime/src/oppo_portrait.rs \
             crates/xdremux-runtime/src/lib.rs \
             crates/xdremux-runtime/src/batch.rs \
+            crates/xdremux-runtime/tests/apple_adapter.rs \
             crates/xdremux-cli/src/lib.rs
           git diff --cached --check
           git config user.name "github-actions[bot]"
