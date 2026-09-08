@@ -115,32 +115,30 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
         self.assertEqual(rust_version, swift_version)
         self.assertGreater(rust_version, 0)
 
-        compact_patterns = (
-            f'"schema_version":{rust_version}',
-            f'"schema_version": {rust_version}',
-        )
-        stale_patterns = (
-            f'"schema_version":{rust_version - 1}',
-            f'"schema_version": {rust_version - 1}',
-        )
         for path, client in APPLE_PROTOCOL_CLIENTS:
-            declares_current_constant = re.search(
-                rf"\bSCHEMA_VERSION\s*=\s*{rust_version}\b", client
-            ) is not None
+            constant_versions = {
+                int(version)
+                for version in re.findall(r"\bSCHEMA_VERSION\s*=\s*(\d+)\b", client)
+            }
+            if constant_versions:
+                protocol_versions = constant_versions
+            else:
+                protocol_versions = {
+                    int(version)
+                    for version in re.findall(
+                        r'["\']schema_version["\']\s*:\s*(\d+)', client
+                    )
+                }
             self.assertTrue(
-                declares_current_constant
-                or any(pattern in client for pattern in compact_patterns),
-                f"Apple protocol client {path} does not declare the runtime/helper schema version",
+                protocol_versions,
+                f"Apple protocol client {path} does not declare its adapter schema version",
             )
-            if rust_version > 1:
-                declares_stale_constant = re.search(
-                    rf"\bSCHEMA_VERSION\s*=\s*{rust_version - 1}\b", client
-                ) is not None
-                self.assertFalse(
-                    declares_stale_constant
-                    or any(pattern in client for pattern in stale_patterns),
-                    f"Apple protocol client {path} still contains the immediately previous schema version",
-                )
+            self.assertEqual(
+                protocol_versions,
+                {rust_version},
+                f"Apple protocol client {path} declares adapter schema version(s) "
+                f"{sorted(protocol_versions)} instead of {rust_version}",
+            )
 
     def test_rust_runtime_composes_adapter_at_one_boundary(self) -> None:
         lib = (ROOT / "crates" / "xdremux-runtime" / "src" / "lib.rs").read_text(

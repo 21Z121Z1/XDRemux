@@ -69,12 +69,14 @@ private func copyMain10SessionProperty(
     key: CFString
 ) -> CFTypeRef? {
     var value: CFTypeRef?
-    let status = VTSessionCopyProperty(
-        session,
-        key: key,
-        allocator: kCFAllocatorDefault,
-        valueOut: &value
-    )
+    let status = withUnsafeMutablePointer(to: &value) { valueOut in
+        VTSessionCopyProperty(
+            session,
+            key: key,
+            allocator: kCFAllocatorDefault,
+            valueOut: valueOut
+        )
+    }
     return status == noErr ? value : nil
 }
 

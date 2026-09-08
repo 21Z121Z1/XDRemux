@@ -224,7 +224,7 @@ def main() -> int:
         for sample in encoder_samples
     )
     report = {
-        "schema_version": 1,
+        "report_schema_version": 1,
         "measurement_layer": "apple-adapter-primitive-e2e",
         "head": git_head(),
         "operation": "videotoolbox-encode-main10",

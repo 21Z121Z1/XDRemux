@@ -34,6 +34,11 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertEqual(source.count("CIContext(options:"), 1)
         self.assertIn("coreImageContext.render(", source)
 
+    def test_apple_main10_property_copy_uses_explicit_out_pointer(self) -> None:
+        source = self.source("Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift")
+        self.assertIn("withUnsafeMutablePointer(to: &value)", source)
+        self.assertNotIn("valueOut: &value", source)
+
     def test_apple_main10_prefers_hardware_without_requiring_it(self) -> None:
         source = self.source("Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift")
         self.assertIn(
@@ -50,6 +55,7 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertIn('case encoderID = "encoder_id"', source)
 
         benchmark = self.source("scripts/benchmark_apple_videotoolbox_primitive.py")
+        self.assertIn('"report_schema_version": 1', benchmark)
         self.assertIn('"hardware_acceleration_allowed": True', benchmark)
         self.assertIn('"hardware_accelerated_samples"', benchmark)
         self.assertIn('"observed_encoder_ids"', benchmark)
