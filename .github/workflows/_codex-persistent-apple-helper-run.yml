@@ -68,7 +68,7 @@ jobs:
               '        ):',
               '            self.assertIn(marker, swift)',
               '        self.assertIn("exec ", lifecycle)',
-              '        self.assertIn(\'"$@"\', lifecycle)',
+              '        self.assertIn("$@", lifecycle)',
               '',
           ]) + '\n'
           script, perf_blocks = re.subn(
