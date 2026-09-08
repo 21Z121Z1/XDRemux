@@ -1,0 +1,725 @@
+name: Codex persistent Apple helper prototype
+
+on:
+  push:
+    branches: [codex/persistent-apple-helper]
+
+permissions:
+  contents: write
+
+jobs:
+  implement-and-verify:
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/persistent-apple-helper
+          fetch-depth: 0
+
+      - name: Install portable HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Apply persistent transport implementation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, got {count}")
+              return text.replace(old, new, 1)
+
+          root = Path.cwd()
+
+          # Rust transport: one lazily spawned helper per AppleAdapterClient,
+          # one request in flight, bounded NDJSON frames, timeout/crash reset.
+          path = root / "crates/xdremux-runtime/src/apple_adapter.rs"
+          text = path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              "use std::io::{Read, Write};\nuse std::path::{Path, PathBuf};\nuse std::process::{Command, Stdio};\nuse std::thread;\nuse std::time::{Duration, Instant};",
+              "use std::io::{self, BufRead, BufReader, Read, Write};\nuse std::path::{Path, PathBuf};\nuse std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};\nuse std::sync::{mpsc, Mutex};\nuse std::thread::{self, JoinHandle};\nuse std::time::Duration;",
+              "apple adapter imports",
+          )
+          text = replace_once(
+              text,
+              "const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;\nconst DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);\nconst APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);\nconst POLL_INTERVAL: Duration = Duration::from_millis(10);\nconst MAX_APPLE_L8_MASK_BYTES: usize = 128 * 1024 * 1024;",
+              "const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;\nconst APPLE_ADAPTER_PERSISTENT_ARGUMENT: &str = \"--persistent-json-lines\";\nconst DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);\nconst APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);\nconst MAX_APPLE_ADAPTER_FRAME_BYTES: usize = 8 * 1024 * 1024;\nconst MAX_APPLE_ADAPTER_DIAGNOSTIC_BYTES: usize = 64 * 1024;\nconst MAX_APPLE_L8_MASK_BYTES: usize = 128 * 1024 * 1024;",
+              "apple adapter constants",
+          )
+          old_client = '''#[derive(Debug, Clone, PartialEq, Eq)]
+          pub(super) struct AppleAdapterClient {
+              executable: PathBuf,
+              timeout: Duration,
+          }
+
+          impl AppleAdapterClient {
+              pub(super) fn new(executable: impl Into<PathBuf>) -> Self {
+                  Self {
+                      executable: executable.into(),
+                      timeout: DEFAULT_TIMEOUT,
+                  }
+              }
+'''.replace("          ", "")
+          new_client = r'''pub(super) struct AppleAdapterClient {
+    executable: PathBuf,
+    timeout: Duration,
+    session: Mutex<Option<AppleAdapterSession>>,
+}
+
+enum AdapterStreamEvent {
+    Frame(Vec<u8>),
+    Error(io::Error),
+    Eof,
+}
+
+struct AppleAdapterSession {
+    child: Child,
+    stdin: Option<ChildStdin>,
+    responses: mpsc::Receiver<AdapterStreamEvent>,
+    stdout_reader: Option<JoinHandle<()>>,
+    stderr_reader: Option<JoinHandle<Vec<u8>>>,
+}
+
+impl AppleAdapterSession {
+    fn spawn(executable: &Path) -> Result<Self> {
+        let mut child = Command::new(executable)
+            .arg(APPLE_ADAPTER_PERSISTENT_ARGUMENT)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| RuntimeError::external("Apple adapter launch", error))?;
+
+        let pipes = (child.stdin.take(), child.stdout.take(), child.stderr.take());
+        let (stdin, stdout, stderr) = match pipes {
+            (Some(stdin), Some(stdout), Some(stderr)) => (stdin, stdout, stderr),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(RuntimeError::new(
+                    "Apple adapter launch",
+                    "persistent helper pipes are unavailable",
+                ));
+            }
+        };
+
+        let (sender, responses) = mpsc::channel();
+        let stdout_reader = thread::spawn(move || {
+            let mut reader = BufReader::new(stdout);
+            loop {
+                match read_bounded_adapter_frame(&mut reader) {
+                    Ok(Some(frame)) => {
+                        if sender.send(AdapterStreamEvent::Frame(frame)).is_err() {
+                            break;
+                        }
+                    }
+                    Ok(None) => {
+                        let _ = sender.send(AdapterStreamEvent::Eof);
+                        break;
+                    }
+                    Err(error) => {
+                        let _ = sender.send(AdapterStreamEvent::Error(error));
+                        break;
+                    }
+                }
+            }
+        });
+        let stderr_reader = thread::spawn(move || read_bounded_diagnostic(stderr));
+
+        Ok(Self {
+            child,
+            stdin: Some(stdin),
+            responses,
+            stdout_reader: Some(stdout_reader),
+            stderr_reader: Some(stderr_reader),
+        })
+    }
+
+    fn is_running(&mut self) -> Result<bool> {
+        self.child
+            .try_wait()
+            .map(|status| status.is_none())
+            .map_err(|error| RuntimeError::external("Apple adapter wait", error))
+    }
+
+    fn invoke(&mut self, executable: &Path, request: &[u8], timeout: Duration) -> Result<Vec<u8>> {
+        if let Err(error) = self
+            .stdin
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::BrokenPipe, "helper stdin is unavailable"))
+            .and_then(|stdin| {
+                stdin.write_all(request)?;
+                stdin.write_all(b"\n")?;
+                stdin.flush()
+            })
+        {
+            return Err(self.execution_error(format!("request write failed: {error}")));
+        }
+
+        match self.responses.recv_timeout(timeout) {
+            Ok(AdapterStreamEvent::Frame(frame)) if !frame.is_empty() => Ok(frame),
+            Ok(AdapterStreamEvent::Frame(_)) => {
+                Err(self.execution_error("adapter returned an empty response frame".to_owned()))
+            }
+            Ok(AdapterStreamEvent::Error(error)) => Err(self.execution_error(format!(
+                "adapter stdout framing failed: {error}"
+            ))),
+            Ok(AdapterStreamEvent::Eof) => Err(self.execution_error(
+                "adapter closed stdout before returning a response".to_owned(),
+            )),
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                self.abort();
+                Err(RuntimeError::new(
+                    "Apple adapter timeout",
+                    format!(
+                        "{} exceeded {} ms",
+                        executable.display(),
+                        timeout.as_millis()
+                    ),
+                ))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => Err(self.execution_error(
+                "adapter response channel disconnected".to_owned(),
+            )),
+        }
+    }
+
+    fn execution_error(&mut self, fallback: String) -> RuntimeError {
+        let (status, stderr) = self.abort();
+        let diagnostic = String::from_utf8_lossy(&stderr).trim().to_owned();
+        let mut detail = fallback;
+        if let Some(status) = status {
+            detail.push_str(&format!("; adapter exited with {status}"));
+        }
+        if !diagnostic.is_empty() {
+            detail.push_str(": ");
+            detail.push_str(&diagnostic);
+        }
+        RuntimeError::new("Apple adapter execution", detail)
+    }
+
+    fn abort(&mut self) -> (Option<ExitStatus>, Vec<u8>) {
+        self.stdin.take();
+        let status = match self.child.try_wait() {
+            Ok(Some(status)) => Some(status),
+            Ok(None) | Err(_) => {
+                let _ = self.child.kill();
+                self.child.wait().ok()
+            }
+        };
+        if let Some(reader) = self.stdout_reader.take() {
+            let _ = reader.join();
+        }
+        let stderr = self
+            .stderr_reader
+            .take()
+            .and_then(|reader| reader.join().ok())
+            .unwrap_or_default();
+        (status, stderr)
+    }
+}
+
+impl Drop for AppleAdapterSession {
+    fn drop(&mut self) {
+        self.abort();
+    }
+}
+
+impl AppleAdapterClient {
+    pub(super) fn new(executable: impl Into<PathBuf>) -> Self {
+        Self {
+            executable: executable.into(),
+            timeout: DEFAULT_TIMEOUT,
+            session: Mutex::new(None),
+        }
+    }
+'''
+          text = replace_once(text, old_client, new_client, "apple adapter client/session")
+
+          invoke_start = text.index("    fn invoke(&self, request: &[u8], timeout: Duration) -> Result<Vec<u8>> {")
+          invoke_end = text.index("\n}\n\nfn checked_l8_byte_count", invoke_start)
+          new_invoke = r'''    fn invoke(&self, request: &[u8], timeout: Duration) -> Result<Vec<u8>> {
+        if request.is_empty() {
+            return Err(RuntimeError::new(
+                "Apple adapter protocol",
+                "request frame is empty",
+            ));
+        }
+        if request.len() > MAX_APPLE_ADAPTER_FRAME_BYTES {
+            return Err(RuntimeError::new(
+                "Apple adapter protocol",
+                format!(
+                    "request frame has {} bytes; maximum is {}",
+                    request.len(),
+                    MAX_APPLE_ADAPTER_FRAME_BYTES
+                ),
+            ));
+        }
+        if request.iter().any(|byte| matches!(*byte, b'\n' | b'\r')) {
+            return Err(RuntimeError::new(
+                "Apple adapter protocol",
+                "request frame contains a raw line delimiter",
+            ));
+        }
+
+        let mut session = self.session.lock().map_err(|_| {
+            RuntimeError::new("Apple adapter session", "persistent session mutex is poisoned")
+        })?;
+        let needs_restart = if let Some(current) = session.as_mut() {
+            match current.is_running() {
+                Ok(running) => !running,
+                Err(error) => {
+                    session.take();
+                    return Err(error);
+                }
+            }
+        } else {
+            true
+        };
+        if needs_restart {
+            session.take();
+            *session = Some(AppleAdapterSession::spawn(&self.executable)?);
+        }
+
+        let result = session
+            .as_mut()
+            .expect("persistent session was initialized")
+            .invoke(&self.executable, request, timeout);
+        if result.is_err() {
+            session.take();
+        }
+        result
+    }
+'''
+          text = text[:invoke_start] + new_invoke + text[invoke_end:]
+
+          old_readers = r'''fn read_all(mut reader: impl Read) -> std::io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn join_reader(
+    reader: thread::JoinHandle<std::io::Result<Vec<u8>>>,
+    stream: &'static str,
+) -> Result<Vec<u8>> {
+    reader
+        .join()
+        .map_err(|_| {
+            RuntimeError::new("Apple adapter output", format!("{stream} reader panicked"))
+        })?
+        .map_err(|error| RuntimeError::external("Apple adapter output", error))
+}
+'''
+          new_readers = r'''fn read_bounded_adapter_frame(reader: &mut impl BufRead) -> io::Result<Option<Vec<u8>>> {
+    let mut frame = Vec::new();
+    loop {
+        let available = reader.fill_buf()?;
+        if available.is_empty() {
+            if frame.is_empty() {
+                return Ok(None);
+            }
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Apple adapter response ended without a newline",
+            ));
+        }
+
+        if let Some(newline) = available.iter().position(|byte| *byte == b'\n') {
+            if frame.len().saturating_add(newline) > MAX_APPLE_ADAPTER_FRAME_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Apple adapter response frame exceeds safety limit",
+                ));
+            }
+            frame.extend_from_slice(&available[..newline]);
+            reader.consume(newline + 1);
+            if frame.last() == Some(&b'\r') {
+                frame.pop();
+            }
+            return Ok(Some(frame));
+        }
+
+        let chunk_len = available.len();
+        if frame.len().saturating_add(chunk_len) > MAX_APPLE_ADAPTER_FRAME_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Apple adapter response frame exceeds safety limit",
+            ));
+        }
+        frame.extend_from_slice(available);
+        reader.consume(chunk_len);
+    }
+}
+
+fn read_bounded_diagnostic(mut reader: impl Read) -> Vec<u8> {
+    let mut diagnostic = Vec::new();
+    let mut buffer = [0_u8; 4096];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => {
+                let remaining = MAX_APPLE_ADAPTER_DIAGNOSTIC_BYTES.saturating_sub(diagnostic.len());
+                let retained = count.min(remaining);
+                diagnostic.extend_from_slice(&buffer[..retained]);
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
+        }
+    }
+    diagnostic
+}
+'''
+          text = replace_once(text, old_readers, new_readers, "apple adapter bounded readers")
+
+          test_insert = r'''
+
+    #[test]
+    fn persistent_session_reuses_process_and_recovers_after_crash() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temporary = tempfile::tempdir().expect("create fake Apple adapter directory");
+        let helper = temporary.path().join("fake-apple-adapter.sh");
+        std::fs::write(
+            &helper,
+            r#"#!/bin/sh
+set -eu
+[ "${1:-}" = "--persistent-json-lines" ] || exit 9
+printf 'launch\n' >> "$0.log"
+count=0
+while IFS= read -r request; do
+    count=$((count + 1))
+    if [ "$count" -eq 2 ]; then
+        printf 'synthetic crash\n' >&2
+        exit 7
+    fi
+    printf '%s\n' '{"schema_version":2,"capabilities":[]}'
+done
+"#,
+        )
+        .expect("write fake Apple adapter");
+        let mut permissions = std::fs::metadata(&helper).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&helper, permissions).unwrap();
+
+        let client = AppleAdapterClient::new(&helper);
+        client.capabilities().expect("first request must succeed");
+        let error = client.capabilities().expect_err("second request must observe helper crash");
+        assert!(error.to_string().contains("synthetic crash"), "{error}");
+        client
+            .capabilities()
+            .expect("client must restart helper after crash");
+
+        let launch_log = PathBuf::from(format!("{}.log", helper.display()));
+        let launches = std::fs::read_to_string(launch_log).unwrap();
+        assert_eq!(launches.lines().count(), 2);
+    }
+
+    #[test]
+    fn persistent_response_reader_rejects_oversized_frame() {
+        let mut payload = vec![b'x'; MAX_APPLE_ADAPTER_FRAME_BYTES + 1];
+        payload.push(b'\n');
+        let mut reader = BufReader::new(std::io::Cursor::new(payload));
+        let error = read_bounded_adapter_frame(&mut reader).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    }
+'''
+          close = text.rfind("\n}")
+          if close == -1 or text.find("#[cfg(test)]\nmod tests {") == -1:
+              raise SystemExit("apple adapter test module not found")
+          text = text[:close] + test_insert + text[close:]
+          path.write_text(text, encoding="utf-8")
+
+          # Share the same client across Portrait preflight and publication.
+          path = root / "crates/xdremux-runtime/src/oppo_portrait.rs"
+          text = path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              "pub(crate) fn prepare_apple_portrait_source(\n    adapter_executable: &Path,\n    input: &[u8],\n) -> Result<ApplePortraitSourcePreflight> {",
+              "pub(crate) fn prepare_apple_portrait_source(\n    adapter: &AppleAdapterClient,\n    input: &[u8],\n) -> Result<ApplePortraitSourcePreflight> {",
+              "portrait preflight signature",
+          )
+          text = replace_once(
+              text,
+              "\n    let adapter = AppleAdapterClient::new(adapter_executable.to_path_buf());\n    let gain_map = adapter.imageio_gain_map_facts(source_image_file.path())?;",
+              "\n    let gain_map = adapter.imageio_gain_map_facts(source_image_file.path())?;",
+              "portrait preflight client creation",
+          )
+          path.write_text(text, encoding="utf-8")
+
+          path = root / "crates/xdremux-runtime/src/lib.rs"
+          text = path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              "        oppo_portrait::prepare_apple_portrait_source(executable.as_ref(), source)",
+              "        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());\n        oppo_portrait::prepare_apple_portrait_source(&adapter, source)",
+              "public Portrait preflight",
+          )
+          text = replace_once(
+              text,
+              "        let preflight = self.preflight_apple_portrait_source(executable.as_ref(), source)?;\n        let expected_gain_map = preflight.gain_map;",
+              "        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());\n        let preflight = oppo_portrait::prepare_apple_portrait_source(&adapter, source)?;\n        let expected_gain_map = preflight.gain_map;",
+              "Portrait conversion shared client",
+          )
+          text = replace_once(
+              text,
+              "\n        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());\n        let carrier_path = staging.path().join(\"carrier.heic\");",
+              "\n        let carrier_path = staging.path().join(\"carrier.heic\");",
+              "Portrait duplicate client",
+          )
+          path.write_text(text, encoding="utf-8")
+
+          # Swift keeps the existing one-shot protocol and adds an explicit,
+          # bounded persistent NDJSON transport mode for Rust.
+          path = root / "Sources/XDRemuxAppleAdapter/main.swift"
+          text = path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              "private let schemaVersion = 2\n",
+              "private let schemaVersion = 2\nprivate let persistentTransportArgument = \"--persistent-json-lines\"\nprivate let maxTransportFrameBytes = 8 * 1024 * 1024\nprivate let transportReadChunkBytes = 64 * 1024\n",
+              "Swift transport constants",
+          )
+          text = replace_once(
+              text,
+              '''do {
+    let input = FileHandle.standardInput.readDataToEndOfFile()
+    guard !input.isEmpty else {
+        fail("apple adapter request is empty")
+    }
+    let request = try JSONDecoder().decode(AdapterRequest.self, from: input)
+    guard request.schemaVersion == schemaVersion else {
+        fail("unsupported apple adapter schema_version \\(request.schemaVersion)")
+    }
+
+    let response: AdapterResponse
+''',
+              '''private func encodedResponse(for input: Data) throws -> Data {
+    guard !input.isEmpty else {
+        fail("apple adapter request is empty")
+    }
+    guard input.count <= maxTransportFrameBytes else {
+        fail("apple adapter request exceeds transport safety limit")
+    }
+    let request = try JSONDecoder().decode(AdapterRequest.self, from: input)
+    guard request.schemaVersion == schemaVersion else {
+        fail("unsupported apple adapter schema_version \\(request.schemaVersion)")
+    }
+
+    let response: AdapterResponse
+''',
+              "Swift request handler start",
+          )
+          text = replace_once(
+              text,
+              '''    var encoded = try JSONEncoder().encode(response)
+    encoded.append(0x0A)
+    FileHandle.standardOutput.write(encoded)
+} catch {
+    fail("invalid apple adapter request: \\(error)")
+}
+''',
+              '''    var encoded = try JSONEncoder().encode(response)
+    encoded.append(0x0A)
+    return encoded
+}
+
+private func runOneShotTransport() throws {
+    let input = FileHandle.standardInput.readDataToEndOfFile()
+    try FileHandle.standardOutput.write(contentsOf: encodedResponse(for: input))
+}
+
+private func runPersistentTransport() throws {
+    let input = FileHandle.standardInput
+    let output = FileHandle.standardOutput
+    var pending = Data()
+
+    while let chunk = try input.read(upToCount: transportReadChunkBytes), !chunk.isEmpty {
+        pending.append(chunk)
+        while let newline = pending.firstIndex(of: 0x0A) {
+            let frameLength = pending.distance(from: pending.startIndex, to: newline)
+            guard frameLength <= maxTransportFrameBytes else {
+                fail("apple adapter request exceeds transport safety limit")
+            }
+            var frame = Data(pending[..<newline])
+            pending.removeFirst(frameLength + 1)
+            if frame.last == 0x0D {
+                frame.removeLast()
+            }
+            guard !frame.isEmpty else {
+                fail("apple adapter persistent request frame is empty")
+            }
+            try output.write(contentsOf: encodedResponse(for: frame))
+        }
+        guard pending.count <= maxTransportFrameBytes else {
+            fail("apple adapter request exceeds transport safety limit")
+        }
+    }
+
+    guard pending.isEmpty else {
+        fail("apple adapter persistent request ended without a newline")
+    }
+}
+
+let transportArguments = Array(CommandLine.arguments.dropFirst())
+do {
+    if transportArguments.isEmpty {
+        try runOneShotTransport()
+    } else if transportArguments == [persistentTransportArgument] {
+        try runPersistentTransport()
+    } else {
+        fail("unsupported apple adapter transport arguments")
+    }
+} catch {
+    fail("invalid apple adapter request: \\(error)")
+}
+''',
+              "Swift request handler end",
+          )
+          path.write_text(text, encoding="utf-8")
+
+          # The launch-count wrapper must preserve the transport argument.
+          path = root / "scripts/characterize_apple_adapter_launches.py"
+          text = path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              '        "exec \\\"$XDREMUX_REAL_APPLE_ADAPTER\\\"\\n",\n',
+              '        "exec \\\"$XDREMUX_REAL_APPLE_ADAPTER\\\" \\\"$@\\\"\\n",\n',
+              "adapter launch wrapper argv",
+          )
+          path.write_text(text, encoding="utf-8")
+
+          # Structural launch budget is now a hard 1 process per conversion.
+          path = root / "benchmarks/macos26-arm64-product-baseline.json"
+          text = path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              '    "apple-portrait": 17,\n    "apple-styles": 7',
+              '    "apple-portrait": 1,\n    "apple-styles": 1',
+              "performance launch baseline",
+          )
+          path.write_text(text, encoding="utf-8")
+
+          path = root / "Tests/test_performance_budget.py"
+          text = path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              '            "apple-portrait": 17,\n            "apple-styles": 7,',
+              '            "apple-portrait": 1,\n            "apple-styles": 1,',
+              "budget fixture baseline",
+          )
+          text = replace_once(
+              text,
+              "def launches(*, portrait: int = 17, styles: int = 7, head: str = HEAD)",
+              "def launches(*, portrait: int = 1, styles: int = 1, head: str = HEAD)",
+              "budget launch defaults",
+          )
+          text = replace_once(
+              text,
+              "launches(portrait=18)",
+              "launches(portrait=2)",
+              "budget launch regression",
+          )
+          path.write_text(text, encoding="utf-8")
+
+          path = root / "Tests/test_performance_design.py"
+          text = path.read_text(encoding="utf-8")
+          marker = "    def test_hdr_benchmarks_distinguish_source_family_and_output_profile(self) -> None:\n"
+          persistent_test = '''    def test_apple_adapter_transport_is_persistent_bounded_and_fail_closed(self) -> None:
+        rust = self.source("crates/xdremux-runtime/src/apple_adapter.rs")
+        swift = self.source("Sources/XDRemuxAppleAdapter/main.swift")
+        lifecycle = self.source("scripts/characterize_apple_adapter_launches.py")
+        for marker in (
+            "--persistent-json-lines",
+            "MAX_APPLE_ADAPTER_FRAME_BYTES",
+            "recv_timeout",
+            "child.kill()",
+            "child.wait()",
+        ):
+            self.assertIn(marker, rust)
+        self.assertNotIn("POLL_INTERVAL", rust)
+        for marker in (
+            "--persistent-json-lines",
+            "maxTransportFrameBytes",
+            "read(upToCount:",
+            "runOneShotTransport",
+            "runPersistentTransport",
+        ):
+            self.assertIn(marker, swift)
+        self.assertIn('exec \\"$XDREMUX_REAL_APPLE_ADAPTER\\" \\"$@\\"', lifecycle)
+
+'''
+          if marker not in text:
+              raise SystemExit("performance design insertion marker missing")
+          text = text.replace(marker, persistent_test + marker, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+          cargo fmt --all
+          git diff --check
+
+      - name: Run targeted regression checks
+        shell: bash
+        run: |
+          python3 -m unittest Tests.test_performance_design Tests.test_performance_budget
+          cargo test --locked -p xdremux-runtime --all-targets --release
+
+      - name: Build Apple adapter and canonical CLI
+        shell: bash
+        run: |
+          swift build -c release --product xdremux-apple-adapter
+          cargo build --locked -p xdremux-cli --release
+          echo "XDREMUX_PROTOTYPE_APPLE_ADAPTER=$(swift build -c release --show-bin-path)/xdremux-apple-adapter" >> "$GITHUB_ENV"
+
+      - name: Exercise Rust-driven Apple product paths
+        shell: bash
+        run: |
+          export XDREMUX_APPLE_ADAPTER="$XDREMUX_PROTOTYPE_APPLE_ADAPTER"
+          bash scripts/check_rust_cli_apple_portrait.sh
+          bash scripts/check_rust_style_consumer.sh
+
+      - name: Require one helper launch per conversion
+        shell: bash
+        run: |
+          python3 scripts/characterize_apple_adapter_launches.py \
+            --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
+            --apple-adapter "$XDREMUX_PROTOTYPE_APPLE_ADAPTER" \
+            --output "$RUNNER_TEMP/apple-adapter-launches.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads((Path(os.environ["RUNNER_TEMP"]) / "apple-adapter-launches.json").read_text())
+          expected = {"apple-portrait": 1, "apple-styles": 1}
+          if report.get("cases") != expected:
+              raise SystemExit(f"persistent transport launch count mismatch: {report.get('cases')!r}")
+          print(f"persistent transport launch counts: {report['cases']}")
+          PY
+
+      - name: Commit verified implementation to prototype branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            Sources/XDRemuxAppleAdapter/main.swift \
+            crates/xdremux-runtime/src/apple_adapter.rs \
+            crates/xdremux-runtime/src/oppo_portrait.rs \
+            crates/xdremux-runtime/src/lib.rs \
+            scripts/characterize_apple_adapter_launches.py \
+            benchmarks/macos26-arm64-product-baseline.json \
+            Tests/test_performance_budget.py \
+            Tests/test_performance_design.py
+          git diff --cached --check
+          git commit -m "perf(apple): reuse persistent adapter session"
+          git push origin HEAD:codex/persistent-apple-helper
