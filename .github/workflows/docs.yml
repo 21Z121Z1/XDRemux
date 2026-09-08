@@ -11,6 +11,9 @@ on:
       - "**/*.md"
       - "Tests/test_public_documentation.py"
 
+permissions:
+  contents: read
+
 jobs:
   docs:
     runs-on: ubuntu-latest

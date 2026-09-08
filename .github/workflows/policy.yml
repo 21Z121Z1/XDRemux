@@ -23,6 +23,9 @@ on:
       - "docs/development.md"
       - "docs/development.en.md"
 
+permissions:
+  contents: read
+
 jobs:
   policy:
     runs-on: ubuntu-latest
