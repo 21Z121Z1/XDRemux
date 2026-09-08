@@ -916,22 +916,22 @@ private func runPersistentTransport() throws {
     while let chunk = try readPersistentTransportChunk() {
         pending.append(chunk)
         while let newline = pending.firstIndex(of: 0x0A) {
-  let frameLength = pending.distance(from: pending.startIndex, to: newline)
-  guard frameLength <= maxTransportFrameBytes else {
-      fail("apple adapter request exceeds transport safety limit")
-  }
-  var frame = Data(pending[..<newline])
-  pending.removeFirst(frameLength + 1)
-  if frame.last == 0x0D {
-      frame.removeLast()
-  }
-  guard !frame.isEmpty else {
-      fail("apple adapter persistent request frame is empty")
-  }
-  try output.write(contentsOf: encodedResponse(for: frame))
+            let frameLength = pending.distance(from: pending.startIndex, to: newline)
+            guard frameLength <= maxTransportFrameBytes else {
+                fail("apple adapter request exceeds transport safety limit")
+            }
+            var frame = Data(pending[..<newline])
+            pending.removeFirst(frameLength + 1)
+            if frame.last == 0x0D {
+                frame.removeLast()
+            }
+            guard !frame.isEmpty else {
+                fail("apple adapter persistent request frame is empty")
+            }
+            try output.write(contentsOf: encodedResponse(for: frame))
         }
         guard pending.count <= maxTransportFrameBytes else {
-  fail("apple adapter request exceeds transport safety limit")
+            fail("apple adapter request exceeds transport safety limit")
         }
     }
 
