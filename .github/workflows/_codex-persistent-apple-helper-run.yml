@@ -73,7 +73,7 @@ jobs:
           ]) + '\n'
           script, perf_blocks = re.subn(
               r"\npersistent_test = '''.*?'''\n",
-              "\npersistent_test = " + repr(perf_test) + "\n",
+              lambda _: "\npersistent_test = " + repr(perf_test) + "\n",
               script,
               count=1,
               flags=re.S,
