@@ -112,38 +112,40 @@ jobs:
 
           path = Path('Sources/XDRemuxAppleAdapter/main.swift')
           text = path.read_text(encoding='utf-8')
-          old = '''private func runPersistentTransport() throws {
-    let input = FileHandle.standardInput
-    let output = FileHandle.standardOutput
-    var pending = Data()
-
-    while let chunk = try input.read(upToCount: transportReadChunkBytes), !chunk.isEmpty {
-'''
-          new = '''private func readPersistentTransportChunk() throws -> Data? {
-    var buffer = [UInt8](repeating: 0, count: transportReadChunkBytes)
-    while true {
-        let count = buffer.withUnsafeMutableBytes { bytes in
-            Darwin.read(STDIN_FILENO, bytes.baseAddress, bytes.count)
-        }
-        if count > 0 {
-            return Data(buffer.prefix(count))
-        }
-        if count == 0 {
-            return nil
-        }
-        if errno == EINTR {
-            continue
-        }
-        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
-    }
-}
-
-private func runPersistentTransport() throws {
-    let output = FileHandle.standardOutput
-    var pending = Data()
-
-    while let chunk = try readPersistentTransportChunk() {
-'''
+          old = '\n'.join([
+              'private func runPersistentTransport() throws {',
+              '    let input = FileHandle.standardInput',
+              '    let output = FileHandle.standardOutput',
+              '    var pending = Data()',
+              '',
+              '    while let chunk = try input.read(upToCount: transportReadChunkBytes), !chunk.isEmpty {',
+          ]) + '\n'
+          new = '\n'.join([
+              'private func readPersistentTransportChunk() throws -> Data? {',
+              '    var buffer = [UInt8](repeating: 0, count: transportReadChunkBytes)',
+              '    while true {',
+              '        let count = buffer.withUnsafeMutableBytes { bytes in',
+              '            Darwin.read(STDIN_FILENO, bytes.baseAddress, bytes.count)',
+              '        }',
+              '        if count > 0 {',
+              '            return Data(buffer.prefix(count))',
+              '        }',
+              '        if count == 0 {',
+              '            return nil',
+              '        }',
+              '        if errno == EINTR {',
+              '            continue',
+              '        }',
+              '        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))',
+              '    }',
+              '}',
+              '',
+              'private func runPersistentTransport() throws {',
+              '    let output = FileHandle.standardOutput',
+              '    var pending = Data()',
+              '',
+              '    while let chunk = try readPersistentTransportChunk() {',
+          ]) + '\n'
           if text.count(old) != 1:
               raise SystemExit(f'Swift persistent read loop: expected exactly one match, got {text.count(old)}')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
