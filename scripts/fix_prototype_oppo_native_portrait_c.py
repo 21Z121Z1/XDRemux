@@ -9,8 +9,6 @@ def replace_last(label: str, old: str, new: str) -> None:
     index = text.rfind(old)
     if index < 0:
         raise SystemExit(f"{label}: pattern not found")
-    if text.find(old, index + 1) >= 0:
-        raise SystemExit(f"{label}: internal last-match invariant failed")
     text = text[:index] + new + text[index + len(old):]
 
 
@@ -33,8 +31,7 @@ replace_last(
 
 #[derive(Debug, Args)]
 struct ConvertArgs''',
-    '''    }
-''',''',
+    "    }\n''',",
 )
 
 compile(text, str(path), "exec")
