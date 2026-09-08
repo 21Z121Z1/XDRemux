@@ -100,6 +100,15 @@ jobs:
           Path('/tmp/xdremux-persistent-apple-helper.py').write_text(script, encoding='utf-8')
           PY
           python3 /tmp/xdremux-persistent-apple-helper.py
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('crates/xdremux-runtime/src/oppo_portrait.rs')
+          text = path.read_text(encoding='utf-8')
+          old = 'use std::path::Path;\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'oppo portrait Path import: expected exactly one match, got {text.count(old)}')
+          path.write_text(text.replace(old, '', 1), encoding='utf-8')
+          PY
           cargo fmt --all
           git diff --check
 
