@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
+use std::sync::{mpsc, Mutex};
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use xdremux_engine::{
@@ -18,9 +19,11 @@ use xdremux_format::FourCC;
 use crate::{Result, RuntimeError};
 
 const APPLE_ADAPTER_SCHEMA_VERSION: u32 = 2;
+const APPLE_ADAPTER_PERSISTENT_ARGUMENT: &str = "--persistent-json-lines";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 const APPLE_COMPUTE_TIMEOUT: Duration = Duration::from_secs(300);
-const POLL_INTERVAL: Duration = Duration::from_millis(10);
+const MAX_APPLE_ADAPTER_FRAME_BYTES: usize = 8 * 1024 * 1024;
+const MAX_APPLE_ADAPTER_DIAGNOSTIC_BYTES: usize = 64 * 1024;
 const MAX_APPLE_L8_MASK_BYTES: usize = 128 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -81,10 +84,168 @@ impl AppleAdapterCapabilities {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct AppleAdapterClient {
     executable: PathBuf,
     timeout: Duration,
+    session: Mutex<Option<AppleAdapterSession>>,
+}
+
+enum AdapterStreamEvent {
+    Frame(Vec<u8>),
+    Error(io::Error),
+    Eof,
+}
+
+struct AppleAdapterSession {
+    child: Child,
+    stdin: Option<ChildStdin>,
+    responses: mpsc::Receiver<AdapterStreamEvent>,
+    stdout_reader: Option<JoinHandle<()>>,
+    stderr_reader: Option<JoinHandle<Vec<u8>>>,
+}
+
+impl AppleAdapterSession {
+    fn spawn(executable: &Path) -> Result<Self> {
+        let mut child = Command::new(executable)
+            .arg(APPLE_ADAPTER_PERSISTENT_ARGUMENT)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| RuntimeError::external("Apple adapter launch", error))?;
+
+        let pipes = (child.stdin.take(), child.stdout.take(), child.stderr.take());
+        let (stdin, stdout, stderr) = match pipes {
+            (Some(stdin), Some(stdout), Some(stderr)) => (stdin, stdout, stderr),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(RuntimeError::new(
+                    "Apple adapter launch",
+                    "persistent helper pipes are unavailable",
+                ));
+            }
+        };
+
+        let (sender, responses) = mpsc::channel();
+        let stdout_reader = thread::spawn(move || {
+            let mut reader = BufReader::new(stdout);
+            loop {
+                match read_bounded_adapter_frame(&mut reader) {
+                    Ok(Some(frame)) => {
+                        if sender.send(AdapterStreamEvent::Frame(frame)).is_err() {
+                            break;
+                        }
+                    }
+                    Ok(None) => {
+                        let _ = sender.send(AdapterStreamEvent::Eof);
+                        break;
+                    }
+                    Err(error) => {
+                        let _ = sender.send(AdapterStreamEvent::Error(error));
+                        break;
+                    }
+                }
+            }
+        });
+        let stderr_reader = thread::spawn(move || read_bounded_diagnostic(stderr));
+
+        Ok(Self {
+            child,
+            stdin: Some(stdin),
+            responses,
+            stdout_reader: Some(stdout_reader),
+            stderr_reader: Some(stderr_reader),
+        })
+    }
+
+    fn is_running(&mut self) -> Result<bool> {
+        self.child
+            .try_wait()
+            .map(|status| status.is_none())
+            .map_err(|error| RuntimeError::external("Apple adapter wait", error))
+    }
+
+    fn invoke(&mut self, executable: &Path, request: &[u8], timeout: Duration) -> Result<Vec<u8>> {
+        if let Err(error) = self
+            .stdin
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::BrokenPipe, "helper stdin is unavailable"))
+            .and_then(|stdin| {
+                stdin.write_all(request)?;
+                stdin.write_all(b"\n")?;
+                stdin.flush()
+            })
+        {
+            return Err(self.execution_error(format!("request write failed: {error}")));
+        }
+
+        match self.responses.recv_timeout(timeout) {
+            Ok(AdapterStreamEvent::Frame(frame)) if !frame.is_empty() => Ok(frame),
+            Ok(AdapterStreamEvent::Frame(_)) => {
+                Err(self.execution_error("adapter returned an empty response frame".to_owned()))
+            }
+            Ok(AdapterStreamEvent::Error(error)) => {
+                Err(self.execution_error(format!("adapter stdout framing failed: {error}")))
+            }
+            Ok(AdapterStreamEvent::Eof) => Err(self
+                .execution_error("adapter closed stdout before returning a response".to_owned())),
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                self.abort();
+                Err(RuntimeError::new(
+                    "Apple adapter timeout",
+                    format!(
+                        "{} exceeded {} ms",
+                        executable.display(),
+                        timeout.as_millis()
+                    ),
+                ))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                Err(self.execution_error("adapter response channel disconnected".to_owned()))
+            }
+        }
+    }
+
+    fn execution_error(&mut self, fallback: String) -> RuntimeError {
+        let (status, stderr) = self.abort();
+        let diagnostic = String::from_utf8_lossy(&stderr).trim().to_owned();
+        let mut detail = fallback;
+        if let Some(status) = status {
+            detail.push_str(&format!("; adapter exited with {status}"));
+        }
+        if !diagnostic.is_empty() {
+            detail.push_str(": ");
+            detail.push_str(&diagnostic);
+        }
+        RuntimeError::new("Apple adapter execution", detail)
+    }
+
+    fn abort(&mut self) -> (Option<ExitStatus>, Vec<u8>) {
+        self.stdin.take();
+        let status = match self.child.try_wait() {
+            Ok(Some(status)) => Some(status),
+            Ok(None) | Err(_) => {
+                let _ = self.child.kill();
+                self.child.wait().ok()
+            }
+        };
+        if let Some(reader) = self.stdout_reader.take() {
+            let _ = reader.join();
+        }
+        let stderr = self
+            .stderr_reader
+            .take()
+            .and_then(|reader| reader.join().ok())
+            .unwrap_or_default();
+        (status, stderr)
+    }
+}
+
+impl Drop for AppleAdapterSession {
+    fn drop(&mut self) {
+        self.abort();
+    }
 }
 
 impl AppleAdapterClient {
@@ -92,9 +253,9 @@ impl AppleAdapterClient {
         Self {
             executable: executable.into(),
             timeout: DEFAULT_TIMEOUT,
+            session: Mutex::new(None),
         }
     }
-
     pub(super) fn capabilities(&self) -> Result<AppleAdapterCapabilities> {
         let output = self.invoke_request(AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
@@ -760,73 +921,59 @@ impl AppleAdapterClient {
     }
 
     fn invoke(&self, request: &[u8], timeout: Duration) -> Result<Vec<u8>> {
-        let mut child = Command::new(&self.executable)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| RuntimeError::external("Apple adapter launch", error))?;
-
-        let mut stdin = child.stdin.take().ok_or_else(|| {
-            RuntimeError::new("Apple adapter launch", "child stdin pipe is unavailable")
-        })?;
-        stdin
-            .write_all(request)
-            .map_err(|error| RuntimeError::external("Apple adapter request write", error))?;
-        drop(stdin);
-
-        let stdout = child.stdout.take().ok_or_else(|| {
-            RuntimeError::new("Apple adapter launch", "child stdout pipe is unavailable")
-        })?;
-        let stderr = child.stderr.take().ok_or_else(|| {
-            RuntimeError::new("Apple adapter launch", "child stderr pipe is unavailable")
-        })?;
-        let stdout_reader = thread::spawn(move || read_all(stdout));
-        let stderr_reader = thread::spawn(move || read_all(stderr));
-
-        let deadline = Instant::now() + timeout;
-        let status = loop {
-            match child
-                .try_wait()
-                .map_err(|error| RuntimeError::external("Apple adapter wait", error))?
-            {
-                Some(status) => break status,
-                None if Instant::now() >= deadline => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    let _ = join_reader(stdout_reader, "stdout");
-                    let _ = join_reader(stderr_reader, "stderr");
-                    return Err(RuntimeError::new(
-                        "Apple adapter timeout",
-                        format!(
-                            "{} exceeded {} ms",
-                            self.executable.display(),
-                            timeout.as_millis()
-                        ),
-                    ));
-                }
-                None => thread::sleep(POLL_INTERVAL),
-            }
-        };
-
-        child
-            .wait()
-            .map_err(|error| RuntimeError::external("Apple adapter reap", error))?;
-        let stdout = join_reader(stdout_reader, "stdout")?;
-        let stderr = join_reader(stderr_reader, "stderr")?;
-
-        if !status.success() {
-            let diagnostic = String::from_utf8_lossy(&stderr).trim().to_owned();
+        if request.is_empty() {
             return Err(RuntimeError::new(
-                "Apple adapter execution",
-                if diagnostic.is_empty() {
-                    format!("adapter exited with {status}")
-                } else {
-                    format!("adapter exited with {status}: {diagnostic}")
-                },
+                "Apple adapter protocol",
+                "request frame is empty",
             ));
         }
-        Ok(stdout)
+        if request.len() > MAX_APPLE_ADAPTER_FRAME_BYTES {
+            return Err(RuntimeError::new(
+                "Apple adapter protocol",
+                format!(
+                    "request frame has {} bytes; maximum is {}",
+                    request.len(),
+                    MAX_APPLE_ADAPTER_FRAME_BYTES
+                ),
+            ));
+        }
+        if request.iter().any(|byte| matches!(*byte, b'\n' | b'\r')) {
+            return Err(RuntimeError::new(
+                "Apple adapter protocol",
+                "request frame contains a raw line delimiter",
+            ));
+        }
+
+        let mut session = self.session.lock().map_err(|_| {
+            RuntimeError::new(
+                "Apple adapter session",
+                "persistent session mutex is poisoned",
+            )
+        })?;
+        let needs_restart = if let Some(current) = session.as_mut() {
+            match current.is_running() {
+                Ok(running) => !running,
+                Err(error) => {
+                    session.take();
+                    return Err(error);
+                }
+            }
+        } else {
+            true
+        };
+        if needs_restart {
+            session.take();
+            *session = Some(AppleAdapterSession::spawn(&self.executable)?);
+        }
+
+        let result = session
+            .as_mut()
+            .expect("persistent session was initialized")
+            .invoke(&self.executable, request, timeout);
+        if result.is_err() {
+            session.take();
+        }
+        result
     }
 }
 
@@ -1298,24 +1445,64 @@ fn validate_schema(schema_version: u32) -> Result<()> {
     Ok(())
 }
 
-fn read_all(mut reader: impl Read) -> std::io::Result<Vec<u8>> {
-    let mut bytes = Vec::new();
-    reader.read_to_end(&mut bytes)?;
-    Ok(bytes)
+fn read_bounded_adapter_frame(reader: &mut impl BufRead) -> io::Result<Option<Vec<u8>>> {
+    let mut frame = Vec::new();
+    loop {
+        let available = reader.fill_buf()?;
+        if available.is_empty() {
+            if frame.is_empty() {
+                return Ok(None);
+            }
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Apple adapter response ended without a newline",
+            ));
+        }
+
+        if let Some(newline) = available.iter().position(|byte| *byte == b'\n') {
+            if frame.len().saturating_add(newline) > MAX_APPLE_ADAPTER_FRAME_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Apple adapter response frame exceeds safety limit",
+                ));
+            }
+            frame.extend_from_slice(&available[..newline]);
+            reader.consume(newline + 1);
+            if frame.last() == Some(&b'\r') {
+                frame.pop();
+            }
+            return Ok(Some(frame));
+        }
+
+        let chunk_len = available.len();
+        if frame.len().saturating_add(chunk_len) > MAX_APPLE_ADAPTER_FRAME_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Apple adapter response frame exceeds safety limit",
+            ));
+        }
+        frame.extend_from_slice(available);
+        reader.consume(chunk_len);
+    }
 }
 
-fn join_reader(
-    reader: thread::JoinHandle<std::io::Result<Vec<u8>>>,
-    stream: &'static str,
-) -> Result<Vec<u8>> {
-    reader
-        .join()
-        .map_err(|_| {
-            RuntimeError::new("Apple adapter output", format!("{stream} reader panicked"))
-        })?
-        .map_err(|error| RuntimeError::external("Apple adapter output", error))
+fn read_bounded_diagnostic(mut reader: impl Read) -> Vec<u8> {
+    let mut diagnostic = Vec::new();
+    let mut buffer = [0_u8; 4096];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => {
+                let remaining = MAX_APPLE_ADAPTER_DIAGNOSTIC_BYTES.saturating_sub(diagnostic.len());
+                let retained = count.min(remaining);
+                diagnostic.extend_from_slice(&buffer[..retained]);
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(_) => break,
+        }
+    }
+    diagnostic
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1360,5 +1547,57 @@ mod tests {
         };
         let error = scene_scores_from_wire(wire).unwrap_err();
         assert!(error.to_string().contains("outside 0 through 1"));
+    }
+
+    #[test]
+    fn persistent_session_reuses_process_and_recovers_after_crash() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temporary = tempfile::tempdir().expect("create fake Apple adapter directory");
+        let helper = temporary.path().join("fake-apple-adapter.sh");
+        std::fs::write(
+            &helper,
+            r#"#!/bin/sh
+set -eu
+[ "${1:-}" = "--persistent-json-lines" ] || exit 9
+printf 'launch\n' >> "$0.log"
+count=0
+while IFS= read -r request; do
+    count=$((count + 1))
+    if [ "$count" -eq 2 ]; then
+        printf 'synthetic crash\n' >&2
+        exit 7
+    fi
+    printf '%s\n' '{"schema_version":2,"capabilities":[]}'
+done
+"#,
+        )
+        .expect("write fake Apple adapter");
+        let mut permissions = std::fs::metadata(&helper).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&helper, permissions).unwrap();
+
+        let client = AppleAdapterClient::new(&helper);
+        client.capabilities().expect("first request must succeed");
+        let error = client
+            .capabilities()
+            .expect_err("second request must observe helper crash");
+        assert!(error.to_string().contains("synthetic crash"), "{error}");
+        client
+            .capabilities()
+            .expect("client must restart helper after crash");
+
+        let launch_log = PathBuf::from(format!("{}.log", helper.display()));
+        let launches = std::fs::read_to_string(launch_log).unwrap();
+        assert_eq!(launches.lines().count(), 2);
+    }
+
+    #[test]
+    fn persistent_response_reader_rejects_oversized_frame() {
+        let mut payload = vec![b'x'; MAX_APPLE_ADAPTER_FRAME_BYTES + 1];
+        payload.push(b'\n');
+        let mut reader = BufReader::new(std::io::Cursor::new(payload));
+        let error = read_bounded_adapter_frame(&mut reader).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
     }
 }

@@ -60,6 +60,30 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertIn('"hardware_accelerated_samples"', benchmark)
         self.assertIn('"observed_encoder_ids"', benchmark)
 
+    def test_apple_adapter_transport_is_persistent_bounded_and_fail_closed(self) -> None:
+        rust = self.source("crates/xdremux-runtime/src/apple_adapter.rs")
+        swift = self.source("Sources/XDRemuxAppleAdapter/main.swift")
+        lifecycle = self.source("scripts/characterize_apple_adapter_launches.py")
+        for marker in (
+            "--persistent-json-lines",
+            "MAX_APPLE_ADAPTER_FRAME_BYTES",
+            "recv_timeout",
+            "child.kill()",
+            "child.wait()",
+        ):
+            self.assertIn(marker, rust)
+        self.assertNotIn("POLL_INTERVAL", rust)
+        for marker in (
+            "--persistent-json-lines",
+            "maxTransportFrameBytes",
+            "Darwin.read",
+            "runOneShotTransport",
+            "runPersistentTransport",
+        ):
+            self.assertIn(marker, swift)
+        self.assertIn("exec ", lifecycle)
+        self.assertIn("$@", lifecycle)
+
     def test_hdr_benchmarks_distinguish_source_family_and_output_profile(self) -> None:
         benchmark = self.source("scripts/benchmark_rust_product.py")
         for case in (

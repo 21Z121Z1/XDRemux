@@ -25,6 +25,52 @@ if sorted(capabilities) != ["photographic-styles", "portrait"]:
     raise SystemExit(f"unexpected Apple adapter capabilities: {capabilities!r}")
 PY
 
+# Persistent transport must answer successive requests without waiting for stdin EOF.
+# This behavioral regression caught a real deadlock caused by one-shot-style buffering.
+python3 - "$ADAPTER" <<'PY'
+import json
+import select
+import subprocess
+import sys
+
+adapter = sys.argv[1]
+process = subprocess.Popen(
+    [adapter, "--persistent-json-lines"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+)
+assert process.stdin is not None
+assert process.stdout is not None
+assert process.stderr is not None
+request = json.dumps({"schema_version": 2, "operation": "capabilities"}).encode() + b"\n"
+try:
+    for index in range(2):
+        process.stdin.write(request)
+        process.stdin.flush()
+        ready, _, _ = select.select([process.stdout], [], [], 5.0)
+        if not ready:
+            raise SystemExit(
+                f"persistent Apple adapter did not answer request {index + 1} while stdin remained open"
+            )
+        response = json.loads(process.stdout.readline())
+        if response.get("schema_version") != 2:
+            raise SystemExit(f"unexpected persistent Apple adapter response: {response!r}")
+        if sorted(response.get("capabilities", [])) != ["photographic-styles", "portrait"]:
+            raise SystemExit(f"unexpected persistent Apple adapter capabilities: {response!r}")
+    process.stdin.close()
+    status = process.wait(timeout=5.0)
+    if status != 0:
+        raise SystemExit(
+            f"persistent Apple adapter exited with {status}: "
+            + process.stderr.read().decode(errors="replace")
+        )
+finally:
+    if process.poll() is None:
+        process.kill()
+        process.wait()
+PY
+
 TEST_INPUT="$PWD/fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg"
 test -f "$TEST_INPUT"
 

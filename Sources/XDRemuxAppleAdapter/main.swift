@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 import Darwin
 
 private let schemaVersion = 2
+private let persistentTransportArgument = "--persistent-json-lines"
+private let maxTransportFrameBytes = 8 * 1024 * 1024
+private let transportReadChunkBytes = 64 * 1024
 
 private struct AdapterRequest: Decodable {
     let schemaVersion: Int
@@ -620,10 +623,12 @@ private func imageIOMergeXMP(
     }
 }
 
-do {
-    let input = FileHandle.standardInput.readDataToEndOfFile()
+private func encodedResponse(for input: Data) throws -> Data {
     guard !input.isEmpty else {
         fail("apple adapter request is empty")
+    }
+    guard input.count <= maxTransportFrameBytes else {
+        fail("apple adapter request exceeds transport safety limit")
     }
     let request = try JSONDecoder().decode(AdapterRequest.self, from: input)
     guard request.schemaVersion == schemaVersion else {
@@ -877,7 +882,73 @@ do {
 
     var encoded = try JSONEncoder().encode(response)
     encoded.append(0x0A)
-    FileHandle.standardOutput.write(encoded)
+    return encoded
+}
+
+private func runOneShotTransport() throws {
+    let input = FileHandle.standardInput.readDataToEndOfFile()
+    try FileHandle.standardOutput.write(contentsOf: encodedResponse(for: input))
+}
+
+private func readPersistentTransportChunk() throws -> Data? {
+    var buffer = [UInt8](repeating: 0, count: transportReadChunkBytes)
+    while true {
+        let count = buffer.withUnsafeMutableBytes { bytes in
+            Darwin.read(STDIN_FILENO, bytes.baseAddress, bytes.count)
+        }
+        if count > 0 {
+            return Data(buffer.prefix(count))
+        }
+        if count == 0 {
+            return nil
+        }
+        if errno == EINTR {
+            continue
+        }
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+    }
+}
+
+private func runPersistentTransport() throws {
+    let output = FileHandle.standardOutput
+    var pending = Data()
+
+    while let chunk = try readPersistentTransportChunk() {
+        pending.append(chunk)
+        while let newline = pending.firstIndex(of: 0x0A) {
+            let frameLength = pending.distance(from: pending.startIndex, to: newline)
+            guard frameLength <= maxTransportFrameBytes else {
+                fail("apple adapter request exceeds transport safety limit")
+            }
+            var frame = Data(pending[..<newline])
+            pending.removeFirst(frameLength + 1)
+            if frame.last == 0x0D {
+                frame.removeLast()
+            }
+            guard !frame.isEmpty else {
+                fail("apple adapter persistent request frame is empty")
+            }
+            try output.write(contentsOf: encodedResponse(for: frame))
+        }
+        guard pending.count <= maxTransportFrameBytes else {
+            fail("apple adapter request exceeds transport safety limit")
+        }
+    }
+
+    guard pending.isEmpty else {
+        fail("apple adapter persistent request ended without a newline")
+    }
+}
+
+let transportArguments = Array(CommandLine.arguments.dropFirst())
+do {
+    if transportArguments.isEmpty {
+        try runOneShotTransport()
+    } else if transportArguments == [persistentTransportArgument] {
+        try runPersistentTransport()
+    } else {
+        fail("unsupported apple adapter transport arguments")
+    }
 } catch {
     fail("invalid apple adapter request: \(error)")
 }
