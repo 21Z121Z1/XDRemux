@@ -2,38 +2,12 @@ from pathlib import Path
 
 path = Path("scripts/prototype_oppo_native_portrait_c.py")
 text = path.read_text()
-
-
-def replace_last(label: str, old: str, new: str) -> None:
-    global text
-    index = text.rfind(old)
-    if index < 0:
-        raise SystemExit(f"{label}: pattern not found")
-    text = text[:index] + new + text[index + len(old):]
-
-
-replace_last(
-    "auxiliary payload splice tail",
-    '''#[cfg(any(target_os = "macos", test))]
-fn producer_focus_region''',
-    "''',",
-)
-replace_last(
-    "Vision branch splice tail",
-    '''    let simulated_aperture = resolve_simulated_aperture(
-''',
-    "''',",
-)
-replace_last(
-    "CLI product splice tail",
-    '''    }
-}
-
-#[derive(Debug, Args)]
-struct ConvertArgs''',
-    "    }\n''',",
-)
-
+old = "    write(path, text[:start_index] + replacement + text[end_index:])"
+new = "    write(path, text[:start_index] + replacement + text[end_index + len(end):])"
+count = text.count(old)
+if count != 1:
+    raise SystemExit(f"splice helper replacement expected one match, found {count}")
+text = text.replace(old, new, 1)
 compile(text, str(path), "exec")
 path.write_text(text)
-print("prototype splice ownership fixed")
+print("prototype splice helper now consumes the end marker")
