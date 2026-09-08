@@ -34,7 +34,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-
           source = Path('.github/workflows/_codex-persistent-apple-helper.yml').read_text(encoding='utf-8').splitlines()
           start = source.index("          python3 - <<'PY'") + 1
           end = source.index("          PY", start)
@@ -44,19 +43,15 @@ jobs:
                   line = line[10:]
               extracted.append(line)
           script = '\n'.join(extracted) + '\n'
-          script, count = re.subn(
-              r"\nold_client = '''.*?'''\.replace\(\"          \", \"\"\)\n",
-              "\n",
-              script,
-              count=1,
-              flags=re.S,
-          )
+          script, count = re.subn(r"\nold_client = '''.*?'''\.replace\(\"          \", \"\"\)\n", "\n", script, count=1, flags=re.S)
           if count != 1:
               raise SystemExit(f'prototype extraction: old_client block count={count}')
           old_call = 'text = replace_once(text, old_client, new_client, "apple adapter client/session")'
-          new_call = '''client_start = text.index("#[derive(Debug, Clone, PartialEq, Eq)]\\npub(super) struct AppleAdapterClient")
-client_end = text.index("    pub(super) fn capabilities", client_start)
-text = text[:client_start] + new_client + text[client_end:]'''
+          new_call = '\n'.join([
+              'client_start = text.index("#[derive(Debug, Clone, PartialEq, Eq)]\\npub(super) struct AppleAdapterClient")',
+              'client_end = text.index("    pub(super) fn capabilities", client_start)',
+              'text = text[:client_start] + new_client + text[client_end:]',
+          ])
           if script.count(old_call) != 1:
               raise SystemExit('prototype extraction: client splice call not found exactly once')
           script = script.replace(old_call, new_call, 1)
