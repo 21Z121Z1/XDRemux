@@ -23,7 +23,6 @@ use xdremux_format::{jpeg_image_end, probe_jpeg_frame_profile};
 #[cfg(target_os = "macos")]
 use std::io::Write;
 #[cfg(target_os = "macos")]
-use std::path::Path;
 #[cfg(target_os = "macos")]
 use xdremux_engine::{
     build_apple_portrait_disparity, derive_apple_portrait_camera_calibration,
@@ -346,7 +345,7 @@ fn resolve_simulated_aperture(
 
 #[cfg(target_os = "macos")]
 pub(crate) fn prepare_apple_portrait_source(
-    adapter_executable: &Path,
+    adapter: &AppleAdapterClient,
     input: &[u8],
 ) -> Result<ApplePortraitSourcePreflight> {
     let source = extract_oppo_portrait_source(input)
@@ -378,7 +377,6 @@ pub(crate) fn prepare_apple_portrait_source(
         .flush()
         .map_err(|error| RuntimeError::external("Portrait input temporary flush", error))?;
 
-    let adapter = AppleAdapterClient::new(adapter_executable.to_path_buf());
     let gain_map = adapter.imageio_gain_map_facts(source_image_file.path())?;
     if !gain_map.supports_portrait_source() {
         return Err(RuntimeError::new(

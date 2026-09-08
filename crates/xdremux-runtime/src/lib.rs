@@ -234,7 +234,8 @@ impl PortableRuntime {
         executable: impl AsRef<Path>,
         source: &[u8],
     ) -> Result<ApplePortraitSourcePreflight> {
-        oppo_portrait::prepare_apple_portrait_source(executable.as_ref(), source)
+        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
+        oppo_portrait::prepare_apple_portrait_source(&adapter, source)
     }
 
     /// Convert an OPPO Portrait source through one Rust-owned file transaction.
@@ -267,7 +268,8 @@ impl PortableRuntime {
         fs::write(&input_path, source)
             .map_err(|error| RuntimeError::external("Apple Portrait input staging", error))?;
 
-        let preflight = self.preflight_apple_portrait_source(executable.as_ref(), source)?;
+        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
+        let preflight = oppo_portrait::prepare_apple_portrait_source(&adapter, source)?;
         let expected_gain_map = preflight.gain_map;
         let mut source_image = preflight.base_jpeg.clone();
         source_image.extend_from_slice(&preflight.gain_map_jpeg);
@@ -281,7 +283,6 @@ impl PortableRuntime {
         fs::write(&source_image_path, source_image)
             .map_err(|error| RuntimeError::external("Apple Portrait source staging", error))?;
 
-        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
         let carrier_path = staging.path().join("carrier.heic");
         adapter.imageio_encode_source_image(
             &source_image_path,

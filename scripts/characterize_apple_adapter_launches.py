@@ -36,7 +36,7 @@ def write_wrapper(path: Path) -> None:
         ': "${XDREMUX_REAL_APPLE_ADAPTER:?}"\n'
         ': "${XDREMUX_ADAPTER_LAUNCH_LOG:?}"\n'
         "printf 'launch\\n' >> \"$XDREMUX_ADAPTER_LAUNCH_LOG\"\n"
-        "exec \"$XDREMUX_REAL_APPLE_ADAPTER\"\n",
+        "exec \"$XDREMUX_REAL_APPLE_ADAPTER\" \"$@\"\n",
         encoding="utf-8",
     )
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

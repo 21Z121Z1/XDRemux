@@ -40,8 +40,8 @@ def baseline() -> dict[str, object]:
             },
         },
         "apple_adapter_process_launches": {
-            "apple-portrait": 17,
-            "apple-styles": 7,
+            "apple-portrait": 1,
+            "apple-styles": 1,
         },
     }
 
@@ -68,7 +68,7 @@ def benchmark(*, tiny_wall: float = 0.30, large_wall: float = 13.0) -> dict[str,
     }
 
 
-def launches(*, portrait: int = 17, styles: int = 7, head: str = HEAD) -> dict[str, object]:
+def launches(*, portrait: int = 1, styles: int = 1, head: str = HEAD) -> dict[str, object]:
     return {
         "schema_version": 1,
         "head": head,
@@ -124,7 +124,7 @@ class PerformanceBudgetTests(unittest.TestCase):
         self.assertIn("large median_wall_seconds regressed", completed.stderr)
 
     def test_rejects_structural_helper_launch_regression(self) -> None:
-        completed = self.run_checker(benchmark(), launches(portrait=18))
+        completed = self.run_checker(benchmark(), launches(portrait=2))
         self.assertEqual(completed.returncode, 1)
         self.assertIn("apple-portrait helper launches regressed", completed.stderr)
 
