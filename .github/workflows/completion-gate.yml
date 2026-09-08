@@ -107,7 +107,7 @@ jobs:
               {
                 "name": "repository-policy-regressions",
                 "kind": "regression",
-                "command": ["python3", "-m", "unittest", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_app_architecture", "Tests.test_performance_design", "Tests.test_rust_artifact_lifecycle", "Tests.test_rust_apple_semantic_policy", "Tests.test_rust_portrait_translation"],
+                "command": ["python3", "-m", "unittest", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_app_architecture", "Tests.test_performance_design", "Tests.test_rust_artifact_lifecycle", "Tests.test_rust_apple_semantic_policy", "Tests.test_apple_device_acceptance", "Tests.test_rust_portrait_translation"],
                 "timeout_seconds": 300
               }
             ]

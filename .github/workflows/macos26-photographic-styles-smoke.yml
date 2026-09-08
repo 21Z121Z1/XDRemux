@@ -15,7 +15,9 @@ on:
       - "scripts/check_rust_cli_apple_portrait.sh"
       - "scripts/check_rust_style_consumer.sh"
       - "scripts/build_apple_device_validation.sh"
+      - "scripts/check_apple_device_acceptance.py"
       - "Tests/test_rust_apple_semantic_policy.py"
+      - "Tests/test_apple_device_acceptance.py"
       - ".github/workflows/macos26-photographic-styles-smoke.yml"
   push:
     branches:
@@ -34,7 +36,9 @@ on:
       - "scripts/check_rust_cli_apple_portrait.sh"
       - "scripts/check_rust_style_consumer.sh"
       - "scripts/build_apple_device_validation.sh"
+      - "scripts/check_apple_device_acceptance.py"
       - "Tests/test_rust_apple_semantic_policy.py"
+      - "Tests/test_apple_device_acceptance.py"
       - ".github/workflows/macos26-photographic-styles-smoke.yml"
   workflow_dispatch:
 
@@ -81,7 +85,9 @@ jobs:
       - name: Check Rust-owned Apple semantic policy
         shell: bash
         run: |
-          python3 -m unittest Tests.test_rust_apple_semantic_policy \
+          python3 -m unittest \
+            Tests.test_rust_apple_semantic_policy \
+            Tests.test_apple_device_acceptance \
             2>&1 | tee artifacts/macos26-apple-adapter/semantic-policy.log
 
       - name: Verify versioned Apple adapter handshake
@@ -123,7 +129,7 @@ jobs:
             echo "Rust owns source analysis, product policy, Styles scene semantics, Portrait synthesis, graph assembly, validation, and publication."
             echo "Swift is limited to Apple framework primitives and raw framework observations."
             echo
-            echo "A SHA-bound device-validation bundle is produced for manual Apple Photos testing. Its manifest deliberately leaves device acceptance fields false/null."
+            echo "A SHA- and commit-bound device-validation bundle is produced for manual Apple Photos testing. Its manifest deliberately leaves device acceptance fields false/null."
             echo "This workflow is framework/offline integration evidence, not Apple Photos device acceptance or visual-equivalence evidence."
           } >> "$GITHUB_STEP_SUMMARY"
 

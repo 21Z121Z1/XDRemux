@@ -88,6 +88,12 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def git_head() -> str:
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=Path.cwd(), text=True
+    ).strip()
+
+
 def auxiliary_facts(path: Path) -> dict[str, object]:
     request = json.dumps(
         {
@@ -162,6 +168,7 @@ def output_record(path: Path, facts: dict[str, object]) -> dict[str, object]:
 
 manifest = {
     "manifest_schema_version": 1,
+    "head": git_head(),
     "purpose": "Rust-produced Apple feature outputs for manual Photos/device acceptance",
     "source": {
         "path": str(source.relative_to(Path.cwd())),
@@ -194,11 +201,25 @@ The accompanying validation files and `manifest.json` record only offline
 structure and ImageIO consumer facts. They do **not** prove Apple Photos device
 acceptance, editability, visual equivalence, or round-trip behavior.
 
-For each output on a representative physical Apple device, record in
-`manifest.json` (or an external result linked by its SHA-256): device and OS,
-Photos import success, feature recognition, editing UI availability, an actual
-edit/render observation, and revert/round-trip behavior. Preserve the output
-SHA-256 so the observation remains bound to the exact tested asset.
+For each output on a representative physical Apple device, fill the
+`device_acceptance` object in `manifest.json`: device and OS, Photos import
+success, feature recognition, editing UI availability, an actual edit/render
+observation, and revert/round-trip behavior. Do not replace or rename the HEIC
+files after testing; the manifest SHA-256 values bind the observation to the
+exact assets and the top-level `head` binds the bundle to the exact source
+commit.
+
+After recording both physical-device observations, validate the evidence from
+the repository root:
+
+```sh
+python3 scripts/check_apple_device_acceptance.py \
+  --manifest PATH/TO/manifest.json \
+  --expected-head "$(git rev-parse HEAD)"
+```
+
+A passing checker result is evidence completeness and integrity validation. It
+is not a substitute for performing the physical Apple Photos test itself.
 """
 (output_root / "README.md").write_text(readme, encoding="utf-8")
 PY
