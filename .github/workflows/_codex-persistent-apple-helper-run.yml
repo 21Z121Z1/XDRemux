@@ -33,6 +33,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           source = Path('.github/workflows/_codex-persistent-apple-helper.yml').read_text(encoding='utf-8').splitlines()
           start = source.index("          python3 - <<'PY'") + 1
@@ -42,9 +43,25 @@ jobs:
               if line.startswith('          '):
                   line = line[10:]
               extracted.append(line)
-          Path('/tmp/xdremux-persistent-apple-helper.py').write_text(
-              '\n'.join(extracted) + '\n', encoding='utf-8'
+          script = '\n'.join(extracted) + '\n'
+          script, count = re.subn(
+              r"\nold_client = '''.*?'''\.replace\(\"          \", \"\"\)\n",
+              "\n",
+              script,
+              count=1,
+              flags=re.S,
           )
+          if count != 1:
+              raise SystemExit(f'prototype extraction: old_client block count={count}')
+          old_call = 'text = replace_once(text, old_client, new_client, "apple adapter client/session")'
+          new_call = '''client_start = text.index("#[derive(Debug, Clone, PartialEq, Eq)]\\npub(super) struct AppleAdapterClient")
+client_end = text.index("    pub(super) fn capabilities", client_start)
+text = text[:client_start] + new_client + text[client_end:]'''
+          if script.count(old_call) != 1:
+              raise SystemExit('prototype extraction: client splice call not found exactly once')
+          script = script.replace(old_call, new_call, 1)
+          compile(script, '/tmp/xdremux-persistent-apple-helper.py', 'exec')
+          Path('/tmp/xdremux-persistent-apple-helper.py').write_text(script, encoding='utf-8')
           PY
           python3 /tmp/xdremux-persistent-apple-helper.py
           cargo fmt --all
