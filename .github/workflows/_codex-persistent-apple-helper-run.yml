@@ -1,4 +1,4 @@
-name: Codex persistent Apple helper runner
+name: Codex persistent Apple helper finalizer
 
 on:
   push:
@@ -8,14 +8,131 @@ permissions:
   contents: write
 
 jobs:
-  implement-and-verify:
+  finalize-and-verify:
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
           ref: codex/persistent-apple-helper
           fetch-depth: 0
+
+      - name: Finalize reviewed source and permanent regression
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          swift = Path('Sources/XDRemuxAppleAdapter/main.swift')
+          text = swift.read_text(encoding='utf-8')
+          old = '\n'.join([
+              '        while let newline = pending.firstIndex(of: 0x0A) {',
+              '  let frameLength = pending.distance(from: pending.startIndex, to: newline)',
+              '  guard frameLength <= maxTransportFrameBytes else {',
+              '      fail("apple adapter request exceeds transport safety limit")',
+              '  }',
+              '  var frame = Data(pending[..<newline])',
+              '  pending.removeFirst(frameLength + 1)',
+              '  if frame.last == 0x0D {',
+              '      frame.removeLast()',
+              '  }',
+              '  guard !frame.isEmpty else {',
+              '      fail("apple adapter persistent request frame is empty")',
+              '  }',
+              '  try output.write(contentsOf: encodedResponse(for: frame))',
+              '        }',
+              '        guard pending.count <= maxTransportFrameBytes else {',
+              '  fail("apple adapter request exceeds transport safety limit")',
+              '        }',
+          ])
+          new = '\n'.join([
+              '        while let newline = pending.firstIndex(of: 0x0A) {',
+              '            let frameLength = pending.distance(from: pending.startIndex, to: newline)',
+              '            guard frameLength <= maxTransportFrameBytes else {',
+              '                fail("apple adapter request exceeds transport safety limit")',
+              '            }',
+              '            var frame = Data(pending[..<newline])',
+              '            pending.removeFirst(frameLength + 1)',
+              '            if frame.last == 0x0D {',
+              '                frame.removeLast()',
+              '            }',
+              '            guard !frame.isEmpty else {',
+              '                fail("apple adapter persistent request frame is empty")',
+              '            }',
+              '            try output.write(contentsOf: encodedResponse(for: frame))',
+              '        }',
+              '        guard pending.count <= maxTransportFrameBytes else {',
+              '            fail("apple adapter request exceeds transport safety limit")',
+              '        }',
+          ])
+          if old in text:
+              text = text.replace(old, new, 1)
+              swift.write_text(text, encoding='utf-8')
+          elif new not in text:
+              raise SystemExit('reviewed Swift persistent framing block not found')
+
+          handshake = Path('scripts/check_apple_adapter_handshake.sh')
+          text = handshake.read_text(encoding='utf-8')
+          marker = "PY\n\nTEST_INPUT=\"$PWD/fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg\"\n"
+          insert = '''PY
+
+# Persistent transport must answer successive requests without waiting for stdin EOF.
+# This is a behavioral regression gate: a one-shot-style buffered read can otherwise
+# look correct in unit tests while deadlocking the first real Rust request.
+python3 - "$ADAPTER" <<'PY'
+import json
+import select
+import subprocess
+import sys
+
+adapter = sys.argv[1]
+process = subprocess.Popen(
+    [adapter, "--persistent-json-lines"],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+)
+assert process.stdin is not None
+assert process.stdout is not None
+assert process.stderr is not None
+request = json.dumps({"schema_version": 2, "operation": "capabilities"}).encode() + b"\\n"
+try:
+    for index in range(2):
+        process.stdin.write(request)
+        process.stdin.flush()
+        ready, _, _ = select.select([process.stdout], [], [], 5.0)
+        if not ready:
+            raise SystemExit(
+                f"persistent Apple adapter did not answer request {index + 1} while stdin remained open"
+            )
+        response = json.loads(process.stdout.readline())
+        if response.get("schema_version") != 2:
+            raise SystemExit(f"unexpected persistent Apple adapter response: {response!r}")
+        if sorted(response.get("capabilities", [])) != ["photographic-styles", "portrait"]:
+            raise SystemExit(f"unexpected persistent Apple adapter capabilities: {response!r}")
+    process.stdin.close()
+    status = process.wait(timeout=5.0)
+    if status != 0:
+        raise SystemExit(
+            f"persistent Apple adapter exited with {status}: "
+            + process.stderr.read().decode(errors="replace")
+        )
+finally:
+    if process.poll() is None:
+        process.kill()
+        process.wait()
+PY
+
+TEST_INPUT="$PWD/fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg"
+'''
+          permanent = 'persistent Apple adapter did not answer request'
+          if permanent not in text:
+              if marker not in text:
+                  raise SystemExit('Apple adapter handshake insertion marker not found')
+              text = text.replace(marker, insert, 1)
+              handshake.write_text(text, encoding='utf-8')
+          PY
+          git diff --check
 
       - name: Install portable HEVC provider
         shell: bash
@@ -28,215 +145,23 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Apply persistent transport implementation
+      - name: Verify permanent handshake and affected runtime
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          source = Path('.github/workflows/_codex-persistent-apple-helper.yml').read_text(encoding='utf-8').splitlines()
-          start = source.index("          python3 - <<'PY'") + 1
-          end = source.index("          PY", start)
-          extracted = []
-          for line in source[start:end]:
-              if line.startswith('          '):
-                  line = line[10:]
-              extracted.append(line)
-          script = '\n'.join(extracted) + '\n'
-          script, client_blocks = re.subn(r"\nold_client = '''.*?'''\.replace\(\"          \", \"\"\)\n", "\n", script, count=1, flags=re.S)
-          script, reader_blocks = re.subn(r"\nold_readers = r'''.*?'''\n", "\n", script, count=1, flags=re.S)
-          perf_test = '\n'.join([
-              '    def test_apple_adapter_transport_is_persistent_bounded_and_fail_closed(self) -> None:',
-              '        rust = self.source("crates/xdremux-runtime/src/apple_adapter.rs")',
-              '        swift = self.source("Sources/XDRemuxAppleAdapter/main.swift")',
-              '        lifecycle = self.source("scripts/characterize_apple_adapter_launches.py")',
-              '        for marker in (',
-              '            "--persistent-json-lines",',
-              '            "MAX_APPLE_ADAPTER_FRAME_BYTES",',
-              '            "recv_timeout",',
-              '            "child.kill()",',
-              '            "child.wait()",',
-              '        ):',
-              '            self.assertIn(marker, rust)',
-              '        self.assertNotIn("POLL_INTERVAL", rust)',
-              '        for marker in (',
-              '            "--persistent-json-lines",',
-              '            "maxTransportFrameBytes",',
-              '            "Darwin.read",',
-              '            "runOneShotTransport",',
-              '            "runPersistentTransport",',
-              '        ):',
-              '            self.assertIn(marker, swift)',
-              '        self.assertIn("exec ", lifecycle)',
-              '        self.assertIn("$@", lifecycle)',
-              '',
-          ]) + '\n'
-          script, perf_blocks = re.subn(
-              r"\npersistent_test = '''.*?'''\n",
-              lambda _: "\npersistent_test = " + repr(perf_test) + "\n",
-              script,
-              count=1,
-              flags=re.S,
-          )
-          if client_blocks != 1 or reader_blocks != 1 or perf_blocks != 1:
-              raise SystemExit(f'prototype extraction blocks: client={client_blocks}, readers={reader_blocks}, perf={perf_blocks}')
-          client_call = 'text = replace_once(text, old_client, new_client, "apple adapter client/session")'
-          client_splice = '\n'.join([
-              'client_start = text.index("#[derive(Debug, Clone, PartialEq, Eq)]\\npub(super) struct AppleAdapterClient")',
-              'client_end = text.index("    pub(super) fn capabilities", client_start)',
-              'text = text[:client_start] + new_client + text[client_end:]',
-          ])
-          reader_call = 'text = replace_once(text, old_readers, new_readers, "apple adapter bounded readers")'
-          reader_splice = '\n'.join([
-              'readers_start = text.index("fn read_all(mut reader: impl Read)")',
-              'readers_end = text.index("#[cfg(test)]", readers_start)',
-              'text = text[:readers_start] + new_readers + text[readers_end:]',
-          ])
-          if script.count(client_call) != 1 or script.count(reader_call) != 1:
-              raise SystemExit('prototype extraction splice call count mismatch')
-          script = script.replace(client_call, client_splice, 1)
-          script = script.replace(reader_call, reader_splice, 1)
-          compile(script, '/tmp/xdremux-persistent-apple-helper.py', 'exec')
-          Path('/tmp/xdremux-persistent-apple-helper.py').write_text(script, encoding='utf-8')
-          PY
-          python3 /tmp/xdremux-persistent-apple-helper.py
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('crates/xdremux-runtime/src/oppo_portrait.rs')
-          text = path.read_text(encoding='utf-8')
-          old = 'use std::path::Path;\n'
-          if text.count(old) != 1:
-              raise SystemExit(f'oppo portrait Path import: expected exactly one match, got {text.count(old)}')
-          path.write_text(text.replace(old, '', 1), encoding='utf-8')
-
-          path = Path('Sources/XDRemuxAppleAdapter/main.swift')
-          text = path.read_text(encoding='utf-8')
-          old = '\n'.join([
-              'private func runPersistentTransport() throws {',
-              '    let input = FileHandle.standardInput',
-              '    let output = FileHandle.standardOutput',
-              '    var pending = Data()',
-              '',
-              '    while let chunk = try input.read(upToCount: transportReadChunkBytes), !chunk.isEmpty {',
-          ]) + '\n'
-          new = '\n'.join([
-              'private func readPersistentTransportChunk() throws -> Data? {',
-              '    var buffer = [UInt8](repeating: 0, count: transportReadChunkBytes)',
-              '    while true {',
-              '        let count = buffer.withUnsafeMutableBytes { bytes in',
-              '            Darwin.read(STDIN_FILENO, bytes.baseAddress, bytes.count)',
-              '        }',
-              '        if count > 0 {',
-              '            return Data(buffer.prefix(count))',
-              '        }',
-              '        if count == 0 {',
-              '            return nil',
-              '        }',
-              '        if errno == EINTR {',
-              '            continue',
-              '        }',
-              '        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))',
-              '    }',
-              '}',
-              '',
-              'private func runPersistentTransport() throws {',
-              '    let output = FileHandle.standardOutput',
-              '    var pending = Data()',
-              '',
-              '    while let chunk = try readPersistentTransportChunk() {',
-          ]) + '\n'
-          if text.count(old) != 1:
-              raise SystemExit(f'Swift persistent read loop: expected exactly one match, got {text.count(old)}')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
-          PY
-          cargo fmt --all
-          git diff --check
-
-      - name: Run targeted regression checks
-        shell: bash
-        run: |
+          bash scripts/check_apple_adapter_handshake.sh
           python3 -m unittest Tests.test_performance_design Tests.test_performance_budget
           cargo test --locked -p xdremux-runtime --all-targets --release
 
-      - name: Build Apple adapter and canonical CLI
+      - name: Commit reviewed finalization
         shell: bash
         run: |
-          swift build -c release --product xdremux-apple-adapter
-          cargo build --locked -p xdremux-cli --release
-          echo "XDREMUX_PROTOTYPE_APPLE_ADAPTER=$(swift build -c release --show-bin-path)/xdremux-apple-adapter" >> "$GITHUB_ENV"
-
-      - name: Verify persistent transport while stdin remains open
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import select
-          import subprocess
-
-          adapter = os.environ['XDREMUX_PROTOTYPE_APPLE_ADAPTER']
-          process = subprocess.Popen(
-              [adapter, '--persistent-json-lines'],
-              stdin=subprocess.PIPE,
-              stdout=subprocess.PIPE,
-              stderr=subprocess.PIPE,
-          )
-          assert process.stdin is not None
-          assert process.stdout is not None
-          assert process.stderr is not None
-          request = json.dumps({'schema_version': 2, 'operation': 'capabilities'}).encode() + b'\n'
-          try:
-              for index in range(2):
-                  process.stdin.write(request)
-                  process.stdin.flush()
-                  ready, _, _ = select.select([process.stdout], [], [], 5.0)
-                  if not ready:
-                      raise SystemExit(f'persistent adapter did not answer request {index + 1} while stdin remained open')
-                  line = process.stdout.readline()
-                  response = json.loads(line)
-                  if response.get('schema_version') != 2:
-                      raise SystemExit(f'invalid persistent adapter response: {response!r}')
-              process.stdin.close()
-              status = process.wait(timeout=5.0)
-              if status != 0:
-                  raise SystemExit(f'persistent adapter exited with {status}: {process.stderr.read().decode(errors="replace")}')
-          finally:
-              if process.poll() is None:
-                  process.kill()
-                  process.wait()
-          print('persistent-open-pipe-pass')
-          PY
-
-      - name: Exercise Rust-driven Apple product paths
-        shell: bash
-        run: |
-          bash scripts/check_rust_cli_apple_portrait.sh
-          bash scripts/check_rust_style_consumer.sh
-
-      - name: Require one helper launch per conversion
-        shell: bash
-        run: |
-          python3 scripts/characterize_apple_adapter_launches.py \
-            --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
-            --apple-adapter "$XDREMUX_PROTOTYPE_APPLE_ADAPTER" \
-            --output "$RUNNER_TEMP/apple-adapter-launches.json"
-          python3 -c 'import json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"apple-adapter-launches.json"; r=json.loads(p.read_text()); expected={"apple-portrait":1,"apple-styles":1}; assert r.get("cases")==expected, r.get("cases"); print(r["cases"])'
-
-      - name: Commit verified implementation to prototype branch
-        shell: bash
-        run: |
+          if git diff --quiet; then
+            echo "prototype already finalized"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            Sources/XDRemuxAppleAdapter/main.swift \
-            crates/xdremux-runtime/src/apple_adapter.rs \
-            crates/xdremux-runtime/src/oppo_portrait.rs \
-            crates/xdremux-runtime/src/lib.rs \
-            scripts/characterize_apple_adapter_launches.py \
-            benchmarks/macos26-arm64-product-baseline.json \
-            Tests/test_performance_budget.py \
-            Tests/test_performance_design.py
+          git add Sources/XDRemuxAppleAdapter/main.swift scripts/check_apple_adapter_handshake.sh
           git diff --cached --check
-          git commit -m "perf(apple): reuse persistent adapter session"
+          git commit -m "test(apple): guard persistent adapter open-pipe behavior"
           git push origin HEAD:codex/persistent-apple-helper
