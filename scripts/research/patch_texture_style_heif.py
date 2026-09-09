@@ -165,10 +165,14 @@ def main() -> int:
         raise SystemExit("style item layout cannot be safely redirected")
 
     symbols = probe.get("symbols", {})
-    private_key = symbols.get("PITextureStyleAdjustmentKey") or "PITextureStyleAdjustmentKey"
+    # The iOS 27 PhotoImaging diff exports PITextureStyleAdjustmentKey and also
+    # contains the literal C string "textureStyleAdjustment".  Hosted macOS 26
+    # cannot resolve the new symbol, so use the firmware string rather than the
+    # symbol's C identifier as the fallback serialized key.
+    adjustment_key = symbols.get("PITextureStyleAdjustmentKey") or "textureStyleAdjustment"
     defaults = probe.get("defaultStyles") or []
 
-    def pick_style(word: str, fallback: dict):
+    def runtime_style(word: str, fallback: dict):
         word = word.lower()
         for item in defaults:
             if word in str(item.get("description", "")).lower():
@@ -177,46 +181,46 @@ def main() -> int:
                     return dictionary
         return fallback
 
-    studio = pick_style("studio", {"Preset": "Studio", "Intensity": 1.0, "Grain": 0.0})
-    soft = pick_style("soft", {"Preset": "Soft", "Intensity": 1.0, "Grain": 0.0})
-    film = pick_style("film", {"Preset": "Filmic", "Intensity": 1.0, "Grain": 1.0})
+    # CameraEditKit exposes the user-facing preset strings Standard / Analog /
+    # People / Scene.  The separate CMI Filmic/Glowy/Soft/Studio names are
+    # renderer-tuning presets, so the CEK names are the safer metadata probe.
+    people = runtime_style("people", {"Preset": "People", "Intensity": 1.0, "Grain": 0.0})
+    analog = runtime_style("analog", {"Preset": "Analog", "Intensity": 1.0, "Grain": 1.0})
+    scene = runtime_style("scene", {"Preset": "Scene", "Intensity": 1.0, "Grain": 0.0})
 
-    def enriched(style: dict, rendering_version: int):
+    def extended(style: dict, rendering_version: int):
         result = dict(style)
-        result.setdefault("Preset", result.get("preset", "Studio"))
-        result.setdefault("Intensity", result.get("intensity", 1.0))
-        result.setdefault("Grain", result.get("grain", 0.0))
         result["RenderingVersion"] = rendering_version
         result["OriginalInsteadOfReversibility"] = False
         return result
 
-    candidates = []
-    for rendering_version in (1, 2, 3):
-        candidates.append(
-            (
-                f"private-studio-v{rendering_version}",
-                private_key,
-                enriched(studio, rendering_version),
-            )
-        )
-        candidates.append(
-            (
-                f"private-film-grain-v{rendering_version}",
-                private_key,
-                enriched(film, rendering_version),
-            )
-        )
-    candidates += [
-        ("private-soft-v2", private_key, enriched(soft, 2)),
-        ("TextureStyle-studio-v2", "TextureStyle", enriched(studio, 2)),
-        ("textureStyle-studio-v2", "textureStyle", enriched(studio, 2)),
-        ("short-l-studio-v2", "l", enriched(studio, 2)),
+    candidates = [
+        # Highest-priority candidates: exact PhotoImaging C string plus the
+        # minimal CEKTextureStyle dictionary shape exposed by firmware symbols.
+        ("adjustment-people-minimal", adjustment_key, people),
+        ("adjustment-analog-grain-minimal", adjustment_key, analog),
+        ("adjustment-scene-minimal", adjustment_key, scene),
+        # RenderingVersion is exposed in capture MakerNote/QuickTime metadata,
+        # but the current version value is not recoverable on a macOS 26 runner.
+        # Probe a deliberately small version matrix rather than pretending it is known.
+        ("adjustment-people-v1", adjustment_key, extended(people, 1)),
+        ("adjustment-people-v2", adjustment_key, extended(people, 2)),
+        ("adjustment-people-v3", adjustment_key, extended(people, 3)),
+        ("adjustment-analog-grain-v2", adjustment_key, extended(analog, 2)),
+        # Lower-confidence serialization locations exposed as PhotoImaging C strings.
+        ("metadata-people-minimal", "textureStyleMetadata", people),
+        ("global-people-minimal", "textureStyleGlobal", people),
+        # Existing semantic-style payload uses compact one-character roots through k;
+        # l is retained only as a compact-schema hypothesis.
+        ("short-l-people-minimal", "l", people),
     ]
 
+    # Capture exports these exact MakerNote/QuickTime field concepts.  This flat
+    # candidate tests whether the HEIF styles plist consumer accepts them directly.
     flat = dict(style_object)
     flat.update(
         {
-            "TextureStylePreset": "Studio",
+            "TextureStylePreset": "People",
             "TextureStyleIntensity": 1.0,
             "TextureStyleGrain": 0.0,
             "TextureStyleRenderingVersion": 2,
@@ -228,12 +232,19 @@ def main() -> int:
         "sourceSHA256": hashlib.sha256(original).hexdigest(),
         "ilocVersion": iloc_version,
         "styleItemID": style_entry["item_id"],
-        "resolvedAdjustmentKey": private_key,
+        "resolvedAdjustmentKey": adjustment_key,
         "runtimeDefaultStyles": defaults,
         "candidates": [],
     }
 
+    seen_names = set()
+
     def write_candidate(name: str, obj: dict):
+        canonical_name = name.casefold()
+        if canonical_name in seen_names:
+            raise SystemExit(f"duplicate candidate filename on case-insensitive filesystems: {name}")
+        seen_names.add(canonical_name)
+
         payload = plistlib.dumps(obj, fmt=plistlib.FMT_BINARY, sort_keys=False)
         mutable = bytearray(original)
         payload_start = len(mutable) + 8
@@ -278,7 +289,7 @@ def main() -> int:
         obj = dict(style_object)
         obj[key] = texture
         write_candidate(name, obj)
-    write_candidate("flat-firmware-keys", flat)
+    write_candidate("flat-firmware-people-v2", flat)
 
     manifest_path = out_dir / "candidate-manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, default=str))
