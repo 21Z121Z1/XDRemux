@@ -5,6 +5,54 @@
 #import <objc/runtime.h>
 #import <dlfcn.h>
 
+static NSURL *DocumentsURL(void) {
+    return [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                   inDomains:NSUserDomainMask] firstObject];
+}
+
+static void WriteCheckpoint(NSString *stage, id value) {
+    NSMutableDictionary *record = [NSMutableDictionary dictionary];
+    record[@"stage"] = stage ?: @"<nil>";
+    record[@"value"] = value ?: [NSNull null];
+    record[@"os"] = NSProcessInfo.processInfo.operatingSystemVersionString ?: @"";
+    NSData *data = [NSJSONSerialization dataWithJSONObject:record
+                                                   options:NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys
+                                                     error:nil];
+    if (data) {
+        NSString *safe = [[stage ?: @"stage" componentsSeparatedByCharactersInSet:
+            [[NSCharacterSet alphanumericCharacterSet] invertedSet]] componentsJoinedByString:@"-"];
+        NSURL *url = [DocumentsURL() URLByAppendingPathComponent:
+            [NSString stringWithFormat:@"checkpoint-%@.json", safe]];
+        [data writeToURL:url atomically:YES];
+    }
+}
+
+static void *LookupSymbol(NSString *name) {
+    if (!name.length) return NULL;
+    void *symbol = dlsym(RTLD_DEFAULT, name.UTF8String);
+    if (!symbol && [name hasPrefix:@"_"] && name.length > 1) {
+        symbol = dlsym(RTLD_DEFAULT, [[name substringFromIndex:1] UTF8String]);
+    }
+    if (!symbol && ![name hasPrefix:@"_"]) {
+        NSString *underscored = [@"_" stringByAppendingString:name];
+        symbol = dlsym(RTLD_DEFAULT, underscored.UTF8String);
+    }
+    return symbol;
+}
+
+static id SymbolRawInfo(NSString *name) {
+    void *symbol = LookupSymbol(name);
+    if (!symbol) return [NSNull null];
+    unsigned char bytes[16] = {0};
+    memcpy(bytes, symbol, sizeof(bytes));
+    NSMutableString *hex = [NSMutableString stringWithCapacity:32];
+    for (NSUInteger i = 0; i < sizeof(bytes); ++i) [hex appendFormat:@"%02x", bytes[i]];
+    return @{
+        @"address": [NSString stringWithFormat:@"%p", symbol],
+        @"first16BytesHex": hex,
+    };
+}
+
 static id SafeObject(id obj) {
     if (!obj) return [NSNull null];
     if ([obj isKindOfClass:[NSString class]] ||
@@ -12,7 +60,9 @@ static id SafeObject(id obj) {
         [obj isKindOfClass:[NSNull class]]) return obj;
     if ([obj isKindOfClass:[NSData class]]) {
         NSData *data = obj;
-        return @{ @"class": NSStringFromClass([obj class]), @"bytes": @(data.length), @"base64": [data base64EncodedStringWithOptions:0] };
+        return @{ @"class": NSStringFromClass([obj class]) ?: @"NSData",
+                  @"bytes": @(data.length),
+                  @"base64": [data base64EncodedStringWithOptions:0] };
     }
     if ([obj isKindOfClass:[NSArray class]]) {
         NSMutableArray *array = [NSMutableArray array];
@@ -26,12 +76,13 @@ static id SafeObject(id obj) {
         }
         return dictionary;
     }
-    return @{ @"class": NSStringFromClass([obj class]) ?: @"<unknown>", @"description": [obj description] ?: @"<nil>" };
+    return @{ @"class": NSStringFromClass([obj class]) ?: @"<unknown>",
+              @"description": [obj description] ?: @"<nil>" };
 }
 
 static id BoxInvocationReturn(NSInvocation *invocation, NSMethodSignature *signature) {
     const char *type = signature.methodReturnType;
-    while (*type == 'r' || *type == 'n' || *type == 'N' || *type == 'o' || *type == 'O' || *type == 'R' || *type == 'V') type++;
+    while (*type && strchr("rnNoORV", *type)) type++;
     if (*type == 'v') return [NSNull null];
     if (*type == '@' || *type == '#') {
         __unsafe_unretained id value = nil;
@@ -39,32 +90,25 @@ static id BoxInvocationReturn(NSInvocation *invocation, NSMethodSignature *signa
         return value ?: [NSNull null];
     }
     if (*type == 'B' || *type == 'c') {
-        BOOL value = NO;
-        [invocation getReturnValue:&value];
-        return @(value);
+        BOOL value = NO; [invocation getReturnValue:&value]; return @(value);
     }
     if (*type == 'f') {
-        float value = 0;
-        [invocation getReturnValue:&value];
-        return @(value);
+        float value = 0; [invocation getReturnValue:&value]; return @(value);
     }
     if (*type == 'd') {
-        double value = 0;
-        [invocation getReturnValue:&value];
-        return @(value);
+        double value = 0; [invocation getReturnValue:&value]; return @(value);
     }
     if (strchr("islqISLQ", *type)) {
-        long long value = 0;
-        NSUInteger length = MIN(sizeof(value), signature.methodReturnLength);
-        unsigned char buffer[sizeof(value)] = {0};
+        unsigned char buffer[sizeof(unsigned long long)] = {0};
         [invocation getReturnValue:buffer];
-        memcpy(&value, buffer, length);
+        unsigned long long value = 0;
+        memcpy(&value, buffer, MIN(sizeof(value), signature.methodReturnLength));
         return @(value);
     }
-    NSUInteger length = signature.methodReturnLength;
-    NSMutableData *data = [NSMutableData dataWithLength:length];
+    NSMutableData *data = [NSMutableData dataWithLength:signature.methodReturnLength];
     [invocation getReturnValue:data.mutableBytes];
-    return @{ @"type": [NSString stringWithUTF8String:type] ?: @"?", @"bytes": [data base64EncodedStringWithOptions:0] };
+    return @{ @"type": [NSString stringWithUTF8String:type] ?: @"?",
+              @"base64": [data base64EncodedStringWithOptions:0] };
 }
 
 static id Invoke0(id target, NSString *selectorName) {
@@ -101,58 +145,6 @@ static id InvokeObject1(id target, NSString *selectorName, id argument) {
     }
 }
 
-static id CallClass0(NSString *className, NSString *selectorName) {
-    return Invoke0(NSClassFromString(className), selectorName);
-}
-
-static id CallClassObject1(NSString *className, NSString *selectorName, id arg) {
-    return InvokeObject1(NSClassFromString(className), selectorName, arg);
-}
-
-static id DataSymbol(NSString *name) {
-    void *symbol = dlsym(RTLD_DEFAULT, name.UTF8String);
-    if (!symbol) return nil;
-    @try {
-        __unsafe_unretained id value = *(__unsafe_unretained id *)symbol;
-        if (!value) return [NSNull null];
-        return value;
-    } @catch (NSException *exception) {
-        return @{ @"address": [NSString stringWithFormat:@"%p", symbol], @"exception": exception.reason ?: exception.name };
-    }
-}
-
-static id RawSymbolBytes(NSString *name) {
-    void *symbol = dlsym(RTLD_DEFAULT, name.UTF8String);
-    if (!symbol) return [NSNull null];
-    unsigned char bytes[16] = {0};
-    memcpy(bytes, symbol, sizeof(bytes));
-    NSMutableString *hex = [NSMutableString stringWithCapacity:32];
-    for (NSUInteger i = 0; i < sizeof(bytes); ++i) [hex appendFormat:@"%02x", bytes[i]];
-    return @{ @"address": [NSString stringWithFormat:@"%p", symbol], @"first16BytesHex": hex };
-}
-
-static NSDictionary *TexturePropertiesTrial(NSDictionary *imageMetadata, NSDictionary *auxMetadata) {
-    Class cls = NSClassFromString(@"_NUTextureStyleProperties");
-    SEL sel = NSSelectorFromString(@"textureStylePropertiesFromImageMetadata:auxImageMetadata:error:");
-    if (!cls || ![cls respondsToSelector:sel]) return @{ @"available": @NO };
-    NSError *error = nil;
-    id result = nil;
-    @try {
-        result = ((id (*)(id, SEL, id, id, NSError **))objc_msgSend)(cls, sel, imageMetadata, auxMetadata, &error);
-    } @catch (NSException *exception) {
-        return @{ @"available": @YES, @"exception": exception.reason ?: exception.name };
-    }
-    NSMutableDictionary *out = [NSMutableDictionary dictionaryWithObject:@YES forKey:@"available"];
-    out[@"result"] = SafeObject(result);
-    if (error) {
-        out[@"errorDomain"] = error.domain ?: @"";
-        out[@"errorCode"] = @(error.code);
-        out[@"errorDescription"] = error.localizedDescription ?: error.description;
-        out[@"errorUserInfo"] = SafeObject(error.userInfo);
-    }
-    return out;
-}
-
 static NSDictionary *ClassSurface(NSString *name) {
     Class cls = NSClassFromString(name);
     if (!cls) return @{ @"available": @NO };
@@ -160,49 +152,67 @@ static NSDictionary *ClassSurface(NSString *name) {
     unsigned int classCount = 0;
     Method *cm = class_copyMethodList(object_getClass(cls), &classCount);
     for (unsigned int i = 0; i < classCount; ++i) {
-        SEL sel = method_getName(cm[i]);
-        [classMethods addObject:@{ @"selector": NSStringFromSelector(sel), @"types": [NSString stringWithUTF8String:method_getTypeEncoding(cm[i])] ?: @"" }];
+        [classMethods addObject:@{
+            @"selector": NSStringFromSelector(method_getName(cm[i])),
+            @"types": [NSString stringWithUTF8String:method_getTypeEncoding(cm[i])] ?: @"",
+        }];
     }
     free(cm);
     NSMutableArray *instanceMethods = [NSMutableArray array];
     unsigned int instanceCount = 0;
     Method *im = class_copyMethodList(cls, &instanceCount);
     for (unsigned int i = 0; i < instanceCount; ++i) {
-        SEL sel = method_getName(im[i]);
-        [instanceMethods addObject:@{ @"selector": NSStringFromSelector(sel), @"types": [NSString stringWithUTF8String:method_getTypeEncoding(im[i])] ?: @"" }];
+        [instanceMethods addObject:@{
+            @"selector": NSStringFromSelector(method_getName(im[i])),
+            @"types": [NSString stringWithUTF8String:method_getTypeEncoding(im[i])] ?: @"",
+        }];
     }
     free(im);
-    return @{ @"available": @YES, @"classMethods": classMethods, @"instanceMethods": instanceMethods };
+    return @{ @"available": @YES,
+              @"classMethods": classMethods,
+              @"instanceMethods": instanceMethods };
 }
 
-static NSDictionary *CEKSerializationProbe(void) {
-    Class cls = NSClassFromString(@"CEKTextureStyle");
-    if (!cls) return @{ @"available": @NO };
-    id defaults = Invoke0(cls, @"defaultStyles");
-    id identity = Invoke0(cls, @"identityStyle");
-    NSMutableArray *styles = [NSMutableArray array];
-    if ([defaults isKindOfClass:[NSArray class]]) {
-        for (id style in defaults) {
-            NSMutableDictionary *entry = [NSMutableDictionary dictionary];
-            entry[@"description"] = [style description] ?: @"";
-            for (NSString *selector in @[ @"preset", @"intensity", @"grain" ]) {
-                id value = Invoke0(style, selector);
-                entry[selector] = value ? SafeObject(value) : [NSNull null];
-            }
-            id dictionary = InvokeObject1(style, @"dictionaryRepresentationUsingReferenceStyle:", identity == [NSNull null] ? nil : identity);
-            entry[@"dictionaryRepresentationUsingIdentity"] = dictionary ? SafeObject(dictionary) : [NSNull null];
-            [styles addObject:entry];
-        }
+typedef id (*DictionaryTransformFunction)(id);
+
+static id CallDictionaryTransform(NSString *symbolName, NSDictionary *input) {
+    void *address = LookupSymbol(symbolName);
+    if (!address) return @{ @"available": @NO };
+    @try {
+        DictionaryTransformFunction fn = (DictionaryTransformFunction)address;
+        id result = fn(input ?: @{});
+        return @{ @"available": @YES, @"result": SafeObject(result) };
+    } @catch (NSException *exception) {
+        return @{ @"available": @YES, @"exception": exception.reason ?: exception.name };
     }
-    return @{
-        @"available": @YES,
-        @"identity": identity ? SafeObject(identity) : [NSNull null],
-        @"defaultStyles": defaults ? SafeObject(defaults) : [NSNull null],
-        @"serializedDefaultStyles": styles,
-    };
+}
+
+static NSDictionary *TexturePropertiesTrial(NSDictionary *imageMetadata, NSDictionary *auxMetadata) {
+    Class cls = NSClassFromString(@"_NUTextureStyleProperties");
+    SEL sel = NSSelectorFromString(@"textureStylePropertiesFromImageMetadata:auxImageMetadata:error:");
+    if (!cls || ![cls respondsToSelector:sel]) return @{ @"available": @NO };
+    NSError *error = nil;
+    @try {
+        id result = ((id (*)(id, SEL, id, id, NSError **))objc_msgSend)(
+            cls, sel, imageMetadata ?: @{}, auxMetadata ?: @{}, &error
+        );
+        NSMutableDictionary *out = [NSMutableDictionary dictionaryWithObject:@YES forKey:@"available"];
+        out[@"result"] = SafeObject(result);
+        if (error) {
+            out[@"errorDomain"] = error.domain ?: @"";
+            out[@"errorCode"] = @(error.code);
+            out[@"errorDescription"] = error.localizedDescription ?: error.description;
+            out[@"errorUserInfo"] = SafeObject(error.userInfo);
+        }
+        return out;
+    } @catch (NSException *exception) {
+        return @{ @"available": @YES, @"exception": exception.reason ?: exception.name };
+    }
 }
 
 static NSDictionary *BuildProbe(void) {
+    WriteCheckpoint(@"00-start", @{ @"pid": @(NSProcessInfo.processInfo.processIdentifier) });
+
     NSArray<NSString *> *frameworks = @[
         @"/System/Library/PrivateFrameworks/CMImaging.framework/CMImaging",
         @"/System/Library/PrivateFrameworks/CMCaptureCore.framework/CMCaptureCore",
@@ -213,44 +223,32 @@ static NSDictionary *BuildProbe(void) {
         @"/System/Library/PrivateFrameworks/CameraEditKit.framework/CameraEditKit"
     ];
     NSMutableDictionary *loaded = [NSMutableDictionary dictionary];
-    for (NSString *path in frameworks) loaded[path] = @(dlopen(path.UTF8String, RTLD_NOW | RTLD_GLOBAL) != NULL);
+    for (NSString *path in frameworks) {
+        dlerror();
+        void *handle = dlopen(path.UTF8String, RTLD_NOW | RTLD_GLOBAL);
+        const char *error = handle ? NULL : dlerror();
+        loaded[path] = handle ? @YES : @{ @"loaded": @NO,
+                                          @"error": error ? [NSString stringWithUTF8String:error] : @"unknown" };
+    }
+    WriteCheckpoint(@"10-frameworks", SafeObject(loaded));
 
     NSArray<NSString *> *symbols = @[
-        @"_AVAppleMakerNote_TextureStyleKey_Preset",
-        @"_AVAppleMakerNote_TextureStyleKey_Intensity",
-        @"_AVAppleMakerNote_TextureStyleKey_Grain",
-        @"_AVAppleMakerNote_TextureStyleKey_RenderingVersion",
-        @"_AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility",
-        @"_kFigAppleMakerNote_TextureStyleKey_Preset",
-        @"_kFigAppleMakerNote_TextureStyleKey_Intensity",
-        @"_kFigAppleMakerNote_TextureStyleKey_Grain",
-        @"_kFigAppleMakerNote_TextureStyleKey_RenderingVersion",
-        @"_kFigAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility",
-        @"_AVCaptureTextureStylePresetStandard",
-        @"_AVCaptureTextureStylePresetStudio",
-        @"_AVCaptureTextureStylePresetSoft",
-        @"_AVCaptureTextureStylePresetFilmic",
-        @"_AVCaptureTextureStylePresetGlowy",
-        @"_AVCaptureTextureStylePresetPreview",
-        @"_kFigCaptureSampleBufferMetadata_TextureStylePreset",
-        @"_kFigCaptureSampleBufferMetadata_TextureStylePresetTunings",
-        @"_kFigCaptureSampleBufferMetadata_TextureStylePeopleDataVersion",
-        @"_kFigCaptureSampleBufferMetadata_TextureStylePostProcessedPeopleData",
-        @"_kFigCaptureSampleBufferAttachedMediaKey_TextureStyleFaceAttitudeMetadata",
-        @"_PITextureStyleAdjustmentKey",
-        @"_kMetadataIdentifier_TextureStyleInfo",
-        @"_NUTextureStyleMetadataKey_FaceAttitude"
+        @"AVAppleMakerNote_TextureStyleKey_Preset",
+        @"AVAppleMakerNote_TextureStyleKey_Intensity",
+        @"AVAppleMakerNote_TextureStyleKey_Grain",
+        @"AVAppleMakerNote_TextureStyleKey_RenderingVersion",
+        @"AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility",
+        @"PITextureStyleAdjustmentKey",
+        @"PITextureStyleCurrentMetadataVersion",
+        @"PITextureStyleSettingsFromMakerNoteProperties",
+        @"PITextureStylePresetFromMakerNoteValue",
+        @"PITextureStylePresetFromString",
+        @"PISemanticStyleSettingsFromMakerNoteProperties",
+        @"kMetadataIdentifier_TextureStyleInfo",
     ];
-    NSMutableDictionary *symbolValues = [NSMutableDictionary dictionary];
-    for (NSString *name in symbols) {
-        id value = DataSymbol(name);
-        symbolValues[name] = value ? SafeObject(value) : [NSNull null];
-    }
-
-    NSMutableDictionary *rawSymbols = [NSMutableDictionary dictionary];
-    for (NSString *name in @[ @"_PITextureStyleCurrentMetadataVersion" ]) {
-        rawSymbols[name] = RawSymbolBytes(name);
-    }
+    NSMutableDictionary *symbolInfo = [NSMutableDictionary dictionary];
+    for (NSString *name in symbols) symbolInfo[name] = SymbolRawInfo(name);
+    WriteCheckpoint(@"20-symbols", symbolInfo);
 
     NSArray<NSString *> *classes = @[
         @"AVCaptureTextureStyle",
@@ -266,10 +264,11 @@ static NSDictionary *BuildProbe(void) {
         @"PITextureStyleAutoCalculator",
         @"PITextureStylePipelineProcessor",
         @"PFMetadata",
-        @"PFMetadataImage"
+        @"PFMetadataImage",
     ];
     NSMutableDictionary *classSurfaces = [NSMutableDictionary dictionary];
     for (NSString *name in classes) classSurfaces[name] = ClassSurface(name);
+    WriteCheckpoint(@"30-classes", classSurfaces);
 
     NSMutableDictionary *api = [NSMutableDictionary dictionary];
     NSArray<NSArray<NSString *> *> *calls = @[
@@ -285,76 +284,105 @@ static NSDictionary *BuildProbe(void) {
         @[ @"PITextureStyleAdjustmentController", @"grainIntensityKey" ],
         @[ @"AVCaptureTextureStyle", @"identityStyle" ],
         @[ @"CEKTextureStyle", @"defaultStyles" ],
-        @[ @"CEKTextureStyle", @"identityStyle" ]
+        @[ @"CEKTextureStyle", @"identityStyle" ],
     ];
     for (NSArray<NSString *> *call in calls) {
-        id value = CallClass0(call[0], call[1]);
-        api[[NSString stringWithFormat:@"%@.%@", call[0], call[1]]] = value ? SafeObject(value) : [NSNull null];
+        id value = Invoke0(NSClassFromString(call[0]), call[1]);
+        api[[NSString stringWithFormat:@"%@.%@", call[0], call[1]]] = SafeObject(value);
     }
+    WriteCheckpoint(@"40-api", api);
 
-    id presets = CallClass0(@"PITextureStyleAdjustmentController", @"allPresets");
+    id presets = Invoke0(NSClassFromString(@"PITextureStyleAdjustmentController"), @"allPresets");
     NSMutableDictionary *presetDictionaries = [NSMutableDictionary dictionary];
     if ([presets isKindOfClass:[NSArray class]]) {
         for (id preset in (NSArray *)presets) {
-            id value = CallClassObject1(@"PITextureStylePipelineProcessor", @"defaultTextureStyleDictionaryForPreset:", preset);
-            presetDictionaries[[preset description]] = value ? SafeObject(value) : [NSNull null];
+            id value = InvokeObject1(NSClassFromString(@"PITextureStylePipelineProcessor"),
+                                     @"defaultTextureStyleDictionaryForPreset:", preset);
+            presetDictionaries[[preset description]] = SafeObject(value);
         }
     }
+    WriteCheckpoint(@"50-presets", presetDictionaries);
 
-    NSMutableDictionary *trials = [NSMutableDictionary dictionary];
-    trials[@"empty"] = TexturePropertiesTrial(@{}, @{});
-
-    NSMutableDictionary *maker = [NSMutableDictionary dictionary];
-    id presetKey = DataSymbol(@"_AVAppleMakerNote_TextureStyleKey_Preset");
-    id intensityKey = DataSymbol(@"_AVAppleMakerNote_TextureStyleKey_Intensity");
-    id grainKey = DataSymbol(@"_AVAppleMakerNote_TextureStyleKey_Grain");
-    id renderingKey = DataSymbol(@"_AVAppleMakerNote_TextureStyleKey_RenderingVersion");
-    id reversibleKey = DataSymbol(@"_AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility");
-    if (presetKey && presetKey != [NSNull null]) maker[presetKey] = @"Standard";
-    if (intensityKey && intensityKey != [NSNull null]) maker[intensityKey] = @1.0;
-    if (grainKey && grainKey != [NSNull null]) maker[grainKey] = @0.0;
-    if (renderingKey && renderingKey != [NSNull null]) maker[renderingKey] = @1;
-    if (reversibleKey && reversibleKey != [NSNull null]) maker[reversibleKey] = @NO;
-    trials[@"makerAppleTextureOnly"] = TexturePropertiesTrial(@{ (__bridge NSString *)kCGImagePropertyMakerAppleDictionary: maker }, @{});
-    trials[@"directTextureOnly"] = TexturePropertiesTrial(maker, @{});
-
-    NSDictionary *nuProperties = @{
-        @"Version": @1,
-        @"HardwareModel": @"iPhone18,1",
-        @"PortType": @"BackWide",
-        @"CaptureMode": @"Photo",
-        @"CaptureType": @"Photo",
-        @"FilmGrainSeed": @12345,
-        @"TextureStylePeopleDataVersion": @1,
-        @"TextureStylePostProcessedPeopleData": @[],
+    // The current XDRemux baseline's Apple iOS MakerNote tag 84 decodes to this
+    // compact SemanticStyle property dictionary. Probe both the semantic and the
+    // new TextureStyle decoders with the exact baseline object before any guesses.
+    NSDictionary *baseline84 = @{
+        @"7": @0, @"3": @1, @"4": @1, @"0": @1,
+        @"5": @1, @"1": @0, @"6": @4, @"2": @0,
     };
-    NSError *plistError = nil;
-    NSData *nuPropertiesBinary = [NSPropertyListSerialization dataWithPropertyList:nuProperties format:NSPropertyListBinaryFormat_v1_0 options:0 error:&plistError];
-    id metadataIdentifier = DataSymbol(@"_kMetadataIdentifier_TextureStyleInfo");
-    trials[@"nuDirectProperties"] = TexturePropertiesTrial(nuProperties, @{});
-    if (metadataIdentifier && metadataIdentifier != [NSNull null]) {
-        trials[@"nuIdentifierDictionary"] = TexturePropertiesTrial(@{ metadataIdentifier: nuProperties }, @{});
-        if (nuPropertiesBinary) {
-            trials[@"nuIdentifierBinaryPlist"] = TexturePropertiesTrial(@{ metadataIdentifier: nuPropertiesBinary }, @{});
-            trials[@"nuIdentifierBinaryPlistAux"] = TexturePropertiesTrial(@{}, @{ metadataIdentifier: nuPropertiesBinary });
-            trials[@"makerPlusNuIdentifierBinaryPlist"] = TexturePropertiesTrial(@{
-                (__bridge NSString *)kCGImagePropertyMakerAppleDictionary: maker,
-                metadataIdentifier: nuPropertiesBinary,
-            }, @{});
-        }
+
+    NSMutableDictionary *makerNoteTransforms = [NSMutableDictionary dictionary];
+    makerNoteTransforms[@"semantic-baseline84"] =
+        CallDictionaryTransform(@"PISemanticStyleSettingsFromMakerNoteProperties", baseline84);
+    makerNoteTransforms[@"texture-baseline84"] =
+        CallDictionaryTransform(@"PITextureStyleSettingsFromMakerNoteProperties", baseline84);
+    makerNoteTransforms[@"texture-wrapper84"] =
+        CallDictionaryTransform(@"PITextureStyleSettingsFromMakerNoteProperties", @{ @"84": baseline84 });
+
+    NSArray<NSDictionary *> *textureInputs = @[
+        @{ @"Preset": @"Standard", @"Intensity": @1.0, @"Grain": @0.0 },
+        @{ @"preset": @"Standard", @"intensity": @1.0, @"grainIntensity": @0.0 },
+        @{ @"TextureStylePreset": @"Standard", @"TextureStyleIntensity": @1.0, @"TextureStyleGrain": @0.0 },
+        @{ @"Preset": @0, @"Intensity": @1.0, @"Grain": @0.0 },
+        @{ @"Preset": @1, @"Intensity": @1.0, @"Grain": @0.0 },
+        @{ @"Preset": @2, @"Intensity": @1.0, @"Grain": @0.0 },
+        @{ @"Preset": @3, @"Intensity": @1.0, @"Grain": @0.0 },
+        @{ @"Preset": @4, @"Intensity": @1.0, @"Grain": @0.0 },
+    ];
+    NSInteger index = 0;
+    for (NSDictionary *input in textureInputs) {
+        makerNoteTransforms[[NSString stringWithFormat:@"texture-input-%02ld", (long)index++]] = @{
+            @"input": input,
+            @"direct": CallDictionaryTransform(@"PITextureStyleSettingsFromMakerNoteProperties", input),
+            @"wrapped84": CallDictionaryTransform(@"PITextureStyleSettingsFromMakerNoteProperties", @{ @"84": input }),
+        };
     }
-    if (plistError) trials[@"nuPropertyListSerializationError"] = @{ @"description": plistError.localizedDescription ?: plistError.description };
+    WriteCheckpoint(@"60-maker-note-transforms", makerNoteTransforms);
+
+    NSMutableDictionary *nuTrials = [NSMutableDictionary dictionary];
+    nuTrials[@"empty"] = TexturePropertiesTrial(@{}, @{});
+    NSArray<NSString *> *hardwareModels = @[ @"V53AP", @"D93AP", @"iPhone17,1" ];
+    NSArray *portTypes = @[ @"PortTypeBack", @"BackWide", @"BackWideCamera", @0, @1 ];
+    NSArray *captureModes = @[ @"Photo", @"StillImage", @0, @1 ];
+    NSArray *captureTypes = @[ @"Photo", @"StillImage", @0, @1 ];
+    NSInteger trialIndex = 0;
+    for (NSString *hardware in hardwareModels) {
+        for (id port in portTypes) {
+            for (id mode in captureModes) {
+                for (id type in captureTypes) {
+                    if (trialIndex >= 48) break;
+                    NSDictionary *properties = @{
+                        @"Version": @1,
+                        @"HardwareModel": hardware,
+                        @"PortType": port,
+                        @"CaptureMode": mode,
+                        @"CaptureType": type,
+                        @"FilmGrainSeed": @12345,
+                        @"TextureStylePeopleDataVersion": @1,
+                        @"TextureStylePostProcessedPeopleData": @[],
+                    };
+                    NSString *key = [NSString stringWithFormat:@"trial-%02ld-%@-%@-%@-%@",
+                        (long)trialIndex, hardware, [port description], [mode description], [type description]];
+                    nuTrials[key] = TexturePropertiesTrial(properties, @{});
+                    trialIndex++;
+                }
+                if (trialIndex >= 48) break;
+            }
+            if (trialIndex >= 48) break;
+        }
+        if (trialIndex >= 48) break;
+    }
+    WriteCheckpoint(@"70-neutrino", nuTrials);
 
     return @{
         @"os": NSProcessInfo.processInfo.operatingSystemVersionString,
         @"frameworks": loaded,
-        @"symbols": symbolValues,
-        @"rawSymbols": rawSymbols,
+        @"symbols": symbolInfo,
         @"classes": classSurfaces,
         @"api": api,
-        @"cekSerialization": CEKSerializationProbe(),
         @"defaultPresetDictionaries": presetDictionaries,
-        @"texturePropertiesTrials": trials
+        @"makerNoteTransforms": makerNoteTransforms,
+        @"texturePropertiesTrials": nuTrials,
     };
 }
 
@@ -365,23 +393,34 @@ static NSDictionary *BuildProbe(void) {
 @implementation TextureProbeDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     (void)application; (void)launchOptions;
-    NSDictionary *probe = BuildProbe();
-    NSError *error = nil;
-    NSData *json = [NSJSONSerialization dataWithJSONObject:probe options:NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys error:&error];
-    if (!json) {
-        NSLog(@"TextureStyle probe JSON serialization failed: %@", error);
-        exit(2);
+    @try {
+        NSDictionary *probe = BuildProbe();
+        NSError *error = nil;
+        NSData *json = [NSJSONSerialization dataWithJSONObject:SafeObject(probe)
+                                                       options:NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys
+                                                         error:&error];
+        if (!json) {
+            WriteCheckpoint(@"90-json-error", @{ @"error": error.localizedDescription ?: @"unknown" });
+            exit(2);
+        }
+        NSURL *output = [DocumentsURL() URLByAppendingPathComponent:@"texture-style-ios27-probe.json"];
+        [json writeToURL:output atomically:YES];
+        WriteCheckpoint(@"99-complete", @{ @"output": output.path ?: @"" });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ exit(0); });
+    } @catch (NSException *exception) {
+        WriteCheckpoint(@"98-exception", @{
+            @"name": exception.name ?: @"",
+            @"reason": exception.reason ?: @"",
+        });
+        exit(3);
     }
-    NSURL *documents = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] firstObject];
-    NSURL *output = [documents URLByAppendingPathComponent:@"texture-style-ios27-probe.json"];
-    [json writeToURL:output atomically:YES];
-    NSString *text = [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding];
-    NSLog(@"TEXTURE_STYLE_PROBE_JSON_BEGIN\n%@\nTEXTURE_STYLE_PROBE_JSON_END", text);
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ exit(0); });
     return YES;
 }
 @end
 
 int main(int argc, char *argv[]) {
-    @autoreleasepool { return UIApplicationMain(argc, argv, nil, NSStringFromClass([TextureProbeDelegate class])); }
+    @autoreleasepool {
+        return UIApplicationMain(argc, argv, nil, NSStringFromClass([TextureProbeDelegate class]));
+    }
 }
