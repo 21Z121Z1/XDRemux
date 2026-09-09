@@ -68,9 +68,6 @@ jobs:
           set -euo pipefail
           ROOT="$RUNTIME_BUNDLE"
           printf '%s\n' "$ROOT" > artifacts/ios27-runtime/runtime-root.txt
-          # Simulator runtimes are dyld-cache based, so individual private-framework
-          # Mach-O files may not exist. Record direct binaries when present; the
-          # in-simulator runtime probe below is authoritative.
           for fw in PhotoImaging NeutrinoCore PhotosFormats AVFCapture CMCaptureCore CMImaging CameraEditKit; do
             binary="$(find "$ROOT" -type f -path "*/${fw}.framework/${fw}" -print -quit 2>/dev/null || true)"
             printf '%s\n' "$binary" > "artifacts/ios27-runtime/${fw}-binary.txt"
@@ -124,18 +121,36 @@ jobs:
           PLIST
           codesign --force --sign - "$APP" 2>&1 | tee artifacts/ios27-runtime/codesign.txt
           xcrun simctl install "$UDID" "$APP" 2>&1 | tee artifacts/ios27-runtime/install.txt
+
           set +e
-          xcrun simctl launch --console "$UDID" org.xdremux.TextureStyleProbe > artifacts/ios27-runtime/launch.txt 2>&1
-          STATUS=$?
+          xcrun simctl launch "$UDID" org.xdremux.TextureStyleProbe > artifacts/ios27-runtime/launch.txt 2>&1
+          LAUNCH_STATUS=$?
           set -e
-          echo "$STATUS" > artifacts/ios27-runtime/launch-status.txt
+          echo "$LAUNCH_STATUS" > artifacts/ios27-runtime/launch-status.txt
+
           DATA_CONTAINER="$(xcrun simctl get_app_container "$UDID" org.xdremux.TextureStyleProbe data)"
           echo "$DATA_CONTAINER" > artifacts/ios27-runtime/data-container.txt
+          for _ in $(seq 1 20); do
+            [[ -s "$DATA_CONTAINER/Documents/texture-style-ios27-probe.json" ]] && break
+            sleep 0.5
+          done
+
+          mkdir -p artifacts/ios27-runtime/checkpoints
+          find "$DATA_CONTAINER/Documents" -maxdepth 1 -type f -name 'checkpoint-*.json' \
+            -exec cp {} artifacts/ios27-runtime/checkpoints/ \; 2>/dev/null || true
+          xcrun simctl spawn "$UDID" log show --last 5m --style compact \
+            --predicate 'process == "TextureStyleProbe" OR process == "SpringBoard"' \
+            > artifacts/ios27-runtime/system-log.txt 2>&1 || true
+          find "$DATA_CONTAINER/Library/Logs/DiagnosticReports" -type f -maxdepth 1 \
+            -exec cp {} artifacts/ios27-runtime/ \; 2>/dev/null || true
+
           if [[ -s "$DATA_CONTAINER/Documents/texture-style-ios27-probe.json" ]]; then
             cp "$DATA_CONTAINER/Documents/texture-style-ios27-probe.json" artifacts/ios27-runtime/runtime-probe.json
             cat artifacts/ios27-runtime/runtime-probe.json
           else
-            cat artifacts/ios27-runtime/launch.txt
+            echo "probe output missing" | tee artifacts/ios27-runtime/failure.txt
+            cat artifacts/ios27-runtime/launch.txt || true
+            ls -la artifacts/ios27-runtime/checkpoints || true
             exit 1
           fi
 
