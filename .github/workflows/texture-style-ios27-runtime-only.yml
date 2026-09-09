@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   runtime-probe:
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
