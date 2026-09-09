@@ -21,7 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           swift build
-          mkdir -p artifacts/candidates artifacts/debug artifacts/baseline-attempts
+          mkdir -p artifacts/candidates artifacts/debug artifacts/runner-smoke
 
       - name: Probe current macOS private TextureStyle runtime
         shell: bash
@@ -33,90 +33,23 @@ jobs:
           "$RUNNER_TEMP/texture-runtime-probe" artifacts/texture-runtime-probe.json
           cat artifacts/texture-runtime-probe.json
 
-      - name: Resolve Apple Styles input
+      - name: Generate hosted-runner Photographic Styles baseline
         shell: bash
         env:
-          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_REGRESSION_FIXTURE_ARCHIVE_URL }}
+          XDREMUX_STYLE_RUNNER_OUTPUT: ${{ github.workspace }}/artifacts/runner-smoke
         run: |
           set -euo pipefail
-          : > artifacts/input-candidates.txt
-          if [[ -n "${FIXTURE_ARCHIVE_URL:-}" ]]; then
-            mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
-            curl --fail --location --silent --show-error \
-              "$FIXTURE_ARCHIVE_URL" \
-              --output "$RUNNER_TEMP/xdremux-fixtures.zip"
-            ditto -x -k \
-              "$RUNNER_TEMP/xdremux-fixtures.zip" \
-              "$RUNNER_TEMP/xdremux-fixtures"
-            find "$RUNNER_TEMP/xdremux-fixtures" -type f -name 'apple-styles.heic' \
-              -print >> artifacts/input-candidates.txt
-          fi
-          find fixtures -maxdepth 1 -type f -iname '*.heic' -print \
-            >> artifacts/input-candidates.txt
-          awk '!seen[$0]++' artifacts/input-candidates.txt \
-            > artifacts/input-candidates.dedup.txt
-          mv artifacts/input-candidates.dedup.txt artifacts/input-candidates.txt
-          test -s artifacts/input-candidates.txt
-          cat artifacts/input-candidates.txt
-
-      - name: Try to generate known-good Photographic Styles baseline
-        shell: bash
-        run: |
-          set -u
-          selected=''
-          index=0
-          while IFS= read -r input; do
-            [[ -n "$input" ]] || continue
-            index=$((index + 1))
-            label="$(printf '%02d-%s' "$index" "$(basename "$input" | tr -cs 'A-Za-z0-9._-' '_')")"
-            attempt="artifacts/baseline-attempts/$label"
-            mkdir -p "$attempt/debug"
-            rm -f artifacts/baseline.heic artifacts/baseline-validation.json
-
-            echo "=== trying $input ==="
-            if .build/debug/xdremux convert \
-                --apple-photographic-styles \
-                --debug-dir "$attempt/debug" \
-                --input "$input" \
-                --output artifacts/baseline.heic \
-                > "$attempt/convert.stdout" \
-                2> "$attempt/convert.stderr"; then
-              echo 0 > "$attempt/convert.exit"
-              if .build/debug/xdremux validate-apple \
-                  --input artifacts/baseline.heic \
-                  > "$attempt/validate.stdout" \
-                  2> "$attempt/validate.stderr"; then
-                echo 0 > "$attempt/validate.exit"
-                selected="$input"
-                cp "$attempt/validate.stdout" artifacts/baseline-validation.json
-                break
-              else
-                status=$?
-                echo "$status" > "$attempt/validate.exit"
-                echo "validate-apple failed for $input (exit $status)"
-                tail -n 80 "$attempt/validate.stderr" || true
-              fi
-            else
-              status=$?
-              echo "$status" > "$attempt/convert.exit"
-              echo "conversion failed for $input (exit $status)"
-              tail -n 80 "$attempt/convert.stderr" || true
-            fi
-          done < artifacts/input-candidates.txt
-
-          if [[ -n "$selected" ]]; then
-            printf '%s\n' "$selected" > artifacts/selected-input.txt
-            echo 'BASELINE_AVAILABLE=true' >> "$GITHUB_ENV"
-            echo "Selected baseline input: $selected"
-          else
-            rm -f artifacts/baseline.heic
-            echo 'BASELINE_AVAILABLE=false' >> "$GITHUB_ENV"
-            echo '::warning::No checked-in HEIC fixture could produce a valid Apple Styles baseline; runtime probe evidence is still retained.'
-          fi
-          exit 0
+          swift test \
+            --filter PhotographicStylesRunnerSmokeTests/testColorOS16MotionPhotoConvertsToLivePhotoWithPhotographicStyles \
+            2>&1 | tee artifacts/runner-smoke/test.log
+          test -s artifacts/runner-smoke/coloros16-live-styles.heic
+          cp artifacts/runner-smoke/coloros16-live-styles.heic artifacts/baseline.heic
+          .build/debug/xdremux validate-apple \
+            --input artifacts/baseline.heic \
+            > artifacts/baseline-validation.json
+          cat artifacts/baseline-validation.json
 
       - name: Build TextureStyle metadata candidate matrix without re-encoding media
-        if: env.BASELINE_AVAILABLE == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -127,7 +60,6 @@ jobs:
             | tee artifacts/candidate-build-report.json
 
       - name: Validate every candidate and record offline evidence
-        if: env.BASELINE_AVAILABLE == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -149,6 +81,37 @@ jobs:
               >> artifacts/candidate-results.tsv
           done
           cat artifacts/candidate-results.tsv
+          python3 - <<'PY'
+          from pathlib import Path
+          rows = Path('artifacts/candidate-results.tsv').read_text().strip().splitlines()[1:]
+          if not rows:
+              raise SystemExit('no HEIC candidates were produced')
+          failed = [row for row in rows if not row.endswith('\tpass\tpass')]
+          if failed:
+              raise SystemExit('candidate offline validation failed:\n' + '\n'.join(failed))
+          PY
+
+      - name: Verify baseline media payloads are unchanged in candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import plistlib
+          from pathlib import Path
+
+          baseline = Path('artifacts/baseline.heic').read_bytes()
+          manifest = json.loads(Path('artifacts/candidates/candidate-manifest.json').read_text())
+          assert manifest['sourceSHA256'] == hashlib.sha256(baseline).hexdigest()
+          for item in manifest['candidates']:
+              candidate = Path('artifacts/candidates', item['file']).read_bytes()
+              # The patcher only edits the original iloc fields and appends one mdat.
+              # It must never shrink or replace the baseline media payload.
+              assert len(candidate) > len(baseline), item['file']
+              assert candidate[:8] == baseline[:8], item['file']
+          print(f"verified {len(manifest['candidates'])} appended-metadata candidates")
+          PY
 
       - name: Run targeted repository checks
         shell: bash
@@ -164,11 +127,11 @@ jobs:
           {
             echo '## Photographic Styles 3 Texture probe'
             echo
-            echo "- Baseline available: ${BASELINE_AVAILABLE:-unknown}"
-            echo '- Runtime probe runs before fixture conversion, so private-framework availability is captured even when the Apple Styles fixture is unavailable.'
-            echo '- Candidate mutation redirects only the existing semantic-style plist item to an appended mdat payload; image, Gain Map and 51,840-byte StyleData are not re-encoded.'
-            echo '- Candidate fields are derived from iOS 27 firmware symbols: Preset, Intensity, Grain, RenderingVersion and OriginalInsteadOfReversibility.'
-            echo '- This is offline structural evidence only. Texture/Grain UI activation still requires importing a candidate into iOS 27/macOS 27 Photos.'
+            echo '- Baseline: existing hosted-runner PhotographicStylesRunnerSmokeTests output using the deterministic identity producer.'
+            echo '- Candidate mutation: redirect only the semantic-style plist item to an appended mdat payload; image, Gain Map and the 51,840-byte StyleData are not re-encoded.'
+            echo '- Candidate fields: Preset, Intensity, Grain, RenderingVersion and OriginalInsteadOfReversibility, derived from iOS 27 firmware symbols.'
+            echo '- Runtime probe records whether the current macOS runner already exposes PITextureStyle/CEKTextureStyle private APIs.'
+            echo '- This is offline structural evidence only. Texture/Grain UI activation requires importing a candidate into iOS 27/macOS 27 Photos.'
             echo
             if [[ -f artifacts/candidate-results.tsv ]]; then
               echo '```text'
