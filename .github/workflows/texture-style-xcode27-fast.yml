@@ -39,10 +39,12 @@ jobs:
           ds=json.loads(Path('artifacts/device-types.json').read_text()).get('devicetypes',[])
           iph=[d for d in ds if str(d.get('name','')).startswith('iPhone')]
           if not iph: raise SystemExit('no iPhone type')
+          preferred=[d for d in iph if d.get('identifier') == 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro']
+          device=(preferred or iph)[0]
           print('RUNTIME_ID='+str(r['identifier']))
           print('RUNTIME_VERSION='+str(r.get('version','')))
           print('RUNTIME_BUILD='+str(r.get('buildversion','')))
-          print('DEVICE_TYPE='+str(iph[-1]['identifier']))
+          print('DEVICE_TYPE='+str(device['identifier']))
           PY
           cat artifacts/selection.env
           cat artifacts/selection.env >> "$GITHUB_ENV"
