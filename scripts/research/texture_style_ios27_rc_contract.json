@@ -1,0 +1,36 @@
+{
+  "source": "iOS 27 RC 24A435 firmware diff",
+  "symbols": {
+    "_kMetadataIdentifier_TextureStyleInfo": "tag:apple.com,2026:photo:metadata:texture_styles"
+  },
+  "requiredTextureInfoKeysObserved": [
+    "Version",
+    "HardwareModel",
+    "PortType",
+    "CaptureMode",
+    "CaptureType"
+  ],
+  "optionalTextureInfoKeysObserved": [
+    "FilmGrainSeed",
+    "TextureStylePeopleDataVersion",
+    "TextureStylePostProcessedPeopleData",
+    "TextureStyleFaceAttitudeMetadata"
+  ],
+  "captureMetadataKeysObserved": [
+    "TextureStylePreset",
+    "TextureStyleIntensity",
+    "TextureStyleGrain",
+    "TextureStyleRenderingVersion",
+    "TextureStyleOriginalInsteadOfReversibility"
+  ],
+  "photosAdjustmentKeysObserved": [
+    "preset",
+    "intensity",
+    "grainIntensity"
+  ],
+  "notes": [
+    "TextureStyleInfo is a separate 2026 metadata identifier, not a field inside the 2023 SemanticStyle metadata payload.",
+    "NeutrinoCore rejects TextureStyleInfo with missing/invalid version, hardware model, port type, capture mode, or capture type.",
+    "PhotosFormats exposes hasTextureStyle plus preset/intensity/grain/reversibility accessors, providing a stronger simulator validation target than structural HEIF parsing alone."
+  ]
+}
