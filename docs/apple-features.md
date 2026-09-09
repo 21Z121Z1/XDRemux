@@ -60,6 +60,8 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy、JPEG/container logic、Gain Map policy、REND generation、auxiliary-manifest construction、feature routing、output naming、validation policy 和 atomic publication。ImageIO 只报告 auxiliary-resource facts，adapter 只执行 Rust transaction 要求的 Apple framework operation。
 
+完整人像模式通过独立的 image request handler 逐个提交 Vision 分割请求，避免把不同分割请求类型一起提交到曾在 macOS 27 beta 上观察到崩溃的 compound request 路径。请求的语义资源和输出校验要求保持一致。任何请求失败都会终止本次操作；adapter 不会重试该请求，也不会改用源数据模式。
+
 ### 源数据模式和效果降级
 
 `convert` 和 `batch` 支持 `--apple-portrait-oppo`。此模式不调用 Vision，包括其私有分割 SPI。它使用公开的 ImageIO 和 Core Image 操作，因此仍需要 macOS。

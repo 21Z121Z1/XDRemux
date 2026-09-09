@@ -79,6 +79,13 @@ test -f "$TEST_INPUT"
 # make an uncompiled or previously different runtime source appear green.
 TEST_TARGET="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-apple-adapter.XXXXXX")"
 trap 'rm -rf "$TEST_TARGET"' EXIT
+
+SCHEDULER_TEST="$TEST_TARGET/vision-request-scheduling-regression"
+swiftc Sources/XDRemuxAppleAdapter/VisionRequestScheduling.swift \
+  scripts/vision_request_scheduler_regression.swift \
+  -o "$SCHEDULER_TEST"
+"$SCHEDULER_TEST"
+
 CARGO_TARGET_DIR="$TEST_TARGET" \
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$ADAPTER" \
 XDREMUX_APPLE_ADAPTER_TEST_INPUT="$TEST_INPUT" \

@@ -60,6 +60,8 @@ Research-only producers, model experiments, donor diagnostics, and RAW experimen
 
 Rust owns Portrait preflight, OPPO block parsing, focus/orientation policy, JPEG/container logic, Gain Map policy, REND generation, auxiliary-manifest construction, feature routing, output naming, validation policy, and atomic publication. ImageIO reports auxiliary-resource facts and the adapter performs only the Apple framework operations required by the Rust transaction.
 
+For the complete Portrait profile, the adapter submits each Vision segmentation request through a separate image request handler. This avoids batching different segmentation request types through the compound request path where a macOS 27 beta crash was observed. The requested semantic roles and output validation remain the same. A failed request stops the operation; the adapter does not retry it or substitute the source-native profile.
+
 ### Source-native profile and reduced effects
 
 `convert` and `batch` accept `--apple-portrait-oppo`. This profile does not call Vision, including its private segmentation SPI. It uses public ImageIO and Core Image operations, so macOS is still required.

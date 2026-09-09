@@ -17,6 +17,9 @@ RUNTIME_ADAPTER = (
 ADAPTER_MAIN = (
     ROOT / "Sources" / "XDRemuxAppleAdapter" / "main.swift"
 ).read_text(encoding="utf-8")
+VISION_MATTES = (
+    ROOT / "Sources" / "XDRemuxAppleAdapter" / "VisionSemanticMattes.swift"
+).read_text(encoding="utf-8")
 ADAPTER = "\n".join(
     path.read_text(encoding="utf-8")
     for path in sorted((ROOT / "Sources" / "XDRemuxAppleAdapter").glob("*.swift"))
@@ -102,6 +105,15 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
                 f"personRequest?.qualityLevel = {direct_quality}",
                 ADAPTER,
             )
+
+    def test_vision_segmentation_requests_are_not_submitted_as_one_compound_batch(self) -> None:
+        self.assertNotIn(
+            "handler.perform(requests)",
+            VISION_MATTES,
+            "heterogeneous Vision segmentation requests must not share the compound perform path",
+        )
+        self.assertIn("performVisionRequests(requests)", VISION_MATTES)
+        self.assertIn("try handler.perform(requestBatch)", VISION_MATTES)
 
     def test_adapter_schema_version_is_atomic_across_runtime_helper_and_clients(self) -> None:
         rust_match = re.search(

@@ -192,8 +192,20 @@ func generateVisionSemanticMattes(
     }
 
     let requests = [humanAttributesRequest, personRequest, glassesRequest, skyRequest].compactMap { $0 }
-    let handler = VNImageRequestHandler(cgImage: image, orientation: orientation, options: [:])
-    try handler.perform(requests)
+    // Keep heterogeneous segmentation requests out of Vision's compound
+    // request path. On macOS 27 that path has produced an internal
+    // EXC_BAD_ACCESS in VNGenerateSemanticSegmentationCompoundRequest.
+    // Execute each framework request in its own handler call instead. The
+    // complete profile still requests and validates the same semantic roles;
+    // only scheduling changes at the Apple framework boundary.
+    try performVisionRequests(requests) { requestBatch in
+        let handler = VNImageRequestHandler(
+            cgImage: image,
+            orientation: orientation,
+            options: [:]
+        )
+        try handler.perform(requestBatch)
+    }
 
     var masks: [VisionSemanticMaskFacts] = []
     if let humanAttributesRequest {
