@@ -39,20 +39,23 @@ jobs:
 
           for name in TextureStyleTuning.plist SmartStyleToTextureStyleMapping.plist RendererTuningWithTextureStyles.plist; do
             echo "== $name ==" | tee -a artifacts/texture-style-resources/locations.txt
-            mapfile -t matches < <(find "$RUNTIME_BUNDLE" -type f -name "$name" -print 2>/dev/null | sort -u)
-            if [[ ${#matches[@]} -eq 0 ]]; then
+            match_file="artifacts/texture-style-resources/.matches-${name}.txt"
+            find "$RUNTIME_BUNDLE" -type f -name "$name" -print 2>/dev/null | sort -u > "$match_file" || true
+            if [[ ! -s "$match_file" ]]; then
               echo "not found" | tee -a artifacts/texture-style-resources/locations.txt
               continue
             fi
             index=0
-            for source in "${matches[@]}"; do
+            while IFS= read -r source; do
+              [[ -n "$source" ]] || continue
               echo "$source" | tee -a artifacts/texture-style-resources/locations.txt
               stem="${name%.plist}-${index}"
               cp "$source" "artifacts/texture-style-resources/${stem}.plist"
               plutil -convert json -o "artifacts/texture-style-resources/${stem}.json" "$source" || true
               plutil -p "$source" > "artifacts/texture-style-resources/${stem}.txt" || true
               index=$((index+1))
-            done
+            done < "$match_file"
+            rm -f "$match_file"
           done
 
           python3 - <<'PY'
@@ -77,11 +80,12 @@ jobs:
                   joined='/'.join(path)
                   if any(term in joined.lower() for term in ('hardware','port','capture','preset','grain','intensity','texture','style','film','skin','halation','diffusion','glow')):
                       rows.append({'path':joined,'value':value})
-              summary[p.name]={'rootType':type(obj).__name__,'interesting':rows[:5000]}
+              summary[p.name]={'rootType':type(obj).__name__,'interesting':rows[:10000]}
           (root/'summary.json').write_text(json.dumps(summary,indent=2,default=str))
           PY
 
       - name: Upload TextureStyle resources
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: texture-style-ios27-resources-${{ github.sha }}
