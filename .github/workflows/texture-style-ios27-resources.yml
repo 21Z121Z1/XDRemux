@@ -1,0 +1,90 @@
+name: TextureStyle iOS 27 Resources
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-ios27-resources.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract-resources:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Locate iOS 27 runtime and TextureStyle resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/texture-style-resources
+          xcodebuild -version | tee artifacts/texture-style-resources/xcode.txt
+          xcrun simctl list runtimes -j > artifacts/texture-style-resources/runtimes.json
+          RUNTIME_BUNDLE="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          runtimes=json.loads(Path('artifacts/texture-style-resources/runtimes.json').read_text()).get('runtimes',[])
+          c=[r for r in runtimes if 'iOS' in str(r.get('name','')) and str(r.get('version','')).startswith('27.') and r.get('isAvailable',True)]
+          if not c: raise SystemExit('no iOS 27 runtime')
+          c.sort(key=lambda r: tuple(int(x) if x.isdigit() else 0 for x in str(r.get('version','0')).split('.')))
+          print(c[-1].get('bundlePath',''))
+          PY
+          )"
+          echo "$RUNTIME_BUNDLE" | tee artifacts/texture-style-resources/runtime-root.txt
+
+          for name in TextureStyleTuning.plist SmartStyleToTextureStyleMapping.plist RendererTuningWithTextureStyles.plist; do
+            echo "== $name ==" | tee -a artifacts/texture-style-resources/locations.txt
+            mapfile -t matches < <(find "$RUNTIME_BUNDLE" -type f -name "$name" -print 2>/dev/null | sort -u)
+            if [[ ${#matches[@]} -eq 0 ]]; then
+              echo "not found" | tee -a artifacts/texture-style-resources/locations.txt
+              continue
+            fi
+            index=0
+            for source in "${matches[@]}"; do
+              echo "$source" | tee -a artifacts/texture-style-resources/locations.txt
+              stem="${name%.plist}-${index}"
+              cp "$source" "artifacts/texture-style-resources/${stem}.plist"
+              plutil -convert json -o "artifacts/texture-style-resources/${stem}.json" "$source" || true
+              plutil -p "$source" > "artifacts/texture-style-resources/${stem}.txt" || true
+              index=$((index+1))
+            done
+          done
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('artifacts/texture-style-resources')
+          summary={}
+          for p in root.glob('*.json'):
+              if p.name=='runtimes.json': continue
+              try: obj=json.loads(p.read_text())
+              except Exception: continue
+              def walk(x,path=()):
+                  if isinstance(x,dict):
+                      for k,v in x.items():
+                          yield from walk(v,path+(str(k),))
+                  elif isinstance(x,list):
+                      for i,v in enumerate(x): yield from walk(v,path+(str(i),))
+                  else:
+                      yield path,x
+              rows=[]
+              for path,value in walk(obj):
+                  joined='/'.join(path)
+                  if any(term in joined.lower() for term in ('hardware','port','capture','preset','grain','intensity','texture','style','film','skin','halation','diffusion','glow')):
+                      rows.append({'path':joined,'value':value})
+              summary[p.name]={'rootType':type(obj).__name__,'interesting':rows[:5000]}
+          (root/'summary.json').write_text(json.dumps(summary,indent=2,default=str))
+          PY
+
+      - name: Upload TextureStyle resources
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-ios27-resources-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/texture-style-resources/
