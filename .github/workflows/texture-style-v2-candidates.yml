@@ -1,0 +1,132 @@
+name: TextureStyle V2 Candidates
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-v2-candidates.yml
+      - scripts/research/patch_texture_style_heif_v2.py
+      - scripts/research/texture_style_ios27_rc_contract.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-v2:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build XDRemux
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build
+          mkdir -p artifacts/v2/runner-smoke artifacts/v2/candidates
+
+      - name: Generate known-good hosted Photographic Styles baseline
+        shell: bash
+        env:
+          XDREMUX_STYLE_RUNNER_OUTPUT: ${{ github.workspace }}/artifacts/v2/runner-smoke
+        run: |
+          set -euo pipefail
+          swift test \
+            --filter PhotographicStylesRunnerSmokeTests/testColorOS16MotionPhotoConvertsToLivePhotoWithPhotographicStyles \
+            2>&1 | tee artifacts/v2/runner-smoke/test.log
+          cp artifacts/v2/runner-smoke/coloros16-live-styles.heic artifacts/v2/baseline.heic
+          .build/debug/xdremux validate-apple \
+            --input artifacts/v2/baseline.heic \
+            > artifacts/v2/baseline-validation.json
+
+      - name: Generate independent 2026 TextureStyleInfo items
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/research/patch_texture_style_heif_v2.py
+          python3 scripts/research/patch_texture_style_heif_v2.py \
+            artifacts/v2/baseline.heic \
+            scripts/research/texture_style_ios27_rc_contract.json \
+            artifacts/v2/candidates \
+            | tee artifacts/v2/candidate-build-report.json
+
+      - name: Validate candidate containers without claiming Texture UI activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'candidate\timageio\txdremux_validate_apple\n' > artifacts/v2/candidate-results.tsv
+          for file in artifacts/v2/candidates/*.heic; do
+            name="$(basename "$file" .heic)"
+            imageio=fail
+            validator=fail
+            if sips -g pixelWidth -g pixelHeight "$file" \
+                > "artifacts/v2/candidates/${name}.sips.txt" 2>&1; then
+              imageio=pass
+            fi
+            if .build/debug/xdremux validate-apple --input "$file" \
+                > "artifacts/v2/candidates/${name}.validation.json" \
+                2> "artifacts/v2/candidates/${name}.validation.stderr"; then
+              validator=pass
+            fi
+            printf '%s\t%s\t%s\n' "$name" "$imageio" "$validator" \
+              >> artifacts/v2/candidate-results.tsv
+          done
+          cat artifacts/v2/candidate-results.tsv
+          python3 - <<'PY'
+          from pathlib import Path
+          rows=Path('artifacts/v2/candidate-results.tsv').read_text().strip().splitlines()[1:]
+          if not rows:
+              raise SystemExit('no V2 candidates produced')
+          failed=[row for row in rows if not row.endswith('\tpass\tpass')]
+          if failed:
+              raise SystemExit('offline validation failed:\n'+'\n'.join(failed))
+          PY
+
+      - name: Verify V2 experiment contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          manifest=json.loads(Path('artifacts/v2/candidates/candidate-manifest.json').read_text())
+          assert manifest['schema']=='xdremux-texture-style-v2-probe-v1'
+          assert manifest['candidateCount'] > 0
+          for c in manifest['candidates']:
+              assert c['metadataIdentifier']=='tag:apple.com,2026:photo:metadata:texture_styles'
+              assert c['oldPayloadsVerifiedUnchanged'] >= 100
+              assert c['cdscTargets']
+          print(f"verified {manifest['candidateCount']} independent TextureStyleInfo candidates")
+          PY
+          python3 -m unittest Tests.validation.test_agent_completion_gate
+          python3 -m unittest Tests.test_swift_app_architecture
+
+      - name: Write summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## TextureStyle V2 candidate experiment'
+            echo
+            echo '- Uses the iOS 27 RC firmware identifier: tag:apple.com,2026:photo:metadata:texture_styles.'
+            echo '- Adds a separate HEIF URI metadata item; it does not mutate the 2023 SemanticStyle plist.'
+            echo '- Existing media/metadata item payload hashes must remain unchanged.'
+            echo '- Structural validation is not UI activation evidence; iOS 27 PFMetadata/Neutrino validation is the next gate.'
+            if [[ -f artifacts/v2/candidate-results.tsv ]]; then
+              echo
+              echo '```text'
+              cat artifacts/v2/candidate-results.tsv
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload V2 candidates and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-v2-candidates-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/v2/
