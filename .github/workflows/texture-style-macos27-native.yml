@@ -1,0 +1,43 @@
+name: TextureStyle macOS 27 Native Probe
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-macos27-native.yml
+      - scripts/research/texture_style_macos27_probe_v2.m
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-probe:
+    runs-on: xcode-27-xlarge
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run native macOS 27 private framework probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          sw_vers | tee artifacts/sw-vers.txt
+          xcodebuild -version | tee artifacts/xcode.txt
+          xcrun clang -fobjc-arc \
+            -framework Foundation -framework ImageIO -framework CoreGraphics \
+            scripts/research/texture_style_macos27_probe_v2.m \
+            -o "$RUNNER_TEMP/texture-style-macos27-probe" \
+            2>&1 | tee artifacts/compile.txt
+          "$RUNNER_TEMP/texture-style-macos27-probe" artifacts \
+            | tee artifacts/stdout.json
+          test -s artifacts/texture-style-macos27-probe-v2.json
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-macos27-native-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
