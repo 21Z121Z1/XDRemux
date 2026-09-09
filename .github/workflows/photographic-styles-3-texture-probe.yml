@@ -12,7 +12,7 @@ permissions:
 jobs:
   texture-probe:
     runs-on: macos-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
 
@@ -21,7 +21,149 @@ jobs:
         run: |
           set -euo pipefail
           swift build
-          mkdir -p artifacts/candidates artifacts/debug artifacts/runner-smoke
+          mkdir -p artifacts/candidates artifacts/debug artifacts/runner-smoke artifacts/ios27-runtime
+
+      - name: Probe iOS 27 Simulator private TextureStyle runtime
+        shell: bash
+        run: |
+          set -u
+          {
+            echo '=== xcode ==='
+            xcodebuild -version || true
+            echo '=== sdk ==='
+            xcrun --sdk iphonesimulator --show-sdk-version || true
+            xcrun --sdk iphonesimulator --show-sdk-path || true
+            echo '=== runtimes ==='
+            xcrun simctl list runtimes || true
+          } | tee artifacts/ios27-runtime/environment.txt
+
+          xcrun simctl list runtimes -j > artifacts/ios27-runtime/runtimes.json 2>&1 || true
+          xcrun simctl list devicetypes -j > artifacts/ios27-runtime/device-types.json 2>&1 || true
+
+          # Static fallback is useful even when CoreSimulator cannot boot on the hosted runner.
+          find /Library/Developer/CoreSimulator/Volumes /Applications \
+            -path '*iOS*27*' -o -path '*24A54*' 2>/dev/null \
+            | head -n 400 > artifacts/ios27-runtime/runtime-paths.txt || true
+          for fw in PhotoImaging NeutrinoCore PhotosFormats AVFCapture CMCaptureCore CMImaging CameraEditKit; do
+            find /Library/Developer/CoreSimulator/Volumes /Applications \
+              -type f -path "*/${fw}.framework/${fw}" 2>/dev/null \
+              | head -n 20 > "artifacts/ios27-runtime/${fw}-binaries.txt" || true
+            while IFS= read -r binary; do
+              [[ -n "$binary" ]] || continue
+              safe="$(echo "$binary" | shasum -a 256 | cut -c1-12)"
+              {
+                echo "### $binary"
+                file "$binary" || true
+                nm -nm "$binary" 2>/dev/null | grep -i -E 'TextureStyle|SemanticStyle|MakerNote' | head -n 1200 || true
+              } > "artifacts/ios27-runtime/${fw}-${safe}-symbols.txt"
+              strings -a "$binary" 2>/dev/null \
+                | grep -i -E 'texture.?style|film.?grain|capture.?mode|capture.?type|hardware.?model|port.?type|reversib|maker.?note' \
+                | head -n 2500 > "artifacts/ios27-runtime/${fw}-${safe}-strings.txt" || true
+            done < "artifacts/ios27-runtime/${fw}-binaries.txt"
+          done
+
+          RUNTIME_ID="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          try:
+              obj=json.loads(Path('artifacts/ios27-runtime/runtimes.json').read_text())
+          except Exception:
+              print(''); raise SystemExit
+          candidates=[]
+          for r in obj.get('runtimes',[]):
+              text=' '.join(str(r.get(k,'')) for k in ('name','version','identifier','buildversion'))
+              if 'iOS' in text and ('27.' in text or 'iOS-27' in text):
+                  candidates.append(r)
+          available=[r for r in candidates if r.get('isAvailable', True)]
+          chosen=(available or candidates)
+          print(chosen[-1].get('identifier','') if chosen else '')
+          PY
+          )"
+          DEVICE_TYPE="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          try:
+              obj=json.loads(Path('artifacts/ios27-runtime/device-types.json').read_text())
+          except Exception:
+              print(''); raise SystemExit
+          iphones=[d for d in obj.get('devicetypes',[]) if str(d.get('name','')).startswith('iPhone')]
+          # newest device types are normally last; any iPhone type is sufficient for framework probing.
+          print(iphones[-1].get('identifier','') if iphones else '')
+          PY
+          )"
+          printf 'runtime=%s\ndeviceType=%s\n' "$RUNTIME_ID" "$DEVICE_TYPE" | tee artifacts/ios27-runtime/selection.txt
+
+          if [[ -z "$RUNTIME_ID" || -z "$DEVICE_TYPE" ]]; then
+            echo 'No usable iOS 27 Simulator runtime/device type found; static evidence only.' | tee artifacts/ios27-runtime/simulator-status.txt
+            exit 0
+          fi
+
+          UDID="$(xcrun simctl create TextureStyleProbe "$DEVICE_TYPE" "$RUNTIME_ID" 2>&1)" || {
+            echo "simctl create failed: $UDID" | tee artifacts/ios27-runtime/simulator-status.txt
+            exit 0
+          }
+          cleanup() { xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          echo "$UDID" > artifacts/ios27-runtime/device-udid.txt
+          xcrun simctl boot "$UDID" > artifacts/ios27-runtime/boot.txt 2>&1 || true
+          if ! xcrun simctl bootstatus "$UDID" -b >> artifacts/ios27-runtime/boot.txt 2>&1; then
+            echo 'iOS 27 Simulator failed to boot; static evidence only.' | tee artifacts/ios27-runtime/simulator-status.txt
+            exit 0
+          fi
+
+          SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          SDK_VERSION="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          ARCH="$(uname -m)"
+          APP="$RUNNER_TEMP/TextureStyleProbe.app"
+          mkdir -p "$APP"
+          if ! xcrun --sdk iphonesimulator clang \
+              -fobjc-arc \
+              -target "${ARCH}-apple-ios${SDK_VERSION}-simulator" \
+              -isysroot "$SDK" \
+              -framework Foundation -framework UIKit -framework ImageIO \
+              scripts/research/texture_style_ios27_sim_probe.m \
+              -o "$APP/TextureStyleProbe" \
+              > artifacts/ios27-runtime/compile.txt 2>&1; then
+            echo 'probe app compile failed; static evidence only.' | tee artifacts/ios27-runtime/simulator-status.txt
+            cat artifacts/ios27-runtime/compile.txt
+            exit 0
+          fi
+          cat > "$APP/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleIdentifier</key><string>org.xdremux.TextureStyleProbe</string>
+            <key>CFBundleExecutable</key><string>TextureStyleProbe</string>
+            <key>CFBundleName</key><string>TextureStyleProbe</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>MinimumOSVersion</key><string>${SDK_VERSION}</string>
+            <key>LSRequiresIPhoneOS</key><true/>
+            <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+          </dict></plist>
+          PLIST
+          codesign --force --sign - "$APP" > artifacts/ios27-runtime/codesign.txt 2>&1 || true
+          if ! xcrun simctl install "$UDID" "$APP" > artifacts/ios27-runtime/install.txt 2>&1; then
+            echo 'probe app install failed; static evidence only.' | tee artifacts/ios27-runtime/simulator-status.txt
+            cat artifacts/ios27-runtime/install.txt
+            exit 0
+          fi
+          set +e
+          xcrun simctl launch --console "$UDID" org.xdremux.TextureStyleProbe \
+            > artifacts/ios27-runtime/launch.txt 2>&1
+          LAUNCH_STATUS=$?
+          set -e
+          DATA_CONTAINER="$(xcrun simctl get_app_container "$UDID" org.xdremux.TextureStyleProbe data 2>/dev/null || true)"
+          echo "launchStatus=$LAUNCH_STATUS" > artifacts/ios27-runtime/simulator-status.txt
+          echo "dataContainer=$DATA_CONTAINER" >> artifacts/ios27-runtime/simulator-status.txt
+          if [[ -n "$DATA_CONTAINER" && -s "$DATA_CONTAINER/Documents/texture-style-ios27-probe.json" ]]; then
+            cp "$DATA_CONTAINER/Documents/texture-style-ios27-probe.json" artifacts/ios27-runtime/runtime-probe.json
+            cat artifacts/ios27-runtime/runtime-probe.json
+          else
+            echo 'runtime probe JSON was not produced.' >> artifacts/ios27-runtime/simulator-status.txt
+            cat artifacts/ios27-runtime/launch.txt || true
+          fi
 
       - name: Probe current macOS private TextureStyle runtime
         shell: bash
@@ -53,9 +195,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          PROBE=artifacts/texture-runtime-probe.json
+          if [[ -s artifacts/ios27-runtime/runtime-probe.json ]]; then
+            PROBE=artifacts/ios27-runtime/runtime-probe.json
+          fi
           python3 scripts/research/patch_texture_style_heif.py \
             artifacts/baseline.heic \
-            artifacts/texture-runtime-probe.json \
+            "$PROBE" \
             artifacts/candidates \
             | tee artifacts/candidate-build-report.json
 
@@ -98,7 +244,6 @@ jobs:
           python3 - <<'PY'
           import hashlib
           import json
-          import plistlib
           from pathlib import Path
 
           baseline = Path('artifacts/baseline.heic').read_bytes()
@@ -106,8 +251,6 @@ jobs:
           assert manifest['sourceSHA256'] == hashlib.sha256(baseline).hexdigest()
           for item in manifest['candidates']:
               candidate = Path('artifacts/candidates', item['file']).read_bytes()
-              # The patcher only edits the original iloc fields and appends one mdat.
-              # It must never shrink or replace the baseline media payload.
               assert len(candidate) > len(baseline), item['file']
               assert candidate[:8] == baseline[:8], item['file']
           print(f"verified {len(manifest['candidates'])} appended-metadata candidates")
@@ -127,13 +270,19 @@ jobs:
           {
             echo '## Photographic Styles 3 Texture probe'
             echo
+            echo '- iOS 27 Simulator private-framework probe is attempted first; static framework symbol/string dumps are retained as fallback evidence.'
             echo '- Baseline: existing hosted-runner PhotographicStylesRunnerSmokeTests output using the deterministic identity producer.'
-            echo '- Candidate mutation: redirect only the semantic-style plist item to an appended mdat payload; image, Gain Map and the 51,840-byte StyleData are not re-encoded.'
-            echo '- Candidate fields: Preset, Intensity, Grain, RenderingVersion and OriginalInsteadOfReversibility, derived from iOS 27 firmware symbols.'
-            echo '- Runtime probe records whether the current macOS runner already exposes PITextureStyle/CEKTextureStyle private APIs.'
-            echo '- This is offline structural evidence only. Texture/Grain UI activation requires importing a candidate into iOS 27/macOS 27 Photos.'
+            echo '- Candidate mutation remains metadata-only; encoded image, Gain Map and 51,840-byte StyleData are not re-encoded.'
+            echo '- Physical-device Photos UI activation remains the final gate.'
             echo
+            if [[ -f artifacts/ios27-runtime/simulator-status.txt ]]; then
+              echo '### Simulator probe status'
+              echo '```text'
+              cat artifacts/ios27-runtime/simulator-status.txt
+              echo '```'
+            fi
             if [[ -f artifacts/candidate-results.tsv ]]; then
+              echo '### Candidates'
               echo '```text'
               cat artifacts/candidate-results.tsv
               echo '```'
