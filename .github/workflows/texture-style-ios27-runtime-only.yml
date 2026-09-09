@@ -117,6 +117,19 @@ jobs:
             <key>CFBundleShortVersionString</key><string>1.0</string>
             <key>MinimumOSVersion</key><string>${SDK_VERSION}</string>
             <key>LSRequiresIPhoneOS</key><true/>
+            <key>UIApplicationSceneManifest</key>
+            <dict>
+              <key>UIApplicationSupportsMultipleScenes</key><false/>
+              <key>UISceneConfigurations</key>
+              <dict>
+                <key>UIWindowSceneSessionRoleApplication</key>
+                <array>
+                  <dict>
+                    <key>UISceneConfigurationName</key><string>Default Configuration</string>
+                  </dict>
+                </array>
+              </dict>
+            </dict>
           </dict></plist>
           PLIST
           codesign --force --sign - "$APP" 2>&1 | tee artifacts/ios27-runtime/codesign.txt
