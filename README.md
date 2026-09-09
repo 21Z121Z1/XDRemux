@@ -104,7 +104,9 @@ xdremux validate output.heic --json
 
 ## Apple 编辑能力
 
-摄影风格和 Apple 人像目前仍处于迁移边界内。目标架构由 Rust 持有产品 policy、orchestration、数据模型和 CLI；一个很薄的 Apple-native adapter 只负责调用 Core Image、Vision、Core ML、AVFoundation 等平台 framework。
+摄影风格和 Apple 人像的策略、编排、数据模型和 CLI 由 Rust 持有。Swift adapter 只执行 Apple framework 操作，不是第二套转换后端。
+
+在 macOS 上，`--apple-portrait` 请求完整语义资源集。`--apple-portrait-oppo` 使用 OPPO 深度和有效蒙版，不调用 Vision 或其私有分割 SPI。该模式的人像效果会降级，缺失蒙版保持缺失。它仍依赖公开的 ImageIO 和 Core Image API。用法见 [CLI 参考](docs/cli.md)。
 
 当前支持和验收边界见 [`docs/apple-features.md`](docs/apple-features.md)。
 

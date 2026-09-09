@@ -56,6 +56,21 @@ xdremux convert \
 
 OPPO-compatible 目前只适用于 ProXDR 静态照片，不能和 Motion Photo → Live Photo 转换组合。遇到这种组合时 CLI 会明确失败，而不会静默忽略参数。
 
+### macOS 上的 Apple 人像
+
+不需要 Apple 私有分割能力时，使用源数据模式：
+
+```bash
+xdremux convert --input portrait.heic --output portrait_apple.heic --apple-portrait-oppo
+xdremux batch --input-dir portraits/ --output-dir converted/ --apple-portrait-oppo --jobs 2
+```
+
+此模式将 OPPO 深度转换为 disparity，并保留焦点元数据、光圈、Rust 生成的 REND 和 ISO Gain Map。存在有效的 OPPO 人物、头发蒙版时才附加；空白或不可用蒙版保持缺失。不生成皮肤、牙齿、眼镜蒙版，不发送任何 Vision 请求。
+
+**相比完整模式，人像效果会降级。** 人物和发丝边缘可能不够精细，语义光效及相关编辑可能受限。此模式仍使用 macOS 上公开的 ImageIO 和 Core Image API，不是 Linux/Windows 人像写入器。Photos 编辑行为仍取决于消费端和系统版本。
+
+需要现有完整资源集和 Vision 语义时，使用 `--apple-portrait`；摄影风格使用 `--apple-styles`。这些选项与 `--apple-portrait-oppo` 互斥，也不能与 `--oppo-compatible` 组合。输入缺少必要的 OPPO 深度或源图数据时，在发布输出前失败。CLI 不会在失败后悄悄切换模式。
+
 ## `batch`
 
 可以重复提供文件或目录：
@@ -83,6 +98,9 @@ xdremux batch \
 | `--skip-existing` | 只在 provenance 与输出身份都匹配时复用已有结果。 |
 | `--categorize` | 转换后直接按分类目录发布。 |
 | `--oppo-compatible` | 对批次中的 ProXDR 静态照片请求 OPPO Gallery 兼容输出。 |
+| `--apple-portrait` | 在 macOS 上请求完整人像资源集。 |
+| `--apple-portrait-oppo` | 在 macOS 上使用 OPPO 深度和有效蒙版，人像效果降级。 |
+| `--apple-styles` | 在 macOS 上请求摄影风格。 |
 | `--json` | 输出稳定的机器可读 receipt。 |
 
 batch 会在开始写文件前完成输出规划，避免源文件、HEIC 输出和 Live Photo MOV companion 之间发生路径碰撞。任务之间相互隔离；一个输入失败不会使已经成功发布的其他输入失去结果。

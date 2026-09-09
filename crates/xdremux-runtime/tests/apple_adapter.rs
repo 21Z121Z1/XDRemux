@@ -14,6 +14,60 @@ const ADAPTER_TEST_INPUT: &str = "XDREMUX_APPLE_ADAPTER_TEST_INPUT";
 const STYLE_METADATA_INPUT: &str = "XDREMUX_APPLE_STYLE_METADATA_INPUT";
 const STYLE_DATA_EXPECTED: &str = "XDREMUX_APPLE_STYLE_DATA_EXPECTED";
 
+#[test]
+fn oppo_native_portrait_preserves_only_available_source_resources() {
+    use xdremux_runtime::ApplePortraitSemanticProfile;
+    let Some(executable) = adapter_executable() else {
+        return;
+    };
+    let runtime = PortableRuntime::new();
+    for name in ["uhdr-portrait-01.heic", "uhdr-portrait-02.heic"] {
+        let input = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/proxdr/oppo/find-x9-ultra")
+            .join(name);
+        let source = fs::read(input).unwrap();
+        let preflight = runtime
+            .preflight_apple_portrait_source_with_profile(
+                &executable,
+                &source,
+                ApplePortraitSemanticProfile::OppoNative,
+            )
+            .expect("native preflight must not require Vision semantics");
+        assert!(preflight.skin_matte.is_none());
+        assert!(preflight.teeth_matte.is_none());
+        assert!(preflight.glasses_matte.is_none());
+        let portrait = preflight.portrait_effects_matte.is_some();
+        let hair = preflight.hair_matte.is_some();
+        if name == "uhdr-portrait-01.heic" {
+            assert!(!portrait, "empty producer plane must remain absent");
+        }
+        let payloads = preflight.clone().into_auxiliary_payloads().unwrap();
+        assert_eq!(
+            payloads.len(),
+            1 + usize::from(portrait) + usize::from(hair)
+        );
+        let mut invalid = preflight.clone();
+        invalid.semantic_profile = ApplePortraitSemanticProfile::Complete;
+        assert!(invalid.into_auxiliary_payloads().is_err());
+        let mut invalid = preflight;
+        invalid.skin_matte = Some(xdremux_engine::AppleL8Mask::new(4, 4, vec![255; 16]).unwrap());
+        assert!(invalid.into_auxiliary_payloads().is_err());
+        let temporary = tempfile::tempdir().unwrap();
+        let output = temporary.path().join(name);
+        let receipt = runtime
+            .convert_apple_portrait_file_with_profile(
+                &executable,
+                &source,
+                output,
+                ApplePortraitSemanticProfile::OppoNative,
+            )
+            .expect("real OPPO-native conversion");
+        assert!(receipt
+            .auxiliary
+            .satisfies_oppo_native_portrait_resources(portrait, hair));
+    }
+}
+
 fn adapter_executable() -> Option<PathBuf> {
     let executable = PathBuf::from(std::env::var_os(ADAPTER_TEST_EXECUTABLE)?);
     assert!(
@@ -150,7 +204,10 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
     );
     assert!(preflight.disparity.near > preflight.disparity.far);
 
-    let portrait = &preflight.portrait_effects_matte;
+    let portrait = preflight
+        .portrait_effects_matte
+        .as_ref()
+        .expect("complete portrait matte");
     assert_eq!(portrait.width, preflight.base_width / 2);
     assert_eq!(portrait.height, preflight.base_height / 2);
     assert_eq!(
@@ -174,10 +231,28 @@ fn rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives() 
                 .is_some_and(|plane| plane.iter().any(|&pixel| pixel != 0))
     );
     for (role, matte) in [
-        (AppleSemanticRole::Skin, &preflight.skin_matte),
-        (AppleSemanticRole::Hair, &preflight.hair_matte),
-        (AppleSemanticRole::Teeth, &preflight.teeth_matte),
-        (AppleSemanticRole::Glasses, &preflight.glasses_matte),
+        (
+            AppleSemanticRole::Skin,
+            preflight.skin_matte.as_ref().expect("complete skin matte"),
+        ),
+        (
+            AppleSemanticRole::Hair,
+            preflight.hair_matte.as_ref().expect("complete hair matte"),
+        ),
+        (
+            AppleSemanticRole::Teeth,
+            preflight
+                .teeth_matte
+                .as_ref()
+                .expect("complete teeth matte"),
+        ),
+        (
+            AppleSemanticRole::Glasses,
+            preflight
+                .glasses_matte
+                .as_ref()
+                .expect("complete glasses matte"),
+        ),
     ] {
         assert_eq!(matte.width, preflight.base_width / 2);
         assert_eq!(matte.height, preflight.base_height / 2);

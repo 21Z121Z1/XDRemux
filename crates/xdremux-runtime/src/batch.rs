@@ -17,7 +17,7 @@ use crate::batch_checkpoint::{
     MotionPhotoCheckpoint, MotionPhotoCheckpointWriter, SourceSignature,
 };
 use crate::categorize::classification_relative_directory;
-use crate::{PortableRuntime, Result, RuntimeError};
+use crate::{ApplePortraitSemanticProfile, PortableRuntime, Result, RuntimeError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchItem {
@@ -344,7 +344,10 @@ fn process_batch_item_with_options(
     checkpoint: &MotionPhotoCheckpoint,
     reuse_existing: bool,
     apple_adapter_executable: Option<&Path>,
+    apple_portrait_profile: ApplePortraitSemanticProfile,
 ) -> BatchWorkResult {
+    #[cfg(not(target_os = "macos"))]
+    let _ = apple_portrait_profile;
     let mut checkpoint_event = None;
     let result: Result<BatchSuccess> = (|| {
         if item.input == item.output {
@@ -462,8 +465,12 @@ fn process_batch_item_with_options(
                                 "the macOS Apple adapter executable was not resolved",
                             )
                         })?;
-                        let receipt =
-                            runtime.convert_apple_portrait_file(adapter, &source, &item.output)?;
+                        let receipt = runtime.convert_apple_portrait_file_with_profile(
+                            adapter,
+                            &source,
+                            &item.output,
+                            apple_portrait_profile,
+                        )?;
                         return Ok(BatchSuccess {
                             input: item.input.clone(),
                             outputs: vec![receipt.output],
@@ -476,7 +483,7 @@ fn process_batch_item_with_options(
                         let _ = apple_adapter_executable;
                         return Err(RuntimeError::new(
                             "Apple Portrait conversion",
-                            "Apple Portrait requires macOS ImageIO/Vision/Core Image capabilities",
+                            "Portrait conversion requires macOS ImageIO/Core Image; the complete profile also requires Vision semantics",
                         ));
                     }
                 } else if request.apple_features.photographic_styles {
@@ -574,6 +581,24 @@ impl PortableRuntime {
     where
         I: IntoIterator<Item = BatchItem>,
     {
+        self.convert_batch_with_options_and_portrait_profile(
+            items,
+            request,
+            options,
+            ApplePortraitSemanticProfile::Complete,
+        )
+    }
+
+    pub fn convert_batch_with_options_and_portrait_profile<I>(
+        &self,
+        items: I,
+        request: ConversionRequest,
+        options: &BatchExecutionOptions,
+        apple_portrait_profile: ApplePortraitSemanticProfile,
+    ) -> BatchReceipt
+    where
+        I: IntoIterator<Item = BatchItem>,
+    {
         let checkpoint = options
             .checkpoint_path
             .as_deref()
@@ -610,6 +635,7 @@ impl PortableRuntime {
                     &checkpoint,
                     options.reuse_existing,
                     options.apple_adapter_executable.as_deref(),
+                    apple_portrait_profile,
                 );
                 outcomes[index] = Some(finalize_work_result(
                     work,
@@ -645,6 +671,7 @@ impl PortableRuntime {
                             checkpoint,
                             reuse_existing,
                             apple_adapter_executable.as_deref(),
+                            apple_portrait_profile,
                         );
                         if sender.send((index, work)).is_err() {
                             break;

@@ -13,8 +13,8 @@ use clap::{error::ErrorKind, Args, CommandFactory, Parser, Subcommand};
 use serde_json::json;
 use xdremux_engine::{AppleFeatureRequest, ConversionRequest};
 use xdremux_runtime::{
-    motion_photo_checkpoint_path, plan_batch_items, BatchAssetKind, BatchExecutionOptions,
-    BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
+    motion_photo_checkpoint_path, plan_batch_items, ApplePortraitSemanticProfile, BatchAssetKind,
+    BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
 };
 use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
 
@@ -57,35 +57,49 @@ struct InspectArgs {
 #[derive(Debug, Args, Default)]
 struct ProductConversionArgs {
     /// Preserve compatibility with OPPO Gallery when converting ProXDR still images.
-    #[arg(long, conflicts_with_all = ["apple_portrait", "apple_styles"])]
+    #[arg(long, conflicts_with_all = ["apple_portrait", "apple_portrait_oppo", "apple_styles"])]
     oppo_compatible: bool,
-    /// Preserve Apple Portrait editing resources when converting an OPPO Portrait still.
-    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_styles"])]
+    /// Preserve the complete Apple Portrait editing resource set using Vision semantics.
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait_oppo", "apple_styles"])]
     apple_portrait: bool,
+    /// Use OPPO depth and available masks without Vision; reduced portrait effects (macOS).
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_styles"])]
+    apple_portrait_oppo: bool,
     /// Attach the Rust-owned Photographic Styles graph to a ProXDR still.
-    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait"])]
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo"])]
     apple_styles: bool,
 }
 
 impl ProductConversionArgs {
     fn request(&self) -> ConversionRequest {
-        match (self.oppo_compatible, self.apple_portrait, self.apple_styles) {
-            (true, false, false) => ConversionRequest::oppo_gallery_compatible(),
-            (false, true, false) => ConversionRequest {
+        if self.oppo_compatible {
+            ConversionRequest::oppo_gallery_compatible()
+        } else if self.apple_portrait || self.apple_portrait_oppo {
+            ConversionRequest {
                 apple_features: AppleFeatureRequest {
                     portrait: true,
                     ..AppleFeatureRequest::default()
                 },
                 ..ConversionRequest::default()
-            },
-            (false, false, true) => ConversionRequest {
+            }
+        } else if self.apple_styles {
+            ConversionRequest {
                 apple_features: AppleFeatureRequest {
                     photographic_styles: true,
                     ..AppleFeatureRequest::default()
                 },
                 ..ConversionRequest::default()
-            },
-            _ => ConversionRequest::default(),
+            }
+        } else {
+            ConversionRequest::default()
+        }
+    }
+
+    fn portrait_profile(&self) -> ApplePortraitSemanticProfile {
+        if self.apple_portrait_oppo {
+            ApplePortraitSemanticProfile::OppoNative
+        } else {
+            ApplePortraitSemanticProfile::Complete
         }
     }
 }
@@ -326,7 +340,9 @@ fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
 
 fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
     let request = arguments.product.request();
-    let apple_portrait = arguments.product.apple_portrait;
+    let apple_portrait = arguments.product.apple_portrait || arguments.product.apple_portrait_oppo;
+    #[cfg(target_os = "macos")]
+    let apple_portrait_profile = arguments.product.portrait_profile();
     let apple_styles = arguments.product.apple_styles;
     let input = arguments.input;
     let output = arguments.output;
@@ -383,7 +399,12 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
                             return 1;
                         }
                     };
-                    match runtime.convert_apple_portrait_file(&adapter, &source, &output) {
+                    match runtime.convert_apple_portrait_file_with_profile(
+                        &adapter,
+                        &source,
+                        &output,
+                        apple_portrait_profile,
+                    ) {
                         Ok(receipt) if receipt.output == input => {
                             writeln!(stdout, "converted: {} (in place)", input.display())
                         }
@@ -403,7 +424,7 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
                 {
                     let _ = writeln!(
                         stderr,
-                        "error: --apple-portrait requires macOS ImageIO/Vision/Core Image capabilities"
+                        "error: Portrait conversion requires macOS ImageIO/Core Image; the complete profile also requires Vision semantics"
                     );
                     return 1;
                 }
@@ -640,37 +661,43 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
     };
 
     let runtime = PortableRuntime::new();
-    let apple_adapter_executable =
-        if arguments.product.apple_portrait || arguments.product.apple_styles {
-            #[cfg(target_os = "macos")]
-            {
-                match resolve_apple_adapter_executable() {
-                    Ok(path) => Some(path),
-                    Err(error) => {
-                        let _ = writeln!(stderr, "error: {error}");
-                        return 1;
-                    }
+    let apple_adapter_executable = if arguments.product.apple_portrait
+        || arguments.product.apple_portrait_oppo
+        || arguments.product.apple_styles
+    {
+        #[cfg(target_os = "macos")]
+        {
+            match resolve_apple_adapter_executable() {
+                Ok(path) => Some(path),
+                Err(error) => {
+                    let _ = writeln!(stderr, "error: {error}");
+                    return 1;
                 }
             }
-            #[cfg(not(target_os = "macos"))]
-            {
-                let _ = writeln!(
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = writeln!(
                 stderr,
                 "error: Apple feature intents require macOS ImageIO/Vision/Core Image capabilities"
             );
-                return 1;
-            }
-        } else {
-            None
-        };
+            return 1;
+        }
+    } else {
+        None
+    };
     let execution_options = BatchExecutionOptions {
         checkpoint_path,
         reuse_existing,
         jobs: arguments.jobs,
         apple_adapter_executable,
     };
-    let receipt =
-        runtime.convert_batch_with_options(items, arguments.product.request(), &execution_options);
+    let receipt = runtime.convert_batch_with_options_and_portrait_profile(
+        items,
+        arguments.product.request(),
+        &execution_options,
+        arguments.product.portrait_profile(),
+    );
 
     if arguments.json {
         let successes = receipt
@@ -856,6 +883,49 @@ mod tests {
     }
 
     #[test]
+    fn convert_accepts_oppo_native_portrait_profile() {
+        let command = parse(&[
+            "convert",
+            "--input",
+            "portrait.heic",
+            "--apple-portrait-oppo",
+        ]);
+        let RootCommand::Convert(arguments) = command.command else {
+            panic!("expected convert command");
+        };
+        assert!(arguments.product.apple_portrait_oppo);
+        assert_eq!(
+            arguments.product.portrait_profile(),
+            ApplePortraitSemanticProfile::OppoNative
+        );
+        assert!(arguments.product.request().apple_features.portrait);
+    }
+
+    #[test]
+    fn convert_rejects_combining_complete_and_oppo_native_portrait() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        assert_eq!(
+            run_from(
+                [
+                    "convert",
+                    "--input",
+                    "portrait.heic",
+                    "--apple-portrait",
+                    "--apple-portrait-oppo",
+                ],
+                &mut stdout,
+                &mut stderr,
+            ),
+            2
+        );
+        assert!(stdout.is_empty());
+        assert!(String::from_utf8(stderr)
+            .unwrap()
+            .contains("cannot be used with"));
+    }
+
+    #[test]
     fn convert_accepts_explicit_output() {
         let command = parse(&[
             "convert",
@@ -938,6 +1008,7 @@ mod tests {
         assert!(!arguments.categorize);
         assert!(!arguments.product.oppo_compatible);
         assert!(!arguments.product.apple_portrait);
+        assert!(!arguments.product.apple_portrait_oppo);
         assert!(arguments.jobs >= 1 && arguments.jobs <= 4);
     }
 

@@ -56,6 +56,21 @@ xdremux convert \
 
 OPPO-compatible output currently applies only to ProXDR still images and cannot be combined with Motion Photo → Live Photo conversion. Such a request fails explicitly instead of silently ignoring the option.
 
+### Apple Portrait on macOS
+
+Use the source-native profile when private Apple segmentation is not required:
+
+```bash
+xdremux convert --input portrait.heic --output portrait_apple.heic --apple-portrait-oppo
+xdremux batch --input-dir portraits/ --output-dir converted/ --apple-portrait-oppo --jobs 2
+```
+
+This profile preserves OPPO depth as disparity, focus metadata, aperture, Rust-generated REND, and the ISO Gain Map. It adds valid OPPO portrait and hair masks when available. Empty or unusable masks remain absent. It does not generate skin, teeth, or glasses masks and makes no Vision requests.
+
+**Portrait effects are degraded compared with the complete profile.** Subject and hair boundaries can be less accurate. Semantic relighting and related edits can be limited. This mode uses public ImageIO and Core Image APIs on macOS; it is not a Linux/Windows Portrait writer. Photos editing behavior remains dependent on the consumer and OS version.
+
+Use `--apple-portrait` for the existing complete resource set with Vision semantics, or `--apple-styles` for Photographic Styles. These options and `--apple-portrait-oppo` are mutually exclusive and cannot be combined with `--oppo-compatible`. Inputs without the required OPPO depth/source data fail before publication. The CLI does not silently switch profiles after a failure.
+
 ## `batch`
 
 Files and directories can be repeated:
@@ -83,6 +98,9 @@ Common options:
 | `--skip-existing` | Reuse an existing result only when provenance and output identity both match. |
 | `--categorize` | Publish converted assets directly into classification folders. |
 | `--oppo-compatible` | Request OPPO Gallery compatible output for ProXDR still items. |
+| `--apple-portrait` | Request the complete Portrait resource set on macOS. |
+| `--apple-portrait-oppo` | Use OPPO depth and available masks with reduced effects on macOS. |
+| `--apple-styles` | Request Photographic Styles on macOS. |
 | `--json` | Emit a stable machine-readable receipt. |
 
 Batch planning reserves all output paths before the first write, preventing collisions between sources, HEIC outputs, and Live Photo MOV companions. Failures are isolated per item; already-published successful work remains valid.

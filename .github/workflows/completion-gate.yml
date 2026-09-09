@@ -87,6 +87,12 @@ jobs:
                 "timeout_seconds": 2400
               },
               {
+                "name": "rust-driven-oppo-native-portrait-cli",
+                "kind": "functional",
+                "command": ["python3", "scripts/check_rust_cli_oppo_portrait.py"],
+                "timeout_seconds": 1200
+              },
+              {
                 "name": "rust-driven-apple-styles-consumer",
                 "kind": "integration",
                 "command": ["bash", "scripts/check_rust_style_consumer.sh"],

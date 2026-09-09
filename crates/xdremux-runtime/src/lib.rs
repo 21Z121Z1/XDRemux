@@ -24,7 +24,7 @@ pub use batch_checkpoint::{
 };
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 pub use live_photo::LivePhotoFileReceipt;
-pub use oppo_portrait::ApplePortraitSourcePreflight;
+pub use oppo_portrait::{ApplePortraitSemanticProfile, ApplePortraitSourcePreflight};
 pub use validation::{
     validate_media_file, IsoHdrValidationReport, LivePhotoValidationReport, ValidationReport,
 };
@@ -238,6 +238,17 @@ impl PortableRuntime {
         oppo_portrait::prepare_apple_portrait_source(&adapter, source)
     }
 
+    #[cfg(target_os = "macos")]
+    pub fn preflight_apple_portrait_source_with_profile(
+        &self,
+        executable: impl AsRef<Path>,
+        source: &[u8],
+        profile: ApplePortraitSemanticProfile,
+    ) -> Result<ApplePortraitSourcePreflight> {
+        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
+        oppo_portrait::prepare_apple_portrait_source_with_profile(&adapter, source, profile)
+    }
+
     /// Convert an OPPO Portrait source through one Rust-owned file transaction.
     ///
     /// Rust selects and derives every product artifact, while the Apple
@@ -250,6 +261,22 @@ impl PortableRuntime {
         executable: impl AsRef<Path>,
         source: &[u8],
         output: impl AsRef<Path>,
+    ) -> Result<ApplePortraitFileReceipt> {
+        self.convert_apple_portrait_file_with_profile(
+            executable,
+            source,
+            output,
+            ApplePortraitSemanticProfile::Complete,
+        )
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn convert_apple_portrait_file_with_profile(
+        &self,
+        executable: impl AsRef<Path>,
+        source: &[u8],
+        output: impl AsRef<Path>,
+        profile: ApplePortraitSemanticProfile,
     ) -> Result<ApplePortraitFileReceipt> {
         let output = output.as_ref();
         let parent = publication_parent(output);
@@ -269,7 +296,8 @@ impl PortableRuntime {
             .map_err(|error| RuntimeError::external("Apple Portrait input staging", error))?;
 
         let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
-        let preflight = oppo_portrait::prepare_apple_portrait_source(&adapter, source)?;
+        let preflight =
+            oppo_portrait::prepare_apple_portrait_source_with_profile(&adapter, source, profile)?;
         let expected_gain_map = preflight.gain_map;
         let mut source_image = preflight.base_jpeg.clone();
         source_image.extend_from_slice(&preflight.gain_map_jpeg);
@@ -320,6 +348,8 @@ impl PortableRuntime {
             preflight.focus_region.height,
         )
         .map_err(|error| RuntimeError::external("Apple Portrait Focus XMP", error))?;
+        let expected_portrait = preflight.portrait_effects_matte.is_some();
+        let expected_hair = preflight.hair_matte.is_some();
         let payloads = preflight.into_auxiliary_payloads()?;
         let assembled_path = staging.path().join("assembled.heic");
         adapter.imageio_write_auxiliary(&metadata_carrier_path, &assembled_path, &payloads)?;
@@ -328,10 +358,18 @@ impl PortableRuntime {
         adapter.imageio_merge_xmp_metadata(&assembled_path, &focus_xmp, &output_path)?;
 
         let facts = adapter.imageio_auxiliary_facts(&output_path)?;
-        if !facts.satisfies_portrait_editing() {
+        let accepted = match profile {
+            ApplePortraitSemanticProfile::Complete => facts.satisfies_portrait_editing(),
+            ApplePortraitSemanticProfile::OppoNative => {
+                facts.satisfies_oppo_native_portrait_resources(expected_portrait, expected_hair)
+            }
+        };
+        if !accepted {
             return Err(RuntimeError::new(
                 "Apple Portrait consumer validation",
-                format!("ImageIO did not expose the complete Portrait resource set: {facts:?}"),
+                format!(
+                    "ImageIO did not expose the requested {profile:?} Portrait resource set: {facts:?}"
+                ),
             ));
         }
         let bytes = fs::read(&output_path)

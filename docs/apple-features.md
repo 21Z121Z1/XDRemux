@@ -16,7 +16,7 @@ Rust 持有 feature request/result model、routing、fallback、validation polic
 
 ## 平台边界
 
-目标结构是：
+CLI 使用以下结构：
 
 ```text
 xdremux CLI
@@ -33,7 +33,7 @@ portable providers + Apple platform adapter
 
 `xdremux-apple-adapter` 是由 Rust 产品消费的可分发平台组件。它不是用户 CLI，也不持有产品 policy。
 
-CLI/runtime 当前使用有版本号、生命周期有界的 helper-process protocol。对于 sandboxed macOS App，如果需要独立 entitlement、sandbox、lifecycle 或 crash isolation，可以使用 XPC。transport 刻意保持为 runtime 私有实现，因此更换 transport 不会改变 engine 或 CLI 语义。
+CLI/runtime 使用有版本号、生命周期有界的 helper-process protocol。每次转换复用一个延迟启动的 adapter session。超时、崩溃或帧格式错误会终止该 session。transport 保持为 Rust runtime 的私有实现，因此更换 transport 不会改变 engine 或 CLI 语义。
 
 ## Rust 持有的 policy
 
@@ -48,7 +48,7 @@ Rust 已把用户层 Apple feature intent 建模为两个事实：摄影风格�
 
 adapter 不回答“这是不是有效人像输出”这类业务问题。该判断由 `xdremux-engine` 中的 `AppleImageAuxiliaryFacts` 和 Portrait resource contract 持有。
 
-后续迁移也应沿用同一模式：返回最窄且足够的 framework fact 或 operation result，再由 Rust 持有 policy。
+新增操作必须沿用同一边界：返回最窄且足够的 framework fact 或 operation result，再由 Rust 持有 policy。
 
 ## 摄影风格迁移
 
@@ -60,6 +60,24 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy、JPEG/container logic、Gain Map policy、REND generation、auxiliary-manifest construction、feature routing、output naming、validation policy 和 atomic publication。ImageIO 只报告 auxiliary-resource facts，adapter 只执行 Rust transaction 要求的 Apple framework operation。
 
+### 源数据模式和效果降级
+
+`convert` 和 `batch` 支持 `--apple-portrait-oppo`。此模式不调用 Vision，包括其私有分割 SPI。它使用公开的 ImageIO 和 Core Image 操作，因此仍需要 macOS。
+
+| 资源 | 源数据模式 |
+| --- | --- |
+| ISO Gain Map | 从源文件保留。 |
+| Disparity、焦点、光圈、REND | 由 Rust 根据 OPPO 深度、拍摄数据和源元数据生成。 |
+| Portrait Effects Matte | OPPO 人物平面存在可信前景时才附加。 |
+| Hair matte | OPPO 头发平面存在可信前景时才附加。 |
+| 皮肤、牙齿、眼镜蒙版 | 保持缺失，不生成替代蒙版。 |
+
+相比完整的 `--apple-portrait` 模式，人像效果会降级。源蒙版分辨率较低或缺失时，主体分离和发丝细节可能降低，语义光效及相关编辑可能受限。仅包含深度的输出可以满足源数据模式的资源契约，但不等同于完整语义资源集。OPPO pet 平面不会被冒充成人物或头发蒙版。
+
+源数据模式不会回退到 Vision。缺少必要深度或源元数据时，在发布输出前报错。完整模式保持原有严格资源要求。两种模式共用 Rust 转换和发布路径。
+
+源数据模式回归使用两张真实 OPPO 人像样张，以 ImageIO 核对单文件及串行、并行批处理输出，并拒绝任何 Vision 操作。它还验证预处理失败时保留已有输出。运行命令为 `python3 scripts/check_rust_cli_oppo_portrait.py`。
+
 ## Live Photo
 
 普通 Motion Photo → Live Photo 已经是 Rust 产品能力，不应绕回 Apple capability adapter。
@@ -70,7 +88,7 @@ Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy�
 
 产品级 compatibility rule 属于 Rust。例如 Apple editing feature 是否能与 OPPO-compatible output 组合、源资产是否具备 Portrait editing 所需资源，以及组合请求如何 atomic publish，都应由 Rust 决策。
 
-不要因为旧 Swift 实现当前负责这些判断，就把这些 policy 固化进 adapter protocol。
+扩展 CLI 时，不要把这些策略移入 adapter protocol。
 
 ## 验证与验收
 
@@ -83,6 +101,8 @@ Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy�
 涉及 Apple Photos 交互式编辑的结论，不能用结构证据替代真机证据。
 
 Canonical completion gate 要求 Rust workspace 和真实 Rust → Apple adapter handshake 在 macOS 上通过。feature-specific gate 驱动 Rust CLI 后查询 Apple consumer facts。结构和 native-framework evidence 本身不等于 visual equivalence 或 Photos 真机验收。
+
+CLI 迁移验收覆盖唯一的 Rust 命令入口、媒体转换、与源数据匹配的资源契约和 Apple adapter。macOS App 集成属于独立范围。源数据模式的效果降级是已记录的产品取舍。Photos 交互式编辑仍是独立消费端结论；CLI 通过不代表 Photos 效果或编辑界面完全一致。
 
 ## 研究材料
 

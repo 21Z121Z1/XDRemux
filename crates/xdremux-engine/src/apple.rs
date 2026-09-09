@@ -36,6 +36,25 @@ impl AppleImageAuxiliaryFacts {
             && self.glasses_matte
             && self.focus_metadata
     }
+
+    /// Resource contract for OPPO-native Portrait, bound to the source mattes.
+    ///
+    /// This profile publishes only producer-backed resources. Skin, teeth
+    /// and glasses are absent instead of being invented when Vision is not used.
+    pub const fn satisfies_oppo_native_portrait_resources(
+        self,
+        expected_portrait: bool,
+        expected_hair: bool,
+    ) -> bool {
+        self.iso_gain_map
+            && self.disparity
+            && self.portrait_effects_matte == expected_portrait
+            && self.hair_matte == expected_hair
+            && self.focus_metadata
+            && !self.skin_matte
+            && !self.teeth_matte
+            && !self.glasses_matte
+    }
 }
 
 /// Semantic image resources used by Apple photo features.
@@ -417,6 +436,86 @@ mod tests {
             ..complete
         };
         assert!(!missing_glasses.satisfies_portrait_editing());
+    }
+
+    #[test]
+    fn oppo_native_portrait_contract_accepts_only_producer_backed_resources() {
+        let c = AppleImageAuxiliaryFacts {
+            iso_gain_map: true,
+            disparity: true,
+            portrait_effects_matte: true,
+            skin_matte: false,
+            hair_matte: true,
+            teeth_matte: false,
+            glasses_matte: false,
+            focus_metadata: true,
+        };
+        assert!(c.satisfies_oppo_native_portrait_resources(true, true));
+        assert!(!c.satisfies_portrait_editing());
+        assert!(!AppleImageAuxiliaryFacts {
+            skin_matte: true,
+            ..c
+        }
+        .satisfies_oppo_native_portrait_resources(true, true));
+        assert!(!AppleImageAuxiliaryFacts {
+            hair_matte: false,
+            ..c
+        }
+        .satisfies_oppo_native_portrait_resources(true, true));
+    }
+
+    #[test]
+    fn oppo_native_portrait_contract_binds_every_optional_resource() {
+        for portrait in [false, true] {
+            for hair in [false, true] {
+                let facts = AppleImageAuxiliaryFacts {
+                    iso_gain_map: true,
+                    disparity: true,
+                    focus_metadata: true,
+                    portrait_effects_matte: portrait,
+                    hair_matte: hair,
+                    ..AppleImageAuxiliaryFacts::default()
+                };
+                assert!(facts.satisfies_oppo_native_portrait_resources(portrait, hair));
+                assert!(!facts.satisfies_portrait_editing());
+                for changed in [
+                    AppleImageAuxiliaryFacts {
+                        iso_gain_map: false,
+                        ..facts
+                    },
+                    AppleImageAuxiliaryFacts {
+                        disparity: false,
+                        ..facts
+                    },
+                    AppleImageAuxiliaryFacts {
+                        focus_metadata: false,
+                        ..facts
+                    },
+                    AppleImageAuxiliaryFacts {
+                        portrait_effects_matte: !portrait,
+                        ..facts
+                    },
+                    AppleImageAuxiliaryFacts {
+                        hair_matte: !hair,
+                        ..facts
+                    },
+                    AppleImageAuxiliaryFacts {
+                        skin_matte: true,
+                        ..facts
+                    },
+                    AppleImageAuxiliaryFacts {
+                        teeth_matte: true,
+                        ..facts
+                    },
+                    AppleImageAuxiliaryFacts {
+                        glasses_matte: true,
+                        ..facts
+                    },
+                ] {
+                    assert!(!changed.satisfies_oppo_native_portrait_resources(portrait, hair));
+                }
+            }
+        }
     }
 
     #[test]

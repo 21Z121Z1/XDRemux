@@ -104,7 +104,9 @@ xdremux validate output.heic --json
 
 ## Apple editing features
 
-Photographic Styles and Apple Portrait currently remain behind a migration boundary. The target architecture keeps product policy, orchestration, data models, and the CLI in Rust while a narrow Apple-native adapter invokes platform frameworks such as Core Image, Vision, Core ML, and AVFoundation.
+Rust owns Photographic Styles and Apple Portrait policy, orchestration, data models, and the CLI. A narrow Swift adapter executes Apple framework operations. It is not a second conversion backend.
+
+On macOS, `--apple-portrait` requests the complete semantic resource set. `--apple-portrait-oppo` uses OPPO depth and available masks without Vision or its private segmentation SPI. This mode has reduced portrait effects. Missing masks remain absent. It still requires public ImageIO and Core Image APIs. See the [CLI reference](docs/cli.en.md) for usage.
 
 See [`docs/apple-features.en.md`](docs/apple-features.en.md) for the current support and acceptance boundary.
 
