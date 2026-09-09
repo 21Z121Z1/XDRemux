@@ -6,7 +6,7 @@ on:
       - research/photographic-styles-3-texture-probe
     paths:
       - .github/workflows/texture-style-xcode27-fast.yml
-      - scripts/research/texture_style_ios27_sim_probe.m
+      - scripts/research/texture_style_ios27_sim_probe_v2.m
   workflow_dispatch:
 
 permissions:
@@ -48,7 +48,7 @@ jobs:
           PY
           cat artifacts/selection.env
           cat artifacts/selection.env >> "$GITHUB_ENV"
-      - name: Compile and execute private probe
+      - name: Compile and execute private probe v2
         shell: bash
         run: |
           set -euo pipefail
@@ -64,8 +64,8 @@ jobs:
           mkdir -p "$APP"
           xcrun --sdk iphonesimulator clang -fobjc-arc \
             -target "${ARCH}-apple-ios${SDK_VERSION}-simulator" -isysroot "$SDK" \
-            -framework Foundation -framework UIKit -framework ImageIO \
-            scripts/research/texture_style_ios27_sim_probe.m -o "$APP/TextureStyleProbe" \
+            -framework Foundation -framework UIKit -framework ImageIO -framework CoreGraphics \
+            scripts/research/texture_style_ios27_sim_probe_v2.m -o "$APP/TextureStyleProbe" \
             2>&1 | tee artifacts/compile.txt
           cat > "$APP/Info.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
@@ -89,9 +89,10 @@ jobs:
           set -e
           echo "$STATUS" > artifacts/launch-status.txt
           DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.TextureStyleProbe data)"
-          if [[ -s "$DATA/Documents/texture-style-ios27-probe.json" ]]; then
-            cp "$DATA/Documents/texture-style-ios27-probe.json" artifacts/runtime-probe.json
-            cat artifacts/runtime-probe.json
+          if [[ -s "$DATA/Documents/texture-style-ios27-probe-v2.json" ]]; then
+            cp "$DATA/Documents/texture-style-ios27-probe-v2.json" artifacts/runtime-probe-v2.json
+            [[ ! -s "$DATA/Documents/texture-style-imageio-probe.jpg" ]] || cp "$DATA/Documents/texture-style-imageio-probe.jpg" artifacts/texture-style-imageio-probe.jpg
+            cat artifacts/runtime-probe-v2.json
           else
             cat artifacts/launch.txt
             exit 1
