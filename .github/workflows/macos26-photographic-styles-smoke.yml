@@ -22,7 +22,6 @@ on:
   push:
     branches:
       - main
-      - feat/rust-cli-unification
     paths:
       - "Package.swift"
       - "Sources/XDRemuxAppleAdapter/**"

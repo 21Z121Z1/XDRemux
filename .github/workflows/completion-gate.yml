@@ -2,23 +2,24 @@ name: XDRemux Completion Gate
 
 on:
   pull_request:
-  # Bootstrap this new gate on its migration branch. Once this workflow lands on
-  # main, pull_request is the normal pre-merge trigger and this branch entry can
-  # be removed with the migration branch itself.
   push:
-    branches: [feat/rust-cli-unification]
+    branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   exact-head:
-    name: canonical-product
+    name: exact-head
     runs-on: macos-latest
     timeout-minutes: 75
     env:
       XDREMUX_GATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      XDREMUX_GATE_BASE: ${{ github.event.pull_request.base.ref || 'main' }}
+      XDREMUX_GATE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.event.pull_request.base.ref) || github.event.before || 'main' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -113,7 +114,7 @@ jobs:
               {
                 "name": "repository-policy-regressions",
                 "kind": "regression",
-                "command": ["python3", "-m", "unittest", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_app_architecture", "Tests.test_performance_design", "Tests.test_rust_artifact_lifecycle", "Tests.test_rust_apple_semantic_policy", "Tests.test_apple_device_acceptance", "Tests.test_rust_portrait_translation"],
+                "command": ["python3", "-m", "unittest", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_app_architecture", "Tests.test_performance_design", "Tests.test_rust_artifact_lifecycle", "Tests.test_rust_apple_semantic_policy", "Tests.test_apple_device_acceptance", "Tests.test_rust_portrait_translation", "Tests.validation.test_workflow_configuration"],
                 "timeout_seconds": 300
               }
             ]
@@ -124,7 +125,7 @@ jobs:
         shell: bash
         run: |
           python3 scripts/agent_completion_gate.py run \
-            --base "origin/$XDREMUX_GATE_BASE" \
+            --base "$XDREMUX_GATE_BASE" \
             --plan "$RUNNER_TEMP/xdremux-completion-plan.json"
           python3 scripts/agent_completion_gate.py verify \
             ".codex/verification-receipts/$(git rev-parse HEAD).json"

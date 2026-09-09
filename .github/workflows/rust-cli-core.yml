@@ -2,6 +2,7 @@ name: Rust CLI core
 
 on:
   push:
+    branches: [main]
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
@@ -43,6 +44,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rust-cli-core:
     runs-on: ubuntu-latest
@@ -69,7 +74,7 @@ jobs:
         run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
       - name: Exercise real Rust CLI routes and product intents
         run: bash scripts/check_rust_cli_smoke.sh
-      - name: Verify exact-head completion gate
+      - name: Verify merge-result completion gate
         shell: bash
         run: |
           cat > "$RUNNER_TEMP/xdremux-rust-cli-gate.json" <<'JSON'
