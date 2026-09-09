@@ -1,0 +1,161 @@
+name: Photographic Styles 3 Texture Probe
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  texture-probe:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build XDRemux
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build
+          mkdir -p artifacts/candidates artifacts/debug
+
+      - name: Resolve Apple Styles input
+        shell: bash
+        env:
+          FIXTURE_ARCHIVE_URL: ${{ secrets.XDREMUX_REGRESSION_FIXTURE_ARCHIVE_URL }}
+        run: |
+          set -euo pipefail
+          : > artifacts/input-candidates.txt
+          if [[ -n "${FIXTURE_ARCHIVE_URL:-}" ]]; then
+            mkdir -p "$RUNNER_TEMP/xdremux-fixtures"
+            curl --fail --location --silent --show-error \
+              "$FIXTURE_ARCHIVE_URL" \
+              --output "$RUNNER_TEMP/xdremux-fixtures.zip"
+            ditto -x -k \
+              "$RUNNER_TEMP/xdremux-fixtures.zip" \
+              "$RUNNER_TEMP/xdremux-fixtures"
+            find "$RUNNER_TEMP/xdremux-fixtures" -type f -name 'apple-styles.heic' \
+              -print >> artifacts/input-candidates.txt
+          fi
+          find fixtures -maxdepth 1 -type f -iname '*.heic' -print \
+            | head -n 12 >> artifacts/input-candidates.txt
+          awk '!seen[$0]++' artifacts/input-candidates.txt \
+            > artifacts/input-candidates.dedup.txt
+          mv artifacts/input-candidates.dedup.txt artifacts/input-candidates.txt
+          test -s artifacts/input-candidates.txt
+          cat artifacts/input-candidates.txt
+
+      - name: Generate known-good Photographic Styles baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          selected=''
+          while IFS= read -r input; do
+            [[ -n "$input" ]] || continue
+            rm -f artifacts/baseline.heic artifacts/baseline-validation.json
+            rm -rf artifacts/debug/baseline
+            mkdir -p artifacts/debug/baseline
+            if .build/debug/xdremux convert \
+                --apple-photographic-styles \
+                --debug-dir artifacts/debug/baseline \
+                --input "$input" \
+                --output artifacts/baseline.heic \
+                > artifacts/baseline-convert.json \
+                2> artifacts/baseline-convert.stderr \
+              && .build/debug/xdremux validate-apple \
+                --input artifacts/baseline.heic \
+                > artifacts/baseline-validation.json \
+                2> artifacts/baseline-validation.stderr; then
+              selected="$input"
+              break
+            fi
+          done < artifacts/input-candidates.txt
+          if [[ -z "$selected" ]]; then
+            echo '::error::No checked-in HEIC fixture could produce a valid Apple Styles baseline.'
+            exit 1
+          fi
+          printf '%s\n' "$selected" > artifacts/selected-input.txt
+          echo "Selected baseline input: $selected"
+
+      - name: Probe current macOS private TextureStyle runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun clang -fobjc-arc -framework Foundation \
+            scripts/research/texture_style_runtime_probe.m \
+            -o "$RUNNER_TEMP/texture-runtime-probe"
+          "$RUNNER_TEMP/texture-runtime-probe" artifacts/texture-runtime-probe.json
+          cat artifacts/texture-runtime-probe.json
+
+      - name: Build TextureStyle metadata candidate matrix without re-encoding media
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/research/patch_texture_style_heif.py \
+            artifacts/baseline.heic \
+            artifacts/texture-runtime-probe.json \
+            artifacts/candidates \
+            | tee artifacts/candidate-build-report.json
+
+      - name: Validate every candidate and record offline evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'candidate\timageio\txdremux_validate_apple\n' > artifacts/candidate-results.tsv
+          for file in artifacts/candidates/*.heic; do
+            name="$(basename "$file" .heic)"
+            imageio=fail
+            validator=fail
+            if sips -g pixelWidth -g pixelHeight "$file" \
+                > "artifacts/candidates/${name}.sips.txt" 2>&1; then
+              imageio=pass
+            fi
+            if .build/debug/xdremux validate-apple --input "$file" \
+                > "artifacts/candidates/${name}.validation.json" \
+                2> "artifacts/candidates/${name}.validation.stderr"; then
+              validator=pass
+            fi
+            printf '%s\t%s\t%s\n' "$name" "$imageio" "$validator" \
+              >> artifacts/candidate-results.tsv
+          done
+          cat artifacts/candidate-results.tsv
+
+      - name: Run targeted repository checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest Tests.validation.test_agent_completion_gate
+          python3 -m unittest Tests.test_swift_app_architecture
+
+      - name: Write experiment summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Photographic Styles 3 Texture probe'
+            echo
+            echo '- Existing XDRemux Apple Styles output is the baseline.'
+            echo '- The candidate patch redirects only the existing semantic-style plist item to an appended mdat payload; image, Gain Map and 51,840-byte StyleData are not re-encoded.'
+            echo '- Candidate fields are derived from the iOS 27 firmware symbols: Preset, Intensity, Grain, RenderingVersion and OriginalInsteadOfReversibility.'
+            echo '- When the runner exposes them, PITextureStyleAdjustmentKey and CEKTextureStyle dictionaries are discovered at runtime instead of guessed.'
+            echo '- This run does not constitute device evidence. Texture/Grain UI activation still requires importing a candidate into iOS 27/macOS Photos.'
+            echo
+            if [[ -f artifacts/candidate-results.tsv ]]; then
+              echo '```text'
+              cat artifacts/candidate-results.tsv
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload HEIC candidates and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: photographic-styles-3-texture-probe-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: artifacts/
