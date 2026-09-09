@@ -1,0 +1,104 @@
+name: TextureStyle Xcode 27 Fast Runtime
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-xcode27-fast.yml
+      - scripts/research/texture_style_ios27_sim_probe.m
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fast-runtime:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select and boot iOS 27
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          xcodebuild -version | tee artifacts/xcode.txt
+          xcrun --sdk iphonesimulator --show-sdk-version | tee artifacts/sdk.txt
+          xcrun simctl list runtimes -j > artifacts/runtimes.json
+          xcrun simctl list devicetypes -j > artifacts/device-types.json
+          python3 - <<'PY' > artifacts/selection.env
+          import json
+          from pathlib import Path
+          rs=json.loads(Path('artifacts/runtimes.json').read_text()).get('runtimes',[])
+          rs=[r for r in rs if 'iOS' in (str(r.get('name',''))+str(r.get('identifier',''))) and r.get('isAvailable',True)]
+          rs=[r for r in rs if str(r.get('version','')).startswith('27.')]
+          if not rs: raise SystemExit('no iOS 27 runtime')
+          def v(r): return tuple(int(x) if x.isdigit() else 0 for x in str(r.get('version','0')).split('.'))
+          r=sorted(rs,key=v)[-1]
+          ds=json.loads(Path('artifacts/device-types.json').read_text()).get('devicetypes',[])
+          iph=[d for d in ds if str(d.get('name','')).startswith('iPhone')]
+          if not iph: raise SystemExit('no iPhone type')
+          print('RUNTIME_ID='+str(r['identifier']))
+          print('RUNTIME_VERSION='+str(r.get('version','')))
+          print('RUNTIME_BUILD='+str(r.get('buildversion','')))
+          print('DEVICE_TYPE='+str(iph[-1]['identifier']))
+          PY
+          cat artifacts/selection.env
+          cat artifacts/selection.env >> "$GITHUB_ENV"
+      - name: Compile and execute private probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          UDID="$(xcrun simctl create TextureStyleProbe "$DEVICE_TYPE" "$RUNTIME_ID")"
+          cleanup() { xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b | tee artifacts/boot.txt
+          SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          SDK_VERSION="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          ARCH="$(uname -m)"
+          APP="$RUNNER_TEMP/TextureStyleProbe.app"
+          mkdir -p "$APP"
+          xcrun --sdk iphonesimulator clang -fobjc-arc \
+            -target "${ARCH}-apple-ios${SDK_VERSION}-simulator" -isysroot "$SDK" \
+            -framework Foundation -framework UIKit -framework ImageIO \
+            scripts/research/texture_style_ios27_sim_probe.m -o "$APP/TextureStyleProbe" \
+            2>&1 | tee artifacts/compile.txt
+          cat > "$APP/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleIdentifier</key><string>org.xdremux.TextureStyleProbe</string>
+            <key>CFBundleExecutable</key><string>TextureStyleProbe</string>
+            <key>CFBundleName</key><string>TextureStyleProbe</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>MinimumOSVersion</key><string>${SDK_VERSION}</string>
+            <key>LSRequiresIPhoneOS</key><true/>
+          </dict></plist>
+          PLIST
+          codesign --force --sign - "$APP"
+          xcrun simctl install "$UDID" "$APP"
+          set +e
+          xcrun simctl launch --console "$UDID" org.xdremux.TextureStyleProbe > artifacts/launch.txt 2>&1
+          STATUS=$?
+          set -e
+          echo "$STATUS" > artifacts/launch-status.txt
+          DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.TextureStyleProbe data)"
+          if [[ -s "$DATA/Documents/texture-style-ios27-probe.json" ]]; then
+            cp "$DATA/Documents/texture-style-ios27-probe.json" artifacts/runtime-probe.json
+            cat artifacts/runtime-probe.json
+          else
+            cat artifacts/launch.txt
+            exit 1
+          fi
+      - name: Upload runtime probe
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-xcode27-fast-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
