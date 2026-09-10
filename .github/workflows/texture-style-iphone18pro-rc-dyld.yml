@@ -1,4 +1,4 @@
-name: TextureStyle iPhone 18 Pro RC dyld
+name: TextureStyle iOS 27 RC device dyld
 
 on:
   push:
@@ -29,45 +29,29 @@ jobs:
           brew install --formula blacktop/tap/ipsw
           ipsw version | tee ipsw-version.txt
 
-      - name: Remote-extract iPhone 18 Pro iOS 27 RC arm64e dyld cache
+      - name: Remote-extract iOS 27 RC arm64e device dyld cache
         shell: bash
         run: |
           set -euo pipefail
-          # iPhone 18 Pro = iPhone19,2 / V63AP. Use Apple's RC OTA source and
-          # blacktop/ipsw's remote DSC extraction so the full OTA is not retained.
-          set +e
-          ipsw download ota \
-            --platform ios \
-            --device iPhone19,2 \
-            --build 24A435 \
-            --rc \
+          # Current ipsw/Pallas indexes lag the 2026 launch devices and RC build.
+          # Bypass those indexes and use Apple's exact 24A435 CDN URL directly.
+          # iPhone18,1 is iPhone 17 Pro / V53AP.  The OS-level TextureStyle
+          # framework schema is common to the 24A435 device build; V63AP-specific
+          # iPhone 18 Pro tuning is kept as a separate follow-up question.
+          RC_URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          printf '%s\n' "$RC_URL" > artifacts/rc-dyld/source-url.txt
+          echo iPhone18,1 > artifacts/rc-dyld/cache-source.txt
+          echo 24A435 > artifacts/rc-dyld/build.txt
+
+          ipsw extract \
+            --remote \
             --dyld \
             --dyld-arch arm64e \
-            --confirm \
             --output "$PWD/artifacts/rc-dyld/cache" \
+            "$RC_URL" \
             2>&1 | tee artifacts/rc-dyld/remote-extract.log
-          status=${PIPESTATUS[0]}
-          set -e
-          echo "$status" > artifacts/rc-dyld/remote-extract-status.txt
 
-          if [[ "$status" -ne 0 ]]; then
-            echo 'iPhone19,2 RC OTA DSC extraction failed; falling back to the iPhone 17 Pro RC IPSW.' | tee -a artifacts/rc-dyld/remote-extract.log
-            # General TextureStyle schema is OS-level. This fallback is only for
-            # common framework recovery; V63AP-specific tuning is never inferred from it.
-            ipsw download ipsw \
-              --device iPhone18,1 \
-              --build 24A435 \
-              --dyld \
-              --dyld-arch arm64e \
-              --confirm \
-              --output "$PWD/artifacts/rc-dyld/cache" \
-              2>&1 | tee artifacts/rc-dyld/fallback-extract.log
-            echo iPhone18,1 > artifacts/rc-dyld/cache-source.txt
-          else
-            echo iPhone19,2 > artifacts/rc-dyld/cache-source.txt
-          fi
-
-          find artifacts/rc-dyld/cache -type f -maxdepth 5 -print | sort > artifacts/rc-dyld/cache-files.txt
+          find artifacts/rc-dyld/cache -type f -maxdepth 6 -print | sort > artifacts/rc-dyld/cache-files.txt
           cat artifacts/rc-dyld/cache-files.txt
           CACHE="$(find artifacts/rc-dyld/cache -type f -name 'dyld_shared_cache_arm64e' -print -quit)"
           if [[ -z "$CACHE" ]]; then
@@ -98,11 +82,11 @@ jobs:
             printf '%s\t%s\t%s\n' "$image" "$macho_status" "$class_status" >> artifacts/rc-dyld/analysis/status.tsv
 
             {
-              grep -i -n -E -C 8 \
-                'TextureStyle|Texture Styles|texture_styles|UnstyledOriginal|unstyledoriginal|FilmGrain|MakerNote|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|hasTextureStyle|textureStyleIsReversible' \
+              grep -i -n -E -C 10 \
+                'TextureStyle|Texture Styles|texture_styles|UnstyledOriginal|unstyledoriginal|FilmGrain|MakerNote|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|hasTextureStyle|textureStyleIsReversible|CustomMetadataTypeURN' \
                 "artifacts/rc-dyld/analysis/${image}-macho.txt" || true
-              grep -i -n -E -C 8 \
-                'TextureStyle|UnstyledOriginal|FilmGrain|MakerNote|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|hasTextureStyle|textureStyleIsReversible' \
+              grep -i -n -E -C 10 \
+                'TextureStyle|UnstyledOriginal|FilmGrain|MakerNote|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|hasTextureStyle|textureStyleIsReversible|CustomMetadataTypeURN' \
                 "artifacts/rc-dyld/analysis/${image}-class-dump.txt" || true
             } > "artifacts/rc-dyld/analysis/${image}-focused.txt"
           done
@@ -128,7 +112,7 @@ jobs:
             ipsw dyld disass "$CACHE" \
               --symbol "$symbol" \
               --symbol-image "$image" \
-              --count 240 \
+              --count 300 \
               > "artifacts/rc-dyld/disass/${safe}.txt" 2>&1
             status=$?
             set -e
@@ -160,7 +144,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: texture-style-iphone18pro-rc-dyld-${{ github.sha }}
+          name: texture-style-ios27-rc-dyld-${{ github.sha }}
           retention-days: 7
           if-no-files-found: error
           compression-level: 6
