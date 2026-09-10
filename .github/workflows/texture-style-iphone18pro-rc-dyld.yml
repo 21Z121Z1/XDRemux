@@ -1,0 +1,174 @@
+name: TextureStyle iPhone 18 Pro RC dyld
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-v3
+    paths:
+      - .github/workflows/texture-style-iphone18pro-rc-dyld.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rc-device-cache:
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install firmware analysis tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install blacktop/tap/ipsw
+          ipsw version | tee ipsw-version.txt
+          mkdir -p artifacts/rc-dyld/cache artifacts/rc-dyld/analysis artifacts/rc-dyld/disass
+
+      - name: Remote-extract iPhone 18 Pro iOS 27 RC arm64e dyld cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          # iPhone 18 Pro = iPhone19,2 / V63AP.  Use Apple's RC OTA source and
+          # blacktop/ipsw's remote DSC extraction so the full OTA is not retained.
+          set +e
+          ipsw download ota \
+            --platform ios \
+            --device iPhone19,2 \
+            --build 24A435 \
+            --rc \
+            --dyld \
+            --dyld-arch arm64e \
+            --confirm \
+            --output "$PWD/artifacts/rc-dyld/cache" \
+            2>&1 | tee artifacts/rc-dyld/remote-extract.log
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "$status" > artifacts/rc-dyld/remote-extract-status.txt
+
+          if [[ "$status" -ne 0 ]]; then
+            echo 'iPhone19,2 RC OTA DSC extraction failed; falling back to the iPhone 17 Pro RC IPSW.' | tee -a artifacts/rc-dyld/remote-extract.log
+            # General TextureStyle schema is OS-level. This fallback is only for
+            # common framework recovery; V63AP-specific tuning is never inferred from it.
+            ipsw download ipsw \
+              --device iPhone18,1 \
+              --build 24A435 \
+              --dyld \
+              --dyld-arch arm64e \
+              --confirm \
+              --output "$PWD/artifacts/rc-dyld/cache" \
+              2>&1 | tee artifacts/rc-dyld/fallback-extract.log
+            echo iPhone18,1 > artifacts/rc-dyld/cache-source.txt
+          else
+            echo iPhone19,2 > artifacts/rc-dyld/cache-source.txt
+          fi
+
+          find artifacts/rc-dyld/cache -type f -maxdepth 5 -print | sort > artifacts/rc-dyld/cache-files.txt
+          cat artifacts/rc-dyld/cache-files.txt
+          CACHE="$(find artifacts/rc-dyld/cache -type f -name 'dyld_shared_cache_arm64e' -print -quit)"
+          if [[ -z "$CACHE" ]]; then
+            echo 'dyld_shared_cache_arm64e not found' >&2
+            exit 1
+          fi
+          printf '%s\n' "$CACHE" | tee artifacts/rc-dyld/cache-path.txt
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+
+      - name: Parse TextureStyle frameworks in-cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipsw dyld info "$CACHE" > artifacts/rc-dyld/analysis/cache-info.txt
+
+          images=(CMPhoto NeutrinoCore PhotoImaging PhotosFormats CameraEditKit AVFCapture CMCaptureCore CMImaging PhotosUIEdit)
+          for image in "${images[@]}"; do
+            echo "=== $image ==="
+            set +e
+            ipsw dyld macho "$CACHE" "$image" \
+              --objc --objc-refs --strings --symbols \
+              > "artifacts/rc-dyld/analysis/${image}-macho.txt" 2>&1
+            macho_status=$?
+            ipsw class-dump "$CACHE" "$image" \
+              > "artifacts/rc-dyld/analysis/${image}-class-dump.txt" 2>&1
+            class_status=$?
+            set -e
+            printf '%s\t%s\t%s\n' "$image" "$macho_status" "$class_status" >> artifacts/rc-dyld/analysis/status.tsv
+
+            {
+              grep -i -n -E -C 8 \
+                'TextureStyle|Texture Styles|texture_styles|UnstyledOriginal|unstyledoriginal|FilmGrain|MakerNote|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|hasTextureStyle|textureStyleIsReversible' \
+                "artifacts/rc-dyld/analysis/${image}-macho.txt" || true
+              grep -i -n -E -C 8 \
+                'TextureStyle|UnstyledOriginal|FilmGrain|MakerNote|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|hasTextureStyle|textureStyleIsReversible' \
+                "artifacts/rc-dyld/analysis/${image}-class-dump.txt" || true
+            } > "artifacts/rc-dyld/analysis/${image}-focused.txt"
+          done
+
+      - name: Disassemble named TextureStyle entry points
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These are deliberately best-effort. The in-cache class dump from the
+          # previous step remains the source of method VM addresses when an ObjC
+          # method is not present in the local-symbol table.
+          cat > artifacts/rc-dyld/disass/targets.tsv <<'EOF'
+          PhotoImaging	_PITextureStyleSettingsFromMakerNoteProperties
+          PhotoImaging	_PITextureStylePresetFromMakerNoteValue
+          PhotoImaging	_PITextureStylePresetFromString
+          PhotosFormats	-[PFMetadata hasTextureStyle]
+          PhotosFormats	-[PFMetadataImage hasTextureStyle]
+          PhotosFormats	-[PFMetadata textureStyleIsReversible]
+          NeutrinoCore	+[_NUTextureStyleProperties textureStylePropertiesFromImageMetadata:auxImageMetadata:error:]
+          PhotoImaging	-[PITextureStyleAdjustmentController updateWithTextureStyleInfo:]
+          EOF
+
+          while IFS=$'\t' read -r image symbol; do
+            safe="$(printf '%s-%s' "$image" "$symbol" | tr -cs 'A-Za-z0-9._-' '_')"
+            set +e
+            ipsw dyld disass "$CACHE" \
+              --symbol "$symbol" \
+              --symbol-image "$image" \
+              --count 240 \
+              > "artifacts/rc-dyld/disass/${safe}.txt" 2>&1
+            status=$?
+            set -e
+            printf '%s\t%s\t%s\n' "$image" "$symbol" "$status" >> artifacts/rc-dyld/disass/status.tsv
+          done < artifacts/rc-dyld/disass/targets.tsv
+
+      - name: Extract focused standalone Mach-Os for later offline analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/rc-dyld/extracted
+          for image in CMPhoto NeutrinoCore PhotoImaging PhotosFormats CameraEditKit AVFCapture; do
+            set +e
+            ipsw dyld extract "$CACHE" "$image" \
+              --slide --objc --stubs --force \
+              --output artifacts/rc-dyld/extracted \
+              >> artifacts/rc-dyld/extract-images.log 2>&1
+            echo "$image $?" >> artifacts/rc-dyld/extract-images-status.txt
+            set -e
+          done
+          find artifacts/rc-dyld/extracted -type f -maxdepth 2 -print -exec file {} \; > artifacts/rc-dyld/extracted-files.txt || true
+
+      - name: Drop full shared cache before artifact upload
+        if: always()
+        shell: bash
+        run: |
+          rm -rf artifacts/rc-dyld/cache
+
+      - name: Upload focused RC evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-iphone18pro-rc-dyld-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 6
+          path: |
+            artifacts/rc-dyld/analysis/
+            artifacts/rc-dyld/disass/
+            artifacts/rc-dyld/extracted/
+            artifacts/rc-dyld/*.txt
+            artifacts/rc-dyld/*.log
+            ipsw-version.txt
