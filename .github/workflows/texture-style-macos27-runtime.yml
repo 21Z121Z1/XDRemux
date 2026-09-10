@@ -1,0 +1,110 @@
+name: TextureStyle macOS 27 runtime
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-v3
+    paths:
+      - .github/workflows/texture-style-macos27-runtime.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: macos-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Probe same-generation Photos private runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          sw_vers | tee artifacts/sw-vers.txt
+          cat > "$RUNNER_TEMP/texture27.m" <<'EOF'
+          #import <Foundation/Foundation.h>
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+
+          static id safe(id x) {
+            if (!x) return [NSNull null];
+            if ([NSJSONSerialization isValidJSONObject:x]) return x;
+            if ([x isKindOfClass:NSClassFromString(@"NSString")] || [x isKindOfClass:NSClassFromString(@"NSNumber")]) return x;
+            return @{ @"class": NSStringFromClass([x class]) ?: @"?", @"description": [x description] ?: @"" };
+          }
+          static id symObj(const char *name) {
+            void *p=dlsym(RTLD_DEFAULT,name); if(!p) return nil;
+            @try { return *(__unsafe_unretained id *)p; } @catch (...) { return nil; }
+          }
+          static id classCall(NSString *c, NSString *s) {
+            Class cls=NSClassFromString(c); SEL sel=NSSelectorFromString(s);
+            if(!cls || ![cls respondsToSelector:sel]) return nil;
+            @try { return ((id(*)(id,SEL))objc_msgSend)(cls,sel); } @catch (...) { return nil; }
+          }
+          static id funcSettings(NSDictionary *d) {
+            void *p=dlsym(RTLD_DEFAULT,"PITextureStyleSettingsFromMakerNoteProperties");
+            if(!p) p=dlsym(RTLD_DEFAULT,"_PITextureStyleSettingsFromMakerNoteProperties");
+            if(!p) return nil;
+            @try { return ((id(*)(id))p)(d); } @catch (...) { return nil; }
+          }
+          int main(void) { @autoreleasepool {
+            NSArray *paths=@[
+              @"/System/Library/PrivateFrameworks/PhotoImaging.framework/Versions/A/PhotoImaging",
+              @"/System/Library/PrivateFrameworks/NeutrinoCore.framework/Versions/A/NeutrinoCore",
+              @"/System/Library/PrivateFrameworks/PhotosFormats.framework/Versions/A/PhotosFormats",
+              @"/System/Library/PrivateFrameworks/AVFCapture.framework/Versions/A/AVFCapture",
+              @"/System/Library/PrivateFrameworks/CameraEditKit.framework/Versions/A/CameraEditKit",
+              @"/System/Library/PrivateFrameworks/CMPhoto.framework/Versions/A/CMPhoto"
+            ];
+            NSMutableDictionary *loaded=[NSMutableDictionary dictionary];
+            for(NSString *p in paths) loaded[p]=@(dlopen(p.UTF8String,RTLD_NOW|RTLD_GLOBAL)!=NULL);
+            NSArray *syms=@[
+              @"_AVAppleMakerNote_TextureStyleKey_Preset", @"_AVAppleMakerNote_TextureStyleKey_Intensity",
+              @"_AVAppleMakerNote_TextureStyleKey_Grain", @"_AVAppleMakerNote_TextureStyleKey_RenderingVersion",
+              @"_AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility",
+              @"_kCMPhotoCustomMetadataTypeURN_TextureStyles", @"_kCMPhotoAuxiliaryImageTypeURN_UnstyledOriginal",
+              @"_PITextureStyleAdjustmentKey"
+            ];
+            NSMutableDictionary *sv=[NSMutableDictionary dictionary];
+            for(NSString *n in syms) sv[n]=safe(symObj(n.UTF8String));
+            NSMutableDictionary *api=[NSMutableDictionary dictionary];
+            NSArray *calls=@[
+              @[@"PISchema",@"textureStyleSchema"], @[@"PITextureStyle",@"identifier"],
+              @[@"PITextureStyle",@"adjustmentFormat"], @[@"PITextureStyle",@"adjustmentDescriptor"],
+              @[@"PITextureStyle",@"availableOptions"], @[@"PITextureStyleAdjustmentController",@"allPresets"],
+              @[@"PITextureStyleAdjustmentController",@"presetKey"], @[@"PITextureStyleAdjustmentController",@"intensityKey"],
+              @[@"PITextureStyleAdjustmentController",@"grainIntensityKey"]
+            ];
+            for(NSArray *c in calls) api[[NSString stringWithFormat:@"%@.%@",c[0],c[1]]]=safe(classCall(c[0],c[1]));
+            NSMutableDictionary *settings=[NSMutableDictionary dictionary];
+            NSArray *presetVals=@[@"Standard",@"People",@"Analog",@"Scene",@"Studio",@"Soft",@"Filmic",@"Glowy"];
+            NSArray *versions=@[@1,@2,@3,@4];
+            for(NSString *preset in presetVals) for(NSNumber *v in versions) {
+              NSMutableDictionary *d=[NSMutableDictionary dictionary];
+              id pk=symObj("_AVAppleMakerNote_TextureStyleKey_Preset");
+              id ik=symObj("_AVAppleMakerNote_TextureStyleKey_Intensity");
+              id gk=symObj("_AVAppleMakerNote_TextureStyleKey_Grain");
+              id rk=symObj("_AVAppleMakerNote_TextureStyleKey_RenderingVersion");
+              id ok=symObj("_AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility");
+              if(pk) d[pk]=preset; if(ik) d[ik]=@1.0; if(gk) d[gk]=@0.0; if(rk) d[rk]=v; if(ok) d[ok]=@NO;
+              id out=funcSettings(d);
+              if(out) settings[[NSString stringWithFormat:@"%@-v%@",preset,v]]=safe(out);
+            }
+            NSDictionary *result=@{ @"os":NSProcessInfo.processInfo.operatingSystemVersionString,
+              @"loaded":loaded, @"symbols":sv, @"api":api, @"makerNoteSettingsTrials":settings };
+            NSData *j=[NSJSONSerialization dataWithJSONObject:result options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+            [j writeToFile:@"artifacts/runtime.json" atomically:YES];
+            fwrite(j.bytes,1,j.length,stdout); fputc('\n',stdout);
+          } return 0; }
+          EOF
+          clang -fobjc-arc -framework Foundation "$RUNNER_TEMP/texture27.m" -o "$RUNNER_TEMP/texture27"
+          "$RUNNER_TEMP/texture27" | tee artifacts/stdout.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: texture-style-macos27-runtime-${{ github.sha }}
+          retention-days: 7
+          path: artifacts/
