@@ -1,0 +1,86 @@
+name: TextureStyle Device Binary V3
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-v3
+    paths:
+      - .github/workflows/texture-style-device-binary-v3.yml
+      - scripts/research/texture_style_device_binary_v3.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  device-binary-inventory:
+    runs-on: xcode-27
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Inventory device-side iOS 27 binaries and dyld caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/device-binary
+          xcodebuild -version | tee artifacts/device-binary/xcode.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee artifacts/device-binary/iphoneos-sdk.txt
+          xcrun --sdk iphonesimulator --show-sdk-version | tee artifacts/device-binary/simulator-sdk.txt
+
+          roots=(/Applications /Library/Developer "$HOME/Library/Developer")
+          : > artifacts/device-binary/all-interesting-paths.txt
+          for root in "${roots[@]}"; do
+            [[ -d "$root" ]] || continue
+            find "$root" -type f \( \
+              -name PhotoImaging -o -name NeutrinoCore -o -name PhotosFormats -o \
+              -name CameraEditKit -o -name AVFCapture -o -name CMCaptureCore -o \
+              -name CMImaging -o -name 'dyld_shared_cache*' \
+            \) -print 2>/dev/null >> artifacts/device-binary/all-interesting-paths.txt || true
+          done
+          sort -u artifacts/device-binary/all-interesting-paths.txt -o artifacts/device-binary/all-interesting-paths.txt
+          cat artifacts/device-binary/all-interesting-paths.txt
+
+          : > artifacts/device-binary/macho-candidates.txt
+          while IFS= read -r path; do
+            [[ -f "$path" ]] || continue
+            desc="$(file "$path" 2>/dev/null || true)"
+            printf '%s\t%s\n' "$path" "$desc" >> artifacts/device-binary/path-file-types.tsv
+            if [[ "$desc" == *Mach-O* ]]; then
+              printf '%s\n' "$path" >> artifacts/device-binary/macho-candidates.txt
+            fi
+          done < artifacts/device-binary/all-interesting-paths.txt
+
+          for tool in dyld_info dyld_shared_cache_util ipsw jtool2 otool nm strings; do
+            printf '%s\t' "$tool" >> artifacts/device-binary/tools.tsv
+            command -v "$tool" >> artifacts/device-binary/tools.tsv 2>/dev/null || echo MISSING >> artifacts/device-binary/tools.tsv
+          done
+
+          mkdir -p artifacts/device-binary/binaries
+          index=0
+          while IFS= read -r binary; do
+            [[ -f "$binary" ]] || continue
+            index=$((index+1))
+            name="$(basename "$binary")-$index"
+            {
+              echo "PATH=$binary"
+              file "$binary" || true
+              echo '--- nm TextureStyle ---'
+              nm -nm "$binary" 2>/dev/null | grep -i -E 'TextureStyle|MakerNote|SemanticStyle' || true
+              echo '--- strings TextureStyle ---'
+              strings -a "$binary" 2>/dev/null | grep -i -E 'texture.?style|film.?grain|reversib|hardware.?model|port.?type|capture.?mode|capture.?type|tag:apple.com,2026' || true
+            } > "artifacts/device-binary/binaries/${name}.txt"
+          done < artifacts/device-binary/macho-candidates.txt
+
+          find /Applications/Xcode*.app -type f -name '*.tbd' -path '*PrivateFrameworks*' 2>/dev/null \
+            | grep -E '/(PhotoImaging|NeutrinoCore|PhotosFormats|CameraEditKit|AVFCapture|CMCaptureCore|CMImaging)\.framework/' \
+            > artifacts/device-binary/private-tbds.txt || true
+
+      - name: Upload device binary inventory
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-device-binary-v3-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/device-binary/
