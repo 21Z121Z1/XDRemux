@@ -1,0 +1,77 @@
+name: TextureStyle RC classdump fast
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-v3
+    paths:
+      - .github/workflows/texture-style-rc-classdump-fast.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  classdump:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ipsw
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          mkdir -p artifacts/cache artifacts/raw artifacts/focused
+          ipsw version > artifacts/ipsw-version.txt
+
+      - name: Extract exact 24A435 device DSC by direct Apple URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" \
+            > artifacts/extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -n "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+          echo "$CACHE" > artifacts/cache-path.txt
+
+      - name: Dump only TextureStyle-relevant device frameworks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image in CMPhoto NeutrinoCore PhotoImaging PhotosFormats AVFCapture CameraEditKit; do
+            set +e
+            ipsw class-dump "$CACHE" "$image" > "artifacts/raw/${image}-class.txt" 2>&1
+            echo -e "$image\tclass-dump\t$?" >> artifacts/status.tsv
+            ipsw dyld macho "$CACHE" "$image" --strings --symbols --objc \
+              > "artifacts/raw/${image}-macho.txt" 2>&1
+            echo -e "$image\tmacho\t$?" >> artifacts/status.tsv
+            set -e
+            cat "artifacts/raw/${image}-class.txt" "artifacts/raw/${image}-macho.txt" \
+              | grep -i -n -E -C 12 \
+                'TextureStyle|texture_styles|UnstyledOriginal|unstyledoriginal|MakerNote|FilmGrain|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|hasTextureStyle|CurrentMetadataVersion|CustomMetadataTypeURN' \
+              > "artifacts/focused/${image}.txt" || true
+          done
+
+      - name: Upload before any expensive disassembly
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-rc-classdump-fast-${{ github.sha }}
+          retention-days: 7
+          compression-level: 6
+          path: |
+            artifacts/raw/
+            artifacts/focused/
+            artifacts/*.txt
+            artifacts/*.tsv
+            artifacts/*.log
+
+      - name: Remove DSC
+        if: always()
+        shell: bash
+        run: rm -rf artifacts/cache
