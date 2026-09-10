@@ -22,15 +22,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          brew install blacktop/tap/ipsw
+          mkdir -p artifacts/rc-dyld/cache artifacts/rc-dyld/analysis artifacts/rc-dyld/disass artifacts/rc-dyld/extracted
+          date -u > artifacts/rc-dyld/workflow-started.txt
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
           ipsw version | tee ipsw-version.txt
-          mkdir -p artifacts/rc-dyld/cache artifacts/rc-dyld/analysis artifacts/rc-dyld/disass
 
       - name: Remote-extract iPhone 18 Pro iOS 27 RC arm64e dyld cache
         shell: bash
         run: |
           set -euo pipefail
-          # iPhone 18 Pro = iPhone19,2 / V63AP.  Use Apple's RC OTA source and
+          # iPhone 18 Pro = iPhone19,2 / V63AP. Use Apple's RC OTA source and
           # blacktop/ipsw's remote DSC extraction so the full OTA is not retained.
           set +e
           ipsw download ota \
@@ -108,9 +111,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # These are deliberately best-effort. The in-cache class dump from the
-          # previous step remains the source of method VM addresses when an ObjC
-          # method is not present in the local-symbol table.
           cat > artifacts/rc-dyld/disass/targets.tsv <<'EOF'
           PhotoImaging	_PITextureStyleSettingsFromMakerNoteProperties
           PhotoImaging	_PITextureStylePresetFromMakerNoteValue
@@ -139,7 +139,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/rc-dyld/extracted
           for image in CMPhoto NeutrinoCore PhotoImaging PhotosFormats CameraEditKit AVFCapture; do
             set +e
             ipsw dyld extract "$CACHE" "$image" \
