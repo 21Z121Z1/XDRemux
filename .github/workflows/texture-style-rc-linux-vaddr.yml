@@ -12,7 +12,7 @@ permissions:
 jobs:
   disass:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - name: Install ipsw and apfs-fuse
@@ -46,7 +46,7 @@ jobs:
           test -s "$CACHE"
           echo "CACHE=$CACHE" >> "$GITHUB_ENV"
 
-      - name: Disassemble reader directly by known 24A435 VA
+      - name: Disassemble known Texture Style readers
         shell: bash
         run: |
           set -euo pipefail
@@ -54,9 +54,76 @@ jobs:
           timeout 120s ipsw dyld disass "$CACHE" --vaddr 0x1c20dcea8 --count 240 --force > artifacts/out/preset-vaddr.asm 2>&1
           grep -n -E -C 16 'TextureStyle|SmartStyle|MakerNote|objectForKey|objectForKeyedSubscript|doubleValue|integerValue|longLongValue|floatValue|NSNumber|NSString|CFString' \
             artifacts/out/settings-vaddr.asm artifacts/out/preset-vaddr.asm > artifacts/out/focused.txt || true
-          sed -n '1,1800p' artifacts/out/focused.txt
           test -s artifacts/out/settings-vaddr.asm
           test -s artifacts/out/preset-vaddr.asm
+
+      - name: Resolve the outer MakerNote global slot
+        shell: bash
+        run: |
+          set -uo pipefail
+          SLOT=0x1e010e930
+          {
+            echo '== a2s =='
+            timeout 120s ipsw dyld a2s "$CACHE" "$SLOT" || true
+            echo
+            echo '== a2f =='
+            timeout 120s ipsw dyld a2f "$CACHE" "$SLOT" || true
+            echo
+            echo '== a2o =='
+            timeout 120s ipsw dyld a2o "$CACHE" "$SLOT" --hex || true
+          } > artifacts/out/outer-slot-resolution.txt 2>&1
+          timeout 300s ipsw dyld xref "$CACHE" "$SLOT" --image PhotoImaging > artifacts/out/outer-slot-xrefs.txt 2>&1 || true
+          timeout 300s ipsw dyld xref "$CACHE" "$SLOT" --all > artifacts/out/outer-slot-xrefs-all.txt 2>&1 || true
+
+      - name: Dump PhotoImaging symbols, strings, ObjC metadata, and references
+        shell: bash
+        run: |
+          set -uo pipefail
+          timeout 300s ipsw dyld macho "$CACHE" PhotoImaging --symbols > artifacts/out/photoimaging-symbols.txt 2>&1 || true
+          timeout 300s ipsw dyld macho "$CACHE" PhotoImaging --strings > artifacts/out/photoimaging-strings.txt 2>&1 || true
+          timeout 420s ipsw dyld macho "$CACHE" PhotoImaging --objc > artifacts/out/photoimaging-objc.txt 2>&1 || true
+          timeout 420s ipsw dyld macho "$CACHE" PhotoImaging --objc-refs > artifacts/out/photoimaging-objc-refs.txt 2>&1 || true
+          grep -n -E -C 24 'TextureStyle|SmartStyle|MakerNote|style properties|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|1e010e930' \
+            artifacts/out/photoimaging-*.txt > artifacts/out/photoimaging-focused.txt || true
+
+      - name: Resolve Smart Style MakerNote accessors in CMImaging
+        shell: bash
+        run: |
+          set -uo pipefail
+          timeout 300s ipsw dyld macho "$CACHE" CMImaging --symbols > artifacts/out/cmimaging-symbols.txt 2>&1 || true
+          timeout 420s ipsw dyld macho "$CACHE" CMImaging --objc > artifacts/out/cmimaging-objc.txt 2>&1 || true
+          timeout 420s ipsw dyld macho "$CACHE" CMImaging --objc-refs > artifacts/out/cmimaging-objc-refs.txt 2>&1 || true
+          timeout 240s ipsw dyld objc sel "$CACHE" --image CMImaging > artifacts/out/cmimaging-selectors.txt 2>&1 || true
+          grep -n -E -C 40 'makerNoteTagForSmartStyle|SmartStyleCast|SmartStyleTuningType|makerNoteTagFor.*Style|TextureStyle|SmartStyle' \
+            artifacts/out/cmimaging-*.txt > artifacts/out/cmimaging-focused.txt || true
+
+      - name: Build evidence summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          out = Path('artifacts/out')
+          needles = (
+              'TextureStylePreset', 'TextureStyleIntensity', 'TextureStyleGrain',
+              'makerNoteTagForSmartStyle', 'SmartStyleCast', 'SmartStyleTuningType',
+              'Missing smart style properties', '0x1e010e930', '1e010e930',
+          )
+          rows = []
+          for p in sorted(out.glob('*.txt')) + sorted(out.glob('*.asm')):
+              try:
+                  lines = p.read_text(errors='replace').splitlines()
+              except Exception:
+                  continue
+              hits = [(i + 1, line) for i, line in enumerate(lines) if any(n in line for n in needles)]
+              if hits:
+                  rows.append(f'## {p.name}')
+                  rows.extend(f'{lineno}: {line}' for lineno, line in hits[:250])
+                  rows.append('')
+          (out / 'evidence-summary.txt').write_text('\n'.join(rows) + '\n')
+          PY
+          sed -n '1,2200p' artifacts/out/evidence-summary.txt
 
       - name: Upload disassembly
         if: always()
