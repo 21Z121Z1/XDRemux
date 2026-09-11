@@ -1,0 +1,75 @@
+name: TextureStyle RC minimal disassembly
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-rc-min-disass.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disass:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ipsw
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          mkdir -p artifacts/cache artifacts/out
+          ipsw version | tee artifacts/ipsw-version.txt
+      - name: Extract exact iOS 27 RC arm64e DSC
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" > artifacts/extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -n "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+      - name: Disassemble only TextureStyle MakerNote reader
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in \
+            'PhotoImaging|_PITextureStyleSettingsFromMakerNoteProperties|360|settings' \
+            'PhotoImaging|_PITextureStylePresetFromMakerNoteValue|220|preset'; do
+            IFS='|' read -r image sym count name <<< "$spec"
+            ipsw dyld disass "$CACHE" --symbol "$sym" --symbol-image "$image" --count "$count" --force \
+              > "artifacts/out/${name}.asm" 2>&1 || true
+          done
+          ipsw dyld macho "$CACHE" AVFCapture --symbols --strings \
+            > artifacts/out/avfcapture.txt 2>&1 || true
+          {
+            echo '===== SETTINGS ====='; cat artifacts/out/settings.asm
+            echo '===== PRESET ====='; cat artifacts/out/preset.asm
+            echo '===== AVFOUNDATION MAKER KEYS ====='
+            grep -n -E 'AVAppleMakerNote_(SmartStyle|TextureStyle)' artifacts/out/avfcapture.txt || true
+          } | tee artifacts/summary.txt
+          grep -n -E -C 8 'SmartStyle|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|Missing smart style|NSNumber|NSString|doubleValue|integerValue|longLongValue|objectForKey|objectForKeyedSubscript' artifacts/out/settings.asm artifacts/out/preset.asm \
+            > artifacts/focused.txt || true
+          cat artifacts/focused.txt || true
+      - name: Upload minimal disassembly
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-rc-min-disass-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: |
+            artifacts/out/
+            artifacts/*.txt
+            artifacts/*.log
+      - name: Remove DSC
+        if: always()
+        shell: bash
+        run: rm -rf artifacts/cache
