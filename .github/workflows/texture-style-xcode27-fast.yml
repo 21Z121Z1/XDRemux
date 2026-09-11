@@ -68,17 +68,71 @@ jobs:
           ARCH="$(uname -m)"
           APP="$RUNNER_TEMP/TextureStyleProbe.app"
           mkdir -p "$APP"
-          # CGDataProviderCreateWithData takes a C release callback, while the
-          # research probe source originally used an Objective-C block. For this
-          # 8x8 one-shot process, compile a temporary copy with a NULL callback;
-          # the 256-byte backing allocation is reclaimed when the probe exits.
           PROBE_SOURCE="$RUNNER_TEMP/texture_style_ios27_sim_probe_v2.m"
           python3 - <<'PY'
           from pathlib import Path
           source = Path('scripts/research/texture_style_ios27_sim_probe_v2.m').read_text()
-          old = '^(void *info,const void *data,size_t size){ free((void *)data); }'
-          assert old in source, 'expected CGDataProvider block callback was not found'
-          Path('/tmp/texture_style_probe_source.tmp').write_text(source.replace(old, 'NULL', 1))
+
+          # CGDataProviderCreateWithData requires a C callback. This one-shot
+          # probe can leave its 256-byte buffer for process teardown.
+          callback = '^(void *info,const void *data,size_t size){ free((void *)data); }'
+          assert callback in source, 'expected CGDataProvider block callback was not found'
+          source = source.replace(callback, 'NULL', 1)
+
+          # Xcode 27/iOS 27 requires the UIScene lifecycle. Run BuildProbe only
+          # after a UIWindowScene connects, rather than from didFinishLaunching.
+          old_tail = r'''@interface ProbeDelegate:UIResponder<UIApplicationDelegate> @end
+          @implementation ProbeDelegate
+          - (BOOL)application:(UIApplication *)app didFinishLaunchingWithOptions:(NSDictionary *)opts {
+              (void)app;(void)opts;
+              NSURL *docs=[[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] firstObject];
+              NSDictionary *probe=BuildProbe(docs);
+              NSData *json=[NSJSONSerialization dataWithJSONObject:probe options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [json writeToURL:[docs URLByAppendingPathComponent:@"texture-style-ios27-probe-v2.json"] atomically:YES];
+              NSLog(@"TEXTURE_STYLE_PROBE_V2_BEGIN\n%@\nTEXTURE_STYLE_PROBE_V2_END",[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]);
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.2*NSEC_PER_SEC)),dispatch_get_main_queue(),^{ exit(0); });
+              return YES;
+          }
+          @end
+          int main(int argc,char *argv[]){ @autoreleasepool { return UIApplicationMain(argc,argv,nil,NSStringFromClass([ProbeDelegate class])); } }
+          '''
+          new_tail = r'''static void RunTextureStyleProbe(void) {
+              NSURL *docs=[[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] firstObject];
+              NSDictionary *probe=BuildProbe(docs);
+              NSData *json=[NSJSONSerialization dataWithJSONObject:probe options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [json writeToURL:[docs URLByAppendingPathComponent:@"texture-style-ios27-probe-v2.json"] atomically:YES];
+              NSLog(@"TEXTURE_STYLE_PROBE_V2_BEGIN\n%@\nTEXTURE_STYLE_PROBE_V2_END",[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]);
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.2*NSEC_PER_SEC)),dispatch_get_main_queue(),^{ exit(0); });
+          }
+
+          @interface ProbeSceneDelegate:UIResponder<UIWindowSceneDelegate>
+          @property(strong,nonatomic) UIWindow *window;
+          @end
+          @implementation ProbeSceneDelegate
+          - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
+              (void)session;(void)connectionOptions;
+              if (![scene isKindOfClass:[UIWindowScene class]]) return;
+              self.window=[[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
+              self.window.rootViewController=[UIViewController new];
+              [self.window makeKeyAndVisible];
+              dispatch_async(dispatch_get_main_queue(), ^{ RunTextureStyleProbe(); });
+          }
+          @end
+
+          @interface ProbeDelegate:UIResponder<UIApplicationDelegate> @end
+          @implementation ProbeDelegate
+          - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options {
+              (void)application;(void)options;
+              UISceneConfiguration *configuration=[[UISceneConfiguration alloc] initWithName:@"Default Configuration" sessionRole:connectingSceneSession.role];
+              configuration.delegateClass=[ProbeSceneDelegate class];
+              return configuration;
+          }
+          @end
+          int main(int argc,char *argv[]){ @autoreleasepool { return UIApplicationMain(argc,argv,nil,NSStringFromClass([ProbeDelegate class])); } }
+          '''
+          assert old_tail in source, 'expected pre-iOS-27 application delegate tail was not found'
+          source = source.replace(old_tail, new_tail, 1)
+          Path('/tmp/texture_style_probe_source.tmp').write_text(source)
           PY
           cp /tmp/texture_style_probe_source.tmp "$PROBE_SOURCE"
           xcrun --sdk iphonesimulator clang -fobjc-arc \
@@ -98,7 +152,18 @@ jobs:
             <key>CFBundleShortVersionString</key><string>1.0</string>
             <key>MinimumOSVersion</key><string>${SDK_VERSION}</string>
             <key>LSRequiresIPhoneOS</key><true/>
-            <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+            <key>UIApplicationSceneManifest</key>
+            <dict>
+              <key>UIApplicationSupportsMultipleScenes</key><false/>
+              <key>UISceneConfigurations</key>
+              <dict>
+                <key>UIWindowSceneSessionRoleApplication</key>
+                <array><dict>
+                  <key>UISceneConfigurationName</key><string>Default Configuration</string>
+                  <key>UISceneDelegateClassName</key><string>ProbeSceneDelegate</string>
+                </dict></array>
+              </dict>
+            </dict>
           </dict></plist>
           PLIST
           codesign --force --sign - "$APP"
