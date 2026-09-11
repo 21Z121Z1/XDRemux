@@ -1,0 +1,44 @@
+name: TextureStyle iOS27 simulator capability
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-ios27-simulator-capability.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - name: Inventory iOS simulator runtimes and TextureStyle symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          xcodebuild -version | tee artifacts/xcode.txt
+          xcrun simctl list runtimes | tee artifacts/runtimes.txt
+          xcrun simctl list devices available | tee artifacts/devices.txt
+          SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          echo "$SDK" | tee artifacts/sdk-path.txt
+          find /Library/Developer/CoreSimulator /Applications/Xcode*.app -path '*PhotosFormats.framework*' -o -path '*PhotoImaging.framework*' 2>/dev/null \
+            | head -n 500 > artifacts/private-framework-paths.txt || true
+          grep -R -a -l -m1 'hasTextureStyle' /Library/Developer/CoreSimulator/Volumes 2>/dev/null \
+            | head -n 50 > artifacts/has-texture-style-files.txt || true
+          grep -R -a -l -m1 'AVAppleMakerNote_TextureStyleKey_Preset' /Library/Developer/CoreSimulator/Volumes 2>/dev/null \
+            | head -n 50 > artifacts/makernote-texture-files.txt || true
+          cat artifacts/has-texture-style-files.txt || true
+          cat artifacts/makernote-texture-files.txt || true
+
+      - name: Upload simulator capability evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-ios27-simulator-capability-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
