@@ -53,7 +53,13 @@ jobs:
         run: |
           set -euo pipefail
           UDID="$(xcrun simctl create TextureStyleProbe "$DEVICE_TYPE" "$RUNTIME_ID")"
-          cleanup() { xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
+          LAUNCH_PID=""
+          cleanup() {
+            xcrun simctl terminate "$UDID" org.xdremux.TextureStyleProbe >/dev/null 2>&1 || true
+            if [[ -n "${LAUNCH_PID:-}" ]]; then kill "$LAUNCH_PID" >/dev/null 2>&1 || true; fi
+            xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
+            xcrun simctl delete "$UDID" >/dev/null 2>&1 || true
+          }
           trap cleanup EXIT
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b | tee artifacts/boot.txt
@@ -79,24 +85,43 @@ jobs:
             <key>CFBundleShortVersionString</key><string>1.0</string>
             <key>MinimumOSVersion</key><string>${SDK_VERSION}</string>
             <key>LSRequiresIPhoneOS</key><true/>
+            <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
           </dict></plist>
           PLIST
           codesign --force --sign - "$APP"
           xcrun simctl install "$UDID" "$APP"
-          set +e
-          xcrun simctl launch --console "$UDID" org.xdremux.TextureStyleProbe > artifacts/launch.txt 2>&1
-          STATUS=$?
-          set -e
-          echo "$STATUS" > artifacts/launch-status.txt
           DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.TextureStyleProbe data)"
-          if [[ -s "$DATA/Documents/texture-style-ios27-probe-v2.json" ]]; then
-            cp "$DATA/Documents/texture-style-ios27-probe-v2.json" artifacts/runtime-probe-v2.json
-            [[ ! -s "$DATA/Documents/texture-style-imageio-probe.jpg" ]] || cp "$DATA/Documents/texture-style-imageio-probe.jpg" artifacts/texture-style-imageio-probe.jpg
-            cat artifacts/runtime-probe-v2.json
-          else
-            cat artifacts/launch.txt
+          mkdir -p "$DATA/Documents"
+
+          set +e
+          xcrun simctl launch --console "$UDID" org.xdremux.TextureStyleProbe > artifacts/launch.txt 2>&1 &
+          LAUNCH_PID=$!
+          set -e
+          found=0
+          for i in $(seq 1 60); do
+            if [[ -s "$DATA/Documents/texture-style-ios27-probe-v2.json" ]]; then
+              found=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$found" -ne 1 ]]; then
+            xcrun simctl spawn "$UDID" log show --style compact --last 3m \
+              --predicate 'process == "TextureStyleProbe"' > artifacts/system-log.txt 2>&1 || true
+            xcrun simctl terminate "$UDID" org.xdremux.TextureStyleProbe >/dev/null 2>&1 || true
+            kill "$LAUNCH_PID" >/dev/null 2>&1 || true
+            wait "$LAUNCH_PID" >/dev/null 2>&1 || true
+            LAUNCH_PID=""
+            cat artifacts/launch.txt || true
+            cat artifacts/system-log.txt || true
             exit 1
           fi
+          kill "$LAUNCH_PID" >/dev/null 2>&1 || true
+          wait "$LAUNCH_PID" >/dev/null 2>&1 || true
+          LAUNCH_PID=""
+          cp "$DATA/Documents/texture-style-ios27-probe-v2.json" artifacts/runtime-probe-v2.json
+          [[ ! -s "$DATA/Documents/texture-style-imageio-probe.jpg" ]] || cp "$DATA/Documents/texture-style-imageio-probe.jpg" artifacts/texture-style-imageio-probe.jpg
+          cat artifacts/runtime-probe-v2.json
       - name: Upload runtime probe
         if: always()
         uses: actions/upload-artifact@v7
