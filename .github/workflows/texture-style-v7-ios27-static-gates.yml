@@ -59,14 +59,16 @@ jobs:
           set -uo pipefail
           timeout 90s ipsw dyld disass "$CACHE" --vaddr 0x1c20de7d8 --count 80 --quiet --force --no-color \
             > artifacts/reports/photoimaging-parser-disass.txt 2>&1 || true
-          for addr in 0x1e010e930 0x1e010e988 0x1e010e990 0x1e010e9a0; do
+          # 0x1e010e998 is consumed by PFMetadataImage.textureStyleIsReversible.
+          # Resolve it alongside the already identified SmartStyle/TextureStyle slots.
+          for addr in 0x1e010e930 0x1e010e988 0x1e010e990 0x1e010e998 0x1e010e9a0; do
             safe="${addr#0x}"
             timeout 45s ipsw dyld a2o "$CACHE" "$addr" > "artifacts/reports/${safe}-a2o.txt" 2>&1 || true
             timeout 45s ipsw dyld a2s "$CACHE" "$addr" > "artifacts/reports/${safe}-a2s.txt" 2>&1 || true
           done
           timeout 90s ipsw dyld macho "$CACHE" PhotoImaging --symbols --strings \
             > artifacts/reports/photoimaging-symbols-strings.txt 2>&1 || true
-          grep -n -E -C 20 '1e010e9(30|88|90|a0)|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|PITextureStyleSettingsFromMakerNoteProperties|MakerApple|MakerNote' \
+          grep -n -E -C 20 '1e010e9(30|88|90|98|a0)|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|IsReversible|RenderingVersion|OriginalInsteadOfReversibility|PITextureStyleSettingsFromMakerNoteProperties|MakerApple|MakerNote' \
             artifacts/reports/photoimaging-parser-disass.txt \
             artifacts/reports/photoimaging-symbols-strings.txt \
             artifacts/reports/*-a2*.txt \
@@ -96,7 +98,7 @@ jobs:
           timeout 90s ipsw macho info "$PI" --fixups > artifacts/reports/photoimaging-fixups.txt 2>&1 || true
           timeout 90s ipsw macho info "$PI" --symbols > artifacts/reports/photoimaging-extracted-symbols.txt 2>&1 || true
           timeout 90s ipsw macho info "$PI" --objc > artifacts/reports/photoimaging-objc.txt 2>&1 || true
-          grep -n -E -C 20 '1e010e9(30|88|90|a0)|e9(30|88|90|a0)|TextureStyle|MakerApple|MakerNote|CGImageProperty' \
+          grep -n -E -C 20 '1e010e9(30|88|90|98|a0)|e9(30|88|90|98|a0)|TextureStyle|IsReversible|RenderingVersion|MakerApple|MakerNote|CGImageProperty' \
             artifacts/reports/photoimaging-fixups.txt \
             artifacts/reports/photoimaging-extracted-symbols.txt \
             artifacts/reports/photoimaging-objc.txt \
@@ -114,8 +116,8 @@ jobs:
             timeout 60s ipsw macho disass "$PF" --symbol "$symbol" --count 120 --quiet --force --no-color \
               > "artifacts/reports/${safe}.disass.txt" 2>&1 || true
           done
-          grep -n -E -C 16 'hasTextureStyle|textureStyleIsReversible|textureStylePreset|textureStyleIntensity|textureStyleGrain|TextureStyle' \
-            artifacts/reports/photosformats-objc.txt artifacts/reports/*.disass.txt \
+          grep -n -E -C 16 'hasTextureStyle|textureStyleIsReversible|textureStylePreset|textureStyleIntensity|textureStyleGrain|TextureStyle|IsReversible|RenderingVersion|OriginalInsteadOfReversibility' \
+            artifacts/reports/photosformats-objc.txt artifacts/reports/photosformats-fixups.txt artifacts/reports/*.disass.txt \
             > artifacts/reports/photosformats-gates-summary.txt || true
           cat artifacts/reports/photosformats-gates-summary.txt || true
 
