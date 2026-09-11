@@ -65,7 +65,13 @@ jobs:
           PY
 
           UDID="$(xcrun simctl create XDRemuxPS3Watchdog "$DEVICE_TYPE" "$RUNTIME_ID")"
-          cleanup(){ xcrun simctl terminate "$UDID" org.xdremux.PS3Watchdog >/dev/null 2>&1 || true; xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
+          LAUNCH_WRAPPER_PID=""
+          cleanup(){
+            xcrun simctl terminate "$UDID" org.xdremux.PS3Watchdog >/dev/null 2>&1 || true
+            if [[ -n "${LAUNCH_WRAPPER_PID:-}" ]]; then kill "$LAUNCH_WRAPPER_PID" >/dev/null 2>&1 || true; fi
+            xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
+            xcrun simctl delete "$UDID" >/dev/null 2>&1 || true
+          }
           trap cleanup EXIT
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b > artifacts/boot.txt
@@ -90,15 +96,28 @@ jobs:
           xcrun simctl install "$UDID" "$APP"
           DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.PS3Watchdog data)"
 
-          xcrun simctl launch "$UDID" org.xdremux.PS3Watchdog > artifacts/launch.txt 2>&1 || true
+          set +e
+          xcrun simctl launch --console "$UDID" org.xdremux.PS3Watchdog > artifacts/launch.txt 2>&1 &
+          LAUNCH_WRAPPER_PID=$!
+          set -e
+          completed=0
           for i in $(seq 1 45); do
             cp "$DATA"/Documents/checkpoint-*.json artifacts/ 2>/dev/null || true
             if [[ -s "$DATA/Documents/texture-style-ios27-probe.json" ]]; then
               cp "$DATA/Documents/texture-style-ios27-probe.json" artifacts/runtime-probe.json
+              completed=1
               break
             fi
             sleep 1
           done
+          if [[ "$completed" -ne 1 ]]; then
+            echo 'watchdog expired before final runtime probe JSON' > artifacts/watchdog.txt
+            xcrun simctl terminate "$UDID" org.xdremux.PS3Watchdog >/dev/null 2>&1 || true
+          fi
+          kill "$LAUNCH_WRAPPER_PID" >/dev/null 2>&1 || true
+          wait "$LAUNCH_WRAPPER_PID" >/dev/null 2>&1 || true
+          LAUNCH_WRAPPER_PID=""
+          cp "$DATA"/Documents/checkpoint-*.json artifacts/ 2>/dev/null || true
           find "$DATA" -maxdepth 3 -type f -print > artifacts/container-files.txt || true
           xcrun simctl spawn "$UDID" log show --style compact --last 3m --predicate 'process == "PS3Watchdog"' > artifacts/system-log.txt 2>&1 || true
           ls -la artifacts
