@@ -1,0 +1,256 @@
+name: PS3 TextureStyle Cleanroom Native Oracles
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-cleanroom-v8
+    paths:
+      - .github/workflows/ps3-texture-cleanroom-native-oracles.yml
+      - scripts/research/patch_texture_style_heif_v7_cleanroom.py
+      - scripts/research/patch_texture_style_heif_v3.py
+      - scripts/research/texture_style_native_loader_trace.m
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  native-oracles:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download public PS3 baseline artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-style-v5-xcode27-a80e635a1e490ffe6c82ec1625f48e0365b3561c
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34623523344
+
+      - name: Build clean-room A/B matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/manifests artifacts/imageio artifacts/trace artifacts/static
+          baseline="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$baseline"
+          cp "$baseline" artifacts/A-baseline-original.heic
+
+          python3 -m py_compile scripts/research/patch_texture_style_heif_v7_cleanroom.py
+          python3 scripts/research/patch_texture_style_heif_v7_cleanroom.py \
+            artifacts/A-baseline-original.heic artifacts/B-tag84-only.heic \
+            --mode tag84-only --manifest artifacts/manifests/B-tag84-only.json
+          python3 scripts/research/patch_texture_style_heif_v7_cleanroom.py \
+            artifacts/A-baseline-original.heic artifacts/C-native-primary.heic \
+            --mode primary --film-grain-seed 0 --hardware-model 'iPhone 18 Pro' \
+            --manifest artifacts/manifests/C-native-primary.json
+          python3 scripts/research/patch_texture_style_heif_v7_cleanroom.py \
+            artifacts/A-baseline-original.heic artifacts/D-native-primary-tmap.heic \
+            --mode primary+tmap --film-grain-seed 0 --hardware-model 'iPhone 18 Pro' \
+            --manifest artifacts/manifests/D-native-primary-tmap.json
+          python3 scripts/research/patch_texture_style_heif_v7_cleanroom.py \
+            artifacts/A-baseline-original.heic artifacts/E-internalmodel-primary.heic \
+            --mode primary --film-grain-seed 0 --hardware-model 'iPhone19,2' \
+            --manifest artifacts/manifests/E-internalmodel-primary.json
+          python3 scripts/research/patch_texture_style_heif_v7_cleanroom.py \
+            artifacts/A-baseline-original.heic artifacts/F-internalmodel-primary-tmap.heic \
+            --mode primary+tmap --film-grain-seed 0 --hardware-model 'iPhone19,2' \
+            --manifest artifacts/manifests/F-internalmodel-primary-tmap.json
+
+          sha256sum artifacts/*.heic | tee artifacts/candidate-sha256.txt
+          sw_vers | tee artifacts/macos.txt
+          xcodebuild -version | tee artifacts/xcode.txt
+
+      - name: Probe ImageIO MakerApple TextureStyle surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/imageio_texture_probe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <dlfcn.h>
+          #import <objc/runtime.h>
+
+          static id JSONSafe(id obj) {
+              if (!obj) return [NSNull null];
+              if ([NSJSONSerialization isValidJSONObject:@[obj]]) return obj;
+              return [obj description] ?: @"<nil>";
+          }
+
+          static id CopyPrivateCFConstant(const char *symbol) {
+              void *h = dlopen("/System/Library/Frameworks/ImageIO.framework/ImageIO", RTLD_NOW | RTLD_GLOBAL);
+              if (!h) return nil;
+              void *p = dlsym(h, symbol);
+              if (!p) return nil;
+              CFTypeRef value = *(CFTypeRef *)p;
+              return value ? (__bridge id)value : nil;
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 3) return 64;
+              NSString *path = [NSString stringWithUTF8String:argv[1]];
+              NSURL *url = [NSURL fileURLWithPath:path];
+              CGImageSourceRef src = CGImageSourceCreateWithURL((__bridge CFURLRef)url, NULL);
+              if (!src) return 2;
+              NSDictionary *props = CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(src, 0, NULL));
+              CFRelease(src);
+              NSDictionary *maker = props[(id)kCGImagePropertyMakerAppleDictionary];
+              id styleConstant = CopyPrivateCFConstant("kCGImagePropertyMakerApple_Style");
+              if (!styleConstant) styleConstant = CopyPrivateCFConstant("_kCGImagePropertyMakerApple_Style");
+              id makerConstant = CopyPrivateCFConstant("kCGImagePropertyMakerAppleDictionary");
+              if (!makerConstant) makerConstant = CopyPrivateCFConstant("_kCGImagePropertyMakerAppleDictionary");
+
+              id styleValue = styleConstant ? maker[styleConstant] : nil;
+              id tag84 = maker[@"84"] ?: maker[@84];
+              NSMutableDictionary *out = [NSMutableDictionary dictionary];
+              out[@"makerPresent"] = @(maker != nil);
+              out[@"makerKeyConstant"] = JSONSafe(makerConstant);
+              out[@"styleKeyConstant"] = JSONSafe(styleConstant);
+              out[@"styleValue"] = JSONSafe(styleValue);
+              out[@"tag84"] = JSONSafe(tag84);
+              if ([tag84 isKindOfClass:[NSDictionary class]]) {
+                  NSDictionary *d = tag84;
+                  NSMutableDictionary *slots = [NSMutableDictionary dictionary];
+                  for (NSInteger i = 0; i <= 12; i++) {
+                      NSString *k = [NSString stringWithFormat:@"%ld", (long)i];
+                      id v = d[k] ?: d[@(i)];
+                      if (v) slots[k] = JSONSafe(v);
+                  }
+                  out[@"numericSlots"] = slots;
+                  for (NSString *k in @[@"TextureStylePreset", @"TextureStyleIntensity", @"TextureStyleGrain", @"TextureStyleOriginalInsteadOfReversibility", @"TextureStyleRenderingVersion"]) {
+                      id v = d[k]; if (v) out[k] = JSONSafe(v);
+                  }
+              }
+              NSData *j = [NSJSONSerialization dataWithJSONObject:out options:(NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys) error:nil];
+              [j writeToFile:[NSString stringWithUTF8String:argv[2]] atomically:YES];
+              fwrite(j.bytes, 1, j.length, stdout); fputc('\n', stdout);
+              return 0;
+          }}
+          OBJC
+
+          xcrun clang -fobjc-arc -fblocks -Wall -Wextra -Werror \
+            -framework Foundation -framework ImageIO \
+            "$RUNNER_TEMP/imageio_texture_probe.m" -o "$RUNNER_TEMP/imageio_texture_probe"
+
+          for f in artifacts/*.heic; do
+            base="$(basename "$f" .heic)"
+            "$RUNNER_TEMP/imageio_texture_probe" "$f" "artifacts/imageio/${base}.json" \
+              > "artifacts/imageio/${base}.stdout" 2> "artifacts/imageio/${base}.stderr" || true
+          done
+          python3 - <<'PY' | tee artifacts/imageio/summary.txt
+          import json
+          from pathlib import Path
+          for p in sorted(Path('artifacts/imageio').glob('*.json')):
+              d=json.loads(p.read_text())
+              print('\n'+p.stem)
+              print(' styleKeyConstant=',repr(d.get('styleKeyConstant')))
+              print(' styleValue=',repr(d.get('styleValue')))
+              print(' numericSlots=',json.dumps(d.get('numericSlots',{}),sort_keys=True))
+              print(' semanticTextureKeys=',{k:d[k] for k in d if k.startswith('TextureStyle')})
+          PY
+
+      - name: Trace PhotoImaging and Neutrino native TextureStyle loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun clang -fno-objc-arc \
+            -framework Foundation -framework ImageIO -framework CoreGraphics \
+            scripts/research/texture_style_native_loader_trace.m \
+            -o "$RUNNER_TEMP/texture_style_native_loader_trace"
+          mapfile -t inputs < <(find artifacts -maxdepth 1 -type f -name '*.heic' | sort)
+          set +e
+          "$RUNNER_TEMP/texture_style_native_loader_trace" artifacts/trace/native-loader-trace.json \
+            "${inputs[@]}" \
+            > artifacts/trace/native-loader.stdout \
+            2> artifacts/trace/native-loader.stderr
+          status=$?
+          set -e
+          echo "$status" | tee artifacts/trace/native-loader.exit-code
+          test -s artifacts/trace/native-loader-trace.json
+          python3 - <<'PY' | tee artifacts/trace/summary.txt
+          import json
+          p=json.load(open('artifacts/trace/native-loader-trace.json'))
+          print('parserHookInstalled=',p.get('parserHookInstalled'))
+          for f in p.get('files',[]):
+              pf=f.get('pfMetadata',{})
+              nu=f.get('neutrino',{})
+              print('\n'+f.get('file','?'))
+              print(' PF hasSmartStyle=',pf.get('hasSmartStyle'),'hasTextureStyle=',pf.get('hasTextureStyle'))
+              print(' PF textureStyleSettings=',pf.get('textureStyleSettings'))
+              print(' NU texture=',nu.get('nodeTextureStylesProperties'))
+              print(' NU nodeLoadOK=',nu.get('nodeLoadOK'),'nodeLoadError=',nu.get('nodeLoadError'))
+          print('\nparser events:')
+          for e in p.get('parserEvents',[]):
+              print(json.dumps(e,ensure_ascii=False,sort_keys=True))
+          PY
+
+      - name: Record iOS 27 device-only TextureStyle static contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_json="artifacts/static/sim-runtimes.json"
+          xcrun simctl list runtimes -j > "$runtime_json"
+          python3 - <<'PY' > artifacts/static/runtime-root.txt
+          import json, pathlib
+          data=json.load(open('artifacts/static/sim-runtimes.json'))
+          for r in data.get('runtimes',[]):
+              if r.get('isAvailable') and 'iOS 27' in (r.get('name') or '') and r.get('bundlePath'):
+                  p=pathlib.Path(r['bundlePath'])/'Contents/Resources/RuntimeRoot'
+                  if p.exists(): print(p); break
+          PY
+          root="$(cat artifacts/static/runtime-root.txt || true)"
+          if [ -n "$root" ]; then
+            for fw in PhotosFormats PhotoImaging NeutrinoCore; do
+              bin="$root/System/Library/PrivateFrameworks/${fw}.framework/${fw}"
+              test -f "$bin" || continue
+              strings -a "$bin" | grep -E -C 10 \
+                'hasTextureStyle|TextureStyleSettings|TextureStylePostProcessedPeopleData|TextureStylePeopleDataVersion|FilmGrainSeed|tag:apple.com,2026:photo:metadata:texture_styles|TextureStyle~1\.0' \
+                > "artifacts/static/${fw}-texture-strings.txt" || true
+              xcrun nm -nm "$bin" 2>/dev/null | grep -E 'TextureStyle|textureStyle' \
+                > "artifacts/static/${fw}-texture-symbols.txt" || true
+            done
+          fi
+
+      - name: Build differential oracle report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee artifacts/oracle-report.txt
+          import json
+          from pathlib import Path
+
+          print('CLEANROOM ORACLE REPORT')
+          imageio={p.stem:json.loads(p.read_text()) for p in Path('artifacts/imageio').glob('*.json')}
+          base=imageio.get('A-baseline-original',{})
+          base_slots=base.get('numericSlots',{})
+          print('baseline slots 8-12=',{k:base_slots.get(k) for k in map(str,range(8,13)) if k in base_slots})
+          for name,d in sorted(imageio.items()):
+              slots=d.get('numericSlots',{})
+              texture={k:slots.get(k) for k in map(str,range(8,13)) if k in slots}
+              print(name,'slots8-12=',texture,'styleValue=',repr(d.get('styleValue')))
+
+          trace_path=Path('artifacts/trace/native-loader-trace.json')
+          if trace_path.exists():
+              t=json.loads(trace_path.read_text())
+              print('\nNATIVE LOADER DIFFERENTIAL')
+              for f in t.get('files',[]):
+                  pf=f.get('pfMetadata',{}); nu=f.get('neutrino',{})
+                  print(Path(f.get('file','?')).stem,
+                        'PFTexture=',pf.get('hasTextureStyle'),
+                        'NUTexture=',nu.get('nodeTextureStylesProperties'),
+                        'NULoad=',nu.get('nodeLoadOK'),
+                        'Err=',nu.get('nodeLoadError'))
+          PY
+
+      - name: Upload clean-room oracle evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-cleanroom-native-oracles-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
