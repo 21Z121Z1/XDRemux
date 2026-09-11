@@ -1,0 +1,65 @@
+name: TextureStyle V7 outer-key oracle
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe-v7]
+    paths:
+      - scripts/research/texture_style_outerkey_oracle.m
+      - .github/workflows/texture-style-v7-outerkey-oracle.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parser-oracle:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Runtime and framework inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          sw_vers | tee artifacts/sw_vers.txt
+          xcodebuild -version | tee artifacts/xcode-version.txt
+          ls -ld /System/Library/PrivateFrameworks/PhotoImaging.framework* | tee artifacts/photoimaging-framework.txt || true
+          nm -gjU /System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging 2>/dev/null \
+            | grep 'PITextureStyleSettingsFromMakerNoteProperties' \
+            | tee artifacts/parser-symbol.txt || true
+
+      - name: Build parser outer-key oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun clang \
+            -fobjc-arc \
+            -Wall -Wextra -Werror \
+            -framework Foundation \
+            -framework CoreGraphics \
+            -framework ImageIO \
+            scripts/research/texture_style_outerkey_oracle.m \
+            -o "$RUNNER_TEMP/texture-style-outerkey-oracle"
+
+      - name: Run parser and ImageIO oracle
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/generated
+          "$RUNNER_TEMP/texture-style-outerkey-oracle" "$PWD/artifacts/generated" \
+            2>&1 | tee artifacts/oracle.log
+          status=${PIPESTATUS[0]}
+          echo "oracle_exit_status=$status" | tee artifacts/oracle-exit-status.txt
+          grep -E 'parser_symbol_found|oracle_objectForKey|captured_outer_key|spy_nonnull|captured_envelope_nonnull|imageio_(finalize|roundtrip)' \
+            artifacts/oracle.log | tee artifacts/oracle-summary.txt || true
+          exit "$status"
+
+      - name: Upload oracle evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-v7-outerkey-oracle-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
