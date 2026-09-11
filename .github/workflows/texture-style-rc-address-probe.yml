@@ -1,0 +1,87 @@
+name: TextureStyle RC address probe
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-rc-address-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ipsw and extract 24A435 DSC
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          mkdir -p artifacts/cache
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          ipsw extract --remote --dyld --dyld-arch arm64e -o artifacts/cache "$URL" > artifacts/extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -n "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+          ipsw version > artifacts/ipsw-version.txt 2>&1 || true
+      - name: Resolve known static addresses
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '=== a2s outer key 0x1e010e930 ==='
+            ipsw dyld a2s "$CACHE" 0x1e010e930 || true
+            echo
+            echo '=== a2s outer key mapping ==='
+            ipsw dyld a2s "$CACHE" 0x1e010e930 -m || true
+            echo
+            echo '=== a2o outer key ==='
+            ipsw dyld a2o "$CACHE" 0x1e010e930 || true
+            echo
+            echo '=== a2s parser ==='
+            ipsw dyld a2s "$CACHE" 0x1c20de7d8 || true
+            echo
+            echo '=== a2f parser ==='
+            ipsw dyld a2f "$CACHE" 0x1c20de7d8 || true
+            echo
+            echo '=== a2s child strings ==='
+            ipsw dyld a2s "$CACHE" 0x1c251574d || true
+            ipsw dyld a2s "$CACHE" 0x1c2515760 || true
+            ipsw dyld a2s "$CACHE" 0x1c2515776 || true
+          } | tee artifacts/address-resolution.txt
+      - name: Find parser references to outer key
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipsw dyld xref "$CACHE" 0x1e010e930 -i PhotoImaging > artifacts/outer-key-xref.txt 2>&1 || true
+          ipsw dyld disass "$CACHE" --vaddr 0x1c20de7d8 --count 260 --force > artifacts/parser-vaddr.txt 2>&1 || true
+          ipsw dyld disass "$CACHE" --symbol '_PITextureStylePresetFromMakerNoteValue' --symbol-image PhotoImaging --count 180 --force > artifacts/preset-parser.txt 2>&1 || true
+          ipsw dsc str "$CACHE" --pattern 'TextureStyle|SmartStyle|Missing smart style properties|Invalid texture style' > artifacts/texture-strings.txt 2>&1 || true
+          {
+            echo '# Address resolution'; cat artifacts/address-resolution.txt
+            echo '# Xrefs'; cat artifacts/outer-key-xref.txt
+            echo '# Parser'; cat artifacts/parser-vaddr.txt
+            echo '# Preset parser'; cat artifacts/preset-parser.txt
+            echo '# Strings'; sed -n '1,800p' artifacts/texture-strings.txt
+          } > artifacts/summary.txt
+          sed -n '1,1800p' artifacts/summary.txt >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Upload address evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-rc-address-probe-${{ github.sha }}
+          retention-days: 14
+          path: |
+            artifacts/*.txt
+            artifacts/*.log
+      - name: Remove cache
+        if: always()
+        shell: bash
+        run: rm -rf artifacts/cache
