@@ -1,0 +1,185 @@
+name: TextureStyle iOS 27 simulator native gate
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-ios27-simulator-native-gate.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  native-gate:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download verified numeric-key candidates
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-style-v5-numeric-413c4e3328e8f9d95f9a655df55ed03e1f9014e6
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34610936229
+
+      - name: Inspect simulator runtimes
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcrun simctl list runtimes
+          xcrun simctl list devicetypes | head -80
+
+      - name: Build Foundation-only native PhotosFormats probe app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p Probe.app artifacts
+          cp source-artifact/A-baseline-original.heic Probe.app/
+          find source-artifact -type f -name 'V5-*.heic' -exec cp {} Probe.app/ \;
+          cat > Probe.m <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+
+          static id Obj(id o, NSString *name) {
+              SEL s = NSSelectorFromString(name);
+              if (!o || ![o respondsToSelector:s]) return [NSNull null];
+              @try { return ((id(*)(id,SEL))objc_msgSend)(o,s) ?: [NSNull null]; }
+              @catch (NSException *e) { return @{ @"exception": e.reason ?: e.name }; }
+          }
+          static id BoxBoolSelector(id o, NSString *name) {
+              SEL s = NSSelectorFromString(name);
+              if (!o || ![o respondsToSelector:s]) return @"selector-unavailable";
+              @try { return @(((BOOL(*)(id,SEL))objc_msgSend)(o,s)); }
+              @catch (NSException *e) { return @{ @"exception": e.reason ?: e.name }; }
+          }
+          static id Open(NSURL *url) {
+              Class c = NSClassFromString(@"PFMetadataImage");
+              if (!c) return nil;
+              Class UT = NSClassFromString(@"UTType");
+              id type = nil;
+              SEL ts = NSSelectorFromString(@"typeWithIdentifier:");
+              if (UT && [UT respondsToSelector:ts]) type = ((id(*)(id,SEL,id))objc_msgSend)(UT,ts,@"public.heic");
+
+              id o = [c alloc];
+              SEL s = NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");
+              if ([o respondsToSelector:s]) {
+                  @try {
+                      id v = ((id(*)(id,SEL,id,id,id))objc_msgSend)(o,s,url,type,nil);
+                      if (v) return v;
+                  } @catch (__unused NSException *e) {}
+              }
+              o = [c alloc];
+              s = NSSelectorFromString(@"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:");
+              if ([o respondsToSelector:s]) {
+                  @try { return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(o,s,url,type,0,nil,YES,YES); }
+                  @catch (__unused NSException *e) {}
+              }
+              return nil;
+          }
+
+          int main(int argc, char **argv) {
+              @autoreleasepool {
+                  void *h = dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats", RTLD_NOW|RTLD_GLOBAL);
+                  NSMutableArray *rows = [NSMutableArray array];
+                  NSArray<NSString *> *files = [[[NSFileManager defaultManager] contentsOfDirectoryAtPath:[[NSBundle mainBundle] resourcePath] error:nil]
+                      filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSString *s, NSDictionary *_) { return [s.pathExtension.lowercaseString isEqualToString:@"heic"]; }]];
+                  files = [files sortedArrayUsingSelector:@selector(compare:)];
+                  for (NSString *file in files) {
+                      NSString *path = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:file];
+                      id m = Open([NSURL fileURLWithPath:path]);
+                      NSMutableDictionary *d = [@{
+                          @"file": file,
+                          @"dlopen": h ? @YES : @NO,
+                          @"class": NSClassFromString(@"PFMetadataImage") ? @YES : @NO,
+                          @"opened": m ? @YES : @NO,
+                      } mutableCopy];
+                      if (m) {
+                          d[@"hasSmartStyle"] = BoxBoolSelector(m,@"hasSmartStyle");
+                          d[@"hasTextureStyle"] = BoxBoolSelector(m,@"hasTextureStyle");
+                          d[@"preset"] = Obj(m,@"textureStylePreset");
+                          d[@"intensity"] = Obj(m,@"textureStyleIntensity");
+                          d[@"grain"] = Obj(m,@"textureStyleGrainIntensity");
+                          d[@"reversible"] = Obj(m,@"textureStyleIsReversible");
+                      }
+                      [rows addObject:d];
+                  }
+                  NSData *json = [NSJSONSerialization dataWithJSONObject:rows options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+                  fwrite(json.bytes,1,json.length,stdout); fputc('\n',stdout); fflush(stdout);
+                  [json writeToFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"texture-style-results.json"] atomically:YES];
+                  return 0;
+              }
+          }
+          OBJC
+
+          cat > Probe.app/Info.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleIdentifier</key><string>com.xdremux.TextureStyleProbe</string>
+            <key>CFBundleExecutable</key><string>Probe</string>
+            <key>CFBundleName</key><string>TextureStyleProbe</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>MinimumOSVersion</key><string>27.0</string>
+            <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+          </dict></plist>
+          PLIST
+
+          ARCH="$(uname -m)"
+          case "$ARCH" in arm64) SIMARCH=arm64;; x86_64) SIMARCH=x86_64;; *) echo "unsupported runner arch $ARCH"; exit 1;; esac
+          xcrun --sdk iphonesimulator clang -fobjc-arc -fblocks -arch "$SIMARCH" -mios-simulator-version-min=27.0 \
+            -framework Foundation Probe.m -o Probe.app/Probe
+          file Probe.app/Probe
+          plutil -lint Probe.app/Info.plist
+
+      - name: Run on iOS 27 simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUNTIME="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; d=json.load(sys.stdin); xs=[x for x in d["runtimes"] if x.get("isAvailable") and x.get("platform")=="iOS" and x.get("version","").startswith("27.")]; print(xs[-1]["identifier"] if xs else "")')"
+          test -n "$RUNTIME"
+          DEVTYPE="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; xs=json.load(sys.stdin)["devicetypes"]; pref=[x for x in xs if "iPhone" in x["name"]]; print(pref[-1]["identifier"] if pref else xs[-1]["identifier"])')"
+          UDID="$(xcrun simctl create TextureStyleProbe "$DEVTYPE" "$RUNTIME")"
+          trap 'xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" Probe.app
+          set +e
+          xcrun simctl launch --console "$UDID" com.xdremux.TextureStyleProbe > artifacts/simulator-console.txt 2>&1
+          rc=$?
+          set -e
+          cat artifacts/simulator-console.txt
+          echo "launch_rc=$rc" | tee artifacts/launch-status.txt
+          # The process intentionally exits after printing JSON; launch may report a non-zero app lifecycle status.
+          grep -q 'hasTextureStyle' artifacts/simulator-console.txt
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          s=Path('artifacts/simulator-console.txt').read_text(errors='replace')
+          a=s.find('[\n')
+          b=s.rfind(']')
+          if a < 0 or b < a: raise SystemExit('JSON array not found in simulator console')
+          rows=json.loads(s[a:b+1])
+          Path('artifacts/native-results.json').write_text(json.dumps(rows,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(rows,indent=2,sort_keys=True))
+          winners=[r for r in rows if r.get('hasTextureStyle') is True]
+          Path('artifacts/winners.json').write_text(json.dumps(winners,indent=2,sort_keys=True)+'\n')
+          print('WINNERS',json.dumps(winners,indent=2,sort_keys=True))
+          if not winners: raise SystemExit('no native TextureStyle-positive candidate')
+          PY
+
+      - name: Upload native gate evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-ios27-native-gate-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
