@@ -1,0 +1,84 @@
+name: TextureStyle macOS PhotoImaging hidden symbols
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-macos-photoimaging-hidden-symbols.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Inspect live PhotoImaging binary and dyld cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          BIN='/System/Library/PrivateFrameworks/PhotoImaging.framework/Versions/A/PhotoImaging'
+          test -e "$BIN"
+          file "$BIN" | tee artifacts/file.txt
+          shasum -a 256 "$BIN" | tee artifacts/sha256.txt
+
+          {
+            echo '=== nm default ==='
+            xcrun nm -nm "$BIN" 2>&1 || true
+            echo '=== nm all ==='
+            xcrun nm -a -nm "$BIN" 2>&1 || true
+            echo '=== exports ==='
+            xcrun dyld_info -exports "$BIN" 2>&1 || true
+          } > artifacts/symbols.txt
+          grep -n -E 'PITextureStyle(SettingsFromMakerNoteProperties|PresetFromMakerNoteValue)|TextureStyle' artifacts/symbols.txt | tee artifacts/focused-symbols.txt || true
+
+          echo '=== candidate dyld caches ===' | tee artifacts/cache-paths.txt
+          find /System /System/Volumes/Preboot -type f \( -name 'dyld_shared_cache_arm64e' -o -name 'dyld_shared_cache_arm64' \) -print 2>/dev/null | head -20 | tee -a artifacts/cache-paths.txt || true
+
+          echo '=== image strings ===' > artifacts/strings.txt
+          strings -a "$BIN" | grep -E 'PITextureStyle|TextureStyle' >> artifacts/strings.txt || true
+          cat artifacts/focused-symbols.txt artifacts/cache-paths.txt artifacts/strings.txt
+
+      - name: Probe deprecated NSLookupSymbolInImage
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/lookup.c" <<'C'
+          #include <stdio.h>
+          #include <dlfcn.h>
+          #include <mach-o/dyld.h>
+          #include <mach-o/loader.h>
+          #include <mach-o/nlist.h>
+          typedef const struct mach_header *(*HeaderFn)(const char *);
+          extern const struct mach_header *NSAddImage(const char *, unsigned long);
+          extern void *NSLookupSymbolInImage(const struct mach_header *, const char *, unsigned long);
+          extern void *NSAddressOfSymbol(void *);
+          int main(void) {
+            const char *p="/System/Library/PrivateFrameworks/PhotoImaging.framework/Versions/A/PhotoImaging";
+            void *h=dlopen(p,RTLD_NOW|RTLD_GLOBAL);
+            printf("dlopen=%p\n",h);
+            const struct mach_header *mh=NSAddImage(p,1u<<0);
+            printf("image=%p\n",mh);
+            const char *names[]={"_PITextureStyleSettingsFromMakerNoteProperties","_PITextureStylePresetFromMakerNoteValue"};
+            for(int i=0;i<2;i++){
+              void *s=mh?NSLookupSymbolInImage(mh,names[i],(1u<<3)|(1u<<7)):0;
+              void *a=s?NSAddressOfSymbol(s):0;
+              printf("%s symbol=%p address=%p dlsym=%p\n",names[i],s,a,dlsym(h,names[i]+1));
+            }
+            return 0;
+          }
+          C
+          clang "$RUNNER_TEMP/lookup.c" -o "$RUNNER_TEMP/lookup" -ldl
+          "$RUNNER_TEMP/lookup" | tee artifacts/nslookup.txt || true
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-macos-photoimaging-hidden-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
