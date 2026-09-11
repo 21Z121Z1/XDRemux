@@ -1,0 +1,77 @@
+name: TextureStyle RC address disassembly
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-rc-address-disass.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disass:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ipsw
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          mkdir -p artifacts/cache artifacts/disass
+      - name: Extract 24A435 dyld cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" > artifacts/extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -n "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+      - name: Disassemble exact addresses
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > artifacts/targets.tsv <<'EOF'
+          PF_hasTextureStyle	0x1b3ca949c	96
+          PF_textureStylePreset	0x1b3ca9510	96
+          PF_textureStyleIntensity	0x1b3ca9588	96
+          PF_textureStyleGrainIntensity	0x1b3ca9600	96
+          PF_textureStyleIsReversible	0x1b3ca9678	128
+          PI_PresetFromMakerNoteValue	0x1c20dcea8	160
+          PI_SettingsFromMakerNoteProperties	0x1c20de7d8	360
+          PI_updateWithTextureStyleInfo	0x1c20bdb8c	220
+          NU_textureStylePropertiesFromImageMetadata	0x1bf1d3978	700
+          CMPhoto_AddCustomMetadata	0x1a6583188	220
+          CMPhoto_OpenExistingF	0x1a6766954	260
+          CMPhoto_OpenExisting	0x1a6766a7c	260
+          CMPhoto_CloseAndCopy	0x1a654346c	220
+          EOF
+          while IFS=$'\t' read -r name addr count; do
+            echo "===== $name @ $addr ====="
+            set +e
+            ipsw dyld disass "$CACHE" --start-address "$addr" --count "$count" --force > "artifacts/disass/${name}.txt" 2>&1
+            status=$?
+            set -e
+            printf '%s\t%s\t%s\n' "$name" "$addr" "$status" | tee -a artifacts/status.tsv
+          done < artifacts/targets.tsv
+          grep -R -n -E -C 8 'TextureStyle|MakerNote|objectForKey|OriginalInstead|RenderingVersion|Grain|Intensity|Preset|CustomMetadata|tag:apple.com,2026|UnstyledOriginal' artifacts/disass > artifacts/focused.txt || true
+          sed -n '1,2200p' artifacts/focused.txt >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-rc-address-disass-${{ github.sha }}
+          retention-days: 14
+          path: |
+            artifacts/disass/
+            artifacts/status.tsv
+            artifacts/focused.txt
+            artifacts/extract.log
+      - name: Remove cache
+        if: always()
+        run: rm -rf artifacts/cache
