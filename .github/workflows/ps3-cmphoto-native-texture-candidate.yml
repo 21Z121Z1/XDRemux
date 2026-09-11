@@ -30,40 +30,75 @@ jobs:
           repository: 21Z121Z1/XDRemux
           run-id: 34623523344
 
-      - name: Select strongest tag84 candidate
+      - name: Select baseline and strongest tag84 candidate
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          src="$(find source-artifact -type f -name 'V5-filmic-rv3-original0.heic' -print -quit)"
-          test -s "$src"
-          cp "$src" artifacts/V5-filmic-rv3-original0.heic
-          sha256sum artifacts/V5-filmic-rv3-original0.heic | tee artifacts/input-sha256.txt
+          baseline="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          candidate="$(find source-artifact -type f -name 'V5-filmic-rv3-original0.heic' -print -quit)"
+          test -s "$baseline"
+          test -s "$candidate"
+          cp "$baseline" artifacts/A-baseline-original.heic
+          cp "$candidate" artifacts/V5-filmic-rv3-original0.heic
+          sha256sum artifacts/A-baseline-original.heic artifacts/V5-filmic-rv3-original0.heic | tee artifacts/input-sha256.txt
           sw_vers | tee artifacts/macos.txt
           xcodebuild -version | tee artifacts/xcode.txt
 
-      - name: Add TextureStyleInfo with Apple's CMPhoto custom-metadata writer
+      - name: A/B CMPhoto existing-container modification path
         shell: bash
         run: |
           set -euo pipefail
           xcrun clang -fobjc-arc -framework Foundation -framework CoreFoundation \
             scripts/research/cmphoto_texture_style_writer.m \
             -o "$RUNNER_TEMP/cmphoto_texture_style_writer"
-          set +e
-          "$RUNNER_TEMP/cmphoto_texture_style_writer" \
-            artifacts/V5-filmic-rv3-original0.heic \
-            artifacts/PS3-combined-texture-v3.heic \
-            artifacts/cmphoto-writer-report.json \
-            > artifacts/cmphoto-writer.stdout 2> artifacts/cmphoto-writer.stderr
-          status=$?
-          set -e
-          echo "$status" | tee artifacts/cmphoto-writer.exit-code
-          cat artifacts/cmphoto-writer.stdout || true
-          cat artifacts/cmphoto-writer.stderr || true
-          cat artifacts/cmphoto-writer-report.json || true
-          test "$status" -eq 0
+
+          run_writer() {
+            local label="$1" input="$2" output="$3"
+            set +e
+            "$RUNNER_TEMP/cmphoto_texture_style_writer" \
+              "$input" "$output" "artifacts/${label}-writer-report.json" \
+              > "artifacts/${label}-writer.stdout" 2> "artifacts/${label}-writer.stderr"
+            local status=$?
+            set -e
+            printf '%s\n' "$status" > "artifacts/${label}-writer.exit-code"
+            echo "===== $label status=$status ====="
+            cat "artifacts/${label}-writer.stderr" || true
+            cat "artifacts/${label}-writer-report.json" || true
+            return "$status"
+          }
+
+          baseline_status=0
+          run_writer baseline artifacts/A-baseline-original.heic artifacts/control-baseline-texture-v3.heic || baseline_status=$?
+          candidate_status=0
+          run_writer candidate artifacts/V5-filmic-rv3-original0.heic artifacts/PS3-combined-texture-v3.heic || candidate_status=$?
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          def load(label):
+              p=Path(f'artifacts/{label}-writer-report.json')
+              return json.loads(p.read_text()) if p.exists() else None
+          summary={
+              'baselineExit':int(Path('artifacts/baseline-writer.exit-code').read_text()),
+              'candidateExit':int(Path('artifacts/candidate-writer.exit-code').read_text()),
+              'baselineReport':load('baseline'),
+              'candidateReport':load('candidate'),
+          }
+          Path('artifacts/cmphoto-ab-summary.json').write_text(json.dumps(summary,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(summary,indent=2,sort_keys=True))
+          PY
+
+          if [[ "$baseline_status" -ne 0 ]]; then
+            echo "CMPhoto modification path fails on the unpatched physical-device baseline; do not attribute the failure to tag84." >&2
+            exit 20
+          fi
+          if [[ "$candidate_status" -ne 0 ]]; then
+            echo "CMPhoto opens baseline but rejects/crashes on the tag84-patched candidate; investigate container mutation compatibility." >&2
+            exit 21
+          fi
           test -s artifacts/PS3-combined-texture-v3.heic
-          sha256sum artifacts/PS3-combined-texture-v3.heic | tee artifacts/output-sha256.txt
+          sha256sum artifacts/control-baseline-texture-v3.heic artifacts/PS3-combined-texture-v3.heic | tee artifacts/output-sha256.txt
           strings -a artifacts/PS3-combined-texture-v3.heic | \
             grep -E '2023:photo:metadata:styles|2026:photo:metadata:texture_styles|textureStyleMetadata' \
             | tee artifacts/container-strings.txt || true
