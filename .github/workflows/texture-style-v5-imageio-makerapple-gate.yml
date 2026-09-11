@@ -64,8 +64,11 @@ jobs:
           }return 0;}
           OBJC
           xcrun clang -fobjc-arc -framework Foundation -framework ImageIO "$RUNNER_TEMP/dump.m" -o "$RUNNER_TEMP/dump"
-          mapfile -t files < <(printf '%s\n' source-artifact/A-baseline-original.heic source-artifact/candidates/V5-standard-min.heic source-artifact/candidates/V5-filmic-min.heic)
-          "$RUNNER_TEMP/dump" "${files[@]}" | tee artifacts/imageio-makerapple.json
+          "$RUNNER_TEMP/dump" \
+            source-artifact/A-baseline-original.heic \
+            source-artifact/candidates/V5-standard-min.heic \
+            source-artifact/candidates/V5-filmic-min.heic \
+            | tee artifacts/imageio-makerapple.json
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -74,7 +77,6 @@ jobs:
               print(r['file'], 'tag84=', json.dumps(r['tag84'], ensure_ascii=False, sort_keys=True))
           film=next(r for r in rows if r['file']=='V5-filmic-min.heic')
           text=json.dumps(film['tag84'],sort_keys=True)
-          # This is only a sanity gate: exact representation may be dictionary or nested decoded object.
           if '8' not in text:
               raise SystemExit('ImageIO did not expose TextureStyle preset key 8 from tag84')
           PY
