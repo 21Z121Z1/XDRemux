@@ -1,0 +1,78 @@
+name: TextureStyle AVFoundation MakerNote constants
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-avfoundation-constants.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  constants:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve private AVFoundation MakerNote constants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cat > "$RUNNER_TEMP/constants.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <dlfcn.h>
+
+          static id Constant(void *h, const char *name) {
+              void *p=dlsym(h,name);
+              if (!p) p=dlsym(RTLD_DEFAULT,name);
+              if (!p) return [NSNull null];
+              @try {
+                  id value=*(id *)p;
+                  return value ?: [NSNull null];
+              } @catch (__unused NSException *e) { return @"<exception>"; }
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 2) return 64;
+              void *h=dlopen("/System/Library/Frameworks/AVFoundation.framework/AVFoundation",RTLD_NOW|RTLD_GLOBAL);
+              NSArray *names=@[
+                  @"AVAppleMakerNote_TextureStyleKey_Preset",
+                  @"AVAppleMakerNote_TextureStyleKey_Intensity",
+                  @"AVAppleMakerNote_TextureStyleKey_Grain",
+                  @"AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility",
+                  @"AVAppleMakerNote_TextureStyleKey_RenderingVersion",
+                  @"AVAppleMakerNote_TextureStyle",
+                  @"AVAppleMakerNote_SmartStyle",
+                  @"AVAppleMakerNote_SmartStyleKey_Cast",
+                  @"AVAppleMakerNote_SmartStyleKey_ToneBias",
+                  @"AVAppleMakerNote_SmartStyleKey_ColorBias",
+                  @"AVAppleMakerNote_SmartStyleKey_Intensity",
+                  @"AVAppleMakerNote_SmartStyleKey_IsReversible",
+                  @"AVAppleMakerNote_SmartStyleKey_RenderingVersion"
+              ];
+              NSMutableDictionary *out=[NSMutableDictionary dictionary];
+              out[@"frameworkLoaded"]=@(h!=NULL);
+              for (NSString *name in names) {
+                  id value=Constant(h,name.UTF8String);
+                  if ([value isKindOfClass:[NSString class]] || [value isKindOfClass:[NSNumber class]] || value==[NSNull null]) out[name]=value;
+                  else out[name]=@{ @"class":NSStringFromClass([value class]), @"description":[value description] ?: @"" };
+              }
+              NSData *json=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [json writeToFile:[NSString stringWithUTF8String:argv[1]] atomically:YES];
+              fwrite(json.bytes,1,json.length,stdout); fputc('\n',stdout);
+              return 0;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation "$RUNNER_TEMP/constants.m" -o "$RUNNER_TEMP/constants"
+          "$RUNNER_TEMP/constants" artifacts/constants.json | tee artifacts/stdout.txt
+          sw_vers > artifacts/macos.txt
+          xcodebuild -version > artifacts/xcode.txt
+      - name: Upload constants
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-avfoundation-constants-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/
