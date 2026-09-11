@@ -37,13 +37,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/macos27rc"
-          # AppleDB records macOS 27.0 RC as build 26A428. `--dyld` performs
-          # range-based remote extraction instead of downloading the full
-          # 18-26 GB OTA/IPSW payload.
+          # Build 26A428 is the exact macOS 27.0 RC build. `--build` already
+          # selects it, so do not combine it with the mutually exclusive --rc.
+          # `--dyld` performs range-based remote extraction instead of pulling
+          # the complete OTA/IPSW payload.
           ipsw download appledb \
             --os macOS \
             --build 26A428 \
-            --rc \
             --type ota \
             --device VirtualMac2,1 \
             --dyld \
