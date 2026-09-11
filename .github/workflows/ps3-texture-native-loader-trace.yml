@@ -1,0 +1,140 @@
+name: PS3 Texture Native Loader Trace
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/ps3-texture-native-loader-trace.yml
+      - scripts/research/texture_style_native_loader_trace.m
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  trace:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download physical-device A/B matrix
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+
+      - name: Locate A B C D inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/trace artifacts/static
+          for name in A-baseline-original B-2026-only-original-maker C-current-v3-tag84-plus-2026 D-tag84-only-no-2026; do
+            f="$(find source-artifact -type f -name "${name}.heic" -print -quit)"
+            test -s "$f"
+            cp "$f" "artifacts/${name}.heic"
+          done
+          sha256sum artifacts/*.heic | tee artifacts/input-sha256.txt
+          sw_vers | tee artifacts/macos.txt
+          xcodebuild -version | tee artifacts/xcode.txt
+
+      - name: Trace Apple native HEIF TextureStyle loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun clang -fobjc-arc \
+            -framework Foundation -framework ImageIO -framework CoreGraphics \
+            scripts/research/texture_style_native_loader_trace.m \
+            -o "$RUNNER_TEMP/texture_style_native_loader_trace"
+          set +e
+          "$RUNNER_TEMP/texture_style_native_loader_trace" artifacts/trace/native-loader-trace.json \
+            artifacts/A-baseline-original.heic \
+            artifacts/B-2026-only-original-maker.heic \
+            artifacts/C-current-v3-tag84-plus-2026.heic \
+            artifacts/D-tag84-only-no-2026.heic \
+            > artifacts/trace/native-loader.stdout \
+            2> artifacts/trace/native-loader.stderr
+          status=$?
+          set -e
+          echo "$status" | tee artifacts/trace/native-loader.exit-code
+          cat artifacts/trace/native-loader.stderr || true
+          cat artifacts/trace/native-loader-trace.json || true
+          # The trace is evidence gathering. Preserve output even if one private initializer changes.
+          test -s artifacts/trace/native-loader-trace.json
+
+      - name: Inspect iOS 27 runtime framework metadata path
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl list runtimes -j > artifacts/static/sim-runtimes.json
+          python3 - <<'PY' > artifacts/static/runtime-root.txt
+          import json, pathlib
+          data=json.load(open('artifacts/static/sim-runtimes.json'))
+          candidates=[]
+          for r in data.get('runtimes',[]):
+              if r.get('isAvailable') and 'iOS 27' in (r.get('name') or ''):
+                  p=r.get('bundlePath')
+                  if p:
+                      candidates.append(pathlib.Path(p)/'Contents/Resources/RuntimeRoot')
+          for p in candidates:
+              if p.exists():
+                  print(p)
+                  break
+          PY
+          runtime_root="$(cat artifacts/static/runtime-root.txt || true)"
+          if [ -z "$runtime_root" ] || [ ! -d "$runtime_root" ]; then
+            echo 'No iOS 27 RuntimeRoot available' | tee artifacts/static/runtime-status.txt
+            exit 0
+          fi
+          echo "RuntimeRoot=$runtime_root" | tee artifacts/static/runtime-status.txt
+          for fw in NeutrinoCore PhotoImaging PhotosFormats; do
+            bin="$runtime_root/System/Library/PrivateFrameworks/${fw}.framework/${fw}"
+            if [ ! -f "$bin" ]; then
+              echo "$fw: missing" | tee -a artifacts/static/runtime-status.txt
+              continue
+            fi
+            echo "$fw: $bin" | tee -a artifacts/static/runtime-status.txt
+            strings -a "$bin" | \
+              grep -E -C 12 'tag:apple.com,2026:photo:metadata:texture_styles|TextureStyle~1\.0|textureStylePropertiesFromImageMetadata|_loadTextureStylesProperties|Could not deserialize property list from texture metadata|Missing texture style version value|Invalid texture style version number|TextureStylePostProcessedPeopleData|TextureStylePeopleDataVersion|FilmGrainSeed|defaultTextureStyle|hasTextureStyle' \
+              > "artifacts/static/${fw}-texture-strings.txt" || true
+            xcrun nm -nm "$bin" 2>/dev/null | \
+              grep -E 'TextureStyle|textureStyle|NUCGImageSourceNode' \
+              > "artifacts/static/${fw}-texture-symbols.txt" || true
+            xcrun otool -ov "$bin" 2>/dev/null | \
+              grep -E -C 8 'TextureStyle|textureStyle|NUCGImageSourceNode' \
+              > "artifacts/static/${fw}-objc.txt" || true
+          done
+
+      - name: Summarize native trace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee artifacts/trace/summary.txt
+          import json
+          p=json.load(open('artifacts/trace/native-loader-trace.json'))
+          print('parserHookInstalled=',p.get('parserHookInstalled'))
+          for f in p.get('files',[]):
+              pf=f.get('pfMetadata',{})
+              nu=f.get('neutrino',{})
+              print('\n'+f.get('file','?'))
+              print(' PF hasSmartStyle=',pf.get('hasSmartStyle'),'hasTextureStyle=',pf.get('hasTextureStyle'))
+              print(' NU texture=',nu.get('nodeTextureStylesProperties'))
+              print(' NU nodeLoadOK=',nu.get('nodeLoadOK'),'nodeLoadError=',nu.get('nodeLoadError'))
+          print('\nparser events:')
+          for e in p.get('parserEvents',[]):
+              print(json.dumps(e,ensure_ascii=False,sort_keys=True))
+          PY
+
+      - name: Upload native loader reverse-engineering evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-native-loader-trace-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
