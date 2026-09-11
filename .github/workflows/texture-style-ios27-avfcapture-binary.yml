@@ -1,0 +1,75 @@
+name: TextureStyle iOS27 AVFCapture binary
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-ios27-avfcapture-binary.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ipsw
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          mkdir -p artifacts/cache artifacts/extracted artifacts/reports
+
+      - name: Extract 24A435 arm64e shared cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          ipsw extract --remote --dyld --dyld-arch arm64e -o artifacts/cache "$URL" > artifacts/reports/extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -s "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+
+      - name: Extract only AVFCapture Mach-O
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipsw dyld macho "$CACHE" AVFCapture --extract --force --output artifacts/extracted > artifacts/reports/macho-extract.log 2>&1
+          BIN="$(find artifacts/extracted -type f -name AVFCapture -print -quit)"
+          test -s "$BIN"
+          cp "$BIN" artifacts/AVFCapture
+          echo "BIN=artifacts/AVFCapture" >> "$GITHUB_ENV"
+          shasum -a 256 artifacts/AVFCapture | tee artifacts/reports/sha256.txt
+
+      - name: Map MakerNote constants
+        shell: bash
+        run: |
+          set -euo pipefail
+          nm -nm "$BIN" > artifacts/reports/nm.txt 2>&1 || true
+          otool -l "$BIN" > artifacts/reports/load-commands.txt 2>&1 || true
+          otool -ov "$BIN" > artifacts/reports/objc-verbose.txt 2>&1 || true
+          strings -a -t x "$BIN" > artifacts/reports/strings-offsets.txt
+          grep -n -E -C 8 'AVAppleMakerNote_(TextureStyle|SmartStyle)' artifacts/reports/nm.txt > artifacts/reports/constants-nm.txt || true
+          grep -n -E -C 12 'TextureStyle|SmartStyle|MakerNote' artifacts/reports/strings-offsets.txt > artifacts/reports/constants-strings.txt || true
+          cat artifacts/reports/constants-nm.txt
+          sed -n '1,1200p' artifacts/reports/constants-strings.txt
+
+      - name: Upload extracted AVFCapture evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios27-24A435-avfcapture-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: |
+            artifacts/AVFCapture
+            artifacts/reports/
+
+      - name: Remove cache
+        if: always()
+        run: rm -rf artifacts/cache artifacts/extracted
