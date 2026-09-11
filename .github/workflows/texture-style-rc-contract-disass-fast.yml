@@ -1,0 +1,112 @@
+name: TextureStyle RC contract disassembly fast
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-rc-contract-disass-fast.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disass:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ipsw
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          mkdir -p artifacts/cache artifacts/disass artifacts/focused
+          ipsw version | tee artifacts/ipsw-version.txt
+
+      - name: Extract exact 24A435 shared cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          printf '%s\n' "$URL" > artifacts/source-url.txt
+          ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" \
+            > artifacts/extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -n "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+          echo "$CACHE" > artifacts/cache-path.txt
+
+      - name: Disassemble consumer predicates and writer ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > artifacts/targets.tsv <<'EOF'
+          PhotosFormats	-[PFMetadataImage hasTextureStyle]
+          PhotosFormats	-[PFMetadataImage textureStylePreset]
+          PhotosFormats	-[PFMetadataImage textureStyleIntensity]
+          PhotosFormats	-[PFMetadataImage textureStyleGrainIntensity]
+          PhotosFormats	-[PFMetadataImage textureStyleIsReversible]
+          PhotoImaging	_PITextureStyleSettingsFromMakerNoteProperties
+          PhotoImaging	_PITextureStylePresetFromMakerNoteValue
+          PhotoImaging	-[PITextureStyleAdjustmentController updateWithTextureStyleInfo:]
+          NeutrinoCore	+[_NUTextureStyleProperties textureStylePropertiesFromImageMetadata:auxImageMetadata:error:]
+          CMPhoto	_CMPhotoCompressionSessionAddCustomMetadata
+          CMPhoto	_CMPhotoCompressionSessionOpenExistingContainerForModificationF
+          CMPhoto	_CMPhotoCompressionSessionCloseContainerAndCopyBacking
+          EOF
+
+          while IFS=$'\t' read -r image symbol; do
+            safe="$(printf '%s-%s' "$image" "$symbol" | tr -cs 'A-Za-z0-9._-' '_')"
+            echo "===== $image :: $symbol =====" | tee -a artifacts/status.txt
+            set +e
+            ipsw dyld disass "$CACHE" \
+              --symbol "$symbol" \
+              --symbol-image "$image" \
+              --count 900 \
+              --force \
+              > "artifacts/disass/${safe}.txt" 2>&1
+            status=$?
+            set -e
+            printf '%s\t%s\t%s\n' "$image" "$symbol" "$status" | tee -a artifacts/status.tsv
+          done < artifacts/targets.tsv
+
+      - name: Collect exact contract strings and symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image in PhotosFormats PhotoImaging NeutrinoCore CMPhoto CameraEditKit AVFCapture; do
+            set +e
+            ipsw class-dump "$CACHE" "$image" > "artifacts/focused/${image}-class.txt" 2>&1
+            ipsw dyld macho "$CACHE" "$image" --strings --symbols --objc --objc-refs \
+              > "artifacts/focused/${image}-macho.txt" 2>&1
+            set -e
+          done
+          grep -R -n -E -C 10 \
+            'hasTextureStyle|textureStyle(Preset|Intensity|GrainIntensity|IsReversible)|TextureStyle(Preset|Intensity|Grain|RenderingVersion|OriginalInsteadOfReversibility)|TextureStyleInfo|texture_styles|HardwareModel|PortType|CaptureMode|CaptureType|FilmGrainSeed|CustomMetadataTypeURN_TextureStyles|CMPhotoCompressionSession(AddCustomMetadata|OpenExistingContainerForModificationF)' \
+            artifacts/focused artifacts/disass \
+            > artifacts/contract-grep.txt || true
+          sed -n '1,2000p' artifacts/contract-grep.txt >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload contract evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-rc-contract-disass-${{ github.sha }}
+          retention-days: 14
+          compression-level: 6
+          path: |
+            artifacts/disass/
+            artifacts/focused/
+            artifacts/*.txt
+            artifacts/*.tsv
+            artifacts/*.log
+
+      - name: Remove DSC
+        if: always()
+        shell: bash
+        run: rm -rf artifacts/cache
