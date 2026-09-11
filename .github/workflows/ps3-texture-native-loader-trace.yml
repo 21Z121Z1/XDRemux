@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          xcrun clang -fobjc-arc \
+          xcrun clang -fno-objc-arc \
             -framework Foundation -framework ImageIO -framework CoreGraphics \
             scripts/research/texture_style_native_loader_trace.m \
             -o "$RUNNER_TEMP/texture_style_native_loader_trace"
@@ -64,7 +64,6 @@ jobs:
           echo "$status" | tee artifacts/trace/native-loader.exit-code
           cat artifacts/trace/native-loader.stderr || true
           cat artifacts/trace/native-loader-trace.json || true
-          # The trace is evidence gathering. Preserve output even if one private initializer changes.
           test -s artifacts/trace/native-loader-trace.json
 
       - name: Inspect iOS 27 runtime framework metadata path
@@ -92,7 +91,7 @@ jobs:
             exit 0
           fi
           echo "RuntimeRoot=$runtime_root" | tee artifacts/static/runtime-status.txt
-          for fw in NeutrinoCore PhotoImaging PhotosFormats; do
+          for fw in NeutrinoCore PhotoImaging PhotosFormats CMPhoto; do
             bin="$runtime_root/System/Library/PrivateFrameworks/${fw}.framework/${fw}"
             if [ ! -f "$bin" ]; then
               echo "$fw: missing" | tee -a artifacts/static/runtime-status.txt
@@ -100,13 +99,13 @@ jobs:
             fi
             echo "$fw: $bin" | tee -a artifacts/static/runtime-status.txt
             strings -a "$bin" | \
-              grep -E -C 12 'tag:apple.com,2026:photo:metadata:texture_styles|TextureStyle~1\.0|textureStylePropertiesFromImageMetadata|_loadTextureStylesProperties|Could not deserialize property list from texture metadata|Missing texture style version value|Invalid texture style version number|TextureStylePostProcessedPeopleData|TextureStylePeopleDataVersion|FilmGrainSeed|defaultTextureStyle|hasTextureStyle' \
+              grep -E -C 14 'tag:apple.com,2026:photo:metadata:texture_styles|TextureStyle~1\.0|textureStylePropertiesFromImageMetadata|_loadTextureStylesProperties|_loadCustomMetadata|custom metadata|CustomMetadata|Could not deserialize property list from texture metadata|Missing texture style version value|Invalid texture style version number|TextureStylePostProcessedPeopleData|TextureStylePeopleDataVersion|FilmGrainSeed|defaultTextureStyle|hasTextureStyle|CMPhoto.*Custom|Custom.*Metadata' \
               > "artifacts/static/${fw}-texture-strings.txt" || true
             xcrun nm -nm "$bin" 2>/dev/null | \
-              grep -E 'TextureStyle|textureStyle|NUCGImageSourceNode' \
+              grep -E 'TextureStyle|textureStyle|NUCGImageSourceNode|CustomMetadata|customMetadata|CMPhoto' \
               > "artifacts/static/${fw}-texture-symbols.txt" || true
             xcrun otool -ov "$bin" 2>/dev/null | \
-              grep -E -C 8 'TextureStyle|textureStyle|NUCGImageSourceNode' \
+              grep -E -C 8 'TextureStyle|textureStyle|NUCGImageSourceNode|CustomMetadata|customMetadata' \
               > "artifacts/static/${fw}-objc.txt" || true
           done
 
