@@ -1,0 +1,134 @@
+name: PS3 PhotosFormats Xcode 27 Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/ps3-photosformats-xcode27-gate.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  photosformats:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download real portrait PS3 candidate
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-real-portrait-parser-valid-d7e899420a9747f9ede88360ea2e77de480fb4bb
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34591620462
+
+      - name: Ask PhotosFormats whether the HEIC has Texture Style
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          candidate="$(find source-artifact -type f -name 'XDRemux-Photographic-Styles-3-Portrait-PREVIEW.heic' -print -quit)"
+          test -s "$candidate"
+          sw_vers | tee artifacts/macos.txt
+          xcodebuild -version | tee artifacts/xcode.txt
+          cat > "$RUNNER_TEMP/pf_texture_probe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <objc/runtime.h>
+          #import <dlfcn.h>
+
+          static id SafeCallObject(id obj, NSString *selectorName) {
+              SEL sel=NSSelectorFromString(selectorName);
+              if (!obj || ![obj respondsToSelector:sel]) return [NSNull null];
+              @try {
+                  id value=((id(*)(id,SEL))objc_msgSend)(obj,sel);
+                  return value ?: [NSNull null];
+              } @catch (NSException *e) {
+                  return @{ @"exception":e.reason ?: e.name };
+              }
+          }
+
+          static id OpenMetadata(NSURL *url) {
+              Class cls=NSClassFromString(@"PFMetadataImage");
+              if (!cls) return nil;
+              id contentType=nil;
+              Class ut=NSClassFromString(@"UTType");
+              SEL typeSel=NSSelectorFromString(@"typeWithIdentifier:");
+              if (ut && [ut respondsToSelector:typeSel]) {
+                  contentType=((id(*)(id,SEL,id))objc_msgSend)(ut,typeSel,@"public.heic");
+              }
+              id obj=[cls alloc];
+              SEL simple=NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");
+              if ([obj respondsToSelector:simple]) {
+                  @try {
+                      id v=((id(*)(id,SEL,id,id,id))objc_msgSend)(obj,simple,url,contentType,nil);
+                      if (v) return v;
+                  } @catch (__unused NSException *e) {}
+              }
+              obj=[cls alloc];
+              SEL full=NSSelectorFromString(@"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:");
+              if ([obj respondsToSelector:full]) {
+                  @try {
+                      return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(obj,full,url,contentType,0,nil,YES,YES);
+                  } @catch (__unused NSException *e) {}
+              }
+              return nil;
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 3) return 64;
+              NSString *framework=@"/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats";
+              void *handle=dlopen(framework.UTF8String,RTLD_NOW|RTLD_GLOBAL);
+              NSMutableDictionary *out=[NSMutableDictionary dictionary];
+              out[@"frameworkLoaded"]=@(handle!=NULL);
+              out[@"classAvailable"]=@(NSClassFromString(@"PFMetadataImage")!=Nil);
+              NSURL *url=[NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]];
+              id metadata=OpenMetadata(url);
+              out[@"metadataClass"]=metadata ? NSStringFromClass([metadata class]) : @"nil";
+              if (metadata) {
+                  SEL hasSel=NSSelectorFromString(@"hasTextureStyle");
+                  BOOL has=NO;
+                  if ([metadata respondsToSelector:hasSel]) {
+                      @try { has=((BOOL(*)(id,SEL))objc_msgSend)(metadata,hasSel); }
+                      @catch (__unused NSException *e) {}
+                  }
+                  out[@"hasTextureStyle"]=@(has);
+                  out[@"textureStylePreset"]=SafeCallObject(metadata,@"textureStylePreset");
+                  out[@"textureStyleIntensity"]=SafeCallObject(metadata,@"textureStyleIntensity");
+                  out[@"textureStyleGrainIntensity"]=SafeCallObject(metadata,@"textureStyleGrainIntensity");
+                  out[@"textureStyleIsReversible"]=SafeCallObject(metadata,@"textureStyleIsReversible");
+                  out[@"hasSmartStyle"]=@([metadata respondsToSelector:NSSelectorFromString(@"hasSmartStyle")] ? ((BOOL(*)(id,SEL))objc_msgSend)(metadata,NSSelectorFromString(@"hasSmartStyle")) : NO);
+              }
+              NSData *json=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [json writeToFile:[NSString stringWithUTF8String:argv[2]] atomically:YES];
+              puts([[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] UTF8String]);
+              if (!metadata) return 2;
+              return [out[@"hasTextureStyle"] boolValue] ? 0 : 3;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework UniformTypeIdentifiers \
+            "$RUNNER_TEMP/pf_texture_probe.m" -o "$RUNNER_TEMP/pf_texture_probe"
+          set +e
+          "$RUNNER_TEMP/pf_texture_probe" "$candidate" artifacts/photosformats-texture-style.json \
+            > artifacts/probe.stdout 2> artifacts/probe.stderr
+          status=$?
+          set -e
+          cat artifacts/probe.stdout || true
+          cat artifacts/probe.stderr || true
+          cat artifacts/photosformats-texture-style.json || true
+          exit "$status"
+
+      - name: Upload PhotosFormats acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-photosformats-xcode27-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
