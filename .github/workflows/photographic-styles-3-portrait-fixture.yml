@@ -34,6 +34,7 @@ jobs:
           xcrun simctl list devicetypes -j > artifacts/runtime/device-types.json
           python3 - <<'PY' > artifacts/runtime/selection.env
           import json
+          import re
           from pathlib import Path
 
           runtimes = json.loads(Path('artifacts/runtime/runtimes.json').read_text()).get('runtimes', [])
@@ -45,14 +46,32 @@ jobs:
           runtime = sorted(ios, key=version_tuple)[-1]
           if not str(runtime.get('version', '')).startswith('27.'):
               raise SystemExit(f"latest simulator runtime is not iOS 27.x: {runtime!r}")
+
           devices = json.loads(Path('artifacts/runtime/device-types.json').read_text()).get('devicetypes', [])
           iphones = [d for d in devices if str(d.get('name', '')).startswith('iPhone')]
           if not iphones:
               raise SystemExit('no iPhone simulator device type')
+          by_name = {str(d.get('name', '')): d for d in iphones}
+          preferred = [
+              'iPhone 18 Pro', 'iPhone 18 Pro Max', 'iPhone 18',
+              'iPhone 17 Pro', 'iPhone 17 Pro Max', 'iPhone 17',
+              'iPhone 16 Pro', 'iPhone 16 Pro Max', 'iPhone 16',
+          ]
+          selected = next((by_name[name] for name in preferred if name in by_name), None)
+          if selected is None:
+              def score(row):
+                  name = str(row.get('name', ''))
+                  match = re.search(r'iPhone\s+(\d+)', name)
+                  generation = int(match.group(1)) if match else 0
+                  pro = 2 if 'Pro Max' in name else (1 if 'Pro' in name else 0)
+                  return generation, pro, name
+              selected = max(iphones, key=score)
+
           print('RUNTIME_ID=' + str(runtime.get('identifier', '')))
           print('RUNTIME_VERSION=' + str(runtime.get('version', '')))
           print('RUNTIME_BUILD=' + str(runtime.get('buildversion', '')))
-          print('DEVICE_TYPE=' + str(iphones[-1].get('identifier', '')))
+          print('DEVICE_TYPE=' + str(selected.get('identifier', '')))
+          print('DEVICE_NAME=' + str(selected.get('name', '')))
           PY
           cat artifacts/runtime/selection.env
           cat artifacts/runtime/selection.env >> "$GITHUB_ENV"
@@ -198,6 +217,7 @@ jobs:
           }
           selection = {
               'runtimeOS': report.get('os'),
+              'simulatorDevice': '${DEVICE_NAME}',
               'makerNote': maker_choice,
               'textureInfoTrial': trial_key,
               'textureInfo': texture_info,
@@ -336,6 +356,7 @@ jobs:
             echo '- Baseline: XDRemux Semantic Photographic Styles with constrained solver.'
             echo '- TextureStyle: separate 2026 TextureStyleInfo item plus MakerNote state; no baked grain or smoothing.'
             echo '- Contract selection: iOS 27 Simulator private API, HardwareModel V63AP.'
+            echo '- Simulator device: `${DEVICE_NAME:-unknown}`.'
             echo '- Final artifact: `XDRemux-Photographic-Styles-3-Portrait.heic`.'
             echo '- Device Photos UI activation/save/reset is intentionally not claimed by this hosted-runner gate.'
             if [[ -f artifacts/runtime/selected-contract.json ]]; then
