@@ -1,0 +1,356 @@
+name: Photographic Styles 3 Portrait Fixture
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/photographic-styles-3-portrait-fixture.yml
+      - scripts/research/patch_texture_style_heif_v3.py
+      - scripts/research/texture_style_ios27_sim_probe.m
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ps3-portrait:
+    runs-on: xcode-27
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Confirm Xcode 27 runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/runtime artifacts/input artifacts/baseline artifacts/ps3/candidates
+          xcodebuild -version | tee artifacts/runtime/xcode.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee artifacts/runtime/iphoneos-sdk.txt
+          xcrun --sdk iphonesimulator --show-sdk-version | tee artifacts/runtime/simulator-sdk.txt
+          xcrun simctl list runtimes -j > artifacts/runtime/runtimes.json
+          xcrun simctl list devicetypes -j > artifacts/runtime/device-types.json
+          python3 - <<'PY' > artifacts/runtime/selection.env
+          import json
+          from pathlib import Path
+
+          runtimes = json.loads(Path('artifacts/runtime/runtimes.json').read_text()).get('runtimes', [])
+          ios = [r for r in runtimes if 'iOS' in (str(r.get('name', '')) + str(r.get('identifier', ''))) and r.get('isAvailable', True)]
+          if not ios:
+              raise SystemExit('no available iOS runtime')
+          def version_tuple(row):
+              return tuple(int(part) if part.isdigit() else 0 for part in str(row.get('version', '0')).split('.'))
+          runtime = sorted(ios, key=version_tuple)[-1]
+          if not str(runtime.get('version', '')).startswith('27.'):
+              raise SystemExit(f"latest simulator runtime is not iOS 27.x: {runtime!r}")
+          devices = json.loads(Path('artifacts/runtime/device-types.json').read_text()).get('devicetypes', [])
+          iphones = [d for d in devices if str(d.get('name', '')).startswith('iPhone')]
+          if not iphones:
+              raise SystemExit('no iPhone simulator device type')
+          print('RUNTIME_ID=' + str(runtime.get('identifier', '')))
+          print('RUNTIME_VERSION=' + str(runtime.get('version', '')))
+          print('RUNTIME_BUILD=' + str(runtime.get('buildversion', '')))
+          print('DEVICE_TYPE=' + str(iphones[-1].get('identifier', '')))
+          PY
+          cat artifacts/runtime/selection.env
+          cat artifacts/runtime/selection.env >> "$GITHUB_ENV"
+
+      - name: Probe the iOS 27 V63AP TextureStyle contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROBE_SOURCE="$RUNNER_TEMP/texture_style_ios27_v63_probe.m"
+          cp scripts/research/texture_style_ios27_sim_probe.m "$PROBE_SOURCE"
+          python3 - "$PROBE_SOURCE" <<'PY'
+          from pathlib import Path
+          import sys
+
+          path = Path(sys.argv[1])
+          text = path.read_text()
+          old_hardware = 'NSArray<NSString *> *hardwareModels = @[ @"V53AP", @"D93AP", @"iPhone17,1" ];'
+          new_hardware = 'NSArray<NSString *> *hardwareModels = @[ @"V63AP", @"V53AP", @"D93AP", @"iPhone17,1" ];'
+          if old_hardware not in text:
+              raise SystemExit('probe source hardware-model anchor changed')
+          text = text.replace(old_hardware, new_hardware, 1)
+          text = text.replace('trialIndex >= 48', 'trialIndex >= 80')
+
+          anchor = 'NSArray<NSDictionary *> *textureInputs = @[\n'
+          if anchor not in text:
+              raise SystemExit('probe source TextureStyle input anchor changed')
+          merged = '''NSArray<NSDictionary *> *textureInputs = @[\n        @{ @"7": @0, @"3": @1, @"4": @1, @"0": @1, @"5": @1, @"1": @0, @"6": @4, @"2": @0,\n           @"TextureStylePreset": @"Standard", @"TextureStyleIntensity": @1.0, @"TextureStyleGrain": @0.0,\n           @"TextureStyleRenderingVersion": @1, @"TextureStyleOriginalInsteadOfReversibility": @NO },\n        @{ @"7": @0, @"3": @1, @"4": @1, @"0": @1, @"5": @1, @"1": @0, @"6": @4, @"2": @0,\n           @"Preset": @"Standard", @"Intensity": @1.0, @"Grain": @0.0,\n           @"RenderingVersion": @1, @"OriginalInsteadOfReversibility": @NO },\n        @{ @"7": @0, @"3": @1, @"4": @1, @"0": @1, @"5": @1, @"1": @0, @"6": @4, @"2": @0,\n           @"preset": @"Standard", @"intensity": @1.0, @"grainIntensity": @0.0 },\n'''
+          text = text.replace(anchor, merged, 1)
+          path.write_text(text)
+          PY
+
+          UDID="$(xcrun simctl create XDRemuxPS3Contract "$DEVICE_TYPE" "$RUNTIME_ID")"
+          cleanup() {
+            xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
+            xcrun simctl delete "$UDID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b | tee artifacts/runtime/boot.txt
+
+          SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          SDK_VERSION="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          ARCH="$(uname -m)"
+          APP="$RUNNER_TEMP/XDRemuxPS3Contract.app"
+          mkdir -p "$APP"
+          xcrun --sdk iphonesimulator clang -fobjc-arc \
+            -target "${ARCH}-apple-ios${SDK_VERSION}-simulator" \
+            -isysroot "$SDK" \
+            -framework Foundation -framework UIKit -framework ImageIO \
+            "$PROBE_SOURCE" \
+            -o "$APP/XDRemuxPS3Contract" \
+            2>&1 | tee artifacts/runtime/compile.txt
+          cat > "$APP/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleIdentifier</key><string>org.xdremux.PS3Contract</string>
+            <key>CFBundleExecutable</key><string>XDRemuxPS3Contract</string>
+            <key>CFBundleName</key><string>XDRemuxPS3Contract</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>MinimumOSVersion</key><string>${SDK_VERSION}</string>
+            <key>LSRequiresIPhoneOS</key><true/>
+          </dict></plist>
+          PLIST
+          codesign --force --sign - "$APP"
+          xcrun simctl install "$UDID" "$APP"
+          set +e
+          xcrun simctl launch --console "$UDID" org.xdremux.PS3Contract > artifacts/runtime/launch.txt 2>&1
+          launch_status=$?
+          set -e
+          echo "$launch_status" > artifacts/runtime/launch-status.txt
+          DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.PS3Contract data)"
+          test -s "$DATA/Documents/texture-style-ios27-probe.json"
+          cp "$DATA/Documents/texture-style-ios27-probe.json" artifacts/runtime/runtime-probe.json
+          cat artifacts/runtime/runtime-probe.json
+
+      - name: Resolve a fail-closed PS3 metadata contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          report = json.loads(Path('artifacts/runtime/runtime-probe.json').read_text())
+
+          def meaningful(call):
+              if not isinstance(call, dict) or call.get('available') is not True:
+                  return False
+              if call.get('exception') or call.get('errorDomain'):
+                  return False
+              return call.get('result') is not None
+
+          transforms = report.get('makerNoteTransforms', {})
+          maker_choice = None
+          for key in sorted(transforms):
+              row = transforms[key]
+              if not key.startswith('texture-input-') or not isinstance(row, dict):
+                  continue
+              candidate = row.get('input')
+              if not isinstance(candidate, dict) or '7' not in candidate:
+                  continue
+              if meaningful(row.get('direct')) or meaningful(row.get('wrapped84')):
+                  maker_choice = {'trial': key, 'properties': candidate,
+                                  'acceptedForm': 'direct' if meaningful(row.get('direct')) else 'wrapped84'}
+                  break
+          if maker_choice is None:
+              raise SystemExit('iOS 27 PITextureStyleSettingsFromMakerNoteProperties accepted none of the merged SemanticStyle+TextureStyle MakerNote candidates')
+
+          trials = report.get('texturePropertiesTrials', {})
+          accepted = []
+          for key, row in trials.items():
+              if not key.startswith('trial-') or '-V63AP-' not in key:
+                  continue
+              if meaningful(row):
+                  match = re.match(r'trial-(\d+)-', key)
+                  if match:
+                      accepted.append((int(match.group(1)), key))
+          if not accepted:
+              raise SystemExit('iOS 27 _NUTextureStyleProperties accepted no V63AP TextureStyleInfo candidate')
+          trial_index, trial_key = sorted(accepted)[0]
+
+          ports = ['PortTypeBack', 'BackWide', 'BackWideCamera', 0, 1]
+          modes = ['Photo', 'StillImage', 0, 1]
+          types = ['Photo', 'StillImage', 0, 1]
+          port = ports[trial_index // 16]
+          remainder = trial_index % 16
+          mode = modes[remainder // 4]
+          capture_type = types[remainder % 4]
+
+          texture_info = {
+              'Version': 1,
+              'HardwareModel': 'V63AP',
+              'PortType': port,
+              'CaptureMode': mode,
+              'CaptureType': capture_type,
+              'FilmGrainSeed': 1480872525,
+              'TextureStylePeopleDataVersion': 1,
+              'TextureStylePostProcessedPeopleData': [],
+          }
+          selection = {
+              'runtimeOS': report.get('os'),
+              'makerNote': maker_choice,
+              'textureInfoTrial': trial_key,
+              'textureInfo': texture_info,
+          }
+          Path('artifacts/runtime/selected-contract.json').write_text(json.dumps(selection, indent=2))
+
+          contract = {
+              'schema': 'xdremux-photographic-styles-3-portrait-v1',
+              'evidence': {
+                  'runtime': 'iOS 27 Simulator private API',
+                  'hardwareModel': 'V63AP',
+                  'makerTrial': maker_choice['trial'],
+                  'textureInfoTrial': trial_key,
+              },
+              'textureURI': 'tag:apple.com,2026:photo:metadata:texture_styles',
+              'maker84Variants': {
+                  'ps3-standard': maker_choice['properties'],
+              },
+              'textureInfoVariants': {
+                  'ps3-standard': texture_info,
+              },
+              'combinations': [
+                  {'name': 'ps3-portrait-standard', 'maker84': 'ps3-standard', 'textureInfo': 'ps3-standard'}
+              ],
+          }
+          Path('artifacts/runtime/ps3-contract.json').write_text(json.dumps(contract, indent=2))
+          print(json.dumps(selection, indent=2))
+          PY
+
+      - name: Fetch the pinned Find X9 Ultra portrait fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          FIXTURE_SHA=f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          FIXTURE_PATH=fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic
+          git fetch --no-tags --depth=1 origin "$FIXTURE_SHA"
+          git show "$FIXTURE_SHA:$FIXTURE_PATH" > artifacts/input/uhdr-portrait-01.heic
+          test -s artifacts/input/uhdr-portrait-01.heic
+          shasum -a 256 artifacts/input/uhdr-portrait-01.heic | tee artifacts/input/SHA256.txt
+          echo "$FIXTURE_SHA:$FIXTURE_PATH" > artifacts/input/source.txt
+
+      - name: Build XDRemux and create the Semantic Photographic Styles baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build 2>&1 | tee artifacts/baseline/swift-build.log
+          mkdir -p artifacts/baseline/debug
+          .build/debug/xdremux convert \
+            --apple-photographic-styles \
+            --apple-style-data-producer constrained-solver \
+            --debug-dir artifacts/baseline/debug \
+            --input artifacts/input/uhdr-portrait-01.heic \
+            --output artifacts/baseline/portrait-semantic-style.heic \
+            > artifacts/baseline/convert.log \
+            2> artifacts/baseline/convert.stderr
+          test -s artifacts/baseline/portrait-semantic-style.heic
+          .build/debug/xdremux validate-apple \
+            --input artifacts/baseline/portrait-semantic-style.heic \
+            > artifacts/baseline/validate-apple.json
+          sips -g pixelWidth -g pixelHeight artifacts/baseline/portrait-semantic-style.heic \
+            > artifacts/baseline/sips.txt
+
+      - name: Add the independently editable 2026 TextureStyle layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/research/patch_texture_style_heif_v3.py
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            artifacts/baseline/portrait-semantic-style.heic \
+            artifacts/runtime/ps3-contract.json \
+            artifacts/ps3/candidates \
+            | tee artifacts/ps3/candidate-build-report.json
+          cp artifacts/ps3/candidates/ps3-portrait-standard.heic \
+             artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
+
+      - name: Validate the complete PS3 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE=artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
+          test -s "$CANDIDATE"
+          sips -g pixelWidth -g pixelHeight "$CANDIDATE" > artifacts/ps3/sips.txt
+          .build/debug/xdremux validate-apple --input "$CANDIDATE" > artifacts/ps3/validate-apple.json
+          shasum -a 256 "$CANDIDATE" > artifacts/ps3/SHA256.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(Path('artifacts/ps3/candidates/candidate-manifest-v3.json').read_text())
+          candidates = manifest.get('candidates', [])
+          if len(candidates) != 1:
+              raise SystemExit(f'expected exactly one canonical PS3 candidate, found {len(candidates)}')
+          candidate = candidates[0]
+          assert candidate['name'] == 'ps3-portrait-standard'
+          assert candidate['payloadInvariant'] is True
+          assert candidate['exifChanged'] is True
+          assert candidate['newTextureItemID'] is not None
+
+          raw = Path('artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic').read_bytes()
+          semantic_uri = b'tag:apple.com,2023:photo:metadata:styles'
+          texture_uri = b'tag:apple.com,2026:photo:metadata:texture_styles'
+          if semantic_uri not in raw:
+              raise SystemExit('final HEIC lost the 2023 SemanticStyle metadata item')
+          if texture_uri not in raw:
+              raise SystemExit('final HEIC is missing the 2026 TextureStyleInfo metadata item')
+          if b'V63AP' not in raw:
+              raise SystemExit('final HEIC does not contain the iPhone 18 Pro V63AP TextureStyle identity')
+
+          report = {
+              'semanticStyleURI': True,
+              'textureStyleURI': True,
+              'hardwareModelV63AP': True,
+              'oldPayloadsInvariant': candidate['payloadInvariant'],
+              'makerNoteUpdated': candidate['exifChanged'],
+              'textureMetadataItemID': candidate['newTextureItemID'],
+              'limitations': [
+                  'iOS 27 Simulator private parsers validated the selected metadata shapes.',
+                  'Physical iPhone Photos UI activation/save/reset still requires device acceptance.',
+              ],
+          }
+          Path('artifacts/ps3/verification.json').write_text(json.dumps(report, indent=2))
+          print(json.dumps(report, indent=2))
+          PY
+
+          python3 -m unittest Tests.validation.test_agent_completion_gate
+          python3 -m unittest Tests.test_swift_app_architecture
+
+      - name: Write summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Photographic Styles 3 portrait fixture'
+            echo
+            echo '- Input: pinned Find X9 Ultra portrait ProXDR fixture.'
+            echo '- Baseline: XDRemux Semantic Photographic Styles with constrained solver.'
+            echo '- TextureStyle: separate 2026 TextureStyleInfo item plus MakerNote state; no baked grain or smoothing.'
+            echo '- Contract selection: iOS 27 Simulator private API, HardwareModel V63AP.'
+            echo '- Final artifact: `XDRemux-Photographic-Styles-3-Portrait.heic`.'
+            echo '- Device Photos UI activation/save/reset is intentionally not claimed by this hosted-runner gate.'
+            if [[ -f artifacts/runtime/selected-contract.json ]]; then
+              echo
+              echo '```json'
+              cat artifacts/runtime/selected-contract.json
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload PS3 portrait fixture and evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: photographic-styles-3-portrait-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
