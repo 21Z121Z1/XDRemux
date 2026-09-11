@@ -1,0 +1,209 @@
+name: Photographic Styles 3 Portrait Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/photographic-styles-3-portrait-build.yml
+      - scripts/research/patch_texture_style_heif_v3.py
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26-arm64
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Fetch pinned portrait fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/input artifacts/baseline/debug artifacts/ps3/candidates
+          FIXTURE_SHA=f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          FIXTURE_PATH=fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic
+          git fetch --no-tags --depth=1 origin "$FIXTURE_SHA"
+          git show "$FIXTURE_SHA:$FIXTURE_PATH" > artifacts/input/uhdr-portrait-01.heic
+          test -s artifacts/input/uhdr-portrait-01.heic
+          shasum -a 256 artifacts/input/uhdr-portrait-01.heic > artifacts/input/SHA256.txt
+          printf '%s:%s\n' "$FIXTURE_SHA" "$FIXTURE_PATH" > artifacts/input/source.txt
+
+      - name: Build current XDRemux and Semantic Style baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build 2>&1 | tee artifacts/baseline/swift-build.log
+          .build/debug/xdremux convert \
+            --apple-photographic-styles \
+            --apple-style-data-producer constrained-solver \
+            --debug-dir artifacts/baseline/debug \
+            --input artifacts/input/uhdr-portrait-01.heic \
+            --output artifacts/baseline/portrait-semantic-style.heic \
+            > artifacts/baseline/convert.log \
+            2> artifacts/baseline/convert.stderr
+          test -s artifacts/baseline/portrait-semantic-style.heic
+          .build/debug/xdremux validate-apple \
+            --input artifacts/baseline/portrait-semantic-style.heic \
+            > artifacts/baseline/validate-apple.json
+          sips -g pixelWidth -g pixelHeight artifacts/baseline/portrait-semantic-style.heic \
+            > artifacts/baseline/sips.txt
+
+      - name: Materialize RC-derived PS3 contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > artifacts/ps3/contract.json <<'JSON'
+          {
+            "schema": "xdremux-photographic-styles-3-portrait-rc-candidate-v1",
+            "evidence": {
+              "textureURI": "iOS 27 RC firmware diff",
+              "requiredTextureInfoKeys": "iOS 27 RC firmware diff",
+              "captureMetadataKeys": "iOS 27 RC firmware diff",
+              "hardwareModel": "iPhone 18 Pro iPhone19,2 / V63AP firmware identity",
+              "enumValues": "candidate pending iOS 27 private-parser gate"
+            },
+            "textureURI": "tag:apple.com,2026:photo:metadata:texture_styles",
+            "maker84Variants": {
+              "ps3-standard": {
+                "7": 0,
+                "3": 1,
+                "4": 1,
+                "0": 1,
+                "5": 1,
+                "1": 0,
+                "6": 4,
+                "2": 0,
+                "TextureStylePreset": "Standard",
+                "TextureStyleIntensity": 1.0,
+                "TextureStyleGrain": 0.0,
+                "TextureStyleRenderingVersion": 1,
+                "TextureStyleOriginalInsteadOfReversibility": false
+              }
+            },
+            "textureInfoVariants": {
+              "ps3-standard": {
+                "Version": 1,
+                "HardwareModel": "V63AP",
+                "PortType": "PortTypeBack",
+                "CaptureMode": "Photo",
+                "CaptureType": "Photo",
+                "FilmGrainSeed": 1480872525,
+                "TextureStylePeopleDataVersion": 1,
+                "TextureStylePostProcessedPeopleData": []
+              }
+            },
+            "combinations": [
+              {
+                "name": "ps3-portrait-standard",
+                "maker84": "ps3-standard",
+                "textureInfo": "ps3-standard"
+              }
+            ]
+          }
+          JSON
+          python3 -m json.tool artifacts/ps3/contract.json > /dev/null
+
+      - name: Construct PS3 portrait HEIC
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/research/patch_texture_style_heif_v3.py
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            artifacts/baseline/portrait-semantic-style.heic \
+            artifacts/ps3/contract.json \
+            artifacts/ps3/candidates \
+            | tee artifacts/ps3/build-report.json
+          cp artifacts/ps3/candidates/ps3-portrait-standard.heic \
+             artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
+
+      - name: Audit PS3 container and metadata graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE=artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
+          .build/debug/xdremux validate-apple --input "$CANDIDATE" > artifacts/ps3/validate-apple.json
+          sips -g pixelWidth -g pixelHeight "$CANDIDATE" > artifacts/ps3/sips.txt
+          shasum -a 256 "$CANDIDATE" > artifacts/ps3/SHA256.txt
+          python3 - <<'PY'
+          import json, plistlib, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/research')
+          import patch_texture_style_heif_v3 as p
+
+          path=Path('artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic')
+          data=path.read_bytes()
+          manifest=json.loads(Path('artifacts/ps3/candidates/candidate-manifest-v3.json').read_text())
+          assert len(manifest['candidates']) == 1
+          candidate=manifest['candidates'][0]
+          assert candidate['payloadInvariant'] is True
+          assert candidate['exifChanged'] is True
+          assert candidate['newTextureItemID'] is not None
+
+          top=list(p.boxes(data,0,len(data)))
+          meta=next(b for b in top if b['type']=='meta')
+          children=list(p.boxes(data,meta['data_start']+4,meta['data_end']))
+          by_type={b['type']:b for b in children}
+          _,infos=p.parse_iinf(data,by_type['iinf'])
+          _,refs=p.parse_iref(data,by_type['iref'])
+          iloc=p.parse_iloc(data,by_type['iloc'])
+          idat=by_type.get('idat')
+          entries={e['id']:e for e in iloc['entries']}
+
+          semantic=next(i for i in infos if i['type']=='uri ' and b'tag:apple.com,2023:photo:metadata:styles\0' in i['raw'])
+          texture=next(i for i in infos if i['type']=='uri ' and b'tag:apple.com,2026:photo:metadata:texture_styles\0' in i['raw'])
+          semantic_targets=next(r['to'] for r in refs if r['type']=='cdsc' and r['from']==semantic['id'])
+          texture_targets=next(r['to'] for r in refs if r['type']=='cdsc' and r['from']==texture['id'])
+          assert texture_targets == semantic_targets and texture_targets
+
+          texture_plist=plistlib.loads(p.item_payload(data,entries[texture['id']],idat))
+          assert texture_plist['Version'] == 1
+          assert texture_plist['HardwareModel'] == 'V63AP'
+          for key in ['PortType','CaptureMode','CaptureType']:
+              assert key in texture_plist
+
+          exif_id=next(i['id'] for i in infos if i['type']=='Exif')
+          exif=p.item_payload(data,entries[exif_id],idat)
+          note,_=p.extract_makernote(exif)
+          _,note_entries=p.parse_apple_makernote(note)
+          tag84=next(raw for tag,_,raw in note_entries if tag==84)
+          maker=plistlib.loads(tag84)
+          for key in ['TextureStylePreset','TextureStyleIntensity','TextureStyleGrain','TextureStyleRenderingVersion','TextureStyleOriginalInsteadOfReversibility']:
+              assert key in maker
+          for key in ['0','1','2','3','4','5','6','7']:
+              assert key in maker
+
+          audit={
+            'semanticStyleItemID': semantic['id'],
+            'textureStyleItemID': texture['id'],
+            'sharedCdscTargets': semantic_targets,
+            'payloadInvariant': candidate['payloadInvariant'],
+            'makerNoteTextureKeys': {k: maker[k] for k in maker if str(k).startswith('TextureStyle')},
+            'textureStyleInfo': texture_plist,
+            'status': 'offline-structurally-complete',
+            'remainingGate': 'iOS 27 private parser and physical Photos UI acceptance'
+          }
+          Path('artifacts/ps3/offline-audit.json').write_text(json.dumps(audit,indent=2))
+          print(json.dumps(audit,indent=2))
+          PY
+
+      - name: Run focused repository gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest Tests.validation.test_agent_completion_gate
+          python3 -m unittest Tests.test_swift_app_architecture
+
+      - name: Upload portrait candidate
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-portrait-offline-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
