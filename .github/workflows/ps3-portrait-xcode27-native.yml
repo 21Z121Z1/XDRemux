@@ -1,0 +1,107 @@
+name: PS3 Portrait Native Xcode 27
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/ps3-portrait-xcode27-native.yml
+      - scripts/research/patch_hosted_semantic_scaffold.py
+      - scripts/research/audit_ps3_portrait_candidate.py
+      - scripts/research/texture_style_ps3_portrait_contract.json
+      - scripts/research/patch_texture_style_heif_v3.py
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Record native environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/input artifacts/baseline/debug artifacts/ps3/candidates
+          sw_vers | tee artifacts/baseline/macos.txt
+          xcodebuild -version | tee artifacts/baseline/xcode.txt
+
+      - name: Fetch real Find X9 Ultra portrait fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture_sha=f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          fixture_path=fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic
+          git fetch --no-tags --depth=1 origin "$fixture_sha"
+          git show "$fixture_sha:$fixture_path" > artifacts/input/portrait.heic
+          test -s artifacts/input/portrait.heic
+          shasum -a 256 artifacts/input/portrait.heic > artifacts/input/SHA256.txt
+          printf '%s:%s\n' "$fixture_sha" "$fixture_path" > artifacts/input/source.txt
+
+      - name: Adapt semantic scaffold without relaxing final HDR graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/research/patch_hosted_semantic_scaffold.py
+          python3 scripts/research/patch_hosted_semantic_scaffold.py
+
+      - name: Build native Semantic Styles baseline with constrained solver
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build 2>&1 | tee artifacts/baseline/swift-build.log
+          .build/debug/xdremux convert \
+            --apple-photographic-styles \
+            --apple-style-data-producer constrained-solver \
+            --debug-dir artifacts/baseline/debug \
+            --input artifacts/input/portrait.heic \
+            --output artifacts/baseline/portrait-semantic-style.heic \
+            > artifacts/baseline/convert.log \
+            2> artifacts/baseline/convert.stderr
+          test -s artifacts/baseline/portrait-semantic-style.heic
+          .build/debug/xdremux validate-apple \
+            --input artifacts/baseline/portrait-semantic-style.heic \
+            > artifacts/baseline/validate-apple.json
+
+      - name: Inject iOS 27 Texture Style contract without re-encoding media
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/research/patch_texture_style_heif_v3.py
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            artifacts/baseline/portrait-semantic-style.heic \
+            scripts/research/texture_style_ps3_portrait_contract.json \
+            artifacts/ps3/candidates \
+            | tee artifacts/ps3/build-report.json
+          cp artifacts/ps3/candidates/ps3-portrait-standard.heic \
+            artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
+          test -s artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
+
+      - name: Fail-closed PS3 graph and payload audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate=artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
+          .build/debug/xdremux validate-apple --input "$candidate" > artifacts/ps3/validate-apple.json
+          sips -g pixelWidth -g pixelHeight "$candidate" > artifacts/ps3/sips.txt
+          shasum -a 256 "$candidate" > artifacts/ps3/SHA256.txt
+          python3 -m py_compile scripts/research/audit_ps3_portrait_candidate.py
+          python3 scripts/research/audit_ps3_portrait_candidate.py \
+            "$candidate" \
+            artifacts/ps3/candidates/candidate-manifest-v3.json \
+            artifacts/ps3/offline-audit.json
+
+      - name: Upload native PS3 portrait candidate and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-portrait-native-xcode27-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
