@@ -42,10 +42,14 @@ jobs:
           set -euo pipefail
           CACHE='/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e'
           test -s "$CACHE"
-          ipsw dyld macho "$CACHE" PhotoImaging --symbols --strings > artifacts/photoimaging-cache.txt 2>&1
-          grep -n -E 'PITextureStyle(SettingsFromMakerNoteProperties|PresetFromMakerNoteValue)' artifacts/photoimaging-cache.txt | tee artifacts/texture-symbols.txt
-          SETTINGS_VM="$(grep -E 'PITextureStyleSettingsFromMakerNoteProperties' artifacts/photoimaging-cache.txt | head -1 | sed -E 's/^.*(0x[0-9a-fA-F]+):.*$/\1/')"
-          PRESET_VM="$(grep -E 'PITextureStylePresetFromMakerNoteValue' artifacts/photoimaging-cache.txt | head -1 | sed -E 's/^.*(0x[0-9a-fA-F]+):.*$/\1/')"
+          ipsw dyld symaddr "$CACHE" '_PITextureStyleSettingsFromMakerNoteProperties' --image PhotoImaging --no-color \
+            > artifacts/settings-symaddr.txt 2>&1 || true
+          ipsw dyld symaddr "$CACHE" '_PITextureStylePresetFromMakerNoteValue' --image PhotoImaging --no-color \
+            > artifacts/preset-symaddr.txt 2>&1 || true
+          echo '=== settings ==='; cat artifacts/settings-symaddr.txt
+          echo '=== preset ==='; cat artifacts/preset-symaddr.txt
+          SETTINGS_VM="$(grep -oE '0x[0-9a-fA-F]+' artifacts/settings-symaddr.txt | head -1 || true)"
+          PRESET_VM="$(grep -oE '0x[0-9a-fA-F]+' artifacts/preset-symaddr.txt | head -1 || true)"
           case "$SETTINGS_VM" in 0x*) ;; *) echo "bad settings vm: $SETTINGS_VM"; exit 1;; esac
           case "$PRESET_VM" in 0x*) ;; *) echo "bad preset vm: $PRESET_VM"; exit 1;; esac
           echo "SETTINGS_VM=$SETTINGS_VM" | tee -a "$GITHUB_ENV" artifacts/resolved.txt
