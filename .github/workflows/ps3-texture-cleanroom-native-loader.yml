@@ -1,0 +1,96 @@
+name: PS3 TextureStyle Cleanroom Native Loader
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-cleanroom-v8
+    paths:
+      - .github/workflows/ps3-texture-cleanroom-native-loader.yml
+      - scripts/research/texture_style_native_loader_trace.m
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  native-loader:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download clean-room A/B candidates
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-cleanroom-native-oracles-a566a03a59eb03907ebdf8626a153527e19e3672
+          path: prior-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34659132629
+
+      - name: Trace PhotoImaging and Neutrino TextureStyle loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/trace artifacts/static
+          cp prior-artifact/*.heic artifacts/
+          xcrun clang -fno-objc-arc \
+            -framework Foundation -framework ImageIO -framework CoreGraphics \
+            scripts/research/texture_style_native_loader_trace.m \
+            -o "$RUNNER_TEMP/texture_style_native_loader_trace"
+          inputs=(artifacts/*.heic)
+          set +e
+          "$RUNNER_TEMP/texture_style_native_loader_trace" artifacts/trace/native-loader-trace.json \
+            "${inputs[@]}" \
+            > artifacts/trace/native-loader.stdout \
+            2> artifacts/trace/native-loader.stderr
+          status=$?
+          set -e
+          echo "$status" | tee artifacts/trace/native-loader.exit-code
+          cat artifacts/trace/native-loader.stderr || true
+          test -s artifacts/trace/native-loader-trace.json
+          python3 - <<'PY' | tee artifacts/trace/summary.txt
+          import json
+          from pathlib import Path
+          p=json.load(open('artifacts/trace/native-loader-trace.json'))
+          print('parserHookInstalled=',p.get('parserHookInstalled'))
+          for f in p.get('files',[]):
+              pf=f.get('pfMetadata',{})
+              nu=f.get('neutrino',{})
+              print('\n'+Path(f.get('file','?')).name)
+              print(' PF hasSmartStyle=',pf.get('hasSmartStyle'),'hasTextureStyle=',pf.get('hasTextureStyle'))
+              print(' PF textureStyleSettings=',pf.get('textureStyleSettings'))
+              print(' NU texture=',nu.get('nodeTextureStylesProperties'))
+              print(' NU nodeLoadOK=',nu.get('nodeLoadOK'),'nodeLoadError=',nu.get('nodeLoadError'))
+          print('\nparser events:')
+          for e in p.get('parserEvents',[]):
+              print(json.dumps(e,ensure_ascii=False,sort_keys=True))
+          PY
+
+      - name: Extract host TextureStyle symbols and strings
+        shell: bash
+        run: |
+          set -euo pipefail
+          for fw in PhotoImaging NeutrinoCore PhotosFormats; do
+            bin="/System/Library/PrivateFrameworks/${fw}.framework/${fw}"
+            if [ ! -f "$bin" ]; then
+              echo "$fw missing" >> artifacts/static/status.txt
+              continue
+            fi
+            echo "$fw $bin" >> artifacts/static/status.txt
+            nm -nm "$bin" 2>/dev/null | grep -E 'TextureStyle|textureStyle' \
+              > "artifacts/static/${fw}-symbols.txt" || true
+            strings -a "$bin" | grep -E -C 10 \
+              'TextureStyle|textureStyle|FilmGrainSeed|TextureStylePeopleDataVersion|tag:apple.com,2026:photo:metadata:texture_styles' \
+              > "artifacts/static/${fw}-strings.txt" || true
+          done
+
+      - name: Upload native loader evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-cleanroom-native-loader-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
