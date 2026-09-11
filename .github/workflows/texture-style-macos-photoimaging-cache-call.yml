@@ -1,0 +1,178 @@
+name: TextureStyle macOS PhotoImaging cache call
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-macos-photoimaging-cache-call.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  native-call:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download V5 candidates
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-style-v5-numeric-413c4e3328e8f9d95f9a655df55ed03e1f9014e6
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34610936229
+
+      - name: Install ipsw
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          ipsw version
+          mkdir -p artifacts
+
+      - name: Resolve private PhotoImaging symbols from live dyld cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          CACHE='/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e'
+          test -s "$CACHE"
+          ipsw dyld macho "$CACHE" PhotoImaging --symbols --strings > artifacts/photoimaging-cache.txt 2>&1
+          grep -n -E 'PITextureStyle(SettingsFromMakerNoteProperties|PresetFromMakerNoteValue)' artifacts/photoimaging-cache.txt | tee artifacts/texture-symbols.txt
+          SETTINGS_VM="$(grep -E 'PITextureStyleSettingsFromMakerNoteProperties' artifacts/photoimaging-cache.txt | head -1 | sed -E 's/^.*(0x[0-9a-fA-F]+):.*$/\1/')"
+          PRESET_VM="$(grep -E 'PITextureStylePresetFromMakerNoteValue' artifacts/photoimaging-cache.txt | head -1 | sed -E 's/^.*(0x[0-9a-fA-F]+):.*$/\1/')"
+          case "$SETTINGS_VM" in 0x*) ;; *) echo "bad settings vm: $SETTINGS_VM"; exit 1;; esac
+          case "$PRESET_VM" in 0x*) ;; *) echo "bad preset vm: $PRESET_VM"; exit 1;; esac
+          echo "SETTINGS_VM=$SETTINGS_VM" | tee -a "$GITHUB_ENV" artifacts/resolved.txt
+          echo "PRESET_VM=$PRESET_VM" | tee -a "$GITHUB_ENV" artifacts/resolved.txt
+
+      - name: Execute hidden Apple parser by VM address plus dyld slide
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/cachecall.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <mach-o/dyld.h>
+          #import <dlfcn.h>
+          #if __has_include(<ptrauth.h>)
+          #include <ptrauth.h>
+          #endif
+
+          typedef id (*SettingsFn)(id);
+          typedef id (*PresetFn)(id);
+
+          static id Safe(id x) {
+              if (!x) return [NSNull null];
+              if ([x isKindOfClass:[NSString class]] || [x isKindOfClass:[NSNumber class]] || [x isKindOfClass:[NSNull class]]) return x;
+              if ([x isKindOfClass:[NSDictionary class]]) {
+                  NSMutableDictionary *d=[NSMutableDictionary dictionary];
+                  for(id k in x) d[[k description]]=Safe(x[k]);
+                  return d;
+              }
+              if ([x isKindOfClass:[NSArray class]]) {
+                  NSMutableArray *a=[NSMutableArray array]; for(id v in x)[a addObject:Safe(v)]; return a;
+              }
+              return [x description];
+          }
+
+          static intptr_t PhotoImagingSlide(void) {
+              uint32_t n=_dyld_image_count();
+              for(uint32_t i=0;i<n;i++){
+                  const char *name=_dyld_get_image_name(i);
+                  if(name && strstr(name,"/PhotoImaging.framework/")){
+                      fprintf(stderr,"image[%u]=%s header=%p slide=%p\n",i,name,_dyld_get_image_header(i),(void *)_dyld_get_image_vmaddr_slide(i));
+                      return _dyld_get_image_vmaddr_slide(i);
+                  }
+              }
+              return 0;
+          }
+
+          static void *SignedFunctionPointer(uintptr_t p) {
+          #if __has_feature(ptrauth_calls)
+              return ptrauth_sign_unauthenticated((void *)p,ptrauth_key_function_pointer,0);
+          #else
+              return (void *)p;
+          #endif
+          }
+
+          int main(int argc,const char **argv){@autoreleasepool{
+              if(argc<4)return 64;
+              uintptr_t settingsVM=strtoull(argv[1],0,0);
+              uintptr_t presetVM=strtoull(argv[2],0,0);
+              void *h=dlopen("/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",RTLD_NOW|RTLD_GLOBAL);
+              fprintf(stderr,"dlopen=%p err=%s\n",h,h?"none":dlerror());
+              if(!h)return 70;
+              intptr_t slide=PhotoImagingSlide();
+              fprintf(stderr,"settingsVM=%p presetVM=%p slide=%p\n",(void *)settingsVM,(void *)presetVM,(void *)slide);
+              if(!slide)return 71;
+              SettingsFn settings=(SettingsFn)SignedFunctionPointer(settingsVM+(uintptr_t)slide);
+              PresetFn preset=(PresetFn)SignedFunctionPointer(presetVM+(uintptr_t)slide);
+              fprintf(stderr,"settings=%p preset=%p\n",settings,preset);
+
+              NSMutableDictionary *presetMap=[NSMutableDictionary dictionary];
+              for(int v=0;v<=6;v++){
+                  id x=nil; @try{x=preset(@(v));}@catch(NSException *e){x=@{ @"exception":e.reason?:e.name };}
+                  presetMap[[NSString stringWithFormat:@"%d",v]]=Safe(x);
+              }
+
+              NSMutableArray *rows=[NSMutableArray array];
+              for(int i=3;i<argc;i++){
+                  NSString *p=[NSString stringWithUTF8String:argv[i]];
+                  CGImageSourceRef src=CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:p],NULL);
+                  NSDictionary *props=src?CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(src,0,NULL)):nil;
+                  if(src)CFRelease(src);
+                  NSDictionary *maker=props[(__bridge NSString *)kCGImagePropertyMakerAppleDictionary];
+                  id out=nil; @try{out=settings(maker);}@catch(NSException *e){out=@{ @"exception":e.reason?:e.name };}
+                  [rows addObject:@{ @"file":p.lastPathComponent, @"nativeSettings":Safe(out), @"tag84":Safe(maker[@"84"]) }];
+              }
+              NSDictionary *root=@{ @"presetMap":presetMap, @"rows":rows };
+              NSData *j=[NSJSONSerialization dataWithJSONObject:root options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);
+          }return 0;}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework ImageIO "$RUNNER_TEMP/cachecall.m" -o "$RUNNER_TEMP/cachecall"
+          "$RUNNER_TEMP/cachecall" "$SETTINGS_VM" "$PRESET_VM" \
+            source-artifact/A-baseline-original.heic \
+            source-artifact/candidates/V5-standard-min.heic \
+            source-artifact/candidates/V5-filmic-min.heic \
+            source-artifact/candidates/V5-filmic-rv1-original0.heic \
+            source-artifact/candidates/V5-filmic-rv1-original1.heic \
+            > artifacts/native-output.json 2> artifacts/native-stderr.txt
+          cat artifacts/native-stderr.txt
+          cat artifacts/native-output.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('artifacts/native-output.json').read_text())
+          print('presetMap',d['presetMap'])
+          rows={r['file']:r for r in d['rows']}
+          assert d['presetMap']['1']=='Standard', d['presetMap']
+          assert d['presetMap']['4']=='Filmic', d['presetMap']
+          base=rows['A-baseline-original.heic']['nativeSettings']
+          std=rows['V5-standard-min.heic']['nativeSettings']
+          film=rows['V5-filmic-min.heic']['nativeSettings']
+          assert base is None, base
+          assert isinstance(std,dict) and std, std
+          assert isinstance(film,dict) and film, film
+          text=json.dumps(film,ensure_ascii=False,sort_keys=True)
+          assert 'Filmic' in text, text
+          assert '0.61' in text, text
+          assert '0.73' in text, text
+          Path('artifacts/native-positive.txt').write_text('V5-standard-min.heic\nV5-filmic-min.heic\n')
+          PY
+
+      - name: Upload native evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-macos-photoimaging-cache-call-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
