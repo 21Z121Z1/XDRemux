@@ -2,7 +2,9 @@ name: TextureStyle V5 macOS 27 acceptance gate
 
 on:
   push:
-    branches: [research/photographic-styles-3-texture-probe]
+    branches:
+      - research/photographic-styles-3-texture-probe
+      - research/photographic-styles-3-texture-probe-v7
     paths:
       - .github/workflows/texture-style-v5-xcode27-acceptance.yml
       - scripts/research/texture_style_tag84_v5_numeric_contract.json
@@ -117,7 +119,7 @@ jobs:
                   @"metadataClass":metadata?NSStringFromClass([metadata class]):@"nil",
                   @"makerApple":JsonSafe(maker)
               } mutableCopy];
-              for(NSString *name in @[@"hasSmartStyle",@"hasTextureStyle",@"textureStylePreset",@"textureStyleIntensity",@"textureStyleGrainIntensity",@"textureStyleIsReversible"])
+              for(NSString *name in @[@"hasSmartStyle",@"hasTextureStyle",@"textureStylePreset",@"textureStyleIntensity",@"textureStyleGrain",@"textureStyleGrainIntensity",@"textureStyleIsReversible"])
                   out[name]=InvokeZeroArg(metadata,name);
               NSData *json=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingSortedKeys error:nil];
               fwrite(json.bytes,1,json.length,stdout); fputc('\n',stdout);
@@ -148,13 +150,16 @@ jobs:
           for r in rows:
               maker=r.get('makerApple',{})
               tag84=maker.get('84') if isinstance(maker,dict) else None
+              grain=val(r,'textureStyleGrain')
+              if grain is None:
+                  grain=val(r,'textureStyleGrainIntensity')
               summary.append({
                 'file':r['file'],
                 'hasSmartStyle':val(r,'hasSmartStyle'),
                 'hasTextureStyle':val(r,'hasTextureStyle'),
                 'preset':val(r,'textureStylePreset'),
                 'intensity':val(r,'textureStyleIntensity'),
-                'grain':val(r,'textureStyleGrainIntensity'),
+                'grain':grain,
                 'reversible':val(r,'textureStyleIsReversible'),
                 'tag84':tag84,
               })
