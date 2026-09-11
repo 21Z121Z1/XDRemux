@@ -88,6 +88,28 @@ jobs:
 
           path = Path(sys.argv[1])
           text = path.read_text()
+
+          old_documents = '''static NSURL *DocumentsURL(void) {
+              return [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                             inDomains:NSUserDomainMask] firstObject];
+          }'''
+          new_documents = '''static NSURL *DocumentsURL(void) {
+              NSURL *url = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                               inDomains:NSUserDomainMask] firstObject];
+              if (url) {
+                  NSError *error = nil;
+                  BOOL ok = [[NSFileManager defaultManager] createDirectoryAtURL:url
+                                                       withIntermediateDirectories:YES
+                                                                        attributes:nil
+                                                                             error:&error];
+                  if (!ok) NSLog(@"failed to create probe documents directory: %@", error);
+              }
+              return url;
+          }'''
+          if old_documents not in text:
+              raise SystemExit('probe source DocumentsURL anchor changed')
+          text = text.replace(old_documents, new_documents, 1)
+
           old_hardware = 'NSArray<NSString *> *hardwareModels = @[ @"V53AP", @"D93AP", @"iPhone17,1" ];'
           new_hardware = 'NSArray<NSString *> *hardwareModels = @[ @"V63AP", @"V53AP", @"D93AP", @"iPhone17,1" ];'
           if old_hardware not in text:
@@ -146,8 +168,20 @@ jobs:
           set -e
           echo "$launch_status" > artifacts/runtime/launch-status.txt
           DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.PS3Contract data)"
-          test -s "$DATA/Documents/texture-style-ios27-probe.json"
+          find "$DATA" -maxdepth 3 -type f -print > artifacts/runtime/app-container-files.txt || true
+          if [[ ! -s "$DATA/Documents/texture-style-ios27-probe.json" ]]; then
+            xcrun simctl spawn "$UDID" log show --style compact --last 5m \
+              --predicate 'process == "XDRemuxPS3Contract"' \
+              > artifacts/runtime/probe-system-log.txt 2>&1 || true
+            if [[ -d "$DATA/Documents" ]]; then
+              cp "$DATA"/Documents/checkpoint-*.json artifacts/runtime/ 2>/dev/null || true
+            fi
+            cat artifacts/runtime/launch.txt || true
+            cat artifacts/runtime/probe-system-log.txt || true
+            exit 1
+          fi
           cp "$DATA/Documents/texture-style-ios27-probe.json" artifacts/runtime/runtime-probe.json
+          cp "$DATA"/Documents/checkpoint-*.json artifacts/runtime/ 2>/dev/null || true
           cat artifacts/runtime/runtime-probe.json
 
       - name: Resolve a fail-closed PS3 metadata contract
