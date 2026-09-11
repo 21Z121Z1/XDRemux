@@ -1,0 +1,205 @@
+name: TextureStyle Xcode 27 Constants
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-xcode27-constants.yml
+
+permissions:
+  contents: read
+
+jobs:
+  constants:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Boot iOS 27 and read exported string constants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          xcrun simctl list runtimes -j > artifacts/runtimes.json
+          xcrun simctl list devicetypes -j > artifacts/device-types.json
+          RUNTIME_ID="$(python3 - <<'PY'
+          import json
+          r=[x for x in json.load(open('artifacts/runtimes.json')).get('runtimes',[]) if str(x.get('version','')).startswith('27.') and x.get('isAvailable',True)]
+          if not r: raise SystemExit('no iOS 27 runtime')
+          print(r[-1]['identifier'])
+          PY
+          )"
+          DEVICE_TYPE="$(python3 - <<'PY'
+          import json
+          ds=json.load(open('artifacts/device-types.json')).get('devicetypes',[])
+          p=[d for d in ds if d.get('identifier')=='com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro']
+          if not p: p=[d for d in ds if str(d.get('name','')).startswith('iPhone')]
+          if not p: raise SystemExit('no iPhone device type')
+          print(p[0]['identifier'])
+          PY
+          )"
+          UDID="$(xcrun simctl create TextureStyleConstants "$DEVICE_TYPE" "$RUNTIME_ID")"
+          cleanup() { xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b > artifacts/boot.txt
+
+          SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          SDK_VERSION="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          ARCH="$(uname -m)"
+          APP="$RUNNER_TEMP/TextureStyleConstants.app"
+          mkdir -p "$APP"
+          cat > "$RUNNER_TEMP/constants.m" <<'OBJC'
+          #import <UIKit/UIKit.h>
+          #import <Foundation/Foundation.h>
+          #import <dlfcn.h>
+
+          static id ReadStringGlobal(NSString *name) {
+              void *s=dlsym(RTLD_DEFAULT,name.UTF8String);
+              if (!s) {
+                  NSString *underscored=[@"_" stringByAppendingString:name];
+                  s=dlsym(RTLD_DEFAULT,underscored.UTF8String);
+              }
+              if (!s) return [NSNull null];
+              @try {
+                  __unsafe_unretained id value=*(__unsafe_unretained id *)s;
+                  if ([value isKindOfClass:[NSString class]]) return value;
+                  return @{ @"address":[NSString stringWithFormat:@"%p",s], @"class": value ? NSStringFromClass([value class]) : @"nil", @"description": value ? [value description] : @"nil" };
+              } @catch (NSException *e) {
+                  return @{ @"address":[NSString stringWithFormat:@"%p",s], @"exception":e.reason ?: e.name };
+              }
+          }
+
+          static void Run(void) {
+              NSArray *frameworks=@[
+                  @"/System/Library/PrivateFrameworks/CMImaging.framework/CMImaging",
+                  @"/System/Library/PrivateFrameworks/CMCaptureCore.framework/CMCaptureCore",
+                  @"/System/Library/PrivateFrameworks/AVFCapture.framework/AVFCapture",
+                  @"/System/Library/PrivateFrameworks/NeutrinoCore.framework/NeutrinoCore",
+                  @"/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",
+                  @"/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats"
+              ];
+              NSMutableDictionary *loaded=[NSMutableDictionary dictionary];
+              for (NSString *f in frameworks) loaded[f]=@(dlopen(f.UTF8String,RTLD_NOW|RTLD_GLOBAL)!=NULL);
+              NSArray *names=@[
+                  @"AVAppleMakerNote_TextureStyleKey_Preset",
+                  @"AVAppleMakerNote_TextureStyleKey_Intensity",
+                  @"AVAppleMakerNote_TextureStyleKey_Grain",
+                  @"AVAppleMakerNote_TextureStyleKey_RenderingVersion",
+                  @"AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility",
+                  @"kFigAppleMakerNote_TextureStyleKey_Preset",
+                  @"kFigAppleMakerNote_TextureStyleKey_Intensity",
+                  @"kFigAppleMakerNote_TextureStyleKey_Grain",
+                  @"kFigAppleMakerNote_TextureStyleKey_RenderingVersion",
+                  @"kFigAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility",
+                  @"AVCaptureTextureStylePresetStandard",
+                  @"AVCaptureTextureStylePresetStudio",
+                  @"AVCaptureTextureStylePresetSoft",
+                  @"AVCaptureTextureStylePresetFilmic",
+                  @"AVCaptureTextureStylePresetGlowy",
+                  @"AVCaptureTextureStylePresetPreview",
+                  @"PITextureStyleAdjustmentKey",
+                  @"kMetadataIdentifier_TextureStyleInfo",
+                  @"kFigCaptureSampleBufferMetadata_TextureStylePreset",
+                  @"kFigCaptureSampleBufferMetadata_TextureStylePresetTunings",
+                  @"kFigCaptureSampleBufferMetadata_TextureStylePeopleDataVersion",
+                  @"kFigCaptureSampleBufferMetadata_TextureStylePostProcessedPeopleData",
+                  @"kFigCaptureSampleBufferAttachedMediaKey_TextureStyleFaceAttitudeMetadata"
+              ];
+              NSMutableDictionary *values=[NSMutableDictionary dictionary];
+              for (NSString *n in names) values[n]=ReadStringGlobal(n);
+              NSDictionary *out=@{
+                  @"os":NSProcessInfo.processInfo.operatingSystemVersionString,
+                  @"frameworks":loaded,
+                  @"strings":values,
+                  @"classes":@{
+                      @"CMITextureStyle":@(NSClassFromString(@"CMITextureStyle")!=Nil),
+                      @"_NUTextureStyleProperties":@(NSClassFromString(@"_NUTextureStyleProperties")!=Nil),
+                      @"PITextureStyleAdjustmentController":@(NSClassFromString(@"PITextureStyleAdjustmentController")!=Nil)
+                  }
+              };
+              NSData *json=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              NSURL *docs=[[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] firstObject];
+              [json writeToURL:[docs URLByAppendingPathComponent:@"texture-style-constants.json"] atomically:YES];
+              NSLog(@"TEXTURE_STYLE_CONSTANTS\n%@",[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]);
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.1*NSEC_PER_SEC)),dispatch_get_main_queue(),^{ exit(0); });
+          }
+
+          @interface SceneDelegate:UIResponder<UIWindowSceneDelegate>
+          @property(strong,nonatomic) UIWindow *window;
+          @end
+          @implementation SceneDelegate
+          - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)options {
+              (void)session;(void)options;
+              self.window=[[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
+              self.window.rootViewController=[UIViewController new];
+              [self.window makeKeyAndVisible];
+              dispatch_async(dispatch_get_main_queue(),^{ Run(); });
+          }
+          @end
+          @interface AppDelegate:UIResponder<UIApplicationDelegate> @end
+          @implementation AppDelegate
+          - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)session options:(UISceneConnectionOptions *)options {
+              (void)application;(void)options;
+              UISceneConfiguration *c=[[UISceneConfiguration alloc] initWithName:@"Default Configuration" sessionRole:session.role];
+              c.delegateClass=[SceneDelegate class]; return c;
+          }
+          @end
+          int main(int argc,char **argv){ @autoreleasepool { return UIApplicationMain(argc,argv,nil,NSStringFromClass([AppDelegate class])); } }
+          OBJC
+
+          xcrun --sdk iphonesimulator clang -fobjc-arc \
+            -target "${ARCH}-apple-ios${SDK_VERSION}-simulator" -isysroot "$SDK" \
+            -framework Foundation -framework UIKit \
+            "$RUNNER_TEMP/constants.m" -o "$APP/TextureStyleConstants"
+          cat > "$APP/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>CFBundleIdentifier</key><string>org.xdremux.TextureStyleConstants</string>
+          <key>CFBundleExecutable</key><string>TextureStyleConstants</string>
+          <key>CFBundleName</key><string>TextureStyleConstants</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>CFBundleVersion</key><string>1</string>
+          <key>MinimumOSVersion</key><string>${SDK_VERSION}</string>
+          <key>UIApplicationSceneManifest</key><dict>
+            <key>UIApplicationSupportsMultipleScenes</key><false/>
+            <key>UISceneConfigurations</key><dict>
+              <key>UIWindowSceneSessionRoleApplication</key><array><dict>
+                <key>UISceneConfigurationName</key><string>Default Configuration</string>
+                <key>UISceneDelegateClassName</key><string>SceneDelegate</string>
+              </dict></array>
+            </dict>
+          </dict>
+          </dict></plist>
+          PLIST
+          codesign --force --sign - "$APP"
+          xcrun simctl install "$UDID" "$APP"
+          DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.TextureStyleConstants data)"
+          set +e
+          xcrun simctl launch --console "$UDID" org.xdremux.TextureStyleConstants > artifacts/launch.txt 2>&1 &
+          PID=$!
+          set -e
+          for _ in $(seq 1 30); do
+            [[ -s "$DATA/Documents/texture-style-constants.json" ]] && break
+            sleep 1
+          done
+          if [[ ! -s "$DATA/Documents/texture-style-constants.json" ]]; then
+            xcrun simctl spawn "$UDID" log show --style compact --last 2m --predicate 'process == "TextureStyleConstants"' > artifacts/system-log.txt 2>&1 || true
+            kill "$PID" >/dev/null 2>&1 || true
+            exit 1
+          fi
+          cp "$DATA/Documents/texture-style-constants.json" artifacts/constants.json
+          cat artifacts/constants.json
+          kill "$PID" >/dev/null 2>&1 || true
+
+      - name: Upload constants
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-xcode27-constants-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
