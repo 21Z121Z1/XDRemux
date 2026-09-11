@@ -15,15 +15,19 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - name: Inspect live PhotoImaging binary and dyld cache
+      - name: Inspect live PhotoImaging image and dyld cache
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           mkdir -p artifacts
-          BIN='/System/Library/PrivateFrameworks/PhotoImaging.framework/Versions/A/PhotoImaging'
-          test -e "$BIN"
-          file "$BIN" | tee artifacts/file.txt
-          shasum -a 256 "$BIN" | tee artifacts/sha256.txt
+          BIN='/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging'
+          {
+            echo "BIN=$BIN"
+            ls -la /System/Library/PrivateFrameworks/PhotoImaging.framework || true
+            stat "$BIN" || true
+            file "$BIN" || true
+            shasum -a 256 "$BIN" || true
+          } | tee artifacts/file.txt
 
           {
             echo '=== nm default ==='
@@ -36,30 +40,28 @@ jobs:
           grep -n -E 'PITextureStyle(SettingsFromMakerNoteProperties|PresetFromMakerNoteValue)|TextureStyle' artifacts/symbols.txt | tee artifacts/focused-symbols.txt || true
 
           echo '=== candidate dyld caches ===' | tee artifacts/cache-paths.txt
-          find /System /System/Volumes/Preboot -type f \( -name 'dyld_shared_cache_arm64e' -o -name 'dyld_shared_cache_arm64' \) -print 2>/dev/null | head -20 | tee -a artifacts/cache-paths.txt || true
+          find /System /System/Volumes/Preboot -type f \( -name 'dyld_shared_cache_arm64e' -o -name 'dyld_shared_cache_arm64' \) -print 2>/dev/null | head -30 | tee -a artifacts/cache-paths.txt || true
 
           echo '=== image strings ===' > artifacts/strings.txt
-          strings -a "$BIN" | grep -E 'PITextureStyle|TextureStyle' >> artifacts/strings.txt || true
-          cat artifacts/focused-symbols.txt artifacts/cache-paths.txt artifacts/strings.txt
+          strings -a "$BIN" 2>/dev/null | grep -E 'PITextureStyle|TextureStyle' >> artifacts/strings.txt || true
+          cat artifacts/focused-symbols.txt artifacts/cache-paths.txt artifacts/strings.txt || true
 
       - name: Probe deprecated NSLookupSymbolInImage
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           cat > "$RUNNER_TEMP/lookup.c" <<'C'
           #include <stdio.h>
           #include <dlfcn.h>
           #include <mach-o/dyld.h>
           #include <mach-o/loader.h>
-          #include <mach-o/nlist.h>
-          typedef const struct mach_header *(*HeaderFn)(const char *);
           extern const struct mach_header *NSAddImage(const char *, unsigned long);
           extern void *NSLookupSymbolInImage(const struct mach_header *, const char *, unsigned long);
           extern void *NSAddressOfSymbol(void *);
           int main(void) {
-            const char *p="/System/Library/PrivateFrameworks/PhotoImaging.framework/Versions/A/PhotoImaging";
+            const char *p="/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging";
             void *h=dlopen(p,RTLD_NOW|RTLD_GLOBAL);
-            printf("dlopen=%p\n",h);
+            printf("dlopen=%p err=%s\n",h, h?"none":dlerror());
             const struct mach_header *mh=NSAddImage(p,1u<<0);
             printf("image=%p\n",mh);
             const char *names[]={"_PITextureStyleSettingsFromMakerNoteProperties","_PITextureStylePresetFromMakerNoteValue"};
@@ -71,8 +73,9 @@ jobs:
             return 0;
           }
           C
-          clang "$RUNNER_TEMP/lookup.c" -o "$RUNNER_TEMP/lookup" -ldl
-          "$RUNNER_TEMP/lookup" | tee artifacts/nslookup.txt || true
+          clang "$RUNNER_TEMP/lookup.c" -o "$RUNNER_TEMP/lookup" -ldl 2> artifacts/lookup-build.txt || true
+          if [ -x "$RUNNER_TEMP/lookup" ]; then "$RUNNER_TEMP/lookup" | tee artifacts/nslookup.txt || true; fi
+          cat artifacts/lookup-build.txt artifacts/nslookup.txt 2>/dev/null || true
 
       - name: Upload evidence
         if: always()
