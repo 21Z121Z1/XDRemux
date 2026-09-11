@@ -1,0 +1,67 @@
+name: TextureStyle MakerNote field writer self-test
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths:
+      - .github/workflows/texture-style-makernote-field-writer-selftest.yml
+      - scripts/research/patch_texture_style_makernote_fields.py
+      - scripts/research/texture_style_makernote_field_writer_selftest.json
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download physical-device validated baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+
+      - name: Patch a synthetic independent MakerNote field
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          baseline="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$baseline"
+          python3 scripts/research/patch_texture_style_makernote_fields.py \
+            "$baseline" \
+            scripts/research/texture_style_makernote_field_writer_selftest.json \
+            artifacts/selftest-tag200.heic \
+            --manifest artifacts/manifest.json \
+            > artifacts/stdout.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('artifacts/manifest.json').read_text())
+          assert m['nonExifPayloadInvariant'] is True
+          assert m['unchangedOriginalMakerNoteValues']['43'] is True
+          assert m['unchangedOriginalMakerNoteValues']['84'] is True
+          a=m['after']['200']
+          assert a['type'] == 4
+          assert a['rawHex'] == '12345678'
+          assert set(m['before']) == {'43','84'}, m['before']
+          assert set(m['after']) == {'43','84','200'}, m['after']
+          print('field-level writer self-test passed')
+          PY
+          sha256sum "$baseline" artifacts/selftest-tag200.heic | tee artifacts/sha256.txt
+
+      - name: Upload self-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-makernote-field-writer-selftest-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
