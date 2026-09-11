@@ -1,0 +1,119 @@
+name: TextureStyle AVFCapture MakerNote constants
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-avfcapture-constants.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  constants:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve AVFCapture MakerNote constants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cat > "$RUNNER_TEMP/constants.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <dlfcn.h>
+
+          static id Resolve(void *h, const char *name) {
+              void *p = dlsym(h, name);
+              if (!p) p = dlsym(RTLD_DEFAULT, name);
+              if (!p) return [NSNull null];
+              id value = *(id *)p;
+              return value ?: [NSNull null];
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 2) return 64;
+              const char *paths[] = {
+                  "/System/Library/PrivateFrameworks/AVFCapture.framework/AVFCapture",
+                  "/System/Library/Frameworks/AVFoundation.framework/AVFoundation"
+              };
+              void *handles[2] = { NULL, NULL };
+              handles[0] = dlopen(paths[0], RTLD_NOW | RTLD_GLOBAL);
+              handles[1] = dlopen(paths[1], RTLD_NOW | RTLD_GLOBAL);
+              NSArray<NSString *> *names = @[
+                  @"AVAppleMakerNote_TextureStyleKey_Preset",
+                  @"AVAppleMakerNote_TextureStyleKey_Intensity",
+                  @"AVAppleMakerNote_TextureStyleKey_Grain",
+                  @"AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility",
+                  @"AVAppleMakerNote_TextureStyleKey_RenderingVersion",
+                  @"AVAppleMakerNote_TextureStyle",
+                  @"AVAppleMakerNote_SmartStyle",
+                  @"AVAppleMakerNote_SmartStyleKey_RenderingVersion",
+                  @"AVAppleMakerNote_SmartStyleKey_ToneBias",
+                  @"AVAppleMakerNote_SmartStyleKey_ColorBias",
+                  @"AVAppleMakerNote_SmartStyleKey_Intensity",
+                  @"AVAppleMakerNote_SmartStyleKey_Cast",
+                  @"AVAppleMakerNote_SmartStyleKey_IsReversible"
+              ];
+              NSMutableDictionary *out = [NSMutableDictionary dictionary];
+              out[@"AVFCaptureLoaded"] = @(handles[0] != NULL);
+              out[@"AVFoundationLoaded"] = @(handles[1] != NULL);
+              if (!handles[0]) out[@"AVFCaptureError"] = [NSString stringWithUTF8String:dlerror() ?: "unknown"];
+              for (NSString *name in names) {
+                  id value = [NSNull null];
+                  NSString *source = @"none";
+                  for (int i = 0; i < 2; i++) {
+                      if (!handles[i]) continue;
+                      value = Resolve(handles[i], name.UTF8String);
+                      if (value != [NSNull null]) {
+                          source = i == 0 ? @"AVFCapture" : @"AVFoundation";
+                          break;
+                      }
+                  }
+                  if ([value isKindOfClass:[NSString class]] || [value isKindOfClass:[NSNumber class]] || value == [NSNull null]) {
+                      out[name] = @{ @"value": value, @"source": source };
+                  } else {
+                      out[name] = @{ @"value": [value description] ?: @"", @"class": NSStringFromClass([value class]) ?: @"?", @"source": source };
+                  }
+              }
+              NSData *json = [NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [json writeToFile:[NSString stringWithUTF8String:argv[1]] atomically:YES];
+              fwrite(json.bytes, 1, json.length, stdout); fputc('\n', stdout);
+              if (handles[0]) dlclose(handles[0]);
+              if (handles[1]) dlclose(handles[1]);
+              return 0;
+          }}
+          OBJC
+          xcrun clang -fno-objc-arc -framework Foundation "$RUNNER_TEMP/constants.m" -o "$RUNNER_TEMP/constants"
+          "$RUNNER_TEMP/constants" artifacts/constants.json | tee artifacts/stdout.txt
+          sw_vers > artifacts/macos.txt
+          xcodebuild -version > artifacts/xcode.txt
+
+      - name: Assert TextureStyle keys were resolved
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open('artifacts/constants.json'))
+          keys=[
+            'AVAppleMakerNote_TextureStyleKey_Preset',
+            'AVAppleMakerNote_TextureStyleKey_Intensity',
+            'AVAppleMakerNote_TextureStyleKey_Grain',
+            'AVAppleMakerNote_TextureStyleKey_OriginalInsteadOfReversibility',
+            'AVAppleMakerNote_TextureStyleKey_RenderingVersion',
+          ]
+          missing=[k for k in keys if d.get(k,{}).get('value') is None]
+          if missing:
+              raise SystemExit('unresolved: '+', '.join(missing))
+          print({k:d[k] for k in keys})
+          PY
+
+      - name: Upload constants
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-avfcapture-constants-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
