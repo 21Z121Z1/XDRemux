@@ -1,0 +1,124 @@
+name: TextureStyle V5 PhotoImaging native gate
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-v5-photoimaging-native-gate.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  photoimaging-gate:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download V5 candidates
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-style-v5-numeric-413c4e3328e8f9d95f9a655df55ed03e1f9014e6
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34610936229
+
+      - name: Call Apple's native TextureStyle MakerNote parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cat > "$RUNNER_TEMP/native.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <dlfcn.h>
+
+          typedef id (*SettingsFn)(id);
+          typedef id (*PresetFn)(id);
+
+          static id Safe(id x) {
+              if (!x) return [NSNull null];
+              if ([x isKindOfClass:[NSString class]] || [x isKindOfClass:[NSNumber class]] || [x isKindOfClass:[NSNull class]]) return x;
+              if ([x isKindOfClass:[NSDictionary class]]) {
+                  NSMutableDictionary *d=[NSMutableDictionary dictionary];
+                  for(id k in x) d[[k description]]=Safe(x[k]);
+                  return d;
+              }
+              if ([x isKindOfClass:[NSArray class]]) {
+                  NSMutableArray *a=[NSMutableArray array]; for(id v in x)[a addObject:Safe(v)]; return a;
+              }
+              return [x description];
+          }
+
+          int main(int argc,const char **argv){@autoreleasepool{
+              void *h=dlopen("/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",RTLD_NOW|RTLD_GLOBAL);
+              if(!h){fprintf(stderr,"PhotoImaging dlopen failed: %s\n",dlerror());return 70;}
+              SettingsFn settings=(SettingsFn)dlsym(h,"PITextureStyleSettingsFromMakerNoteProperties");
+              if(!settings) settings=(SettingsFn)dlsym(h,"_PITextureStyleSettingsFromMakerNoteProperties");
+              PresetFn preset=(PresetFn)dlsym(h,"PITextureStylePresetFromMakerNoteValue");
+              if(!preset) preset=(PresetFn)dlsym(h,"_PITextureStylePresetFromMakerNoteValue");
+              fprintf(stderr,"settings=%p preset=%p\n",settings,preset);
+              if(!settings || !preset)return 71;
+
+              NSMutableDictionary *presetMap=[NSMutableDictionary dictionary];
+              for(int i=0;i<=6;i++){
+                  id v=nil; @try{v=preset(@(i));}@catch(NSException *e){v=@{ @"exception":e.reason?:e.name };}
+                  presetMap[[NSString stringWithFormat:@"%d",i]]=Safe(v);
+              }
+
+              NSMutableArray *rows=[NSMutableArray array];
+              for(int i=1;i<argc;i++){
+                  NSString *p=[NSString stringWithUTF8String:argv[i]];
+                  CGImageSourceRef src=CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:p],NULL);
+                  NSDictionary *props=src?CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(src,0,NULL)):nil;
+                  if(src)CFRelease(src);
+                  NSDictionary *maker=props[(__bridge NSString *)kCGImagePropertyMakerAppleDictionary];
+                  id out=nil; @try{out=settings(maker);}@catch(NSException *e){out=@{ @"exception":e.reason?:e.name };}
+                  [rows addObject:@{ @"file":p.lastPathComponent, @"nativeSettings":Safe(out), @"tag84":Safe(maker[@"84"]) }];
+              }
+              NSDictionary *root=@{ @"presetMap":presetMap, @"rows":rows };
+              NSData *j=[NSJSONSerialization dataWithJSONObject:root options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);
+          }return 0;}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework ImageIO "$RUNNER_TEMP/native.m" -o "$RUNNER_TEMP/native"
+          "$RUNNER_TEMP/native" \
+            source-artifact/A-baseline-original.heic \
+            source-artifact/candidates/V5-standard-min.heic \
+            source-artifact/candidates/V5-filmic-min.heic \
+            source-artifact/candidates/V5-filmic-rv1-original0.heic \
+            source-artifact/candidates/V5-filmic-rv1-original1.heic \
+            | tee artifacts/photoimaging-native.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('artifacts/photoimaging-native.json').read_text())
+          print('presetMap=',json.dumps(d['presetMap'],ensure_ascii=False,sort_keys=True))
+          rows={r['file']:r for r in d['rows']}
+          for k,r in rows.items(): print(k,json.dumps(r['nativeSettings'],ensure_ascii=False,sort_keys=True))
+          if d['presetMap'].get('1') != 'Standard': raise SystemExit('preset 1 did not decode as Standard')
+          if d['presetMap'].get('4') != 'Filmic': raise SystemExit('preset 4 did not decode as Filmic')
+          base=rows['A-baseline-original.heic']['nativeSettings']
+          std=rows['V5-standard-min.heic']['nativeSettings']
+          film=rows['V5-filmic-min.heic']['nativeSettings']
+          if base not in (None, {}, 'null') and base != None:
+              # NSNull serializes as null, so normally base is None.
+              print('baseline native settings=',base)
+          if not isinstance(std,dict) or not std: raise SystemExit('Standard candidate rejected by native PhotoImaging parser')
+          if not isinstance(film,dict) or not film: raise SystemExit('Filmic candidate rejected by native PhotoImaging parser')
+          text=json.dumps(film,ensure_ascii=False)
+          if 'Filmic' not in text or '0.61' not in text or '0.73' not in text:
+              raise SystemExit('Filmic native settings do not preserve expected preset/intensity/grain')
+          Path('artifacts/native-positive.txt').write_text('V5-standard-min.heic\nV5-filmic-min.heic\n')
+          PY
+
+      - name: Upload native-positive evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-v5-photoimaging-native-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
