@@ -30,7 +30,7 @@ jobs:
           sw_vers | tee artifacts/macos.txt
           xcodebuild -version | tee artifacts/xcode.txt
 
-      - name: Remote extract iPhone 18 Pro 24A435 dyld cache
+      - name: Remote extract iPhone 18 Pro 24A435 AEA dyld cache
         shell: bash
         run: |
           set -euo pipefail
@@ -40,26 +40,31 @@ jobs:
           echo 'V63AP' | tee artifacts/hardware-model.txt
           echo '24A435' | tee artifacts/build.txt
 
+          # AppleDB's exact iPhone19,2 full OTA for 24A435 is AEA-encrypted,
+          # not a ZIP.  The generic extract command is OTA/AEA-aware and can
+          # fetch the decryption key from Apple's AEA metadata service.
+          OTA_URL='https://updates.cdn-apple.com/2026FallFCS/5e7d3d3f-c8fe-485d-8192-3bec80492821/com_apple_MobileAsset_SoftwareUpdate/8c808e0105332e366d5928e805cd6d360b971c821f6dc464cbc8ce7772b5e4d0.aea'
+          printf '%s\n' "$OTA_URL" | tee artifacts/source-url.txt
+
           set +e
-          ipsw download appledb \
-            --os iOS \
-            --build 24A435 \
-            --type ota \
+          ipsw extract \
+            --remote \
             --device iPhone19,2 \
             --dyld \
-            --confirm \
+            --dyld-arch arm64e \
             --output "$out" \
-            > artifacts/appledb-dyld.stdout 2> artifacts/appledb-dyld.stderr
+            "$OTA_URL" \
+            > artifacts/aea-extract.stdout 2> artifacts/aea-extract.stderr
           status=$?
           set -e
-          echo "$status" | tee artifacts/appledb-dyld.exit-code
-          cat artifacts/appledb-dyld.stdout || true
-          cat artifacts/appledb-dyld.stderr || true
+          echo "$status" | tee artifacts/aea-extract.exit-code
+          cat artifacts/aea-extract.stdout || true
+          cat artifacts/aea-extract.stderr || true
 
-          find "$out" -maxdepth 10 -type f -print | sort | tee artifacts/extracted-files.txt || true
-          DSC="$(find "$out" -type f \( -name 'dyld_shared_cache_arm64e' -o -name 'dyld_shared_cache_arm64' \) -print -quit)"
+          find "$out" -maxdepth 12 -type f -print | sort | tee artifacts/extracted-files.txt || true
+          DSC="$(find "$out" -type f -name 'dyld_shared_cache_arm64e' -print -quit)"
           if [[ -z "$DSC" ]]; then
-            echo 'No dyld cache was extracted for iPhone19,2 / 24A435.' >&2
+            echo 'No arm64e dyld cache was extracted from the iPhone19,2 24A435 AEA OTA.' >&2
             exit 2
           fi
           echo "$DSC" | tee artifacts/dsc-path.txt
