@@ -1,0 +1,10 @@
+{
+  "purpose": "self-test only; tag 200 is a synthetic field and is not claimed to be TextureStyle",
+  "fields": [
+    {
+      "tag": 200,
+      "type": 4,
+      "value": 305419896
+    }
+  ]
+}
