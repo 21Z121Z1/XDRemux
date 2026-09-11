@@ -2,7 +2,9 @@ name: TextureStyle iOS 27 simulator native gate
 
 on:
   push:
-    branches: [research/photographic-styles-3-texture-probe]
+    branches:
+      - research/photographic-styles-3-texture-probe
+      - research/photographic-styles-3-texture-probe-v7
     paths: [.github/workflows/texture-style-ios27-simulator-native-gate.yml]
   workflow_dispatch:
 
@@ -17,16 +19,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download verified numeric-key candidates
+      - name: Download V5 candidates from direct PhotosFormats gate
         uses: actions/download-artifact@v5
         with:
-          name: ps3-texture-style-v5-numeric-413c4e3328e8f9d95f9a655df55ed03e1f9014e6
+          name: ps3-texture-style-v5-xcode27-a80e635a1e490ffe6c82ec1625f48e0365b3561c
           path: source-artifact
           github-token: ${{ github.token }}
           repository: 21Z121Z1/XDRemux
-          run-id: 34610936229
+          run-id: 34623523344
 
-      - name: Build Foundation-only native PhotosFormats probe app
+      - name: Build native PhotosFormats probe app
         shell: bash
         run: |
           set -euo pipefail
@@ -36,20 +38,40 @@ jobs:
           cat > Probe.m <<'OBJC'
           #import <Foundation/Foundation.h>
           #import <objc/message.h>
+          #import <objc/runtime.h>
           #import <dlfcn.h>
 
-          static id Obj(id o, NSString *name) {
-              SEL s = NSSelectorFromString(name);
-              if (!o || ![o respondsToSelector:s]) return [NSNull null];
-              @try { return ((id(*)(id,SEL))objc_msgSend)(o,s) ?: [NSNull null]; }
-              @catch (NSException *e) { return @{ @"exception": e.reason ?: e.name }; }
+          static id JsonSafe(id obj) {
+              if (!obj) return [NSNull null];
+              if ([obj isKindOfClass:[NSString class]] || [obj isKindOfClass:[NSNumber class]] || [obj isKindOfClass:[NSNull class]]) return obj;
+              return [obj description] ?: @"";
           }
-          static id BoxBoolSelector(id o, NSString *name) {
-              SEL s = NSSelectorFromString(name);
-              if (!o || ![o respondsToSelector:s]) return @"selector-unavailable";
-              @try { return @(((BOOL(*)(id,SEL))objc_msgSend)(o,s)); }
-              @catch (NSException *e) { return @{ @"exception": e.reason ?: e.name }; }
+
+          static id InvokeZeroArg(id obj, NSString *name) {
+              SEL sel=NSSelectorFromString(name);
+              if (!obj || ![obj respondsToSelector:sel]) return @{ @"available":@NO };
+              NSMethodSignature *sig=[obj methodSignatureForSelector:sel];
+              if(!sig) return @{ @"available":@YES, @"error":@"no-signature" };
+              NSInvocation *inv=[NSInvocation invocationWithMethodSignature:sig];
+              inv.target=obj; inv.selector=sel;
+              @try { [inv invoke]; }
+              @catch(NSException *e) { return @{ @"available":@YES, @"exception":e.reason ?: e.name }; }
+              const char *t=sig.methodReturnType;
+              while(*t=='r'||*t=='n'||*t=='N'||*t=='o'||*t=='O'||*t=='R'||*t=='V')t++;
+              id value=nil;
+              if(*t=='@') { __unsafe_unretained id v=nil; [inv getReturnValue:&v]; value=v ?: [NSNull null]; }
+              else if(*t=='B'||*t=='c') { BOOL v=NO; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='i'||*t=='s'||*t=='l'||*t=='q') { long long v=0; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='I'||*t=='S'||*t=='L'||*t=='Q') { unsigned long long v=0; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='f') { float v=0; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='d') { double v=0; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='v') value=[NSNull null];
+              else value=[NSString stringWithFormat:@"unsupported-return:%s",t];
+              return @{ @"available":@YES,
+                        @"encoding":[NSString stringWithUTF8String:sig.methodReturnType],
+                        @"value":JsonSafe(value) };
           }
+
           static id Open(NSURL *url) {
               Class c = NSClassFromString(@"PFMetadataImage");
               if (!c) return nil;
@@ -71,6 +93,7 @@ jobs:
               }
               return nil;
           }
+
           int main(void) {@autoreleasepool {
               void *h=dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);
               NSMutableArray *rows=[NSMutableArray array];
@@ -80,14 +103,15 @@ jobs:
               for(NSString *file in files){
                   NSString *path=[[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:file];
                   id m=Open([NSURL fileURLWithPath:path]);
-                  NSMutableDictionary *d=[@{@"file":file,@"dlopen":h?@YES:@NO,@"class":NSClassFromString(@"PFMetadataImage")?@YES:@NO,@"opened":m?@YES:@NO} mutableCopy];
+                  NSMutableDictionary *d=[@{@"file":file,
+                                             @"dlopen":h?@YES:@NO,
+                                             @"class":NSClassFromString(@"PFMetadataImage")?@YES:@NO,
+                                             @"opened":m?@YES:@NO} mutableCopy];
                   if(m){
-                      d[@"hasSmartStyle"]=BoxBoolSelector(m,@"hasSmartStyle");
-                      d[@"hasTextureStyle"]=BoxBoolSelector(m,@"hasTextureStyle");
-                      d[@"preset"]=Obj(m,@"textureStylePreset");
-                      d[@"intensity"]=Obj(m,@"textureStyleIntensity");
-                      d[@"grain"]=Obj(m,@"textureStyleGrainIntensity");
-                      d[@"reversible"]=Obj(m,@"textureStyleIsReversible");
+                      for(NSString *selector in @[@"hasSmartStyle", @"hasTextureStyle", @"textureStylePreset",
+                                                  @"textureStyleIntensity", @"textureStyleGrain", @"textureStyleGrainIntensity",
+                                                  @"textureStyleIsReversible"])
+                          d[selector]=InvokeZeroArg(m,selector);
                   }
                   [rows addObject:d];
               }
@@ -148,14 +172,27 @@ jobs:
           import json
           from pathlib import Path
           rows=json.loads(Path('artifacts/native-results.json').read_text())
+          def value(row,key):
+              x=row.get(key)
+              return x.get('value') if isinstance(x,dict) and x.get('available') is True else None
+          def available(row,key):
+              x=row.get(key)
+              return isinstance(x,dict) and x.get('available') is True
           base=next(r for r in rows if r['file']=='A-baseline-original.heic')
-          winners=[r for r in rows if r.get('hasTextureStyle') is True]
-          Path('artifacts/winners.json').write_text(json.dumps(winners,indent=2,sort_keys=True)+'\n')
-          print('BASELINE',json.dumps(base,indent=2,sort_keys=True))
-          print('WINNERS',json.dumps(winners,indent=2,sort_keys=True))
-          if base.get('hasTextureStyle') is True:
+          candidates=[r for r in rows if r['file'].startswith('V5-')]
+          report={
+              'baseline':base,
+              'selectorAvailable':available(base,'hasTextureStyle'),
+              'winners':[r for r in candidates if value(r,'hasTextureStyle') is True],
+              'candidateCount':len(candidates),
+          }
+          Path('artifacts/gate-summary.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(report,indent=2,sort_keys=True))
+          if not available(base,'hasTextureStyle'):
+              raise SystemExit('iOS 27 simulator PFMetadataImage does not expose hasTextureStyle')
+          if value(base,'hasTextureStyle') is True:
               raise SystemExit('baseline unexpectedly reports TextureStyle')
-          if not winners:
+          if not report['winners']:
               raise SystemExit('no native TextureStyle-positive candidate')
           PY
 
