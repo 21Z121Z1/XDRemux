@@ -143,9 +143,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p artifacts
           RUNTIME="$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; d=json.load(sys.stdin); xs=[x for x in d["runtimes"] if x.get("isAvailable") and x.get("platform")=="iOS" and x.get("version","").startswith("27.")]; print(xs[-1]["identifier"] if xs else "")')"
           test -n "$RUNTIME"
-          DEVTYPE="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; xs=json.load(sys.stdin)["devicetypes"]; pref=[x for x in xs if "iPhone" in x["name"]]; print(pref[-1]["identifier"] if pref else xs[-1]["identifier"])')"
+          DEVTYPE='com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro'
+          echo "runtime=$RUNTIME device=$DEVTYPE" | tee artifacts/simulator-selection.txt
           UDID="$(xcrun simctl create TextureStyleProbe "$DEVTYPE" "$RUNTIME")"
           trap 'xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
           xcrun simctl boot "$UDID"
@@ -157,10 +159,9 @@ jobs:
           set -e
           cat artifacts/simulator-console.txt
           echo "launch_rc=$rc" | tee artifacts/launch-status.txt
-          # The process intentionally exits after printing JSON; launch may report a non-zero app lifecycle status.
           grep -q 'hasTextureStyle' artifacts/simulator-console.txt
           python3 - <<'PY'
-          import json,re
+          import json
           from pathlib import Path
           s=Path('artifacts/simulator-console.txt').read_text(errors='replace')
           a=s.find('[\n')
