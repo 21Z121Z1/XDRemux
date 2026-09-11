@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
+
       - name: Install ipsw and apfs-fuse
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,9 +35,9 @@ jobs:
           cmake -S "$src" -B "$src/build" -DCMAKE_BUILD_TYPE=Release >/dev/null
           cmake --build "$src/build" --parallel "$(nproc)" >/dev/null
           sudo install -m 0755 "$src/build/apfs-fuse" /usr/local/bin/apfs-fuse
-          mkdir -p artifacts/cache artifacts/out
+          mkdir -p artifacts/cache artifacts/macho artifacts/out
 
-      - name: Extract exact 24A435 cache
+      - name: Extract exact iOS 27 RC 24A435 cache
         shell: bash
         run: |
           set -euo pipefail
@@ -46,58 +47,82 @@ jobs:
           test -s "$CACHE"
           echo "CACHE=$CACHE" >> "$GITHUB_ENV"
 
-      - name: Disassemble known Texture Style readers
-        shell: bash
-        run: |
-          set -euo pipefail
-          timeout 180s ipsw dyld disass "$CACHE" --vaddr 0x1c20de7d8 --count 440 --force > artifacts/out/settings-vaddr.asm 2>&1
-          timeout 120s ipsw dyld disass "$CACHE" --vaddr 0x1c20dcea8 --count 240 --force > artifacts/out/preset-vaddr.asm 2>&1
-          grep -n -E -C 16 'TextureStyle|SmartStyle|MakerNote|objectForKey|objectForKeyedSubscript|doubleValue|integerValue|longLongValue|floatValue|NSNumber|NSString|CFString' \
-            artifacts/out/settings-vaddr.asm artifacts/out/preset-vaddr.asm > artifacts/out/focused.txt || true
-          test -s artifacts/out/settings-vaddr.asm
-          test -s artifacts/out/preset-vaddr.asm
-
-      - name: Resolve the outer MakerNote global slot
+      - name: Read the unresolved PhotoImaging outer-key slot directly
         shell: bash
         run: |
           set -uo pipefail
           SLOT=0x1e010e930
-          {
-            echo '== a2s =='
-            timeout 120s ipsw dyld a2s "$CACHE" "$SLOT" || true
-            echo
-            echo '== a2f =='
-            timeout 120s ipsw dyld a2f "$CACHE" "$SLOT" || true
-            echo
-            echo '== a2o =='
-            timeout 120s ipsw dyld a2o "$CACHE" "$SLOT" --hex || true
-          } > artifacts/out/outer-slot-resolution.txt 2>&1
-          timeout 300s ipsw dyld xref "$CACHE" "$SLOT" --image PhotoImaging > artifacts/out/outer-slot-xrefs.txt 2>&1 || true
-          timeout 300s ipsw dyld xref "$CACHE" "$SLOT" --all > artifacts/out/outer-slot-xrefs-all.txt 2>&1 || true
+          timeout 90s ipsw dyld dump "$CACHE" "$SLOT" --addr --count 8 > artifacts/out/outer-slot-addresses.txt 2>&1 || true
+          timeout 90s ipsw dyld dump "$CACHE" "$SLOT" --bytes --size 64 > artifacts/out/outer-slot-bytes.txt 2>&1 || true
+          timeout 90s ipsw dyld a2o "$CACHE" "$SLOT" --hex > artifacts/out/outer-slot-a2o.txt 2>&1 || true
+          cat artifacts/out/outer-slot-addresses.txt artifacts/out/outer-slot-a2o.txt || true
 
-      - name: Dump PhotoImaging symbols, strings, ObjC metadata, and references
+      - name: Extract only the target Mach-O images
         shell: bash
         run: |
           set -uo pipefail
-          timeout 300s ipsw dyld macho "$CACHE" PhotoImaging --symbols > artifacts/out/photoimaging-symbols.txt 2>&1 || true
-          timeout 300s ipsw dyld macho "$CACHE" PhotoImaging --strings > artifacts/out/photoimaging-strings.txt 2>&1 || true
-          timeout 420s ipsw dyld macho "$CACHE" PhotoImaging --objc > artifacts/out/photoimaging-objc.txt 2>&1 || true
-          timeout 420s ipsw dyld macho "$CACHE" PhotoImaging --objc-refs > artifacts/out/photoimaging-objc-refs.txt 2>&1 || true
-          grep -n -E -C 24 'TextureStyle|SmartStyle|MakerNote|style properties|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|1e010e930' \
-            artifacts/out/photoimaging-*.txt > artifacts/out/photoimaging-focused.txt || true
+          timeout 300s ipsw dyld extract "$CACHE" PhotoImaging --objc --stubs --force -o artifacts/macho/photo > artifacts/out/extract-photoimaging.log 2>&1 || true
+          timeout 300s ipsw dyld extract "$CACHE" CMImaging --objc --stubs --force -o artifacts/macho/cmi > artifacts/out/extract-cmimaging.log 2>&1 || true
+          timeout 300s ipsw dyld extract "$CACHE" ImageIO --objc --stubs --force -o artifacts/macho/imageio > artifacts/out/extract-imageio.log 2>&1 || true
+          find artifacts/macho -type f -maxdepth 8 -print > artifacts/out/extracted-files.txt
+          cat artifacts/out/extracted-files.txt
 
-      - name: Resolve Smart Style MakerNote accessors in CMImaging
+      - name: Disassemble the exact CMImaging SmartStyle MakerNote mapping IMPs
         shell: bash
         run: |
           set -uo pipefail
-          timeout 300s ipsw dyld macho "$CACHE" CMImaging --symbols > artifacts/out/cmimaging-symbols.txt 2>&1 || true
-          timeout 420s ipsw dyld macho "$CACHE" CMImaging --objc > artifacts/out/cmimaging-objc.txt 2>&1 || true
-          timeout 420s ipsw dyld macho "$CACHE" CMImaging --objc-refs > artifacts/out/cmimaging-objc-refs.txt 2>&1 || true
-          timeout 240s ipsw dyld objc sel "$CACHE" --image CMImaging > artifacts/out/cmimaging-selectors.txt 2>&1 || true
-          grep -n -E -C 40 'makerNoteTagForSmartStyle|SmartStyleCast|SmartStyleTuningType|makerNoteTagFor.*Style|TextureStyle|SmartStyle' \
-            artifacts/out/cmimaging-*.txt > artifacts/out/cmimaging-focused.txt || true
+          CMI="$(find artifacts/macho/cmi -type f -name CMImaging -print -quit)"
+          if [ -z "$CMI" ]; then
+            echo 'CMImaging extraction did not produce a Mach-O' | tee artifacts/out/cmimaging-missing.txt
+            exit 0
+          fi
+          # Addresses come from the 24A435 CMImaging class dump in the supplied evidence pack.
+          declare -A FNS=(
+            [maker-tag-cast]=0x1d42e8398
+            [maker-tag-tuning]=0x1d42f4260
+            [cast-from-maker-tag]=0x1d446bff8
+            [tuning-from-maker-tag]=0x1d4329734
+            [default-texture-for-cast]=0x1d43287c8
+          )
+          for name in "${!FNS[@]}"; do
+            timeout 90s ipsw macho disass "$CMI" --vaddr "${FNS[$name]}" --count 180 --quiet --force \
+              > "artifacts/out/cm-${name}.asm" 2>&1 || true
+          done
+          grep -n -E -C 28 'cmp|subs|mov[zk]?|#0x|0x[0-9a-f]+|SmartStyle|TextureStyle|MakerNote' artifacts/out/cm-*.asm \
+            > artifacts/out/cmimaging-focused.txt || true
+          sed -n '1,1800p' artifacts/out/cmimaging-focused.txt || true
 
-      - name: Build evidence summary
+      - name: Re-run the known PhotoImaging reader on the extracted image
+        shell: bash
+        run: |
+          set -uo pipefail
+          PHOTO="$(find artifacts/macho/photo -type f -name PhotoImaging -print -quit)"
+          if [ -z "$PHOTO" ]; then
+            echo 'PhotoImaging extraction did not produce a Mach-O' | tee artifacts/out/photoimaging-missing.txt
+            exit 0
+          fi
+          timeout 90s ipsw macho disass "$PHOTO" --vaddr 0x1c20de7d8 --count 220 --quiet --force \
+            > artifacts/out/photo-settings-reader.asm 2>&1 || true
+          timeout 90s ipsw macho disass "$PHOTO" --vaddr 0x1c20dcea8 --count 140 --quiet --force \
+            > artifacts/out/photo-preset-reader.asm 2>&1 || true
+          grep -n -E -C 24 '0x1e010e930|#0x930|TextureStyle|SmartStyle|MakerNote|objectForKey|objc_msgSend' \
+            artifacts/out/photo-*.asm > artifacts/out/photoimaging-focused.txt || true
+          sed -n '1,1000p' artifacts/out/photoimaging-focused.txt || true
+
+      - name: Check whether ImageIO itself knows the Texture Style MakerNote names
+        shell: bash
+        run: |
+          set -uo pipefail
+          IMAGEIO="$(find artifacts/macho/imageio -type f -name ImageIO -print -quit)"
+          if [ -z "$IMAGEIO" ]; then
+            echo 'ImageIO extraction did not produce a Mach-O' | tee artifacts/out/imageio-missing.txt
+            exit 0
+          fi
+          strings -a "$IMAGEIO" | grep -n -E -C 20 'TextureStyle|SmartStyle|MakerApple|MakerNote|AppleMaker' \
+            > artifacts/out/imageio-style-strings.txt || true
+          sed -n '1,1200p' artifacts/out/imageio-style-strings.txt || true
+
+      - name: Build compact evidence summary
         shell: bash
         run: |
           set -euo pipefail
@@ -105,27 +130,24 @@ jobs:
           from pathlib import Path
 
           out = Path('artifacts/out')
-          needles = (
-              'TextureStylePreset', 'TextureStyleIntensity', 'TextureStyleGrain',
-              'makerNoteTagForSmartStyle', 'SmartStyleCast', 'SmartStyleTuningType',
-              'Missing smart style properties', '0x1e010e930', '1e010e930',
-          )
+          names = [
+              'outer-slot-addresses.txt', 'outer-slot-a2o.txt',
+              'cmimaging-focused.txt', 'photoimaging-focused.txt',
+              'imageio-style-strings.txt', 'extracted-files.txt',
+          ]
           rows = []
-          for p in sorted(out.glob('*.txt')) + sorted(out.glob('*.asm')):
-              try:
-                  lines = p.read_text(errors='replace').splitlines()
-              except Exception:
+          for name in names:
+              p = out / name
+              if not p.exists():
                   continue
-              hits = [(i + 1, line) for i, line in enumerate(lines) if any(n in line for n in needles)]
-              if hits:
-                  rows.append(f'## {p.name}')
-                  rows.extend(f'{lineno}: {line}' for lineno, line in hits[:250])
-                  rows.append('')
-          (out / 'evidence-summary.txt').write_text('\n'.join(rows) + '\n')
+              rows.append(f'===== {name} =====')
+              text = p.read_text(errors='replace')
+              rows.append(text[:120000])
+          (out / 'evidence-summary.txt').write_text('\n'.join(rows))
           PY
-          sed -n '1,2200p' artifacts/out/evidence-summary.txt
+          sed -n '1,2600p' artifacts/out/evidence-summary.txt
 
-      - name: Upload disassembly
+      - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -134,6 +156,6 @@ jobs:
           if-no-files-found: error
           path: artifacts/out/
 
-      - name: Remove cache
+      - name: Remove large cache and extracted images
         if: always()
-        run: rm -rf artifacts/cache
+        run: rm -rf artifacts/cache artifacts/macho
