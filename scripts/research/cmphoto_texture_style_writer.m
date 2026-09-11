@@ -9,10 +9,22 @@ typedef OSStatus (*CMPhotoCompressionSessionAddCustomMetadataFn)(CFTypeRef, int6
 typedef OSStatus (*CMPhotoCompressionSessionCloseContainerAndCopyBackingFn)(CFTypeRef, int64_t, int64_t, CFTypeRef *);
 typedef void (*CMPhotoCompressionSessionInvalidateFn)(CFTypeRef);
 
+static void Stage(const char *name) {
+    fprintf(stderr, "CMPhotoTextureStage:%s\n", name);
+    fflush(stderr);
+}
+
 static id LoadConstant(void *handle, const char *name) {
+    fprintf(stderr, "CMPhotoTextureConstant:resolve:%s\n", name); fflush(stderr);
     void *sym = dlsym(handle, name);
-    if (!sym) return nil;
-    return (__bridge id)(*(CFTypeRef *)sym);
+    if (!sym) {
+        fprintf(stderr, "CMPhotoTextureConstant:missing:%s\n", name); fflush(stderr);
+        return nil;
+    }
+    fprintf(stderr, "CMPhotoTextureConstant:address:%s:%p\n", name, sym); fflush(stderr);
+    CFTypeRef value = *(CFTypeRef *)sym;
+    fprintf(stderr, "CMPhotoTextureConstant:value:%s:%p\n", name, value); fflush(stderr);
+    return (__bridge id)value;
 }
 
 static void WriteJSON(NSString *path, NSDictionary *obj) {
@@ -20,8 +32,15 @@ static void WriteJSON(NSString *path, NSDictionary *obj) {
     [d writeToFile:path atomically:YES];
 }
 
+static void Checkpoint(NSString *path, NSMutableDictionary *report, NSString *stage) {
+    report[@"lastCompletedStage"] = stage;
+    WriteJSON(path, report);
+    fprintf(stderr, "CMPhotoTextureCheckpoint:%s\n", stage.UTF8String); fflush(stderr);
+}
+
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        Stage("enter-main");
         if (argc != 4) {
             fprintf(stderr, "usage: cmphoto_texture_style_writer INPUT OUTPUT REPORT_JSON\n");
             return 64;
@@ -33,14 +52,18 @@ int main(int argc, const char *argv[]) {
         report[@"schema"] = @"xdremux-cmphoto-texture-style-writer-v3";
         report[@"input"] = [inputPath lastPathComponent];
         report[@"output"] = [outputPath lastPathComponent];
+        Checkpoint(reportPath, report, @"arguments");
 
+        Stage("dlopen");
         void *cm = dlopen("/System/Library/PrivateFrameworks/CMPhoto.framework/CMPhoto", RTLD_NOW|RTLD_LOCAL);
         if (!cm) {
             report[@"dlerror"] = @(dlerror() ?: "unknown");
-            WriteJSON(reportPath, report);
+            Checkpoint(reportPath, report, @"dlopen-failed");
             return 2;
         }
+        Checkpoint(reportPath, report, @"dlopen");
 
+        Stage("resolve-functions");
         CMPhotoCompressionSessionCreateFn create = (CMPhotoCompressionSessionCreateFn)dlsym(cm, "CMPhotoCompressionSessionCreate");
         CMPhotoCompressionSessionOpenExistingContainerForModificationFFn openF = (CMPhotoCompressionSessionOpenExistingContainerForModificationFFn)dlsym(cm, "CMPhotoCompressionSessionOpenExistingContainerForModificationF");
         CMPhotoCompressionSessionAddCustomMetadataFn add = (CMPhotoCompressionSessionAddCustomMetadataFn)dlsym(cm, "CMPhotoCompressionSessionAddCustomMetadata");
@@ -50,11 +73,10 @@ int main(int argc, const char *argv[]) {
             @"create": @(create != NULL), @"openF": @(openF != NULL), @"add": @(add != NULL),
             @"closeCopy": @(closeCopy != NULL), @"invalidate": @(invalidate != NULL)
         };
-        if (!create || !openF || !add || !closeCopy) {
-            WriteJSON(reportPath, report);
-            return 3;
-        }
+        Checkpoint(reportPath, report, @"functions");
+        if (!create || !openF || !add || !closeCopy) return 3;
 
+        Stage("resolve-constants");
         id keyData = LoadConstant(cm, "kCMPhotoCustomMetadata_Data");
         id keyURI = LoadConstant(cm, "kCMPhotoCustomMetadata_URI");
         id keyName = LoadConstant(cm, "kCMPhotoCustomMetadata_Name");
@@ -65,23 +87,23 @@ int main(int argc, const char *argv[]) {
             @"Name": keyName ?: [NSNull null], @"TextureURN": textureURN,
             @"TextureURNFromRuntimeSymbol": @(exportedTextureURN != nil)
         };
-        if (!keyData || !keyURI || !keyName) {
-            WriteJSON(reportPath, report);
-            return 4;
-        }
+        Checkpoint(reportPath, report, @"constants");
+        if (!keyData || !keyURI || !keyName) return 4;
 
+        Stage("read-source");
         NSError *err = nil;
-        NSData *source = [NSData dataWithContentsOfFile:inputPath options:NSDataReadingMappedIfSafe error:&err];
+        NSData *source = [NSData dataWithContentsOfFile:inputPath options:0 error:&err];
         if (!source) {
             report[@"sourceError"] = err.description ?: @"unknown";
-            WriteJSON(reportPath, report);
+            Checkpoint(reportPath, report, @"source-failed");
             return 5;
         }
+        report[@"sourceLength"] = @(source.length);
+        Checkpoint(reportPath, report, @"source");
 
         // PITextureStyleCurrentMetadataVersion() in the iOS 27 RC 24A435
         // PhotoImaging binary returns NSNumber(3) whenever TextureStyle rendering
-        // is supported.  Use that device-firmware value instead of the earlier
-        // exploratory v1 guess.
+        // is supported. Use that device-firmware value instead of the earlier v1 guess.
         NSDictionary *texture = @{
             @"Version": @3,
             @"HardwareModel": @"V63AP",
@@ -93,71 +115,91 @@ int main(int argc, const char *argv[]) {
             @"TextureStylePostProcessedPeopleData": @[]
         };
         report[@"textureStyleInfo"] = texture;
+        Stage("serialize-plist");
         NSData *plist = [NSPropertyListSerialization dataWithPropertyList:texture
                                                                    format:NSPropertyListBinaryFormat_v1_0
                                                                   options:0
                                                                     error:&err];
         if (!plist) {
             report[@"plistError"] = err.description ?: @"unknown";
-            WriteJSON(reportPath, report);
+            Checkpoint(reportPath, report, @"plist-failed");
             return 6;
         }
         report[@"plistLength"] = @(plist.length);
+        Checkpoint(reportPath, report, @"plist");
 
+        Stage("build-custom-dictionary");
         NSDictionary *custom = @{ keyData: plist, keyURI: textureURN, keyName: @"textureStyleMetadata" };
+        report[@"customMetadataEntryCount"] = @(custom.count);
+        Checkpoint(reportPath, report, @"custom-dictionary");
+
         CFTypeRef session = NULL;
+        Stage("create-before");
         OSStatus sCreate = create(kCFAllocatorDefault, NULL, &session);
+        fprintf(stderr, "CMPhotoTextureCreate:status=%d session=%p\n", (int)sCreate, session); fflush(stderr);
         report[@"createStatus"] = @(sCreate);
         report[@"sessionCreated"] = @(session != NULL);
-        if (sCreate || !session) {
-            WriteJSON(reportPath, report);
-            return 10;
-        }
+        Checkpoint(reportPath, report, @"create");
+        if (sCreate || !session) return 10;
 
+        Stage("open-before");
         OSStatus sOpen = openF(session, NULL, (__bridge CFTypeRef)source);
+        fprintf(stderr, "CMPhotoTextureOpen:status=%d\n", (int)sOpen); fflush(stderr);
         report[@"openStatus"] = @(sOpen);
+        Checkpoint(reportPath, report, @"open");
         if (sOpen) {
             if (invalidate) invalidate(session);
             CFRelease(session);
-            WriteJSON(reportPath, report);
             return 11;
         }
 
+        Stage("add-before");
         OSStatus sAdd = add(session, 0, 0, (__bridge CFDictionaryRef)custom);
+        fprintf(stderr, "CMPhotoTextureAdd:status=%d\n", (int)sAdd); fflush(stderr);
         report[@"addStatus"] = @(sAdd);
+        Checkpoint(reportPath, report, @"add");
         if (sAdd) {
             if (invalidate) invalidate(session);
             CFRelease(session);
-            WriteJSON(reportPath, report);
             return 12;
         }
 
         CFTypeRef backing = NULL;
+        Stage("close-before");
         OSStatus sClose = closeCopy(session, 0, 0, &backing);
+        fprintf(stderr, "CMPhotoTextureClose:status=%d backing=%p\n", (int)sClose, backing); fflush(stderr);
         report[@"closeStatus"] = @(sClose);
-        report[@"backingClass"] = backing ? NSStringFromClass([(__bridge id)backing class]) : [NSNull null];
+        report[@"backingPresent"] = @(backing != NULL);
+        if (backing) {
+            CFTypeID typeID = CFGetTypeID(backing);
+            report[@"backingCFTypeID"] = @(typeID);
+            report[@"backingIsCFData"] = @(typeID == CFDataGetTypeID());
+            fprintf(stderr, "CMPhotoTextureBacking:typeID=%lu cfDataTypeID=%lu\n", (unsigned long)typeID, (unsigned long)CFDataGetTypeID()); fflush(stderr);
+        }
+        Checkpoint(reportPath, report, @"close");
         if (invalidate) invalidate(session);
         CFRelease(session);
         if (sClose || !backing) {
             if (backing) CFRelease(backing);
-            WriteJSON(reportPath, report);
             return 13;
         }
 
-        id backingObj = (__bridge id)backing;
-        NSData *output = [backingObj isKindOfClass:[NSData class]] ? backingObj : nil;
-        if (!output) {
-            report[@"backingDescription"] = [backingObj description] ?: @"";
+        if (CFGetTypeID(backing) != CFDataGetTypeID()) {
+            report[@"unsupportedBackingType"] = @YES;
+            Checkpoint(reportPath, report, @"unsupported-backing");
             CFRelease(backing);
-            WriteJSON(reportPath, report);
             return 14;
         }
+
+        Stage("write-output");
+        CFDataRef data = (CFDataRef)backing;
+        NSData *output = (__bridge NSData *)data;
         BOOL wrote = [output writeToFile:outputPath options:NSDataWritingAtomic error:&err];
-        report[@"outputLength"] = @(output.length);
+        report[@"outputLength"] = @(CFDataGetLength(data));
         report[@"writeOK"] = @(wrote);
         if (!wrote) report[@"writeError"] = err.description ?: @"unknown";
+        Checkpoint(reportPath, report, wrote ? @"complete" : @"write-failed");
         CFRelease(backing);
-        WriteJSON(reportPath, report);
         return wrote ? 0 : 15;
     }
 }
