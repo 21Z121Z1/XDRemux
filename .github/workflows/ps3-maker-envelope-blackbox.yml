@@ -1,0 +1,210 @@
+name: PS3 MakerNote TextureStyle envelope black-box
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/ps3-maker-envelope-blackbox.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Probe PhotoImaging MakerNote envelope and value types
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          sw_vers | tee artifacts/macos.txt
+          xcodebuild -version | tee artifacts/xcode.txt
+
+          cat > "$RUNNER_TEMP/texture_envelope_probe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/runtime.h>
+          #import <dlfcn.h>
+
+          typedef id (*SettingsFn)(NSDictionary *);
+
+          static id Safe(id obj) {
+              if (!obj) return [NSNull null];
+              if ([obj isKindOfClass:[NSString class]] ||
+                  [obj isKindOfClass:[NSNumber class]] ||
+                  [obj isKindOfClass:[NSNull class]]) return obj;
+              if ([obj isKindOfClass:[NSData class]])
+                  return @{ @"class":NSStringFromClass([obj class]), @"bytes":@([(NSData *)obj length]) };
+              if ([obj isKindOfClass:[NSArray class]]) {
+                  NSMutableArray *a=[NSMutableArray array];
+                  for (id v in (NSArray *)obj) [a addObject:Safe(v)];
+                  return a;
+              }
+              if ([obj isKindOfClass:[NSDictionary class]]) {
+                  NSMutableDictionary *d=[NSMutableDictionary dictionary];
+                  for (id k in (NSDictionary *)obj) d[[k description]]=Safe([(NSDictionary *)obj objectForKey:k]);
+                  return d;
+              }
+              NSMutableDictionary *d=[NSMutableDictionary dictionaryWithDictionary:@{
+                  @"class":NSStringFromClass([obj class]) ?: @"?",
+                  @"description":[obj description] ?: @""
+              }];
+              for (NSString *key in @[ @"preset", @"intensity", @"grain", @"grainIntensity" ]) {
+                  @try {
+                      id value=[obj valueForKey:key];
+                      if (value) d[key]=Safe(value);
+                  } @catch (__unused NSException *e) {}
+              }
+              return d;
+          }
+
+          static id KVC(id obj, NSString *key) {
+              if (!obj) return nil;
+              @try { return [obj valueForKey:key]; }
+              @catch (__unused NSException *e) { return nil; }
+          }
+
+          static BOOL NumberNear(id value, double target) {
+              return [value isKindOfClass:[NSNumber class]] && fabs([value doubleValue]-target) < 0.0001;
+          }
+
+          static NSDictionary *Run(SettingsFn fn, NSString *name, NSDictionary *input,
+                                   NSNumber *expectedPreset, double expectedIntensity, double expectedGrain) {
+              id result=nil;
+              NSString *exception=nil;
+              @try { result=fn(input); }
+              @catch (NSException *e) { exception=e.reason ?: e.name; }
+
+              id preset=KVC(result,@"preset");
+              id intensity=KVC(result,@"intensity");
+              id grain=KVC(result,@"grainIntensity") ?: KVC(result,@"grain");
+              BOOL presetMatch = expectedPreset ? ([preset isKindOfClass:[NSNumber class]] && [preset integerValue]==[expectedPreset integerValue]) : NO;
+              BOOL match = presetMatch && NumberNear(intensity,expectedIntensity) && NumberNear(grain,expectedGrain);
+
+              NSMutableDictionary *out=[NSMutableDictionary dictionaryWithDictionary:@{
+                  @"name":name,
+                  @"input":Safe(input),
+                  @"result":Safe(result),
+                  @"presetObserved":Safe(preset),
+                  @"intensityObserved":Safe(intensity),
+                  @"grainObserved":Safe(grain),
+                  @"matchesSentinel":@(match)
+              }];
+              if (exception) out[@"exception"]=exception;
+              return out;
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 2) return 64;
+              void *h=dlopen("/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",RTLD_NOW|RTLD_GLOBAL);
+              NSMutableDictionary *root=[NSMutableDictionary dictionary];
+              root[@"frameworkLoaded"]=@(h!=NULL);
+              SettingsFn fn=(SettingsFn)dlsym(RTLD_DEFAULT,"PITextureStyleSettingsFromMakerNoteProperties");
+              if (!fn) fn=(SettingsFn)dlsym(RTLD_DEFAULT,"_PITextureStyleSettingsFromMakerNoteProperties");
+              root[@"parserFound"]=@(fn!=NULL);
+              if (!fn) {
+                  NSData *j=[NSJSONSerialization dataWithJSONObject:root options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+                  [j writeToFile:[NSString stringWithUTF8String:argv[1]] atomically:YES];
+                  return 2;
+              }
+
+              NSArray<NSString *> *envelopes=@[
+                  @"TextureStyle", @"TextureStyle~1.0", @"TextureStyleSettings",
+                  @"TextureStyleProperties", @"TextureStyleMetadata", @"TextureStyleInfo",
+                  @"TextureStyleData", @"SmartStyle", @"SmartStyle~1.0",
+                  @"SmartStyleProperties", @"SemanticStyle", @"SemanticStyle~1.0",
+                  @"PhotographicStyle", @"PhotographicStyleProperties"
+              ];
+              NSMutableArray *trials=[NSMutableArray array];
+
+              // Direct dictionary is the negative/control shape: no outer envelope.
+              NSDictionary *direct=@{
+                  @"TextureStylePreset":@2,
+                  @"TextureStyleIntensity":@0.37,
+                  @"TextureStyleGrain":@0.63
+              };
+              [trials addObject:Run(fn,@"direct-prefixed-numeric",direct,@2,0.37,0.63)];
+
+              for (NSString *envelope in envelopes) {
+                  for (NSNumber *preset in @[@0,@1,@2,@3,@4,@5]) {
+                      double intensity=0.31 + 0.01*[preset intValue];
+                      double grain=0.71 - 0.01*[preset intValue];
+                      NSDictionary *inner=@{
+                          @"TextureStylePreset":preset,
+                          @"TextureStyleIntensity":@(intensity),
+                          @"TextureStyleGrain":@(grain)
+                      };
+                      NSDictionary *input=@{ envelope: inner };
+                      NSString *name=[NSString stringWithFormat:@"%@/prefixed/enum%@",envelope,preset];
+                      [trials addObject:Run(fn,name,input,preset,intensity,grain)];
+                  }
+
+                  // String-preset and CEK short-key controls, each with distinct sentinels.
+                  NSDictionary *stringInner=@{
+                      @"TextureStylePreset":@"Filmic",
+                      @"TextureStyleIntensity":@0.43,
+                      @"TextureStyleGrain":@0.57
+                  };
+                  @try {
+                      id result=fn(@{envelope:stringInner});
+                      [trials addObject:@{
+                          @"name":[NSString stringWithFormat:@"%@/prefixed/string-Filmic",envelope],
+                          @"input":Safe(@{envelope:stringInner}),
+                          @"result":Safe(result)
+                      }];
+                  } @catch (NSException *e) {
+                      [trials addObject:@{
+                          @"name":[NSString stringWithFormat:@"%@/prefixed/string-Filmic",envelope],
+                          @"exception":e.reason ?: e.name
+                      }];
+                  }
+
+                  NSDictionary *shortInner=@{ @"Preset":@2, @"Intensity":@0.47, @"Grain":@0.53 };
+                  @try {
+                      id result=fn(@{envelope:shortInner});
+                      [trials addObject:@{
+                          @"name":[NSString stringWithFormat:@"%@/short/enum2",envelope],
+                          @"input":Safe(@{envelope:shortInner}),
+                          @"result":Safe(result)
+                      }];
+                  } @catch (NSException *e) {
+                      [trials addObject:@{
+                          @"name":[NSString stringWithFormat:@"%@/short/enum2",envelope],
+                          @"exception":e.reason ?: e.name
+                      }];
+                  }
+              }
+
+              NSMutableArray *matches=[NSMutableArray array];
+              for (NSDictionary *t in trials)
+                  if ([t[@"matchesSentinel"] boolValue]) [matches addObject:t[@"name"]];
+
+              root[@"trials"]=trials;
+              root[@"sentinelMatches"]=matches;
+              NSData *json=[NSJSONSerialization dataWithJSONObject:root options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [json writeToFile:[NSString stringWithUTF8String:argv[1]] atomically:YES];
+              fwrite(json.bytes,1,json.length,stdout); fputc('\n',stdout);
+              return 0;
+          }}
+          OBJC
+
+          xcrun clang -fobjc-arc -framework Foundation "$RUNNER_TEMP/texture_envelope_probe.m" \
+            -o "$RUNNER_TEMP/texture_envelope_probe"
+          "$RUNNER_TEMP/texture_envelope_probe" artifacts/envelope-probe.json \
+            > artifacts/probe.stdout 2> artifacts/probe.stderr
+          cat artifacts/probe.stdout
+          cat artifacts/probe.stderr || true
+
+      - name: Upload envelope evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-maker-envelope-blackbox-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
