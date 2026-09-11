@@ -90,6 +90,7 @@ jobs:
           <key>CFBundleVersion</key><string>1</string>
           <key>MinimumOSVersion</key><string>${VER}</string>
           <key>LSRequiresIPhoneOS</key><true/>
+          <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
           </dict></plist>
           PLIST
           codesign --force --sign - "$APP"
