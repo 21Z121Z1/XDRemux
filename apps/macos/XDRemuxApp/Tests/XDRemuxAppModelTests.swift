@@ -427,11 +427,7 @@ struct XDRemuxAppModelTests {
         try expect(AppStrings.statSkipped == "已跳过", "skipped statistic should be explicit")
         try expect(AppStrings.statCancelled == "已取消", "cancelled statistic should be explicit")
         try expect(AppStrings.statTotal == "总计", "total statistic should use the requested term")
-        try expect(AppStrings.oppoCompatLabel == "[实验性] OPPO 相册 HDR 兼容层", "OPPO setting should be clearly marked experimental")
-        try expect(AppStrings.oppoGalleryCompatibilityHelp.contains("非 HDR 厂商尾部"), "default product copy should describe the non-HDR tail policy")
-        try expect(AppStrings.inputProcessingSystemHelp.contains("ImageIO"), "system mode help should explain ImageIO ownership")
-        try expect(AppStrings.inputProcessingHybridHelp.contains("HEVC Rext"), "hybrid mode help should explain the gain map rewrite")
-        try expect(AppStrings.inputProcessingPassthroughHelp.contains("ISOBMFF box"), "passthrough mode help should explain container rebuilding")
+        try expect(AppStrings.oppoGalleryCompatibilityHelp.contains("Rust"), "OPPO setting should name the canonical product owner")
         try expect(AppStrings.outputPlanOverwriteExisting.contains("覆盖"), "overwrite plan copy should make replacement explicit")
         try expect(AppStrings.previewUnavailable.contains("预览"), "thumbnail failure copy should name preview behavior")
     }
@@ -440,13 +436,10 @@ struct XDRemuxAppModelTests {
     private static func testProductPolicyDefaults() throws {
         let config = ConversionConfig()
 
-        try expect(config.family == .auto, "product input family should be detected automatically")
-        try expect(config.inputProcessingBranch == .hybrid, "product output should use metadata-preserving remux")
-        try expect(config.tmapFormat == .imageIO, "product output should use the device-validated 142-byte tmap")
-        try expect(config.oppoCompatibility == .off, "default product output should select standard high-spec ISO encoding")
-        try expect(config.oppoCameraTail == .preserveWithoutPrivateHDR, "default product output should preserve only the non-HDR source tail")
+        try expect(config.fileNameSuffix == "_iso", "default output naming should remain stable")
+        try expect(config.skipExisting, "default conversion should skip an already-valid output")
+        try expect(config.maxConcurrentJobs >= 1, "default concurrency should always be positive")
         try expect(!config.oppoGalleryCompatibilityEnabled, "OPPO Gallery compatibility should be opt-in")
-        try expect(config.preservesPortraitEditingData, "portrait editing data should default to preserved")
         try expect(!config.applePhotographicStyles, "Apple Photographic Styles should be opt-in")
         try expect(!config.applePortrait, "Apple Portrait should be opt-in")
     }
@@ -456,51 +449,43 @@ struct XDRemuxAppModelTests {
         var config = ConversionConfig()
 
         config.oppoGalleryCompatibilityEnabled = false
-        try expect(config.oppoCompatibility == .off, "disabling compatibility should select Hybrid high-spec encoding")
-        try expect(config.oppoCameraTail == .preserveWithoutPrivateHDR, "standard ISO mode should remove private HDR tail entries")
-
-        config.preservesPortraitEditingData = false
-        try expect(config.oppoCameraTail == .preserveWithoutPortraitOrPrivateHDR, "portrait filtering must not reintroduce private HDR tail entries")
-        try expect(config.oppoCompatibility == .off, "portrait switch must not change Gain Map encoding")
+        try expect(!config.oppoGalleryCompatibilityEnabled, "standard ISO mode should remain the default")
 
         config.oppoGalleryCompatibilityEnabled = true
-        try expect(config.oppoCameraTail == .preserveWithoutPortrait, "OPPO compatibility should restore private HDR tail data without portrait resources")
-        config.preservesPortraitEditingData = true
-        try expect(config.oppoCompatibility == .auto, "enabling compatibility should restore automatic OPPO routing")
-        try expect(config.oppoCameraTail == .preserve, "enabling portrait preservation should restore the byte-preserving tail")
+        try expect(config.oppoGalleryCompatibilityEnabled, "OPPO compatibility should be an explicit product intent")
+        try expect(!config.applePhotographicStyles && !config.applePortrait, "OPPO compatibility should clear incompatible Apple intents")
 
         config.oppoGalleryCompatibilityEnabled = false
-        try expect(config.oppoCameraTail == .preserveWithoutPrivateHDR, "leaving OPPO compatibility should restore the non-HDR default tail")
+        try expect(!config.oppoGalleryCompatibilityEnabled, "disabling OPPO compatibility should restore standard HDR")
     }
 
     @MainActor
     private static func testIndependentAppleFeatureConfiguration() throws {
         var config = ConversionConfig()
         config.applePhotographicStyles = true
-        config.applePortrait = true
 
         try expect(config.appleFeaturesEnabled, "either Apple capability should activate the shared writer")
-        let input = URL(fileURLWithPath: "/tmp/input.heic")
-        let output = URL(fileURLWithPath: "/tmp/output.heic")
-        let request = AppConversionEngine.requestForTesting(
-            inputURL: input,
-            outputURL: output,
-            config: config
+        let stylesArguments = try RustCLIClient.productArgumentsForTesting(config: config)
+        try expect(
+            stylesArguments == ["--apple-styles"],
+            "Styles intent must map to the canonical Rust CLI"
         )
-        try expect(request.configuration.applePhotographicStyles, "App must preserve the Styles capability")
-        try expect(request.configuration.applePortrait, "App must preserve the independent Portrait capability")
-        try expect(request.input.url == input, "App must create one shared input source")
-        try expect(request.output.url == output, "combined mode must produce one final HEIC")
 
-        config.applePortrait = false
-        let stylesOnly = AppConversionEngine.requestForTesting(
-            inputURL: input,
-            outputURL: output,
-            config: config
+        config.applePhotographicStyles = false
+        config.applePortrait = true
+        let portraitArguments = try RustCLIClient.productArgumentsForTesting(config: config)
+        try expect(
+            portraitArguments == ["--apple-portrait"],
+            "Portrait intent must map to the canonical Rust CLI"
         )
-        try expect(stylesOnly.configuration.applePhotographicStyles, "Styles must not depend on Portrait")
-        try expect(!stylesOnly.configuration.applePortrait, "Portrait must stay independently disabled")
 
+        config.applePhotographicStyles = true
+        try expect(
+            (try? RustCLIClient.productArgumentsForTesting(config: config)) == nil,
+            "the app must not silently collapse two incompatible Rust product intents"
+        )
+
+        config.applePhotographicStyles = false
         config.applePortrait = true
         config.oppoGalleryCompatibilityEnabled = true
         try expect(!config.applePhotographicStyles && !config.applePortrait, "enabling OPPO compatibility must clear incompatible Apple capabilities")

@@ -1,0 +1,22 @@
+[workspace]
+members = [
+    "crates/xdremux-format",
+    "crates/xdremux-metadata",
+    "crates/xdremux-hdr",
+    "crates/xdremux-container",
+    "crates/xdremux-heif",
+    "crates/xdremux-motion-photo",
+    "crates/xdremux-classification",
+    "crates/xdremux-source",
+    "crates/xdremux-engine",
+    "crates/xdremux-codec",
+    "crates/xdremux-runtime",
+    "crates/xdremux-cli",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

@@ -1,0 +1,762 @@
+use crate::{portrait_blocks, ContainerError, Result};
+
+const CONFIG_CONTEXT: &str = "rear.depth.config";
+const SOURCE_CONTEXT: &str = "OPPO portrait source";
+const DEPTH_CONTEXT: &str = "decoded rear.depth";
+const MAX_DIMENSION: i32 = 16_384;
+const BLUR_SAMPLE_COUNT: usize = 32;
+const FACE_KEYPOINT_COUNT: usize = 296;
+const MAX_FACE_COUNT: i32 = 10;
+const V4_MINIMUM_BYTES: usize = 27_260;
+const DEPTH_HEADER_BYTES: usize = 0x300;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OppoPortraitFace {
+    pub rectangle: [i32; 4],
+    pub angle: i32,
+    pub keypoint_x: [i32; FACE_KEYPOINT_COUNT],
+    pub keypoint_y: [i32; FACE_KEYPOINT_COUNT],
+    pub keypoint_confidence: [i8; FACE_KEYPOINT_COUNT],
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OppoPortraitConfig {
+    pub version: f32,
+    pub processing_width: u32,
+    pub processing_height: u32,
+    pub focus_x: i32,
+    pub focus_y: i32,
+    pub blur_apertures: [f32; BLUR_SAMPLE_COUNT],
+    pub blur_values: [f32; BLUR_SAMPLE_COUNT],
+    pub current_blur_strength: i32,
+    pub camera_roll: i32,
+    pub spotlight_width: Option<i32>,
+    pub spotlight_height: Option<i32>,
+    pub current_f_number: Option<f32>,
+    pub object_distance: Option<u32>,
+    pub tele_master: Option<bool>,
+    pub focus_rectangle: Option<[i32; 4]>,
+    pub focus_rectangle_is_valid: bool,
+    pub mirror_enabled: Option<bool>,
+    pub refocus_mode: Option<i32>,
+    pub foreground_blur_scale: Option<i32>,
+    pub big_face_enabled: Option<bool>,
+    pub pets_enabled: Option<bool>,
+    pub multi_semantic_segmentation_enabled: Option<bool>,
+    pub bokeh_version: Option<i32>,
+    pub iso: Option<i32>,
+    pub zoom_ratio: Option<i32>,
+    pub focus_roi_type: Option<i32>,
+    pub shutter: Option<f32>,
+    pub aec_lux_index: Option<f32>,
+    pub faces: Vec<OppoPortraitFace>,
+}
+
+/// Portable OPPO portrait payloads required before any Apple-specific work.
+///
+/// The Apple layer may derive additional facts from `source_image`, but it does
+/// not need to know manifest entry names or re-parse the producer config.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OppoPortraitSource {
+    pub source_image: Vec<u8>,
+    pub compressed_depth: Vec<u8>,
+    pub config: OppoPortraitConfig,
+    pub private_gain_map_info: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OppoPortraitDepthHeader {
+    pub width: u32,
+    pub height: u32,
+    pub rank_disparity_scale: f32,
+    pub focal_length_pixels: f32,
+    pub stereo_baseline: f32,
+    pub hair_plane_present: bool,
+    pub portrait_plane_present: bool,
+    pub pet_plane_present: bool,
+    pub near_object_detected: bool,
+    pub near_object_confidence: Option<f32>,
+    pub plant_object_state: u8,
+    pub disparity_minimum: u16,
+    pub disparity_maximum: u16,
+    pub disparity_exponentiation: u8,
+    pub auxiliary_width: Option<u32>,
+    pub auxiliary_height: Option<u32>,
+    pub model_output_present: bool,
+    pub scene_class: i32,
+    pub object_distance: Option<u32>,
+    pub aec_lux_index: Option<f32>,
+    pub app_zoom_ratio: Option<f32>,
+}
+
+impl OppoPortraitDepthHeader {
+    pub fn native_float_depth(&self, rank: f64) -> Option<f64> {
+        if !rank.is_finite() || !(1..=2).contains(&self.disparity_exponentiation) {
+            return None;
+        }
+        let minimum = f64::from(self.disparity_minimum);
+        let maximum = f64::from(self.disparity_maximum);
+        if maximum <= minimum {
+            return None;
+        }
+        let normalized = (rank / 255.0)
+            .clamp(0.0, 1.0)
+            .powi(i32::from(self.disparity_exponentiation));
+        let internal_disparity = 65_535.0 - (minimum + normalized * (maximum - minimum));
+        if !internal_disparity.is_finite() || internal_disparity < 0.0 {
+            return None;
+        }
+        let denominator = (internal_disparity * f64::from(self.rank_disparity_scale)).max(0.00001);
+        Some(
+            (f64::from(self.focal_length_pixels) * f64::from(self.stereo_baseline) / denominator)
+                .min(140_000.0),
+        )
+    }
+
+    pub fn rank_for_native_float_depth(&self, depth: f64) -> Option<f64> {
+        if !depth.is_finite()
+            || depth <= 0.0
+            || self.rank_disparity_scale <= 0.0
+            || self.focal_length_pixels <= 0.0
+            || self.stereo_baseline <= 0.0
+            || !(1..=2).contains(&self.disparity_exponentiation)
+        {
+            return None;
+        }
+        let minimum = f64::from(self.disparity_minimum);
+        let maximum = f64::from(self.disparity_maximum);
+        if maximum <= minimum {
+            return None;
+        }
+        let internal_disparity =
+            (f64::from(self.focal_length_pixels) * f64::from(self.stereo_baseline) / depth)
+                / f64::from(self.rank_disparity_scale);
+        let normalized = (65_535.0 - internal_disparity - minimum) / (maximum - minimum);
+        let exponent = 1.0 / f64::from(self.disparity_exponentiation);
+        Some(255.0 * normalized.clamp(0.0, 1.0).powf(exponent))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OppoPortraitDepth {
+    pub header: OppoPortraitDepthHeader,
+    pub ranks: Vec<u8>,
+    pub hair: Option<Vec<u8>>,
+    pub portrait: Option<Vec<u8>>,
+    pub pet: Option<Vec<u8>>,
+}
+
+fn truncated(field: &str) -> ContainerError {
+    ContainerError::invalid(CONFIG_CONTEXT, format!("truncated at {field}"))
+}
+
+fn invalid(field: &str) -> ContainerError {
+    ContainerError::invalid(CONFIG_CONTEXT, format!("invalid {field}"))
+}
+
+fn missing_source_block(name: &str) -> ContainerError {
+    ContainerError::invalid(SOURCE_CONTEXT, format!("missing {name}"))
+}
+
+fn depth_invalid(detail: impl Into<String>) -> ContainerError {
+    ContainerError::invalid(DEPTH_CONTEXT, detail)
+}
+
+fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[u8; N]> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<N>())
+        .copied()
+        .ok_or_else(|| truncated(field))
+}
+
+fn read_i32_le(data: &[u8], offset: usize, field: &str) -> Result<i32> {
+    Ok(i32::from_le_bytes(read_bytes(data, offset, field)?))
+}
+
+fn read_u16_le_at(data: &[u8], offset: usize) -> Option<u16> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<2>())
+        .map(|bytes| u16::from_le_bytes(*bytes))
+}
+
+fn read_u32_le_at(data: &[u8], offset: usize) -> Option<u32> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<4>())
+        .map(|bytes| u32::from_le_bytes(*bytes))
+}
+
+fn read_i32_le_at(data: &[u8], offset: usize) -> Option<i32> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<4>())
+        .map(|bytes| i32::from_le_bytes(*bytes))
+}
+
+fn read_f32_raw_le_at(data: &[u8], offset: usize) -> Option<f32> {
+    data.get(offset..)
+        .and_then(|remaining| remaining.first_chunk::<4>())
+        .map(|bytes| f32::from_le_bytes(*bytes))
+}
+
+fn read_f32_le(data: &[u8], offset: usize, field: &str) -> Result<f32> {
+    let value = f32::from_le_bytes(read_bytes(data, offset, field)?);
+    if !value.is_finite() {
+        return Err(invalid(field));
+    }
+    Ok(value)
+}
+
+fn read_bool_byte(data: &[u8], offset: usize, field: &str) -> Result<bool> {
+    data.get(offset)
+        .copied()
+        .map(|value| value != 0)
+        .ok_or_else(|| truncated(field))
+}
+
+fn read_i32_array<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[i32; N]> {
+    let mut values = [0_i32; N];
+    for (index, value) in values.iter_mut().enumerate() {
+        let byte_offset = offset
+            .checked_add(index.checked_mul(4).ok_or_else(|| invalid(field))?)
+            .ok_or_else(|| invalid(field))?;
+        *value = read_i32_le(data, byte_offset, field)?;
+    }
+    Ok(values)
+}
+
+fn read_f32_array<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[f32; N]> {
+    let mut values = [0.0_f32; N];
+    for (index, value) in values.iter_mut().enumerate() {
+        let byte_offset = offset
+            .checked_add(index.checked_mul(4).ok_or_else(|| invalid(field))?)
+            .ok_or_else(|| invalid(field))?;
+        *value = read_f32_le(data, byte_offset, field)?;
+    }
+    Ok(values)
+}
+
+fn positive_u32(value: i32, field: &str) -> Result<u32> {
+    u32::try_from(value).map_err(|_| invalid(field))
+}
+
+/// Parse OPPO's versioned `rear.depth.config` producer record.
+///
+/// This parser owns only the portable binary contract. It deliberately does not
+/// decide Apple Portrait policy, invoke Apple frameworks, or infer values that
+/// are absent from the producer payload.
+pub fn parse_oppo_portrait_config(data: &[u8]) -> Result<OppoPortraitConfig> {
+    let version = read_f32_le(data, 0, "version")?;
+    if !(1.0..=4.0).contains(&version) {
+        return Err(invalid("version"));
+    }
+
+    let width_raw = read_i32_le(data, 4, "depth width")?;
+    let height_raw = read_i32_le(data, 8, "depth height")?;
+    if !(1..=MAX_DIMENSION).contains(&width_raw) || !(1..=MAX_DIMENSION).contains(&height_raw) {
+        return Err(invalid("dimensions"));
+    }
+
+    let blur_apertures = read_f32_array::<BLUR_SAMPLE_COUNT>(data, 20, "blur aperture")?;
+    let blur_values = read_f32_array::<BLUR_SAMPLE_COUNT>(data, 148, "blur value")?;
+
+    let mut spotlight_width = None;
+    let mut spotlight_height = None;
+    let mut current_f_number = None;
+    let mut object_distance = None;
+    let mut tele_master = None;
+    let mut focus_rectangle = None;
+    let mut focus_rectangle_is_valid = false;
+    let mut mirror_enabled = None;
+    let mut refocus_mode = None;
+    let mut foreground_blur_scale = None;
+    let mut big_face_enabled = None;
+    let mut pets_enabled = None;
+    let mut multi_semantic_segmentation_enabled = None;
+    let mut bokeh_version = None;
+    let mut iso = None;
+    let mut zoom_ratio = None;
+    let mut focus_roi_type = None;
+    let mut shutter = None;
+    let mut aec_lux_index = None;
+    let mut faces = Vec::new();
+
+    if version >= 2.0 {
+        spotlight_width = Some(read_i32_le(data, 284, "spotlight width")?);
+        spotlight_height = Some(read_i32_le(data, 288, "spotlight height")?);
+        let aperture = read_f32_le(data, 292, "current f-number")?;
+        current_f_number = (1.0..=64.0).contains(&aperture).then_some(aperture);
+        let distance = read_i32_le(data, 296, "object distance")?;
+        object_distance = if distance > 0 {
+            Some(positive_u32(distance, "object distance")?)
+        } else {
+            None
+        };
+        tele_master = Some(read_bool_byte(data, 300, "tele-master flag")?);
+        let _ = read_i32_le(data, 304, "reference EV")?;
+        let _ = read_i32_le(data, 308, "minimum EV")?;
+        let _ = read_i32_le(data, 312, "scene mode")?;
+    }
+
+    if version >= 2.2 {
+        focus_rectangle = Some(read_i32_array::<4>(data, 316, "focus rectangle")?);
+        focus_rectangle_is_valid = read_bool_byte(data, 332, "focus rectangle validity")?;
+    }
+
+    if version >= 2.3 {
+        mirror_enabled = Some(read_i32_le(data, 336, "mirror flag")? != 0);
+    }
+
+    if version >= 2.4 {
+        refocus_mode = Some(read_i32_le(data, 340, "refocus mode")?);
+        let _ = read_i32_le(data, 344, "light spot strength")?;
+        let _ = read_i32_le(data, 348, "bright spot trigger")?;
+        let _ = read_f32_le(data, 352, "curve value")?;
+        let _ = read_i32_le(data, 356, "shine threshold")?;
+        let _ = read_i32_le(data, 360, "shine level")?;
+        let _ = read_i32_le(data, 364, "spot sharpen amount")?;
+        let _ = read_i32_le(data, 368, "spot sharpen radius")?;
+        foreground_blur_scale = Some(read_i32_le(data, 372, "foreground blur scale")?);
+        let _ = read_i32_le(data, 376, "master type")?;
+    }
+
+    if version >= 2.5 {
+        big_face_enabled = Some(read_i32_le(data, 380, "big-face flag")? != 0);
+        pets_enabled = Some(read_i32_le(data, 384, "pet flag")? != 0);
+        multi_semantic_segmentation_enabled =
+            Some(read_i32_le(data, 388, "multi-semantic flag")? != 0);
+    }
+
+    if version >= 4.0 {
+        bokeh_version = Some(read_i32_le(data, 392, "bokeh version")?);
+        iso = Some(read_i32_le(data, 396, "ISO")?);
+        zoom_ratio = Some(read_i32_le(data, 400, "zoom ratio")?);
+        focus_roi_type = Some(read_i32_le(data, 404, "focus ROI type")?);
+        shutter = Some(read_f32_le(data, 408, "shutter")?);
+        aec_lux_index = Some(read_f32_le(data, 412, "AEC lux index")?);
+        let face_count = read_i32_le(data, 416, "face count")?;
+        if !(0..=MAX_FACE_COUNT).contains(&face_count) || data.len() < V4_MINIMUM_BYTES {
+            return Err(ContainerError::invalid(
+                CONFIG_CONTEXT,
+                "v4 face table is invalid or truncated",
+            ));
+        }
+        let face_count = usize::try_from(face_count).map_err(|_| invalid("face count"))?;
+
+        faces.reserve(face_count);
+        for face_index in 0..face_count {
+            let rectangle_offset = 420 + face_index * 16;
+            let angle_offset = 580 + face_index * 4;
+            let keypoint_x_offset = 620 + face_index * FACE_KEYPOINT_COUNT * 4;
+            let keypoint_y_offset = 12_460 + face_index * FACE_KEYPOINT_COUNT * 4;
+            let confidence_offset = 24_300 + face_index * FACE_KEYPOINT_COUNT;
+            let confidence_bytes = data
+                .get(confidence_offset..confidence_offset + FACE_KEYPOINT_COUNT)
+                .ok_or_else(|| truncated("face keypoint confidence"))?;
+            let mut confidence = [0_i8; FACE_KEYPOINT_COUNT];
+            for (destination, source) in confidence.iter_mut().zip(confidence_bytes) {
+                *destination = i8::from_ne_bytes([*source]);
+            }
+            faces.push(OppoPortraitFace {
+                rectangle: read_i32_array::<4>(data, rectangle_offset, "face rectangle")?,
+                angle: read_i32_le(data, angle_offset, "face angle")?,
+                keypoint_x: read_i32_array::<FACE_KEYPOINT_COUNT>(
+                    data,
+                    keypoint_x_offset,
+                    "face keypoint X",
+                )?,
+                keypoint_y: read_i32_array::<FACE_KEYPOINT_COUNT>(
+                    data,
+                    keypoint_y_offset,
+                    "face keypoint Y",
+                )?,
+                keypoint_confidence: confidence,
+            });
+        }
+    }
+
+    Ok(OppoPortraitConfig {
+        version,
+        processing_width: positive_u32(width_raw, "depth width")?,
+        processing_height: positive_u32(height_raw, "depth height")?,
+        focus_x: read_i32_le(data, 12, "focus X")?,
+        focus_y: read_i32_le(data, 16, "focus Y")?,
+        blur_apertures,
+        blur_values,
+        current_blur_strength: read_i32_le(data, 276, "current blur strength")?,
+        camera_roll: read_i32_le(data, 280, "camera roll")?,
+        spotlight_width,
+        spotlight_height,
+        current_f_number,
+        object_distance,
+        tele_master,
+        focus_rectangle,
+        focus_rectangle_is_valid,
+        mirror_enabled,
+        refocus_mode,
+        foreground_blur_scale,
+        big_face_enabled,
+        pets_enabled,
+        multi_semantic_segmentation_enabled,
+        bokeh_version,
+        iso,
+        zoom_ratio,
+        focus_roi_type,
+        shutter,
+        aec_lux_index,
+        faces,
+    })
+}
+
+/// Extract the portable OPPO portrait source contract from one camera HEIC.
+///
+/// The three required blocks are a source-format invariant. Optional private
+/// Gain Map metadata remains optional because ImageIO can recover it from the
+/// embedded `src.image` on Apple platforms.
+pub fn extract_oppo_portrait_source(data: &[u8]) -> Result<OppoPortraitSource> {
+    let mut blocks = portrait_blocks(data)?;
+    let source_image = blocks
+        .remove("src.image")
+        .ok_or_else(|| missing_source_block("src.image"))?;
+    let compressed_depth = blocks
+        .remove("rear.depth")
+        .ok_or_else(|| missing_source_block("rear.depth"))?;
+    let config_bytes = blocks
+        .remove("rear.depth.config")
+        .ok_or_else(|| missing_source_block("rear.depth.config"))?;
+    let config = parse_oppo_portrait_config(&config_bytes)?;
+
+    Ok(OppoPortraitSource {
+        source_image,
+        compressed_depth,
+        config,
+        private_gain_map_info: blocks.remove("local.uhdr.gainmap.info"),
+    })
+}
+
+/// Parse the decompressed OPPO `rear.depth` producer record and its same-sized
+/// semantic planes. Decompression is intentionally outside this function so the
+/// binary contract is independent of compression transport.
+pub fn parse_oppo_portrait_depth(data: &[u8]) -> Result<OppoPortraitDepth> {
+    if data.len() < DEPTH_HEADER_BYTES {
+        return Err(depth_invalid("shorter than its 768-byte header"));
+    }
+
+    let width = read_u32_le_at(data, 0).ok_or_else(|| depth_invalid("missing width"))?;
+    let height = read_u32_le_at(data, 4).ok_or_else(|| depth_invalid("missing height"))?;
+    if width == 0 || height == 0 || width > 16_384 || height > 16_384 {
+        return Err(depth_invalid("header dimensions are invalid"));
+    }
+
+    let required_positive_f32 = |offset, field| -> Result<f32> {
+        let value = read_f32_raw_le_at(data, offset).ok_or_else(|| depth_invalid(field))?;
+        if !value.is_finite() || value <= 0.0 {
+            return Err(depth_invalid(format!("invalid {field}")));
+        }
+        Ok(value)
+    };
+    let rank_disparity_scale = required_positive_f32(0x18, "rank disparity scale")?;
+    let focal_length_pixels = required_positive_f32(0x1c, "focal length")?;
+    let stereo_baseline = required_positive_f32(0x20, "stereo baseline")?;
+
+    let plane_size = usize::try_from(width)
+        .ok()
+        .and_then(|width| {
+            usize::try_from(height)
+                .ok()
+                .and_then(|height| width.checked_mul(height))
+        })
+        .ok_or_else(|| depth_invalid("rank plane size overflows"))?;
+    let rank_end = DEPTH_HEADER_BYTES
+        .checked_add(plane_size)
+        .ok_or_else(|| depth_invalid("rank plane end overflows"))?;
+    if rank_end > data.len() {
+        return Err(depth_invalid("rank plane is truncated"));
+    }
+
+    let disparity_minimum =
+        read_u16_le_at(data, 0x2e).ok_or_else(|| depth_invalid("missing disparity minimum"))?;
+    let disparity_maximum =
+        read_u16_le_at(data, 0x30).ok_or_else(|| depth_invalid("missing disparity maximum"))?;
+    let disparity_exponentiation = data[0x32];
+    if !(1..=2).contains(&disparity_exponentiation) || disparity_maximum <= disparity_minimum {
+        return Err(depth_invalid("quantization range is invalid"));
+    }
+
+    let finite_optional = |offset| {
+        read_f32_raw_le_at(data, offset).and_then(|value| value.is_finite().then_some(value))
+    };
+    let positive_optional_u32 = |offset| read_u32_le_at(data, offset).filter(|value| *value > 0);
+    let positive_optional_i32 = |offset| {
+        read_i32_le_at(data, offset).and_then(|value| u32::try_from(value).ok().filter(|v| *v > 0))
+    };
+    let app_zoom_ratio = finite_optional(0x1bc).filter(|value| *value > 0.0);
+
+    let header = OppoPortraitDepthHeader {
+        width,
+        height,
+        rank_disparity_scale,
+        focal_length_pixels,
+        stereo_baseline,
+        hair_plane_present: data[0x24] != 0,
+        portrait_plane_present: data[0x25] != 0,
+        pet_plane_present: data[0x26] != 0,
+        near_object_detected: data[0x27] != 0,
+        near_object_confidence: finite_optional(0x28),
+        plant_object_state: data[0x2c],
+        disparity_minimum,
+        disparity_maximum,
+        disparity_exponentiation,
+        auxiliary_width: positive_optional_u32(0x188),
+        auxiliary_height: positive_optional_u32(0x18c),
+        model_output_present: data[0x190] != 0,
+        scene_class: read_i32_le_at(data, 0x1b0)
+            .ok_or_else(|| depth_invalid("missing scene class"))?,
+        object_distance: positive_optional_i32(0x1b4),
+        aec_lux_index: finite_optional(0x1b8),
+        app_zoom_ratio,
+    };
+
+    let ranks = data[DEPTH_HEADER_BYTES..rank_end].to_vec();
+    let mut cursor = rank_end;
+    let mut consume_plane = |present: bool, name: &str| -> Result<Option<Vec<u8>>> {
+        if !present {
+            return Ok(None);
+        }
+        let end = cursor
+            .checked_add(plane_size)
+            .ok_or_else(|| depth_invalid(format!("{name} plane end overflows")))?;
+        let plane = data
+            .get(cursor..end)
+            .ok_or_else(|| depth_invalid(format!("too short for flagged {name} plane")))?
+            .to_vec();
+        cursor = end;
+        Ok(Some(plane))
+    };
+
+    let hair = consume_plane(header.hair_plane_present, "hair")?;
+    let portrait = consume_plane(header.portrait_plane_present, "portrait")?;
+    let pet = consume_plane(header.pet_plane_present, "pet")?;
+
+    Ok(OppoPortraitDepth {
+        header,
+        ranks,
+        hair,
+        portrait,
+        pet,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn put_i32(data: &mut [u8], offset: usize, value: i32) {
+        data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn put_u16(data: &mut [u8], offset: usize, value: u16) {
+        data[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn put_u32(data: &mut [u8], offset: usize, value: u32) {
+        data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn put_f32(data: &mut [u8], offset: usize, value: f32) {
+        data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn base_config(version: f32, size: usize) -> Vec<u8> {
+        let mut data = vec![0_u8; size];
+        put_f32(&mut data, 0, version);
+        put_i32(&mut data, 4, 900);
+        put_i32(&mut data, 8, 1200);
+        put_i32(&mut data, 12, 300);
+        put_i32(&mut data, 16, 500);
+        for index in 0..BLUR_SAMPLE_COUNT {
+            put_f32(&mut data, 20 + index * 4, 1.0 + index as f32 * 0.1);
+            put_f32(&mut data, 148 + index * 4, index as f32);
+        }
+        put_i32(&mut data, 276, 20);
+        put_i32(&mut data, 280, 0);
+        data
+    }
+
+    fn depth_record(exponentiation: u8, semantic_planes: usize) -> Vec<u8> {
+        let width = 16_u32;
+        let height = 16_u32;
+        let plane_size = usize::try_from(width * height).unwrap();
+        let mut data = vec![0_u8; DEPTH_HEADER_BYTES + plane_size * (1 + semantic_planes)];
+        put_u32(&mut data, 0, width);
+        put_u32(&mut data, 4, height);
+        put_f32(&mut data, 0x18, 0.00345042);
+        put_f32(&mut data, 0x1c, 4098.0234);
+        put_f32(&mut data, 0x20, 38.844524);
+        put_f32(&mut data, 0x28, 0.75);
+        data[0x2c] = 3;
+        put_u16(&mut data, 0x2e, 11_560);
+        put_u16(&mut data, 0x30, 38_858);
+        data[0x32] = exponentiation;
+        put_u32(&mut data, 0x188, 32);
+        put_u32(&mut data, 0x18c, 24);
+        data[0x190] = 1;
+        put_i32(&mut data, 0x1b0, 3);
+        put_i32(&mut data, 0x1b4, 102);
+        put_f32(&mut data, 0x1b8, 324.54495);
+        put_f32(&mut data, 0x1bc, 6.0);
+        for (index, value) in data[DEPTH_HEADER_BYTES..DEPTH_HEADER_BYTES + plane_size]
+            .iter_mut()
+            .enumerate()
+        {
+            *value = (index % 256) as u8;
+        }
+        data
+    }
+
+    fn fixture(name: &str) -> Vec<u8> {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/proxdr/oppo/find-x9-ultra")
+            .join(name);
+        fs::read(path).expect("read committed ProXDR fixture")
+    }
+
+    #[test]
+    fn parses_version_one_without_inventing_newer_fields() {
+        let config = parse_oppo_portrait_config(&base_config(1.0, 284)).unwrap();
+        assert_eq!(config.version, 1.0);
+        assert_eq!(
+            (config.processing_width, config.processing_height),
+            (900, 1200)
+        );
+        assert_eq!((config.focus_x, config.focus_y), (300, 500));
+        assert_eq!(config.current_blur_strength, 20);
+        assert_eq!(config.current_f_number, None);
+        assert_eq!(config.focus_rectangle, None);
+        assert!(config.faces.is_empty());
+    }
+
+    #[test]
+    fn parses_version_four_face_table_into_fixed_shape_records() {
+        let mut data = base_config(4.0, V4_MINIMUM_BYTES);
+        put_i32(&mut data, 284, 640);
+        put_i32(&mut data, 288, 480);
+        put_f32(&mut data, 292, 2.8);
+        put_i32(&mut data, 296, 123);
+        data[300] = 1;
+        put_i32(&mut data, 316, 10);
+        put_i32(&mut data, 320, 20);
+        put_i32(&mut data, 324, 110);
+        put_i32(&mut data, 328, 220);
+        data[332] = 1;
+        put_i32(&mut data, 336, 1);
+        put_i32(&mut data, 340, 2);
+        put_f32(&mut data, 352, 0.5);
+        put_i32(&mut data, 372, 7);
+        put_i32(&mut data, 380, 1);
+        put_i32(&mut data, 384, 1);
+        put_i32(&mut data, 388, 1);
+        put_i32(&mut data, 392, 4);
+        put_i32(&mut data, 396, 100);
+        put_i32(&mut data, 400, 3);
+        put_i32(&mut data, 404, 1);
+        put_f32(&mut data, 408, 0.01);
+        put_f32(&mut data, 412, 42.0);
+        put_i32(&mut data, 416, 1);
+        put_i32(&mut data, 420, 1);
+        put_i32(&mut data, 424, 2);
+        put_i32(&mut data, 428, 3);
+        put_i32(&mut data, 432, 4);
+        put_i32(&mut data, 580, 90);
+        for index in 0..FACE_KEYPOINT_COUNT {
+            put_i32(&mut data, 620 + index * 4, index as i32);
+            put_i32(&mut data, 12_460 + index * 4, 1000 + index as i32);
+            data[24_300 + index] = (index % 128) as u8;
+        }
+
+        let config = parse_oppo_portrait_config(&data).unwrap();
+        assert_eq!(config.current_f_number, Some(2.8));
+        assert_eq!(config.object_distance, Some(123));
+        assert_eq!(config.tele_master, Some(true));
+        assert_eq!(config.focus_rectangle, Some([10, 20, 110, 220]));
+        assert!(config.focus_rectangle_is_valid);
+        assert_eq!(config.faces.len(), 1);
+        assert_eq!(config.faces[0].rectangle, [1, 2, 3, 4]);
+        assert_eq!(config.faces[0].angle, 90);
+        assert_eq!(config.faces[0].keypoint_x[295], 295);
+        assert_eq!(config.faces[0].keypoint_y[295], 1295);
+    }
+
+    #[test]
+    fn rejects_non_finite_or_truncated_config_records() {
+        let mut invalid_version = base_config(1.0, 284);
+        put_f32(&mut invalid_version, 0, f32::NAN);
+        assert!(parse_oppo_portrait_config(&invalid_version).is_err());
+
+        let truncated = base_config(2.0, 300);
+        assert!(parse_oppo_portrait_config(&truncated).is_err());
+    }
+
+    #[test]
+    fn extracts_typed_source_from_committed_portrait_fixture() {
+        let source = extract_oppo_portrait_source(&fixture("uhdr-portrait-01.heic"))
+            .expect("extract real OPPO portrait source");
+        assert!(!source.source_image.is_empty());
+        assert!(!source.compressed_depth.is_empty());
+        assert!((1.0..=4.0).contains(&source.config.version));
+        assert!(source.config.processing_width > 0);
+        assert!(source.config.processing_height > 0);
+    }
+
+    #[test]
+    fn rejects_committed_non_portrait_fixture_as_portrait_source() {
+        assert!(extract_oppo_portrait_source(&fixture("uhdr-hr-01.heic")).is_err());
+    }
+
+    #[test]
+    fn parses_depth_header_and_flagged_planes() {
+        let plane_size = 16 * 16;
+        let mut data = depth_record(1, 3);
+        data[0x24] = 1;
+        data[0x25] = 1;
+        data[0x26] = 1;
+        let hair_start = DEPTH_HEADER_BYTES + plane_size;
+        let portrait_start = hair_start + plane_size;
+        let pet_start = portrait_start + plane_size;
+        data[hair_start..portrait_start].fill(11);
+        data[portrait_start..pet_start].fill(22);
+        data[pet_start..pet_start + plane_size].fill(33);
+
+        let depth = parse_oppo_portrait_depth(&data).unwrap();
+        assert_eq!((depth.header.width, depth.header.height), (16, 16));
+        assert_eq!(depth.header.scene_class, 3);
+        assert_eq!(depth.header.object_distance, Some(102));
+        assert_eq!(depth.header.app_zoom_ratio, Some(6.0));
+        assert_eq!(depth.ranks.len(), plane_size);
+        assert_eq!(depth.hair.as_ref().unwrap()[0], 11);
+        assert_eq!(depth.portrait.as_ref().unwrap()[0], 22);
+        assert_eq!(depth.pet.as_ref().unwrap()[0], 33);
+    }
+
+    #[test]
+    fn depth_rank_mapping_matches_producer_round_trip() {
+        for exponentiation in [1_u8, 2_u8] {
+            let depth = parse_oppo_portrait_depth(&depth_record(exponentiation, 0)).unwrap();
+            for rank in [0.0, 1.0, 63.5, 127.0, 191.5, 254.0, 255.0] {
+                let native = depth.header.native_float_depth(rank).unwrap();
+                let reconstructed = depth.header.rank_for_native_float_depth(native).unwrap();
+                assert!((reconstructed - rank).abs() <= 1e-5);
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_depth_quantization_and_missing_flagged_plane() {
+        let mut invalid = depth_record(3, 0);
+        assert!(parse_oppo_portrait_depth(&invalid).is_err());
+
+        invalid = depth_record(1, 0);
+        invalid[0x24] = 1;
+        assert!(parse_oppo_portrait_depth(&invalid).is_err());
+    }
+}

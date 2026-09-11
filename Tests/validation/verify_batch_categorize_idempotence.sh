@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 #
-# `batch --categorize` must be idempotent: re-running it over a directory it
-# already filed must skip the existing outputs, not re-enumerate the
-# capture-mode folders it wrote and fail every file in them.
+# `categorize` must be idempotent: re-running it over the same input must report
+# duplicates and leave the already-filed bytes unchanged.
 #
 # usage: verify_batch_categorize_idempotence.sh <sample.heic> [<sample.heic> ...]
 
@@ -14,10 +13,13 @@ if (($# == 0)); then
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CLI="$ROOT_DIR/.build/debug/xdremux"
+CLI="${XDREMUX_CLI:-$ROOT_DIR/target/debug/xdremux}"
 
 if [[ ! -x "$CLI" ]]; then
-  echo "Swift CLI not built: $CLI (run swift build first)" >&2
+  cargo build --locked -q -p xdremux-cli
+fi
+if [[ ! -x "$CLI" ]]; then
+  echo "Rust CLI not built: $CLI (run cargo build -p xdremux-cli first)" >&2
   exit 2
 fi
 
@@ -33,33 +35,22 @@ for sample in "$@"; do
 done
 
 EXPECTED="$#"
+OUTPUT="$WORK/output"
 
 echo "== run 1 =="
-FIRST="$("$CLI" batch --input-dir "$WORK" --output-dir "$WORK" --categorize 2>&1)"
+FIRST="$("$CLI" categorize --input "$WORK" --output-dir "$OUTPUT" 2>&1)"
 echo "$FIRST"
-if ! grep -q "batch complete: $EXPECTED converted, 0 skipped, 0 failed" <<<"$FIRST"; then
-  echo "run 1 did not convert all $EXPECTED inputs cleanly" >&2
+if ! grep -q "categorize: $EXPECTED resources, $EXPECTED copied, 0 duplicates, 0 dry-run, 0 failed" <<<"$FIRST"; then
+  echo "run 1 did not categorize all $EXPECTED inputs cleanly" >&2
   exit 1
 fi
 
 echo "== run 2 =="
-set +e
-SECOND="$("$CLI" batch --input-dir "$WORK" --output-dir "$WORK" --categorize 2>&1)"
-SECOND_STATUS=$?
-set -e
+SECOND="$("$CLI" categorize --input "$WORK" --output-dir "$OUTPUT" 2>&1)"
 echo "$SECOND"
-
-if ((SECOND_STATUS != 0)); then
-  echo "run 2 exited $SECOND_STATUS; a repeated categorized batch must succeed" >&2
-  exit 1
-fi
-if ! grep -q "batch complete: 0 converted, $EXPECTED skipped, 0 failed" <<<"$SECOND"; then
-  echo "run 2 must skip the $EXPECTED existing outputs and fail nothing" >&2
-  exit 1
-fi
-if grep -q "failed to locate plausible 144-byte" <<<"$SECOND"; then
-  echo "run 2 re-enumerated its own categorized output" >&2
+if ! grep -q "categorize: $EXPECTED resources, 0 copied, $EXPECTED duplicates, 0 dry-run, 0 failed" <<<"$SECOND"; then
+  echo "run 2 must report the $EXPECTED existing outputs as duplicates" >&2
   exit 1
 fi
 
-echo "batch --categorize is idempotent over $EXPECTED inputs"
+echo "categorize is idempotent over $EXPECTED inputs"

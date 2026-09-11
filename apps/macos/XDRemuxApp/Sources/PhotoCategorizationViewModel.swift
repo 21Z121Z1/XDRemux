@@ -1,7 +1,5 @@
 import Foundation
 import Observation
-import XDRemuxCore
-import XDRemuxAppleFeatures
 import AppKit
 
 enum PhotoCategorizationAppState: Equatable {
@@ -41,7 +39,7 @@ final class PhotoCategorizationViewModel {
     var completedCount = 0
 
     var canScan: Bool { !inputURLs.isEmpty && !isBusy }
-    var canCopy: Bool { state == .ready && items.contains { $0.disposition == .copy } }
+    var canCopy: Bool { state == .ready && items.contains { $0.disposition == .dryRun } }
     var isBusy: Bool { state == .scanning || state == .copying }
     var categorizedCount: Int { items.count { $0.classification.mode != nil } }
     var unclassifiedCount: Int { items.count { $0.classification.mode == nil } }
@@ -88,16 +86,14 @@ final class PhotoCategorizationViewModel {
         task = Task { [weak self] in
             do {
                 let plan = try await Task.detached(priority: .userInitiated) {
-                    try PhotoCategorizationEngine.makePlan(
+                    try Self.runCategorization(
                         inputs: inputs,
                         outputDirectory: outputDirectory,
-                        livePhotoPairValidator: { imageURL, videoURL in
-                            AppleLivePhotoValidator.isValidPair(imageURL: imageURL, videoURL: videoURL)
-                        }
+                        dryRun: true
                     )
                 }.value
                 guard !Task.isCancelled else { return }
-                self?.items = plan.items
+                self?.items = plan
                 self?.state = .ready
             } catch {
                 self?.state = .failed(String(describing: error))
@@ -114,14 +110,27 @@ final class PhotoCategorizationViewModel {
         let planItems = items
         let outputDirectory = outputDirectory
         task = Task { [weak self] in
-            let results = await Task.detached(priority: .userInitiated) {
-                var completed: [PhotoCategorizationItem] = []
-                for item in planItems {
-                    if token.isCancelled { break }
-                    let plan = PhotoCategorizationPlan(outputDirectory: outputDirectory, items: [item])
-                    completed.append(contentsOf: PhotoCategorizationEngine.execute(plan, jobs: 1).items)
+            let results: [PhotoCategorizationItem] = await Task.detached(priority: .userInitiated) {
+                guard !token.isCancelled else { return [] as [PhotoCategorizationItem] }
+                do {
+                    return try Self.runCategorization(
+                        inputs: planItems
+                            .map(\.sourceURL)
+                            .filter(Self.isSupportedImage),
+                        outputDirectory: outputDirectory,
+                        dryRun: false
+                    )
+                } catch {
+                    return planItems.map { item in
+                        PhotoCategorizationItem(
+                            sourceURL: item.sourceURL,
+                            destinationURL: item.destinationURL,
+                            classification: item.classification,
+                            disposition: .failed,
+                            errorDescription: String(describing: error)
+                        )
+                    }
                 }
-                return completed
             }.value
             guard let self else { return }
             let completedByID = Dictionary(uniqueKeysWithValues: results.map { ($0.id, $0) })
@@ -135,6 +144,55 @@ final class PhotoCategorizationViewModel {
                 state = .completed
             }
             cancellationToken = nil
+        }
+    }
+
+    nonisolated private static func runCategorization(
+        inputs: [URL],
+        outputDirectory: URL?,
+        dryRun: Bool
+    ) throws -> [PhotoCategorizationItem] {
+        let roots = categorizationRoots(inputs: inputs, outputDirectory: outputDirectory)
+        var items: [PhotoCategorizationItem] = []
+        for root in roots {
+            items.append(contentsOf: try RustCLIClient.categorize(
+                inputs: root.inputs,
+                outputDirectory: root.outputDirectory,
+                dryRun: dryRun
+            ))
+        }
+        var seen = Set<String>()
+        return items.filter { seen.insert($0.id).inserted }
+    }
+
+    nonisolated private static func isSupportedImage(_ url: URL) -> Bool {
+        ["heic", "heif", "jpg", "jpeg"].contains(url.pathExtension.lowercased())
+    }
+
+    private struct CategorizationRoot: Sendable {
+        let inputs: [URL]
+        let outputDirectory: URL
+    }
+
+    nonisolated private static func categorizationRoots(
+        inputs: [URL],
+        outputDirectory: URL?
+    ) -> [CategorizationRoot] {
+        if let outputDirectory {
+            return [CategorizationRoot(inputs: inputs, outputDirectory: outputDirectory)]
+        }
+        var grouped: [String: [URL]] = [:]
+        for input in inputs {
+            let isDirectory = (try? input.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            let root = isDirectory ? input : input.deletingLastPathComponent()
+            grouped[root.standardizedFileURL.path, default: []].append(input)
+        }
+        return grouped.keys.sorted().compactMap { key in
+            guard let groupedInputs = grouped[key] else { return nil }
+            return CategorizationRoot(
+                inputs: groupedInputs,
+                outputDirectory: URL(fileURLWithPath: key)
+            )
         }
     }
 

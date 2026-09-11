@@ -11,6 +11,9 @@ DerivedData/
 Package.resolved
 __pycache__/
 
+# Rust
+/target/
+
 # Large binaries
 *.apk
 *.heic

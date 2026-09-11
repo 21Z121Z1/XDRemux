@@ -10,7 +10,7 @@ For commands, see [Tests/README.en.md](../../Tests/README.en.md). For completion
 
 | Layer | Typical command or source | What it proves |
 | --- | --- | --- |
-| Unit and contract | `swift test` | Swift model, parser, format, and Apple-feature contracts. |
+| Unit and contract | `cargo test --workspace --locked` | Rust product, parser, format, Apple-feature policy, and transaction contracts. |
 | Repository policy | `python3 -m unittest discover -s Tests -v` | Cross-file policy, Python behavior, documentation, and architecture contracts. |
 | Real fixture | `fixtures/` and `Tests/validation/` | Behavior on versioned or supplied real media. |
 | Native framework | macOS validation jobs | ImageIO, PhotoKit, or other tested Apple framework behavior. |
@@ -43,7 +43,7 @@ The repository contains versioned real Motion Photo fixtures under `fixtures/`.
 
 Their exact bytes are part of the test contract. `fixtures/SHA256SUMS` is the identity manifest.
 
-Strict Swift and pure-Python CI gates use these fixtures to test multiple JPEG and HEIC/HEIF Motion Photo layouts.
+Strict Rust CI gates use these fixtures to test multiple JPEG and HEIC/HEIF Motion Photo layouts.
 
 Do not describe all real samples as private. Some older ProXDR, device-only, and Apple-feature samples can still be external or private.
 

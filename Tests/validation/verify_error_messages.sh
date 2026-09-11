@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Error text and help text are product surfaces, so exercise them through the
-# real binary on real files rather than trusting unit-level string checks.
+# real Rust binary on a real file rather than trusting unit-level string checks.
 #
 # usage: verify_error_messages.sh <proxdr-sample.heic>
 
@@ -14,14 +14,17 @@ fi
 
 SAMPLE="$1"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CLI="$ROOT_DIR/.build/debug/xdremux"
+CLI="${XDREMUX_CLI:-$ROOT_DIR/target/debug/xdremux}"
 
 if [[ ! -f "$SAMPLE" ]]; then
   echo "sample not found: $SAMPLE" >&2
   exit 2
 fi
 if [[ ! -x "$CLI" ]]; then
-  echo "Swift CLI not built: $CLI (run swift build first)" >&2
+  cargo build --locked -q -p xdremux-cli
+fi
+if [[ ! -x "$CLI" ]]; then
+  echo "Rust CLI not built: $CLI (run cargo build -p xdremux-cli first)" >&2
   exit 2
 fi
 
@@ -46,46 +49,42 @@ expect_absent() {
   fi
 }
 
-echo "== generated help owns the command tree and each command owns its options =="
+expect_option_absent() {
+  local haystack="$1" option="$2" label="$3"
+  if grep -Eq -- "(^|[[:space:]])${option}([[:space:]]|$)" <<<"$haystack"; then
+    echo "$label: did not expect option $option in:" >&2
+    echo "$haystack" >&2
+    exit 1
+  fi
+}
+
+echo "== generated help owns the command tree and public options =="
 ROOT_HELP="$("$CLI" --help 2>&1)"
-expect_absent "$ROOT_HELP" "XDRemux.swift" "root help"
-for command in convert batch categorize validate-apple validate-portrait portrait-self-test; do
+expect_absent "$ROOT_HELP" "Swift" "root help"
+for command in inspect convert batch categorize validate; do
   expect_contains "$ROOT_HELP" "$command" "root help"
 done
 
 CONVERT_HELP="$("$CLI" convert --help 2>&1)"
-for option in --input --output --family --input-processing --tmap-format --oppo-camera-tail \
-              --oppo-compat --debug-dir --apple-photographic-styles --apple-portrait; do
+for option in --input --output --oppo-compatible --apple-styles --apple-portrait; do
   expect_contains "$CONVERT_HELP" "$option" "convert help"
+done
+for option in --family --input-processing --tmap-format --oppo-camera-tail --oppo-compat --debug-dir; do
+  expect_option_absent "$CONVERT_HELP" "$option" "convert help"
 done
 
 BATCH_HELP="$("$CLI" batch --help 2>&1)"
-for option in --input-dir --output-dir --glob --jobs --checkpoint --categorize \
-              --resume --skip-existing --family --oppo-compatible; do
+for option in --input-dir --output-dir --jobs --checkpoint --categorize \
+              --resume --skip-existing --oppo-compatible --apple-styles --apple-portrait; do
   expect_contains "$BATCH_HELP" "$option" "batch help"
 done
 
-CATEGORIZE_HELP="$("$CLI" categorize --help 2>&1)"
-for option in --input --output-dir --jobs --dry-run; do
-  expect_contains "$CATEGORIZE_HELP" "$option" "categorize help"
-done
-
-echo "== converting an already-converted file explains there is nothing to do =="
+echo "== validating a produced output is a separate read-only operation =="
 CONVERTED="$WORK/converted.heic"
 "$CLI" convert --input "$SAMPLE" --output "$CONVERTED" >/dev/null
-set +e
-AGAIN="$("$CLI" convert --input "$CONVERTED" --output "$WORK/again.heic" 2>&1)"
-AGAIN_STATUS=$?
-set -e
-if ((AGAIN_STATUS == 0)); then
-  echo "re-converting an output should fail rather than silently rewrite it" >&2
-  exit 1
-fi
-expect_contains "$AGAIN" "already converted" "re-convert"
-expect_contains "$AGAIN" "ISO 21496-1" "re-convert"
-expect_absent "$AGAIN" "local.hdr.meta.data" "re-convert"
+"$CLI" validate "$CONVERTED" >/dev/null
 
-echo "== converting an unrelated file says it is not a ProXDR photo =="
+echo "== converting an unrelated file reports a direct input error =="
 printf 'not an image at all' >"$WORK/bogus.heic"
 set +e
 BOGUS="$("$CLI" convert --input "$WORK/bogus.heic" --output "$WORK/bogus-out.heic" 2>&1)"
@@ -95,8 +94,8 @@ if ((BOGUS_STATUS == 0)); then
   echo "converting a non-photo should fail" >&2
   exit 1
 fi
-expect_contains "$BOGUS" "not a ProXDR photo" "unsupported input"
-expect_absent "$BOGUS" "local.hdr.meta.data" "unsupported input"
+expect_contains "$BOGUS" "unsupported input" "unsupported input"
+expect_absent "$BOGUS" "Swift" "unsupported input"
 
 echo "== a batch failure stays one readable line =="
 mkdir -p "$WORK/batch"
@@ -105,14 +104,13 @@ printf 'not an image at all' >"$WORK/batch/bad.heic"
 set +e
 BATCH="$("$CLI" batch --input-dir "$WORK/batch" --output-dir "$WORK/batch-out" 2>&1)"
 set -e
-expect_contains "$BATCH" "failed bad.heic: not a ProXDR photo" "batch"
-expect_contains "$BATCH" "batch complete: 1 converted, 0 skipped, 1 failed" "batch"
-expect_contains "$BATCH" "run the same command again" "batch"
-FAILURE_LINE="$(grep "^failed bad.heic" <<<"$BATCH" | head -1)"
-if ((${#FAILURE_LINE} > 120)); then
+expect_contains "$BATCH" "failed: bad.heic" "batch"
+expect_contains "$BATCH" "batch: 2 processed, 1 succeeded, 1 failed" "batch"
+FAILURE_LINE="$(grep "failed: bad.heic" <<<"$BATCH" | head -1)"
+if ((${#FAILURE_LINE} > 160)); then
   echo "batch failure line is ${#FAILURE_LINE} chars; list output must stay terse:" >&2
   echo "$FAILURE_LINE" >&2
   exit 1
 fi
 
-echo "error and help text behave as documented"
+echo "Rust error and help text behave as documented"

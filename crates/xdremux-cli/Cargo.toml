@@ -1,0 +1,23 @@
+[package]
+name = "xdremux-cli"
+version = "0.1.0"
+edition.workspace = true
+
+[[bin]]
+name = "xdremux"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+serde_json = "1"
+xdremux-engine = { path = "../xdremux-engine" }
+xdremux-runtime = { path = "../xdremux-runtime" }
+xdremux-source = { path = "../xdremux-source" }
+
+[dev-dependencies]
+xdremux-format = { path = "../xdremux-format" }
+xdremux-heif = { path = "../xdremux-heif" }
+xdremux-motion-photo = { path = "../xdremux-motion-photo" }
+
+[lints]
+workspace = true

@@ -2,15 +2,15 @@
 
 English | [简体中文](README.md)
 
-This directory indexes stable implementation contracts for XDRemux.
+This directory indexes stable implementation contracts for XDRemux. The Rust workspace is the only product implementation; Swift contains only the explicitly bounded Apple primitive adapter.
 
 Use the [project README](../../README.en.md) for normal use and the [CLI reference](../cli.en.md) for command behavior.
 
 ## Current architecture
 
-### `XDRemuxCore`
+### Rust workspace
 
-`XDRemuxCore` owns format and conversion logic that does not require the Apple feature layer.
+The Rust `xdremux` CLI and workspace crates own all product semantics, format conversion, classification, batching, Motion Photo routing, validation, and publication.
 
 Current responsibilities include:
 
@@ -19,35 +19,34 @@ Current responsibilities include:
 - HEIF and ISO-BMFF parsing and writing;
 - Motion Photo parsing and resource extraction;
 - source metadata and classification;
-- output validation shared by core conversion paths.
+- output validation shared by core conversion paths;
+- cross-platform policy, manifest construction, and transaction orchestration for Apple Portrait and Photographic Styles.
 
-### `XDRemuxAppleFeatures`
+### Apple capability boundary
 
-`XDRemuxAppleFeatures` owns Apple-specific conversion and validation.
+`Sources/XDRemuxAppleAdapter/` is the minimal Apple-framework primitive adapter invoked by the Rust runtime.
 
 Current responsibilities include:
 
-- Motion Photo to Apple Live Photo;
-- Live Photo still and MOV writing;
-- Live Photo timing and asset identity;
-- vendor-specific geometry policy used by the Live Photo writer;
-- Photographic Styles;
-- Apple Portrait;
-- Apple-specific native helper integration.
+- invoking ImageIO, Vision, CoreImage, VideoToolbox, and other Apple frameworks;
+- returning framework facts through the Rust-defined protocol;
+- writing or probing Apple-specific resources already planned by Rust.
+
+The former Swift product targets have been removed. Only `Sources/XDRemuxAppleAdapter/` remains on the Swift side, and it must not receive product policy.
 
 ### CLI layer
 
-`Sources/XDRemuxCLI/` owns user command parsing and routing.
+`crates/xdremux-cli/` owns the only user command parser and router.
 
 The CLI automatically routes supported Motion Photo inputs before the normal HDR command path.
 
 The Motion Photo and normal HDR paths have different output-safety rules. See the [CLI reference](../cli.en.md).
 
-### Python implementation
+### Python research tooling
 
-`xdremux_py/` is a separate cross-platform implementation.
+`xdremux_py/` contains only research/training tooling.
 
-It supports standard HDR conversion, Motion Photo to Live Photo conversion, and classification. It does not implement Photographic Styles or Apple Portrait generation.
+It does not participate in the Rust runtime, define a formal conversion path, or serve as the canonical CI correctness source.
 
 ## Stable media contracts
 

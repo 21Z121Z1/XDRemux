@@ -2,130 +2,110 @@
 
 [English](apple-features.en.md) | 简体中文
 
-XDRemux 提供 Apple 特有的摄影风格、Apple 人像和 Apple Live Photo metadata 转换链路。
+摄影风格和 Apple 人像已经是 XDRemux 中由 Rust 持有的产品 intent。它们不是第二套产品栈。
 
-这些链路与标准 ISO HDR 链路分离。部分组合受到支持，其他组合会在写入输出前被拒绝。
+Canonical 公开产品是 Rust `xdremux` CLI。Swift target 只作为无法跨平台完成的 Apple framework adapter，例如 ImageIO consumer probing、Vision observation 和 VideoToolbox encoding。
+
+## 当前可用性
+
+标准 HDR、OPPO 兼容输出、Motion Photo → Live Photo、batch、分类、inspect 和 portable validation 已属于 canonical Rust 产品。
+
+摄影风格和 Apple 人像通过 `convert`/`batch` 的产品 intent 表达，不新增 Apple 专用 CLI 子命令，也不把 adapter 或 solver 的底层控制暴露为公开契约。
+
+Rust 持有 feature request/result model、routing、fallback、validation policy、metadata synthesis、assembly 和 publication lifecycle。Apple-native 代码只执行 Rust 请求的平台 operation，并返回事实 observation。
 
 ## 平台边界
 
-Swift package 需要 macOS 15 或更高版本。
+CLI 使用以下结构：
 
-Apple 特有的分析和渲染会使用 Apple 平台框架和辅助进程。普通跨平台 Python 转换器不生成摄影风格或 Apple 人像数据。
-
-OPPO 兼容 HDR 输出和 Apple 特有编辑输出互斥。
-
-## 摄影风格
-
-启用摄影风格：
-
-```bash
-xdremux convert \
-  --apple-photographic-styles \
-  --input IMG_001.heic \
-  --output IMG_001_styles.heic
+```text
+xdremux CLI
+    ↓
+Rust runtime
+    ↓
+Rust engine policy
+    ↓
+portable providers + Apple platform adapter
+                         ↓
+          ImageIO / Core Image / Vision /
+          Core ML / AVFoundation / ...
 ```
 
-启用摄影风格且没有指定 producer 时，CLI 使用 `constrained-solver`。
+`xdremux-apple-adapter` 是由 Rust 产品消费的可分发平台组件。它不是用户 CLI，也不持有产品 policy。
 
-参数解析器还接受：
+CLI/runtime 使用有版本号、生命周期有界的 helper-process protocol。每次转换复用一个延迟启动的 adapter session。超时、崩溃或帧格式错误会终止该 session。transport 保持为 Rust runtime 的私有实现，因此更换 transport 不会改变 engine 或 CLI 语义。
 
-- `--apple-style-data-producer constrained-solver`
-- `--apple-style-data-producer learn-node`
-- `--apple-style-data-producer identity-fallback`
-- `--apple-styles-raw-dng <file>`
+## Rust 持有的 policy
 
-producer 参数和 RAW DNG 参数都要求同时启用 `--apple-photographic-styles`。
+Rust 已把用户层 Apple feature intent 建模为两个事实：摄影风格和人像。旧 Swift 的 producer、donor、backend、research control 不作为产品配置重新暴露。
 
-`learn-node` 和 `identity-fallback` 是诊断或研究控制，不是正常产品默认路径。
+第一项真实 Apple adapter operation 是 ImageIO auxiliary-resource probing。adapter 只报告 observation，例如：
 
-提供 RAW DNG 时，它必须满足链路对源照片匹配关系的要求。可选 RAW 输入不可用时，转换会拒绝它，不会静默使用不相关 RAW 数据。
+- ISO Gain Map 是否存在；
+- disparity 是否存在；
+- Portrait Effects Matte 是否存在；
+- skin、hair、teeth、glasses semantic matte 是否存在。
 
-### 验证边界
+adapter 不回答“这是不是有效人像输出”这类业务问题。该判断由 `xdremux-engine` 中的 `AppleImageAuxiliaryFacts` 和 Portrait resource contract 持有。
 
-摄影风格链路会通过仓库验证器检查生成的 HEIC 结构和 Apple style 资源，并在宿主系统支持时使用原生 Apple 组件验证。
+新增操作必须沿用同一边界：返回最窄且足够的 framework fact 或 operation result，再由 Rust 持有 policy。
 
-Apple 私有接口可能随 macOS 版本变化。仓库会在运行时检查 style-response 工具使用的私有 selector ABI。ABI 形状不受支持时会返回兼容性错误，不会按假定的函数签名调用。
+## 摄影风格迁移
 
-离线结构验证不等于在所有 Apple Photos 版本上完成导入、编辑、保存、退出和重新打开。涉及真机编辑行为的结论必须使用对应的真机证据。
+Rust 持有 style generation 语义、constrained search、source-bound policy、key1/property-list synthesis、graph assembly、validation policy 和 publication。adapter 只执行 Rust runtime 请求的 framework observation 或 encoding primitive。
 
-## Apple 人像
+研究型 producer、model experiment、donor diagnostic 和 RAW experiment 继续作为 research tooling，不定义公开 CLI 契约，也不构成第二套 runtime。
 
-启用 Apple 人像：
+## Apple 人像迁移
 
-```bash
-xdremux convert \
-  --apple-portrait \
-  --input IMG_001.heic \
-  --output IMG_001_portrait.heic
-```
+Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy、JPEG/container logic、Gain Map policy、REND generation、auxiliary-manifest construction、feature routing、output naming、validation policy 和 atomic publication。ImageIO 只报告 auxiliary-resource facts，adapter 只执行 Rust transaction 要求的 Apple framework operation。
 
-源文件必须包含转换链路要求的人像资源。普通非人像照片不会自动变成人像照片。
+完整人像模式通过独立的 image request handler 逐个提交 Vision 分割请求，避免把不同分割请求类型一起提交到曾在 macOS 27 beta 上观察到崩溃的 compound request 路径。请求的语义资源和输出校验要求保持一致。任何请求失败都会终止本次操作；adapter 不会重试该请求，也不会改用源数据模式。
 
-存在且有效时，转换可以使用源景深、焦点、光圈、语义和 restore-original 资源。
+### 源数据模式和效果降级
 
-支持的人像 JPEG 只能通过 Apple 人像链路输入，输出仍然是 HEIC。
+`convert` 和 `batch` 支持 `--apple-portrait-oppo`。此模式不调用 Vision，包括其私有分割 SPI。它使用公开的 ImageIO 和 Core Image 操作，因此仍需要 macOS。
 
-成功的人像转换可以在输出旁生成 portrait manifest。manifest 记录转换使用的资源和决策，只用于诊断，不需要导入 Apple Photos。
+| 资源 | 源数据模式 |
+| --- | --- |
+| ISO Gain Map | 从源文件保留。 |
+| Disparity、焦点、光圈、REND | 由 Rust 根据 OPPO 深度、拍摄数据和源元数据生成。 |
+| Portrait Effects Matte | OPPO 人物平面存在可信前景时才附加。 |
+| Hair matte | OPPO 头发平面存在可信前景时才附加。 |
+| 皮肤、牙齿、眼镜蒙版 | 保持缺失，不生成替代蒙版。 |
 
-## 摄影风格 + Apple 人像
+相比完整的 `--apple-portrait` 模式，人像效果会降级。源蒙版分辨率较低或缺失时，主体分离和发丝细节可能降低，语义光效及相关编辑可能受限。仅包含深度的输出可以满足源数据模式的资源契约，但不等同于完整语义资源集。OPPO pet 平面不会被冒充成人物或头发蒙版。
 
-静态照片可以同时启用两个参数：
+源数据模式不会回退到 Vision。缺少必要深度或源元数据时，在发布输出前报错。完整模式保持原有严格资源要求。两种模式共用 Rust 转换和发布路径。
 
-```bash
-xdremux convert \
-  --apple-photographic-styles \
-  --apple-portrait \
-  --input IMG_001.heic \
-  --output IMG_001_apple.heic
-```
+源数据模式回归使用两张真实 OPPO 人像样张，以 ImageIO 核对单文件及串行、并行批处理输出，并拒绝任何 Vision 操作。它还验证预处理失败时保留已有输出。运行命令为 `python3 scripts/check_rust_cli_oppo_portrait.py`。
 
-启用 Styles 时，Apple feature engine 进入摄影风格链路，由该链路负责 Styles + Portrait 的组合输出契约。
+## Live Photo
 
-源文件缺少必要人像数据时，不要假设组合请求一定能生成有效的人像编辑数据。
+普通 Motion Photo → Live Photo 已经是 Rust 产品能力，不应绕回 Apple capability adapter。
 
-## Motion Photo + 摄影风格
+如果未来组合功能需要对 Live Photo 静态照片执行 Apple-only operation，Rust 仍必须持有 Live Photo asset lifecycle、pair identity、publication 和 validation ordering。Apple adapter 只接收它真正需要执行的窄平台 operation。
 
-当前 Swift CLI 为这个组合提供单文件独立桥接：
+## 兼容规则
 
-```bash
-xdremux convert \
-  --apple-photographic-styles \
-  --input IMG_001.jpg \
-  --output IMG_001_apple.heic
-```
+产品级 compatibility rule 属于 Rust。例如 Apple editing feature 是否能与 OPPO-compatible output 组合、源资产是否具备 Portrait editing 所需资源，以及组合请求如何 atomic publish，都应由 Rust 决策。
 
-这条链路先把 Motion Photo 转换为 Apple Live Photo pair，再给 Live Photo 静态照片生成摄影风格，并验证 Live Photo asset identifier 仍然有效。
+扩展 CLI 时，不要把这些策略移入 adapter protocol。
 
-该组合不支持在同一遍处理中加入 Apple 人像。
+## 验证与验收
 
-这条组合链路不同于普通 Motion Photo 转换。部分 hosted macOS 版本不会为外部 style-rich HEIC 完成 PhotoKit display-object 请求，因此 hosted style-rich 路径不把 PhotoKit load 当成写入 gate。发布前仍然必须通过确定性的 Live Photo validator 和摄影风格 validator。
+把证据分成三类：
 
-普通 Motion Photo 转换继续使用自己的 Live Photo 验证链路。
+1. 结构证据证明 HEIF/MOV resource 和 metadata 存在且可解析；
+2. 原生 framework 证据证明被测试的 Apple framework 能接受或暴露预期资源；
+3. 真机证据证明特定真实设备和 Apple Photos 版本上的行为。
 
-## 不支持的组合
+涉及 Apple Photos 交互式编辑的结论，不能用结构证据替代真机证据。
 
-CLI 会拒绝：
+Canonical completion gate 要求 Rust workspace 和真实 Rust → Apple adapter handshake 在 macOS 上通过。feature-specific gate 驱动 Rust CLI 后查询 Apple consumer facts。结构和 native-framework evidence 本身不等于 visual equivalence 或 Photos 真机验收。
 
-- Apple 功能 + OPPO 兼容输出；
-- 普通 Motion Photo + Apple 人像；
-- Motion Photo + 摄影风格 + Apple 人像；
-- 未启用 `--apple-photographic-styles` 时选择 style producer；
-- 未启用 `--apple-photographic-styles` 时提供 Styles RAW DNG。
+CLI 迁移验收覆盖唯一的 Rust 命令入口、媒体转换、与源数据匹配的资源契约和 Apple adapter。macOS App 集成属于独立范围。源数据模式的效果降级是已记录的产品取舍。Photos 交互式编辑仍是独立消费端结论；CLI 通过不代表 Photos 效果或编辑界面完全一致。
 
-## 研究控制
+## 研究材料
 
-仓库包含用于摄影风格研究的环境变量和可选模型路径。
-
-研究控制可能改变 solver 行为或验证范围。只有默认代码路径使用相同配置时，才能把研究结果描述为默认产品结果。
-
-可选 `ReverseKey1Ensemble` 模型见[模型卡](../Models/ReverseKey1Ensemble.model-card.md)。
-
-## 验收
-
-把证据分为三类：
-
-1. 结构证据证明 HEIF 资源和 metadata 存在且可解析。
-2. 原生框架证据证明被测试的 macOS 框架接受生成资源。
-3. 真机证据证明特定真实设备上的 Apple Photos 版本行为。
-
-如果产品结论涉及 Apple Photos 交互式编辑，不要用结构证据替代真机证据。
+仓库仍保留摄影风格研究代码和 `ReverseKey1Ensemble` 等可选模型。它们属于研究/训练资产，不是产品模式。需要时见[模型卡](../Models/ReverseKey1Ensemble.model-card.md)。

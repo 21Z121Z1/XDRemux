@@ -2,105 +2,112 @@
 
 English | [简体中文](development.md)
 
-Use this document when you change XDRemux, integrate its Swift package, or build the macOS app.
+XDRemux has one product core: the Rust workspace. The only public CLI is the Rust `xdremux` binary. New product behavior belongs in Rust. Swift is limited to the Apple framework adapter, and Python is research/training tooling rather than a second XDRemux runtime.
 
-For command-line use, see the [CLI reference](cli.en.md).
+For user-facing command-line behavior, see the [CLI reference](cli.en.md).
 
-## Toolchain
+## Canonical development loop
 
-The package manifest sets:
-
-- Swift tools version 6.0;
-- minimum platform macOS 15;
-- package default localization `en`.
-
-The package currently uses Swift language mode 5 for its targets.
-
-Build and test:
+Use the Rust workspace for product changes:
 
 ```bash
-swift build
-swift test
-python3 -m unittest discover -s Tests -v
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo run -p xdremux-cli -- --help
 ```
 
-## Swift package products
+The canonical product stack is:
 
-| Product | Type | Purpose |
-| --- | --- | --- |
-| `XDRemuxCore` | library | HDR conversion, HEIF/ISO-BMFF work, metadata, Motion Photo parsing, classification, and shared validation. |
-| `XDRemuxAppleFeatures` | library | Apple Live Photo, Photographic Styles, Apple Portrait, and Apple-specific analysis. |
-| `xdremux` | executable | Swift command-line interface. |
+```text
+xdremux-cli
+    ↓
+xdremux-runtime
+    ↓
+xdremux-engine
+    ↓
+source / classification
+motion-photo / hdr / metadata
+container / heif / codec / format
+    ↓
+portable providers + platform adapters
+```
 
-`CoreImageRAWDiagnostics` is a developer-only executable target. It is not a public package product.
+Keep product intent at the top of this stack. Do not expose codec, camera-tail, source-generation, routing, or container implementation choices as user options unless they represent a distinct user outcome.
 
-Build it with:
+## Rust workspace ownership
+
+| Crate | Responsibility |
+| --- | --- |
+| `xdremux-cli` | The only public user CLI and command contract. |
+| `xdremux-runtime` | Filesystem execution, publication, batch reliability, recovery, and platform capability coordination. |
+| `xdremux-engine` | Product intent, conversion planning, capability requirements, platform-independent facts, and orchestration. |
+| `xdremux-source` / `xdremux-classification` | Source probing, asset identity, and classification. |
+| `xdremux-motion-photo` | Motion Photo parsing and Live Photo media semantics. |
+| `xdremux-hdr` / `xdremux-metadata` | HDR/Gain Map math and metadata primitives. |
+| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Container, HEIF, codec, JPEG/EXIF/TIFF/ISOBMFF primitives. |
+
+A lower crate may provide a format primitive without making it a product mode. Runtime and engine own the decision to use that primitive.
+
+## Apple platform capabilities
+
+`Sources/XDRemuxAppleAdapter/` is the only Swift package source. It contains the Apple framework primitives that the Rust runtime cannot call portably. The former Swift conversion/core/oracle targets have been removed; new product behavior must not enter Swift.
+
+The boundary is intentionally narrow:
+
+- Rust owns requests, results, policy, routing, naming, classification, HDR behavior, Motion Photo behavior, batch behavior, validation policy, and fallback decisions.
+- Apple code calls Apple frameworks and returns observations or operation results defined by Rust semantics.
+- Do not add new cross-platform product policy to Swift.
+- Do not return business conclusions such as “convertible” or “valid portrait” when the adapter can return lower-level framework facts and Rust can decide the policy.
+
+`xdremux-apple-adapter` is a distributable platform component, not a user CLI. The current CLI/runtime boundary is a versioned JSON helper protocol with bounded process lifetime and separate machine-readable stdout/diagnostic stderr. `xdremux-runtime` owns that transport; `xdremux-engine` does not know about processes, paths, JSON, Swift, or XPC. The macOS app also invokes the Rust `xdremux` binary and does not link Swift product code.
+
+For a sandboxed macOS app, prefer XPC when the Apple capability process needs separate sandboxing, entitlements, lifecycle, or crash isolation. The transport must remain replaceable without changing engine or public CLI semantics. Use an in-process C ABI only for a capability that actually benefits from direct in-process interoperability; do not make FFI the default architecture merely to avoid a helper process.
+
+ImageIO auxiliary-resource probing is the first migrated operation. The Swift adapter reports only framework observations such as Gain Map, disparity, Portrait Effects Matte, and semantic mattes. Rust owns the rule that decides whether those facts satisfy the Portrait editing contract.
+
+SwiftPM contains only the adapter executable. Its build verifies the platform primitive boundary; Rust tests and Rust-driven consumer checks define the product contract.
+
+## Python tooling
+
+The Python package requires Python 3.11 or newer and contains only research/training code. It does not install a CLI, participate in the runtime, or define product semantics.
+
+Install the tooling only when a Python research workflow requires it:
 
 ```bash
-swift build --target CoreImageRAWDiagnostics
+python -m pip install -e .
+python -m unittest Tests.test_apple_reverse_key1_training
 ```
 
-## Package integration
+Research dependencies currently include `Pillow` and `numpy`. The optional `training` dependency adds PyTorch.
 
-Add the repository as a package dependency:
-
-```swift
-dependencies: [
-    .package(
-        url: "https://github.com/21Z121Z1/XDRemux.git",
-        branch: "main"
-    )
-]
-```
-
-Use `XDRemuxCore` when you need the standard conversion pipeline.
-
-```swift
-import XDRemuxCore
-
-let input = InputSource(url: inputURL)
-let request = ConversionRequest(
-    input: input,
-    output: OutputTarget.file(outputURL).destination(for: input),
-    configuration: ConversionConfiguration()
-)
-
-let result = try ConversionEngine.convert(request)
-```
-
-Use `XDRemuxAppleFeatures` for Apple-specific conversion engines.
-
-There is no stable release tag contract in the current package documentation. A dependency on `main` can receive API changes.
+Training and evaluation scripts may remain in the Python research package because they are tooling, not a second XDRemux implementation.
 
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `Sources/XDRemuxCore/` | Core conversion and format logic. |
-| `Sources/XDRemuxAppleFeatures/` | Apple-specific conversion and validation. |
-| `Sources/XDRemuxCLI/` | Swift CLI parser and command routing. |
-| `Sources/CoreImageRAWDiagnostics/` | Developer RAW diagnostic target. |
-| `xdremux_py/` | Cross-platform Python implementation. |
-| `apps/macos/XDRemuxApp/` | macOS SwiftUI app. |
-| `Tests/` | Swift tests, Python policy tests, and validation harnesses. |
-| `fixtures/` | Versioned real Motion Photo fixtures used by strict CI gates. |
-| `scripts/` | Build, evaluation, and acceptance utilities. |
-| `docs/` | Current documentation and historical validation records. |
+| `crates/` | Canonical Rust product stack. |
+| `Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
+| `xdremux_py/` | Research/training tooling; no product CLI or converter. |
+| `apps/macos/XDRemuxApp/` | macOS SwiftUI presentation shell that invokes the Rust CLI. |
+| `Tests/` | Rust acceptance policy tests and validation harnesses. |
+| `fixtures/` | Versioned real media fixtures used by strict gates. |
+| `scripts/` | Build, evaluation, migration, and acceptance utilities. |
+| `docs/` | Current guidance and historical research records. |
 | `Models/` | Optional research models and model documentation. |
 
-## Apple helper processes
+New user-visible behavior belongs in Rust. Swift changes must remain framework primitives, and Python changes must remain research tooling.
 
-Some Apple-feature operations compile or run helper programs from package resources.
+## Apple helper lifecycle
 
-The helper toolchain hashes source content and caches compatible built tools. The implementation uses bounded helper invocations and separates machine-readable stdout from diagnostics where the helper protocol requires it.
+A helper invocation must be bounded, must keep machine-readable stdout separate from diagnostics, and must explicitly reap the child process. Do not let transport concerns leak into engine models.
 
 Private Apple API compatibility must be checked at runtime. Do not call a private Objective-C selector with an assumed ABI when the runtime method signature does not match a supported form.
 
-The macOS 27 compatibility path in the style-response helper checks known initializer and style-apply ABI shapes before calling them.
-
 ## macOS app
 
-The app is in `apps/macos/XDRemuxApp/`.
+The app is in `apps/macos/XDRemuxApp/`. It invokes the Rust CLI for product work and keeps only presentation state, queue management, and receipt translation in Swift.
 
 Common commands:
 
@@ -113,45 +120,10 @@ scripts/build_and_run.sh logs
 scripts/build_and_run.sh clean
 ```
 
-The app links the Swift package. It does not use the CLI as a subprocess for core conversion.
-
-## Python package
-
-The Python package requires Python 3.11 or newer.
-
-Runtime dependencies include:
-
-- `pillow-heif`;
-- `Pillow`;
-- `numpy`;
-- `piexif`.
-
-The optional `training` dependency adds PyTorch.
-
-The installed console command is `xdremux-py`. The repository-local entry point is `python3 -m xdremux_py`.
+The app bundles the Rust CLI and Apple adapter as helpers. It owns presentation state and receipt translation only; conversion policy remains in Rust.
 
 ## Debug and research controls
 
 Environment variables exist for encoding diagnostics, scratch retention, style rendering, and research model selection.
 
-Do not add a research environment variable to a normal user command unless the product behavior requires it.
-
-Do not document a research switch as a stable public interface unless tests and the current product path depend on it.
-
-The optional Reverse Key 1 model has a separate [model card](../Models/ReverseKey1Ensemble.model-card.en.md).
-
-## Completion gate
-
-Repository agents must validate the exact committed `HEAD` before they claim completion.
-
-The acceptance runbook is in [validation/README.en.md](validation/README.en.md).
-
-Use targeted evidence. A documentation-only change does not need the full real-photo matrix. A conversion-core change needs functional evidence in addition to static checks.
-
-The completion receipt is bound to the commit, base commit, changed paths, and clean worktree. A later tracked edit invalidates the receipt.
-
-## Documentation changes
-
-Current technical documentation follows the [technical writing guide](style-guide.en.md).
-
-When a code change alters a documented command, output rule, format contract, or acceptance boundary, update the English document first and then update its Chinese translation.
+Do not add a research environment variable to a normal user command unless the product behavior requires it. Do not document a research switch as a stable public interface unless the canonical Rust product path and tests depend on it.

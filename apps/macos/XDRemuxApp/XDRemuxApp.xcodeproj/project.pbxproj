@@ -7,27 +7,27 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		05412BD804CEF55569CAE7EF /* XDRemuxCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6145D033286A8F0E09BD373D /* XDRemuxCore.swift */; };
 		0F43851D4B592404CEAC2195 /* XDRemuxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02861545396D149E80797322 /* XDRemuxViewModel.swift */; };
-		31A8AD6AA40C358D2256BAE5 /* XDRemuxAppleFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 6161D9D9DDB6EF3D09CB1565 /* XDRemuxAppleFeatures */; };
+		130A8F3095B008F0E6EBBB5B /* RustAppConversionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8226BF0C67D61F1ED81F6C18 /* RustAppConversionBridge.swift */; };
+		17105CA4AA094A96D25AC071 /* RustCLIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7991F954B97C8C6059E2396D /* RustCLIClient.swift */; };
+		20FFE9400D3A7728B116293A /* RustCLIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7991F954B97C8C6059E2396D /* RustCLIClient.swift */; };
+		21E8B10752D98447E81C4EDE /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533B4F99005F2161735DB764 /* AppModels.swift */; };
+		352247840A9DE001C2383196 /* RustAppConversionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8226BF0C67D61F1ED81F6C18 /* RustAppConversionBridge.swift */; };
+		380978E0BA3FD18D9D246F58 /* RustAppConversionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8226BF0C67D61F1ED81F6C18 /* RustAppConversionBridge.swift */; };
 		4647AC898D992E985AED2E10 /* VisualEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78B033306E4AE0A568C34EBB /* VisualEffectView.swift */; };
 		64707094865385A92093E856 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B735B3E26375EEF954008A /* ContentView.swift */; };
-		6CFF6C897EE95ADA2AD61994 /* XDRemuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 55A425FEE6F8B9E96D90D2BC /* XDRemuxCore */; };
 		6FB05CECE182A7A46CEB0EAB /* XDRemuxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02861545396D149E80797322 /* XDRemuxViewModel.swift */; };
 		730715CA1E3ED4981267A175 /* XDRemuxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F286B32FD9F916FBCC95124 /* XDRemuxApp.swift */; };
 		7D5AF2A3C8D8CD5B3E4C16ED /* PhotoCategorizationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD897E1D2BE4F3EDFDA6F539 /* PhotoCategorizationView.swift */; };
-		91B25CCEC94C36E1AD7C7ADF /* XDRemuxAppleFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 5387D4A93C45E1A2DD45B6EC /* XDRemuxAppleFeatures */; };
-		941FF8D05D7878AE38937FE3 /* XDRemuxCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6145D033286A8F0E09BD373D /* XDRemuxCore.swift */; };
 		A5D5F7315B5BAB773495946F /* XDRemuxAppConversionSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1F041FB2225C19F92B5072 /* XDRemuxAppConversionSmoke.swift */; };
-		A93949EEDCA56F8FE29266E3 /* XDRemuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1D61EF06B4A13105FB0521 /* XDRemuxCore */; };
 		AA8B69637B6501859D143F53 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C71CCE0438700ED958A717D9 /* Assets.xcassets */; };
-		B66A0608AE01B0872E60A8B5 /* XDRemuxCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6145D033286A8F0E09BD373D /* XDRemuxCore.swift */; };
 		BAF5DCC3B6AB918C96092168 /* PhotoCategorizationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84352F34EF49AA75EBBD028F /* PhotoCategorizationViewModel.swift */; };
 		C135C4E6E7337935172B1AAC /* PhotoCategorizationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84352F34EF49AA75EBBD028F /* PhotoCategorizationViewModel.swift */; };
-		D9CEF12592FDD344F3F41A43 /* XDRemuxAppleFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = F48590AC451F7304EEB000A2 /* XDRemuxAppleFeatures */; };
+		D4F2AA7C7F6176104270BF09 /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533B4F99005F2161735DB764 /* AppModels.swift */; };
+		D8D51E9630DACA31BD4401A5 /* RustCLIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7991F954B97C8C6059E2396D /* RustCLIClient.swift */; };
 		E099FE876A4F0E60B9D321F9 /* XDRemuxAppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D38BBBE639FE49CE3858D2 /* XDRemuxAppModelTests.swift */; };
 		E1116493F99381D29CD7E8D7 /* AppStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C894071433802A3CCD2584E /* AppStrings.swift */; };
-		F5F31309C8B9E1444AFC858E /* XDRemuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3F104D52F84F7132F954DC08 /* XDRemuxCore */; };
+		F0B1FDD6D6EB6EAC9DE6CDDD /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533B4F99005F2161735DB764 /* AppModels.swift */; };
 		FA8D86BD040C149938C2778B /* AppStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C894071433802A3CCD2584E /* AppStrings.swift */; };
 		FBAE381A260B401C292D7ABC /* AppStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C894071433802A3CCD2584E /* AppStrings.swift */; };
 /* End PBXBuildFile section */
@@ -36,12 +36,13 @@
 		02861545396D149E80797322 /* XDRemuxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxViewModel.swift; sourceTree = "<group>"; };
 		24D38BBBE639FE49CE3858D2 /* XDRemuxAppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxAppModelTests.swift; sourceTree = "<group>"; };
 		33E42AF90B0C23E087B64A36 /* XDRemuxApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XDRemuxApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		385EDD63795756F2E8F07D00 /* proxdrtest */ = {isa = PBXFileReference; lastKnownFileType = folder; name = proxdrtest; path = ../../..; sourceTree = SOURCE_ROOT; };
 		4C1F041FB2225C19F92B5072 /* XDRemuxAppConversionSmoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxAppConversionSmoke.swift; sourceTree = "<group>"; };
 		4C894071433802A3CCD2584E /* AppStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStrings.swift; sourceTree = "<group>"; };
-		6145D033286A8F0E09BD373D /* XDRemuxCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxCore.swift; sourceTree = "<group>"; };
+		533B4F99005F2161735DB764 /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
 		67B735B3E26375EEF954008A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		78B033306E4AE0A568C34EBB /* VisualEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectView.swift; sourceTree = "<group>"; };
+		7991F954B97C8C6059E2396D /* RustCLIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RustCLIClient.swift; sourceTree = "<group>"; };
+		8226BF0C67D61F1ED81F6C18 /* RustAppConversionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RustAppConversionBridge.swift; sourceTree = "<group>"; };
 		84352F34EF49AA75EBBD028F /* PhotoCategorizationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCategorizationViewModel.swift; sourceTree = "<group>"; };
 		8E527F1F8D6D31E4D93147BD /* XDRemuxAppModelTests */ = {isa = PBXFileReference; includeInIndex = 0; path = XDRemuxAppModelTests; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F286B32FD9F916FBCC95124 /* XDRemuxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XDRemuxApp.swift; sourceTree = "<group>"; };
@@ -49,36 +50,6 @@
 		D91FEFE1496703DB6B56AFC8 /* XDRemuxAppConversionSmoke */ = {isa = PBXFileReference; includeInIndex = 0; path = XDRemuxAppConversionSmoke; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD897E1D2BE4F3EDFDA6F539 /* PhotoCategorizationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCategorizationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFrameworksBuildPhase section */
-		1B32BFE09B4822CD2A4A358C /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				F5F31309C8B9E1444AFC858E /* XDRemuxCore in Frameworks */,
-				D9CEF12592FDD344F3F41A43 /* XDRemuxAppleFeatures in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		730CDBE8CE4E43B9FCB15ACE /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A93949EEDCA56F8FE29266E3 /* XDRemuxCore in Frameworks */,
-				91B25CCEC94C36E1AD7C7ADF /* XDRemuxAppleFeatures in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		7D64FFF3FA8351B5E9B98B9E /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				6CFF6C897EE95ADA2AD61994 /* XDRemuxCore in Frameworks */,
-				31A8AD6AA40C358D2256BAE5 /* XDRemuxAppleFeatures in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		1DF0B83CD6A4294749BA3C29 /* Tests */ = {
@@ -104,31 +75,24 @@
 			isa = PBXGroup;
 			children = (
 				C71CCE0438700ED958A717D9 /* Assets.xcassets */,
-				B7A0A209B126F278B11B4134 /* Packages */,
 				E7A4CA36C47CDA7399DC9F7B /* Sources */,
 				1DF0B83CD6A4294749BA3C29 /* Tests */,
 				47AC7D1C26659BEDC0B30E28 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		B7A0A209B126F278B11B4134 /* Packages */ = {
-			isa = PBXGroup;
-			children = (
-				385EDD63795756F2E8F07D00 /* proxdrtest */,
-			);
-			name = Packages;
-			sourceTree = "<group>";
-		};
 		E7A4CA36C47CDA7399DC9F7B /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				533B4F99005F2161735DB764 /* AppModels.swift */,
 				4C894071433802A3CCD2584E /* AppStrings.swift */,
 				67B735B3E26375EEF954008A /* ContentView.swift */,
 				FD897E1D2BE4F3EDFDA6F539 /* PhotoCategorizationView.swift */,
 				84352F34EF49AA75EBBD028F /* PhotoCategorizationViewModel.swift */,
+				8226BF0C67D61F1ED81F6C18 /* RustAppConversionBridge.swift */,
+				7991F954B97C8C6059E2396D /* RustCLIClient.swift */,
 				78B033306E4AE0A568C34EBB /* VisualEffectView.swift */,
 				8F286B32FD9F916FBCC95124 /* XDRemuxApp.swift */,
-				6145D033286A8F0E09BD373D /* XDRemuxCore.swift */,
 				02861545396D149E80797322 /* XDRemuxViewModel.swift */,
 			);
 			path = Sources;
@@ -142,7 +106,6 @@
 			buildConfigurationList = 9E7AA06415D18C7009F3CBDF /* Build configuration list for PBXNativeTarget "XDRemuxAppModelTests" */;
 			buildPhases = (
 				C920CDAC59EE4DB9E6637158 /* Sources */,
-				7D64FFF3FA8351B5E9B98B9E /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -150,8 +113,6 @@
 			);
 			name = XDRemuxAppModelTests;
 			packageProductDependencies = (
-				55A425FEE6F8B9E96D90D2BC /* XDRemuxCore */,
-				6161D9D9DDB6EF3D09CB1565 /* XDRemuxAppleFeatures */,
 			);
 			productName = XDRemuxAppModelTests;
 			productReference = 8E527F1F8D6D31E4D93147BD /* XDRemuxAppModelTests */;
@@ -161,9 +122,9 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 85CB44165E48F2F8587BA77E /* Build configuration list for PBXNativeTarget "XDRemuxApp" */;
 			buildPhases = (
+				E29EBA8FAD16B27F56212699 /* Embed Rust product and Apple adapter */,
 				80BA6548CDA15D10C2CBFABB /* Sources */,
 				7852DCF60575A9880B4F9988 /* Resources */,
-				1B32BFE09B4822CD2A4A358C /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -171,8 +132,6 @@
 			);
 			name = XDRemuxApp;
 			packageProductDependencies = (
-				3F104D52F84F7132F954DC08 /* XDRemuxCore */,
-				F48590AC451F7304EEB000A2 /* XDRemuxAppleFeatures */,
 			);
 			productName = XDRemuxApp;
 			productReference = 33E42AF90B0C23E087B64A36 /* XDRemuxApp.app */;
@@ -183,7 +142,6 @@
 			buildConfigurationList = C4EF20FFDEA8D4E0811426AE /* Build configuration list for PBXNativeTarget "XDRemuxAppConversionSmoke" */;
 			buildPhases = (
 				D36C54929D96C4B67FEEED6D /* Sources */,
-				730CDBE8CE4E43B9FCB15ACE /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -191,8 +149,6 @@
 			);
 			name = XDRemuxAppConversionSmoke;
 			packageProductDependencies = (
-				5A1D61EF06B4A13105FB0521 /* XDRemuxCore */,
-				5387D4A93C45E1A2DD45B6EC /* XDRemuxAppleFeatures */,
 			);
 			productName = XDRemuxAppConversionSmoke;
 			productReference = D91FEFE1496703DB6B56AFC8 /* XDRemuxAppConversionSmoke */;
@@ -222,9 +178,6 @@
 			);
 			mainGroup = 9FDEBE29B674DC40978103CC;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				8C62C6224FAFB1642DF7DFC9 /* XCLocalSwiftPackageReference "../../.." */,
-			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
@@ -247,18 +200,42 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		E29EBA8FAD16B27F56212699 /* Embed Rust product and Apple adapter */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Rust product and Apple adapter";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nrepo_root=\"$(cd \"${PROJECT_DIR}/../../..\" && pwd)\"\ncase \"${CONFIGURATION}\" in\n  Release)\n    swift_configuration=release\n    rust_binary=\"${repo_root}/target/release/xdremux\"\n    cargo_profile=release\n    ;;\n  *)\n    swift_configuration=debug\n    rust_binary=\"${repo_root}/target/debug/xdremux\"\n    cargo_profile=debug\n    ;;\nesac\n\ncd \"${repo_root}\"\nif [[ \"${cargo_profile}\" == \"release\" ]]; then\n  cargo build --locked -p xdremux-cli --release\nelse\n  cargo build --locked -p xdremux-cli\nfi\nswift build -c \"${swift_configuration}\" --product xdremux-apple-adapter\nadapter_binary=\"$(swift build -c \"${swift_configuration}\" --show-bin-path)/xdremux-apple-adapter\"\n\nhelper_directory=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nmkdir -p \"${helper_directory}\"\ncp \"${rust_binary}\" \"${helper_directory}/xdremux\"\ncp \"${adapter_binary}\" \"${helper_directory}/xdremux-apple-adapter\"\nchmod 755 \"${helper_directory}/xdremux\" \"${helper_directory}/xdremux-apple-adapter\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		80BA6548CDA15D10C2CBFABB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D4F2AA7C7F6176104270BF09 /* AppModels.swift in Sources */,
 				E1116493F99381D29CD7E8D7 /* AppStrings.swift in Sources */,
 				64707094865385A92093E856 /* ContentView.swift in Sources */,
 				7D5AF2A3C8D8CD5B3E4C16ED /* PhotoCategorizationView.swift in Sources */,
 				BAF5DCC3B6AB918C96092168 /* PhotoCategorizationViewModel.swift in Sources */,
+				352247840A9DE001C2383196 /* RustAppConversionBridge.swift in Sources */,
+				D8D51E9630DACA31BD4401A5 /* RustCLIClient.swift in Sources */,
 				4647AC898D992E985AED2E10 /* VisualEffectView.swift in Sources */,
 				730715CA1E3ED4981267A175 /* XDRemuxApp.swift in Sources */,
-				B66A0608AE01B0872E60A8B5 /* XDRemuxCore.swift in Sources */,
 				6FB05CECE182A7A46CEB0EAB /* XDRemuxViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -267,10 +244,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F0B1FDD6D6EB6EAC9DE6CDDD /* AppModels.swift in Sources */,
 				FBAE381A260B401C292D7ABC /* AppStrings.swift in Sources */,
 				C135C4E6E7337935172B1AAC /* PhotoCategorizationViewModel.swift in Sources */,
+				130A8F3095B008F0E6EBBB5B /* RustAppConversionBridge.swift in Sources */,
+				20FFE9400D3A7728B116293A /* RustCLIClient.swift in Sources */,
 				E099FE876A4F0E60B9D321F9 /* XDRemuxAppModelTests.swift in Sources */,
-				05412BD804CEF55569CAE7EF /* XDRemuxCore.swift in Sources */,
 				0F43851D4B592404CEAC2195 /* XDRemuxViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -279,9 +258,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				21E8B10752D98447E81C4EDE /* AppModels.swift in Sources */,
 				FA8D86BD040C149938C2778B /* AppStrings.swift in Sources */,
+				380978E0BA3FD18D9D246F58 /* RustAppConversionBridge.swift in Sources */,
+				17105CA4AA094A96D25AC071 /* RustCLIClient.swift in Sources */,
 				A5D5F7315B5BAB773495946F /* XDRemuxAppConversionSmoke.swift in Sources */,
-				941FF8D05D7878AE38937FE3 /* XDRemuxCore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -547,40 +528,6 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		8C62C6224FAFB1642DF7DFC9 /* XCLocalSwiftPackageReference "../../.." */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../..;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		3F104D52F84F7132F954DC08 /* XDRemuxCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XDRemuxCore;
-		};
-		5387D4A93C45E1A2DD45B6EC /* XDRemuxAppleFeatures */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XDRemuxAppleFeatures;
-		};
-		55A425FEE6F8B9E96D90D2BC /* XDRemuxCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XDRemuxCore;
-		};
-		5A1D61EF06B4A13105FB0521 /* XDRemuxCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XDRemuxCore;
-		};
-		6161D9D9DDB6EF3D09CB1565 /* XDRemuxAppleFeatures */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XDRemuxAppleFeatures;
-		};
-		F48590AC451F7304EEB000A2 /* XDRemuxAppleFeatures */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XDRemuxAppleFeatures;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9A7F749F21AB507A46FB89D2 /* Project object */;
 }

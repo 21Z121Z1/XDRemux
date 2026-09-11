@@ -10,7 +10,7 @@
 
 仓库的 `fixtures/` 下包含真实 Motion Photo fixture。
 
-当前 strict gate 同时覆盖 Swift 和纯 Python 路径。转换前会检查输入文件身份，fixture 字节与 `fixtures/SHA256SUMS` 不一致时会拒绝。
+当前 strict gate 由 Rust 路径执行。转换前会检查输入文件身份，fixture 字节与 `fixtures/SHA256SUMS` 不一致时会拒绝。
 
 fixture gate 覆盖多种 JPEG 和 HEIC/HEIF 容器布局。gate 名称和具体断言可能随着实现变化，因此 workflow 和测试源码是最终依据。
 
@@ -31,22 +31,18 @@ fixture gate 覆盖多种 JPEG 和 HEIC/HEIF 容器布局。gate 名称和具体
 
 | Harness | 用途 |
 | --- | --- |
-| `verify_swift_cli_sample.py` | 运行或验证 Swift HDR 转换，并检查预期 Gain Map pixel format。 |
-| `verify_error_messages.sh` | 通过真实 Swift binary 检查部分帮助和错误契约。 |
+| `check_rust_motion_photo_real_fixtures.sh` | 通过 Rust CLI 转换全部版本化 Motion Photo fixture，并验证 pair 两个成员。 |
+| `verify_error_messages.sh` | 通过真实 Rust binary 检查部分帮助和错误契约。 |
 | `verify_batch_categorize_idempotence.sh` | 检查重复 categorized batch 行为。 |
-| `verify_validate_only_harness.sh` | 检查 validation-only 行为。 |
-| `verify_categorization_cross_implementation.py` | 对比 Swift 和 Python 分类结果。 |
-| `verify_categorized_batch_outputs.py` | 检查分类目录投影。 |
-| `verify_apple_feature_artifact_lifecycle.py` | 检查 Apple feature 临时产物 policy。 |
+| `verify_validate_only_harness.sh` | 检查 Rust validation-only 行为。 |
 | `verify_macos_app_model_tests.sh` | 构建并运行 macOS App model test。 |
-| `verify_python_motion_photo_fixtures.py` | 使用 Python 转换并验证版本化 Motion Photo corpus。 |
 
 ## 根据受影响链路选择证据
 
 - Gain Map 编码或 HEIF 结构：使用 HDR validation harness 和代表性真实输入。
-- Motion Photo parser 或 writer：使用 strict fixture gate 和针对性的 Swift/Python 测试。
+- Motion Photo parser 或 writer：使用 Rust unit test 和 strict real-fixture gate。
 - Batch provenance 或输出安全：使用 output collision 和 checkpoint 回归。
-- 分类：两套实现都受影响时使用 cross-implementation 和 output-layout 检查。
+- 分类：使用 Rust classification test 和 output-layout 检查。
 - App 状态：使用 macOS App model test。
 - Apple Photos 行为：除结构检查外，还需要原生框架或真机证据。
 
