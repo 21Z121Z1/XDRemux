@@ -1,0 +1,152 @@
+name: TextureStyle RC focused file format
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-rc-focused-format.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reverse:
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ipsw
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          mkdir -p artifacts/cache artifacts/extracted artifacts/evidence
+          ipsw version | tee artifacts/ipsw-version.txt
+          ipsw dyld --help > artifacts/ipsw-dyld-help.txt 2>&1 || true
+          ipsw dyld disass --help > artifacts/ipsw-disass-help.txt 2>&1 || true
+          ipsw dyld macho --help > artifacts/ipsw-macho-help.txt 2>&1 || true
+
+      - name: Extract iOS 27 RC shared cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          echo "$URL" > artifacts/source-url.txt
+          ipsw extract --remote --dyld --dyld-arch arm64e -o artifacts/cache "$URL" \
+            > artifacts/extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -n "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+          echo "$CACHE" > artifacts/cache-path.txt
+
+      - name: Resolve PhotoImaging TextureStyle parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipsw dyld disass "$CACHE" \
+            --symbol '_PITextureStyleSettingsFromMakerNoteProperties' \
+            --symbol-image PhotoImaging --count 320 --force \
+            > artifacts/evidence/pi-texture-parser.txt 2>&1 || true
+          ipsw dyld disass "$CACHE" \
+            --symbol '_PITextureStylePresetFromMakerNoteValue' \
+            --symbol-image PhotoImaging --count 220 --force \
+            > artifacts/evidence/pi-texture-preset.txt 2>&1 || true
+          for image in PhotoImaging PhotosFormats ImageIO CameraEditKit AVFCapture; do
+            ipsw dyld macho "$CACHE" "$image" --strings --symbols --objc --objc-refs \
+              > "artifacts/evidence/${image}-all.txt" 2>&1 || true
+            ipsw dyld macho "$CACHE" "$image" --extract --force --output artifacts/extracted \
+              > "artifacts/evidence/${image}-extract.txt" 2>&1 || true
+          done
+
+      - name: Inspect exact outer-key address and string neighborhood
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '=== known static addresses ==='
+            echo 'PITextureStyleSettingsFromMakerNoteProperties 0x1c20de7d8'
+            echo 'outer-key global 0x1e010e930'
+            echo
+            echo '=== parser disassembly ==='
+            cat artifacts/evidence/pi-texture-parser.txt || true
+            echo
+            echo '=== preset disassembly ==='
+            cat artifacts/evidence/pi-texture-preset.txt || true
+          } > artifacts/evidence/focused.txt
+
+          grep -R -n -E -C 16 \
+            '0x1e010e930|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|Missing smart style properties|Invalid texture style|TextureStyle~1\.0|CEKTextureStylePreset|TextureStyleCustomized' \
+            artifacts/evidence > artifacts/evidence/string-xrefs.txt || true
+
+          # Dump Mach-O literal/object sections from extracted images where available.
+          find artifacts/extracted -type f | while read -r f; do
+            base="$(basename "$f")"
+            case "$base" in
+              PhotoImaging|ImageIO|PhotosFormats|CameraEditKit|AVFCapture)
+                otool -l "$f" > "artifacts/evidence/${base}-loads.txt" 2>&1 || true
+                otool -ov "$f" > "artifacts/evidence/${base}-objc-verbose.txt" 2>&1 || true
+                strings -a -t x "$f" | grep -Ei -C 10 \
+                  'TextureStyle|Texture Style|Missing smart style properties|Invalid texture style|MakerNote|smart style' \
+                  > "artifacts/evidence/${base}-string-offsets.txt" || true
+                ;;
+            esac
+          done
+
+      - name: Trace PhotosFormats acceptance and ImageIO MakerNote mapping
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in \
+            'PhotosFormats|-[PFMetadataImage hasTextureStyle]' \
+            'PhotosFormats|-[PFMetadataImage textureStylePreset]' \
+            'PhotosFormats|-[PFMetadataImage textureStyleIntensity]' \
+            'PhotosFormats|-[PFMetadataImage textureStyleGrainIntensity]' \
+            'PhotosFormats|-[PFMetadataImage textureStyleIsReversible]'; do
+            image="${spec%%|*}"; sym="${spec#*|}"
+            safe="$(echo "$sym" | tr -cs 'A-Za-z0-9._-' '_')"
+            ipsw dyld disass "$CACHE" --symbol "$sym" --symbol-image "$image" \
+              --count 260 --force > "artifacts/evidence/${image}-${safe}.txt" 2>&1 || true
+          done
+
+          grep -R -n -E -C 24 \
+            'TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|TextureStyle~1\.0|MakerApple|MakerNote|hasTextureStyle|textureStylePreset' \
+            artifacts/evidence/ImageIO-all.txt artifacts/evidence/PhotosFormats-all.txt \
+            > artifacts/evidence/imageio-photosformats-contract.txt || true
+
+      - name: Summarize evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '# iOS 27 RC TextureStyle focused file-format evidence'
+            echo
+            echo '## Parser / outer-key xrefs'
+            sed -n '1,1200p' artifacts/evidence/string-xrefs.txt 2>/dev/null || true
+            echo
+            echo '## ImageIO / PhotosFormats contract'
+            sed -n '1,1600p' artifacts/evidence/imageio-photosformats-contract.txt 2>/dev/null || true
+          } > artifacts/summary.md
+          sed -n '1,2200p' artifacts/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload focused reverse-engineering evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-rc-focused-format-${{ github.sha }}
+          retention-days: 14
+          compression-level: 6
+          path: |
+            artifacts/evidence/
+            artifacts/*.txt
+            artifacts/*.md
+            artifacts/*.log
+
+      - name: Remove cache
+        if: always()
+        shell: bash
+        run: rm -rf artifacts/cache artifacts/extracted
