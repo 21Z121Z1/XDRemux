@@ -1,0 +1,26 @@
+{
+  "schema": "xdremux-texture-style-v4-tag84-full-numeric",
+  "evidence": {
+    "outerContainer": "AVAppleMakerNote_SmartStyle resolves to MakerNote key 84 on macOS 27",
+    "innerKeys": "TextureStylePreset/Intensity/Grain verified by iOS 27 PhotoImaging parser; OriginalInsteadOfReversibility and RenderingVersion exported by AVFCapture",
+    "valueTypes": "NSNumber; preset enumerated 0..5",
+    "standaloneURI": "absent"
+  },
+  "maker84Variants": {
+    "p0": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":0,"TextureStyleIntensity":1.0,"TextureStyleGrain":0.0,"TextureStyleRenderingVersion":1,"TextureStyleOriginalInsteadOfReversibility":false},
+    "p1": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":1,"TextureStyleIntensity":1.0,"TextureStyleGrain":0.0,"TextureStyleRenderingVersion":1,"TextureStyleOriginalInsteadOfReversibility":false},
+    "p2": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":2,"TextureStyleIntensity":1.0,"TextureStyleGrain":0.0,"TextureStyleRenderingVersion":1,"TextureStyleOriginalInsteadOfReversibility":false},
+    "p3": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":3,"TextureStyleIntensity":1.0,"TextureStyleGrain":0.0,"TextureStyleRenderingVersion":1,"TextureStyleOriginalInsteadOfReversibility":false},
+    "p4": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":4,"TextureStyleIntensity":1.0,"TextureStyleGrain":0.0,"TextureStyleRenderingVersion":1,"TextureStyleOriginalInsteadOfReversibility":false},
+    "p5": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":5,"TextureStyleIntensity":1.0,"TextureStyleGrain":0.0,"TextureStyleRenderingVersion":1,"TextureStyleOriginalInsteadOfReversibility":false}
+  },
+  "textureInfoVariants": {},
+  "combinations": [
+    {"name":"V4-full-tag84-preset0","maker84":"p0"},
+    {"name":"V4-full-tag84-preset1","maker84":"p1"},
+    {"name":"V4-full-tag84-preset2","maker84":"p2"},
+    {"name":"V4-full-tag84-preset3","maker84":"p3"},
+    {"name":"V4-full-tag84-preset4","maker84":"p4"},
+    {"name":"V4-full-tag84-preset5","maker84":"p5"}
+  ]
+}
