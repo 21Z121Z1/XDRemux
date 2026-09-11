@@ -1,0 +1,123 @@
+name: TextureStyle macOS 27 RC dyld Probe
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-macos27-rc-dyld.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rc-dyld:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ipsw
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install blacktop/tap/ipsw
+          ipsw version || ipsw --version || true
+
+      - name: Remote extract macOS 27 RC dyld cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/macos27rc" artifacts
+          # AppleDB records macOS 27.0 RC as build 26A428. `--dyld` performs
+          # range-based remote extraction instead of downloading the full
+          # 18-26 GB OTA/IPSW payload.
+          ipsw download appledb \
+            --os macOS \
+            --build 26A428 \
+            --rc \
+            --type ota \
+            --device VirtualMac2,1 \
+            --dyld \
+            --confirm \
+            --output "$RUNNER_TEMP/macos27rc" \
+            2>&1 | tee artifacts/remote-extract.log
+          find "$RUNNER_TEMP/macos27rc" -maxdepth 8 -type f -print \
+            | tee artifacts/extracted-files.txt
+          DSC="$(find "$RUNNER_TEMP/macos27rc" -type f \( -name 'dyld_shared_cache_arm64e' -o -name 'dyld_shared_cache_arm64' \) | head -n 1)"
+          test -n "$DSC"
+          printf '%s\n' "$DSC" > artifacts/dsc-path.txt
+          cp "$DSC" "$RUNNER_TEMP/texture-style-rc-dsc"
+
+      - name: Extract TextureStyle frameworks from RC cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          DSC="$RUNNER_TEMP/texture-style-rc-dsc"
+          mkdir -p artifacts/frameworks
+          frameworks=(
+            AVFCapture
+            CMCaptureCore
+            CMImaging
+            CameraEditKit
+            NeutrinoCore
+            PhotoImaging
+            PhotosFormats
+          )
+          for fw in "${frameworks[@]}"; do
+            echo "===== $fw ====="
+            ipsw dyld macho "$DSC" "$fw" --symbols > "artifacts/${fw}-symbols.txt" 2>&1 || true
+            ipsw dyld macho "$DSC" "$fw" --strings > "artifacts/${fw}-strings.txt" 2>&1 || true
+            ipsw dyld macho "$DSC" "$fw" --objc > "artifacts/${fw}-objc.txt" 2>&1 || true
+            ipsw dyld macho "$DSC" "$fw" --extract --force --output artifacts/frameworks > "artifacts/${fw}-extract.txt" 2>&1 || true
+          done
+          find artifacts/frameworks -type f -maxdepth 6 -print | tee artifacts/framework-files.txt
+
+      - name: Resolve TextureStyle constants from extracted Mach-O
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/macho
+          find artifacts/frameworks -type f | while read -r bin; do
+            base="$(basename "$bin")"
+            case "$base" in
+              AVFCapture|CMCaptureCore|CMImaging|CameraEditKit|NeutrinoCore|PhotoImaging|PhotosFormats)
+                file "$bin" > "artifacts/macho/${base}-file.txt" || true
+                nm -nm "$bin" 2>/dev/null \
+                  | grep -Ei 'TextureStyle|PhotographicStyle' \
+                  > "artifacts/macho/${base}-nm-texture.txt" || true
+                strings -a "$bin" \
+                  | grep -Ei 'TextureStyle|Texture Style|texture_styles|textureStyle|FilmGrain|OriginalInstead|HardwareModel|PortType' \
+                  > "artifacts/macho/${base}-strings-texture.txt" || true
+                otool -l "$bin" > "artifacts/macho/${base}-loads.txt" || true
+                ;;
+            esac
+          done
+
+      - name: Summarize evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '# macOS 27 RC TextureStyle dyld evidence'
+            echo
+            echo 'Build: 26A428'
+            echo
+            for f in artifacts/macho/*-nm-texture.txt artifacts/macho/*-strings-texture.txt; do
+              test -f "$f" || continue
+              echo "## $f"
+              sed -n '1,240p' "$f"
+              echo
+            done
+          } > artifacts/summary.md
+          sed -n '1,400p' artifacts/summary.md || true
+
+      - name: Upload RC dyld evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-macos27-rc-dyld-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
