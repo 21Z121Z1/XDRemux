@@ -1,0 +1,115 @@
+name: TextureStyle V7 iOS27 static gates
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe-v7]
+    paths:
+      - .github/workflows/texture-style-v7-ios27-static-gates.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios27-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ipsw
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(gh api repos/blacktop/ipsw/releases/latest --jq '.assets[] | select(.name | test("^ipsw_.*linux_x86_64\\.deb$")) | .browser_download_url' | head -n1)"
+          curl -fsSL -o /tmp/ipsw.deb "$url"
+          sudo dpkg -i /tmp/ipsw.deb
+          mkdir -p artifacts/cache artifacts/extracted artifacts/reports
+          ipsw version | tee artifacts/reports/ipsw-version.txt || true
+          ipsw dyld disass --help > artifacts/reports/dyld-disass-help.txt 2>&1 || true
+          ipsw macho info --help > artifacts/reports/macho-info-help.txt 2>&1 || true
+
+      - name: Extract exact iOS 27 RC 24A435 dyld cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" \
+            > artifacts/reports/cache-extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -s "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+          sha256sum "$CACHE" | tee artifacts/reports/cache.sha256
+
+      - name: Resolve PhotoImaging parser imports and outer key slot
+        shell: bash
+        run: |
+          set -uo pipefail
+          ipsw dyld disass "$CACHE" --vaddr 0x1c20de7d8 --count 96 --dylibs --force --no-color \
+            > artifacts/reports/photoimaging-parser-disass.txt 2>&1 || true
+          ipsw dyld a2o "$CACHE" 0x1e010e930 \
+            > artifacts/reports/outer-key-a2o.txt 2>&1 || true
+          ipsw dyld a2s "$CACHE" 0x1e010e930 \
+            > artifacts/reports/outer-key-a2s.txt 2>&1 || true
+          ipsw dyld a2f "$CACHE" 0x1e010e930 \
+            > artifacts/reports/outer-key-a2f.txt 2>&1 || true
+          ipsw dyld macho "$CACHE" PhotoImaging --symbols --strings \
+            > artifacts/reports/photoimaging-symbols-strings.txt 2>&1 || true
+          grep -n -E -C 20 '1e010e930|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|PITextureStyleSettingsFromMakerNoteProperties|MakerApple|MakerNote' \
+            artifacts/reports/photoimaging-parser-disass.txt \
+            artifacts/reports/photoimaging-symbols-strings.txt \
+            artifacts/reports/outer-key-a2o.txt \
+            artifacts/reports/outer-key-a2s.txt \
+            artifacts/reports/outer-key-a2f.txt \
+            > artifacts/reports/parser-gate-summary.txt || true
+          cat artifacts/reports/parser-gate-summary.txt || true
+
+      - name: Extract PhotoImaging and PhotosFormats Mach-O files
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipsw dyld macho "$CACHE" PhotoImaging --extract --force --output "$PWD/artifacts/extracted" \
+            > artifacts/reports/photoimaging-extract.log 2>&1
+          ipsw dyld macho "$CACHE" PhotosFormats --extract --force --output "$PWD/artifacts/extracted" \
+            > artifacts/reports/photosformats-extract.log 2>&1
+          PI="$(find artifacts/extracted -type f -name PhotoImaging -print -quit)"
+          PF="$(find artifacts/extracted -type f -name PhotosFormats -print -quit)"
+          test -s "$PI"
+          test -s "$PF"
+          echo "PI=$PI" >> "$GITHUB_ENV"
+          echo "PF=$PF" >> "$GITHUB_ENV"
+          sha256sum "$PI" "$PF" | tee artifacts/reports/extracted.sha256
+
+      - name: Dump ObjC metadata and capability gates
+        shell: bash
+        run: |
+          set -uo pipefail
+          ipsw macho info "$PF" --objc > artifacts/reports/photosformats-objc.txt 2>&1 || true
+          ipsw macho info "$PI" --objc > artifacts/reports/photoimaging-objc.txt 2>&1 || true
+          for symbol in '-[PFMetadata hasTextureStyle]' '-[PFMetadata textureStyleIsReversible]' '-[PFMetadataImage hasTextureStyle]' '-[PFMetadataImage textureStyleIsReversible]'; do
+            safe="$(printf '%s' "$symbol" | tr -cs 'A-Za-z0-9' '_')"
+            ipsw macho disass "$PF" --symbol "$symbol" --count 160 --force --no-color \
+              > "artifacts/reports/${safe}.disass.txt" 2>&1 || true
+          done
+          grep -n -E -C 16 'hasTextureStyle|textureStyleIsReversible|textureStylePreset|textureStyleIntensity|textureStyleGrain|TextureStyle' \
+            artifacts/reports/photosformats-objc.txt artifacts/reports/*.disass.txt \
+            > artifacts/reports/photosformats-gates-summary.txt || true
+          cat artifacts/reports/photosformats-gates-summary.txt || true
+
+      - name: Upload exact-firmware evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-v7-ios27-24A435-static-gates-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: |
+            artifacts/reports/
+            artifacts/extracted/
+
+      - name: Remove dyld cache
+        if: always()
+        run: rm -rf artifacts/cache
