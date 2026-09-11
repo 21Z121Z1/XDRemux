@@ -23,6 +23,7 @@ jobs:
           brew trust blacktop/tap
           brew install --formula blacktop/tap/ipsw
           mkdir -p artifacts/cache artifacts/disass
+          ipsw version | tee artifacts/ipsw-version.txt
       - name: Extract 24A435 dyld cache
         shell: bash
         run: |
@@ -51,16 +52,22 @@ jobs:
           CMPhoto_OpenExisting	0x1a6766a7c	260
           CMPhoto_CloseAndCopy	0x1a654346c	220
           EOF
+          failed=0
           while IFS=$'\t' read -r name addr count; do
             echo "===== $name @ $addr ====="
             set +e
-            ipsw dyld disass "$CACHE" --start-address "$addr" --count "$count" --force > "artifacts/disass/${name}.txt" 2>&1
+            ipsw dyld disass "$CACHE" --vaddr "$addr" --count "$count" --force > "artifacts/disass/${name}.txt" 2>&1
             status=$?
             set -e
             printf '%s\t%s\t%s\n' "$name" "$addr" "$status" | tee -a artifacts/status.tsv
+            if [[ "$status" -ne 0 ]]; then failed=1; fi
           done < artifacts/targets.tsv
           grep -R -n -E -C 8 'TextureStyle|MakerNote|objectForKey|OriginalInstead|RenderingVersion|Grain|Intensity|Preset|CustomMetadata|tag:apple.com,2026|UnstyledOriginal' artifacts/disass > artifacts/focused.txt || true
-          sed -n '1,2200p' artifacts/focused.txt >> "$GITHUB_STEP_SUMMARY" || true
+          sed -n '1,2600p' artifacts/focused.txt >> "$GITHUB_STEP_SUMMARY" || true
+          if [[ "$failed" -ne 0 ]]; then
+            echo 'One or more exact-address disassemblies failed; see artifacts/status.tsv.' >&2
+            exit 1
+          fi
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -72,6 +79,7 @@ jobs:
             artifacts/status.tsv
             artifacts/focused.txt
             artifacts/extract.log
+            artifacts/ipsw-version.txt
       - name: Remove cache
         if: always()
         run: rm -rf artifacts/cache
