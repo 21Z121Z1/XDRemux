@@ -17,40 +17,61 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - name: Boot iOS 27 and read exported string constants
+
+      - name: Read iOS 27 TextureStyle exported constants
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts
           xcrun simctl list runtimes -j > artifacts/runtimes.json
           xcrun simctl list devicetypes -j > artifacts/device-types.json
-          RUNTIME_ID="$(python3 - <<'PY'
+          runtime_id="$(python3 - <<'PY'
           import json
-          r=[x for x in json.load(open('artifacts/runtimes.json')).get('runtimes',[]) if str(x.get('version','')).startswith('27.') and x.get('isAvailable',True)]
-          if not r: raise SystemExit('no iOS 27 runtime')
-          print(r[-1]['identifier'])
+          rs=json.load(open('artifacts/runtimes.json')).get('runtimes',[])
+          rs=[r for r in rs if 'iOS' in (str(r.get('name',''))+str(r.get('identifier',''))) and str(r.get('version','')).startswith('27.') and r.get('isAvailable',True)]
+          if not rs: raise SystemExit('no iOS 27 runtime')
+          def ver(r): return tuple(int(x) if x.isdigit() else 0 for x in str(r.get('version','0')).split('.'))
+          print(sorted(rs,key=ver)[-1]['identifier'])
           PY
           )"
-          DEVICE_TYPE="$(python3 - <<'PY'
+          mapfile -t device_types < <(python3 - <<'PY'
           import json
           ds=json.load(open('artifacts/device-types.json')).get('devicetypes',[])
-          p=[d for d in ds if d.get('identifier')=='com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro']
-          if not p: p=[d for d in ds if str(d.get('name','')).startswith('iPhone')]
-          if not p: raise SystemExit('no iPhone device type')
-          print(p[0]['identifier'])
+          iph=[d for d in ds if str(d.get('name','')).startswith('iPhone')]
+          def rank(d):
+              n=str(d.get('name',''))
+              prefs=('iPhone 18 Pro','iPhone 17 Pro','iPhone 16 Pro','iPhone 18','iPhone 17','iPhone 16')
+              for i,p in enumerate(prefs):
+                  if n==p: return (0,i,n)
+              return (1,0,n)
+          for d in sorted(iph,key=rank): print(d['identifier'])
           PY
-          )"
-          UDID="$(xcrun simctl create TextureStyleConstants "$DEVICE_TYPE" "$RUNTIME_ID")"
-          cleanup() { xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
+          )
+          udid=''
+          selected=''
+          for device_type in "${device_types[@]}"; do
+            set +e
+            candidate="$(xcrun simctl create TextureStyleConstants "$device_type" "$runtime_id" 2>/dev/null)"
+            rc=$?
+            set -e
+            if [[ $rc -eq 0 && -n "$candidate" ]]; then
+              udid="$candidate"
+              selected="$device_type"
+              break
+            fi
+          done
+          [[ -n "$udid" ]] || { echo 'no iPhone device type compatible with iOS 27 runtime' >&2; exit 1; }
+          printf 'runtime=%s\ndevice=%s\nudid=%s\n' "$runtime_id" "$selected" "$udid" | tee artifacts/selection.txt
+          cleanup() { xcrun simctl terminate "$udid" org.xdremux.TextureStyleConstants >/dev/null 2>&1 || true; xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true; xcrun simctl delete "$udid" >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b > artifacts/boot.txt
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b > artifacts/boot.txt
 
-          SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
-          SDK_VERSION="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          ARCH="$(uname -m)"
-          APP="$RUNNER_TEMP/TextureStyleConstants.app"
-          mkdir -p "$APP"
+          sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          sdk_version="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          arch="$(uname -m)"
+          app="$RUNNER_TEMP/TextureStyleConstants.app"
+          mkdir -p "$app"
           cat > "$RUNNER_TEMP/constants.m" <<'OBJC'
           #import <UIKit/UIKit.h>
           #import <Foundation/Foundation.h>
@@ -122,8 +143,8 @@ jobs:
               };
               NSData *json=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
               NSURL *docs=[[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] firstObject];
+              [[NSFileManager defaultManager] createDirectoryAtURL:docs withIntermediateDirectories:YES attributes:nil error:nil];
               [json writeToURL:[docs URLByAppendingPathComponent:@"texture-style-constants.json"] atomically:YES];
-              NSLog(@"TEXTURE_STYLE_CONSTANTS\n%@",[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]);
               dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(0.1*NSEC_PER_SEC)),dispatch_get_main_queue(),^{ exit(0); });
           }
 
@@ -144,17 +165,18 @@ jobs:
           - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)session options:(UISceneConnectionOptions *)options {
               (void)application;(void)options;
               UISceneConfiguration *c=[[UISceneConfiguration alloc] initWithName:@"Default Configuration" sessionRole:session.role];
-              c.delegateClass=[SceneDelegate class]; return c;
+              c.delegateClass=[SceneDelegate class];
+              return c;
           }
           @end
           int main(int argc,char **argv){ @autoreleasepool { return UIApplicationMain(argc,argv,nil,NSStringFromClass([AppDelegate class])); } }
           OBJC
 
           xcrun --sdk iphonesimulator clang -fobjc-arc \
-            -target "${ARCH}-apple-ios${SDK_VERSION}-simulator" -isysroot "$SDK" \
+            -target "${arch}-apple-ios${sdk_version}-simulator" -isysroot "$sdk" \
             -framework Foundation -framework UIKit \
-            "$RUNNER_TEMP/constants.m" -o "$APP/TextureStyleConstants"
-          cat > "$APP/Info.plist" <<PLIST
+            "$RUNNER_TEMP/constants.m" -o "$app/TextureStyleConstants"
+          cat > "$app/Info.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
@@ -163,7 +185,7 @@ jobs:
           <key>CFBundleName</key><string>TextureStyleConstants</string>
           <key>CFBundlePackageType</key><string>APPL</string>
           <key>CFBundleVersion</key><string>1</string>
-          <key>MinimumOSVersion</key><string>${SDK_VERSION}</string>
+          <key>MinimumOSVersion</key><string>${sdk_version}</string>
           <key>UIApplicationSceneManifest</key><dict>
             <key>UIApplicationSupportsMultipleScenes</key><false/>
             <key>UISceneConfigurations</key><dict>
@@ -175,25 +197,28 @@ jobs:
           </dict>
           </dict></plist>
           PLIST
-          codesign --force --sign - "$APP"
-          xcrun simctl install "$UDID" "$APP"
-          DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.TextureStyleConstants data)"
+          codesign --force --sign - "$app"
+          xcrun simctl install "$udid" "$app"
+          data="$(xcrun simctl get_app_container "$udid" org.xdremux.TextureStyleConstants data)"
+          mkdir -p "$data/Documents"
           set +e
-          xcrun simctl launch --console "$UDID" org.xdremux.TextureStyleConstants > artifacts/launch.txt 2>&1 &
-          PID=$!
+          xcrun simctl launch --console "$udid" org.xdremux.TextureStyleConstants > artifacts/launch.txt 2>&1 &
+          pid=$!
           set -e
           for _ in $(seq 1 30); do
-            [[ -s "$DATA/Documents/texture-style-constants.json" ]] && break
+            [[ -s "$data/Documents/texture-style-constants.json" ]] && break
             sleep 1
           done
-          if [[ ! -s "$DATA/Documents/texture-style-constants.json" ]]; then
-            xcrun simctl spawn "$UDID" log show --style compact --last 2m --predicate 'process == "TextureStyleConstants"' > artifacts/system-log.txt 2>&1 || true
-            kill "$PID" >/dev/null 2>&1 || true
+          if [[ ! -s "$data/Documents/texture-style-constants.json" ]]; then
+            xcrun simctl spawn "$udid" log show --style compact --last 2m --predicate 'process == "TextureStyleConstants"' > artifacts/system-log.txt 2>&1 || true
+            kill "$pid" >/dev/null 2>&1 || true
+            cat artifacts/launch.txt || true
+            cat artifacts/system-log.txt || true
             exit 1
           fi
-          cp "$DATA/Documents/texture-style-constants.json" artifacts/constants.json
+          cp "$data/Documents/texture-style-constants.json" artifacts/constants.json
           cat artifacts/constants.json
-          kill "$PID" >/dev/null 2>&1 || true
+          kill "$pid" >/dev/null 2>&1 || true
 
       - name: Upload constants
         if: always()

@@ -1,0 +1,47 @@
+{
+  "schema": "xdremux-photographic-styles-3-portrait-fixture-rc-candidate-v3",
+  "evidence": {
+    "textureURI": "iOS 27 RC firmware diff",
+    "requiredTextureInfoKeys": "iOS 27 RC firmware diff",
+    "captureMetadataKeys": "iOS 27 RC firmware diff",
+    "hardwareModel": "iPhone 18 Pro iPhone19,2 / V63AP firmware identity",
+    "enumValues": "candidate pending iOS 27 runtime parser gate"
+  },
+  "textureURI": "tag:apple.com,2026:photo:metadata:texture_styles",
+  "maker84Variants": {
+    "standard": {
+      "7": 0,
+      "3": 1,
+      "4": 1,
+      "0": 1,
+      "5": 1,
+      "1": 0,
+      "6": 4,
+      "2": 0,
+      "TextureStylePreset": "Standard",
+      "TextureStyleIntensity": 1.0,
+      "TextureStyleGrain": 0.0,
+      "TextureStyleRenderingVersion": 1,
+      "TextureStyleOriginalInsteadOfReversibility": false
+    }
+  },
+  "textureInfoVariants": {
+    "standard": {
+      "Version": 1,
+      "HardwareModel": "V63AP",
+      "PortType": "PortTypeBack",
+      "CaptureMode": "Photo",
+      "CaptureType": "Photo",
+      "FilmGrainSeed": 1480872525,
+      "TextureStylePeopleDataVersion": 1,
+      "TextureStylePostProcessedPeopleData": []
+    }
+  },
+  "combinations": [
+    {
+      "name": "ps3-portrait-standard",
+      "maker84": "standard",
+      "textureInfo": "standard"
+    }
+  ]
+}
