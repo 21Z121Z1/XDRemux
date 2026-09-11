@@ -1,0 +1,84 @@
+name: TextureStyle RC Linux fast analysis
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-rc-linux-fast.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install latest ipsw Linux package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(gh api repos/blacktop/ipsw/releases/latest --jq '.assets[] | select(.name | test("^ipsw_.*linux_x86_64\\.deb$")) | .browser_download_url' | head -n1)"
+          test -n "$url"
+          curl -fsSL -o /tmp/ipsw.deb "$url"
+          sudo dpkg -i /tmp/ipsw.deb
+          ipsw version
+          mkdir -p artifacts/cache artifacts/out
+
+      - name: Extract exact iOS 27 RC arm64e DSC
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" > artifacts/out/extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -s "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+          du -h "$CACHE" | tee artifacts/out/cache-size.txt
+
+      - name: Recover TextureStyle reader and MakerNote constants
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Two tiny disassemblies only.  Do not hide failures: these are the primary evidence.
+          ipsw dyld disass "$CACHE" --symbol '_PITextureStyleSettingsFromMakerNoteProperties' --symbol-image PhotoImaging --count 420 --force \
+            > artifacts/out/settings.asm 2>&1
+          ipsw dyld disass "$CACHE" --symbol '_PITextureStylePresetFromMakerNoteValue' --symbol-image PhotoImaging --count 240 --force \
+            > artifacts/out/preset.asm 2>&1
+
+          # AVFCapture owns the new iOS-only MakerNote constants.
+          ipsw dyld macho "$CACHE" AVFCapture --symbols --strings \
+            > artifacts/out/avfcapture.txt 2>&1
+
+          grep -n -E -C 12 'AVAppleMakerNote_(TextureStyle|SmartStyle)' artifacts/out/avfcapture.txt \
+            > artifacts/out/avfcapture-maker-constants.txt || true
+          grep -n -E -C 14 'TextureStyle|SmartStyle|objectForKey|objectForKeyedSubscript|doubleValue|integerValue|longLongValue|floatValue|NSNumber|NSString' \
+            artifacts/out/settings.asm artifacts/out/preset.asm > artifacts/out/reader-focused.txt || true
+
+          echo '=== AVFCapture constants ==='
+          cat artifacts/out/avfcapture-maker-constants.txt
+          echo '=== Reader ==='
+          cat artifacts/out/reader-focused.txt
+
+          # Require that we actually obtained the functions rather than an ipsw usage/error page.
+          grep -q 'PITextureStyleSettingsFromMakerNoteProperties' artifacts/out/settings.asm
+          grep -q 'PITextureStylePresetFromMakerNoteValue' artifacts/out/preset.asm
+          grep -q 'AVAppleMakerNote_TextureStyleKey_Preset' artifacts/out/avfcapture.txt
+
+      - name: Upload fast evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-rc-linux-fast-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: artifacts/out/
+
+      - name: Remove DSC
+        if: always()
+        run: rm -rf artifacts/cache
