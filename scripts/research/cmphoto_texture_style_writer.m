@@ -30,7 +30,7 @@ int main(int argc, const char *argv[]) {
         NSString *outputPath = [NSString stringWithUTF8String:argv[2]];
         NSString *reportPath = [NSString stringWithUTF8String:argv[3]];
         NSMutableDictionary *report = [NSMutableDictionary dictionary];
-        report[@"schema"] = @"xdremux-cmphoto-texture-style-writer-v1";
+        report[@"schema"] = @"xdremux-cmphoto-texture-style-writer-v2";
         report[@"input"] = [inputPath lastPathComponent];
         report[@"output"] = [outputPath lastPathComponent];
 
@@ -58,12 +58,16 @@ int main(int argc, const char *argv[]) {
         id keyData = LoadConstant(cm, "kCMPhotoCustomMetadata_Data");
         id keyURI = LoadConstant(cm, "kCMPhotoCustomMetadata_URI");
         id keyName = LoadConstant(cm, "kCMPhotoCustomMetadata_Name");
-        id textureURN = LoadConstant(cm, "kCMPhotoCustomMetadataTypeURN_TextureStyles");
+        id exportedTextureURN = LoadConstant(cm, "kCMPhotoCustomMetadataTypeURN_TextureStyles");
+        // iOS 27 firmware exports kCMPhotoCustomMetadataTypeURN_TextureStyles with this exact value.
+        // macOS 27 CMPhoto on the hosted runner exposes the writer APIs but not that iOS-only symbol.
+        id textureURN = exportedTextureURN ?: @"tag:apple.com,2026:photo:metadata:texture_styles";
         report[@"constants"] = @{
             @"Data": keyData ?: [NSNull null], @"URI": keyURI ?: [NSNull null],
-            @"Name": keyName ?: [NSNull null], @"TextureURN": textureURN ?: [NSNull null]
+            @"Name": keyName ?: [NSNull null], @"TextureURN": textureURN,
+            @"TextureURNFromRuntimeSymbol": @(exportedTextureURN != nil)
         };
-        if (!keyData || !keyURI || !keyName || !textureURN) {
+        if (!keyData || !keyURI || !keyName) {
             WriteJSON(reportPath, report);
             return 4;
         }
@@ -76,8 +80,6 @@ int main(int argc, const char *argv[]) {
             return 5;
         }
 
-        // Keep the first native candidate deliberately minimal. The outer encoding is the variable
-        // under test; the inner plist uses only fields verified by the iOS 27 TextureStyle parser.
         NSDictionary *texture = @{
             @"Version": @1,
             @"HardwareModel": @"V63AP",
@@ -118,8 +120,6 @@ int main(int argc, const char *argv[]) {
             return 11;
         }
 
-        // CMCapture's BWCMPhotoEncoderManager calls this exact shape:
-        // CMPhotoCompressionSessionAddCustomMetadata(session, 0, 0, {Data,URI,Name}).
         OSStatus sAdd = add(session, 0, 0, (__bridge CFDictionaryRef)custom);
         report[@"addStatus"] = @(sAdd);
         if (sAdd) {
@@ -142,8 +142,7 @@ int main(int argc, const char *argv[]) {
         }
 
         id backingObj = (__bridge id)backing;
-        NSData *output = nil;
-        if ([backingObj isKindOfClass:[NSData class]]) output = backingObj;
+        NSData *output = [backingObj isKindOfClass:[NSData class]] ? backingObj : nil;
         if (!output) {
             report[@"backingDescription"] = [backingObj description] ?: @"";
             CFRelease(backing);
