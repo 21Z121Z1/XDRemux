@@ -1,0 +1,188 @@
+name: TextureStyle iOS 27 RC contract disassembly
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-ios27-rc-contract-disasm.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-disasm:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ipsw tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/{analysis,disass,extracted}
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw
+          ipsw version | tee artifacts/ipsw-version.txt
+          sw_vers | tee artifacts/macos.txt
+          xcodebuild -version | tee artifacts/xcode.txt
+
+      - name: Remote extract iPhone 18 Pro 24A435 dyld cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/ios27rc"
+          mkdir -p "$out"
+          echo 'iPhone19,2' | tee artifacts/device.txt
+          echo 'V63AP' | tee artifacts/hardware-model.txt
+          echo '24A435' | tee artifacts/build.txt
+
+          set +e
+          ipsw download appledb \
+            --os iOS \
+            --build 24A435 \
+            --type ota \
+            --device iPhone19,2 \
+            --dyld \
+            --confirm \
+            --output "$out" \
+            > artifacts/appledb-dyld.stdout 2> artifacts/appledb-dyld.stderr
+          status=$?
+          set -e
+          echo "$status" | tee artifacts/appledb-dyld.exit-code
+          cat artifacts/appledb-dyld.stdout || true
+          cat artifacts/appledb-dyld.stderr || true
+
+          find "$out" -maxdepth 10 -type f -print | sort | tee artifacts/extracted-files.txt || true
+          DSC="$(find "$out" -type f \( -name 'dyld_shared_cache_arm64e' -o -name 'dyld_shared_cache_arm64' \) -print -quit)"
+          if [[ -z "$DSC" ]]; then
+            echo 'No dyld cache was extracted for iPhone19,2 / 24A435.' >&2
+            exit 2
+          fi
+          echo "$DSC" | tee artifacts/dsc-path.txt
+          echo "DSC=$DSC" >> "$GITHUB_ENV"
+
+      - name: Dump TextureStyle framework contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          images=(PhotoImaging NeutrinoCore PhotosFormats CMPhoto ImageIO CameraEditKit CMCaptureCore AVFCapture CMImaging PhotosEditing PhotosUIEdit)
+          for image in "${images[@]}"; do
+            echo "===== $image ====="
+            set +e
+            ipsw dyld macho "$DSC" "$image" --symbols --strings --objc --objc-refs \
+              > "artifacts/analysis/${image}-macho.txt" 2>&1
+            echo "$?" > "artifacts/analysis/${image}-macho.exit"
+            ipsw class-dump "$DSC" "$image" \
+              > "artifacts/analysis/${image}-class-dump.txt" 2>&1
+            echo "$?" > "artifacts/analysis/${image}-class-dump.exit"
+            set -e
+
+            {
+              grep -i -n -E -C 12 \
+                'TextureStyle|Texture Style|texture_styles|MakerNote|FilmGrain|UnstyledOriginal|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|CustomMetadataTypeURN|QuicktimeMetadataKey' \
+                "artifacts/analysis/${image}-macho.txt" || true
+              grep -i -n -E -C 12 \
+                'TextureStyle|Texture Style|texture_styles|MakerNote|FilmGrain|UnstyledOriginal|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|CustomMetadataTypeURN|QuicktimeMetadataKey' \
+                "artifacts/analysis/${image}-class-dump.txt" || true
+            } > "artifacts/analysis/${image}-focused.txt"
+          done
+
+      - name: Disassemble exact TextureStyle readers and CMPhoto writer ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > artifacts/disass/targets.tsv <<'EOF'
+          PhotoImaging	_PITextureStyleSettingsFromMakerNoteProperties
+          PhotoImaging	_PITextureStylePresetFromMakerNoteValue
+          PhotoImaging	_PITextureStylePresetFromString
+          PhotoImaging	-[PITextureStyleAdjustmentController updateWithTextureStyleInfo:]
+          PhotosFormats	-[PFMetadata textureStylePreset]
+          PhotosFormats	-[PFMetadata textureStyleIntensity]
+          PhotosFormats	-[PFMetadata textureStyleGrainIntensity]
+          PhotosFormats	-[PFMetadata textureStyleIsReversible]
+          PhotosFormats	-[PFMetadataImage hasTextureStyle]
+          NeutrinoCore	+[_NUTextureStyleProperties textureStylePropertiesFromImageMetadata:auxImageMetadata:error:]
+          CMPhoto	CMPhotoCompressionSessionAddCustomMetadata
+          CMPhoto	CMPhotoCompressionSessionOpenExistingContainerForModificationF
+          CMPhoto	CMPhotoCompressionSessionOpenExistingContainerForModification
+          CMPhoto	CMPhotoCompressionSessionCloseContainerAndCopyBacking
+          EOF
+
+          while IFS=$'\t' read -r image symbol; do
+            safe="$(printf '%s-%s' "$image" "$symbol" | tr -cs 'A-Za-z0-9._-' '_')"
+            set +e
+            ipsw dyld disass "$DSC" \
+              --symbol "$symbol" \
+              --symbol-image "$image" \
+              --count 700 \
+              > "artifacts/disass/${safe}.txt" 2>&1
+            status=$?
+            set -e
+            printf '%s\t%s\t%s\n' "$image" "$symbol" "$status" | tee -a artifacts/disass/status.tsv
+          done < artifacts/disass/targets.tsv
+
+      - name: Extract standalone binaries for cross-checking
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image in PhotoImaging NeutrinoCore PhotosFormats CMPhoto ImageIO CameraEditKit CMCaptureCore AVFCapture CMImaging; do
+            set +e
+            ipsw dyld extract "$DSC" "$image" --slide --objc --stubs --force --output artifacts/extracted \
+              >> artifacts/extracted/extract.log 2>&1
+            echo "$image $?" >> artifacts/extracted/status.tsv
+            set -e
+          done
+          find artifacts/extracted -type f -maxdepth 5 -print | sort | tee artifacts/extracted/files.txt || true
+
+      - name: Build focused contract summary
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          {
+            echo '# iOS 27 RC 24A435 / iPhone19,2 TextureStyle contract evidence'
+            echo
+            echo 'Device: iPhone19,2 (iPhone 18 Pro)'
+            echo 'Hardware model: V63AP'
+            echo 'Build: 24A435'
+            echo
+            echo '## Focused framework strings / ObjC'
+            for f in artifacts/analysis/*-focused.txt; do
+              [[ -f "$f" ]] || continue
+              echo
+              echo "### $f"
+              sed -n '1,500p' "$f"
+            done
+            echo
+            echo '## Exact target disassembly'
+            for f in artifacts/disass/*.txt; do
+              [[ -f "$f" ]] || continue
+              echo
+              echo "### $f"
+              sed -n '1,900p' "$f"
+            done
+          } > artifacts/texture-style-contract-summary.md
+
+          grep -R -n -E -C 8 \
+            'TextureStyle|texture_styles|MakerNote|FilmGrain|Reversib|HardwareModel|PortType|CaptureMode|CaptureType|CustomMetadataTypeURN|0x54|#84' \
+            artifacts/analysis artifacts/disass \
+            > artifacts/texture-style-focused-grep.txt || true
+
+          cat artifacts/texture-style-contract-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+          sed -n '1,1200p' artifacts/texture-style-focused-grep.txt || true
+          exit 0
+
+      - name: Upload RC contract evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-ios27-rc-contract-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: warn
+          compression-level: 6
+          path: artifacts/
