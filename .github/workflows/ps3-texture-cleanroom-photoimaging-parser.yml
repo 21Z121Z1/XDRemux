@@ -1,0 +1,195 @@
+name: PS3 TextureStyle Cleanroom PhotoImaging Parser
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-cleanroom-v8
+    paths:
+      - .github/workflows/ps3-texture-cleanroom-photoimaging-parser.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  parser-oracle:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download clean-room A/B candidates
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-cleanroom-native-oracles-a566a03a59eb03907ebdf8626a153527e19e3672
+          path: prior-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34659132629
+
+      - name: Build isolated PhotoImaging TextureStyle parser probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/probes artifacts/static
+          cp prior-artifact/*.heic artifacts/
+          cat > "$RUNNER_TEMP/pi_texture_settings_probe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <dlfcn.h>
+
+          typedef NSDictionary *(*TextureSettingsFn)(NSDictionary *);
+
+          static id JSONSafe(id value) {
+              if (!value) return [NSNull null];
+              if ([NSJSONSerialization isValidJSONObject:@[value]]) return value;
+              return [value description] ?: @"<nil>";
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 4) {
+                  fprintf(stderr, "usage: probe FILE variant OUTPUT_JSON\n");
+                  return 64;
+              }
+              NSString *path = [NSString stringWithUTF8String:argv[1]];
+              NSString *variant = [NSString stringWithUTF8String:argv[2]];
+              NSString *outPath = [NSString stringWithUTF8String:argv[3]];
+              NSMutableDictionary *report = [NSMutableDictionary dictionary];
+              report[@"variant"] = variant;
+
+              void *h = dlopen("/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging", RTLD_NOW | RTLD_GLOBAL);
+              report[@"frameworkLoaded"] = @(h != NULL);
+              if (!h) {
+                  report[@"dlerror"] = @((dlerror() ?: ""));
+              }
+              void *sym = h ? dlsym(h, "PITextureStyleSettingsFromMakerNoteProperties") : NULL;
+              if (!sym && h) sym = dlsym(h, "_PITextureStyleSettingsFromMakerNoteProperties");
+              report[@"symbolAvailable"] = @(sym != NULL);
+
+              CGImageSourceRef src = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path], NULL);
+              if (!src) return 2;
+              NSDictionary *props = CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(src, 0, NULL));
+              CFRelease(src);
+              NSDictionary *maker = props[(id)kCGImagePropertyMakerAppleDictionary];
+              id tag84 = maker[@"84"] ?: maker[@84];
+              report[@"makerPresent"] = @(maker != nil);
+              report[@"tag84Present"] = @(tag84 != nil);
+
+              NSDictionary *input = nil;
+              if ([variant isEqualToString:@"properties"]) input = props;
+              else if ([variant isEqualToString:@"maker"]) input = maker;
+              else if ([variant isEqualToString:@"tag84"] && [tag84 isKindOfClass:[NSDictionary class]]) input = tag84;
+              else {
+                  report[@"inputValid"] = @NO;
+              }
+              if (input) report[@"inputValid"] = @YES;
+
+              if (sym && input) {
+                  @try {
+                      TextureSettingsFn fn = (TextureSettingsFn)sym;
+                      NSDictionary *result = fn(input);
+                      report[@"resultClass"] = result ? NSStringFromClass([result class]) : @"nil";
+                      report[@"result"] = JSONSafe(result);
+                      report[@"recognized"] = @(result != nil && [result count] > 0);
+                  } @catch (NSException *e) {
+                      report[@"exception"] = @{
+                          @"name": e.name ?: @"",
+                          @"reason": e.reason ?: @""
+                      };
+                      report[@"recognized"] = @NO;
+                  }
+              } else {
+                  report[@"recognized"] = @NO;
+              }
+
+              NSData *json = [NSJSONSerialization dataWithJSONObject:report options:(NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys) error:nil];
+              if (!json || ![json writeToFile:outPath atomically:YES]) return 3;
+              fwrite(json.bytes, 1, json.length, stdout); fputc('\n', stdout);
+              return 0;
+          }}
+          OBJC
+
+          xcrun clang -fobjc-arc -fblocks -Wall -Wextra -Werror \
+            -framework Foundation -framework ImageIO \
+            "$RUNNER_TEMP/pi_texture_settings_probe.m" \
+            -o "$RUNNER_TEMP/pi_texture_settings_probe"
+
+          PI=/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging
+          nm -nm "$PI" 2>/dev/null | grep -E 'PITextureStyleSettingsFromMakerNoteProperties|PIParseTextureStylesFromAdjustmentDictionary' \
+            | tee artifacts/static/photoimaging-parser-symbols.txt || true
+          strings -a "$PI" | grep -E -C 5 \
+            'PITextureStyleSettingsFromMakerNoteProperties|Missing smart style properties|Invalid texture style preset|Invalid texture style intensity|Invalid texture style grain' \
+            | tee artifacts/static/photoimaging-parser-strings.txt || true
+
+      - name: Run each parser input in a separate process
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > artifacts/probes/status.tsv
+          for f in artifacts/*.heic; do
+            base="$(basename "$f" .heic)"
+            for variant in properties maker tag84; do
+              out="artifacts/probes/${base}--${variant}.json"
+              stdout="artifacts/probes/${base}--${variant}.stdout"
+              stderr="artifacts/probes/${base}--${variant}.stderr"
+              set +e
+              "$RUNNER_TEMP/pi_texture_settings_probe" "$f" "$variant" "$out" >"$stdout" 2>"$stderr"
+              status=$?
+              set -e
+              printf '%s\t%s\t%s\n' "$base" "$variant" "$status" >> artifacts/probes/status.tsv
+            done
+          done
+          cat artifacts/probes/status.tsv
+
+      - name: Evaluate native PhotoImaging discrimination
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee artifacts/photoimaging-oracle-summary.txt
+          import json
+          from pathlib import Path
+
+          results = {}
+          for p in sorted(Path('artifacts/probes').glob('*.json')):
+              base, variant = p.stem.rsplit('--', 1)
+              results.setdefault(base, {})[variant] = json.loads(p.read_text())
+
+          print(json.dumps(results, indent=2, sort_keys=True))
+          Path('artifacts/photoimaging-oracle.json').write_text(json.dumps(results, indent=2, sort_keys=True) + '\n')
+
+          if not results:
+              raise SystemExit('no parser results')
+          any_symbol = any(
+              d.get('symbolAvailable') is True
+              for per_file in results.values() for d in per_file.values()
+          )
+          if not any_symbol:
+              raise SystemExit('PITextureStyleSettingsFromMakerNoteProperties is unavailable on this host')
+
+          baseline = results.get('A-baseline-original', {})
+          candidates = {k:v for k,v in results.items() if k != 'A-baseline-original'}
+          discriminators = []
+          for variant in ('properties','maker','tag84'):
+              b = baseline.get(variant, {}).get('recognized') is True
+              hits = [name for name, v in candidates.items() if v.get(variant, {}).get('recognized') is True]
+              print(f'variant={variant} baseline={b} hits={hits}')
+              if not b and hits:
+                  discriminators.append((variant, hits))
+
+          Path('artifacts/photoimaging-discriminators.txt').write_text(
+              '\n'.join(f'{variant}: {", ".join(hits)}' for variant, hits in discriminators) + ('\n' if discriminators else '')
+          )
+          if not discriminators:
+              raise SystemExit('PhotoImaging parser did not discriminate any clean-room candidate from baseline')
+          print('DISCRIMINATING NATIVE PARSER ORACLES:', discriminators)
+          PY
+
+      - name: Upload PhotoImaging parser evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-cleanroom-photoimaging-parser-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
