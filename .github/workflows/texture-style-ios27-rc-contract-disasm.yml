@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - research/photographic-styles-3-texture-probe
+      - research/photographic-styles-3-texture-probe-v7
     paths:
       - .github/workflows/texture-style-ios27-rc-contract-disasm.yml
   workflow_dispatch:
@@ -39,8 +40,6 @@ jobs:
           echo '24A435' | tee artifacts/build.txt
           echo 'Rave' | tee artifacts/build-train.txt
 
-          # Preferred source: exact iPhone 18 Pro (iPhone19,2 / V63AP) full OTA.
-          # AppleDB serves this RC as an AEA OTA rather than a ZIP/Restore IPSW.
           OTA_URL='https://updates.cdn-apple.com/2026FallFCS/5e7d3d3f-c8fe-485d-8192-3bec80492821/com_apple_MobileAsset_SoftwareUpdate/8c808e0105332e366d5928e805cd6d360b971c821f6dc464cbc8ce7772b5e4d0.aea'
           RESTORE_URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
           {
@@ -49,13 +48,7 @@ jobs:
           } | tee artifacts/source-urls.txt
 
           set +e
-          ipsw extract \
-            --remote \
-            --device iPhone19,2 \
-            --dyld \
-            --dyld-arch arm64e \
-            --output "$out" \
-            "$OTA_URL" \
+          ipsw extract --remote --device iPhone19,2 --dyld --dyld-arch arm64e --output "$out" "$OTA_URL" \
             > artifacts/iphone19-2-aea.stdout 2> artifacts/iphone19-2-aea.stderr
           ota_status=$?
           set -e
@@ -67,19 +60,9 @@ jobs:
           if [[ -n "$DSC" ]]; then
             echo 'iPhone19,2 / V63AP exact OTA' | tee artifacts/cache-source.txt
           else
-            # Protocol fallback: AppleDB has an active 24A435 Restore IPSW for
-            # iPhone18,1.  TextureStyle reader/writer schema lives in the same
-            # 24A435 OS framework build; V63AP-specific tuning is not used to
-            # infer the HEIF/MakerNote wire contract.
             rm -rf "$out"
             mkdir -p "$out"
-            ipsw extract \
-              --remote \
-              --device iPhone18,1 \
-              --dyld \
-              --dyld-arch arm64e \
-              --output "$out" \
-              "$RESTORE_URL" \
+            ipsw extract --remote --device iPhone18,1 --dyld --dyld-arch arm64e --output "$out" "$RESTORE_URL" \
               > artifacts/iphone18-1-ipsw.stdout 2> artifacts/iphone18-1-ipsw.stderr
             cat artifacts/iphone18-1-ipsw.stdout || true
             cat artifacts/iphone18-1-ipsw.stderr || true
@@ -145,10 +128,7 @@ jobs:
           while IFS=$'\t' read -r image symbol; do
             safe="$(printf '%s-%s' "$image" "$symbol" | tr -cs 'A-Za-z0-9._-' '_')"
             set +e
-            ipsw dyld disass "$DSC" \
-              --symbol "$symbol" \
-              --symbol-image "$image" \
-              --count 700 \
+            ipsw dyld disass "$DSC" --symbol "$symbol" --symbol-image "$image" --count 700 \
               > "artifacts/disass/${safe}.txt" 2>&1
             status=$?
             set -e
