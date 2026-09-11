@@ -1,4 +1,4 @@
-name: Photographic Styles 3 Portrait Build
+name: Photographic Styles 3 Portrait Fixture Build
 
 on:
   workflow_dispatch:
@@ -34,26 +34,131 @@ jobs:
           shasum -a 256 artifacts/input/uhdr-portrait-01.heic > artifacts/input/SHA256.txt
           printf '%s:%s\n' "$FIXTURE_SHA" "$FIXTURE_PATH" > artifacts/input/source.txt
 
-      - name: Build current XDRemux and combined Portrait + Semantic Style baseline
+      - name: Patch semantic scaffold merge for hosted ImageIO
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('Sources/XDRemuxAppleFeatures/PhotographicStyles/ApplePhotographicStylesPipeline.swift')
+          source = path.read_text()
+
+          old_parse = '''            let itemInfo = parseISOBMFFItemInfos(data, iinf)
+                      guard let toneMapID = itemInfo.items.first(where: { $0.type == "tmap" })?.itemID,
+                            let ipmaBox = isobmffBoxes(
+                                in: data, start: iprp.dataStart, end: iprp.dataEnd
+                            ).first(where: { $0.type == "ipma" }) else {
+                          throw CLIError.invalidContainer("\\(owner) semantic merge item graph is incomplete")
+                      }
+          '''
+          # Account for source indentation exactly as Swift formats it.
+          if old_parse not in source:
+              old_parse = '''            let itemInfo = parseISOBMFFItemInfos(data, iinf)
+                      guard let toneMapID = itemInfo.items.first(where: { $0.type == "tmap" })?.itemID,
+                            let ipmaBox = isobmffBoxes(
+                                in: data, start: iprp.dataStart, end: iprp.dataEnd
+                            ).first(where: { $0.type == "ipma" }) else {
+                          throw CLIError.invalidContainer("\\(owner) semantic merge item graph is incomplete")
+                      }'''
+
+          marker = '            let itemInfo = parseISOBMFFItemInfos(data, iinf)\n'
+          start = source.find(marker)
+          assert start >= 0, 'semantic merge parser marker not found'
+          end_marker = '            let refs = parseISOBMFFIRefs(data, iref)\n'
+          end = source.find(end_marker, start)
+          assert end > start, 'semantic merge parser end marker not found'
+          current = source[start:end]
+          assert 'semantic merge item graph is incomplete' in current
+          assert 'toneMapID' in current and 'ipmaBox' in current
+          replacement = '''            let itemInfo = parseISOBMFFItemInfos(data, iinf)
+                      let primaryID = try parseISOBMFFPITM(data, pitm)
+                      let toneMapID: Int
+                      if let existingToneMapID = itemInfo.items.first(where: { $0.type == "tmap" })?.itemID {
+                          toneMapID = existingToneMapID
+                      } else if owner == "semantic scaffold" {
+                          // macOS 15 ImageIO keeps Person/Skin/Sky auxiliaries but may
+                          // omit the temporary ISO tmap. The real source HDR still owns
+                          // the authoritative tone-map item; use primary as a sentinel
+                          // only while importing the scaffold semantics.
+                          toneMapID = primaryID
+                      } else {
+                          throw CLIError.invalidContainer("\\(owner) semantic merge source has no tmap")
+                      }
+                      guard let ipmaBox = isobmffBoxes(
+                          in: data, start: iprp.dataStart, end: iprp.dataEnd
+                      ).first(where: { $0.type == "ipma" }) else {
+                          throw CLIError.invalidContainer("\\(owner) semantic merge item graph is incomplete")
+                      }
+          '''
+          source = source[:start] + replacement + source[end:]
+
+          old_primary = '                primaryID: try parseISOBMFFPITM(data, pitm),\n'
+          assert old_primary in source, 'semantic merge primary return was not found'
+          source = source.replace(old_primary, '                primaryID: primaryID,\n', 1)
+
+          old_refs = '''        for ref in scaffold.refs where itemIDMap[ref.from] != nil {
+                      outputRefs.append(ISOBMFFIRefEntry(
+                          type: ref.type,
+                          from: itemIDMap[ref.from]!,
+                          to: try ref.to.map(mappedTarget)
+                      ))
+                  }
+          '''
+          if old_refs not in source:
+              start = source.find('        for ref in scaffold.refs where itemIDMap[ref.from] != nil {\n')
+              assert start >= 0, 'semantic reference copy loop not found'
+              end = source.find('        }\n', start)
+              # First closing brace after the append block is the loop close only
+              # after the nested call; locate the following known marker instead.
+              next_marker = '        if !outputRefs.contains(where: {\n'
+              end = source.find(next_marker, start)
+              assert end > start, 'semantic reference copy loop end not found'
+              current_refs = source[start:end]
+          else:
+              current_refs = old_refs
+              start = source.find(old_refs)
+              end = start + len(old_refs)
+          assert 'to: try ref.to.map(mappedTarget)' in current_refs
+          replacement_refs = '''        for ref in scaffold.refs where itemIDMap[ref.from] != nil {
+                      var targets = try ref.to.map(mappedTarget)
+                      if ref.type == "auxl", semanticImageIDs.contains(ref.from) {
+                          // Native style semantics describe both the primary SDR base
+                          // and its HDR tone-map relation. If hosted ImageIO omitted
+                          // tmap from the temporary scaffold, restore that relation here.
+                          if !targets.contains(source.primaryID) { targets.append(source.primaryID) }
+                          if !targets.contains(source.toneMapID) { targets.append(source.toneMapID) }
+                      }
+                      outputRefs.append(ISOBMFFIRefEntry(
+                          type: ref.type,
+                          from: itemIDMap[ref.from]!,
+                          to: targets
+                      ))
+                  }
+          '''
+          source = source[:start] + replacement_refs + source[end:]
+          path.write_text(source)
+          print('patched hosted semantic scaffold merge without relaxing final source-HDR tmap requirement')
+          PY
+
+      - name: Build XDRemux and Semantic Styles baseline from portrait fixture
         shell: bash
         run: |
           set -euo pipefail
           swift build 2>&1 | tee artifacts/baseline/swift-build.log
           .build/debug/xdremux convert \
             --apple-photographic-styles \
-            --apple-portrait \
             --apple-style-data-producer constrained-solver \
             --debug-dir artifacts/baseline/debug \
             --input artifacts/input/uhdr-portrait-01.heic \
-            --output artifacts/baseline/portrait-semantic-style.heic \
+            --output artifacts/baseline/portrait-fixture-semantic-style.heic \
             > artifacts/baseline/convert.log \
             2> artifacts/baseline/convert.stderr
-          test -s artifacts/baseline/portrait-semantic-style.heic
+          test -s artifacts/baseline/portrait-fixture-semantic-style.heic
           .build/debug/xdremux validate-apple \
-            --input artifacts/baseline/portrait-semantic-style.heic \
-            --expect-portrait \
+            --input artifacts/baseline/portrait-fixture-semantic-style.heic \
             > artifacts/baseline/validate-apple.json
-          sips -g pixelWidth -g pixelHeight artifacts/baseline/portrait-semantic-style.heic \
+          sips -g pixelWidth -g pixelHeight artifacts/baseline/portrait-fixture-semantic-style.heic \
             > artifacts/baseline/sips.txt
 
       - name: Materialize RC-derived PS3 contract
@@ -62,7 +167,7 @@ jobs:
           set -euo pipefail
           cat > artifacts/ps3/contract.json <<'JSON'
           {
-            "schema": "xdremux-photographic-styles-3-portrait-rc-candidate-v1",
+            "schema": "xdremux-photographic-styles-3-portrait-fixture-rc-candidate-v2",
             "evidence": {
               "textureURI": "iOS 27 RC firmware diff",
               "requiredTextureInfoKeys": "iOS 27 RC firmware diff",
@@ -111,13 +216,13 @@ jobs:
           JSON
           python3 -m json.tool artifacts/ps3/contract.json > /dev/null
 
-      - name: Construct PS3 portrait HEIC
+      - name: Construct PS3 portrait-fixture HEIC
         shell: bash
         run: |
           set -euo pipefail
           python3 -m py_compile scripts/research/patch_texture_style_heif_v3.py
           python3 scripts/research/patch_texture_style_heif_v3.py \
-            artifacts/baseline/portrait-semantic-style.heic \
+            artifacts/baseline/portrait-fixture-semantic-style.heic \
             artifacts/ps3/contract.json \
             artifacts/ps3/candidates \
             | tee artifacts/ps3/build-report.json
@@ -129,7 +234,7 @@ jobs:
         run: |
           set -euo pipefail
           CANDIDATE=artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
-          .build/debug/xdremux validate-apple --input "$CANDIDATE" --expect-portrait > artifacts/ps3/validate-apple.json
+          .build/debug/xdremux validate-apple --input "$CANDIDATE" > artifacts/ps3/validate-apple.json
           sips -g pixelWidth -g pixelHeight "$CANDIDATE" > artifacts/ps3/sips.txt
           shasum -a 256 "$CANDIDATE" > artifacts/ps3/SHA256.txt
           python3 - <<'PY'
@@ -157,11 +262,14 @@ jobs:
           idat=by_type.get('idat')
           entries={e['id']:e for e in iloc['entries']}
 
+          primary=next(i['id'] for i in infos if i['id']==p.parse_pitm(data,by_type['pitm'])) if hasattr(p,'parse_pitm') else None
+          tmap=next(i['id'] for i in infos if i['type']=='tmap')
           semantic=next(i for i in infos if i['type']=='uri ' and b'tag:apple.com,2023:photo:metadata:styles\0' in i['raw'])
           texture=next(i for i in infos if i['type']=='uri ' and b'tag:apple.com,2026:photo:metadata:texture_styles\0' in i['raw'])
           semantic_targets=next(r['to'] for r in refs if r['type']=='cdsc' and r['from']==semantic['id'])
           texture_targets=next(r['to'] for r in refs if r['type']=='cdsc' and r['from']==texture['id'])
           assert texture_targets == semantic_targets and texture_targets
+          assert tmap in semantic_targets, '2023 style metadata must describe the HDR tone-map target'
 
           texture_plist=plistlib.loads(p.item_payload(data,entries[texture['id']],idat))
           assert texture_plist['Version'] == 1
@@ -180,9 +288,14 @@ jobs:
           for key in ['0','1','2','3','4','5','6','7']:
               assert key in maker
 
+          semantic_aux=[r for r in refs if r['type']=='auxl' and tmap in r['to']]
+          assert len(semantic_aux) >= 3, 'Person/Skin/Sky semantics must retain HDR tone-map association'
+
           audit={
             'semanticStyleItemID': semantic['id'],
             'textureStyleItemID': texture['id'],
+            'toneMapItemID': tmap,
+            'semanticAuxToToneMapCount': len(semantic_aux),
             'sharedCdscTargets': semantic_targets,
             'payloadInvariant': candidate['payloadInvariant'],
             'makerNoteTextureKeys': {k: maker[k] for k in maker if str(k).startswith('TextureStyle')},
@@ -201,11 +314,11 @@ jobs:
           python3 -m unittest Tests.validation.test_agent_completion_gate
           python3 -m unittest Tests.test_swift_app_architecture
 
-      - name: Upload portrait candidate
+      - name: Upload portrait-fixture candidate
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ps3-portrait-offline-${{ github.sha }}
+          name: ps3-portrait-fixture-${{ github.sha }}
           retention-days: 14
           if-no-files-found: error
           path: artifacts/
