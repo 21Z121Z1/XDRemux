@@ -1,0 +1,127 @@
+name: TextureStyle V4 tag84 gate
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-v4-tag84-gate.yml
+      - scripts/research/texture_style_tag84_v4_contract.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download A baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+
+      - name: Generate tag84-only V4 candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/candidates artifacts/probes
+          BASELINE="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$BASELINE"
+          echo "BASELINE=$BASELINE" >> "$GITHUB_ENV"
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            "$BASELINE" scripts/research/texture_style_tag84_v4_contract.json artifacts/candidates \
+            | tee artifacts/generator.json
+
+      - name: Build PhotosFormats gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/pf_gate.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <objc/runtime.h>
+          #import <dlfcn.h>
+
+          static id OpenMetadata(NSURL *url) {
+              Class cls=NSClassFromString(@"PFMetadataImage"); if(!cls)return nil;
+              id contentType=nil; Class ut=NSClassFromString(@"UTType"); SEL ts=NSSelectorFromString(@"typeWithIdentifier:");
+              if(ut && [ut respondsToSelector:ts]) contentType=((id(*)(id,SEL,id))objc_msgSend)(ut,ts,@"public.heic");
+              id obj=[cls alloc]; SEL s=NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");
+              if([obj respondsToSelector:s]) { @try { id v=((id(*)(id,SEL,id,id,id))objc_msgSend)(obj,s,url,contentType,nil); if(v)return v; } @catch(__unused NSException *e){} }
+              obj=[cls alloc]; SEL f=NSSelectorFromString(@"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:");
+              if([obj respondsToSelector:f]) { @try { return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(obj,f,url,contentType,0,nil,YES,YES); } @catch(__unused NSException *e){} }
+              return nil;
+          }
+          static id ScalarOrObject(id obj, NSString *name) {
+              SEL sel=NSSelectorFromString(name); if(!obj || ![obj respondsToSelector:sel]) return [NSNull null];
+              NSMethodSignature *sig=[obj methodSignatureForSelector:sel]; if(!sig)return [NSNull null];
+              const char *t=sig.methodReturnType;
+              @try {
+                  if(t[0]=='@') return ((id(*)(id,SEL))objc_msgSend)(obj,sel) ?: [NSNull null];
+                  if(t[0]=='B' || t[0]=='c') return @(((BOOL(*)(id,SEL))objc_msgSend)(obj,sel));
+                  if(t[0]=='f') return @(((float(*)(id,SEL))objc_msgSend)(obj,sel));
+                  if(t[0]=='d') return @(((double(*)(id,SEL))objc_msgSend)(obj,sel));
+                  if(strchr("qQiIlLsS",t[0])) return @(((long long(*)(id,SEL))objc_msgSend)(obj,sel));
+              } @catch(__unused NSException *e){}
+              return [NSNull null];
+          }
+          int main(int argc,const char **argv){ @autoreleasepool {
+              if(argc!=2)return 64;
+              dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);
+              NSURL *url=[NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]]; id m=OpenMetadata(url);
+              NSMutableDictionary *o=[NSMutableDictionary dictionary]; o[@"metadataClass"]=m?NSStringFromClass([m class]):@"nil";
+              for(NSString *k in @[@"hasSmartStyle",@"hasTextureStyle",@"textureStylePreset",@"textureStyleIntensity",@"textureStyleGrainIntensity",@"textureStyleIsReversible"])
+                  o[k]=ScalarOrObject(m,k);
+              NSData *j=[NSJSONSerialization dataWithJSONObject:o options:NSJSONWritingSortedKeys error:nil];
+              fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout); return m?0:2;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework UniformTypeIdentifiers \
+            "$RUNNER_TEMP/pf_gate.m" -o "$RUNNER_TEMP/pf_gate"
+
+      - name: Gate all candidates and retain winners
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/winners
+          : > artifacts/results.jsonl
+          for f in artifacts/candidates/V4-tag84-preset*.heic; do
+            name="$(basename "$f" .heic)"
+            json="$($RUNNER_TEMP/pf_gate "$f")"
+            printf '{"file":"%s","gate":%s}\n' "$(basename "$f")" "$json" | tee -a artifacts/results.jsonl
+            printf '%s\n' "$json" > "artifacts/probes/${name}.json"
+            has="$(python3 - "$json" <<'PY'
+          import json,sys
+          v=json.loads(sys.argv[1]).get('hasTextureStyle')
+          print('1' if v is True or v==1 else '0')
+          PY
+          )"
+            if [[ "$has" == 1 ]]; then cp "$f" artifacts/winners/; fi
+          done
+          python3 - <<'PY'
+          import json,glob
+          rows=[json.loads(line) for line in open('artifacts/results.jsonl') if line.strip()]
+          winners=[r for r in rows if r['gate'].get('hasTextureStyle') is True or r['gate'].get('hasTextureStyle')==1]
+          print(json.dumps({'winners':winners,'count':len(winners)},indent=2))
+          open('artifacts/winners.json','w').write(json.dumps({'winners':winners,'count':len(winners)},indent=2))
+          PY
+          cat artifacts/winners.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload V4 tag84 fixtures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-v4-tag84-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: artifacts/
