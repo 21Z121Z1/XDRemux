@@ -1,0 +1,88 @@
+name: TextureStyle V5 ImageIO MakerApple gate
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-v5-imageio-makerapple-gate.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  imageio-gate:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download V5 candidates
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-style-v5-numeric-413c4e3328e8f9d95f9a655df55ed03e1f9014e6
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34610936229
+      - name: Read MakerApple through system ImageIO
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cat > "$RUNNER_TEMP/dump.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+
+          static id JSONSafe(id x) {
+              if (!x) return [NSNull null];
+              if ([x isKindOfClass:[NSString class]] || [x isKindOfClass:[NSNumber class]] || [x isKindOfClass:[NSNull class]]) return x;
+              if ([x isKindOfClass:[NSData class]]) return @{ @"dataHex": [(NSData *)x description] };
+              if ([x isKindOfClass:[NSArray class]]) {
+                  NSMutableArray *a=[NSMutableArray array]; for(id v in x)[a addObject:JSONSafe(v)]; return a;
+              }
+              if ([x isKindOfClass:[NSDictionary class]]) {
+                  NSMutableDictionary *d=[NSMutableDictionary dictionary];
+                  for(id k in x) d[[k description]]=JSONSafe(x[k]);
+                  return d;
+              }
+              return [x description];
+          }
+          int main(int argc,const char **argv){@autoreleasepool{
+              if(argc<2)return 64;
+              NSMutableArray *rows=[NSMutableArray array];
+              for(int i=1;i<argc;i++){
+                  NSString *p=[NSString stringWithUTF8String:argv[i]];
+                  CGImageSourceRef src=CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:p],NULL);
+                  NSDictionary *props=src?CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(src,0,NULL)):nil;
+                  if(src)CFRelease(src);
+                  id maker=props[(__bridge NSString *)kCGImagePropertyMakerAppleDictionary];
+                  id style=[maker isKindOfClass:[NSDictionary class]] ? maker[@"84"] : nil;
+                  [rows addObject:@{@"file":p.lastPathComponent,@"makerApple":JSONSafe(maker),@"tag84":JSONSafe(style)}];
+              }
+              NSData*j=[NSJSONSerialization dataWithJSONObject:rows options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              fwrite(j.bytes,1,j.length,stdout); fputc('\n',stdout);
+          }return 0;}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework ImageIO "$RUNNER_TEMP/dump.m" -o "$RUNNER_TEMP/dump"
+          mapfile -t files < <(printf '%s\n' source-artifact/A-baseline-original.heic source-artifact/candidates/V5-standard-min.heic source-artifact/candidates/V5-filmic-min.heic)
+          "$RUNNER_TEMP/dump" "${files[@]}" | tee artifacts/imageio-makerapple.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('artifacts/imageio-makerapple.json').read_text())
+          for r in rows:
+              print(r['file'], 'tag84=', json.dumps(r['tag84'], ensure_ascii=False, sort_keys=True))
+          film=next(r for r in rows if r['file']=='V5-filmic-min.heic')
+          text=json.dumps(film['tag84'],sort_keys=True)
+          # This is only a sanity gate: exact representation may be dictionary or nested decoded object.
+          if '8' not in text:
+              raise SystemExit('ImageIO did not expose TextureStyle preset key 8 from tag84')
+          PY
+      - name: Upload ImageIO evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-v5-imageio-makerapple-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
