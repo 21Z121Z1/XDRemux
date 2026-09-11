@@ -1,0 +1,60 @@
+name: TextureStyle V4 tag84 fast artifacts
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-v4-tag84-artifact-fast.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download physical-device validated baseline A
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+      - name: Generate numeric tag84 candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/candidates
+          BASELINE="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$BASELINE"
+          cp "$BASELINE" artifacts/A-baseline-original.heic
+          sha256sum "$BASELINE" | tee artifacts/baseline.sha256
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            "$BASELINE" scripts/research/texture_style_tag84_v4_contract.json artifacts/candidates \
+            > artifacts/build.stdout
+          sha256sum artifacts/candidates/*.heic | sort | tee artifacts/candidates.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('artifacts/candidates/candidate-manifest-v3.json').read_text())
+          for x in m:
+              if x.get('newTextureItemID') is not None:
+                  raise SystemExit('unexpected standalone TextureStyle item')
+              if not x.get('payloadInvariant'):
+                  raise SystemExit('non-Exif payload invariant failed')
+          print(json.dumps(m,indent=2))
+          PY
+      - name: Upload V4 candidates
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-style-v4-tag84-fast-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: artifacts/
