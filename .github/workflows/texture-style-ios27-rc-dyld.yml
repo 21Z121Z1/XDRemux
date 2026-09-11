@@ -1,0 +1,126 @@
+name: TextureStyle iPhone 18 Pro iOS 27 RC dyld Probe
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-ios27-rc-dyld.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  iphone18pro-rc-dyld:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare tools and evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          brew tap blacktop/tap
+          brew trust blacktop/tap
+          brew install --formula blacktop/tap/ipsw 2>&1 | tee artifacts/brew-install.log
+          ipsw version 2>&1 | tee artifacts/ipsw-version.txt || true
+
+      - name: Remote extract iPhone 18 Pro iOS 27 RC dyld cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ios27rc"
+          # AppleDB: iPhone 18 Pro = iPhone19,2 / V63AP. Build 24A435 is
+          # iOS 27.0 RC. --dyld uses range-based remote extraction.
+          ipsw download appledb \
+            --os iOS \
+            --build 24A435 \
+            --type ota \
+            --device iPhone19,2 \
+            --dyld \
+            --confirm \
+            --output "$RUNNER_TEMP/ios27rc" \
+            2>&1 | tee artifacts/remote-extract.log
+          find "$RUNNER_TEMP/ios27rc" -maxdepth 8 -type f -print \
+            | tee artifacts/extracted-files.txt
+          DSC="$(find "$RUNNER_TEMP/ios27rc" -type f \( -name 'dyld_shared_cache_arm64e' -o -name 'dyld_shared_cache_arm64' \) | head -n 1)"
+          test -n "$DSC"
+          printf '%s\n' "$DSC" > artifacts/dsc-path.txt
+          cp "$DSC" "$RUNNER_TEMP/texture-style-ios27rc-dsc"
+
+      - name: Extract TextureStyle frameworks from iPhone 18 Pro RC cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          DSC="$RUNNER_TEMP/texture-style-ios27rc-dsc"
+          mkdir -p artifacts/frameworks artifacts/macho
+          frameworks=(
+            AVFCapture
+            CMCaptureCore
+            CMImaging
+            CameraEditKit
+            NeutrinoCore
+            PhotoImaging
+            PhotosFormats
+          )
+          for fw in "${frameworks[@]}"; do
+            echo "===== $fw ====="
+            ipsw dyld macho "$DSC" "$fw" --symbols > "artifacts/${fw}-symbols.txt" 2>&1 || true
+            ipsw dyld macho "$DSC" "$fw" --strings > "artifacts/${fw}-strings.txt" 2>&1 || true
+            ipsw dyld macho "$DSC" "$fw" --objc > "artifacts/${fw}-objc.txt" 2>&1 || true
+            ipsw dyld macho "$DSC" "$fw" --extract --force --output artifacts/frameworks > "artifacts/${fw}-extract.txt" 2>&1 || true
+          done
+          find artifacts/frameworks -type f -maxdepth 6 -print | tee artifacts/framework-files.txt
+
+      - name: Resolve TextureStyle symbols and strings
+        shell: bash
+        run: |
+          set -euo pipefail
+          find artifacts/frameworks -type f | while read -r bin; do
+            base="$(basename "$bin")"
+            case "$base" in
+              AVFCapture|CMCaptureCore|CMImaging|CameraEditKit|NeutrinoCore|PhotoImaging|PhotosFormats)
+                file "$bin" > "artifacts/macho/${base}-file.txt" || true
+                nm -nm "$bin" 2>/dev/null \
+                  | grep -Ei 'TextureStyle|PhotographicStyle|MakerNote' \
+                  > "artifacts/macho/${base}-nm-texture.txt" || true
+                strings -a "$bin" \
+                  | grep -Ei 'TextureStyle|Texture Style|texture_styles|textureStyle|FilmGrain|OriginalInstead|HardwareModel|PortType|CaptureMode|CaptureType|V63AP' \
+                  > "artifacts/macho/${base}-strings-texture.txt" || true
+                otool -l "$bin" > "artifacts/macho/${base}-loads.txt" || true
+                ;;
+            esac
+          done
+
+      - name: Summarize evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          {
+            echo '# iPhone 18 Pro iOS 27 RC TextureStyle dyld evidence'
+            echo
+            echo 'Build: 24A435'
+            echo 'ProductType: iPhone19,2'
+            echo 'HardwareModel: V63AP'
+            echo
+            for f in artifacts/macho/*-nm-texture.txt artifacts/macho/*-strings-texture.txt; do
+              test -f "$f" || continue
+              echo "## $f"
+              sed -n '1,260p' "$f"
+              echo
+            done
+          } > artifacts/summary.md
+          sed -n '1,500p' artifacts/summary.md || true
+
+      - name: Upload iPhone 18 Pro RC dyld evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-iphone18pro-ios27-rc-dyld-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
