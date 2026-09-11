@@ -1,0 +1,79 @@
+name: TextureStyle RC Linux PhotoImaging extract
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-rc-linux-photoimaging-extract.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ipsw and apfs-fuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APFS_FUSE_SHA: 66b86bd525e8cb90f9012543be89b1f092b75cf3
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(gh api repos/blacktop/ipsw/releases/latest --jq '.assets[] | select(.name | test("^ipsw_.*linux_x86_64\\.deb$")) | .browser_download_url' | head -n1)"
+          curl -fsSL -o /tmp/ipsw.deb "$url"
+          sudo dpkg -i /tmp/ipsw.deb
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fuse3 libfuse3-dev libbz2-dev libattr1-dev zlib1g-dev cmake g++ git
+          src="$RUNNER_TEMP/apfs-fuse"
+          git clone --quiet https://github.com/sgan81/apfs-fuse.git "$src"
+          git -C "$src" checkout --quiet "$APFS_FUSE_SHA"
+          git -C "$src" submodule update --init --recursive --quiet
+          cmake -S "$src" -B "$src/build" -DCMAKE_BUILD_TYPE=Release >/dev/null
+          cmake --build "$src/build" --parallel "$(nproc)" >/dev/null
+          sudo install -m 0755 "$src/build/apfs-fuse" /usr/local/bin/apfs-fuse
+          mkdir -p artifacts/cache artifacts/extracted artifacts/reports
+
+      - name: Extract exact 24A435 cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
+          ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" > artifacts/reports/cache-extract.log 2>&1
+          CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
+          test -s "$CACHE"
+          echo "CACHE=$CACHE" >> "$GITHUB_ENV"
+
+      - name: Extract PhotoImaging Mach-O only
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipsw dyld macho "$CACHE" PhotoImaging --extract --force --output "$PWD/artifacts/extracted" \
+            > artifacts/reports/photoimaging-extract.log 2>&1
+          BIN="$(find artifacts/extracted -type f -name PhotoImaging -print -quit)"
+          test -s "$BIN"
+          cp "$BIN" artifacts/PhotoImaging
+          sha256sum artifacts/PhotoImaging | tee artifacts/reports/PhotoImaging.sha256
+          file artifacts/PhotoImaging | tee artifacts/reports/file.txt
+          ipsw dyld macho "$CACHE" PhotoImaging --symbols --strings > artifacts/reports/photoimaging-symbols-strings.txt 2>&1 || true
+          grep -n -E -C 12 'PITextureStyle(SettingsFromMakerNoteProperties|PresetFromMakerNoteValue)|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|Missing smart style' \
+            artifacts/reports/photoimaging-symbols-strings.txt > artifacts/reports/texture-symbols.txt || true
+          cat artifacts/reports/texture-symbols.txt || true
+
+      - name: Upload PhotoImaging binary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios27-24A435-photoimaging-binary-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: |
+            artifacts/PhotoImaging
+            artifacts/reports/
+
+      - name: Remove cache
+        if: always()
+        run: rm -rf artifacts/cache artifacts/extracted
