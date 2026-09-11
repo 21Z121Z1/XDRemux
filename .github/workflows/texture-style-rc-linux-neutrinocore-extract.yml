@@ -2,7 +2,9 @@ name: TextureStyle RC Linux NeutrinoCore extract
 
 on:
   push:
-    branches: [research/photographic-styles-3-texture-probe]
+    branches:
+      - research/photographic-styles-3-texture-probe
+      - research/photographic-styles-3-texture-probe-v7
     paths: [.github/workflows/texture-style-rc-linux-neutrinocore-extract.yml]
   workflow_dispatch:
 
@@ -46,7 +48,7 @@ jobs:
           test -s "$CACHE"
           echo "CACHE=$CACHE" >> "$GITHUB_ENV"
 
-      - name: Extract NeutrinoCore Mach-O only
+      - name: Extract and disassemble NeutrinoCore TextureStyle reader
         shell: bash
         run: |
           set -euo pipefail
@@ -57,12 +59,22 @@ jobs:
           cp "$BIN" artifacts/NeutrinoCore
           sha256sum artifacts/NeutrinoCore | tee artifacts/reports/NeutrinoCore.sha256
           file artifacts/NeutrinoCore | tee artifacts/reports/file.txt
-          ipsw dyld macho "$CACHE" NeutrinoCore --symbols --strings > artifacts/reports/neutrinocore-symbols-strings.txt 2>&1 || true
-          grep -n -E -C 16 '_NUTextureStyleProperties|textureStylePropertiesFromImageMetadata|TextureStyle|filmGrainSeed|personInstances|videoFacesInfoData' \
-            artifacts/reports/neutrinocore-symbols-strings.txt > artifacts/reports/texture-symbols.txt || true
-          cat artifacts/reports/texture-symbols.txt || true
 
-      - name: Upload NeutrinoCore binary
+          ipsw dyld macho "$CACHE" NeutrinoCore --symbols --strings --objc --objc-refs \
+            > artifacts/reports/neutrinocore-symbols-strings.txt 2>&1 || true
+          grep -n -E -C 24 '_NUTextureStyleProperties|textureStylePropertiesFromImageMetadata|tag:apple.com,2026:photo:metadata:texture_styles|TextureStyle|Version|HardwareModel|PortType|CaptureMode|CaptureType|FilmGrainSeed|PeopleSkinMaskType|PeopleSkinLookupTableIndex|CustomMetadata' \
+            artifacts/reports/neutrinocore-symbols-strings.txt > artifacts/reports/texture-symbols.txt || true
+
+          ipsw dyld disass "$CACHE" \
+            --symbol '+[_NUTextureStyleProperties textureStylePropertiesFromImageMetadata:auxImageMetadata:error:]' \
+            --symbol-image NeutrinoCore --count 1200 --quiet --force --no-color \
+            > artifacts/reports/texture-properties-reader.disass.txt 2>&1 || true
+          grep -n -E -C 30 'TextureStyle|Version|HardwareModel|PortType|CaptureMode|CaptureType|FilmGrainSeed|PeopleSkinMaskType|PeopleSkinLookupTableIndex|objectForKey|isKindOfClass|integerValue|unsignedIntegerValue|boolValue' \
+            artifacts/reports/texture-properties-reader.disass.txt > artifacts/reports/texture-reader-focused.txt || true
+          cat artifacts/reports/texture-symbols.txt || true
+          cat artifacts/reports/texture-reader-focused.txt || true
+
+      - name: Upload NeutrinoCore evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
