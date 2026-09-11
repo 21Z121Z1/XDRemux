@@ -1,0 +1,173 @@
+name: TextureStyle V5 macOS 27 acceptance gate
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths:
+      - .github/workflows/texture-style-v5-xcode27-acceptance.yml
+      - scripts/research/texture_style_tag84_v5_numeric_contract.json
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  gate:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download physical-device validated baseline A
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+
+      - name: Build V5 candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/candidates artifacts/probes
+          BASELINE="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$BASELINE"
+          cp "$BASELINE" artifacts/A-baseline-original.heic
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            "$BASELINE" scripts/research/texture_style_tag84_v5_numeric_contract.json artifacts/candidates \
+            > artifacts/build.stdout
+          shasum -a 256 artifacts/candidates/*.heic | sort > artifacts/candidates.sha256
+
+      - name: Build direct PhotosFormats and ImageIO probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/texture_probe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <objc/message.h>
+          #import <objc/runtime.h>
+          #import <dlfcn.h>
+
+          static id JsonSafe(id obj) {
+              if (!obj) return [NSNull null];
+              if ([NSJSONSerialization isValidJSONObject:obj]) return obj;
+              if ([obj isKindOfClass:[NSDictionary class]]) {
+                  NSMutableDictionary *out=[NSMutableDictionary dictionary];
+                  for (id k in obj) out[[k description]] = JsonSafe(obj[k]);
+                  return out;
+              }
+              if ([obj isKindOfClass:[NSArray class]]) {
+                  NSMutableArray *out=[NSMutableArray array]; for(id x in obj)[out addObject:JsonSafe(x)]; return out;
+              }
+              if ([obj isKindOfClass:[NSString class]] || [obj isKindOfClass:[NSNumber class]] || [obj isKindOfClass:[NSNull class]]) return obj;
+              return [obj description] ?: @"";
+          }
+
+          static id InvokeZeroArg(id obj, NSString *name) {
+              SEL sel=NSSelectorFromString(name);
+              if (!obj || ![obj respondsToSelector:sel]) return @{ @"available":@NO };
+              NSMethodSignature *sig=[obj methodSignatureForSelector:sel];
+              if(!sig) return @{ @"available":@YES, @"error":@"no signature" };
+              NSInvocation *inv=[NSInvocation invocationWithMethodSignature:sig];
+              inv.target=obj; inv.selector=sel; [inv invoke];
+              const char *t=sig.methodReturnType;
+              while(*t=='r'||*t=='n'||*t=='N'||*t=='o'||*t=='O'||*t=='R'||*t=='V')t++;
+              id value=nil;
+              if(*t=='@') { __unsafe_unretained id v=nil; [inv getReturnValue:&v]; value=v ?: [NSNull null]; }
+              else if(*t=='B'||*t=='c') { BOOL v=NO; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='i'||*t=='s'||*t=='l'||*t=='q') { long long v=0; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='I'||*t=='S'||*t=='L'||*t=='Q') { unsigned long long v=0; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='f') { float v=0; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='d') { double v=0; [inv getReturnValue:&v]; value=@(v); }
+              else if(*t=='v') value=[NSNull null];
+              else value=[NSString stringWithFormat:@"unsupported-return:%s",t];
+              return @{ @"available":@YES, @"encoding":[NSString stringWithUTF8String:sig.methodReturnType], @"value":JsonSafe(value) };
+          }
+
+          static id OpenMetadata(NSURL *url) {
+              Class cls=NSClassFromString(@"PFMetadataImage"); if(!cls)return nil;
+              Class ut=NSClassFromString(@"UTType"); id type=nil;
+              SEL ts=NSSelectorFromString(@"typeWithIdentifier:");
+              if(ut&&[ut respondsToSelector:ts]) type=((id(*)(id,SEL,id))objc_msgSend)(ut,ts,@"public.heic");
+              id obj=[cls alloc];
+              SEL s=NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");
+              if([obj respondsToSelector:s]) { @try { id v=((id(*)(id,SEL,id,id,id))objc_msgSend)(obj,s,url,type,nil); if(v)return v; } @catch(__unused NSException *e){} }
+              obj=[cls alloc];
+              s=NSSelectorFromString(@"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:");
+              if([obj respondsToSelector:s]) { @try { return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(obj,s,url,type,0,nil,YES,YES); } @catch(__unused NSException *e){} }
+              return nil;
+          }
+
+          int main(int argc,const char **argv){ @autoreleasepool {
+              if(argc!=2)return 64;
+              dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);
+              dlopen("/System/Library/Frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers",RTLD_NOW|RTLD_GLOBAL);
+              NSString *path=[NSString stringWithUTF8String:argv[1]];
+              NSURL *url=[NSURL fileURLWithPath:path];
+              CGImageSourceRef src=CGImageSourceCreateWithURL((__bridge CFURLRef)url,NULL);
+              NSDictionary *props=nil;
+              if(src){ CFDictionaryRef p=CGImageSourceCopyPropertiesAtIndex(src,0,NULL); props=CFBridgingRelease(p); CFRelease(src); }
+              id maker=props[(__bridge NSString*)kCGImagePropertyMakerAppleDictionary] ?: [NSNull null];
+              id metadata=OpenMetadata(url);
+              NSMutableDictionary *out=[@{
+                  @"file":path.lastPathComponent,
+                  @"metadataClass":metadata?NSStringFromClass([metadata class]):@"nil",
+                  @"makerApple":JsonSafe(maker)
+              } mutableCopy];
+              for(NSString *name in @[@"hasSmartStyle",@"hasTextureStyle",@"textureStylePreset",@"textureStyleIntensity",@"textureStyleGrainIntensity",@"textureStyleIsReversible"])
+                  out[name]=InvokeZeroArg(metadata,name);
+              NSData *json=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingSortedKeys error:nil];
+              fwrite(json.bytes,1,json.length,stdout); fputc('\n',stdout);
+              return metadata?0:2;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework ImageIO -framework UniformTypeIdentifiers \
+            "$RUNNER_TEMP/texture_probe.m" -o "$RUNNER_TEMP/texture_probe"
+
+      - name: Probe baseline and every V5 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > artifacts/probes/results.jsonl
+          "$RUNNER_TEMP/texture_probe" artifacts/A-baseline-original.heic >> artifacts/probes/results.jsonl
+          for f in artifacts/candidates/*.heic; do
+            "$RUNNER_TEMP/texture_probe" "$f" >> artifacts/probes/results.jsonl || true
+          done
+          cat artifacts/probes/results.jsonl
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          rows=[json.loads(x) for x in Path('artifacts/probes/results.jsonl').read_text().splitlines() if x.strip()]
+          def val(r,k):
+              x=r.get(k,{})
+              return x.get('value') if isinstance(x,dict) else x
+          summary=[]
+          for r in rows:
+              maker=r.get('makerApple',{})
+              tag84=maker.get('84') if isinstance(maker,dict) else None
+              summary.append({
+                'file':r['file'],
+                'hasSmartStyle':val(r,'hasSmartStyle'),
+                'hasTextureStyle':val(r,'hasTextureStyle'),
+                'preset':val(r,'textureStylePreset'),
+                'intensity':val(r,'textureStyleIntensity'),
+                'grain':val(r,'textureStyleGrainIntensity'),
+                'reversible':val(r,'textureStyleIsReversible'),
+                'tag84':tag84,
+              })
+          Path('artifacts/probes/summary.json').write_text(json.dumps(summary,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(summary,indent=2,sort_keys=True))
+          PY
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-style-v5-xcode27-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: artifacts/
