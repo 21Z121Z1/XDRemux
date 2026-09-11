@@ -1,0 +1,30 @@
+{
+  "schema": "xdremux-texture-style-v5-verified-numeric-tag84",
+  "evidence": {
+    "outerMakerNoteTag": 84,
+    "presetKey": "8",
+    "intensityKey": "9",
+    "grainKey": "10",
+    "originalInsteadOfReversibilityKey": "11",
+    "renderingVersionKey": "12",
+    "presetMapping": {"1":"Standard","2":"Soft","3":"Studio","4":"Filmic","5":"Glowy"},
+    "standaloneTextureURI": "absent"
+  },
+  "maker84Variants": {
+    "standard-min": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"8":1,"9":1.0,"10":0.0},
+    "filmic-min": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"8":4,"9":0.61,"10":0.73},
+    "filmic-rv1-original0": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"8":4,"9":0.61,"10":0.73,"11":0,"12":1},
+    "filmic-rv1-original1": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"8":4,"9":0.61,"10":0.73,"11":1,"12":1},
+    "filmic-rv3-original0": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"8":4,"9":0.61,"10":0.73,"11":0,"12":3},
+    "filmic-rv3-original1": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"8":4,"9":0.61,"10":0.73,"11":1,"12":3}
+  },
+  "textureInfoVariants": {},
+  "combinations": [
+    {"name":"V5-standard-min","maker84":"standard-min"},
+    {"name":"V5-filmic-min","maker84":"filmic-min"},
+    {"name":"V5-filmic-rv1-original0","maker84":"filmic-rv1-original0"},
+    {"name":"V5-filmic-rv1-original1","maker84":"filmic-rv1-original1"},
+    {"name":"V5-filmic-rv3-original0","maker84":"filmic-rv3-original0"},
+    {"name":"V5-filmic-rv3-original1","maker84":"filmic-rv3-original1"}
+  ]
+}
