@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - research/photographic-styles-3-texture-probe
+      - research/photographic-styles-3-texture-probe-v7
     paths:
       - .github/workflows/ps3-cmphoto-native-texture-candidate.yml
       - scripts/research/cmphoto_texture_style_writer.m
@@ -20,28 +21,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download physical-device-accepted SmartStyle baseline A
+      - name: Download V5 tag84 TextureStyle candidates
         uses: actions/download-artifact@v5
         with:
-          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          name: ps3-texture-style-v5-xcode27-a80e635a1e490ffe6c82ec1625f48e0365b3561c
           path: source-artifact
           github-token: ${{ github.token }}
           repository: 21Z121Z1/XDRemux
-          run-id: 34597954896
+          run-id: 34623523344
 
-      - name: Select A baseline
+      - name: Select strongest tag84 candidate
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          src="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          src="$(find source-artifact -type f -name 'V5-filmic-rv3-original0.heic' -print -quit)"
           test -s "$src"
-          cp "$src" artifacts/A-baseline-original.heic
-          sha256sum artifacts/A-baseline-original.heic | tee artifacts/input-sha256.txt
+          cp "$src" artifacts/V5-filmic-rv3-original0.heic
+          sha256sum artifacts/V5-filmic-rv3-original0.heic | tee artifacts/input-sha256.txt
           sw_vers | tee artifacts/macos.txt
           xcodebuild -version | tee artifacts/xcode.txt
 
-      - name: Add TextureStyle with Apple's CMPhoto custom-metadata writer
+      - name: Add TextureStyleInfo with Apple's CMPhoto custom-metadata writer
         shell: bash
         run: |
           set -euo pipefail
@@ -50,8 +51,8 @@ jobs:
             -o "$RUNNER_TEMP/cmphoto_texture_style_writer"
           set +e
           "$RUNNER_TEMP/cmphoto_texture_style_writer" \
-            artifacts/A-baseline-original.heic \
-            artifacts/PS3-CMPhoto-native-texture.heic \
+            artifacts/V5-filmic-rv3-original0.heic \
+            artifacts/PS3-combined-texture-v3.heic \
             artifacts/cmphoto-writer-report.json \
             > artifacts/cmphoto-writer.stdout 2> artifacts/cmphoto-writer.stderr
           status=$?
@@ -61,13 +62,13 @@ jobs:
           cat artifacts/cmphoto-writer.stderr || true
           cat artifacts/cmphoto-writer-report.json || true
           test "$status" -eq 0
-          test -s artifacts/PS3-CMPhoto-native-texture.heic
-          sha256sum artifacts/PS3-CMPhoto-native-texture.heic | tee artifacts/output-sha256.txt
-          strings -a artifacts/PS3-CMPhoto-native-texture.heic | \
+          test -s artifacts/PS3-combined-texture-v3.heic
+          sha256sum artifacts/PS3-combined-texture-v3.heic | tee artifacts/output-sha256.txt
+          strings -a artifacts/PS3-combined-texture-v3.heic | \
             grep -E '2023:photo:metadata:styles|2026:photo:metadata:texture_styles|textureStyleMetadata' \
             | tee artifacts/container-strings.txt || true
 
-      - name: Ask PhotosFormats whether native CMPhoto output has TextureStyle
+      - name: Verify SmartStyle survives CMPhoto rewrite
         shell: bash
         run: |
           set -euo pipefail
@@ -76,12 +77,6 @@ jobs:
           #import <objc/message.h>
           #import <objc/runtime.h>
           #import <dlfcn.h>
-          static id SafeCallObject(id obj, NSString *selectorName) {
-              SEL sel=NSSelectorFromString(selectorName);
-              if (!obj || ![obj respondsToSelector:sel]) return [NSNull null];
-              @try { id value=((id(*)(id,SEL))objc_msgSend)(obj,sel); return value ?: [NSNull null]; }
-              @catch (NSException *e) { return @{ @"exception":e.reason ?: e.name }; }
-          }
           static id OpenMetadata(NSURL *url) {
               Class cls=NSClassFromString(@"PFMetadataImage"); if (!cls) return nil;
               id contentType=nil; Class ut=NSClassFromString(@"UTType"); SEL typeSel=NSSelectorFromString(@"typeWithIdentifier:");
@@ -93,34 +88,45 @@ jobs:
               return nil;
           }
           int main(int argc,const char **argv){ @autoreleasepool {
-              if(argc!=3)return 64; void *h=dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);
-              NSMutableDictionary *out=[NSMutableDictionary dictionary]; out[@"frameworkLoaded"]=@(h!=NULL); out[@"classAvailable"]=@(NSClassFromString(@"PFMetadataImage")!=Nil);
-              id metadata=OpenMetadata([NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]]); out[@"metadataClass"]=metadata?NSStringFromClass([metadata class]):@"nil";
-              if(metadata){ SEL hs=NSSelectorFromString(@"hasTextureStyle"); BOOL has=[metadata respondsToSelector:hs]?((BOOL(*)(id,SEL))objc_msgSend)(metadata,hs):NO; out[@"hasTextureStyle"]=@(has);
-                  out[@"hasSmartStyle"]=@([metadata respondsToSelector:NSSelectorFromString(@"hasSmartStyle")]?((BOOL(*)(id,SEL))objc_msgSend)(metadata,NSSelectorFromString(@"hasSmartStyle")):NO);
-                  out[@"textureStylePreset"]=SafeCallObject(metadata,@"textureStylePreset"); out[@"textureStyleIntensity"]=SafeCallObject(metadata,@"textureStyleIntensity");
-                  out[@"textureStyleGrainIntensity"]=SafeCallObject(metadata,@"textureStyleGrainIntensity"); out[@"textureStyleIsReversible"]=SafeCallObject(metadata,@"textureStyleIsReversible"); }
-              NSData *j=[NSJSONSerialization dataWithJSONObject:out options:(NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys) error:nil]; [j writeToFile:[NSString stringWithUTF8String:argv[2]] atomically:YES]; fwrite(j.bytes,1,j.length,stdout); fputc('\n',stdout);
+              if(argc!=3)return 64;
+              void *h=dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);
+              NSMutableDictionary *out=[NSMutableDictionary dictionary];
+              out[@"frameworkLoaded"]=@(h!=NULL);
+              out[@"classAvailable"]=@(NSClassFromString(@"PFMetadataImage")!=Nil);
+              id metadata=OpenMetadata([NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]]);
+              out[@"metadataClass"]=metadata?NSStringFromClass([metadata class]):@"nil";
+              if(metadata){
+                  SEL ss=NSSelectorFromString(@"hasSmartStyle");
+                  out[@"hasSmartStyleAvailable"]=@([metadata respondsToSelector:ss]);
+                  if([metadata respondsToSelector:ss]) out[@"hasSmartStyle"]=@(((BOOL(*)(id,SEL))objc_msgSend)(metadata,ss));
+                  SEL ts=NSSelectorFromString(@"hasTextureStyle");
+                  out[@"hasTextureStyleAvailable"]=@([metadata respondsToSelector:ts]);
+                  if([metadata respondsToSelector:ts]) out[@"hasTextureStyle"]=@(((BOOL(*)(id,SEL))objc_msgSend)(metadata,ts));
+              }
+              NSData *j=[NSJSONSerialization dataWithJSONObject:out options:(NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys) error:nil];
+              [j writeToFile:[NSString stringWithUTF8String:argv[2]] atomically:YES]; fwrite(j.bytes,1,j.length,stdout); fputc('\n',stdout);
               return metadata ? 0 : 2;
           }}
           OBJC
           xcrun clang -fobjc-arc -framework Foundation -framework UniformTypeIdentifiers \
             "$RUNNER_TEMP/pf_texture_probe.m" -o "$RUNNER_TEMP/pf_texture_probe"
-          "$RUNNER_TEMP/pf_texture_probe" artifacts/PS3-CMPhoto-native-texture.heic artifacts/photosformats-texture-style.json \
+          "$RUNNER_TEMP/pf_texture_probe" artifacts/PS3-combined-texture-v3.heic artifacts/photosformats-texture-style.json \
             > artifacts/photosformats.stdout 2> artifacts/photosformats.stderr
           cat artifacts/photosformats.stdout
           cat artifacts/photosformats.stderr || true
           python3 - <<'PY'
           import json
           p=json.load(open('artifacts/photosformats-texture-style.json'))
-          print('hasSmartStyle=',p.get('hasSmartStyle'),'hasTextureStyle=',p.get('hasTextureStyle'))
+          assert p.get('hasSmartStyleAvailable') is True, p
+          assert p.get('hasSmartStyle') is True, p
+          print('SmartStyle preserved; TextureStyle selector available on host:', p.get('hasTextureStyleAvailable'))
           PY
 
-      - name: Upload CMPhoto-native candidate and evidence
+      - name: Upload combined TextureStyle candidate and evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ps3-cmphoto-native-${{ github.sha }}
+          name: ps3-cmphoto-combined-v3-${{ github.sha }}
           retention-days: 14
           if-no-files-found: error
           path: artifacts/
