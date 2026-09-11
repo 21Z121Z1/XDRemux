@@ -1,0 +1,253 @@
+name: TextureStyle ImageIO oracle v2
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-imageio-oracle-v2.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  oracle:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download known-good A baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+
+      - name: Compile ImageIO MakerApple encoder oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/jpegs artifacts/readback
+          BASELINE="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$BASELINE"
+          echo "BASELINE=$BASELINE" >> "$GITHUB_ENV"
+          shasum -a 256 "$BASELINE" | tee artifacts/baseline.sha256
+          sw_vers > artifacts/macos.txt
+          xcodebuild -version > artifacts/xcode.txt
+
+          cat > "$RUNNER_TEMP/imageio_oracle.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <CoreGraphics/CoreGraphics.h>
+
+          static void ReleaseProviderData(void *info, const void *data, size_t size) {
+              (void)info; (void)size; free((void *)data);
+          }
+
+          static id Safe(id obj) {
+              if (!obj) return [NSNull null];
+              if ([obj isKindOfClass:[NSString class]] || [obj isKindOfClass:[NSNumber class]] || [obj isKindOfClass:[NSNull class]]) return obj;
+              if ([obj isKindOfClass:[NSData class]]) return @{ @"class":NSStringFromClass([obj class]), @"bytes":@([(NSData *)obj length]) };
+              if ([obj isKindOfClass:[NSArray class]]) { NSMutableArray *a=[NSMutableArray array]; for(id v in obj)[a addObject:Safe(v)]; return a; }
+              if ([obj isKindOfClass:[NSDictionary class]]) { NSMutableDictionary *d=[NSMutableDictionary dictionary]; for(id k in obj)d[[k description]]=Safe([obj objectForKey:k]); return d; }
+              return @{ @"class":NSStringFromClass([obj class])?:@"?", @"description":[obj description]?:@"" };
+          }
+
+          static CGImageRef TinyImage(void) {
+              const size_t w=8,h=8,bpr=w*4;
+              uint8_t *bytes=calloc(h,bpr);
+              for(size_t y=0;y<h;y++) for(size_t x=0;x<w;x++) {
+                  size_t i=y*bpr+x*4; bytes[i]=(uint8_t)(x*31); bytes[i+1]=(uint8_t)(y*31); bytes[i+2]=127; bytes[i+3]=255;
+              }
+              CGDataProviderRef p=CGDataProviderCreateWithData(NULL,bytes,h*bpr,ReleaseProviderData);
+              CGColorSpaceRef cs=CGColorSpaceCreateDeviceRGB();
+              CGImageRef im=CGImageCreate(w,h,8,32,bpr,cs,kCGBitmapByteOrderDefault|kCGImageAlphaLast,p,NULL,false,kCGRenderingIntentDefault);
+              CGColorSpaceRelease(cs); CGDataProviderRelease(p); return im;
+          }
+
+          static BOOL WriteJPEG(NSString *path, CGImageRef image, NSDictionary *maker) {
+              CGImageDestinationRef d=CGImageDestinationCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path],CFSTR("public.jpeg"),1,NULL);
+              if(!d) return NO;
+              NSDictionary *props=@{
+                  (__bridge NSString*)kCGImagePropertyMakerAppleDictionary:maker,
+                  (__bridge NSString*)kCGImagePropertyTIFFDictionary:@{
+                      (__bridge NSString*)kCGImagePropertyTIFFMake:@"Apple",
+                      (__bridge NSString*)kCGImagePropertyTIFFModel:@"iPhone19,2"
+                  }
+              };
+              CGImageDestinationAddImage(d,image,(__bridge CFDictionaryRef)props);
+              BOOL ok=CGImageDestinationFinalize(d); CFRelease(d); return ok;
+          }
+
+          static NSDictionary *ReadProps(NSString *path) {
+              CGImageSourceRef s=CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path],NULL);
+              if(!s)return nil;
+              CFDictionaryRef raw=CGImageSourceCopyPropertiesAtIndex(s,0,NULL); CFRelease(s);
+              return CFBridgingRelease(raw);
+          }
+
+          int main(int argc,const char **argv){ @autoreleasepool {
+              if(argc!=3)return 64;
+              NSString *source=[NSString stringWithUTF8String:argv[1]];
+              NSString *outdir=[NSString stringWithUTF8String:argv[2]];
+              NSDictionary *props=ReadProps(source);
+              NSDictionary *maker=props[(__bridge NSString*)kCGImagePropertyMakerAppleDictionary];
+              if(![maker isKindOfClass:[NSDictionary class]])return 3;
+              NSData *baseJSON=[NSJSONSerialization dataWithJSONObject:Safe(maker) options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [baseJSON writeToFile:[outdir stringByAppendingPathComponent:@"baseline-maker-read.json"] atomically:YES];
+
+              CGImageRef image=TinyImage();
+              NSMutableArray *manifest=[NSMutableArray array];
+              NSArray *envelopes=@[
+                  @"SmartStyle", @"SmartStyle~1.0", @"TextureStyle", @"TextureStyle~1.0",
+                  @"TextureStyleSettings", @"TextureStyleProperties", @"TextureStyleInfo"
+              ];
+
+              NSMutableArray *variants=[NSMutableArray array];
+              [variants addObject:@{ @"name":@"baseline", @"maker":maker }];
+              for(NSString *env in envelopes) {
+                  for(NSNumber *preset in @[@0,@1,@2,@3,@4,@5]) {
+                      NSMutableDictionary *m=[maker mutableCopy];
+                      m[env]=@{
+                          @"TextureStylePreset":preset,
+                          @"TextureStyleIntensity":@0.61,
+                          @"TextureStyleGrain":@0.73
+                      };
+                      NSString *safe=[[env stringByReplacingOccurrencesOfString:@"~" withString:@"_"] stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+                      [variants addObject:@{ @"name":[NSString stringWithFormat:@"%@-p%@",safe,preset], @"maker":m }];
+                  }
+              }
+              // Also test adding the verified keys directly to the decoded MakerApple dictionary.
+              for(NSNumber *preset in @[@0,@1,@2,@3,@4,@5]) {
+                  NSMutableDictionary *m=[maker mutableCopy];
+                  m[@"TextureStylePreset"]=preset;
+                  m[@"TextureStyleIntensity"]=@0.61;
+                  m[@"TextureStyleGrain"]=@0.73;
+                  [variants addObject:@{ @"name":[NSString stringWithFormat:@"direct-p%@",preset], @"maker":m }];
+              }
+
+              for(NSDictionary *v in variants) {
+                  NSString *name=v[@"name"];
+                  NSString *path=[outdir stringByAppendingPathComponent:[name stringByAppendingString:@".jpg"]];
+                  BOOL ok=WriteJPEG(path,image,v[@"maker"]);
+                  NSMutableDictionary *row=[NSMutableDictionary dictionaryWithDictionary:@{ @"name":name, @"writeOK":@(ok) }];
+                  if(ok) {
+                      NSDictionary *rp=ReadProps(path);
+                      id rm=rp[(__bridge NSString*)kCGImagePropertyMakerAppleDictionary];
+                      row[@"makerReadback"]=Safe(rm);
+                  }
+                  [manifest addObject:row];
+              }
+              CGImageRelease(image);
+              NSData *mj=[NSJSONSerialization dataWithJSONObject:manifest options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [mj writeToFile:[outdir stringByAppendingPathComponent:@"oracle-manifest.json"] atomically:YES];
+              return 0;
+          }}
+          OBJC
+
+          xcrun clang -fobjc-arc -framework Foundation -framework ImageIO -framework CoreGraphics \
+            "$RUNNER_TEMP/imageio_oracle.m" -o "$RUNNER_TEMP/imageio_oracle"
+          "$RUNNER_TEMP/imageio_oracle" "$BASELINE" artifacts/jpegs
+          cat artifacts/jpegs/baseline-maker-read.json | tee artifacts/baseline-maker-read.txt
+          find artifacts/jpegs -type f -name '*.jpg' -print | sort | tee artifacts/jpegs.txt
+
+      - name: Decode raw MakerNote deltas emitted by ImageIO
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee artifacts/raw-deltas.json
+          import hashlib,json,sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts/research')
+          from merge_imageio_makernote_delta import maker_from_jpeg, entries_map
+
+          root=Path('artifacts/jpegs')
+          base_note=maker_from_jpeg(str(root/'baseline.jpg'))
+          _,base=entries_map(base_note)
+          rows=[]
+          for p in sorted(root.glob('*.jpg')):
+              if p.name=='baseline.jpg': continue
+              try:
+                  note=maker_from_jpeg(str(p)); _,cand=entries_map(note)
+                  delta=[]
+                  for tag,(typ,raw) in cand.items():
+                      if tag not in base or base[tag]!=(typ,raw):
+                          delta.append({'tag':tag,'type':typ,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'prefix':raw[:64].hex()})
+                  removed=sorted(set(base)-set(cand))
+                  rows.append({'file':p.name,'delta':delta,'removed':removed,'tags':sorted(cand)})
+              except Exception as e:
+                  rows.append({'file':p.name,'error':repr(e)})
+          print(json.dumps({'baselineTags':sorted(base),'variants':rows},indent=2))
+          PY
+          python3 - <<'PY' | tee artifacts/nonempty-deltas.txt
+          import json
+          j=json.load(open('artifacts/raw-deltas.json'))
+          for r in j['variants']:
+              if r.get('delta'):
+                  print(r['file'], r['delta'])
+          PY
+
+      - name: Transplant ImageIO deltas into A and gate PhotosFormats
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/candidates artifacts/reports artifacts/probes
+          : > artifacts/transplant-status.tsv
+          for jpg in artifacts/jpegs/*.jpg; do
+            base="$(basename "$jpg" .jpg)"
+            [[ "$base" == baseline ]] && continue
+            out="artifacts/candidates/V4-${base}.heic"
+            report="artifacts/reports/V4-${base}.json"
+            set +e
+            python3 scripts/research/merge_imageio_makernote_delta.py \
+              "$BASELINE" artifacts/jpegs/baseline.jpg "$jpg" "$out" "$report" \
+              > "artifacts/reports/V4-${base}.stdout" 2> "artifacts/reports/V4-${base}.stderr"
+            status=$?
+            set -e
+            printf '%s\t%s\n' "$base" "$status" >> artifacts/transplant-status.tsv
+          done
+          cat artifacts/transplant-status.tsv
+
+          cat > "$RUNNER_TEMP/pf_gate.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+          static id Open(NSURL *url){
+              Class c=NSClassFromString(@"PFMetadataImage"); if(!c)return nil;
+              Class ut=NSClassFromString(@"UTType"); id type=nil; SEL ts=NSSelectorFromString(@"typeWithIdentifier:");
+              if(ut&&[ut respondsToSelector:ts])type=((id(*)(id,SEL,id))objc_msgSend)(ut,ts,@"public.heic");
+              id o=[c alloc]; SEL s=NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");
+              if([o respondsToSelector:s]){@try{id v=((id(*)(id,SEL,id,id,id))objc_msgSend)(o,s,url,type,nil);if(v)return v;}@catch(__unused NSException*e){}}
+              o=[c alloc]; s=NSSelectorFromString(@"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:");
+              if([o respondsToSelector:s]){@try{return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(o,s,url,type,0,nil,YES,YES);}@catch(__unused NSException*e){}}
+              return nil;
+          }
+          int main(int argc,const char**argv){@autoreleasepool{
+              if(argc!=2)return 64; dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);
+              id m=Open([NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]]); BOOL hs=NO,ht=NO;
+              SEL a=NSSelectorFromString(@"hasSmartStyle"),b=NSSelectorFromString(@"hasTextureStyle");
+              if(m&&[m respondsToSelector:a])hs=((BOOL(*)(id,SEL))objc_msgSend)(m,a);
+              if(m&&[m respondsToSelector:b])ht=((BOOL(*)(id,SEL))objc_msgSend)(m,b);
+              NSDictionary*o=@{@"file":[[NSString stringWithUTF8String:argv[1]] lastPathComponent],@"hasSmartStyle":@(hs),@"hasTextureStyle":@(ht),@"hasTextureSelector":@(m&&[m respondsToSelector:b])};
+              NSData*j=[NSJSONSerialization dataWithJSONObject:o options:NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);return 0;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework UniformTypeIdentifiers "$RUNNER_TEMP/pf_gate.m" -o "$RUNNER_TEMP/pf_gate"
+          : > artifacts/photosformats.jsonl
+          "$RUNNER_TEMP/pf_gate" "$BASELINE" >> artifacts/photosformats.jsonl
+          for f in artifacts/candidates/*.heic; do test -e "$f" || continue; "$RUNNER_TEMP/pf_gate" "$f" | tee -a artifacts/photosformats.jsonl; done
+
+      - name: Upload oracle evidence and candidate HEICs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-imageio-oracle-v2-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: artifacts/
