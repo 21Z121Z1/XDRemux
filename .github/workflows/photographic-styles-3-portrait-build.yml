@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -34,13 +34,14 @@ jobs:
           shasum -a 256 artifacts/input/uhdr-portrait-01.heic > artifacts/input/SHA256.txt
           printf '%s:%s\n' "$FIXTURE_SHA" "$FIXTURE_PATH" > artifacts/input/source.txt
 
-      - name: Build current XDRemux and Semantic Style baseline
+      - name: Build current XDRemux and combined Portrait + Semantic Style baseline
         shell: bash
         run: |
           set -euo pipefail
           swift build 2>&1 | tee artifacts/baseline/swift-build.log
           .build/debug/xdremux convert \
             --apple-photographic-styles \
+            --apple-portrait \
             --apple-style-data-producer constrained-solver \
             --debug-dir artifacts/baseline/debug \
             --input artifacts/input/uhdr-portrait-01.heic \
@@ -50,6 +51,7 @@ jobs:
           test -s artifacts/baseline/portrait-semantic-style.heic
           .build/debug/xdremux validate-apple \
             --input artifacts/baseline/portrait-semantic-style.heic \
+            --expect-portrait \
             > artifacts/baseline/validate-apple.json
           sips -g pixelWidth -g pixelHeight artifacts/baseline/portrait-semantic-style.heic \
             > artifacts/baseline/sips.txt
@@ -127,7 +129,7 @@ jobs:
         run: |
           set -euo pipefail
           CANDIDATE=artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait.heic
-          .build/debug/xdremux validate-apple --input "$CANDIDATE" > artifacts/ps3/validate-apple.json
+          .build/debug/xdremux validate-apple --input "$CANDIDATE" --expect-portrait > artifacts/ps3/validate-apple.json
           sips -g pixelWidth -g pixelHeight "$CANDIDATE" > artifacts/ps3/sips.txt
           shasum -a 256 "$CANDIDATE" > artifacts/ps3/SHA256.txt
           python3 - <<'PY'
