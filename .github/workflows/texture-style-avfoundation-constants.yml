@@ -65,7 +65,7 @@ jobs:
               return 0;
           }}
           OBJC
-          xcrun clang -fobjc-arc -framework Foundation "$RUNNER_TEMP/constants.m" -o "$RUNNER_TEMP/constants"
+          xcrun clang -fno-objc-arc -framework Foundation "$RUNNER_TEMP/constants.m" -o "$RUNNER_TEMP/constants"
           "$RUNNER_TEMP/constants" artifacts/constants.json | tee artifacts/stdout.txt
           sw_vers > artifacts/macos.txt
           xcodebuild -version > artifacts/xcode.txt
