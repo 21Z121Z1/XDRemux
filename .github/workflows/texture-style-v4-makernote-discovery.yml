@@ -1,0 +1,211 @@
+name: TextureStyle V4 MakerNote discovery
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-v4-makernote-discovery.yml
+      - scripts/research/patch_texture_style_makernote_v4.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  discover:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download physical-device A/B baseline artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+
+      - name: Locate parser-valid baseline A
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/candidates artifacts/probes
+          BASELINE="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$BASELINE"
+          echo "BASELINE=$BASELINE" >> "$GITHUB_ENV"
+          shasum -a 256 "$BASELINE" | tee artifacts/baseline.sha256
+
+      - name: Build PhotosFormats acceptance probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/pf_texture_gate.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+
+          static id KVC(id obj, NSString *key) {
+              if (!obj) return [NSNull null];
+              @try { id v=[obj valueForKey:key]; return v ?: [NSNull null]; }
+              @catch (NSException *e) { return @{ @"exception":e.reason ?: e.name }; }
+          }
+          static id OpenMetadata(NSURL *url) {
+              Class cls=NSClassFromString(@"PFMetadataImage");
+              if (!cls) return nil;
+              id contentType=nil;
+              Class ut=NSClassFromString(@"UTType");
+              SEL typeSel=NSSelectorFromString(@"typeWithIdentifier:");
+              if (ut && [ut respondsToSelector:typeSel])
+                  contentType=((id(*)(id,SEL,id))objc_msgSend)(ut,typeSel,@"public.heic");
+              id obj=[cls alloc];
+              SEL simple=NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");
+              if ([obj respondsToSelector:simple]) {
+                  @try { id v=((id(*)(id,SEL,id,id,id))objc_msgSend)(obj,simple,url,contentType,nil); if(v)return v; }
+                  @catch (__unused NSException *e) {}
+              }
+              obj=[cls alloc];
+              SEL full=NSSelectorFromString(@"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:");
+              if ([obj respondsToSelector:full]) {
+                  @try { return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(obj,full,url,contentType,0,nil,YES,YES); }
+                  @catch (__unused NSException *e) {}
+              }
+              return nil;
+          }
+          int main(int argc,const char **argv){ @autoreleasepool {
+              if(argc!=2)return 64;
+              dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);
+              dlopen("/System/Library/Frameworks/UniformTypeIdentifiers.framework/UniformTypeIdentifiers",RTLD_NOW|RTLD_GLOBAL);
+              NSURL *url=[NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]];
+              id m=OpenMetadata(url);
+              NSMutableDictionary *out=[NSMutableDictionary dictionary];
+              out[@"metadataClass"]=m?NSStringFromClass([m class]):@"nil";
+              BOOL hasTexture=NO,hasSmart=NO;
+              if(m && [m respondsToSelector:NSSelectorFromString(@"hasTextureStyle")])
+                  hasTexture=((BOOL(*)(id,SEL))objc_msgSend)(m,NSSelectorFromString(@"hasTextureStyle"));
+              if(m && [m respondsToSelector:NSSelectorFromString(@"hasSmartStyle")])
+                  hasSmart=((BOOL(*)(id,SEL))objc_msgSend)(m,NSSelectorFromString(@"hasSmartStyle"));
+              out[@"hasTextureStyle"]=@(hasTexture);
+              out[@"hasSmartStyle"]=@(hasSmart);
+              for(NSString *k in @[@"textureStylePreset",@"textureStyleIntensity",@"textureStyleGrainIntensity",@"textureStyleIsReversible"])
+                  out[k]=KVC(m,k);
+              NSData *j=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingSortedKeys error:nil];
+              fwrite(j.bytes,1,j.length,stdout); fputc('\n',stdout);
+              return m?0:2;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework UniformTypeIdentifiers \
+            "$RUNNER_TEMP/pf_texture_gate.m" -o "$RUNNER_TEMP/pf_texture_gate"
+          "$RUNNER_TEMP/pf_texture_gate" "$BASELINE" | tee artifacts/baseline-pf.json
+
+      - name: Enumerate existing Apple MakerNote tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$BASELINE" <<'PY' | tee artifacts/existing-maker-tags.txt
+          import sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts/research')
+          import patch_texture_style_heif_v3 as h
+          data=Path(sys.argv[1]).read_bytes()
+          meta=next(b for b in h.boxes(data,0,len(data)) if b['type']=='meta')
+          ch=list(h.boxes(data,meta['data_start']+4,meta['data_end']))
+          bt={b['type']:b for b in ch}
+          _,infos=h.parse_iinf(data,bt['iinf']); iloc=h.parse_iloc(data,bt['iloc']); idat=bt.get('idat')
+          types={i['id']:i['type'] for i in infos}; exif=next(i for i,t in types.items() if t=='Exif')
+          em={e['id']:e for e in iloc['entries']}; p=h.item_payload(data,em[exif],idat)
+          note,_=h.extract_makernote(p); endian,entries=h.parse_apple_makernote(note)
+          print(' '.join(str(tag) for tag,_,_ in entries))
+          for tag,typ,raw in entries: print(f'{tag}\ttype={typ}\tbytes={len(raw)}\tprefix={raw[:16].hex()}')
+          PY
+
+      - name: Brute-force MakerNote envelope tag through PhotosFormats
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > artifacts/bruteforce.tsv
+          echo -e 'tag\tpreset\thasSmartStyle\thasTextureStyle\ttextureStylePreset\tintensity\tgrain\treversible' >> artifacts/bruteforce.tsv
+          existing=" $(head -n1 artifacts/existing-maker-tags.txt) "
+          found=''
+          # New Apple camera metadata usually clusters near recent MakerNote tags; test that range first,
+          # then exhaust the low 9-bit tag space if necessary.
+          order="$(seq 80 160) $(seq 1 79) $(seq 161 255) $(seq 256 512)"
+          for tag in $order; do
+            case "$existing" in *" $tag "*) continue;; esac
+            out="$RUNNER_TEMP/v4-tag-${tag}.heic"
+            if ! python3 scripts/research/patch_texture_style_makernote_v4.py \
+                "$BASELINE" "$out" --tag-id "$tag" --preset 2 --intensity 0.37 --grain 0.63 \
+                > "$RUNNER_TEMP/patch.json" 2> "$RUNNER_TEMP/patch.err"; then
+              continue
+            fi
+            json="$($RUNNER_TEMP/pf_texture_gate "$out" 2>/dev/null || true)"
+            test -n "$json" || { rm -f "$out"; continue; }
+            python3 - "$tag" 2 "$json" >> artifacts/bruteforce.tsv <<'PY'
+          import json,sys
+          tag,preset,j=sys.argv[1],sys.argv[2],json.loads(sys.argv[3])
+          def v(k):
+              x=j.get(k)
+              return json.dumps(x,separators=(',',':')) if isinstance(x,(dict,list)) else str(x)
+          print('\t'.join([tag,preset,v('hasSmartStyle'),v('hasTextureStyle'),v('textureStylePreset'),v('textureStyleIntensity'),v('textureStyleGrainIntensity'),v('textureStyleIsReversible')]))
+          PY
+            has="$(python3 - "$json" <<'PY'
+          import json,sys
+          print('1' if json.loads(sys.argv[1]).get('hasTextureStyle') else '0')
+          PY
+          )"
+            if [[ "$has" == 1 ]]; then
+              found="$tag"
+              cp "$out" "artifacts/candidates/V4-TextureStyle-tag${tag}-preset2.heic"
+              cp "$RUNNER_TEMP/patch.json" "artifacts/candidates/V4-tag${tag}-patch.json"
+              printf '%s\n' "$json" > "artifacts/probes/V4-tag${tag}-pf.json"
+              break
+            fi
+            rm -f "$out"
+          done
+          printf '%s\n' "$found" | tee artifacts/discovered-tag.txt
+
+          if [[ -n "$found" ]]; then
+            # Map accepted preset enum values and retain every accepted fixture.
+            for preset in 0 1 2 3 4 5; do
+              out="artifacts/candidates/V4-TextureStyle-tag${found}-preset${preset}.heic"
+              python3 scripts/research/patch_texture_style_makernote_v4.py \
+                "$BASELINE" "$out" --tag-id "$found" --preset "$preset" --intensity 0.61 --grain 0.73 \
+                > "artifacts/candidates/V4-tag${found}-preset${preset}-patch.json"
+              "$RUNNER_TEMP/pf_texture_gate" "$out" \
+                > "artifacts/probes/V4-tag${found}-preset${preset}-pf.json" || true
+            done
+          fi
+
+      - name: Assert baseline integrity and summarize discovery
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '# TextureStyle V4 MakerNote discovery'
+            echo
+            echo '## Baseline PhotosFormats'
+            cat artifacts/baseline-pf.json || true
+            echo
+            echo '## Discovered tag'
+            cat artifacts/discovered-tag.txt 2>/dev/null || true
+            echo
+            echo '## Accepted / interesting rows'
+            awk -F '\t' 'NR==1 || $4=="True" || $4=="true" || $4=="1"' artifacts/bruteforce.tsv 2>/dev/null || true
+            echo
+            echo '## Candidate gates'
+            for f in artifacts/probes/*.json; do echo "### $f"; cat "$f"; echo; done
+          } | tee artifacts/summary.md
+          cat artifacts/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload V4 discovery and candidates
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-v4-makernote-discovery-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 6
+          path: artifacts/
