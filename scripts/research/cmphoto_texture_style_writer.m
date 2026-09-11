@@ -30,7 +30,7 @@ int main(int argc, const char *argv[]) {
         NSString *outputPath = [NSString stringWithUTF8String:argv[2]];
         NSString *reportPath = [NSString stringWithUTF8String:argv[3]];
         NSMutableDictionary *report = [NSMutableDictionary dictionary];
-        report[@"schema"] = @"xdremux-cmphoto-texture-style-writer-v2";
+        report[@"schema"] = @"xdremux-cmphoto-texture-style-writer-v3";
         report[@"input"] = [inputPath lastPathComponent];
         report[@"output"] = [outputPath lastPathComponent];
 
@@ -59,8 +59,6 @@ int main(int argc, const char *argv[]) {
         id keyURI = LoadConstant(cm, "kCMPhotoCustomMetadata_URI");
         id keyName = LoadConstant(cm, "kCMPhotoCustomMetadata_Name");
         id exportedTextureURN = LoadConstant(cm, "kCMPhotoCustomMetadataTypeURN_TextureStyles");
-        // iOS 27 firmware exports kCMPhotoCustomMetadataTypeURN_TextureStyles with this exact value.
-        // macOS 27 CMPhoto on the hosted runner exposes the writer APIs but not that iOS-only symbol.
         id textureURN = exportedTextureURN ?: @"tag:apple.com,2026:photo:metadata:texture_styles";
         report[@"constants"] = @{
             @"Data": keyData ?: [NSNull null], @"URI": keyURI ?: [NSNull null],
@@ -80,8 +78,12 @@ int main(int argc, const char *argv[]) {
             return 5;
         }
 
+        // PITextureStyleCurrentMetadataVersion() in the iOS 27 RC 24A435
+        // PhotoImaging binary returns NSNumber(3) whenever TextureStyle rendering
+        // is supported.  Use that device-firmware value instead of the earlier
+        // exploratory v1 guess.
         NSDictionary *texture = @{
-            @"Version": @1,
+            @"Version": @3,
             @"HardwareModel": @"V63AP",
             @"PortType": @"PortTypeBack",
             @"CaptureMode": @"Photo",
@@ -90,6 +92,7 @@ int main(int argc, const char *argv[]) {
             @"TextureStylePeopleDataVersion": @1,
             @"TextureStylePostProcessedPeopleData": @[]
         };
+        report[@"textureStyleInfo"] = texture;
         NSData *plist = [NSPropertyListSerialization dataWithPropertyList:texture
                                                                    format:NSPropertyListBinaryFormat_v1_0
                                                                   options:0
