@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - research/photographic-styles-3-texture-probe
+      - research/photographic-styles-3-texture-probe-v7
     paths:
       - .github/workflows/texture-style-ios27-resources.yml
   workflow_dispatch:
