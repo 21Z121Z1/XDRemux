@@ -1,0 +1,216 @@
+name: TextureStyle V4 ImageIO candidates
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-imageio-v4-candidates.yml
+      - scripts/research/merge_imageio_makernote_delta.py
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  candidates:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download parser-valid Smart Style baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-real-portrait-parser-valid-d7e899420a9747f9ede88360ea2e77de480fb4bb
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34591620462
+
+      - name: Encode candidate Apple MakerNotes with macOS 27 ImageIO
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/jpegs artifacts/candidates artifacts/reports
+          SOURCE="$(find source-artifact -type f -name 'XDRemux-Photographic-Styles-3-Portrait-PREVIEW.heic' -print -quit)"
+          test -s "$SOURCE"
+          cp "$SOURCE" artifacts/A-baseline.heic
+          echo "$SOURCE" > artifacts/source-path.txt
+          sw_vers > artifacts/macos.txt
+          xcodebuild -version > artifacts/xcode.txt
+
+          cat > "$RUNNER_TEMP/encode_maker.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <CoreGraphics/CoreGraphics.h>
+
+          static CGImageRef TinyImage(void) {
+              const size_t w=8,h=8,bpr=w*4;
+              uint8_t *bytes=calloc(h,bpr);
+              for(size_t y=0;y<h;y++) for(size_t x=0;x<w;x++) {
+                  size_t i=y*bpr+x*4; bytes[i]=x*31; bytes[i+1]=y*31; bytes[i+2]=127; bytes[i+3]=255;
+              }
+              CGDataProviderRef p=CGDataProviderCreateWithData(NULL,bytes,h*bpr,^(void *info,const void *data,size_t size){free((void*)data);});
+              CGColorSpaceRef cs=CGColorSpaceCreateDeviceRGB();
+              CGImageRef im=CGImageCreate(w,h,8,32,bpr,cs,kCGBitmapByteOrderDefault|kCGImageAlphaLast,p,NULL,false,kCGRenderingIntentDefault);
+              CGColorSpaceRelease(cs); CGDataProviderRelease(p); return im;
+          }
+
+          static BOOL WriteJPEG(NSString *path, CGImageRef image, NSDictionary *maker) {
+              NSURL *url=[NSURL fileURLWithPath:path];
+              CGImageDestinationRef d=CGImageDestinationCreateWithURL((__bridge CFURLRef)url,CFSTR("public.jpeg"),1,NULL);
+              if(!d) return NO;
+              NSDictionary *props=@{
+                  (__bridge NSString*)kCGImagePropertyMakerAppleDictionary:maker,
+                  (__bridge NSString*)kCGImagePropertyTIFFDictionary:@{
+                      (__bridge NSString*)kCGImagePropertyTIFFMake:@"Apple",
+                      (__bridge NSString*)kCGImagePropertyTIFFModel:@"iPhone19,2"
+                  }
+              };
+              CGImageDestinationAddImage(d,image,(__bridge CFDictionaryRef)props);
+              BOOL ok=CGImageDestinationFinalize(d); CFRelease(d); return ok;
+          }
+
+          int main(int argc,const char **argv){ @autoreleasepool {
+              if(argc!=3) return 64;
+              NSString *source=[NSString stringWithUTF8String:argv[1]];
+              NSString *outdir=[NSString stringWithUTF8String:argv[2]];
+              CGImageSourceRef s=CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:source],NULL);
+              if(!s) return 2;
+              CFDictionaryRef raw=CGImageSourceCopyPropertiesAtIndex(s,0,NULL); CFRelease(s);
+              NSDictionary *props=CFBridgingRelease(raw);
+              NSDictionary *maker=props[(__bridge NSString*)kCGImagePropertyMakerAppleDictionary];
+              if(![maker isKindOfClass:[NSDictionary class]]) return 3;
+              NSData *json=[NSJSONSerialization dataWithJSONObject:maker options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [json writeToFile:[outdir stringByAppendingPathComponent:@"baseline-maker.json"] atomically:YES];
+              CGImageRef image=TinyImage();
+              if(!WriteJPEG([outdir stringByAppendingPathComponent:@"baseline.jpg"],image,maker)) return 4;
+
+              NSArray *envelopes=@[@"TextureStyle",@"TextureStyle~1.0",@"TextureStyleProperties",@"TextureStyleSettings",@"TextureStyleInfo",@"SmartStyle",@"SmartStyle~1.0"];
+              NSMutableArray *manifest=[NSMutableArray array];
+              for(NSString *env in envelopes) {
+                  for(NSNumber *preset in @[@0,@1,@2,@3,@4]) {
+                      NSMutableDictionary *m=[maker mutableCopy];
+                      m[env]=@{
+                          @"TextureStylePreset":preset,
+                          @"TextureStyleIntensity":@1.0,
+                          @"TextureStyleGrain":@0.0
+                      };
+                      NSString *safe=[[env stringByReplacingOccurrencesOfString:@"~" withString:@"_"] stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+                      NSString *name=[NSString stringWithFormat:@"%@-p%@",safe,preset];
+                      NSString *path=[outdir stringByAppendingPathComponent:[name stringByAppendingString:@".jpg"]];
+                      BOOL ok=WriteJPEG(path,image,m);
+                      [manifest addObject:@{@"name":name,@"envelope":env,@"preset":preset,@"writeOK":@(ok)}];
+                  }
+              }
+              CGImageRelease(image);
+              NSData *mj=[NSJSONSerialization dataWithJSONObject:manifest options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [mj writeToFile:[outdir stringByAppendingPathComponent:@"encoder-manifest.json"] atomically:YES];
+              return 0;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework ImageIO -framework CoreGraphics \
+            "$RUNNER_TEMP/encode_maker.m" -o "$RUNNER_TEMP/encode_maker"
+          "$RUNNER_TEMP/encode_maker" "$SOURCE" artifacts/jpegs
+          ls -lh artifacts/jpegs | tee artifacts/encoded-files.txt
+
+      - name: Transplant only ImageIO-produced MakerNote deltas into original HEIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=artifacts/A-baseline.heic
+          : > artifacts/transplant-status.tsv
+          for jpg in artifacts/jpegs/*.jpg; do
+            base="$(basename "$jpg" .jpg)"
+            test "$base" = baseline && continue
+            out="artifacts/candidates/V4-${base}.heic"
+            report="artifacts/reports/V4-${base}.json"
+            set +e
+            python3 scripts/research/merge_imageio_makernote_delta.py \
+              "$SOURCE" artifacts/jpegs/baseline.jpg "$jpg" "$out" "$report" \
+              > "artifacts/reports/V4-${base}.stdout" 2> "artifacts/reports/V4-${base}.stderr"
+            status=$?
+            set -e
+            printf '%s\t%s\n' "$base" "$status" >> artifacts/transplant-status.tsv
+          done
+          cat artifacts/transplant-status.tsv
+          find artifacts/candidates -type f -name '*.heic' -print | sort | tee artifacts/candidate-files.txt
+
+      - name: Gate every candidate with PhotosFormats
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/pf_gate.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+
+          static id KVC(id o, NSString *k) { @try { return [o valueForKey:k] ?: [NSNull null]; } @catch(NSException *e) { return @{ @"exception":e.reason?:e.name }; } }
+          static id Open(NSURL *url) {
+              Class cls=NSClassFromString(@"PFMetadataImage"); if(!cls)return nil;
+              Class ut=NSClassFromString(@"UTType"); id type=nil;
+              SEL ts=NSSelectorFromString(@"typeWithIdentifier:"); if(ut&&[ut respondsToSelector:ts]) type=((id(*)(id,SEL,id))objc_msgSend)(ut,ts,@"public.heic");
+              id o=[cls alloc]; SEL s=NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");
+              if([o respondsToSelector:s]) { @try { id v=((id(*)(id,SEL,id,id,id))objc_msgSend)(o,s,url,type,nil); if(v)return v; } @catch(__unused NSException *e){} }
+              o=[cls alloc]; s=NSSelectorFromString(@"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:");
+              if([o respondsToSelector:s]) { @try { return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(o,s,url,type,0,nil,YES,YES); } @catch(__unused NSException *e){} }
+              return nil;
+          }
+          int main(int argc,const char **argv){ @autoreleasepool {
+              if(argc!=2)return 64;
+              dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);
+              id m=Open([NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]]);
+              BOOL hs=NO,ht=NO;
+              if(m&&[m respondsToSelector:NSSelectorFromString(@"hasSmartStyle")]) hs=((BOOL(*)(id,SEL))objc_msgSend)(m,NSSelectorFromString(@"hasSmartStyle"));
+              if(m&&[m respondsToSelector:NSSelectorFromString(@"hasTextureStyle")]) ht=((BOOL(*)(id,SEL))objc_msgSend)(m,NSSelectorFromString(@"hasTextureStyle"));
+              NSDictionary *o=@{
+                @"file":[[NSString stringWithUTF8String:argv[1]] lastPathComponent],
+                @"metadataClass":m?NSStringFromClass([m class]):@"nil",
+                @"hasSmartStyle":@(hs), @"hasTextureStyle":@(ht),
+                @"preset":m?KVC(m,@"textureStylePreset"):[NSNull null],
+                @"intensity":m?KVC(m,@"textureStyleIntensity"):[NSNull null],
+                @"grain":m?KVC(m,@"textureStyleGrainIntensity"):[NSNull null],
+                @"reversible":m?KVC(m,@"textureStyleIsReversible"):[NSNull null]
+              };
+              NSData *j=[NSJSONSerialization dataWithJSONObject:o options:NSJSONWritingSortedKeys error:nil];
+              fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout); return 0;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework UniformTypeIdentifiers \
+            "$RUNNER_TEMP/pf_gate.m" -o "$RUNNER_TEMP/pf_gate"
+
+          : > artifacts/photosformats-results.jsonl
+          "$RUNNER_TEMP/pf_gate" artifacts/A-baseline.heic >> artifacts/photosformats-results.jsonl
+          for f in artifacts/candidates/*.heic; do
+            test -e "$f" || continue
+            "$RUNNER_TEMP/pf_gate" "$f" >> artifacts/photosformats-results.jsonl
+          done
+          cat artifacts/photosformats-results.jsonl
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          rows=[json.loads(x) for x in Path('artifacts/photosformats-results.jsonl').read_text().splitlines() if x.strip()]
+          winners=[r for r in rows if r.get('hasTextureStyle')]
+          Path('artifacts/photosformats-winners.json').write_text(json.dumps(winners,indent=2,sort_keys=True)+'\n')
+          print('TextureStyle winners:',len(winners))
+          print(json.dumps(winners,indent=2,sort_keys=True))
+          PY
+
+      - name: Upload V4 candidates and evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-style-v4-imageio-${{ github.sha }}
+          retention-days: 14
+          compression-level: 6
+          path: |
+            artifacts/A-baseline.heic
+            artifacts/candidates/
+            artifacts/reports/
+            artifacts/jpegs/*.json
+            artifacts/photosformats-results.jsonl
+            artifacts/photosformats-winners.json
+            artifacts/transplant-status.tsv
+            artifacts/*.txt
