@@ -1,0 +1,87 @@
+name: PS3 Portrait Materialize Parser-Valid Baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/ps3-portrait-materialize-preliminary.yml
+      - scripts/research/patch_texture_style_heif_v3.py
+      - scripts/research/audit_ps3_portrait_candidate.py
+      - scripts/research/texture_style_ps3_portrait_contract.json
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download real portrait intermediate produced by Actions
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-portrait-candidate-546d5301139a0c82e0ff3d79f7a6e30835de5571
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34590622596
+
+      - name: Select Apple-parser-valid preliminary Semantic Styles HEIC
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/baseline artifacts/ps3/candidates
+          baseline="$(find source-artifact -type f -name 'constrained-solver-preliminary-identity.heic' -print -quit)"
+          probe="$(find source-artifact -type f -name 'semantic-style-properties-probe.json' -print -quit)"
+          test -s "$baseline"
+          test -s "$probe"
+          python3 - "$probe" <<'PY'
+          import json, sys
+          p=json.load(open(sys.argv[1]))
+          assert p.get('parseSucceeded') == 1, p
+          assert p.get('styleDataLength') == 51840, p
+          assert p.get('readbackWritten') is True, p
+          print(json.dumps(p, sort_keys=True))
+          PY
+          cp "$baseline" artifacts/baseline/portrait-semantic-style-preliminary.heic
+          cp "$probe" artifacts/baseline/semantic-style-properties-probe.json
+          sha256sum artifacts/baseline/portrait-semantic-style-preliminary.heic > artifacts/baseline/SHA256.txt
+
+      - name: Inject separate iOS 27 Texture Style metadata item
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/research/patch_texture_style_heif_v3.py
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            artifacts/baseline/portrait-semantic-style-preliminary.heic \
+            scripts/research/texture_style_ps3_portrait_contract.json \
+            artifacts/ps3/candidates \
+            | tee artifacts/ps3/build-report.json
+          cp artifacts/ps3/candidates/ps3-portrait-standard.heic \
+            artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait-PREVIEW.heic
+          test -s artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait-PREVIEW.heic
+
+      - name: Fail-closed HEIF graph and payload audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate=artifacts/ps3/XDRemux-Photographic-Styles-3-Portrait-PREVIEW.heic
+          python3 -m py_compile scripts/research/audit_ps3_portrait_candidate.py
+          python3 scripts/research/audit_ps3_portrait_candidate.py \
+            "$candidate" \
+            artifacts/ps3/candidates/candidate-manifest-v3.json \
+            artifacts/ps3/offline-audit.json
+          sha256sum "$candidate" > artifacts/ps3/SHA256.txt
+
+      - name: Upload real portrait PS3 candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-real-portrait-parser-valid-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
