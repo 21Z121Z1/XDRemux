@@ -68,10 +68,23 @@ jobs:
           ARCH="$(uname -m)"
           APP="$RUNNER_TEMP/TextureStyleProbe.app"
           mkdir -p "$APP"
+          # CGDataProviderCreateWithData takes a C release callback, while the
+          # research probe source originally used an Objective-C block. For this
+          # 8x8 one-shot process, compile a temporary copy with a NULL callback;
+          # the 256-byte backing allocation is reclaimed when the probe exits.
+          PROBE_SOURCE="$RUNNER_TEMP/texture_style_ios27_sim_probe_v2.m"
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('scripts/research/texture_style_ios27_sim_probe_v2.m').read_text()
+          old = '^(void *info,const void *data,size_t size){ free((void *)data); }'
+          assert old in source, 'expected CGDataProvider block callback was not found'
+          Path('/tmp/texture_style_probe_source.tmp').write_text(source.replace(old, 'NULL', 1))
+          PY
+          cp /tmp/texture_style_probe_source.tmp "$PROBE_SOURCE"
           xcrun --sdk iphonesimulator clang -fobjc-arc \
             -target "${ARCH}-apple-ios${SDK_VERSION}-simulator" -isysroot "$SDK" \
             -framework Foundation -framework UIKit -framework ImageIO -framework CoreGraphics \
-            scripts/research/texture_style_ios27_sim_probe_v2.m -o "$APP/TextureStyleProbe" \
+            "$PROBE_SOURCE" -o "$APP/TextureStyleProbe" \
             2>&1 | tee artifacts/compile.txt
           cat > "$APP/Info.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
