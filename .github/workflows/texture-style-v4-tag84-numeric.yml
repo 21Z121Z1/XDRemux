@@ -1,0 +1,75 @@
+name: TextureStyle V4 numeric tag84 candidates
+
+on:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/texture-style-v4-tag84-numeric.yml
+      - scripts/research/texture_style_tag84_v4_contract.json
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download physical-device validated baseline A
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+      - name: Build V4 numeric tag84 candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/candidates artifacts/gates
+          BASELINE="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$BASELINE"
+          cp "$BASELINE" artifacts/A-baseline-original.heic
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            "$BASELINE" scripts/research/texture_style_tag84_v4_contract.json artifacts/candidates \
+            > artifacts/build-manifest.stdout
+          shasum -a 256 artifacts/candidates/*.heic | tee artifacts/candidate-sha256.txt
+      - name: Gate with PhotosFormats direct selectors
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/pf.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+          static id Obj(id o,NSString *n){SEL s=NSSelectorFromString(n);if(!o||![o respondsToSelector:s])return [NSNull null];@try{return ((id(*)(id,SEL))objc_msgSend)(o,s)?:[NSNull null];}@catch(NSException *e){return @{ @"exception":e.reason?:e.name};}}
+          static BOOL Bool(id o,NSString *n){SEL s=NSSelectorFromString(n);if(!o||![o respondsToSelector:s])return NO;@try{return ((BOOL(*)(id,SEL))objc_msgSend)(o,s);}@catch(__unused NSException *e){return NO;}}
+          static id Open(NSURL *url){Class c=NSClassFromString(@"PFMetadataImage");if(!c)return nil;Class u=NSClassFromString(@"UTType");id t=nil;SEL ts=NSSelectorFromString(@"typeWithIdentifier:");if(u&&[u respondsToSelector:ts])t=((id(*)(id,SEL,id))objc_msgSend)(u,ts,@"public.heic");id o=[c alloc];SEL s=NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");if([o respondsToSelector:s]){@try{id v=((id(*)(id,SEL,id,id,id))objc_msgSend)(o,s,url,t,nil);if(v)return v;}@catch(__unused NSException *e){}}o=[c alloc];s=NSSelectorFromString(@"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:");if([o respondsToSelector:s]){@try{return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(o,s,url,t,0,nil,YES,YES);}@catch(__unused NSException *e){}}return nil;}
+          int main(int argc,const char **argv){@autoreleasepool{if(argc!=2)return 64;dlopen("/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",RTLD_NOW|RTLD_GLOBAL);id m=Open([NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]]);NSDictionary *d=@{@"file":[[NSString stringWithUTF8String:argv[1]] lastPathComponent],@"hasSmartStyle":@(Bool(m,@"hasSmartStyle")),@"hasTextureStyle":@(Bool(m,@"hasTextureStyle")),@"preset":Obj(m,@"textureStylePreset"),@"intensity":Obj(m,@"textureStyleIntensity"),@"grain":Obj(m,@"textureStyleGrainIntensity"),@"reversible":Obj(m,@"textureStyleIsReversible")};NSData*j=[NSJSONSerialization dataWithJSONObject:d options:NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);return 0;}}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework UniformTypeIdentifiers "$RUNNER_TEMP/pf.m" -o "$RUNNER_TEMP/pf"
+          : > artifacts/photosformats.jsonl
+          "$RUNNER_TEMP/pf" artifacts/A-baseline-original.heic >> artifacts/photosformats.jsonl
+          for f in artifacts/candidates/*.heic; do "$RUNNER_TEMP/pf" "$f" >> artifacts/photosformats.jsonl; done
+          cat artifacts/photosformats.jsonl
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          rows=[json.loads(x) for x in Path('artifacts/photosformats.jsonl').read_text().splitlines() if x.strip()]
+          winners=[x for x in rows if x['hasTextureStyle']]
+          Path('artifacts/winners.json').write_text(json.dumps(winners,indent=2,sort_keys=True)+'\n')
+          print('winners',json.dumps(winners,indent=2,sort_keys=True))
+          PY
+      - name: Upload candidates
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-style-v4-tag84-numeric-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
