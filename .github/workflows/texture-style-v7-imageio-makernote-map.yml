@@ -1,0 +1,94 @@
+name: TextureStyle V7 ImageIO MakerNote map
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe-v7]
+    paths:
+      - .github/workflows/texture-style-v7-imageio-makernote-map.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  map-maker-note:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download physical-device baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-physical-device-ab-49b97e39a486b778163d6ef7fbd6ba09d7a0c544
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34597954896
+
+      - name: Build ImageIO MakerApple dumper
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/dump_maker.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <objc/runtime.h>
+
+          static void PrintObject(const char *prefix, id obj) {
+              printf("%s_class=%s\n", prefix, obj ? object_getClassName(obj) : "(nil)");
+              printf("%s_description=%s\n", prefix, obj ? [[obj description] UTF8String] : "(nil)");
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 2) return 64;
+              NSString *path = [NSString stringWithUTF8String:argv[1]];
+              CGImageSourceRef src = CGImageSourceCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path], NULL);
+              if (!src) return 2;
+              NSDictionary *props = CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(src, 0, NULL));
+              CFRelease(src);
+              NSDictionary *maker = props[(id)kCGImagePropertyMakerAppleDictionary];
+              PrintObject("maker", maker);
+              NSArray *keys = [[maker allKeys] sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
+                  return [[a description] compare:[b description] options:NSNumericSearch];
+              }];
+              for (id key in keys) {
+                  id value = maker[key];
+                  printf("key_class=%s key_description=%s value_class=%s value_description=%s\n",
+                         object_getClassName(key), [[key description] UTF8String],
+                         value ? object_getClassName(value) : "(nil)",
+                         value ? [[value description] UTF8String] : "(nil)");
+              }
+              NSData *plist = [NSPropertyListSerialization dataWithPropertyList:maker ?: @{}
+                                                                         format:NSPropertyListXMLFormat_v1_0
+                                                                        options:0 error:nil];
+              if (plist) fwrite(plist.bytes, 1, plist.length, stdout);
+              fputc('\n', stdout);
+              return maker ? 0 : 3;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -fblocks -Wall -Wextra -Werror \
+            -framework Foundation -framework ImageIO \
+            "$RUNNER_TEMP/dump_maker.m" -o "$RUNNER_TEMP/dump_maker"
+
+      - name: Dump A-D MakerApple dictionaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          for f in source-artifact/*.heic; do
+            name="$(basename "$f" .heic)"
+            "$RUNNER_TEMP/dump_maker" "$f" > "artifacts/${name}.txt" 2>&1 || true
+          done
+          grep -n -E 'maker_class|key_description|TextureStyle|<key>' artifacts/*.txt \
+            | tee artifacts/summary.txt || true
+
+      - name: Upload mapping evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-v7-imageio-makernote-map-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
