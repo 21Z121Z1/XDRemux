@@ -29,6 +29,24 @@ jobs:
           ipsw version
           mkdir -p artifacts/cache artifacts/out
 
+      - name: Install pinned apfs-fuse
+        shell: bash
+        env:
+          APFS_FUSE_SHA: 66b86bd525e8cb90f9012543be89b1f092b75cf3
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            fuse3 libfuse3-dev libbz2-dev libattr1-dev zlib1g-dev cmake g++ git
+          src="$RUNNER_TEMP/apfs-fuse"
+          git clone --quiet https://github.com/sgan81/apfs-fuse.git "$src"
+          git -C "$src" checkout --quiet "$APFS_FUSE_SHA"
+          git -C "$src" submodule update --init --recursive --quiet
+          cmake -S "$src" -B "$src/build" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$src/build" --parallel "$(nproc)"
+          sudo install -m 0755 "$src/build/apfs-fuse" /usr/local/bin/apfs-fuse
+          command -v apfs-fuse
+
       - name: Extract exact iOS 27 RC arm64e DSC
         shell: bash
         run: |
@@ -44,13 +62,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Two tiny disassemblies only.  Do not hide failures: these are the primary evidence.
           ipsw dyld disass "$CACHE" --symbol '_PITextureStyleSettingsFromMakerNoteProperties' --symbol-image PhotoImaging --count 420 --force \
             > artifacts/out/settings.asm 2>&1
           ipsw dyld disass "$CACHE" --symbol '_PITextureStylePresetFromMakerNoteValue' --symbol-image PhotoImaging --count 240 --force \
             > artifacts/out/preset.asm 2>&1
-
-          # AVFCapture owns the new iOS-only MakerNote constants.
           ipsw dyld macho "$CACHE" AVFCapture --symbols --strings \
             > artifacts/out/avfcapture.txt 2>&1
 
@@ -64,7 +79,6 @@ jobs:
           echo '=== Reader ==='
           cat artifacts/out/reader-focused.txt
 
-          # Require that we actually obtained the functions rather than an ipsw usage/error page.
           grep -q 'PITextureStyleSettingsFromMakerNoteProperties' artifacts/out/settings.asm
           grep -q 'PITextureStylePresetFromMakerNoteValue' artifacts/out/preset.asm
           grep -q 'AVAppleMakerNote_TextureStyleKey_Preset' artifacts/out/avfcapture.txt
