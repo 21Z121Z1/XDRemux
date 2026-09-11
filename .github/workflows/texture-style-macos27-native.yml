@@ -14,11 +14,14 @@ permissions:
 
 jobs:
   native-probe:
-    runs-on: xcode-27-xlarge
+    # xcode-27-xlarge never started on the hosted fleet and produced no logs or
+    # artifacts. xcode-27-arm64 is the public Xcode 27 lane already proven by
+    # the iOS runtime/resource probes, so use it for a reproducible host probe.
+    runs-on: xcode-27-arm64
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - name: Run native macOS 27 private framework probe
+      - name: Run native macOS host private framework probe
         shell: bash
         run: |
           set -euo pipefail
