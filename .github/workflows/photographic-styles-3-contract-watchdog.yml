@@ -1,0 +1,114 @@
+name: Photographic Styles 3 Contract Watchdog
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/photographic-styles-3-contract-watchdog.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run checkpointed iOS 27 probe with watchdog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          xcrun simctl list runtimes -j > artifacts/runtimes.json
+          xcrun simctl list devicetypes -j > artifacts/devices.json
+          eval "$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          runtimes=json.loads(Path('artifacts/runtimes.json').read_text())['runtimes']
+          runtime=next(r for r in runtimes if str(r.get('version','')).startswith('27.') and r.get('isAvailable',True))
+          devices=json.loads(Path('artifacts/devices.json').read_text())['devicetypes']
+          preferred=['iPhone 18 Pro','iPhone 18 Pro Max','iPhone 17 Pro','iPhone 17 Pro Max','iPhone 17']
+          by_name={d.get('name'):d for d in devices}
+          device=next((by_name[n] for n in preferred if n in by_name),None)
+          if device is None: raise SystemExit('no modern iPhone simulator device')
+          print('RUNTIME_ID='+runtime['identifier'])
+          print('DEVICE_TYPE='+device['identifier'])
+          PY
+          )"
+
+          SRC="$RUNNER_TEMP/probe.m"
+          cp scripts/research/texture_style_ios27_sim_probe.m "$SRC"
+          python3 - "$SRC" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1]); s=p.read_text()
+          old='''static NSURL *DocumentsURL(void) {
+              return [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                             inDomains:NSUserDomainMask] firstObject];
+          }'''
+          new='''static NSURL *DocumentsURL(void) {
+              NSURL *url = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                               inDomains:NSUserDomainMask] firstObject];
+              if (url) [[NSFileManager defaultManager] createDirectoryAtURL:url withIntermediateDirectories:YES attributes:nil error:nil];
+              return url;
+          }'''
+          if old not in s: raise SystemExit('DocumentsURL anchor changed')
+          s=s.replace(old,new,1)
+          s=s.replace('NSArray<NSString *> *hardwareModels = @[ @"V53AP", @"D93AP", @"iPhone17,1" ];',
+                      'NSArray<NSString *> *hardwareModels = @[ @"V63AP", @"V53AP", @"D93AP", @"iPhone17,1" ];',1)
+          s=s.replace('trialIndex >= 48','trialIndex >= 80')
+          p.write_text(s)
+          PY
+
+          UDID="$(xcrun simctl create XDRemuxPS3Watchdog "$DEVICE_TYPE" "$RUNTIME_ID")"
+          cleanup(){ xcrun simctl terminate "$UDID" org.xdremux.PS3Watchdog >/dev/null 2>&1 || true; xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b > artifacts/boot.txt
+          SDK="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          VER="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          ARCH="$(uname -m)"
+          APP="$RUNNER_TEMP/PS3Watchdog.app"; mkdir -p "$APP"
+          xcrun --sdk iphonesimulator clang -fobjc-arc -target "${ARCH}-apple-ios${VER}-simulator" -isysroot "$SDK" \
+            -framework Foundation -framework UIKit -framework ImageIO "$SRC" -o "$APP/PS3Watchdog"
+          cat > "$APP/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <plist version="1.0"><dict>
+          <key>CFBundleIdentifier</key><string>org.xdremux.PS3Watchdog</string>
+          <key>CFBundleExecutable</key><string>PS3Watchdog</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>CFBundleVersion</key><string>1</string>
+          <key>MinimumOSVersion</key><string>${VER}</string>
+          <key>LSRequiresIPhoneOS</key><true/>
+          </dict></plist>
+          PLIST
+          codesign --force --sign - "$APP"
+          xcrun simctl install "$UDID" "$APP"
+          DATA="$(xcrun simctl get_app_container "$UDID" org.xdremux.PS3Watchdog data)"
+
+          xcrun simctl launch "$UDID" org.xdremux.PS3Watchdog > artifacts/launch.txt 2>&1 || true
+          for i in $(seq 1 45); do
+            cp "$DATA"/Documents/checkpoint-*.json artifacts/ 2>/dev/null || true
+            if [[ -s "$DATA/Documents/texture-style-ios27-probe.json" ]]; then
+              cp "$DATA/Documents/texture-style-ios27-probe.json" artifacts/runtime-probe.json
+              break
+            fi
+            sleep 1
+          done
+          find "$DATA" -maxdepth 3 -type f -print > artifacts/container-files.txt || true
+          xcrun simctl spawn "$UDID" log show --style compact --last 3m --predicate 'process == "PS3Watchdog"' > artifacts/system-log.txt 2>&1 || true
+          ls -la artifacts
+          test -e artifacts/checkpoint-00-start.json
+
+      - name: Upload checkpoints
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-contract-watchdog-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 7
+          path: artifacts/
