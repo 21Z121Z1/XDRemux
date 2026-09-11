@@ -13,7 +13,7 @@ permissions:
 jobs:
   ios27-static:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -38,7 +38,6 @@ jobs:
           sudo install -m 0755 "$src/build/apfs-fuse" /usr/local/bin/apfs-fuse
           mkdir -p artifacts/cache artifacts/extracted artifacts/reports
           ipsw version | tee artifacts/reports/ipsw-version.txt || true
-          apfs-fuse --help > artifacts/reports/apfs-fuse-help.txt 2>&1 || true
           ipsw dyld disass --help > artifacts/reports/dyld-disass-help.txt 2>&1 || true
           ipsw macho info --help > artifacts/reports/macho-info-help.txt 2>&1 || true
 
@@ -47,33 +46,30 @@ jobs:
         run: |
           set -euo pipefail
           URL='https://updates.cdn-apple.com/2026FallFCS/452c0b80-3d97-455f-a941-ea7e4dd2f964/iPhone18,1_27.0_24A435_Restore.ipsw'
-          ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" \
+          timeout 8m ipsw extract --remote --dyld --dyld-arch arm64e -o "$PWD/artifacts/cache" "$URL" \
             > artifacts/reports/cache-extract.log 2>&1
           CACHE="$(find artifacts/cache -type f -name dyld_shared_cache_arm64e -print -quit)"
           test -s "$CACHE"
           echo "CACHE=$CACHE" >> "$GITHUB_ENV"
           sha256sum "$CACHE" | tee artifacts/reports/cache.sha256
 
-      - name: Resolve PhotoImaging parser imports and outer key slot
+      - name: Resolve PhotoImaging parser slots
         shell: bash
         run: |
           set -uo pipefail
-          ipsw dyld disass "$CACHE" --vaddr 0x1c20de7d8 --count 96 --dylibs --force --no-color \
+          timeout 90s ipsw dyld disass "$CACHE" --vaddr 0x1c20de7d8 --count 80 --quiet --force --no-color \
             > artifacts/reports/photoimaging-parser-disass.txt 2>&1 || true
-          ipsw dyld a2o "$CACHE" 0x1e010e930 \
-            > artifacts/reports/outer-key-a2o.txt 2>&1 || true
-          ipsw dyld a2s "$CACHE" 0x1e010e930 \
-            > artifacts/reports/outer-key-a2s.txt 2>&1 || true
-          ipsw dyld a2f "$CACHE" 0x1e010e930 \
-            > artifacts/reports/outer-key-a2f.txt 2>&1 || true
-          ipsw dyld macho "$CACHE" PhotoImaging --symbols --strings \
+          for addr in 0x1e010e930 0x1e010e988 0x1e010e990 0x1e010e9a0; do
+            safe="${addr#0x}"
+            timeout 45s ipsw dyld a2o "$CACHE" "$addr" > "artifacts/reports/${safe}-a2o.txt" 2>&1 || true
+            timeout 45s ipsw dyld a2s "$CACHE" "$addr" > "artifacts/reports/${safe}-a2s.txt" 2>&1 || true
+          done
+          timeout 90s ipsw dyld macho "$CACHE" PhotoImaging --symbols --strings \
             > artifacts/reports/photoimaging-symbols-strings.txt 2>&1 || true
-          grep -n -E -C 20 '1e010e930|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|PITextureStyleSettingsFromMakerNoteProperties|MakerApple|MakerNote' \
+          grep -n -E -C 20 '1e010e9(30|88|90|a0)|TextureStylePreset|TextureStyleIntensity|TextureStyleGrain|PITextureStyleSettingsFromMakerNoteProperties|MakerApple|MakerNote' \
             artifacts/reports/photoimaging-parser-disass.txt \
             artifacts/reports/photoimaging-symbols-strings.txt \
-            artifacts/reports/outer-key-a2o.txt \
-            artifacts/reports/outer-key-a2s.txt \
-            artifacts/reports/outer-key-a2f.txt \
+            artifacts/reports/*-a2*.txt \
             > artifacts/reports/parser-gate-summary.txt || true
           cat artifacts/reports/parser-gate-summary.txt || true
 
@@ -81,9 +77,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ipsw dyld macho "$CACHE" PhotoImaging --extract --force --output "$PWD/artifacts/extracted" \
+          timeout 90s ipsw dyld macho "$CACHE" PhotoImaging --extract --force --output "$PWD/artifacts/extracted" \
             > artifacts/reports/photoimaging-extract.log 2>&1
-          ipsw dyld macho "$CACHE" PhotosFormats --extract --force --output "$PWD/artifacts/extracted" \
+          timeout 90s ipsw dyld macho "$CACHE" PhotosFormats --extract --force --output "$PWD/artifacts/extracted" \
             > artifacts/reports/photosformats-extract.log 2>&1
           PI="$(find artifacts/extracted -type f -name PhotoImaging -print -quit)"
           PF="$(find artifacts/extracted -type f -name PhotosFormats -print -quit)"
@@ -97,10 +93,10 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          ipsw macho info "$PI" --fixups > artifacts/reports/photoimaging-fixups.txt 2>&1 || true
-          ipsw macho info "$PI" --symbols > artifacts/reports/photoimaging-extracted-symbols.txt 2>&1 || true
-          ipsw macho info "$PI" --objc > artifacts/reports/photoimaging-objc.txt 2>&1 || true
-          grep -n -E -C 20 '1e010e930|e930|TextureStyle|MakerApple|MakerNote|CGImageProperty' \
+          timeout 90s ipsw macho info "$PI" --fixups > artifacts/reports/photoimaging-fixups.txt 2>&1 || true
+          timeout 90s ipsw macho info "$PI" --symbols > artifacts/reports/photoimaging-extracted-symbols.txt 2>&1 || true
+          timeout 90s ipsw macho info "$PI" --objc > artifacts/reports/photoimaging-objc.txt 2>&1 || true
+          grep -n -E -C 20 '1e010e9(30|88|90|a0)|e9(30|88|90|a0)|TextureStyle|MakerApple|MakerNote|CGImageProperty' \
             artifacts/reports/photoimaging-fixups.txt \
             artifacts/reports/photoimaging-extracted-symbols.txt \
             artifacts/reports/photoimaging-objc.txt \
@@ -111,11 +107,11 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
-          ipsw macho info "$PF" --objc > artifacts/reports/photosformats-objc.txt 2>&1 || true
-          ipsw macho info "$PF" --fixups > artifacts/reports/photosformats-fixups.txt 2>&1 || true
+          timeout 90s ipsw macho info "$PF" --objc > artifacts/reports/photosformats-objc.txt 2>&1 || true
+          timeout 90s ipsw macho info "$PF" --fixups > artifacts/reports/photosformats-fixups.txt 2>&1 || true
           for symbol in '-[PFMetadata hasTextureStyle]' '-[PFMetadata textureStyleIsReversible]' '-[PFMetadataImage hasTextureStyle]' '-[PFMetadataImage textureStyleIsReversible]'; do
             safe="$(printf '%s' "$symbol" | tr -cs 'A-Za-z0-9' '_')"
-            ipsw macho disass "$PF" --symbol "$symbol" --count 160 --force --no-color \
+            timeout 60s ipsw macho disass "$PF" --symbol "$symbol" --count 120 --quiet --force --no-color \
               > "artifacts/reports/${safe}.disass.txt" 2>&1 || true
           done
           grep -n -E -C 16 'hasTextureStyle|textureStyleIsReversible|textureStylePreset|textureStyleIntensity|textureStyleGrain|TextureStyle' \
