@@ -1,0 +1,78 @@
+name: TextureStyle macOS runtime introspection
+
+on:
+  push:
+    branches: [research/photographic-styles-3-texture-probe]
+    paths: [.github/workflows/texture-style-macos-runtime-introspection.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Enumerate live PhotoImaging TextureStyle classes and methods
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cat > "$RUNNER_TEMP/introspect.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+
+          static NSArray *Methods(Class c, BOOL meta) {
+              if(!c) return @[];
+              Class t=meta?object_getClass(c):c;
+              unsigned n=0; Method *ms=class_copyMethodList(t,&n);
+              NSMutableArray *a=[NSMutableArray array];
+              for(unsigned i=0;i<n;i++){
+                  SEL s=method_getName(ms[i]);
+                  const char *types=method_getTypeEncoding(ms[i]);
+                  [a addObject:@{@"name":NSStringFromSelector(s),@"types":types?[NSString stringWithUTF8String:types]:@""}];
+              }
+              free(ms); return a;
+          }
+          int main(void){@autoreleasepool{
+              void *h=dlopen("/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",RTLD_NOW|RTLD_GLOBAL);
+              fprintf(stderr,"dlopen=%p %s\n",h,h?"":dlerror());
+              int n=objc_getClassList(NULL,0); Class *cs=calloc(n,sizeof(Class)); objc_getClassList(cs,n);
+              NSMutableArray *rows=[NSMutableArray array];
+              for(int i=0;i<n;i++){
+                  NSString *name=NSStringFromClass(cs[i]);
+                  if([name rangeOfString:@"TextureStyle" options:NSCaseInsensitiveSearch].location==NSNotFound &&
+                     ![name isEqualToString:@"PISchema"]) continue;
+                  [rows addObject:@{@"class":name,@"instanceMethods":Methods(cs[i],NO),@"classMethods":Methods(cs[i],YES)}];
+              }
+              free(cs);
+              NSData*j=[NSJSONSerialization dataWithJSONObject:rows options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);
+          }return 0;}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation "$RUNNER_TEMP/introspect.m" -o "$RUNNER_TEMP/introspect"
+          "$RUNNER_TEMP/introspect" > artifacts/runtime.json 2> artifacts/stderr.txt
+          cat artifacts/stderr.txt
+          cat artifacts/runtime.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          xs=json.loads(Path('artifacts/runtime.json').read_text())
+          for x in xs:
+              print('\n',x['class'])
+              for m in x['classMethods']:
+                  if 'texture' in m['name'].lower() or 'schema' in m['name'].lower(): print(' +',m)
+              for m in x['instanceMethods']:
+                  if any(k in m['name'].lower() for k in ('texture','preset','grain','intensity','unstyled','revers')): print(' -',m)
+          PY
+      - name: Upload runtime inventory
+        uses: actions/upload-artifact@v7
+        with:
+          name: texture-style-macos-runtime-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
