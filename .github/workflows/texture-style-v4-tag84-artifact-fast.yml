@@ -43,7 +43,10 @@ jobs:
           import json
           from pathlib import Path
           m=json.loads(Path('artifacts/candidates/candidate-manifest-v3.json').read_text())
-          for x in m:
+          c=m.get('candidates',[])
+          if len(c)!=6:
+              raise SystemExit(f'expected 6 candidates, got {len(c)}')
+          for x in c:
               if x.get('newTextureItemID') is not None:
                   raise SystemExit('unexpected standalone TextureStyle item')
               if not x.get('payloadInvariant'):
@@ -51,6 +54,7 @@ jobs:
           print(json.dumps(m,indent=2))
           PY
       - name: Upload V4 candidates
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ps3-texture-style-v4-tag84-fast-${{ github.sha }}
