@@ -1,0 +1,26 @@
+{
+  "schema": "xdremux-texture-style-v4-tag84-minimal",
+  "evidence": {
+    "outerContainer": "AVAppleMakerNote_SmartStyle / existing tag84 hypothesis from PhotoImaging imports and Missing smart style properties path",
+    "innerKeys": "VERIFIED TextureStylePreset / TextureStyleIntensity / TextureStyleGrain",
+    "valueTypes": "NSNumber candidates; CEK and parser disassembly indicate numeric values",
+    "standaloneURI": "intentionally absent"
+  },
+  "maker84Variants": {
+    "p0": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":0,"TextureStyleIntensity":0.61,"TextureStyleGrain":0.73},
+    "p1": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":1,"TextureStyleIntensity":0.61,"TextureStyleGrain":0.73},
+    "p2": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":2,"TextureStyleIntensity":0.61,"TextureStyleGrain":0.73},
+    "p3": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":3,"TextureStyleIntensity":0.61,"TextureStyleGrain":0.73},
+    "p4": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":4,"TextureStyleIntensity":0.61,"TextureStyleGrain":0.73},
+    "p5": {"7":0,"3":1,"4":1,"0":1,"5":1,"1":0,"6":4,"2":0,"TextureStylePreset":5,"TextureStyleIntensity":0.61,"TextureStyleGrain":0.73}
+  },
+  "textureInfoVariants": {},
+  "combinations": [
+    {"name":"V4-tag84-preset0","maker84":"p0"},
+    {"name":"V4-tag84-preset1","maker84":"p1"},
+    {"name":"V4-tag84-preset2","maker84":"p2"},
+    {"name":"V4-tag84-preset3","maker84":"p3"},
+    {"name":"V4-tag84-preset4","maker84":"p4"},
+    {"name":"V4-tag84-preset5","maker84":"p5"}
+  ]
+}
