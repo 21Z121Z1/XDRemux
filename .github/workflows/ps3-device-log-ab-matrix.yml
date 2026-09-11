@@ -1,0 +1,158 @@
+name: PS3 Physical Device A-B Matrix
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe
+    paths:
+      - .github/workflows/ps3-device-log-ab-matrix.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download parser-valid real portrait baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-portrait-candidate-546d5301139a0c82e0ff3d79f7a6e30835de5571
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34590622596
+
+      - name: Select and verify baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/device-ab generated
+          baseline="$(find source-artifact -type f -name 'constrained-solver-preliminary-identity.heic' -print -quit)"
+          probe="$(find source-artifact -type f -name 'semantic-style-properties-probe.json' -print -quit)"
+          test -s "$baseline"
+          test -s "$probe"
+          python3 - "$probe" <<'PY'
+          import json, sys
+          p = json.load(open(sys.argv[1]))
+          assert p.get('parseSucceeded') == 1, p
+          assert p.get('styleDataLength') == 51840, p
+          assert p.get('readbackWritten') is True, p
+          print(json.dumps(p, sort_keys=True))
+          PY
+          cp "$baseline" artifacts/device-ab/A-baseline-original.heic
+          cp "$probe" artifacts/device-ab/A-semantic-style-parser.json
+          sha256sum "$baseline" artifacts/device-ab/A-baseline-original.heic | tee artifacts/device-ab/A-baseline-copy-sha256.txt
+
+      - name: Build one-variable PS3 candidate matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline=artifacts/device-ab/A-baseline-original.heic
+          cat > "$RUNNER_TEMP/device-ab-contract.json" <<'JSON'
+          {
+            "schema": "xdremux-ps3-physical-device-ab-v1",
+            "evidence": {
+              "purpose": "isolate physical Photos loss of defaultSemanticStyle/defaultTextureStyle",
+              "textureURI": "iOS 27 RC firmware diff",
+              "maker84Placement": "UNVERIFIED negative-control mutation",
+              "enumValues": "candidate pending device acceptance"
+            },
+            "textureURI": "tag:apple.com,2026:photo:metadata:texture_styles",
+            "maker84Variants": {
+              "mutated-v3": {
+                "7": 0,
+                "3": 1,
+                "4": 1,
+                "0": 1,
+                "5": 1,
+                "1": 0,
+                "6": 4,
+                "2": 0,
+                "TextureStylePreset": "Standard",
+                "TextureStyleIntensity": 1.0,
+                "TextureStyleGrain": 0.0,
+                "TextureStyleRenderingVersion": 1,
+                "TextureStyleOriginalInsteadOfReversibility": false
+              }
+            },
+            "textureInfoVariants": {
+              "standard": {
+                "Version": 1,
+                "HardwareModel": "V63AP",
+                "PortType": "PortTypeBack",
+                "CaptureMode": "Photo",
+                "CaptureType": "Photo",
+                "FilmGrainSeed": 1480872525,
+                "TextureStylePeopleDataVersion": 1,
+                "TextureStylePostProcessedPeopleData": []
+              }
+            },
+            "combinations": [
+              {
+                "name": "B-2026-only-original-maker",
+                "maker84": "baseline",
+                "textureInfo": "standard"
+              },
+              {
+                "name": "C-current-v3-tag84-plus-2026",
+                "maker84": "mutated-v3",
+                "textureInfo": "standard"
+              },
+              {
+                "name": "D-tag84-only-no-2026",
+                "maker84": "mutated-v3"
+              }
+            ]
+          }
+          JSON
+          python3 -m py_compile scripts/research/patch_texture_style_heif_v3.py
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            "$baseline" \
+            "$RUNNER_TEMP/device-ab-contract.json" \
+            generated \
+            | tee artifacts/device-ab/build-report.json
+          cp generated/B-2026-only-original-maker.heic artifacts/device-ab/
+          cp generated/C-current-v3-tag84-plus-2026.heic artifacts/device-ab/
+          cp generated/D-tag84-only-no-2026.heic artifacts/device-ab/
+          cp generated/candidate-manifest-v3.json artifacts/device-ab/
+
+      - name: Verify mutation isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - artifacts/device-ab/candidate-manifest-v3.json <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          rows = {c['name']: c for c in m['candidates']}
+          b = rows['B-2026-only-original-maker']
+          c = rows['C-current-v3-tag84-plus-2026']
+          d = rows['D-tag84-only-no-2026']
+          assert b['payloadInvariant'] is True and b['exifChanged'] is False and b['newTextureItemID'] is not None, b
+          assert c['payloadInvariant'] is True and c['exifChanged'] is True and c['newTextureItemID'] is not None, c
+          assert d['payloadInvariant'] is True and d['exifChanged'] is True and d['newTextureItemID'] is None, d
+          out = {
+            'A': 'untouched parser-valid 2023 baseline',
+            'B': '2026 texture_styles URI item only; original Exif/MakerNote byte-for-byte',
+            'C': 'current V3: tag84 mutation + 2026 texture_styles URI item',
+            'D': 'tag84 mutation only; no 2026 texture_styles URI item',
+            'manifestChecks': 'PASS'
+          }
+          print(json.dumps(out, indent=2))
+          open('artifacts/device-ab/test-plan.json','w').write(json.dumps(out, indent=2))
+          PY
+          sha256sum artifacts/device-ab/*.heic | tee artifacts/device-ab/SHA256SUMS
+          test "$(sha256sum artifacts/device-ab/A-baseline-original.heic | awk '{print $1}')" = "$(head -1 artifacts/device-ab/A-baseline-copy-sha256.txt | awk '{print $1}')"
+
+      - name: Upload physical-device test matrix
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-physical-device-ab-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/device-ab/
