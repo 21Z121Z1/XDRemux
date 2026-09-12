@@ -372,6 +372,10 @@ def patch_candidates(source, contract, output_dir):
         name = candidate["name"]
         maker_name = candidate.get("maker84", "baseline")
         texture_name = candidate.get("textureInfo")
+        texture_item_name = candidate.get(
+            "textureItemName",
+            contract.get("textureItemName", "textureStyleMetadata"),
+        )
         maker_object = maker_variants[maker_name]
         new_tag84 = plistlib.dumps(maker_object, fmt=plistlib.FMT_BINARY, sort_keys=False)
         new_note = rebuild_apple_makernote(old_note, new_tag84)
@@ -388,7 +392,7 @@ def patch_candidates(source, contract, output_dir):
         if new_item_id:
             raw_infes.append(make_uri_infe(
                 new_item_id,
-                "textureStyleMetadata",
+                texture_item_name,
                 contract["textureURI"],
             ))
         new_refs = [
@@ -500,6 +504,9 @@ def patch_candidates(source, contract, output_dir):
             "payloadInvariant": True,
             "exifChanged": new_exif is not None,
             "newTextureItemID": new_item_id,
+            "textureItemName": texture_item_name if new_item_id else None,
+            "textureConstructionMethod": 0 if new_item_id else None,
+            "textureTargets": list(style_targets) if new_item_id else None,
         })
 
     manifest_path = output_dir / "candidate-manifest-v3.json"
