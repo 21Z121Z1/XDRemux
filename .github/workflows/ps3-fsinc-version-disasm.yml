@@ -1,0 +1,44 @@
+name: PS3 FSINC Version Disassembly
+
+on:
+  push:
+    branches: [research/ps3-fsinc-beta6-probe]
+    paths: [.github/workflows/ps3-fsinc-version-disasm.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disasm:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+      - name: Extract ANSTKit version dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          BIN=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/ANSTKit
+          xcrun nm -nm "$BIN" > artifacts/nm.txt || true
+          xcrun otool -tvV "$BIN" > artifacts/disasm-full.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('artifacts/disasm-full.txt').read_text(errors='replace').splitlines()
+          needles=['ANSTFsincAlgorithmVersionToNSString','ANSTFsincInferenceVersionToNSString','_concreteClassOfVersion','ANSTFsincAlgorithmResolutionToNSString']
+          out=[]
+          for needle in needles:
+              hits=[i for i,l in enumerate(lines) if needle in l]
+              out.append(f'===== {needle} hits={hits} =====')
+              for i in hits:
+                  a=max(0,i-5); b=min(len(lines),i+120)
+                  out.extend(lines[a:b]); out.append('===== END HIT =====')
+          Path('artifacts/fsinc-version-disasm.txt').write_text('\n'.join(out))
+          print('\n'.join(out))
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: fsinc-version-disasm-${{ github.sha }}
+          retention-days: 7
+          path: artifacts/
