@@ -1,0 +1,96 @@
+name: PS3 Texture V12 semantic generator r4
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-v12-spi-matrix
+    paths:
+      - .github/workflows/ps3-texture-v12-semantic-generator-r4.yml
+
+permissions:
+  contents: read
+
+jobs:
+  semantic-generator:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Fetch second portrait fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r4
+          git fetch --no-tags --depth=1 origin f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          git show f89eea8c1714eb5d1e3da1ff8ba83e61655181d5:fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic > "$RUNNER_TEMP/portrait.heic"
+
+      - name: Enumerate V4 V7 multi-generator output contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/maps.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+          static id Obj(Class c, NSString *s){SEL x=NSSelectorFromString(s); if(!c||![c respondsToSelector:x])return nil; id(*f)(id,SEL)=(void*)objc_msgSend; return f(c,x);}
+          static NSUInteger UInt(Class c, NSString *s){SEL x=NSSelectorFromString(s);if(!c||![c respondsToSelector:x])return 0;NSUInteger(*f)(id,SEL)=(void*)objc_msgSend;return f(c,x);}
+          int main(void){@autoreleasepool{
+            NSMutableDictionary*out=[NSMutableDictionary dictionary];
+            for(NSString*n in @[@"VNE5RTSemanticSegmentationMultiGeneratorV4",@"VNE5RTSemanticSegmentationMultiGeneratorV7"]){
+              Class c=NSClassFromString(n); if(!c)continue;
+              NSMutableDictionary*d=[NSMutableDictionary dictionary];
+              id names=Obj(c,@"outputMaskBlobNames"); if(names)d[@"outputMaskBlobNames"]=[names description];
+              id f=Obj(c,@"outputMaskBlobNameToFeatureName"); if(f)d[@"outputMaskBlobNameToFeatureName"]=f;
+              id k=Obj(c,@"outputMaskBlobNameToRequestKey"); if(k)d[@"outputMaskBlobNameToRequestKey"]=k;
+              d[@"modelVersion"]=@(UInt(c,@"modelVersion")); out[n]=d;
+            }
+            Class h=NSClassFromString(@"VNGenerateHumanAttributesSegmentationRequest");
+            id attrs=Obj(h,@"_supportedHumanAttributesNamesRevision1"); if(attrs)out[@"humanAttributesRevision1"]=attrs;
+            NSError*e=nil; id req=[[h alloc]init]; SEL sel=NSSelectorFromString(@"supportedHumanAttributesNamesAndReturnError:");
+            if(req&&[req respondsToSelector:sel]){id(*f)(id,SEL,NSError**)=(void*)objc_msgSend;id v=f(req,sel,&e);if(v)out[@"supportedHumanAttributesNames"]=v;if(e)out[@"humanAttributesError"]=e.description;}
+            Class av=NSClassFromString(@"AVSemanticSegmentationMatte"); id types=Obj(av,@"_allSupportedSemanticSegmentationMatteTypes"); if(types)out[@"AVSemanticSegmentationMatteTypes"]=[types description];
+            id fmts=Obj(av,@"_allSupportedSemanticSegmentationMattePixelFormatTypes");if(fmts)out[@"AVSemanticSegmentationMattePixelFormats"]=[fmts description];
+            NSData*j=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);return 0;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework AVFoundation "$RUNNER_TEMP/maps.m" -o "$RUNNER_TEMP/maps"
+          "$RUNNER_TEMP/maps" | tee artifacts/r4/model-output-contract.json
+
+      - name: Run configured compound requests on portrait 02
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/compound.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <ImageIO/ImageIO.h>
+          #import <CoreVideo/CoreVideo.h>
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+          static id New(NSString*n){Class c=NSClassFromString(n);return c?[[c alloc]init]:nil;}
+          static NSString *FCC(OSType v){char b[5]={(char)(v>>24),(char)(v>>16),(char)(v>>8),(char)v,0};for(int i=0;i<4;i++)if(b[i]<32||b[i]>126)return[NSString stringWithFormat:@"0x%08x",v];return[NSString stringWithUTF8String:b];}
+          static NSDictionary *Describe(id x){NSMutableDictionary*d=[@{@"class":NSStringFromClass([x class])}mutableCopy];SEL fs=NSSelectorFromString(@"featureName");if([x respondsToSelector:fs]){id(*f)(id,SEL)=(void*)objc_msgSend;id v=f(x,fs);if(v)d[@"featureName"]=[v description];}SEL ps=NSSelectorFromString(@"pixelBuffer");if([x respondsToSelector:ps]){CVPixelBufferRef(*f)(id,SEL)=(void*)objc_msgSend;CVPixelBufferRef pb=f(x,ps);if(pb){d[@"width"]=@(CVPixelBufferGetWidth(pb));d[@"height"]=@(CVPixelBufferGetHeight(pb));d[@"pixelFormat"]=FCC(CVPixelBufferGetPixelFormatType(pb));}}return d;}
+          static NSDictionary *Attempt(CGImageRef image,NSArray*names){NSMutableDictionary*r=[@{@"originalRequests":names}mutableCopy];NSMutableArray*original=[NSMutableArray array];for(NSString*n in names){id q=New(n);if(q)[original addObject:q];else{r[@"missingClass"]=n;return r;}}Class cc=NSClassFromString(@"VNGenerateSemanticSegmentationCompoundRequest");SEL init=NSSelectorFromString(@"initWithOriginalRequests:");id alloc=[cc alloc];id(*make)(id,SEL,id)=(void*)objc_msgSend;id compound=make(alloc,init,original);if(!compound){r[@"initReturnedNil"]=@YES;return r;}@try{NSError*e=nil;VNImageRequestHandler*h=[[VNImageRequestHandler alloc]initWithCGImage:image options:@{}];BOOL ok=[h performRequests:@[compound] error:&e];r[@"ok"]=@(ok);if(e)r[@"error"]=e.description;NSArray*results=[compound valueForKey:@"results"]?:@[];NSMutableArray*desc=[NSMutableArray array];for(id x in results)[desc addObject:Describe(x)];r[@"results"]=desc;r[@"resultCount"]=@(results.count);}@catch(NSException*e){r[@"exception"]=@{@"name":e.name?:@"",@"reason":e.reason?:@""};}return r;}
+          int main(int argc,const char**argv){@autoreleasepool{if(argc!=2)return 64;NSURL*u=[NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]];CGImageSourceRef s=CGImageSourceCreateWithURL((__bridge CFURLRef)u,NULL);CGImageRef im=s?CGImageSourceCreateImageAtIndex(s,0,NULL):NULL;if(!im)return 3;NSArray*sets=@[
+            @[@"VNGenerateHumanAttributesSegmentationRequest"],
+            @[@"VNGenerateGlassesSegmentationRequest"],
+            @[@"VNGenerateSkySegmentationRequest"],
+            @[@"VNGenerateHumanAttributesSegmentationRequest",@"VNGenerateGlassesSegmentationRequest"],
+            @[@"VNGenerateHumanAttributesSegmentationRequest",@"VNGenerateGlassesSegmentationRequest",@"VNGenerateSkySegmentationRequest"]
+          ];NSMutableArray*out=[NSMutableArray array];for(NSArray*x in sets)[out addObject:Attempt(im,x)];NSData*j=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);CGImageRelease(im);CFRelease(s);return 0;}}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework ImageIO -framework CoreVideo "$RUNNER_TEMP/compound.m" -o "$RUNNER_TEMP/compound"
+          "$RUNNER_TEMP/compound" "$RUNNER_TEMP/portrait.heic" | tee artifacts/r4/configured-compound-results.json
+
+      - name: Upload r4 evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-v12-semantic-generator-r4-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/r4/
