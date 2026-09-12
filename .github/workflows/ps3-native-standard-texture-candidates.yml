@@ -1,0 +1,215 @@
+name: PS3 Native Standard Texture Candidate Matrix
+
+"on":
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe-v7
+    paths:
+      - .github/workflows/ps3-native-standard-texture-candidates.yml
+      - scripts/research/patch_texture_style_heif_v3.py
+      - scripts/research/validate_texture_style_native_matrix.py
+      - scripts/research/texture_style_native_standard_contract.json
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  generate-native-standard-matrix:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download the existing physical-device baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-style-v5-xcode27-a80e635a1e490ffe6c82ec1625f48e0365b3561c
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34623523344
+
+      - name: Generate native Standard candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/candidates artifacts/evidence
+          baseline="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$baseline"
+          cp "$baseline" artifacts/candidates/A-baseline-original.heic
+          python3 scripts/research/patch_texture_style_heif_v3.py \
+            "$baseline" \
+            scripts/research/texture_style_native_standard_contract.json \
+            artifacts/candidates \
+            | tee artifacts/evidence/generator-report.json
+          python3 scripts/research/validate_texture_style_native_matrix.py \
+            scripts/research/texture_style_native_standard_contract.json \
+            artifacts/candidates \
+            artifacts/evidence/structural-validation.json
+          sha256sum artifacts/candidates/*.heic | tee artifacts/evidence/SHA256SUMS
+          sw_vers | tee artifacts/evidence/macos.txt
+          xcodebuild -version | tee artifacts/evidence/xcode.txt
+
+      - name: Build ImageIO and PhotosFormats probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/texture_probe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+
+          static id SafeObject(id object, NSString *name) {
+              SEL selector = NSSelectorFromString(name);
+              if (!object || ![object respondsToSelector:selector]) return [NSNull null];
+              @try {
+                  id value = ((id(*)(id,SEL))objc_msgSend)(object, selector);
+                  return value ?: [NSNull null];
+              } @catch (NSException *exception) {
+                  return @{@"exception": exception.reason ?: exception.name};
+              }
+          }
+
+          static id OpenMetadata(NSURL *url) {
+              Class cls = NSClassFromString(@"PFMetadataImage");
+              if (!cls) return nil;
+              id contentType = nil;
+              Class ut = NSClassFromString(@"UTType");
+              SEL typeSelector = NSSelectorFromString(@"typeWithIdentifier:");
+              if (ut && [ut respondsToSelector:typeSelector]) {
+                  contentType = ((id(*)(id,SEL,id))objc_msgSend)(ut, typeSelector, @"public.heic");
+              }
+              id object = [cls alloc];
+              SEL simple = NSSelectorFromString(@"initWithImageURL:contentType:timeZoneLookup:");
+              if ([object respondsToSelector:simple]) {
+                  @try {
+                      id value = ((id(*)(id,SEL,id,id,id))objc_msgSend)(
+                          object, simple, url, contentType, nil
+                      );
+                      if (value) return value;
+                  } @catch (__unused NSException *exception) {}
+              }
+              object = [cls alloc];
+              SEL full = NSSelectorFromString(
+                  @"initWithImageURL:contentType:options:timeZoneLookup:cacheImageSource:cacheImageData:"
+              );
+              if ([object respondsToSelector:full]) {
+                  @try {
+                      return ((id(*)(id,SEL,id,id,unsigned long long,id,BOOL,BOOL))objc_msgSend)(
+                          object, full, url, contentType, 0, nil, YES, YES
+                      );
+                  } @catch (__unused NSException *exception) {}
+              }
+              return nil;
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 4) return 64;
+              NSString *input = [NSString stringWithUTF8String:argv[1]];
+              NSString *jsonPath = [NSString stringWithUTF8String:argv[2]];
+              NSString *plistPath = [NSString stringWithUTF8String:argv[3]];
+              NSURL *url = [NSURL fileURLWithPath:input];
+
+              CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)url, NULL);
+              NSDictionary *properties = source
+                  ? CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(source, 0, NULL))
+                  : nil;
+              if (source) CFRelease(source);
+              NSDictionary *maker = properties[(id)kCGImagePropertyMakerAppleDictionary];
+              NSData *makerPlist = [NSPropertyListSerialization
+                  dataWithPropertyList:maker ?: @{}
+                  format:NSPropertyListXMLFormat_v1_0
+                  options:0
+                  error:nil];
+              [makerPlist writeToFile:plistPath atomically:YES];
+
+              void *handle = dlopen(
+                  "/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",
+                  RTLD_NOW | RTLD_GLOBAL
+              );
+              id metadata = OpenMetadata(url);
+              NSMutableDictionary *report = [NSMutableDictionary dictionary];
+              report[@"file"] = input.lastPathComponent;
+              report[@"imageSourceAvailable"] = @(properties != nil);
+              report[@"makerAppleAvailable"] = @(maker != nil);
+              report[@"frameworkLoaded"] = @(handle != NULL);
+              report[@"classAvailable"] = @(NSClassFromString(@"PFMetadataImage") != Nil);
+              report[@"metadataClass"] = metadata ? NSStringFromClass([metadata class]) : @"nil";
+              NSArray *selectors = @[
+                  @"hasSmartStyle", @"hasTextureStyle", @"textureStylePreset",
+                  @"textureStyleIntensity", @"textureStyleGrainIntensity",
+                  @"textureStyleIsReversible"
+              ];
+              for (NSString *name in selectors) {
+                  SEL selector = NSSelectorFromString(name);
+                  BOOL available = metadata && [metadata respondsToSelector:selector];
+                  report[[name stringByAppendingString:@"Available"]] = @(available);
+                  if (!available) continue;
+                  @try {
+                      if ([name hasPrefix:@"has"] || [name isEqualToString:@"textureStyleIsReversible"]) {
+                          report[name] = @(((BOOL(*)(id,SEL))objc_msgSend)(metadata, selector));
+                      } else {
+                          report[name] = SafeObject(metadata, name);
+                      }
+                  } @catch (NSException *exception) {
+                      report[name] = @{@"exception": exception.reason ?: exception.name};
+                  }
+              }
+              NSData *json = [NSJSONSerialization dataWithJSONObject:report
+                  options:(NSJSONWritingPrettyPrinted | NSJSONWritingSortedKeys) error:nil];
+              [json writeToFile:jsonPath atomically:YES];
+              fwrite(json.bytes, 1, json.length, stdout);
+              fputc('\n', stdout);
+              return properties ? 0 : 2;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -Wall -Wextra -Werror \
+            -framework Foundation -framework ImageIO -framework UniformTypeIdentifiers \
+            "$RUNNER_TEMP/texture_probe.m" -o "$RUNNER_TEMP/texture_probe"
+
+      - name: Probe every generated candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in artifacts/candidates/*.heic; do
+            name="$(basename "$file" .heic)"
+            "$RUNNER_TEMP/texture_probe" \
+              "$file" \
+              "artifacts/evidence/${name}-photosformats.json" \
+              "artifacts/evidence/${name}-makerapple.plist" \
+              | tee "artifacts/evidence/${name}-probe.stdout"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          rows = []
+          for path in sorted(Path("artifacts/evidence").glob("*-photosformats.json")):
+              value = json.loads(path.read_text())
+              rows.append({
+                  "file": value["file"],
+                  "hasSmartStyle": value.get("hasSmartStyle"),
+                  "hasTextureStyleAvailable": value.get("hasTextureStyleAvailable"),
+                  "hasTextureStyle": value.get("hasTextureStyle"),
+                  "textureStylePreset": value.get("textureStylePreset"),
+                  "textureStyleIntensity": value.get("textureStyleIntensity"),
+                  "textureStyleGrainIntensity": value.get("textureStyleGrainIntensity"),
+                  "textureStyleIsReversible": value.get("textureStyleIsReversible"),
+              })
+          Path("artifacts/evidence/probe-summary.json").write_text(
+              json.dumps(rows, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(rows, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload candidates and evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-native-standard-texture-candidates-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
