@@ -1,18 +1,16 @@
-name: Implement Rust Texture Style integration
+name: Rust Texture Style integration harness
 
 on:
   push:
-    branches:
-      - feat/rust-texture-style-support
-    paths:
-      - .github/workflows/implement-rust-texture-style.yml
+    branches: [feat/rust-texture-style-support]
+    paths: [.github/workflows/implement-rust-texture-style.yml]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  implement-and-verify:
+  verify:
     runs-on: macos-26
     timeout-minutes: 105
     steps:
@@ -21,7 +19,7 @@ jobs:
           ref: feat/rust-texture-style-support
           fetch-depth: 0
 
-      - name: Install portable HEVC provider
+      - name: Install dependencies
         shell: bash
         run: |
           brew install libheif
@@ -32,206 +30,40 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Wire verified Texture Style contract into Rust product path
+      - name: Apply product integration
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace_once(path, old, new):
-              p = Path(path)
-              text = p.read_text()
-              if text.count(old) != 1:
-                  raise SystemExit(f"{path}: expected one anchor, got {text.count(old)}: {old[:80]!r}")
-              p.write_text(text.replace(old, new, 1))
-
-          # HEIF public surface.
-          replace_once(
-              "crates/xdremux-heif/src/lib.rs",
-              "mod styles;\nmod validation;",
-              "mod styles;\nmod texture_styles;\nmod validation;",
-          )
-          replace_once(
-              "crates/xdremux-heif/src/lib.rs",
-              "pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};",
-              "pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};\npub use texture_styles::augment_texture_style_heif;",
-          )
-
-          # Keep the ordinary v15 object for the existing Apple private-consumer
-          # preflight, and derive the physical-device-positive v16+l=false object
-          # from the exact same Rust request for the final carrier.
-          engine = Path("crates/xdremux-engine/src/apple_photographic_styles.rs")
-          text = engine.read_text()
-          start = text.index("pub fn apple_style_property_list(")
-          end = text.index("\nfn validate_style_statistics(", start)
-          original = text[start:end]
-          texture = original.replace(
-              "pub fn apple_style_property_list(",
-              "pub fn apple_texture_style_property_list(",
-              1,
-          ).replace(
-              '("0", PlistValue::Integer(15)),',
-              '("0", PlistValue::Integer(16)),',
-              1,
-          ).replace(
-              '("k", PlistValue::Bool(false)),\n    ]);',
-              '("k", PlistValue::Bool(false)),\n        ("l", PlistValue::Bool(false)),\n    ]);',
-              1,
-          )
-          if texture == original or '("l", PlistValue::Bool(false))' not in texture:
-              raise SystemExit("failed to derive Texture Style v16 property-list writer")
-          texture = "/// Synthesize the iOS 27 Texture Style v16 metadata object.\n" + texture
-          text = text[:end] + "\n\n" + texture + text[end:]
-          engine.write_text(text)
-
-          replace_once(
-              "crates/xdremux-engine/src/lib.rs",
-              "apple_style_property_list, apple_style_solve_refinement_update, resolve_apple_style_scene_type,",
-              "apple_style_property_list, apple_style_solve_refinement_update, apple_texture_style_property_list,\n    resolve_apple_style_scene_type,",
-          )
-
-          runtime = Path("crates/xdremux-runtime/src/apple_styles.rs")
-          text = runtime.read_text()
-          text = text.replace(
-              "apple_style_property_list, resolve_apple_style_scene_type, AppleL8Mask,",
-              "apple_style_property_list, apple_texture_style_property_list, resolve_apple_style_scene_type,\n    AppleL8Mask,",
-              1,
-          )
-          old_start = "    let style_properties = apple_style_property_list(&AppleStylePropertyListRequest {\n"
-          if text.count(old_start) != 1:
-              raise SystemExit("runtime: style request anchor changed")
-          text = text.replace(old_start, "    let style_request = AppleStylePropertyListRequest {\n", 1)
-          old_tail = "        face_exposure_boost,\n    })\n    .map_err(|error| RuntimeError::external(\"Photographic Styles metadata\", error))?;\n\n    // Validate the exact Rust-owned key-1 resource"
-          new_tail = "        face_exposure_boost,\n    };\n    let style_properties = apple_style_property_list(&style_request)\n        .map_err(|error| RuntimeError::external(\"Photographic Styles metadata\", error))?;\n    let texture_style_properties = apple_texture_style_property_list(&style_request)\n        .map_err(|error| RuntimeError::external(\"Texture Style v16 metadata\", error))?;\n\n    // Validate the exact Rust-owned key-1 resource"
-          if text.count(old_tail) != 1:
-              raise SystemExit("runtime: style request tail anchor changed")
-          text = text.replace(old_tail, new_tail, 1)
-          if text.count("style_property_list: &style_properties,") != 1:
-              raise SystemExit("runtime: assembly property-list anchor changed")
-          text = text.replace(
-              "style_property_list: &style_properties,",
-              "style_property_list: &texture_style_properties,",
-              1,
-          )
-          old_assembly = '''    let assembled = xdremux_heif::assemble_photographic_styles_heif(&semantic_base, &assembly)
-        .map_err(|error| RuntimeError::external("Rust Photographic Styles graph", error))?;
-    xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
-        RuntimeError::external("Photographic Styles HDR structural validation", error)
-    })?;
-
-    let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
-    let published = publisher.publish_bytes(assembled)?;
-'''
-          new_assembly = '''    let assembled = xdremux_heif::assemble_photographic_styles_heif(&semantic_base, &assembly)
-        .map_err(|error| RuntimeError::external("Rust Photographic Styles graph", error))?;
-    let textured = xdremux_heif::augment_texture_style_heif(&assembled)
-        .map_err(|error| RuntimeError::external("Rust Texture Style carrier", error))?;
-    xdremux_heif::validate_gain_map_structure(&textured).map_err(|error| {
-        RuntimeError::external("Texture Style HDR structural validation", error)
-    })?;
-
-    let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
-    let published = publisher.publish_bytes(textured)?;
-'''
-          if text.count(old_assembly) != 1:
-              raise SystemExit("runtime: final assembly anchor changed")
-          text = text.replace(old_assembly, new_assembly, 1)
-          runtime.write_text(text)
-
-          # Upgrade the real-fixture consumer test from the old styleMetadata/idat
-          # assumption to the native Texture carrier: `metadata`, method-0, v16,
-          # central 2026 metadata URI and all twelve semantic roles.
-          script = Path("scripts/check_rust_style_consumer.sh")
-          text = script.read_text()
-          old_reader = '''def read_style_plist(path, inspect_path):
-    report = json.load(open(inspect_path, encoding="utf-8"))
-    metadata = next(
-        item
-        for item in report["items"]
-        if item.get("type") == "uri " and item.get("name") == "styleMetadata"
-    )
-    idat = next(child for child in report["meta_children"] if child["type"] == "idat")
-    extent = metadata["location"]["extents"][0]
-    with open(path, "rb") as stream:
-        data = stream.read()
-    start = idat["start"] + 8 + extent["offset"]
-    payload = data[start : start + extent["length"]]
-    return plistlib.loads(payload)
-'''
-          new_reader = '''def read_style_plist(path, inspect_path):
-    report = json.load(open(inspect_path, encoding="utf-8"))
-    candidates = [
-        item for item in report["items"]
-        if item.get("type") == "uri " and item.get("name") == "metadata"
-    ]
-    if len(candidates) != 2:
-        raise SystemExit(f"{path}: expected style+Texture metadata items, got {len(candidates)}")
-    # The Photographic Styles object contains the 51,840-byte key-1 payload and
-    # is necessarily larger than the small Texture Style capture metadata plist.
-    metadata = max(candidates, key=lambda item: item.get("payload_length") or 0)
-    location = metadata["location"]
-    if location.get("construction_method") != 0:
-        raise SystemExit(f"{path}: Styles v16 metadata is not method-0: {location!r}")
-    extent = location["extents"][0]
-    with open(path, "rb") as stream:
-        data = stream.read()
-    start = extent["offset"]
-    payload = data[start : start + extent["length"]]
-    plist = plistlib.loads(payload)
-    if plist.get("0") != 16 or plist.get("l") is not False:
-        raise SystemExit(f"{path}: final Styles carrier is not v16+l=false")
-    texture_uri = b"tag:apple.com,2026:photo:metadata:texture_styles\\0"
-    if texture_uri not in data:
-        raise SystemExit(f"{path}: missing Texture Style metadata URI")
-    roles = [
-        b"semanticnosematte", b"semanticskinmattev2", b"semanticnonfaceskinmatte",
-        b"semanticlipsmatte", b"semanticteethmattev2", b"semanticpersonmatte",
-        b"semanticglassesmattev2", b"semanticeyebrowsmatte", b"semantictattoomatte",
-        b"semantichandsmatte", b"semanticearsmatte", b"semanticfaceskinmatte",
-    ]
-    missing = [role.decode() for role in roles if role not in data]
-    if missing:
-        raise SystemExit(f"{path}: missing Texture Style semantic roles {missing}")
-    return plist
-'''
-          if text.count(old_reader) != 1:
-              raise SystemExit("consumer gate: plist reader anchor changed")
-          script.write_text(text.replace(old_reader, new_reader, 1))
-          PY
-
+          python3 scripts/research/apply_texture_style_product_patch.py
           cargo fmt --all
           git diff --check
 
-      - name: Compile and test Texture Style Rust layers
+      - name: Test Rust layers
         shell: bash
         run: |
           cargo test --locked -p xdremux-engine -p xdremux-heif
           cargo clippy --locked -p xdremux-engine -p xdremux-heif -p xdremux-runtime --all-targets -- -D warnings
 
-      - name: Run real ProXDR Rust Styles and Texture carrier integration
+      - name: Test real ProXDR product path
         shell: bash
-        run: |
-          bash scripts/check_rust_style_consumer.sh
+        run: bash scripts/check_rust_style_consumer.sh
 
-      - name: Inspect integration diff
+      - name: Review diff
         shell: bash
         run: |
           git status --short
           git diff --stat
           git diff --check
-          git diff -- crates/xdremux-engine/src/lib.rs crates/xdremux-engine/src/apple_photographic_styles.rs crates/xdremux-heif/src/lib.rs crates/xdremux-heif/src/texture_styles.rs crates/xdremux-runtime/src/apple_styles.rs scripts/check_rust_style_consumer.sh
 
-      - name: Commit verified integration
+      - name: Commit verified implementation
         shell: bash
         run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add crates/xdremux-engine/src/lib.rs \
-                  crates/xdremux-engine/src/apple_photographic_styles.rs \
-                  crates/xdremux-heif/src/lib.rs \
-                  crates/xdremux-heif/src/texture_styles.rs \
-                  crates/xdremux-runtime/src/apple_styles.rs \
-                  scripts/check_rust_style_consumer.sh
-          git diff --cached --quiet && { echo "no integration changes to commit"; exit 1; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/implement-rust-texture-style.yml
+          git rm scripts/research/apply_texture_style_product_patch.py
+          git add crates/xdremux-engine/src/lib.rs crates/xdremux-engine/src/apple_photographic_styles.rs
+          git add crates/xdremux-heif/src/lib.rs crates/xdremux-heif/src/texture_styles.rs
+          git add crates/xdremux-runtime/src/apple_styles.rs scripts/check_rust_style_consumer.sh
+          git diff --cached --check
           git commit -m "feat: enable Rust iOS 27 Texture Style carrier"
           git push origin HEAD:feat/rust-texture-style-support
