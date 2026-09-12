@@ -61,12 +61,17 @@ static id tryRun(Class cls, Class cfgCls, uint64_t v, NSUInteger r, NSString *in
         id alg=((id(*)(id,SEL,id))objc_msgSend)(aa,sel_registerName("initWithConfiguration:"),cfg);
         printf("RUN class=%s v=0x%llx r=%lu cfg=%s instanceClass=%s\n",class_getName(cls),(unsigned long long)v,(unsigned long)r,descstr(cfg),alg?object_getClassName(alg):"nil");
         if(!alg)return nil;
+        SEL prepSel=sel_registerName("prepareWithError:");
         SEL bindSel=sel_registerName("bindNetworkInputPixelBuffer:error:");
         SEL execSel=sel_registerName("executeInferenceWithError:");
-        if(![alg respondsToSelector:bindSel]||![alg respondsToSelector:execSel]) { printf("  missing bind/execute\n"); return nil; }
+        if(![alg respondsToSelector:prepSel]||![alg respondsToSelector:bindSel]||![alg respondsToSelector:execSel]) { printf("  missing prepare/bind/execute\n"); return nil; }
+        NSError*err=nil;
+        BOOL prepared=((BOOL(*)(id,SEL,NSError**))objc_msgSend)(alg,prepSel,&err);
+        printf("  prepare=%d err=%s\n",prepared,descstr(err));
+        if(!prepared)return nil;
         size_t w=r==1?576:(r==2?256:768), h=r==1?768:(r==2?256:576);
         CVPixelBufferRef pb=makeBGRA(input,w,h); if(!pb)return nil;
-        NSError*err=nil;
+        err=nil;
         BOOL bound=((BOOL(*)(id,SEL,CVPixelBufferRef,NSError**))objc_msgSend)(alg,bindSel,pb,&err);
         printf("  bind=%d err=%s\n",bound,descstr(err));
         if(!bound){CFRelease(pb);return nil;}
