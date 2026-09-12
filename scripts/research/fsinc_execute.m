@@ -9,6 +9,8 @@
 
 typedef NSString *(*NameFn)(uint64_t);
 
+static const char *descstr(id obj) { return obj ? [[obj description] UTF8String] : "nil"; }
+
 static CVPixelBufferRef makeBGRA(NSString *path, size_t w, size_t h) {
     CIImage *src = [CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path] options:@{}];
     if (!src) return NULL;
@@ -35,7 +37,7 @@ static BOOL writeMask(CVPixelBufferRef pb, NSString *path) {
     NSError *err=nil;
     BOOL ok=[ctx writePNGRepresentationOfImage:[CIImage imageWithCVPixelBuffer:pb] toURL:[NSURL fileURLWithPath:path] format:kCIFormatL8 colorSpace:gray options:@{} error:&err];
     CGColorSpaceRelease(gray);
-    if(!ok) fprintf(stderr,"PNG_ERROR %s %s\n",path.UTF8String,err.description.UTF8String);
+    if(!ok) fprintf(stderr,"PNG_ERROR %s %s\n",path.UTF8String,descstr(err));
     return ok;
 }
 
@@ -57,7 +59,7 @@ static id tryRun(Class cls, Class cfgCls, uint64_t v, NSUInteger r, NSString *in
         id cfg=((id(*)(id,SEL,uint64_t,NSUInteger))objc_msgSend)(ca,sel_registerName("initWithVersion:resolution:"),v,r);
         id aa=((id(*)(id,SEL))objc_msgSend)((id)cls,sel_registerName("alloc"));
         id alg=((id(*)(id,SEL,id))objc_msgSend)(aa,sel_registerName("initWithConfiguration:"),cfg);
-        printf("RUN class=%s v=0x%llx r=%lu cfg=%s instanceClass=%s\n",class_getName(cls),(unsigned long long)v,(unsigned long)r,cfg.description.UTF8String,alg?object_getClassName(alg):"nil");
+        printf("RUN class=%s v=0x%llx r=%lu cfg=%s instanceClass=%s\n",class_getName(cls),(unsigned long long)v,(unsigned long)r,descstr(cfg),alg?object_getClassName(alg):"nil");
         if(!alg)return nil;
         SEL bindSel=sel_registerName("bindNetworkInputPixelBuffer:error:");
         SEL execSel=sel_registerName("executeInferenceWithError:");
@@ -66,11 +68,11 @@ static id tryRun(Class cls, Class cfgCls, uint64_t v, NSUInteger r, NSString *in
         CVPixelBufferRef pb=makeBGRA(input,w,h); if(!pb)return nil;
         NSError*err=nil;
         BOOL bound=((BOOL(*)(id,SEL,CVPixelBufferRef,NSError**))objc_msgSend)(alg,bindSel,pb,&err);
-        printf("  bind=%d err=%s\n",bound,err.description.UTF8String?:"none");
+        printf("  bind=%d err=%s\n",bound,descstr(err));
         if(!bound){CFRelease(pb);return nil;}
         err=nil;
         id result=((id(*)(id,SEL,NSError**))objc_msgSend)(alg,execSel,&err);
-        printf("  execute=%s class=%s err=%s\n",result.description.UTF8String,result?object_getClassName(result):"nil",err.description.UTF8String?:"none");
+        printf("  execute=%s class=%s err=%s\n",descstr(result),result?object_getClassName(result):"nil",descstr(err));
         CFRelease(pb);
         return result;
     } @catch(NSException*e){ printf("  EXCEPTION %s: %s\n",e.name.UTF8String,e.reason.UTF8String); return nil; }
@@ -104,18 +106,15 @@ int main(int argc,const char*argv[]){@autoreleasepool{
       printf("CAND 0x%llx alg=%s inf=%s concrete=%s\n",(unsigned long long)v,a.UTF8String?:"nil",b.UTF8String?:"nil",c?class_getName(c):"nil");
       if((a&&validName(a))||(b&&validName(b))||(c&&c!=base)){ discovered[discoveredN++]=v; }
     }
-    // As a bounded fallback, scan common 16-bit space using concrete class lookup only.
     if(discoveredN==0){
       for(uint64_t v=0;v<=0xffff;v++){ Class c=concrete(base,v); if(c&&c!=base){printf("SCAN_HIT 0x%llx class=%s\n",(unsigned long long)v,class_getName(c));discovered[discoveredN++]=v;if(discoveredN==128)break;} }
     }
     printf("DISCOVERED_N=%zu\n",discoveredN);
 
     id result=nil; uint64_t usedV=0;
-    // Portrait fixture: resolution enum 1 = 576x768.
     for(size_t i=0;i<discoveredN&&!result;i++){
       uint64_t v=discovered[i]; Class c=concrete(base,v); if(!c)c=direct; if(c){result=tryRun(c,cfgCls,v,1,input);if(result)usedV=v;}
     }
-    // Final fallback: directly force V2Dot4 with candidate version codes, because subclass fixes the model generation.
     if(!result&&direct){
       for(size_t i=0;i<sizeof(candidates)/sizeof(candidates[0])&&!result;i++){result=tryRun(direct,cfgCls,candidates[i],1,input);if(result)usedV=candidates[i];}
     }
@@ -127,7 +126,7 @@ int main(int argc,const char*argv[]){@autoreleasepool{
     for(NSUInteger i=0;i<count;i++){
       NSError*err=nil; CVPixelBufferRef pb=((CVPixelBufferRef(*)(id,SEL,NSUInteger,NSError**))objc_msgSend)(result,sel_registerName("outputMaskAtIndex:error:"),i,&err);
       id score=((id(*)(id,SEL,NSInteger,NSError**))objc_msgSend)(result,sel_registerName("outputMaskConfidenceScoreAtIndex:error:"),(NSInteger)i,&err);
-      printf("INSTANCE %lu score=%s err=%s\n",(unsigned long)i,score.description.UTF8String,err.description.UTF8String?:"none");
+      printf("INSTANCE %lu score=%s err=%s\n",(unsigned long)i,descstr(score),descstr(err));
       if(pb)writeMask(pb,[out stringByAppendingPathComponent:[NSString stringWithFormat:@"instances/instance-%02lu.png",(unsigned long)i]]);
     }
     NSUInteger sem=0; SEL semSel=sel_registerName("outputVisegMaskForCategory:error:");
