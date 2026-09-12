@@ -1,0 +1,43 @@
+name: PS3 FSINC Descriptor Probe
+
+on:
+  push:
+    branches: [research/ps3-fsinc-beta6-probe]
+    paths:
+      - scripts/research/fsinc_descriptor_probe.m
+      - .github/workflows/ps3-fsinc-descriptor-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  descriptor:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Record runner
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          sw_vers | tee artifacts/macos.txt
+          xcodebuild -version | tee artifacts/xcode.txt
+      - name: Build high-level FSINC descriptor probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang -fobjc-arc -framework Foundation -framework CoreVideo \
+            scripts/research/fsinc_descriptor_probe.m -o artifacts/fsinc_descriptor_probe
+      - name: Run high-level FSINC descriptor probe
+        shell: bash
+        run: |
+          set -o pipefail
+          artifacts/fsinc_descriptor_probe 2>&1 | tee artifacts/descriptor-probe.txt
+          exit ${PIPESTATUS[0]}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: fsinc-descriptor-probe-${{ github.sha }}
+          retention-days: 7
+          path: artifacts/
