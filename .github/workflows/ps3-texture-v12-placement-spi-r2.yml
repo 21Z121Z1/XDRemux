@@ -1,0 +1,223 @@
+name: PS3 Texture V12 placement and macOS 27 semantic SPI r2
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-v12-spi-matrix
+    paths:
+      - .github/workflows/ps3-texture-v12-placement-spi-r2.yml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  placement-matrix-r2:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Download V11 matrix
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-cleanroom-v11-real-semantic-mattes-06b52f3af8f0325efbea3e2baa816adc6e786deb
+          path: prior
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34663278696
+      - name: Build selective placement matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/placement/manifests
+          F="$(find prior -type f -name 'F-full-v16-known-negative.heic' -print -quit)"
+          G="$(find prior -type f -name 'G-semantic-role-graph.heic' -print -quit)"
+          H="$(find prior -type f -name 'H-semantic-role-graph-early.heic' -print -quit)"
+          test -s "$F"; test -s "$G"; test -s "$H"
+          cp "$G" artifacts/placement/G-control-no-early.heic
+          cp "$H" artifacts/placement/H-control-all-three-early.heic
+          python3 - "$F" <<'PY'
+          from pathlib import Path
+          import shutil, subprocess, sys
+          source=Path('scripts/research/patch_texture_style_heif_v10_contract.py').read_text()
+          anchor='selected = [style_id, texture_id, exif_id]'
+          if source.count(anchor)!=1: raise SystemExit('selective-pack anchor changed')
+          baseline=sys.argv[1]
+          cases=[
+            ('P1-style-only','style_id'),
+            ('P2-texture-only','texture_id'),
+            ('P3-exif-only','exif_id'),
+            ('P4-style-texture','style_id, texture_id'),
+            ('P5-style-exif','style_id, exif_id'),
+            ('P6-texture-exif','texture_id, exif_id'),
+            ('P7-style-texture-exif','style_id, texture_id, exif_id'),
+          ]
+          for name,selection in cases:
+              d=Path('/tmp')/name; d.mkdir(exist_ok=True)
+              script=d/'patch_texture_style_heif_v10_contract.py'
+              script.write_text(source.replace(anchor,f'selected = [{selection}]',1))
+              shutil.copy2('scripts/research/patch_texture_style_heif_v3.py',d/'patch_texture_style_heif_v3.py')
+              out=Path('artifacts/placement')/f'{name}.heic'
+              manifest=Path('artifacts/placement/manifests')/f'{name}.json'
+              subprocess.run(['python3',str(script),baseline,str(out),'--semantic-aliases','--pack-early','--manifest',str(manifest)],check=True)
+          PY
+          cmp artifacts/placement/P7-style-texture-exif.heic "$H"
+          printf 'P7 is byte-identical to H\n' > artifacts/placement/P7-H-CMP.txt
+          shasum -a 256 artifacts/placement/*.heic | tee artifacts/placement/SHA256SUMS
+          for f in artifacts/placement/*.heic; do sips -g pixelWidth -g pixelHeight "$f" >/dev/null; done
+          cat > artifacts/placement/DEVICE-TEST-ORDER.txt <<'TXT'
+          G -> H packs style + TextureStyle + Exif early/method-0.
+          Test these to identify the minimum gate:
+          P1 style only
+          P2 TextureStyle only
+          P3 Exif only
+          P4 style + TextureStyle
+          P5 style + Exif
+          P6 TextureStyle + Exif
+          P7 style + TextureStyle + Exif (byte-identical H control)
+          TXT
+      - name: Upload placement matrix
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-v12-placement-r2-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/placement/
+
+  macos27-semantic-spi-r2:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Fetch second portrait and record runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/spi/runtime artifacts/spi/results artifacts/spi/known
+          sw_vers | tee artifacts/spi/runtime/macos.txt
+          xcodebuild -version | tee artifacts/spi/runtime/xcode.txt
+          FIXTURE_SHA=f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          FIXTURE_PATH=fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic
+          git fetch --no-tags --depth=1 origin "$FIXTURE_SHA"
+          git show "$FIXTURE_SHA:$FIXTURE_PATH" > "$RUNNER_TEMP/uhdr-portrait-02.heic"
+          shasum -a 256 "$RUNNER_TEMP/uhdr-portrait-02.heic" | tee artifacts/spi/runtime/input-sha256.txt
+          printf '%s:%s\n' "$FIXTURE_SHA" "$FIXTURE_PATH" > artifacts/spi/runtime/input-source.txt
+      - name: Enumerate and execute Vision segmentation requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/vnprobe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <ImageIO/ImageIO.h>
+          #import <CoreVideo/CoreVideo.h>
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+          static BOOL Sub(Class c,Class b){for(Class p=c;p;p=class_getSuperclass(p))if(p==b)return YES;return NO;}
+          static NSString *FCC(OSType v){char b[5]={(char)(v>>24),(char)(v>>16),(char)(v>>8),(char)v,0};for(int i=0;i<4;i++)if(b[i]<32||b[i]>126)return [NSString stringWithFormat:@"0x%08x",v];return [NSString stringWithUTF8String:b];}
+          static NSString *Safe(NSString*s){NSMutableString*m=[NSMutableString string];NSCharacterSet*ok=[NSCharacterSet alphanumericCharacterSet];for(NSUInteger i=0;i<s.length;i++){unichar ch=[s characterAtIndex:i];[m appendString:[ok characterIsMember:ch]?[NSString stringWithCharacters:&ch length:1]:@"_"];}return m;}
+          static void Load(void){const char*p[]={
+            "/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",
+            "/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",
+            "/System/Library/PrivateFrameworks/MediaAnalysis.framework/MediaAnalysis",
+            "/System/Library/PrivateFrameworks/PhotoFoundation.framework/PhotoFoundation",
+            "/System/Library/PrivateFrameworks/PortraitFilters.framework/PortraitFilters"};
+            for(unsigned i=0;i<sizeof(p)/sizeof(p[0]);i++)dlopen(p[i],RTLD_LAZY|RTLD_GLOBAL);}
+          static NSArray *Methods(Class c){unsigned n=0;Method*ms=class_copyMethodList(c,&n);NSMutableArray*a=[NSMutableArray array];for(unsigned i=0;i<n;i++){NSString*s=NSStringFromSelector(method_getName(ms[i]));NSString*l=s.lowercaseString;if([l containsString:@"segment"]||[l containsString:@"mask"]||[l containsString:@"matte"]||[l containsString:@"feature"]||[l containsString:@"pixel"])[a addObject:s];}free(ms);return a;}
+          static int Inventory(void){Load();int n=objc_getClassList(NULL,0);__unsafe_unretained Class *cs=(__unsafe_unretained Class *)calloc((size_t)n,sizeof(Class));objc_getClassList(cs,n);Class base=NSClassFromString(@"VNRequest");NSMutableArray*rows=[NSMutableArray array];NSArray*keys=@[@"segment",@"semantic",@"matte",@"mask",@"humanattribute",@"glasses",@"texturestyle",@"portrait",@"person",@"skin",@"teeth",@"nose",@"lip",@"eyebrow",@"tattoo",@"hand",@"ear"];
+            for(int i=0;i<n;i++){NSString*name=NSStringFromClass(cs[i]);NSString*low=name.lowercaseString;BOOL rel=NO;for(NSString*k in keys)if([low containsString:k]){rel=YES;break;}if(!rel)continue;[rows addObject:@{@"class":name,@"isVNRequest":@(base&&Sub(cs[i],base)),@"instanceMethods":Methods(cs[i])}];}free(cs);NSData*j=[NSJSONSerialization dataWithJSONObject:rows options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);return 0;}
+          static NSDictionary *PB(id r,NSString*outdir,NSString*req,NSUInteger idx){SEL ps=NSSelectorFromString(@"pixelBuffer");if(![r respondsToSelector:ps])return @{};CVPixelBufferRef(*g)(id,SEL)=(void*)objc_msgSend;CVPixelBufferRef pb=g(r,ps);if(!pb)return @{};size_t w=CVPixelBufferGetWidth(pb),h=CVPixelBufferGetHeight(pb),bpr=CVPixelBufferGetBytesPerRow(pb);OSType fmt=CVPixelBufferGetPixelFormatType(pb);NSMutableDictionary*d=[@{@"width":@(w),@"height":@(h),@"bytesPerRow":@(bpr),@"pixelFormat":FCC(fmt)} mutableCopy];if(fmt==kCVPixelFormatType_OneComponent8){CVPixelBufferLockBaseAddress(pb,kCVPixelBufferLock_ReadOnly);uint8_t*src=CVPixelBufferGetBaseAddress(pb);NSMutableData*raw=[NSMutableData dataWithLength:w*h];uint8_t*dst=raw.mutableBytes;uint64_t sum=0,cov=0;uint8_t mn=255,mx=0;for(size_t y=0;y<h;y++)for(size_t x=0;x<w;x++){uint8_t v=src[y*bpr+x];dst[y*w+x]=v;mn=MIN(mn,v);mx=MAX(mx,v);sum+=v;if(v)cov++;}CVPixelBufferUnlockBaseAddress(pb,kCVPixelBufferLock_ReadOnly);NSString*f=@"mask";SEL fs=NSSelectorFromString(@"featureName");if([r respondsToSelector:fs]){id(*go)(id,SEL)=(void*)objc_msgSend;id v=go(r,fs);if([v isKindOfClass:NSString.class])f=v;}NSString*path=[outdir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-%03lu-%@.l8",Safe(req),(unsigned long)idx,Safe(f)]];[raw writeToFile:path atomically:YES];d[@"rawOutput"]=path;d[@"minimum"]=@(mn);d[@"maximum"]=@(mx);d[@"mean"]=@(w*h?(double)sum/(double)(w*h):0);d[@"coverage"]=@(w*h?(double)cov/(double)(w*h):0);}return d;}
+          static int Run(NSString*imagePath,NSString*outdir,NSString*name){Load();[[NSFileManager defaultManager]createDirectoryAtPath:outdir withIntermediateDirectories:YES attributes:nil error:NULL];Class c=NSClassFromString(name),base=NSClassFromString(@"VNRequest");if(!c||!base||!Sub(c,base))return 3;NSURL*u=[NSURL fileURLWithPath:imagePath];CGImageSourceRef src=CGImageSourceCreateWithURL((__bridge CFURLRef)u,NULL);if(!src)return 4;CGImageRef im=CGImageSourceCreateImageAtIndex(src,0,NULL);if(!im){CFRelease(src);return 5;}NSDictionary*props=CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(src,0,NULL));CGImagePropertyOrientation ori=(CGImagePropertyOrientation)[props[(id)kCGImagePropertyOrientation] unsignedIntegerValue];if(ori<1||ori>8)ori=1;NSMutableDictionary*rep=[@{@"class":name,@"orientation":@(ori)} mutableCopy];@try{VNRequest*req=[[c alloc]init];SEL os=NSSelectorFromString(@"setOutputPixelFormat:");if([req respondsToSelector:os]){void(*sf)(id,SEL,OSType)=(void*)objc_msgSend;sf(req,os,kCVPixelFormatType_OneComponent8);}VNImageRequestHandler*h=[[VNImageRequestHandler alloc]initWithCGImage:im orientation:ori options:@{}];NSError*e=nil;BOOL ok=[h performRequests:@[req] error:&e];rep[@"performOK"]=@(ok);if(e)rep[@"error"]=e.description;NSArray*results=req.results?:@[];NSMutableArray*out=[NSMutableArray array];NSUInteger i=0;for(id r in results){NSMutableDictionary*row=[@{@"resultClass":NSStringFromClass([r class])} mutableCopy];SEL fs=NSSelectorFromString(@"featureName");if([r respondsToSelector:fs]){id(*go)(id,SEL)=(void*)objc_msgSend;id v=go(r,fs);if(v)row[@"featureName"]=[v description];}[row addEntriesFromDictionary:PB(r,outdir,name,i++)];[out addObject:row];}rep[@"results"]=out;rep[@"resultCount"]=@(out.count);}@catch(NSException*e){rep[@"exception"]=@{@"name":e.name?:@"",@"reason":e.reason?:@""};}CGImageRelease(im);CFRelease(src);NSData*j=[NSJSONSerialization dataWithJSONObject:rep options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);return 0;}
+          int main(int argc,const char**argv){@autoreleasepool{if(argc==2&&!strcmp(argv[1],"inventory"))return Inventory();if(argc==5&&!strcmp(argv[1],"run"))return Run([NSString stringWithUTF8String:argv[2]],[NSString stringWithUTF8String:argv[3]],[NSString stringWithUTF8String:argv[4]]);return 64;}}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework ImageIO -framework CoreVideo -framework CoreGraphics "$RUNNER_TEMP/vnprobe.m" -o "$RUNNER_TEMP/vnprobe"
+          "$RUNNER_TEMP/vnprobe" inventory > artifacts/spi/runtime/class-inventory.json
+          python3 - "$RUNNER_TEMP/vnprobe" "$RUNNER_TEMP/uhdr-portrait-02.heic" <<'PY'
+          import json,pathlib,subprocess,sys
+          probe,image=sys.argv[1:]
+          inv=json.loads(pathlib.Path('artifacts/spi/runtime/class-inventory.json').read_text())
+          keys=('segmentation','humanattributes','glasses','personinstancemask','foregroundinstancemask','sky','matte','mask')
+          classes=sorted({r['class'] for r in inv if r.get('isVNRequest') and any(k in r['class'].lower() for k in keys)})
+          pathlib.Path('artifacts/spi/runtime/request-candidates.txt').write_text('\n'.join(classes)+'\n')
+          rows=[]
+          for cls in classes:
+              d=pathlib.Path('artifacts/spi/results')/cls;d.mkdir(parents=True,exist_ok=True)
+              try:
+                  p=subprocess.run([probe,'run',image,str(d),cls],capture_output=True,text=True,timeout=30)
+                  (d/'stdout.json').write_text(p.stdout);(d/'stderr.txt').write_text(p.stderr)
+                  row={'class':cls,'returncode':p.returncode}
+                  try:row['report']=json.loads(p.stdout)
+                  except Exception:row['stdout']=p.stdout[-4000:]
+              except subprocess.TimeoutExpired as e:row={'class':cls,'timeout':True}
+              rows.append(row)
+          pathlib.Path('artifacts/spi/runtime/request-results.json').write_text(json.dumps(rows,indent=2,sort_keys=True))
+          print(json.dumps(rows,indent=2,sort_keys=True))
+          PY
+      - name: Run known repository Vision helper per role
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc Sources/XDRemuxAppleFeatures/Resources/ApplePlatform/Native/apple_vision_semantic_mattes.swift -o "$RUNNER_TEMP/apple_mattes"
+          for role in portrait skin hair teeth glasses; do
+            mkdir -p "artifacts/spi/known/$role"
+            set +e
+            "$RUNNER_TEMP/apple_mattes" "$RUNNER_TEMP/uhdr-portrait-02.heic" "artifacts/spi/known/$role" --roles "$role" --raw-only > "artifacts/spi/known/$role/result.json" 2> "artifacts/spi/known/$role/stderr.txt"
+            s=$?
+            set -e
+            echo "$s" > "artifacts/spi/known/$role/status.txt"
+          done
+      - name: Search framework strings for exact role names
+        shell: bash
+        run: |
+          set -u
+          T='semanticnosematte|semanticskinmattev2|semanticnonfaceskinmatte|semanticlipsmatte|semanticteethmattev2|semanticpersonmatte|semanticglassesmattev2|semanticeyebrowsmatte|semantictattoomatte|semantichandsmatte|semanticearsmatte|semanticfaceskinmatte|HumanAttributesSegmentation|GlassesSegmentation'
+          : > artifacts/spi/runtime/framework-strings.txt
+          for b in /System/Library/Frameworks/Vision.framework/Vision /System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging /System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats /System/Library/PrivateFrameworks/MediaAnalysis.framework/MediaAnalysis /System/Library/PrivateFrameworks/PhotoFoundation.framework/PhotoFoundation; do
+            if [ -r "$b" ]; then echo "===== $b =====" >> artifacts/spi/runtime/framework-strings.txt; strings -a "$b" 2>/dev/null | grep -Ei "$T" >> artifacts/spi/runtime/framework-strings.txt || true; fi
+          done
+          cat artifacts/spi/runtime/framework-strings.txt
+      - name: Summarize 12-role coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib
+          root=pathlib.Path('artifacts/spi')
+          dyn=json.loads((root/'runtime/request-results.json').read_text())
+          obs=[]
+          for row in dyn:
+              for r in (row.get('report') or {}).get('results') or []:
+                  obs.append({'request':row['class'],'feature':r.get('featureName'),'pixelFormat':r.get('pixelFormat'),'width':r.get('width'),'height':r.get('height'),'rawOutput':r.get('rawOutput'),'coverage':r.get('coverage')})
+          known={}
+          for role in ('portrait','skin','hair','teeth','glasses'):
+              p=root/'known'/role/'result.json';status=int((root/'known'/role/'status.txt').read_text().strip());known[role]={'status':status}
+              if status==0 and p.exists():
+                  try:known[role]['report']=json.loads(p.read_text())
+                  except Exception:pass
+          tokens={
+            'semanticnosematte':['nose'],'semanticskinmattev2':['skin'],'semanticnonfaceskinmatte':['nonface','non_face'],
+            'semanticlipsmatte':['lip'],'semanticteethmattev2':['teeth'],'semanticpersonmatte':['person'],
+            'semanticglassesmattev2':['glass'],'semanticeyebrowsmatte':['eyebrow'],'semantictattoomatte':['tattoo'],
+            'semantichandsmatte':['hand'],'semanticearsmatte':['ear'],'semanticfaceskinmatte':['faceskin','face_skin']}
+          cov={}
+          for role,ts in tokens.items():
+              hits=[o for o in obs if any(t in ((o.get('request') or '')+' '+(o.get('feature') or '')).lower() for t in ts)]
+              cov[role]={'runtimeCandidates':hits}
+          cov['semanticskinmattev2']['knownVisionHelper']=known['skin'];cov['semanticteethmattev2']['knownVisionHelper']=known['teeth'];cov['semanticpersonmatte']['knownVisionHelper']=known['portrait'];cov['semanticglassesmattev2']['knownVisionHelper']=known['glasses']
+          report={'input':'repository fixture uhdr-portrait-02.heic','claimBoundary':'Semantic similarity is not camera-time Texture Style equivalence unless the exact Apple role/producer contract is exposed.','dynamicPixelBufferObservations':obs,'knownHelper':known,'requestedRoleCoverage':cov}
+          (root/'runtime/coverage-summary.json').write_text(json.dumps(report,indent=2,sort_keys=True));print(json.dumps(report,indent=2,sort_keys=True))
+          PY
+      - name: Upload SPI evidence and generated masks
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-v12-macos27-semantic-spi-r2-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/spi/
