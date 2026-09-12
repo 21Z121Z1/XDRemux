@@ -28,8 +28,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet --user capstone
-          python3 - <<'PY'
+          python3 -m venv artifacts/venv
+          artifacts/venv/bin/pip install --quiet capstone
+          artifacts/venv/bin/python - <<'PY'
           from pathlib import Path
           from capstone import Cs, CS_ARCH_ARM64, CS_MODE_ARM
           md=Cs(CS_ARCH_ARM64,CS_MODE_ARM)
