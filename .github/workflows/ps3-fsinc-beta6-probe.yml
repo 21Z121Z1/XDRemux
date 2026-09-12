@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/input artifacts/probe
+          mkdir -p artifacts/input artifacts/probe artifacts/masks/instances artifacts/masks/semantic
           sw_vers | tee artifacts/probe/macos.txt
           xcodebuild -version | tee artifacts/probe/xcode.txt
           fixture_sha=f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
@@ -32,103 +32,194 @@ jobs:
           git fetch --no-tags --depth=1 origin "$fixture_sha"
           git show "$fixture_sha:$fixture_path" > artifacts/input/portrait.heic
           shasum -a 256 artifacts/input/portrait.heic | tee artifacts/input/SHA256.txt
+          sips -g pixelWidth -g pixelHeight -g orientation artifacts/input/portrait.heic | tee artifacts/input/sips.txt
 
-      - name: Build ANSTKit FSINC runtime probe
+      - name: Build executable FSINC inference probe
         shell: bash
         run: |
           set -euo pipefail
-          cat > artifacts/probe/fsinc_probe.m <<'OBJC'
+          cat > artifacts/probe/fsinc_execute.m <<'OBJC'
           #import <Foundation/Foundation.h>
+          #import <CoreImage/CoreImage.h>
+          #import <CoreVideo/CoreVideo.h>
+          #import <ImageIO/ImageIO.h>
           #import <objc/runtime.h>
+          #import <objc/message.h>
           #import <dlfcn.h>
 
-          static void dump_methods(Class cls, BOOL classMethods) {
-              Class target = classMethods ? object_getClass(cls) : cls;
-              unsigned int count = 0;
-              Method *methods = class_copyMethodList(target, &count);
-              printf("METHODS %s %s count=%u\n", class_getName(cls), classMethods ? "+" : "-", count);
-              for (unsigned int i = 0; i < count; i++) {
-                  SEL s = method_getName(methods[i]);
-                  const char *types = method_getTypeEncoding(methods[i]);
-                  printf("  %c[%s %s] types=%s\n", classMethods ? '+' : '-', class_getName(cls), sel_getName(s), types ?: "?");
-              }
-              free(methods);
+          typedef NSString *(*NameFn)(NSUInteger);
+
+          static id send_id(id obj, SEL sel) {
+              return ((id(*)(id,SEL))objc_msgSend)(obj, sel);
+          }
+          static NSUInteger send_u(id obj, SEL sel) {
+              return ((NSUInteger(*)(id,SEL))objc_msgSend)(obj, sel);
           }
 
-          static void dump_ivars(Class cls) {
-              unsigned int count = 0;
-              Ivar *ivars = class_copyIvarList(cls, &count);
-              printf("IVARS %s count=%u\n", class_getName(cls), count);
-              for (unsigned int i = 0; i < count; i++) {
-                  printf("  %s type=%s\n", ivar_getName(ivars[i]), ivar_getTypeEncoding(ivars[i]));
-              }
-              free(ivars);
+          static CVPixelBufferRef makeBGRA(NSString *path, size_t w, size_t h) {
+              NSURL *url = [NSURL fileURLWithPath:path];
+              CIImage *src = [CIImage imageWithContentsOfURL:url options:@{}];
+              if (!src) { fprintf(stderr, "CIImage load failed\n"); return NULL; }
+              CGRect e = src.extent;
+              CGFloat sx = (CGFloat)w / e.size.width;
+              CGFloat sy = (CGFloat)h / e.size.height;
+              CGFloat s = MAX(sx, sy);
+              CIImage *scaled = [src imageByApplyingTransform:CGAffineTransformMakeScale(s, s)];
+              CGRect se = scaled.extent;
+              CGFloat tx = ((CGFloat)w - se.size.width) * 0.5 - se.origin.x;
+              CGFloat ty = ((CGFloat)h - se.size.height) * 0.5 - se.origin.y;
+              CIImage *placed = [scaled imageByApplyingTransform:CGAffineTransformMakeTranslation(tx, ty)];
+
+              NSDictionary *attrs = @{(id)kCVPixelBufferIOSurfacePropertiesKey:@{},
+                                      (id)kCVPixelBufferCGImageCompatibilityKey:@YES,
+                                      (id)kCVPixelBufferCGBitmapContextCompatibilityKey:@YES};
+              CVPixelBufferRef pb = NULL;
+              CVReturn r = CVPixelBufferCreate(kCFAllocatorDefault, w, h, kCVPixelFormatType_32BGRA,
+                                               (__bridge CFDictionaryRef)attrs, &pb);
+              if (r != kCVReturnSuccess || !pb) { fprintf(stderr, "CVPixelBufferCreate=%d\n", r); return NULL; }
+              CIContext *ctx = [CIContext contextWithOptions:@{kCIContextUseSoftwareRenderer:@NO}];
+              CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+              [ctx render:placed toCVPixelBuffer:pb bounds:CGRectMake(0,0,w,h) colorSpace:cs];
+              CGColorSpaceRelease(cs);
+              return pb;
           }
 
-          static void dump_class(NSString *name) {
-              Class cls = NSClassFromString(name);
-              printf("CLASS %s => %p\n", name.UTF8String, cls);
-              if (!cls) return;
-              dump_methods(cls, YES);
-              dump_methods(cls, NO);
-              dump_ivars(cls);
+          static BOOL writeMask(CVPixelBufferRef pb, NSString *path) {
+              if (!pb) return NO;
+              size_t w = CVPixelBufferGetWidth(pb), h = CVPixelBufferGetHeight(pb);
+              OSType fmt = CVPixelBufferGetPixelFormatType(pb);
+              printf("MASK %s %zux%zu fmt=0x%08x\n", path.UTF8String, w, h, (unsigned)fmt);
+              CIImage *im = [CIImage imageWithCVPixelBuffer:pb];
+              CIContext *ctx = [CIContext contextWithOptions:@{kCIContextUseSoftwareRenderer:@NO}];
+              NSURL *url = [NSURL fileURLWithPath:path];
+              CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+              NSError *error = nil;
+              BOOL ok = [ctx writePNGRepresentationOfImage:im toURL:url format:kCIFormatL8 colorSpace:gray options:@{} error:&error];
+              CGColorSpaceRelease(gray);
+              if (!ok) fprintf(stderr, "write PNG failed %s: %s\n", path.UTF8String, error.description.UTF8String);
+              return ok;
+          }
+
+          static NSString *safeName(NameFn fn, NSUInteger x) {
+              if (!fn) return nil;
+              @try { return fn(x); } @catch (NSException *e) { return nil; }
+          }
+
+          static BOOL usefulName(NSString *s) {
+              if (!s.length) return NO;
+              NSString *l = s.lowercaseString;
+              return ![l containsString:@"unknown"] && ![l containsString:@"unsupported"] && ![l containsString:@"invalid"];
           }
 
           int main(int argc, const char *argv[]) {
               @autoreleasepool {
-                  const char *paths[] = {
-                      "/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/ANSTKit",
-                      "/System/Library/PrivateFrameworks/ANSTKit.framework/ANSTKit",
-                      "/System/Library/PrivateFrameworks/VisionCore.framework/Versions/A/VisionCore",
-                      "/System/Library/PrivateFrameworks/VisionCore.framework/VisionCore",
-                      NULL
-                  };
-                  for (int i = 0; paths[i]; i++) {
-                      void *h = dlopen(paths[i], RTLD_NOW | RTLD_GLOBAL);
-                      printf("DLOPEN %s => %p error=%s\n", paths[i], h, h ? "none" : dlerror());
+                  if (argc < 3) return 64;
+                  NSString *input = [NSString stringWithUTF8String:argv[1]];
+                  NSString *outDir = [NSString stringWithUTF8String:argv[2]];
+                  void *h = dlopen("/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/ANSTKit", RTLD_NOW|RTLD_GLOBAL);
+                  if (!h) { fprintf(stderr, "dlopen failed: %s\n", dlerror()); return 2; }
+
+                  NameFn versionName = (NameFn)dlsym(h, "ANSTFsincAlgorithmVersionToNSString");
+                  NameFn resolutionName = (NameFn)dlsym(h, "ANSTFsincAlgorithmResolutionToNSString");
+                  printf("=== enum discovery ===\n");
+                  for (NSUInteger v=0; v<12; v++) printf("VERSION %lu = %s\n", (unsigned long)v, safeName(versionName,v).UTF8String ?: "(nil)");
+                  for (NSUInteger r=0; r<12; r++) printf("RESOLUTION %lu = %s\n", (unsigned long)r, safeName(resolutionName,r).UTF8String ?: "(nil)");
+
+                  Class cfgCls = NSClassFromString(@"ANSTFsincAlgorithmConfiguration");
+                  Class algCls = NSClassFromString(@"ANSTFsincAlgorithm");
+                  if (!cfgCls || !algCls) { fprintf(stderr, "FSINC classes missing\n"); return 3; }
+
+                  id successfulResult = nil;
+                  NSUInteger successfulV = NSNotFound, successfulR = NSNotFound;
+                  for (NSUInteger v=0; v<12 && !successfulResult; v++) {
+                      NSString *vn = safeName(versionName,v);
+                      if (!usefulName(vn)) continue;
+                      for (NSUInteger r=0; r<12 && !successfulResult; r++) {
+                          NSString *rn = safeName(resolutionName,r);
+                          if (!usefulName(rn)) continue;
+                          size_t w=0,hgt=0;
+                          NSString *low = rn.lowercaseString;
+                          if ([low containsString:@"768"] && [low containsString:@"576"]) {
+                              NSRange a=[low rangeOfString:@"768"], b=[low rangeOfString:@"576"];
+                              if (a.location < b.location) { w=768; hgt=576; } else { w=576; hgt=768; }
+                          } else if ([low containsString:@"256"]) { w=256; hgt=256; }
+                          else continue;
+                          @try {
+                              id cfgAlloc = ((id(*)(id,SEL))objc_msgSend)((id)cfgCls, sel_registerName("alloc"));
+                              id cfg = ((id(*)(id,SEL,NSUInteger,NSUInteger))objc_msgSend)(cfgAlloc, sel_registerName("initWithVersion:resolution:"), v, r);
+                              printf("TRY v=%lu(%s) r=%lu(%s) cfg=%s\n", (unsigned long)v, vn.UTF8String, (unsigned long)r, rn.UTF8String, [[cfg description] UTF8String]);
+                              id algAlloc = ((id(*)(id,SEL))objc_msgSend)((id)algCls, sel_registerName("alloc"));
+                              id alg = ((id(*)(id,SEL,id))objc_msgSend)(algAlloc, sel_registerName("initWithConfiguration:"), cfg);
+                              if (!alg) { printf("  alg=nil\n"); continue; }
+                              id inputDesc = send_id(alg, sel_registerName("networkInputImageDescriptor"));
+                              printf("  alg=%s inputDesc=%s\n", [[alg description] UTF8String], [[inputDesc description] UTF8String]);
+                              CVPixelBufferRef inputPB = makeBGRA(input,w,hgt);
+                              if (!inputPB) continue;
+                              NSError *err=nil;
+                              BOOL bound = ((BOOL(*)(id,SEL,CVPixelBufferRef,NSError**))objc_msgSend)(alg, sel_registerName("bindNetworkInputPixelBuffer:error:"), inputPB, &err);
+                              printf("  bind=%d error=%s\n", bound, err.description.UTF8String ?: "none");
+                              if (!bound) { CFRelease(inputPB); continue; }
+                              err=nil;
+                              id result = ((id(*)(id,SEL,NSError**))objc_msgSend)(alg, sel_registerName("executeInferenceWithError:"), &err);
+                              printf("  execute result=%s class=%s error=%s\n", [[result description] UTF8String], result ? object_getClassName(result) : "nil", err.description.UTF8String ?: "none");
+                              CFRelease(inputPB);
+                              if (result) { successfulResult=result; successfulV=v; successfulR=r; }
+                          } @catch (NSException *e) {
+                              printf("  EXCEPTION %s: %s\n", e.name.UTF8String, e.reason.UTF8String);
+                          }
+                      }
                   }
 
-                  NSArray *classes = @[
-                      @"ANSTFsincAlgorithm",
-                      @"ANSTFsincAlgorithmConfiguration",
-                      @"ANSTFsincAlgorithmResult",
-                      @"ANSTFsincInferenceConfiguration",
-                      @"ANSTFsincInferenceDescriptor",
-                      @"ANSTFsincInferenceDescriptorV2Dot4",
-                      @"ANSTFsincInferencePostprocessorV2Dot4",
-                      @"ANSTFsincInferencePostprocessorV2",
-                      @"ANSTAssetProvider",
-                      @"_ANSTMobileAssetManager"
-                  ];
-                  for (NSString *name in classes) dump_class(name);
+                  if (!successfulResult) { fprintf(stderr, "NO_SUCCESSFUL_FSINC_RESULT\n"); return 10; }
+                  printf("SUCCESS v=%lu r=%lu\n", (unsigned long)successfulV, (unsigned long)successfulR);
+                  NSUInteger count = send_u(successfulResult, sel_registerName("outputMaskCount"));
+                  printf("INSTANCE_MASK_COUNT=%lu\n", (unsigned long)count);
+                  for (NSUInteger i=0; i<count; i++) {
+                      NSError *err=nil;
+                      CVPixelBufferRef pb = ((CVPixelBufferRef(*)(id,SEL,NSUInteger,NSError**))objc_msgSend)(successfulResult, sel_registerName("outputMaskAtIndex:error:"), i, &err);
+                      id score = ((id(*)(id,SEL,NSInteger,NSError**))objc_msgSend)(successfulResult, sel_registerName("outputMaskConfidenceScoreAtIndex:error:"), (NSInteger)i, &err);
+                      printf("INSTANCE %lu score=%s error=%s\n", (unsigned long)i, [[score description] UTF8String], err.description.UTF8String ?: "none");
+                      if (pb) writeMask(pb, [outDir stringByAppendingPathComponent:[NSString stringWithFormat:@"instances/instance-%02lu.png",(unsigned long)i]]);
+                  }
 
-                  printf("ENV input=%s\n", argc > 1 ? argv[1] : "none");
-                  printf("ANST bundle=%s\n", [[NSBundle bundleWithPath:@"/System/Library/PrivateFrameworks/ANSTKit.framework"] bundlePath].UTF8String);
+                  NSUInteger semanticOK=0;
+                  for (NSUInteger cat=0; cat<64; cat++) {
+                      NSError *err=nil;
+                      CVPixelBufferRef pb = ((CVPixelBufferRef(*)(id,SEL,NSUInteger,NSError**))objc_msgSend)(successfulResult, sel_registerName("outputVisegMaskForCategory:error:"), cat, &err);
+                      if (!pb) continue;
+                      semanticOK++;
+                      printf("SEMANTIC category=%lu error=%s\n", (unsigned long)cat, err.description.UTF8String ?: "none");
+                      writeMask(pb, [outDir stringByAppendingPathComponent:[NSString stringWithFormat:@"semantic/category-%02lu.png",(unsigned long)cat]]);
+                  }
+                  printf("SEMANTIC_MASK_COUNT=%lu\n", (unsigned long)semanticOK);
+                  return semanticOK ? 0 : 11;
               }
-              return 0;
           }
           OBJC
-          clang -fobjc-arc -framework Foundation artifacts/probe/fsinc_probe.m -o artifacts/probe/fsinc_probe
+          clang -fobjc-arc -framework Foundation -framework CoreImage -framework CoreVideo -framework ImageIO artifacts/probe/fsinc_execute.m -o artifacts/probe/fsinc_execute
 
-      - name: Run FSINC runtime probe and inspect assets
+      - name: Execute native FSINC inference
         shell: bash
         run: |
           set -o pipefail
-          ./artifacts/probe/fsinc_probe artifacts/input/portrait.heic 2>&1 | tee artifacts/probe/runtime.txt
-          {
-            echo '=== ANSTKit files ==='
-            find /System/Library/PrivateFrameworks/ANSTKit.framework -maxdepth 5 -type f 2>/dev/null | sort
-            echo '=== FSINC/model candidates ==='
-            find /System/Library /Library -iname '*fsinc*' -o -iname '*ANST*mlmodelc*' 2>/dev/null | head -500
-            echo '=== MobileAsset candidates ==='
-            find /System/Library/AssetsV2 /Library/AssetsV2 -maxdepth 5 -iname '*ANST*' -o -iname '*fsinc*' 2>/dev/null | head -500
-          } | tee artifacts/probe/assets.txt
+          ./artifacts/probe/fsinc_execute artifacts/input/portrait.heic artifacts/masks 2>&1 | tee artifacts/probe/inference.txt
+          status=${PIPESTATUS[0]}
+          find artifacts/masks -type f -maxdepth 3 -print | sort | tee artifacts/probe/generated-files.txt
+          exit "$status"
 
-      - name: Upload probe evidence
+      - name: Record bundled FSINC model
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          find /System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models -maxdepth 2 -type d -print | sort | tee artifacts/probe/models.txt
+          du -sh /System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc 2>/dev/null | tee -a artifacts/probe/models.txt
+
+      - name: Upload native masks and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ps3-fsinc-beta6-probe-${{ github.sha }}
+          name: ps3-fsinc-beta6-native-masks-${{ github.sha }}
           retention-days: 7
           if-no-files-found: error
           path: artifacts/
