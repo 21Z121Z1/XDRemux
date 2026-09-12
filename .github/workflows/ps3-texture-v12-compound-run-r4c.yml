@@ -1,0 +1,39 @@
+name: PS3 Texture V12 configured compound r4c
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/photographic-styles-3-texture-v12-spi-matrix]
+    paths: [.github/workflows/ps3-texture-v12-compound-run-r4c.yml]
+permissions: {contents: read}
+jobs:
+  run:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - shell: bash
+        run: |
+          set -euo pipefail; mkdir -p artifacts/r4c
+          git fetch --no-tags --depth=1 origin f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          git show f89eea8c1714eb5d1e3da1ff8ba83e61655181d5:fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic > "$RUNNER_TEMP/p.heic"
+          cat > "$RUNNER_TEMP/c.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <ImageIO/ImageIO.h>
+          #import <CoreVideo/CoreVideo.h>
+          #import <CoreGraphics/CoreGraphics.h>
+          #import <objc/message.h>
+          static id N(NSString*n){Class c=NSClassFromString(n);return c?[[c alloc]init]:nil;}
+          static NSDictionary*D(id x){NSMutableDictionary*d=[@{@"class":NSStringFromClass([x class])}mutableCopy];SEL fs=NSSelectorFromString(@"featureName");if([x respondsToSelector:fs]){id(*f)(id,SEL)=(void*)objc_msgSend;id v=f(x,fs);if(v)d[@"featureName"]=[v description];}SEL ps=NSSelectorFromString(@"pixelBuffer");if([x respondsToSelector:ps]){CVPixelBufferRef(*f)(id,SEL)=(void*)objc_msgSend;CVPixelBufferRef p=f(x,ps);if(p){d[@"width"]=@(CVPixelBufferGetWidth(p));d[@"height"]=@(CVPixelBufferGetHeight(p));d[@"pixelFormat"]=@(CVPixelBufferGetPixelFormatType(p));}}return d;}
+          static NSDictionary*A(CGImageRef im,NSArray*names){NSMutableArray*o=[NSMutableArray array];for(NSString*n in names){id q=N(n);if(q)[o addObject:q];}Class c=NSClassFromString(@"VNGenerateSemanticSegmentationCompoundRequest");SEL s=NSSelectorFromString(@"initWithOriginalRequests:");id(*f)(id,SEL,id)=(void*)objc_msgSend;id q=f([c alloc],s,o);NSMutableDictionary*r=[@{@"originalRequests":names}mutableCopy];@try{NSError*e=nil;VNImageRequestHandler*h=[[VNImageRequestHandler alloc]initWithCGImage:im options:@{}];BOOL ok=[h performRequests:@[q] error:&e];r[@"ok"]=@(ok);if(e)r[@"error"]=e.description;NSArray*z=[q valueForKey:@"results"]?:@[];NSMutableArray*a=[NSMutableArray array];for(id x in z)[a addObject:D(x)];r[@"results"]=a;r[@"resultCount"]=@(z.count);}@catch(NSException*e){r[@"exception"]=e.reason?:@"";}return r;}
+          int main(int ac,const char**av){@autoreleasepool{if(ac!=2)return 64;NSURL*u=[NSURL fileURLWithPath:[NSString stringWithUTF8String:av[1]]];CGImageSourceRef s=CGImageSourceCreateWithURL((__bridge CFURLRef)u,NULL);CGImageRef im=CGImageSourceCreateImageAtIndex(s,0,NULL);NSArray*sets=@[@[@"VNGenerateHumanAttributesSegmentationRequest"],@[@"VNGenerateGlassesSegmentationRequest"],@[@"VNGenerateSkySegmentationRequest"],@[@"VNGenerateHumanAttributesSegmentationRequest",@"VNGenerateGlassesSegmentationRequest"],@[@"VNGenerateHumanAttributesSegmentationRequest",@"VNGenerateGlassesSegmentationRequest",@"VNGenerateSkySegmentationRequest"]];NSMutableArray*out=[NSMutableArray array];for(NSArray*x in sets)[out addObject:A(im,x)];NSData*j=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);CGImageRelease(im);CFRelease(s);}}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework ImageIO -framework CoreVideo -framework CoreGraphics "$RUNNER_TEMP/c.m" -o "$RUNNER_TEMP/c"
+          "$RUNNER_TEMP/c" "$RUNNER_TEMP/p.heic" | tee artifacts/r4c/results.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-texture-v12-compound-r4c-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r4c/
