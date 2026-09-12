@@ -1,0 +1,172 @@
+name: PS3 TextureStyle Cleanroom V8 Device Candidates Fixed
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-cleanroom-v8
+    paths:
+      - .github/workflows/ps3-texture-cleanroom-v8-device-candidates-fixed.yml
+      - scripts/research/patch_texture_style_heif_v8_cleanroom.py
+      - scripts/research/patch_texture_style_heif_v3.py
+      - scripts/research/texture_style_v8_simulator_probe.m
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build-and-probe:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download public Photographic Styles baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-style-v5-xcode27-a80e635a1e490ffe6c82ec1625f48e0365b3561c
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34623523344
+
+      - name: Build coherent clean-room candidate matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/manifests artifacts/simulator
+          baseline="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$baseline"
+          cp "$baseline" artifacts/A-baseline-original.heic
+          python3 -m py_compile scripts/research/patch_texture_style_heif_v8_cleanroom.py
+
+          build() {
+            local name="$1"
+            local mode="$2"
+            python3 scripts/research/patch_texture_style_heif_v8_cleanroom.py \
+              artifacts/A-baseline-original.heic "artifacts/${name}.heic" \
+              --mode "$mode" --hardware-model 'iPhone19,2' --film-grain-seed 0 \
+              --manifest "artifacts/manifests/${name}.json"
+          }
+          build B-maker-surgical maker-surgical
+          build C-style-v16 style-v16
+          build D-style-v16-maker style-v16-maker
+          build E-full-v16 full-v16
+          build F-full-v16-legacy-name full-v16-legacy-name
+          build G-full-carrier-v15 full-carrier-v15
+
+          sha256sum artifacts/*.heic | tee artifacts/candidate-sha256.txt
+          python3 - <<'PY' | tee artifacts/contract-matrix.txt
+          import json
+          from pathlib import Path
+          for p in sorted(Path('artifacts/manifests').glob('*.json')):
+              d=json.loads(p.read_text())
+              print(p.stem)
+              print('  style:',d['styleBefore'],'->',d['styleAfter'])
+              print('  makerSlots:',d['maker84TextureSlots'])
+              print('  textureItem:',d['textureItemAdded'],'targetsMirrorStyle=',d['textureTargetsMirrorStyle'])
+              print('  unrelatedPayloadsByteIdentical=',d['preExistingUnrelatedPayloadsByteIdentical'])
+          PY
+
+      - name: Build iOS 27 semantic-style probe app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p Probe.app
+          cp artifacts/*.heic Probe.app/
+          cat > Probe.app/Info.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleIdentifier</key><string>com.xdremux.PS3V8Probe</string>
+            <key>CFBundleExecutable</key><string>Probe</string>
+            <key>CFBundleName</key><string>PS3V8Probe</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>MinimumOSVersion</key><string>27.0</string>
+            <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+          </dict></plist>
+          PLIST
+          xcrun --sdk iphonesimulator clang -fobjc-arc -fblocks -arch arm64 -mios-simulator-version-min=27.0 \
+            -framework Foundation -framework ImageIO \
+            scripts/research/texture_style_v8_simulator_probe.m -o Probe.app/Probe
+          codesign --force --sign - Probe.app
+
+      - name: Run iOS 27 semantic-style compatibility probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUNTIME='com.apple.CoreSimulator.SimRuntime.iOS-27-0'
+          DEVTYPE='com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro'
+          UDID="$(xcrun simctl create PS3V8Probe "$DEVTYPE" "$RUNTIME")"
+          echo "$UDID" > artifacts/simulator/udid.txt
+          trap 'xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$UDID"
+          for i in $(seq 1 90); do
+            state="$(xcrun simctl list devices -j | python3 -c 'import json,sys; d=json.load(sys.stdin); u=sys.argv[1]; print(next((x.get("state","") for xs in d["devices"].values() for x in xs if x.get("udid")==u),""))' "$UDID")"
+            echo "boot poll $i: $state"
+            [ "$state" = Booted ] && break
+            sleep 2
+          done
+          xcrun simctl install "$UDID" Probe.app
+          xcrun simctl launch "$UDID" com.xdremux.PS3V8Probe | tee artifacts/simulator/launch.txt
+          DATA_DIR="$(xcrun simctl get_app_container "$UDID" com.xdremux.PS3V8Probe data)"
+          RESULT="$DATA_DIR/tmp/ps3-v8-results.json"
+          for i in $(seq 1 45); do
+            [ -s "$RESULT" ] && break
+            sleep 1
+          done
+          test -s "$RESULT"
+          cp "$RESULT" artifacts/simulator/results.json
+          python3 - <<'PY' | tee artifacts/simulator/summary.txt
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('artifacts/simulator/results.json').read_text())
+          def value(row,key):
+              x=row.get(key)
+              return x.get('value') if isinstance(x,dict) and x.get('available') is True else None
+          for r in rows:
+              print(r['file'],
+                    'hasSmartStyle=',value(r,'hasSmartStyle'),
+                    'semanticStyleCanRender=',r.get('semanticStyleCanRender'),
+                    'hasTextureSelector=',r.get('hasTextureStyle',{}).get('available'))
+          base=next(r for r in rows if r['file']=='A-baseline-original.heic')
+          if value(base,'hasSmartStyle') is not True:
+              raise SystemExit('baseline lost hasSmartStyle in iOS 27 simulator')
+          survivors=[r['file'] for r in rows if r['file']!='A-baseline-original.heic' and value(r,'hasSmartStyle') is True]
+          Path('artifacts/simulator/smartstyle-survivors.txt').write_text('\n'.join(survivors)+'\n')
+          print('smart-style survivors:',survivors)
+          if not survivors:
+              raise SystemExit('no V8 candidate preserves simulator hasSmartStyle')
+          PY
+
+      - name: Write physical-device test order
+        if: always()
+        shell: bash
+        run: |
+          cat > artifacts/DEVICE-TEST-ORDER.txt <<'TXT'
+          Test on a physical iOS 27 device in this order:
+          1. A-baseline-original.heic        control: ordinary Photographic Styles must remain available
+          2. C-style-v16.heic               2023 schema/carrier control
+          3. D-style-v16-maker.heic         coherent 2023 + MakerNote, no 2026 item
+          4. E-full-v16.heic                 strongest TextureStyle candidate
+          5. B-maker-surgical.heic           MakerNote-only diagnostic
+          6. F-full-v16-legacy-name.heic     item-name diagnostic
+          7. G-full-carrier-v15.heic         schema-version diagnostic
+
+          Record for every file:
+          - ordinary Photographic Styles control visible: yes/no
+          - TextureStyle control visible: yes/no
+          - if TextureStyle appears: preset/intensity/grain editable and survives save/reopen: yes/no
+          TXT
+
+      - name: Upload V8 physical-device candidates and evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-cleanroom-v8-device-candidates-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
