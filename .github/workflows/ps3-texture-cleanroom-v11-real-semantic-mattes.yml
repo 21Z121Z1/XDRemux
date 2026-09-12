@@ -1,0 +1,277 @@
+name: PS3 TextureStyle Cleanroom V11 Real Semantic Mattes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-cleanroom-v8
+    paths:
+      - .github/workflows/ps3-texture-cleanroom-v11-real-semantic-mattes.yml
+      - scripts/research/patch_texture_style_heif_v11_semantic_payloads.py
+      - scripts/research/patch_texture_style_heif_v10_contract.py
+      - scripts/research/patch_texture_style_heif_v8_cleanroom.py
+      - scripts/research/patch_texture_style_heif_v3.py
+      - scripts/research/texture_style_v8_simulator_probe.m
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build-and-probe:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download public Photographic Styles baseline
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-style-v5-xcode27-a80e635a1e490ffe6c82ec1625f48e0365b3561c
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34623523344
+
+      - name: Build V11 clean-room semantic-matte matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/manifests artifacts/imageio artifacts/simulator
+          baseline="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          test -s "$baseline"
+          cp "$baseline" artifacts/A-baseline-original.heic
+
+          python3 -m py_compile \
+            scripts/research/patch_texture_style_heif_v8_cleanroom.py \
+            scripts/research/patch_texture_style_heif_v10_contract.py \
+            scripts/research/patch_texture_style_heif_v11_semantic_payloads.py
+
+          # E is the strongest known physical-device positive for the ordinary
+          # Photographic Styles control. F differs mainly by adding the 2026
+          # TextureStyle item and is a known physical-device negative.
+          python3 scripts/research/patch_texture_style_heif_v8_cleanroom.py \
+            artifacts/A-baseline-original.heic artifacts/E-style-v16-maker-known-positive.heic \
+            --mode style-v16-maker --hardware-model 'iPhone19,2' --film-grain-seed 0 \
+            --manifest artifacts/manifests/E-style-v16-maker-known-positive.json
+          python3 scripts/research/patch_texture_style_heif_v8_cleanroom.py \
+            artifacts/A-baseline-original.heic artifacts/F-full-v16-known-negative.heic \
+            --mode full-v16 --hardware-model 'iPhone19,2' --film-grain-seed 0 \
+            --manifest artifacts/manifests/F-full-v16-known-negative.json
+
+          v10() {
+            local output="$1"; shift
+            python3 scripts/research/patch_texture_style_heif_v10_contract.py \
+              artifacts/F-full-v16-known-negative.heic "artifacts/${output}.heic" "$@" \
+              --manifest "artifacts/manifests/${output}.json"
+          }
+          v11() {
+            local source="$1" output="$2"
+            python3 scripts/research/patch_texture_style_heif_v11_semantic_payloads.py \
+              "artifacts/${source}.heic" "artifacts/${output}.heic" \
+              --manifest "artifacts/manifests/${output}.json"
+          }
+
+          # Structural alias controls (source-owned matte bytes; no private donor).
+          v10 G-semantic-role-graph --semantic-aliases
+          v10 H-semantic-role-graph-early --semantic-aliases --pack-early
+          v10 J-semantic-role-graph-early-provenance --semantic-aliases --pack-early --provenance
+          v10 K-semantic-role-graph-native-layout --semantic-aliases --pack-early --provenance --canonical
+
+          # Replace all 12 aliases with independently generated, valid, black,
+          # 768x576 monochrome HEVC mattes and FSINC MatteVersion=0 XMP.
+          # These payloads were produced clean-room from an all-zero frame.
+          v11 G-semantic-role-graph L-real-blank-semantic-mattes
+          v11 H-semantic-role-graph-early M-real-blank-semantic-mattes-early
+          v11 J-semantic-role-graph-early-provenance N-real-blank-semantic-mattes-early-provenance
+          v11 K-semantic-role-graph-native-layout O-real-blank-semantic-mattes-native-layout
+
+          shasum -a 256 artifacts/*.heic | tee artifacts/SHA256SUMS
+          python3 - <<'PY' | tee artifacts/v11-matrix.txt
+          import json
+          from pathlib import Path
+          for p in sorted(Path('artifacts/manifests').glob('*.json')):
+              d=json.loads(p.read_text())
+              print(p.stem, d.get('schema'))
+              if d.get('schema') == 'xdremux-texture-style-cleanroom-v11':
+                  print('  semanticRoleCount=',d['semanticRoleCount'])
+                  print('  blankMatte=',d['blankMatte'])
+                  print('  descriptor=',d['descriptor'])
+                  print('  unrelatedByteIdentical=',d['preExistingUnrelatedPayloadsByteIdentical'])
+              elif d.get('schema') == 'xdremux-texture-style-cleanroom-v10':
+                  print('  aliasCount=',d['semanticAliasCount'],'canonical=',d['canonicalContainer'])
+          PY
+
+      - name: ImageIO decode and custom auxiliary lookup
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/aux_probe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+
+          static NSArray<NSString *> *Roles(void) {
+              return @[
+                @"tag:apple.com,2026:photo:aux:semanticnosematte",
+                @"tag:apple.com,2026:photo:aux:semanticskinmattev2",
+                @"tag:apple.com,2026:photo:aux:semanticnonfaceskinmatte",
+                @"tag:apple.com,2026:photo:aux:semanticlipsmatte",
+                @"tag:apple.com,2026:photo:aux:semanticteethmattev2",
+                @"tag:apple.com,2026:photo:aux:semanticpersonmatte",
+                @"tag:apple.com,2026:photo:aux:semanticglassesmattev2",
+                @"tag:apple.com,2026:photo:aux:semanticeyebrowsmatte",
+                @"tag:apple.com,2026:photo:aux:semantictattoomatte",
+                @"tag:apple.com,2026:photo:aux:semantichandsmatte",
+                @"tag:apple.com,2026:photo:aux:semanticearsmatte",
+                @"tag:apple.com,2026:photo:aux:semanticfaceskinmatte"
+              ];
+          }
+
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 3) return 64;
+              NSString *path=[NSString stringWithUTF8String:argv[1]];
+              NSURL *url=[NSURL fileURLWithPath:path];
+              CGImageSourceRef src=CGImageSourceCreateWithURL((__bridge CFURLRef)url,NULL);
+              if(!src) return 2;
+              NSDictionary *props=CFBridgingRelease(CGImageSourceCopyPropertiesAtIndex(src,0,NULL));
+              NSMutableDictionary *out=[NSMutableDictionary dictionary];
+              out[@"imageCount"]=@(CGImageSourceGetCount(src));
+              out[@"width"]=props[(id)kCGImagePropertyPixelWidth] ?: [NSNull null];
+              out[@"height"]=props[(id)kCGImagePropertyPixelHeight] ?: [NSNull null];
+              NSMutableDictionary *roles=[NSMutableDictionary dictionary];
+              for(NSString *role in Roles()) {
+                  CFDictionaryRef raw=CGImageSourceCopyAuxiliaryDataInfoAtIndex(src,0,(__bridge CFStringRef)role);
+                  if(raw) {
+                      NSDictionary *d=CFBridgingRelease(raw);
+                      id bytes=d[(id)kCGImageAuxiliaryDataInfoData];
+                      roles[role]=@{
+                          @"present":@YES,
+                          @"dataLength":@([bytes respondsToSelector:@selector(length)] ? [bytes length] : 0),
+                          @"keys": [[d allKeys] valueForKey:@"description"] ?: @[]
+                      };
+                  } else {
+                      roles[role]=@{ @"present":@NO };
+                  }
+              }
+              out[@"roles"]=roles;
+              CFRelease(src);
+              NSData *json=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];
+              [json writeToFile:[NSString stringWithUTF8String:argv[2]] atomically:YES];
+              return props ? 0 : 3;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -Wall -Wextra -Werror -framework Foundation -framework ImageIO \
+            "$RUNNER_TEMP/aux_probe.m" -o "$RUNNER_TEMP/aux_probe"
+          for f in artifacts/*.heic; do
+            b="$(basename "$f" .heic)"
+            "$RUNNER_TEMP/aux_probe" "$f" "artifacts/imageio/${b}.json"
+          done
+          python3 - <<'PY' | tee artifacts/imageio/summary.txt
+          import json
+          from pathlib import Path
+          for p in sorted(Path('artifacts/imageio').glob('*.json')):
+              d=json.loads(p.read_text())
+              n=sum(bool(x.get('present')) for x in d['roles'].values())
+              print(p.stem,'decoded=',d['width'],'x',d['height'],'customAuxRecognized=',n,'/12')
+          PY
+
+      - name: Build iOS 27 ordinary-style regression probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p Probe.app
+          cp artifacts/*.heic Probe.app/
+          cat > Probe.app/Info.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleIdentifier</key><string>com.xdremux.PS3V11Probe</string>
+            <key>CFBundleExecutable</key><string>Probe</string>
+            <key>CFBundleName</key><string>PS3V11Probe</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>1</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>MinimumOSVersion</key><string>27.0</string>
+            <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+          </dict></plist>
+          PLIST
+          xcrun --sdk iphonesimulator clang -fobjc-arc -fblocks -arch arm64 -mios-simulator-version-min=27.0 \
+            -framework Foundation -framework ImageIO scripts/research/texture_style_v8_simulator_probe.m \
+            -o Probe.app/Probe
+          codesign --force --sign - Probe.app
+
+      - name: Run iOS 27 ordinary-style regression probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUNTIME='com.apple.CoreSimulator.SimRuntime.iOS-27-0'
+          DEVTYPE='com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro'
+          UDID="$(xcrun simctl create PS3V11Probe "$DEVTYPE" "$RUNTIME")"
+          trap 'xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true; xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$UDID"
+          for i in $(seq 1 90); do
+            state="$(xcrun simctl list devices -j | python3 -c 'import json,sys; d=json.load(sys.stdin); u=sys.argv[1]; print(next((x.get("state","") for xs in d["devices"].values() for x in xs if x.get("udid")==u),""))' "$UDID")"
+            [ "$state" = Booted ] && break
+            sleep 2
+          done
+          xcrun simctl install "$UDID" Probe.app
+          xcrun simctl launch "$UDID" com.xdremux.PS3V11Probe | tee artifacts/simulator/launch.txt
+          DATA_DIR="$(xcrun simctl get_app_container "$UDID" com.xdremux.PS3V11Probe data)"
+          RESULT="$DATA_DIR/tmp/ps3-v8-results.json"
+          for i in $(seq 1 60); do [ -s "$RESULT" ] && break; sleep 1; done
+          test -s "$RESULT"
+          cp "$RESULT" artifacts/simulator/results.json
+          python3 - <<'PY' | tee artifacts/simulator/summary.txt
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('artifacts/simulator/results.json').read_text())
+          def value(r,k):
+              x=r.get(k); return x.get('value') if isinstance(x,dict) and x.get('available') is True else None
+          for r in rows: print(r['file'],'hasSmartStyle=',value(r,'hasSmartStyle'))
+          failures=[r['file'] for r in rows if value(r,'hasSmartStyle') is not True]
+          if failures: raise SystemExit('simulator ordinary-style regressions: '+repr(failures))
+          PY
+
+      - name: Write physical-device test order
+        if: always()
+        shell: bash
+        run: |
+          cat > artifacts/DEVICE-TEST-ORDER.txt <<'TXT'
+          Known physical-device result from the preceding round:
+            A / C / D / E: ordinary Photographic Styles control = YES
+            F and every candidate containing the incomplete 2026 TextureStyle
+            contract: ordinary control = NO; TextureStyle = NO
+
+          V11 targets the strongest newly isolated missing contract: all genuine
+          PS3 TextureStyle positives in the private local corpus carry the same
+          12 2026 semantic auxiliary roles, even positives with no people records.
+          No private image bytes are present in this artifact.
+
+          Test in this order:
+          1. L-real-blank-semantic-mattes.heic
+             Adds the 12 roles as actual independently generated 768x576 black
+             monochrome HEVC mattes + FSINC MatteVersion=0 descriptors.
+          2. M-real-blank-semantic-mattes-early.heic
+             L + native-like early style/texture/Exif placement.
+          3. N-real-blank-semantic-mattes-early-provenance.heic
+             M + coherent Apple/iPhone Exif Make/Model.
+          4. O-real-blank-semantic-mattes-native-layout.heic
+             Strongest clean-room candidate: N + native-compatible ftyp,
+             ftyp/meta/mdat top-level shape, and native meta child ordering.
+
+          G/H/J/K are structural-alias controls; E/F are known controls.
+
+          Record separately for L/M/N/O:
+          - ordinary Photographic Styles control: YES / NO
+          - TextureStyle / 质感 control: YES / NO
+          If TextureStyle is YES, test preset/intensity/grain and save/reopen.
+          TXT
+
+      - name: Upload V11 physical-device candidates
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-cleanroom-v11-real-semantic-mattes-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
