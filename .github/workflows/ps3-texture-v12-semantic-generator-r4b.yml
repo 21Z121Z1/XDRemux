@@ -1,0 +1,60 @@
+name: PS3 Texture V12 semantic generator r4b
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/photographic-styles-3-texture-v12-spi-matrix]
+    paths: [.github/workflows/ps3-texture-v12-semantic-generator-r4b.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Fetch portrait 02
+        shell: bash
+        run: |
+          set -euo pipefail; mkdir -p artifacts/r4b
+          git fetch --no-tags --depth=1 origin f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          git show f89eea8c1714eb5d1e3da1ff8ba83e61655181d5:fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic > "$RUNNER_TEMP/p.heic"
+      - name: Read semantic model output maps
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/maps.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <AVFoundation/AVFoundation.h>
+          #import <objc/message.h>
+          static id O(Class c,NSString*s){SEL q=NSSelectorFromString(s);if(!c||![c respondsToSelector:q])return nil;id(*f)(id,SEL)=(void*)objc_msgSend;return f(c,q);}
+          static NSUInteger U(Class c,NSString*s){SEL q=NSSelectorFromString(s);if(!c||![c respondsToSelector:q])return 0;NSUInteger(*f)(id,SEL)=(void*)objc_msgSend;return f(c,q);}
+          static id J(id x){if(!x)return [NSNull null];if([NSJSONSerialization isValidJSONObject:@[x]])return x;return [x description];}
+          int main(){@autoreleasepool{NSMutableDictionary*out=[NSMutableDictionary dictionary];for(NSString*n in @[@"VNE5RTSemanticSegmentationMultiGeneratorV4",@"VNE5RTSemanticSegmentationMultiGeneratorV7"]){Class c=NSClassFromString(n);if(!c)continue;out[n]=@{@"modelVersion":@(U(c,@"modelVersion")),@"blobNames":J(O(c,@"outputMaskBlobNames")),@"featureMap":J(O(c,@"outputMaskBlobNameToFeatureName")),@"requestMap":J(O(c,@"outputMaskBlobNameToRequestKey"))};}Class h=NSClassFromString(@"VNGenerateHumanAttributesSegmentationRequest");out[@"humanAttributesRevision1"]=J(O(h,@"_supportedHumanAttributesNamesRevision1"));id hr=[[h alloc]init];NSError*e=nil;SEL s=NSSelectorFromString(@"supportedHumanAttributesNamesAndReturnError:");if([hr respondsToSelector:s]){id(*f)(id,SEL,NSError**)=(void*)objc_msgSend;id v=f(hr,s,&e);out[@"humanAttributesRuntime"]=J(v);if(e)out[@"humanAttributesError"]=e.description;}Class av=NSClassFromString(@"AVSemanticSegmentationMatte");out[@"AVMatteTypes"]=J(O(av,@"_allSupportedSemanticSegmentationMatteTypes"));out[@"AVPixelFormats"]=J(O(av,@"_allSupportedSemanticSegmentationMattePixelFormatTypes"));NSData*j=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);}}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework AVFoundation "$RUNNER_TEMP/maps.m" -o "$RUNNER_TEMP/maps"
+          "$RUNNER_TEMP/maps" | tee artifacts/r4b/model-output-contract.json
+      - name: Run configured compound requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/c.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <ImageIO/ImageIO.h>
+          #import <CoreVideo/CoreVideo.h>
+          #import <objc/message.h>
+          static id N(NSString*n){Class c=NSClassFromString(n);return c?[[c alloc]init]:nil;}
+          static NSDictionary*D(id x){NSMutableDictionary*d=[@{@"class":NSStringFromClass([x class])}mutableCopy];SEL fs=NSSelectorFromString(@"featureName");if([x respondsToSelector:fs]){id(*f)(id,SEL)=(void*)objc_msgSend;id v=f(x,fs);if(v)d[@"featureName"]=[v description];}SEL ps=NSSelectorFromString(@"pixelBuffer");if([x respondsToSelector:ps]){CVPixelBufferRef(*f)(id,SEL)=(void*)objc_msgSend;CVPixelBufferRef p=f(x,ps);if(p){d[@"width"]=@(CVPixelBufferGetWidth(p));d[@"height"]=@(CVPixelBufferGetHeight(p));}}return d;}
+          static NSDictionary*A(CGImageRef im,NSArray*names){NSMutableArray*o=[NSMutableArray array];for(NSString*n in names){id q=N(n);if(q)[o addObject:q];}Class c=NSClassFromString(@"VNGenerateSemanticSegmentationCompoundRequest");SEL s=NSSelectorFromString(@"initWithOriginalRequests:");id(*f)(id,SEL,id)=(void*)objc_msgSend;id q=f([c alloc],s,o);NSMutableDictionary*r=[@{@"originalRequests":names}mutableCopy];@try{NSError*e=nil;VNImageRequestHandler*h=[[VNImageRequestHandler alloc]initWithCGImage:im options:@{}];BOOL ok=[h performRequests:@[q] error:&e];r[@"ok"]=@(ok);if(e)r[@"error"]=e.description;NSArray*z=[q valueForKey:@"results"]?:@[];NSMutableArray*a=[NSMutableArray array];for(id x in z)[a addObject:D(x)];r[@"results"]=a;r[@"resultCount"]=@(z.count);}@catch(NSException*e){r[@"exception"]=e.reason?:@"";}return r;}
+          int main(int ac,const char**av){@autoreleasepool{if(ac!=2)return 64;NSURL*u=[NSURL fileURLWithPath:[NSString stringWithUTF8String:av[1]]];CGImageSourceRef s=CGImageSourceCreateWithURL((__bridge CFURLRef)u,NULL);CGImageRef im=CGImageSourceCreateImageAtIndex(s,0,NULL);NSArray*sets=@[@[@"VNGenerateHumanAttributesSegmentationRequest"],@[@"VNGenerateGlassesSegmentationRequest"],@[@"VNGenerateSkySegmentationRequest"],@[@"VNGenerateHumanAttributesSegmentationRequest",@"VNGenerateGlassesSegmentationRequest"],@[@"VNGenerateHumanAttributesSegmentationRequest",@"VNGenerateGlassesSegmentationRequest",@"VNGenerateSkySegmentationRequest"]];NSMutableArray*out=[NSMutableArray array];for(NSArray*x in sets)[out addObject:A(im,x)];NSData*j=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);CGImageRelease(im);CFRelease(s);}}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework ImageIO -framework CoreVideo "$RUNNER_TEMP/c.m" -o "$RUNNER_TEMP/c"
+          "$RUNNER_TEMP/c" "$RUNNER_TEMP/p.heic" | tee artifacts/r4b/configured-compound-results.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-texture-v12-semantic-generator-r4b-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r4b/
