@@ -1,0 +1,135 @@
+name: PS3 TextureStyle Carrier Consistency Matrix
+
+"on":
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-probe-v7
+    paths:
+      - .github/workflows/ps3-texture-carrier-consistency-matrix.yml
+      - scripts/research/patch_texture_style_heif_v6.py
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  carrier-matrix:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download A and byte-exact B candidates
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-native-standard-texture-candidates-4d044df06b25fb417e8f94b86daf7d247eb4236b
+          path: source-artifact
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34661435632
+
+      - name: Build method-1 carrier matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/candidates artifacts/evidence
+          baseline="$(find source-artifact -type f -name 'A-baseline-original.heic' -print -quit)"
+          exact_b="$(find source-artifact -type f -name 'B-native-standard-complete-tag84-only.heic' -print -quit)"
+          test -s "$baseline"
+          test -s "$exact_b"
+          cp "$baseline" artifacts/candidates/A-baseline-original.heic
+          cp "$exact_b" artifacts/candidates/B-native-standard-complete-tag84-only.heic
+
+          build_one() {
+            local label="$1" item_name="$2"
+            python3 scripts/research/patch_texture_style_heif_v6.py               "$baseline" "artifacts/candidates/${label}.heic"               --manifest "artifacts/evidence/${label}.json"               --native-standard-maker84               --item-name "$item_name"               --people-version 3               --film-grain-seed 0
+          }
+          build_one F-method1-name-metadata metadata
+          build_one G-method1-name-styleMetadata styleMetadata
+          build_one H-method1-name-textureStyleMetadata textureStyleMetadata
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          expected_names = {
+              "F-method1-name-metadata": "metadata",
+              "G-method1-name-styleMetadata": "styleMetadata",
+              "H-method1-name-textureStyleMetadata": "textureStyleMetadata",
+          }
+          expected_tag84 = "954d8bf0be80fc1e202f98188caed89403134b7f7dd1216432bf7793cd21f8f5"
+          summary = []
+          for label, expected_name in expected_names.items():
+              report = json.loads(Path(f"artifacts/evidence/{label}.json").read_text())
+              assert report["maker84PayloadSize"] == 141, report
+              assert report["maker84PayloadSHA256"] == expected_tag84, report
+              assert report["existingStyleConstructionMethod"] == 1, report
+              assert report["textureConstructionMethod"] == 1, report
+              assert report["textureCarrier"]["name"] == expected_name, report
+              assert report["textureCarrier"]["flags"] == report["existingStyleCarrier"]["flags"], report
+              assert report["textureTargets"] == [10048, 10063], report
+              assert report["textureMetadata"] == {
+                  "Preset": "Standard",
+                  "CaptureType": "LF",
+                  "CaptureMode": "Still",
+                  "PortType": "PortTypeBack",
+                  "HardwareModel": "iPhone 18 Pro",
+                  "TextureStylePeopleDataVersion": 3,
+                  "FilmGrainSeed": 0,
+              }, report
+              assert report["existing2023StylePayloadByteIdentical"] is True, report
+              assert report["preExistingNonExifPayloadsByteIdentical"] is True, report
+              summary.append({
+                  "file": f"{label}.heic",
+                  "itemName": expected_name,
+                  "constructionMethod": 1,
+                  "tag84SHA256": expected_tag84,
+                  "outputSHA256": report["outputSHA256"],
+              })
+          Path("artifacts/evidence/carrier-matrix-summary.json").write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+          sha256sum artifacts/candidates/*.heic | tee artifacts/evidence/SHA256SUMS
+          sw_vers | tee artifacts/evidence/macos.txt
+          xcodebuild -version | tee artifacts/evidence/xcode.txt
+
+      - name: Verify ImageIO still reads MakerApple
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/dump_maker.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <ImageIO/ImageIO.h>
+          int main(int argc, const char **argv) { @autoreleasepool {
+              if (argc != 2) return 64;
+              NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[1]]];
+              CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)url, NULL);
+              if (!source) return 2;
+              NSDictionary *properties = CFBridgingRelease(
+                  CGImageSourceCopyPropertiesAtIndex(source, 0, NULL)
+              );
+              CFRelease(source);
+              NSDictionary *maker = properties[(id)kCGImagePropertyMakerAppleDictionary];
+              printf("%s\n", maker ? maker.description.UTF8String : "(nil)");
+              return maker ? 0 : 3;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -Wall -Wextra -Werror             -framework Foundation -framework ImageIO             "$RUNNER_TEMP/dump_maker.m" -o "$RUNNER_TEMP/dump_maker"
+          for file in artifacts/candidates/*.heic; do
+            name="$(basename "$file" .heic)"
+            "$RUNNER_TEMP/dump_maker" "$file"               | tee "artifacts/evidence/${name}-makerapple.txt"
+          done
+          grep -n 'TextureStyle' artifacts/evidence/*-makerapple.txt             | tee artifacts/evidence/imageio-texture-summary.txt
+
+      - name: Upload carrier candidates and evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-carrier-consistency-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/
+
