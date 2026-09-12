@@ -122,7 +122,10 @@ jobs:
             name="$(basename "$file" .heic)"
             "$RUNNER_TEMP/dump_maker" "$file"               | tee "artifacts/evidence/${name}-makerapple.txt"
           done
-          grep -n 'TextureStyle' artifacts/evidence/*-makerapple.txt             | tee artifacts/evidence/imageio-texture-summary.txt
+          grep -n -E '^[[:space:]]+(8|9|10|11|12) = ' \
+            artifacts/evidence/*-makerapple.txt \
+            | tee artifacts/evidence/imageio-texture-summary.txt
+          test "$(grep -l '^[[:space:]]*8 = 1;' artifacts/evidence/*-makerapple.txt | wc -l | tr -d ' ')" -eq 4
 
       - name: Upload carrier candidates and evidence
         if: always()
@@ -132,4 +135,3 @@ jobs:
           retention-days: 14
           if-no-files-found: error
           path: artifacts/
-
