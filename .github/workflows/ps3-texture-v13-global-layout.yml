@@ -1,0 +1,245 @@
+name: PS3 Texture V13 global mdat layout gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-v12-spi-matrix
+    paths:
+      - .github/workflows/ps3-texture-v13-global-layout.yml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  global-layout-matrix:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Download validated V11 source matrix
+        uses: actions/download-artifact@v5
+        with:
+          name: ps3-texture-cleanroom-v11-real-semantic-mattes-06b52f3af8f0325efbea3e2baa816adc6e786deb
+          path: prior
+          github-token: ${{ github.token }}
+          repository: 21Z121Z1/XDRemux
+          run-id: 34663278696
+
+      - name: Build global-layout controls from G
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/v13/manifests
+          G="$(find prior -type f -name 'G-semantic-role-graph.heic' -print -quit)"
+          test -s "$G"
+          cp "$G" artifacts/v13/G-control-no-early.heic
+
+          cat > "$RUNNER_TEMP/build_v13.py" <<'PY'
+          from __future__ import annotations
+          import hashlib, importlib.util, json, sys
+          from pathlib import Path
+
+          repo = Path.cwd()
+          spec = importlib.util.spec_from_file_location(
+              'v10', repo / 'scripts/research/patch_texture_style_heif_v10_contract.py'
+          )
+          V10 = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(V10)
+          V3 = V10.V3
+
+          source_path = Path(sys.argv[1])
+          source = source_path.read_bytes()
+          top = list(V3.boxes(source, 0, len(source)))
+          meta = next(b for b in top if b['type'] == 'meta')
+          mdat = next(b for b in top if b['type'] == 'mdat')
+          children = list(V3.boxes(source, meta['data_start'] + 4, meta['data_end']))
+          by_type = {b['type']: b for b in children}
+          iinf_version, infos = V3.parse_iinf(source, by_type['iinf'])
+          iref_version, refs = V3.parse_iref(source, by_type['iref'])
+          iloc = V3.parse_iloc(source, by_type['iloc'])
+          idat = by_type.get('idat')
+          entry_map = {e['id']: e for e in iloc['entries']}
+          item_types = {i['id']: i['type'] for i in infos}
+
+          style = next(i for i in infos if i['type'] == 'uri ' and V10.STYLE_URI in i['raw'])
+          texture = next(i for i in infos if i['type'] == 'uri ' and V10.TEXTURE_URI in i['raw'])
+          exif_id = next(i for i, t in item_types.items() if t == 'Exif')
+          style_id, texture_id = style['id'], texture['id']
+
+          raw_properties, ipma_version, ipma_flags, ipma_entries = V10.parse_iprp(source, by_type['iprp'])
+          aux_uris = {idx + 1: V10.auxc_uri(raw) for idx, raw in enumerate(raw_properties)}
+          source_aux_index = next(
+              idx for idx, uri in aux_uris.items()
+              if uri == 'urn:com:apple:photo:2019:aux:semanticskinmatte'
+          )
+          source_image = next(
+              e['id'] for e in ipma_entries
+              if any(a['index'] == source_aux_index for a in e['associations'])
+          )
+          source_descriptor = next(
+              r['from'] for r in refs
+              if r['type'] == 'cdsc' and r['to'] == [source_image]
+              and item_types.get(r['from']) == 'mime'
+          )
+
+          old_hashes = {
+              e['id']: hashlib.sha256(V3.item_payload(source, e, idat)).hexdigest()
+              for e in iloc['entries']
+          }
+
+          def make_meta(iloc_raw: bytes) -> bytes:
+              out = []
+              for child in children:
+                  if child['type'] == 'iloc':
+                      out.append(iloc_raw)
+                  else:
+                      out.append(source[child['pos']:child['pos'] + child['size']])
+              return V3.make_box(
+                  'meta',
+                  source[meta['data_start']:meta['data_start'] + 4] + b''.join(out),
+              )
+
+          def build(name: str, *, move_ids=(), unreferenced=b''):
+              move_ids = list(move_ids)
+              entries = [V3.clone_iloc_entry(e) for e in iloc['entries']]
+              payloads = {i: V3.item_payload(source, entry_map[i], idat) for i in move_ids}
+              prefix = bytes(unreferenced) + b''.join(payloads[i] for i in move_ids)
+              if not prefix:
+                  raise ValueError('variant must insert a non-empty mdat prefix')
+
+              # iloc field widths are fixed by the parent iloc box, so changing construction
+              # method/extent values does not change meta size. We nevertheless verify that.
+              provisional = V3.make_iloc(iloc, entries)
+              provisional_meta = make_meta(provisional)
+              top_delta = len(provisional_meta) - meta['size']
+
+              # Every existing method-0 extent at/after the original mdat payload start moves
+              # forward by the inserted prefix. Selected entries are overwritten below.
+              for e in entries:
+                  if e['method'] != 0:
+                      continue
+                  for x in e['extents']:
+                      absolute = e['base_offset'] + x['offset']
+                      if absolute >= mdat['data_start']:
+                          x['offset'] += top_delta + len(prefix)
+
+              cursor = mdat['data_start'] + top_delta + len(unreferenced)
+              for item_id in move_ids:
+                  e = next(x for x in entries if x['id'] == item_id)
+                  payload = payloads[item_id]
+                  e['construction_field'] &= 0xFFF0
+                  e['method'] = 0
+                  e['data_ref'] = 0
+                  e['base_offset'] = 0
+                  e['extents'] = [{'index': None, 'offset': cursor, 'length': len(payload)}]
+                  cursor += len(payload)
+
+              iloc_raw = V3.make_iloc(iloc, entries)
+              final_meta = make_meta(iloc_raw)
+              if len(final_meta) != len(provisional_meta):
+                  raise ValueError('meta size instability')
+              top_delta = len(final_meta) - meta['size']
+
+              modified = bytearray(
+                  source[:meta['pos']] + final_meta + source[meta['pos'] + meta['size']:]
+              )
+              mdat_pos = mdat['pos'] + top_delta
+              old_size = int.from_bytes(modified[mdat_pos:mdat_pos + 4], 'big')
+              modified[mdat_pos:mdat_pos + 4] = (old_size + len(prefix)).to_bytes(4, 'big')
+              insert_at = mdat_pos + mdat['header']
+              modified[insert_at:insert_at] = prefix
+              modified = bytes(modified)
+
+              # Verify the control operation did not alter the logical payload of any item.
+              ntop = list(V3.boxes(modified, 0, len(modified)))
+              nmeta = next(b for b in ntop if b['type'] == 'meta')
+              nchildren = list(V3.boxes(modified, nmeta['data_start'] + 4, nmeta['data_end']))
+              nby = {b['type']: b for b in nchildren}
+              niloc = V3.parse_iloc(modified, nby['iloc'])
+              nidat = nby.get('idat')
+              new_hashes = {
+                  e['id']: hashlib.sha256(V3.item_payload(modified, e, nidat)).hexdigest()
+                  for e in niloc['entries']
+              }
+              changed = [i for i, h in old_hashes.items() if new_hashes.get(i) != h]
+              if changed:
+                  raise ValueError(f'logical item payloads changed: {changed}')
+
+              out = Path('artifacts/v13') / f'{name}.heic'
+              out.write_bytes(modified)
+              manifest = {
+                  'name': name,
+                  'sourceSHA256': hashlib.sha256(source).hexdigest(),
+                  'outputSHA256': hashlib.sha256(modified).hexdigest(),
+                  'insertedPrefixLength': len(prefix),
+                  'unreferencedPrefixLength': len(unreferenced),
+                  'movedItemIDs': move_ids,
+                  'styleItemID': style_id,
+                  'textureItemID': texture_id,
+                  'exifItemID': exif_id,
+                  'sourceSemanticImageID': source_image,
+                  'sourceSemanticDescriptorID': source_descriptor,
+                  'allLogicalItemPayloadsByteIdentical': True,
+              }
+              (Path('artifacts/v13/manifests') / f'{name}.json').write_text(
+                  json.dumps(manifest, indent=2, sort_keys=True) + '\n'
+              )
+
+          style_payload = V3.item_payload(source, entry_map[style_id], idat)
+          texture_payload = V3.item_payload(source, entry_map[texture_id], idat)
+          exif_payload = V3.item_payload(source, entry_map[exif_id], idat)
+
+          # Q1 changes only mdat size/start contents and method-0 offsets. No item points at
+          # the inserted bytes.
+          build('Q1-unreferenced-zero-pad16', unreferenced=b'\x00' * 16)
+
+          # Q2/Q3 move completely unrelated, pre-existing semantic resources to the mdat head.
+          build('Q2-unrelated-semantic-descriptor-head', move_ids=[source_descriptor])
+          build('Q3-unrelated-semantic-image-head', move_ids=[source_image])
+
+          # Q4-Q7 copy the same metadata payload bytes used by P1/P2/P3 into the mdat head,
+          # but leave their iloc entries completely untouched. They are deliberately orphaned.
+          build('Q4-unreferenced-style-bytes', unreferenced=style_payload)
+          build('Q5-unreferenced-texture-bytes', unreferenced=texture_payload)
+          build('Q6-unreferenced-exif-bytes', unreferenced=exif_payload)
+          build('Q7-unreferenced-all-three-bytes', unreferenced=style_payload + texture_payload + exif_payload)
+          PY
+
+          python3 "$RUNNER_TEMP/build_v13.py" "$G"
+          shasum -a 256 artifacts/v13/*.heic | tee artifacts/v13/SHA256SUMS
+          for f in artifacts/v13/*.heic; do
+            sips -g pixelWidth -g pixelHeight "$f" >/dev/null
+          done
+
+          cat > artifacts/v13/DEVICE-TEST-ORDER.txt <<'TXT'
+          V13 isolates the common side effects shared by P1/P2/P3, all of which the
+          physical-device tester reported as fully Texture Style adjustable.
+
+          G  known negative: no mdat prefix insertion.
+          Q1 unreferenced 16-byte zero padding at mdat payload start; no item moved.
+          Q2 unrelated existing semantic descriptor moved to mdat head.
+          Q3 unrelated existing semantic image moved to mdat head.
+          Q4 style plist bytes copied to mdat head but style iloc is untouched.
+          Q5 TextureStyle plist bytes copied to mdat head but TextureStyle iloc is untouched.
+          Q6 Exif bytes copied to mdat head but Exif iloc is untouched.
+          Q7 all three metadata payloads copied unreferenced; all iloc entries untouched.
+
+          Interpretation:
+          - Q1 YES => content/item identity is irrelevant; global mdat/iloc topology alone is enough.
+          - Q1 NO, Q2/Q3 YES => at least one referenced early method-0 item is enough, even unrelated.
+          - Q1/Q2/Q3 NO, Q4-Q6 YES => Photos is sensitive to the physical metadata bytes/order beyond iloc ownership.
+          - Only referenced P-series YES => early placement of a recognized metadata item is the gate.
+          TXT
+
+      - name: Upload V13 physical-device matrix
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-v13-global-layout-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/v13/
