@@ -1,0 +1,159 @@
+name: PS3 Texture V12 compound semantic SPI r3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/photographic-styles-3-texture-v12-spi-matrix
+    paths:
+      - .github/workflows/ps3-texture-v12-compound-spi-r3.yml
+
+permissions:
+  contents: read
+
+jobs:
+  compound-spi:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Fetch second portrait fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r3
+          git fetch --no-tags --depth=1 origin f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          git show f89eea8c1714eb5d1e3da1ff8ba83e61655181d5:fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic > "$RUNNER_TEMP/portrait.heic"
+          shasum -a 256 "$RUNNER_TEMP/portrait.heic" | tee artifacts/r3/input-sha256.txt
+
+      - name: Introspect compound segmentation runtime contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/introspect.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <ImageIO/ImageIO.h>
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+
+          static void LoadFrameworks(void) {
+            const char *paths[] = {
+              "/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",
+              "/System/Library/PrivateFrameworks/PhotosFormats.framework/PhotosFormats",
+              "/System/Library/PrivateFrameworks/MediaAnalysis.framework/MediaAnalysis",
+              "/System/Library/PrivateFrameworks/PhotoFoundation.framework/PhotoFoundation",
+              "/System/Library/PrivateFrameworks/PortraitFilters.framework/PortraitFilters"
+            };
+            for (unsigned i=0; i<sizeof(paths)/sizeof(paths[0]); i++) dlopen(paths[i], RTLD_LAZY|RTLD_GLOBAL);
+          }
+          static NSString *Enc(const char *s) { return s ? [NSString stringWithUTF8String:s] : @""; }
+          static NSArray *MethodRows(Class c) {
+            unsigned n=0; Method *ms=class_copyMethodList(c,&n); NSMutableArray *a=[NSMutableArray array];
+            for(unsigned i=0;i<n;i++) [a addObject:@{@"selector":NSStringFromSelector(method_getName(ms[i])),@"encoding":Enc(method_getTypeEncoding(ms[i]))}];
+            free(ms); return a;
+          }
+          static NSArray *IvarRows(Class c) {
+            unsigned n=0; Ivar *vs=class_copyIvarList(c,&n); NSMutableArray *a=[NSMutableArray array];
+            for(unsigned i=0;i<n;i++) [a addObject:@{@"name":Enc(ivar_getName(vs[i])),@"encoding":Enc(ivar_getTypeEncoding(vs[i])),@"offset":@(ivar_getOffset(vs[i]))}];
+            free(vs); return a;
+          }
+          static NSArray *PropertyRows(Class c) {
+            unsigned n=0; objc_property_t *ps=class_copyPropertyList(c,&n); NSMutableArray *a=[NSMutableArray array];
+            for(unsigned i=0;i<n;i++) [a addObject:@{@"name":Enc(property_getName(ps[i])),@"attributes":Enc(property_getAttributes(ps[i]))}];
+            free(ps); return a;
+          }
+          static NSDictionary *ClassRow(Class c) {
+            NSMutableArray *chain=[NSMutableArray array];
+            for(Class p=c; p; p=class_getSuperclass(p)) [chain addObject:NSStringFromClass(p)];
+            NSMutableDictionary *d=[@{
+              @"class":NSStringFromClass(c), @"superclasses":chain,
+              @"instanceMethods":MethodRows(c), @"classMethods":MethodRows(object_getClass(c)),
+              @"ivars":IvarRows(c), @"properties":PropertyRows(c)
+            } mutableCopy];
+            SEL sr=NSSelectorFromString(@"supportedRevisions");
+            if([c respondsToSelector:sr]) { id(*f)(id,SEL)=(void*)objc_msgSend; id v=f(c,sr); if(v)d[@"supportedRevisions"]=[v description]; }
+            SEL dr=NSSelectorFromString(@"defaultRevision");
+            if([c respondsToSelector:dr]) { NSUInteger(*f)(id,SEL)=(void*)objc_msgSend; d[@"defaultRevision"]=@(f(c,dr)); }
+            SEL cr=NSSelectorFromString(@"currentRevision");
+            if([c respondsToSelector:cr]) { NSUInteger(*f)(id,SEL)=(void*)objc_msgSend; d[@"currentRevision"]=@(f(c,cr)); }
+            return d;
+          }
+          static BOOL Relevant(NSString *name) {
+            NSString *l=name.lowercaseString;
+            NSArray *k=@[@"semanticsegmentation",@"segmentationcompound",@"humanattributessegmentation",@"glassessegmentation",@"segmentationobservation",@"segmentationrequest",@"maskgenerator",@"semanticmask",@"humanattribute"];
+            for(NSString *x in k) if([l containsString:x]) return YES; return NO;
+          }
+          int main(void) { @autoreleasepool {
+            LoadFrameworks(); int n=objc_getClassList(NULL,0); __unsafe_unretained Class *cs=(__unsafe_unretained Class*)calloc((size_t)n,sizeof(Class)); objc_getClassList(cs,n);
+            NSMutableArray *rows=[NSMutableArray array];
+            for(int i=0;i<n;i++){ NSString *name=NSStringFromClass(cs[i]); if(Relevant(name)) [rows addObject:ClassRow(cs[i])]; }
+            free(cs);
+            NSData *j=[NSJSONSerialization dataWithJSONObject:rows options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil]; fwrite(j.bytes,1,j.length,stdout); fputc('\n',stdout); return 0;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision "$RUNNER_TEMP/introspect.m" -o "$RUNNER_TEMP/introspect"
+          "$RUNNER_TEMP/introspect" > artifacts/r3/runtime-contract.json
+          python3 - <<'PY'
+          import json,pathlib
+          rows=json.loads(pathlib.Path('artifacts/r3/runtime-contract.json').read_text())
+          for r in rows:
+              print('\n###',r['class'])
+              print('super=', ' -> '.join(r['superclasses']))
+              if 'supportedRevisions' in r: print('supportedRevisions=',r['supportedRevisions'])
+              for kind in ('classMethods','instanceMethods','ivars','properties'):
+                  print(kind+':')
+                  for x in r[kind]: print(' ',x)
+          PY
+
+      - name: Exercise compound request with full-frame ROI and discovered zero-arg setters
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/runcompound.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <ImageIO/ImageIO.h>
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+          static void Load(void){dlopen("/System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging",RTLD_LAZY|RTLD_GLOBAL);dlopen("/System/Library/PrivateFrameworks/MediaAnalysis.framework/MediaAnalysis",RTLD_LAZY|RTLD_GLOBAL);}
+          static NSDictionary *Attempt(NSString *path, BOOL fullROI) {
+            Class c=NSClassFromString(@"VNGenerateSemanticSegmentationCompoundRequest"); NSMutableDictionary *r=[NSMutableDictionary dictionary];
+            if(!c){r[@"classMissing"]=@YES;return r;} id req=[[c alloc]init]; r[@"class"]=NSStringFromClass(c);
+            if(fullROI){ SEL s=NSSelectorFromString(@"setRegionOfInterest:"); if([req respondsToSelector:s]){ void(*f)(id,SEL,CGRect)=(void*)objc_msgSend; f(req,s,CGRectMake(0,0,1,1)); r[@"setFullROI"]=@YES; } }
+            NSURL*u=[NSURL fileURLWithPath:path]; CGImageSourceRef src=CGImageSourceCreateWithURL((__bridge CFURLRef)u,NULL); CGImageRef im=src?CGImageSourceCreateImageAtIndex(src,0,NULL):NULL;
+            if(!im){if(src)CFRelease(src);r[@"decodeFailed"]=@YES;return r;} @try{ NSError *e=nil; VNImageRequestHandler *h=[[VNImageRequestHandler alloc]initWithCGImage:im options:@{}]; BOOL ok=[h performRequests:@[req] error:&e]; r[@"ok"]=@(ok); if(e)r[@"error"]=e.description; NSArray *results=[req valueForKey:@"results"]?:@[]; r[@"resultCount"]=@(results.count); NSMutableArray *types=[NSMutableArray array];for(id x in results)[types addObject:NSStringFromClass([x class])];r[@"resultClasses"]=types;}@catch(NSException*e){r[@"exception"]=@{@"name":e.name?:@"",@"reason":e.reason?:@""};}
+            CGImageRelease(im);CFRelease(src);return r;
+          }
+          int main(int argc,const char**argv){@autoreleasepool{if(argc!=2)return 64;Load();NSString*p=[NSString stringWithUTF8String:argv[1]];NSArray*a=@[Attempt(p,NO),Attempt(p,YES)];NSData*j=[NSJSONSerialization dataWithJSONObject:a options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil];fwrite(j.bytes,1,j.length,stdout);fputc('\n',stdout);return 0;}}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework ImageIO -framework CoreGraphics "$RUNNER_TEMP/runcompound.m" -o "$RUNNER_TEMP/runcompound"
+          "$RUNNER_TEMP/runcompound" "$RUNNER_TEMP/portrait.heic" | tee artifacts/r3/compound-attempts.json
+
+      - name: Ask dyld-aware tools for compound symbols
+        shell: bash
+        run: |
+          set +e
+          {
+            echo '=== nm Vision ==='
+            nm -m /System/Library/Frameworks/Vision.framework/Vision 2>&1 | grep -Ei 'SemanticSegmentation|HumanAttributesSegmentation|GlassesSegmentation|Compound' || true
+            echo '=== dyld_info exports Vision ==='
+            xcrun dyld_info -exports /System/Library/Frameworks/Vision.framework/Vision 2>&1 | grep -Ei 'SemanticSegmentation|HumanAttributesSegmentation|GlassesSegmentation|Compound' || true
+            echo '=== objc metadata strings from Vision path ==='
+            strings -a /System/Library/Frameworks/Vision.framework/Vision 2>&1 | grep -Ei 'SemanticSegmentation|HumanAttributesSegmentation|GlassesSegmentation|Compound' || true
+          } | tee artifacts/r3/symbol-search.txt
+          exit 0
+
+      - name: Upload r3 evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-texture-v12-compound-spi-r3-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/r3/
