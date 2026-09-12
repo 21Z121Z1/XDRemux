@@ -33,35 +33,7 @@ jobs:
       - name: Apply product integration
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("crates/xdremux-heif/src/texture_styles.rs")
-          s = p.read_text()
-          s = s.replace("value.as_bytes().chunks_exact(2)", "value.as_bytes().as_chunks::<2>().0")
-          s = s.replace("const HDLR: FourCC = FourCC::new(*b\"hdlr\");\nconst DINF: FourCC = FourCC::new(*b\"dinf\");\nconst GRPL: FourCC = FourCC::new(*b\"grpl\");\n", "")
-          old = '''    let canonical_order = [HDLR, DINF, ILOC, IINF, PITM, IPRP, IDAT, IREF, GRPL];
-    let mut ordered = Vec::with_capacity(graph.meta_children.len());
-    for kind in canonical_order {
-        ordered.extend(graph.meta_children.iter().filter(|header| header.kind == kind));
-    }
-    ordered.extend(
-        graph
-            .meta_children
-            .iter()
-            .filter(|header| !canonical_order.contains(&header.kind)),
-    );
-    let mut saw_iref = false;
-    for header in ordered {
-'''
-          new = '''    // H, the physical-device-positive carrier, preserves the source meta child
-    // order. Do not introduce an extra canonicalization variable here.
-    let mut saw_iref = false;
-    for header in &graph.meta_children {
-'''
-          if old not in s:
-              raise SystemExit("meta-order anchor changed")
-          p.write_text(s.replace(old, new, 1))
-          PY
+          python3 scripts/research/fix_texture_style_carrier_module.py
           python3 scripts/research/apply_texture_style_product_patch.py
           cargo fmt --all
           git diff --check
@@ -90,6 +62,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/implement-rust-texture-style.yml
           git rm scripts/research/apply_texture_style_product_patch.py
+          git rm scripts/research/fix_texture_style_carrier_module.py
           git add crates/xdremux-engine/src/lib.rs crates/xdremux-engine/src/apple_photographic_styles.rs
           git add crates/xdremux-heif/src/lib.rs crates/xdremux-heif/src/texture_styles.rs
           git add crates/xdremux-runtime/src/apple_styles.rs scripts/check_rust_style_consumer.sh
