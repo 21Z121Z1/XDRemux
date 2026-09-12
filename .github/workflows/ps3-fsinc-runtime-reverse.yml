@@ -1,0 +1,63 @@
+name: PS3 FSINC Runtime Reverse
+
+on:
+  push:
+    branches: [research/ps3-fsinc-beta6-probe]
+    paths:
+      - scripts/research/fsinc_runtime_reverse.m
+      - .github/workflows/ps3-fsinc-runtime-reverse.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reverse:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Dump FSINC runtime classes and dispatch bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/runtime
+          clang -fobjc-arc -framework Foundation scripts/research/fsinc_runtime_reverse.m -o artifacts/fsinc_runtime_reverse
+          artifacts/fsinc_runtime_reverse artifacts/runtime 2>&1 | tee artifacts/runtime/runtime.txt
+      - name: Disassemble dumped functions with Capstone
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --user capstone
+          python3 - <<'PY'
+          from pathlib import Path
+          from capstone import Cs, CS_ARCH_ARM64, CS_MODE_ARM
+          md=Cs(CS_ARCH_ARM64,CS_MODE_ARM)
+          out=[]
+          for p in sorted(Path('artifacts/runtime').glob('*.bin')):
+              data=p.read_bytes()
+              out.append(f'===== {p.name} =====')
+              for ins in md.disasm(data,0):
+                  out.append(f'{ins.address:04x}: {ins.mnemonic:8s} {ins.op_str}')
+                  if ins.mnemonic=='ret':
+                      break
+          Path('artifacts/runtime/disasm.txt').write_text('\n'.join(out))
+          print('\n'.join(out))
+          PY
+      - name: Inspect FSINC MIL only
+        shell: bash
+        run: |
+          set -euo pipefail
+          MODEL=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/model.mil
+          {
+            echo '=== file ==='
+            file "$MODEL"
+            echo '=== strings around opset/cast ==='
+            strings "$MODEL" | grep -E -i 'ios17|ios18|opset|cast|semantic_|instance_|fsinc' | head -400 || true
+          } | tee artifacts/runtime/model.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: fsinc-runtime-reverse-${{ github.sha }}
+          retention-days: 7
+          path: artifacts/
