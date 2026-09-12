@@ -83,7 +83,15 @@ def make_cloned_uri_infe(template, item_id, name, uri):
     return V3.make_box("infe", payload)
 
 
-def build_one(source, output, maker84, texture_metadata, manifest_path=None):
+def build_one(
+    source,
+    output,
+    maker84,
+    texture_metadata,
+    manifest_path=None,
+    item_name="textureStyleMetadata",
+    replace_maker84=False,
+):
     data = Path(source).read_bytes()
     top = list(V3.boxes(data, 0, len(data)))
     meta = next(b for b in top if b["type"] == "meta")
@@ -112,8 +120,9 @@ def build_one(source, output, maker84, texture_metadata, manifest_path=None):
     old_tag84 = next(raw for tag, _, raw in old_note_entries if tag == 84)
     old_tag84_obj = plistlib.loads(old_tag84)
 
-    merged84 = dict(old_tag84_obj)
-    merged84.update(maker84)
+    merged84 = dict(maker84) if replace_maker84 else dict(old_tag84_obj)
+    if not replace_maker84:
+        merged84.update(maker84)
     new_tag84 = plistlib.dumps(merged84, fmt=plistlib.FMT_BINARY, sort_keys=False)
     new_note = V3.rebuild_apple_makernote(old_note, new_tag84)
     new_exif = V3.replace_makernote(exif_payload, new_note)
@@ -121,7 +130,7 @@ def build_one(source, output, maker84, texture_metadata, manifest_path=None):
     texture_payload = plistlib.dumps(texture_metadata, fmt=plistlib.FMT_BINARY, sort_keys=False)
     new_item_id = max(entry_map) + 1
     raw_infes = [i["raw"] for i in infos]
-    raw_infes.append(make_cloned_uri_infe(style_template, new_item_id, "textureStyleMetadata", TEXTURE_URI))
+    raw_infes.append(make_cloned_uri_infe(style_template, new_item_id, item_name, TEXTURE_URI))
     new_refs = [{"type": r["type"], "from": r["from"], "to": list(r["to"])} for r in refs]
     new_refs.append({"type": "cdsc", "from": new_item_id, "to": list(style_targets)})
 
@@ -223,6 +232,8 @@ def build_one(source, output, maker84, texture_metadata, manifest_path=None):
         "exifItemID": exif_id,
         "existingStyleItemID": style_id,
         "existingStylePayloadSHA256": old_style_hash,
+        "existingStyleCarrier": style_template,
+        "existingStyleConstructionMethod": style_entry["method"],
         "newTextureItemID": new_item_id,
         "textureCarrier": carrier,
         "textureConstructionMethod": new_entry["method"],
@@ -230,6 +241,8 @@ def build_one(source, output, maker84, texture_metadata, manifest_path=None):
         "textureTargets": style_targets,
         "textureMetadata": roundtrip_obj,
         "maker84": merged84,
+        "maker84PayloadSize": len(new_tag84),
+        "maker84PayloadSHA256": hashlib.sha256(new_tag84).hexdigest(),
         "existing2023StylePayloadByteIdentical": True,
         "preExistingNonExifPayloadsByteIdentical": True,
     }
@@ -247,14 +260,52 @@ def main():
     p.add_argument("--preset", type=int, default=4)
     p.add_argument("--intensity", type=float, default=0.61)
     p.add_argument("--grain", type=float, default=0.73)
-    p.add_argument("--people-version", type=int, default=1)
+    p.add_argument("--rendering-version", type=int, default=1)
+    p.add_argument("--original-instead-of-reversibility", type=int, choices=(0, 1), default=0)
+    p.add_argument("--native-standard-maker84", action="store_true")
+    p.add_argument("--item-name", default="metadata")
+    p.add_argument("--preset-name", default="Standard")
+    p.add_argument("--hardware-model", default="iPhone 18 Pro")
+    p.add_argument("--port-type", default="PortTypeBack")
+    p.add_argument("--capture-mode", default="Still")
+    p.add_argument("--capture-type", default="LF")
+    p.add_argument("--people-version", type=int, default=3)
     p.add_argument("--film-grain-seed", type=int)
     args = p.parse_args()
-    maker84 = {"8": args.preset, "9": args.intensity, "10": args.grain}
-    texture = {"TextureStylePeopleDataVersion": args.people_version}
+    if args.native_standard_maker84:
+        # Key insertion order is part of the native 141-byte binary plist.
+        maker84 = {
+            "10": 0.0, "2": 0.0, "3": 1.0, "11": False, "4": 1,
+            "5": 1, "12": 1, "6": 4, "7": 0, "0": 1, "8": 1,
+            "1": 0.0, "9": 1.0,
+        }
+    else:
+        maker84 = {
+            "8": args.preset,
+            "9": args.intensity,
+            "10": args.grain,
+            "11": bool(args.original_instead_of_reversibility),
+            "12": args.rendering_version,
+        }
+    texture = {
+        "Preset": args.preset_name,
+        "CaptureType": args.capture_type,
+        "CaptureMode": args.capture_mode,
+        "PortType": args.port_type,
+        "HardwareModel": args.hardware_model,
+        "TextureStylePeopleDataVersion": args.people_version,
+    }
     if args.film_grain_seed is not None:
         texture["FilmGrainSeed"] = args.film_grain_seed
-    build_one(args.source, args.output, maker84, texture, args.manifest)
+    build_one(
+        args.source,
+        args.output,
+        maker84,
+        texture,
+        args.manifest,
+        item_name=args.item_name,
+        replace_maker84=args.native_standard_maker84,
+    )
 
 
 if __name__ == "__main__":
