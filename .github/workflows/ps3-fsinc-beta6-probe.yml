@@ -35,6 +35,34 @@ jobs:
           shasum -a 256 artifacts/input/portrait.heic | tee artifacts/input/SHA256.txt
           sips -g pixelWidth -g pixelHeight -g orientation artifacts/input/portrait.heic | tee artifacts/input/sips.txt
 
+      - name: Reverse FSINC version dispatch and inspect bundled MIL
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/ANSTKit
+          MODEL=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/model.mil
+          xcrun nm -nm "$BIN" > artifacts/probe/anst-nm.txt || true
+          xcrun otool -tvV "$BIN" > artifacts/probe/anst-disasm-full.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('artifacts/probe/anst-disasm-full.txt').read_text(errors='replace').splitlines()
+          needles=['ANSTFsincAlgorithmVersionToNSString','ANSTFsincInferenceVersionToNSString','_concreteClassOfVersion','ANSTFsincAlgorithmResolutionToNSString']
+          out=[]
+          for needle in needles:
+              hits=[i for i,l in enumerate(lines) if needle in l]
+              out.append(f'===== {needle} hits={hits} =====')
+              for i in hits:
+                  out.extend(lines[max(0,i-8):min(len(lines),i+100)])
+          Path('artifacts/probe/fsinc-version-disasm.txt').write_text('\n'.join(out))
+          print('\n'.join(out))
+          PY
+          {
+            echo '=== model.mil head ==='
+            head -80 "$MODEL" || true
+            echo '=== opset/cast references ==='
+            grep -a -n -E 'opset|ios17|ios18|cast|program|function' "$MODEL" | head -200 || true
+          } | tee artifacts/probe/fsinc-model-mil.txt
+
       - name: Build executable FSINC inference probe
         shell: bash
         run: |
