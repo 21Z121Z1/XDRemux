@@ -1,0 +1,72 @@
+{
+  "schema": "xdremux-texture-style-native-standard-v1",
+  "textureURI": "tag:apple.com,2026:photo:metadata:texture_styles",
+  "textureItemName": "metadata",
+  "maker84Variants": {
+    "nativeStandardComplete": {
+      "10": 0.0,
+      "2": 0.0,
+      "3": 1.0,
+      "11": false,
+      "4": 1,
+      "5": 1,
+      "12": 1,
+      "6": 4,
+      "7": 0,
+      "0": 1,
+      "8": 1,
+      "1": 0.0,
+      "9": 1.0
+    }
+  },
+  "textureInfoVariants": {
+    "nativeNoPeopleMarketingName": {
+      "Preset": "Standard",
+      "CaptureType": "LF",
+      "CaptureMode": "Still",
+      "PortType": "PortTypeBack",
+      "HardwareModel": "iPhone 18 Pro",
+      "TextureStylePeopleDataVersion": 3,
+      "FilmGrainSeed": 0
+    },
+    "nativeNoPeopleModel192": {
+      "Preset": "Standard",
+      "CaptureType": "LF",
+      "CaptureMode": "Still",
+      "PortType": "PortTypeBack",
+      "HardwareModel": "iPhone19,2",
+      "TextureStylePeopleDataVersion": 3,
+      "FilmGrainSeed": 0
+    },
+    "nativeNoPeopleModel193": {
+      "Preset": "Standard",
+      "CaptureType": "LF",
+      "CaptureMode": "Still",
+      "PortType": "PortTypeBack",
+      "HardwareModel": "iPhone19,3",
+      "TextureStylePeopleDataVersion": 3,
+      "FilmGrainSeed": 0
+    }
+  },
+  "combinations": [
+    {
+      "name": "B-native-standard-complete-tag84-only",
+      "maker84": "nativeStandardComplete"
+    },
+    {
+      "name": "C-native-standard-2026-iPhone18Pro",
+      "maker84": "nativeStandardComplete",
+      "textureInfo": "nativeNoPeopleMarketingName"
+    },
+    {
+      "name": "D-native-standard-2026-iPhone19-2",
+      "maker84": "nativeStandardComplete",
+      "textureInfo": "nativeNoPeopleModel192"
+    },
+    {
+      "name": "E-native-standard-2026-iPhone19-3",
+      "maker84": "nativeStandardComplete",
+      "textureInfo": "nativeNoPeopleModel193"
+    }
+  ]
+}
