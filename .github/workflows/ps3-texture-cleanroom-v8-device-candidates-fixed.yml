@@ -49,12 +49,13 @@ jobs:
               --mode "$mode" --hardware-model 'iPhone19,2' --film-grain-seed 0 \
               --manifest "artifacts/manifests/${name}.json"
           }
-          build B-maker-surgical maker-surgical
+          build B-exif-relocate-control exif-relocate-control
           build C-style-v16 style-v16
-          build D-style-v16-maker style-v16-maker
-          build E-full-v16 full-v16
-          build F-full-v16-legacy-name full-v16-legacy-name
-          build G-full-carrier-v15 full-carrier-v15
+          build D-maker-surgical maker-surgical
+          build E-style-v16-maker style-v16-maker
+          build F-full-v16 full-v16
+          build G-full-v16-legacy-name full-v16-legacy-name
+          build H-full-carrier-v15 full-carrier-v15
 
           sha256sum artifacts/*.heic | tee artifacts/candidate-sha256.txt
           python3 - <<'PY' | tee artifacts/contract-matrix.txt
@@ -64,8 +65,11 @@ jobs:
               d=json.loads(p.read_text())
               print(p.stem)
               print('  style:',d['styleBefore'],'->',d['styleAfter'])
-              print('  makerSlots:',d['maker84TextureSlots'])
-              print('  textureItem:',d['textureItemAdded'],'targetsMirrorStyle=',d['textureTargetsMirrorStyle'])
+              print('  styleRewrite=',d['styleRewrite'])
+              print('  exifRelocated=',d['exifRelocated'])
+              print('  makerEncoding=',d['maker84Encoding'],'makerSlots=',d['maker84TextureSlots'])
+              print('  textureItem=',d['textureItemAdded'],'targetsMirrorStyle=',d['textureTargetsMirrorStyle'])
+              print('  mdat=',d['mdatCarrier'],d['mdatCountBefore'],'->',d['mdatCountAfter'])
               print('  unrelatedPayloadsByteIdentical=',d['preExistingUnrelatedPayloadsByteIdentical'])
           PY
 
@@ -148,13 +152,14 @@ jobs:
         run: |
           cat > artifacts/DEVICE-TEST-ORDER.txt <<'TXT'
           Test on a physical iOS 27 device in this order:
-          1. A-baseline-original.heic        control: ordinary Photographic Styles must remain available
-          2. C-style-v16.heic               2023 schema/carrier control
-          3. D-style-v16-maker.heic         coherent 2023 + MakerNote, no 2026 item
-          4. E-full-v16.heic                 strongest TextureStyle candidate
-          5. B-maker-surgical.heic           MakerNote-only diagnostic
-          6. F-full-v16-legacy-name.heic     item-name diagnostic
-          7. G-full-carrier-v15.heic         schema-version diagnostic
+          1. A-baseline-original.heic         positive control: ordinary Photographic Styles must remain available
+          2. B-exif-relocate-control.heic     byte-identical Exif moved inside the same final mdat; isolates relocation itself
+          3. C-style-v16.heic                 2023 style schema 15->16 + l=false + native carrier/name, no MakerNote change
+          4. D-maker-surgical.heic             MakerNote-only diagnostic using native Float32 slot types
+          5. E-style-v16-maker.heic           coherent 2023 style + MakerNote, no 2026 item
+          6. F-full-v16.heic                  strongest TextureStyle candidate: coherent 2023 + MakerNote + 2026 item
+          7. G-full-v16-legacy-name.heic      isolates 2023 item-name requirement
+          8. H-full-carrier-v15.heic          isolates style schema 16/l requirement
 
           Record for every file:
           - ordinary Photographic Styles control visible: yes/no
