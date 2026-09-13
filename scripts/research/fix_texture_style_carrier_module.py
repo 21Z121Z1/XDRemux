@@ -8,6 +8,11 @@ if s.count(old) != 1:
     raise SystemExit(f"expected one clippy anchor, got {s.count(old)}")
 s = s.replace(old, "value.as_bytes().as_chunks::<2>().0", 1)
 
+old_import = "    ILOC, IPCO, IPMA, IPRP, IREF, MDAT, META, PITM,\n"
+if s.count(old_import) != 1:
+    raise SystemExit("PITM import anchor changed")
+s = s.replace(old_import, "    ILOC, IPCO, IPMA, IPRP, IREF, MDAT, META,\n", 1)
+
 constants = (
     'const HDLR: FourCC = FourCC::new(*b"hdlr");\n'
     'const DINF: FourCC = FourCC::new(*b"dinf");\n'
