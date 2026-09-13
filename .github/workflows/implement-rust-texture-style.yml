@@ -1,5 +1,6 @@
 name: Rust Texture Style integration harness
 
+# Temporary integration harness; deleted automatically after a fully green product-path run.
 on:
   push:
     branches: [feat/rust-texture-style-support]
