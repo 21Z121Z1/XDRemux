@@ -1,0 +1,85 @@
+name: PS3 FSINC E5 compatibility r6
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-e5-compat-r6.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Scan system ios18 MIL models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r6
+          python3 - <<'PY' | tee artifacts/r6/ios18-models.txt
+          import os,re
+          roots=['/System/Library/PrivateFrameworks','/System/Library/Frameworks']
+          rows=[]
+          for root in roots:
+            for dp,dn,fn in os.walk(root):
+              if 'model.mil' not in fn: continue
+              p=os.path.join(dp,'model.mil')
+              try: s=open(p,errors='ignore').read()
+              except: continue
+              if '<ios18>' not in s: continue
+              ops=[]
+              for line in s.splitlines():
+                m=re.search(r'=\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(',line)
+                if m: ops.append(m.group(1))
+              casts=[x for x in s.splitlines() if re.search(r'=\s*cast\(',x)]
+              sparse='constexpr_sparse_blockwise_shift_scale' in s
+              rows.append((p,len(casts),sparse,sorted(set(ops))))
+          print('COUNT',len(rows))
+          for p,n,sparse,ops in rows:
+            print('\nMODEL',p)
+            print('cast_count',n,'sparse_shift_scale',sparse)
+            print('ops',','.join(ops))
+            try:
+              lines=open(p,errors='ignore').read().splitlines()
+              for i,x in enumerate(lines):
+                if re.search(r'=\s*cast\(',x):
+                  print('CAST',i+1,x.strip()[:500])
+                  if i>0: print('PREV',lines[i-1].strip()[:300])
+                  if i+1<len(lines): print('NEXT',lines[i+1].strip()[:300])
+                  break
+            except: pass
+          PY
+      - name: Search FSINC precompiled E5 assets and caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '=== FSINC named paths ==='
+            find /System /Library /private/var -iname '*fsinc*' -print 2>/dev/null | head -500 || true
+            echo '=== likely E5 compiled assets ==='
+            find /System/Library/PrivateFrameworks/ANSTKit.framework -type f -maxdepth 10 -print 2>/dev/null | grep -Ei '\.(e5|bin|bundle|espresso|mil|mlmodelc)$|compiled|cache|library' | head -500 || true
+            echo '=== e5 strings in ANSTKit ==='
+            strings /System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/ANSTKit 2>/dev/null | grep -Ei 'e5rt|opset|compiler_option|compile.*mil|legacy|compat|bundle' | head -800 || true
+          } | tee artifacts/r6/e5-assets-strings.txt
+      - name: Inspect compiler command surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            for t in coremlcompiler coremlc; do
+              P=$(xcrun --find "$t" 2>/dev/null || true)
+              echo "=== $t $P ==="
+              [ -n "$P" ] || continue
+              "$P" --help 2>&1 | head -200 || true
+              "$P" help 2>&1 | head -200 || true
+              strings "$P" | grep -Ei 'mil|compile|convert|decompress|sparse|weight|opset|lower|target' | head -500 || true
+            done
+          } | tee artifacts/r6/compiler-help.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-fsinc-e5-compat-r6-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r6/
