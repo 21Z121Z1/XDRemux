@@ -7,6 +7,7 @@ pub mod error;
 mod native;
 mod semantic;
 mod styles;
+mod texture_styles;
 mod validation;
 
 pub use direct::{
@@ -20,6 +21,7 @@ pub use error::{HeifError, Result};
 pub use native::IsoGainMapAssembly;
 pub use semantic::{merge_apple_semantic_auxiliary_heif, transplant_apple_semantic_auxiliary_heif};
 pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};
+pub use texture_styles::augment_texture_style_heif;
 pub use validation::{validate_gain_map_structure, GainMapStructure};
 
 pub fn assemble_iso_gain_map_heif(

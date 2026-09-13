@@ -1293,6 +1293,77 @@ pub fn apple_style_property_list(
     serialize_binary_plist(root)
 }
 
+/// Synthesize the iOS 27 Texture Style v16 metadata object.
+pub fn apple_texture_style_property_list(
+    request: &AppleStylePropertyListRequest<'_>,
+) -> Result<Vec<u8>, AppleStyleDataError> {
+    validate_apple_style_data(request.style_data)?;
+    if request.global_tone_curve.len() != 516
+        || request.tone_light_map.len() != APPLE_STYLE_LIGHT_MAP_BYTE_COUNT
+        || request.linear_light_map.len() != APPLE_STYLE_LIGHT_MAP_BYTE_COUNT
+        || request.scene_type > 3
+        || !(0.0..=1.0).contains(&request.people_ratio)
+        || !(-1.0..=1.0).contains(&request.person_masks_valid_hint)
+        || !(0.0..=1.0).contains(&request.skin_ratio)
+        || !request.baseline_exposure.is_finite()
+        || !request.base_gain.is_finite()
+        || !request.linear_gain.is_finite()
+        || !request.original_range_min.is_finite()
+        || !request.original_range_max.is_finite()
+        || request.original_range_min > request.original_range_max
+        || !request.face_exposure_boost.is_finite()
+    {
+        return Err(AppleStyleDataError::InvalidPropertyListInput);
+    }
+    validate_style_statistics(request.statistics)?;
+
+    let statistics = style_statistics_value(request.statistics);
+    let root = plist_dictionary([
+        ("0", PlistValue::Integer(16)),
+        ("1", PlistValue::Data(request.style_data.to_vec())),
+        ("2", PlistValue::Bool(true)),
+        ("3", PlistValue::Data(request.global_tone_curve.to_vec())),
+        ("4", PlistValue::Real(request.baseline_exposure)),
+        ("5", PlistValue::Integer(u64::from(request.scene_type))),
+        ("6", statistics),
+        (
+            "7",
+            plist_dictionary([
+                ("PeopleRatio", PlistValue::Real(request.people_ratio)),
+                (
+                    "PersonMasksValidHint",
+                    PlistValue::Real(request.person_masks_valid_hint),
+                ),
+                ("SkinRatio", PlistValue::Real(request.skin_ratio)),
+            ]),
+        ),
+        ("c", PlistValue::Data(request.tone_light_map.to_vec())),
+        ("d", PlistValue::Data(request.linear_light_map.to_vec())),
+        ("e", PlistValue::Integer(32)),
+        ("f", PlistValue::Integer(32)),
+        ("g", PlistValue::Integer(0x4C30_3068)),
+        ("h", PlistValue::Real(request.base_gain)),
+        (
+            "i",
+            plist_dictionary([
+                ("Gain", PlistValue::Real(request.linear_gain)),
+                (
+                    "OriginalRangeMin",
+                    PlistValue::Real(request.original_range_min),
+                ),
+                (
+                    "OriginalRangeMax",
+                    PlistValue::Real(request.original_range_max),
+                ),
+            ]),
+        ),
+        ("j", PlistValue::Real(request.face_exposure_boost)),
+        ("k", PlistValue::Bool(false)),
+        ("l", PlistValue::Bool(false)),
+    ]);
+    serialize_binary_plist(root)
+}
+
 fn validate_style_statistics(statistics: &AppleStyleStatistics) -> Result<(), AppleStyleDataError> {
     let distributions = [
         statistics.linear_gtc_image,

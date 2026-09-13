@@ -129,18 +129,36 @@ output, inspect_path, batch_output, batch_inspect_path = sys.argv[1:]
 
 def read_style_plist(path, inspect_path):
     report = json.load(open(inspect_path, encoding="utf-8"))
-    metadata = next(
-        item
-        for item in report["items"]
-        if item.get("type") == "uri " and item.get("name") == "styleMetadata"
-    )
-    idat = next(child for child in report["meta_children"] if child["type"] == "idat")
-    extent = metadata["location"]["extents"][0]
+    candidates = [
+        item for item in report["items"]
+        if item.get("type") == "uri " and item.get("name") == "metadata"
+    ]
+    if len(candidates) != 2:
+        raise SystemExit(f"{path}: expected style+Texture metadata items, got {len(candidates)}")
+    metadata = max(candidates, key=lambda item: item.get("payload_length") or 0)
+    location = metadata["location"]
+    if location.get("construction_method") != 0:
+        raise SystemExit(f"{path}: Styles v16 metadata is not method-0: {location!r}")
+    extent = location["extents"][0]
     with open(path, "rb") as stream:
         data = stream.read()
-    start = idat["start"] + 8 + extent["offset"]
+    start = extent["offset"]
     payload = data[start : start + extent["length"]]
-    return plistlib.loads(payload)
+    plist = plistlib.loads(payload)
+    if plist.get("0") != 16 or plist.get("l") is not False:
+        raise SystemExit(f"{path}: final Styles carrier is not v16+l=false")
+    if b"tag:apple.com,2026:photo:metadata:texture_styles\0" not in data:
+        raise SystemExit(f"{path}: missing Texture Style metadata URI")
+    roles = [
+        b"semanticnosematte", b"semanticskinmattev2", b"semanticnonfaceskinmatte",
+        b"semanticlipsmatte", b"semanticteethmattev2", b"semanticpersonmatte",
+        b"semanticglassesmattev2", b"semanticeyebrowsmatte", b"semantictattoomatte",
+        b"semantichandsmatte", b"semanticearsmatte", b"semanticfaceskinmatte",
+    ]
+    missing = [role.decode() for role in roles if role not in data]
+    if missing:
+        raise SystemExit(f"{path}: missing Texture Style semantic roles {missing}")
+    return plist
 
 def srgb_encode(linear):
     return linear * 12.92 if linear <= 0.0031308 else 1.055 * linear ** (1 / 2.4) - 0.055
