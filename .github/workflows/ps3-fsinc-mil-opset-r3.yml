@@ -1,0 +1,93 @@
+name: PS3 FSINC MIL opset r3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-mil-opset-r3.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Prepare model variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/opset "$RUNNER_TEMP/raw" "$RUNNER_TEMP/ios17"
+          SRC=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc
+          cp -R "$SRC"/. "$RUNNER_TEMP/raw/"
+          cp -R "$SRC"/. "$RUNNER_TEMP/ios17/"
+          grep -nE '^func |<ios[0-9]+>|cast\(' "$RUNNER_TEMP/raw/model.mil" | head -120 | tee artifacts/opset/model-head.txt || true
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/Users/runner/work/_temp')
+          # Resolve through RUNNER_TEMP from env to avoid hard-coding UUID.
+          import os
+          f=Path(os.environ['RUNNER_TEMP'])/'ios17'/'model.mil'
+          s=f.read_text()
+          before=s.count('<ios18>')
+          s=s.replace('<ios18>','<ios17>')
+          f.write_text(s)
+          print('patched_function_opsets', before)
+          PY
+          diff -u <(grep -nE '^func ' "$RUNNER_TEMP/raw/model.mil") <(grep -nE '^func ' "$RUNNER_TEMP/ios17/model.mil") | tee artifacts/opset/function-diff.txt || true
+      - name: Build E5 loader probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/load.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+          static BOOL Load(NSString*mil, NSString*fn, unsigned long long device){
+            Class c=NSClassFromString(@"ANSTE5MLNetwork"); NSError*e=nil;
+            id a=((id(*)(id,SEL))objc_msgSend)((id)c,sel_registerName("alloc"));
+            id n=((id(*)(id,SEL,id,id,unsigned long long))objc_msgSend)(a,sel_registerName("initWithMILPath:e5FunctionName:computeDevice:"),mil,fn,device);
+            printf("INIT path=%s fn=%s device=%llu obj=%s\n",mil.UTF8String,fn.UTF8String,device,n?object_getClassName(n):"nil");
+            if(!n)return NO;
+            BOOL ok=((BOOL(*)(id,SEL,NSError**))objc_msgSend)(n,sel_registerName("loadNetworkWithError:"),&e);
+            printf("LOAD ok=%d err=%s\n",ok,e?e.description.UTF8String:"nil");
+            return ok;
+          }
+          int main(int ac,const char**av){@autoreleasepool{
+            if(ac!=3)return 64;
+            void*h=dlopen("/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/ANSTKit",RTLD_NOW|RTLD_GLOBAL);
+            printf("DLOPEN=%p err=%s\n",h,h?"none":dlerror()); if(!h)return 2;
+            NSString*mil=[NSString stringWithUTF8String:av[1]]; NSString*fn=[NSString stringWithUTF8String:av[2]];
+            BOOL any=NO; for(unsigned long long d: (unsigned long long[]){1,3,5,7}) { if(Load(mil,fn,d)){any=YES;break;} }
+            return any?0:10;
+          }}
+          OBJC
+          # C syntax does not allow range-for; rewrite tiny loop portably.
+          python3 - <<'PY'
+          import os
+          p=os.path.join(os.environ['RUNNER_TEMP'],'load.m')
+          s=open(p).read()
+          s=s.replace('BOOL any=NO; for(unsigned long long d: (unsigned long long[]){1,3,5,7}) { if(Load(mil,fn,d)){any=YES;break;} }', 'BOOL any=NO; unsigned long long ds[]={1,3,5,7}; for(int i=0;i<4;i++){ if(Load(mil,fn,ds[i])){any=YES;break;} }')
+          open(p,'w').write(s)
+          PY
+          clang -fobjc-arc -framework Foundation "$RUNNER_TEMP/load.m" -o "$RUNNER_TEMP/load"
+      - name: Test raw and patched MIL
+        shell: bash
+        run: |
+          set +e
+          "$RUNNER_TEMP/load" "$RUNNER_TEMP/raw/model.mil" resolution_768_576 2>&1 | tee artifacts/opset/raw.txt
+          raw=${PIPESTATUS[0]}
+          "$RUNNER_TEMP/load" "$RUNNER_TEMP/ios17/model.mil" resolution_768_576 2>&1 | tee artifacts/opset/ios17.txt
+          patched=${PIPESTATUS[0]}
+          set -e
+          echo "raw=$raw patched=$patched" | tee artifacts/opset/status.txt
+          test "$patched" -eq 0
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-fsinc-mil-opset-r3-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/opset/
