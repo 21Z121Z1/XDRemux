@@ -1,0 +1,79 @@
+name: PS3 FSINC MIL opset r4
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-mil-opset-r4.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Prepare raw and ios17 model variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r4 "$RUNNER_TEMP/raw" "$RUNNER_TEMP/ios17"
+          SRC=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc
+          cp -R "$SRC"/. "$RUNNER_TEMP/raw/"
+          cp -R "$SRC"/. "$RUNNER_TEMP/ios17/"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          f=Path(os.environ['RUNNER_TEMP'])/'ios17'/'model.mil'
+          s=f.read_text()
+          print('ios18_functions',s.count('<ios18>'))
+          f.write_text(s.replace('<ios18>','<ios17>'))
+          PY
+      - name: Build corrected E5 loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/load.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+          static BOOL Load(NSString*path, NSString*fn, unsigned long long device){
+            Class c=NSClassFromString(@"ANSTE5MLNetwork"); NSError*e=nil;
+            NSURL*url=[NSURL fileURLWithPath:path];
+            id a=((id(*)(id,SEL))objc_msgSend)((id)c,sel_registerName("alloc"));
+            id n=((id(*)(id,SEL,id,id,unsigned long long))objc_msgSend)(a,sel_registerName("initWithMILPath:e5FunctionName:computeDevice:"),url,fn,device);
+            printf("INIT url=%s fn=%s device=%llu obj=%s\n",url.path.UTF8String,fn.UTF8String,device,n?object_getClassName(n):"nil");
+            if(!n)return NO;
+            @try {
+              BOOL ok=((BOOL(*)(id,SEL,NSError**))objc_msgSend)(n,sel_registerName("loadNetworkWithError:"),&e);
+              printf("LOAD ok=%d err=%s\n",ok,e?e.description.UTF8String:"nil");
+              return ok;
+            } @catch(NSException*x) { printf("EXCEPTION %s: %s\n",x.name.UTF8String,x.reason.UTF8String); return NO; }
+          }
+          int main(int ac,const char**av){@autoreleasepool{
+            if(ac!=3)return 64; void*h=dlopen("/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/ANSTKit",RTLD_NOW|RTLD_GLOBAL); printf("DLOPEN=%p err=%s\n",h,h?"none":dlerror()); if(!h)return 2;
+            NSString*mil=[NSString stringWithUTF8String:av[1]]; NSString*fn=[NSString stringWithUTF8String:av[2]];
+            unsigned long long ds[]={1,3,5,7}; BOOL any=NO; for(int i=0;i<4;i++){if(Load(mil,fn,ds[i])){any=YES;break;}} return any?0:10;
+          }}
+          OBJC
+          clang -fobjc-arc -framework Foundation "$RUNNER_TEMP/load.m" -o "$RUNNER_TEMP/load"
+      - name: Test raw then ios17 patched MIL
+        shell: bash
+        run: |
+          set +e
+          "$RUNNER_TEMP/load" "$RUNNER_TEMP/raw/model.mil" resolution_768_576 2>&1 | tee artifacts/r4/raw.txt
+          raw=${PIPESTATUS[0]}
+          "$RUNNER_TEMP/load" "$RUNNER_TEMP/ios17/model.mil" resolution_768_576 2>&1 | tee artifacts/r4/ios17.txt
+          patched=${PIPESTATUS[0]}
+          set -e
+          echo "raw=$raw patched=$patched" | tee artifacts/r4/status.txt
+          test "$patched" -eq 0
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-fsinc-mil-opset-r4-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/r4/
