@@ -5,6 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+sha2 = "=0.11.0"
 xdremux-format = { path = "../xdremux-format" }
 
 [lints]
