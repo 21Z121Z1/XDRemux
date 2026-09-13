@@ -1,0 +1,106 @@
+name: PS3 semantic 12-role runner probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-semantic-12role-runner.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Fetch portrait fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/semantic12
+          git fetch --no-tags --depth=1 origin f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          git show f89eea8c1714eb5d1e3da1ff8ba83e61655181d5:fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic > "$RUNNER_TEMP/p.heic"
+
+      - name: Probe Vision request and model contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/probe.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <Vision/Vision.h>
+          #import <ImageIO/ImageIO.h>
+          #import <CoreVideo/CoreVideo.h>
+          #import <CoreGraphics/CoreGraphics.h>
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+
+          static id Obj(Class c, NSString *s){ SEL q=NSSelectorFromString(s); if(!c||![c respondsToSelector:q]) return nil; id(*f)(id,SEL)=(void*)objc_msgSend; return f(c,q); }
+          static id Inst(id x, NSString*s){SEL q=NSSelectorFromString(s); if(!x||![x respondsToSelector:q]) return nil; id(*f)(id,SEL)=(void*)objc_msgSend; return f(x,q);}
+          static id JSON(id x){ if(!x) return [NSNull null]; if([NSJSONSerialization isValidJSONObject:@[x]]) return x; return [x description]; }
+          static NSDictionary *Desc(id x){
+            NSMutableDictionary*d=[@{@"class":NSStringFromClass([x class])?:@""} mutableCopy];
+            for(NSString*k in @[@"featureName",@"requestKey",@"label",@"identifier"]){ @try{ id v=[x valueForKey:k]; if(v)d[k]=[v description]; }@catch(id e){} }
+            SEL ps=NSSelectorFromString(@"pixelBuffer");
+            if([x respondsToSelector:ps]){ CVPixelBufferRef(*f)(id,SEL)=(void*)objc_msgSend; CVPixelBufferRef p=f(x,ps); if(p){ d[@"width"]=@(CVPixelBufferGetWidth(p)); d[@"height"]=@(CVPixelBufferGetHeight(p)); d[@"pixelFormat"]=@(CVPixelBufferGetPixelFormatType(p)); } }
+            return d;
+          }
+          static NSDictionary *RunReq(NSString*n, CGImageRef im){
+            NSMutableDictionary*r=[@{@"request":n} mutableCopy]; Class c=NSClassFromString(n); r[@"classPresent"]=@(c!=Nil); if(!c)return r;
+            id q=[[c alloc]init]; if(!q){r[@"initNil"]=@YES;return r;}
+            @try{ NSError*e=nil; VNImageRequestHandler*h=[[VNImageRequestHandler alloc]initWithCGImage:im options:@{}]; BOOL ok=[h performRequests:@[q] error:&e]; r[@"ok"]=@(ok); if(e)r[@"error"]=e.description; NSArray*z=[q valueForKey:@"results"]?:@[]; NSMutableArray*a=[NSMutableArray array]; for(id x in z)[a addObject:Desc(x)]; r[@"resultCount"]=@(z.count); r[@"results"]=a; }
+            @catch(NSException*e){ r[@"exception"]=@{@"name":e.name?:@"",@"reason":e.reason?:@""}; }
+            return r;
+          }
+          int main(int ac,const char**av){ @autoreleasepool{
+            if(ac!=2)return 64;
+            NSURL*u=[NSURL fileURLWithPath:[NSString stringWithUTF8String:av[1]]]; CGImageSourceRef s=CGImageSourceCreateWithURL((__bridge CFURLRef)u,NULL); CGImageRef im=s?CGImageSourceCreateImageAtIndex(s,0,NULL):NULL; if(!im)return 3;
+            NSMutableDictionary*out=[NSMutableDictionary dictionary];
+            NSMutableDictionary*maps=[NSMutableDictionary dictionary];
+            for(NSString*n in @[@"VNE5RTSemanticSegmentationMultiGeneratorV4",@"VNE5RTSemanticSegmentationMultiGeneratorV7"]){
+              Class c=NSClassFromString(n); if(!c)continue; NSMutableDictionary*d=[NSMutableDictionary dictionary];
+              for(NSString*k in @[@"outputMaskBlobNames",@"outputMaskBlobNameToFeatureName",@"outputMaskBlobNameToRequestKey",@"supportedOutputMaskBlobNames",@"supportedHumanAttributesNames"]){ id v=Obj(c,k); if(v)d[k]=JSON(v); }
+              maps[n]=d;
+            }
+            out[@"modelMaps"]=maps;
+            NSArray*reqs=@[
+              @"VNGenerateHumanAttributesSegmentationRequest",
+              @"VNGenerateGlassesSegmentationRequest",
+              @"VNGeneratePersonSegmentationRequest",
+              @"VNGenerateSkySegmentationRequest",
+              @"VNGenerateFaceSegmentsRequest",
+              @"VNGeneratePersonInstanceMaskRequest",
+              @"VNGenerateForegroundInstanceMaskRequest",
+              @"VNGenerateOpticalFlowRequest"
+            ];
+            NSMutableArray*rows=[NSMutableArray array]; for(NSString*n in reqs)[rows addObject:RunReq(n,im)]; out[@"requests"]=rows;
+
+            // Enumerate likely semantic classes/selectors containing anatomy role names.
+            NSArray*needles=@[@"Nose",@"Lip",@"Eyebrow",@"Tattoo",@"Hand",@"Ear",@"Skin",@"Face",@"Teeth",@"Glasses",@"Person",@"Semantic"];
+            NSMutableArray*classes=[NSMutableArray array]; int count=objc_getClassList(NULL,0); Class*buf=(Class*)calloc(count,sizeof(Class)); objc_getClassList(buf,count);
+            for(int i=0;i<count;i++){
+              NSString*n=NSStringFromClass(buf[i]); if(![n hasPrefix:@"VN"]&&![n hasPrefix:@"FS"]&&![n hasPrefix:@"PI"])continue;
+              BOOL hit=NO; for(NSString*x in needles) if([n rangeOfString:x options:NSCaseInsensitiveSearch].location!=NSNotFound){hit=YES;break;} if(!hit)continue;
+              unsigned mc=0; Method*m=class_copyMethodList(object_getClass(buf[i]),&mc); NSMutableArray*cms=[NSMutableArray array]; for(unsigned j=0;j<mc;j++){NSString*sn=NSStringFromSelector(method_getName(m[j])); for(NSString*x in needles)if([sn rangeOfString:x options:NSCaseInsensitiveSearch].location!=NSNotFound){[cms addObject:sn];break;}} free(m);
+              [classes addObject:@{@"class":n,@"classMethods":cms}];
+            }
+            free(buf); out[@"semanticClasses"]=classes;
+            NSData*j=[NSJSONSerialization dataWithJSONObject:out options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:nil]; fwrite(j.bytes,1,j.length,stdout); fputc('\n',stdout);
+            CGImageRelease(im); CFRelease(s); return 0;
+          }}
+          OBJC
+          xcrun clang -fobjc-arc -framework Foundation -framework Vision -framework ImageIO -framework CoreVideo -framework CoreGraphics "$RUNNER_TEMP/probe.m" -o "$RUNNER_TEMP/probe"
+          "$RUNNER_TEMP/probe" "$RUNNER_TEMP/p.heic" | tee artifacts/semantic12/probe.json
+
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-semantic-12role-probe-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/semantic12/
