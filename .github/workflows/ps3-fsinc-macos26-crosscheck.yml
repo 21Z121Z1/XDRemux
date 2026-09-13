@@ -1,0 +1,43 @@
+name: PS3 FSINC macOS 26 crosscheck
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-macos26-crosscheck.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Record FSINC environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/macos26/input artifacts/macos26/masks artifacts/macos26/probe
+          sw_vers | tee artifacts/macos26/probe/os.txt
+          find /System/Library/PrivateFrameworks/ANSTKit.framework -maxdepth 6 \( -iname '*fsinc*' -o -iname '*semantic*' \) -print 2>/dev/null | sort | tee artifacts/macos26/probe/assets.txt || true
+          git fetch --no-tags --depth=1 origin f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          git show f89eea8c1714eb5d1e3da1ff8ba83e61655181d5:fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic > artifacts/macos26/input/p.heic
+      - name: Build and execute native FSINC probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang -fobjc-arc -framework Foundation -framework CoreImage -framework CoreVideo -framework CoreGraphics -framework ImageIO scripts/research/fsinc_execute.m -o artifacts/macos26/probe/fsinc_execute
+          set +e
+          artifacts/macos26/probe/fsinc_execute artifacts/macos26/input/p.heic artifacts/macos26/masks 2>&1 | tee artifacts/macos26/probe/run.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          find artifacts/macos26/masks -type f -print | sort | tee artifacts/macos26/probe/generated.txt
+          exit "$rc"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-fsinc-macos26-crosscheck-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/macos26/
