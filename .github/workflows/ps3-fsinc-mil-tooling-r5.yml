@@ -1,0 +1,57 @@
+name: PS3 FSINC MIL tooling r5
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-mil-tooling-r5.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Inspect MIL operator surface and Xcode tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r5
+          M=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/model.mil
+          python3 - <<'PY' | tee artifacts/r5/operators.txt
+          import re
+          from collections import Counter
+          p='/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/model.mil'
+          s=open(p).read().splitlines()
+          c=Counter()
+          for line in s:
+              m=re.search(r'=\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(',line)
+              if m:c[m.group(1)]+=1
+          for k,v in sorted(c.items()): print(f'{k}\t{v}')
+          print('TOTAL_LINES',len(s))
+          for needle in ['constexpr_sparse_blockwise_shift_scale','cast(']:
+              print('\nCONTEXT',needle)
+              hits=[i for i,x in enumerate(s) if needle in x][:4]
+              for i in hits:
+                  for j in range(max(0,i-3),min(len(s),i+5)): print(f'{j+1}: {s[j]}')
+                  print('---')
+          PY
+          {
+            xcrun --find coremlcompiler || true
+            xcrun coremlcompiler 2>&1 | head -100 || true
+            xcrun --find coremlc || true
+            xcrun coremlc 2>&1 | head -100 || true
+            python3 - <<'PY'
+          try:
+            import coremltools as ct
+            print('coremltools',ct.__version__)
+          except Exception as e: print('coremltools unavailable',repr(e))
+          PY
+          } | tee artifacts/r5/tooling.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-fsinc-mil-tooling-r5-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r5/
