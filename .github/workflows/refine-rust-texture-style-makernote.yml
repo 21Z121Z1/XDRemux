@@ -1,0 +1,121 @@
+name: Refine Rust Texture Style MakerNote
+
+on:
+  push:
+    branches: [feat/rust-texture-style-support]
+    paths: [.github/workflows/refine-rust-texture-style-makernote.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-publish-test-artifact:
+    runs-on: macos-26
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/rust-texture-style-support
+          fetch-depth: 0
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Apply MakerNote refinement
+        shell: bash
+        run: |
+          python3 scripts/research/refine_texture_style_makernote.py
+          cargo check -p xdremux-heif
+          cargo fmt --all
+          git diff --check
+
+      - name: Pre-commit targeted verification
+        shell: bash
+        run: |
+          cargo test --locked -p xdremux-engine -p xdremux-heif
+          cargo clippy --locked -p xdremux-engine -p xdremux-heif -p xdremux-runtime --all-targets -- -D warnings
+          bash scripts/check_rust_style_consumer.sh
+
+      - name: Commit production-only refinement
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/refine-rust-texture-style-makernote.yml
+          git rm scripts/research/refine_texture_style_makernote.py
+          git add Cargo.lock crates/xdremux-heif/Cargo.toml crates/xdremux-heif/src/texture_styles.rs
+          git diff --cached --check
+          git commit -m "fix: preserve native Texture Style MakerNote shape"
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Run repository completion gate on exact HEAD
+        shell: bash
+        run: |
+          cat > /tmp/texture-style-gate.json <<'JSON'
+          {
+            "schema_version": 1,
+            "scope": "Rust CLI iOS 27 Texture Style carrier and Apple MakerNote contract",
+            "checks": [
+              {
+                "name": "texture-style-regression",
+                "kind": "regression",
+                "command": ["cargo", "test", "--locked", "-p", "xdremux-engine", "-p", "xdremux-heif"],
+                "timeout_seconds": 300
+              },
+              {
+                "name": "texture-style-clippy",
+                "kind": "static",
+                "command": ["cargo", "clippy", "--locked", "-p", "xdremux-engine", "-p", "xdremux-heif", "-p", "xdremux-runtime", "--all-targets", "--", "-D", "warnings"],
+                "timeout_seconds": 300
+              },
+              {
+                "name": "real-proxdr-texture-style-product-path",
+                "kind": "functional",
+                "command": ["bash", "scripts/check_rust_style_consumer.sh"],
+                "timeout_seconds": 600
+              }
+            ]
+          }
+          JSON
+          python3 scripts/agent_completion_gate.py run --base origin/main --plan /tmp/texture-style-gate.json
+          receipt=".codex/verification-receipts/$(git rev-parse HEAD).json"
+          python3 scripts/agent_completion_gate.py verify "$receipt"
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Push verified branch HEAD
+        shell: bash
+        run: git push origin HEAD:feat/rust-texture-style-support
+
+      - name: Build real HEIC for iOS device validation
+        shell: bash
+        run: |
+          swift build --product xdremux-apple-adapter
+          cargo build --locked -p xdremux-cli
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          mkdir -p /tmp/texture-style-device-test
+          output=/tmp/texture-style-device-test/xdremux-rust-texture-style.heic
+          XDREMUX_APPLE_ADAPTER="$adapter" \
+            target/debug/xdremux convert \
+              --input fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic \
+              --output "$output" \
+              --apple-styles
+          target/debug/xdremux validate "$output"
+          shasum -a 256 "$output" > /tmp/texture-style-device-test/SHA256SUMS
+          printf 'branch=feat/rust-texture-style-support\ncommit=%s\nsource=fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic\nclaim=offline carrier verified; iOS Photos Texture Style UI requires device validation\n' "$(git rev-parse HEAD)" > /tmp/texture-style-device-test/MANIFEST.txt
+          cp ".codex/verification-receipts/$(git rev-parse HEAD).json" /tmp/texture-style-device-test/completion-gate-receipt.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rust-texture-style-device-test-${{ github.run_id }}
+          path: /tmp/texture-style-device-test
+          if-no-files-found: error
+          retention-days: 14
