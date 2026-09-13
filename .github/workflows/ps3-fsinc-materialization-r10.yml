@@ -1,0 +1,160 @@
+name: PS3 FSINC sparse materialization r10
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-materialization-r10.yml]
+permissions:
+  contents: read
+jobs:
+  materialize-oracle:
+    runs-on: xcode-27
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Install isolated CoreMLTools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r10
+          python3 -m venv .venv-r10
+          source .venv-r10/bin/activate
+          python -m pip install -U pip wheel setuptools
+          python -m pip install -U coremltools
+          python - <<'PY' | tee artifacts/r10/version.txt
+          import coremltools as ct,sys,platform
+          print('coremltools',ct.__version__)
+          print('python',sys.version)
+          print('platform',platform.platform())
+          PY
+      - name: Capture authoritative constexpr implementation and passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .venv-r10/bin/activate
+          python - <<'PY' > artifacts/r10/coremltools-constexpr-source.txt
+          import inspect
+          from coremltools.converters.mil.mil.ops.defs.iOS18.compression import (
+              constexpr_sparse_blockwise_shift_scale,
+              constexpr_sparse_to_dense,
+              constexpr_blockwise_shift_scale,
+          )
+          for c in [constexpr_sparse_to_dense,constexpr_blockwise_shift_scale,constexpr_sparse_blockwise_shift_scale]:
+              print('\n===== CLASS',c.__name__,'=====')
+              print(inspect.getsource(c))
+              if hasattr(c,'decompress'):
+                  print('\n===== DECOMPRESS',c.__name__,'=====')
+                  print(inspect.getsource(c.decompress))
+              if hasattr(c,'materialized_val_inference'):
+                  print('\n===== MATERIALIZED',c.__name__,'=====')
+                  print(inspect.getsource(c.materialized_val_inference))
+          PY
+          ROOT=$(.venv-r10/bin/python - <<'PY'
+          import coremltools,os
+          print(os.path.dirname(coremltools.__file__))
+          PY
+          )
+          grep -RniE 'materializ|decompress|constexpr_sparse_blockwise_shift_scale|constexpr_sparse_to_dense' "$ROOT/converters/mil" | head -4000 > artifacts/r10/pass-search.txt || true
+      - name: Prove sparse materialization identity against CoreMLTools oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .venv-r10/bin/activate
+          python - <<'PY' | tee artifacts/r10/oracle-validation.txt
+          import numpy as np, hashlib
+          from coremltools.converters.mil.mil.ops.defs.iOS18.compression import (
+              constexpr_sparse_blockwise_shift_scale as SBSS,
+              constexpr_sparse_to_dense as S2D,
+              constexpr_blockwise_shift_scale as BSS,
+          )
+          rng=np.random.default_rng(0x20190)
+          for dtype in [np.float16,np.float32]:
+              for shape,scale_shape in [((8,12),(2,3)),((4,6,8),(1,3,2)),((16,16),(4,1))]:
+                  mask=(rng.random(shape)>.68).astype(np.uint8)
+                  q=rng.integers(-8,8,size=shape,dtype=np.int8)
+                  nz=q[mask!=0].flatten()
+                  scale=(rng.random(scale_shape)*1.75+.01).astype(dtype)
+                  offset=rng.integers(-3,4,size=scale_shape,dtype=np.int8)
+                  out_mask,out_nz=SBSS.decompress(mask,nz,scale,offset)
+                  dense0=S2D.decompress(nz,mask)
+                  dense1=BSS.decompress(dense0,scale,offset)
+                  remat=S2D.decompress(out_nz,out_mask)
+                  same=np.array_equal(remat,dense1)
+                  maxerr=float(np.max(np.abs(remat.astype(np.float32)-dense1.astype(np.float32))))
+                  sha=hashlib.sha256(remat.tobytes()).hexdigest()
+                  print(dtype.__name__,shape,scale_shape,'same=',same,'maxerr=',maxerr,'sha256=',sha)
+                  assert same and maxerr==0.0
+          print('ORACLE_IDENTITY_OK')
+          PY
+      - name: Inventory actual FSINC sparse op syntax and blob references
+        shell: bash
+        run: |
+          set -euo pipefail
+          MODEL=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/model.mil
+          WEIGHTS=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/weights/weight.bin
+          [ -f "$WEIGHTS" ] || WEIGHTS=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/weight.bin
+          {
+            echo MODEL=$MODEL
+            echo WEIGHTS=$WEIGHTS
+            ls -lh "$MODEL" "$WEIGHTS" 2>&1 || true
+            shasum -a 256 "$MODEL" "$WEIGHTS" 2>/dev/null || true
+          } | tee artifacts/r10/model-files.txt
+          python3 - <<'PY' > artifacts/r10/actual-op-snippets.txt
+          from pathlib import Path
+          import re
+          p=Path('/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/model.mil')
+          lines=p.read_text(errors='ignore').splitlines()
+          hits=[i for i,x in enumerate(lines) if 'constexpr_sparse_blockwise_shift_scale' in x]
+          hits2=[i for i,x in enumerate(lines) if 'constexpr_sparse_to_dense' in x]
+          print('SBSS_COUNT',len(hits),'S2D_COUNT',len(hits2))
+          for kind,arr in [('SBSS',hits[:12]),('S2D',hits2[:12])]:
+              for k,i in enumerate(arr):
+                  print(f'\n===== {kind} #{k} line {i+1} =====')
+                  for j in range(max(0,i-10),min(len(lines),i+7)):
+                      print(f'{j+1:08d}: {lines[j]}')
+          print('\n===== BLOB-LIKE SYNTAX SAMPLE =====')
+          n=0
+          for i,x in enumerate(lines):
+              if re.search(r'blob|weight|offset\s*=|file',x,re.I):
+                  print(f'{i+1:08d}: {x}')
+                  n+=1
+                  if n>=200:break
+          PY
+      - name: Probe available MIL/blob readers without mutating model
+        shell: bash
+        run: |
+          set +e
+          source .venv-r10/bin/activate
+          python - <<'PY' > artifacts/r10/reader-probe.txt 2>&1
+          import coremltools,inspect,os,pkgutil
+          print('ct',coremltools.__version__)
+          names=[]
+          for m in pkgutil.walk_packages(coremltools.__path__,coremltools.__name__+'.'):
+              n=m.name.lower()
+              if any(k in n for k in ['milproto','milstorage','blob','compression']): names.append(m.name)
+          print('MODULES')
+          print('\n'.join(names))
+          try:
+              import coremltools.libmilstoragepython as m
+              print('libmilstoragepython',dir(m))
+              for n in dir(m):
+                  if 'Reader' in n or 'Writer' in n:
+                      c=getattr(m,n); print('\n',n,c)
+                      try: print(inspect.signature(c))
+                      except Exception as e: print('sig',e)
+          except Exception as e: print('storage import error',repr(e))
+          try:
+              from coremltools.converters.mil.frontend import milproto
+              print('milproto',dir(milproto))
+              print('load',inspect.signature(milproto.load))
+              print(inspect.getsource(milproto.load)[:12000])
+          except Exception as e: print('milproto error',repr(e))
+          PY
+          exit 0
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-fsinc-materialization-r10-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r10/
