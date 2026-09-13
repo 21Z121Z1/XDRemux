@@ -1,0 +1,79 @@
+name: PS3 FSINC MIL namespace r8
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-mil-namespace-r8.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Prepare namespace variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r8
+          SRC=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc
+          for v in raw ios18cast ios17mix ios18explicit17cast; do mkdir -p "$RUNNER_TEMP/$v"; cp -R "$SRC"/. "$RUNNER_TEMP/$v/"; done
+          python3 - <<'PY'
+          import os,re
+          from pathlib import Path
+          rt=Path(os.environ['RUNNER_TEMP'])
+          def rw(name, fn):
+            p=rt/name/'model.mil'; s=p.read_text(); s=fn(s); p.write_text(s)
+          # Test whether the textual grammar accepts explicit operator namespaces.
+          rw('ios18cast', lambda s: re.sub(r'(?<![A-Za-z0-9_.])cast\(', 'ios18.cast(', s))
+          rw('ios18explicit17cast', lambda s: re.sub(r'(?<![A-Za-z0-9_.])cast\(', 'ios17.cast(', s))
+          def mix(s):
+            s=s.replace('<ios18>','<ios17>')
+            s=re.sub(r'(?<![A-Za-z0-9_.])constexpr_sparse_blockwise_shift_scale\(', 'ios18.constexpr_sparse_blockwise_shift_scale(', s)
+            s=re.sub(r'(?<![A-Za-z0-9_.])constexpr_sparse_to_dense\(', 'ios18.constexpr_sparse_to_dense(', s)
+            return s
+          rw('ios17mix',mix)
+          for n in ['raw','ios18cast','ios17mix','ios18explicit17cast']:
+            s=(rt/n/'model.mil').read_text()
+            print(n,'ios18',s.count('<ios18>'),'ios17',s.count('<ios17>'),'ios18.cast',s.count('ios18.cast('),'ios17.cast',s.count('ios17.cast('),'ios18.sparse',s.count('ios18.constexpr_sparse_blockwise_shift_scale('))
+          PY
+      - name: Build E5 loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/load.m" <<'OBJC'
+          #import <Foundation/Foundation.h>
+          #import <objc/message.h>
+          #import <dlfcn.h>
+          int main(int ac,const char**av){@autoreleasepool{
+            if(ac!=2)return 64; void*h=dlopen("/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/ANSTKit",RTLD_NOW|RTLD_GLOBAL); if(!h)return 2;
+            NSURL*u=[NSURL fileURLWithPath:[NSString stringWithUTF8String:av[1]]]; Class c=NSClassFromString(@"ANSTE5MLNetwork");
+            unsigned long long ds[]={1,3,5,7};
+            for(int i=0;i<4;i++){@try{NSError*e=nil;id a=((id(*)(id,SEL))objc_msgSend)((id)c,sel_registerName("alloc"));id n=((id(*)(id,SEL,id,id,unsigned long long))objc_msgSend)(a,sel_registerName("initWithMILPath:e5FunctionName:computeDevice:"),u,@"resolution_768_576",ds[i]);BOOL ok=n&&((BOOL(*)(id,SEL,NSError**))objc_msgSend)(n,sel_registerName("loadNetworkWithError:"),&e);printf("device=%llu ok=%d err=%s\n",ds[i],ok,e?e.description.UTF8String:"nil");if(ok)return 0;}@catch(NSException*x){printf("device=%llu exception=%s: %s\n",ds[i],x.name.UTF8String,x.reason.UTF8String);}}
+            return 10;
+          }}
+          OBJC
+          clang -fobjc-arc -framework Foundation "$RUNNER_TEMP/load.m" -o "$RUNNER_TEMP/load"
+      - name: Test variants
+        shell: bash
+        run: |
+          set +e
+          winner=''
+          for v in raw ios18cast ios18explicit17cast ios17mix; do
+            echo "=== $v ===" | tee "artifacts/r8/$v.txt"
+            "$RUNNER_TEMP/load" "$RUNNER_TEMP/$v/model.mil" 2>&1 | tee -a "artifacts/r8/$v.txt"
+            rc=${PIPESTATUS[0]}
+            echo "rc=$rc" | tee -a "artifacts/r8/$v.txt"
+            if [ "$rc" -eq 0 ]; then winner="$v"; break; fi
+          done
+          set -e
+          echo "winner=$winner" | tee artifacts/r8/status.txt
+          test -n "$winner"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-fsinc-mil-namespace-r8-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r8/
