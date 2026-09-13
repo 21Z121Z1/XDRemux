@@ -1,0 +1,87 @@
+name: PS3 FSINC wrapper chain r9
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths:
+      - .github/workflows/ps3-fsinc-wrapper-chain-r9.yml
+      - scripts/research/fsinc_wrapper_chain.m
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Record exact runtime and model inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r9
+          { sw_vers; xcodebuild -version; uname -a; } | tee artifacts/r9/runtime.txt
+          FS=/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A
+          {
+            echo '=== FSINC / ANST model functions ==='
+            for m in "$FS"/Resources/Models/fsinc_v2d4.mlmodelc/model.mil "$FS"/Resources/Models/anst_v5d4.mlmodelc/model.mil; do
+              echo "MODEL $m"
+              [ -f "$m" ] || { echo MISSING; continue; }
+              grep -nE '^\s*func |<ios1[78]>|constexpr_sparse_blockwise_shift_scale|constexpr_sparse_to_dense' "$m" | head -300 || true
+            done
+            echo '=== ANSTKit compiler / execution / compatibility strings ==='
+            strings "$FS/ANSTKit" | grep -Ei 'deployment|opset|compiler|compile|compat|execution.?stream|E5|MIL|asset|descriptor|legacy|target' | head -3000 || true
+            echo '=== relevant ObjC symbols ==='
+            nm -m "$FS/ANSTKit" 2>/dev/null | grep -Ei 'ANST.*(Fsinc|E5|V5Dot4)|E5.*(Network|Execution|Compiler|Asset)' | head -3000 || true
+          } | tee artifacts/r9/static-surface.txt
+      - name: Build runtime object-graph probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang -g -O0 -fobjc-arc -framework Foundation scripts/research/fsinc_wrapper_chain.m -o artifacts/r9/fsinc_wrapper_chain
+      - name: Run high-level prepare and dump ivars
+        shell: bash
+        run: |
+          set +e
+          ./artifacts/r9/fsinc_wrapper_chain > artifacts/r9/wrapper-run.txt 2>&1
+          rc=$?
+          echo "$rc" > artifacts/r9/wrapper-exit.txt
+          tail -400 artifacts/r9/wrapper-run.txt
+          exit 0
+      - name: LLDB trace E5 calls reached from prepareWithError
+        shell: bash
+        run: |
+          set +e
+          cat > artifacts/r9/trace.lldb <<'LLDB'
+          settings set target.env-vars NSUnbufferedIO=YES
+          breakpoint set -r 'ANSTE5.*(init|prepare|load|compile|execution|stream|MIL|asset|descriptor)'
+          breakpoint set -r 'ANSTFsinc.*(prepare|loadE5|ExecutionStream|Network)'
+          breakpoint command add 1 -s command -o 'script print("=== E5 BREAK ===")' -o 'bt 18' -o 'register read x0 x1 x2 x3 x4 x5 x6 x7' -o 'continue'
+          breakpoint command add 2 -s command -o 'script print("=== FSINC BREAK ===")' -o 'bt 18' -o 'register read x0 x1 x2 x3 x4 x5 x6 x7' -o 'continue'
+          run
+          quit
+          LLDB
+          lldb --batch -s artifacts/r9/trace.lldb -- artifacts/r9/fsinc_wrapper_chain > artifacts/r9/lldb.txt 2>&1
+          rc=$?
+          echo "$rc" > artifacts/r9/lldb-exit.txt
+          grep -E -A25 -B5 'E5 BREAK|FSINC BREAK|stop reason|ANSTE5|ANSTFsinc' artifacts/r9/lldb.txt | head -4000 || true
+          exit 0
+      - name: Summarize hidden setup evidence
+        shell: bash
+        run: |
+          python3 - <<'PY' | tee artifacts/r9/summary.txt
+          from pathlib import Path
+          p=Path('artifacts/r9')
+          txt='\n'.join(x.read_text(errors='ignore') for x in [p/'wrapper-run.txt',p/'lldb.txt',p/'static-surface.txt'] if x.exists())
+          needles=['deployment','opset','compat','compiler','executionstream','execution stream','asset','descriptor','ANSTE5MLNetwork','loadE5']
+          for n in needles:
+              hits=[ln for ln in txt.splitlines() if n.lower() in ln.lower()]
+              print(f'## {n} hits={len(hits)}')
+              for ln in hits[:80]: print(ln[:1200])
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-fsinc-wrapper-chain-r9-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r9/
