@@ -1,0 +1,71 @@
+name: PS3 FSINC coremltools r7
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-coremltools-r7.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Install and inspect coremltools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r7
+          python3 -m pip install --user --upgrade coremltools 2>&1 | tee artifacts/r7/pip.txt
+          python3 - <<'PY' | tee artifacts/r7/introspect.txt
+          import coremltools as ct, inspect, os, pkgutil
+          print('version',ct.__version__)
+          root=os.path.dirname(inspect.getfile(ct))
+          print('root',root)
+          needles=['constexpr_sparse_blockwise_shift_scale','constexpr_sparse_to_dense','blockwise_shift_scale','ios18','cast']
+          for dp,dn,fn in os.walk(root):
+            for f in fn:
+              if not f.endswith('.py'): continue
+              p=os.path.join(dp,f)
+              try:s=open(p,errors='ignore').read()
+              except:continue
+              hits=[n for n in needles if n in s]
+              if hits:
+                print('\nFILE',p,'HITS',hits)
+                lines=s.splitlines()
+                for n in hits:
+                  for i,x in enumerate(lines):
+                    if n in x:
+                      print('NEEDLE',n,'LINE',i+1)
+                      for j in range(max(0,i-6),min(len(lines),i+30)): print(f'{j+1}: {lines[j]}')
+                      break
+          PY
+      - name: Test loading raw system MIL via coremltools internals
+        shell: bash
+        run: |
+          set +e
+          python3 - <<'PY' 2>&1 | tee artifacts/r7/load-attempt.txt
+          import coremltools as ct, inspect, pkgutil
+          p='/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc/model.mil'
+          candidates=[]
+          for name in dir(ct):
+            if 'load' in name.lower(): candidates.append(('ct.'+name,getattr(ct,name)))
+          print('top candidates',[x[0] for x in candidates])
+          try:
+            from coremltools.converters.mil.frontend.milproto import load as milproto_load
+            print('milproto_load',milproto_load)
+          except Exception as e: print('no milproto load',repr(e))
+          try:
+            import coremltools.converters.mil as mil
+            print('mil attrs',[x for x in dir(mil) if 'load' in x.lower() or 'parse' in x.lower()])
+          except Exception as e: print('mil inspect fail',repr(e))
+          PY
+          set -e
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-fsinc-coremltools-r7-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r7/
