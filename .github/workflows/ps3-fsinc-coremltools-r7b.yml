@@ -1,0 +1,49 @@
+name: PS3 FSINC coremltools r7b
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-coremltools-r7b.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+      - name: Install coremltools in isolated venv and inspect sparse ops
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/r7b
+          python3 -m venv "$RUNNER_TEMP/venv"
+          source "$RUNNER_TEMP/venv/bin/activate"
+          python -m pip install -U pip coremltools 2>&1 | tee artifacts/r7b/pip.txt
+          python - <<'PY' | tee artifacts/r7b/introspect.txt
+          import coremltools as ct, inspect, os
+          print('version',ct.__version__)
+          root=os.path.dirname(inspect.getfile(ct)); print('root',root)
+          needles=['constexpr_sparse_blockwise_shift_scale','constexpr_sparse_to_dense','blockwise_shift_scale']
+          for dp,dn,fn in os.walk(root):
+            for f in fn:
+              if not f.endswith('.py'): continue
+              p=os.path.join(dp,f)
+              try:s=open(p,errors='ignore').read()
+              except:continue
+              for n in needles:
+                if n not in s: continue
+                print('\nFILE',p,'NEEDLE',n)
+                lines=s.splitlines()
+                for i,x in enumerate(lines):
+                  if n in x:
+                    for j in range(max(0,i-20),min(len(lines),i+100)): print(f'{j+1}: {lines[j]}')
+                    break
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ps3-fsinc-coremltools-r7b-${{ github.sha }}
+          retention-days: 14
+          path: artifacts/r7b/
