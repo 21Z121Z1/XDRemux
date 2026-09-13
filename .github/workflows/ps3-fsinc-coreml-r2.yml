@@ -1,0 +1,121 @@
+name: PS3 FSINC CoreML 12-role r2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ps3-semantic-12role-runner]
+    paths: [.github/workflows/ps3-fsinc-coreml-r2.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  coreml:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with: {fetch-depth: 1}
+
+      - name: Fetch portrait fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/fsinc-coreml/masks
+          git fetch --no-tags --depth=1 origin f89eea8c1714eb5d1e3da1ff8ba83e61655181d5
+          git show f89eea8c1714eb5d1e3da1ff8ba83e61655181d5:fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic > "$RUNNER_TEMP/p.heic"
+          find /System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc -maxdepth 2 -type f -print | sort | tee artifacts/fsinc-coreml/model-files.txt
+
+      - name: Try public CoreML loader and prediction
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/fsinc.swift" <<'SWIFT'
+          import Foundation
+          import CoreML
+          import CoreImage
+          import CoreVideo
+          import ImageIO
+
+          let modelURL = URL(fileURLWithPath: "/System/Library/PrivateFrameworks/ANSTKit.framework/Versions/A/Resources/Models/fsinc_v2d4.mlmodelc")
+          let imageURL = URL(fileURLWithPath: CommandLine.arguments[1])
+          let outDir = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
+          let fm = FileManager.default
+          try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
+
+          func dumpModel(_ model: MLModel, label: String) throws {
+              print("MODEL_OK \(label)")
+              print("DESCRIPTION \(model.modelDescription)")
+              print("INPUTS \(model.modelDescription.inputDescriptionsByName)")
+              print("OUTPUTS \(model.modelDescription.outputDescriptionsByName)")
+              let src = CGImageSourceCreateWithURL(imageURL as CFURL, nil)!
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil)!
+              guard let input = model.modelDescription.inputDescriptionsByName.first else { print("NO_INPUT"); return }
+              let name = input.key
+              let desc = input.value
+              guard let c = desc.imageConstraint else { print("INPUT_NOT_IMAGE \(desc)"); return }
+              let w = c.pixelsWide
+              let h = c.pixelsHigh
+              var pb: CVPixelBuffer?
+              let attrs: [CFString: Any] = [kCVPixelBufferCGImageCompatibilityKey: true, kCVPixelBufferCGBitmapContextCompatibilityKey: true]
+              let st = CVPixelBufferCreate(kCFAllocatorDefault, w, h, kCVPixelFormatType_32BGRA, attrs as CFDictionary, &pb)
+              guard st == kCVReturnSuccess, let pix = pb else { print("PB_FAIL \(st)"); return }
+              let ci = CIImage(cgImage: cg)
+              let sx = CGFloat(w) / ci.extent.width
+              let sy = CGFloat(h) / ci.extent.height
+              let scaled = ci.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
+              let ctx = CIContext(options: [.useSoftwareRenderer: false])
+              ctx.render(scaled, to: pix, bounds: CGRect(x: 0, y: 0, width: w, height: h), colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+              let provider = try MLDictionaryFeatureProvider(dictionary: [name: MLFeatureValue(pixelBuffer: pix)])
+              let pred = try model.prediction(from: provider)
+              print("PREDICTION_FEATURES \(pred.featureNames.sorted())")
+              for n in pred.featureNames.sorted() {
+                  let v = pred.featureValue(for: n)!
+                  print("OUTPUT \(n) type=\(v.type.rawValue) value=\(v)")
+                  if v.type == .image {
+                      let opb = v.imageBufferValue!
+                      let out = outDir.appendingPathComponent(n.replacingOccurrences(of: "/", with: "_") + ".png")
+                      let oci = CIImage(cvPixelBuffer: opb)
+                      if let data = ctx.pngRepresentation(of: oci, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, options: [:]) {
+                          try data.write(to: out)
+                      }
+                  } else if v.type == .multiArray, let a = v.multiArrayValue {
+                      let meta = outDir.appendingPathComponent(n.replacingOccurrences(of: "/", with: "_") + ".txt")
+                      try "shape=\(a.shape) dtype=\(a.dataType.rawValue) strides=\(a.strides)\n".write(to: meta, atomically: true, encoding: .utf8)
+                  }
+              }
+          }
+
+          var attempts: [[String: Any]] = []
+          for function in [nil, "resolution_256_256", "resolution_576_768", "resolution_768_576"] as [String?] {
+              let cfg = MLModelConfiguration()
+              cfg.computeUnits = .all
+              if let f = function {
+                  if cfg.responds(to: NSSelectorFromString("setFunctionName:")) { cfg.setValue(f, forKey: "functionName") }
+              }
+              do {
+                  let m = try MLModel(contentsOf: modelURL, configuration: cfg)
+                  try dumpModel(m, label: function ?? "default")
+                  exit(0)
+              } catch {
+                  print("MODEL_FAIL function=\(function ?? "default") error=\(error)")
+              }
+          }
+          exit(10)
+          SWIFT
+          xcrun swiftc "$RUNNER_TEMP/fsinc.swift" -framework CoreML -framework CoreImage -framework CoreVideo -framework ImageIO -o "$RUNNER_TEMP/fsinc"
+          set +e
+          "$RUNNER_TEMP/fsinc" "$RUNNER_TEMP/p.heic" artifacts/fsinc-coreml/masks 2>&1 | tee artifacts/fsinc-coreml/run.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          find artifacts/fsinc-coreml -maxdepth 2 -type f -print | sort | tee artifacts/fsinc-coreml/generated.txt
+          exit "$rc"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps3-fsinc-coreml-r2-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: artifacts/fsinc-coreml/
