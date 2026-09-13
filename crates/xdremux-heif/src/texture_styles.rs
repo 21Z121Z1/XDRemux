@@ -2,8 +2,8 @@ use xdremux_format::exif::read_item_payload;
 use xdremux_format::isobmff::{
     make_box, make_full_box, make_iinf_box, make_iloc_box, make_ipma_box, make_iref_box,
     parse_boxes, parse_meta_box, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
-    IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta, PropertyInfo, EXIF, FTYP, IDAT, IINF,
-    ILOC, IPCO, IPMA, IPRP, IREF, MDAT, META, PITM,
+    IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta, PropertyInfo, EXIF, FTYP, IDAT, IINF, ILOC,
+    IPCO, IPMA, IPRP, IREF, MDAT, META,
 };
 use xdremux_format::{exif_makernote, heif_exif_tiff, replace_exif_makernote, FourCC};
 
@@ -15,9 +15,6 @@ const MIME: FourCC = FourCC::new(*b"mime");
 const AUXC: FourCC = FourCC::new(*b"auxC");
 const AUXL: FourCC = FourCC::new(*b"auxl");
 const CDSC: FourCC = FourCC::new(*b"cdsc");
-const HDLR: FourCC = FourCC::new(*b"hdlr");
-const DINF: FourCC = FourCC::new(*b"dinf");
-const GRPL: FourCC = FourCC::new(*b"grpl");
 const TMAP: FourCC = FourCC::new(*b"tmap");
 
 const STYLE_METADATA_URI: &[u8] = b"tag:apple.com,2023:photo:metadata:styles";
@@ -77,7 +74,7 @@ fn decode_hex(value: &str, context: &str) -> Result<Vec<u8>> {
         return Err(invalid(format!("{context} hex length is odd")));
     }
     let mut output = Vec::with_capacity(value.len() / 2);
-    for pair in value.as_bytes().chunks_exact(2) {
+    for pair in value.as_bytes().as_chunks::<2>().0 {
         let digit = |byte: u8| -> Result<u8> {
             match byte {
                 b'0'..=b'9' => Ok(byte - b'0'),
@@ -94,7 +91,9 @@ fn decode_hex(value: &str, context: &str) -> Result<Vec<u8>> {
 fn texture_metadata_bplist() -> Result<Vec<u8>> {
     let payload = decode_hex(TEXTURE_METADATA_BPLIST_HEX, "Texture Style metadata")?;
     if payload.len() != 216 || !payload.starts_with(b"bplist00") {
-        return Err(invalid("Texture Style metadata contract failed integrity validation"));
+        return Err(invalid(
+            "Texture Style metadata contract failed integrity validation",
+        ));
     }
     Ok(payload)
 }
@@ -102,7 +101,9 @@ fn texture_metadata_bplist() -> Result<Vec<u8>> {
 fn texture_tag84_bplist() -> Result<Vec<u8>> {
     let payload = decode_hex(TEXTURE_TAG84_BPLIST_HEX, "Texture Style MakerNote tag84")?;
     if payload.len() != 133 || !payload.starts_with(b"bplist00") {
-        return Err(invalid("Texture Style tag84 contract failed integrity validation"));
+        return Err(invalid(
+            "Texture Style tag84 contract failed integrity validation",
+        ));
     }
     Ok(payload)
 }
@@ -252,7 +253,12 @@ fn make_mime_infe(item_id: u32) -> Result<Vec<u8>> {
     Ok(make_full_box(FourCC::new(*b"infe"), version, 1, &payload)?)
 }
 
-fn clone_infe_with_id(data: &[u8], meta: &ParsedMeta, source_id: u32, new_id: u32) -> Result<Vec<u8>> {
+fn clone_infe_with_id(
+    data: &[u8],
+    meta: &ParsedMeta,
+    source_id: u32,
+    new_id: u32,
+) -> Result<Vec<u8>> {
     let item = meta
         .iinf
         .entries
@@ -264,7 +270,9 @@ fn clone_infe_with_id(data: &[u8], meta: &ParsedMeta, source_id: u32, new_id: u3
         .ok_or_else(|| invalid("Texture Style semantic source infe is outside input"))?
         .to_vec();
     if raw.len() < 14 || raw.get(4..8) != Some(b"infe".as_slice()) {
-        return Err(invalid("Texture Style semantic source infe has unexpected layout"));
+        return Err(invalid(
+            "Texture Style semantic source infe has unexpected layout",
+        ));
     }
     match raw[8] {
         2 => {
@@ -274,7 +282,9 @@ fn clone_infe_with_id(data: &[u8], meta: &ParsedMeta, source_id: u32, new_id: u3
         }
         3 => {
             if raw.len() < 16 {
-                return Err(invalid("Texture Style semantic source infe v3 is truncated"));
+                return Err(invalid(
+                    "Texture Style semantic source infe v3 is truncated",
+                ));
             }
             raw[12..16].copy_from_slice(&new_id.to_be_bytes());
         }
@@ -343,26 +353,34 @@ fn find_skin_alias_source(data: &[u8], meta: &ParsedMeta) -> Result<(u32, u32, u
     let image_id = match image_ids.as_slice() {
         [only] => *only,
         [] => return Err(invalid("Texture Style skin property has no hvc1 owner")),
-        _ => return Err(invalid("Texture Style skin property has multiple hvc1 owners")),
+        _ => {
+            return Err(invalid(
+                "Texture Style skin property has multiple hvc1 owners",
+            ))
+        }
     };
-    let descriptor_ids = meta
-        .iref
-        .as_ref()
-        .into_iter()
-        .flat_map(|iref| iref.entries.iter())
-        .filter(|entry| {
-            entry.kind == CDSC
-                && entry.to_item_ids == vec![image_id]
-                && meta.iinf.entries.iter().any(|item| {
-                    item.item_id == entry.from_item_id && item.item_type == Some(MIME)
-                })
-        })
-        .map(|entry| entry.from_item_id)
-        .collect::<Vec<_>>();
+    let descriptor_ids =
+        meta.iref
+            .as_ref()
+            .into_iter()
+            .flat_map(|iref| iref.entries.iter())
+            .filter(|entry| {
+                entry.kind == CDSC
+                    && entry.to_item_ids == vec![image_id]
+                    && meta.iinf.entries.iter().any(|item| {
+                        item.item_id == entry.from_item_id && item.item_type == Some(MIME)
+                    })
+            })
+            .map(|entry| entry.from_item_id)
+            .collect::<Vec<_>>();
     let descriptor_id = match descriptor_ids.as_slice() {
         [only] => *only,
         [] => return Err(invalid("Texture Style skin matte has no MIME descriptor")),
-        _ => return Err(invalid("Texture Style skin matte has multiple MIME descriptors")),
+        _ => {
+            return Err(invalid(
+                "Texture Style skin matte has multiple MIME descriptors",
+            ))
+        }
     };
     Ok((image_id, descriptor_id, skin_property_index))
 }
@@ -387,7 +405,11 @@ fn build_iinf(
             );
         }
     }
-    entries.push(make_uri_infe(texture_id, b"metadata", TEXTURE_METADATA_URI)?);
+    entries.push(make_uri_infe(
+        texture_id,
+        b"metadata",
+        TEXTURE_METADATA_URI,
+    )?);
     for alias in aliases {
         entries.push(clone_infe_with_id(data, meta, source_skin_id, alias.image)?);
         entries.push(make_mime_infe(alias.descriptor)?);
@@ -689,7 +711,11 @@ fn build_locations(
             )
             .ok_or_else(|| invalid("Texture Style Exif offset overflows"))?
     };
-    entries.push(direct_location(style_id, style_offset, style_payload.len())?);
+    entries.push(direct_location(
+        style_id,
+        style_offset,
+        style_payload.len(),
+    )?);
     entries.push(direct_location(
         texture_id,
         texture_offset,
@@ -742,19 +768,11 @@ fn build_meta(
         .get(graph.meta_header.data_start..full_header_end)
         .ok_or_else(|| invalid("Texture Style meta full-box header is truncated"))?;
     let mut payload = full_header.to_vec();
-    let canonical_order = [HDLR, DINF, ILOC, IINF, PITM, IPRP, IDAT, IREF, GRPL];
-    let mut ordered = Vec::with_capacity(graph.meta_children.len());
-    for kind in canonical_order {
-        ordered.extend(graph.meta_children.iter().filter(|header| header.kind == kind));
-    }
-    ordered.extend(
-        graph
-            .meta_children
-            .iter()
-            .filter(|header| !canonical_order.contains(&header.kind)),
-    );
+    // The physical-device-positive H carrier preserves the source meta-child
+    // order. Replacing boxes in place keeps this postprocessor from adding a
+    // second, unverified container-layout transformation.
     let mut saw_iref = false;
-    for header in ordered {
+    for header in &graph.meta_children {
         match header.kind {
             IINF => payload.extend_from_slice(iinf),
             ILOC => payload.extend_from_slice(iloc),
@@ -790,7 +808,8 @@ fn texture_makernote() -> Result<Vec<u8>> {
 }
 
 fn texture_exif_payload(data: &[u8]) -> Result<Vec<u8>> {
-    let tiff = heif_exif_tiff(data)?.ok_or_else(|| invalid("Texture Style source has no Exif item"))?;
+    let tiff =
+        heif_exif_tiff(data)?.ok_or_else(|| invalid("Texture Style source has no Exif item"))?;
     let note = texture_makernote()?;
     let patched = replace_exif_makernote(Some(&tiff), &note)?;
     let mut output = Vec::with_capacity(10 + patched.len());
@@ -802,7 +821,12 @@ fn texture_exif_payload(data: &[u8]) -> Result<Vec<u8>> {
 
 fn validate_output(data: &[u8], expected_alias_count: usize) -> Result<()> {
     let graph = parse_graph(data)?;
-    let style_id = find_uri_item(data, &graph.meta, STYLE_METADATA_URI, "Texture Style style item")?;
+    let style_id = find_uri_item(
+        data,
+        &graph.meta,
+        STYLE_METADATA_URI,
+        "Texture Style style item",
+    )?;
     let texture_id = find_uri_item(
         data,
         &graph.meta,
@@ -855,7 +879,8 @@ fn validate_output(data: &[u8], expected_alias_count: usize) -> Result<()> {
         )));
     }
     let tiff = heif_exif_tiff(data)?.ok_or_else(|| invalid("Texture Style output lost Exif"))?;
-    let note = exif_makernote(&tiff)?.ok_or_else(|| invalid("Texture Style output lost MakerNote"))?;
+    let note =
+        exif_makernote(&tiff)?.ok_or_else(|| invalid("Texture Style output lost MakerNote"))?;
     let tag84 = texture_tag84_bplist()?;
     if !note.starts_with(b"Apple iOS\0\0\x01")
         || !note
@@ -892,7 +917,9 @@ pub fn augment_texture_style_heif(source: &[u8]) -> Result<Vec<u8>> {
     let style_location = item_location(&graph.meta, style_id, "Texture Style style metadata")?;
     let style_payload = read_item_payload(source, style_location, graph.meta.idat.as_ref())?;
     if !style_payload.starts_with(b"bplist00") {
-        return Err(invalid("Texture Style style metadata is not a binary plist"));
+        return Err(invalid(
+            "Texture Style style metadata is not a binary plist",
+        ));
     }
     let texture_payload = texture_metadata_bplist()?;
     let exif_payload = texture_exif_payload(source)?;
