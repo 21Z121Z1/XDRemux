@@ -6,6 +6,7 @@ on:
       - experiment/ios27-video-smartstyle-metadata
     paths:
       - scripts/experiments/VideoSmartStyleInjector.swift
+      - scripts/experiments/VideoSmartStyleValidator.swift
       - .github/workflows/ios27-video-smartstyle-metadata.yml
   workflow_dispatch:
 
@@ -49,7 +50,7 @@ jobs:
           ffprobe -v error -show_format -show_streams -of json out/source-iphone.MP4 > out/reports/source.ffprobe.json
           grep -Eai 'Apple|iPhone|QuickTime|com\.apple|make|model' out/reports/source.exiftool.txt | tee out/reports/source.apple-lines.txt || true
 
-      - name: Build AVFoundation injector
+      - name: Build AVFoundation tools
         shell: bash
         run: |
           set -euxo pipefail
@@ -60,6 +61,12 @@ jobs:
             -framework CoreMedia \
             scripts/experiments/VideoSmartStyleInjector.swift \
             -o out/bin/VideoSmartStyleInjector
+          xcrun swiftc \
+            -O \
+            -framework AVFoundation \
+            -framework CoreMedia \
+            scripts/experiments/VideoSmartStyleValidator.swift \
+            -o out/bin/VideoSmartStyleValidator
 
       - name: Generate candidate MOVs
         shell: bash
@@ -70,20 +77,38 @@ jobs:
           out/bin/VideoSmartStyleInjector out/source-iphone.MP4 out/C-static-plus-timed-compact.MOV compact | tee out/reports/C.log
           out/bin/VideoSmartStyleInjector out/source-iphone.MP4 out/D-static-plus-timed-upper.MOV upper | tee out/reports/D.log
 
-      - name: Inspect injected metadata and validate remuxed media
+      - name: Validate candidates with Apple AVFoundation
+        shell: bash
+        run: |
+          set -euxo pipefail
+          out/bin/VideoSmartStyleValidator out/A-static-keys.MOV 0 | tee out/reports/A.avfoundation.txt
+          out/bin/VideoSmartStyleValidator out/B-static-plus-timed-lower.MOV 1 | tee out/reports/B.avfoundation.txt
+          out/bin/VideoSmartStyleValidator out/C-static-plus-timed-compact.MOV 1 | tee out/reports/C.avfoundation.txt
+          out/bin/VideoSmartStyleValidator out/D-static-plus-timed-upper.MOV 1 | tee out/reports/D.avfoundation.txt
+
+      - name: Inspect injected metadata
         shell: bash
         run: |
           set -euxo pipefail
           for f in out/[ABCD]-*.MOV; do
             base="$(basename "$f" .MOV)"
-            ffprobe -v error -show_format -show_streams -of json "$f" > "out/reports/${base}.ffprobe.json"
-            exiftool -ee -G1 -s "$f" > "out/reports/${base}.exiftool.txt"
+            # FFmpeg does not understand Apple's private timed-metadata stsd predicate.
+            # Preserve its diagnostic, but use AVFoundation above as the native parser gate.
+            ffprobe -v error -show_format -show_streams -of json "$f" \
+              > "out/reports/${base}.ffprobe.json" \
+              2> "out/reports/${base}.ffprobe.stderr.txt" || true
+            exiftool -ee -G1 -s "$f" \
+              > "out/reports/${base}.exiftool.txt" \
+              2> "out/reports/${base}.exiftool.stderr.txt" || true
             strings "$f" | grep -Eai 'smartstyle|smartstyle-info' > "out/reports/${base}.smartstyle-strings.txt" || true
             test -s "$f"
           done
 
+          # A proves the file-level marker path independently of the private timed track.
           grep -q 'com.apple.quicktime.smartstyle.rendering-version' out/reports/A-static-keys.smartstyle-strings.txt
           grep -q 'com.apple.quicktime.smartstyle.cast' out/reports/A-static-keys.smartstyle-strings.txt
+
+          # B/C/D must physically carry the Apple timed Smart Style metadata identifier.
           for x in B-static-plus-timed-lower C-static-plus-timed-compact D-static-plus-timed-upper; do
             grep -q 'com.apple.quicktime.smartstyle-info' "out/reports/${x}.smartstyle-strings.txt"
           done
@@ -116,7 +141,9 @@ jobs:
             Same static keys plus the timed track using upper-camel property names.
 
           Important: these are structural probes, not claims of valid Apple reversible style data.
-          A Photos UI success is device evidence; ffprobe/exiftool success only proves container/metadata structure.
+          AVFoundation validation proves macOS can parse the movie, discover the timed metadata track,
+          and read the first encoded video sample. Only an iOS 27 Photos device test can prove that the
+          private payload is sufficient to make the Photographic Styles editor space appear.
           EOF
 
       - name: Upload candidates and reports
