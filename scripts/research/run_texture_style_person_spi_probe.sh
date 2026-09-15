@@ -13,12 +13,12 @@ SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 PERSON_PROBE="$BUILD_DIR/texture_style_person_input_probe"
 TRACE_DYLIB="$BUILD_DIR/libXDRemuxTextureStyleTrace.dylib"
 
-"$CLANG" -fobjc-arc -fmodules -isysroot "$SDKROOT" \
+"$CLANG" -fobjc-arc -fblocks -fmodules -isysroot "$SDKROOT" \
   -framework Foundation -framework CoreGraphics -ldl \
   "$SRC_DIR/texture_style_person_input_probe.m" \
   -o "$PERSON_PROBE"
 
-"$CLANG" -dynamiclib -fobjc-arc -fmodules -isysroot "$SDKROOT" \
+"$CLANG" -dynamiclib -fobjc-arc -fblocks -fmodules -isysroot "$SDKROOT" \
   -framework Foundation -ldl \
   -Wl,-install_name,@rpath/libXDRemuxTextureStyleTrace.dylib \
   "$SRC_DIR/texture_style_input_trace.m" \
