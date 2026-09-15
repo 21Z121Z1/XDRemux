@@ -39,7 +39,7 @@ jobs:
           DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e*' ! -name '*.symbols' ! -name '*.atlas' ! -name '*.dylddata' ! -name '*.dyldreadonly' ! -name '*.dyldlinkedit' | sort | head -1)"
           test -n "$DSC"
           echo "$DSC" | tee /tmp/report/dsc-path.txt
-          ipsw dyld extract "$DSC" CameraUI --objc --stubs --output /tmp/cameraui 2>&1 | tee /tmp/report/cameraui-extract.log
+          ipsw dyld extract "$DSC" CameraUI --objc --output /tmp/cameraui 2>&1 | tee /tmp/report/cameraui-extract.log
           BIN=/tmp/cameraui/CameraUI
           test -f "$BIN"
           nm -nm "$BIN" > /tmp/report/cameraui-nm.txt || true
@@ -56,6 +56,7 @@ jobs:
           import pathlib, re, subprocess
           report = pathlib.Path('/tmp/report')
           binary = '/tmp/cameraui/CameraUI'
+          dsc = (report/'dsc-path.txt').read_text().strip()
           nm_text = (report/'cameraui-nm.txt').read_text(errors='replace') if (report/'cameraui-nm.txt').exists() else ''
           pats = [
               r'[-+]\[[^\]]+ _desiredSmartStyleSupportForMode:devicePosition:\]',
@@ -71,9 +72,11 @@ jobs:
                       syms.append(s)
           (report/'candidate-symbols.txt').write_text('\n'.join(syms)+'\n')
           for i,sym in enumerate(syms[:40]):
-              out=report/f'disass-{i:02d}.txt'
-              with out.open('w') as f:
+              with (report/f'macho-disass-{i:02d}.txt').open('w') as f:
                   p=subprocess.run(['ipsw','macho','disass',binary,'--symbol',sym,'--force','-V'],stdout=f,stderr=subprocess.STDOUT,text=True)
+                  f.write(f'\nEXIT={p.returncode}\n')
+              with (report/f'dyld-disass-{i:02d}.txt').open('w') as f:
+                  p=subprocess.run(['ipsw','dyld','disass',dsc,'--symbol',sym,'--symbol-image','CameraUI','-V'],stdout=f,stderr=subprocess.STDOUT,text=True)
                   f.write(f'\nEXIT={p.returncode}\n')
           subprocess.run("grep -n -C 12 -E 'desiredSmartStyleSupportForMode|SmartStyleSupport|PhotographicStyle.*Support' /tmp/report/cameraui-nm.txt > /tmp/report/symbol-context.txt || true", shell=True)
           PY
@@ -110,7 +113,7 @@ jobs:
             cat /tmp/report/dyld-cameraui-relevant.txt 2>/dev/null | head -500
             echo
             echo '=== disassemblies ==='
-            for f in /tmp/report/disass-*.txt; do
+            for f in /tmp/report/*-disass-*.txt; do
               [ -f "$f" ] || continue
               echo "--- $f ---"
               cat "$f"
