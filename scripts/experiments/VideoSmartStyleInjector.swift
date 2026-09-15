@@ -41,9 +41,6 @@ private func metadataItem(_ identifier: String, _ value: NSObject & NSCopying, d
 }
 
 private func staticSmartStyleItems() -> [AVMetadataItem] {
-    // Exact QuickTime key names recovered from CMCaptureCore/NeutrinoCore.
-    // Values deliberately describe a simple positive, non-bypassed style so the
-    // Photos-side current-style predicates do not immediately collapse to zero.
     return [
         metadataItem("com.apple.quicktime.smartstyle.rendering-version", NSNumber(value: 1)),
         metadataItem("com.apple.quicktime.smartstyle.cast", NSNumber(value: 1)),
@@ -145,7 +142,7 @@ private func writeVariant(inputURL: URL, outputURL: URL, variant: String) throws
         }
         reader.add(output)
 
-        let hint = track.formatDescriptions.first as? CMFormatDescription
+        let hint = track.formatDescriptions.first
         let input = AVAssetWriterInput(mediaType: track.mediaType, outputSettings: nil, sourceFormatHint: hint)
         input.expectsMediaDataInRealTime = false
         if track.mediaType == .video {
