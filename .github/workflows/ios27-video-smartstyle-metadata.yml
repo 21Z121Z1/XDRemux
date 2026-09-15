@@ -19,22 +19,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download public iPhone MOV fixture from GitHub LFS
+      - name: Download public iPhone video fixture from GitHub
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p out/reports /tmp/refly
-          git lfs version
-          git clone --no-checkout --filter=blob:none https://github.com/stefwalter/refly.git /tmp/refly/repo
-          cd /tmp/refly/repo
-          git checkout c885d0758c6f364ada3e36384a3f6c77c09adb2c -- public/fixtures/iphone.MOV
-          git lfs pull --include='public/fixtures/iphone.MOV' --exclude=''
-          cd "$GITHUB_WORKSPACE"
-          cp /tmp/refly/repo/public/fixtures/iphone.MOV out/source-iphone.MOV
-          test -s out/source-iphone.MOV
-          test "$(stat -f%z out/source-iphone.MOV)" -gt 1024
-          shasum -a 256 out/source-iphone.MOV | tee out/reports/source.sha256
-          file out/source-iphone.MOV | tee out/reports/source.file.txt
+          mkdir -p out/reports
+          # The upstream iphone.MP4/MOV entries are local symlinks. iphone-invalid.MP4
+          # is the same iPhone fixture family committed as a real 5.9 MB Git blob;
+          # its test only deliberately corrupts the date box, which is immaterial here.
+          curl --fail --location --retry 3 \
+            'https://raw.githubusercontent.com/stefwalter/refly/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone-invalid.MP4' \
+            -o out/source-iphone.MP4
+          test -s out/source-iphone.MP4
+          test "$(stat -f%z out/source-iphone.MP4)" -gt 1000000
+          shasum -a 256 out/source-iphone.MP4 | tee out/reports/source.sha256
+          file out/source-iphone.MP4 | tee out/reports/source.file.txt
 
       - name: Install metadata inspection tools
         shell: bash
@@ -42,14 +41,13 @@ jobs:
           set -euxo pipefail
           brew install exiftool ffmpeg
 
-      - name: Inspect source and confirm Apple/iPhone provenance
+      - name: Inspect source iPhone fixture
         shell: bash
         run: |
           set -euxo pipefail
-          exiftool -ee -G1 -s out/source-iphone.MOV | tee out/reports/source.exiftool.txt
-          ffprobe -v error -show_format -show_streams -of json out/source-iphone.MOV > out/reports/source.ffprobe.json
-          # Keep the actual provenance evidence in the artifact rather than trusting the filename alone.
-          grep -Eai 'Apple|iPhone|QuickTime|com\.apple' out/reports/source.exiftool.txt | tee out/reports/source.apple-lines.txt || true
+          exiftool -ee -G1 -s out/source-iphone.MP4 | tee out/reports/source.exiftool.txt
+          ffprobe -v error -show_format -show_streams -of json out/source-iphone.MP4 > out/reports/source.ffprobe.json
+          grep -Eai 'Apple|iPhone|QuickTime|com\.apple|make|model' out/reports/source.exiftool.txt | tee out/reports/source.apple-lines.txt || true
 
       - name: Build AVFoundation injector
         shell: bash
@@ -67,10 +65,10 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          out/bin/VideoSmartStyleInjector out/source-iphone.MOV out/A-static-keys.MOV static | tee out/reports/A.log
-          out/bin/VideoSmartStyleInjector out/source-iphone.MOV out/B-static-plus-timed-lower.MOV lower | tee out/reports/B.log
-          out/bin/VideoSmartStyleInjector out/source-iphone.MOV out/C-static-plus-timed-compact.MOV compact | tee out/reports/C.log
-          out/bin/VideoSmartStyleInjector out/source-iphone.MOV out/D-static-plus-timed-upper.MOV upper | tee out/reports/D.log
+          out/bin/VideoSmartStyleInjector out/source-iphone.MP4 out/A-static-keys.MOV static | tee out/reports/A.log
+          out/bin/VideoSmartStyleInjector out/source-iphone.MP4 out/B-static-plus-timed-lower.MOV lower | tee out/reports/B.log
+          out/bin/VideoSmartStyleInjector out/source-iphone.MP4 out/C-static-plus-timed-compact.MOV compact | tee out/reports/C.log
+          out/bin/VideoSmartStyleInjector out/source-iphone.MP4 out/D-static-plus-timed-upper.MOV upper | tee out/reports/D.log
 
       - name: Inspect injected metadata and validate remuxed media
         shell: bash
@@ -84,11 +82,8 @@ jobs:
             test -s "$f"
           done
 
-          # Static keys are the minimum Photos/Neutrino-side style marker discovered in firmware.
           grep -q 'com.apple.quicktime.smartstyle.rendering-version' out/reports/A-static-keys.smartstyle-strings.txt
           grep -q 'com.apple.quicktime.smartstyle.cast' out/reports/A-static-keys.smartstyle-strings.txt
-
-          # Timed candidates must physically contain the smartstyle-info identifier.
           for x in B-static-plus-timed-lower C-static-plus-timed-compact D-static-plus-timed-upper; do
             grep -q 'com.apple.quicktime.smartstyle-info' "out/reports/${x}.smartstyle-strings.txt"
           done
@@ -99,8 +94,9 @@ jobs:
           cat > out/README-DEVICE-TEST.txt <<'EOF'
           iOS 27 Photos Smart Style video metadata experiment
 
-          Source:
-          https://github.com/stefwalter/refly/blob/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone.MOV
+          Source fixture:
+          https://github.com/stefwalter/refly/blob/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone-invalid.MP4
+          Upstream tests identify it as the iPhone fixture and state that only its date box is intentionally invalid.
 
           Import the four candidates into Photos on iOS 27, preferably one at a time, then open Edit.
           Record whether the Photographic Styles control/space appears and whether changing a style renders successfully.
@@ -129,7 +125,8 @@ jobs:
         with:
           name: ios27-video-smartstyle-metadata-candidates
           path: |
-            out/*.MOV
+            out/source-iphone.MP4
+            out/[ABCD]-*.MOV
             out/README-DEVICE-TEST.txt
             out/reports/
           if-no-files-found: warn
