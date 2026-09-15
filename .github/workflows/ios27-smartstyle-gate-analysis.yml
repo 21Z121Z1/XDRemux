@@ -17,8 +17,8 @@ jobs:
       IPSW_URL: https://updates.cdn-apple.com/2026FallFCS/0f4c05a9-05f9-472c-a2ec-d7046fe0872b/iPhone19,2_27.0_24A437_Restore.ipsw
       CAMERAUI_IMAGE: /System/Library/PrivateFrameworks/CameraUI.framework/CameraUI
     steps:
-      - name: Prepare report directory
-        run: mkdir -p /tmp/report /tmp/ios27 /tmp/cameraui
+      - name: Prepare
+        run: mkdir -p /tmp/report /tmp/ios27
 
       - name: Install ipsw
         run: |
@@ -32,97 +32,52 @@ jobs:
         run: |
           set -euxo pipefail
           ipsw extract --remote --dyld --dyld-arch arm64e --output /tmp/ios27 "$IPSW_URL" 2>&1 | tee /tmp/report/extract.log
-          find /tmp/ios27 -maxdepth 5 -type f -print | sort > /tmp/report/extracted-files.txt
-
-      - name: Extract exact CameraUI framework image
-        run: |
-          set -euxo pipefail
           DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e*' ! -name '*.symbols' ! -name '*.atlas' ! -name '*.dylddata' ! -name '*.dyldreadonly' ! -name '*.dyldlinkedit' | sort | head -1)"
           test -n "$DSC"
           echo "$DSC" | tee /tmp/report/dsc-path.txt
-          ipsw dyld extract "$DSC" "$CAMERAUI_IMAGE" --objc --output /tmp/cameraui 2>&1 | tee /tmp/report/cameraui-extract.log
-          BIN="$(find /tmp/cameraui -type f -name CameraUI | head -1)"
-          test -n "$BIN"
-          echo "$BIN" | tee /tmp/report/cameraui-bin-path.txt
-          nm -nm "$BIN" > /tmp/report/cameraui-nm.txt || true
-          strings -a "$BIN" > /tmp/report/cameraui-strings.txt
-          grep -n -E 'desiredSmartStyleSupportForMode|SmartStyleSupport|smartStyleInVideoMode|PhotographicStyle|TextureStyle|CAMFeatureDevelopment|VideoMode|Cinematic' /tmp/report/cameraui-nm.txt > /tmp/report/nm-relevant.txt || true
-          grep -n -E 'desiredSmartStyleSupportForMode|SmartStyleSupport|smartStyleInVideoMode|PhotographicStyle|TextureStyle|CAMFeatureDevelopment|VideoMode|Cinematic' /tmp/report/cameraui-strings.txt > /tmp/report/strings-relevant.txt || true
-          ipsw macho info "$BIN" --objc --objc-refs --symbols --strings --starts -V > /tmp/report/cameraui-info.txt 2>&1 || true
-          grep -n -C 30 -E 'desiredSmartStyleSupportForMode|SmartStyleSupport|smartStyleInVideoMode|PhotographicStyle|TextureStyle|CAMFeatureDevelopment|VideoMode|Cinematic' /tmp/report/cameraui-info.txt > /tmp/report/cameraui-info-relevant.txt || true
 
-      - name: Disassemble Smart Style support methods
+      - name: Disassemble gate methods by verified addresses
         run: |
           set -euxo pipefail
-          python3 - <<'PY'
-          import pathlib, re, subprocess
-          report = pathlib.Path('/tmp/report')
-          binary = (report/'cameraui-bin-path.txt').read_text().strip()
-          dsc = (report/'dsc-path.txt').read_text().strip()
-          image = '/System/Library/PrivateFrameworks/CameraUI.framework/CameraUI'
-          nm_text = (report/'cameraui-nm.txt').read_text(errors='replace') if (report/'cameraui-nm.txt').exists() else ''
-          pats = [
-              r'[-+]\[[^\]]+ _desiredSmartStyleSupportForMode:devicePosition:\]',
-              r'[-+]\[[^\]]+ desiredSmartStyleSupportForMode:devicePosition:\]',
-              r'[-+]\[[^\]]+ [^\]]*SmartStyle[^\]]*Support[^\]]*\]',
-              r'[-+]\[[^\]]+ [^\]]*PhotographicStyle[^\]]*Support[^\]]*\]',
-          ]
-          syms=[]
-          for pat in pats:
-              for m in re.finditer(pat, nm_text):
-                  s=m.group(0)
-                  if s not in syms:
-                      syms.append(s)
-          (report/'candidate-symbols.txt').write_text('\n'.join(syms)+'\n')
-          for i,sym in enumerate(syms[:40]):
-              with (report/f'macho-disass-{i:02d}.txt').open('w') as f:
-                  p=subprocess.run(['ipsw','macho','disass',binary,'--symbol',sym,'--force','-V'],stdout=f,stderr=subprocess.STDOUT,text=True)
-                  f.write(f'\nEXIT={p.returncode}\n')
-              with (report/f'dyld-disass-{i:02d}.txt').open('w') as f:
-                  p=subprocess.run(['ipsw','dyld','disass',dsc,'--symbol',sym,'--symbol-image',image,'-V'],stdout=f,stderr=subprocess.STDOUT,text=True)
-                  f.write(f'\nEXIT={p.returncode}\n')
-          subprocess.run("grep -n -C 12 -E 'desiredSmartStyleSupportForMode|SmartStyleSupport|PhotographicStyle.*Support' /tmp/report/cameraui-nm.txt > /tmp/report/symbol-context.txt || true", shell=True)
-          PY
+          DSC="$(cat /tmp/report/dsc-path.txt)"
+          # 24A437 iPhone19,2 CameraUI addresses, recovered from ObjC metadata.
+          ipsw dyld disass "$DSC" --vaddr 0x1bdd478fc --count 32 -V > /tmp/report/desired-smartstyle.txt 2>&1
+          ipsw dyld disass "$DSC" --vaddr 0x1bdf25490 --count 32 -V > /tmp/report/photographic-picker.txt 2>&1
+          ipsw dyld disass "$DSC" --vaddr 0x1bdf251a8 --count 48 -V > /tmp/report/semantic-support.txt 2>&1
+          ipsw dyld disass "$DSC" --vaddr 0x1bdf25250 --count 56 -V > /tmp/report/desired-semantic.txt 2>&1
+          cat /tmp/report/desired-smartstyle.txt
+          cat /tmp/report/photographic-picker.txt
 
-      - name: Capture dyld Objective-C metadata fallbacks
+      - name: Find cross-references to gate methods
+        run: |
+          set +e
+          DSC="$(cat /tmp/report/dsc-path.txt)"
+          ipsw dyld xref "$DSC" 0x1bdd478fc --image "$CAMERAUI_IMAGE" -V > /tmp/report/xref-desired-smartstyle.txt 2>&1
+          ipsw dyld xref "$DSC" 0x1bdf25490 --image "$CAMERAUI_IMAGE" -V > /tmp/report/xref-photographic-picker.txt 2>&1
+          cat /tmp/report/xref-desired-smartstyle.txt
+          cat /tmp/report/xref-photographic-picker.txt
+          exit 0
+
+      - name: Dump relevant ObjC metadata
         if: always()
         run: |
           set +e
-          mkdir -p /tmp/report
-          DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e*' ! -name '*.symbols' ! -name '*.atlas' ! -name '*.dylddata' ! -name '*.dyldreadonly' ! -name '*.dyldlinkedit' 2>/dev/null | sort | head -1)"
-          if [ -n "$DSC" ] && command -v ipsw >/dev/null; then
-            ipsw dyld macho "$DSC" "$CAMERAUI_IMAGE" --objc --objc-refs --symbols --strings --starts -V > /tmp/report/dyld-cameraui.txt 2>&1
-            grep -n -C 30 -E 'desiredSmartStyleSupportForMode|SmartStyleSupport|smartStyleInVideoMode|PhotographicStyle|TextureStyle|CAMFeatureDevelopment|VideoMode|Cinematic' /tmp/report/dyld-cameraui.txt > /tmp/report/dyld-cameraui-relevant.txt || true
-            ipsw dyld objc sel "$DSC" --image "$CAMERAUI_IMAGE" > /tmp/report/dyld-objc-selectors.txt 2>&1
-            grep -n -C 20 -E 'desiredSmartStyleSupportForMode|SmartStyleSupport|PhotographicStyle|TextureStyle' /tmp/report/dyld-objc-selectors.txt > /tmp/report/dyld-objc-selectors-relevant.txt || true
+          DSC="$(cat /tmp/report/dsc-path.txt 2>/dev/null)"
+          if [ -n "$DSC" ]; then
+            ipsw dyld macho "$DSC" "$CAMERAUI_IMAGE" --objc --objc-refs --symbols --strings --starts -V > /tmp/report/cameraui-metadata.txt 2>&1
+            grep -n -C 40 -E '_desiredSmartStyleSupportForMode|isPhotographicStylesPickerSupportedForMode|smartStylesSupported|textureStylesSupported|semanticStyleSupportForMode|CAMFeatureDevelopment|systemstyle|photographicStyle' /tmp/report/cameraui-metadata.txt > /tmp/report/cameraui-relevant.txt || true
           fi
+          exit 0
 
-      - name: Summarize report
+      - name: Summarize
         if: always()
         run: |
           set +e
-          mkdir -p /tmp/report
           {
-            echo '=== candidate symbols ==='
-            cat /tmp/report/candidate-symbols.txt 2>/dev/null
-            echo
-            echo '=== symbol context ==='
-            cat /tmp/report/symbol-context.txt 2>/dev/null
-            echo
-            echo '=== relevant strings ==='
-            cat /tmp/report/strings-relevant.txt 2>/dev/null | head -800
-            echo
-            echo '=== relevant dyld metadata ==='
-            cat /tmp/report/dyld-cameraui-relevant.txt 2>/dev/null | head -800
-            echo
-            echo '=== selector metadata ==='
-            cat /tmp/report/dyld-objc-selectors-relevant.txt 2>/dev/null | head -400
-            echo
-            echo '=== disassemblies ==='
-            for f in /tmp/report/*-disass-*.txt; do
-              [ -f "$f" ] || continue
-              echo "--- $f ---"
-              cat "$f"
+            for f in desired-smartstyle.txt photographic-picker.txt semantic-support.txt desired-semantic.txt xref-desired-smartstyle.txt xref-photographic-picker.txt cameraui-relevant.txt; do
+              echo "===== $f ====="
+              cat "/tmp/report/$f" 2>/dev/null
+              echo
             done
           } > /tmp/report/summary.txt
           cat /tmp/report/summary.txt
