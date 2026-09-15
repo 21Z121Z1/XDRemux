@@ -14,12 +14,12 @@ PERSON_PROBE="$BUILD_DIR/texture_style_person_input_probe"
 TRACE_DYLIB="$BUILD_DIR/libXDRemuxTextureStyleTrace.dylib"
 
 "$CLANG" -fobjc-arc -fblocks -fmodules -isysroot "$SDKROOT" \
-  -framework Foundation -framework CoreGraphics -ldl \
+  -framework Foundation -framework CoreGraphics \
   "$SRC_DIR/texture_style_person_input_probe.m" \
   -o "$PERSON_PROBE"
 
 "$CLANG" -dynamiclib -fobjc-arc -fblocks -fmodules -isysroot "$SDKROOT" \
-  -framework Foundation -ldl \
+  -framework Foundation \
   -Wl,-install_name,@rpath/libXDRemuxTextureStyleTrace.dylib \
   "$SRC_DIR/texture_style_input_trace.m" \
   -o "$TRACE_DYLIB"
