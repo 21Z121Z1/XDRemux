@@ -12,13 +12,12 @@ permissions:
 jobs:
   reverse-camera-ui:
     runs-on: macos-15
-    timeout-minutes: 120
+    timeout-minutes: 30
     env:
       IPSW_URL: https://updates.cdn-apple.com/2026FallFCS/0f4c05a9-05f9-472c-a2ec-d7046fe0872b/iPhone19,2_27.0_24A437_Restore.ipsw
-      CAMERAUI_IMAGE: /System/Library/PrivateFrameworks/CameraUI.framework/CameraUI
     steps:
       - name: Prepare
-        run: mkdir -p /tmp/report /tmp/ios27
+        run: mkdir -p /tmp/report /tmp/ios27 /tmp/cameraui
 
       - name: Install ipsw
         run: |
@@ -28,66 +27,36 @@ jobs:
           brew install --formula blacktop/tap/ipsw
           ipsw version | tee /tmp/report/ipsw-version.txt
 
-      - name: Extract arm64e dyld cache remotely
+      - name: Extract dyld cache and CameraUI
         run: |
           set -euxo pipefail
           ipsw extract --remote --dyld --dyld-arch arm64e --output /tmp/ios27 "$IPSW_URL" 2>&1 | tee /tmp/report/extract.log
           DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e*' ! -name '*.symbols' ! -name '*.atlas' ! -name '*.dylddata' ! -name '*.dyldreadonly' ! -name '*.dyldlinkedit' | sort | head -1)"
-          test -n "$DSC"
-          echo "$DSC" | tee /tmp/report/dsc-path.txt
+          echo "$DSC" > /tmp/report/dsc-path.txt
+          ipsw dyld extract "$DSC" /System/Library/PrivateFrameworks/CameraUI.framework/CameraUI --objc --output /tmp/cameraui
+          test -f /tmp/cameraui/CameraUI
+          nm -nm /tmp/cameraui/CameraUI > /tmp/report/nm.txt || true
 
-      - name: Disassemble gate methods by verified addresses
+      - name: Raw disassembly
         run: |
           set -euxo pipefail
-          DSC="$(cat /tmp/report/dsc-path.txt)"
-          # 24A437 iPhone19,2 CameraUI addresses, recovered from ObjC metadata.
-          ipsw dyld disass "$DSC" --vaddr 0x1bdd478fc --count 32 -V > /tmp/report/desired-smartstyle.txt 2>&1
-          ipsw dyld disass "$DSC" --vaddr 0x1bdf25490 --count 32 -V > /tmp/report/photographic-picker.txt 2>&1
-          ipsw dyld disass "$DSC" --vaddr 0x1bdf251a8 --count 48 -V > /tmp/report/semantic-support.txt 2>&1
-          ipsw dyld disass "$DSC" --vaddr 0x1bdf25250 --count 56 -V > /tmp/report/desired-semantic.txt 2>&1
-          cat /tmp/report/desired-smartstyle.txt
-          cat /tmp/report/photographic-picker.txt
+          BIN=/tmp/cameraui/CameraUI
+          # _desiredSmartStyleSupportForMode:devicePosition: is 0x60 bytes in this build.
+          ipsw macho disass "$BIN" --vaddr 0x1bdd478fc --count 24 --quiet --force > /tmp/report/desired-smartstyle-raw.txt 2>&1
+          # isPhotographicStylesPickerSupportedForMode:device:resolvedRAWMode: is 0x60 bytes.
+          ipsw macho disass "$BIN" --vaddr 0x1bdf25490 --count 24 --quiet --force > /tmp/report/picker-raw.txt 2>&1
+          # Comparative semantic-style gates.
+          ipsw macho disass "$BIN" --vaddr 0x1bdf251a8 --count 42 --quiet --force > /tmp/report/semantic-support-raw.txt 2>&1
+          ipsw macho disass "$BIN" --vaddr 0x1bdf25250 --count 42 --quiet --force > /tmp/report/desired-semantic-raw.txt 2>&1
+          grep -n -C 5 -E '_desiredSmartStyleSupportForMode|isPhotographicStylesPickerSupportedForMode|semanticStyleSupportForMode|_desiredSemanticStyleSupportForMode' /tmp/report/nm.txt > /tmp/report/nm-context.txt || true
+          cat /tmp/report/desired-smartstyle-raw.txt
+          cat /tmp/report/picker-raw.txt
 
-      - name: Find cross-references to gate methods
-        run: |
-          set +e
-          DSC="$(cat /tmp/report/dsc-path.txt)"
-          ipsw dyld xref "$DSC" 0x1bdd478fc --image "$CAMERAUI_IMAGE" -V > /tmp/report/xref-desired-smartstyle.txt 2>&1
-          ipsw dyld xref "$DSC" 0x1bdf25490 --image "$CAMERAUI_IMAGE" -V > /tmp/report/xref-photographic-picker.txt 2>&1
-          cat /tmp/report/xref-desired-smartstyle.txt
-          cat /tmp/report/xref-photographic-picker.txt
-          exit 0
-
-      - name: Dump relevant ObjC metadata
-        if: always()
-        run: |
-          set +e
-          DSC="$(cat /tmp/report/dsc-path.txt 2>/dev/null)"
-          if [ -n "$DSC" ]; then
-            ipsw dyld macho "$DSC" "$CAMERAUI_IMAGE" --objc --objc-refs --symbols --strings --starts -V > /tmp/report/cameraui-metadata.txt 2>&1
-            grep -n -C 40 -E '_desiredSmartStyleSupportForMode|isPhotographicStylesPickerSupportedForMode|smartStylesSupported|textureStylesSupported|semanticStyleSupportForMode|CAMFeatureDevelopment|systemstyle|photographicStyle' /tmp/report/cameraui-metadata.txt > /tmp/report/cameraui-relevant.txt || true
-          fi
-          exit 0
-
-      - name: Summarize
-        if: always()
-        run: |
-          set +e
-          {
-            for f in desired-smartstyle.txt photographic-picker.txt semantic-support.txt desired-semantic.txt xref-desired-smartstyle.txt xref-photographic-picker.txt cameraui-relevant.txt; do
-              echo "===== $f ====="
-              cat "/tmp/report/$f" 2>/dev/null
-              echo
-            done
-          } > /tmp/report/summary.txt
-          cat /tmp/report/summary.txt
-          exit 0
-
-      - name: Upload text report
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios27-smartstyle-gate-report
+          name: ios27-smartstyle-gate-fast-report
           path: /tmp/report
           if-no-files-found: warn
           retention-days: 7
