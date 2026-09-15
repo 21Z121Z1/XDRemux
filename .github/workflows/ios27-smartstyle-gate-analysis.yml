@@ -10,14 +10,14 @@ permissions:
   contents: read
 
 jobs:
-  reverse-camera-ui:
+  reverse-style-gates:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       IPSW_URL: https://updates.cdn-apple.com/2026FallFCS/0f4c05a9-05f9-472c-a2ec-d7046fe0872b/iPhone19,2_27.0_24A437_Restore.ipsw
     steps:
       - name: Prepare
-        run: mkdir -p /tmp/report /tmp/ios27 /tmp/cameraui
+        run: mkdir -p /tmp/report /tmp/ios27 /tmp/images
 
       - name: Install ipsw
         run: |
@@ -27,36 +27,88 @@ jobs:
           brew install --formula blacktop/tap/ipsw
           ipsw version | tee /tmp/report/ipsw-version.txt
 
-      - name: Extract dyld cache and CameraUI
+      - name: Extract dyld cache and target frameworks
         run: |
           set -euxo pipefail
           ipsw extract --remote --dyld --dyld-arch arm64e --output /tmp/ios27 "$IPSW_URL" 2>&1 | tee /tmp/report/extract.log
           DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e*' ! -name '*.symbols' ! -name '*.atlas' ! -name '*.dylddata' ! -name '*.dyldreadonly' ! -name '*.dyldlinkedit' | sort | head -1)"
+          test -n "$DSC"
           echo "$DSC" > /tmp/report/dsc-path.txt
-          ipsw dyld extract "$DSC" /System/Library/PrivateFrameworks/CameraUI.framework/CameraUI --objc --output /tmp/cameraui
-          test -f /tmp/cameraui/CameraUI
-          nm -nm /tmp/cameraui/CameraUI > /tmp/report/nm.txt || true
+          extract_one() {
+            local image="$1" out="$2"
+            mkdir -p "/tmp/images/$out"
+            ipsw dyld extract "$DSC" "$image" --objc --output "/tmp/images/$out" 2>&1 | tee "/tmp/report/extract-$out.log"
+          }
+          extract_one /System/Library/PrivateFrameworks/CameraUI.framework/CameraUI cameraui
+          extract_one /System/Library/PrivateFrameworks/PhotosUIEdit.framework/PhotosUIEdit photosuiedit
+          extract_one /System/Library/PrivateFrameworks/PhotoImaging.framework/PhotoImaging photoimaging
+          extract_one /System/Library/Frameworks/Photos.framework/Photos photos
+          extract_one /System/Library/PrivateFrameworks/NeutrinoCore.framework/NeutrinoCore neutrinocore
+          for d in cameraui photosuiedit photoimaging photos neutrinocore; do
+            BIN="$(find /tmp/images/$d -maxdepth 1 -type f | head -1)"
+            echo "$BIN" > "/tmp/report/$d-bin.txt"
+            nm -nm "$BIN" > "/tmp/report/$d-nm.txt" || true
+            grep -ni -C 3 -E 'SmartStyle|PhotographicStyle|Styleable|Stylable|canRenderStyles|VideoMetadata|VideoCast|isVideo|TextureStyle' "/tmp/report/$d-nm.txt" > "/tmp/report/$d-nm-relevant.txt" || true
+          done
 
-      - name: Raw disassembly
+      - name: Disassemble Camera video-style gates
         run: |
           set -euxo pipefail
-          BIN=/tmp/cameraui/CameraUI
-          # _desiredSmartStyleSupportForMode:devicePosition: is 0x60 bytes in this build.
-          ipsw macho disass "$BIN" --vaddr 0x1bdd478fc --count 24 --quiet --force > /tmp/report/desired-smartstyle-raw.txt 2>&1
-          # isPhotographicStylesPickerSupportedForMode:device:resolvedRAWMode: is 0x60 bytes.
-          ipsw macho disass "$BIN" --vaddr 0x1bdf25490 --count 24 --quiet --force > /tmp/report/picker-raw.txt 2>&1
-          # Comparative semantic-style gates.
-          ipsw macho disass "$BIN" --vaddr 0x1bdf251a8 --count 42 --quiet --force > /tmp/report/semantic-support-raw.txt 2>&1
-          ipsw macho disass "$BIN" --vaddr 0x1bdf25250 --count 42 --quiet --force > /tmp/report/desired-semantic-raw.txt 2>&1
-          grep -n -C 5 -E '_desiredSmartStyleSupportForMode|isPhotographicStylesPickerSupportedForMode|semanticStyleSupportForMode|_desiredSemanticStyleSupportForMode' /tmp/report/nm.txt > /tmp/report/nm-context.txt || true
-          cat /tmp/report/desired-smartstyle-raw.txt
-          cat /tmp/report/picker-raw.txt
+          BIN="$(cat /tmp/report/cameraui-bin.txt)"
+          ipsw macho disass "$BIN" --vaddr 0x1bdd478fc --count 24 --quiet --force > /tmp/report/camera-desired-smartstyle.txt 2>&1
+          ipsw macho disass "$BIN" --vaddr 0x1bdf25490 --count 24 --quiet --force > /tmp/report/camera-picker.txt 2>&1
+
+      - name: Disassemble Photos edit eligibility methods
+        run: |
+          set +e
+          disass_symbol() {
+            local bin="$1" sym="$2" out="$3"
+            echo "=== $sym ===" > "$out"
+            ipsw macho disass "$bin" --symbol "$sym" --count 160 --quiet --force >> "$out" 2>&1
+            echo "EXIT=$?" >> "$out"
+          }
+          PEBIN="$(cat /tmp/report/photosuiedit-bin.txt)"
+          PIBIN="$(cat /tmp/report/photoimaging-bin.txt)"
+          PHBIN="$(cat /tmp/report/photos-bin.txt)"
+          disass_symbol "$PEBIN" '+[PESupport assetCanRenderStyles:]' /tmp/report/pe-asset-can-render-styles.txt
+          disass_symbol "$PEBIN" '+[PESupport canPerformEditOnAsset:]' /tmp/report/pe-can-perform-edit.txt
+          disass_symbol "$PIBIN" '+[PISemanticStyleAutoCalculator canRenderStylesOnComposition:]' /tmp/report/pi-can-render-styles.txt
+          disass_symbol "$PIBIN" '+[PISemanticStyleAutoCalculator isStylableFromImageProperties:error:]' /tmp/report/pi-is-stylable-properties.txt
+          disass_symbol "$PHBIN" '-[PHAssetPhotosSmartStyleExtendedProperties isCurrentlySmartStyleable]' /tmp/report/ph-currently-styleable.txt
+          disass_symbol "$PHBIN" '-[PHAsset _setupSmartStyleFromFetchDictionary:]' /tmp/report/ph-setup-smartstyle.txt
+          exit 0
+
+      - name: Collect metadata and strings evidence
+        if: always()
+        run: |
+          set +e
+          for d in cameraui photosuiedit photoimaging photos neutrinocore; do
+            BIN="$(cat /tmp/report/$d-bin.txt 2>/dev/null)"
+            [ -f "$BIN" ] || continue
+            strings -a "$BIN" 2>/dev/null | grep -ni -E 'smart.?style|photographic.?style|styleable|stylable|video.?cast|video.?metadata|reversib|texture.?style|unsupported style|can.?render.?styles' | head -2000 > "/tmp/report/$d-strings-relevant.txt" || true
+          done
+          {
+            echo '=== PhotosUIEdit nm ==='; cat /tmp/report/photosuiedit-nm-relevant.txt 2>/dev/null
+            echo '=== PhotoImaging nm ==='; cat /tmp/report/photoimaging-nm-relevant.txt 2>/dev/null
+            echo '=== Photos nm ==='; cat /tmp/report/photos-nm-relevant.txt 2>/dev/null
+            echo '=== NeutrinoCore nm ==='; cat /tmp/report/neutrinocore-nm-relevant.txt 2>/dev/null
+            echo '=== PE asset eligibility ==='; cat /tmp/report/pe-asset-can-render-styles.txt 2>/dev/null
+            echo '=== PE general edit eligibility ==='; cat /tmp/report/pe-can-perform-edit.txt 2>/dev/null
+            echo '=== PI composition style rendering ==='; cat /tmp/report/pi-can-render-styles.txt 2>/dev/null
+            echo '=== PI metadata stylability ==='; cat /tmp/report/pi-is-stylable-properties.txt 2>/dev/null
+            echo '=== PH current styleability ==='; cat /tmp/report/ph-currently-styleable.txt 2>/dev/null
+            echo '=== PH SmartStyle setup ==='; cat /tmp/report/ph-setup-smartstyle.txt 2>/dev/null
+            echo '=== Relevant strings ==='
+            for f in /tmp/report/*-strings-relevant.txt; do echo "--- $f ---"; cat "$f"; done
+          } > /tmp/report/summary.txt
+          cat /tmp/report/summary.txt
+          exit 0
 
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios27-smartstyle-gate-fast-report
+          name: ios27-video-style-edit-report
           path: /tmp/report
           if-no-files-found: warn
           retention-days: 7
