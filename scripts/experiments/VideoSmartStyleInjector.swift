@@ -30,6 +30,38 @@ private struct Pipe {
     let input: AVAssetWriterInput
 }
 
+private final class WriterState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedError: Error?
+    private var metadataIndex = 0
+
+    func record(_ error: Error) {
+        lock.lock()
+        defer { lock.unlock() }
+        if storedError == nil {
+            storedError = error
+        }
+    }
+
+    func error() -> Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedError
+    }
+
+    func currentMetadataIndex() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return metadataIndex
+    }
+
+    func advanceMetadataIndex() {
+        lock.lock()
+        metadataIndex += 1
+        lock.unlock()
+    }
+}
+
 private func metadataItem(_ identifier: String, _ value: NSObject & NSCopying, dataType: String? = nil) -> AVMutableMetadataItem {
     let item = AVMutableMetadataItem()
     item.identifier = AVMetadataIdentifier(rawValue: "mdta/\(identifier)")
@@ -177,13 +209,7 @@ private func writeVariant(inputURL: URL, outputURL: URL, variant: String) throws
     writer.startSession(atSourceTime: .zero)
 
     let group = DispatchGroup()
-    let errorLock = NSLock()
-    var firstError: Error?
-    func record(_ error: Error) {
-        errorLock.lock()
-        defer { errorLock.unlock() }
-        if firstError == nil { firstError = error }
-    }
+    let state = WriterState()
 
     for (index, pipe) in pipes.enumerated() {
         group.enter()
@@ -192,7 +218,7 @@ private func writeVariant(inputURL: URL, outputURL: URL, variant: String) throws
             while pipe.input.isReadyForMoreMediaData {
                 if let sample = pipe.output.copyNextSampleBuffer() {
                     if !pipe.input.append(sample) {
-                        record(InjectError.append(writer.error?.localizedDescription ?? "media sample append failed"))
+                        state.record(InjectError.append(writer.error?.localizedDescription ?? "media sample append failed"))
                         pipe.input.markAsFinished()
                         group.leave()
                         return
@@ -209,31 +235,33 @@ private func writeVariant(inputURL: URL, outputURL: URL, variant: String) throws
     if let metadataInput, let metadataAdaptor, let payloadData {
         group.enter()
         let queue = DispatchQueue(label: "xdremux.smartstyle.metadata")
-        var index = 0
         metadataInput.requestMediaDataWhenReady(on: queue) {
-            while metadataInput.isReadyForMoreMediaData && index < times.count {
+            while metadataInput.isReadyForMoreMediaData {
+                let index = state.currentMetadataIndex()
+                guard index < times.count else {
+                    metadataInput.markAsFinished()
+                    group.leave()
+                    return
+                }
+
                 let item = AVMutableMetadataItem()
                 item.identifier = AVMetadataIdentifier(rawValue: "mdta/com.apple.quicktime.smartstyle-info")
                 item.dataType = "com.apple.metadata.datatype.raw-data"
                 item.value = payloadData as NSData
                 let timedGroup = AVTimedMetadataGroup(items: [item], timeRange: times[index])
                 if !metadataAdaptor.append(timedGroup) {
-                    record(InjectError.append(writer.error?.localizedDescription ?? "timed metadata append failed at frame \(index)"))
+                    state.record(InjectError.append(writer.error?.localizedDescription ?? "timed metadata append failed at frame \(index)"))
                     metadataInput.markAsFinished()
                     group.leave()
                     return
                 }
-                index += 1
-            }
-            if index == times.count {
-                metadataInput.markAsFinished()
-                group.leave()
+                state.advanceMetadataIndex()
             }
         }
     }
 
     group.wait()
-    if let firstError { throw firstError }
+    if let firstError = state.error() { throw firstError }
     if reader.status == .failed {
         throw InjectError.reader(reader.error?.localizedDescription ?? "reader failed")
     }
