@@ -36,7 +36,7 @@ jobs:
       - name: Extract CameraUI with Objective-C symbols
         run: |
           set -euxo pipefail
-          DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e' | head -1)"
+          DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e*' ! -name '*.symbols' ! -name '*.atlas' ! -name '*.dylddata' ! -name '*.dyldreadonly' ! -name '*.dyldlinkedit' | sort | head -1)"
           test -n "$DSC"
           echo "$DSC" | tee /tmp/report/dsc-path.txt
           ipsw dyld extract "$DSC" CameraUI --objc --stubs --output /tmp/cameraui 2>&1 | tee /tmp/report/cameraui-extract.log
@@ -83,7 +83,7 @@ jobs:
         run: |
           set +e
           mkdir -p /tmp/report
-          DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e' 2>/dev/null | head -1)"
+          DSC="$(find /tmp/ios27 -type f -name 'dyld_shared_cache_arm64e*' ! -name '*.symbols' ! -name '*.atlas' ! -name '*.dylddata' ! -name '*.dyldreadonly' ! -name '*.dyldlinkedit' 2>/dev/null | sort | head -1)"
           if [ -n "$DSC" ] && command -v ipsw >/dev/null; then
             ipsw dyld macho "$DSC" CameraUI --objc --objc-refs --symbols --strings --starts -V > /tmp/report/dyld-cameraui.txt 2>&1
             grep -n -C 30 -E 'desiredSmartStyleSupportForMode|SmartStyleSupport|smartStyleInVideoMode|PhotographicStyle|TextureStyle|CAMFeatureDevelopment|VideoMode|Cinematic' /tmp/report/dyld-cameraui.txt > /tmp/report/dyld-cameraui-relevant.txt || true
