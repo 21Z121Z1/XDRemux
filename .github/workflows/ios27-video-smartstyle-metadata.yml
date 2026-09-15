@@ -19,15 +19,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download public iPhone MOV fixture from GitHub
+      - name: Download public iPhone MOV fixture from GitHub LFS
         shell: bash
         run: |
           set -euxo pipefail
           mkdir -p out/reports
+          # raw.githubusercontent.com returns the LFS pointer for this fixture;
+          # media.githubusercontent.com resolves the exact pinned LFS object.
           curl --fail --location --retry 3 \
-            'https://raw.githubusercontent.com/stefwalter/refly/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone.MOV' \
+            'https://media.githubusercontent.com/media/stefwalter/refly/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone.MOV' \
             -o out/source-iphone.MOV
           test -s out/source-iphone.MOV
+          test "$(stat -f%z out/source-iphone.MOV)" -gt 1024
           shasum -a 256 out/source-iphone.MOV | tee out/reports/source.sha256
           file out/source-iphone.MOV | tee out/reports/source.file.txt
 
@@ -43,7 +46,7 @@ jobs:
           set -euxo pipefail
           exiftool -ee -G1 -s out/source-iphone.MOV | tee out/reports/source.exiftool.txt
           ffprobe -v error -show_format -show_streams -of json out/source-iphone.MOV > out/reports/source.ffprobe.json
-          # This fixture is named iphone.MOV upstream; keep the actual metadata evidence in the artifact.
+          # Keep the actual provenance evidence in the artifact rather than trusting the filename alone.
           grep -Eai 'Apple|iPhone|QuickTime|com\.apple' out/reports/source.exiftool.txt | tee out/reports/source.apple-lines.txt || true
 
       - name: Build AVFoundation injector
