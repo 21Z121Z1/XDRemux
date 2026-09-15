@@ -174,7 +174,7 @@ private func writeVariant(inputURL: URL, outputURL: URL, variant: String) throws
         }
         reader.add(output)
 
-        let hint = track.formatDescriptions.first as? CMFormatDescription
+        let hint: CMFormatDescription? = track.formatDescriptions.first.map { $0 as! CMFormatDescription }
         let input = AVAssetWriterInput(mediaType: track.mediaType, outputSettings: nil, sourceFormatHint: hint)
         input.expectsMediaDataInRealTime = false
         if track.mediaType == .video {
