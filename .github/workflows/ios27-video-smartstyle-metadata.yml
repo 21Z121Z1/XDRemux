@@ -1,0 +1,131 @@
+name: iOS 27 video Smart Style metadata experiment
+
+on:
+  push:
+    branches:
+      - experiment/ios27-video-smartstyle-metadata
+    paths:
+      - scripts/experiments/VideoSmartStyleInjector.swift
+      - .github/workflows/ios27-video-smartstyle-metadata.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inject-and-inspect:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download public iPhone MOV fixture from GitHub
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p out/reports
+          curl --fail --location --retry 3 \
+            'https://raw.githubusercontent.com/stefwalter/refly/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone.MOV' \
+            -o out/source-iphone.MOV
+          test -s out/source-iphone.MOV
+          shasum -a 256 out/source-iphone.MOV | tee out/reports/source.sha256
+          file out/source-iphone.MOV | tee out/reports/source.file.txt
+
+      - name: Install metadata inspection tools
+        shell: bash
+        run: |
+          set -euxo pipefail
+          brew install exiftool ffmpeg
+
+      - name: Inspect source and confirm Apple/iPhone provenance
+        shell: bash
+        run: |
+          set -euxo pipefail
+          exiftool -ee -G1 -s out/source-iphone.MOV | tee out/reports/source.exiftool.txt
+          ffprobe -v error -show_format -show_streams -of json out/source-iphone.MOV > out/reports/source.ffprobe.json
+          # This fixture is named iphone.MOV upstream; keep the actual metadata evidence in the artifact.
+          grep -Eai 'Apple|iPhone|QuickTime|com\.apple' out/reports/source.exiftool.txt | tee out/reports/source.apple-lines.txt || true
+
+      - name: Build AVFoundation injector
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p out/bin
+          xcrun swiftc \
+            -O \
+            -framework AVFoundation \
+            -framework CoreMedia \
+            scripts/experiments/VideoSmartStyleInjector.swift \
+            -o out/bin/VideoSmartStyleInjector
+
+      - name: Generate candidate MOVs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          out/bin/VideoSmartStyleInjector out/source-iphone.MOV out/A-static-keys.MOV static | tee out/reports/A.log
+          out/bin/VideoSmartStyleInjector out/source-iphone.MOV out/B-static-plus-timed-lower.MOV lower | tee out/reports/B.log
+          out/bin/VideoSmartStyleInjector out/source-iphone.MOV out/C-static-plus-timed-compact.MOV compact | tee out/reports/C.log
+          out/bin/VideoSmartStyleInjector out/source-iphone.MOV out/D-static-plus-timed-upper.MOV upper | tee out/reports/D.log
+
+      - name: Inspect injected metadata and validate remuxed media
+        shell: bash
+        run: |
+          set -euxo pipefail
+          for f in out/[ABCD]-*.MOV; do
+            base="$(basename "$f" .MOV)"
+            ffprobe -v error -show_format -show_streams -of json "$f" > "out/reports/${base}.ffprobe.json"
+            exiftool -ee -G1 -s "$f" > "out/reports/${base}.exiftool.txt"
+            strings "$f" | grep -Eai 'smartstyle|smartstyle-info' > "out/reports/${base}.smartstyle-strings.txt" || true
+            test -s "$f"
+          done
+
+          # Static keys are the minimum Photos/Neutrino-side style marker discovered in firmware.
+          grep -q 'com.apple.quicktime.smartstyle.rendering-version' out/reports/A-static-keys.smartstyle-strings.txt
+          grep -q 'com.apple.quicktime.smartstyle.cast' out/reports/A-static-keys.smartstyle-strings.txt
+
+          # Timed candidates must physically contain the smartstyle-info identifier.
+          for x in B-static-plus-timed-lower C-static-plus-timed-compact D-static-plus-timed-upper; do
+            grep -q 'com.apple.quicktime.smartstyle-info' "out/reports/${x}.smartstyle-strings.txt"
+          done
+
+      - name: Write device-test notes
+        shell: bash
+        run: |
+          cat > out/README-DEVICE-TEST.txt <<'EOF'
+          iOS 27 Photos Smart Style video metadata experiment
+
+          Source:
+          https://github.com/stefwalter/refly/blob/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone.MOV
+
+          Import the four candidates into Photos on iOS 27, preferably one at a time, then open Edit.
+          Record whether the Photographic Styles control/space appears and whether changing a style renders successfully.
+
+          A-static-keys.MOV
+            File-level QuickTime Smart Style keys only:
+            rendering-version, cast, intensity, tone, color, bypassed.
+
+          B-static-plus-timed-lower.MOV
+            Same static keys plus a per-video-frame mdta/com.apple.quicktime.smartstyle-info track.
+            Payload is a binary plist using lower-camel Smart Style property names.
+
+          C-static-plus-timed-compact.MOV
+            Same static keys plus the timed track using compact property names.
+
+          D-static-plus-timed-upper.MOV
+            Same static keys plus the timed track using upper-camel property names.
+
+          Important: these are structural probes, not claims of valid Apple reversible style data.
+          A Photos UI success is device evidence; ffprobe/exiftool success only proves container/metadata structure.
+          EOF
+
+      - name: Upload candidates and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios27-video-smartstyle-metadata-candidates
+          path: |
+            out/*.MOV
+            out/README-DEVICE-TEST.txt
+            out/reports/
+          if-no-files-found: warn
+          retention-days: 7
