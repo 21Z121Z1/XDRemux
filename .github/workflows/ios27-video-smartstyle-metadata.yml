@@ -56,12 +56,14 @@ jobs:
           set -euxo pipefail
           mkdir -p out/bin
           xcrun swiftc \
+            -parse-as-library \
             -O \
             -framework AVFoundation \
             -framework CoreMedia \
             scripts/experiments/VideoSmartStyleInjector.swift \
             -o out/bin/VideoSmartStyleInjector
           xcrun swiftc \
+            -parse-as-library \
             -O \
             -framework AVFoundation \
             -framework CoreMedia \
@@ -92,8 +94,6 @@ jobs:
           set -euxo pipefail
           for f in out/[ABCD]-*.MOV; do
             base="$(basename "$f" .MOV)"
-            # FFmpeg does not understand Apple's private timed-metadata stsd predicate.
-            # Preserve its diagnostic, but use AVFoundation above as the native parser gate.
             ffprobe -v error -show_format -show_streams -of json "$f" \
               > "out/reports/${base}.ffprobe.json" \
               2> "out/reports/${base}.ffprobe.stderr.txt" || true
@@ -103,12 +103,8 @@ jobs:
             strings "$f" | grep -Eai 'smartstyle|smartstyle-info' > "out/reports/${base}.smartstyle-strings.txt" || true
             test -s "$f"
           done
-
-          # A proves the file-level marker path independently of the private timed track.
           grep -q 'com.apple.quicktime.smartstyle.rendering-version' out/reports/A-static-keys.smartstyle-strings.txt
           grep -q 'com.apple.quicktime.smartstyle.cast' out/reports/A-static-keys.smartstyle-strings.txt
-
-          # B/C/D must physically carry the Apple timed Smart Style metadata identifier.
           for x in B-static-plus-timed-lower C-static-plus-timed-compact D-static-plus-timed-upper; do
             grep -q 'com.apple.quicktime.smartstyle-info' "out/reports/${x}.smartstyle-strings.txt"
           done
@@ -121,29 +117,17 @@ jobs:
 
           Source fixture:
           https://github.com/stefwalter/refly/blob/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone-invalid.MP4
-          Upstream tests identify it as the iPhone fixture and state that only its date box is intentionally invalid.
 
           Import the four candidates into Photos on iOS 27, preferably one at a time, then open Edit.
           Record whether the Photographic Styles control/space appears and whether changing a style renders successfully.
 
-          A-static-keys.MOV
-            File-level QuickTime Smart Style keys only:
-            rendering-version, cast, intensity, tone, color, bypassed.
+          A-static-keys.MOV: file-level QuickTime Smart Style keys only.
+          B-static-plus-timed-lower.MOV: static keys plus per-frame smartstyle-info binary plist, lower-camel names.
+          C-static-plus-timed-compact.MOV: same, compact names.
+          D-static-plus-timed-upper.MOV: same, upper-camel names.
 
-          B-static-plus-timed-lower.MOV
-            Same static keys plus a per-video-frame mdta/com.apple.quicktime.smartstyle-info track.
-            Payload is a binary plist using lower-camel Smart Style property names.
-
-          C-static-plus-timed-compact.MOV
-            Same static keys plus the timed track using compact property names.
-
-          D-static-plus-timed-upper.MOV
-            Same static keys plus the timed track using upper-camel property names.
-
-          Important: these are structural probes, not claims of valid Apple reversible style data.
-          AVFoundation validation proves macOS can parse the movie, discover the timed metadata track,
-          and read the first encoded video sample. Only an iOS 27 Photos device test can prove that the
-          private payload is sufficient to make the Photographic Styles editor space appear.
+          These are structural probes, not claims of valid Apple reversible style data.
+          Only iOS 27 Photos device testing can establish UI activation.
           EOF
 
       - name: Upload candidates and reports
