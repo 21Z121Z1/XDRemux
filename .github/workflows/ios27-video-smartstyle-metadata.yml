@@ -23,12 +23,14 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p out/reports
-          # raw.githubusercontent.com returns the LFS pointer for this fixture;
-          # media.githubusercontent.com resolves the exact pinned LFS object.
-          curl --fail --location --retry 3 \
-            'https://media.githubusercontent.com/media/stefwalter/refly/c885d0758c6f364ada3e36384a3f6c77c09adb2c/public/fixtures/iphone.MOV' \
-            -o out/source-iphone.MOV
+          mkdir -p out/reports /tmp/refly
+          git lfs version
+          git clone --no-checkout --filter=blob:none https://github.com/stefwalter/refly.git /tmp/refly/repo
+          cd /tmp/refly/repo
+          git checkout c885d0758c6f364ada3e36384a3f6c77c09adb2c -- public/fixtures/iphone.MOV
+          git lfs pull --include='public/fixtures/iphone.MOV' --exclude=''
+          cd "$GITHUB_WORKSPACE"
+          cp /tmp/refly/repo/public/fixtures/iphone.MOV out/source-iphone.MOV
           test -s out/source-iphone.MOV
           test "$(stat -f%z out/source-iphone.MOV)" -gt 1024
           shasum -a 256 out/source-iphone.MOV | tee out/reports/source.sha256
