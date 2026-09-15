@@ -50,31 +50,46 @@ jobs:
           ffprobe -v error -show_format -show_streams -of json out/source-iphone.MP4 > out/reports/source.ffprobe.json
           grep -Eai 'Apple|iPhone|QuickTime|com\.apple|make|model' out/reports/source.exiftool.txt | tee out/reports/source.apple-lines.txt || true
 
+      - name: Typecheck VideoSmartStyleInjector
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p out/bin out/reports
+          xcrun swiftc \
+            -parse-as-library \
+            -typecheck \
+            -framework AVFoundation \
+            -framework CoreMedia \
+            scripts/experiments/VideoSmartStyleInjector.swift \
+            2>&1 | tee out/reports/injector-swiftc-typecheck.txt
+
       - name: Build VideoSmartStyleInjector
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p out/bin
+          mkdir -p out/bin out/reports
           xcrun swiftc \
             -parse-as-library \
             -O \
             -framework AVFoundation \
             -framework CoreMedia \
             scripts/experiments/VideoSmartStyleInjector.swift \
-            -o out/bin/VideoSmartStyleInjector
+            -o out/bin/VideoSmartStyleInjector \
+            2>&1 | tee out/reports/injector-swiftc-build.txt
 
       - name: Build VideoSmartStyleValidator
         shell: bash
         run: |
           set -euxo pipefail
-          mkdir -p out/bin
+          mkdir -p out/bin out/reports
           xcrun swiftc \
             -parse-as-library \
             -O \
             -framework AVFoundation \
             -framework CoreMedia \
             scripts/experiments/VideoSmartStyleValidator.swift \
-            -o out/bin/VideoSmartStyleValidator
+            -o out/bin/VideoSmartStyleValidator \
+            2>&1 | tee out/reports/validator-swiftc-build.txt
 
       - name: Generate candidate MOVs
         shell: bash
