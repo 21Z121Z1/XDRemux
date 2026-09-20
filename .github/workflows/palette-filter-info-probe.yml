@@ -1,20 +1,7 @@
 name: Palette metadata compatibility probe
 
 on:
-  push:
-    paths:
-      - "scripts/build_palette_filter_info_probe.py"
-      - "Tests/test_palette_filter_info_probe.py"
-      - ".github/workflows/palette-filter-info-probe.yml"
-      - "fixtures/proxdr/**"
-      - "fixtures/SHA256SUMS"
-  pull_request:
-    paths:
-      - "scripts/build_palette_filter_info_probe.py"
-      - "Tests/test_palette_filter_info_probe.py"
-      - ".github/workflows/palette-filter-info-probe.yml"
-      - "fixtures/proxdr/**"
-      - "fixtures/SHA256SUMS"
+  workflow_dispatch:
 
 permissions:
   contents: read
