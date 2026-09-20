@@ -11,10 +11,11 @@ For user-facing command-line behavior, see the [CLI reference](cli.en.md).
 Use the Rust workspace for product changes:
 
 ```bash
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo run -p xdremux-cli -- --help
+cargo metadata --locked --no-deps --format-version 1 >/dev/null
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- --deny warnings
+cargo test --locked --workspace --all-targets
+cargo run --locked -p xdremux-cli -- --help
 ```
 
 The canonical product stack is:
