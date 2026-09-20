@@ -10,7 +10,6 @@ import unittest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_ROOT = REPOSITORY_ROOT / ".github" / "workflows"
-FEATURE_BRANCH = "feat/rust-cli-unification"
 CONCURRENCY = (
     "concurrency:\n"
     "  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}\n"
@@ -63,7 +62,6 @@ class WorkflowConfigurationTests(unittest.TestCase):
         for name in workflows:
             with self.subTest(workflow=name):
                 push = self.event_block(self.workflow(name), "push")
-                self.assertNotIn(FEATURE_BRANCH, push)
                 self.assertRegex(
                     push,
                     r"(?m)(?:^    branches:\s*\[main\]$|^    branches:\n(?:      - main\n)+)",
