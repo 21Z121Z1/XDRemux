@@ -1,44 +1,6 @@
-name: macOS 26 Rust Apple adapter integration
+name: XDRemux Apple photo editing device promotion evidence
 
 on:
-  pull_request:
-    paths:
-      - "Package.swift"
-      - "Sources/XDRemuxAppleAdapter/**"
-      - "crates/xdremux-engine/src/apple_*.rs"
-      - "crates/xdremux-engine/src/lib.rs"
-      - "crates/xdremux-runtime/src/apple_*.rs"
-      - "crates/xdremux-runtime/src/apple_styles.rs"
-      - "crates/xdremux-runtime/tests/apple_adapter.rs"
-      - "crates/xdremux-heif/**"
-      - "scripts/check_apple_adapter_handshake.sh"
-      - "scripts/check_rust_cli_apple_portrait.sh"
-      - "scripts/check_rust_style_consumer.sh"
-      - "scripts/build_apple_device_validation.sh"
-      - "scripts/check_apple_device_acceptance.py"
-      - "Tests/test_rust_apple_semantic_policy.py"
-      - "Tests/test_apple_device_acceptance.py"
-      - ".github/workflows/macos26-photographic-styles-smoke.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "Package.swift"
-      - "Sources/XDRemuxAppleAdapter/**"
-      - "crates/xdremux-engine/src/apple_*.rs"
-      - "crates/xdremux-engine/src/lib.rs"
-      - "crates/xdremux-runtime/src/apple_*.rs"
-      - "crates/xdremux-runtime/src/apple_styles.rs"
-      - "crates/xdremux-runtime/tests/apple_adapter.rs"
-      - "crates/xdremux-heif/**"
-      - "scripts/check_apple_adapter_handshake.sh"
-      - "scripts/check_rust_cli_apple_portrait.sh"
-      - "scripts/check_rust_style_consumer.sh"
-      - "scripts/build_apple_device_validation.sh"
-      - "scripts/check_apple_device_acceptance.py"
-      - "Tests/test_rust_apple_semantic_policy.py"
-      - "Tests/test_apple_device_acceptance.py"
-      - ".github/workflows/macos26-photographic-styles-smoke.yml"
   workflow_dispatch:
 
 permissions:

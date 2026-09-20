@@ -56,12 +56,8 @@ class WorkflowConfigurationTests(unittest.TestCase):
         workflows = (
             "ci.yml",
             "completion-gate.yml",
-            "macos26-photographic-styles-smoke.yml",
             "performance.yml",
-            "motion-photo-real-fixtures.yml",
             "rust-cli-core.yml",
-            "rust-codec-core.yml",
-            "rust-engine-core.yml",
             "rust-proxdr-real-fixtures.yml",
         )
         for name in workflows:
@@ -76,12 +72,8 @@ class WorkflowConfigurationTests(unittest.TestCase):
     def test_push_path_filters_remain_present(self) -> None:
         path_filtered = (
             "ci.yml",
-            "macos26-photographic-styles-smoke.yml",
             "performance.yml",
-            "motion-photo-real-fixtures.yml",
             "rust-cli-core.yml",
-            "rust-codec-core.yml",
-            "rust-engine-core.yml",
             "rust-proxdr-real-fixtures.yml",
         )
         for name in path_filtered:
@@ -89,32 +81,49 @@ class WorkflowConfigurationTests(unittest.TestCase):
                 push = self.event_block(self.workflow(name), "push")
                 self.assertRegex(push, r"(?m)^    paths(?:-ignore)?:")
 
+    def test_device_promotion_workflows_are_manual_only(self) -> None:
+        for name in (
+            "macos26-photographic-styles-smoke.yml",
+            "motion-photo-real-fixtures.yml",
+        ):
+            with self.subTest(workflow=name):
+                workflow = self.workflow(name)
+                self.assertIn("  workflow_dispatch:", workflow)
+                self.assertNotIn("  pull_request:", workflow)
+                self.assertNotIn("  push:", workflow)
+
     def test_workflows_with_new_concurrency_policy_have_the_shared_group(self) -> None:
         workflows = (
             "completion-gate.yml",
-            "docs.yml",
-            "policy.yml",
             "motion-photo-real-fixtures.yml",
             "rust-cli-core.yml",
-            "rust-codec-core.yml",
-            "rust-engine-core.yml",
             "rust-proxdr-real-fixtures.yml",
         )
         for name in workflows:
             with self.subTest(workflow=name):
                 self.assertIn(CONCURRENCY, self.workflow(name))
 
-    def test_rust_cli_core_labels_merge_result_gate_correctly(self) -> None:
+    def test_rust_cli_workflow_is_portability_only(self) -> None:
         workflow = self.workflow("rust-cli-core.yml")
-        self.assertIn("- name: Verify merge-result completion gate", workflow)
-        self.assertNotIn("- name: Verify exact-head completion gate", workflow)
+        self.assertIn("name: Rust CLI portability", workflow)
+        self.assertIn("os: [ubuntu-latest, macos-latest, windows-latest]", workflow)
+        self.assertNotIn("agent_completion_gate.py", workflow)
+        self.assertNotIn("cargo clippy", workflow)
+        self.assertNotIn("cargo fmt", workflow)
 
-    def test_configuration_regression_is_wired_into_policy_gates(self) -> None:
-        policy = self.workflow("policy.yml")
-        self.assertIn('"Tests/validation/test_workflow_configuration.py"', policy)
-        self.assertIn("Tests.validation.test_workflow_configuration", policy)
+    def test_performance_workflow_does_not_duplicate_completion(self) -> None:
+        workflow = self.workflow("performance.yml")
+        self.assertIn("scripts/benchmark_rust_product.py", workflow)
+        self.assertIn("scripts/check_performance_budget.py", workflow)
+        self.assertNotIn("scripts/agent_completion_gate.py", workflow)
+        self.assertNotIn("scripts/check_rust_cli_smoke.sh", workflow)
+        self.assertNotIn("XDRemuxAppModelTests", workflow)
+
+    def test_completion_gate_owns_repository_policy_regressions(self) -> None:
         completion_gate = self.workflow("completion-gate.yml")
+        self.assertIn("Tests.validation.test_agent_completion_gate", completion_gate)
         self.assertIn("Tests.validation.test_workflow_configuration", completion_gate)
+        self.assertIn("scripts/check_engine_plan_vectors.sh", completion_gate)
 
 
 if __name__ == "__main__":
