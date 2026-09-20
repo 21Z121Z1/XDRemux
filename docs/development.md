@@ -11,10 +11,11 @@ XDRemux 只有一个产品核心：Rust workspace。唯一公开 CLI 是 Rust `x
 产品改动使用 Rust workspace：
 
 ```bash
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo run -p xdremux-cli -- --help
+cargo metadata --locked --no-deps --format-version 1 >/dev/null
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- --deny warnings
+cargo test --locked --workspace --all-targets
+cargo run --locked -p xdremux-cli -- --help
 ```
 
 Canonical 产品栈为：
