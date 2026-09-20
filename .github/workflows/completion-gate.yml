@@ -106,6 +106,12 @@ jobs:
                 "timeout_seconds": 3600
               },
               {
+                "name": "engine-plan-vectors",
+                "kind": "integration",
+                "command": ["bash", "scripts/check_engine_plan_vectors.sh"],
+                "timeout_seconds": 1200
+              },
+              {
                 "name": "rust-motion-photo-real-fixtures",
                 "kind": "functional",
                 "command": ["bash", "scripts/check_rust_motion_photo_real_fixtures.sh"],
@@ -114,7 +120,7 @@ jobs:
               {
                 "name": "repository-policy-regressions",
                 "kind": "regression",
-                "command": ["python3", "-m", "unittest", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_app_architecture", "Tests.test_performance_design", "Tests.test_rust_artifact_lifecycle", "Tests.test_rust_apple_semantic_policy", "Tests.test_apple_device_acceptance", "Tests.test_rust_portrait_translation", "Tests.validation.test_workflow_configuration"],
+                "command": ["python3", "-m", "unittest", "Tests.validation.test_agent_completion_gate", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_app_architecture", "Tests.test_performance_design", "Tests.test_rust_artifact_lifecycle", "Tests.test_rust_apple_semantic_policy", "Tests.test_apple_device_acceptance", "Tests.test_rust_portrait_translation", "Tests.validation.test_workflow_configuration"],
                 "timeout_seconds": 300
               }
             ]
