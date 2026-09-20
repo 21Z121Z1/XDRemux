@@ -8,13 +8,17 @@ This is the canonical research line for iOS 27 Texture Style work.
 - This directory and `scripts/research/` keep reusable contracts, validators, and probes for unresolved questions.
 - Historical experiment branches can provide provenance, but one-off workflows do not belong in the canonical working tree.
 
-## Current promotion blocker
+## Current promotion blockers
 
-`augment_texture_style_heif` currently reuses one producer-backed 2019 `semanticskinmatte` image and descriptor for all twelve 2026 Texture semantic roles.
+The current carrier contains three useful admission probes that are not valid product facts.
 
-This is useful for container and Photos-admission experiments. It does not prove that the aliased resources contain the semantics named by those roles. A device UI that accepts the carrier does not prove that claim.
+1. `augment_texture_style_heif` reuses one producer-backed 2019 `semanticskinmatte` image and descriptor for all twelve 2026 Texture semantic roles. The published role names therefore exceed the semantics proved by the resource.
+2. The Texture metadata payload is a fixed native-positive sample. It publishes `HardwareModel = iPhone19,2`, `CaptureType = LF`, `CaptureMode = Still`, and `PortType = PortTypeBack` without deriving those facts from the source.
+3. If the source has no Apple MakerNote, the probe synthesizes an `Apple iOS` MakerNote, a source-derived PhotoIdentifier, and Texture tag 84.
 
-Do not promote this implementation while it relies on those aliases. Promotion requires producer-backed content for every published semantic role, or native evidence that the corresponding role is allowed to reference that exact resource without changing its semantic meaning.
+These transformations can test container shape and Apple Photos admission. Device admission does not make the claimed source facts or semantic roles true.
+
+Do not promote this implementation while these probes remain. Product output must preserve or derive producer-backed facts. It must omit unsupported claims or fail closed.
 
 ## Experiment rule
 
@@ -26,4 +30,4 @@ When a GitHub-hosted Apple runner is required, use a narrow `workflow_dispatch` 
 
 Structural HEIC checks, ImageIO readback, and repository completion gates can establish offline conformance only. Apple Photos Texture Style admission and editability require device evidence.
 
-Device admission is still insufficient for semantic-role promotion. The resource content must also match the role that the container claims.
+Device admission is still insufficient for promotion. The resource content and metadata facts must also match what the container claims.
