@@ -2,12 +2,6 @@ name: Palette HEIC Compatibility Probe
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "scripts/build_palette_heic_probe.py"
-      - "Tests/test_palette_heic_probe.py"
-      - ".github/workflows/palette-heic-probe.yml"
-      - "fixtures/IMG20260710191114_ColorOS_16.jpg"
 
 permissions:
   contents: read
