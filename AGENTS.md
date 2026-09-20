@@ -1,87 +1,37 @@
-# XDRemux Agent Acceptance Contract
+# XDRemux Agent Guide
 
 English | [简体中文](AGENTS.zh-CN.md)
 
-An agent must not claim that a change is complete until the required evidence passes for the exact committed `HEAD`.
+XDRemux has one product stack: the Rust `xdremux` CLI, runtime, engine, and media crates. Swift is only the narrow Apple framework adapter. Python is research and training tooling.
 
-This file defines the repository acceptance contract. Use the [validation runbook](docs/validation/README.en.md) for the plan format and examples.
+Read [development](docs/development.en.md) for ownership, [testing policy](docs/quality/testing.en.md) for evidence selection, [validation](docs/validation/README.en.md) for exact-HEAD receipts, and [Apple features](docs/apple-features.en.md) for the platform boundary.
 
-## Required sequence
+## Invariants
 
-1. Identify each affected product path.
-2. Identify the acceptance criteria and required evidence for each path.
-3. Make the intended change without unrelated edits.
-4. Commit the change.
-5. Create a completion-gate plan.
-6. Run the gate against the intended base.
-7. Verify the generated receipt.
-8. Report only the behavior that the evidence proves.
+- Preserve real source facts and verified resource relationships. Do not invent Apple or vendor metadata only to satisfy a parser.
+- `xdremux-engine` owns source facts, user intent, capabilities, deterministic policy, and the conversion plan. `xdremux-runtime` owns execution, validation order, filesystem effects, and atomic or recoverable publication.
+- The Apple adapter performs only operations that require Apple frameworks. It returns facts or primitive results. It does not own product policy.
+- Missing required source data, capability, or validation must fail closed. A failed operation must not damage an existing input or published output.
+- Structural, native-framework, and device evidence are different. A parser pass does not prove Apple Photos editing or gallery behavior.
+- Keep public fixture bytes and provenance exact. Keep private or device-only media outside public Git and public artifacts.
 
-Example:
+## Change process
 
-```bash
-python3 scripts/agent_completion_gate.py run \
-  --base origin/main \
-  --plan /tmp/xdremux-agent-verification.json
+1. Derive current branch, PR, changed-path, and CI state from Git and GitHub. Do not trust copied status in prose.
+2. Read the canonical owner, nearby tests, and applicable contracts before editing.
+3. Make the smallest coherent change. Do not create a second product policy in Swift, Python, scripts, or research code.
+4. Add a regression that checks observable behavior when practical. Do not bind a test to a local variable name or helper call unless that source structure is the contract.
+5. Run the smallest complete evidence set. Bind completion evidence to the committed `HEAD` when product code or validation infrastructure changes.
+6. Report only the behavior that the evidence proves. State device-dependent gaps explicitly.
 
-python3 scripts/agent_completion_gate.py verify \
-  .codex/verification-receipts/$(git rev-parse HEAD).json
-```
+Write the English canonical document first. Finalize it before translating the same scope and limits into Chinese.
 
-A compiler pass, parser pass, or smoke test is not a substitute for the required gate.
+## Research lifecycle
 
-## Evidence requirements
+Product implementation, durable research evidence, and diagnostic probes are different assets. Each experiment must end in one state:
 
-Every source change must have a targeted regression check that would fail for the original defect or contract violation.
+- **PROMOTE**: move the verified contract into canonical code, tests, or current documentation, then remove the superseded probe.
+- **ARCHIVE**: keep only the reproducible evidence, provenance, result, and residual gap that have long-term value.
+- **DISCARD**: remove the probe when its conclusion is absorbed or it has no durable value.
 
-Every production conversion-core or app-core change must also have functional, integration, or device evidence that reaches the changed behavior.
-
-If more than one entry point changes, validate each affected entry point.
-
-Do not use a static source check as functional evidence.
-
-Do not relabel a static check as a regression or functional check to satisfy the gate.
-
-Strict ISO parser success alone is not acceptance evidence for OPPO Gallery behavior. Keep structural, ImageIO, renderer, and device evidence distinct.
-
-Do not use container structure alone as evidence for interactive Apple Photos editing.
-
-A device-dependent product claim requires device evidence. If the required device or closed component is unavailable, report the device-dependent claim as blocked or explicitly limit the claim to tested offline behavior. Do not mark the device-dependent claim complete without device evidence.
-
-All checks declared in a completion plan are mandatory.
-
-## Scope
-
-Use targeted verification by default.
-
-Run broader repository verification for release or preflight work, cross-module changes, or verification-framework changes.
-
-Do not run unrelated expensive checks only to make a plan look more complete.
-
-## Receipt integrity
-
-The completion receipt is bound to:
-
-- `HEAD`;
-- the base commit;
-- changed paths;
-- a clean tracked worktree;
-- declared checks and their results.
-
-A later commit or tracked edit invalidates the receipt.
-
-## Media and fixtures
-
-Public Motion Photo fixtures are versioned under `fixtures/`.
-
-Other large, private, device-only, or Apple-feature samples can remain outside Git.
-
-A verification plan can reference an external local sample when the runner can access it.
-
-Verification receipts under `.codex/verification-receipts/` remain ignored by Git.
-
-## Documentation
-
-Current technical documents follow [docs/style-guide.en.md](docs/style-guide.en.md).
-
-When a code change alters a documented contract, update the English canonical document first and then update the Chinese version.
+A branch name, commit count, structural artifact, or offline metric does not promote a feature. Use an execution plan only for work that spans sessions or PRs, depends on private fixtures or devices, or has a long promotion ladder. Do not store chat logs, chain-of-thought, session journals, branch SHAs, ahead/behind counts, or current workflow status as stable repository knowledge.

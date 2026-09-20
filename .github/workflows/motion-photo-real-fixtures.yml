@@ -1,38 +1,7 @@
-name: Rust Motion Photo real fixtures
+name: XDRemux Live Photo device promotion evidence
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "crates/xdremux-cli/**"
-      - "crates/xdremux-runtime/**"
-      - "crates/xdremux-motion-photo/**"
-      - "crates/xdremux-codec/**"
-      - "crates/xdremux-heif/**"
-      - "crates/xdremux-format/**"
-      - "fixtures/SHA256SUMS"
-      - "fixtures/motion-photo/**"
-      - "scripts/check_rust_motion_photo_real_fixtures.sh"
-      - "scripts/build_live_photo_device_validation.sh"
-      - ".github/workflows/motion-photo-real-fixtures.yml"
-  pull_request:
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "crates/xdremux-cli/**"
-      - "crates/xdremux-runtime/**"
-      - "crates/xdremux-motion-photo/**"
-      - "crates/xdremux-codec/**"
-      - "crates/xdremux-heif/**"
-      - "crates/xdremux-format/**"
-      - "fixtures/SHA256SUMS"
-      - "fixtures/motion-photo/**"
-      - "scripts/check_rust_motion_photo_real_fixtures.sh"
-      - "scripts/build_live_photo_device_validation.sh"
-      - ".github/workflows/motion-photo-real-fixtures.yml"
 
 permissions:
   contents: read

@@ -134,14 +134,11 @@ class PublicDocumentationTests(unittest.TestCase):
             self.assertIn("fixtures/", text)
             self.assertNotIn("Real samples are not in the repository", text)
 
-    def test_documentation_workflows_reference_present_test_module(self) -> None:
-        workflows = (
-            ROOT / ".github" / "workflows" / "docs.yml",
-            ROOT / ".github" / "workflows" / "policy.yml",
-        )
-        for workflow in workflows:
-            text = workflow.read_text(encoding="utf-8")
-            self.assertIn("python3 -m unittest Tests.test_public_documentation", text)
+    def test_public_documentation_is_wired_into_completion_gate(self) -> None:
+        workflow = (
+            ROOT / ".github" / "workflows" / "completion-gate.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Tests.test_public_documentation", workflow)
         self.assertTrue((ROOT / "Tests" / "test_public_documentation.py").is_file())
 
 
