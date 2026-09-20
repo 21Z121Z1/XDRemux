@@ -60,8 +60,6 @@ class WorkflowConfigurationTests(unittest.TestCase):
             "performance.yml",
             "motion-photo-real-fixtures.yml",
             "rust-cli-core.yml",
-            "rust-codec-core.yml",
-            "rust-engine-core.yml",
             "rust-proxdr-real-fixtures.yml",
         )
         for name in workflows:
@@ -80,8 +78,6 @@ class WorkflowConfigurationTests(unittest.TestCase):
             "performance.yml",
             "motion-photo-real-fixtures.yml",
             "rust-cli-core.yml",
-            "rust-codec-core.yml",
-            "rust-engine-core.yml",
             "rust-proxdr-real-fixtures.yml",
         )
         for name in path_filtered:
@@ -92,12 +88,8 @@ class WorkflowConfigurationTests(unittest.TestCase):
     def test_workflows_with_new_concurrency_policy_have_the_shared_group(self) -> None:
         workflows = (
             "completion-gate.yml",
-            "docs.yml",
-            "policy.yml",
             "motion-photo-real-fixtures.yml",
             "rust-cli-core.yml",
-            "rust-codec-core.yml",
-            "rust-engine-core.yml",
             "rust-proxdr-real-fixtures.yml",
         )
         for name in workflows:
@@ -109,12 +101,11 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertIn("- name: Verify merge-result completion gate", workflow)
         self.assertNotIn("- name: Verify exact-head completion gate", workflow)
 
-    def test_configuration_regression_is_wired_into_policy_gates(self) -> None:
-        policy = self.workflow("policy.yml")
-        self.assertIn('"Tests/validation/test_workflow_configuration.py"', policy)
-        self.assertIn("Tests.validation.test_workflow_configuration", policy)
+    def test_completion_gate_owns_repository_policy_regressions(self) -> None:
         completion_gate = self.workflow("completion-gate.yml")
+        self.assertIn("Tests.validation.test_agent_completion_gate", completion_gate)
         self.assertIn("Tests.validation.test_workflow_configuration", completion_gate)
+        self.assertIn("scripts/check_engine_plan_vectors.sh", completion_gate)
 
 
 if __name__ == "__main__":
