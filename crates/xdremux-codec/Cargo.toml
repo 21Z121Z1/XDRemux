@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-libheif-rs = { version = "=2.7.0", default-features = false, features = ["v1_17"] }
+libheif-rs = { version = "=3.0.0", default-features = false, features = ["v1_17"] }
 zune-jpeg = "=0.5.15"
 xdremux-engine = { path = "../xdremux-engine" }
 xdremux-format = { path = "../xdremux-format" }
