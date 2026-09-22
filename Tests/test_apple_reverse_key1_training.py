@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,8 @@ from xdremux_py.apple_reverse_key1_training import (
     INPUT_SIZE,
     KEY1_BYTE_LENGTH,
     build_model,
+    _CachedDataset,
+    TrainingInputMode,
     decode_key1,
     device_profile_vocabulary,
     encode_key1,
@@ -23,6 +26,52 @@ from xdremux_py.apple_reverse_key1_training import (
 
 
 class ReverseKey1TrainingTests(unittest.TestCase):
+    def test_key1_rejects_nonfinite_and_unrepresentable_values(self) -> None:
+        for invalid in (float("nan"), float("inf"), -float("inf"), 65520.0):
+            with self.subTest(value=invalid):
+                value = identity_key1()
+                value[0, 0, 0, 0, 0] = invalid
+                with self.assertRaises(RuntimeError):
+                    encode_key1(value, width_slots=12, height_slots=9)
+        for invalid in (float("nan"), float("inf"), -float("inf")):
+            payload = np.zeros(KEY1_BYTE_LENGTH // 2, dtype="<f2")
+            payload[0] = invalid
+            with self.assertRaises(RuntimeError):
+                decode_key1(payload.tobytes(), display_width=4032, display_height=3024)
+
+    def test_key1_dimensions_are_positive_integers_not_flags(self) -> None:
+        payload = bytes(KEY1_BYTE_LENGTH)
+        for width in (True, 3.5, float("inf"), 0, -1):
+            with self.subTest(width=width), self.assertRaises(RuntimeError):
+                decode_key1(payload, display_width=width, display_height=3024)
+        with self.assertRaises(RuntimeError):
+            encode_key1(identity_key1(), width_slots=12.0, height_slots=9)
+
+    def test_self_pair_changes_only_observation_not_labels_or_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            images = np.zeros((2, 3, INPUT_SIZE, INPUT_SIZE), dtype=np.uint8)
+            images[0, 0] = 255
+            images[1, 1] = 127
+            key1 = identity_key1()
+            mask = np.ones((GRID_LONG, GRID_LONG), dtype=np.bool_)
+            np.savez(root / "one.npz", images=images, key1=key1, mask=mask)
+            before = (root / "one.npz").read_bytes()
+            records = [{"samplePath": "one.npz", "captureSession": "one"}]
+            paired = _CachedDataset(root, records)[0]
+            alone = _CachedDataset(root, records, input_mode=TrainingInputMode.SELF_PAIR)[0]
+            np.testing.assert_array_equal(alone[0][:3], paired[0][:3])
+            np.testing.assert_array_equal(alone[0][:3], alone[0][3:6])
+            self.assertFalse(np.array_equal(paired[0][:3], paired[0][3:6]))
+            self.assertEqual(np.count_nonzero(alone[0][6:]), 0)
+            np.testing.assert_array_equal(alone[1], paired[1])
+            np.testing.assert_array_equal(alone[2], paired[2])
+            self.assertEqual((root / "one.npz").read_bytes(), before)
+        with self.assertRaises(RuntimeError):
+            input_features(images.astype(np.float32))
+        with self.assertRaises(RuntimeError):
+            input_features(images, mode="guess")
+
     def test_identity_template_has_native_quadratic_diagonal(self) -> None:
         identity = identity_key1()
         self.assertEqual(identity.shape, (12, 12, 8, 10, 3))
