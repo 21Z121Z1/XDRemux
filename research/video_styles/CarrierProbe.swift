@@ -70,12 +70,19 @@ private func frameRanges(_ asset: AVAsset, _ track: AVAssetTrack) throws -> [CMT
     var ranges: [CMTimeRange] = []
     while let sample = output.copyNextSampleBuffer() {
         try checkDeadline(started)
-        let pts = CMSampleBufferGetPresentationTimeStamp(sample)
-        let duration = CMSampleBufferGetDuration(sample)
-        guard CMSampleBufferGetNumSamples(sample) == 1,
+        let count = CMSampleBufferGetNumSamples(sample)
+        // AVAssetReader emits empty edit-boundary control buffers. They still
+        // pass unchanged through the A/V writer, but do not describe a frame.
+        // Use output timing: raw media timestamps precede edit-list mapping.
+        let pts = CMSampleBufferGetOutputPresentationTimeStamp(sample)
+        let duration = CMSampleBufferGetOutputDuration(sample)
+        if count == 0, duration == .zero, CMSampleBufferGetTotalSampleSize(sample) == 0 {
+            continue
+        }
+        guard count == 1,
               pts.isNumeric, duration.isNumeric, duration > .zero,
               ranges.count < 100_000 else {
-            throw ProbeFailure("unsupported sample timing/count; no invented frame-rate fallback")
+            throw ProbeFailure("unsupported sample timing/count: count=\(count) pts=\(pts) duration=\(duration)")
         }
         ranges.append(CMTimeRange(start: pts, duration: duration))
     }
