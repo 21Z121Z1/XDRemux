@@ -159,8 +159,12 @@ private func construct(source: URL, destination: URL, variant: Variant) async th
         let input = AVAssetWriterInput(mediaType: track.mediaType, outputSettings: nil, sourceFormatHint: format)
         input.expectsMediaDataInRealTime = false
         input.metadata = try await track.load(.metadata)
-        input.mediaTimeScale = try await track.load(.naturalTimeScale)
-        if track.mediaType == .video { input.transform = try await track.load(.preferredTransform) }
+        // Audio derives its timescale from the compressed format description;
+        // AVFoundation raises NSInvalidArgumentException for an audio override.
+        if track.mediaType == .video {
+            input.mediaTimeScale = try await track.load(.naturalTimeScale)
+            input.transform = try await track.load(.preferredTransform)
+        }
         guard writer.canAdd(input) else { throw ProbeFailure("cannot add compressed writer input") }
         writer.add(input)
         pipes.append(Pipe(output: output, input: input))
