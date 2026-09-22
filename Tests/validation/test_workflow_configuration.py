@@ -79,21 +79,20 @@ class WorkflowConfigurationTests(unittest.TestCase):
                 push = self.event_block(self.workflow(name), "push")
                 self.assertRegex(push, r"(?m)^    paths(?:-ignore)?:")
 
-    def test_device_promotion_workflows_are_manual_only(self) -> None:
-        for name in (
-            "macos26-photographic-styles-smoke.yml",
-            "motion-photo-real-fixtures.yml",
-        ):
-            with self.subTest(workflow=name):
-                workflow = self.workflow(name)
-                self.assertIn("  workflow_dispatch:", workflow)
-                self.assertNotIn("  pull_request:", workflow)
-                self.assertNotIn("  push:", workflow)
+    def test_workflow_set_stays_minimal(self) -> None:
+        expected = {
+            "ci.yml",
+            "completion-gate.yml",
+            "performance.yml",
+            "rust-cli-core.yml",
+            "rust-proxdr-real-fixtures.yml",
+        }
+        actual = {path.name for path in WORKFLOW_ROOT.glob("*.yml")}
+        self.assertEqual(actual, expected)
 
     def test_workflows_with_new_concurrency_policy_have_the_shared_group(self) -> None:
         workflows = (
             "completion-gate.yml",
-            "motion-photo-real-fixtures.yml",
             "rust-cli-core.yml",
             "rust-proxdr-real-fixtures.yml",
         )
