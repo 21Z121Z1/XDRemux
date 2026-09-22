@@ -80,6 +80,41 @@ class PaletteResearchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             probe.carry_context(sample([dict(name="watermark", offset=3, length=3)]), base)
 
+    def test_context_preserves_all_four_original_render_context_contracts(self):
+        blocks = [
+            ("basictone.vig.table", b"vig"),
+            ("filter.info", b"excluded"),
+            ("basictone.info", b"basic"),
+            ("hdr.transform.data", b"hdr"),
+            ("basictone.lmtlut.table", b"lut"),
+        ]
+        payload = b"".join(block for _, block in blocks)
+        records, cursor = [], 0
+        for name, block in blocks:
+            records.append(dict(name=name, offset=len(payload) - cursor,
+                                length=len(block), version=17, future={"keep": True}))
+            cursor += len(block)
+        # Logical order need not match the physical payload order.
+        records.reverse()
+        text = json.dumps(records, separators=(",", ":")).encode()
+        source = payload + text + b"\0wtmk" + struct.pack("<I", len(text) + 9)
+        base = struct.pack(">I4s4sI", 16, b"ftyp", b"heic", 0)
+        parsed = probe.parse(probe.carry_context(source, base))
+        self.assertEqual([e.name for e in parsed.entries],
+                         [r["name"] for r in records if r["name"] in probe.CONTEXT_NAMES])
+        self.assertEqual({e.name: parsed.payload(e) for e in parsed.entries},
+                         {name: block for name, block in blocks if name in probe.CONTEXT_NAMES})
+        self.assertEqual(parsed.tag, b"wtmk")
+        for entry in parsed.entries:
+            self.assertEqual(entry.fields["future"], {"keep": True})
+            self.assertEqual(entry.fields["version"], 17)
+
+    def test_overflowed_json_float_is_not_a_finite_measurement(self):
+        text = b'[{"name":"a","offset":3,"length":3,"future":1e10000}]'
+        source = b"abc" + text + b"\0jxrs" + struct.pack("<I", len(text) + 9)
+        with self.assertRaisesRegex(ValueError, "non-finite"):
+            probe.parse(source)
+
     def test_malformed_and_ambiguous_manifests_are_rejected(self):
         cases = [b"", b"x" * 30, sample()[:-1], sample()[:-4] + struct.pack("<I", 2**32-1)]
         for record in (dict(name="a", offset=True, length=1), dict(name="a", offset="3", length=1),

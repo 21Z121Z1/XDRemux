@@ -1,0 +1,42 @@
+name: Research evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "research/**"
+      - "xdremux_py/**"
+      - "Tests/test_*.py"
+      - "pyproject.toml"
+      - ".github/workflows/research.yml"
+  pull_request:
+    paths:
+      - "research/**"
+      - "xdremux_py/**"
+      - "Tests/test_*.py"
+      - "pyproject.toml"
+      - ".github/workflows/research.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install research test dependencies
+        run: python -m pip install ".[training]"
+      - name: Run all portable regression tests
+        run: python -m unittest discover -s Tests -p 'test_*.py' -v

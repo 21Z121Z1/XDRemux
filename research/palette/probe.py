@@ -10,6 +10,7 @@ import argparse
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import struct
@@ -59,6 +60,13 @@ def _reject_constant(value: str) -> None:
     raise ValueError(f"non-finite JSON value: {value}")
 
 
+def _finite_float(value: str) -> float:
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError(f"non-finite JSON number: {value}")
+    return result
+
+
 def parse(data: bytes) -> Manifest:
     """Reject ambiguous/truncated tails instead of searching arbitrary bytes."""
     if len(data) < 11 or data[-9] != 0:
@@ -73,7 +81,8 @@ def parse(data: bytes) -> Manifest:
     try:
         fields = json.loads(data[start:-9].decode("utf-8"),
                             object_pairs_hook=_unique_object,
-                            parse_constant=_reject_constant)
+                            parse_constant=_reject_constant,
+                            parse_float=_finite_float)
     except (UnicodeError, json.JSONDecodeError, RecursionError) as error:
         raise ValueError("invalid manifest JSON") from error
     if not isinstance(fields, list) or not 1 <= len(fields) <= MAX_ENTRIES:
