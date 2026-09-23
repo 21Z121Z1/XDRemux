@@ -34,6 +34,7 @@ use std::error::Error;
 use std::fmt;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[cfg(target_os = "macos")]
 use std::fs;
@@ -67,10 +68,11 @@ use xdremux_metadata::{make_apple_tmap_payload, make_hdrgm_xmp};
 #[cfg(target_os = "macos")]
 const APPLE_PORTRAIT_BASE_QUALITY: f64 = 0.9;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct RuntimeError {
     context: &'static str,
     detail: String,
+    source: Option<Arc<dyn Error + Send + Sync>>,
 }
 
 impl RuntimeError {
@@ -78,21 +80,43 @@ impl RuntimeError {
         Self {
             context,
             detail: detail.into(),
+            source: None,
         }
     }
 
-    pub(crate) fn external(context: &'static str, error: impl fmt::Display) -> Self {
-        Self::new(context, error.to_string())
+    pub(crate) fn external(context: &'static str, error: impl Error + Send + Sync + 'static) -> Self {
+        Self {
+            context,
+            detail: error.to_string(),
+            source: Some(Arc::new(error)),
+        }
     }
 }
 
+// Preserve the public error's existing diagnostic equality contract. The
+// retained cause enables inspection/downcasting; pointer identity is not an
+// equality condition, and cloning must not flatten the error chain.
+impl PartialEq for RuntimeError {
+    fn eq(&self, other: &Self) -> bool {
+        self.context == other.context && self.detail == other.detail
+    }
+}
+
+impl Eq for RuntimeError {}
+
+// Display remains complete for existing CLI/JSON callers. Chain-aware callers
+// should not concatenate this legacy diagnostic with its source a second time.
 impl fmt::Display for RuntimeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}: {}", self.context, self.detail)
     }
 }
 
-impl Error for RuntimeError {}
+impl Error for RuntimeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.source.as_deref().map(|source| source as &dyn Error)
+    }
+}
 
 pub type Result<T> = std::result::Result<T, RuntimeError>;
 
@@ -844,6 +868,39 @@ mod tests {
     use xdremux_engine::OutputIntent;
     use xdremux_format::isobmff::{make_box, MDAT};
     use xdremux_format::FourCC;
+
+    #[test]
+    fn runtime_error_retains_typed_sources_through_context_and_clone() {
+        let io = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
+        let error = RuntimeError::external("conversion", RuntimeError::external("read", io));
+        let cloned = error.clone();
+        assert_eq!(error, cloned);
+        assert_eq!(cloned.to_string(), "conversion: read: denied");
+        let context = cloned
+            .source()
+            .unwrap()
+            .downcast_ref::<RuntimeError>()
+            .unwrap();
+        let source = context
+            .source()
+            .unwrap()
+            .downcast_ref::<std::io::Error>()
+            .unwrap();
+        assert_eq!(source.kind(), std::io::ErrorKind::PermissionDenied);
+        assert_eq!(source.to_string(), "denied");
+        assert!(source.source().is_none());
+    }
+
+    #[test]
+    fn diagnostic_only_error_has_no_invented_source() {
+        let error = RuntimeError::new("input", "unsupported");
+        assert!(error.source().is_none());
+        assert_eq!(error.to_string(), "input: unsupported");
+        assert_eq!(error, RuntimeError::new("input", "unsupported"));
+        assert_ne!(error, RuntimeError::new("output", "unsupported"));
+        fn assert_thread_safe<T: Send + Sync>() {}
+        assert_thread_safe::<RuntimeError>();
+    }
 
     #[test]
     fn standard_heif_body_drops_post_mdat_vendor_tail() {
