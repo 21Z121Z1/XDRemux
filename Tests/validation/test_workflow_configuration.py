@@ -106,6 +106,13 @@ class WorkflowConfigurationTests(unittest.TestCase):
             self.assertNotIn(forbidden, workflow)
         self.assertIn("research.video_styles.smoke", workflow)
 
+    def test_native_research_failure_artifacts_are_not_a_success_waiver(self) -> None:
+        workflow = self.workflow("research.yml")
+        self.assertIn("- uses: actions/upload-artifact@v7\n        if: ${{ always() }}", workflow)
+        self.assertIn('> "$RUNNER_TEMP/video-style-evidence.json"', workflow)
+        self.assertNotIn("continue-on-error", workflow)
+        self.assertNotIn("|| true", workflow)
+
     def test_workflows_with_new_concurrency_policy_have_the_shared_group(self) -> None:
         workflows = (
             "completion-gate.yml",

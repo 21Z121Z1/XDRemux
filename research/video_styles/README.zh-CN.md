@@ -85,3 +85,19 @@ Photos 导入、独立参数编辑、保存、重开和撤销。对照矩阵否�
 
 可移植回归：`python -m unittest Tests.test_video_style_research -v`。
 原生结构检查位于 `.github/workflows/research.yml`，与产品验收分开，成功也不改变上述支持状态。
+
+## 失败证据
+
+probe 失败时输出 JSON receipt 并返回非零退出码。timing mismatch 保留媒体类型、
+source/candidate track ID 和 stream index、packet index（stream timing 为 null）、
+原始 tick/time base 和精确有理数。临时 candidate 在清理前计算 hash；parity 失败后
+不会发布，也不会作为 artifact 保留。source hash/readback 区分未改变、改变和证据
+不可用；不可用值为 null。
+
+synthetic gate 即使遇到前序失败也记录 H.264/HEVC10 × static/lower/compact/upper
+全部八项。八项结果、terminal empty-marker coverage、no-clobber/source immutability
+和 malformed-input rejection 都是必需项。prerequisite 缺失不能让 malformed control
+通过。CI 在成功或失败时均上传 JSON 诊断，但不会豁免失败退出码。carrier trial 成功
+而后续 smoke control 失败时，整体仍失败，并如实记录此前已完成的 publication。
+
+诊断回归：`python -m unittest Tests.test_video_style_research Tests.test_video_style_diagnostics -v`。

@@ -59,6 +59,7 @@ jobs:
       - name: Verify H264, HEVC10, audio, rotation, all payload hypotheses and no-clobber publication
         run: python -m research.video_styles.smoke --helper "$RUNNER_TEMP/CarrierProbe" > "$RUNNER_TEMP/video-style-evidence.json"
       - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
         with:
           name: video-style-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/video-style-evidence.json

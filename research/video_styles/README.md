@@ -83,6 +83,23 @@ removed. The full-packet validator remains the publication gate.
 The synthetic smoke gate asserts that this control-buffer path is exercised.
 It is evidence about the tested public framework behavior, not iOS 27 Photos.
 
+## Failure evidence
+
+The probe emits a JSON receipt and returns a nonzero status on failure. Timing
+mismatches retain media kind, source/candidate track IDs and stream indices,
+packet index (null for stream timing), raw ticks/time bases and exact rational
+values. The temporary candidate is hashed before cleanup, never published after
+failed parity, and not retained as an artifact. Source hash/readback distinguishes
+unchanged input from unavailable or changed input; unavailable evidence is null.
+
+The synthetic gate records every H.264/HEVC10 × static/lower/compact/upper case,
+even after an earlier failure. All eight cases, terminal empty-marker coverage,
+no-clobber/source-immutability controls and malformed-input rejection are mandatory.
+A missing prerequisite cannot pass the malformed-input control. CI uploads the
+JSON diagnostic on failure as well as success; uploading evidence does not waive
+the failing exit status. A successful carrier trial followed by a failed smoke
+control remains an unsuccessful test and reports its earlier publication honestly.
+
 ## Promotion gate
 
 A structurally readable file is insufficient. Promotion additionally requires a
@@ -100,6 +117,6 @@ pass, `photosEditingValidated` remains false regardless of CI results.
 - [Metadata adaptor](https://developer.apple.com/documentation/avfoundation/avassetwriterinputmetadataadaptor): append timed metadata groups with an explicit boxed format description; the installed SDK and native readback are the executable contract.
 - [ffprobe](https://ffmpeg.org/ffprobe.html): `-show_packets -show_streams -show_data_hash sha256` supplies complete packet and codec-extradata checksums. Rational timestamps avoid rounding-based false equivalence.
 
-Portable regressions: `python -m unittest Tests.test_video_style_research -v`.
+Portable regressions: `python -m unittest Tests.test_video_style_research Tests.test_video_style_diagnostics -v`.
 Native structural gate: `.github/workflows/research.yml`, separate from product
 acceptance. A passing research gate never changes the support status above.
