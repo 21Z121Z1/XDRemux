@@ -86,9 +86,25 @@ class WorkflowConfigurationTests(unittest.TestCase):
             "performance.yml",
             "rust-cli-core.yml",
             "rust-proxdr-real-fixtures.yml",
+            # One reusable research-evidence workflow, not a product gate or
+            # another per-hypothesis writer. Historical one-shot workflows stay out.
+            "research.yml",
         }
         actual = {path.name for path in WORKFLOW_ROOT.glob("*.yml")}
         self.assertEqual(actual, expected)
+
+    def test_research_evidence_is_read_only_exact_head_and_separate(self) -> None:
+        workflow = self.workflow("research.yml")
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn(CONCURRENCY, workflow)
+        self.assertIn("    branches: [main]", self.event_block(workflow, "push"))
+        for event in ("push", "pull_request"):
+            self.assertIn("    paths:", self.event_block(workflow, event))
+        for forbidden in ("contents: write", "secrets.", "pull_request_target", "git push",
+                          "agent_completion_gate.py", "workflow_dispatch"):
+            self.assertNotIn(forbidden, workflow)
+        self.assertIn("research.video_styles.smoke", workflow)
 
     def test_workflows_with_new_concurrency_policy_have_the_shared_group(self) -> None:
         workflows = (

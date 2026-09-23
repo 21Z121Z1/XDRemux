@@ -62,3 +62,12 @@ User-visible command names, options, defaults, output-safety rules, and support 
 When code changes one of these contracts, update the English and Chinese documentation in the same change.
 
 Current technical documentation follows the [technical writing guide](../style-guide.en.md).
+
+## Research regression evidence
+
+A single reusable `research.yml` workflow owns portable research tests and native
+carrier readback. It runs read-only against the exact pull-request or main SHA,
+with research-specific path filters. It neither writes repository refs nor
+supplies the product `exact-head` check. A research pass does not promote a
+hypothesis or establish Photos/Gallery device acceptance. Keep per-experiment
+commands and promotion gates next to their code; do not add one-shot workflows.
