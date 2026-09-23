@@ -15,6 +15,8 @@ import json
 import hashlib
 import io
 import math
+import os
+import tempfile
 import re
 import subprocess
 from collections import Counter, defaultdict
@@ -1067,8 +1069,39 @@ class _UniversalDataset:
         )
 
 
+def _require_finite_tensors(torch: Any, values: Mapping[str, Any], phase: str) -> None:
+    for name, value in values.items():
+        if not bool(torch.isfinite(value).all()):
+            raise ReverseKey1Error(f"{phase} contains non-finite tensor: {name}")
+
+
+def _require_finite_metrics(values: Mapping[str, Any], phase: str) -> None:
+    try:
+        json.dumps(values, allow_nan=False)
+    except (TypeError, ValueError) as error:
+        raise ReverseKey1Error(f"{phase} contains non-finite or invalid metrics") from error
+
+
+def _atomic_checkpoint(torch: Any, path: Path, checkpoint: Mapping[str, Any]) -> None:
+    """Replace a checkpoint only after a complete write in this run's new directory."""
+    staging: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".checkpoint-", delete=False) as raw:
+            staging = Path(raw.name)
+            torch.save(checkpoint, raw)
+            raw.flush()
+            os.fsync(raw.fileno())
+        os.replace(staging, path)
+    finally:
+        if staging is not None:
+            staging.unlink(missing_ok=True)
+
+
 def _model_forward(model: Any, batch: Sequence[Any]) -> Mapping[str, Any]:
-    return model(batch[0], batch[1], batch[2], batch[12], batch[13], batch[14])
+    torch, _ = _require_torch()
+    output = model(batch[0], batch[1], batch[2], batch[12], batch[13], batch[14])
+    _require_finite_tensors(torch, output, "model prediction")
+    return output
 
 
 def _apply_modality_policy(batch: Sequence[Any], policy: str) -> tuple[Any, ...]:
@@ -1311,9 +1344,13 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         raise ReverseKey1Error(
             f"unsupported universal architecture: {config.architecture}"
         )
+    output = config.output.absolute()
+    if output.exists() or output.is_symlink():
+        raise FileExistsError(output)
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
     manifest = config.manifest.resolve()
+    manifest_hash = sha256_file(manifest)
     header, records = load_universal_manifest(manifest)
     by_split = {
         split: [record for record in records if record["split"] == split]
@@ -1368,12 +1405,12 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         for split, values in by_split.items()
     }
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-4)
-    output = config.output.resolve()
-    output.mkdir(parents=True, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=False)
     best_score = float("inf")
     best_epoch = 0
     history = []
-    manifest_hash = sha256_file(manifest)
+    if sha256_file(manifest) != manifest_hash:
+        raise ReverseKey1Error("training manifest changed during dataset preparation")
     for epoch in range(1, config.epochs + 1):
         model.train()
         totals = []
@@ -1385,8 +1422,10 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
             total, details = _losses(
                 torch, model, prediction, batch, consumer_weight=config.consumer_weight
             )
+            if not bool(torch.isfinite(total).all()):
+                raise ReverseKey1Error("training loss is non-finite")
             total.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0, error_if_nonfinite=True)
             optimizer.step()
             totals.append(float(total.detach().cpu()))
             for name, value in details.items():
@@ -1398,6 +1437,7 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
             device,
             modality_policy="primary_only",
         )
+        _require_finite_metrics(calibration, "calibration")
         score = calibration["key1NormalizedMAE"] + 0.15 * (
             calibration["gtcNormalizedMAE"] + calibration["lightMapsNormalizedMAE"]
         )
@@ -1410,6 +1450,10 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
             "calibration": calibration,
             "selectionScore": score,
         }
+        _require_finite_metrics(row, "training epoch")
+        _require_finite_tensors(torch, model.state_dict(), "checkpoint")
+        if sha256_file(manifest) != manifest_hash:
+            raise ReverseKey1Error("training manifest changed during fitting")
         history.append(row)
         checkpoint = {
             "schema": REPORT_SCHEMA,
@@ -1426,11 +1470,11 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
             "metadataFields": list(METADATA_FIELDS),
             "styleScalarFields": list(STYLE_SCALAR_FIELDS),
         }
-        torch.save(checkpoint, output / "last.pt")
+        _atomic_checkpoint(torch, output / "last.pt", checkpoint)
         if score < best_score:
             best_score = score
             best_epoch = epoch
-            torch.save(checkpoint, output / "best.pt")
+            _atomic_checkpoint(torch, output / "best.pt", checkpoint)
         _atomic_json(output / "history.json", history)
         print(json.dumps(row, sort_keys=True), flush=True)
     best = torch.load(output / "best.pt", map_location=device, weights_only=True)
@@ -1488,5 +1532,8 @@ def train_universal_model(config: UniversalTrainingConfig) -> dict[str, Any]:
         "resumeMode": "manifest-locked-weights-only" if config.resume else None,
         "warmStart": str(config.warm_start.resolve()) if config.warm_start else None,
     }
+    _require_finite_metrics(report, "training report")
+    if sha256_file(manifest) != manifest_hash:
+        raise ReverseKey1Error("training manifest changed during evaluation")
     _atomic_json(output / "report.json", report)
     return report

@@ -39,6 +39,9 @@ GTC 标签保留完整的 516-byte mixed-layout Tag3 字节。将其当成平坦
 `base`、`multiscale_large`、`multimodal_large` 都是研究模型变体。warm start 必须包含
 全部 learned parameters，保留目标语料统计量，并将新增 modality channel 初始化为零。
 `--resume` 只表示绑定同一 manifest 的 weights-only continuation，不恢复完整 optimizer/RNG。
+所有运行（包括 continuation）必须使用新的输出目录；不复用已有 checkpoint，也不跟随输出符号链接。
+预测、loss、gradient 或选择指标出现非有限值时立即失败，不能沿用旧 `best.pt`。
+checkpoint 在新运行目录内完成暂存后才原子替换；manifest 在拟合前绑定哈希，在发布证据前重新检查。
 checkpoint 由 calibration 选择，随后才进行 heldout evaluation。
 `consumerProxyRMSE8` 使用逐像素 squared residual，而不是逐图 MAE 的平方；encoded-RGB
 quadratic proxy 只是训练 regularizer，不是 Apple renderer。
@@ -89,6 +92,7 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 
 ## 一手参考
 
+- [PyTorch finite gradient checks](https://docs.pytorch.org/docs/stable/generated/torch.nn.utils.clip_grad_norm_.html)：拒绝非有限梯度，不把它们缩放成无效 checkpoint。
 - [PyTorch checkpoint loading](https://docs.pytorch.org/docs/stable/generated/torch.load)：restricted loading 与 provenance 注意事项。
 - [Core ML compute units](https://developer.apple.com/documentation/coreml/mlmodelconfiguration/computeunits)：允许使用的处理单元不能证明实际 ANE placement。
 - [scikit-image 0.24 图像来源](https://scikit-image.org/docs/0.24.x/api/skimage.data.html)：对应 revision 的来源和 license 记录。

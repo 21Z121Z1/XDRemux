@@ -36,6 +36,9 @@ from research.oppo_styles.training import (
     build_universal_model,
     primary_image_features,
     normalized_primary_rgb,
+    _atomic_checkpoint,
+    _require_finite_tensors,
+    _require_finite_metrics,
 )
 
 
@@ -487,8 +490,13 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
         raise ReverseKey1Error("loss weights and learning rate must be finite with valid positive/nonnegative ranges")
     if config.device == "mps" and not torch.backends.mps.is_available():
         raise ReverseKey1Error("MPS was requested but is unavailable")
+    run_directory = config.output.absolute()
+    if run_directory.exists() or run_directory.is_symlink():
+        raise FileExistsError(run_directory)
     manifest = config.manifest.resolve()
-    value = json.loads(manifest.read_text(encoding="utf-8"))
+    manifest_bytes = manifest.read_bytes()
+    manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
+    value = json.loads(manifest_bytes)
     if value.get("schema") != PUBLIC_CORPUS_SCHEMA:
         raise ReverseKey1Error("invalid public style corpus manifest")
     records = value.get("samples")
@@ -550,6 +558,7 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
                     torch.zeros((len(primary), len(METADATA_FIELDS)), device=config.device),
                     torch.zeros((len(primary), len(METADATA_FIELDS)), device=config.device),
                 )
+                _require_finite_tensors(torch, output, "public model evaluation")
                 key_errors.extend(
                     (output["key1"] - key1)
                     .abs()
@@ -587,11 +596,14 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
                     .cpu()
                     .tolist()
                 )
-        return {
+        metrics = {
             "key1MAE": float(np.mean(key_errors)),
             "unstyledMAE": float(np.mean(unstyled_errors)),
             "syntheticResponseRMSE8": float(np.mean(response_errors)),
         }
+
+        _require_finite_metrics(metrics, "public model evaluation")
+        return metrics
 
     baseline = evaluate("calibration")
     best_epoch = 0
@@ -611,14 +623,17 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
                 torch.zeros((len(primary), len(METADATA_FIELDS)), device=config.device),
                 torch.zeros((len(primary), len(METADATA_FIELDS)), device=config.device),
             )
+            _require_finite_tensors(torch, output, "public model prediction")
             key_loss = torch.nn.functional.l1_loss(output["key1"], key1)
             unstyled_loss = torch.nn.functional.l1_loss(output["unstyled"], clean)
             loss = (
                 config.key_loss_weight * key_loss
                 + config.unstyled_loss_weight * unstyled_loss
             )
+            if not bool(torch.isfinite(loss).all()):
+                raise ReverseKey1Error("public training loss is non-finite")
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0, error_if_nonfinite=True)
             optimizer.step()
             losses.append(float(loss.detach().cpu()))
         metrics = evaluate("calibration")
@@ -637,24 +652,26 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
     model.load_state_dict(best_state)
     # No heldout access occurs before the selected weights are frozen.
     heldout = evaluate("heldout")
-    output = config.output.resolve()
-    output.mkdir(parents=True, exist_ok=True)
+    _require_finite_tensors(torch, model.state_dict(), "public checkpoint")
+    if sha256_file(manifest) != manifest_hash:
+        raise ReverseKey1Error("public manifest changed during fitting")
+    run_directory.mkdir(parents=True, exist_ok=False)
     checkpoint = {
         "schema": SYNTHETIC_REPORT_SCHEMA,
         "architecture": "UniversalPhotographicStyleStateNet-v3-optional-modalities",
         "architectureConfig": "multimodal_large",
         "epoch": best_epoch,
-        "manifestSHA256": sha256_file(manifest),
+        "manifestSHA256": manifest_hash,
         "model": model.state_dict(),
         "statistics": {name: array.tolist() for name, array in statistics.items()},
         "metadataFields": list(METADATA_FIELDS),
         "styleScalarFields": list(STYLE_SCALAR_FIELDS),
         "syntheticPretrainingOnly": True,
     }
-    torch.save(checkpoint, output / "synthetic-pretrained.pt")
+    _atomic_checkpoint(torch, run_directory / "synthetic-pretrained.pt", checkpoint)
     report = {
         "schema": SYNTHETIC_REPORT_SCHEMA,
-        "manifestSHA256": sha256_file(manifest),
+        "manifestSHA256": manifest_hash,
         "sourceSamples": len(records),
         "syntheticExamples": sum(len(rows) for rows in examples.values()),
         "splitExamples": {name: len(rows) for name, rows in examples.items()},
@@ -679,5 +696,6 @@ def pretrain_public_synthetic_style(config: PublicPretrainingConfig) -> dict[str
             "Neutrino solver supervision and cannot establish production accuracy."
         ),
     }
-    _atomic_json(output / "report.json", report)
+    _require_finite_metrics(report, "public training report")
+    _atomic_json(run_directory / "report.json", report)
     return report

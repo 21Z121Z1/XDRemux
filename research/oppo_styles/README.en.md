@@ -49,6 +49,11 @@ The three model variants (`base`, `multiscale_large`, `multimodal_large`) remain
 research alternatives. Warm starts must include every learned parameter and keep
 target-corpus statistics; newly added modality channels start at zero. `--resume`
 is manifest-locked **weights-only continuation**, not optimizer/RNG-exact resumption.
+Every run requires a new output directory, including continuation runs. Existing
+checkpoints and output symlinks are never reused. Non-finite predictions, losses,
+gradients or selection metrics stop the run; a failed selection cannot inherit an
+older `best.pt`. Checkpoint writes are staged atomically inside the new run directory.
+The manifest identity is pinned before fitting and checked before publishing evidence.
 Calibration chooses the checkpoint; heldout evaluation follows that choice.
 `consumerProxyRMSE8` uses squared pixel residuals, not squared per-image MAE.
 The encoded-RGB quadratic proxy is a training regularizer, not Apple's renderer.
@@ -109,6 +114,7 @@ accuracy. Real-device Photos import/edit/save/reopen evidence remains absent.
 
 ## Primary references
 
+- [PyTorch finite gradient checks](https://docs.pytorch.org/docs/stable/generated/torch.nn.utils.clip_grad_norm_.html): reject non-finite gradients rather than scaling them into invalid checkpoints.
 - [PyTorch checkpoint loading](https://docs.pytorch.org/docs/stable/generated/torch.load): restricted loading and provenance cautions.
 - [Core ML compute units](https://developer.apple.com/documentation/coreml/mlmodelconfiguration/computeunits): permitted processing units do not identify actual ANE placement.
 - [scikit-image 0.24 image provenance](https://scikit-image.org/docs/0.24.x/api/skimage.data.html): revision-specific source/license records.
