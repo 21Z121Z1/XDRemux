@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
 from pathlib import Path
 import subprocess
 import sys
@@ -163,8 +164,6 @@ class CompletionGateTests(unittest.TestCase):
     def test_changed_paths_are_nul_delimited_not_display_quoted(self) -> None:
         names = ['crates/space and "quote".rs', "crates/new\nline.rs", "crates/tab\tname.rs",
                  "research/中文.rs", " leading-space.py"]
-        if os.name == "posix":
-            names.append(os.fsdecode(b"crates/non-utf8-\xff.rs"))
         for name in names:
             self.add_tracked_file(name)
         receipt = self.repo / "receipt.json"
@@ -173,6 +172,35 @@ class CompletionGateTests(unittest.TestCase):
         self.assertEqual(set(json.loads(receipt.read_text())["changed_files"]), set(names))
         result = self.run_gate(self.write_plan([self.passing_check("static", "static")]), receipt)
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
+    def test_non_utf8_tree_path_bytes_are_preserved_without_checkout(self) -> None:
+        # Git can store byte names that APFS cannot materialize. Exercise the
+        # real Git records without assuming the host filesystem accepts them.
+        blob = subprocess.check_output(
+            ["git", "hash-object", "-w", "--stdin"], cwd=self.repo, input=b"// source\n"
+        ).strip()
+        tree = subprocess.check_output(
+            ["git", "mktree", "-z"], cwd=self.repo,
+            input=b"100644 blob " + blob + b"\tbad-\xff.rs\0",
+        ).strip()
+        root = subprocess.check_output(
+            ["git", "mktree", "-z"], cwd=self.repo,
+            input=b"040000 tree " + tree + b"\tcrates\0",
+        ).strip()
+        head = subprocess.check_output(
+            ["git", "commit-tree", root.decode(), "-p", self.base],
+            cwd=self.repo, input=b"source tree without checkout\n",
+        ).decode().strip()
+        gate = runpy.run_path(str(GATE))
+        paths = gate["changed_files"](self.repo, self.base, head)
+        self.assertIn(os.fsdecode(b"crates/bad-\xff.rs"), paths)
+        self.assertIn(b"crates/bad-\xff.rs", [os.fsencode(path) for path in paths])
+        policy = gate["enforce_evidence_policy"](
+            {"checks": [self.passing_check("regression", "regression"),
+                        self.passing_check("functional", "functional")]}, paths,
+        )
+        self.assertTrue(policy["production_changed"])
+        self.assertTrue(policy["source_changed"])
 
     def test_dirty_status_preserves_leading_columns_and_embedded_newlines(self) -> None:
         name = 'a\n"quoted".txt'
