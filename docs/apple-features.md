@@ -78,7 +78,7 @@ Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy�
 
 源数据模式不会回退到 Vision。缺少必要深度或源元数据时，在发布输出前报错。完整模式保持原有严格资源要求。两种模式共用 Rust 转换和发布路径。
 
-源数据模式回归使用两张真实 OPPO 人像样张，以 ImageIO 核对单文件及串行、并行批处理输出，并拒绝任何 Vision 操作。它还验证预处理失败时保留已有输出。运行命令为 `python3 scripts/check_rust_cli_oppo_portrait.py`。
+源数据模式回归使用两张真实 OPPO 人像样张，以 ImageIO 核对单文件及串行、并行批处理输出，并拒绝任何 Vision 操作。它还验证预处理失败时保留已有输出。运行命令为 `python3 scripts/apple/check_rust_cli_oppo_portrait.py`。
 
 ## Live Photo
 
@@ -108,4 +108,4 @@ CLI 迁移验收覆盖唯一的 Rust 命令入口、媒体转换、与源数据�
 
 ## 研究材料
 
-仓库仍保留摄影风格研究代码和 `ReverseKey1Ensemble` 等可选模型。它们属于研究/训练资产，不是产品模式。需要时见[模型卡](../Models/ReverseKey1Ensemble.model-card.md)。
+仓库仍保留摄影风格研究代码和 `ReverseKey1Ensemble` 等可选模型。它们属于研究/训练资产，不是产品模式。需要时见[模型卡](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.md)。

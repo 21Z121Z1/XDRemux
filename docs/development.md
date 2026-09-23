@@ -77,7 +77,7 @@ Python package 需要 Python 3.11 或更高版本，只包含研究/训练代码
 
 ```bash
 python -m pip install -e .
-python -m unittest Tests.test_apple_reverse_key1_training
+python -m unittest tests.test_apple_reverse_key1_training
 ```
 
 研究依赖包括 `Pillow` 和 `numpy`。可选 `training` dependency 会加入 PyTorch。
@@ -92,11 +92,11 @@ python -m unittest Tests.test_apple_reverse_key1_training
 | `Sources/XDRemuxAppleAdapter/` | Rust runtime 消费的版本化 Apple 平台进程 adapter。 |
 | `xdremux_py/` | 研究/训练工具；没有产品 CLI 或 converter。 |
 | `apps/macos/XDRemuxApp/` | 调用 Rust CLI 的 macOS SwiftUI presentation shell。 |
-| `Tests/` | Rust acceptance policy test 和 validation harness。 |
+| `tests/` | Rust acceptance policy test 和 validation harness。 |
 | `fixtures/` | strict gate 使用的版本化真实媒体 fixture。 |
 | `scripts/` | 构建、评估、迁移和验收工具。 |
 | `docs/` | 当前指导文档和历史研究记录。 |
-| `Models/` | 可选研究模型和模型文档。 |
+| `research/oppo_styles/models/` | 可选研究模型和模型文档。 |
 
 新的用户可见行为进入 Rust。Swift 改动必须保持 framework primitive 边界，Python 改动必须保持研究工具边界。
 
@@ -113,12 +113,12 @@ App 位于 `apps/macos/XDRemuxApp/`。
 常用命令：
 
 ```bash
-scripts/build_and_run.sh run
-scripts/build_and_run.sh build
-scripts/build_and_run.sh debug
-scripts/build_and_run.sh verify
-scripts/build_and_run.sh logs
-scripts/build_and_run.sh clean
+apps/macos/XDRemuxApp/scripts/build_and_run.sh run
+apps/macos/XDRemuxApp/scripts/build_and_run.sh build
+apps/macos/XDRemuxApp/scripts/build_and_run.sh debug
+apps/macos/XDRemuxApp/scripts/build_and_run.sh verify
+apps/macos/XDRemuxApp/scripts/build_and_run.sh logs
+apps/macos/XDRemuxApp/scripts/build_and_run.sh clean
 ```
 
 App 通过 Rust CLI 传输用户 intent 和分类请求；SwiftUI 层只保留 presentation state、队列和回执翻译。Rust CLI 与 Apple adapter 以 helper 形式随 app 打包。

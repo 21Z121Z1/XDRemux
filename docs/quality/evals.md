@@ -27,7 +27,7 @@ fixture gate 覆盖多种 JPEG 和 HEIC/HEIF 容器布局。gate 名称和具体
 
 ## 可复用验证 harness
 
-`Tests/validation/` 包含可复用脚本。
+`tests/validation/` 包含可复用脚本。
 
 | Harness | 用途 |
 | --- | --- |

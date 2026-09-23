@@ -77,7 +77,7 @@ Install the tooling only when a Python research workflow requires it:
 
 ```bash
 python -m pip install -e .
-python -m unittest Tests.test_apple_reverse_key1_training
+python -m unittest tests.test_apple_reverse_key1_training
 ```
 
 Research dependencies currently include `Pillow` and `numpy`. The optional `training` dependency adds PyTorch.
@@ -92,11 +92,11 @@ Training and evaluation scripts may remain in the Python research package becaus
 | `Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
 | `xdremux_py/` | Research/training tooling; no product CLI or converter. |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI presentation shell that invokes the Rust CLI. |
-| `Tests/` | Rust acceptance policy tests and validation harnesses. |
+| `tests/` | Rust acceptance policy tests and validation harnesses. |
 | `fixtures/` | Versioned real media fixtures used by strict gates. |
 | `scripts/` | Build, evaluation, migration, and acceptance utilities. |
 | `docs/` | Current guidance and historical research records. |
-| `Models/` | Optional research models and model documentation. |
+| `research/oppo_styles/models/` | Optional research models and model documentation. |
 
 New user-visible behavior belongs in Rust. Swift changes must remain framework primitives, and Python changes must remain research tooling.
 
@@ -113,12 +113,12 @@ The app is in `apps/macos/XDRemuxApp/`. It invokes the Rust CLI for product work
 Common commands:
 
 ```bash
-scripts/build_and_run.sh run
-scripts/build_and_run.sh build
-scripts/build_and_run.sh debug
-scripts/build_and_run.sh verify
-scripts/build_and_run.sh logs
-scripts/build_and_run.sh clean
+apps/macos/XDRemuxApp/scripts/build_and_run.sh run
+apps/macos/XDRemuxApp/scripts/build_and_run.sh build
+apps/macos/XDRemuxApp/scripts/build_and_run.sh debug
+apps/macos/XDRemuxApp/scripts/build_and_run.sh verify
+apps/macos/XDRemuxApp/scripts/build_and_run.sh logs
+apps/macos/XDRemuxApp/scripts/build_and_run.sh clean
 ```
 
 The app bundles the Rust CLI and Apple adapter as helpers. It owns presentation state and receipt translation only; conversion policy remains in Rust.

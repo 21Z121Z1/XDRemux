@@ -27,7 +27,7 @@ Important current assertions include:
 
 ## Reusable validation harnesses
 
-`Tests/validation/` contains reusable scripts.
+`tests/validation/` contains reusable scripts.
 
 | Harness | Purpose |
 | --- | --- |

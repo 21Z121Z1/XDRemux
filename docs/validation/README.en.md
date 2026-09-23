@@ -4,7 +4,7 @@ English | [简体中文](README.md)
 
 Use this directory for validation rationale, acceptance criteria, and evidence records.
 
-Keep executable tests under `Tests/` or `scripts/`.
+Keep executable tests under `tests/` or `scripts/`.
 
 ## Evidence classes
 
@@ -22,16 +22,16 @@ A stricter class can include lower-level checks, but it does not change what an 
 
 ## Completion gate
 
-Repository agents use `scripts/agent_completion_gate.py` after the intended change is committed.
+Repository agents use `scripts/ci/agent_completion_gate.py` after the intended change is committed.
 
 Example:
 
 ```bash
-python3 scripts/agent_completion_gate.py run \
+python3 scripts/ci/agent_completion_gate.py run \
   --base origin/main \
   --plan /tmp/xdremux-agent-verification.json
 
-python3 scripts/agent_completion_gate.py verify \
+python3 scripts/ci/agent_completion_gate.py verify \
   .codex/verification-receipts/$(git rev-parse HEAD).json
 ```
 
@@ -51,7 +51,7 @@ Example plan:
         "python3",
         "-m",
         "unittest",
-        "Tests.test_public_documentation"
+        "tests.test_public_documentation"
       ],
       "timeout_seconds": 120
     }

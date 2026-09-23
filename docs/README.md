@@ -19,13 +19,13 @@
 - [回归和真实样本验证](quality/evals.md)：可复用测试和 fixture gate。
 - [输出政策](quality/logging.md)：stdout、stderr、JSON 输出和错误文本规则。
 - [验证 runbook](validation/README.md)：completion gate 计划和证据类别。
-- [测试套件说明](../Tests/README.md)：canonical 与迁移期测试套件。
+- [测试套件说明](../tests/README.md)：canonical 与迁移期测试套件。
 - [Fixture 说明](../fixtures/README.md)：版本化 Motion Photo fixture 和文件身份规则。
 
 ## 技术实现
 
 - [技术实现索引](xdremux/README.md)：稳定的实现契约。
-- [ReverseKey1Ensemble 模型卡](../Models/ReverseKey1Ensemble.model-card.md)：可选研究模型契约。
+- [ReverseKey1Ensemble 模型卡](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.md)：可选研究模型契约。
 
 ## 历史记录
 

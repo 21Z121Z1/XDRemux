@@ -4,7 +4,7 @@
 
 只有验证证据与实际修改的行为匹配时，才能认为修改完成。
 
-测试命令见 [Tests/README.md](../../Tests/README.md)。completion gate 计划见[验证 runbook](../validation/README.md)。
+测试命令见 [tests/README.md](../../tests/README.md)。completion gate 计划见[验证 runbook](../validation/README.md)。
 
 ## 证据层级
 
@@ -12,10 +12,10 @@
 | --- | --- | --- |
 | Unit 和 contract | `cargo test --workspace --locked` | Rust 产品、parser、格式、Apple feature policy 和 transaction 契约。 |
 | 仓库 policy | `python3 -m unittest discover -s Tests -v` | 跨文件 policy、Python 行为、文档和架构契约。 |
-| 真实 fixture | `fixtures/` 和 `Tests/validation/` | 版本化或提供的真实媒体行为。 |
+| 真实 fixture | `fixtures/` 和 `tests/validation/` | 版本化或提供的真实媒体行为。 |
 | 原生框架 | macOS validation job | 被测试的 ImageIO、PhotoKit 或其他 Apple framework 行为。 |
 | 真机 | 手工或记录的真实设备验证 | 依赖具体相册、Photos 版本、显示或设备的行为。 |
-| Completion receipt | `scripts/agent_completion_gate.py` | 选定检查在准确 commit 上通过。 |
+| Completion receipt | `scripts/ci/agent_completion_gate.py` | 选定检查在准确 commit 上通过。 |
 
 静态 policy test 不是功能转换证据。
 

@@ -4,7 +4,7 @@ English | [简体中文](testing.md)
 
 A change is complete only when its evidence matches the behavior that changed.
 
-For commands, see [Tests/README.en.md](../../Tests/README.en.md). For completion-gate plans, see the [validation runbook](../validation/README.en.md).
+For commands, see [tests/README.en.md](../../tests/README.en.md). For completion-gate plans, see the [validation runbook](../validation/README.en.md).
 
 ## Evidence layers
 
@@ -12,10 +12,10 @@ For commands, see [Tests/README.en.md](../../Tests/README.en.md). For completion
 | --- | --- | --- |
 | Unit and contract | `cargo test --workspace --locked` | Rust product, parser, format, Apple-feature policy, and transaction contracts. |
 | Repository policy | `python3 -m unittest discover -s Tests -v` | Cross-file policy, Python behavior, documentation, and architecture contracts. |
-| Real fixture | `fixtures/` and `Tests/validation/` | Behavior on versioned or supplied real media. |
+| Real fixture | `fixtures/` and `tests/validation/` | Behavior on versioned or supplied real media. |
 | Native framework | macOS validation jobs | ImageIO, PhotoKit, or other tested Apple framework behavior. |
 | Device | manual or recorded real-device validation | Behavior that depends on a specific gallery, Photos version, display, or device. |
-| Completion receipt | `scripts/agent_completion_gate.py` | The selected checks passed for the exact commit. |
+| Completion receipt | `scripts/ci/agent_completion_gate.py` | The selected checks passed for the exact commit. |
 
 A static policy test is not functional conversion evidence.
 

@@ -6,14 +6,14 @@ on:
     paths:
       - "research/**"
       - "xdremux_py/**"
-      - "Tests/test_*.py"
+      - "tests/test_*.py"
       - "pyproject.toml"
       - ".github/workflows/research.yml"
   pull_request:
     paths:
       - "research/**"
       - "xdremux_py/**"
-      - "Tests/test_*.py"
+      - "tests/test_*.py"
       - "pyproject.toml"
       - ".github/workflows/research.yml"
 

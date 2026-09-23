@@ -1,0 +1,1 @@
+"""Apple-platform validation helpers."""

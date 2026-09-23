@@ -19,13 +19,13 @@ All current technical documents use the writing policy in the [technical writing
 - [Regression and real-sample verification](quality/evals.en.md): reusable test and fixture gates.
 - [Output policy](quality/logging.en.md): stdout, stderr, JSON output, and error-text rules.
 - [Validation runbook](validation/README.en.md): completion-gate plans and evidence classes.
-- [Test suite guide](../Tests/README.en.md): canonical and migration-time test suites.
+- [Test suite guide](../tests/README.en.md): canonical and migration-time test suites.
 - [Fixture guide](../fixtures/README.en.md): versioned Motion Photo fixtures and identity rules.
 
 ## Technical implementation
 
 - [Technical implementation index](xdremux/README.en.md): stable implementation contracts.
-- [ReverseKey1Ensemble model card](../Models/ReverseKey1Ensemble.model-card.en.md): optional research model contract.
+- [ReverseKey1Ensemble model card](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.en.md): optional research model contract.
 
 ## Historical records
 

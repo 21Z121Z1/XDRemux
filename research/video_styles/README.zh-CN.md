@@ -83,7 +83,7 @@ Photos 导入、独立参数编辑、保存、重开和撤销。对照矩阵否�
 [ffprobe](https://ffmpeg.org/ffprobe.html) 的 `-show_packets -show_streams -show_data_hash sha256`
 提供全部编码包与 codec extradata 的校验值；有理数时间避免把舍入误差当作等价。
 
-可移植回归：`python -m unittest Tests.test_video_style_research -v`。
+可移植回归：`python -m unittest tests.test_video_style_research -v`。
 原生结构检查位于 `.github/workflows/research.yml`，与产品验收分开，成功也不改变上述支持状态。
 
 ## 失败证据
@@ -100,4 +100,4 @@ synthetic gate 即使遇到前序失败也记录 H.264/HEVC10 × static/lower/co
 通过。CI 在成功或失败时均上传 JSON 诊断，但不会豁免失败退出码。carrier trial 成功
 而后续 smoke control 失败时，整体仍失败，并如实记录此前已完成的 publication。
 
-诊断回归：`python -m unittest Tests.test_video_style_research Tests.test_video_style_diagnostics -v`。
+诊断回归：`python -m unittest tests.test_video_style_research tests.test_video_style_diagnostics -v`。

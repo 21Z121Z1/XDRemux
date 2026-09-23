@@ -72,55 +72,55 @@ jobs:
               {
                 "name": "canonical-rust-cli-entrypoint",
                 "kind": "functional",
-                "command": ["/bin/zsh", "-lc", "set -euo pipefail; cargo build --locked -p xdremux-cli; CLI=target/debug/xdremux; $CLI --help >/dev/null; for command in inspect convert batch categorize validate; do $CLI $command --help >/dev/null; done; for command in convert batch; do help=$($CLI $command --help); print -r -- $help | grep -F -- '--oppo-compatible' >/dev/null; if print -r -- $help | grep -E -- '(^|[[:space:]])--family([=[:space:]]|$)|(^|[[:space:]])--oppo-compat([=[:space:]]|$)|--oppo-camera-tail|--input-processing|--tmap-format'; then exit 1; fi; done; bash scripts/check_rust_cli_smoke.sh"],
+                "command": ["/bin/zsh", "-lc", "set -euo pipefail; cargo build --locked -p xdremux-cli; CLI=target/debug/xdremux; $CLI --help >/dev/null; for command in inspect convert batch categorize validate; do $CLI $command --help >/dev/null; done; for command in convert batch; do help=$($CLI $command --help); print -r -- $help | grep -F -- '--oppo-compatible' >/dev/null; if print -r -- $help | grep -E -- '(^|[[:space:]])--family([=[:space:]]|$)|(^|[[:space:]])--oppo-compat([=[:space:]]|$)|--oppo-camera-tail|--input-processing|--tmap-format'; then exit 1; fi; done; bash scripts/validation/check_rust_cli_smoke.sh"],
                 "timeout_seconds": 1200
               },
               {
                 "name": "apple-capability-adapter-handshake",
                 "kind": "functional",
-                "command": ["bash", "scripts/check_apple_adapter_handshake.sh"],
+                "command": ["bash", "scripts/apple/check_apple_adapter_handshake.sh"],
                 "timeout_seconds": 1800
               },
               {
                 "name": "rust-driven-apple-portrait-cli",
                 "kind": "functional",
-                "command": ["bash", "scripts/check_rust_cli_apple_portrait.sh"],
+                "command": ["bash", "scripts/apple/check_rust_cli_apple_portrait.sh"],
                 "timeout_seconds": 2400
               },
               {
                 "name": "rust-driven-oppo-native-portrait-cli",
                 "kind": "functional",
-                "command": ["python3", "scripts/check_rust_cli_oppo_portrait.py"],
+                "command": ["python3", "scripts/apple/check_rust_cli_oppo_portrait.py"],
                 "timeout_seconds": 1200
               },
               {
                 "name": "rust-driven-apple-styles-consumer",
                 "kind": "integration",
-                "command": ["bash", "scripts/check_rust_style_consumer.sh"],
+                "command": ["bash", "scripts/apple/check_rust_style_consumer.sh"],
                 "timeout_seconds": 2400
               },
               {
                 "name": "rust-component-conformance",
                 "kind": "integration",
-                "command": ["/bin/bash", "-lc", "set -euo pipefail; bash scripts/check_classification_conformance.sh; bash scripts/check_container_conformance.sh; bash scripts/check_format_conformance.sh; bash scripts/check_format_constructor_conformance.sh; bash scripts/check_hdr_edr_conformance.sh; bash scripts/check_hdr_gainmap_conformance.sh; bash scripts/check_heif_conformance.sh; bash scripts/check_metadata_conformance.sh; bash scripts/check_motion_photo_rust_conformance.sh"],
+                "command": ["/bin/bash", "-lc", "set -euo pipefail; bash scripts/validation/check_classification_conformance.sh; bash scripts/validation/check_container_conformance.sh; bash scripts/validation/check_format_conformance.sh; bash scripts/validation/check_format_constructor_conformance.sh; bash scripts/validation/check_hdr_edr_conformance.sh; bash scripts/validation/check_hdr_gainmap_conformance.sh; bash scripts/validation/check_heif_conformance.sh; bash scripts/validation/check_metadata_conformance.sh; bash scripts/validation/check_motion_photo_rust_conformance.sh"],
                 "timeout_seconds": 3600
               },
               {
                 "name": "engine-plan-vectors",
                 "kind": "integration",
-                "command": ["bash", "scripts/check_engine_plan_vectors.sh"],
+                "command": ["bash", "scripts/validation/check_engine_plan_vectors.sh"],
                 "timeout_seconds": 1200
               },
               {
                 "name": "rust-motion-photo-real-fixtures",
                 "kind": "functional",
-                "command": ["bash", "scripts/check_rust_motion_photo_real_fixtures.sh"],
+                "command": ["bash", "scripts/validation/check_rust_motion_photo_real_fixtures.sh"],
                 "timeout_seconds": 3600
               },
               {
                 "name": "repository-policy-regressions",
                 "kind": "regression",
-                "command": ["python3", "-m", "unittest", "Tests.validation.test_agent_completion_gate", "Tests.test_product_ownership", "Tests.test_public_documentation", "Tests.test_categorization_documentation", "Tests.test_app_architecture", "Tests.test_performance_design", "Tests.test_rust_artifact_lifecycle", "Tests.test_rust_apple_semantic_policy", "Tests.test_apple_device_acceptance", "Tests.test_rust_portrait_translation", "Tests.validation.test_workflow_configuration"],
+                "command": ["python3", "-m", "unittest", "tests.validation.test_agent_completion_gate", "tests.test_product_ownership", "tests.test_public_documentation", "tests.test_categorization_documentation", "tests.test_app_architecture", "tests.test_performance_design", "tests.test_rust_artifact_lifecycle", "tests.test_rust_apple_semantic_policy", "tests.test_apple_device_acceptance", "tests.test_rust_portrait_translation", "tests.validation.test_workflow_configuration"],
                 "timeout_seconds": 300
               }
             ]
@@ -130,10 +130,10 @@ jobs:
       - name: Run exact-HEAD completion gate
         shell: bash
         run: |
-          python3 scripts/agent_completion_gate.py run \
+          python3 scripts/ci/agent_completion_gate.py run \
             --base "$XDREMUX_GATE_BASE" \
             --plan "$RUNNER_TEMP/xdremux-completion-plan.json"
-          python3 scripts/agent_completion_gate.py verify \
+          python3 scripts/ci/agent_completion_gate.py verify \
             ".codex/verification-receipts/$(git rev-parse HEAD).json"
 
       - name: Upload completion receipt
