@@ -84,7 +84,10 @@ impl RuntimeError {
         }
     }
 
-    pub(crate) fn external(context: &'static str, error: impl Error + Send + Sync + 'static) -> Self {
+    pub(crate) fn external(
+        context: &'static str,
+        error: impl Error + Send + Sync + 'static,
+    ) -> Self {
         Self {
             context,
             detail: error.to_string(),
