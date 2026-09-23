@@ -65,3 +65,23 @@ jobs:
           path: ${{ runner.temp }}/video-style-evidence.json
           if-no-files-found: error
           retention-days: 7
+
+  coreml-candidate:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Compile the isolated public Core ML evidence reader
+        run: swiftc -swift-version 5 -parse-as-library research/oppo_styles/CoreMLProbe.swift -o "$RUNNER_TEMP/CoreMLProbe"
+      - name: Verify preserved model parsing and finite synthetic prediction
+        run: '"$RUNNER_TEMP/CoreMLProbe" research/oppo_styles/models/UniversalPhotographicStyleStateNet.mlpackage > "$RUNNER_TEMP/coreml-candidate-evidence.json"'
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: coreml-candidate-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/coreml-candidate-evidence.json
+          if-no-files-found: error
+          retention-days: 7
