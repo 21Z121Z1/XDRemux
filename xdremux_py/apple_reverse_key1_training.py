@@ -22,6 +22,7 @@ import subprocess
 import tempfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -45,6 +46,11 @@ INPUT_CHANNELS = 12
 
 class ReverseKey1Error(RuntimeError):
     """The reverse-key1 data or training contract is invalid."""
+
+
+class TrainingInputMode(str, Enum):
+    PAIRED = "paired_styled_unstyled"
+    SELF_PAIR = "single_image_self_pair"
 
 
 def canonical_json_bytes(value: Any) -> bytes:
@@ -117,14 +123,14 @@ def decode_key1(
         raise ReverseKey1Error(
             f"key1 must contain {KEY1_BYTE_LENGTH} bytes, got {len(payload)}"
         )
-    if display_width < 1 or display_height < 1:
-        raise ReverseKey1Error("display dimensions must be positive")
+    if any(type(v) is not int or v < 1 for v in (display_width, display_height)):
+        raise ReverseKey1Error("display dimensions must be positive integers")
     landscape = display_width >= display_height
     width_slots = GRID_LONG if landscape else GRID_SHORT
     height_slots = GRID_SHORT if landscape else GRID_LONG
     values = np.frombuffer(payload, dtype="<f2")
-    if values.size != KEY1_VALUE_COUNT:
-        raise ReverseKey1Error("key1 Float16 value count is invalid")
+    if values.size != KEY1_VALUE_COUNT or not np.isfinite(values).all():
+        raise ReverseKey1Error("key1 Float16 values must have the native count and be finite")
     x_major = values.reshape(
         width_slots,
         height_slots,
@@ -156,7 +162,7 @@ def encode_key1(
     height_slots: int,
 ) -> bytes:
     expected = {GRID_LONG, GRID_SHORT}
-    if {width_slots, height_slots} != expected:
+    if any(type(v) is not int for v in (width_slots, height_slots)) or {width_slots, height_slots} != expected:
         raise ReverseKey1Error("key1 grid must be 12x9 or 9x12")
     value = np.asarray(padded)
     expected_shape = (
@@ -168,9 +174,16 @@ def encode_key1(
     )
     if value.shape != expected_shape:
         raise ReverseKey1Error(f"padded key1 shape must be {expected_shape}")
+    if value.dtype.kind not in "fiu" or not np.isfinite(value).all():
+        raise ReverseKey1Error("key1 coefficients must be finite real numbers")
     y_major = value[:height_slots, :width_slots]
     x_major = np.transpose(y_major, (1, 0, 2, 3, 4))
-    return np.asarray(x_major, dtype="<f2").tobytes(order="C")
+    # Finite Float32/64 values can still overflow when encoded as native Float16.
+    with np.errstate(over="ignore", invalid="ignore"):
+        encoded = np.asarray(x_major, dtype="<f2")
+    if not np.isfinite(encoded).all():
+        raise ReverseKey1Error("key1 coefficients overflow native Float16")
+    return encoded.tobytes(order="C")
 
 
 def split_for_session(session_id: str) -> str:
@@ -607,11 +620,21 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     return header, usable
 
 
-def input_features(images: np.ndarray) -> np.ndarray:
-    value = np.asarray(images, dtype=np.float32) / 255.0
-    if value.shape != (2, 3, INPUT_SIZE, INPUT_SIZE):
-        raise ReverseKey1Error("cached image pair has an invalid shape")
+def input_features(
+    images: np.ndarray,
+    *,
+    mode: TrainingInputMode = TrainingInputMode.PAIRED,
+) -> np.ndarray:
+    if not isinstance(mode, TrainingInputMode):
+        raise ReverseKey1Error("input mode must be an explicit TrainingInputMode")
+    images = np.asarray(images)
+    if images.shape != (2, 3, INPUT_SIZE, INPUT_SIZE) or images.dtype != np.uint8:
+        raise ReverseKey1Error("cached image pair must be uint8 with the declared shape")
+    value = images.astype(np.float32) / 255.0
     styled, unstyled = value
+    if mode is TrainingInputMode.SELF_PAIR:
+        # Change the observation, never the native labels or the cached bytes.
+        unstyled = styled
     difference = styled - unstyled
     matrix = np.asarray(
         [
@@ -1022,6 +1045,7 @@ class _CachedDataset:
         samples: Sequence[Mapping[str, Any]],
         profile_vocabulary: Sequence[str] = (),
         horizontal_flip_probability: float = 0.0,
+        input_mode: TrainingInputMode = TrainingInputMode.PAIRED,
     ):
         self.root = root
         self.samples = list(samples)
@@ -1031,6 +1055,7 @@ class _CachedDataset:
         }
         self.unknown_profile_id = self.profile_ids.get("__unknown__", 0)
         self.horizontal_flip_probability = horizontal_flip_probability
+        self.input_mode = input_mode
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -1040,7 +1065,7 @@ class _CachedDataset:
         record = self.samples[index]
         path = self.root / str(record["samplePath"])
         with np.load(path, allow_pickle=False) as archive:
-            features = input_features(archive["images"])
+            features = input_features(archive["images"], mode=self.input_mode)
             key1 = np.asarray(archive["key1"], dtype=np.float32)
             mask = np.asarray(archive["mask"], dtype=np.bool_)
         if (
@@ -1101,6 +1126,7 @@ class TrainingConfig:
     architecture: str = "small"
     horizontal_flip_probability: float = 0.0
     checkpoint_interval: int = 1
+    input_mode: TrainingInputMode = TrainingInputMode.PAIRED
 
 
 def _select_device(torch: Any, requested: str) -> str:
@@ -1206,6 +1232,8 @@ def _evaluate(
 
 
 def train(config: TrainingConfig) -> dict[str, Any]:
+    if not isinstance(config.input_mode, TrainingInputMode):
+        raise ReverseKey1Error("input mode must be an explicit TrainingInputMode")
     torch, _ = _require_torch()
     if config.profile_conditioning not in {"none", "target_device_model"}:
         raise ReverseKey1Error(
@@ -1269,7 +1297,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             raise ReverseKey1Error("warm-start coefficient scales do not match")
         incompatible = model.load_state_dict(initial["model"], strict=False)
         allowed_missing = {"profile_embedding.weight"} if profile_count else set()
-        if set(incompatible.missing_keys) != allowed_missing:
+        if not set(incompatible.missing_keys).issubset(allowed_missing):
             raise ReverseKey1Error(
                 "unexpected warm-start missing keys: "
                 f"{sorted(incompatible.missing_keys)}"
@@ -1295,6 +1323,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             horizontal_flip_probability=(
                 config.horizontal_flip_probability if split == "train" else 0.0
             ),
+            input_mode=config.input_mode,
         )
         for split, values in by_split.items()
     }
@@ -1469,6 +1498,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
             "sourceCorpusSHA256": header["corpusSHA256"],
             "architecture": architecture,
             "inputChannels": INPUT_CHANNELS,
+            "inputMode": config.input_mode.value,
             "profileConditioning": config.profile_conditioning,
             "profileVocabulary": list(profile_vocabulary),
             "deviceMetadataPolicy": (
@@ -1512,6 +1542,7 @@ def train(config: TrainingConfig) -> dict[str, Any]:
         "architectureConfig": config.architecture,
         "horizontalFlipProbability": config.horizontal_flip_probability,
         "checkpointInterval": config.checkpoint_interval,
+        "inputMode": config.input_mode.value,
         "seed": config.seed,
         "parameterCount": sum(parameter.numel() for parameter in model.parameters()),
         "dataset": header,

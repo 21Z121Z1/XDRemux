@@ -37,6 +37,8 @@ on:
       - "crates/xdremux-motion-photo/**"
       - ".github/workflows/rust-cli-core.yml"
 
+  workflow_dispatch:
+
 permissions:
   contents: read
 
@@ -55,6 +57,14 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact checked-out head
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
 
       - name: Install libheif + HEVC on Linux
         if: runner.os == 'Linux'

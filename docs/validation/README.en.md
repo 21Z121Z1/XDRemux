@@ -75,6 +75,16 @@ A later commit or tracked edit invalidates the receipt.
 
 All checks in the plan are mandatory.
 
+The gate classifies canonical Rust `crates/` and Apple adapter/app sources as
+product ownership. Rust `.rs` files require regression evidence; product changes
+also require functional, integration, or device evidence. Cargo/Swift manifests,
+lockfiles, toolchain configuration, and the app build project are build inputs,
+not documentation-only changes. Deletions and both sides of an ownership-changing
+move count. Changed paths and dirty tracked status use NUL-delimited Git records
+so quoted names, embedded whitespace, and arbitrary path bytes cannot hide work.
+A research `.rs` file remains research: its language alone does not make it product.
+
+
 ## Select checks by change
 
 Use targeted evidence by default.

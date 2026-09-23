@@ -75,6 +75,15 @@ receipt 会绑定：
 
 plan 中声明的所有检查都是必需项。
 
+gate 将 canonical Rust `crates/` 和 Apple adapter/App 源码归为产品 ownership。
+Rust `.rs` 文件需要 regression evidence；产品修改还需要 functional、integration
+或 device evidence。Cargo/Swift manifest、lockfile、toolchain configuration 和 App
+build project 属于 build input，而不是纯文档修改。删除，以及跨 ownership 移动的
+两端都计入变更。changed paths 和 dirty tracked status 使用 NUL 分隔的 Git
+记录，避免引号显示、内嵌空白或任意路径字节隐藏变更。research 中的 `.rs` 文件
+仍属于研究，不会仅因语言为 Rust 而成为产品。
+
+
 ## 根据修改选择检查
 
 默认使用有针对性的验证。

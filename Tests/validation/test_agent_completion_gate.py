@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import json
+import os
+import runpy
 from pathlib import Path
 import subprocess
 import sys
@@ -77,6 +79,142 @@ class CompletionGateTests(unittest.TestCase):
             "command": [sys.executable, "-c", "print('ok')"],
             "timeout_seconds": 30,
         }
+
+    def add_tracked_file(self, name: str, contents: str = "// source\n") -> None:
+        path = self.repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents, encoding="utf-8")
+        self.commit_all("add " + repr(name))
+
+    def complete_plan(self) -> Path:
+        return self.write_plan([
+            self.passing_check("regression", "regression"),
+            self.passing_check("functional", "functional"),
+        ])
+
+    def test_rust_product_requires_regression_and_functional_evidence(self) -> None:
+        self.add_tracked_file("crates/xdremux-runtime/src/lib.rs")
+        receipt = self.repo / "receipt.json"
+        result = self.run_gate(self.write_plan([self.passing_check("static", "static")]), receipt)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("regression", result.stderr)
+        result = self.run_gate(self.write_plan([self.passing_check("regression", "regression")]), receipt)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("functional, integration, or device", result.stderr)
+        result = self.run_gate(self.complete_plan(), receipt)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(receipt.read_text())["policy"],
+                         {"production_changed": True, "source_changed": True})
+
+    def test_build_inputs_require_regression_and_functional_evidence(self) -> None:
+        for name in ("Cargo.toml", "Cargo.lock", "Package.swift", "Package.resolved",
+                     "rust-toolchain", "rust-toolchain.toml", "build.rs", ".cargo/config.toml",
+                     "crates/xdremux-runtime/Cargo.toml",
+                     "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj"):
+            with self.subTest(path=name):
+                self.base = self.git("rev-parse", "HEAD").stdout.strip()
+                self.add_tracked_file(name)
+                receipt = self.repo / "receipt.json"
+                result = self.run_gate(self.write_plan([self.passing_check("static", "static")]), receipt)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("regression", result.stderr)
+                result = self.run_gate(self.write_plan([self.passing_check("regression", "regression")]), receipt)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("functional, integration, or device", result.stderr)
+
+    def test_research_rust_is_source_not_product(self) -> None:
+        self.add_tracked_file("research/probe.rs")
+        receipt = self.repo / "receipt.json"
+        result = self.run_gate(self.write_plan([self.passing_check("static", "static")]), receipt)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        result = self.run_gate(self.write_plan([self.passing_check("regression", "regression")]), receipt)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(receipt.read_text())["policy"],
+                         {"production_changed": False, "source_changed": True})
+
+    def test_deleted_rust_source_requires_functional_evidence(self) -> None:
+        name = "crates/xdremux-runtime/src/lib.rs"
+        self.add_tracked_file(name)
+        self.base = self.git("rev-parse", "HEAD").stdout.strip()
+        (self.repo / name).unlink()
+        self.commit_all("remove product owner")
+        result = self.run_gate(self.write_plan([self.passing_check("regression", "regression")]),
+                               self.repo / "receipt.json")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("functional, integration, or device", result.stderr)
+
+    def test_moves_account_for_both_ownership_endpoints(self) -> None:
+        for index, (before, after) in enumerate((("crates/from.rs", "research/to.rs"),
+                                                ("research/from.rs", "crates/to.rs"))):
+            with self.subTest(before=before, after=after):
+                self.add_tracked_file(before, f"// distinct file {index}\n")
+                self.base = self.git("rev-parse", "HEAD").stdout.strip()
+                (self.repo / after).parent.mkdir(parents=True, exist_ok=True)
+                self.git("mv", before, after)
+                self.commit_all("move source")
+                # Rename detection must not hide a removed product owner.
+                self.git("config", "diff.renames", "true")
+                receipt = self.repo / "receipt.json"
+                result = self.run_gate(self.write_plan([self.passing_check("regression", "regression")]), receipt)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                result = self.run_gate(self.complete_plan(), receipt)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(set(json.loads(receipt.read_text())["changed_files"]), {before, after})
+
+    def test_changed_paths_are_nul_delimited_not_display_quoted(self) -> None:
+        names = ['crates/space and "quote".rs', "crates/new\nline.rs", "crates/tab\tname.rs",
+                 "research/中文.rs", " leading-space.py"]
+        for name in names:
+            self.add_tracked_file(name)
+        receipt = self.repo / "receipt.json"
+        result = self.run_gate(self.complete_plan(), receipt)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(set(json.loads(receipt.read_text())["changed_files"]), set(names))
+        result = self.run_gate(self.write_plan([self.passing_check("static", "static")]), receipt)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
+    def test_non_utf8_tree_path_bytes_are_preserved_without_checkout(self) -> None:
+        # Git can store byte names that APFS cannot materialize. Exercise the
+        # real Git records without assuming the host filesystem accepts them.
+        blob = subprocess.check_output(
+            ["git", "hash-object", "-w", "--stdin"], cwd=self.repo, input=b"// source\n"
+        ).strip()
+        tree = subprocess.check_output(
+            ["git", "mktree", "-z"], cwd=self.repo,
+            input=b"100644 blob " + blob + b"\tbad-\xff.rs\0",
+        ).strip()
+        root = subprocess.check_output(
+            ["git", "mktree", "-z"], cwd=self.repo,
+            input=b"040000 tree " + tree + b"\tcrates\0",
+        ).strip()
+        head = subprocess.check_output(
+            ["git", "commit-tree", root.decode(), "-p", self.base],
+            cwd=self.repo, input=b"source tree without checkout\n",
+        ).decode().strip()
+        gate = runpy.run_path(str(GATE))
+        paths = gate["changed_files"](self.repo, self.base, head)
+        self.assertIn(os.fsdecode(b"crates/bad-\xff.rs"), paths)
+        self.assertIn(b"crates/bad-\xff.rs", [os.fsencode(path) for path in paths])
+        policy = gate["enforce_evidence_policy"](
+            {"checks": [self.passing_check("regression", "regression"),
+                        self.passing_check("functional", "functional")]}, paths,
+        )
+        self.assertTrue(policy["production_changed"])
+        self.assertTrue(policy["source_changed"])
+
+    def test_dirty_status_preserves_leading_columns_and_embedded_newlines(self) -> None:
+        name = 'a\n"quoted".txt'
+        self.add_tracked_file(name, "before\n")
+        (self.repo / name).write_text("dirty\n")
+        (self.repo / "README.md").write_text("also dirty\n")
+        receipt = self.repo / "receipt.json"
+        result = self.run_gate(self.write_plan([self.passing_check("static", "static")]), receipt)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        record = json.loads(receipt.read_text())
+        self.assertEqual(set(record["initial_tracked_status"]), {" M " + name, " M README.md"})
+        self.assertEqual(record["initial_tracked_status"], record["final_tracked_status"])
+        self.assertFalse(record["builtins"]["initial_tracked_tree_clean"])
+        self.assertFalse(record["builtins"]["final_tracked_tree_clean"])
 
     def test_docs_change_passes_and_receipt_verifies(self) -> None:
         (self.repo / "README.md").write_text("updated\n", encoding="utf-8")

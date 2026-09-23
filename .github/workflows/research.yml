@@ -1,0 +1,122 @@
+name: Research evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "research/**"
+      - "xdremux_py/**"
+      - "Tests/test_*.py"
+      - "pyproject.toml"
+      - ".github/workflows/research.yml"
+  pull_request:
+    paths:
+      - "research/**"
+      - "xdremux_py/**"
+      - "Tests/test_*.py"
+      - "pyproject.toml"
+      - ".github/workflows/research.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install research test dependencies
+        run: python -m pip install ".[training]"
+      - name: Run all portable regression tests
+        run: python -m unittest discover -s Tests -p 'test_*.py' -v
+
+  video-carrier:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install media inspection tools
+        run: brew install ffmpeg
+      - name: Compile the isolated public-framework research constructor
+        run: swiftc -swift-version 5 -parse-as-library research/video_styles/CarrierProbe.swift -o "$RUNNER_TEMP/CarrierProbe"
+      - name: Verify H264, HEVC10, audio, rotation, all payload hypotheses and no-clobber publication
+        run: python -m research.video_styles.smoke --helper "$RUNNER_TEMP/CarrierProbe" > "$RUNNER_TEMP/video-style-evidence.json"
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: video-style-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/video-style-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
+  coreml-candidate:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install the pinned public sparse-operator reference
+        run: python -m pip install "coremltools==9.0"
+      - name: Verify sparse lowering against the public reference, not a native model
+        run: python -m research.texture_styles.oracle > "$RUNNER_TEMP/sparse-operator-evidence.json"
+      - name: Compile the isolated public Core ML evidence reader
+        run: swiftc -swift-version 5 -parse-as-library research/oppo_styles/CoreMLProbe.swift -o "$RUNNER_TEMP/CoreMLProbe"
+      - name: Verify preserved model parsing and finite synthetic prediction
+        run: '"$RUNNER_TEMP/CoreMLProbe" research/oppo_styles/models/UniversalPhotographicStyleStateNet.mlpackage > "$RUNNER_TEMP/coreml-candidate-evidence.json"'
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: coreml-candidate-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/coreml-candidate-evidence.json
+            ${{ runner.temp }}/sparse-operator-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
+  texture-probe-build:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Compile isolated probes and verify ABI guards without private calls
+        run: python -m research.texture_styles.probe self-test --output "$RUNNER_TEMP/texture-probe-build"
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: texture-probe-build-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/texture-probe-build/report.json
+            ${{ runner.temp }}/texture-probe-build/*.stdout
+            ${{ runner.temp }}/texture-probe-build/*.stderr
+          if-no-files-found: error
+          retention-days: 7

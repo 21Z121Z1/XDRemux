@@ -86,9 +86,52 @@ class WorkflowConfigurationTests(unittest.TestCase):
             "performance.yml",
             "rust-cli-core.yml",
             "rust-proxdr-real-fixtures.yml",
+            # One reusable research-evidence workflow, not a product gate or
+            # another per-hypothesis writer. Historical one-shot workflows stay out.
+            "research.yml",
         }
         actual = {path.name for path in WORKFLOW_ROOT.glob("*.yml")}
         self.assertEqual(actual, expected)
+
+    def test_research_evidence_is_read_only_exact_head_and_separate(self) -> None:
+        workflow = self.workflow("research.yml")
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn(CONCURRENCY, workflow)
+        self.assertIn("    branches: [main]", self.event_block(workflow, "push"))
+        for event in ("push", "pull_request"):
+            self.assertIn("    paths:", self.event_block(workflow, event))
+        for forbidden in ("contents: write", "secrets.", "pull_request_target", "git push",
+                          "agent_completion_gate.py"):
+            self.assertNotIn(forbidden, workflow)
+        self.assertIn("research.video_styles.smoke", workflow)
+
+    def test_manual_evidence_runs_are_read_only_and_accept_no_inputs(self) -> None:
+        # Exact-main acceptance sometimes needs a workflow whose path filter
+        # did not fire. Manual replay may not accept alternate code or secrets.
+        for name in ("research.yml", "rust-cli-core.yml", "rust-proxdr-real-fixtures.yml"):
+            with self.subTest(workflow=name):
+                workflow = self.workflow(name)
+                self.assertRegex(workflow, r"(?m)^  workflow_dispatch:\s*\n\npermissions:")
+                self.assertIn("permissions:\n  contents: read", workflow)
+                for forbidden in ("inputs:", "contents: write", "secrets.", "pull_request_target"):
+                    self.assertNotIn(forbidden, workflow)
+
+    def test_portability_and_fixtures_test_the_requested_exact_head(self) -> None:
+        for name in ("rust-cli-core.yml", "rust-proxdr-real-fixtures.yml"):
+            with self.subTest(workflow=name):
+                workflow = self.workflow(name)
+                self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+                self.assertIn("persist-credentials: false", workflow)
+                self.assertIn("EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+                self.assertIn('test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"', workflow)
+
+    def test_native_research_failure_artifacts_are_not_a_success_waiver(self) -> None:
+        workflow = self.workflow("research.yml")
+        self.assertIn("- uses: actions/upload-artifact@v7\n        if: ${{ always() }}", workflow)
+        self.assertIn('> "$RUNNER_TEMP/video-style-evidence.json"', workflow)
+        self.assertNotIn("continue-on-error", workflow)
+        self.assertNotIn("|| true", workflow)
 
     def test_workflows_with_new_concurrency_policy_have_the_shared_group(self) -> None:
         workflows = (
