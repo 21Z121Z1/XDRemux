@@ -1,0 +1,598 @@
+{
+  "schema": 1,
+  "warning": "Statements and constants below are historical hypotheses, not newly verified native contracts or product defaults. Synthetic capture fields and semantic aliases are rejected. See README for promotion gates and negative results.",
+  "artifacts": [
+    {
+      "source_path": "scripts/research/texture_style_ios27_rc_contract.json",
+      "source_commit": "fb03b4242f375490ce93e1efca3b9de0557d74af",
+      "source_blob": "4f18d57061d390ed6c1d13d2870a656dbd73096e",
+      "source_sha256": "a06616b94c1a6830b4bea5b8af07b73e18e9f413744326db9bc28415d2884ff4",
+      "status": "historical-hypothesis-not-product",
+      "evidence": {
+        "source": "iOS 27 RC 24A435 firmware diff",
+        "symbols": {
+          "_kMetadataIdentifier_TextureStyleInfo": "tag:apple.com,2026:photo:metadata:texture_styles"
+        },
+        "requiredTextureInfoKeysObserved": [
+          "Version",
+          "HardwareModel",
+          "PortType",
+          "CaptureMode",
+          "CaptureType"
+        ],
+        "optionalTextureInfoKeysObserved": [
+          "FilmGrainSeed",
+          "TextureStylePeopleDataVersion",
+          "TextureStylePostProcessedPeopleData",
+          "TextureStyleFaceAttitudeMetadata"
+        ],
+        "captureMetadataKeysObserved": [
+          "TextureStylePreset",
+          "TextureStyleIntensity",
+          "TextureStyleGrain",
+          "TextureStyleRenderingVersion",
+          "TextureStyleOriginalInsteadOfReversibility"
+        ],
+        "photosAdjustmentKeysObserved": [
+          "preset",
+          "intensity",
+          "grainIntensity"
+        ],
+        "notes": [
+          "TextureStyleInfo is a separate 2026 metadata identifier, not a field inside the 2023 SemanticStyle metadata payload.",
+          "NeutrinoCore rejects TextureStyleInfo with missing/invalid version, hardware model, port type, capture mode, or capture type.",
+          "PhotosFormats exposes hasTextureStyle plus preset/intensity/grain/reversibility accessors, providing a stronger simulator validation target than structural HEIF parsing alone."
+        ]
+      }
+    },
+    {
+      "source_path": "scripts/research/texture_style_makernote_field_writer_selftest.json",
+      "source_commit": "fb03b4242f375490ce93e1efca3b9de0557d74af",
+      "source_blob": "96d84d1a68e348fda2ae49f1944964611e68305b",
+      "source_sha256": "8628b53e25944c8115d48d4b20542b2b8b2d23527c4fac815a3db7336bcfd582",
+      "status": "historical-hypothesis-not-product",
+      "evidence": {
+        "purpose": "self-test only; tag 200 is a synthetic field and is not claimed to be TextureStyle",
+        "fields": [
+          {
+            "tag": 200,
+            "type": 4,
+            "value": 305419896
+          }
+        ]
+      }
+    },
+    {
+      "source_path": "scripts/research/texture_style_native_standard_contract.json",
+      "source_commit": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "source_blob": "e5f6e6f53630cc56427ddbe92a59bed8219d6169",
+      "source_sha256": "2bb45a9273a270802da6148b21431666a03dd8d0296915532e396bf197277d4d",
+      "status": "historical-hypothesis-not-product",
+      "evidence": {
+        "schema": "xdremux-texture-style-native-standard-v1",
+        "textureURI": "tag:apple.com,2026:photo:metadata:texture_styles",
+        "textureItemName": "metadata",
+        "maker84Variants": {
+          "nativeStandardComplete": {
+            "10": 0.0,
+            "2": 0.0,
+            "3": 1.0,
+            "11": false,
+            "4": 1,
+            "5": 1,
+            "12": 1,
+            "6": 4,
+            "7": 0,
+            "0": 1,
+            "8": 1,
+            "1": 0.0,
+            "9": 1.0
+          }
+        },
+        "textureInfoVariants": {
+          "nativeNoPeopleMarketingName": {
+            "Preset": "Standard",
+            "CaptureType": "LF",
+            "CaptureMode": "Still",
+            "PortType": "PortTypeBack",
+            "HardwareModel": "iPhone 18 Pro",
+            "TextureStylePeopleDataVersion": 3,
+            "FilmGrainSeed": 0
+          },
+          "nativeNoPeopleModel192": {
+            "Preset": "Standard",
+            "CaptureType": "LF",
+            "CaptureMode": "Still",
+            "PortType": "PortTypeBack",
+            "HardwareModel": "iPhone19,2",
+            "TextureStylePeopleDataVersion": 3,
+            "FilmGrainSeed": 0
+          },
+          "nativeNoPeopleModel193": {
+            "Preset": "Standard",
+            "CaptureType": "LF",
+            "CaptureMode": "Still",
+            "PortType": "PortTypeBack",
+            "HardwareModel": "iPhone19,3",
+            "TextureStylePeopleDataVersion": 3,
+            "FilmGrainSeed": 0
+          }
+        },
+        "combinations": [
+          {
+            "name": "B-native-standard-complete-tag84-only",
+            "maker84": "nativeStandardComplete"
+          },
+          {
+            "name": "C-native-standard-2026-iPhone18Pro",
+            "maker84": "nativeStandardComplete",
+            "textureInfo": "nativeNoPeopleMarketingName"
+          },
+          {
+            "name": "D-native-standard-2026-iPhone19-2",
+            "maker84": "nativeStandardComplete",
+            "textureInfo": "nativeNoPeopleModel192"
+          },
+          {
+            "name": "E-native-standard-2026-iPhone19-3",
+            "maker84": "nativeStandardComplete",
+            "textureInfo": "nativeNoPeopleModel193"
+          }
+        ]
+      }
+    },
+    {
+      "source_path": "scripts/research/texture_style_ps3_portrait_contract.json",
+      "source_commit": "fb03b4242f375490ce93e1efca3b9de0557d74af",
+      "source_blob": "9a9606d02cefe73414f383b9deb319d37f2a5143",
+      "source_sha256": "58be0e6f11c191ea4c8bb34fbcf20fad2c7bb01e64f19347b721a93272638dd9",
+      "status": "historical-hypothesis-not-product",
+      "evidence": {
+        "schema": "xdremux-photographic-styles-3-portrait-fixture-rc-candidate-v3",
+        "evidence": {
+          "textureURI": "iOS 27 RC firmware diff",
+          "requiredTextureInfoKeys": "iOS 27 RC firmware diff",
+          "captureMetadataKeys": "iOS 27 RC firmware diff",
+          "hardwareModel": "iPhone 18 Pro iPhone19,2 / V63AP firmware identity",
+          "enumValues": "candidate pending iOS 27 runtime parser gate"
+        },
+        "textureURI": "tag:apple.com,2026:photo:metadata:texture_styles",
+        "maker84Variants": {
+          "standard": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": "Standard",
+            "TextureStyleIntensity": 1.0,
+            "TextureStyleGrain": 0.0,
+            "TextureStyleRenderingVersion": 1,
+            "TextureStyleOriginalInsteadOfReversibility": false
+          }
+        },
+        "textureInfoVariants": {
+          "standard": {
+            "Version": 1,
+            "HardwareModel": "V63AP",
+            "PortType": "PortTypeBack",
+            "CaptureMode": "Photo",
+            "CaptureType": "Photo",
+            "FilmGrainSeed": 1480872525,
+            "TextureStylePeopleDataVersion": 1,
+            "TextureStylePostProcessedPeopleData": []
+          }
+        },
+        "combinations": [
+          {
+            "name": "ps3-portrait-standard",
+            "maker84": "standard",
+            "textureInfo": "standard"
+          }
+        ]
+      }
+    },
+    {
+      "source_path": "scripts/research/texture_style_tag84_v4_contract.json",
+      "source_commit": "fb03b4242f375490ce93e1efca3b9de0557d74af",
+      "source_blob": "1c04220a00fbb2f3ce325ac648f4002bcf72dcec",
+      "source_sha256": "ec4a94baa90e143045eb95f991156cd96d5d36c2b236a8b2706c8f6ac7c2fbe0",
+      "status": "historical-hypothesis-not-product",
+      "evidence": {
+        "schema": "xdremux-texture-style-v4-tag84-minimal",
+        "evidence": {
+          "outerContainer": "AVAppleMakerNote_SmartStyle / existing tag84 hypothesis from PhotoImaging imports and Missing smart style properties path",
+          "innerKeys": "VERIFIED TextureStylePreset / TextureStyleIntensity / TextureStyleGrain",
+          "valueTypes": "NSNumber candidates; CEK and parser disassembly indicate numeric values",
+          "standaloneURI": "intentionally absent"
+        },
+        "maker84Variants": {
+          "p0": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 0,
+            "TextureStyleIntensity": 0.61,
+            "TextureStyleGrain": 0.73
+          },
+          "p1": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 1,
+            "TextureStyleIntensity": 0.61,
+            "TextureStyleGrain": 0.73
+          },
+          "p2": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 2,
+            "TextureStyleIntensity": 0.61,
+            "TextureStyleGrain": 0.73
+          },
+          "p3": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 3,
+            "TextureStyleIntensity": 0.61,
+            "TextureStyleGrain": 0.73
+          },
+          "p4": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 4,
+            "TextureStyleIntensity": 0.61,
+            "TextureStyleGrain": 0.73
+          },
+          "p5": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 5,
+            "TextureStyleIntensity": 0.61,
+            "TextureStyleGrain": 0.73
+          }
+        },
+        "textureInfoVariants": {},
+        "combinations": [
+          {
+            "name": "V4-tag84-preset0",
+            "maker84": "p0"
+          },
+          {
+            "name": "V4-tag84-preset1",
+            "maker84": "p1"
+          },
+          {
+            "name": "V4-tag84-preset2",
+            "maker84": "p2"
+          },
+          {
+            "name": "V4-tag84-preset3",
+            "maker84": "p3"
+          },
+          {
+            "name": "V4-tag84-preset4",
+            "maker84": "p4"
+          },
+          {
+            "name": "V4-tag84-preset5",
+            "maker84": "p5"
+          }
+        ]
+      }
+    },
+    {
+      "source_path": "scripts/research/texture_style_tag84_v4_full_numeric_contract.json",
+      "source_commit": "fb03b4242f375490ce93e1efca3b9de0557d74af",
+      "source_blob": "25c70940007f20830410263963c85b78f03abb5c",
+      "source_sha256": "bfb467ee50262581a5bcbe26baf3eb9dca251a52ad133ef73006e3056b9abe49",
+      "status": "historical-hypothesis-not-product",
+      "evidence": {
+        "schema": "xdremux-texture-style-v4-tag84-full-numeric",
+        "evidence": {
+          "outerContainer": "AVAppleMakerNote_SmartStyle resolves to MakerNote key 84 on macOS 27",
+          "innerKeys": "TextureStylePreset/Intensity/Grain verified by iOS 27 PhotoImaging parser; OriginalInsteadOfReversibility and RenderingVersion exported by AVFCapture",
+          "valueTypes": "NSNumber; preset enumerated 0..5",
+          "standaloneURI": "absent"
+        },
+        "maker84Variants": {
+          "p0": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 0,
+            "TextureStyleIntensity": 1.0,
+            "TextureStyleGrain": 0.0,
+            "TextureStyleRenderingVersion": 1,
+            "TextureStyleOriginalInsteadOfReversibility": false
+          },
+          "p1": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 1,
+            "TextureStyleIntensity": 1.0,
+            "TextureStyleGrain": 0.0,
+            "TextureStyleRenderingVersion": 1,
+            "TextureStyleOriginalInsteadOfReversibility": false
+          },
+          "p2": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 2,
+            "TextureStyleIntensity": 1.0,
+            "TextureStyleGrain": 0.0,
+            "TextureStyleRenderingVersion": 1,
+            "TextureStyleOriginalInsteadOfReversibility": false
+          },
+          "p3": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 3,
+            "TextureStyleIntensity": 1.0,
+            "TextureStyleGrain": 0.0,
+            "TextureStyleRenderingVersion": 1,
+            "TextureStyleOriginalInsteadOfReversibility": false
+          },
+          "p4": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 4,
+            "TextureStyleIntensity": 1.0,
+            "TextureStyleGrain": 0.0,
+            "TextureStyleRenderingVersion": 1,
+            "TextureStyleOriginalInsteadOfReversibility": false
+          },
+          "p5": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "TextureStylePreset": 5,
+            "TextureStyleIntensity": 1.0,
+            "TextureStyleGrain": 0.0,
+            "TextureStyleRenderingVersion": 1,
+            "TextureStyleOriginalInsteadOfReversibility": false
+          }
+        },
+        "textureInfoVariants": {},
+        "combinations": [
+          {
+            "name": "V4-full-tag84-preset0",
+            "maker84": "p0"
+          },
+          {
+            "name": "V4-full-tag84-preset1",
+            "maker84": "p1"
+          },
+          {
+            "name": "V4-full-tag84-preset2",
+            "maker84": "p2"
+          },
+          {
+            "name": "V4-full-tag84-preset3",
+            "maker84": "p3"
+          },
+          {
+            "name": "V4-full-tag84-preset4",
+            "maker84": "p4"
+          },
+          {
+            "name": "V4-full-tag84-preset5",
+            "maker84": "p5"
+          }
+        ]
+      }
+    },
+    {
+      "source_path": "scripts/research/texture_style_tag84_v5_numeric_contract.json",
+      "source_commit": "fb03b4242f375490ce93e1efca3b9de0557d74af",
+      "source_blob": "d0a67992eaca1d7f22e728d92dd5dcf6099e4b22",
+      "source_sha256": "575a90f4acd571339976d5bbd802b3e16cd9a3e998ee8510df50186b80f0cd13",
+      "status": "historical-hypothesis-not-product",
+      "evidence": {
+        "schema": "xdremux-texture-style-v5-verified-numeric-tag84",
+        "evidence": {
+          "outerMakerNoteTag": 84,
+          "presetKey": "8",
+          "intensityKey": "9",
+          "grainKey": "10",
+          "originalInsteadOfReversibilityKey": "11",
+          "renderingVersionKey": "12",
+          "presetMapping": {
+            "1": "Standard",
+            "2": "Soft",
+            "3": "Studio",
+            "4": "Filmic",
+            "5": "Glowy"
+          },
+          "standaloneTextureURI": "absent"
+        },
+        "maker84Variants": {
+          "standard-min": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "8": 1,
+            "9": 1.0,
+            "10": 0.0
+          },
+          "filmic-min": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "8": 4,
+            "9": 0.61,
+            "10": 0.73
+          },
+          "filmic-rv1-original0": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "8": 4,
+            "9": 0.61,
+            "10": 0.73,
+            "11": 0,
+            "12": 1
+          },
+          "filmic-rv1-original1": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "8": 4,
+            "9": 0.61,
+            "10": 0.73,
+            "11": 1,
+            "12": 1
+          },
+          "filmic-rv3-original0": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "8": 4,
+            "9": 0.61,
+            "10": 0.73,
+            "11": 0,
+            "12": 3
+          },
+          "filmic-rv3-original1": {
+            "7": 0,
+            "3": 1,
+            "4": 1,
+            "0": 1,
+            "5": 1,
+            "1": 0,
+            "6": 4,
+            "2": 0,
+            "8": 4,
+            "9": 0.61,
+            "10": 0.73,
+            "11": 1,
+            "12": 3
+          }
+        },
+        "textureInfoVariants": {},
+        "combinations": [
+          {
+            "name": "V5-standard-min",
+            "maker84": "standard-min"
+          },
+          {
+            "name": "V5-filmic-min",
+            "maker84": "filmic-min"
+          },
+          {
+            "name": "V5-filmic-rv1-original0",
+            "maker84": "filmic-rv1-original0"
+          },
+          {
+            "name": "V5-filmic-rv1-original1",
+            "maker84": "filmic-rv1-original1"
+          },
+          {
+            "name": "V5-filmic-rv3-original0",
+            "maker84": "filmic-rv3-original0"
+          },
+          {
+            "name": "V5-filmic-rv3-original1",
+            "maker84": "filmic-rv3-original1"
+          }
+        ]
+      }
+    }
+  ]
+}

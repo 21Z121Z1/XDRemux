@@ -81,3 +81,7 @@ Historical device-positive carrier reports support their reported admission obse
 - [Objective-C method replacement](https://developer.apple.com/documentation/objectivec/method_setimplementation(_:_:)): retain the original IMP; do not assume a selector's ABI.
 - [Core ML sparse operator source](https://apple.github.io/coremltools/_modules/coremltools/converters/mil/mil/ops/defs/iOS18/compression.html#constexpr_sparse_blockwise_shift_scale): dequantization applies only to mask-selected entries.
 - [Pinned public oracle release](https://pypi.org/project/coremltools/9.0/): optional isolated research dependency, not a product dependency.
+
+## Literal historical evidence
+
+`evidence/historical-contracts.json` retains seven small RC/numeric-key/candidate records with their original commit/blob/SHA-256 identities. Original statements and synthetic values are explicitly wrapped as historical hypotheses, not current capture facts. This preserves experiment definitions without keeping seven competing patchers or reacquiring private frameworks or firmware bytes. The `native-standard-matrix.json` file also remains byte-exact; its duplicated record in the provenance index is historical evidence, not a second runtime configuration.

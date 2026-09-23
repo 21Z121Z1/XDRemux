@@ -79,3 +79,7 @@ python -m research.texture_styles.probe runtime --output /tmp/texture-runtime-in
 - [Objective-C 方法替换](https://developer.apple.com/documentation/objectivec/method_setimplementation(_:_:))：保留原 IMP，不假定 selector ABI。
 - [Core ML sparse operator 源码](https://apple.github.io/coremltools/_modules/coremltools/converters/mil/mil/ops/defs/iOS18/compression.html#constexpr_sparse_blockwise_shift_scale)：只对 mask 选中的元素反量化。
 - [固定版本的公开 oracle](https://pypi.org/project/coremltools/9.0/)：可选、隔离的研究依赖，不是产品依赖。
+
+## 历史字面证据
+
+`evidence/historical-contracts.json` 保留七份小型 RC/数字键/候选契约记录及其原始 commit/blob/SHA-256 身份。原文和合成值被明确包装为历史假设，不是当前拍摄事实；可据此恢复实验，不保留七套互相竞争的 patcher，也不重新获取私有框架或固件字节。`native-standard-matrix.json` 另保留字节完全一致的原件；它在来源索引中的重复记录只是历史证据，不是第二份运行时配置。

@@ -96,3 +96,7 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 - [PyTorch checkpoint loading](https://docs.pytorch.org/docs/stable/generated/torch.load)：restricted loading 与 provenance 注意事项。
 - [Core ML compute units](https://developer.apple.com/documentation/coreml/mlmodelconfiguration/computeunits)：允许使用的处理单元不能证明实际 ANE placement。
 - [scikit-image 0.24 图像来源](https://scikit-image.org/docs/0.24.x/api/skimage.data.html)：对应 revision 的来源和 license 记录。
+
+## 历史实验方法
+
+[原生消费者与低维校准实验](methodology.md)保存冻结队列、响应/对照矩阵、训练负结果、ABI 失败与晋级门槛。`calibration.py` 重建冻结的共享 channel 校正，应用接口不接收 heldout 标签。旧缓存报告生成器与私有 Swift 产品入口不再作为维护入口。

@@ -112,6 +112,10 @@ source integrity, dataset leakage, calibration-only selection and publication
 failure. Synthetic test data proves those contracts, not native reconstruction
 accuracy. Real-device Photos import/edit/save/reopen evidence remains absent.
 
+## Historical experiment methodology
+
+[Native-consumer and low-dimensional experiments](methodology.en.md) preserves the cohort freezes, response/control matrix, negative training results, ABI failures and promotion gates. `calibration.py` reconstructs frozen shared-channel correction without exposing heldout labels to application. Obsolete cache-report writers and private Swift product hooks are not maintained entry points.
+
 ## Primary references
 
 - [PyTorch finite gradient checks](https://docs.pytorch.org/docs/stable/generated/torch.nn.utils.clip_grad_norm_.html): reject non-finite gradients rather than scaling them into invalid checkpoints.
