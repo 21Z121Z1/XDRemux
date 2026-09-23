@@ -71,8 +71,8 @@ private func frameRanges(_ asset: AVAsset, _ track: AVAssetTrack) throws -> [CMT
     while let sample = output.copyNextSampleBuffer() {
         try checkDeadline(started)
         let count = CMSampleBufferGetNumSamples(sample)
-        // AVAssetReader emits empty edit-boundary control buffers. They still
-        // pass unchanged through the A/V writer, but do not describe a frame.
+        // AVAssetReader emits zero-length control buffers as well as frames.
+        // They are not metadata sample intervals; construction handles them.
         // Use output timing: raw media timestamps precede edit-list mapping.
         let pts = CMSampleBufferGetOutputPresentationTimeStamp(sample)
         let duration = CMSampleBufferGetOutputDuration(sample)
@@ -101,6 +101,8 @@ private func frameRanges(_ asset: AVAsset, _ track: AVAssetTrack) throws -> [CMT
 private struct Pipe {
     let output: AVAssetReaderTrackOutput
     let input: AVAssetWriterInput
+    let presentationEnd: CMTime
+    var terminalEmptyMarkers = 0
     var finished = false
 }
 
@@ -119,7 +121,7 @@ private func metadataHint() throws -> CMMetadataFormatDescription {
     return result
 }
 
-private func construct(source: URL, destination: URL, variant: Variant) async throws -> Int {
+private func construct(source: URL, destination: URL, variant: Variant) async throws -> (frames: Int, terminalMarkers: Int) {
     guard source.standardizedFileURL != destination.standardizedFileURL,
           !FileManager.default.fileExists(atPath: destination.path) else {
         throw ProbeFailure("destination already exists or names the source")
@@ -167,7 +169,11 @@ private func construct(source: URL, destination: URL, variant: Variant) async th
         }
         guard writer.canAdd(input) else { throw ProbeFailure("cannot add compressed writer input") }
         writer.add(input)
-        pipes.append(Pipe(output: output, input: input))
+        let timeRange = try await track.load(.timeRange)
+        guard timeRange.isValid, timeRange.end.isNumeric else {
+            throw ProbeFailure("invalid source track presentation range")
+        }
+        pipes.append(Pipe(output: output, input: input, presentationEnd: timeRange.end))
     }
     var adaptor: AVAssetWriterInputMetadataAdaptor?
     if payload != nil {
@@ -192,6 +198,26 @@ private func construct(source: URL, destination: URL, variant: Variant) async th
         var progressed = false
         for index in pipes.indices where !pipes[index].finished && pipes[index].input.isReadyForMoreMediaData {
             if let sample = pipes[index].output.copyNextSampleBuffer() {
+                if CMGetAttachment(sample, key: kCMSampleBufferAttachmentKey_EmptyMedia,
+                                   attachmentModeOut: nil) as? Bool == true {
+                    // EmptyMedia announces an empty edit, not a compressed sample.
+                    // Forwarding the terminal marker extends the last B-frame's
+                    // decode duration to its presentation end. Only the exact
+                    // zero-length end marker may be consumed here; interior gaps
+                    // or nonempty edits need a separate, validated edit-list model.
+                    guard CMSampleBufferGetNumSamples(sample) == 0,
+                          CMSampleBufferGetTotalSampleSize(sample) == 0,
+                          CMSampleBufferGetOutputDuration(sample) == .zero,
+                          CMSampleBufferGetOutputPresentationTimeStamp(sample) == pipes[index].presentationEnd else {
+                        throw ProbeFailure("unsupported nonterminal empty edit")
+                    }
+                    pipes[index].terminalEmptyMarkers += 1
+                    progressed = true
+                    continue
+                }
+                guard pipes[index].terminalEmptyMarkers == 0 || CMSampleBufferGetNumSamples(sample) == 0 else {
+                    throw ProbeFailure("media samples follow a terminal empty edit")
+                }
                 guard pipes[index].input.append(sample) else { throw writer.error ?? ProbeFailure("media append failed") }
             } else {
                 if reader.status == .failed || reader.status == .cancelled {
@@ -224,7 +250,7 @@ private func construct(source: URL, destination: URL, variant: Variant) async th
     await writer.finishWriting()
     guard writer.status == .completed else { throw writer.error ?? ProbeFailure("writer incomplete") }
     try await readback(destination, variant: variant, ranges: ranges)
-    return ranges.count
+    return (ranges.count, pipes.reduce(0) { $0 + $1.terminalEmptyMarkers })
 }
 
 private func readback(_ url: URL, variant: Variant, ranges: [CMTimeRange]) async throws {
@@ -272,10 +298,11 @@ private func readback(_ url: URL, variant: Variant, ranges: [CMTimeRange]) async
             guard CommandLine.arguments.count == 4, let variant = Variant(rawValue: CommandLine.arguments[3]) else {
                 throw ProbeFailure("usage: CarrierProbe <source> <private-output.mov> <static|lower|compact|upper>; use probe.py for publication")
             }
-            let count = try await construct(source: URL(fileURLWithPath: CommandLine.arguments[1]),
+            let counts = try await construct(source: URL(fileURLWithPath: CommandLine.arguments[1]),
                                             destination: URL(fileURLWithPath: CommandLine.arguments[2]), variant: variant)
             let report: [String: Any] = ["schema": 1, "variant": variant.rawValue,
-                "videoSamples": count, "metadataReadback": true, "photosEditingValidated": false]
+                "videoSamples": counts.frames, "terminalEmptyMarkersSkipped": counts.terminalMarkers,
+                "metadataReadback": true, "photosEditingValidated": false]
             let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
             FileHandle.standardOutput.write(data)
             FileHandle.standardOutput.write(Data([10]))

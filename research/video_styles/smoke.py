@@ -37,6 +37,7 @@ def main() -> None:
             for variant in VARIANTS:
                 target = root / f"{codec}-{variant}.mov"
                 receipt = run(rotated, target, helper=args.helper, variant=variant)
+                assert receipt["native"]["terminalEmptyMarkersSkipped"] > 0
                 receipts.append({"fixture": codec, **receipt})
                 original = target.read_bytes()
                 try:

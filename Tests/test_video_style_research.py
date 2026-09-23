@@ -48,6 +48,7 @@ class VideoStyleResearchTests(unittest.TestCase):
             lambda r: r["packets"][1].update(data_hash="SHA256:" + "b" * 64),
             lambda r: r["packets"].pop(),
             lambda r: r["packets"][3].update(pts=1601),
+            lambda r: r["packets"][1].update(duration=3),
             lambda r: r["streams"][0].update(color_primaries="bt2020"),
             lambda r: r["streams"][0].update(pix_fmt="yuv420p10le"),
             lambda r: r["streams"][0].update(side_data_list=[]),

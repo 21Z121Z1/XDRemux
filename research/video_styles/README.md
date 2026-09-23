@@ -68,6 +68,21 @@ input replacement. Call the Python wrapper rather than the private-output Swift
 constructor for validated publication. Native errors and subprocess timeouts are
 reported, not converted into success.
 
+## Native timing regression
+
+On macOS 26.6.2 (25G83), compressed `AVAssetReader` emits zero-length
+`EmptyMedia` control buffers at the track presentation end. Forwarding those
+markers to `AVAssetWriter` changed the last H.264 B-frame packet duration from
+1/12 to 1/4 second, despite identical payloads and track presentation duration.
+Explicit `endSession` did not fix it. Consuming only the terminal empty markers
+preserved all packets and timing for the H.264 and HEVC10/audio/rotation matrix.
+Other control buffers and actual samples, including audio trim attachments,
+remain unchanged. Interior empty edits fail explicitly; they are not silently
+removed. The full-packet validator remains the publication gate.
+
+The synthetic smoke gate asserts that this control-buffer path is exercised.
+It is evidence about the tested public framework behavior, not iOS 27 Photos.
+
 ## Promotion gate
 
 A structurally readable file is insufficient. Promotion additionally requires a

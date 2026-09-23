@@ -128,10 +128,10 @@ def verify_parity(source: dict[str, Any], candidate: dict[str, Any], *, timed: b
                 raise ValueError("packet payload checksum is missing")
             for field in ("data_hash", "size", "flags", "side_data_list"):
                 if a.get(field) != b.get(field):
-                    raise ValueError(f"packet {index} {field} changed")
+                    raise ValueError(f"{old['codec_type']} packet {index} {field} changed")
             for field in ("pts", "dts", "duration"):
                 if _time(a, field, old_base) != _time(b, field, new_base):
-                    raise ValueError(f"packet {index} {field} changed")
+                    raise ValueError(f"{old['codec_type']} packet {index} {field} changed")
         counts.append({"kind": old["codec_type"], "packets": len(left)})
     _tags(source.get("format", {}), candidate.get("format", {}), CONTAINER_TAGS)
     return {"encodedMediaParity": True, "tracks": counts,
