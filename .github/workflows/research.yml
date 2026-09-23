@@ -17,6 +17,8 @@ on:
       - "pyproject.toml"
       - ".github/workflows/research.yml"
 
+  workflow_dispatch:
+
 permissions:
   contents: read
 
