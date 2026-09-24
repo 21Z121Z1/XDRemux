@@ -13,73 +13,70 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  source-inspection:
+  platform-migration:
+    if: github.ref == 'refs/heads/feat/rust-cli-distribution-i18n-20260924'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      head: ${{ steps.migrate.outputs.head }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
-      - name: Export tracked build inputs for distribution inspection
-        shell: bash
-        run: |
-          mkdir -p "$RUNNER_TEMP/distribution-inspection"
-          python3 - <<'PY'
-          import pathlib, subprocess, tarfile, os
-          root = pathlib.Path.cwd()
-          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'distribution-inspection'
-          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
-          (output / 'tracked-paths.txt').write_text('\n'.join(paths))
-          (output / 'head.txt').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode())
-          with tarfile.open(output / 'source.tar.gz', 'w:gz') as archive:
-              for name in paths:
-                  path = root / name
-                  if not name or not path.is_file() or path.stat().st_size > 1048576:
-                      continue
-                  try:
-                      path.read_text(encoding='utf-8')
-                  except UnicodeError:
-                      continue
-                  archive.add(path, arcname=name, recursive=False)
-          PY
-      - uses: actions/upload-artifact@v7
-        with:
-          name: xdremux-distribution-source
-          path: ${{ runner.temp }}/distribution-inspection/
-          retention-days: 3
-          if-no-files-found: error
-  macos-build-inspection:
-    runs-on: macos-26
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
-        with:
-          toolchain: stable
-      - name: Inspect native codec dependencies and build canonical executables
+      - name: Apply reviewed, immutable platform move
+        id: migrate
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/distribution
-          git rev-parse HEAD | tee artifacts/distribution/head.txt
+          branch='feat/rust-cli-distribution-i18n-20260924'
+          git fetch origin "$branch"
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          if test -f Package.swift; then
+            gh api repos/21Z121Z1/XDRemux/git/blobs/0093fddf1efb1b5f10755eb6893c26937a5501b4 --jq .content | base64 --decode > "$RUNNER_TEMP/platform-move.py"
+            python3 "$RUNNER_TEMP/platform-move.py"
+            git add --all
+            test -z "$(git diff --cached --name-only -- .github)"
+            python3 -m unittest tests.test_product_ownership tests.test_performance_design tests.test_rust_apple_semantic_policy
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'refactor: give the Apple adapter one platform-owned package boundary'
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  platform-validation:
+    needs: platform-migration
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.platform-migration.outputs.head }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Test relocated package and canonical product
+        shell: bash
+        run: |
+          set -euo pipefail
           brew install libheif
           export PKG_CONFIG_PATH="$(brew --prefix libheif)/lib/pkgconfig"
-          brew info --json=v2 libheif libde265 x265 > artifacts/distribution/brew-info.json
-          pkg-config --modversion libheif | tee artifacts/distribution/libheif-version.txt
-          find "$(brew --prefix libheif)" -type f -o -type l > artifacts/distribution/libheif-files.txt
-          cargo build --locked --release -p xdremux-cli
-          swift build -c release --product xdremux-apple-adapter
-          adapter="$(swift build -c release --show-bin-path)/xdremux-apple-adapter"
-          otool -L target/release/xdremux "$adapter" > artifacts/distribution/executable-linkage.txt
-          otool -l target/release/xdremux "$adapter" > artifacts/distribution/executable-load-commands.txt
-          find "$(brew --prefix libheif)/lib" -name '*.dylib' -exec otool -L '{}' \; > artifacts/distribution/libheif-linkage.txt
-          target/release/xdremux --help > artifacts/distribution/help.txt
+          mkdir -p artifacts/distribution
+          git rev-parse HEAD | tee artifacts/distribution/head.txt
+          cargo fmt --all -- --check
+          cargo clippy --locked --workspace --all-targets -- --deny warnings
+          cargo test --locked --workspace --all-targets
+          swift build --package-path platforms/apple --product xdremux-apple-adapter
+          bash scripts/apple/check_apple_adapter_handshake.sh
+          xcodebuild -quiet -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj -scheme XDRemuxApp -configuration Debug -derivedDataPath "$RUNNER_TEMP/xdremux-app" CODE_SIGNING_ALLOWED=NO build
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: xdremux-distribution-inspection
+          name: xdremux-platform-migration
           path: artifacts/distribution/
           retention-days: 3
           if-no-files-found: error
