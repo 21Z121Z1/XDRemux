@@ -91,11 +91,13 @@ Training and evaluation scripts may remain in the Python research package becaus
 | `crates/` | Canonical Rust product stack. |
 | `Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
 | `xdremux_py/` | Research/training tooling; no product CLI or converter. |
-| `apps/macos/XDRemuxApp/` | macOS SwiftUI presentation shell that invokes the Rust CLI. |
-| `tests/` | Rust acceptance policy tests and validation harnesses. |
+| `apps/macos/XDRemuxApp/` | macOS SwiftUI shell, Xcode project, app tests, and app-owned build/test scripts. |
+| `tests/` | Python regression suites, validation-framework self-tests, and small synthetic fixtures; Rust tests remain with their crates. |
 | `fixtures/` | Versioned real media fixtures used by strict gates. |
-| `scripts/` | Build, evaluation, migration, and acceptance utilities. |
-| `docs/` | Current guidance and historical research records. |
+| `scripts/` | [Repository automation](../scripts/README.en.md), grouped by CI, validation, Apple, diagnostics, and performance. |
+| `docs/` | Current guidance; dated audits are isolated in `docs/history/`. |
+| `research/` | Isolated OPPO Styles, Texture Styles, video Styles, and Palette investigations. |
+| `benchmarks/` | Versioned performance baselines, separate from measurement scripts and generated reports. |
 | `research/oppo_styles/models/` | Optional research models and model documentation. |
 
 New user-visible behavior belongs in Rust. Swift changes must remain framework primitives, and Python changes must remain research tooling.

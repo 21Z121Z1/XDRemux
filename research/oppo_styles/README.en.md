@@ -104,7 +104,7 @@ and the removed Swift experimental environment switch is not a supported API.
 Run the research regressions with:
 
 ```bash
-python -m unittest discover -s Tests -p 'test_*.py' -v
+python -m unittest discover -s tests -t . -p 'test_*.py' -v
 ```
 
 Tests cover model shapes, finite serialization, byte identity, modality masking,

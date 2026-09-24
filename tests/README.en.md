@@ -2,7 +2,7 @@
 
 English | [简体中文](README.md)
 
-This directory contains Rust product-policy tests, Python repository-policy tests, and reusable validation harnesses.
+This directory contains Rust product-policy tests, Python repository-policy tests, validation-framework self-tests, and small synthetic fixtures.
 
 ## Rust tests
 
@@ -25,7 +25,7 @@ The public CLI parsing, conversion, batch, Motion Photo, classification, Portrai
 Run:
 
 ```bash
-python3 -m unittest discover -s Tests -v
+python3 -m unittest discover -s tests -t . -v
 ```
 
 These tests cover repository policies, documentation, app architecture, and the optional research/training package. They are not a product conversion implementation.
@@ -34,14 +34,16 @@ A source-inspection policy test is static evidence. It is not a replacement for 
 
 ## Validation harnesses
 
-Reusable harnesses are in `tests/validation/`.
+Reusable portable harnesses are in `scripts/validation/`. The macOS app owns its model-test launcher in `apps/macos/XDRemuxApp/scripts/`.
+
+`tests/validation/` contains Python self-tests for the validation framework, workflow configuration, and repository layout; it does not contain shell launchers.
 
 Examples include:
 
-- `check_rust_motion_photo_real_fixtures.sh`
-- `verify_error_messages.sh`
-- `verify_batch_categorize_idempotence.sh`
-- `verify_macos_app_model_tests.sh`
+- `scripts/validation/check_rust_motion_photo_real_fixtures.sh`
+- `scripts/validation/verify_error_messages.sh`
+- `scripts/validation/verify_batch_categorize_idempotence.sh`
+- `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh`
 
 Use the [regression and real-sample guide](../docs/quality/evals.en.md) to select a harness.
 

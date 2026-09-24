@@ -63,4 +63,4 @@ Training data and checkpoints are not part of the public model package unless a 
 
 Research changes to this model must not change the documented default Photographic Styles producer unless the CLI default and production tests change in the same revision.
 
-See the [Apple features guide](../docs/apple-features.en.md) for the current product boundary.
+See the [Apple features guide](../../../docs/apple-features.en.md) for the current product boundary.

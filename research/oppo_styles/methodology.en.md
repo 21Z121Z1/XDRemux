@@ -2,7 +2,7 @@
 
 English | [简体中文](methodology.md)
 
-This preserves the solver branch's **research methodology**, not an alternate converter or a claim that private experiments have been reproduced. Original paths, commits, blob identities and retirement decisions are in the [convergence ledger](../../docs/convergence/2026-09-23/README.en.md). The unchanged public model and historical measurements are documented separately in its [model card](models/UniversalPhotographicStyleStateNet.model-card.en.md).
+This preserves the solver branch's **research methodology**, not an alternate converter or a claim that private experiments have been reproduced. The previously referenced convergence ledger is not present in this tree. Recover the original ledger and source identities before relying on retired-ref provenance; this methodology is not a substitute for those records. The unchanged public model and historical measurements are documented separately in its [model card](models/UniversalPhotographicStyleStateNet.model-card.en.md).
 
 ## Data boundaries and prospective cohorts
 

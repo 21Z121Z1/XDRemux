@@ -91,11 +91,13 @@ python -m unittest tests.test_apple_reverse_key1_training
 | `crates/` | Canonical Rust 产品栈。 |
 | `Sources/XDRemuxAppleAdapter/` | Rust runtime 消费的版本化 Apple 平台进程 adapter。 |
 | `xdremux_py/` | 研究/训练工具；没有产品 CLI 或 converter。 |
-| `apps/macos/XDRemuxApp/` | 调用 Rust CLI 的 macOS SwiftUI presentation shell。 |
-| `tests/` | Rust acceptance policy test 和 validation harness。 |
+| `apps/macos/XDRemuxApp/` | macOS SwiftUI 界面、Xcode 工程、App 测试与 App 自有的构建和测试脚本。 |
+| `tests/` | Python 回归测试、验证框架自测与小型合成 fixture；Rust 测试仍与所属 crate 放在一起。 |
 | `fixtures/` | strict gate 使用的版本化真实媒体 fixture。 |
-| `scripts/` | 构建、评估、迁移和验收工具。 |
-| `docs/` | 当前指导文档和历史研究记录。 |
+| `scripts/` | 按 CI、validation、Apple、diagnostics、performance 分类的[仓库自动化](../scripts/README.md)。 |
+| `docs/` | 当前指导文档；带日期的审计记录单独放在 `docs/history/`。 |
+| `research/` | 隔离的 OPPO Styles、Texture Styles、视频 Styles 与 Palette 研究。 |
+| `benchmarks/` | 版本化性能基线，与测量脚本及生成的报告分开存放。 |
 | `research/oppo_styles/models/` | 可选研究模型和模型文档。 |
 
 新的用户可见行为进入 Rust。Swift 改动必须保持 framework primitive 边界，Python 改动必须保持研究工具边界。

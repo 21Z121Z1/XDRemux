@@ -21,7 +21,7 @@ if [[ ! -f "$SAMPLE" ]]; then
   exit 2
 fi
 if [[ ! -x "$CLI" ]]; then
-  cargo build --locked -q -p xdremux-cli
+  cargo build --manifest-path "$ROOT_DIR/Cargo.toml" --locked -q -p xdremux-cli
 fi
 if [[ ! -x "$CLI" ]]; then
   echo "Rust CLI not built: $CLI (run cargo build -p xdremux-cli first)" >&2

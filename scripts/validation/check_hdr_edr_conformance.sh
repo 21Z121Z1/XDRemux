@@ -10,7 +10,7 @@ trap 'rm -rf "$TMP"' EXIT
 RUST_OUT="$TMP/rust-edr.txt"
 
 cargo run --quiet --locked -p xdremux-hdr --bin xdremux-hdr-vectors -- \
-  Tests/fixtures/hdr_edr_cases.tsv > "$RUST_OUT"
+  tests/fixtures/hdr_edr_cases.tsv > "$RUST_OUT"
 
 RESOLVE_COUNT="$(grep -c '^resolve' "$RUST_OUT")"
 KNEE_COUNT="$(grep -c '^knee' "$RUST_OUT")"

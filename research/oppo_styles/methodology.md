@@ -2,7 +2,7 @@
 
 [English](methodology.en.md) | 简体中文
 
-本文保存 solver 分支的**研究方法**，不是第二套转换器，也不声称重新完成了私有实验。原始路径、commit、blob 身份及处置见[收敛台账](../../docs/convergence/2026-09-23/README.md)。未改动的公开模型与历史指标另见[模型卡](models/UniversalPhotographicStyleStateNet.model-card.md)。
+本文保存 solver 分支的**研究方法**，不是第二套转换器，也不声称重新完成了私有实验。先前引用的收敛台账不在当前目录树中。依赖退休引用的来源证明之前，需找回原始台账与源文件身份；本文的方法说明不能代替这些记录。未改动的公开模型与历史指标另见[模型卡](models/UniversalPhotographicStyleStateNet.model-card.md)。
 
 ## 数据边界与前瞻队列
 

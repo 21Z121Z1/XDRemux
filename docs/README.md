@@ -24,14 +24,14 @@
 
 ## 技术实现
 
-- [技术实现索引](xdremux/README.md)：稳定的实现契约。
+- [技术实现索引](architecture.md)：稳定的实现契约。
 - [ReverseKey1Ensemble 模型卡](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.md)：可选研究模型契约。
 
 ## 历史记录
 
 以下文件是证据记录。它们描述特定仓库状态或实验，不是当前产品规范。
 
-- ISO 一致性审计，2026-05-11：[当前语言摘要](xdremux/iso-conformance-audit-20260511.summary.md) | [原始记录](xdremux/iso-conformance-audit-20260511.md)
+- ISO 一致性审计，2026-05-11：[当前语言摘要](history/iso-conformance-audit-20260511.summary.md) | [原始记录](history/iso-conformance-audit-20260511.md)
 - 编码质量和体积审计，2026-07-18：[当前语言摘要](validation/encoding-quality-pareto-20260718.summary.md) | [原始记录](validation/encoding-quality-pareto-20260718.md)
 - 厂商 Live Photo 几何证据：[当前语言摘要](validation/vendor-live-photo-geometry.summary.md) | [原始记录](validation/vendor-live-photo-geometry.md)
 

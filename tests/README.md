@@ -25,7 +25,7 @@ swift build --product xdremux-apple-adapter
 运行：
 
 ```bash
-python3 -m unittest discover -s Tests -v
+python3 -m unittest discover -s tests -t . -v
 ```
 
 这些测试覆盖仓库 policy、文档、App 架构以及可选的研究/训练 package；它们不是产品转换实现。
@@ -34,14 +34,16 @@ python3 -m unittest discover -s Tests -v
 
 ## Validation harness
 
-可复用 harness 位于 `tests/validation/`。
+可复用的可移植 harness 位于 `scripts/validation/`；macOS App 的模型测试启动器位于 `apps/macos/XDRemuxApp/scripts/`。
+
+`tests/validation/` 只放验证框架、工作流配置和目录布局的 Python 自测，不放 shell 启动器。
 
 例如：
 
-- `check_rust_motion_photo_real_fixtures.sh`
-- `verify_error_messages.sh`
-- `verify_batch_categorize_idempotence.sh`
-- `verify_macos_app_model_tests.sh`
+- `scripts/validation/check_rust_motion_photo_real_fixtures.sh`
+- `scripts/validation/verify_error_messages.sh`
+- `scripts/validation/verify_batch_categorize_idempotence.sh`
+- `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh`
 
 如何选择 harness 见[回归和真实样本验证](../docs/quality/evals.md)。
 

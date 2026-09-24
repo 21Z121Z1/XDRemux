@@ -1,10 +1,10 @@
 # Technical Implementation Index
 
-English | [简体中文](README.md)
+English | [简体中文](architecture.md)
 
-This directory indexes stable implementation contracts for XDRemux. The Rust workspace is the only product implementation; Swift contains only the explicitly bounded Apple primitive adapter.
+This document indexes stable implementation contracts for XDRemux. The Rust workspace is the only product implementation; Swift contains only the explicitly bounded Apple primitive adapter.
 
-Use the [project README](../../README.en.md) for normal use and the [CLI reference](../cli.en.md) for command behavior.
+Use the [project README](../README.en.md) for normal use and the [CLI reference](cli.en.md) for command behavior.
 
 ## Current architecture
 
@@ -40,7 +40,7 @@ The former Swift product targets have been removed. Only `Sources/XDRemuxAppleAd
 
 The CLI automatically routes supported Motion Photo inputs before the normal HDR command path.
 
-The Motion Photo and normal HDR paths have different output-safety rules. See the [CLI reference](../cli.en.md).
+The Motion Photo and normal HDR paths have different output-safety rules. See the [CLI reference](cli.en.md).
 
 ### Python research tooling
 
@@ -74,18 +74,18 @@ Batch reuse requires source provenance. A valid pair with unknown lineage is not
 
 ## Current technical documents
 
-- [Apple feature guide](../apple-features.en.md)
-- [Development guide](../development.en.md)
-- [Testing policy](../quality/testing.en.md)
-- [Validation runbook](../validation/README.en.md)
-- [Fixture guide](../../fixtures/README.en.md)
+- [Apple feature guide](apple-features.en.md)
+- [Development guide](development.en.md)
+- [Testing policy](quality/testing.en.md)
+- [Validation runbook](validation/README.en.md)
+- [Fixture guide](../fixtures/README.en.md)
 
 ## Historical audit
 
-[ISO conformance audit, 2026-05-11](iso-conformance-audit-20260511.md) is a historical record.
+[ISO conformance audit, 2026-05-11](history/iso-conformance-audit-20260511.md) is a historical record.
 
 It contains paths and implementation details from that date. Do not use its old paths as the current architecture reference.
 
 Preserve historical audit measurements. Add a new dated audit when a new conformance study supersedes them.
 
-Current technical documentation follows the [technical writing guide](../style-guide.en.md).
+Current technical documentation follows the [technical writing guide](style-guide.en.md).

@@ -11,8 +11,8 @@
 | 层级 | 常用命令或来源 | 能证明什么 |
 | --- | --- | --- |
 | Unit 和 contract | `cargo test --workspace --locked` | Rust 产品、parser、格式、Apple feature policy 和 transaction 契约。 |
-| 仓库 policy | `python3 -m unittest discover -s Tests -v` | 跨文件 policy、Python 行为、文档和架构契约。 |
-| 真实 fixture | `fixtures/` 和 `tests/validation/` | 版本化或提供的真实媒体行为。 |
+| 仓库 policy | `python3 -m unittest discover -s tests -t . -v` | 跨文件 policy、Python 行为、文档和架构契约。 |
+| 真实 fixture | `fixtures/` 和 `scripts/validation/` | 版本化或提供的真实媒体行为。 |
 | 原生框架 | macOS validation job | 被测试的 ImageIO、PhotoKit 或其他 Apple framework 行为。 |
 | 真机 | 手工或记录的真实设备验证 | 依赖具体相册、Photos 版本、显示或设备的行为。 |
 | Completion receipt | `scripts/ci/agent_completion_gate.py` | 选定检查在准确 commit 上通过。 |

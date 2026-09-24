@@ -11,6 +11,8 @@ CANONICAL_BILINGUAL_PAIRS = (
     ("docs/cli.en.md", "docs/cli.md"),
     ("docs/apple-features.en.md", "docs/apple-features.md"),
     ("docs/development.en.md", "docs/development.md"),
+    ("docs/architecture.en.md", "docs/architecture.md"),
+    ("scripts/README.en.md", "scripts/README.md"),
     ("docs/supported-devices.en.md", "docs/supported-devices.md"),
     ("docs/quality/testing.en.md", "docs/quality/testing.md"),
     ("docs/quality/evals.en.md", "docs/quality/evals.md"),
@@ -139,7 +141,7 @@ class PublicDocumentationTests(unittest.TestCase):
             ROOT / ".github" / "workflows" / "completion-gate.yml"
         ).read_text(encoding="utf-8")
         self.assertIn("tests.test_public_documentation", workflow)
-        self.assertTrue((ROOT / "Tests" / "test_public_documentation.py").is_file())
+        self.assertTrue((ROOT / "tests" / "test_public_documentation.py").is_file())
 
 
 if __name__ == "__main__":

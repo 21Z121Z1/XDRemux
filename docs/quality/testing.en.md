@@ -11,8 +11,8 @@ For commands, see [tests/README.en.md](../../tests/README.en.md). For completion
 | Layer | Typical command or source | What it proves |
 | --- | --- | --- |
 | Unit and contract | `cargo test --workspace --locked` | Rust product, parser, format, Apple-feature policy, and transaction contracts. |
-| Repository policy | `python3 -m unittest discover -s Tests -v` | Cross-file policy, Python behavior, documentation, and architecture contracts. |
-| Real fixture | `fixtures/` and `tests/validation/` | Behavior on versioned or supplied real media. |
+| Repository policy | `python3 -m unittest discover -s tests -t . -v` | Cross-file policy, Python behavior, documentation, and architecture contracts. |
+| Real fixture | `fixtures/` and `scripts/validation/` | Behavior on versioned or supplied real media. |
 | Native framework | macOS validation jobs | ImageIO, PhotoKit, or other tested Apple framework behavior. |
 | Device | manual or recorded real-device validation | Behavior that depends on a specific gallery, Photos version, display, or device. |
 | Completion receipt | `scripts/ci/agent_completion_gate.py` | The selected checks passed for the exact commit. |

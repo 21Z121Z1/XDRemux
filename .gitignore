@@ -21,7 +21,7 @@ __pycache__/
 *.zip
 
 # Real Motion Photo fixtures are intentionally versioned for CI.
-!fixtures/*.heic
+!fixtures/**/*.heic
 
 # Local agent / project scaffolding (not for tracking)
 .codex/
@@ -44,7 +44,7 @@ proxdr-probe-app/
 test-samples/
 tmp-samples/
 tmp/
-tools/
+/tools/
 .codex/verification-receipts/
 artifacts/
 lhdr_test_sapmple/

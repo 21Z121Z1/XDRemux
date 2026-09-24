@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 DERIVED_DATA="${XDREMUX_APP_MODEL_DERIVED_DATA:-$(mktemp -d "${TMPDIR:-/tmp}/xdremux-app-model-XXXXXX")}"
 
 cd "$ROOT_DIR"

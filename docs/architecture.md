@@ -1,10 +1,10 @@
 # 技术实现索引
 
-[English](README.en.md) | 简体中文
+[English](architecture.en.md) | 简体中文
 
-本目录索引 XDRemux 当前稳定的实现契约。Rust workspace 是唯一产品实现；Swift 只保留明确受限的 Apple primitive adapter。
+本文档索引 XDRemux 当前稳定的实现契约。Rust workspace 是唯一产品实现；Swift 只保留明确受限的 Apple primitive adapter。
 
-普通使用见[项目 README](../../README.md)，命令行为见 [CLI 参考](../cli.md)。
+普通使用见[项目 README](../README.md)，命令行为见 [CLI 参考](cli.md)。
 
 ## 当前架构
 
@@ -40,7 +40,7 @@ Rust `xdremux` CLI 和 workspace crate 负责全部产品语义、格式转换�
 
 CLI 会在普通 HDR 命令链路前自动路由支持的 Motion Photo 输入。
 
-Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](../cli.md)。
+Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](cli.md)。
 
 ### Python 实现
 
@@ -74,18 +74,18 @@ batch 复用要求 source provenance。来源未知的有效 pair 不能被接�
 
 ## 当前技术文档
 
-- [Apple 功能文档](../apple-features.md)
-- [开发文档](../development.md)
-- [测试政策](../quality/testing.md)
-- [验证 runbook](../validation/README.md)
-- [Fixture 说明](../../fixtures/README.md)
+- [Apple 功能文档](apple-features.md)
+- [开发文档](development.md)
+- [测试政策](quality/testing.md)
+- [验证 runbook](validation/README.md)
+- [Fixture 说明](../fixtures/README.md)
 
 ## 历史审计
 
-[ISO 一致性审计，2026-05-11](iso-conformance-audit-20260511.md) 是历史记录。
+[ISO 一致性审计，2026-05-11](history/iso-conformance-audit-20260511.md) 是历史记录。
 
 它包含当时的路径和实现细节。不要把其中的旧路径当作当前架构参考。
 
 保留历史审计中的测量结果。新的 conformance 研究取代旧结论时，应增加新的带日期审计。
 
-当前技术文档遵循[技术写作规范](../style-guide.md)。
+当前技术文档遵循[技术写作规范](style-guide.md)。

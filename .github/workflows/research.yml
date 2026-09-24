@@ -7,6 +7,8 @@ on:
       - "research/**"
       - "xdremux_py/**"
       - "tests/**"
+      - "scripts/**"
+      - ".gitignore"
       - "pyproject.toml"
       - ".github/workflows/research.yml"
   pull_request:
@@ -14,6 +16,8 @@ on:
       - "research/**"
       - "xdremux_py/**"
       - "tests/**"
+      - "scripts/**"
+      - ".gitignore"
       - "pyproject.toml"
       - ".github/workflows/research.yml"
 
@@ -35,16 +39,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Capture tracked inputs for the repository layout audit
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 56 }}
-        run: git archive --format=tar.gz HEAD -o "$RUNNER_TEMP/layout-workspace.tar.gz"
-      - uses: actions/upload-artifact@v7
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 56 }}
-        with:
-          name: layout-workspace-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/layout-workspace.tar.gz
-          if-no-files-found: error
-          retention-days: 1
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

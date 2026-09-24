@@ -24,14 +24,14 @@ All current technical documents use the writing policy in the [technical writing
 
 ## Technical implementation
 
-- [Technical implementation index](xdremux/README.en.md): stable implementation contracts.
+- [Technical implementation index](architecture.en.md): stable implementation contracts.
 - [ReverseKey1Ensemble model card](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.en.md): optional research model contract.
 
 ## Historical records
 
 The following files are evidence records. They describe a specific repository state or experiment. They are not current product specifications.
 
-- ISO conformance audit, 2026-05-11: [current-language summary](xdremux/iso-conformance-audit-20260511.summary.en.md) | [original record](xdremux/iso-conformance-audit-20260511.md)
+- ISO conformance audit, 2026-05-11: [current-language summary](history/iso-conformance-audit-20260511.summary.en.md) | [original record](history/iso-conformance-audit-20260511.md)
 - Encoding quality and size audit, 2026-07-18: [current-language summary](validation/encoding-quality-pareto-20260718.summary.en.md) | [original record](validation/encoding-quality-pareto-20260718.md)
 - Vendor Live Photo geometry evidence: [current-language summary](validation/vendor-live-photo-geometry.summary.en.md) | [original record](validation/vendor-live-photo-geometry.md)
 

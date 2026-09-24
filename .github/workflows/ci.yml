@@ -83,6 +83,7 @@ jobs:
         run: |
           python3 -m unittest \
             tests.validation.test_agent_completion_gate \
+            tests.validation.test_repository_layout \
             tests.test_app_architecture \
             tests.test_product_ownership \
             tests.test_public_documentation \

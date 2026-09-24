@@ -63,4 +63,4 @@ ensemble 组合小型 profile-conditioned baseline 和更大的 multiscale candi
 
 研究模型的修改不能改变文档中的默认摄影风格 producer，除非 CLI 默认值和 production test 在同一 revision 中一起改变。
 
-当前产品边界见 [Apple 功能文档](../docs/apple-features.md)。
+当前产品边界见 [Apple 功能文档](../../../docs/apple-features.md)。

@@ -14,7 +14,7 @@ import unittest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-GATE = REPOSITORY_ROOT / "scripts" / "agent_completion_gate.py"
+GATE = REPOSITORY_ROOT / "scripts" / "ci" / "agent_completion_gate.py"
 
 
 class CompletionGateTests(unittest.TestCase):

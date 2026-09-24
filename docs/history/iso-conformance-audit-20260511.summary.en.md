@@ -18,6 +18,6 @@ It also recorded compatibility choices where strict standard representation and 
 
 Use the original file for the exact findings and measurements from that date.
 
-For current architecture and product behavior, use the [technical implementation index](README.en.md), current source, and current tests.
+For current architecture and product behavior, use the [technical implementation index](../architecture.en.md), current source, and current tests.
 
 A new conformance study should create a new dated record instead of rewriting the 2026-05-11 evidence.
