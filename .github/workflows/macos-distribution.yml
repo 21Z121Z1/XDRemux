@@ -1,0 +1,85 @@
+name: macOS Rust Distribution
+
+on:
+  push:
+    branches: [feat/rust-cli-distribution-i18n-20260924]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-distribution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-inspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - name: Export tracked build inputs for distribution inspection
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/distribution-inspection"
+          python3 - <<'PY'
+          import pathlib, subprocess, tarfile, os
+          root = pathlib.Path.cwd()
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'distribution-inspection'
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          (output / 'tracked-paths.txt').write_text('\n'.join(paths))
+          (output / 'head.txt').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode())
+          with tarfile.open(output / 'source.tar.gz', 'w:gz') as archive:
+              for name in paths:
+                  path = root / name
+                  if not name or not path.is_file() or path.stat().st_size > 1048576:
+                      continue
+                  try:
+                      path.read_text(encoding='utf-8')
+                  except UnicodeError:
+                      continue
+                  archive.add(path, arcname=name, recursive=False)
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: xdremux-distribution-source
+          path: ${{ runner.temp }}/distribution-inspection/
+          retention-days: 3
+          if-no-files-found: error
+  macos-build-inspection:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+      - name: Inspect native codec dependencies and build canonical executables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/distribution
+          git rev-parse HEAD | tee artifacts/distribution/head.txt
+          brew install libheif
+          export PKG_CONFIG_PATH="$(brew --prefix libheif)/lib/pkgconfig"
+          brew info --json=v2 libheif libde265 x265 > artifacts/distribution/brew-info.json
+          pkg-config --modversion libheif | tee artifacts/distribution/libheif-version.txt
+          find "$(brew --prefix libheif)" -type f -o -type l > artifacts/distribution/libheif-files.txt
+          cargo build --locked --release -p xdremux-cli
+          swift build -c release --product xdremux-apple-adapter
+          adapter="$(swift build -c release --show-bin-path)/xdremux-apple-adapter"
+          otool -L target/release/xdremux "$adapter" > artifacts/distribution/executable-linkage.txt
+          otool -l target/release/xdremux "$adapter" > artifacts/distribution/executable-load-commands.txt
+          find "$(brew --prefix libheif)/lib" -name '*.dylib' -exec otool -L '{}' \; > artifacts/distribution/libheif-linkage.txt
+          target/release/xdremux --help > artifacts/distribution/help.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: xdremux-distribution-inspection
+          path: artifacts/distribution/
+          retention-days: 3
+          if-no-files-found: error
