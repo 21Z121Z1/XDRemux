@@ -111,7 +111,7 @@ case "$COMMAND" in
     cargo fmt --all -- --check
     cargo clippy --locked --workspace --all-targets -- -D warnings
     cargo test --locked --workspace --all-targets
-    swift build --product xdremux-apple-adapter
+    swift build --package-path platforms/apple --product xdremux-apple-adapter
     python3 -m unittest discover -s tests -t . -p "test_*.py"
   ;;
   --telemetry|telemetry)

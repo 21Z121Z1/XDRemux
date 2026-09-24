@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "XDRemux",
+    name: "XDRemuxAppleAdapter",
     defaultLocalization: "en",
     platforms: [
         .macOS(.v15)

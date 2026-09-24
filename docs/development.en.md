@@ -52,7 +52,7 @@ A lower crate may provide a format primitive without making it a product mode. R
 
 ## Apple platform capabilities
 
-`Sources/XDRemuxAppleAdapter/` is the only Swift package source. It contains the Apple framework primitives that the Rust runtime cannot call portably. The former Swift conversion/core/oracle targets have been removed; new product behavior must not enter Swift.
+`platforms/apple/Sources/XDRemuxAppleAdapter/` is the only Swift package source. It contains the Apple framework primitives that the Rust runtime cannot call portably. The former Swift conversion/core/oracle targets have been removed; new product behavior must not enter Swift.
 
 The boundary is intentionally narrow:
 
@@ -89,7 +89,7 @@ Training and evaluation scripts may remain in the Python research package becaus
 | Path | Purpose |
 | --- | --- |
 | `crates/` | Canonical Rust product stack. |
-| `Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
+| `platforms/apple/Sources/XDRemuxAppleAdapter/` | Versioned Apple platform process adapter consumed by the Rust runtime. |
 | `xdremux_py/` | Research/training tooling; no product CLI or converter. |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI shell, Xcode project, app tests, and app-owned build/test scripts. |
 | `tests/` | Python regression suites, validation-framework self-tests, and small synthetic fixtures; Rust tests remain with their crates. |

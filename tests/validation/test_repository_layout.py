@@ -13,7 +13,7 @@ from urllib.parse import unquote, urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_GROUPS = {"apple", "ci", "diagnostics", "performance", "validation"}
+SCRIPT_GROUPS = {"apple", "ci", "diagnostics", "distribution", "performance", "validation"}
 HARNESSES = (
     "scripts/validation/verify_batch_categorize_idempotence.sh",
     "scripts/validation/verify_error_messages.sh",
@@ -32,6 +32,24 @@ class RepositoryLayoutTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.paths = tracked_paths()
+
+    def test_apple_adapter_has_one_platform_owner(self) -> None:
+        self.assertNotIn("Package.swift", self.paths)
+        self.assertFalse(any(path.startswith("Sources/") for path in self.paths))
+        self.assertIn("platforms/apple/Package.swift", self.paths)
+        self.assertIn("platforms/apple/Sources/XDRemuxAppleAdapter/main.swift", self.paths)
+        self.assertIn("apps/macos/XDRemuxApp/project.yml", self.paths)
+
+    def test_apple_build_references_use_explicit_package_boundary(self) -> None:
+        old_source = re.compile(r"(?<![\w/])Sources/" + r"XDRemuxAppleAdapter/")
+        for path in sorted(self.paths):
+            if not path.endswith((".sh", ".yml", ".md", ".pbxproj")) or path.startswith("docs/history/"):
+                continue
+            content = (ROOT / path).read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                self.assertIsNone(old_source.search(content))
+                for command in re.findall(r"swift build[^\n\\]*", content):
+                    self.assertIn("--package-path", command)
 
     def test_paths_do_not_collide_on_case_insensitive_filesystems(self) -> None:
         folded: dict[str, str] = {}

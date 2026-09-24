@@ -107,7 +107,7 @@ class CompletionGateTests(unittest.TestCase):
                          {"production_changed": True, "source_changed": True})
 
     def test_build_inputs_require_regression_and_functional_evidence(self) -> None:
-        for name in ("Cargo.toml", "Cargo.lock", "Package.swift", "Package.resolved",
+        for name in ("Cargo.toml", "Cargo.lock", "platforms/apple/Package.swift", "platforms/apple/Package.resolved",
                      "rust-toolchain", "rust-toolchain.toml", "build.rs", ".cargo/config.toml",
                      "crates/xdremux-runtime/Cargo.toml",
                      "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj"):

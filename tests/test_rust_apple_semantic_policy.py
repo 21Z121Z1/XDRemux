@@ -15,14 +15,14 @@ RUNTIME_ADAPTER = (
     ROOT / "crates" / "xdremux-runtime" / "src" / "apple_adapter.rs"
 ).read_text(encoding="utf-8")
 ADAPTER_MAIN = (
-    ROOT / "Sources" / "XDRemuxAppleAdapter" / "main.swift"
+    ROOT / "platforms" / "apple" / "Sources" / "XDRemuxAppleAdapter" / "main.swift"
 ).read_text(encoding="utf-8")
 VISION_MATTES = (
-    ROOT / "Sources" / "XDRemuxAppleAdapter" / "VisionSemanticMattes.swift"
+    ROOT / "platforms" / "apple" / "Sources" / "XDRemuxAppleAdapter" / "VisionSemanticMattes.swift"
 ).read_text(encoding="utf-8")
 ADAPTER = "\n".join(
     path.read_text(encoding="utf-8")
-    for path in sorted((ROOT / "Sources" / "XDRemuxAppleAdapter").glob("*.swift"))
+    for path in sorted((ROOT / "platforms" / "apple" / "Sources" / "XDRemuxAppleAdapter").glob("*.swift"))
 )
 APPLE_PROTOCOL_CLIENTS = tuple(
     (path, (ROOT / path).read_text(encoding="utf-8"))
@@ -162,7 +162,7 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
         self.assertIn("AppleAdapterClient", RUNTIME)
 
     def test_no_swift_product_sources_survive_outside_adapter(self) -> None:
-        source_root = ROOT / "Sources"
+        source_root = ROOT / "platforms" / "apple" / "Sources"
         swift_paths = sorted(source_root.rglob("*.swift"))
         self.assertTrue(swift_paths)
         self.assertTrue(all("XDRemuxAppleAdapter" in path.parts for path in swift_paths))

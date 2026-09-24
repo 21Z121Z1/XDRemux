@@ -20,13 +20,14 @@ FUNCTIONAL_KINDS = {"functional", "integration", "device"}
 PRODUCTION_PREFIXES = (
     "crates/",
     ".cargo/",
-    "Sources/",
+    "platforms/apple/",
+    "scripts/distribution/",
     "xdremux/",
     "apps/macos/XDRemuxApp/Sources/",
     "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/",
 )
 PRODUCT_BUILD_INPUTS = {
-    "Cargo.toml", "Cargo.lock", "Package.swift", "Package.resolved",
+    "Cargo.toml", "Cargo.lock", "platforms/apple/Package.swift", "platforms/apple/Package.resolved",
     "rust-toolchain", "rust-toolchain.toml", "build.rs",
 }
 SOURCE_SUFFIXES = {".rs", ".swift", ".py", ".sh", ".c", ".cc", ".cpp", ".h", ".m", ".mm"}

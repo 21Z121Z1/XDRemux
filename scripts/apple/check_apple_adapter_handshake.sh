@@ -6,8 +6,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 2
 fi
 
-swift build --product xdremux-apple-adapter
-ADAPTER="$(swift build --show-bin-path)/xdremux-apple-adapter"
+swift build --package-path platforms/apple --product xdremux-apple-adapter
+ADAPTER="$(swift build --package-path platforms/apple --show-bin-path)/xdremux-apple-adapter"
 test -x "$ADAPTER"
 
 RESPONSE="$(printf '%s\n' '{"schema_version":2,"operation":"capabilities"}' | "$ADAPTER")"
@@ -81,7 +81,7 @@ TEST_TARGET="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-apple-adapter.XXXXXX")"
 trap 'rm -rf "$TEST_TARGET"' EXIT
 
 SCHEDULER_TEST="$TEST_TARGET/vision-request-scheduling-regression"
-swiftc Sources/XDRemuxAppleAdapter/VisionRequestScheduling.swift \
+swiftc platforms/apple/Sources/XDRemuxAppleAdapter/VisionRequestScheduling.swift \
   scripts/apple/vision_request_scheduler_regression.swift \
   -o "$SCHEDULER_TEST"
 "$SCHEDULER_TEST"

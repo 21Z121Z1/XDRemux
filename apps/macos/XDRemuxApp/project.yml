@@ -35,8 +35,8 @@ targets:
           else
             cargo build --locked -p xdremux-cli
           fi
-          swift build -c "${swift_configuration}" --product xdremux-apple-adapter
-          adapter_binary="$(swift build -c "${swift_configuration}" --show-bin-path)/xdremux-apple-adapter"
+          swift build --package-path platforms/apple -c "${swift_configuration}" --product xdremux-apple-adapter
+          adapter_binary="$(swift build --package-path platforms/apple -c "${swift_configuration}" --show-bin-path)/xdremux-apple-adapter"
 
           helper_directory="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers"
           mkdir -p "${helper_directory}"

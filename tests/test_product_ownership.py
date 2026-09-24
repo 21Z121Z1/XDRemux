@@ -22,7 +22,7 @@ class ProductOwnershipTests(unittest.TestCase):
             self.assertFalse((ROOT / relative).exists(), f"legacy Python product entry point returned: {relative}")
 
     def test_swift_package_vends_only_apple_platform_artifacts(self) -> None:
-        manifest = (ROOT / "Package.swift").read_text(encoding="utf-8")
+        manifest = (ROOT / "platforms" / "apple" / "Package.swift").read_text(encoding="utf-8")
         self.assertIn('.executable(name: "xdremux-apple-adapter"', manifest)
         for legacy in (
             "XDRemuxCore",
@@ -36,7 +36,7 @@ class ProductOwnershipTests(unittest.TestCase):
             self.assertNotIn(legacy, manifest)
 
     def test_swift_sources_are_limited_to_the_framework_adapter(self) -> None:
-        source_root = ROOT / "Sources"
+        source_root = ROOT / "platforms" / "apple" / "Sources"
         swift_sources = sorted(source_root.rglob("*.swift"))
         self.assertTrue(swift_sources)
         self.assertTrue(all("XDRemuxAppleAdapter" in path.parts for path in swift_sources))

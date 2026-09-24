@@ -28,8 +28,8 @@ if [[ ! -x "$cli" ]]; then
 fi
 
 if [[ -z "$adapter" ]]; then
-  swift build --product xdremux-apple-adapter >/dev/null
-  adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+  swift build --package-path platforms/apple --product xdremux-apple-adapter >/dev/null
+  adapter="$(swift build --package-path platforms/apple --show-bin-path)/xdremux-apple-adapter"
 fi
 if [[ ! -x "$adapter" ]]; then
   echo "Apple adapter was not built at $adapter" >&2

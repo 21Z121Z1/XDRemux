@@ -29,18 +29,18 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
         self.assertIn("Huber", source)
 
     def test_apple_core_image_context_is_process_scoped(self) -> None:
-        source = self.source("Sources/XDRemuxAppleAdapter/CoreImageL8.swift")
+        source = self.source("platforms/apple/Sources/XDRemuxAppleAdapter/CoreImageL8.swift")
         self.assertIn("private let coreImageContext = CIContext", source)
         self.assertEqual(source.count("CIContext(options:"), 1)
         self.assertIn("coreImageContext.render(", source)
 
     def test_apple_main10_property_copy_uses_explicit_out_pointer(self) -> None:
-        source = self.source("Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift")
+        source = self.source("platforms/apple/Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift")
         self.assertIn("withUnsafeMutablePointer(to: &value)", source)
         self.assertNotIn("valueOut: &value", source)
 
     def test_apple_main10_prefers_hardware_without_requiring_it(self) -> None:
-        source = self.source("Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift")
+        source = self.source("platforms/apple/Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift")
         self.assertIn(
             "kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: true",
             source,
@@ -62,7 +62,7 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
 
     def test_apple_adapter_transport_is_persistent_bounded_and_fail_closed(self) -> None:
         rust = self.source("crates/xdremux-runtime/src/apple_adapter.rs")
-        swift = self.source("Sources/XDRemuxAppleAdapter/main.swift")
+        swift = self.source("platforms/apple/Sources/XDRemuxAppleAdapter/main.swift")
         lifecycle = self.source("scripts/performance/characterize_apple_adapter_launches.py")
         for marker in (
             "--persistent-json-lines",

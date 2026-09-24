@@ -24,7 +24,7 @@ Rust `xdremux` CLI 和 workspace crate 负责全部产品语义、格式转换�
 
 ### Apple capability boundary
 
-`Sources/XDRemuxAppleAdapter/` 是 Rust runtime 调用的最小 Apple framework primitive adapter。
+`platforms/apple/Sources/XDRemuxAppleAdapter/` 是 Rust runtime 调用的最小 Apple framework primitive adapter。
 
 当前职责包括：
 
@@ -32,7 +32,7 @@ Rust `xdremux` CLI 和 workspace crate 负责全部产品语义、格式转换�
 - 返回 Rust 定义协议中的 framework facts；
 - 写入或探测 Rust 已规划的 Apple-specific resource。
 
-原来的 Swift product target 已删除。Swift 侧只剩 `Sources/XDRemuxAppleAdapter/`，不得承载 product policy。
+原来的 Swift product target 已删除。Swift 侧只剩 `platforms/apple/Sources/XDRemuxAppleAdapter/`，不得承载 product policy。
 
 ### CLI 层
 

@@ -9,8 +9,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 2
 fi
 
-swift build --product xdremux-apple-adapter
-adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+swift build --package-path platforms/apple --product xdremux-apple-adapter
+adapter="$(swift build --package-path platforms/apple --show-bin-path)/xdremux-apple-adapter"
 test -x "$adapter"
 
 cargo build --locked -p xdremux-cli

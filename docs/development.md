@@ -52,7 +52,7 @@ portable providers + platform adapters
 
 ## Apple 平台能力
 
-`Sources/XDRemuxAppleAdapter/` 是唯一保留的 Swift package source，只包含 Rust 无法跨平台调用的 Apple framework primitive。原 Swift conversion/core/oracle target 已删除；新的产品行为不得进入 Swift。
+`platforms/apple/Sources/XDRemuxAppleAdapter/` 是唯一保留的 Swift package source，只包含 Rust 无法跨平台调用的 Apple framework primitive。原 Swift conversion/core/oracle target 已删除；新的产品行为不得进入 Swift。
 
 边界刻意保持很窄：
 
@@ -89,7 +89,7 @@ python -m unittest tests.test_apple_reverse_key1_training
 | 路径 | 用途 |
 | --- | --- |
 | `crates/` | Canonical Rust 产品栈。 |
-| `Sources/XDRemuxAppleAdapter/` | Rust runtime 消费的版本化 Apple 平台进程 adapter。 |
+| `platforms/apple/Sources/XDRemuxAppleAdapter/` | Rust runtime 消费的版本化 Apple 平台进程 adapter。 |
 | `xdremux_py/` | 研究/训练工具；没有产品 CLI 或 converter。 |
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI 界面、Xcode 工程、App 测试与 App 自有的构建和测试脚本。 |
 | `tests/` | Python 回归测试、验证框架自测与小型合成 fixture；Rust 测试仍与所属 crate 放在一起。 |

@@ -15,7 +15,7 @@ cargo test --workspace --locked
 The Swift package contains only the Apple primitive adapter. Build it when running macOS consumer checks:
 
 ```bash
-swift build --product xdremux-apple-adapter
+swift build --package-path platforms/apple --product xdremux-apple-adapter
 ```
 
 The public CLI parsing, conversion, batch, Motion Photo, classification, Portrait, Styles, validation, and output-safety tests live in the Rust workspace.

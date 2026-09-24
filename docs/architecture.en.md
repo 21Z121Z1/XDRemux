@@ -24,7 +24,7 @@ Current responsibilities include:
 
 ### Apple capability boundary
 
-`Sources/XDRemuxAppleAdapter/` is the minimal Apple-framework primitive adapter invoked by the Rust runtime.
+`platforms/apple/Sources/XDRemuxAppleAdapter/` is the minimal Apple-framework primitive adapter invoked by the Rust runtime.
 
 Current responsibilities include:
 
@@ -32,7 +32,7 @@ Current responsibilities include:
 - returning framework facts through the Rust-defined protocol;
 - writing or probing Apple-specific resources already planned by Rust.
 
-The former Swift product targets have been removed. Only `Sources/XDRemuxAppleAdapter/` remains on the Swift side, and it must not receive product policy.
+The former Swift product targets have been removed. Only `platforms/apple/Sources/XDRemuxAppleAdapter/` remains on the Swift side, and it must not receive product policy.
 
 ### CLI layer
 
