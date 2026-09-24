@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod categorize;
+mod i18n;
 mod validate;
 
 use std::collections::BTreeSet;
@@ -9,7 +10,8 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use clap::{error::ErrorKind, Args, CommandFactory, Parser, Subcommand};
+use clap::{error::ErrorKind, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
+use i18n::{message, Language};
 use serde_json::json;
 use xdremux_engine::{AppleFeatureRequest, ConversionRequest};
 use xdremux_runtime::{
@@ -26,6 +28,9 @@ use xdremux_source::{inspect_path, probe_bytes, SourceAsset, SourceInspection};
     disable_help_subcommand = true
 )]
 struct Cli {
+    /// Human-readable language (en or zh-CN); JSON is never translated.
+    #[arg(long, global = true, value_name = "LANG", value_parser = Language::parse)]
+    lang: Option<Language>,
     #[command(subcommand)]
     command: RootCommand,
 }
@@ -178,10 +183,29 @@ struct BatchArgs {
     json: bool,
 }
 
-fn write_clap_error(error: clap::Error, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+fn write_clap_error(
+    language: Language,
+    error: clap::Error,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
     let kind = error.kind();
     let code = u8::try_from(error.exit_code()).unwrap_or(2);
-    let rendered = error.to_string();
+    let rendered = if language == Language::ZhCn
+        && !matches!(kind, ErrorKind::DisplayHelp | ErrorKind::DisplayVersion)
+    {
+        // Keep clap's exact argument/value diagnostics intact. Its underlying
+        // formatter is English; this CLI-owned context and help are localized.
+        format!(
+            "{}\n{error}",
+            language.text(
+                "error: invalid command-line arguments; see --help.",
+                "错误：命令行参数无效。请使用 --help 查看用法。"
+            )
+        )
+    } else {
+        error.to_string()
+    };
     let result = if matches!(kind, ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) {
         write!(stdout, "{rendered}")
     } else {
@@ -193,12 +217,22 @@ fn write_clap_error(error: clap::Error, stdout: &mut impl Write, stderr: &mut im
     code
 }
 
-fn parse_cli(args: impl IntoIterator<Item = OsString>) -> Result<Cli, clap::Error> {
-    Cli::try_parse_from(std::iter::once(OsString::from("xdremux")).chain(args))
+fn parse_cli_language(
+    args: impl IntoIterator<Item = OsString>,
+    language: Language,
+) -> Result<Cli, clap::Error> {
+    let matches = i18n::command(Cli::command(), language)
+        .try_get_matches_from(std::iter::once(OsString::from("xdremux")).chain(args))?;
+    Cli::from_arg_matches(&matches)
 }
 
-fn write_root_help(stdout: &mut impl Write) -> u8 {
-    let mut command = Cli::command();
+#[cfg(test)]
+fn parse_cli(args: impl IntoIterator<Item = OsString>) -> Result<Cli, clap::Error> {
+    parse_cli_language(args, Language::En)
+}
+
+fn write_root_help(language: Language, stdout: &mut impl Write) -> u8 {
+    let mut command = i18n::command(Cli::command(), language);
     match command
         .write_long_help(&mut *stdout)
         .and_then(|()| writeln!(stdout))
@@ -208,9 +242,26 @@ fn write_root_help(stdout: &mut impl Write) -> u8 {
     }
 }
 
-fn write_human(inspection: &SourceInspection, output: &mut impl Write) -> io::Result<()> {
-    writeln!(output, "input: {}", inspection.input.display())?;
-    writeln!(output, "kind: {}", inspection.asset.kind())?;
+fn write_human(
+    language: Language,
+    inspection: &SourceInspection,
+    output: &mut impl Write,
+) -> io::Result<()> {
+    writeln!(
+        output,
+        "{}",
+        message!(
+            language,
+            "input: {}",
+            "输入：{}",
+            inspection.input.display()
+        )
+    )?;
+    writeln!(
+        output,
+        "{}",
+        message!(language, "kind: {}", "类型：{}", inspection.asset.kind())
+    )?;
     match &inspection.asset {
         SourceAsset::MotionPhoto {
             source_kind,
@@ -220,23 +271,67 @@ fn write_human(inspection: &SourceInspection, output: &mut impl Write) -> io::Re
             presentation_source,
             stream_count,
         } => {
-            writeln!(output, "source-kind: {source_kind}")?;
             writeln!(
                 output,
-                "still: offset={} length={}",
-                still.offset, still.length
+                "{}",
+                message!(
+                    language,
+                    "source-kind: {source_kind}",
+                    "源类型：{source_kind}"
+                )
             )?;
             writeln!(
                 output,
-                "video: offset={} length={}",
-                video.offset, video.length
+                "{}",
+                message!(
+                    language,
+                    "still: offset={} length={}",
+                    "静态图像：偏移={} 长度={}",
+                    still.offset,
+                    still.length
+                )
             )?;
-            writeln!(output, "streams: {stream_count}")?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "video: offset={} length={}",
+                    "视频：偏移={} 长度={}",
+                    video.offset,
+                    video.length
+                )
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "streams: {stream_count}",
+                    "流数量：{stream_count}"
+                )
+            )?;
             if let Some(value) = presentation_timestamp_us {
-                writeln!(output, "presentation-timestamp-us: {value}")?;
+                writeln!(
+                    output,
+                    "{}",
+                    message!(
+                        language,
+                        "presentation-timestamp-us: {value}",
+                        "显示时间戳（微秒）：{value}"
+                    )
+                )?;
             }
             if let Some(value) = presentation_source {
-                writeln!(output, "presentation-source: {value}")?;
+                writeln!(
+                    output,
+                    "{}",
+                    message!(
+                        language,
+                        "presentation-source: {value}",
+                        "显示时间来源：{value}"
+                    )
+                )?;
             }
         }
         SourceAsset::ProXdr {
@@ -246,21 +341,67 @@ fn write_human(inspection: &SourceInspection, output: &mut impl Write) -> io::Re
             manifest_entry_count,
             has_local_hdr_info,
         } => {
-            writeln!(output, "hdr-mode: {hdr_mode}")?;
-            writeln!(output, "metadata-floats: {metadata_float_count}")?;
-            writeln!(output, "gain-map-bytes: {gain_map_bytes}")?;
-            writeln!(output, "manifest-entries: {manifest_entry_count}")?;
-            writeln!(output, "local-hdr-info: {has_local_hdr_info}")?;
+            writeln!(
+                output,
+                "{}",
+                message!(language, "hdr-mode: {hdr_mode}", "HDR 模式：{hdr_mode}")
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "metadata-floats: {metadata_float_count}",
+                    "元数据浮点数数量：{metadata_float_count}"
+                )
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "gain-map-bytes: {gain_map_bytes}",
+                    "Gain Map 字节数：{gain_map_bytes}"
+                )
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "manifest-entries: {manifest_entry_count}",
+                    "清单项目数：{manifest_entry_count}"
+                )
+            )?;
+            writeln!(
+                output,
+                "{}",
+                message!(
+                    language,
+                    "local-hdr-info: {has_local_hdr_info}",
+                    "Local HDR 信息：{has_local_hdr_info}"
+                )
+            )?;
         }
     }
     Ok(())
 }
 
-fn run_inspect(input: PathBuf, json: bool, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+fn run_inspect(
+    language: Language,
+    input: PathBuf,
+    json: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
     let inspection = match inspect_path(&input) {
         Ok(value) => value,
         Err(error) => {
-            let _ = writeln!(stderr, "error: {error}");
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(language, "error: {error}", "错误：{error}")
+            );
             return 1;
         }
     };
@@ -270,10 +411,18 @@ fn run_inspect(input: PathBuf, json: bool, stdout: &mut impl Write, stderr: &mut
             .map_err(io::Error::other)
             .and_then(|()| writeln!(stdout))
     } else {
-        write_human(&inspection, stdout)
+        write_human(language, &inspection, stdout)
     };
     if let Err(error) = result {
-        let _ = writeln!(stderr, "error: could not write output: {error}");
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: could not write output: {error}",
+                "错误：无法写入输出：{error}"
+            )
+        );
         return 1;
     }
     0
@@ -338,7 +487,12 @@ fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
         })
 }
 
-fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+fn run_convert(
+    language: Language,
+    arguments: ConvertArgs,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
     let request = arguments.product.request();
     let apple_portrait = arguments.product.apple_portrait || arguments.product.apple_portrait_oppo;
     #[cfg(target_os = "macos")]
@@ -349,7 +503,16 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
     let source = match fs::read(&input) {
         Ok(value) => value,
         Err(error) => {
-            let _ = writeln!(stderr, "error: could not read {}: {error}", input.display());
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(
+                    language,
+                    "error: could not read {}: {error}",
+                    "错误：无法读取 {}：{error}",
+                    input.display()
+                )
+            );
             return 1;
         }
     };
@@ -357,7 +520,11 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
     let asset = match probe_bytes(&source) {
         Ok(value) => value,
         Err(error) => {
-            let _ = writeln!(stderr, "error: {error}");
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(language, "error: {error}", "错误：{error}")
+            );
             return 1;
         }
     };
@@ -365,10 +532,7 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
     let result = match asset {
         SourceAsset::MotionPhoto { .. } => {
             if apple_portrait || apple_styles {
-                let _ = writeln!(
-                    stderr,
-                    "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion"
-                );
+                let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
                 return 1;
             }
             let output = output.unwrap_or_else(|| default_motion_photo_output(&input));
@@ -376,13 +540,22 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
             {
                 Ok(receipt) => writeln!(
                     stdout,
-                    "converted: {} -> {} + {}",
-                    input.display(),
-                    receipt.image.display(),
-                    receipt.video.display()
+                    "{}",
+                    message!(
+                        language,
+                        "converted: {} -> {} + {}",
+                        "已转换：{} -> {} + {}",
+                        input.display(),
+                        receipt.image.display(),
+                        receipt.video.display()
+                    )
                 ),
                 Err(error) => {
-                    let _ = writeln!(stderr, "error: {error}");
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(language, "error: {error}", "错误：{error}")
+                    );
                     return 1;
                 }
             }
@@ -395,7 +568,11 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
                     let adapter = match resolve_apple_adapter_executable() {
                         Ok(path) => path,
                         Err(error) => {
-                            let _ = writeln!(stderr, "error: {error}");
+                            let _ = writeln!(
+                                stderr,
+                                "{}",
+                                message!(language, "error: {error}", "错误：{error}")
+                            );
                             return 1;
                         }
                     };
@@ -406,26 +583,41 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
                         apple_portrait_profile,
                     ) {
                         Ok(receipt) if receipt.output == input => {
-                            writeln!(stdout, "converted: {} (in place)", input.display())
+                            writeln!(
+                                stdout,
+                                "{}",
+                                message!(
+                                    language,
+                                    "converted: {} (in place)",
+                                    "已转换：{}（原地替换）",
+                                    input.display()
+                                )
+                            )
                         }
                         Ok(receipt) => writeln!(
                             stdout,
-                            "converted: {} -> {}",
-                            input.display(),
-                            receipt.output.display()
+                            "{}",
+                            message!(
+                                language,
+                                "converted: {} -> {}",
+                                "已转换：{} -> {}",
+                                input.display(),
+                                receipt.output.display()
+                            )
                         ),
                         Err(error) => {
-                            let _ = writeln!(stderr, "error: {error}");
+                            let _ = writeln!(
+                                stderr,
+                                "{}",
+                                message!(language, "error: {error}", "错误：{error}")
+                            );
                             return 1;
                         }
                     }
                 }
                 #[cfg(not(target_os = "macos"))]
                 {
-                    let _ = writeln!(
-                        stderr,
-                        "error: Portrait conversion requires macOS ImageIO/Core Image; the complete profile also requires Vision semantics"
-                    );
+                    let _ = writeln!(stderr, "{}", message!(language, "error: Portrait conversion requires macOS ImageIO/Core Image; the complete profile also requires Vision semantics", "错误：Portrait 转换需要 macOS ImageIO/Core Image；完整模式还需要 Vision 语义能力"));
                     return 1;
                 }
             } else if apple_styles {
@@ -434,23 +626,45 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
                     let adapter = match resolve_apple_adapter_executable() {
                         Ok(path) => path,
                         Err(error) => {
-                            let _ = writeln!(stderr, "error: {error}");
+                            let _ = writeln!(
+                                stderr,
+                                "{}",
+                                message!(language, "error: {error}", "错误：{error}")
+                            );
                             return 1;
                         }
                     };
                     match runtime.convert_apple_photographic_styles_file(&adapter, &source, &output)
                     {
                         Ok(receipt) if receipt.output == input => {
-                            writeln!(stdout, "converted: {} (in place)", input.display())
+                            writeln!(
+                                stdout,
+                                "{}",
+                                message!(
+                                    language,
+                                    "converted: {} (in place)",
+                                    "已转换：{}（原地替换）",
+                                    input.display()
+                                )
+                            )
                         }
                         Ok(receipt) => writeln!(
                             stdout,
-                            "converted: {} -> {}",
-                            input.display(),
-                            receipt.output.display()
+                            "{}",
+                            message!(
+                                language,
+                                "converted: {} -> {}",
+                                "已转换：{} -> {}",
+                                input.display(),
+                                receipt.output.display()
+                            )
                         ),
                         Err(error) => {
-                            let _ = writeln!(stderr, "error: {error}");
+                            let _ = writeln!(
+                                stderr,
+                                "{}",
+                                message!(language, "error: {error}", "错误：{error}")
+                            );
                             return 1;
                         }
                     }
@@ -459,30 +673,61 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
                 {
                     let _ = writeln!(
                         stderr,
-                        "error: --apple-styles requires macOS ImageIO/Vision capabilities"
+                        "{}",
+                        message!(
+                            language,
+                            "error: --apple-styles requires macOS ImageIO/Vision capabilities",
+                            "错误：--apple-styles 需要 macOS ImageIO/Vision 能力"
+                        )
                     );
                     return 1;
                 }
             } else {
                 if let Err(error) = runtime.convert_proxdr_file(&source, &output, request, |_| {}) {
-                    let _ = writeln!(stderr, "error: {error}");
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(language, "error: {error}", "错误：{error}")
+                    );
                     return 1;
                 }
                 if output == input {
-                    writeln!(stdout, "converted: {} (in place)", input.display())
+                    writeln!(
+                        stdout,
+                        "{}",
+                        message!(
+                            language,
+                            "converted: {} (in place)",
+                            "已转换：{}（原地替换）",
+                            input.display()
+                        )
+                    )
                 } else {
                     writeln!(
                         stdout,
-                        "converted: {} -> {}",
-                        input.display(),
-                        output.display()
+                        "{}",
+                        message!(
+                            language,
+                            "converted: {} -> {}",
+                            "已转换：{} -> {}",
+                            input.display(),
+                            output.display()
+                        )
                     )
                 }
             }
         }
     };
     if let Err(error) = result {
-        let _ = writeln!(stderr, "error: could not write output: {error}");
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(
+                language,
+                "error: could not write output: {error}",
+                "错误：无法写入输出：{error}"
+            )
+        );
         return 1;
     }
     0
@@ -626,11 +871,20 @@ fn human_batch_name(path: &Path) -> String {
 
 const BATCH_RECEIPT_SCHEMA_VERSION: u32 = 1;
 
-fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+fn run_batch(
+    language: Language,
+    arguments: BatchArgs,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
     let inputs = match discover_batch_inputs(&arguments) {
         Ok(inputs) => inputs,
         Err(error) => {
-            let _ = writeln!(stderr, "error: {error}");
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(language, "error: {error}", "错误：{error}")
+            );
             return 2;
         }
     };
@@ -640,10 +894,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         arguments.checkpoint.as_deref(),
     );
     if reuse_existing && checkpoint_path.is_none() {
-        let _ = writeln!(
-            stderr,
-            "error: --skip-existing/--resume requires --output-dir or --checkpoint for durable provenance"
-        );
+        let _ = writeln!(stderr, "{}", message!(language, "error: --skip-existing/--resume requires --output-dir or --checkpoint for durable provenance", "错误：--skip-existing/--resume 需要 --output-dir 或 --checkpoint 来保存持久化来源记录"));
         return 2;
     }
     let plan_options = BatchPlanOptions {
@@ -655,7 +906,11 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
     let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,
         Err(error) => {
-            let _ = writeln!(stderr, "error: {error}");
+            let _ = writeln!(
+                stderr,
+                "{}",
+                message!(language, "error: {error}", "错误：{error}")
+            );
             return 2;
         }
     };
@@ -670,17 +925,18 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
             match resolve_apple_adapter_executable() {
                 Ok(path) => Some(path),
                 Err(error) => {
-                    let _ = writeln!(stderr, "error: {error}");
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(language, "error: {error}", "错误：{error}")
+                    );
                     return 1;
                 }
             }
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let _ = writeln!(
-                stderr,
-                "error: Apple feature intents require macOS ImageIO/Vision/Core Image capabilities"
-            );
+            let _ = writeln!(stderr, "{}", message!(language, "error: Apple feature intents require macOS ImageIO/Vision/Core Image capabilities", "错误：Apple 功能需要 macOS ImageIO/Vision/Core Image 能力"));
             return 1;
         }
     } else {
@@ -739,7 +995,15 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         {
             Ok(()) => {}
             Err(error) => {
-                let _ = writeln!(stderr, "error: could not write batch JSON: {error}");
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    message!(
+                        language,
+                        "error: could not write batch JSON: {error}",
+                        "错误：无法写入 batch JSON：{error}"
+                    )
+                );
                 return 1;
             }
         }
@@ -753,24 +1017,39 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
                 .join(" + ");
             let _ = writeln!(
                 stdout,
-                "converted: {} -> {outputs}",
-                success.input.display()
+                "{}",
+                message!(
+                    language,
+                    "converted: {} -> {outputs}",
+                    "已转换：{} -> {outputs}",
+                    success.input.display()
+                )
             );
         }
         for failure in &receipt.failures {
             let _ = writeln!(
                 stderr,
-                "error: failed: {}: {}",
-                human_batch_name(&failure.input),
-                failure.error
+                "{}",
+                message!(
+                    language,
+                    "error: failed: {}: {}",
+                    "错误：转换失败：{}：{}",
+                    human_batch_name(&failure.input),
+                    failure.error
+                )
             );
         }
         let _ = writeln!(
             stdout,
-            "batch: {} processed, {} succeeded, {} failed",
-            receipt.processed(),
-            receipt.succeeded(),
-            receipt.failed()
+            "{}",
+            message!(
+                language,
+                "batch: {} processed, {} succeeded, {} failed",
+                "批处理：已处理 {} 项，成功 {} 项，失败 {} 项",
+                receipt.processed(),
+                receipt.succeeded(),
+                receipt.failed()
+            )
         );
     }
 
@@ -783,27 +1062,23 @@ where
     S: Into<OsString>,
 {
     let args = args.into_iter().map(Into::into).collect::<Vec<_>>();
+    let language = i18n::resolve(&args, |name| std::env::var_os(name));
     if args.is_empty() {
-        return write_root_help(stdout);
+        return write_root_help(language, stdout);
     }
-
-    match parse_cli(args) {
-        Ok(Cli {
-            command: RootCommand::Inspect(arguments),
-        }) => run_inspect(arguments.input, arguments.json, stdout, stderr),
-        Ok(Cli {
-            command: RootCommand::Convert(arguments),
-        }) => run_convert(arguments, stdout, stderr),
-        Ok(Cli {
-            command: RootCommand::Batch(arguments),
-        }) => run_batch(arguments, stdout, stderr),
-        Ok(Cli {
-            command: RootCommand::Categorize(arguments),
-        }) => categorize::run(arguments, stdout, stderr),
-        Ok(Cli {
-            command: RootCommand::Validate(arguments),
-        }) => validate::run(arguments, stdout, stderr),
-        Err(error) => write_clap_error(error, stdout, stderr),
+    let cli = match parse_cli_language(args, language) {
+        Ok(cli) => cli,
+        Err(error) => return write_clap_error(language, error, stdout, stderr),
+    };
+    let language = cli.lang.unwrap_or(language);
+    match cli.command {
+        RootCommand::Inspect(arguments) => {
+            run_inspect(language, arguments.input, arguments.json, stdout, stderr)
+        }
+        RootCommand::Convert(arguments) => run_convert(language, arguments, stdout, stderr),
+        RootCommand::Batch(arguments) => run_batch(language, arguments, stdout, stderr),
+        RootCommand::Categorize(arguments) => categorize::run(language, arguments, stdout, stderr),
+        RootCommand::Validate(arguments) => validate::run(language, arguments, stdout, stderr),
     }
 }
 
