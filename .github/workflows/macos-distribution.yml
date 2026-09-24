@@ -2,88 +2,86 @@ name: macOS Rust Distribution
 
 on:
   push:
-    branches: [feat/rust-cli-distribution-i18n-20260924]
+    branches: [main, feat/rust-cli-distribution-i18n-20260924]
+    tags: ['v*']
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: macos-distribution-${{ github.ref }}
+  group: macos-distribution-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  MACOSX_DEPLOYMENT_TARGET: '15.0'
+
 jobs:
-  cli-implementation:
-    if: github.ref == 'refs/heads/feat/rust-cli-distribution-i18n-20260924'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    outputs:
-      head: ${{ steps.apply.outputs.head }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-      - uses: actions-rust-lang/setup-rust-toolchain@v2
-        with:
-          toolchain: stable
-          components: rustfmt
-      - name: Apply immutable reviewed CLI changes
-        id: apply
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          branch='feat/rust-cli-distribution-i18n-20260924'
-          git fetch origin "$branch"
-          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
-          if ! test -f crates/xdremux-cli/src/i18n.rs; then
-            gh api repos/21Z121Z1/XDRemux/git/blobs/1a6c8c9f4a5abccf9b2cec29a7835784f8eae29c --jq .content | base64 --decode > crates/xdremux-cli/src/i18n.rs
-            gh api repos/21Z121Z1/XDRemux/git/blobs/e7088c1b071f001f917219bf1a3fc37e247a0413 --jq .content | base64 --decode > crates/xdremux-cli/tests/i18n.rs
-            gh api repos/21Z121Z1/XDRemux/git/blobs/531393e58aef1d457623443059dcbc6c0ecd7c25 --jq .content | base64 --decode > "$RUNNER_TEMP/cli-presentation.py"
-            python3 "$RUNNER_TEMP/cli-presentation.py"
-            cargo fmt --all
-            git add crates/xdremux-cli
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'feat(cli): localize terminal presentation without changing machine contracts'
-            git push origin "HEAD:refs/heads/$branch"
-          fi
-          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-  cli-validation:
-    needs: cli-implementation
-    runs-on: macos-26
+  build:
+    name: build (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-26
+            target: aarch64-apple-darwin
+          - arch: x86_64
+            runner: macos-26-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
-    env:
-      LANG: C
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.cli-implementation.outputs.head }}
+          ref: ${{ env.EXPECTED_HEAD }}
+          persist-credentials: false
+      - name: Verify exact source revision
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
-          toolchain: stable
-          components: rustfmt, clippy
-      - name: Validate actual CLI presentation and machine receipts
+          toolchain: '1.98.1'
+      - name: Install build tools only
+        run: brew install cmake ninja nasm pkgconf
+      - name: Build pinned native dependencies
         shell: bash
         run: |
           set -euo pipefail
-          brew install libheif
-          export PKG_CONFIG_PATH="$(brew --prefix libheif)/lib/pkgconfig"
-          mkdir -p artifacts/distribution
-          git rev-parse HEAD | tee artifacts/distribution/head.txt
-          rustc --version | tee artifacts/distribution/rust-version.txt
-          cargo fmt --all -- --check
-          cargo clippy --locked -p xdremux-cli --all-targets -- --deny warnings
-          cargo test --locked -p xdremux-cli --all-targets
-          target/debug/xdremux --lang en --help > artifacts/distribution/help-en.txt
-          target/debug/xdremux --lang zh-CN --help > artifacts/distribution/help-zh-CN.txt
+          mkdir -p "$RUNNER_TEMP/distribution-artifacts/evidence"
+          python3 scripts/distribution/build_native.py --arch '${{ matrix.arch }}' --work "$RUNNER_TEMP/xdremux-native" 2>&1 | tee "$RUNNER_TEMP/distribution-artifacts/evidence/native-build.log"
+      - name: Build Rust and narrow Apple adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PKG_CONFIG_PATH="$RUNNER_TEMP/xdremux-native/prefix/lib/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
+          export RUSTFLAGS='-C link-arg=-Wl,-headerpad_max_install_names'
+          cargo build --locked --release --target '${{ matrix.target }}' -p xdremux-cli
+          swift build --package-path platforms/apple -c release --product xdremux-apple-adapter -Xlinker -headerpad_max_install_names
+          adapter="$(swift build --package-path platforms/apple -c release --show-bin-path)/xdremux-apple-adapter"
+          package="$RUNNER_TEMP/staging/XDRemux-macOS-${{ matrix.arch }}"
+          python3 scripts/distribution/macos.py stage --cli 'target/${{ matrix.target }}/release/xdremux' --adapter "$adapter" --native "$RUNNER_TEMP/xdremux-native" --output "$package" --arch '${{ matrix.arch }}' --head "$EXPECTED_HEAD"
+          python3 scripts/distribution/macos.py archive --package "$package" --output "$RUNNER_TEMP/distribution-artifacts/XDRemux-macOS-${{ matrix.arch }}.tar.gz" --epoch "$(git show -s --format=%ct HEAD)"
+          cp "$RUNNER_TEMP/staging/XDRemux-macOS-${{ matrix.arch }}-linkage.json" "$RUNNER_TEMP/distribution-artifacts/evidence/"
+          cp "$RUNNER_TEMP/xdremux-native/build/libheif/CMakeCache.txt" "$RUNNER_TEMP/distribution-artifacts/evidence/libheif-cmake-cache.txt"
+          {
+            git rev-parse HEAD
+            rustc --version
+            cargo --version
+            swift --version
+            xcodebuild -version
+            sw_vers
+            printf 'ImageVersion=%s\n' "${ImageVersion:-unknown}"
+          } > "$RUNNER_TEMP/distribution-artifacts/evidence/toolchain.txt"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: xdremux-cli-i18n-validation
-          path: artifacts/distribution/
-          retention-days: 3
+          name: XDRemux-macOS-${{ matrix.arch }}
+          path: ${{ runner.temp }}/distribution-artifacts/
+          retention-days: 14
           if-no-files-found: error
