@@ -27,15 +27,15 @@ fixture gate 覆盖多种 JPEG 和 HEIC/HEIF 容器布局。gate 名称和具体
 
 ## 可复用验证 harness
 
-`Tests/validation/` 包含可复用脚本。
+`scripts/validation/` 包含可复用的可移植脚本；macOS App 的模型测试启动器位于 `apps/macos/XDRemuxApp/scripts/`。
 
 | Harness | 用途 |
 | --- | --- |
-| `check_rust_motion_photo_real_fixtures.sh` | 通过 Rust CLI 转换全部版本化 Motion Photo fixture，并验证 pair 两个成员。 |
-| `verify_error_messages.sh` | 通过真实 Rust binary 检查部分帮助和错误契约。 |
-| `verify_batch_categorize_idempotence.sh` | 检查重复 categorized batch 行为。 |
-| `verify_validate_only_harness.sh` | 检查 Rust validation-only 行为。 |
-| `verify_macos_app_model_tests.sh` | 构建并运行 macOS App model test。 |
+| `scripts/validation/check_rust_motion_photo_real_fixtures.sh` | 通过 Rust CLI 转换全部版本化 Motion Photo fixture，并验证 pair 两个成员。 |
+| `scripts/validation/verify_error_messages.sh` | 通过真实 Rust binary 检查部分帮助和错误契约。 |
+| `scripts/validation/verify_batch_categorize_idempotence.sh` | 检查重复 categorized batch 行为。 |
+| `scripts/validation/verify_validate_only_harness.sh` | 检查 Rust validation-only 行为。 |
+| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | 构建并运行 macOS App model test。 |
 
 ## 根据受影响链路选择证据
 

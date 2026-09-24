@@ -2,7 +2,7 @@
 
 English | [简体中文](README.md)
 
-**Research only.** The Rust product does not fabricate Texture Style support. This directory preserves native-contract observations, rejected shortcuts, synthetic probes and explicit promotion gates. It is not a second converter and does not write HEIF files. The [dated convergence ledger](../../docs/convergence/2026-09-23/README.en.md) identifies the historical commits and every retired artifact; its archival refs are provenance, not development branches.
+**Research only.** The Rust product does not fabricate Texture Style support. This directory preserves native-contract observations, rejected shortcuts, synthetic probes and explicit promotion gates. It is not a second converter and does not write HEIF files. The previously referenced convergence ledger is not present in this tree. Check historical commits and retired-artifact provenance against the original records, not this summary.
 
 ## What the carrier experiments established—and did not
 

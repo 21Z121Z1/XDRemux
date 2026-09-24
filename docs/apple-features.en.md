@@ -78,7 +78,7 @@ Portrait effects are reduced compared with the complete `--apple-portrait` profi
 
 The native profile never falls back to Vision. Missing required depth or source metadata causes an error before output publication. The complete profile keeps its existing strict resource requirements. Both profiles use the same Rust conversion and publication path.
 
-The native regression uses two real OPPO Portrait fixtures, checks single-file and serial/parallel batch output with ImageIO, and rejects any attempted Vision operation. It also verifies that a failed preflight preserves an existing output. Run it with `python3 scripts/check_rust_cli_oppo_portrait.py`.
+The native regression uses two real OPPO Portrait fixtures, checks single-file and serial/parallel batch output with ImageIO, and rejects any attempted Vision operation. It also verifies that a failed preflight preserves an existing output. Run it with `python3 scripts/apple/check_rust_cli_oppo_portrait.py`.
 
 ## Live Photo
 
@@ -108,4 +108,4 @@ CLI migration acceptance covers the canonical Rust commands, media conversion, s
 
 ## Research material
 
-The repository still contains style research code and optional models such as `ReverseKey1Ensemble`. These are research/training assets rather than product modes. See the [model card](../Models/ReverseKey1Ensemble.model-card.en.md) where relevant.
+The repository still contains style research code and optional models such as `ReverseKey1Ensemble`. These are research/training assets rather than product modes. See the [model card](../research/oppo_styles/models/ReverseKey1Ensemble.model-card.en.md) where relevant.

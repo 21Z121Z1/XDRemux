@@ -8,12 +8,12 @@ on:
       - "crates/**"
       - "Sources/XDRemuxAppleAdapter/**"
       - "benchmarks/macos26-arm64-product-baseline.json"
-      - "Tests/test_performance_design.py"
-      - "Tests/test_performance_budget.py"
-      - "scripts/benchmark_rust_product.py"
-      - "scripts/benchmark_apple_videotoolbox_primitive.py"
-      - "scripts/characterize_apple_adapter_launches.py"
-      - "scripts/check_performance_budget.py"
+      - "tests/test_performance_design.py"
+      - "tests/test_performance_budget.py"
+      - "scripts/performance/benchmark_rust_product.py"
+      - "scripts/performance/benchmark_apple_videotoolbox_primitive.py"
+      - "scripts/performance/characterize_apple_adapter_launches.py"
+      - "scripts/performance/check_performance_budget.py"
       - ".github/workflows/performance.yml"
   push:
     branches:
@@ -24,12 +24,12 @@ on:
       - "crates/**"
       - "Sources/XDRemuxAppleAdapter/**"
       - "benchmarks/macos26-arm64-product-baseline.json"
-      - "Tests/test_performance_design.py"
-      - "Tests/test_performance_budget.py"
-      - "scripts/benchmark_rust_product.py"
-      - "scripts/benchmark_apple_videotoolbox_primitive.py"
-      - "scripts/characterize_apple_adapter_launches.py"
-      - "scripts/check_performance_budget.py"
+      - "tests/test_performance_design.py"
+      - "tests/test_performance_budget.py"
+      - "scripts/performance/benchmark_rust_product.py"
+      - "scripts/performance/benchmark_apple_videotoolbox_primitive.py"
+      - "scripts/performance/characterize_apple_adapter_launches.py"
+      - "scripts/performance/check_performance_budget.py"
       - ".github/workflows/performance.yml"
   workflow_dispatch:
 
@@ -91,14 +91,14 @@ jobs:
         shell: bash
         run: |
           python3 -m unittest \
-            Tests.test_performance_design \
-            Tests.test_performance_budget \
+            tests.test_performance_design \
+            tests.test_performance_budget \
             2>&1 | tee artifacts/performance/design-policy.log
 
       - name: Measure representative end-to-end product workloads
         shell: bash
         run: |
-          python3 scripts/benchmark_rust_product.py \
+          python3 scripts/performance/benchmark_rust_product.py \
             --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
             --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
             --warmup 1 \
@@ -120,7 +120,7 @@ jobs:
       - name: Measure Apple VideoToolbox primitive separately
         shell: bash
         run: |
-          python3 scripts/benchmark_apple_videotoolbox_primitive.py \
+          python3 scripts/performance/benchmark_apple_videotoolbox_primitive.py \
             --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
             --width 1024 \
             --height 768 \
@@ -132,7 +132,7 @@ jobs:
       - name: Characterize Apple adapter process lifecycle
         shell: bash
         run: |
-          python3 scripts/characterize_apple_adapter_launches.py \
+          python3 scripts/performance/characterize_apple_adapter_launches.py \
             --cli "$GITHUB_WORKSPACE/target/release/xdremux" \
             --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \
             --output artifacts/performance/apple-adapter-launches.json \
@@ -141,7 +141,7 @@ jobs:
       - name: Enforce stable-runner performance regression budget
         shell: bash
         run: |
-          python3 scripts/check_performance_budget.py \
+          python3 scripts/performance/check_performance_budget.py \
             --baseline benchmarks/macos26-arm64-product-baseline.json \
             --benchmark artifacts/performance/product-benchmark.json \
             --launches artifacts/performance/apple-adapter-launches.json \

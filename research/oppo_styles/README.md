@@ -83,7 +83,7 @@ checkpoint 字节；restricted unpickling 仍然不是 sandbox。
 已经移除的 Swift 实验环境变量不是受支持 API。
 
 ```bash
-python -m unittest discover -s Tests -p 'test_*.py' -v
+python -m unittest discover -s tests -t . -p 'test_*.py' -v
 ```
 
 回归覆盖 model shape、有限值序列化、byte identity、modality mask、source integrity、

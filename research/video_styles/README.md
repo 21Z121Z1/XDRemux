@@ -117,6 +117,6 @@ pass, `photosEditingValidated` remains false regardless of CI results.
 - [Metadata adaptor](https://developer.apple.com/documentation/avfoundation/avassetwriterinputmetadataadaptor): append timed metadata groups with an explicit boxed format description; the installed SDK and native readback are the executable contract.
 - [ffprobe](https://ffmpeg.org/ffprobe.html): `-show_packets -show_streams -show_data_hash sha256` supplies complete packet and codec-extradata checksums. Rational timestamps avoid rounding-based false equivalence.
 
-Portable regressions: `python -m unittest Tests.test_video_style_research Tests.test_video_style_diagnostics -v`.
+Portable regressions: `python -m unittest tests.test_video_style_research tests.test_video_style_diagnostics -v`.
 Native structural gate: `.github/workflows/research.yml`, separate from product
 acceptance. A passing research gate never changes the support status above.

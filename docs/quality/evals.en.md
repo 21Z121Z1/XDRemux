@@ -27,15 +27,15 @@ Important current assertions include:
 
 ## Reusable validation harnesses
 
-`Tests/validation/` contains reusable scripts.
+`scripts/validation/` contains reusable portable scripts. The macOS app owns its model-test launcher under `apps/macos/XDRemuxApp/scripts/`.
 
 | Harness | Purpose |
 | --- | --- |
-| `check_rust_motion_photo_real_fixtures.sh` | Convert every versioned Motion Photo fixture through the Rust CLI and validate both pair members. |
-| `verify_error_messages.sh` | Check selected help and error contracts through the real Rust binary. |
-| `verify_batch_categorize_idempotence.sh` | Check repeated categorized batch behavior. |
-| `verify_validate_only_harness.sh` | Check Rust validation-only behavior. |
-| `verify_macos_app_model_tests.sh` | Build and run the macOS app model tests. |
+| `scripts/validation/check_rust_motion_photo_real_fixtures.sh` | Convert every versioned Motion Photo fixture through the Rust CLI and validate both pair members. |
+| `scripts/validation/verify_error_messages.sh` | Check selected help and error contracts through the real Rust binary. |
+| `scripts/validation/verify_batch_categorize_idempotence.sh` | Check repeated categorized batch behavior. |
+| `scripts/validation/verify_validate_only_harness.sh` | Check Rust validation-only behavior. |
+| `apps/macos/XDRemuxApp/scripts/verify_model_tests.sh` | Build and run the macOS app model tests. |
 
 ## Choose evidence by affected path
 

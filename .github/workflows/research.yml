@@ -6,14 +6,18 @@ on:
     paths:
       - "research/**"
       - "xdremux_py/**"
-      - "Tests/test_*.py"
+      - "tests/**"
+      - "scripts/**"
+      - ".gitignore"
       - "pyproject.toml"
       - ".github/workflows/research.yml"
   pull_request:
     paths:
       - "research/**"
       - "xdremux_py/**"
-      - "Tests/test_*.py"
+      - "tests/**"
+      - "scripts/**"
+      - ".gitignore"
       - "pyproject.toml"
       - ".github/workflows/research.yml"
 
@@ -41,7 +45,7 @@ jobs:
       - name: Install research test dependencies
         run: python -m pip install ".[training]"
       - name: Run all portable regression tests
-        run: python -m unittest discover -s Tests -p 'test_*.py' -v
+        run: python -m unittest discover -s tests -t . -p 'test_*.py' -v
 
   video-carrier:
     runs-on: macos-26

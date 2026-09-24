@@ -4,7 +4,7 @@
 
 本目录用于保存验证依据、验收条件和证据记录。
 
-可执行测试放在 `Tests/` 或 `scripts/`。
+可执行测试放在 `tests/` 或 `scripts/`。
 
 ## 证据类别
 
@@ -22,16 +22,16 @@
 
 ## Completion gate
 
-仓库 Agent 在目标修改提交后使用 `scripts/agent_completion_gate.py`。
+仓库 Agent 在目标修改提交后使用 `scripts/ci/agent_completion_gate.py`。
 
 示例：
 
 ```bash
-python3 scripts/agent_completion_gate.py run \
+python3 scripts/ci/agent_completion_gate.py run \
   --base origin/main \
   --plan /tmp/xdremux-agent-verification.json
 
-python3 scripts/agent_completion_gate.py verify \
+python3 scripts/ci/agent_completion_gate.py verify \
   .codex/verification-receipts/$(git rev-parse HEAD).json
 ```
 
@@ -51,7 +51,7 @@ plan 中每个命令使用参数数组。gate 不会添加隐式 shell 解析。
         "python3",
         "-m",
         "unittest",
-        "Tests.test_public_documentation"
+        "tests.test_public_documentation"
       ],
       "timeout_seconds": 120
     }

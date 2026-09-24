@@ -45,7 +45,7 @@ python3 research/palette/probe.py filter-info \
   candidate.heic --filter-type palette-default --capture-mode common
 
 target/debug/xdremux inspect candidate.heic --json
-python3 -m unittest Tests.test_palette_research
+python3 -m unittest tests.test_palette_research
 ```
 
 On macOS, generate a separate HEIC base from the same JPEG with `sips`, then

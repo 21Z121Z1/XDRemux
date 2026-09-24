@@ -36,8 +36,8 @@ path = "xdremux_py/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["xdremux_py"]
 
-# Anchored patterns: an unanchored "README.md" would also pull in Tests/README.md
-# and xdremux/README.md. docs/ is VCS-ignored and cannot be packaged.
+# Anchored patterns: an unanchored "README.md" would also pull in tests/README.md
+# and nested research documentation. Keep the research wheel and sdist small.
 [tool.hatch.build.targets.sdist]
 include = [
     "/xdremux_py/__init__.py",
