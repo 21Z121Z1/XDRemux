@@ -60,6 +60,17 @@ fn real_coloros_motion_video_rewrap_preserves_compressed_media() {
     )
     .unwrap();
 
+    if let Some(transform) = asset
+        .vendor_metadata
+        .as_ref()
+        .and_then(xdremux_motion_photo::oppo_live_photo_transform)
+    {
+        let bytes = transform
+            .into_iter()
+            .flat_map(f64::to_be_bytes)
+            .collect::<Vec<_>>();
+        assert!(output.windows(bytes.len()).any(|window| window == bytes));
+    }
     validate_live_photo_movie(&output, "01234567-89AB-CDEF-0123-456789ABCDEF", still_time).unwrap();
     assert_eq!(media_mdat_payloads(&output).unwrap(), media_before);
 }

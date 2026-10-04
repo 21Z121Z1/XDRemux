@@ -17,10 +17,14 @@ Current responsibilities include:
 - ProXDR metadata parsing;
 - ISO/TS 21496-1 Gain Map conversion;
 - HEIF and ISO-BMFF parsing and writing;
-- Motion Photo parsing and resource extraction;
+- Motion Photo routing and resource extraction through the independent LibLivePhoto facade;
 - source metadata and classification;
 - output validation shared by core conversion paths;
 - cross-platform policy, manifest construction, and transaction orchestration for Apple Portrait and Photographic Styles.
+
+LibLivePhoto supplies the portable Motion/Live Photo format implementation.
+XDRemux retains HDR processing, codec choices, inferred-time policy, geometry and
+filesystem publication. See [the integration contract](liblivephoto-integration.en.md).
 
 ### Apple capability boundary
 

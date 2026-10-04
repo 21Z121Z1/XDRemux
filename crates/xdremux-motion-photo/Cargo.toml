@@ -4,10 +4,10 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-little_exif = "=0.6.23"
-quick-xml = "0.42"
+liblivephoto = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "f314fe85c7c9acfc2e7e97a6e78f32f68e6aa6ad", features = ["xdremux-compat"] }
+
+[dev-dependencies]
 serde_json = "1.0"
-xdremux-format = { path = "../xdremux-format" }
 
 [lints]
 workspace = true
