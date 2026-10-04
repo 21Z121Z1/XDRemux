@@ -6,10 +6,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use xdremux_engine::ConversionRequest;
-use xdremux_motion_photo::{
-    read_apple_content_identifier, read_live_photo_content_identifier, read_live_photo_still_time,
-    validate_live_photo_movie,
-};
+use xdremux_motion_photo::{Input, MotionPhoto, ParseOptions};
 use xdremux_source::{probe_bytes, SourceAsset};
 
 use crate::batch_checkpoint::{
@@ -262,19 +259,14 @@ fn pair_matches_identifier(image: &Path, video: &Path, expected: &str) -> bool {
     let Ok(video_bytes) = fs::read(video) else {
         return false;
     };
-    let Ok(Some(image_id)) = read_apple_content_identifier(&image_bytes) else {
-        return false;
-    };
-    let Ok(Some(video_id)) = read_live_photo_content_identifier(&video_bytes) else {
-        return false;
-    };
-    if image_id != expected || video_id != expected {
-        return false;
-    }
-    let Ok(Some(still_time)) = read_live_photo_still_time(&video_bytes) else {
-        return false;
-    };
-    validate_live_photo_movie(&video_bytes, expected, still_time).is_ok()
+    MotionPhoto::parse(
+        Input::ApplePair {
+            still: &image_bytes,
+            movie: &video_bytes,
+        },
+        ParseOptions::strict(),
+    )
+    .is_ok_and(|photo| photo.asset().pairing.identifier.as_deref() == Some(expected))
 }
 
 #[derive(Debug)]

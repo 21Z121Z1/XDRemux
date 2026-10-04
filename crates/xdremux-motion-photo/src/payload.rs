@@ -3,8 +3,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
-use crate::error::MotionPhotoError;
-use crate::model::ByteRange;
+use crate::{ByteRange, MotionPhotoError};
 
 pub const DEFAULT_MAX_PAYLOAD_BYTES: u64 = 1_073_741_824;
 pub const DEFAULT_COPY_BUFFER_SIZE: usize = 1_048_576;

@@ -17,10 +17,13 @@ Rust `xdremux` CLI 和 workspace crate 负责全部产品语义、格式转换�
 - ProXDR metadata 解析；
 - ISO/TS 21496-1 Gain Map 转换；
 - HEIF 和 ISO-BMFF 解析与写入；
-- Motion Photo 解析和资源提取；
+- 通过独立 LibLivePhoto facade 完成 Motion Photo 路由和资源提取；
 - 源 metadata 和分类；
 - 核心转换链路共享的输出验证；
 - Apple Portrait / Photographic Styles 的跨平台 policy、manifest 和 transaction orchestration。
+
+LibLivePhoto 提供可移植的 Motion/Live Photo 格式实现。XDRemux 保留 HDR、codec
+选择、推断时间、几何和文件发布策略。见 [接入契约](liblivephoto-integration.md)。
 
 ### Apple capability boundary
 

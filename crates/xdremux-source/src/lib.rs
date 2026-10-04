@@ -7,7 +7,10 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use xdremux_container::{extract as extract_proxdr, ContainerError};
-use xdremux_motion_photo::{parse_oppo_motion_photo, ByteRange, MotionPhotoError};
+use xdremux_motion_photo::{
+    product_source_kind, AssetFormat, ByteRange, ContainerKind, Input, MotionPhoto,
+    MotionPhotoError, MotionPhotoReadError, ParseOptions, TimeSource,
+};
 
 pub const INSPECTION_SCHEMA_VERSION: u32 = 1;
 
@@ -66,7 +69,7 @@ pub struct SourceInspection {
 #[derive(Debug)]
 pub enum SourceProbeError {
     Io { path: PathBuf, source: io::Error },
-    MotionPhoto(MotionPhotoError),
+    MotionPhoto(MotionPhotoReadError),
     Unsupported(ContainerError),
 }
 
@@ -100,24 +103,41 @@ impl std::error::Error for SourceProbeError {
 pub type Result<T> = std::result::Result<T, SourceProbeError>;
 
 pub fn probe_bytes(data: &[u8]) -> Result<SourceAsset> {
-    match parse_oppo_motion_photo(data) {
-        Ok(Some(asset)) => {
-            let stream_count = asset
-                .vendor_metadata
-                .as_ref()
-                .map_or(1, |metadata| metadata.stream_count.max(1));
+    match MotionPhoto::parse(Input::SingleFile(data), ParseOptions::compatible()) {
+        Ok(photo) => {
+            let asset = photo.asset();
             return Ok(SourceAsset::MotionPhoto {
-                source_kind: asset.source_kind.as_str().to_owned(),
-                still: asset.still_resource_range.into(),
-                video: asset.video_resource_range.into(),
-                presentation_timestamp_us: asset.presentation_timestamp_us,
-                presentation_source: asset
-                    .presentation_source
-                    .map(|source| source.as_str().to_owned()),
-                stream_count,
+                source_kind: product_source_kind(asset).to_owned(),
+                still: photo.still().extents[0].into(),
+                video: photo.motion_video().extents[0].into(),
+                presentation_timestamp_us: photo
+                    .presentation_time()
+                    .and_then(|t| t.rescale_exact(1_000_000))
+                    .map(|t| t.value),
+                presentation_source: asset.presentation.map(|p| {
+                    match p.source {
+                        TimeSource::Xmp if asset.format == AssetFormat::LegacyMicroVideo => {
+                            "legacyMicroVideoXMP"
+                        }
+                        TimeSource::Xmp => "androidXMP",
+                        TimeSource::VendorMetadata => "oppoCoverFrame",
+                        TimeSource::AppleTimedMetadata => "appleTimedMetadata",
+                        TimeSource::Caller => "caller",
+                    }
+                    .to_owned()
+                }),
+                stream_count: asset
+                    .containers
+                    .iter()
+                    .filter(|c| c.kind == ContainerKind::IsoBmff)
+                    .count(),
             });
         }
-        Ok(None) | Err(MotionPhotoError::FileTooSmall) => {}
+        Err(
+            MotionPhotoReadError::Unrecognized
+            | MotionPhotoReadError::InvalidStill
+            | MotionPhotoReadError::Parse(MotionPhotoError::FileTooSmall),
+        ) => {}
         Err(error) => return Err(SourceProbeError::MotionPhoto(error)),
     }
 
@@ -158,9 +178,41 @@ mod tests {
     }
 
     fn fake_mp4() -> Vec<u8> {
-        let mut output = make_box(b"ftyp", b"isom\0\0\x02\0");
-        output.extend_from_slice(&make_box(b"mdat", &[]));
-        output
+        let mut mvhd = vec![0; 12];
+        mvhd.extend_from_slice(&1000_u32.to_be_bytes());
+        mvhd.extend_from_slice(&2000_u32.to_be_bytes());
+        mvhd.extend_from_slice(&[0; 80]);
+        let mut tkhd = vec![0; 12];
+        tkhd.extend_from_slice(&1_u32.to_be_bytes());
+        tkhd.extend_from_slice(&[0; 68]);
+        let mut mdhd = vec![0; 12];
+        mdhd.extend_from_slice(&1000_u32.to_be_bytes());
+        mdhd.extend_from_slice(&2000_u32.to_be_bytes());
+        mdhd.extend_from_slice(&[0; 4]);
+        let mut hdlr = vec![0; 8];
+        hdlr.extend_from_slice(b"vide");
+        hdlr.extend_from_slice(&[0; 12]);
+        let mdia = make_box(
+            b"mdia",
+            &[make_box(b"mdhd", &mdhd), make_box(b"hdlr", &hdlr)].concat(),
+        );
+        let trak = make_box(b"trak", &[make_box(b"tkhd", &tkhd), mdia].concat());
+        [
+            make_box(b"ftyp", b"isom\0\0\x02\0"),
+            make_box(b"moov", &[make_box(b"mvhd", &mvhd), trak].concat()),
+            make_box(b"mdat", b"test"),
+        ]
+        .concat()
+    }
+    fn jpeg_with_xmp(xmp: &str) -> Vec<u8> {
+        let packet = [b"http://ns.adobe.com/xap/1.0/\0".as_slice(), xmp.as_bytes()].concat();
+        [
+            vec![0xff, 0xd8, 0xff, 0xe1],
+            ((packet.len() + 2) as u16).to_be_bytes().to_vec(),
+            packet,
+            vec![0xff, 0xd9],
+        ]
+        .concat()
     }
 
     fn android_motion_photo() -> Vec<u8> {
@@ -169,9 +221,7 @@ mod tests {
             r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:Camera="http://ns.google.com/photos/1.0/camera/" xmlns:Container="http://ns.google.com/photos/1.0/container/" xmlns:Item="http://ns.google.com/photos/1.0/container/item/" Camera:MotionPhoto="1" Camera:MotionPhotoVersion="1" Camera:MotionPhotoPresentationTimestampUs="1417000"><Container:Directory><rdf:Seq><rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="image/jpeg" Item:Semantic="Primary" Item:Length="0" Item:Padding="0"/></rdf:li><rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="video/mp4" Item:Semantic="MotionPhoto" Item:Length="{}" Item:Padding="0"/></rdf:li></rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>"#,
             video.len()
         );
-        let mut data = vec![0xff, 0xd8];
-        data.extend_from_slice(xmp.as_bytes());
-        data.extend_from_slice(&[0xff, 0xd9]);
+        let mut data = jpeg_with_xmp(&xmp);
         data.extend_from_slice(&video);
         data
     }
@@ -204,8 +254,7 @@ mod tests {
 
     #[test]
     fn malformed_motion_metadata_is_not_silently_treated_as_hdr() {
-        let mut data = b"<x:xmpmeta><broken>".to_vec();
-        data.resize(32, 0);
+        let data = jpeg_with_xmp("<x:xmpmeta><broken>");
         let error = probe_bytes(&data).unwrap_err();
         assert!(matches!(error, SourceProbeError::MotionPhoto(_)));
     }

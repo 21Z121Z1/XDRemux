@@ -374,13 +374,22 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
             let output = output.unwrap_or_else(|| default_motion_photo_output(&input));
             match runtime.convert_motion_photo_file_with_request(&source, &input, &output, request)
             {
-                Ok(receipt) => writeln!(
-                    stdout,
-                    "converted: {} -> {} + {}",
-                    input.display(),
-                    receipt.image.display(),
-                    receipt.video.display()
-                ),
+                Ok(receipt) => {
+                    let omitted = receipt.omitted_resource_count();
+                    if omitted > 0 {
+                        let _ = writeln!(
+                            stdout,
+                            "note: {omitted} source resources remain only in the original input"
+                        );
+                    }
+                    writeln!(
+                        stdout,
+                        "converted: {} -> {} + {}",
+                        input.display(),
+                        receipt.image.display(),
+                        receipt.video.display()
+                    )
+                }
                 Err(error) => {
                     let _ = writeln!(stderr, "error: {error}");
                     return 1;
