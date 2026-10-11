@@ -64,7 +64,7 @@ python3 scripts/compare_cinematic_alignment.py \
   --require-improvement SAMPLE_NAME --minimum-reduction 0.25
 ```
 
-The tool requires the current report to match `HEAD`. It checks source hashes, ordinary-input hashes, decoded color identity, sample times, render settings, native repeatability, and unchanged reference effect energy. The required sample must reduce both mean f/2 render error and mean relative effect error. The report also shows every other sample, including regressions. This check does not turn a measured improvement into an equivalence guarantee.
+The tool requires the current report to match `HEAD`. It checks source hashes, ordinary-input integrity, media packet identity, decoded color identity, sample times, render settings, native repeatability, and unchanged reference effect energy. The required sample must reduce both mean f/2 render error and mean relative effect error. The report also shows every other sample, including regressions. This check does not turn a measured improvement into an equivalence guarantee.
 
 PNG files are 8-bit sRGB previews. They are not the floating point measurement data. Test preprocessing derivatives reference their unchanged input color tracks to avoid duplicate data. These test derivatives are not portable; the product `pending.mov` remains self-contained.
 

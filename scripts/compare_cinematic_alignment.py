@@ -41,7 +41,16 @@ def compare_runs(baseline: dict, current: dict) -> dict:
     for name, new in new_assets.items():
         old = old_assets[name]
         require(old["source_sha256"] == new["source_sha256"], f"reference input differs: {name}")
-        require(old["ordinary_sha256"] == new["ordinary_sha256"], f"ordinary input differs: {name}")
+        # A fresh MOV can have a different container layout or creation time.
+        # Both runs independently prove that stripping copied every media
+        # packet from the same hash-identified native source unchanged.
+        require(old["stripped_compressed_media"] == new["stripped_compressed_media"], f"ordinary media differs: {name}")
+        for asset in [old, new]:
+            require(asset["strip"]["capability"] == "none" and asset["strip"]["cinematic_data_removed"],
+                    f"ordinary input retains Cinematic data: {name}")
+            for records in [asset["stripped_compressed_media"], asset["compressed_media"]]:
+                require(bool(records) and all(x["packet_bytes_timestamps_and_trim_identical"] for x in records),
+                        f"media packet identity is not proven: {name}")
         a, b = old["headless_comparison"], new["headless_comparison"]
         for key in ["renderer", "quality", "texture_format", "input_pixel_format", "comparison_space", "source_transform", "native_rendering_version"]:
             require(a[key] == b[key], f"render configuration differs: {name}/{key}")
@@ -81,7 +90,9 @@ def compare_runs(baseline: dict, current: dict) -> dict:
                 total_components += count
         mean_old, mean_new = statistics.mean(old_rmse), statistics.mean(new_rmse)
         relative_old, relative_new = statistics.mean(old_relative), statistics.mean(new_relative)
-        rows.append({"sample": name, "reference_sha256": old["source_sha256"], "ordinary_sha256": old["ordinary_sha256"],
+        rows.append({"sample": name, "reference_sha256": old["source_sha256"],
+                     "baseline_ordinary_sha256": old["ordinary_sha256"], "current_ordinary_sha256": new["ordinary_sha256"],
+                     "ordinary_media_packets_identical_to_reference": True,
                      "mean_baseline_f2_rmse": mean_old, "mean_current_f2_rmse": mean_new,
                      "f2_rmse_reduction": 1 - mean_new / mean_old,
                      "mean_baseline_relative_effect_error": relative_old, "mean_current_relative_effect_error": relative_new,
