@@ -106,7 +106,12 @@ func writeSDRPreview(_ image: CIImage, context: CIContext, transform: CGAffineTr
     let toneMap = CIFilter.systemToneMap()
     toneMap.inputImage = image; toneMap.displayHeadroom = 1; toneMap.preferredDynamicRange = .standard
     guard let output = toneMap.outputImage else { throw NSError(domain: "CannotToneMapPreview", code: 1) }
-    try context.writePNGRepresentation(of: output.transformed(by: transform), to: url, format: .RGBA8,
+    // Track transforms use top-left video coordinates. Core Image uses a
+    // bottom-left origin, so conjugate the transform with the two Y flips.
+    let height = image.extent.height, displayHeight = image.extent.applying(transform).height
+    let display = CGAffineTransform(a: transform.a, b: -transform.b, c: -transform.c, d: transform.d,
+        tx: transform.tx + transform.c * height, ty: displayHeight - transform.d * height - transform.ty)
+    try context.writePNGRepresentation(of: output.transformed(by: display), to: url, format: .RGBA8,
         colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, options: [:])
 }
 
@@ -155,7 +160,36 @@ func verifyColorManagement(_ directory: URL) throws -> [String: Any] {
                         "wrong_linear_srgb_error": wrongError, "sdr_reference_error": sdrError, "color_management": color])
     }
     try check(zip(grayOutputs, grayOutputs.dropFirst()).allSatisfy { $1 > $0 + 0.005 }, "HDR highlights were clipped instead of tone-mapped")
-    return ["schema": "xdremux-cinematic-color-regression-v1", "patches": records, "highlights_distinct": true]
+    let marker = (0..<256).flatMap { index -> [UInt16] in
+        let x = index % 16, y = index / 16
+        let colors: [[Float]] = [[0.8,0.2,0.2], [0.2,0.8,0.2], [0.2,0.2,0.8], [0.8,0.8,0.8]]
+        return (colors[(y / 8) * 2 + x / 8] + [1]).map { Float16($0).bitPattern }
+    }
+    marker.withUnsafeBytes { texture.replace(region: MTLRegionMake2D(0,0,16,16), mipmapLevel: 0, withBytes: $0.baseAddress!, bytesPerRow: 16*8) }
+    let (markerImage, _) = try managedImage(texture, source: source!)
+    let transforms: [(String, CGAffineTransform, CGImagePropertyOrientation)] = [
+        ("0", .identity, .up), ("90", CGAffineTransform(a: 0,b: 1,c: -1,d: 0,tx: 16,ty: 0), .right),
+        ("180", CGAffineTransform(a: -1,b: 0,c: 0,d: -1,tx: 16,ty: 16), .down),
+        ("270", CGAffineTransform(a: 0,b: -1,c: 1,d: 0,tx: 0,ty: 16), .left)]
+    var orientationRecords: [[String: Any]] = []
+    for (name, transform, exif) in transforms {
+        let png = directory.appendingPathComponent("orientation-\(name).png")
+        try writeSDRPreview(markerImage, context: context, transform: transform, to: png)
+        let tone = CIFilter.systemToneMap(); tone.inputImage = markerImage; tone.displayHeadroom = 1; tone.preferredDynamicRange = .standard
+        let expected = tone.outputImage!.oriented(exif), decoded = CIImage(contentsOf: png)!
+        func pixels(_ image: CIImage) -> [UInt16] {
+            var values = [UInt16](repeating: 0, count: 256*4)
+            context.render(image, toBitmap: &values, rowBytes: 16*8, bounds: image.extent, format: .RGBAh, colorSpace: sRGB)
+            return values
+        }
+        let referencePNG = directory.appendingPathComponent("orientation-\(name)-reference.png")
+        try context.writePNGRepresentation(of: expected, to: referencePNG, format: .RGBA8, colorSpace: sRGB, options: [:])
+        let error = try difference(pixels(decoded), pixels(CIImage(contentsOf: referencePNG)!))
+        try check((error["rmse"] as! Double) < 0.006, "video preview orientation \(name) differs from the EXIF reference: \(error)")
+        orientationRecords.append(["rotation_degrees": name, "reference_difference": error])
+    }
+    return ["schema": "xdremux-cinematic-color-regression-v1", "patches": records, "highlights_distinct": true,
+            "orientation_checks": orientationRecords]
 }
 
 func render(_ session: CNRenderingSession, _ attributes: CNRenderingSession.Attributes,

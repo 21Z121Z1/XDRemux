@@ -341,70 +341,6 @@ static CGFloat XDRectOverlap(CGRect a, CGRect b) {
     return total > 0 ? common / total : 0;
 }
 
-static id XDRegistrationLuma(CVPixelBufferRef source) {
-    if (CVPixelBufferGetPixelFormatType(source) != kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange ||
-        CVPixelBufferLockBaseAddress(source, kCVPixelBufferLock_ReadOnly) != kCVReturnSuccess) return nil;
-    size_t sourceWidth = CVPixelBufferGetWidthOfPlane(source, 0), sourceHeight = CVPixelBufferGetHeightOfPlane(source, 0);
-    size_t width = MIN(sourceWidth, 960), height = MAX(1, sourceHeight * width / sourceWidth);
-    CVPixelBufferRef result = NULL;
-    CVReturn status = CVPixelBufferCreate(NULL, width, height, kCVPixelFormatType_OneComponent8,
-        (__bridge CFDictionaryRef)@{(id)kCVPixelBufferIOSurfacePropertiesKey: @{}}, &result);
-    if (status == kCVReturnSuccess && CVPixelBufferLockBaseAddress(result, 0) == kCVReturnSuccess) {
-        const uint8_t *input = CVPixelBufferGetBaseAddressOfPlane(source, 0);
-        size_t inputStride = CVPixelBufferGetBytesPerRowOfPlane(source, 0), outputStride = CVPixelBufferGetBytesPerRow(result);
-        uint8_t *output = CVPixelBufferGetBaseAddress(result);
-        for (size_t y = 0; y < height; ++y) {
-            size_t sy = MIN(sourceHeight - 1, (2 * y + 1) * sourceHeight / (2 * height));
-            for (size_t x = 0; x < width; ++x) {
-                size_t sx = MIN(sourceWidth - 1, (2 * x + 1) * sourceWidth / (2 * width));
-                output[y * outputStride + x] = input[sy * inputStride + sx];
-            }
-        }
-        CVPixelBufferUnlockBaseAddress(result, 0);
-    } else if (result) { CVPixelBufferRelease(result); result = NULL; }
-    CVPixelBufferUnlockBaseAddress(source, kCVPixelBufferLock_ReadOnly);
-    return CFBridgingRelease(result);
-}
-
-static double XDRegisteredScale(matrix_float3x3 matrix, float x, float y) {
-    vector_float3 projected = simd_mul(matrix, (vector_float3){x, y, 1});
-    if (!isfinite(projected.z) || fabsf(projected.z) < 0.01f) return NAN;
-    float divisor = projected.z * projected.z;
-    float a = (matrix.columns[0].x * projected.z - projected.x * matrix.columns[0].z) / divisor;
-    float b = (matrix.columns[1].x * projected.z - projected.x * matrix.columns[1].z) / divisor;
-    float c = (matrix.columns[0].y * projected.z - projected.y * matrix.columns[0].z) / divisor;
-    float d = (matrix.columns[1].y * projected.z - projected.y * matrix.columns[1].z) / divisor;
-    return sqrt(fabs((double)a * d - (double)b * c));
-}
-
-static double XDRelativeZoom(id previous, id current) {
-    if (!previous || !current) return 1;
-    CVPixelBufferRef buffer = (__bridge CVPixelBufferRef)current;
-    VNHomographicImageRegistrationRequest *request = [[VNHomographicImageRegistrationRequest alloc]
-        initWithTargetedCVPixelBuffer:(__bridge CVPixelBufferRef)previous options:@{}];
-    NSError *error = nil;
-    if (![[[VNImageRequestHandler alloc] initWithCVPixelBuffer:buffer options:@{}]
-          performRequests:@[request] error:&error] || !request.results.firstObject) return 1;
-    matrix_float3x3 matrix = request.results.firstObject.warpTransform;
-    double minimum = INFINITY, maximum = 0, scales[9];
-    NSUInteger count = 0;
-    for (float x = 0.25f; x <= 0.75f; x += 0.25f) {
-        for (float y = 0.25f; y <= 0.75f; y += 0.25f) {
-            double scale = XDRegisteredScale(matrix, x * CVPixelBufferGetWidth(buffer), y * CVPixelBufferGetHeight(buffer));
-            if (!isfinite(scale) || scale <= 0) return 1;
-            minimum = MIN(minimum, scale); maximum = MAX(maximum, scale); scales[count++] = scale;
-        }
-    }
-    for (NSUInteger i = 0; i < count; ++i) for (NSUInteger j = i + 1; j < count; ++j) {
-        if (scales[j] < scales[i]) { double saved = scales[i]; scales[i] = scales[j]; scales[j] = saved; }
-    }
-    double scale = scales[4];
-    // Use only substantial, spatially consistent magnification. Small scale
-    // drift from walking and perspective changes must not accumulate as zoom.
-    if (scale < 0.8 || scale > 1.25 || (maximum - minimum) / scale > 0.08 || fabs(log(scale)) < 0.02) return 1;
-    return scale;
-}
-
 static NSData *XDSerializeTimedRendering(float focusDisparity, float aperture, float focalLength,
                                          CGSize encodedSize, uint32_t frameId,
                                          char *errorBuffer, size_t errorCapacity) {
@@ -947,8 +883,6 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         VNSequenceRequestHandler *visionHandler = [[VNSequenceRequestHandler alloc] init];
         CGImagePropertyOrientation visionOrientation = XDVisionOrientation(videoTrack.preferredTransform);
         CGRect previousFocusBox = CGRectNull;
-        id previousZoomImage = nil;
-        double previousZoomTime = -INFINITY, relativeZoom = 1;
         while (YES) {
             @autoreleasepool {
                 CMSampleBufferRef sample = [decodeOutput copyNextSampleBuffer];
@@ -963,18 +897,8 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     return XDFail(error_buffer, error_buffer_size, 65, @"decoded frame is missing a pixel buffer or presentation time");
                 }
                 uint32_t sceneIlluminanceMilliLux = XDApproximateSceneIlluminanceMilliLux(color);
-                if (CMTimeGetSeconds(pts) - previousZoomTime >= 0.19) {
-                    id currentZoomImage = XDRegistrationLuma(color);
-                    if (currentZoomImage) {
-                        relativeZoom *= XDRelativeZoom(previousZoomImage, currentZoomImage);
-                        relativeZoom = MIN(300.0 / focal_length_35mm, MAX(1.0 / focal_length_35mm, relativeZoom));
-                        previousZoomImage = currentZoomImage;
-                    }
-                    previousZoomTime = CMTimeGetSeconds(pts);
-                }
-                float frameFocalLength = focal_length_35mm * relativeZoom;
                 CVPixelBufferRef inferred = ((PTInferDisparity)method_getImplementation(inferMethod))(
-                    provider, sel_registerName("disparityForColorBuffer:focalLenIn35mmFilm:"), color, frameFocalLength);
+                    provider, sel_registerName("disparityForColorBuffer:focalLenIn35mmFilm:"), color, focal_length_35mm);
                 if (!inferred) {
                     CFRelease(sample);
                     [decodeReader cancelReading];
@@ -1062,8 +986,8 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 CGRect fallbackBox = CGRectMake(0.40, 0.40, 0.20, 0.20);
                 if (subjects.count == 0) {
                     // Native capture can focus on non-human objects. Use
-                    // Vision's objectness regions rather than inventing a
-                    // person at the center of an otherwise empty scene.
+                    // Vision's objectness regions when face/body detection
+                    // supplies no subject.
                     VNGenerateObjectnessBasedSaliencyImageRequest *saliency = [[VNGenerateObjectnessBasedSaliencyImageRequest alloc] init];
                     NSError *saliencyError = nil;
                     if ([visionHandler performRequests:@[saliency] onCMSampleBuffer:sample orientation:visionOrientation error:&saliencyError]) {
@@ -1165,7 +1089,6 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 [frameRows addObject:@{@"pts": @(pts.value), @"timescale": @(pts.timescale),
                                        @"duration": @(duration.value), @"durationScale": @(duration.timescale),
                                        @"raw": rawPath, @"aperture": @(aperture),
-                                       @"focalLength": @(frameFocalLength),
                                        @"sceneIlluminanceMilliLux": @(sceneIlluminanceMilliLux)}];
                 CFRelease(sample);
                 index++;
@@ -1289,7 +1212,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 frameData = XDResetPreprocessingDetectionFocusDistances(frameData, error_buffer, error_buffer_size);
             }
             NSData *renderingData = XDSerializeTimedRendering(-1.0f, aperture,
-                                                              [row[@"focalLength"] floatValue], inputSize, (uint32_t)frameIndex,
+                                                              focal_length_35mm, inputSize, (uint32_t)frameIndex,
                                                               error_buffer, error_buffer_size);
             if (!frameData || !renderingData) {
                 [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil]; return 3;
