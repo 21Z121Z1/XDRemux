@@ -20,9 +20,22 @@ let package = Package(
         // matches the final architecture.
         .executableTarget(
             name: "XDRemuxAppleAdapter",
-            dependencies: [],
+            dependencies: ["XDCinematicNative"],
             path: "Sources/XDRemuxAppleAdapter"
-        )
+        ),
+        .target(
+            name: "XDCinematicNative",
+            path: "Sources/XDCinematicNative",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("Cinematic"),
+                .linkedFramework("CoreMedia"),
+                .linkedFramework("CoreVideo"),
+                .linkedFramework("Foundation"),
+                .linkedFramework("Vision"),
+            ]
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

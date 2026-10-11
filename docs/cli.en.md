@@ -15,6 +15,7 @@ The Swift package is only the Apple platform capability adapter, and the remaini
 | `categorize` | Classify assets by asset type and primary capture mode without conversion. |
 | `inspect` | Inspect input type and important structure. |
 | `validate` | Validate ISO HDR HEIF or Live Photo output. |
+| `cinematic` | Create a pending Cinematic MOV from ordinary video on macOS. |
 
 Show help with:
 
@@ -134,6 +135,20 @@ xdremux validate output.heic --json
 ```
 
 `validate` automatically recognizes and validates either ISO HDR HEIF or a Live Photo pair. It is suitable for independent post-conversion checks in scripts and CI.
+
+## `cinematic` (macOS)
+
+```bash
+xdremux cinematic --input ordinary.mp4 --output pending.mov
+```
+
+The command generates new Cinematic metadata from decoded video frames. It copies the compressed video and audio samples into a new MOV. The output must not exist. The input is never replaced.
+
+Before publication, the Apple adapter requires public `CNAssetInfo` to report `needsPreprocessing`, resource status `ready`, and `isPreprocessed == false`. The MOV contains no materialized raster disparity track. This state is the acceptance target; it does not establish Photos editing or rendering quality.
+
+The current implementation requires macOS 27, the corresponding Apple private framework methods, and supported inference hardware/resources. It fails when a required method or resource is unavailable.
+
+`--focal-length-35mm MM` defaults to 24. `--aperture F` defaults to 2.8. These are assumed capture values for input without camera geometry. They are not recovered physical camera measurements. See the [Cinematic envelope contract](cinematic.en.md) for the native pipeline and verification procedure.
 
 ## Product intent versus implementation detail
 

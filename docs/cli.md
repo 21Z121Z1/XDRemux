@@ -15,6 +15,7 @@ Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 
 | `categorize` | 不转换，只按资产类型和主要拍摄模式分类。 |
 | `inspect` | 检查输入类型和关键结构。 |
 | `validate` | 验证 ISO HDR HEIF 或 Live Photo 输出。 |
+| `cinematic` | 在 macOS 上从普通视频生成待预处理的 Cinematic MOV。 |
 
 运行帮助：
 
@@ -134,6 +135,20 @@ xdremux validate output.heic --json
 ```
 
 `validate` 自动识别并验证 ISO HDR HEIF 或 Live Photo pair，适合脚本和 CI 在转换后做独立检查。
+
+## `cinematic`（macOS）
+
+```bash
+xdremux cinematic --input ordinary.mp4 --output pending.mov
+```
+
+命令从解码后的视频帧生成新的 Cinematic 元数据，将压缩的视频和音频样本复制到新 MOV 中。输出文件必须尚不存在，输入文件不会被替换。
+
+发布前，Apple adapter 必须通过公共 `CNAssetInfo` 确认 `needsPreprocessing`、资源状态 `ready` 和 `isPreprocessed == false`。MOV 不包含已物化的栅格视差轨道。此状态是验收目标，不代表 Photos 编辑或渲染画质已经通过验证。
+
+当前实现需要 macOS 27、对应的 Apple 私有框架方法，以及受支持的推理硬件和资源。必要的方法或资源不可用时，命令会失败。
+
+`--focal-length-35mm MM` 默认为 24，`--aperture F` 默认为 2.8。对缺少相机几何信息的输入，这些值是生成元数据时采用的拍摄假设，不是恢复出的物理相机测量值。原生处理路径和验证方法见 [Cinematic 元数据封装约定](cinematic.md)。
 
 ## 产品意图与实现细节
 

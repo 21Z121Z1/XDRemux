@@ -42,6 +42,24 @@ enum RootCommand {
     Categorize(categorize::CategorizeArgs),
     /// Validate one canonical output without converting it.
     Validate(validate::ValidateArgs),
+    /// Build a pending Cinematic envelope for ordinary video on macOS.
+    Cinematic(CinematicEnvelopeArgs),
+}
+
+#[derive(Debug, Args)]
+struct CinematicEnvelopeArgs {
+    /// Ordinary input video; it is never replaced.
+    #[arg(long, value_name = "INPUT")]
+    input: PathBuf,
+    /// New MOV output path; existing files are never replaced.
+    #[arg(long, value_name = "OUTPUT")]
+    output: PathBuf,
+    /// Assumed 35mm-equivalent view angle when the source has no camera geometry.
+    #[arg(long, default_value_t = 24.0, value_name = "MM")]
+    focal_length_35mm: f32,
+    /// Assumed capture aperture used by Cinematic rendering metadata.
+    #[arg(long, default_value_t = 2.8, value_name = "F")]
+    aperture: f32,
 }
 
 #[derive(Debug, Args)]
@@ -488,6 +506,56 @@ fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut imp
     0
 }
 
+fn run_cinematic_envelope(
+    arguments: CinematicEnvelopeArgs,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
+    #[cfg(target_os = "macos")]
+    {
+        let adapter = match resolve_apple_adapter_executable() {
+            Ok(path) => path,
+            Err(error) => {
+                let _ = writeln!(stderr, "error: {error}");
+                return 1;
+            }
+        };
+        match PortableRuntime::new().generate_cinematic_envelope_file(
+            adapter,
+            &arguments.input,
+            &arguments.output,
+            arguments.focal_length_35mm,
+            arguments.aperture,
+        ) {
+            Ok(receipt) => {
+                let _ = writeln!(stdout, "created: {}", receipt.output.display());
+                let _ = writeln!(stdout, "processed-frames: {}", receipt.processed_frames);
+                let _ = writeln!(stdout, "focal-length-35mm: {}", receipt.focal_length_35mm);
+                let _ = writeln!(stdout, "aperture: {}", receipt.aperture);
+                let _ = writeln!(
+                    stdout,
+                    "raster-disparity-track: {}",
+                    receipt.disparity_track_written
+                );
+                0
+            }
+            Err(error) => {
+                let _ = writeln!(stderr, "error: {error}");
+                1
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = arguments;
+        let _ = writeln!(
+            stderr,
+            "error: the cinematic command requires macOS and Apple's Cinematic frameworks"
+        );
+        1
+    }
+}
+
 fn is_hidden_batch_artifact(path: &Path) -> bool {
     path.file_name()
         .and_then(OsStr::to_str)
@@ -803,6 +871,9 @@ where
         Ok(Cli {
             command: RootCommand::Validate(arguments),
         }) => validate::run(arguments, stdout, stderr),
+        Ok(Cli {
+            command: RootCommand::Cinematic(arguments),
+        }) => run_cinematic_envelope(arguments, stdout, stderr),
         Err(error) => write_clap_error(error, stdout, stderr),
     }
 }
