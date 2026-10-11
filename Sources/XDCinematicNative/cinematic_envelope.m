@@ -6,6 +6,7 @@
 #import <CoreVideo/CoreVideo.h>
 #import <simd/simd.h>
 #import <Vision/Vision.h>
+#import <ImageIO/ImageIO.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <math.h>
@@ -300,8 +301,49 @@ static NSData *XDResetPreprocessingDetectionFocusDistances(NSData *serialized,
     return result;
 }
 
+static CGImagePropertyOrientation XDVisionOrientation(CGAffineTransform transform) {
+    // AVFoundation keeps encoded buffers unrotated. Give Vision the display
+    // orientation, then map its rectangles back to the encoded image.
+    if (fabs(transform.b) > fabs(transform.a)) {
+        if (transform.b > 0) return transform.c < 0 ? kCGImagePropertyOrientationRight : kCGImagePropertyOrientationLeftMirrored;
+        return transform.c > 0 ? kCGImagePropertyOrientationLeft : kCGImagePropertyOrientationRightMirrored;
+    }
+    if (transform.a < 0) return transform.d < 0 ? kCGImagePropertyOrientationDown : kCGImagePropertyOrientationUpMirrored;
+    return transform.d < 0 ? kCGImagePropertyOrientationDownMirrored : kCGImagePropertyOrientationUp;
+}
+
+static CGRect XDEncodedVisionRect(CGRect vision, CGImagePropertyOrientation orientation) {
+    CGRect rect = CGRectMake(vision.origin.x, 1.0 - CGRectGetMaxY(vision), vision.size.width, vision.size.height);
+    switch (orientation) {
+        case kCGImagePropertyOrientationDown:
+            rect = CGRectMake(1.0 - CGRectGetMaxX(rect), 1.0 - CGRectGetMaxY(rect), rect.size.width, rect.size.height); break;
+        case kCGImagePropertyOrientationRight:
+            rect = CGRectMake(rect.origin.y, 1.0 - CGRectGetMaxX(rect), rect.size.height, rect.size.width); break;
+        case kCGImagePropertyOrientationLeft:
+            rect = CGRectMake(1.0 - CGRectGetMaxY(rect), rect.origin.x, rect.size.height, rect.size.width); break;
+        case kCGImagePropertyOrientationUpMirrored:
+            rect.origin.x = 1.0 - CGRectGetMaxX(rect); break;
+        case kCGImagePropertyOrientationDownMirrored:
+            rect.origin.y = 1.0 - CGRectGetMaxY(rect); break;
+        case kCGImagePropertyOrientationLeftMirrored:
+            rect = CGRectMake(rect.origin.y, rect.origin.x, rect.size.height, rect.size.width); break;
+        case kCGImagePropertyOrientationRightMirrored:
+            rect = CGRectMake(1.0 - CGRectGetMaxY(rect), 1.0 - CGRectGetMaxX(rect), rect.size.height, rect.size.width); break;
+        default: break;
+    }
+    return CGRectIntersection(rect, CGRectMake(0, 0, 1, 1));
+}
+
+static CGFloat XDRectOverlap(CGRect a, CGRect b) {
+    CGRect intersection = CGRectIntersection(a, b);
+    CGFloat common = CGRectIsNull(intersection) ? 0 : intersection.size.width * intersection.size.height;
+    CGFloat total = a.size.width * a.size.height + b.size.width * b.size.height - common;
+    return total > 0 ? common / total : 0;
+}
+
 static NSData *XDSerializeTimedRendering(float focusDisparity, float aperture, float focalLength,
-                                         uint32_t frameId, char *errorBuffer, size_t errorCapacity) {
+                                         CGSize encodedSize, uint32_t frameId,
+                                         char *errorBuffer, size_t errorCapacity) {
     Class cls = NSClassFromString(@"PTTimedRenderingMetadataVersion2");
     if (!cls) {
         XDFail(errorBuffer, errorCapacity, 3, @"PTTimedRenderingMetadataVersion2 is unavailable");
@@ -319,6 +361,15 @@ static NSData *XDSerializeTimedRendering(float focusDisparity, float aperture, f
     // Synthetic RGB has no optical-crop measurement, so use the identity crop.
     ((PTSetFloat2)method_getImplementation(setVisibleCrop))(
         object, sel_registerName("setVisCropFactor:"), (vector_float2){1.0f, 1.0f});
+    Method setSensorCrop = XDRequireMethod(cls, "setTotalSensorCropRectSize:", NO,
+                                          "v32@0:8{CGSize=dd}16", errorBuffer, errorCapacity);
+    if (!setSensorCrop || !isfinite(encodedSize.width) || !isfinite(encodedSize.height) ||
+        encodedSize.width <= 0 || encodedSize.height <= 0) return nil;
+    // Ordinary video has no measured sensor region. A virtual region with the
+    // encoded image size keeps rendering geometry valid without borrowing a
+    // camera sample's overscan or stabilization crop.
+    ((void (*)(id, SEL, CGSize))method_getImplementation(setSensorCrop))(
+        object, sel_registerName("setTotalSensorCropRectSize:"), encodedSize);
     const struct { const char *name; float value; } floatFields[] = {
         {"setFocusDisparity:", focusDisparity}, {"setFNumber:", aperture},
         {"setFocalLenIn35mmFilm:", focalLength}, {"setAlphaLowLight:", 1.0f},
@@ -830,6 +881,8 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         }
         NSUInteger index = 0;
         VNSequenceRequestHandler *visionHandler = [[VNSequenceRequestHandler alloc] init];
+        CGImagePropertyOrientation visionOrientation = XDVisionOrientation(videoTrack.preferredTransform);
+        CGRect previousFocusBox = CGRectNull;
         while (YES) {
             @autoreleasepool {
                 CMSampleBufferRef sample = [decodeOutput copyNextSampleBuffer];
@@ -875,7 +928,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 VNDetectFaceRectanglesRequest *faceRequest = [[VNDetectFaceRectanglesRequest alloc] init];
                 NSError *visionError = nil;
                 BOOL faceDetectionSucceeded = [visionHandler performRequests:@[faceRequest]
-                                                            onCMSampleBuffer:sample error:&visionError];
+                                                            onCMSampleBuffer:sample orientation:visionOrientation error:&visionError];
                 if (!faceDetectionSucceeded) {
                     CFRelease(sample);
                     [decodeReader cancelReading];
@@ -884,30 +937,59 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                                   [NSString stringWithFormat:@"Vision face detection failed at frame %lu: %@",
                                    (unsigned long)index, visionError.localizedDescription ?: @"unknown error"]);
                 }
-                NSMutableArray<VNFaceObservation *> *faces = [NSMutableArray array];
+                NSMutableArray<VNDetectedObjectObservation *> *subjects = [NSMutableArray array];
                 for (VNFaceObservation *face in (NSArray<VNFaceObservation *> *)faceRequest.results) {
                     if (face.confidence > 0.05 && face.boundingBox.size.width > 0 &&
-                        face.boundingBox.size.height > 0) [faces addObject:face];
+                        face.boundingBox.size.height > 0) [subjects addObject:face];
                 }
-                [faces sortUsingComparator:^NSComparisonResult(VNFaceObservation *left, VNFaceObservation *right) {
-                    CGFloat leftCenter = CGRectGetMidX(left.boundingBox);
-                    CGFloat rightCenter = CGRectGetMidX(right.boundingBox);
-                    if (leftCenter < rightCenter) return NSOrderedAscending;
-                    if (leftCenter > rightCenter) return NSOrderedDescending;
+                CNDetectionType subjectType = CNDetectionTypeHumanFace;
+                if (subjects.count == 0) {
+                    VNDetectHumanRectanglesRequest *bodyRequest = [[VNDetectHumanRectanglesRequest alloc] init];
+                    bodyRequest.upperBodyOnly = YES;
+                    if (![visionHandler performRequests:@[bodyRequest] onCMSampleBuffer:sample
+                                             orientation:visionOrientation error:&visionError]) {
+                        CFRelease(sample); [decodeReader cancelReading];
+                        [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
+                        return XDFail(error_buffer, error_buffer_size, 65,
+                                      [NSString stringWithFormat:@"Vision person detection failed: %@", visionError.localizedDescription]);
+                    }
+                    for (VNHumanObservation *body in bodyRequest.results) {
+                        if (body.confidence >= 0.3 && body.boundingBox.size.width > 0 && body.boundingBox.size.height > 0)
+                            [subjects addObject:body];
+                    }
+                    subjectType = CNDetectionTypeHumanTorso;
+                }
+                [subjects sortUsingComparator:^NSComparisonResult(VNDetectedObjectObservation *left, VNDetectedObjectObservation *right) {
+                    CGFloat leftArea = left.boundingBox.size.width * left.boundingBox.size.height;
+                    CGFloat rightArea = right.boundingBox.size.width * right.boundingBox.size.height;
+                    if (leftArea > rightArea) return NSOrderedAscending;
+                    if (leftArea < rightArea) return NSOrderedDescending;
                     return NSOrderedSame;
                 }];
-                if (faces.count > 2) [faces removeObjectsInRange:NSMakeRange(2, faces.count - 2)];
+                // Retain a detected subject while its rectangle remains near
+                // the prior anchor. A substantially larger subject may replace it.
+                if (subjects.count > 1 && !CGRectIsNull(previousFocusBox)) {
+                    CGFloat largestArea = subjects[0].boundingBox.size.width * subjects[0].boundingBox.size.height;
+                    NSUInteger bestIndex = 0; CGFloat bestOverlap = 0.15;
+                    for (NSUInteger candidate = 0; candidate < subjects.count; ++candidate) {
+                        VNDetectedObjectObservation *subject = subjects[candidate];
+                        CGFloat area = subject.boundingBox.size.width * subject.boundingBox.size.height;
+                        CGFloat overlap = XDRectOverlap(previousFocusBox, XDEncodedVisionRect(subject.boundingBox, visionOrientation));
+                        if (area >= largestArea * 0.6 && overlap > bestOverlap) { bestIndex = candidate; bestOverlap = overlap; }
+                    }
+                    if (bestIndex != 0) [subjects exchangeObjectAtIndex:0 withObjectAtIndex:bestIndex];
+                }
+                if (subjects.count > 2) [subjects removeObjectsInRange:NSMakeRange(2, subjects.count - 2)];
 
                 // Vision rectangles have a bottom-left origin. Cinematic uses
                 // top-left normalized coordinates, independent of display rotation.
                 CGRect fallbackBox = CGRectMake(0.40, 0.40, 0.20, 0.20);
-                CGRect focusBox = faces.firstObject ? faces.firstObject.boundingBox : fallbackBox;
-                if (faces.firstObject) focusBox.origin.y = 1.0 - CGRectGetMaxY(focusBox);
+                CGRect focusBox = subjects.firstObject ? XDEncodedVisionRect(subjects.firstObject.boundingBox, visionOrientation) : fallbackBox;
+                previousFocusBox = subjects.firstObject ? focusBox : CGRectNull;
                 id focusDetection = nil;
-                NSMutableArray *allDetections = [NSMutableArray arrayWithCapacity:faces.count + 1];
-                for (NSUInteger faceIndex = 0; faceIndex < faces.count; ++faceIndex) {
-                    CGRect subjectBox = faces[faceIndex].boundingBox;
-                    subjectBox.origin.y = 1.0 - CGRectGetMaxY(subjectBox);
+                NSMutableArray *allDetections = [NSMutableArray arrayWithCapacity:subjects.count + 1];
+                for (NSUInteger faceIndex = 0; faceIndex < subjects.count; ++faceIndex) {
+                    CGRect subjectBox = XDEncodedVisionRect(subjects[faceIndex].boundingBox, visionOrientation);
                     id subjectDetection = ((PTInitDetection)objc_msgSend)([detectionClass alloc],
                         sel_registerName("initWithTime:rect:focusDistance:"), pts, subjectBox, -1.0f);
                     if (!subjectDetection) {
@@ -922,13 +1004,13 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     ((void (*)(id, SEL, long long))method_getImplementation(setGroup))(
                         subjectDetection, sel_registerName("setGroupIdentifier:"), subjectGroupIdentifiers[faceIndex]);
                     ((void (*)(id, SEL, unsigned long long))method_getImplementation(setType))(
-                        subjectDetection, sel_registerName("setDetectionType:"), (unsigned long long)CNDetectionTypeHumanFace);
+                        subjectDetection, sel_registerName("setDetectionType:"), (unsigned long long)subjectType);
                     [allDetections addObject:subjectDetection];
                     if (faceIndex == 0) focusDetection = subjectDetection;
                 }
                 if (!focusDetection) {
-                    // Preserve a serializable focus anchor for footage with no
-                    // detectable faces; the face-bearing V7 fixture takes the path above.
+                    // Preserve a serializable center anchor when Vision finds
+                    // neither a face nor a torso.
                     id fallbackDetection = ((PTInitDetection)objc_msgSend)([detectionClass alloc],
                         sel_registerName("initWithTime:rect:focusDistance:"), pts, fallbackBox, -1.0f);
                     if (!fallbackDetection) {
@@ -1115,7 +1197,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 frameData = XDResetPreprocessingDetectionFocusDistances(frameData, error_buffer, error_buffer_size);
             }
             NSData *renderingData = XDSerializeTimedRendering(-1.0f, aperture,
-                                                              focal_length_35mm, (uint32_t)frameIndex,
+                                                              focal_length_35mm, inputSize, (uint32_t)frameIndex,
                                                               error_buffer, error_buffer_size);
             if (!frameData || !renderingData) {
                 [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil]; return 3;

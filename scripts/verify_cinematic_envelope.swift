@@ -198,6 +198,7 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
         try require(selected.detectionID != nil, "selected detection has an invalid track ID")
     }
     let attributes = try await CNRenderingSession.Attributes(asset: candidate)
+    let encodedSize = try await info.cinematicVideoTrack.load(.naturalSize)
     let reader = try AVAssetReader(asset: candidate)
     let output = AVAssetReaderTrackOutput(track: info.cinematicMetadataTrack, outputSettings: nil)
     reader.add(output)
@@ -216,6 +217,22 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
         }
         try require(abs(parsed.fNumber - expectedAperture) < 0.001 && parsed.focusDisparity == -1,
                     "invalid pending focus/aperture")
+        guard let renderingItem = group.items.first(where: { $0.identifier?.rawValue.hasSuffix("cinematic-video.rendering") == true }),
+              let renderingData = renderingItem.value as? Data else { throw failure("missing rendering geometry") }
+        let bytes = Array(renderingData)
+        try require(bytes.count == 112 && Array(bytes[4..<8]) == Array("rend".utf8), "unsupported timed rendering format")
+        var geometry: [UInt16: Float] = [:]
+        for offset in stride(from: 8, to: bytes.count, by: 8) {
+            let tag = UInt16(bytes[offset]) << 8 | UInt16(bytes[offset + 1])
+            let type = UInt16(bytes[offset + 2]) << 8 | UInt16(bytes[offset + 3])
+            if type == 1 {
+                let bits = bytes[offset+4..<offset+8].reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+                geometry[tag] = Float(bitPattern: bits)
+            }
+        }
+        try require(geometry[4] == Float(encodedSize.width) && geometry[5] == Float(encodedSize.height),
+                    "virtual sensor region does not match encoded video geometry")
+        try require(geometry[6] == 1 && geometry[7] == 1, "virtual visible crop is not identity")
         for item in group.items { if let data = item.value as? Data { payloadDigest.update(data: data) } }
         groupCount += 1
     }
@@ -225,6 +242,7 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
             "is_preprocessed": false, "raster_disparity_track": false, "decoded_frames": decoded.count,
             "script_frames": frames.count, "timed_metadata_groups": groupCount, "script_f_number": script.fNumber,
             "rendering_version": attributes.renderingVersion,
+            "virtual_sensor_region": [encodedSize.width, encodedSize.height], "virtual_visible_crop": [1, 1],
             "generated_payload_sha256": payloadDigest.finalize().map { String(format: "%02x", $0) }.joined(),
             "media": media]
 }

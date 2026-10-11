@@ -5,6 +5,7 @@ import Cinematic
 import CoreImage
 import CoreMedia
 import CoreVideo
+import CryptoKit
 import Foundation
 import Metal
 
@@ -142,15 +143,43 @@ func disparityPixels(_ buffer: CVPixelBuffer) throws -> [UInt16] {
     return pixels
 }
 
-func effectDifference(_ reference: [[UInt16]], _ candidate: [[UInt16]]) throws -> [String: Any] {
+func colorDigest(_ buffer: CVPixelBuffer) throws -> String {
+    try check(CVPixelBufferLockBaseAddress(buffer, .readOnly) == kCVReturnSuccess, "cannot read color")
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+    var digest = SHA256()
+    for plane in 0..<CVPixelBufferGetPlaneCount(buffer) {
+        guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, plane) else { throw NSError(domain: "MissingColorBytes", code: 1) }
+        let width = CVPixelBufferGetWidthOfPlane(buffer, plane) * (plane == 0 ? 2 : 4)
+        let stride = CVPixelBufferGetBytesPerRowOfPlane(buffer, plane)
+        for row in 0..<CVPixelBufferGetHeightOfPlane(buffer, plane) {
+            digest.update(data: Data(bytes: base.advanced(by: row * stride), count: width))
+        }
+    }
+    return digest.finalize().map { String(format: "%02x", $0) }.joined()
+}
+
+func detectionRecord(_ detection: CNDetection) -> [String: Any] {
+    let rect = detection.normalizedRect
+    return ["type": detection.detectionType.rawValue, "rect": [rect.minX, rect.minY, rect.width, rect.height],
+            "focus_disparity": detection.focusDisparity]
+}
+
+func effectDifference(_ reference: [[UInt16]], _ candidate: [[UInt16]], width: Int? = nil, region: CGRect? = nil) throws -> [String: Any] {
     try check(reference.count == 2 && candidate.count == 2 && reference[0].count == candidate[0].count,
               "effect comparison geometry differs")
-    var errorEnergy = 0.0, nativeEnergy = 0.0, generatedEnergy = 0.0, count = 0
+    var errorEnergy = 0.0, nativeEnergy = 0.0, generatedEnergy = 0.0, dotProduct = 0.0, count = 0
     for index in reference[0].indices where index % 4 != 3 {
+        if let width, let region {
+            let pixel = index / 4, height = reference[0].count / (4 * width)
+            let point = CGPoint(x: (Double(pixel % width) + 0.5) / Double(width),
+                                y: (Double(pixel / width) + 0.5) / Double(height))
+            if !region.contains(point) { continue }
+        }
         let a = Double(Float(Float16(bitPattern: reference[0][index]))) - Double(Float(Float16(bitPattern: reference[1][index])))
         let b = Double(Float(Float16(bitPattern: candidate[0][index]))) - Double(Float(Float16(bitPattern: candidate[1][index])))
-        errorEnergy += (a - b) * (a - b); nativeEnergy += a * a; generatedEnergy += b * b; count += 1
+        errorEnergy += (a - b) * (a - b); nativeEnergy += a * a; generatedEnergy += b * b; dotProduct += a * b; count += 1
     }
+    try check(count > 0, "empty effect comparison region")
     var result: [String: Any] = ["definition": "(native f2 - native f16) versus (generated f2 - generated f16)",
                                "effect_error_rmse": sqrt(errorEnergy / Double(count)),
                                "native_effect_rmse": sqrt(nativeEnergy / Double(count)),
@@ -159,6 +188,8 @@ func effectDifference(_ reference: [[UInt16]], _ candidate: [[UInt16]]) throws -
         result["relative_effect_error"] = sqrt(errorEnergy / nativeEnergy)
         result["generated_to_native_effect_strength"] = sqrt(generatedEnergy / nativeEnergy)
     }
+    if nativeEnergy > 0 && generatedEnergy > 0 { result["effect_cosine_similarity"] = dotProduct / sqrt(nativeEnergy * generatedEnergy) }
+    result["components"] = count
     return result
 }
 
@@ -168,6 +199,8 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
     let generated = try await prepare(generatedURL, directory.appendingPathComponent("generated-processed.mov"))
     let nativeAttributes = try await CNRenderingSession.Attributes(asset: native.asset)
     let generatedAttributes = try await CNRenderingSession.Attributes(asset: generated.asset)
+    let nativeScript = try await CNScript(asset: native.asset)
+    let generatedScript = try await CNScript(asset: generated.asset)
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
         throw NSError(domain: "NoMetalDevice", code: 1)
     }
@@ -178,6 +211,12 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
     for (index, fraction) in [0.25, 0.5, 0.75].enumerated() {
         let a = try select(native, time: duration * fraction), b = try select(generated, time: duration * fraction)
         try check(CMTimeCompare(a.pts, b.pts) == 0, "selected native/generated timestamps differ")
+        let nativeColorHash = try colorDigest(a.color), generatedColorHash = try colorDigest(b.color)
+        try check(nativeColorHash == generatedColorHash, "decoded color inputs differ")
+        guard let nativeFrame = nativeScript.frame(at: a.pts, tolerance: .zero),
+              let generatedFrame = generatedScript.frame(at: b.pts, tolerance: .zero) else {
+            throw NSError(domain: "MissingScriptFrame", code: 1)
+        }
         let depthDifference = try difference(disparityPixels(a.depth), disparityPixels(b.depth), channels: 1)
         var referenceRenders: [[UInt16]] = [], candidateRenders: [[UInt16]] = []
         for fNumber: Float in [2, 16] {
@@ -188,6 +227,9 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
             let candidate = try render(generatedSession, generatedAttributes, b, fNumber, queue, device, generatedPNG)
             var row: [String: Any] = ["pts": a.pts.seconds, "f_number": fNumber,
                 "native_focus": reference.focus, "generated_focus": candidate.focus,
+                "native_focus_detection": detectionRecord(nativeFrame.focusDetection),
+                "generated_focus_detection": detectionRecord(generatedFrame.focusDetection),
+                "decoded_color_sha256": nativeColorHash, "decoded_color_identical": true,
                 "native_png": nativePNG.path, "generated_png": generatedPNG.path,
                 "render_difference": try difference(reference.pixels, candidate.pixels), "disparity_difference": depthDifference]
             if index == 0 && fNumber == 2 {
@@ -202,6 +244,8 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
         results[results.count - 1]["native_f2_f16_difference"] = try difference(referenceRenders[0], referenceRenders[1])
         results[results.count - 1]["generated_f2_f16_difference"] = try difference(candidateRenders[0], candidateRenders[1])
         results[results.count - 1]["effect_comparison"] = try effectDifference(referenceRenders, candidateRenders)
+        results[results.count - 1]["native_focus_region_effect_comparison"] = try effectDifference(referenceRenders, candidateRenders,
+            width: CVPixelBufferGetWidth(a.color), region: nativeFrame.focusDetection.normalizedRect)
     }
     return ["schema": "xdremux-cinematic-headless-comparison-v1", "renderer": "public CNRenderingSession",
             "quality": "export", "texture_format": "RGBA16Float", "input_pixel_format": "10-bit bi-planar video range",
