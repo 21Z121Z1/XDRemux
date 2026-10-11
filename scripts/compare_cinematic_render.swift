@@ -3,10 +3,12 @@
 import AVFoundation
 import Cinematic
 import CoreImage
+import CoreImage.CIFilterBuiltins
 import CoreMedia
 import CoreVideo
 import CryptoKit
 import Foundation
+import ImageIO
 import Metal
 
 func check(_ condition: Bool, _ message: String) throws {
@@ -75,12 +77,91 @@ func select(_ info: CNAssetInfo, time: Double) throws -> Selected {
 
 struct Rendered {
     let pixels: [UInt16]
+    let linearPixels: [UInt16]
     let focus: Float
+    let color: [String: Any]
+}
+
+// CNRenderingSession's RGBA destination retains the source RGB transfer
+// function. In particular, HLG output is not a linear sRGB texture. Core Image
+// obtains the primaries, transfer function and headroom from the decoded buffer.
+func managedImage(_ texture: MTLTexture, source: CVPixelBuffer) throws -> (CIImage, [String: Any]) {
+    let sourceImage = CIImage(cvPixelBuffer: source)
+    guard let colorSpace = sourceImage.colorSpace,
+          let image = CIImage(mtlTexture: texture, options: [.colorSpace: colorSpace]) else {
+        throw NSError(domain: "MissingSourceColorSpace", code: 1)
+    }
+    let headroom = sourceImage.contentHeadroom
+    try check(headroom.isFinite && headroom >= 1, "source HDR headroom is unknown")
+    let upright = image.transformed(by: CGAffineTransform(translationX: 0, y: image.extent.height).scaledBy(x: 1, y: -1))
+        .settingContentHeadroom(headroom)
+        .settingContentAverageLightLevel(sourceImage.contentAverageLightLevel)
+    return (upright, ["source_color_space": colorSpace.name as String? ?? "unnamed",
+                      "source_headroom": headroom, "source_average_light_level": sourceImage.contentAverageLightLevel,
+                      "sdr_tone_map": "CISystemToneMap, standard dynamic range, display headroom 1",
+                      "sdr_output_color_space": "sRGB", "linear_measurement_color_space": "extended linear ITU-R BT.2020"])
+}
+
+func writeSDRPreview(_ image: CIImage, context: CIContext, transform: CGAffineTransform, to url: URL) throws {
+    let toneMap = CIFilter.systemToneMap()
+    toneMap.inputImage = image; toneMap.displayHeadroom = 1; toneMap.preferredDynamicRange = .standard
+    guard let output = toneMap.outputImage else { throw NSError(domain: "CannotToneMapPreview", code: 1) }
+    try context.writePNGRepresentation(of: output.transformed(by: transform), to: url, format: .RGBA8,
+        colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, options: [:])
+}
+
+func verifyColorManagement(_ directory: URL) throws -> [String: Any] {
+    guard let device = MTLCreateSystemDefaultDevice() else { throw NSError(domain: "NoMetalDevice", code: 1) }
+    let linear = CGColorSpace(name: CGColorSpace.extendedLinearITUR_2020)!
+    let hlg = CGColorSpace(name: CGColorSpace.itur_2100_HLG)!
+    let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
+    let context = CIContext(mtlDevice: device, options: [.workingColorSpace: linear])
+    var source: CVPixelBuffer?
+    try check(CVPixelBufferCreate(nil, 16, 16, kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
+        [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &source) == kCVReturnSuccess, "cannot allocate color fixture")
+    CVBufferSetAttachment(source!, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_2020, .shouldPropagate)
+    CVBufferSetAttachment(source!, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_2100_HLG, .shouldPropagate)
+    CVBufferSetAttachment(source!, kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_2020, .shouldPropagate)
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: 16, height: 16, mipmapped: false)
+    descriptor.storageMode = .shared; descriptor.usage = [.shaderRead]
+    let texture = device.makeTexture(descriptor: descriptor)!
+    var records: [[String: Any]] = [], grayOutputs: [Double] = []
+    for (index, rgb) in [[Float(0.5),0.5,0.5], [0.75,0.75,0.75], [0.9,0.9,0.9], [1,1,1], [0.65,0.4,0.25]].enumerated() {
+        let values = (0..<256).flatMap { _ in (rgb + [1]).map { Float16($0).bitPattern } }
+        values.withUnsafeBytes { texture.replace(region: MTLRegionMake2D(0,0,16,16), mipmapLevel: 0, withBytes: $0.baseAddress!, bytesPerRow: 16*8) }
+        let (image, color) = try managedImage(texture, source: source!)
+        let reference = CIImage(color: CIColor(red: CGFloat(rgb[0]), green: CGFloat(rgb[1]), blue: CGFloat(rgb[2]), alpha: 1, colorSpace: hlg)!)
+            .cropped(to: image.extent).settingContentHeadroom(color["source_headroom"] as! Float)
+        func pixels(_ image: CIImage, _ space: CGColorSpace) -> [UInt16] {
+            var p = [UInt16](repeating: 0, count: 256*4)
+            context.render(image, toBitmap: &p, rowBytes: 16*8, bounds: image.extent, format: .RGBAh, colorSpace: space)
+            return p
+        }
+        let error = try difference(pixels(image, linear), pixels(reference, linear))
+        try check((error["rmse"] as! Double) < 0.003, "HLG texture was interpreted in the wrong color space")
+        let wrong = CIImage(mtlTexture: texture, options: [.colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!])!
+        let wrongError = try difference(pixels(wrong, linear), pixels(reference, linear))
+        try check(wrongError["rmse"] as! Double > 0.05, "negative color-space control did not fail")
+        let png = directory.appendingPathComponent("hlg-patch-\(index).png")
+        try writeSDRPreview(image, context: context, transform: .identity, to: png)
+        guard let decoded = CIImage(contentsOf: png), let actualSpace = decoded.colorSpace else { throw NSError(domain: "CannotReadColorFixture", code: 1) }
+        try check(actualSpace.name == sRGB.name, "SDR PNG has no sRGB color profile")
+        let tone = CIFilter.systemToneMap(); tone.inputImage = reference; tone.displayHeadroom = 1; tone.preferredDynamicRange = .standard
+        let sdrError = try difference(pixels(decoded, sRGB), pixels(tone.outputImage!, sRGB))
+        try check((sdrError["rmse"] as! Double) < 0.006, "SDR preview differs from system tone-mapped reference")
+        let channels = pixels(decoded, sRGB).prefix(3).map { Double(Float(Float16(bitPattern: $0))) }
+        if index < 4 { grayOutputs.append(channels[0]) }
+        records.append(["input_hlg_rgb": rgb, "sdr_rgb": channels, "linear_reference_error": error,
+                        "wrong_linear_srgb_error": wrongError, "sdr_reference_error": sdrError, "color_management": color])
+    }
+    try check(zip(grayOutputs, grayOutputs.dropFirst()).allSatisfy { $1 > $0 + 0.005 }, "HDR highlights were clipped instead of tone-mapped")
+    return ["schema": "xdremux-cinematic-color-regression-v1", "patches": records, "highlights_distinct": true]
 }
 
 func render(_ session: CNRenderingSession, _ attributes: CNRenderingSession.Attributes,
             _ selected: Selected, _ fNumber: Float, _ queue: MTLCommandQueue,
-            _ device: MTLDevice, _ png: URL?, focusOverride: Float? = nil) throws -> Rendered {
+            _ device: MTLDevice, _ png: URL?, focusOverride: Float? = nil,
+            displayTransform: CGAffineTransform = .identity) throws -> Rendered {
     guard var frame = CNRenderingSession.FrameAttributes(timedMetadataGroup: selected.metadata, sessionAttributes: attributes) else {
         throw NSError(domain: "InvalidFrameAttributes", code: 1)
     }
@@ -101,15 +182,13 @@ func render(_ session: CNRenderingSession, _ attributes: CNRenderingSession.Attr
     var pixels = [UInt16](repeating: 0, count: destination.width * destination.height * 4)
     destination.getBytes(&pixels, bytesPerRow: destination.width * 8,
                          from: MTLRegionMake2D(0, 0, destination.width, destination.height), mipmapLevel: 0)
-    if let png {
-        guard let ci = CIImage(mtlTexture: destination, options: [.colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!]) else {
-            throw NSError(domain: "CannotCreatePreview", code: 1)
-        }
-        let display = ci.transformed(by: CGAffineTransform(translationX: 0, y: ci.extent.height).scaledBy(x: 1, y: -1))
-        try CIContext(mtlDevice: device).writePNGRepresentation(of: display, to: png, format: .RGBA8,
-            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, options: [:])
-    }
-    return Rendered(pixels: pixels, focus: frame.focusDisparity)
+    let linearSpace = CGColorSpace(name: CGColorSpace.extendedLinearITUR_2020)!
+    let context = CIContext(mtlDevice: device, options: [.workingColorSpace: linearSpace])
+    let (image, color) = try managedImage(destination, source: selected.color)
+    var linear = [UInt16](repeating: 0, count: pixels.count)
+    context.render(image, toBitmap: &linear, rowBytes: destination.width * 8, bounds: image.extent, format: .RGBAh, colorSpace: linearSpace)
+    if let png { try writeSDRPreview(image, context: context, transform: displayTransform, to: png) }
+    return Rendered(pixels: pixels, linearPixels: linear, focus: frame.focusDisparity, color: color)
 }
 
 func difference(_ a: [UInt16], _ b: [UInt16], channels: Int = 4) throws -> [String: Any] {
@@ -219,38 +298,47 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
         }
         let depthDifference = try difference(disparityPixels(a.depth), disparityPixels(b.depth), channels: 1)
         var referenceRenders: [[UInt16]] = [], candidateRenders: [[UInt16]] = []
+        var referenceLinear: [[UInt16]] = [], candidateLinear: [[UInt16]] = []
         for fNumber: Float in [2, 16] {
             let prefix = "t\(index + 1)-f\(Int(fNumber))"
             let nativePNG = directory.appendingPathComponent(prefix + "-native.png")
             let generatedPNG = directory.appendingPathComponent(prefix + "-generated.png")
-            let reference = try render(nativeSession, nativeAttributes, a, fNumber, queue, device, nativePNG)
-            let candidate = try render(generatedSession, generatedAttributes, b, fNumber, queue, device, generatedPNG)
+            let reference = try render(nativeSession, nativeAttributes, a, fNumber, queue, device, nativePNG, displayTransform: native.preferredTransform)
+            let candidate = try render(generatedSession, generatedAttributes, b, fNumber, queue, device, generatedPNG, displayTransform: generated.preferredTransform)
+            try check(NSDictionary(dictionary: reference.color).isEqual(to: candidate.color), "source color management differs")
             var row: [String: Any] = ["pts": a.pts.seconds, "f_number": fNumber,
                 "native_focus": reference.focus, "generated_focus": candidate.focus,
                 "native_focus_detection": detectionRecord(nativeFrame.focusDetection),
                 "generated_focus_detection": detectionRecord(generatedFrame.focusDetection),
                 "decoded_color_sha256": nativeColorHash, "decoded_color_identical": true,
                 "native_png": nativePNG.path, "generated_png": generatedPNG.path,
-                "render_difference": try difference(reference.pixels, candidate.pixels), "disparity_difference": depthDifference]
+                "color_management": reference.color,
+                "render_difference": try difference(reference.pixels, candidate.pixels),
+                "linear_render_difference": try difference(reference.linearPixels, candidate.linearPixels),
+                "disparity_difference": depthDifference]
             if index == 0 && fNumber == 2 {
                 let repeatRender = try render(nativeSession, nativeAttributes, a, fNumber, queue, device, nil)
                 row["native_repeat_difference"] = try difference(reference.pixels, repeatRender.pixels)
+                row["native_linear_repeat_difference"] = try difference(reference.linearPixels, repeatRender.linearPixels)
                 let fixedFocus = try render(generatedSession, generatedAttributes, b, fNumber, queue, device, nil, focusOverride: reference.focus)
                 row["generated_with_native_focus_difference"] = try difference(reference.pixels, fixedFocus.pixels)
             }
             referenceRenders.append(reference.pixels); candidateRenders.append(candidate.pixels)
+            referenceLinear.append(reference.linearPixels); candidateLinear.append(candidate.linearPixels)
             results.append(row)
         }
         results[results.count - 1]["native_f2_f16_difference"] = try difference(referenceRenders[0], referenceRenders[1])
         results[results.count - 1]["generated_f2_f16_difference"] = try difference(candidateRenders[0], candidateRenders[1])
         results[results.count - 1]["effect_comparison"] = try effectDifference(referenceRenders, candidateRenders)
+        results[results.count - 1]["linear_effect_comparison"] = try effectDifference(referenceLinear, candidateLinear)
         results[results.count - 1]["native_focus_region_effect_comparison"] = try effectDifference(referenceRenders, candidateRenders,
             width: CVPixelBufferGetWidth(a.color), region: nativeFrame.focusDetection.normalizedRect)
     }
     return ["schema": "xdremux-cinematic-headless-comparison-v1", "renderer": "public CNRenderingSession",
             "quality": "export", "texture_format": "RGBA16Float", "input_pixel_format": "10-bit bi-planar video range",
-            "comparison_space": "raw linear RGB, full resolution, alpha excluded", "source_transform": "identity for both assets",
-            "preview_png": "8-bit sRGB preview; measurements use the original floating point texture",
+            "comparison_space": "source-transfer RGB texture plus color-managed extended linear BT.2020, full resolution, alpha excluded",
+            "source_transform": "identity for measurements; source preferred transform for previews",
+            "preview_png": "HDR source color space -> CISystemToneMap headroom 1 -> 8-bit sRGB PNG with color profile",
             "public_preprocessing": true, "test_processed_color_tracks_reference_inputs": true,
             "native_rendering_version": nativeAttributes.renderingVersion,
             "generated_rendering_version": generatedAttributes.renderingVersion,
@@ -263,8 +351,18 @@ struct HeadlessComparison {
     static func main() async {
         do {
             let args = Array(CommandLine.arguments.dropFirst())
-            try check(args.count == 3, "usage: compare_cinematic_render NATIVE.mov GENERATED.mov NEW_OUTPUT_DIRECTORY")
             guard #available(macOS 27.0, *) else { throw NSError(domain: "RequiresMacOS27", code: 1) }
+            if args.count == 2 && args[0] == "--verify-color" {
+                let directory = URL(fileURLWithPath: args[1])
+                try check(!FileManager.default.fileExists(atPath: directory.path), "color output directory exists")
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let report = try verifyColorManagement(directory)
+                try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+                    .write(to: directory.appendingPathComponent("color-regression.json"), options: .atomic)
+                print("HLG color-space, system SDR tone-map, profile and highlight regression passed")
+                return
+            }
+            try check(args.count == 3, "usage: compare_cinematic_render NATIVE.mov GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-color NEW_OUTPUT_DIRECTORY")
             let directory = URL(fileURLWithPath: args[2])
             try check(!FileManager.default.fileExists(atPath: directory.path), "comparison output directory exists")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

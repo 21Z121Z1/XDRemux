@@ -207,6 +207,7 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
     let expectedKeys: Set<String> = ["cinematic-video.cinematography", "cinematic-video.rendering", "aperture-float", "disparity-float"]
     var groupCount = 0
     var payloadDigest = SHA256()
+    var focalTimeline: [[String: Double]] = []
     while let group = adaptor.nextTimedMetadataGroup() {
         let keys = Set(group.items.compactMap { $0.identifier?.rawValue.components(separatedBy: "com.apple.quicktime.").last })
         try require(keys == expectedKeys, "timed metadata keys are incomplete")
@@ -233,6 +234,10 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
         try require(geometry[4] == Float(encodedSize.width) && geometry[5] == Float(encodedSize.height),
                     "virtual sensor region does not match encoded video geometry")
         try require(geometry[6] == 1 && geometry[7] == 1, "virtual visible crop is not identity")
+        guard let focalLength = geometry[3], focalLength.isFinite, (1...300).contains(focalLength) else {
+            throw failure("invalid per-frame focal length")
+        }
+        focalTimeline.append(["time": CMTimeGetSeconds(group.timeRange.start), "focal_length_35mm": Double(focalLength)])
         for item in group.items { if let data = item.value as? Data { payloadDigest.update(data: data) } }
         groupCount += 1
     }
@@ -243,6 +248,7 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
             "script_frames": frames.count, "timed_metadata_groups": groupCount, "script_f_number": script.fNumber,
             "rendering_version": attributes.renderingVersion,
             "virtual_sensor_region": [encodedSize.width, encodedSize.height], "virtual_visible_crop": [1, 1],
+            "focal_length_35mm_timeline": focalTimeline,
             "generated_payload_sha256": payloadDigest.finalize().map { String(format: "%02x", $0) }.joined(),
             "media": media]
 }

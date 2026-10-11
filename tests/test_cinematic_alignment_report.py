@@ -35,6 +35,28 @@ def report(error, ordinary_hash):
 
 
 class CinematicAlignmentReportTests(unittest.TestCase):
+    def test_legacy_linear_label_correction_requires_matching_color_witness(self):
+        original, changed = report(0.1, "layout-A"), report(0.025, "layout-B")
+        a, b = (x["assets"][0]["headless_comparison"] for x in [original, changed])
+        a["comparison_space"] = "raw linear RGB, full resolution, alpha excluded"
+        b["comparison_space"] = "source-transfer RGB texture plus color-managed extended linear BT.2020, full resolution, alpha excluded"
+        a["source_transform"] = "identity for both assets"
+        b["source_transform"] = "identity for measurements; source preferred transform for previews"
+        for before, after in zip(a["frames"], b["frames"]):
+            before["decoded_color_sha256"] = after["decoded_color_sha256"] = "same-color"
+            after["color_management"] = {"source_color_space": "HLG"}
+        result = compare_runs(original, changed)
+        self.assertTrue(result["assets"][0]["legacy_color_label_corrected"])
+        b["frames"][0]["decoded_color_sha256"] = "different-color"
+        with self.assertRaisesRegex(RuntimeError, "lacks color identity"):
+            compare_runs(original, changed)
+
+    def test_unknown_measurement_space_changes_are_rejected(self):
+        changed = report(0.025, "layout-B")
+        changed["assets"][0]["headless_comparison"]["comparison_space"] = "different space"
+        with self.assertRaisesRegex(RuntimeError, "comparison_space"):
+            compare_runs(report(0.1, "layout-A"), changed)
+
     def test_identical_media_in_different_mov_containers_is_comparable(self):
         result = compare_runs(report(0.1, "layout-A"), report(0.025, "layout-B"))
         self.assertAlmostEqual(result["assets"][0]["f2_rmse_reduction"], 0.75)

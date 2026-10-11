@@ -31,6 +31,26 @@ def comparisons(document: dict) -> dict[str, dict]:
     return assets
 
 
+LEGACY_COLOR_LABEL = "raw linear RGB, full resolution, alpha excluded"
+MANAGED_COLOR_LABEL = "source-transfer RGB texture plus color-managed extended linear BT.2020, full resolution, alpha excluded"
+
+
+def raw_measurement_space(document: dict) -> str:
+    label = document["comparison_space"]
+    if label in [LEGACY_COLOR_LABEL, MANAGED_COLOR_LABEL]:
+        require(document["renderer"] == "public CNRenderingSession" and document["texture_format"] == "RGBA16Float",
+                "color-label correction requires the known native RGBA texture path")
+        return "source-transfer RGB texture, alpha excluded"
+    return label
+
+
+def measurement_transform(document: dict) -> str:
+    value = document["source_transform"]
+    if value in ["identity for both assets", "identity for measurements; source preferred transform for previews"]:
+        return "identity for measurements"
+    return value
+
+
 def compare_runs(baseline: dict, current: dict) -> dict:
     require(baseline["runtime"] == current["runtime"], "OS versions differ")
     old_assets, new_assets = comparisons(baseline), comparisons(current)
@@ -52,8 +72,11 @@ def compare_runs(baseline: dict, current: dict) -> dict:
                 require(bool(records) and all(x["packet_bytes_timestamps_and_trim_identical"] for x in records),
                         f"media packet identity is not proven: {name}")
         a, b = old["headless_comparison"], new["headless_comparison"]
-        for key in ["renderer", "quality", "texture_format", "input_pixel_format", "comparison_space", "source_transform", "native_rendering_version"]:
+        for key in ["renderer", "quality", "texture_format", "input_pixel_format", "native_rendering_version"]:
             require(a[key] == b[key], f"render configuration differs: {name}/{key}")
+        require(raw_measurement_space(a) == raw_measurement_space(b), f"render configuration differs: {name}/comparison_space")
+        require(measurement_transform(a) == measurement_transform(b), f"render configuration differs: {name}/source_transform")
+        color_label_corrected = a["comparison_space"] == LEGACY_COLOR_LABEL and b["comparison_space"] == MANAGED_COLOR_LABEL
         require(a["quality"] == "export", "comparison is not export quality")
         keyed = lambda document: {(x["pts"], x["f_number"]): x for x in document["frames"]}
         before, after = keyed(a), keyed(b)
@@ -67,6 +90,9 @@ def compare_runs(baseline: dict, current: dict) -> dict:
         pairs = []
         for key, candidate in after.items():
             reference = before[key]
+            if color_label_corrected:
+                require(reference.get("decoded_color_sha256") and reference["decoded_color_sha256"] == candidate.get("decoded_color_sha256")
+                        and candidate.get("color_management"), f"legacy color-label correction lacks color identity: {name}/{key[0]}")
             if key[1] == 2:
                 old_rmse.append(reference["render_difference"]["rmse"])
                 new_rmse.append(candidate["render_difference"]["rmse"])
@@ -93,6 +119,7 @@ def compare_runs(baseline: dict, current: dict) -> dict:
         rows.append({"sample": name, "reference_sha256": old["source_sha256"],
                      "baseline_ordinary_sha256": old["ordinary_sha256"], "current_ordinary_sha256": new["ordinary_sha256"],
                      "ordinary_media_packets_identical_to_reference": True,
+                     "legacy_color_label_corrected": color_label_corrected,
                      "mean_baseline_f2_rmse": mean_old, "mean_current_f2_rmse": mean_new,
                      "f2_rmse_reduction": 1 - mean_new / mean_old,
                      "mean_baseline_relative_effect_error": relative_old, "mean_current_relative_effect_error": relative_new,
@@ -104,6 +131,7 @@ def compare_runs(baseline: dict, current: dict) -> dict:
                      "pairs": pairs})
     return {"schema": "xdremux-cinematic-alignment-v1", "baseline_head": baseline["head"], "current_head": current["head"],
             "runtime": current["runtime"], "scope": "three sampled frames per asset; independent RGB generation; public native rendering",
+            "metric_space": "source-transfer RGB texture; legacy linear-RGB labels corrected only with matching decoded color hashes and unchanged native reference effect",
             "assets": rows, "components": total_components,
             "pooled_baseline_effect_error_rmse": math.sqrt(old_total / total_components),
             "pooled_current_effect_error_rmse": math.sqrt(new_total / total_components),
