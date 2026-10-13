@@ -38,7 +38,7 @@ The Rust CLI remains the product entry point. The Swift/Objective-C adapter perf
 Private samples can remain outside Git. Run the following command from this checkout. Use new result and build directories, or reuse existing build directories. The result directory must not exist.
 
 ```bash
-python3 scripts/verify_cinematic_envelope.py \
+python3 scripts/apple/verify_cinematic_envelope.py \
   --input /absolute/path/native.MOV \
   --run-dir /absolute/path/new-results \
   --swift-build-dir /absolute/path/swift-build \
@@ -65,7 +65,7 @@ The generated render with a native focus value is a diagnostic control. Disparit
 To compare a new verification run with an earlier run, use:
 
 ```bash
-python3 scripts/compare_cinematic_alignment.py \
+python3 scripts/diagnostics/compare_cinematic_alignment.py \
   --baseline /absolute/path/baseline/report.json \
   --current /absolute/path/current/report.json \
   --output /absolute/path/current/alignment.json \

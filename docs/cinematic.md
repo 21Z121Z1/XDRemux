@@ -38,7 +38,7 @@ Rust CLI 仍是产品入口。Swift/Objective-C adapter 执行 Apple 框架操�
 私有样本可以保留在 Git 外。在本工作树中执行以下命令，使用新的结果目录和新的或已有的构建目录。结果目录必须尚不存在。
 
 ```bash
-python3 scripts/verify_cinematic_envelope.py \
+python3 scripts/apple/verify_cinematic_envelope.py \
   --input /absolute/path/native.MOV \
   --run-dir /absolute/path/new-results \
   --swift-build-dir /absolute/path/swift-build \
@@ -65,7 +65,7 @@ python3 scripts/verify_cinematic_envelope.py \
 比较新旧两轮验证结果时，使用：
 
 ```bash
-python3 scripts/compare_cinematic_alignment.py \
+python3 scripts/diagnostics/compare_cinematic_alignment.py \
   --baseline /absolute/path/baseline/report.json \
   --current /absolute/path/current/report.json \
   --output /absolute/path/current/alignment.json \

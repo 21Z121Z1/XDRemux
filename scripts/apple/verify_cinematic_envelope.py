@@ -62,7 +62,7 @@ def main() -> None:
     parser.add_argument("--synthetic", action="store_true", help="Test independent 1080p H.264 rendering and a separate 360p native compatibility probe")
     parser.add_argument("--compare-render", action="store_true", help="Preprocess, render and reload public edits; compare native references when available")
     args = parser.parse_args()
-    repo = Path(__file__).resolve().parents[1]
+    repo = Path(__file__).resolve().parents[2]
     out = args.run_dir.resolve()
     out.mkdir(parents=True, exist_ok=False)
     rust_env = os.environ | {"CARGO_TARGET_DIR": str(args.rust_build_dir.resolve())}
@@ -72,11 +72,11 @@ def main() -> None:
     adapter = next(path.resolve() for path in adapter_candidates if path.is_file())
     cli = (args.rust_build_dir / "debug/xdremux").resolve()
     probe = out / "cinematic-consumer-probe"
-    run(["swiftc", "-parse-as-library", str(repo / "scripts/verify_cinematic_envelope.swift"),
+    run(["swiftc", "-parse-as-library", str(repo / "scripts/apple/verify_cinematic_envelope.swift"),
          "-module-cache-path", str(out / "module-cache"), "-o", str(probe)], out / "probe-build.log")
     renderer = out / "cinematic-render-comparison"
     if args.compare_render:
-        run(["swiftc", "-O", "-parse-as-library", str(repo / "scripts/compare_cinematic_render.swift"),
+        run(["swiftc", "-O", "-parse-as-library", str(repo / "scripts/apple/compare_cinematic_render.swift"),
              "-module-cache-path", str(out / "module-cache"), "-o", str(renderer)], out / "render-probe-build.log")
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
     report: dict = {"schema": "xdremux-cinematic-envelope-verification-v1", "head": head,

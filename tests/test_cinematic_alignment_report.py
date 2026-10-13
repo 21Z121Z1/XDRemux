@@ -4,7 +4,7 @@ import runpy
 import unittest
 
 
-compare_runs = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/compare_cinematic_alignment.py"))["compare_runs"]
+compare_runs = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/diagnostics/compare_cinematic_alignment.py"))["compare_runs"]
 
 
 def report(error, ordinary_hash):

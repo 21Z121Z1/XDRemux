@@ -149,7 +149,7 @@ def main() -> None:
     require(0 < args.minimum_reduction < 1, "minimum reduction must be between zero and one")
     require(not args.output.exists(), "alignment output already exists")
     current = json.loads(args.current.read_text())
-    repo = Path(__file__).resolve().parents[1]
+    repo = Path(__file__).resolve().parents[2]
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
     require(current["head"] == head, "current verification report does not match HEAD")
     report = compare_runs(json.loads(args.baseline.read_text()), current)
