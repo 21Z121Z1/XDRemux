@@ -195,13 +195,19 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
     var recordedIDs = Set<Int64>()
     var recordedGroupIDs = Set<Int64>()
     var recordedTypes: [Int64: Int] = [:]
+    var selectedIDs = Set<CNDetectionID>()
+    var focusWithoutCurrentDetection = 0
     for index in frames.indices {
         try require(CMTimeCompare(frames[index].time, decoded[index]) == 0, "script/video PTS differ at frame \(index)")
         try require(!frames[index].allDetections.isEmpty, "frame has no generated detection graph")
         let selected = frames[index].focusDetection
-        try require(selected.detectionID != nil, "selected detection has an invalid track ID")
-        try require(frames[index].allDetections.contains { $0.detectionID == selected.detectionID },
-                    "selected detection is missing from its frame graph")
+        guard let selectedID = selected.detectionID else { throw failure("selected detection has an invalid track ID") }
+        selectedIDs.insert(selectedID)
+        // Native capture scripts can retain the prior focus subject through a
+        // detector gap/rack. It need not occur in this frame's allDetections.
+        if !frames[index].allDetections.contains(where: { $0.detectionID == selectedID }) {
+            focusWithoutCurrentDetection += 1
+        }
         try require(frames[index].focusDisparity.isFinite, "pending script focus is not finite")
         for detection in frames[index].allDetections {
             guard let id = detection.detectionID?.rawValue else { throw failure("recorded detection has no ID") }
@@ -216,6 +222,9 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
                 recordedGroupIDs.insert(group)
             }
         }
+    }
+    for id in selectedIDs {
+        try require(script.detectionTrack(for: id) != nil, "selected detection has no script track")
     }
     let baseDecisions = script.baseDecisions(in: script.timeRange)
     try require(!baseDecisions.isEmpty, "pending script has no base focus decisions")
@@ -282,6 +291,7 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
             "focal_length_35mm_timeline": focalTimeline,
             "recorded_detection_ids": recordedIDs.sorted(), "recorded_group_ids": recordedGroupIDs.sorted(),
             "base_focus_decisions": baseDecisions.count, "recorded_track_types_stable": true,
+            "selected_tracks_resolved": true, "focus_frames_without_current_detection": focusWithoutCurrentDetection,
             "public_edit_track_ids": addedIDs,
             "public_edit_ids_disjoint": true,
             "generated_payload_sha256": payloadDigest.finalize().map { String(format: "%02x", $0) }.joined(),
