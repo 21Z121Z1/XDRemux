@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn matches_shared_swift_python_golden_contract() {
-        let raw = include_str!("../../../Tests/fixtures/photo_classification_cases.json");
+        let raw = include_str!("../../../tests/fixtures/photo_classification_cases.json");
         let Value::Array(cases) = serde_json::from_str::<Value>(raw).unwrap() else {
             panic!("classification fixture must be a JSON array");
         };
