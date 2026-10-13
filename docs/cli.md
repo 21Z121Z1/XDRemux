@@ -146,7 +146,7 @@ xdremux cinematic --input ordinary.mp4 --output pending.mov
 
 发布前，Apple adapter 必须通过公共 `CNAssetInfo` 确认 `needsPreprocessing`、资源状态 `ready` 和 `isPreprocessed == false`。MOV 不包含已物化的栅格视差轨道。此状态是验收目标，不代表 Photos 编辑或渲染画质已经通过验证。
 
-当前实现需要 macOS 27、对应的 Apple 私有框架方法，以及受支持的推理硬件和资源。必要的方法或资源不可用时，命令会失败。
+当前实现需要 macOS 27、使用 macOS 27 SDK 构建的 adapter、对应的 Apple 私有框架方法，以及受支持的推理和跟踪硬件/资源。必要的 SDK、系统、方法或资源不可用时，命令会失败。将待处理 MOV 导入 Photos 并开启电影效果，由 Photos 处理和渲染其资源。
 
 `--focal-length-35mm MM` 默认为 24，`--aperture F` 默认为 2.8。对缺少相机几何信息的输入，这些值是生成元数据时采用的拍摄假设，不是恢复出的物理相机测量值。原生处理路径和验证方法见 [Cinematic 元数据封装约定](cinematic.md)。
 

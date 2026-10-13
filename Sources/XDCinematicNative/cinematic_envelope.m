@@ -7,6 +7,7 @@
 #import <simd/simd.h>
 #import <Vision/Vision.h>
 #import <ImageIO/ImageIO.h>
+#import <Metal/Metal.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <math.h>
@@ -27,6 +28,7 @@ typedef id (*PTInitDecision)(id, SEL, CMTime, long long, long long, unsigned lon
 typedef id (*PTInitRefinement)(id, SEL, id, BOOL);
 typedef CMTime (*PTProcessDisparity)(id, SEL, CVPixelBufferRef);
 typedef long long (*PTNextTrackIdentifier)(id, SEL);
+typedef id (*PTInitTrackAllocator)(id, SEL, long long);
 typedef id (*PTInternalizeFocusTrack)(id, SEL, id);
 typedef void (*PTInternalizeFrames)(id, SEL, id);
 typedef BOOL (*PTBoolGetter)(id, SEL);
@@ -46,6 +48,7 @@ static int XDFail(char *buffer, size_t capacity, int code, NSString *message) {
 // The public consumer decides whether a generated envelope is accepted. Do
 // not publish a MOV merely because the private serializers returned bytes.
 static BOOL XDValidatePendingAsset(NSString *path, char *errorBuffer, size_t errorCapacity) {
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 270000
     if (@available(macOS 27.0, *)) {
         AVURLAsset *asset = [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:path] options:nil];
         dispatch_semaphore_t finished = dispatch_semaphore_create(0);
@@ -71,6 +74,7 @@ static BOOL XDValidatePendingAsset(NSString *path, char *errorBuffer, size_t err
         }
         return valid;
     }
+#endif
     XDFail(errorBuffer, errorCapacity, 5, @"Cinematic envelope validation requires macOS 27 or later");
     return NO;
 }
@@ -339,6 +343,40 @@ static CGFloat XDRectOverlap(CGRect a, CGRect b) {
     CGFloat common = CGRectIsNull(intersection) ? 0 : intersection.size.width * intersection.size.height;
     CGFloat total = a.size.width * a.size.height + b.size.width * b.size.height - common;
     return total > 0 ? common / total : 0;
+}
+
+// Identity belongs to a subject's lifetime, never to its rank in one frame.
+// Object and human seeds remain distinct. A center fallback uses the separate
+// autofocus track and cannot inherit a subject's disparity history.
+@interface XDTrackedSubject : NSObject
+@property long long trackIdentifier;
+@property long long groupIdentifier;
+@property CGRect rect;
+@property CNDetectionType detectionType;
+@property BOOL human;
+@property BOOL tracking;
+@property (strong) CNObjectTracker *tracker;
+@end
+@implementation XDTrackedSubject
+@end
+
+static BOOL XDUsableSubjectRect(CGRect rect) {
+    return !CGRectIsNull(rect) && !CGRectIsEmpty(rect) &&
+           isfinite(rect.origin.x) && isfinite(rect.origin.y) &&
+           isfinite(rect.size.width) && isfinite(rect.size.height) &&
+           CGRectContainsRect(CGRectMake(0, 0, 1, 1), rect);
+}
+
+static CGFloat XDSubjectMatch(CGRect previous, CGRect candidate) {
+    if (!XDUsableSubjectRect(previous) || !XDUsableSubjectRect(candidate)) return 0;
+    CGFloat overlap = XDRectOverlap(previous, candidate);
+    CGRect common = CGRectIntersection(previous, candidate);
+    CGFloat smaller = MIN(previous.size.width * previous.size.height, candidate.size.width * candidate.size.height);
+    CGFloat containment = CGRectIsNull(common) ? 0 : common.size.width * common.size.height / smaller;
+    CGFloat distance = hypot(CGRectGetMidX(previous) - CGRectGetMidX(candidate),
+                             CGRectGetMidY(previous) - CGRectGetMidY(candidate));
+    // Containment permits face/upper-body detector changes for one actor.
+    return overlap >= 0.15 || (containment >= 0.6 && distance < 0.2) ? overlap + containment * 0.1 : 0;
 }
 
 static NSData *XDSerializeTimedRendering(float focusDisparity, float aperture, float focalLength,
@@ -756,6 +794,13 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                                char *error_buffer, size_t error_buffer_size) {
     if (error_buffer && error_buffer_size) error_buffer[0] = '\0';
     if (processed_frames) *processed_frames = 0;
+#if __MAC_OS_X_VERSION_MAX_ALLOWED < 270000
+    return XDFail(error_buffer, error_buffer_size, 3, @"Cinematic envelope generation requires an Apple SDK for macOS 27 or later");
+#else
+    if (@available(macOS 27.0, *)) {} else {
+        return XDFail(error_buffer, error_buffer_size, 3, @"Cinematic envelope generation requires macOS 27 or later");
+    }
+#endif
     if (!input_path || !output_path || !*input_path || !*output_path ||
         !isfinite(focal_length_35mm) || focal_length_35mm <= 0 ||
         !isfinite(aperture) || aperture < 1.0f || aperture > 64.0f) {
@@ -815,9 +860,14 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         NSMutableArray *frameRows = [NSMutableArray array];
         NSMutableArray *scriptFrames = [NSMutableArray array];
         id script = [[scriptClass alloc] init];
-        Method trackAllocatorGetter = XDRequireMethod(scriptClass, "trackAllocator", NO, "@16@0:8", error_buffer, error_buffer_size);
-        Method focusAllocatorGetter = XDRequireMethod(scriptClass, "trackAllocatorForFocusIdentifier", NO, "@16@0:8", error_buffer, error_buffer_size);
-        Method nextTrackIdentifier = XDRequireMethod(NSClassFromString(@"PTCinematographyTrackAllocator"),
+        Class allocatorClass = NSClassFromString(@"PTCinematographyTrackAllocator");
+        Method allocatorInit = XDRequireMethod(allocatorClass, "initWithTrackIdentifier:", NO,
+            "@24@0:8q16", error_buffer, error_buffer_size);
+        Method setTrackAllocator = XDRequireMethod(scriptClass, "setTrackAllocator:", NO,
+            "v24@0:8@16", error_buffer, error_buffer_size);
+        Method setFocusAllocator = XDRequireMethod(scriptClass, "setTrackAllocatorForFocusIdentifier:", NO,
+            "v24@0:8@16", error_buffer, error_buffer_size);
+        Method nextTrackIdentifier = XDRequireMethod(allocatorClass,
             "nextTrackIdentifier", NO, "q16@0:8", error_buffer, error_buffer_size);
         Method internalizeFocusIdentifier = XDRequireMethod(scriptClass, "_internalizeTrackNumberForFocusIdentifier:",
             NO, "@24@0:8@16", error_buffer, error_buffer_size);
@@ -828,33 +878,37 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
             "B16@0:8", error_buffer, error_buffer_size);
         Method setTrack = XDRequireMethod(detectionClass, "setTrackIdentifier:", NO,
             "v24@0:8q16", error_buffer, error_buffer_size);
+        Method detectionInit = XDRequireMethod(detectionClass, "initWithTime:rect:focusDistance:", NO,
+            "@76@0:8{?=qiIq}16{CGRect={CGPoint=dd}{CGSize=dd}}40f72", error_buffer, error_buffer_size);
         Method setGroup = XDRequireMethod(detectionClass, "setGroupIdentifier:", NO,
             "v24@0:8q16", error_buffer, error_buffer_size);
         Method setType = XDRequireMethod(detectionClass, "setDetectionType:", NO,
             "v24@0:8Q16", error_buffer, error_buffer_size);
         Method setFocusIdentifier = XDRequireMethod(detectionClass, "setFocusIdentifier:", NO,
             "v24@0:8@16", error_buffer, error_buffer_size);
-        if (!script || !trackAllocatorGetter || !focusAllocatorGetter || !nextTrackIdentifier ||
+        if (!script || !allocatorInit || !setTrackAllocator || !setFocusAllocator || !nextTrackIdentifier ||
             !internalizeFocusIdentifier || !setFrames || !internalizeTracks || !didInternalizeTracks ||
-            !setTrack || !setGroup || !setType || !setFocusIdentifier) {
+            !detectionInit || !setTrack || !setGroup || !setType || !setFocusIdentifier) {
             [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
             return XDFail(error_buffer, error_buffer_size, 3, @"Apple Cinematography track allocator API is unavailable");
         }
-        id trackAllocator = ((PTObjectGetter)method_getImplementation(trackAllocatorGetter))(
-            script, sel_registerName("trackAllocator"));
-        id focusAllocator = ((PTObjectGetter)method_getImplementation(focusAllocatorGetter))(
-            script, sel_registerName("trackAllocatorForFocusIdentifier"));
+        // Capture IDs occupy the native recorded namespaces. A new PTScript
+        // otherwise starts in the public editor's namespaces (0x12 / 0x13).
+        // Reopening such a script resets the edit allocator and collides with
+        // the first recorded subject. Set both allocators before building the
+        // detection/group/frame/decision graph; never rewrite serialized IDs.
+        PTInitTrackAllocator initAllocator = (PTInitTrackAllocator)method_getImplementation(allocatorInit);
+        id trackAllocator = initAllocator([allocatorClass alloc], sel_registerName("initWithTrackIdentifier:"), 1LL);
+        id focusAllocator = initAllocator([allocatorClass alloc], sel_registerName("initWithTrackIdentifier:"), 0x1000000001LL);
         if (!trackAllocator || !focusAllocator) {
             [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
             return XDFail(error_buffer, error_buffer_size, 3, @"Apple Cinematography script returned no track allocator");
         }
+        ((void (*)(id, SEL, id))method_getImplementation(setTrackAllocator))(
+            script, sel_registerName("setTrackAllocator:"), trackAllocator);
+        ((void (*)(id, SEL, id))method_getImplementation(setFocusAllocator))(
+            script, sel_registerName("setTrackAllocatorForFocusIdentifier:"), focusAllocator);
         PTNextTrackIdentifier nextTrack = (PTNextTrackIdentifier)method_getImplementation(nextTrackIdentifier);
-        long long trackIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
-        long long groupIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
-        long long secondTrackIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
-        long long secondGroupIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
-        long long subjectTrackIdentifiers[2] = {trackIdentifier, secondTrackIdentifier};
-        long long subjectGroupIdentifiers[2] = {groupIdentifier, secondGroupIdentifier};
         id autofocusTrackNumber = ((PTInternalizeFocusTrack)method_getImplementation(internalizeFocusIdentifier))(
             script, sel_registerName("_internalizeTrackNumberForFocusIdentifier:"), @"BA-1");
         if (!autofocusTrackNumber || ![autofocusTrackNumber respondsToSelector:@selector(longLongValue)]) {
@@ -882,7 +936,14 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         NSUInteger index = 0;
         VNSequenceRequestHandler *visionHandler = [[VNSequenceRequestHandler alloc] init];
         CGImagePropertyOrientation visionOrientation = XDVisionOrientation(videoTrack.preferredTransform);
-        CGRect previousFocusBox = CGRectNull;
+        id<MTLCommandQueue> trackingQueue = [MTLCreateSystemDefaultDevice() newCommandQueue];
+        if (!trackingQueue || !CNObjectTracker.isSupported) {
+            [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
+            return XDFail(error_buffer, error_buffer_size, 3, @"native Cinematic object tracking is unavailable");
+        }
+        NSMutableArray<XDTrackedSubject *> *activeSubjects = [NSMutableArray array];
+        long long selectedSubject = -1;
+        NSMutableArray<NSDictionary *> *selectionChanges = [NSMutableArray array];
         while (YES) {
             @autoreleasepool {
                 CMSampleBufferRef sample = [decodeOutput copyNextSampleBuffer];
@@ -923,7 +984,9 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
                     return XDFail(error_buffer, error_buffer_size, 73, @"cannot preserve transient disparity output for Apple refinement");
                 }
-                CVPixelBufferRelease(inferred);
+                // Keep transient depth alive through native object tracking.
+                __attribute__((objc_precise_lifetime)) id disparityOwner = CFBridgingRelease(inferred);
+                inferred = (__bridge CVPixelBufferRef)disparityOwner;
 
                 VNDetectFaceRectanglesRequest *faceRequest = [[VNDetectFaceRectanglesRequest alloc] init];
                 NSError *visionError = nil;
@@ -966,83 +1029,120 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     if (leftArea < rightArea) return NSOrderedDescending;
                     return NSOrderedSame;
                 }];
-                // Retain a detected subject while its rectangle remains near
-                // the prior anchor. A substantially larger subject may replace it.
-                if (subjects.count > 1 && !CGRectIsNull(previousFocusBox)) {
-                    CGFloat largestArea = subjects[0].boundingBox.size.width * subjects[0].boundingBox.size.height;
-                    NSUInteger bestIndex = 0; CGFloat bestOverlap = 0.15;
-                    for (NSUInteger candidate = 0; candidate < subjects.count; ++candidate) {
-                        VNDetectedObjectObservation *subject = subjects[candidate];
-                        CGFloat area = subject.boundingBox.size.width * subject.boundingBox.size.height;
-                        CGFloat overlap = XDRectOverlap(previousFocusBox, XDEncodedVisionRect(subject.boundingBox, visionOrientation));
-                        if (area >= largestArea * 0.6 && overlap > bestOverlap) { bestIndex = candidate; bestOverlap = overlap; }
-                    }
-                    if (bestIndex != 0) [subjects exchangeObjectAtIndex:0 withObjectAtIndex:bestIndex];
-                }
                 if (subjects.count > 2) [subjects removeObjectsInRange:NSMakeRange(2, subjects.count - 2)];
-
-                // Vision rectangles have a bottom-left origin. Cinematic uses
-                // top-left normalized coordinates, independent of display rotation.
-                CGRect fallbackBox = CGRectMake(0.40, 0.40, 0.20, 0.20);
-                if (subjects.count == 0) {
-                    // Native capture can focus on non-human objects. Use
-                    // Vision's objectness regions when face/body detection
-                    // supplies no subject.
+                NSMutableArray<NSDictionary *> *candidates = [NSMutableArray array];
+                for (VNDetectedObjectObservation *subject in subjects) {
+                    CGRect rect = XDEncodedVisionRect(subject.boundingBox, visionOrientation);
+                    if (XDUsableSubjectRect(rect)) [candidates addObject:@{
+                        @"rect": [NSValue valueWithRect:rect], @"type": @(subjectType), @"human": @YES}];
+                }
+                if (candidates.count == 0) {
                     VNGenerateObjectnessBasedSaliencyImageRequest *saliency = [[VNGenerateObjectnessBasedSaliencyImageRequest alloc] init];
-                    NSError *saliencyError = nil;
-                    if ([visionHandler performRequests:@[saliency] onCMSampleBuffer:sample orientation:visionOrientation error:&saliencyError]) {
+                    if ([visionHandler performRequests:@[saliency] onCMSampleBuffer:sample orientation:visionOrientation error:nil]) {
                         VNRectangleObservation *best = nil;
                         for (VNRectangleObservation *object in saliency.results.firstObject.salientObjects) {
                             CGFloat area = object.boundingBox.size.width * object.boundingBox.size.height;
                             if (object.confidence >= 0.3f && area >= 0.005 && area <= 0.6 && (!best || object.confidence > best.confidence)) best = object;
                         }
-                        if (best) fallbackBox = XDEncodedVisionRect(best.boundingBox, visionOrientation);
+                        CGRect rect = best ? XDEncodedVisionRect(best.boundingBox, visionOrientation) : CGRectNull;
+                        if (XDUsableSubjectRect(rect)) [candidates addObject:@{
+                            @"rect": [NSValue valueWithRect:rect], @"type": @(CNDetectionTypeUnknown), @"human": @NO}];
                     }
                 }
-                CGRect focusBox = subjects.firstObject ? XDEncodedVisionRect(subjects.firstObject.boundingBox, visionOrientation) : fallbackBox;
-                previousFocusBox = subjects.firstObject ? focusBox : CGRectNull;
+                NSMutableArray<XDTrackedSubject *> *visibleSubjects = [NSMutableArray array];
+                NSMutableIndexSet *usedCandidates = [NSMutableIndexSet indexSet];
+                XDTrackedSubject *previousSelected = nil;
+                for (XDTrackedSubject *subject in activeSubjects) {
+                    if (subject.trackIdentifier == selectedSubject) previousSelected = subject;
+                    CNBoundsPrediction *prediction = subject.tracking
+                        ? [subject.tracker continueTrackingAt:pts sourceImage:color sourceDisparity:inferred] : nil;
+                    BOOL predicted = prediction && prediction.confidence >= 0.3f && XDUsableSubjectRect(prediction.normalizedBounds);
+                    CGRect matchRect = predicted ? prediction.normalizedBounds : subject.rect;
+                    NSUInteger matchIndex = NSNotFound;
+                    CGFloat bestMatch = 0;
+                    for (NSUInteger candidateIndex = 0; candidateIndex < candidates.count; ++candidateIndex) {
+                        NSDictionary *candidate = candidates[candidateIndex];
+                        if ([usedCandidates containsIndex:candidateIndex] || subject.human != [candidate[@"human"] boolValue]) continue;
+                        CGFloat score = XDSubjectMatch(matchRect, [candidate[@"rect"] rectValue]);
+                        if (score > bestMatch) { bestMatch = score; matchIndex = candidateIndex; }
+                    }
+                    if (matchIndex != NSNotFound) {
+                        NSDictionary *candidate = candidates[matchIndex];
+                        [usedCandidates addIndex:matchIndex];
+                        if (!predicted) {
+                            CNDetectionType candidateType = [candidate[@"type"] unsignedLongLongValue];
+                            if (subject.detectionType != candidateType) {
+                                // A native detection track has one type. A
+                                // face-to-torso reseed starts a new track for
+                                // the same actor group; a valid prediction
+                                // keeps its existing type and bounds.
+                                subject.trackIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
+                                subject.detectionType = candidateType;
+                            }
+                            subject.rect = [candidate[@"rect"] rectValue];
+                            [subject.tracker resetDetectionTrack];
+                            subject.tracking = [subject.tracker startTrackingAt:pts within:subject.rect sourceImage:color sourceDisparity:inferred];
+                        }
+                    }
+                    if (predicted) subject.rect = prediction.normalizedBounds;
+                    if (predicted || matchIndex != NSNotFound) [visibleSubjects addObject:subject];
+                    else [subject.tracker resetDetectionTrack];
+                }
+                for (NSUInteger candidateIndex = 0; candidateIndex < candidates.count && visibleSubjects.count < 2; ++candidateIndex) {
+                    if ([usedCandidates containsIndex:candidateIndex]) continue;
+                    NSDictionary *candidate = candidates[candidateIndex];
+                    // Avoid duplicating an object seed covered by a live actor.
+                    CGRect candidateRect = [candidate[@"rect"] rectValue];
+                    BOOL duplicate = NO;
+                    for (XDTrackedSubject *subject in visibleSubjects) {
+                        if (XDSubjectMatch(subject.rect, candidateRect) > 0) { duplicate = YES; break; }
+                    }
+                    if (duplicate) continue;
+                    XDTrackedSubject *subject = [XDTrackedSubject new];
+                    subject.trackIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
+                    subject.groupIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
+                    subject.rect = candidateRect;
+                    subject.human = [candidate[@"human"] boolValue];
+                    subject.detectionType = [candidate[@"type"] unsignedLongLongValue];
+                    subject.tracker = [[CNObjectTracker alloc] initWithCommandQueue:trackingQueue];
+                    subject.tracking = [subject.tracker startTrackingAt:pts within:subject.rect sourceImage:color sourceDisparity:inferred];
+                    [visibleSubjects addObject:subject];
+                }
+                activeSubjects = visibleSubjects;
+                XDTrackedSubject *selected = previousSelected && [activeSubjects containsObject:previousSelected] ? previousSelected : nil;
+                // Retain a valid selected actor through brief detector gaps.
+                // Prefer a newly visible actor over a non-human object seed.
+                if (!selected || !selected.human) {
+                    for (XDTrackedSubject *subject in activeSubjects) {
+                        if (!selected || (subject.human && !selected.human)) selected = subject;
+                    }
+                }
+                CGRect focusBox = selected ? selected.rect : CGRectMake(0.40, 0.40, 0.20, 0.20);
+                long long selectedTrack = selected ? selected.trackIdentifier : autofocusTrackIdentifier;
+                long long selectedGroup = selected ? selected.groupIdentifier : -1LL;
+                if (selectedTrack != selectedSubject) {
+                    [selectionChanges addObject:@{@"pts": @(pts.value), @"timescale": @(pts.timescale),
+                        @"track": @(selectedTrack), @"group": @(selectedGroup)}];
+                    selectedSubject = selectedTrack;
+                }
                 id focusDetection = nil;
-                NSMutableArray *allDetections = [NSMutableArray arrayWithCapacity:subjects.count + 1];
-                for (NSUInteger faceIndex = 0; faceIndex < subjects.count; ++faceIndex) {
-                    CGRect subjectBox = XDEncodedVisionRect(subjects[faceIndex].boundingBox, visionOrientation);
-                    id subjectDetection = ((PTInitDetection)objc_msgSend)([detectionClass alloc],
-                        sel_registerName("initWithTime:rect:focusDistance:"), pts, subjectBox, -1.0f);
-                    if (!subjectDetection) {
-                        CFRelease(sample);
-                        [decodeReader cancelReading];
+                NSMutableArray *allDetections = [NSMutableArray arrayWithCapacity:activeSubjects.count + 1];
+                for (XDTrackedSubject *subject in activeSubjects) {
+                    id detection = ((PTInitDetection)method_getImplementation(detectionInit))([detectionClass alloc],
+                        sel_registerName("initWithTime:rect:focusDistance:"), pts, subject.rect, -1.0f);
+                    if (!detection) {
+                        CFRelease(sample); [decodeReader cancelReading];
                         [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
-                        return XDFail(error_buffer, error_buffer_size, 3,
-                                      @"cannot construct Apple Cinematography subject detection");
+                        return XDFail(error_buffer, error_buffer_size, 3, @"cannot construct Apple Cinematography subject detection");
                     }
                     ((void (*)(id, SEL, long long))method_getImplementation(setTrack))(
-                        subjectDetection, sel_registerName("setTrackIdentifier:"), subjectTrackIdentifiers[faceIndex]);
+                        detection, sel_registerName("setTrackIdentifier:"), subject.trackIdentifier);
                     ((void (*)(id, SEL, long long))method_getImplementation(setGroup))(
-                        subjectDetection, sel_registerName("setGroupIdentifier:"), subjectGroupIdentifiers[faceIndex]);
+                        detection, sel_registerName("setGroupIdentifier:"), subject.groupIdentifier);
                     ((void (*)(id, SEL, unsigned long long))method_getImplementation(setType))(
-                        subjectDetection, sel_registerName("setDetectionType:"), (unsigned long long)subjectType);
-                    [allDetections addObject:subjectDetection];
-                    if (faceIndex == 0) focusDetection = subjectDetection;
-                }
-                if (!focusDetection) {
-                    // Preserve a serializable synthetic anchor when Vision
-                    // finds neither a face nor a torso.
-                    id fallbackDetection = ((PTInitDetection)objc_msgSend)([detectionClass alloc],
-                        sel_registerName("initWithTime:rect:focusDistance:"), pts, fallbackBox, -1.0f);
-                    if (!fallbackDetection) {
-                        CFRelease(sample);
-                        [decodeReader cancelReading];
-                        [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
-                        return XDFail(error_buffer, error_buffer_size, 3,
-                                      @"cannot construct fallback Apple Cinematography detection");
-                    }
-                    ((void (*)(id, SEL, long long))method_getImplementation(setTrack))(
-                        fallbackDetection, sel_registerName("setTrackIdentifier:"), trackIdentifier);
-                    ((void (*)(id, SEL, long long))method_getImplementation(setGroup))(
-                        fallbackDetection, sel_registerName("setGroupIdentifier:"), groupIdentifier);
-                    ((void (*)(id, SEL, unsigned long long))method_getImplementation(setType))(
-                        fallbackDetection, sel_registerName("setDetectionType:"), 3ULL);
-                    [allDetections addObject:fallbackDetection];
-                    focusDetection = fallbackDetection;
+                        detection, sel_registerName("setDetectionType:"), subject.detectionType);
+                    [allDetections addObject:detection];
+                    if (subject == selected) focusDetection = detection;
                 }
 
                 CGFloat focusMarginX = CGRectGetWidth(focusBox) * 0.25;
@@ -1054,7 +1154,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 CGFloat focusMaxY = MIN(1.0, CGRectGetMaxY(expandedFocusBox));
                 expandedFocusBox = CGRectMake(focusMinX, focusMinY,
                     MAX(0.001, focusMaxX - focusMinX), MAX(0.001, focusMaxY - focusMinY));
-                id autofocusDetection = ((PTInitDetection)objc_msgSend)([detectionClass alloc],
+                id autofocusDetection = ((PTInitDetection)method_getImplementation(detectionInit))([detectionClass alloc],
                     sel_registerName("initWithTime:rect:focusDistance:"), pts, expandedFocusBox, -1.0f);
                 if (!autofocusDetection) {
                     CFRelease(sample); [decodeReader cancelReading];
@@ -1070,6 +1170,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 ((void (*)(id, SEL, id))method_getImplementation(setFocusIdentifier))(
                     autofocusDetection, sel_registerName("setFocusIdentifier:"), @"BA-1");
                 [allDetections addObject:autofocusDetection];
+                if (!focusDetection) focusDetection = autofocusDetection;
                 id frame = [[frameClass alloc] init];
                 Method setFrameTime = XDRequireMethod(frameClass, "setTime:", NO, "v40@0:8{?=qiIq}16", error_buffer, error_buffer_size);
                 Method setDetections = XDRequireMethod(frameClass, "setAllDetections:", NO, "v24@0:8@16", error_buffer, error_buffer_size);
@@ -1089,6 +1190,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 [frameRows addObject:@{@"pts": @(pts.value), @"timescale": @(pts.timescale),
                                        @"duration": @(duration.value), @"durationScale": @(duration.timescale),
                                        @"raw": rawPath, @"aperture": @(aperture),
+                                       @"selectedTrack": @(selectedTrack), @"selectedGroup": @(selectedGroup),
                                        @"sceneIlluminanceMilliLux": @(sceneIlluminanceMilliLux)}];
                 CFRelease(sample);
                 index++;
@@ -1118,23 +1220,29 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         }
         ((void (*)(id, SEL, id))method_getImplementation(setBaseDecisions))(script, sel_registerName("setBaseDecisions:"), @[]);
         ((void (*)(id, SEL, id))method_getImplementation(setTrackDecisions))(script, sel_registerName("setTrackDecisions:"), @[]);
-        NSDictionary *firstRow = frameRows.firstObject;
-        CMTime decisionTime = CMTimeMake([firstRow[@"pts"] longLongValue], [firstRow[@"timescale"] intValue]);
-        id decision = ((PTInitDecision)method_getImplementation(decisionInit))([decisionClass alloc],
-                          sel_registerName("_initWithTime:trackIdentifier:groupIdentifier:options:"),
-                          decisionTime, trackIdentifier, groupIdentifier, 0ULL);
-        if (!decision) {
-            [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
-            return XDFail(error_buffer, error_buffer_size, 3, @"cannot construct the initial Apple focus decision");
+        NSMutableArray *baseDecisions = [NSMutableArray array];
+        for (NSDictionary *change in selectionChanges) {
+            CMTime decisionTime = CMTimeMake([change[@"pts"] longLongValue], [change[@"timescale"] intValue]);
+            id decision = ((PTInitDecision)method_getImplementation(decisionInit))([decisionClass alloc],
+                sel_registerName("_initWithTime:trackIdentifier:groupIdentifier:options:"),
+                decisionTime, [change[@"track"] longLongValue], [change[@"group"] longLongValue], 0ULL);
+            if (!decision) {
+                [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
+                return XDFail(error_buffer, error_buffer_size, 3, @"cannot construct an Apple focus decision");
+            }
+            [baseDecisions addObject:decision];
+            ((void (*)(id, SEL, id))method_getImplementation(addBaseDecision))(
+                script, sel_registerName("addBaseDecision:"), decision);
         }
-        ((void (*)(id, SEL, id))method_getImplementation(addBaseDecision))(script, sel_registerName("addBaseDecision:"), decision);
         Method calculate = XDRequireMethod(scriptClass, "_calculateTrackDecisions", NO, "@16@0:8", error_buffer, error_buffer_size);
         id calculated = calculate ? ((PTObjectGetter)method_getImplementation(calculate))(script, sel_registerName("_calculateTrackDecisions")) : nil;
-        if ([calculated isKindOfClass:NSArray.class] && [calculated count] > 0) {
-            ((void (*)(id, SEL, id))method_getImplementation(setTrackDecisions))(script, sel_registerName("setTrackDecisions:"), calculated);
-        } else {
-            ((void (*)(id, SEL, id))method_getImplementation(setTrackDecisions))(script, sel_registerName("setTrackDecisions:"), @[decision]);
-        }
+        // Before the refiner has a disparity sequence, some runtimes do not
+        // calculate track decisions. Seed it with every base decision, rather
+        // than dropping all subject switches to the initial decision.
+        NSArray *resolvedDecisions = [calculated isKindOfClass:NSArray.class] && [calculated count] > 0
+            ? calculated : baseDecisions;
+        ((void (*)(id, SEL, id))method_getImplementation(setTrackDecisions))(
+            script, sel_registerName("setTrackDecisions:"), resolvedDecisions);
         Method refinementInit = XDRequireMethod(refinementClass, "initWithScript:samplesAllDetections:", NO,
                                                "@28@0:8@16B24", error_buffer, error_buffer_size);
         Method processDisparity = XDRequireMethod(refinementClass, "processNextDisparityBuffer:", NO,
@@ -1147,10 +1255,12 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         Method setCaptureFocus = XDRequireMethod(frameClass, "setFocusDistance:", NO, "v20@0:8f16", error_buffer, error_buffer_size);
         Method setCaptureRawFocus = XDRequireMethod(frameClass, "setRawFocusDistance:", NO, "v20@0:8f16", error_buffer, error_buffer_size);
         Method setCaptureAperture = XDRequireMethod(frameClass, "setAperture:", NO, "v20@0:8f16", error_buffer, error_buffer_size);
+        Method refinedFocusDetection = XDRequireMethod(frameClass, "focusDetection", NO, "@16@0:8", error_buffer, error_buffer_size);
+        Method detectionTrackIdentifier = XDRequireMethod(detectionClass, "trackIdentifier", NO, "q16@0:8", error_buffer, error_buffer_size);
         Method setFocusTrackNumber = XDRequireMethod(frameClass, "setFocusTrackNumber:", NO, "v24@0:8@16", error_buffer, error_buffer_size);
         Method setBaseFocusTrackNumber = XDRequireMethod(frameClass, "setBaseFocusTrackNumber:", NO, "v24@0:8@16", error_buffer, error_buffer_size);
         if (!refinementInit || !processDisparity || !endInputs || !hasNext || !nextFrame || !frameTimeGetter || !focusGetter ||
-            !setCaptureFocus || !setCaptureRawFocus || !setCaptureAperture || !setFocusTrackNumber || !setBaseFocusTrackNumber) {
+            !setCaptureFocus || !setCaptureRawFocus || !setCaptureAperture || !refinedFocusDetection || !detectionTrackIdentifier || !setFocusTrackNumber || !setBaseFocusTrackNumber) {
             [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil]; return 3;
         }
         id refinement = ((PTInitRefinement)method_getImplementation(refinementInit))([refinementClass alloc],
@@ -1189,14 +1299,22 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 return XDFail(error_buffer, error_buffer_size, 3, [NSString stringWithFormat:@"refiner PTS mismatch at frame %lu", (unsigned long)frameIndex]);
             }
             float focus = ((PTFloatGetter)method_getImplementation(focusGetter))(frame, sel_registerName("focusDistance"));
-            // The refiner returns a focus track but does not copy the source
-            // script's base-focus selection into its output frame header.
-            // Photos needs that field to resolve an autofocus detection.
-            NSNumber *selectedTrack = @(trackIdentifier);
+            // During a rack the refiner may select a different detection from
+            // the capture decision. Keep its actual focus detection/header in
+            // agreement, and retain the independent base selection separately.
+            id refinedDetection = ((PTObjectGetter)method_getImplementation(refinedFocusDetection))(
+                frame, sel_registerName("focusDetection"));
+            long long refinedTrack = refinedDetection
+                ? ((PTNextTrackIdentifier)method_getImplementation(detectionTrackIdentifier))(
+                    refinedDetection, sel_registerName("trackIdentifier")) : -1LL;
+            if (![CNDetection isValidDetectionID:refinedTrack]) {
+                [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
+                return XDFail(error_buffer, error_buffer_size, 3, @"Apple refiner returned no valid focus detection");
+            }
             ((void (*)(id, SEL, id))method_getImplementation(setFocusTrackNumber))(
-                frame, sel_registerName("setFocusTrackNumber:"), selectedTrack);
+                frame, sel_registerName("setFocusTrackNumber:"), @(refinedTrack));
             ((void (*)(id, SEL, id))method_getImplementation(setBaseFocusTrackNumber))(
-                frame, sel_registerName("setBaseFocusTrackNumber:"), selectedTrack);
+                frame, sel_registerName("setBaseFocusTrackNumber:"), row[@"selectedTrack"]);
             // This MOV is still a capture-time .needsPreprocessing asset. Its
             // image-derived focus estimate is not an observed capture focus;
             // match genuine capture metadata and let Photos resolve focus from

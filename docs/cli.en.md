@@ -146,7 +146,7 @@ The command generates new Cinematic metadata from decoded video frames. It copie
 
 Before publication, the Apple adapter requires public `CNAssetInfo` to report `needsPreprocessing`, resource status `ready`, and `isPreprocessed == false`. The MOV contains no materialized raster disparity track. This state is the acceptance target; it does not establish Photos editing or rendering quality.
 
-The current implementation requires macOS 27, the corresponding Apple private framework methods, and supported inference hardware/resources. It fails when a required method or resource is unavailable.
+The current implementation requires macOS 27, a macOS 27 SDK build of the adapter, the corresponding Apple private framework methods, and supported inference and tracking hardware/resources. It fails when a required SDK, OS, method, or resource is unavailable. Import the pending MOV into Photos and enable Cinematic to let Photos process and render its resources.
 
 `--focal-length-35mm MM` defaults to 24. `--aperture F` defaults to 2.8. These are assumed capture values for input without camera geometry. They are not recovered physical camera measurements. See the [Cinematic envelope contract](cinematic.en.md) for the native pipeline and verification procedure.
 

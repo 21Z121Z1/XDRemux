@@ -307,6 +307,98 @@ func effectDifference(_ reference: [[UInt16]], _ candidate: [[UInt16]], width: I
 }
 
 @available(macOS 27.0, *)
+func verifyEditing(_ info: CNAssetInfo) async throws -> [String: Any] {
+    try check(info.cinematicCapability == .renderable && info.isPreprocessed,
+              "editing verification requires preprocessed resources")
+    let script = try await CNScript(asset: info.asset)
+    let frames = script.frames(in: script.timeRange)
+    try check(frames.count >= 2, "editing verification needs two frames")
+    let recordedIDs = Set(frames.flatMap { $0.allDetections.compactMap { $0.detectionID?.rawValue } })
+    var editIDs: [CNDetectionID] = []
+    for focus: Float in [0.05, 0.08] {
+        let detections = frames.map { CNDetection(time: $0.time, detectionType: .custom,
+            normalizedRect: CGRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2), focusDisparity: focus) }
+        let id = script.addDetectionTrack(CNCustomDetectionTrack(detections: detections, smooth: false))
+        try check(!recordedIDs.contains(id.rawValue) && !editIDs.contains(id),
+                  "processed public editor allocated a colliding track ID")
+        editIDs.append(id)
+    }
+    for (time, id) in [(frames[0].time, editIDs[0]), (frames[frames.count - 1].time, editIDs[1])] {
+        try check(script.addUserDecision(CNDecision(time: time, detectionID: id, strong: true)),
+                  "public editor rejected a custom-focus decision")
+    }
+    script.fNumber = 4
+    let editedFrames = script.frames(in: script.timeRange)
+    try check(abs(editedFrames[0].focusDisparity - 0.05) < 1e-6 &&
+              abs(editedFrames[editedFrames.count - 1].focusDisparity - 0.08) < 1e-6,
+              "public editor did not apply the requested focus")
+    guard let changes = CNScript.Changes(dataRepresentation: script.changes().dataRepresentation) else {
+        throw NSError(domain: "CannotSerializeCinematicEdits", code: 1)
+    }
+    let reopened = try await CNScript(asset: info.asset, changes: changes)
+    let reloadedFrames = reopened.frames(in: reopened.timeRange)
+    let restoredIDs = reopened.addedDetectionTracks.map { $0.detectionID }
+    try check(restoredIDs == editIDs && restoredIDs.allSatisfy { !recordedIDs.contains($0.rawValue) },
+              "public custom track IDs changed or collided after reload")
+    try check(reopened.fNumber == 4 && reloadedFrames.count == editedFrames.count,
+              "public aperture/frame count did not survive reload (aperture=\(reopened.fNumber))")
+    try check(abs(reloadedFrames[0].focusDisparity - 0.05) < 1e-6 &&
+              abs(reloadedFrames[reloadedFrames.count - 1].focusDisparity - 0.08) < 1e-6,
+              "public focus decisions did not survive reload")
+    for (index, track) in reopened.addedDetectionTracks.enumerated() {
+        let restored = track.detections(in: reopened.timeRange)
+        let expectedFocus: Float = index == 0 ? 0.05 : 0.08
+        try check(restored.count == frames.count && zip(restored, frames).allSatisfy {
+            CMTimeCompare($0.time, $1.time) == 0 && $0.focusDisparity.isFinite &&
+            abs($0.focusDisparity - expectedFocus) < 1e-6
+        }, "public custom detections did not survive reload")
+    }
+    var transitionChanges = 0, maximumTransitionDifference: Float = 0
+    for (expected, actual) in zip(editedFrames, reloadedFrames) {
+        try check(CMTimeCompare(expected.time, actual.time) == 0 && actual.focusDisparity.isFinite,
+                  "public reload returned invalid focus or timing")
+        let error = abs(expected.focusDisparity - actual.focusDisparity)
+        if error >= 1e-6 { transitionChanges += 1 }
+        maximumTransitionDifference = max(maximumTransitionDifference, error)
+    }
+    // The public loader recalculates focus transitions. Native camera controls
+    // also differ from the immediate in-memory curve around the last decision.
+    // Require the persisted decisions/detections, not bit-identical transitions.
+    return ["serialized_changes_reload": true, "aperture": reopened.fNumber,
+            "custom_track_ids": restoredIDs.map { $0.rawValue }, "recorded_ids_disjoint": true,
+            "focus_frames_checked": reloadedFrames.count, "all_focus_finite": true,
+            "transition_frames_changed_after_reload": transitionChanges,
+            "transition_max_abs_difference_after_reload": maximumTransitionDifference,
+            "first_focus": reloadedFrames[0].focusDisparity,
+            "last_focus": reloadedFrames[reloadedFrames.count - 1].focusDisparity]
+}
+
+@available(macOS 27.0, *)
+func verifyGenerated(_ url: URL, _ directory: URL) async throws -> [String: Any] {
+    let info = try await prepare(url, directory.appendingPathComponent("generated-processed.mov"))
+    let attributes = try await CNRenderingSession.Attributes(asset: info.asset)
+    guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
+        throw NSError(domain: "NoMetalDevice", code: 1)
+    }
+    let session = CNRenderingSession(commandQueue: queue, sessionAttributes: attributes,
+                                    preferredTransform: .identity, quality: .export)
+    let selected = try select(info, time: info.timeRange.start.seconds + info.timeRange.duration.seconds / 2)
+    let a = try render(session, attributes, selected, 2, queue, device,
+                       directory.appendingPathComponent("f2.png"), displayTransform: info.preferredTransform)
+    let b = try render(session, attributes, selected, 16, queue, device,
+                       directory.appendingPathComponent("f16.png"), displayTransform: info.preferredTransform)
+    // Finite data and native completion are required; a flat scene may have no
+    // measurable blur difference even when its resources are renderable.
+    return ["schema": "xdremux-cinematic-generated-render-verification-v1",
+            "public_preprocessing": true, "output_capability": "renderable",
+            "renderer": "public CNRenderingSession", "quality": "export", "pts": selected.pts.seconds,
+            "disparity_finite": try difference(disparityPixels(selected.depth), disparityPixels(selected.depth), channels: 1),
+            "f2_f16_difference": try difference(a.pixels, b.pixels),
+            "linear_f2_f16_difference": try difference(a.linearPixels, b.linearPixels),
+            "public_editing": try await verifyEditing(info)]
+}
+
+@available(macOS 27.0, *)
 func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async throws -> [String: Any] {
     let native = try await prepare(nativeURL, directory.appendingPathComponent("native-processed.mov"))
     let generated = try await prepare(generatedURL, directory.appendingPathComponent("generated-processed.mov"))
@@ -374,6 +466,7 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
             "source_transform": "identity for measurements; source preferred transform for previews",
             "preview_png": "HDR source color space -> CISystemToneMap headroom 1 -> 8-bit sRGB PNG with color profile",
             "public_preprocessing": true, "test_processed_color_tracks_reference_inputs": true,
+            "public_editing": try await verifyEditing(generated),
             "native_rendering_version": nativeAttributes.renderingVersion,
             "generated_rendering_version": generatedAttributes.renderingVersion,
             "all_compared_frames_identical": results.allSatisfy { ($0["render_difference"] as? [String: Any])?["identical"] as? Bool == true },
@@ -396,14 +489,18 @@ struct HeadlessComparison {
                 print("HLG color-space, system SDR tone-map, profile and highlight regression passed")
                 return
             }
-            try check(args.count == 3, "usage: compare_cinematic_render NATIVE.mov GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-color NEW_OUTPUT_DIRECTORY")
+            try check(args.count == 3, "usage: compare_cinematic_render NATIVE.mov GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-generated GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-color NEW_OUTPUT_DIRECTORY")
             let directory = URL(fileURLWithPath: args[2])
             try check(!FileManager.default.fileExists(atPath: directory.path), "comparison output directory exists")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let report = try await compare(URL(fileURLWithPath: args[0]), URL(fileURLWithPath: args[1]), directory)
+            let generatedOnly = args[0] == "--verify-generated"
+            let report = generatedOnly
+                ? try await verifyGenerated(URL(fileURLWithPath: args[1]), directory)
+                : try await compare(URL(fileURLWithPath: args[0]), URL(fileURLWithPath: args[1]), directory)
             let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
-            try data.write(to: directory.appendingPathComponent("comparison.json"), options: .atomic)
-            print("headless comparison complete; identical=\(report["all_compared_frames_identical"]!)")
+            try data.write(to: directory.appendingPathComponent(generatedOnly ? "generated-verification.json" : "comparison.json"), options: .atomic)
+            print(generatedOnly ? "generated native preprocessing, render and edit/reload passed" :
+                  "headless comparison complete; identical=\(report["all_compared_frames_identical"]!)")
         } catch { fputs("headless comparison failed: \(error.localizedDescription)\n", stderr); exit(1) }
     }
 }

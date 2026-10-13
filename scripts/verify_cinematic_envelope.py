@@ -60,7 +60,7 @@ def main() -> None:
     parser.add_argument("--focal-length-35mm", type=float, default=24.0)
     parser.add_argument("--aperture", type=float, default=2.8)
     parser.add_argument("--synthetic", action="store_true", help="Also test a generated H.264 MP4 with no original Cinematic data")
-    parser.add_argument("--compare-render", action="store_true", help="Compare native and regenerated effects with the public headless export renderer")
+    parser.add_argument("--compare-render", action="store_true", help="Preprocess, render and reload public edits; compare native references when available")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     out = args.run_dir.resolve()
@@ -116,9 +116,13 @@ def main() -> None:
         if needs_strip:
             record["strip"] = json.loads((case / "strip.json").read_text())
             record["stripped_compressed_media"] = strip_packets
-        if args.compare_render and needs_strip:
-            run([str(renderer), str(source), str(pending), str(case / "headless")], case / "headless.log")
-            record["headless_comparison"] = json.loads((case / "headless/comparison.json").read_text())
+        if args.compare_render:
+            if needs_strip:
+                run([str(renderer), str(source), str(pending), str(case / "headless")], case / "headless.log")
+                record["headless_comparison"] = json.loads((case / "headless/comparison.json").read_text())
+            else:
+                run([str(renderer), "--verify-generated", str(pending), str(case / "headless")], case / "headless.log")
+                record["headless_generated"] = json.loads((case / "headless/generated-verification.json").read_text())
             if digest(source) != original_hash or digest(pending) != record["pending_sha256"]:
                 raise RuntimeError("a Cinematic input changed during headless comparison")
         report["assets"].append(record)

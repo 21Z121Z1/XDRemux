@@ -188,15 +188,37 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
     try require(!tracks.contains { $0.mediaType.rawValue == "auxv" }, "candidate materialized an auxiliary raster track")
     let script = try await CNScript(asset: candidate)
     try require(abs(script.fNumber - expectedAperture) < 0.001, "script aperture does not match requested aperture")
+    let captureAperture = script.fNumber
     let frames = script.frames(in: script.timeRange)
     let decoded = try videoTimes(candidate, info.cinematicVideoTrack)
     try require(!decoded.isEmpty && decoded.count == frames.count, "script and decoded frame counts differ")
+    var recordedIDs = Set<Int64>()
+    var recordedGroupIDs = Set<Int64>()
+    var recordedTypes: [Int64: Int] = [:]
     for index in frames.indices {
         try require(CMTimeCompare(frames[index].time, decoded[index]) == 0, "script/video PTS differ at frame \(index)")
         try require(!frames[index].allDetections.isEmpty, "frame has no generated detection graph")
         let selected = frames[index].focusDetection
         try require(selected.detectionID != nil, "selected detection has an invalid track ID")
+        try require(frames[index].allDetections.contains { $0.detectionID == selected.detectionID },
+                    "selected detection is missing from its frame graph")
+        try require(frames[index].focusDisparity.isFinite, "pending script focus is not finite")
+        for detection in frames[index].allDetections {
+            guard let id = detection.detectionID?.rawValue else { throw failure("recorded detection has no ID") }
+            try require(id > 0 && id < 0x1100000000, "recorded detection occupies an editor ID namespace")
+            let type = detection.detectionType.rawValue
+            try require(recordedTypes[id] == nil || recordedTypes[id] == type,
+                        "recorded track changes detection type")
+            recordedTypes[id] = type
+            recordedIDs.insert(id)
+            if let group = detection.detectionGroupID?.rawValue {
+                try require(group > 0 && group < 0x1000000000, "recorded group occupies an editor ID namespace")
+                recordedGroupIDs.insert(group)
+            }
+        }
     }
+    let baseDecisions = script.baseDecisions(in: script.timeRange)
+    try require(!baseDecisions.isEmpty, "pending script has no base focus decisions")
     let attributes = try await CNRenderingSession.Attributes(asset: candidate)
     let encodedSize = try await info.cinematicVideoTrack.load(.naturalSize)
     let reader = try AVAssetReader(asset: candidate)
@@ -243,12 +265,25 @@ func verify(_ ordinaryURL: URL, _ candidateURL: URL, _ expectedAperture: Float) 
     }
     try require(reader.status == .completed && groupCount == decoded.count, "incomplete timed metadata sequence")
     let media = try await preserveMedia(ordinary, candidate)
+    // Pending assets still need preprocessing before editing. Probe allocation
+    // only: the previous generator occupied the editor's first recorded ID.
+    var addedIDs: [Int64] = []
+    for focus: Float in [0.05, 0.08] {
+        let id = script.addDetectionTrack(CNFixedDetectionTrack(focusDisparity: focus))
+        try require(!recordedIDs.contains(id.rawValue) && !recordedGroupIDs.contains(id.rawValue) &&
+                    !addedIDs.contains(id.rawValue), "public editor allocated a colliding detection ID")
+        addedIDs.append(id.rawValue)
+    }
     return ["input_capability": "none", "output_capability": "needsPreprocessing", "resource_status": "ready",
             "is_preprocessed": false, "raster_disparity_track": false, "decoded_frames": decoded.count,
-            "script_frames": frames.count, "timed_metadata_groups": groupCount, "script_f_number": script.fNumber,
+            "script_frames": frames.count, "timed_metadata_groups": groupCount, "script_f_number": captureAperture,
             "rendering_version": attributes.renderingVersion,
             "virtual_sensor_region": [encodedSize.width, encodedSize.height], "virtual_visible_crop": [1, 1],
             "focal_length_35mm_timeline": focalTimeline,
+            "recorded_detection_ids": recordedIDs.sorted(), "recorded_group_ids": recordedGroupIDs.sorted(),
+            "base_focus_decisions": baseDecisions.count, "recorded_track_types_stable": true,
+            "public_edit_track_ids": addedIDs,
+            "public_edit_ids_disjoint": true,
             "generated_payload_sha256": payloadDigest.finalize().map { String(format: "%02x", $0) }.joined(),
             "media": media]
 }
