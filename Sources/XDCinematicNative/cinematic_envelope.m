@@ -1006,10 +1006,15 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                         face.boundingBox.size.height > 0) [subjects addObject:face];
                 }
                 CNDetectionType subjectType = CNDetectionTypeHumanFace;
+                // Back-facing actors have no face rectangle. Use independently
+                // detected ear landmarks to seed a head instead of focusing
+                // through the larger torso/background mixture.
+                NSMutableArray<NSDictionary *> *headCandidates = [NSMutableArray array];
                 if (subjects.count == 0) {
                     VNDetectHumanRectanglesRequest *bodyRequest = [[VNDetectHumanRectanglesRequest alloc] init];
                     bodyRequest.upperBodyOnly = YES;
-                    if (![visionHandler performRequests:@[bodyRequest] onCMSampleBuffer:sample
+                    VNDetectHumanBodyPoseRequest *poseRequest = [[VNDetectHumanBodyPoseRequest alloc] init];
+                    if (![visionHandler performRequests:@[bodyRequest, poseRequest] onCMSampleBuffer:sample
                                              orientation:visionOrientation error:&visionError]) {
                         CFRelease(sample); [decodeReader cancelReading];
                         [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
@@ -1021,6 +1026,24 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                             [subjects addObject:body];
                     }
                     subjectType = CNDetectionTypeHumanTorso;
+                    BOOL rotated = visionOrientation == kCGImagePropertyOrientationRight ||
+                        visionOrientation == kCGImagePropertyOrientationLeft ||
+                        visionOrientation == kCGImagePropertyOrientationLeftMirrored ||
+                        visionOrientation == kCGImagePropertyOrientationRightMirrored;
+                    CGFloat aspect = rotated ? inputSize.height / inputSize.width : inputSize.width / inputSize.height;
+                    for (VNHumanBodyPoseObservation *pose in poseRequest.results) {
+                        VNRecognizedPoint *left = [pose recognizedPointForJointName:VNHumanBodyPoseObservationJointNameLeftEar error:nil];
+                        VNRecognizedPoint *right = [pose recognizedPointForJointName:VNHumanBodyPoseObservationJointNameRightEar error:nil];
+                        if (left.confidence < 0.3 || right.confidence < 0.3) continue;
+                        CGFloat width = fabs(left.location.x - right.location.x) * 1.4;
+                        CGFloat height = width * aspect;
+                        if (width < 0.01 || width > 0.5) continue;
+                        CGRect head = CGRectMake((left.location.x + right.location.x - width) * 0.5,
+                            (left.location.y + right.location.y - height) * 0.5, width, height);
+                        CGRect encoded = XDEncodedVisionRect(head, visionOrientation);
+                        if (XDUsableSubjectRect(encoded)) [headCandidates addObject:@{
+                            @"rect": [NSValue valueWithRect:encoded], @"type": @(CNDetectionTypeHumanHead), @"human": @YES}];
+                    }
                 }
                 [subjects sortUsingComparator:^NSComparisonResult(VNDetectedObjectObservation *left, VNDetectedObjectObservation *right) {
                     CGFloat leftArea = left.boundingBox.size.width * left.boundingBox.size.height;
@@ -1035,6 +1058,15 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     CGRect rect = XDEncodedVisionRect(subject.boundingBox, visionOrientation);
                     if (XDUsableSubjectRect(rect)) [candidates addObject:@{
                         @"rect": [NSValue valueWithRect:rect], @"type": @(subjectType), @"human": @YES}];
+                }
+                if (headCandidates.count) {
+                    [headCandidates sortUsingComparator:^NSComparisonResult(NSDictionary *left, NSDictionary *right) {
+                        CGRect a = [left[@"rect"] rectValue], b = [right[@"rect"] rectValue];
+                        CGFloat difference = a.size.width * a.size.height - b.size.width * b.size.height;
+                        return difference > 0 ? NSOrderedAscending : difference < 0 ? NSOrderedDescending : NSOrderedSame;
+                    }];
+                    if (headCandidates.count > 2) [headCandidates removeObjectsInRange:NSMakeRange(2, headCandidates.count - 2)];
+                    candidates = headCandidates;
                 }
                 if (candidates.count == 0) {
                     VNGenerateObjectnessBasedSaliencyImageRequest *saliency = [[VNGenerateObjectnessBasedSaliencyImageRequest alloc] init];
@@ -1069,13 +1101,14 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     if (matchIndex != NSNotFound) {
                         NSDictionary *candidate = candidates[matchIndex];
                         [usedCandidates addIndex:matchIndex];
-                        if (!predicted) {
+                        if (!predicted || (subject.detectionType != [candidate[@"type"] unsignedLongLongValue] &&
+                            (subject.detectionType == CNDetectionTypeHumanHead || [candidate[@"type"] unsignedLongLongValue] == CNDetectionTypeHumanHead))) {
                             CNDetectionType candidateType = [candidate[@"type"] unsignedLongLongValue];
                             if (subject.detectionType != candidateType) {
                                 // A native detection track has one type. A
-                                // face-to-torso reseed starts a new track for
-                                // the same actor group; a valid prediction
-                                // keeps its existing type and bounds.
+                                // type reseed starts a new track for the same
+                                // actor group. A newly detected head replaces
+                                // a larger tracked torso region.
                                 subject.trackIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
                                 subject.detectionType = candidateType;
                             }
@@ -1084,7 +1117,8 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                             subject.tracking = [subject.tracker startTrackingAt:pts within:subject.rect sourceImage:color sourceDisparity:inferred];
                         }
                     }
-                    if (predicted) subject.rect = prediction.normalizedBounds;
+                    if (matchIndex != NSNotFound && [candidates[matchIndex][@"type"] unsignedLongLongValue] == CNDetectionTypeHumanHead) subject.rect = [candidates[matchIndex][@"rect"] rectValue];
+                    else if (predicted) subject.rect = prediction.normalizedBounds;
                     if (predicted || matchIndex != NSNotFound) [visibleSubjects addObject:subject];
                     else [subject.tracker resetDetectionTrack];
                 }
@@ -1116,6 +1150,14 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     for (XDTrackedSubject *subject in activeSubjects) {
                         if (!selected || (subject.human && !selected.human)) selected = subject;
                     }
+                }
+                // A materially larger head can become the foreground actor even
+                // while the previous actor remains trackable. Retain smaller
+                // changes so detector jitter does not force a focus rack.
+                for (XDTrackedSubject *subject in activeSubjects) {
+                    if (subject.detectionType == CNDetectionTypeHumanHead && (!selected ||
+                        subject.rect.size.width * subject.rect.size.height >
+                        selected.rect.size.width * selected.rect.size.height / 0.6)) selected = subject;
                 }
                 CGRect focusBox = selected ? selected.rect : CGRectMake(0.40, 0.40, 0.20, 0.20);
                 long long selectedTrack = selected ? selected.trackIdentifier : autofocusTrackIdentifier;
