@@ -274,7 +274,9 @@ func colorDigest(_ buffer: CVPixelBuffer) throws -> String {
 func detectionRecord(_ detection: CNDetection) -> [String: Any] {
     let rect = detection.normalizedRect
     return ["type": detection.detectionType.rawValue, "rect": [rect.minX, rect.minY, rect.width, rect.height],
-            "focus_disparity": detection.focusDisparity]
+            "focus_disparity": detection.focusDisparity.isFinite ? detection.focusDisparity as Any : NSNull(),
+            "id": detection.detectionID?.rawValue as Any? ?? NSNull(),
+            "group": detection.detectionGroupID?.rawValue as Any? ?? NSNull()]
 }
 
 func effectDifference(_ reference: [[UInt16]], _ candidate: [[UInt16]], width: Int? = nil, region: CGRect? = nil) throws -> [String: Any] {
@@ -374,13 +376,13 @@ func verifyEditing(_ info: CNAssetInfo) async throws -> [String: Any] {
 }
 
 @available(macOS 27.0, *)
-func verifyGenerated(_ url: URL, _ directory: URL) async throws -> [String: Any] {
+func verifyGenerated(_ url: URL, _ directory: URL, writePreviews: Bool = true) async throws -> [String: Any] {
     let info = try await prepare(url, directory.appendingPathComponent("generated-processed.mov"))
-    return try await verifyPrepared(info, directory)
+    return try await verifyPrepared(info, directory, writePreviews: writePreviews)
 }
 
 @available(macOS 27.0, *)
-func verifyCompatibility(_ url: URL, _ directory: URL) async throws -> [String: Any] {
+func verifyCompatibility(_ url: URL, _ directory: URL, writePreviews: Bool = true) async throws -> [String: Any] {
     let info: CNAssetInfo
     do {
         info = try await prepare(url, directory.appendingPathComponent("generated-processed.mov"))
@@ -395,13 +397,13 @@ func verifyCompatibility(_ url: URL, _ directory: URL) async throws -> [String: 
                 "error_domain": nativeError.domain, "error_code": nativeError.code,
                 "render_and_edit_verified": false]
     }
-    var report = try await verifyPrepared(info, directory)
+    var report = try await verifyPrepared(info, directory, writePreviews: writePreviews)
     report["native_preprocessing_supported"] = true
     return report
 }
 
 @available(macOS 27.0, *)
-func verifyPrepared(_ info: CNAssetInfo, _ directory: URL) async throws -> [String: Any] {
+func verifyPrepared(_ info: CNAssetInfo, _ directory: URL, writePreviews: Bool = true) async throws -> [String: Any] {
     let attributes = try await CNRenderingSession.Attributes(asset: info.asset)
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
         throw NSError(domain: "NoMetalDevice", code: 1)
@@ -410,9 +412,9 @@ func verifyPrepared(_ info: CNAssetInfo, _ directory: URL) async throws -> [Stri
                                     preferredTransform: .identity, quality: .export)
     let selected = try select(info, time: info.timeRange.start.seconds + info.timeRange.duration.seconds / 2)
     let a = try render(session, attributes, selected, 2, queue, device,
-                       directory.appendingPathComponent("f2.png"), displayTransform: info.preferredTransform)
+                       writePreviews ? directory.appendingPathComponent("f2.png") : nil, displayTransform: info.preferredTransform)
     let b = try render(session, attributes, selected, 16, queue, device,
-                       directory.appendingPathComponent("f16.png"), displayTransform: info.preferredTransform)
+                       writePreviews ? directory.appendingPathComponent("f16.png") : nil, displayTransform: info.preferredTransform)
     // Finite data and native completion are required; a flat scene may have no
     // measurable blur difference even when its resources are renderable.
     return ["schema": "xdremux-cinematic-generated-render-verification-v1",
@@ -424,14 +426,40 @@ func verifyPrepared(_ info: CNAssetInfo, _ directory: URL) async throws -> [Stri
             "public_editing": try await verifyEditing(info)]
 }
 
+func scriptMetadata(_ script: CNScript) -> [String: Any] {
+    let frames = script.frames(in: script.timeRange)
+    return ["frames": frames.map { frame in
+        ["time": frame.time.seconds, "focus": frame.focusDisparity.isFinite ? frame.focusDisparity as Any : NSNull(),
+         "selected": detectionRecord(frame.focusDetection), "detections": frame.allDetections.map(detectionRecord)]
+    }, "base_decisions": script.baseDecisions(in: script.timeRange).map { decision in
+        var result: [String: Any] = ["time": decision.time.seconds, "strong": decision.isStrongDecision, "user": decision.isUserDecision]
+        switch decision.focusDetectionID {
+        case .single(let id): result["id"] = id.rawValue
+        case .group(let id): result["group"] = id.rawValue
+        }
+        for (key, transition) in [("transition_before", script.timeRangeOfTransition(before: decision)),
+                                  ("transition_after", script.timeRangeOfTransition(after: decision))] {
+            result[key] = transition.isValid && transition.start.seconds.isFinite && transition.duration.seconds.isFinite
+                ? [transition.start.seconds, transition.duration.seconds] as Any : NSNull()
+        }
+        return result
+    }]
+}
+
 @available(macOS 27.0, *)
-func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async throws -> [String: Any] {
+func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL, automaticReference: Bool = false, writePreviews: Bool = true) async throws -> [String: Any] {
     let native = try await prepare(nativeURL, directory.appendingPathComponent("native-processed.mov"))
     let generated = try await prepare(generatedURL, directory.appendingPathComponent("generated-processed.mov"))
     let nativeAttributes = try await CNRenderingSession.Attributes(asset: native.asset)
     let generatedAttributes = try await CNRenderingSession.Attributes(asset: generated.asset)
     let nativeScript = try await CNScript(asset: native.asset)
     let generatedScript = try await CNScript(asset: generated.asset)
+    let nativeUserDecisionCount = nativeScript.userDecisions(in: nativeScript.timeRange).count
+    if automaticReference {
+        // Evaluate the camera's base choices without importing user edits into
+        // the reference. This only changes the in-memory comparison script.
+        nativeScript.removeAllUserDecisions()
+    }
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
         throw NSError(domain: "NoMetalDevice", code: 1)
     }
@@ -448,28 +476,43 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
               let generatedFrame = generatedScript.frame(at: b.pts, tolerance: .zero) else {
             throw NSError(domain: "MissingScriptFrame", code: 1)
         }
-        let depthDifference = try difference(disparityPixels(a.depth), disparityPixels(b.depth), channels: 1)
+        let nativeDepthSize = [CVPixelBufferGetWidth(a.depth), CVPixelBufferGetHeight(a.depth)]
+        let generatedDepthSize = [CVPixelBufferGetWidth(b.depth), CVPixelBufferGetHeight(b.depth)]
+        let nativeDepth = try disparityPixels(a.depth), generatedDepth = try disparityPixels(b.depth)
+        var depthDifference: [String: Any]
+        if nativeDepthSize == generatedDepthSize {
+            depthDifference = try difference(nativeDepth, generatedDepth, channels: 1)
+            depthDifference["comparable"] = true
+        } else {
+            // Legacy captures can use a different disparity raster. Native
+            // rendering accepts it directly; RGB remains at source resolution.
+            depthDifference = ["comparable": false, "reason": "disparity raster dimensions differ",
+                "native_finite": try difference(nativeDepth, nativeDepth, channels: 1),
+                "generated_finite": try difference(generatedDepth, generatedDepth, channels: 1)]
+        }
+        depthDifference["native_size"] = nativeDepthSize
+        depthDifference["generated_size"] = generatedDepthSize
         var referenceRenders: [[UInt16]] = [], candidateRenders: [[UInt16]] = []
         var referenceLinear: [[UInt16]] = [], candidateLinear: [[UInt16]] = []
         for fNumber: Float in [2, 16] {
             let prefix = "t\(index + 1)-f\(Int(fNumber))"
-            let nativePNG = directory.appendingPathComponent(prefix + "-native.png")
-            let generatedPNG = directory.appendingPathComponent(prefix + "-generated.png")
-            let reference = try render(nativeSession, nativeAttributes, a, fNumber, queue, device, nativePNG, displayTransform: native.preferredTransform)
-            let candidate = try render(generatedSession, generatedAttributes, b, fNumber, queue, device, generatedPNG, displayTransform: generated.preferredTransform)
+            let nativePNG: URL? = writePreviews ? directory.appendingPathComponent(prefix + "-native.png") : nil
+            let generatedPNG: URL? = writePreviews ? directory.appendingPathComponent(prefix + "-generated.png") : nil
+            let reference = try render(nativeSession, nativeAttributes, a, fNumber, queue, device, nativePNG, focusOverride: automaticReference ? nativeFrame.focusDisparity : nil, displayTransform: native.preferredTransform)
+            let candidate = try render(generatedSession, generatedAttributes, b, fNumber, queue, device, generatedPNG, focusOverride: automaticReference ? generatedFrame.focusDisparity : nil, displayTransform: generated.preferredTransform)
             try check(NSDictionary(dictionary: reference.color).isEqual(to: candidate.color), "source color management differs")
             var row: [String: Any] = ["pts": a.pts.seconds, "f_number": fNumber,
                 "native_focus": reference.focus, "generated_focus": candidate.focus,
                 "native_focus_detection": detectionRecord(nativeFrame.focusDetection),
                 "generated_focus_detection": detectionRecord(generatedFrame.focusDetection),
                 "decoded_color_sha256": nativeColorHash, "decoded_color_identical": true,
-                "native_png": nativePNG.path, "generated_png": generatedPNG.path,
+                "native_png": nativePNG?.path as Any? ?? NSNull(), "generated_png": generatedPNG?.path as Any? ?? NSNull(),
                 "color_management": reference.color,
                 "render_difference": try difference(reference.pixels, candidate.pixels),
                 "linear_render_difference": try difference(reference.linearPixels, candidate.linearPixels),
                 "disparity_difference": depthDifference]
             if index == 0 && fNumber == 2 {
-                let repeatRender = try render(nativeSession, nativeAttributes, a, fNumber, queue, device, nil)
+                let repeatRender = try render(nativeSession, nativeAttributes, a, fNumber, queue, device, nil, focusOverride: automaticReference ? nativeFrame.focusDisparity : nil)
                 row["native_repeat_difference"] = try difference(reference.pixels, repeatRender.pixels)
                 row["native_linear_repeat_difference"] = try difference(reference.linearPixels, repeatRender.linearPixels)
                 let fixedFocus = try render(generatedSession, generatedAttributes, b, fNumber, queue, device, nil, focusOverride: reference.focus)
@@ -492,6 +535,10 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
             "source_transform": "identity for measurements; source preferred transform for previews",
             "preview_png": "HDR source color space -> CISystemToneMap headroom 1 -> 8-bit sRGB PNG with color profile",
             "public_preprocessing": true, "test_processed_color_tracks_reference_inputs": true,
+            "reference_mode": automaticReference ? "automatic-base" : "stored-script",
+            "reference_user_decisions_ignored": automaticReference ? nativeUserDecisionCount : 0,
+            "previews_written": writePreviews,
+            "focus_metadata": ["native": scriptMetadata(nativeScript), "generated": scriptMetadata(generatedScript)],
             "public_editing": try await verifyEditing(generated),
             "native_rendering_version": nativeAttributes.renderingVersion,
             "generated_rendering_version": generatedAttributes.renderingVersion,
@@ -503,7 +550,10 @@ func compare(_ nativeURL: URL, _ generatedURL: URL, _ directory: URL) async thro
 struct HeadlessComparison {
     static func main() async {
         do {
-            let args = Array(CommandLine.arguments.dropFirst())
+            let supplied = Array(CommandLine.arguments.dropFirst())
+            let automaticReference = supplied.contains("--automatic-reference")
+            let writePreviews = !supplied.contains("--no-previews")
+            let args = supplied.filter { $0 != "--automatic-reference" && $0 != "--no-previews" }
             guard #available(macOS 27.0, *) else { throw NSError(domain: "RequiresMacOS27", code: 1) }
             if args.count == 2 && args[0] == "--verify-color" {
                 let directory = URL(fileURLWithPath: args[1])
@@ -515,17 +565,18 @@ struct HeadlessComparison {
                 print("HLG color-space, system SDR tone-map, profile and highlight regression passed")
                 return
             }
-            try check(args.count == 3, "usage: compare_cinematic_render NATIVE.mov GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-generated GENERATED.mov NEW_OUTPUT_DIRECTORY | --probe-compatibility GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-color NEW_OUTPUT_DIRECTORY")
+            try check(args.count == 3, "usage: compare_cinematic_render [--automatic-reference] [--no-previews] NATIVE.mov GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-generated GENERATED.mov NEW_OUTPUT_DIRECTORY | --probe-compatibility GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-color NEW_OUTPUT_DIRECTORY")
             let directory = URL(fileURLWithPath: args[2])
             try check(!FileManager.default.fileExists(atPath: directory.path), "comparison output directory exists")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let generatedOnly = args[0] == "--verify-generated"
             let compatibility = args[0] == "--probe-compatibility"
+            try check(!automaticReference || (!generatedOnly && !compatibility), "automatic reference requires a paired comparison")
             let report = compatibility
-                ? try await verifyCompatibility(URL(fileURLWithPath: args[1]), directory)
+                ? try await verifyCompatibility(URL(fileURLWithPath: args[1]), directory, writePreviews: writePreviews)
                 : generatedOnly
-                ? try await verifyGenerated(URL(fileURLWithPath: args[1]), directory)
-                : try await compare(URL(fileURLWithPath: args[0]), URL(fileURLWithPath: args[1]), directory)
+                ? try await verifyGenerated(URL(fileURLWithPath: args[1]), directory, writePreviews: writePreviews)
+                : try await compare(URL(fileURLWithPath: args[0]), URL(fileURLWithPath: args[1]), directory, automaticReference: automaticReference, writePreviews: writePreviews)
             let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
             let reportName = compatibility ? "compatibility.json" : generatedOnly ? "generated-verification.json" : "comparison.json"
             try data.write(to: directory.appendingPathComponent(reportName), options: .atomic)

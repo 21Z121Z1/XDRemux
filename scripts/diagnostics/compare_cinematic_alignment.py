@@ -72,6 +72,8 @@ def compare_runs(baseline: dict, current: dict) -> dict:
                 require(bool(records) and all(x["packet_bytes_timestamps_and_trim_identical"] for x in records),
                         f"media packet identity is not proven: {name}")
         a, b = old["headless_comparison"], new["headless_comparison"]
+        require(a.get("reference_mode", "stored-script") == b.get("reference_mode", "stored-script"),
+                f"reference focus mode differs: {name}")
         for key in ["renderer", "quality", "texture_format", "input_pixel_format", "native_rendering_version"]:
             require(a[key] == b[key], f"render configuration differs: {name}/{key}")
         require(raw_measurement_space(a) == raw_measurement_space(b), f"render configuration differs: {name}/comparison_space")

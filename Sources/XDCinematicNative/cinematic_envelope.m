@@ -354,6 +354,8 @@ static CGFloat XDRectOverlap(CGRect a, CGRect b) {
 @property CGRect rect;
 @property CNDetectionType detectionType;
 @property BOOL human;
+@property CGRect animalBodyRect;
+@property (strong) NSMutableDictionary<NSNumber *, NSNumber *> *trackIdentifiersByType;
 @property BOOL tracking;
 @property (strong) CNObjectTracker *tracker;
 @end
@@ -365,6 +367,16 @@ static BOOL XDUsableSubjectRect(CGRect rect) {
            isfinite(rect.origin.x) && isfinite(rect.origin.y) &&
            isfinite(rect.size.width) && isfinite(rect.size.height) &&
            CGRectContainsRect(CGRectMake(0, 0, 1, 1), rect);
+}
+
+static BOOL XDHeadType(CNDetectionType type) {
+    return type == CNDetectionTypeHumanHead || type == CNDetectionTypeDogHead || type == CNDetectionTypeCatHead;
+}
+
+static NSUInteger XDAnimalFamily(CNDetectionType type) {
+    if (type == CNDetectionTypeDogHead || type == CNDetectionTypeDogBody) return 2;
+    if (type == CNDetectionTypeCatHead || type == CNDetectionTypeCatBody) return 3;
+    return 0;
 }
 
 static CGFloat XDSubjectMatch(CGRect previous, CGRect candidate) {
@@ -1068,6 +1080,61 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     if (headCandidates.count > 2) [headCandidates removeObjectsInRange:NSMakeRange(2, headCandidates.count - 2)];
                     candidates = headCandidates;
                 }
+                // Keep animal anatomy separate from generic saliency. Match
+                // head landmarks to a recognized body before asserting species.
+                if (candidates.count == 0) {
+                    VNRecognizeAnimalsRequest *animals = [[VNRecognizeAnimalsRequest alloc] init];
+                    VNDetectAnimalBodyPoseRequest *poses = [[VNDetectAnimalBodyPoseRequest alloc] init];
+                    if (![visionHandler performRequests:@[animals, poses] onCMSampleBuffer:sample orientation:visionOrientation error:&visionError]) {
+                        CFRelease(sample); [decodeReader cancelReading];
+                        [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
+                        return XDFail(error_buffer, error_buffer_size, 65,
+                            [NSString stringWithFormat:@"Vision animal detection failed: %@", visionError.localizedDescription]);
+                    }
+                    NSArray<VNRecognizedObjectObservation *> *recognized = [animals.results sortedArrayUsingComparator:^NSComparisonResult(VNRecognizedObjectObservation *a, VNRecognizedObjectObservation *b) {
+                        CGFloat areaA = a.boundingBox.size.width * a.boundingBox.size.height;
+                        CGFloat areaB = b.boundingBox.size.width * b.boundingBox.size.height;
+                        return areaA > areaB ? NSOrderedAscending : areaA < areaB ? NSOrderedDescending : NSOrderedSame;
+                    }];
+                    BOOL rotated = visionOrientation == kCGImagePropertyOrientationRight || visionOrientation == kCGImagePropertyOrientationLeft ||
+                        visionOrientation == kCGImagePropertyOrientationLeftMirrored || visionOrientation == kCGImagePropertyOrientationRightMirrored;
+                    CGFloat aspect = rotated ? inputSize.height / inputSize.width : inputSize.width / inputSize.height;
+                    for (VNRecognizedObjectObservation *animal in recognized) {
+                        VNClassificationObservation *label = animal.labels.firstObject;
+                        BOOL dog = [label.identifier isEqualToString:@"Dog"];
+                        BOOL cat = [label.identifier isEqualToString:@"Cat"];
+                        if ((!dog && !cat) || label.confidence < 0.5) continue;
+                        CGRect region = animal.boundingBox;
+                        CNDetectionType type = dog ? CNDetectionTypeDogBody : CNDetectionTypeCatBody;
+                        CGFloat bestContainment = 0;
+                        for (VNAnimalBodyPoseObservation *pose in poses.results) {
+                            VNRecognizedPoint *nose = [pose recognizedPointForJointName:VNAnimalBodyPoseObservationJointNameNose error:nil];
+                            VNRecognizedPoint *leftEye = [pose recognizedPointForJointName:VNAnimalBodyPoseObservationJointNameLeftEye error:nil];
+                            VNRecognizedPoint *rightEye = [pose recognizedPointForJointName:VNAnimalBodyPoseObservationJointNameRightEye error:nil];
+                            if (nose.confidence < 0.3 || MAX(leftEye.confidence, rightEye.confidence) < 0.3) continue;
+                            NSDictionary *points = [pose recognizedPointsForJointsGroupName:VNAnimalBodyPoseObservationJointsGroupNameHead error:nil];
+                            CGFloat minX = 1, minY = 1, maxX = 0, maxY = 0;
+                            NSUInteger count = 0;
+                            for (VNRecognizedPoint *point in points.allValues) {
+                                if (point.confidence < 0.3) continue;
+                                minX = MIN(minX, point.location.x); maxX = MAX(maxX, point.location.x);
+                                minY = MIN(minY, point.location.y); maxY = MAX(maxY, point.location.y); ++count;
+                            }
+                            if (count < 3 || maxX - minX < 0.01 || maxY - minY < 0.01) continue;
+                            CGFloat padding = MAX(maxX - minX, (maxY - minY) / aspect) * 0.15;
+                            CGRect head = CGRectInset(CGRectMake(minX, minY, maxX - minX, maxY - minY), -padding, -padding * aspect);
+                            CGRect common = CGRectIntersection(head, animal.boundingBox);
+                            CGFloat containment = CGRectIsNull(common) ? 0 : common.size.width * common.size.height / (head.size.width * head.size.height);
+                            if (containment < 0.6 || !CGRectContainsPoint(animal.boundingBox, CGPointMake(CGRectGetMidX(head), CGRectGetMidY(head))) || containment <= bestContainment) continue;
+                            region = head; bestContainment = containment;
+                            type = dog ? CNDetectionTypeDogHead : CNDetectionTypeCatHead;
+                        }
+                        CGRect encoded = XDEncodedVisionRect(region, visionOrientation);
+                        if (XDUsableSubjectRect(encoded)) [candidates addObject:@{
+                            @"rect": [NSValue valueWithRect:encoded], @"bodyRect": [NSValue valueWithRect:XDEncodedVisionRect(animal.boundingBox, visionOrientation)], @"type": @(type), @"human": @NO}];
+                        if (candidates.count == 2) break;
+                    }
+                }
                 if (candidates.count == 0) {
                     VNGenerateObjectnessBasedSaliencyImageRequest *saliency = [[VNGenerateObjectnessBasedSaliencyImageRequest alloc] init];
                     if ([visionHandler performRequests:@[saliency] onCMSampleBuffer:sample orientation:visionOrientation error:nil]) {
@@ -1095,21 +1162,31 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     for (NSUInteger candidateIndex = 0; candidateIndex < candidates.count; ++candidateIndex) {
                         NSDictionary *candidate = candidates[candidateIndex];
                         if ([usedCandidates containsIndex:candidateIndex] || subject.human != [candidate[@"human"] boolValue]) continue;
+                        NSUInteger oldFamily = XDAnimalFamily(subject.detectionType), newFamily = XDAnimalFamily([candidate[@"type"] unsignedLongLongValue]);
+                        if (oldFamily && oldFamily != newFamily) continue;
                         CGFloat score = XDSubjectMatch(matchRect, [candidate[@"rect"] rectValue]);
+                        if (oldFamily && newFamily && candidate[@"bodyRect"])
+                            score = MAX(score, XDSubjectMatch(subject.animalBodyRect, [candidate[@"bodyRect"] rectValue]));
                         if (score > bestMatch) { bestMatch = score; matchIndex = candidateIndex; }
                     }
                     if (matchIndex != NSNotFound) {
                         NSDictionary *candidate = candidates[matchIndex];
                         [usedCandidates addIndex:matchIndex];
+                        if (candidate[@"bodyRect"]) subject.animalBodyRect = [candidate[@"bodyRect"] rectValue];
                         if (!predicted || (subject.detectionType != [candidate[@"type"] unsignedLongLongValue] &&
-                            (subject.detectionType == CNDetectionTypeHumanHead || [candidate[@"type"] unsignedLongLongValue] == CNDetectionTypeHumanHead))) {
+                            (XDHeadType([candidate[@"type"] unsignedLongLongValue]) || subject.detectionType == CNDetectionTypeHumanHead || subject.detectionType == CNDetectionTypeUnknown))) {
                             CNDetectionType candidateType = [candidate[@"type"] unsignedLongLongValue];
                             if (subject.detectionType != candidateType) {
-                                // A native detection track has one type. A
-                                // type reseed starts a new track for the same
-                                // actor group. A newly detected head replaces
-                                // a larger tracked torso region.
-                                subject.trackIdentifier = nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier"));
+                                // Each track retains one detection type. Reuse
+                                // an animal part's ID within its actor group so
+                                // a returning head resolves earlier decisions.
+                                // Human reseeds retain their allocator behavior.
+                                NSNumber *identifier = XDAnimalFamily(candidateType) ? subject.trackIdentifiersByType[@(candidateType)] : nil;
+                                if (!identifier) {
+                                    identifier = @(nextTrack(trackAllocator, sel_registerName("nextTrackIdentifier")));
+                                    subject.trackIdentifiersByType[@(candidateType)] = identifier;
+                                }
+                                subject.trackIdentifier = identifier.longLongValue;
                                 subject.detectionType = candidateType;
                             }
                             subject.rect = [candidate[@"rect"] rectValue];
@@ -1117,7 +1194,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                             subject.tracking = [subject.tracker startTrackingAt:pts within:subject.rect sourceImage:color sourceDisparity:inferred];
                         }
                     }
-                    if (matchIndex != NSNotFound && [candidates[matchIndex][@"type"] unsignedLongLongValue] == CNDetectionTypeHumanHead) subject.rect = [candidates[matchIndex][@"rect"] rectValue];
+                    if (matchIndex != NSNotFound && XDHeadType([candidates[matchIndex][@"type"] unsignedLongLongValue])) subject.rect = [candidates[matchIndex][@"rect"] rectValue];
                     else if (predicted) subject.rect = prediction.normalizedBounds;
                     if (predicted || matchIndex != NSNotFound) [visibleSubjects addObject:subject];
                     else [subject.tracker resetDetectionTrack];
@@ -1138,6 +1215,8 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                     subject.rect = candidateRect;
                     subject.human = [candidate[@"human"] boolValue];
                     subject.detectionType = [candidate[@"type"] unsignedLongLongValue];
+                    subject.trackIdentifiersByType = [NSMutableDictionary dictionaryWithObject:@(subject.trackIdentifier) forKey:@(subject.detectionType)];
+                    if (candidate[@"bodyRect"]) subject.animalBodyRect = [candidate[@"bodyRect"] rectValue];
                     subject.tracker = [[CNObjectTracker alloc] initWithCommandQueue:trackingQueue];
                     subject.tracking = [subject.tracker startTrackingAt:pts within:subject.rect sourceImage:color sourceDisparity:inferred];
                     [visibleSubjects addObject:subject];
@@ -1155,7 +1234,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 // while the previous actor remains trackable. Retain smaller
                 // changes so detector jitter does not force a focus rack.
                 for (XDTrackedSubject *subject in activeSubjects) {
-                    if (subject.detectionType == CNDetectionTypeHumanHead && (!selected ||
+                    if (XDHeadType(subject.detectionType) && (!selected ||
                         subject.rect.size.width * subject.rect.size.height >
                         selected.rect.size.width * selected.rect.size.height / 0.6)) selected = subject;
                 }
@@ -1164,7 +1243,8 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
                 long long selectedGroup = selected ? selected.groupIdentifier : -1LL;
                 if (selectedTrack != selectedSubject) {
                     [selectionChanges addObject:@{@"pts": @(pts.value), @"timescale": @(pts.timescale),
-                        @"track": @(selectedTrack), @"group": @(selectedGroup)}];
+                        @"track": @(selectedTrack), @"group": @(selectedGroup),
+                        @"animal": @(selected && XDAnimalFamily(selected.detectionType) > 0)}];
                     selectedSubject = selectedTrack;
                 }
                 id focusDetection = nil;
@@ -1267,7 +1347,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
             CMTime decisionTime = CMTimeMake([change[@"pts"] longLongValue], [change[@"timescale"] intValue]);
             id decision = ((PTInitDecision)method_getImplementation(decisionInit))([decisionClass alloc],
                 sel_registerName("_initWithTime:trackIdentifier:groupIdentifier:options:"),
-                decisionTime, [change[@"track"] longLongValue], [change[@"group"] longLongValue], 0ULL);
+                decisionTime, [change[@"track"] longLongValue], [change[@"animal"] boolValue] ? -1LL : [change[@"group"] longLongValue], 0ULL);
             if (!decision) {
                 [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
                 return XDFail(error_buffer, error_buffer_size, 3, @"cannot construct an Apple focus decision");

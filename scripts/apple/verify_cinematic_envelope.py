@@ -62,7 +62,11 @@ def main() -> None:
     parser.add_argument("--synthetic", action="store_true", help="Test independent 1080p H.264 rendering and a separate 360p native compatibility probe")
     parser.add_argument("--compare-render", action="store_true", help="Preprocess, render and reload public edits; compare native references when available")
     parser.add_argument("--verify-batch", action="store_true", help="Verify the same Cinematic intent through the directory batch entry point")
+    parser.add_argument("--no-previews", action="store_true", help="Keep numerical reports without writing preview PNG files")
+    parser.add_argument("--automatic-reference", action="store_true", help="Compare native base focus after removing user decisions in memory")
     args = parser.parse_args()
+    render_options = (["--no-previews"] if args.no_previews else [])
+    paired_options = render_options + (["--automatic-reference"] if args.automatic_reference else [])
     repo = Path(__file__).resolve().parents[2]
     out = args.run_dir.resolve()
     out.mkdir(parents=True, exist_ok=False)
@@ -120,13 +124,13 @@ def main() -> None:
             record["stripped_compressed_media"] = strip_packets
         if args.compare_render:
             if needs_strip:
-                run([str(renderer), str(source), str(pending), str(case / "headless")], case / "headless.log")
+                run([str(renderer), *paired_options, str(source), str(pending), str(case / "headless")], case / "headless.log")
                 record["headless_comparison"] = json.loads((case / "headless/comparison.json").read_text())
             elif compatibility:
-                run([str(renderer), "--probe-compatibility", str(pending), str(case / "headless")], case / "headless.log")
+                run([str(renderer), *render_options, "--probe-compatibility", str(pending), str(case / "headless")], case / "headless.log")
                 record["headless_compatibility"] = json.loads((case / "headless/compatibility.json").read_text())
             else:
-                run([str(renderer), "--verify-generated", str(pending), str(case / "headless")], case / "headless.log")
+                run([str(renderer), *render_options, "--verify-generated", str(pending), str(case / "headless")], case / "headless.log")
                 record["headless_generated"] = json.loads((case / "headless/generated-verification.json").read_text())
             if digest(source) != original_hash or digest(pending) != record["pending_sha256"]:
                 raise RuntimeError("a Cinematic input changed during headless comparison")
@@ -166,7 +170,7 @@ def main() -> None:
                       "pending_sha256": digest(pending), "compressed_media": compare_packets(source, pending),
                       "consumer": json.loads((case / "consumer.json").read_text())}
             if args.compare_render:
-                run([str(renderer), "--verify-generated", str(pending), str(case / "headless")], case / "headless.log")
+                run([str(renderer), *render_options, "--verify-generated", str(pending), str(case / "headless")], case / "headless.log")
                 record["headless_generated"] = json.loads((case / "headless/generated-verification.json").read_text())
             if digest(source) != source_hash:
                 raise RuntimeError("batch input changed")

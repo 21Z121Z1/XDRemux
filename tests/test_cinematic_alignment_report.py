@@ -51,6 +51,14 @@ class CinematicAlignmentReportTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "lacks color identity"):
             compare_runs(original, changed)
 
+    def test_stored_user_focus_and_automatic_base_focus_cannot_be_mixed(self):
+        original, changed = report(0.1, "layout-A"), report(0.025, "layout-B")
+        changed["assets"][0]["headless_comparison"]["reference_mode"] = "automatic-base"
+        with self.assertRaisesRegex(RuntimeError, "reference focus mode differs"):
+            compare_runs(original, changed)
+        original["assets"][0]["headless_comparison"]["reference_mode"] = "automatic-base"
+        self.assertAlmostEqual(compare_runs(original, changed)["pooled_effect_error_reduction"], 0.75)
+
     def test_unknown_measurement_space_changes_are_rejected(self):
         changed = report(0.025, "layout-B")
         changed["assets"][0]["headless_comparison"]["comparison_space"] = "different space"
