@@ -61,6 +61,7 @@ def main() -> None:
     parser.add_argument("--aperture", type=float, default=2.8)
     parser.add_argument("--synthetic", action="store_true", help="Test independent 1080p H.264 rendering and a separate 360p native compatibility probe")
     parser.add_argument("--compare-render", action="store_true", help="Preprocess, render and reload public edits; compare native references when available")
+    parser.add_argument("--verify-batch", action="store_true", help="Verify the same Cinematic intent through the directory batch entry point")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
     out = args.run_dir.resolve()
@@ -100,7 +101,7 @@ def main() -> None:
         ordinary_hash = digest(ordinary)
         pending = case / "pending.mov"
         environment = os.environ | {"XDREMUX_APPLE_ADAPTER": str(adapter)}
-        run([str(cli), "cinematic", "--input", str(ordinary), "--output", str(pending),
+        run([str(cli), "convert", "--apple-cinematic", "--input", str(ordinary), "--output", str(pending),
              "--focal-length-35mm", str(args.focal_length_35mm), "--aperture", str(args.aperture)], case / "generate.log", environment)
         run([str(probe), "verify", str(ordinary), str(pending), str(case / "consumer.json"), str(args.aperture)], case / "consumer.log")
         consumer = json.loads((case / "consumer.json").read_text())
@@ -136,6 +137,43 @@ def main() -> None:
             print(f"  headless native/generated pixel identity={record['headless_comparison']['all_compared_frames_identical']}", flush=True)
         if "headless_compatibility" in record:
             print(f"  compatibility only: native preprocessing supported={record['headless_compatibility']['native_preprocessing_supported']}", flush=True)
+    if args.verify_batch:
+        # Use the original stripped inputs plus independently encoded supported
+        # video. A separate unsupported-size probe does not become render evidence.
+        selected = [row for row in report["assets"] if "headless_compatibility" not in row]
+        batch_dir = out / "batch-inputs"
+        batch_dir.mkdir()
+        for index, row in enumerate(selected):
+            os.link(row["ordinary"], batch_dir / f"input-{index + 1}.mov")
+        destination = out / "batch-outputs"
+        environment = os.environ | {"XDREMUX_APPLE_ADAPTER": str(adapter)}
+        run([str(cli), "batch", "--input-dir", str(batch_dir), "--output-dir", str(destination),
+             "--apple-cinematic", "--jobs", "2", "--json", "--focal-length-35mm", str(args.focal_length_35mm),
+             "--aperture", str(args.aperture)], out / "batch.json", environment)
+        receipt = json.loads((out / "batch.json").read_text())
+        if receipt["failures"] or len(receipt["successes"]) != len(selected):
+            raise RuntimeError("Cinematic batch did not process every selected input")
+        batch_records = []
+        for index, result in enumerate(receipt["successes"]):
+            if result["kind"] != "cinematic" or len(result["outputs"]) != 1:
+                raise RuntimeError("batch reported a photo result for Cinematic video")
+            source, pending = Path(result["input"]), Path(result["outputs"][0])
+            case = out / f"batch-{index + 1}"
+            case.mkdir()
+            source_hash = digest(source)
+            run([str(probe), "verify", str(source), str(pending), str(case / "consumer.json"), str(args.aperture)], case / "consumer.log")
+            record = {"source": str(source), "source_sha256": source_hash, "pending": str(pending),
+                      "pending_sha256": digest(pending), "compressed_media": compare_packets(source, pending),
+                      "consumer": json.loads((case / "consumer.json").read_text())}
+            if args.compare_render:
+                run([str(renderer), "--verify-generated", str(pending), str(case / "headless")], case / "headless.log")
+                record["headless_generated"] = json.loads((case / "headless/generated-verification.json").read_text())
+            if digest(source) != source_hash:
+                raise RuntimeError("batch input changed")
+            batch_records.append(record)
+        report["batch"] = {"receipt": receipt, "assets": batch_records}
+        (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+        print(f"verified-batch={len(batch_records)}; movie output kind and native processing checked", flush=True)
     print(f"verified={len(report['assets'])}; report={out / 'report.json'}", flush=True)
 
 

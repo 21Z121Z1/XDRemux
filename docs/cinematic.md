@@ -7,16 +7,16 @@
 ## 命令与运行条件
 
 ```bash
-xdremux cinematic --input ordinary.mp4 --output pending.mov
+xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
 ```
 
-输出文件必须尚不存在，输入文件保持不变。Rust runtime 在生成前后计算输入哈希，通过不会替换现有输出的硬链接发布候选文件。
+该开关与人像、摄影风格一样，可用于 `convert` 和 `batch`，并与照片功能及 OPPO 兼容开关互斥。输出必须使用 `.mov` 后缀且尚不存在；单文件未指定输出时，在源文件旁生成 `SOURCE.xdremux.mov`。输入文件保持不变。Rust runtime 在生成前后计算输入哈希，通过不会替换现有输出的硬链接发布候选文件。
 
 当前实现需要 macOS 27、使用 macOS 27 SDK 构建、可用的 Apple 推理资源，以及 adapter 使用的 Portrait/Cinematic 私有框架方法。adapter 在调用前检查每个必要私有 Objective-C 方法的类型编码。方法、SDK、系统或资源不受支持时，命令会失败。使用旧 SDK 构建时，其他 Apple adapter 操作仍可使用，此命令在开始推理前拒绝执行。
 
 这是实验性的待处理元数据命令。`needsPreprocessing` 和 `ready` 表示 Apple 能识别元数据，不能保证后续的 Apple 预处理支持每一种输入。在 macOS 27.0.1 上，移除电影数据的 1080p/4K HEVC 相机输入及独立编码的 1080p H.264 输入，已完成公共预处理、渲染和编辑重载。相同 1920×1080、30 fps 短片的 H.264、HEVC 和 ProRes Standard 对照也均通过，公共处理路径不要求输入必须使用 HEVC。独立的 640×360 H.264 输入能达到待处理状态，但预处理返回 `CNCinematicErrorDomain` 错误码 5（`unsupported`）。修改色彩标签或虚拟传感器元数据没有消除原生尺寸检查的拒绝。命令保留压缩媒体，不通过缩放或转码绕过这个限制。其他尺寸、编码格式、系统及 iPhone 相册处理需要各自的消费者验证。
 
-`--focal-length-35mm MM` 设置每帧使用的焦距假设，默认为 24，允许范围是 1 到 300。`--aperture F` 默认为 2.8，允许范围是 1 到 64。两个值都必须有限。缺少相机几何信息时，它们是生成元数据使用的拍摄假设，不是实测光学属性。
+`--focal-length-35mm MM` 设置每帧使用的焦距假设，默认为 24，允许范围是 1 到 300。`--aperture F` 默认为 2.8，允许范围是 1 到 64。两个值都必须有限，显式传入任一参数都需要 `--apple-cinematic`。缺少相机几何信息时，它们是生成元数据使用的拍摄假设，不是实测光学属性。
 
 ## 处理所需的最低信息
 
@@ -51,10 +51,10 @@ python3 scripts/apple/verify_cinematic_envelope.py \
   --run-dir /absolute/path/new-results \
   --swift-build-dir /absolute/path/swift-build \
   --rust-build-dir /absolute/path/rust-build \
-  --synthetic --compare-render
+  --synthetic --compare-render --verify-batch
 ```
 
-重复 `--input` 可加入更多原生样本。runner 构建当前 CLI 和 adapter，移除各原生样本的全局元数据以及所有非视频/非音频轨道。公共 `CNAssetInfo` 必须将普通副本判定为 `none`。随后 runner 调用 CLI，生成独立的待处理元数据封装。
+`--verify-batch` 还会将受支持的普通副本与合成输入通过目录发现和并行 `batch --apple-cinematic` 处理，检查 MOV 结果类型、媒体包一致性以及每个输出的公共预处理、渲染与编辑重载。重复 `--input` 可加入更多原生样本。runner 构建当前 CLI 和 adapter，移除各原生样本的全局元数据以及所有非视频/非音频轨道。公共 `CNAssetInfo` 必须将普通副本判定为 `none`。随后 runner 调用 CLI，生成独立的待处理元数据封装。
 
 公共消费者检查会验证脚本、拍摄 ID 命名空间、选定检测对象的轨道能否解析、逐轨道检测类型不变、有限的逐帧焦点、帧数、时间戳、光圈、逐帧键、渲染帧属性、虚拟传感器几何、逐帧焦距范围以及待处理资源状态。检查会加入两个公共固定焦点轨道，要求分配的 ID 与拍摄 ID 不冲突。待处理资源必须先预处理，才能编辑。检查记录基础决策数量和焦距时间线。FFprobe 比较实际编码视频/音频包的哈希、时间戳和音频裁切数据。AVAssetReader 的音频缓冲分组不能用于证明媒体包相同。runner 在各操作后复查源文件哈希。`--synthetic` 加入没有原始 Cinematic 数据及可检测人脸的独立 1080p 和 360p H.264 输入。使用 `--compare-render` 时，1080p 输入必须通过完整原生处理检查。360p 输入单独探测兼容性：只有 Apple 明确的预处理 `unsupported` 错误会记录为限制，其他错误会使验证失败。不受支持的兼容性样本不计入渲染或编辑证据；后续系统若支持该样本，则继续执行完整渲染与编辑检查。
 

@@ -2,21 +2,21 @@
 
 English | [简体中文](cinematic.md)
 
-The `xdremux cinematic` command creates a new pending Cinematic MOV from ordinary video. The acceptance target is the public Apple `needsPreprocessing` state. The command does not claim that inferred effects match the original camera's effects.
+The `xdremux convert --apple-cinematic` path creates a new pending Cinematic MOV from ordinary video. The acceptance target is the public Apple `needsPreprocessing` state. The command does not claim that inferred effects match the original camera's effects.
 
 ## Command and requirements
 
 ```bash
-xdremux cinematic --input ordinary.mp4 --output pending.mov
+xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
 ```
 
-The output must not exist. The input remains unchanged. The Rust runtime hashes the input before and after generation. It publishes the candidate with a hard link that cannot replace an existing output.
+The flag is available on `convert` and `batch`, like the Portrait and Photographic Styles flags. It is exclusive with image-feature and OPPO compatibility flags. The output must use `.mov` and must not exist. Without an explicit single-file output, `convert` creates `SOURCE.xdremux.mov` beside the source. The input remains unchanged. The Rust runtime hashes the input before and after generation. It publishes the candidate with a hard link that cannot replace an existing output.
 
 The current implementation requires macOS 27, a macOS 27 SDK build, available Apple inference resources, and the private Portrait/Cinematic framework methods used by the adapter. The adapter checks each required private Objective-C method encoding before use. An unsupported method, SDK, OS, or resource causes failure. Older SDK builds retain the other Apple adapter operations and reject this command before inference.
 
 This is an experimental pending-metadata command. `needsPreprocessing` and `ready` confirm that Apple recognizes the metadata; they do not guarantee that Apple's later preprocessing supports every input. On macOS 27.0.1, stripped 1080p/4K HEVC camera inputs and independently encoded 1080p H.264 inputs completed public preprocessing, rendering, and edit reload. A matched 1920×1080, 30 fps short-video test also passed with H.264, HEVC, and ProRes Standard. HEVC is not a required input codec for the public processing path. An independent 640×360 H.264 input reached the pending state but preprocessing returned `CNCinematicErrorDomain` code 5 (`unsupported`). Changing its color tags or virtual sensor metadata did not resolve the native size rejection. The command preserves encoded media and does not resize or transcode to work around that restriction. Other dimensions, codecs, systems, and iPhone Photos processing require their own consumer verification.
 
-`--focal-length-35mm MM` sets the focal-length assumption for every frame. It defaults to 24. Its permitted range is 1 to 300. `--aperture F` defaults to 2.8. Its permitted range is 1 to 64. Both values must be finite. They are capture assumptions when the source lacks camera geometry, not measured optical properties.
+`--focal-length-35mm MM` sets the focal-length assumption for every frame. It defaults to 24. Its permitted range is 1 to 300. `--aperture F` defaults to 2.8. Its permitted range is 1 to 64. Both values must be finite. Supplying either option requires `--apple-cinematic`. They are capture assumptions when the source lacks camera geometry, not measured optical properties.
 
 ## Minimum processing information
 
@@ -51,10 +51,10 @@ python3 scripts/apple/verify_cinematic_envelope.py \
   --run-dir /absolute/path/new-results \
   --swift-build-dir /absolute/path/swift-build \
   --rust-build-dir /absolute/path/rust-build \
-  --synthetic --compare-render
+  --synthetic --compare-render --verify-batch
 ```
 
-Repeat `--input` for more native samples. The runner builds the current CLI and adapter. It removes all non-video/non-audio tracks and global metadata from each native sample. Public `CNAssetInfo` must report `none` for this ordinary derivative. The runner then invokes the CLI to generate an independent pending envelope.
+`--verify-batch` also runs the supported stripped and synthetic inputs through directory discovery and parallel `batch --apple-cinematic`, then checks the MOV result kind, packet identity, and public processing/rendering/edit reload for each output. Repeat `--input` for more native samples. The runner builds the current CLI and adapter. It removes all non-video/non-audio tracks and global metadata from each native sample. Public `CNAssetInfo` must report `none` for this ordinary derivative. The runner then invokes the CLI to generate an independent pending envelope.
 
 The public consumer check validates the script, recorded ID namespaces, selected detection track resolution, stable per-track detection type, finite frame focus, frame count, timestamps, aperture, timed keys, rendering frame attributes, virtual sensor geometry, per-frame focal-length range, and pending resource state. It adds two public fixed-focus tracks and requires their allocated IDs to be disjoint from recorded IDs. Pending resources must be preprocessed before editing. The check records base-decision counts and the focal-length timeline. FFprobe compares individual encoded video/audio packets, hashes, timestamps, and audio trim data. AVAssetReader audio buffer grouping is not a packet-identity test. The runner checks source hashes again after each operation. `--synthetic` adds independent 1080p and 360p H.264 inputs with no original Cinematic data or detectable faces. With `--compare-render`, the 1080p input must pass the full native processing checks. The 360p input is a separate compatibility probe: only Apple's explicit `unsupported` preprocessing error is recorded as a limitation; other errors fail the run. An unsupported compatibility probe never counts as rendering or editing evidence. If a later system supports it, the full rendering and edit checks run.
 

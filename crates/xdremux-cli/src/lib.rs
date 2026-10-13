@@ -42,23 +42,17 @@ enum RootCommand {
     Categorize(categorize::CategorizeArgs),
     /// Validate one canonical output without converting it.
     Validate(validate::ValidateArgs),
-    /// Build a pending Cinematic envelope for ordinary video on macOS.
-    Cinematic(CinematicEnvelopeArgs),
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug)]
 struct CinematicEnvelopeArgs {
     /// Ordinary input video; it is never replaced.
-    #[arg(long, value_name = "INPUT")]
     input: PathBuf,
     /// New MOV output path; existing files are never replaced.
-    #[arg(long, value_name = "OUTPUT")]
     output: PathBuf,
     /// Assumed 35mm-equivalent view angle when the source has no camera geometry.
-    #[arg(long, default_value_t = 24.0, value_name = "MM")]
     focal_length_35mm: f32,
     /// Assumed capture aperture used by Cinematic rendering metadata.
-    #[arg(long, default_value_t = 2.8, value_name = "F")]
     aperture: f32,
 }
 
@@ -75,17 +69,26 @@ struct InspectArgs {
 #[derive(Debug, Args, Default)]
 struct ProductConversionArgs {
     /// Preserve compatibility with OPPO Gallery when converting ProXDR still images.
-    #[arg(long, conflicts_with_all = ["apple_portrait", "apple_portrait_oppo", "apple_styles"])]
+    #[arg(long, conflicts_with_all = ["apple_portrait", "apple_portrait_oppo", "apple_styles", "apple_cinematic"])]
     oppo_compatible: bool,
     /// Preserve the complete Apple Portrait editing resource set using Vision semantics.
-    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait_oppo", "apple_styles"])]
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait_oppo", "apple_styles", "apple_cinematic"])]
     apple_portrait: bool,
     /// Use OPPO depth and available masks without Vision; reduced portrait effects (macOS).
-    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_styles"])]
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_styles", "apple_cinematic"])]
     apple_portrait_oppo: bool,
     /// Attach the Rust-owned Photographic Styles graph to a ProXDR still.
-    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo"])]
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_cinematic"])]
     apple_styles: bool,
+    /// Infer pending Cinematic editing metadata for ordinary video (macOS 27).
+    #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_styles"])]
+    apple_cinematic: bool,
+    /// Assumed 35mm-equivalent focal length for Cinematic input without camera geometry.
+    #[arg(long, value_name = "MM", requires = "apple_cinematic")]
+    focal_length_35mm: Option<f32>,
+    /// Assumed capture aperture for Cinematic rendering metadata.
+    #[arg(long, value_name = "F", requires = "apple_cinematic")]
+    aperture: Option<f32>,
 }
 
 impl ProductConversionArgs {
@@ -96,6 +99,14 @@ impl ProductConversionArgs {
             ConversionRequest {
                 apple_features: AppleFeatureRequest {
                     portrait: true,
+                    ..AppleFeatureRequest::default()
+                },
+                ..ConversionRequest::default()
+            }
+        } else if self.apple_cinematic {
+            ConversionRequest {
+                apple_features: AppleFeatureRequest {
+                    cinematic: true,
                     ..AppleFeatureRequest::default()
                 },
                 ..ConversionRequest::default()
@@ -113,6 +124,13 @@ impl ProductConversionArgs {
         }
     }
 
+    fn cinematic_options(&self) -> xdremux_runtime::CinematicEnvelopeOptions {
+        xdremux_runtime::CinematicEnvelopeOptions {
+            focal_length_35mm: self.focal_length_35mm.unwrap_or(24.0),
+            aperture: self.aperture.unwrap_or(2.8),
+        }
+    }
+
     fn portrait_profile(&self) -> ApplePortraitSemanticProfile {
         if self.apple_portrait_oppo {
             ApplePortraitSemanticProfile::OppoNative
@@ -124,10 +142,10 @@ impl ProductConversionArgs {
 
 #[derive(Debug, Args)]
 struct ConvertArgs {
-    /// Input ProXDR HEIC or supported Motion Photo.
+    /// Input ProXDR, Motion Photo, or ordinary video with --apple-cinematic.
     #[arg(long, value_name = "INPUT")]
     input: PathBuf,
-    /// Output HEIC; ProXDR defaults in-place, Motion Photo chooses a new pair.
+    /// Output HEIC or MOV; Cinematic chooses a new .xdremux.mov file.
     #[arg(long, value_name = "OUTPUT")]
     output: Option<PathBuf>,
     #[command(flatten)]
@@ -156,13 +174,13 @@ struct BatchArgs {
     /// Explicit input file. Repeat to add multiple files.
     #[arg(long = "input", value_name = "FILE")]
     inputs: Vec<PathBuf>,
-    /// Discover HEIC/HEIF/JPEG inputs in a directory. Repeat to add multiple roots.
+    /// Discover image inputs, or video inputs with --apple-cinematic. Repeatable.
     #[arg(long = "input-dir", value_name = "DIR")]
     input_dirs: Vec<PathBuf>,
     /// Recurse below each input directory. Symlinks are never followed.
     #[arg(long)]
     recursive: bool,
-    /// Place generated HEIC outputs in this directory.
+    /// Place generated HEIC or Cinematic MOV outputs in this directory.
     ///
     /// When omitted, each output is written beside its source with an .xdremux suffix.
     #[arg(long, value_name = "DIR")]
@@ -357,6 +375,28 @@ fn resolve_apple_adapter_executable() -> Result<PathBuf, String> {
 }
 
 fn run_convert(arguments: ConvertArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+    if arguments.product.apple_cinematic {
+        let options = arguments.product.cinematic_options();
+        let output = arguments.output.unwrap_or_else(|| {
+            let mut name = arguments
+                .input
+                .file_stem()
+                .unwrap_or_default()
+                .to_os_string();
+            name.push(".xdremux.mov");
+            arguments.input.with_file_name(name)
+        });
+        return run_cinematic_envelope(
+            CinematicEnvelopeArgs {
+                input: arguments.input,
+                output,
+                focal_length_35mm: options.focal_length_35mm,
+                aperture: options.aperture,
+            },
+            stdout,
+            stderr,
+        );
+    }
     let request = arguments.product.request();
     let apple_portrait = arguments.product.apple_portrait || arguments.product.apple_portrait_oppo;
     #[cfg(target_os = "macos")]
@@ -550,7 +590,7 @@ fn run_cinematic_envelope(
         let _ = (arguments, stdout);
         let _ = writeln!(
             stderr,
-            "error: the cinematic command requires macOS and Apple's Cinematic frameworks"
+            "error: --apple-cinematic requires macOS and Apple's Cinematic frameworks"
         );
         1
     }
@@ -562,14 +602,16 @@ fn is_hidden_batch_artifact(path: &Path) -> bool {
         .is_some_and(|name| name.starts_with('.'))
 }
 
-fn is_supported_batch_candidate(path: &Path) -> bool {
+fn is_supported_batch_candidate(path: &Path, cinematic: bool) -> bool {
     path.extension()
         .and_then(OsStr::to_str)
         .is_some_and(|extension| {
-            matches!(
-                extension.to_ascii_lowercase().as_str(),
-                "heic" | "heif" | "jpg" | "jpeg"
-            )
+            let extension = extension.to_ascii_lowercase();
+            if cinematic {
+                matches!(extension.as_str(), "mov" | "mp4" | "m4v" | "avi" | "mkv")
+            } else {
+                matches!(extension.as_str(), "heic" | "heif" | "jpg" | "jpeg")
+            }
         })
 }
 
@@ -589,6 +631,7 @@ fn is_generated_batch_output(path: &Path) -> bool {
 fn discover_directory(
     root: &Path,
     recursive: bool,
+    cinematic: bool,
     inputs: &mut Vec<PathBuf>,
 ) -> Result<(), String> {
     let mut pending = vec![root.to_path_buf()];
@@ -621,7 +664,9 @@ fn discover_directory(
                 continue;
             }
             if file_type.is_file() {
-                if is_supported_batch_candidate(&path) && !is_generated_batch_output(&path) {
+                if is_supported_batch_candidate(&path, cinematic)
+                    && !is_generated_batch_output(&path)
+                {
                     inputs.push(path);
                 }
             } else if recursive && file_type.is_dir() {
@@ -652,7 +697,12 @@ fn discover_batch_inputs(arguments: &BatchArgs) -> Result<Vec<PathBuf>, String> 
                 directory.display()
             ));
         }
-        discover_directory(directory, arguments.recursive, &mut inputs)?;
+        discover_directory(
+            directory,
+            arguments.recursive,
+            arguments.product.apple_cinematic,
+            &mut inputs,
+        )?;
     }
 
     inputs.sort();
@@ -675,6 +725,7 @@ fn batch_kind_name(kind: BatchAssetKind) -> &'static str {
     match kind {
         BatchAssetKind::ProXdr => "pro-xdr",
         BatchAssetKind::LivePhoto => "live-photo",
+        BatchAssetKind::Cinematic => "cinematic",
     }
 }
 
@@ -695,6 +746,15 @@ fn human_batch_name(path: &Path) -> String {
 const BATCH_RECEIPT_SCHEMA_VERSION: u32 = 1;
 
 fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
+    if arguments.product.apple_cinematic
+        && (arguments.resume
+            || arguments.skip_existing
+            || arguments.checkpoint.is_some()
+            || arguments.categorize)
+    {
+        let _ = writeln!(stderr, "error: --apple-cinematic does not support photo categorization or Live Photo checkpoint/resume options");
+        return 2;
+    }
     let inputs = match discover_batch_inputs(&arguments) {
         Ok(inputs) => inputs,
         Err(error) => {
@@ -703,10 +763,14 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         }
     };
     let reuse_existing = arguments.skip_existing || arguments.resume;
-    let checkpoint_path = motion_photo_checkpoint_path(
-        arguments.output_dir.as_deref(),
-        arguments.checkpoint.as_deref(),
-    );
+    let checkpoint_path = if arguments.product.apple_cinematic {
+        None
+    } else {
+        motion_photo_checkpoint_path(
+            arguments.output_dir.as_deref(),
+            arguments.checkpoint.as_deref(),
+        )
+    };
     if reuse_existing && checkpoint_path.is_none() {
         let _ = writeln!(
             stderr,
@@ -719,6 +783,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         checkpoint_path: checkpoint_path.clone(),
         reuse_existing,
         categorize_output: arguments.categorize,
+        cinematic_output: arguments.product.apple_cinematic,
     };
     let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,
@@ -732,6 +797,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
     let apple_adapter_executable = if arguments.product.apple_portrait
         || arguments.product.apple_portrait_oppo
         || arguments.product.apple_styles
+        || arguments.product.apple_cinematic
     {
         #[cfg(target_os = "macos")]
         {
@@ -760,11 +826,12 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         jobs: arguments.jobs,
         apple_adapter_executable,
     };
-    let receipt = runtime.convert_batch_with_options_and_portrait_profile(
+    let receipt = runtime.convert_batch_with_options_and_apple_profiles(
         items,
         arguments.product.request(),
         &execution_options,
         arguments.product.portrait_profile(),
+        arguments.product.cinematic_options(),
     );
 
     if arguments.json {
@@ -871,9 +938,6 @@ where
         Ok(Cli {
             command: RootCommand::Validate(arguments),
         }) => validate::run(arguments, stdout, stderr),
-        Ok(Cli {
-            command: RootCommand::Cinematic(arguments),
-        }) => run_cinematic_envelope(arguments, stdout, stderr),
         Err(error) => write_clap_error(error, stdout, stderr),
     }
 }
@@ -1269,6 +1333,53 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn cinematic_requests_and_video_discovery_follow_the_selected_intent() {
+        for command in ["convert", "batch"] {
+            let cli = parse(&[
+                command,
+                "--input",
+                "clip.mp4",
+                "--apple-cinematic",
+                "--focal-length-35mm",
+                "35",
+                "--aperture",
+                "4",
+            ]);
+            let product = match &cli.command {
+                RootCommand::Convert(a) => &a.product,
+                RootCommand::Batch(a) => &a.product,
+                _ => panic!("conversion expected"),
+            };
+            assert!(product.request().apple_features.cinematic);
+            assert_eq!(product.cinematic_options().focal_length_35mm, 35.0);
+            assert_eq!(product.cinematic_options().aperture, 4.0);
+        }
+        let root = unique_dir("cinematic-discovery");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("clip.MOV"), b"video").unwrap();
+        fs::write(root.join("capture.JPG"), b"image").unwrap();
+        fs::write(root.join("clip.xdremux.mov"), b"generated").unwrap();
+        let mut product = ProductConversionArgs::default();
+        product.apple_cinematic = true;
+        let mut found = Vec::new();
+        discover_directory(&root, false, true, &mut found).unwrap();
+        assert_eq!(found, vec![root.join("clip.MOV")]);
+        found.clear();
+        discover_directory(&root, false, false, &mut found).unwrap();
+        assert_eq!(found, vec![root.join("capture.JPG")]);
+        let options = BatchPlanOptions {
+            output_dir: Some(root.join("out")),
+            cinematic_output: product.request().apple_features.cinematic,
+            ..BatchPlanOptions::default()
+        };
+        let planned =
+            plan_batch_items(&[root.join("clip.MOV"), root.join("clip.mp4")], &options).unwrap();
+        assert_eq!(planned[0].output, root.join("out/clip.xdremux.mov"));
+        assert_eq!(planned[1].output, root.join("out/clip.xdremux (2).mov"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

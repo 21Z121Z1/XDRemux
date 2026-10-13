@@ -16,7 +16,7 @@ mod validation;
 pub use apple_adapter::AppleStylePropertiesFacts;
 pub use batch::{
     plan_batch_items, BatchAssetKind, BatchExecutionOptions, BatchFailure, BatchItem,
-    BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition,
+    BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition, CinematicEnvelopeOptions,
 };
 pub use batch_checkpoint::{
     motion_photo_checkpoint_path, DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME,
@@ -220,6 +220,9 @@ impl PortableRuntime {
         }
 
         let requested_output = output.as_ref();
+        if !requested_output.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("mov")) {
+            return Err(RuntimeError::new("Cinematic output", "Cinematic output must use the .mov extension"));
+        }
         let output_name = requested_output
             .file_name()
             .ok_or_else(|| RuntimeError::new("Cinematic output", "output must name a file"))?;

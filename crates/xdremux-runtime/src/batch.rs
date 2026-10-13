@@ -40,6 +40,7 @@ pub struct BatchPlanOptions {
     pub checkpoint_path: Option<PathBuf>,
     pub reuse_existing: bool,
     pub categorize_output: bool,
+    pub cinematic_output: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,10 +64,25 @@ impl Default for BatchExecutionOptions {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CinematicEnvelopeOptions {
+    pub focal_length_35mm: f32,
+    pub aperture: f32,
+}
+impl Default for CinematicEnvelopeOptions {
+    fn default() -> Self {
+        Self {
+            focal_length_35mm: 24.0,
+            aperture: 2.8,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BatchAssetKind {
     ProXdr,
     LivePhoto,
+    Cinematic,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,7 +157,7 @@ fn create_output_parent(path: &Path) -> Result<()> {
         .map_err(|error| RuntimeError::external("batch output directory", error))
 }
 
-fn output_candidate(input: &Path, parent: &Path, suffix: u32) -> Result<PathBuf> {
+fn output_candidate(input: &Path, parent: &Path, suffix: u32, cinematic: bool) -> Result<PathBuf> {
     let stem = input.file_stem().ok_or_else(|| {
         RuntimeError::new(
             "batch planning",
@@ -153,7 +169,7 @@ fn output_candidate(input: &Path, parent: &Path, suffix: u32) -> Result<PathBuf>
     if suffix > 1 {
         name.push(format!(" ({suffix})"));
     }
-    name.push(".heic");
+    name.push(if cinematic { ".mov" } else { ".heic" });
     Ok(parent.join(name))
 }
 
@@ -182,6 +198,16 @@ fn reusable_planned_output(
 /// source size+SHA-256 still matches the durable checkpoint. Actual HEIC/MOV
 /// identifier validation remains an execution-time requirement before reuse.
 pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Result<Vec<BatchItem>> {
+    if options.cinematic_output
+        && (options.reuse_existing
+            || options.checkpoint_path.is_some()
+            || options.categorize_output)
+    {
+        return Err(RuntimeError::new(
+            "Cinematic batch planning",
+            "Cinematic video does not support photo categorization or Live Photo checkpoints",
+        ));
+    }
     let checkpoint = if options.reuse_existing {
         match options.checkpoint_path.as_deref() {
             Some(path) => Some(MotionPhotoCheckpoint::load(path)?),
@@ -231,7 +257,7 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
 
         let mut suffix = 1_u32;
         let output = loop {
-            let candidate = output_candidate(input, &parent, suffix)?;
+            let candidate = output_candidate(input, &parent, suffix, options.cinematic_output)?;
             let companion = candidate.with_extension("mov");
             if candidate != *input
                 && !reserved.contains(&candidate)
@@ -345,15 +371,56 @@ fn process_batch_item_with_options(
     reuse_existing: bool,
     apple_adapter_executable: Option<&Path>,
     apple_portrait_profile: ApplePortraitSemanticProfile,
+    cinematic_options: CinematicEnvelopeOptions,
 ) -> BatchWorkResult {
     #[cfg(not(target_os = "macos"))]
-    let _ = apple_portrait_profile;
+    let _ = (apple_portrait_profile, cinematic_options);
     let mut checkpoint_event = None;
     let result: Result<BatchSuccess> = (|| {
         if item.input == item.output {
             return Err(RuntimeError::new(
                 "batch output",
                 "batch conversion never overwrites its source",
+            ));
+        }
+        if request.apple_features.cinematic {
+            if request.apple_features.portrait
+                || request.apple_features.photographic_styles
+                || request.requests_oppo_gallery_compatibility()
+                || reuse_existing
+            {
+                return Err(RuntimeError::new(
+                    "Cinematic batch intent",
+                    "Cinematic video intent is exclusive and cannot reuse Live Photo checkpoints",
+                ));
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let adapter = apple_adapter_executable.ok_or_else(|| {
+                    RuntimeError::new(
+                        "Apple capability",
+                        "Cinematic intent requires a resolved Apple adapter",
+                    )
+                })?;
+                create_output_parent(&item.output)?;
+                let receipt = runtime.generate_cinematic_envelope_file(
+                    adapter,
+                    &item.input,
+                    &item.output,
+                    cinematic_options.focal_length_35mm,
+                    cinematic_options.aperture,
+                )?;
+                return Ok(BatchSuccess {
+                    input: item.input.clone(),
+                    outputs: vec![receipt.output],
+                    kind: BatchAssetKind::Cinematic,
+                    disposition: BatchSuccessDisposition::Converted,
+                });
+            }
+            #[cfg(not(target_os = "macos"))]
+            return Err(RuntimeError::new(
+                "Apple capability",
+                "Cinematic intent requires macOS Cinematic frameworks",
             ));
         }
         create_output_parent(&item.output)?;
@@ -599,6 +666,39 @@ impl PortableRuntime {
     where
         I: IntoIterator<Item = BatchItem>,
     {
+        self.convert_batch_with_options_and_apple_profiles(
+            items,
+            request,
+            options,
+            apple_portrait_profile,
+            CinematicEnvelopeOptions::default(),
+        )
+    }
+
+    pub fn convert_batch_with_options_and_apple_profiles<I>(
+        &self,
+        items: I,
+        request: ConversionRequest,
+        options: &BatchExecutionOptions,
+        apple_portrait_profile: ApplePortraitSemanticProfile,
+        cinematic_options: CinematicEnvelopeOptions,
+    ) -> BatchReceipt
+    where
+        I: IntoIterator<Item = BatchItem>,
+    {
+        if request.apple_features.cinematic
+            && (options.reuse_existing || options.checkpoint_path.is_some())
+        {
+            return BatchReceipt {
+                successes: Vec::new(),
+                failures: vec![BatchFailure {
+                    input: PathBuf::new(),
+                    output: options.checkpoint_path.clone().unwrap_or_default(),
+                    error: "Cinematic video does not support Live Photo checkpoint/resume options"
+                        .to_owned(),
+                }],
+            };
+        }
         let checkpoint = options
             .checkpoint_path
             .as_deref()
@@ -636,6 +736,7 @@ impl PortableRuntime {
                     options.reuse_existing,
                     options.apple_adapter_executable.as_deref(),
                     apple_portrait_profile,
+                    cinematic_options,
                 );
                 outcomes[index] = Some(finalize_work_result(
                     work,
@@ -672,6 +773,7 @@ impl PortableRuntime {
                             reuse_existing,
                             apple_adapter_executable.as_deref(),
                             apple_portrait_profile,
+                            cinematic_options,
                         );
                         if sender.send((index, work)).is_err() {
                             break;

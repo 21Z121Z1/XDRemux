@@ -91,11 +91,12 @@ pub enum OutputIntent {
 pub struct AppleFeatureRequest {
     pub photographic_styles: bool,
     pub portrait: bool,
+    pub cinematic: bool,
 }
 
 impl AppleFeatureRequest {
     pub const fn any(self) -> bool {
-        self.photographic_styles || self.portrait
+        self.photographic_styles || self.portrait || self.cinematic
     }
 }
 
@@ -116,6 +117,7 @@ impl ConversionRequest {
             apple_features: AppleFeatureRequest {
                 photographic_styles: false,
                 portrait: false,
+                cinematic: false,
             },
         }
     }
@@ -334,6 +336,12 @@ pub fn plan_conversion(
         ));
     }
 
+    if request.apple_features.cinematic {
+        return Err(PlannerError::IncompatibleProductIntents(
+            "Cinematic metadata requires a video conversion path",
+        ));
+    }
+
     let gain_map_encoder = capabilities.gain_map_encoder_capabilities();
     let gain_map_target = resolve_product_gain_map_encode_profile(
         analysis.gain_map,
@@ -497,14 +505,17 @@ mod tests {
             AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: false,
+                cinematic: false,
             },
             AppleFeatureRequest {
                 photographic_styles: false,
                 portrait: true,
+                cinematic: false,
             },
             AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: true,
+                cinematic: false,
             },
         ] {
             let request = ConversionRequest {
@@ -538,6 +549,28 @@ mod tests {
     }
 
     #[test]
+    fn cinematic_intent_is_not_silently_ignored_by_the_still_planner() {
+        let request = ConversionRequest {
+            apple_features: AppleFeatureRequest {
+                cinematic: true,
+                ..AppleFeatureRequest::default()
+            },
+            ..ConversionRequest::default()
+        };
+        assert!(request.apple_features.any());
+        let analysis = ConversionAnalysis {
+            gain_map: source(GainMapChannels::Rgb, Some(ChromaSampling::Yuv420), 8),
+        };
+        let capabilities = capability_inventory([layout(ChromaSampling::Yuv444, 8)]);
+        assert_eq!(
+            plan_conversion(&analysis, request, &capabilities),
+            Err(PlannerError::IncompatibleProductIntents(
+                "Cinematic metadata requires a video conversion path"
+            ))
+        );
+    }
+
+    #[test]
     fn planner_rejects_requested_apple_feature_without_its_adapter() {
         let target = layout(ChromaSampling::Yuv444, 8);
         let capabilities = capability_inventory([target]);
@@ -548,6 +581,7 @@ mod tests {
             apple_features: AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: false,
+                cinematic: false,
             },
             ..ConversionRequest::default()
         };
@@ -569,6 +603,7 @@ mod tests {
             apple_features: AppleFeatureRequest {
                 photographic_styles: true,
                 portrait: false,
+                cinematic: false,
             },
             ..ConversionRequest::default()
         };

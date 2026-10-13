@@ -15,7 +15,6 @@ Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 
 | `categorize` | 不转换，只按资产类型和主要拍摄模式分类。 |
 | `inspect` | 检查输入类型和关键结构。 |
 | `validate` | 验证 ISO HDR HEIF 或 Live Photo 输出。 |
-| `cinematic` | 在 macOS 上从普通视频生成待预处理的 Cinematic MOV。 |
 
 运行帮助：
 
@@ -102,6 +101,7 @@ xdremux batch \
 | `--apple-portrait` | 在 macOS 上请求完整人像资源集。 |
 | `--apple-portrait-oppo` | 在 macOS 上使用 OPPO 深度和有效蒙版，人像效果降级。 |
 | `--apple-styles` | 在 macOS 上请求摄影风格。 |
+| `--apple-cinematic` | 在 macOS 27 上为普通视频推理待处理的电影效果元数据。 |
 | `--json` | 输出稳定的机器可读 receipt。 |
 
 batch 会在开始写文件前完成输出规划，避免源文件、HEIC 输出和 Live Photo MOV companion 之间发生路径碰撞。任务之间相互隔离；一个输入失败不会使已经成功发布的其他输入失去结果。
@@ -136,11 +136,14 @@ xdremux validate output.heic --json
 
 `validate` 自动识别并验证 ISO HDR HEIF 或 Live Photo pair，适合脚本和 CI 在转换后做独立检查。
 
-## `cinematic`（macOS）
+## 电影效果视频意图（macOS）
 
 ```bash
-xdremux cinematic --input ordinary.mp4 --output pending.mov
+xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
+xdremux batch --input-dir videos/ --output-dir converted/ --apple-cinematic --jobs 2
 ```
+
+`--apple-cinematic` 与 `--apple-styles`、`--apple-portrait` 一样，在 `convert` 和 `batch` 中启用；它与照片功能及 OPPO 兼容开关互斥。输出必须使用 `.mov` 后缀且尚不存在。单文件未指定输出时，在源文件旁生成 `SOURCE.xdremux.mov`。
 
 命令从解码后的视频帧生成新的 Cinematic 元数据，将压缩的视频和音频样本复制到新 MOV 中。输出文件必须尚不存在，输入文件不会被替换。
 
@@ -150,7 +153,9 @@ xdremux cinematic --input ordinary.mp4 --output pending.mov
 
 这是实验性命令。成功识别待处理状态，不保证原生处理支持每一种输入。在 macOS 27.0.1 上，独立 1080p H.264 输入能正常处理和渲染；640×360 H.264 输入能达到待处理状态，但 Apple 预处理会以不受支持为由拒绝。命令保留压缩媒体，不进行缩放或转码。已验证范围和消费者检查见 [Cinematic 元数据封装约定](cinematic.md)。
 
-`--focal-length-35mm MM` 默认为 24，`--aperture F` 默认为 2.8。对缺少相机几何信息的输入，这些值是生成元数据时采用的拍摄假设，不是恢复出的物理相机测量值。原生处理路径和验证方法见 [Cinematic 元数据封装约定](cinematic.md)。
+此意图的批处理目录扫描选择 MOV、MP4、M4V、AVI、MKV 候选，媒体是否能解码由 AVFoundation 判断。不会重新发现已生成的 `.xdremux` 文件。规划器保留不冲突的 `.mov` 文件名，回执类型为 `cinematic`。Live Photo 检查点/恢复及照片分类选项不适用于此视频意图。
+
+`--focal-length-35mm MM` 默认为 24，`--aperture F` 默认为 2.8，显式传入任一参数都需要 `--apple-cinematic`。对缺少相机几何信息的输入，这些值是生成元数据时采用的拍摄假设，不是恢复出的物理相机测量值。原生处理路径和验证方法见 [Cinematic 元数据封装约定](cinematic.md)。
 
 ## 产品意图与实现细节
 

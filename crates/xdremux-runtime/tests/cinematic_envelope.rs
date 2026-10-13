@@ -85,3 +85,58 @@ fn cinematic_rejects_incomplete_adapter_output_and_removes_staging() {
             .starts_with(".xdremux-cinematic-")));
     }
 }
+
+#[test]
+fn cinematic_rejects_misnamed_output_before_adapter_execution() {
+    let temp = tempfile::tempdir().unwrap();
+    let input = source(temp.path());
+    let output = temp.path().join("image.heic");
+    let error = PortableRuntime::new()
+        .generate_cinematic_envelope_file("/must-not-execute", &input, &output, 24.0, 2.8)
+        .unwrap_err();
+    assert!(error.to_string().contains(".mov extension"));
+    assert!(!output.exists());
+    assert_eq!(fs::read(input).unwrap(), b"protected source bytes");
+}
+
+#[test]
+fn cinematic_batch_routes_video_intent_and_rejects_incomplete_output() {
+    use xdremux_engine::{AppleFeatureRequest, ConversionRequest};
+    use xdremux_runtime::{BatchExecutionOptions, BatchItem};
+    for jobs in [1, 2] {
+        let temp = tempfile::tempdir().unwrap();
+        let input = source(temp.path());
+        let output = temp.path().join("pending.mov");
+        let second_input = temp.path().join("second.mov");
+        fs::write(&second_input, b"protected second source").unwrap();
+        let second_output = temp.path().join("second-pending.mov");
+        let adapter = helper(temp.path(), "zero-frames");
+        let request = ConversionRequest {
+            apple_features: AppleFeatureRequest {
+                cinematic: true,
+                ..AppleFeatureRequest::default()
+            },
+            ..ConversionRequest::default()
+        };
+        let receipt = PortableRuntime::new().convert_batch_with_options(
+            vec![
+                BatchItem::new(&input, &output),
+                BatchItem::new(&second_input, &second_output),
+            ],
+            request,
+            &BatchExecutionOptions {
+                jobs,
+                apple_adapter_executable: Some(adapter),
+                ..BatchExecutionOptions::default()
+            },
+        );
+        assert_eq!(receipt.failed(), 2);
+        assert!(receipt
+            .failures
+            .iter()
+            .all(|failure| failure.error.contains("without processing a video frame")));
+        assert!(!output.exists() && !second_output.exists());
+        assert_eq!(fs::read(input).unwrap(), b"protected source bytes");
+        assert_eq!(fs::read(second_input).unwrap(), b"protected second source");
+    }
+}
