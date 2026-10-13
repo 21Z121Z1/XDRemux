@@ -363,6 +363,12 @@ enum OrderedBatchOutcome {
     Failure(BatchFailure),
 }
 
+#[derive(Clone, Copy)]
+struct BatchAppleOptions {
+    portrait_profile: ApplePortraitSemanticProfile,
+    cinematic: CinematicEnvelopeOptions,
+}
+
 fn process_batch_item_with_options(
     runtime: &PortableRuntime,
     item: BatchItem,
@@ -370,11 +376,10 @@ fn process_batch_item_with_options(
     checkpoint: &MotionPhotoCheckpoint,
     reuse_existing: bool,
     apple_adapter_executable: Option<&Path>,
-    apple_portrait_profile: ApplePortraitSemanticProfile,
-    cinematic_options: CinematicEnvelopeOptions,
+    apple_options: BatchAppleOptions,
 ) -> BatchWorkResult {
     #[cfg(not(target_os = "macos"))]
-    let _ = (apple_portrait_profile, cinematic_options);
+    let _ = (apple_options.portrait_profile, apple_options.cinematic);
     let mut checkpoint_event = None;
     let result: Result<BatchSuccess> = (|| {
         if item.input == item.output {
@@ -407,8 +412,8 @@ fn process_batch_item_with_options(
                     adapter,
                     &item.input,
                     &item.output,
-                    cinematic_options.focal_length_35mm,
-                    cinematic_options.aperture,
+                    apple_options.cinematic.focal_length_35mm,
+                    apple_options.cinematic.aperture,
                 )?;
                 return Ok(BatchSuccess {
                     input: item.input.clone(),
@@ -536,7 +541,7 @@ fn process_batch_item_with_options(
                             adapter,
                             &source,
                             &item.output,
-                            apple_portrait_profile,
+                            apple_options.portrait_profile,
                         )?;
                         return Ok(BatchSuccess {
                             input: item.input.clone(),
@@ -725,6 +730,10 @@ impl PortableRuntime {
         let jobs = options.jobs.max(1).min(items.len());
         let mut writer: Option<MotionPhotoCheckpointWriter> = None;
         let mut outcomes = (0..items.len()).map(|_| None).collect::<Vec<_>>();
+        let apple_options = BatchAppleOptions {
+            portrait_profile: apple_portrait_profile,
+            cinematic: cinematic_options,
+        };
 
         if jobs == 1 {
             for (index, item) in items.iter().cloned().enumerate() {
@@ -735,8 +744,7 @@ impl PortableRuntime {
                     &checkpoint,
                     options.reuse_existing,
                     options.apple_adapter_executable.as_deref(),
-                    apple_portrait_profile,
-                    cinematic_options,
+                    apple_options,
                 );
                 outcomes[index] = Some(finalize_work_result(
                     work,
@@ -772,8 +780,7 @@ impl PortableRuntime {
                             checkpoint,
                             reuse_existing,
                             apple_adapter_executable.as_deref(),
-                            apple_portrait_profile,
-                            cinematic_options,
+                            apple_options,
                         );
                         if sender.send((index, work)).is_err() {
                             break;

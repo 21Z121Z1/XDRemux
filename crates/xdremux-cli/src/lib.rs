@@ -587,7 +587,13 @@ fn run_cinematic_envelope(
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (arguments, stdout);
+        let _ = (
+            arguments.input,
+            arguments.output,
+            arguments.focal_length_35mm,
+            arguments.aperture,
+            stdout,
+        );
         let _ = writeln!(
             stderr,
             "error: --apple-cinematic requires macOS and Apple's Cinematic frameworks"
