@@ -2,7 +2,7 @@
 
 [English](cinematic.en.md) | 简体中文
 
-`xdremux cinematic` 从普通视频生成新的待预处理 Cinematic MOV。验收目标是 Apple 公共 API 的 `needsPreprocessing` 状态。命令不保证推理出的电影效果与原始相机效果相同。
+`xdremux convert --apple-cinematic` 从普通视频生成新的待预处理 Cinematic MOV。验收目标是 Apple 公共 API 的 `needsPreprocessing` 状态。命令不保证推理出的电影效果与原始相机效果相同。
 
 ## 命令与运行条件
 
