@@ -1368,8 +1368,10 @@ mod tests {
         fs::write(root.join("clip.MOV"), b"video").unwrap();
         fs::write(root.join("capture.JPG"), b"image").unwrap();
         fs::write(root.join("clip.xdremux.mov"), b"generated").unwrap();
-        let mut product = ProductConversionArgs::default();
-        product.apple_cinematic = true;
+        let product = ProductConversionArgs {
+            apple_cinematic: true,
+            ..ProductConversionArgs::default()
+        };
         let mut found = Vec::new();
         discover_directory(&root, false, true, &mut found).unwrap();
         assert_eq!(found, vec![root.join("clip.MOV")]);
