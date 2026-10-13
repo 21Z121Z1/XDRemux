@@ -376,6 +376,32 @@ func verifyEditing(_ info: CNAssetInfo) async throws -> [String: Any] {
 @available(macOS 27.0, *)
 func verifyGenerated(_ url: URL, _ directory: URL) async throws -> [String: Any] {
     let info = try await prepare(url, directory.appendingPathComponent("generated-processed.mov"))
+    return try await verifyPrepared(info, directory)
+}
+
+@available(macOS 27.0, *)
+func verifyCompatibility(_ url: URL, _ directory: URL) async throws -> [String: Any] {
+    let info: CNAssetInfo
+    do {
+        info = try await prepare(url, directory.appendingPathComponent("generated-processed.mov"))
+    } catch {
+        let nativeError = error as NSError
+        // The SDK defines CNCinematicErrorCodeUnsupported as 5. This exception
+        // is allowed only for the explicit compatibility probe, never for the
+        // ordinary native/reference or generated render acceptance checks.
+        guard nativeError.domain == "CNCinematicErrorDomain", nativeError.code == 5 else { throw error }
+        return ["schema": "xdremux-cinematic-compatibility-probe-v1",
+                "public_preprocessing": false, "native_preprocessing_supported": false,
+                "error_domain": nativeError.domain, "error_code": nativeError.code,
+                "render_and_edit_verified": false]
+    }
+    var report = try await verifyPrepared(info, directory)
+    report["native_preprocessing_supported"] = true
+    return report
+}
+
+@available(macOS 27.0, *)
+func verifyPrepared(_ info: CNAssetInfo, _ directory: URL) async throws -> [String: Any] {
     let attributes = try await CNRenderingSession.Attributes(asset: info.asset)
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
         throw NSError(domain: "NoMetalDevice", code: 1)
@@ -489,16 +515,24 @@ struct HeadlessComparison {
                 print("HLG color-space, system SDR tone-map, profile and highlight regression passed")
                 return
             }
-            try check(args.count == 3, "usage: compare_cinematic_render NATIVE.mov GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-generated GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-color NEW_OUTPUT_DIRECTORY")
+            try check(args.count == 3, "usage: compare_cinematic_render NATIVE.mov GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-generated GENERATED.mov NEW_OUTPUT_DIRECTORY | --probe-compatibility GENERATED.mov NEW_OUTPUT_DIRECTORY | --verify-color NEW_OUTPUT_DIRECTORY")
             let directory = URL(fileURLWithPath: args[2])
             try check(!FileManager.default.fileExists(atPath: directory.path), "comparison output directory exists")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let generatedOnly = args[0] == "--verify-generated"
-            let report = generatedOnly
+            let compatibility = args[0] == "--probe-compatibility"
+            let report = compatibility
+                ? try await verifyCompatibility(URL(fileURLWithPath: args[1]), directory)
+                : generatedOnly
                 ? try await verifyGenerated(URL(fileURLWithPath: args[1]), directory)
                 : try await compare(URL(fileURLWithPath: args[0]), URL(fileURLWithPath: args[1]), directory)
             let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
-            try data.write(to: directory.appendingPathComponent(generatedOnly ? "generated-verification.json" : "comparison.json"), options: .atomic)
+            let reportName = compatibility ? "compatibility.json" : generatedOnly ? "generated-verification.json" : "comparison.json"
+            try data.write(to: directory.appendingPathComponent(reportName), options: .atomic)
+            if compatibility {
+                print("compatibility probe: native preprocessing supported=\(report["native_preprocessing_supported"]!)")
+                return
+            }
             print(generatedOnly ? "generated native preprocessing, render and edit/reload passed" :
                   "headless comparison complete; identical=\(report["all_compared_frames_identical"]!)")
         } catch { fputs("headless comparison failed: \(error.localizedDescription)\n", stderr); exit(1) }

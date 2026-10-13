@@ -59,7 +59,7 @@ def main() -> None:
     parser.add_argument("--rust-build-dir", type=Path, required=True)
     parser.add_argument("--focal-length-35mm", type=float, default=24.0)
     parser.add_argument("--aperture", type=float, default=2.8)
-    parser.add_argument("--synthetic", action="store_true", help="Also test a generated H.264 MP4 with no original Cinematic data")
+    parser.add_argument("--synthetic", action="store_true", help="Test independent 1080p H.264 rendering and a separate 360p native compatibility probe")
     parser.add_argument("--compare-render", action="store_true", help="Preprocess, render and reload public edits; compare native references when available")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
@@ -82,13 +82,14 @@ def main() -> None:
     report: dict = {"schema": "xdremux-cinematic-envelope-verification-v1", "head": head,
                     "runtime": subprocess.check_output(["sw_vers", "-productVersion"], text=True).strip(),
                     "cli_sha256": digest(cli), "adapter_sha256": digest(adapter), "assets": []}
-    inputs = [(path.resolve(), True) for path in args.input]
+    inputs = [(path.resolve(), True, False) for path in args.input]
     if args.synthetic:
-        generated = out / "synthetic-h264.mp4"
-        run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30000/1001", "-t", "2",
-             "-c:v", "libx264", "-pix_fmt", "yuv420p", str(generated)], out / "synthetic-create.log")
-        inputs.append((generated, False))
-    for index, (source, needs_strip) in enumerate(inputs):
+        for label, size, compatibility in [("1080", "1920x1080", False), ("360", "640x360", True)]:
+            generated = out / f"synthetic-h264-{label}.mp4"
+            run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", f"testsrc2=size={size}:rate=30000/1001", "-t", "2",
+                 "-c:v", "libx264", "-pix_fmt", "yuv420p", str(generated)], out / f"synthetic-{label}-create.log")
+            inputs.append((generated, False, compatibility))
+    for index, (source, needs_strip, compatibility) in enumerate(inputs):
         case = out / f"{index + 1:02d}-{source.stem}"
         case.mkdir()
         original_hash = digest(source)
@@ -120,6 +121,9 @@ def main() -> None:
             if needs_strip:
                 run([str(renderer), str(source), str(pending), str(case / "headless")], case / "headless.log")
                 record["headless_comparison"] = json.loads((case / "headless/comparison.json").read_text())
+            elif compatibility:
+                run([str(renderer), "--probe-compatibility", str(pending), str(case / "headless")], case / "headless.log")
+                record["headless_compatibility"] = json.loads((case / "headless/compatibility.json").read_text())
             else:
                 run([str(renderer), "--verify-generated", str(pending), str(case / "headless")], case / "headless.log")
                 record["headless_generated"] = json.loads((case / "headless/generated-verification.json").read_text())
@@ -130,6 +134,8 @@ def main() -> None:
         print(f"{source.name}: none -> needsPreprocessing, ready, frames={processed}, compressed media unchanged", flush=True)
         if "headless_comparison" in record:
             print(f"  headless native/generated pixel identity={record['headless_comparison']['all_compared_frames_identical']}", flush=True)
+        if "headless_compatibility" in record:
+            print(f"  compatibility only: native preprocessing supported={record['headless_compatibility']['native_preprocessing_supported']}", flush=True)
     print(f"verified={len(report['assets'])}; report={out / 'report.json'}", flush=True)
 
 

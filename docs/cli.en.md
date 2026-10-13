@@ -148,6 +148,8 @@ Before publication, the Apple adapter requires public `CNAssetInfo` to report `n
 
 The current implementation requires macOS 27, a macOS 27 SDK build of the adapter, the corresponding Apple private framework methods, and supported inference and tracking hardware/resources. It fails when a required SDK, OS, method, or resource is unavailable. Import the pending MOV into Photos and enable Cinematic to let Photos process and render its resources.
 
+This command is experimental. Successful pending-state recognition does not guarantee native processing for every input. On macOS 27.0.1, an independent 1080p H.264 input processed and rendered successfully; a 640×360 H.264 input reached the pending state but Apple's preprocessing rejected it as unsupported. The command preserves encoded media without resizing or transcoding. See the [Cinematic contract](cinematic.en.md) for the tested scope and consumer checks.
+
 `--focal-length-35mm MM` defaults to 24. `--aperture F` defaults to 2.8. These are assumed capture values for input without camera geometry. They are not recovered physical camera measurements. See the [Cinematic envelope contract](cinematic.en.md) for the native pipeline and verification procedure.
 
 ## Product intent versus implementation detail

@@ -148,6 +148,8 @@ xdremux cinematic --input ordinary.mp4 --output pending.mov
 
 当前实现需要 macOS 27、使用 macOS 27 SDK 构建的 adapter、对应的 Apple 私有框架方法，以及受支持的推理和跟踪硬件/资源。必要的 SDK、系统、方法或资源不可用时，命令会失败。将待处理 MOV 导入 Photos 并开启电影效果，由 Photos 处理和渲染其资源。
 
+这是实验性命令。成功识别待处理状态，不保证原生处理支持每一种输入。在 macOS 27.0.1 上，独立 1080p H.264 输入能正常处理和渲染；640×360 H.264 输入能达到待处理状态，但 Apple 预处理会以不受支持为由拒绝。命令保留压缩媒体，不进行缩放或转码。已验证范围和消费者检查见 [Cinematic 元数据封装约定](cinematic.md)。
+
 `--focal-length-35mm MM` 默认为 24，`--aperture F` 默认为 2.8。对缺少相机几何信息的输入，这些值是生成元数据时采用的拍摄假设，不是恢复出的物理相机测量值。原生处理路径和验证方法见 [Cinematic 元数据封装约定](cinematic.md)。
 
 ## 产品意图与实现细节
