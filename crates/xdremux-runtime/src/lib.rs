@@ -17,6 +17,7 @@ pub use apple_adapter::AppleStylePropertiesFacts;
 pub use batch::{
     plan_batch_items, BatchAssetKind, BatchExecutionOptions, BatchFailure, BatchItem,
     BatchPlanOptions, BatchReceipt, BatchSuccess, BatchSuccessDisposition,
+    CinematicEnvelopeOptions,
 };
 pub use batch_checkpoint::{
     motion_photo_checkpoint_path, DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME,
@@ -40,6 +41,8 @@ use std::sync::Arc;
 use std::fs;
 
 use atomic_write_file::AtomicWriteFile;
+#[cfg(target_os = "macos")]
+use sha2::{Digest, Sha256};
 use xdremux_codec::{
     GainMapTileEncodeRequest, JpegRasterDecodeRequest, LibHeifProvider, Raster8, RasterPixelFormat,
     ZuneJpegProvider,
@@ -148,6 +151,16 @@ pub struct PhotographicStylesFileReceipt {
 }
 
 #[cfg(target_os = "macos")]
+#[derive(Debug, Clone, PartialEq)]
+pub struct CinematicEnvelopeFileReceipt {
+    pub output: PathBuf,
+    pub processed_frames: u64,
+    pub focal_length_35mm: f32,
+    pub aperture: f32,
+    pub disparity_track_written: bool,
+}
+
+#[cfg(target_os = "macos")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplePortraitFileReceipt {
     pub output: PathBuf,
@@ -166,6 +179,140 @@ impl PortableRuntime {
             jpeg: ZuneJpegProvider::new(),
             heif: LibHeifProvider::new(),
         }
+    }
+
+    /// Create a lightweight pending Cinematic MOV for ordinary video.
+    /// Apple Vision and Portrait/Cinematic SPIs derive timed frame data; the
+    /// raster disparity buffers stay transient so Photos can own materializing
+    /// that resource after import. The source is never replaced.
+    #[cfg(target_os = "macos")]
+    pub fn generate_cinematic_envelope_file(
+        &self,
+        executable: impl AsRef<Path>,
+        input: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+        focal_length_35mm: f32,
+        aperture: f32,
+    ) -> Result<CinematicEnvelopeFileReceipt> {
+        use std::fs::File;
+        use std::io::Read;
+
+        let input = input
+            .as_ref()
+            .canonicalize()
+            .map_err(|error| RuntimeError::external("Cinematic input", error))?;
+        if !input.is_file() {
+            return Err(RuntimeError::new(
+                "Cinematic input",
+                "input is not a regular file",
+            ));
+        }
+        if !focal_length_35mm.is_finite() || !(1.0..=300.0).contains(&focal_length_35mm) {
+            return Err(RuntimeError::new(
+                "Cinematic configuration",
+                "35mm-equivalent focal length must be finite and between 1 and 300",
+            ));
+        }
+        if !aperture.is_finite() || !(1.0..=64.0).contains(&aperture) {
+            return Err(RuntimeError::new(
+                "Cinematic configuration",
+                "aperture must be finite and between 1 and 64",
+            ));
+        }
+
+        let requested_output = output.as_ref();
+        if !requested_output
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("mov"))
+        {
+            return Err(RuntimeError::new(
+                "Cinematic output",
+                "Cinematic output must use the .mov extension",
+            ));
+        }
+        let output_name = requested_output
+            .file_name()
+            .ok_or_else(|| RuntimeError::new("Cinematic output", "output must name a file"))?;
+        let output_parent = requested_output
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."))
+            .canonicalize()
+            .map_err(|error| RuntimeError::external("Cinematic output parent", error))?;
+        let output = output_parent.join(output_name);
+        if output.exists() {
+            return Err(RuntimeError::new(
+                "Cinematic output",
+                format!("refusing to replace existing file {}", output.display()),
+            ));
+        }
+        if input == output {
+            return Err(RuntimeError::new(
+                "Cinematic output",
+                "output must not replace the source video",
+            ));
+        }
+
+        let mut source_digest = Sha256::new();
+        let mut source_file = File::open(&input)
+            .map_err(|error| RuntimeError::external("Cinematic source hash", error))?;
+        let mut buffer = [0_u8; 1024 * 1024];
+        loop {
+            let count = source_file
+                .read(&mut buffer)
+                .map_err(|error| RuntimeError::external("Cinematic source hash", error))?;
+            if count == 0 {
+                break;
+            }
+            source_digest.update(&buffer[..count]);
+        }
+        let original_digest = source_digest.finalize();
+
+        let staging = tempfile::Builder::new()
+            .prefix(".xdremux-cinematic-")
+            .tempdir_in(&output_parent)
+            .map_err(|error| RuntimeError::external("Cinematic staging", error))?;
+        let candidate = staging.path().join("pending-cinematic.mov");
+        let adapter = apple_adapter::AppleAdapterClient::new(executable.as_ref().to_path_buf());
+        let facts =
+            adapter.generate_cinematic_envelope(&input, &candidate, focal_length_35mm, aperture)?;
+        let candidate_metadata = fs::metadata(&candidate)
+            .map_err(|error| RuntimeError::external("Cinematic candidate", error))?;
+        if !candidate_metadata.is_file() || candidate_metadata.len() == 0 {
+            return Err(RuntimeError::new(
+                "Cinematic candidate",
+                "Apple adapter returned an empty output",
+            ));
+        }
+
+        let mut final_digest = Sha256::new();
+        let mut source_file = File::open(&input)
+            .map_err(|error| RuntimeError::external("Cinematic source recheck", error))?;
+        loop {
+            let count = source_file
+                .read(&mut buffer)
+                .map_err(|error| RuntimeError::external("Cinematic source recheck", error))?;
+            if count == 0 {
+                break;
+            }
+            final_digest.update(&buffer[..count]);
+        }
+        if original_digest[..] != final_digest.finalize()[..] {
+            return Err(RuntimeError::new(
+                "Cinematic source recheck",
+                "source changed while the Cinematic envelope was being generated",
+            ));
+        }
+        fs::hard_link(&candidate, &output)
+            .map_err(|error| RuntimeError::external("Cinematic publication", error))?;
+
+        Ok(CinematicEnvelopeFileReceipt {
+            output,
+            processed_frames: facts.processed_frames,
+            focal_length_35mm: facts.focal_length_35mm,
+            aperture: facts.aperture,
+            disparity_track_written: facts.disparity_track_written,
+        })
     }
 
     pub fn capability_inventory(&self) -> Result<CapabilityInventory> {

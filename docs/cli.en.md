@@ -101,6 +101,7 @@ Common options:
 | `--apple-portrait` | Request the complete Portrait resource set on macOS. |
 | `--apple-portrait-oppo` | Use OPPO depth and available masks with reduced effects on macOS. |
 | `--apple-styles` | Request Photographic Styles on macOS. |
+| `--apple-cinematic` | Infer pending Cinematic metadata for ordinary video on macOS 27. |
 | `--json` | Emit a stable machine-readable receipt. |
 
 Batch planning reserves all output paths before the first write, preventing collisions between sources, HEIC outputs, and Live Photo MOV companions. Failures are isolated per item; already-published successful work remains valid.
@@ -134,6 +135,25 @@ xdremux validate output.heic --json
 ```
 
 `validate` automatically recognizes and validates either ISO HDR HEIF or a Live Photo pair. It is suitable for independent post-conversion checks in scripts and CI.
+
+## Cinematic video intent (macOS)
+
+```bash
+xdremux convert --input ordinary.mp4 --output pending.mov --apple-cinematic
+xdremux batch --input-dir videos/ --output-dir converted/ --apple-cinematic --jobs 2
+```
+
+`--apple-cinematic` activates this feature on `convert` and `batch`, like `--apple-styles` and `--apple-portrait`. It is mutually exclusive with the image feature and OPPO compatibility flags. The selected path generates new Cinematic metadata from decoded video frames. It copies the compressed video and audio samples into a new MOV. The output must use the `.mov` extension and must not exist. If `convert --output` is omitted, the command creates `SOURCE.xdremux.mov` beside the input. The input is never replaced.
+
+Before publication, the Apple adapter requires public `CNAssetInfo` to report `needsPreprocessing`, resource status `ready`, and `isPreprocessed == false`. The MOV contains no materialized raster disparity track. This state is the acceptance target; it does not establish Photos editing or rendering quality.
+
+The current implementation requires macOS 27, a macOS 27 SDK build of the adapter, the corresponding Apple private framework methods, and supported inference and tracking hardware/resources. It fails when a required SDK, OS, method, or resource is unavailable. Import the pending MOV into Photos and enable Cinematic to let Photos process and render its resources.
+
+This command is experimental. Successful pending-state recognition does not guarantee native processing for every input. On macOS 27.0.1, an independent 1080p H.264 input processed and rendered successfully; a 640×360 H.264 input reached the pending state but Apple's preprocessing rejected it as unsupported. The command preserves encoded media without resizing or transcoding. See the [Cinematic contract](cinematic.en.md) for the tested scope and consumer checks.
+
+For this intent, batch directory discovery selects MOV, MP4, M4V, AVI, and MKV candidates. AVFoundation decides whether their media can be decoded. Generated `.xdremux` files are not rediscovered. Output planning reserves unique `.mov` names; receipts use kind `cinematic`. Live Photo checkpoint/resume and photo categorization options do not apply to this video intent.
+
+`--focal-length-35mm MM` defaults to 24. `--aperture F` defaults to 2.8. Supplying either parameter requires `--apple-cinematic`. These are assumed capture values for input without camera geometry. They are not recovered physical camera measurements. See the [Cinematic envelope contract](cinematic.en.md) for the native pipeline and verification procedure.
 
 ## Product intent versus implementation detail
 
