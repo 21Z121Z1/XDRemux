@@ -74,3 +74,48 @@ PY
 if printenv XDREMUX_STYLE_VERSION_PROBE_REPORT >/dev/null; then
   cp "$work/native-result.json" "$XDREMUX_STYLE_VERSION_PROBE_REPORT"
 fi
+
+# Only the public, checked-in OPPO fixture is used for this export. The
+# temporary working directory is still deleted after the validated outputs
+# have been copied to the Actions artifact staging directory.
+if [[ -n "${XDREMUX_STYLE_VERSION_PROBE_MEDIA_DIR:-}" ]]; then
+  media_dir="$XDREMUX_STYLE_VERSION_PROBE_MEDIA_DIR"
+  mkdir -p "$media_dir"
+  for name in styles-v15.heic styles-v16-version-only.heic native-result.json README.txt; do
+    if [[ -e "$media_dir/$name" ]]; then
+      echo "Refusing to overwrite an existing Photos-import artifact: $name" >&2
+      exit 1
+    fi
+  done
+  cp "$original" "$media_dir/styles-v15.heic"
+  cp "$changed" "$media_dir/styles-v16-version-only.heic"
+  cp "$work/native-result.json" "$media_dir/native-result.json"
+  cat > "$media_dir/README.txt" <<'README'
+XDRemux / Apple Photos Photographic Styles A/B experiment
+Source: checked-in public OPPO Find X9 Ultra fixture
+  fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic
+
+styles-v15.heic
+  Real XDRemux --apple-styles conversion with reconstructed HDR Log thumbnail.
+styles-v16-version-only.heic
+  The exact same HEIC with ONLY the root Styles metadata version byte
+  changed from 15 to 16. It is NOT a complete native iOS 27 Texture Styles
+  asset, nor does it contain the additional v16 Texture Style resources.
+native-result.json
+  Hashes, byte-change offset, and the macOS ImageIO/NeutrinoCore parser
+  comparison. Both files passed the Rust HEIF structural validator.
+
+Import each HEIC separately into iPhone Photos. Compare whether the
+Photographic Styles Tone/Color controls appear, whether they actually
+change the picture, and whether edits persist after Save/reopen.
+Compare on the same iPhone / iOS version. A parsing success or UI button
+alone is NOT sufficient to prove functional Tone/Color adjustments.
+
+These files are research-only and should not replace the product output.
+README
+  test -s "$media_dir/styles-v15.heic"
+  test -s "$media_dir/styles-v16-version-only.heic"
+  test -s "$media_dir/native-result.json"
+  test -s "$media_dir/README.txt"
+  echo "photos-import-artifacts-ready: $media_dir"
+fi
