@@ -21,6 +21,9 @@ class RustArtifactLifecycleTests(unittest.TestCase):
 
     def test_styles_transaction_validates_the_final_artifact_before_publication(self) -> None:
         source = (RUNTIME / "apple_styles.rs").read_text(encoding="utf-8")
+        # Native readback tests also validate their decoded outputs. Only the
+        # production transaction determines publication ordering.
+        source = source.partition("\n#[cfg(test)]")[0]
         for marker in (
             "tempdir_in(parent)",
             "assemble_photographic_styles_heif",
