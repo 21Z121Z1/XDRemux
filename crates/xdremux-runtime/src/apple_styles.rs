@@ -7,10 +7,11 @@ use xdremux_codec::{EncodedHevcResource, HeifRasterDecodeRequest, Raster8, Raste
 use xdremux_engine::{
     apple_style_apply_global_tone_curve, apple_style_data_from_coefficient_deltas,
     apple_style_distribution, apple_style_face_exposure_boost, apple_style_fit_global_polynomial,
-    apple_style_light_map, apple_style_linear_metadata, apple_style_monotonic_global_tone_curve,
-    apple_style_property_list, resolve_apple_style_scene_type, AppleL8Mask,
-    AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
-    AppleStylePropertyListRequest, AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+    apple_style_light_map, apple_style_linear_metadata, apple_style_linear_thumbnail_codes,
+    apple_style_monotonic_global_tone_curve, apple_style_property_list,
+    resolve_apple_style_scene_type, AppleL8Mask, AppleStyleGlobalToneCurve,
+    AppleStyleLightMapRequest, AppleStyleLinearMetadata, AppleStylePropertyListRequest,
+    AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
 };
 
 use crate::apple_adapter::{AppleAdapterClient, AppleVideoToolboxMain10Encode};
@@ -215,7 +216,7 @@ pub(crate) fn convert_file(
         .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
     let scene_raster = downsample_raster(&raster, LINEAR_THUMBNAIL_MAX_SIZE)?;
     let scene_rasters = derive_style_scene(&scene_raster, &gain_raster, &prepared.scale)?;
-    let linear_thumbnail_raster = scene_raster.clone();
+    let linear_thumbnail_raster = linear_thumbnail_raster(&scene_rasters)?;
     let linear_thumbnail = encode_linear_thumbnail(
         &adapter,
         staging.path(),
@@ -465,6 +466,7 @@ struct StyleSceneRasters {
     width: usize,
     height: usize,
     base_rgb: Vec<f32>,
+    hdr_rgb: Vec<f32>,
     base_luminance: Vec<f32>,
     hdr_luminance: Vec<f32>,
     coded_linear_luminance: Vec<f32>,
@@ -528,6 +530,7 @@ fn derive_style_scene(
         RuntimeError::new("Photographic Styles source raster", "pixel count overflows")
     })?;
     let mut base_rgb = Vec::with_capacity(pixel_count * 3);
+    let mut hdr_rgb = Vec::with_capacity(pixel_count * 3);
     let mut base_luminance = Vec::with_capacity(pixel_count);
     let mut hdr_luminance = Vec::with_capacity(pixel_count);
     let mut renderer_linear_minimum = f32::INFINITY;
@@ -630,6 +633,7 @@ fn derive_style_scene(
                 ));
             }
             base_rgb.extend_from_slice(&base);
+            hdr_rgb.extend_from_slice(&hdr);
             base_luminance.push(base_y);
             hdr_luminance.push(hdr_y);
             for value in hdr {
@@ -688,6 +692,7 @@ fn derive_style_scene(
         width,
         height,
         base_rgb,
+        hdr_rgb,
         base_luminance,
         hdr_luminance,
         coded_linear_luminance,
@@ -698,6 +703,30 @@ fn derive_style_scene(
         renderer_linear_minimum,
         renderer_linear_maximum,
     })
+}
+
+fn linear_thumbnail_raster(scene: &StyleSceneRasters) -> Result<Raster8> {
+    let data =
+        apple_style_linear_thumbnail_codes(&scene.hdr_rgb, scene.linear_metadata.baseline_exposure)
+            .map_err(|error| {
+                RuntimeError::external("Photographic Styles Linear Thumbnail", error)
+            })?;
+    // Keep the decoded scene geometry used by the auxiliary graph. Applying
+    // another display rotation here would misregister the reference.
+    Raster8::new(
+        u32::try_from(scene.width).map_err(|_| {
+            RuntimeError::new("Photographic Styles Linear Thumbnail", "width exceeds u32")
+        })?,
+        u32::try_from(scene.height).map_err(|_| {
+            RuntimeError::new("Photographic Styles Linear Thumbnail", "height exceeds u32")
+        })?,
+        scene.width.checked_mul(3).ok_or_else(|| {
+            RuntimeError::new("Photographic Styles Linear Thumbnail", "row size overflows")
+        })?,
+        RasterPixelFormat::Rgb8,
+        data,
+    )
+    .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))
 }
 
 fn source_derived_style_data(scene: &StyleSceneRasters) -> Result<Vec<u8>> {
@@ -1139,6 +1168,186 @@ fn style_grid_size(width: u32, height: u32) -> (u32, u32, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox() {
+        use xdremux_format::isobmff::{parse_meta_box, scan_top_level_boxes, META};
+        use xdremux_format::FourCC;
+
+        let Some(adapter) = std::env::var_os("XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE") else {
+            return;
+        };
+        let runtime = PortableRuntime::new();
+        let temporary = tempfile::tempdir().unwrap();
+        let output_dir = std::env::var_os("XDREMUX_TEST_STYLES_OUTPUT")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| temporary.path().to_path_buf());
+        fs::create_dir_all(&output_dir).unwrap();
+        for fixture in [
+            "oppo/find-x9-ultra/uhdr-portrait-01.heic",
+            "oppo/find-x7-ultra/lhdr-v2-01.heic",
+        ] {
+            let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../fixtures/proxdr")
+                .join(fixture);
+            let source = fs::read(&path).unwrap();
+            let output_path = output_dir.join(path.file_name().unwrap());
+            convert_file(&runtime, &adapter, &source, &output_path).unwrap();
+            let output = fs::read(&output_path).unwrap();
+            let structure = xdremux_heif::validate_gain_map_structure(&output).unwrap();
+            let top = scan_top_level_boxes(&output).unwrap();
+            let meta_header = top.boxes.iter().find(|header| header.kind == META).unwrap();
+            let meta = parse_meta_box(&output, meta_header).unwrap();
+            let thumbnail_id = meta
+                .ipma
+                .entries
+                .iter()
+                .find(|entry| {
+                    entry.associations.iter().any(|association| {
+                        meta.properties.iter().any(|property| {
+                            property.index == u32::from(association.property_index)
+                                && property.kind == FourCC::new(*b"auxC")
+                                && output[property.box_range.clone()]
+                                    .windows(b"tag:apple.com,2023:photo:aux:linearthumbnail".len())
+                                    .any(|bytes| {
+                                        bytes == b"tag:apple.com,2023:photo:aux:linearthumbnail"
+                                    })
+                        })
+                    })
+                })
+                .expect("Styles graph must expose its Linear Thumbnail")
+                .item_id;
+            let decoded = runtime
+                .heif
+                .decode_item_raster(&output, thumbnail_id, RasterPixelFormat::Rgb8)
+                .unwrap();
+            let base = runtime
+                .heif
+                .decode_raster(&HeifRasterDecodeRequest {
+                    data: output.clone(),
+                    format: RasterPixelFormat::Rgb8,
+                })
+                .unwrap();
+            let base = downsample_raster(&base, LINEAR_THUMBNAIL_MAX_SIZE).unwrap();
+            let prepared = runtime.analyze_proxdr(&source).unwrap();
+            let gain = runtime
+                .heif
+                .decode_item_raster(
+                    &output,
+                    structure.gain_map_item_id,
+                    match prepared.analysis.gain_map.channels {
+                        xdremux_engine::GainMapChannels::Mono => RasterPixelFormat::Mono8,
+                        xdremux_engine::GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
+                    },
+                )
+                .unwrap();
+            let scene = derive_style_scene(&base, &gain, &prepared.scale).unwrap();
+            let expected = linear_thumbnail_raster(&scene).unwrap();
+            assert_eq!(
+                (decoded.width, decoded.height),
+                (expected.width, expected.height)
+            );
+            let mut log_error = 0.0;
+            let mut sdr_error = 0.0;
+            for y in 0..scene.height {
+                for x in 0..scene.width * 3 {
+                    let actual = f64::from(decoded.data[y * decoded.bytes_per_row + x]);
+                    log_error +=
+                        (actual - f64::from(expected.data[y * expected.bytes_per_row + x])).abs();
+                    sdr_error += (actual - f64::from(base.data[y * base.bytes_per_row + x])).abs();
+                }
+            }
+            let count = (scene.width * scene.height * 3) as f64;
+            let log_mae = log_error / count;
+            let sdr_mae = sdr_error / count;
+            assert!(
+                log_mae < 3.0,
+                "{fixture}: decoded HDR Log MAE {log_mae}/255"
+            );
+            assert!(
+                sdr_mae > 10.0,
+                "{fixture}: thumbnail still resembles copied SDR: {sdr_mae}/255"
+            );
+            let standard = runtime
+                .convert_proxdr_bytes(
+                    &source,
+                    xdremux_engine::ConversionRequest::default(),
+                    |_| {},
+                )
+                .unwrap()
+                .bytes;
+            let before = runtime
+                .heif
+                .extract_primary_hevc_resource(&standard)
+                .unwrap();
+            let after = runtime.heif.extract_primary_hevc_resource(&output).unwrap();
+            assert_eq!(
+                before.payload, after.payload,
+                "Styles must preserve the primary HEVC"
+            );
+            assert_eq!(before.hvcc, after.hvcc);
+            eprintln!("hdr-log-thumbnail: fixture={fixture} dimensions={}x{} log_mae={log_mae:.4}/255 sdr_mae={sdr_mae:.4}/255 output={}", decoded.width, decoded.height, output_path.display());
+        }
+    }
+
+    #[test]
+    fn linear_thumbnail_reconstructs_rgb_gain_and_keeps_storage_geometry() {
+        let base = Raster8::new(
+            2,
+            2,
+            6,
+            RasterPixelFormat::Rgb8,
+            vec![64, 96, 128, 128, 160, 192, 192, 224, 255, 32, 48, 64],
+        )
+        .unwrap();
+        let gain = Raster8::new(
+            2,
+            2,
+            6,
+            RasterPixelFormat::Rgb8,
+            vec![0, 128, 255, 255, 128, 0, 64, 192, 255, 255, 0, 128],
+        )
+        .unwrap();
+        let mut parameters = vec![0.0; 20];
+        parameters[0..3].fill(1.0);
+        parameters[4..7].copy_from_slice(&[2.0, 4.0, 8.0]);
+        parameters[7..10].fill(1.0);
+        parameters[16] = 1.0;
+        parameters[17] = 8.0;
+        parameters[18] = 8.0;
+        let scale = xdremux_hdr::resolve(&parameters, xdremux_hdr::ExtractionMode::Uhdr).unwrap();
+        let scene = derive_style_scene(&base, &gain, &scale).unwrap();
+        let thumbnail = linear_thumbnail_raster(&scene).unwrap();
+        assert_eq!(
+            (thumbnail.width, thumbnail.height, thumbnail.bytes_per_row),
+            (2, 2, 6)
+        );
+        assert_ne!(
+            thumbnail.data, base.data,
+            "SDR codes are not a Linear Thumbnail"
+        );
+        // Independent scalar reconstruction verifies channel order, exposure,
+        // and position. There is no display rotation in this storage raster.
+        for index in 0..12 {
+            let channel = index % 3;
+            let sdr = f64::from(base.data[index]) / 255.0;
+            let linear = if sdr <= 0.04045 {
+                sdr / 12.92
+            } else {
+                ((sdr + 0.055) / 1.055).powf(2.4)
+            };
+            let hdr =
+                linear * [2.0_f64, 4.0, 8.0][channel].powf(f64::from(gain.data[index]) / 255.0);
+            let normalized = hdr / f64::from(scene.linear_metadata.baseline_exposure);
+            let code = if normalized >= 0.01 {
+                0.08550479 * (normalized + 0.00964052).log2() + 0.69336945
+            } else {
+                47.28711236 * (normalized + 0.05641088).powi(2)
+            };
+            let expected = (code.clamp(0.0, 1.0) * 255.0).round() as u8;
+            assert_eq!(thumbnail.data[index], expected, "RGB index {index}");
+        }
+    }
 
     #[test]
     fn identity_statistics_match_percentile_contract() {
