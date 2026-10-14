@@ -71,6 +71,6 @@ report = {"scope": "version-only macOS native parser, NOT a Photos Tone/Color te
 pathlib.Path(report_path).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
 print(json.dumps(report, sort_keys=True))
 PY
-if [[ -n "$XDREMUX_STYLE_VERSION_PROBE_REPORT" ]]; then
+if printenv XDREMUX_STYLE_VERSION_PROBE_REPORT >/dev/null; then
   cp "$work/native-result.json" "$XDREMUX_STYLE_VERSION_PROBE_REPORT"
 fi
