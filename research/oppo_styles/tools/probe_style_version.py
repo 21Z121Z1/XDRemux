@@ -58,7 +58,7 @@ def root_version_offset(plist: bytes) -> int:
         if key_index >= count or value_index >= count:
             raise ValueError("Object reference out of range")
         pos = offsets[key_index]
-        if plist[pos:pos + 2] != b"\\x51\\x30":  # ASCII string "0"
+        if plist[pos:pos + 2] != bytes((0x51, 0x30)):  # ASCII string "0"
             continue
         pos = offsets[value_index]
         if plist[pos] != 0x10 or plist[pos + 1] != 15:
@@ -131,7 +131,7 @@ def main() -> None:
     if args.output.exists() or args.report.exists():
         parser.error("Refusing to overwrite an existing output or report")
     args.output.write_bytes(changed)
-    args.report.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+    args.report.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(receipt, sort_keys=True))
 
 
