@@ -2,6 +2,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 import Darwin
+import XDCinematicNative
 
 private let schemaVersion = 2
 private let persistentTransportArgument = "--persistent-json-lines"
@@ -22,6 +23,7 @@ private struct AdapterRequest: Decodable {
     let lossyQuality: Double?
     let primaryMetadataXMPPath: String?
     let videoToolboxMain10: VideoToolboxMain10Request?
+    let cinematicEnvelope: CinematicEnvelopeRequest?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -37,6 +39,17 @@ private struct AdapterRequest: Decodable {
         case lossyQuality = "lossy_quality"
         case primaryMetadataXMPPath = "primary_metadata_xmp_path"
         case videoToolboxMain10 = "video_toolbox_main10"
+        case cinematicEnvelope = "cinematic_envelope"
+    }
+}
+
+private struct CinematicEnvelopeRequest: Decodable {
+    let focalLength35mm: Float
+    let aperture: Float
+
+    enum CodingKeys: String, CodingKey {
+        case focalLength35mm = "focal_length_35mm"
+        case aperture
     }
 }
 
@@ -185,6 +198,24 @@ private struct StylePropertiesFacts: Encodable {
     }
 }
 
+private struct CinematicEnvelopeFacts: Encodable {
+    let outputPath: String
+    let processedFrames: Int
+    let focalLength35mm: Float
+    let aperture: Float
+    let disparityTrackWritten: Bool
+    let generatedByAppleProviderAndRefiner: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case outputPath = "output_path"
+        case processedFrames = "processed_frames"
+        case focalLength35mm = "focal_length_35mm"
+        case aperture
+        case disparityTrackWritten = "disparity_track_written"
+        case generatedByAppleProviderAndRefiner = "generated_by_apple_provider_and_refiner"
+    }
+}
+
 private struct AdapterResponse: Encodable {
     let schemaVersion: Int
     let capabilities: [String]?
@@ -195,6 +226,7 @@ private struct AdapterResponse: Encodable {
     let styleProperties: StylePropertiesFacts?
     let videoToolboxMain10: VideoToolboxMain10Facts?
     let sceneClassification: VisionSceneClassificationFacts?
+    let cinematicEnvelope: CinematicEnvelopeFacts?
 
     init(
         schemaVersion: Int,
@@ -205,7 +237,8 @@ private struct AdapterResponse: Encodable {
         semanticMasks: [VisionSemanticMaskFacts]?,
         styleProperties: StylePropertiesFacts? = nil,
         videoToolboxMain10: VideoToolboxMain10Facts? = nil,
-        sceneClassification: VisionSceneClassificationFacts? = nil
+        sceneClassification: VisionSceneClassificationFacts? = nil,
+        cinematicEnvelope: CinematicEnvelopeFacts? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.capabilities = capabilities
@@ -216,6 +249,7 @@ private struct AdapterResponse: Encodable {
         self.styleProperties = styleProperties
         self.videoToolboxMain10 = videoToolboxMain10
         self.sceneClassification = sceneClassification
+        self.cinematicEnvelope = cinematicEnvelope
     }
 
     enum CodingKeys: String, CodingKey {
@@ -228,6 +262,7 @@ private struct AdapterResponse: Encodable {
         case styleProperties = "style_properties"
         case videoToolboxMain10 = "video_toolbox_main10"
         case sceneClassification = "scene_classification"
+        case cinematicEnvelope = "cinematic_envelope"
     }
 }
 
@@ -717,6 +752,53 @@ private func encodedResponse(for input: Data) throws -> Data {
                 inputPath: inputPath,
                 outputPath: outputPath,
                 configuration: configuration
+            )
+        )
+    case "cinematic-envelope":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let configuration = request.cinematicEnvelope else {
+            fail("cinematic-envelope requires input_path, output_path, and cinematic_envelope")
+        }
+        var frameCount: UInt64 = 0
+        var errorBytes = [CChar](repeating: 0, count: 4096)
+        let status = inputPath.withCString { inputCString in
+            outputPath.withCString { outputCString in
+                errorBytes.withUnsafeMutableBufferPointer { errorBuffer in
+                    withUnsafeMutablePointer(to: &frameCount) { frameCountPointer in
+                        xdremux_cinematic_generate(
+                            inputCString,
+                            outputCString,
+                            configuration.focalLength35mm,
+                            configuration.aperture,
+                            frameCountPointer,
+                            errorBuffer.baseAddress,
+                            errorBuffer.count
+                        )
+                    }
+                }
+            }
+        }
+        guard status == 0 else {
+            let detail = errorBytes.withUnsafeBufferPointer { bytes in
+                bytes.baseAddress.map { String(cString: $0) } ?? "unknown native failure"
+            }
+            fail("Cinematic envelope failed (status \(status)): \(detail)", status: status)
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            cinematicEnvelope: CinematicEnvelopeFacts(
+                outputPath: outputPath,
+                processedFrames: Int(frameCount),
+                focalLength35mm: configuration.focalLength35mm,
+                aperture: configuration.aperture,
+                disparityTrackWritten: false,
+                generatedByAppleProviderAndRefiner: true
             )
         )
     case "vision-semantic-mattes":

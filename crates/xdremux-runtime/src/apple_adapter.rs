@@ -55,6 +55,14 @@ pub(super) struct AppleVideoToolboxMain10Facts {
     pub hvcc_length: usize,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct AppleCinematicEnvelopeFacts {
+    pub processed_frames: u64,
+    pub focal_length_35mm: f32,
+    pub aperture: f32,
+    pub disparity_track_written: bool,
+}
+
 pub(super) struct AppleVideoToolboxMain10Encode<'a> {
     pub input: &'a Path,
     pub output_annex_b: &'a Path,
@@ -293,6 +301,51 @@ impl AppleAdapterClient {
 
     pub(super) fn supports_photographic_styles(&self) -> Result<bool> {
         Ok(self.capabilities()?.photographic_styles)
+    }
+
+    pub(super) fn generate_cinematic_envelope(
+        &self,
+        input: &Path,
+        output: &Path,
+        focal_length_35mm: f32,
+        aperture: f32,
+    ) -> Result<AppleCinematicEnvelopeFacts> {
+        let request = CinematicEnvelopeAdapterRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "cinematic-envelope",
+            input_path: input_path(input)?,
+            output_path: input_path(output)?,
+            cinematic_envelope: CinematicEnvelopeWire {
+                focal_length_35mm,
+                aperture,
+            },
+        };
+        let bytes = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Cinematic adapter request encoding", error))?;
+        let output_bytes = self.invoke(&bytes, Duration::from_secs(3600))?;
+        let response: CinematicEnvelopeAdapterResponse = serde_json::from_slice(&output_bytes)
+            .map_err(|error| {
+                RuntimeError::external("Cinematic adapter response decoding", error)
+            })?;
+        validate_schema(response.schema_version)?;
+        if response.cinematic_envelope.processed_frames == 0 {
+            return Err(RuntimeError::new(
+                "Cinematic adapter protocol",
+                "adapter completed without processing a video frame",
+            ));
+        }
+        if response.cinematic_envelope.disparity_track_written {
+            return Err(RuntimeError::new(
+                "Cinematic adapter protocol",
+                "pending Cinematic envelope unexpectedly materialized a disparity track",
+            ));
+        }
+        Ok(AppleCinematicEnvelopeFacts {
+            processed_frames: response.cinematic_envelope.processed_frames,
+            focal_length_35mm: response.cinematic_envelope.focal_length_35mm,
+            aperture: response.cinematic_envelope.aperture,
+            disparity_track_written: response.cinematic_envelope.disparity_track_written,
+        })
     }
 
     pub(super) fn imageio_auxiliary_facts(&self, input: &Path) -> Result<AppleImageAuxiliaryFacts> {
@@ -1134,6 +1187,35 @@ struct EncodeSourceImageRequest {
     input_path: String,
     output_path: String,
     lossy_quality: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct CinematicEnvelopeAdapterRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    cinematic_envelope: CinematicEnvelopeWire,
+}
+
+#[derive(Debug, Serialize)]
+struct CinematicEnvelopeWire {
+    focal_length_35mm: f32,
+    aperture: f32,
+}
+
+#[derive(Debug, Deserialize)]
+struct CinematicEnvelopeAdapterResponse {
+    schema_version: u32,
+    cinematic_envelope: CinematicEnvelopeResponseFacts,
+}
+
+#[derive(Debug, Deserialize)]
+struct CinematicEnvelopeResponseFacts {
+    processed_frames: u64,
+    focal_length_35mm: f32,
+    aperture: f32,
+    disparity_track_written: bool,
 }
 
 #[derive(Debug, Serialize)]

@@ -106,6 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         apple_features: AppleFeatureRequest {
             photographic_styles: true,
             portrait: false,
+            cinematic: false,
         },
         ..ConversionRequest::default()
     };
