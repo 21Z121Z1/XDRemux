@@ -11,7 +11,7 @@ from research.oppo_styles.tools.probe_style_version import (
 class StyleVersionProbeTests(unittest.TestCase):
     def test_only_version_changes(self):
         raw = plistlib.dumps({"0": 15, "1": bytes(range(256)) * 8,
-                              "4": 6.0, "nested": {"15": 15},
+                              "4": 6.0, "nested": {"15": 14},
                               "c": b"example"}, fmt=plistlib.FMT_BINARY)
         edited = change_only_version(raw)
         self.assertEqual(raw[root_version_offset(raw)], 15)
@@ -21,6 +21,12 @@ class StyleVersionProbeTests(unittest.TestCase):
                          {**plistlib.loads(raw), "0": 16})
         with self.assertRaises(ValueError):
             change_only_version(edited)
+
+    def test_rejects_shared_version_object_instead_of_mutating_other_fields(self):
+        raw = plistlib.dumps({"0": 15, "nested": {"same_integer": 15}},
+                              fmt=plistlib.FMT_BINARY)
+        with self.assertRaises(ValueError):
+            change_only_version(raw)
 
     def test_heif_scope_and_refusal(self):
         raw = plistlib.dumps({"0": 15, "1": b"xyz"}, fmt=plistlib.FMT_BINARY)
