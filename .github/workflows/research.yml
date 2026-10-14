@@ -143,7 +143,20 @@ jobs:
       - name: Compare version-only Styles metadata in Apple native parsers
         env:
           XDREMUX_STYLE_VERSION_PROBE_REPORT: ${{ runner.temp }}/styles-version-native.json
+          XDREMUX_STYLE_VERSION_PROBE_MEDIA_DIR: ${{ runner.temp }}/styles-photos-import
         run: bash scripts/apple/check_styles_version_hypothesis.sh
+      - name: Verify iPhone Photos import media artifact
+        run: |
+          test -s "$RUNNER_TEMP/styles-photos-import/styles-v15.heic"
+          test -s "$RUNNER_TEMP/styles-photos-import/styles-v16-version-only.heic"
+          test -s "$RUNNER_TEMP/styles-photos-import/native-result.json"
+          test -s "$RUNNER_TEMP/styles-photos-import/README.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: photos-import-styles-v15-v16-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/styles-photos-import/
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v7
         if: always()
         with:
