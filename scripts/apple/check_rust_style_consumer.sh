@@ -19,12 +19,8 @@ test -x "$cli"
 
 # Decode the actual VideoToolbox resource from RGB UHDR and mono LHDR Styles
 # conversions. This fails if the producer writes SDR codes as the reference.
-# The optional acceptance directory is the CI artifact staging path.
-if [[ -n "${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" ]]; then
-  mkdir -p "$XDREMUX_STYLES_ACCEPTANCE_DIR"
-fi
-XDREMUX_TEST_STYLES_REPORT="${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" \
-XDREMUX_TEST_STYLES_OUTPUT="${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" \
+# Native Main10/Log roundtrip tests run with isolated temporary output.
+# Test media are not Photos acceptance files and must not enter the artifact.
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
   cargo test --locked -p xdremux-runtime --lib \
   real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox -- --nocapture
@@ -182,52 +178,56 @@ for path, inspect_path in ((output, inspect_path), (batch_output, batch_inspect_
     )
 PY
 
-# Acceptance outputs are built from checked-in public fixtures only. Never
-# upload private RAWs, input credentials, or user-owned sample media to Actions.
+# Trial output is the only file in the downloadable acceptance artifact.
+# A v16 metadata root is a version-only hypothesis, not proven Photos support.
 if [[ -n "${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" ]]; then
   acceptance="$XDREMUX_STYLES_ACCEPTANCE_DIR"
+  mkdir -p "$acceptance"
   master="$repo_root/fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic"
-  target="$acceptance/uhdr-master-v2-01-apple-styles.heic"
+  target="$acceptance/uhdr-master-v2-01-apple-styles-v16.heic"
+  test ! -e "$target"
   XDREMUX_APPLE_ADAPTER="$adapter" \
     "$cli" convert --input "$master" --output "$target" --apple-styles
   test -s "$target"
-  "$cli" validate "$target" > "$acceptance/master-validation.txt"
-  python3 scripts/diagnostics/inspect_oppo_heif.py "$target" --json > "$acceptance/master-inspect.json"
-  # sips renders an SDR preview for side-by-side inspection. The HEIF itself
-  # carries the HDR Gain Map and the Log-encoded Linear Thumbnail.
-  sips -s format png "$master" --out "$acceptance/master-source-sdr.png" >/dev/null
-  sips -s format png "$target" --out "$acceptance/master-converted-sdr.png" >/dev/null
-  python3 - "$acceptance" <<'PY'
+  "$cli" validate "$target" >/dev/null
+
+  inspection="$test_root/master-inspect.json"
+  python3 scripts/diagnostics/inspect_oppo_heif.py "$target" --json > "$inspection"
+  python3 - "$target" "$inspection" <<'PY'
 import hashlib
 import json
-from pathlib import Path
+import pathlib
+import plistlib
 import sys
-root = Path(sys.argv[1])
-report_path = root / "linear-thumbnail-roundtrip.json"
-if not report_path.exists():
-    raise SystemExit("missing native HDR Log thumbnail roundtrip report")
-report = json.loads(report_path.read_text())
-if len(report) != 2 or any(
-    item["log_mae"] >= 3.0 or item["sdr_mae"] <= 10.0
-    for item in report
-):
-    raise SystemExit(f"invalid HDR-first native readback evidence: {report!r}")
-files = {}
-for path in sorted(root.iterdir()):
-    if path.is_file():
-        files[path.name] = {
-            "bytes": path.stat().st_size,
-            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        }
-(root / "manifest.json").write_text(json.dumps({
-    "manifest_format": 1,
-    "purpose": "HDR-first Linear Thumbnail acceptance on public OPPO fixtures",
-    "limitation": "SDR preview PNGs are NOT HDR renders or proof of Photos editing.",
-    "native_readback": report,
-    "files": files,
-}, indent=2) + "\n")
-print("styles-acceptance: " + json.dumps({
-    "count": len(report), "files": sorted(files)
-}))
+
+heic = pathlib.Path(sys.argv[1])
+inspection = json.loads(pathlib.Path(sys.argv[2]).read_text())
+metadata = [item for item in inspection["items"]
+            if item.get("type") == "uri " and item.get("name") == "styleMetadata"]
+idats = [box for box in inspection["meta_children"] if box["type"] == "idat"]
+if len(metadata) != 1 or len(idats) != 1:
+    raise SystemExit("expected one Styles metadata item backed by one idat")
+extents = metadata[0]["location"]["extents"]
+if len(extents) != 1:
+    raise SystemExit("Styles metadata must have one contiguous extent")
+raw = heic.read_bytes()
+extent = extents[0]
+start = idats[0]["start"] + 8 + extent["offset"]
+end = start + extent["length"]
+if start < 0 or end > len(raw) or end <= start:
+    raise SystemExit("Styles metadata extent outside HEIF")
+plist = plistlib.loads(raw[start:end])
+if plist.get("0") != 16:
+    raise SystemExit(f"not a v16 Styles carrier: {plist.get('0')!r}")
+if len(plist.get("1", b"")) != 51840 or len(plist.get("3", b"")) != 516:
+    raise SystemExit("Styles payload missing expected key1 or GTC")
+print(f"v16-photos-trial: file={heic.name} bytes={len(raw)} "
+      f"sha256={hashlib.sha256(raw).hexdigest()} "
+      "Photos Tone/Color admission remains UNVERIFIED")
 PY
+  files=( "$acceptance"/* )
+  if [[ "${#files[@]}" -ne 1 || ! -f "${files[0]}" ]]; then
+    echo "Only one final Photos trial HEIC may enter the acceptance artifact" >&2
+    exit 1
+  fi
 fi
