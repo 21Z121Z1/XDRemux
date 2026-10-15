@@ -383,8 +383,7 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
 
     // Each rational carries its own denominator; the 2025 layout has
     // no optional common-denominator or reverse-direction fields.
-    let base_headroom =
-        fraction_unsigned(cursor.u32()?, cursor.u32()?, "baseHdrHeadroom")?;
+    let base_headroom = fraction_unsigned(cursor.u32()?, cursor.u32()?, "baseHdrHeadroom")?;
     let alternate_headroom =
         fraction_unsigned(cursor.u32()?, cursor.u32()?, "alternateHdrHeadroom")?;
     let mut gain_min = Vec::with_capacity(channel_count);
