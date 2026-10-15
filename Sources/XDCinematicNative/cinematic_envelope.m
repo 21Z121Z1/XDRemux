@@ -791,6 +791,16 @@ static BOOL XDWriteMediaAndMetadata(AVURLAsset *asset, AVAssetTrack *videoTrack,
         XDFail(errorBuffer, errorCapacity, 5, workerError);
         return NO;
     }
+    // A nil sample can mean either EOF or a failed read. Multiple tracks
+    // share this reader, so validate its terminal status only after every
+    // media pump has drained, and before finalizing the output container.
+    if (reader.status != AVAssetReaderStatusCompleted) {
+        NSString *reason = reader.error.localizedDescription ?: @"source media read did not complete";
+        [writer cancelWriting];
+        XDFail(errorBuffer, errorCapacity, 5,
+               [NSString stringWithFormat:@"Cinematic passthrough reader status %ld: %@", (long)reader.status, reason]);
+        return NO;
+    }
     dispatch_semaphore_t finished = dispatch_semaphore_create(0);
     [writer finishWritingWithCompletionHandler:^{ dispatch_semaphore_signal(finished); }];
     if (dispatch_semaphore_wait(finished, dispatch_time(DISPATCH_TIME_NOW, 3600LL * NSEC_PER_SEC)) != 0 || writer.status != AVAssetWriterStatusCompleted) {
@@ -818,6 +828,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         !isfinite(aperture) || aperture < 1.0f || aperture > 64.0f) {
         return XDFail(error_buffer, error_buffer_size, 64, @"invalid Cinematic input, output, focal length, or aperture");
     }
+    NSString *tempDirectory = nil;
     @try {
       @autoreleasepool {
         NSError *error = nil;
@@ -865,7 +876,7 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         OSType disparityFormat = ((PTDisparityFormat)method_getImplementation(disparityFormatMethod))(provider, sel_registerName("disparityPixelFormat"));
         if (disparitySize.width <= 0 || disparitySize.height <= 0) return XDFail(error_buffer, error_buffer_size, 3, @"provider returned invalid disparity geometry");
 
-        NSString *tempDirectory = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"xdremux-cinematic-%@", NSUUID.UUID.UUIDString]];
+        tempDirectory = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"xdremux-cinematic-%@", NSUUID.UUID.UUIDString]];
         if (![[NSFileManager defaultManager] createDirectoryAtPath:tempDirectory withIntermediateDirectories:NO attributes:nil error:&error]) {
             return XDFail(error_buffer, error_buffer_size, 73, [NSString stringWithFormat:@"cannot create transient disparity directory: %@", error.localizedDescription]);
         }
@@ -1483,6 +1494,9 @@ int xdremux_cinematic_generate(const char *input_path, const char *output_path,
         return 0;
       }
     } @catch (NSException *exception) {
+        if (tempDirectory) {
+            [[NSFileManager defaultManager] removeItemAtPath:tempDirectory error:nil];
+        }
         return XDFail(error_buffer, error_buffer_size, 3,
                       [NSString stringWithFormat:@"Apple metadata framework exception %@: %@",
                        exception.name, exception.reason ?: @"unknown reason"]);
