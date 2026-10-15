@@ -269,11 +269,9 @@ fn assemble_jpeg_gain_map(
         .metadata
         .to_info_floats()
         .map_err(|error| RuntimeError::external("Ultra HDR metadata normalization", error))?;
-    let tmap_payload = make_apple_tmap_payload_with_colour_space(
-        &info,
-        gain.metadata.use_base_color_space,
-    )
-        .map_err(|error| RuntimeError::external("Ultra HDR ISO tmap", error))?;
+    let tmap_payload =
+        make_apple_tmap_payload_with_colour_space(&info, gain.metadata.use_base_color_space)
+            .map_err(|error| RuntimeError::external("Ultra HDR ISO tmap", error))?;
     let xmp_payload = make_hdrgm_xmp(&info)
         .map_err(|error| RuntimeError::external("Ultra HDR hdrgm XMP", error))?;
     let tiles = encoded
