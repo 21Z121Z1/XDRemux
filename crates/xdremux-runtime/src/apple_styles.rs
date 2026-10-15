@@ -223,10 +223,16 @@ pub(crate) fn convert_file(
         &gain_raster,
         &prepared.scale,
         usize::try_from(scene_raster.width).map_err(|_| {
-            RuntimeError::new("Photographic Styles Linear Thumbnail", "width exceeds usize")
+            RuntimeError::new(
+                "Photographic Styles Linear Thumbnail",
+                "width exceeds usize",
+            )
         })?,
         usize::try_from(scene_raster.height).map_err(|_| {
-            RuntimeError::new("Photographic Styles Linear Thumbnail", "height exceeds usize")
+            RuntimeError::new(
+                "Photographic Styles Linear Thumbnail",
+                "height exceeds usize",
+            )
         })?,
     )?;
     let linear_thumbnail_raster = linear_thumbnail_raster(&scene_rasters)?;
@@ -606,28 +612,19 @@ fn derive_style_scene_at_resolution(
                 let (source_x, source_y) = if reduced {
                     let sub_x = tap % 2;
                     let sub_y = tap / 2;
-                    let sx = ((x as f64 + (sub_x as f64 + 0.5) / 2.0)
-                        * source_width as f64
+                    let sx = ((x as f64 + (sub_x as f64 + 0.5) / 2.0) * source_width as f64
                         / width as f64)
                         .floor() as usize;
-                    let sy = ((y as f64 + (sub_y as f64 + 0.5) / 2.0)
-                        * source_height as f64
+                    let sy = ((y as f64 + (sub_y as f64 + 0.5) / 2.0) * source_height as f64
                         / height as f64)
                         .floor() as usize;
-                    (
-                        sx.min(source_width - 1),
-                        sy.min(source_height - 1),
-                    )
+                    (sx.min(source_width - 1), sy.min(source_height - 1))
                 } else {
                     (x, y)
                 };
                 let source_offset = source_y
                     .checked_mul(raster.bytes_per_row)
-                    .and_then(|row| {
-                        source_x
-                            .checked_mul(3)
-                            .and_then(|col| row.checked_add(col))
-                    })
+                    .and_then(|row| source_x.checked_mul(3).and_then(|col| row.checked_add(col)))
                     .ok_or_else(|| {
                         RuntimeError::new(
                             "Photographic Styles source raster",
@@ -1395,16 +1392,12 @@ mod tests {
                 "verification": "decoded Main10 Linear Thumbnail versus expected Apple Log RGB8 codes"
             }));
         }
-        if let Some(report_dir) = std::env::var_os("XDREMUX_TEST_STYLES_REPORT")
-            .filter(|value| !value.is_empty())
+        if let Some(report_dir) =
+            std::env::var_os("XDREMUX_TEST_STYLES_REPORT").filter(|value| !value.is_empty())
         {
-            let report_path = std::path::PathBuf::from(report_dir)
-                .join("linear-thumbnail-roundtrip.json");
-            fs::write(
-                report_path,
-                serde_json::to_vec_pretty(&evidence).unwrap(),
-            )
-            .unwrap();
+            let report_path =
+                std::path::PathBuf::from(report_dir).join("linear-thumbnail-roundtrip.json");
+            fs::write(report_path, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
         }
     }
 
