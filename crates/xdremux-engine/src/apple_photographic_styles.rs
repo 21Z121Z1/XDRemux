@@ -86,6 +86,7 @@ pub enum AppleStyleDataError {
     InvalidRgbRaster {
         actual: usize,
     },
+    InvalidThumbnailExposure,
     InvalidRefinementParameter {
         actual: usize,
         expected: usize,
@@ -148,6 +149,9 @@ impl fmt::Display for AppleStyleDataError {
                 formatter,
                 "Apple Photographic Styles RGB raster has {actual} values; expected a non-empty multiple of 3"
             ),
+            Self::InvalidThumbnailExposure => formatter.write_str(
+                "Apple Photographic Styles thumbnail exposure must be finite and positive",
+            ),
             Self::InvalidRefinementParameter { actual, expected } => write!(
                 formatter,
                 "Apple Photographic Styles refinement parameter {actual} is outside 0..{expected}"
@@ -195,6 +199,49 @@ impl fmt::Display for AppleStyleDataError {
 }
 
 impl Error for AppleStyleDataError {}
+
+/// Encode the reconstructed HDR reference for the Styles Linear Thumbnail.
+///
+/// Apply the Apple Log transfer curve per channel after normalizing by plist
+/// key 4. The input remains in linear Display P3; this does not convert it to
+/// the BT.2020 gamut of Apple Log video. In particular, encoding_gain belongs
+/// to the renderer metadata and must not be applied a second time here.
+///
+/// The current VideoToolbox primitive accepts RGB8 and encodes Main10 4:2:0.
+/// Quantize only after the log curve so HDR values above SDR white survive.
+pub fn apple_style_linear_thumbnail_codes(
+    hdr_rgb: &[f32],
+    baseline_exposure: f32,
+) -> Result<Vec<u8>, AppleStyleDataError> {
+    if hdr_rgb.is_empty() || !hdr_rgb.len().is_multiple_of(3) {
+        return Err(AppleStyleDataError::InvalidRgbRaster {
+            actual: hdr_rgb.len(),
+        });
+    }
+    if !baseline_exposure.is_finite() || baseline_exposure <= 0.0 {
+        return Err(AppleStyleDataError::InvalidThumbnailExposure);
+    }
+    hdr_rgb
+        .iter()
+        .enumerate()
+        .map(|(index, &value)| {
+            if !value.is_finite() {
+                return Err(AppleStyleDataError::NonFiniteValue { index });
+            }
+            // Float64 division also prevents finite f32 HDR/exposure pairs
+            // from overflowing before the log compresses them.
+            let linear = f64::from(value) / f64::from(baseline_exposure);
+            let code = if linear >= 0.01 {
+                0.085_504_79 * (linear + 0.009_640_52).log2() + 0.693_369_45
+            } else if linear >= -0.056_410_88 {
+                47.287_112_36 * (linear + 0.056_410_88).powi(2)
+            } else {
+                0.0
+            };
+            Ok((code.clamp(0.0, 1.0) * 255.0).round() as u8)
+        })
+        .collect()
+}
 
 /// Build the verified identity key-1 payload used by CMImaging.
 pub fn apple_style_identity_data() -> Vec<u8> {
@@ -1709,6 +1756,44 @@ fn solve_linear_system(matrix: &[f64], vector: &[f64]) -> Result<Vec<f64>, Apple
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn linear_thumbnail_uses_log_toe_and_preserves_hdr_above_sdr_white() {
+        let rgb = [-0.1, -0.056_410_88, 0.0, 0.01, 0.18, 1.0, 4.0, 16.0, 100.0];
+        assert_eq!(
+            apple_style_linear_thumbnail_codes(&rgb, 1.0).unwrap(),
+            [0, 0, 38, 53, 125, 177, 220, 255, 255]
+        );
+        // Normalizing by the same exposure used in the metadata must leave
+        // the reference unchanged, including HDR channels above 1.0.
+        let exposed = rgb.map(|value| value * 4.0);
+        assert_eq!(
+            apple_style_linear_thumbnail_codes(&exposed, 4.0).unwrap(),
+            apple_style_linear_thumbnail_codes(&rgb, 1.0).unwrap()
+        );
+    }
+
+    #[test]
+    fn linear_thumbnail_rejects_invalid_reference_before_quantization() {
+        for rgb in [&[][..], &[0.0, 0.0][..]] {
+            assert!(matches!(
+                apple_style_linear_thumbnail_codes(rgb, 1.0),
+                Err(AppleStyleDataError::InvalidRgbRaster { .. })
+            ));
+        }
+        for exposure in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            assert_eq!(
+                apple_style_linear_thumbnail_codes(&[0.0; 3], exposure),
+                Err(AppleStyleDataError::InvalidThumbnailExposure)
+            );
+        }
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert_eq!(
+                apple_style_linear_thumbnail_codes(&[0.0, value, 0.0], 1.0),
+                Err(AppleStyleDataError::NonFiniteValue { index: 1 })
+            );
+        }
+    }
 
     #[test]
     fn identity_layout_matches_verified_dimensions_and_values() {

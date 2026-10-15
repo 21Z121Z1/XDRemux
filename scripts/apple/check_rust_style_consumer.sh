@@ -17,6 +17,12 @@ cargo build --locked -p xdremux-cli
 cli="$repo_root/target/debug/xdremux"
 test -x "$cli"
 
+# Decode the actual VideoToolbox resource from RGB UHDR and mono LHDR Styles
+# conversions. This fails if the producer writes SDR codes as the reference.
+XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
+  cargo test --locked -p xdremux-runtime --lib \
+  real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox -- --nocapture
+
 # This is a real Rust product-path check. The fixture is a checked-in ProXDR
 # source; no Swift product writer or legacy Styles runner is used to produce
 # the output under test.
