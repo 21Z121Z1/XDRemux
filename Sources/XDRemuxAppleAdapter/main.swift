@@ -2,6 +2,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 import Darwin
+import XDCinematicNative
 
 private let schemaVersion = 2
 private let persistentTransportArgument = "--persistent-json-lines"
@@ -16,12 +17,14 @@ private struct AdapterRequest: Decodable {
     let roles: [String]?
     let orientation: UInt32?
     let auxiliaryPayloads: [AuxiliaryPayloadRequest]?
+    let makerAppleIntegerDictionaries: [String: [String: Int64]]?
     let edgePreserveUpsample: EdgePreserveUpsampleRequest?
     let renderL8: RenderL8Request?
     let metadataSourcePath: String?
     let lossyQuality: Double?
     let primaryMetadataXMPPath: String?
     let videoToolboxMain10: VideoToolboxMain10Request?
+    let cinematicEnvelope: CinematicEnvelopeRequest?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -31,12 +34,24 @@ private struct AdapterRequest: Decodable {
         case roles
         case orientation
         case auxiliaryPayloads = "auxiliary_payloads"
+        case makerAppleIntegerDictionaries = "maker_apple_integer_dictionaries"
         case edgePreserveUpsample = "edge_preserve_upsample"
         case renderL8 = "render_l8"
         case metadataSourcePath = "metadata_source_path"
         case lossyQuality = "lossy_quality"
         case primaryMetadataXMPPath = "primary_metadata_xmp_path"
         case videoToolboxMain10 = "video_toolbox_main10"
+        case cinematicEnvelope = "cinematic_envelope"
+    }
+}
+
+private struct CinematicEnvelopeRequest: Decodable {
+    let focalLength35mm: Float
+    let aperture: Float
+
+    enum CodingKeys: String, CodingKey {
+        case focalLength35mm = "focal_length_35mm"
+        case aperture
     }
 }
 
@@ -156,6 +171,7 @@ private struct ImageProperties: Encodable {
     let digitalZoomRatio: Double?
     let lensModel: String?
     let fNumber: Double?
+    let makerAppleIntegerDictionaries: [String: [String: Int64]]
 
     enum CodingKeys: String, CodingKey {
         case width
@@ -166,6 +182,7 @@ private struct ImageProperties: Encodable {
         case digitalZoomRatio = "digital_zoom_ratio"
         case lensModel = "lens_model"
         case fNumber = "f_number"
+        case makerAppleIntegerDictionaries = "maker_apple_integer_dictionaries"
     }
 }
 
@@ -185,6 +202,24 @@ private struct StylePropertiesFacts: Encodable {
     }
 }
 
+private struct CinematicEnvelopeFacts: Encodable {
+    let outputPath: String
+    let processedFrames: Int
+    let focalLength35mm: Float
+    let aperture: Float
+    let disparityTrackWritten: Bool
+    let generatedByAppleProviderAndRefiner: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case outputPath = "output_path"
+        case processedFrames = "processed_frames"
+        case focalLength35mm = "focal_length_35mm"
+        case aperture
+        case disparityTrackWritten = "disparity_track_written"
+        case generatedByAppleProviderAndRefiner = "generated_by_apple_provider_and_refiner"
+    }
+}
+
 private struct AdapterResponse: Encodable {
     let schemaVersion: Int
     let capabilities: [String]?
@@ -195,6 +230,7 @@ private struct AdapterResponse: Encodable {
     let styleProperties: StylePropertiesFacts?
     let videoToolboxMain10: VideoToolboxMain10Facts?
     let sceneClassification: VisionSceneClassificationFacts?
+    let cinematicEnvelope: CinematicEnvelopeFacts?
 
     init(
         schemaVersion: Int,
@@ -205,7 +241,8 @@ private struct AdapterResponse: Encodable {
         semanticMasks: [VisionSemanticMaskFacts]?,
         styleProperties: StylePropertiesFacts? = nil,
         videoToolboxMain10: VideoToolboxMain10Facts? = nil,
-        sceneClassification: VisionSceneClassificationFacts? = nil
+        sceneClassification: VisionSceneClassificationFacts? = nil,
+        cinematicEnvelope: CinematicEnvelopeFacts? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.capabilities = capabilities
@@ -216,6 +253,7 @@ private struct AdapterResponse: Encodable {
         self.styleProperties = styleProperties
         self.videoToolboxMain10 = videoToolboxMain10
         self.sceneClassification = sceneClassification
+        self.cinematicEnvelope = cinematicEnvelope
     }
 
     enum CodingKeys: String, CodingKey {
@@ -228,6 +266,7 @@ private struct AdapterResponse: Encodable {
         case styleProperties = "style_properties"
         case videoToolboxMain10 = "video_toolbox_main10"
         case sceneClassification = "scene_classification"
+        case cinematicEnvelope = "cinematic_envelope"
     }
 }
 
@@ -301,6 +340,28 @@ private func imageIOGainMapFacts(inputPath: String) -> GainMapFacts {
     return GainMapFacts(pixelFormat: rawPixelFormat, width: width, height: height)
 }
 
+// Report numeric dictionary cells without interpreting their product meaning.
+private func makerAppleIntegerDictionaries(_ properties: [CFString: Any]) -> [String: [String: Int64]] {
+    guard let maker = properties[kCGImagePropertyMakerAppleDictionary] as? NSDictionary else {
+        return [:]
+    }
+    var result: [String: [String: Int64]] = [:]
+    for (tag, value) in maker {
+        guard let dictionary = value as? NSDictionary else { continue }
+        var integers: [String: Int64] = [:]
+        for (key, value) in dictionary {
+            guard let number = value as? NSNumber,
+                  number.doubleValue.isFinite,
+                  number.doubleValue == Double(number.int64Value) else { continue }
+            integers[String(describing: key)] = number.int64Value
+        }
+        if !integers.isEmpty {
+            result[String(describing: tag)] = integers
+        }
+    }
+    return result
+}
+
 private func imageIOImageProperties(inputPath: String) -> ImageProperties {
     let inputURL = URL(fileURLWithPath: inputPath)
     guard let source = CGImageSourceCreateWithURL(inputURL as CFURL, nil),
@@ -320,7 +381,8 @@ private func imageIOImageProperties(inputPath: String) -> ImageProperties {
         focalLengthIn35mmFilm: (exif[kCGImagePropertyExifFocalLenIn35mmFilm] as? NSNumber)?.doubleValue,
         digitalZoomRatio: (exif[kCGImagePropertyExifDigitalZoomRatio] as? NSNumber)?.doubleValue,
         lensModel: exif[kCGImagePropertyExifLensModel] as? String,
-        fNumber: (exif[kCGImagePropertyExifFNumber] as? NSNumber)?.doubleValue
+        fNumber: (exif[kCGImagePropertyExifFNumber] as? NSNumber)?.doubleValue,
+        makerAppleIntegerDictionaries: makerAppleIntegerDictionaries(properties)
     )
 }
 
@@ -464,7 +526,8 @@ private func makeAuxiliaryMetadata(_ payload: AuxiliaryPayloadRequest) -> CGMuta
 private func imageIOWriteAuxiliary(
     inputPath: String,
     outputPath: String,
-    payloads: [AuxiliaryPayloadRequest]
+    payloads: [AuxiliaryPayloadRequest],
+    makerAppleIntegerDictionaries: [String: [String: Int64]]
 ) throws {
     guard !payloads.isEmpty else {
         fail("imageio-write-auxiliary requires at least one auxiliary payload")
@@ -482,9 +545,31 @@ private func imageIOWriteAuxiliary(
         fail("ImageIO cannot create auxiliary destination for \(outputPath)", status: 1)
     }
 
-    let imageOptions: [CFString: Any] = [
+    var imageOptions: [CFString: Any] = [
         kCGImageDestinationPreserveGainMap: true,
     ]
+    if !makerAppleIntegerDictionaries.isEmpty {
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+        var maker: [String: Any] = [:]
+        if let existing = properties[kCGImagePropertyMakerAppleDictionary] as? NSDictionary {
+            for (key, value) in existing {
+                maker[String(describing: key)] = value
+            }
+        }
+        for (tag, fields) in makerAppleIntegerDictionaries {
+            var merged: [String: Any] = [:]
+            if let existing = maker[tag] as? NSDictionary {
+                for (key, value) in existing {
+                    merged[String(describing: key)] = value
+                }
+            }
+            for (key, value) in fields {
+                merged[key] = NSNumber(value: value)
+            }
+            maker[tag] = merged
+        }
+        imageOptions[kCGImagePropertyMakerAppleDictionary] = maker
+    }
     CGImageDestinationAddImageFromSource(destination, source, 0, imageOptions as CFDictionary)
 
     for payload in payloads {
@@ -719,6 +804,53 @@ private func encodedResponse(for input: Data) throws -> Data {
                 configuration: configuration
             )
         )
+    case "cinematic-envelope":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty,
+              let configuration = request.cinematicEnvelope else {
+            fail("cinematic-envelope requires input_path, output_path, and cinematic_envelope")
+        }
+        var frameCount: UInt64 = 0
+        var errorBytes = [CChar](repeating: 0, count: 4096)
+        let status = inputPath.withCString { inputCString in
+            outputPath.withCString { outputCString in
+                errorBytes.withUnsafeMutableBufferPointer { errorBuffer in
+                    withUnsafeMutablePointer(to: &frameCount) { frameCountPointer in
+                        xdremux_cinematic_generate(
+                            inputCString,
+                            outputCString,
+                            configuration.focalLength35mm,
+                            configuration.aperture,
+                            frameCountPointer,
+                            errorBuffer.baseAddress,
+                            errorBuffer.count
+                        )
+                    }
+                }
+            }
+        }
+        guard status == 0 else {
+            let detail = errorBytes.withUnsafeBufferPointer { bytes in
+                bytes.baseAddress.map { String(cString: $0) } ?? "unknown native failure"
+            }
+            fail("Cinematic envelope failed (status \(status)): \(detail)", status: status)
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            cinematicEnvelope: CinematicEnvelopeFacts(
+                outputPath: outputPath,
+                processedFrames: Int(frameCount),
+                focalLength35mm: configuration.focalLength35mm,
+                aperture: configuration.aperture,
+                disparityTrackWritten: false,
+                generatedByAppleProviderAndRefiner: true
+            )
+        )
     case "vision-semantic-mattes":
         guard let inputPath = request.inputPath, !inputPath.isEmpty,
               let outputPath = request.outputPath, !outputPath.isEmpty,
@@ -809,7 +941,8 @@ private func encodedResponse(for input: Data) throws -> Data {
         try imageIOWriteAuxiliary(
             inputPath: inputPath,
             outputPath: outputPath,
-            payloads: payloads
+            payloads: payloads,
+            makerAppleIntegerDictionaries: request.makerAppleIntegerDictionaries ?? [:]
         )
         response = AdapterResponse(
             schemaVersion: schemaVersion,

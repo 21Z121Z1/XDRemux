@@ -36,5 +36,24 @@ build and gates in a separate environment.
 
 Original Gallery/Photos acceptance remains a separate requirement. Reader, writer,
 fixture, CI and device status must not be combined into one support claim. See
-[LibLivePhoto support](https://github.com/21Z121Z1/LibLivePhoto/blob/f314fe85c7c9acfc2e7e97a6e78f32f68e6aa6ad/FORMAT_SUPPORT.md)
-and [vendor evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/f314fe85c7c9acfc2e7e97a6e78f32f68e6aa6ad/evidence/VENDORS.md).
+[LibLivePhoto support](https://github.com/21Z121Z1/LibLivePhoto/blob/b962d9bc23cc36cdea7411c7d32d7646d0dfc590/FORMAT_SUPPORT.md)
+and [vendor evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/b962d9bc23cc36cdea7411c7d32d7646d0dfc590/evidence/VENDORS.md).
+
+The public consumer contract uses an original ColorOS 16 dual-stream fixture.
+The default Apple plan blocks its unmapped vendor resources. Explicit sidecar
+policy retains every unmapped resource byte-for-byte. Re-reading the pair checks
+exact presentation time and encoded media equality; a truncated movie is rejected.
+This evidence does not assign a semantic role to stream 2 or prove Gallery support.
+
+The consumer keeps the current product HDR application-colour-space flag,
+Photographic Styles and Cinematic routes. Shared format parsing stays in
+LibLivePhoto; HDR decisions and codec operations stay in XDRemux. The standalone
+library converter and external workspace check exercise Android/Apple round trips
+without this product stack. See the library compatibility document for the
+integer-microsecond restriction on Apple-to-Android output.
+
+The `xdremux-compat` feature remains a migration boundary for existing low-level
+helpers. It is not a stable API. Remove each re-export after its consumer uses a
+public resource or Apple primitive API and the associated conformance gate passes.
+Keep payload copying, atomic publication and product geometry local. No removal
+of the compatibility feature is scheduled before these callers are migrated.

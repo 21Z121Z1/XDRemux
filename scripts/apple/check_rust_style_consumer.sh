@@ -17,6 +17,12 @@ cargo build --locked -p xdremux-cli
 cli="$repo_root/target/debug/xdremux"
 test -x "$cli"
 
+# Decode the actual VideoToolbox resource from RGB UHDR and mono LHDR Styles
+# conversions. This fails if the producer writes SDR codes as the reference.
+XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
+  cargo test --locked -p xdremux-runtime --lib \
+  real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox -- --nocapture
+
 # This is a real Rust product-path check. The fixture is a checked-in ProXDR
 # source; no Swift product writer or legacy Styles runner is used to produce
 # the output under test.
@@ -67,6 +73,11 @@ def request(operation, path):
     return json.loads(result.stdout)
 
 for output in outputs:
+    properties = request("imageio-image-properties", output)["image_properties"]
+    smart_style = properties.get("maker_apple_integer_dictionaries", {}).get("84", {})
+    expected = dict(zip(map(str, range(8)), (1, 0, 0, 1, 1, 1, 4, 0)))
+    if any(smart_style.get(key) != value for key, value in expected.items()):
+        raise SystemExit(f"{output}: ImageIO did not retain SmartStyle MakerApple 84: {smart_style!r}")
     auxiliary = request("imageio-auxiliary-facts", output)["auxiliary"]
     required = [
         "iso_gain_map",
@@ -85,6 +96,7 @@ for output in outputs:
     print(
         "rust-styles-consumer-pass: "
         f"output={output} "
+        f"maker_apple_84={smart_style!r} "
         f"iso_gain_map={auxiliary['iso_gain_map']} "
         f"portrait_effects_matte={auxiliary['portrait_effects_matte']} "
         f"skin_matte={auxiliary['skin_matte']} "

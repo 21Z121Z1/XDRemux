@@ -28,3 +28,17 @@ completion gate 将本地检查绑定到已提交 HEAD；GitHub 提供第二验�
 
 原厂 Gallery/Photos 验收是独立要求。read、write、fixture、CI 和 device 状态
 不得合并成一个支持结论。完整支持与证据边界见英文 canonical 文档的链接。
+
+公共 consumer 合约使用真实 ColorOS 16 双视频样本。默认 Apple 计划会阻止
+无法映射的厂商资源；显式 sidecar 策略逐字节保留这些资源。输出 pair 经重新
+读取后检查精确时间和编码媒体一致性，并拒绝截断 MOV。这些证据不确定第二视频
+的语义，也不证明原厂相册支持。
+
+接入保留当前产品 HDR 应用色彩空间标记、摄影风格与 Cinematic 路径。共享格式
+解析归 LibLivePhoto；HDR 决策和编解码仍归 XDRemux。独立库转换示例和外部
+workspace 检查可脱离产品栈执行 Android/Apple 往返。Apple 转 Android 的整数
+微秒限制见独立库兼容性文档。
+
+`xdremux-compat` 仍是不稳定的迁移边界。每个旧 re-export 应在调用方改用公共
+资源或 Apple 基础 API、对应 conformance 门禁通过后移除。文件复制、原子发布和
+产品几何策略保持本地所有权。完成这些调用方迁移前不移除整个兼容 feature。

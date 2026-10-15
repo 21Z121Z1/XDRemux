@@ -36,6 +36,7 @@ pub(super) struct AppleImageProperties {
     pub digital_zoom_ratio: Option<f64>,
     pub lens_model: Option<String>,
     pub f_number: Option<f64>,
+    pub maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +54,14 @@ pub(super) struct AppleVideoToolboxMain10Facts {
     pub height: u32,
     pub annex_b_length: usize,
     pub hvcc_length: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct AppleCinematicEnvelopeFacts {
+    pub processed_frames: u64,
+    pub focal_length_35mm: f32,
+    pub aperture: f32,
+    pub disparity_track_written: bool,
 }
 
 pub(super) struct AppleVideoToolboxMain10Encode<'a> {
@@ -295,6 +304,51 @@ impl AppleAdapterClient {
         Ok(self.capabilities()?.photographic_styles)
     }
 
+    pub(super) fn generate_cinematic_envelope(
+        &self,
+        input: &Path,
+        output: &Path,
+        focal_length_35mm: f32,
+        aperture: f32,
+    ) -> Result<AppleCinematicEnvelopeFacts> {
+        let request = CinematicEnvelopeAdapterRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "cinematic-envelope",
+            input_path: input_path(input)?,
+            output_path: input_path(output)?,
+            cinematic_envelope: CinematicEnvelopeWire {
+                focal_length_35mm,
+                aperture,
+            },
+        };
+        let bytes = serde_json::to_vec(&request)
+            .map_err(|error| RuntimeError::external("Cinematic adapter request encoding", error))?;
+        let output_bytes = self.invoke(&bytes, Duration::from_secs(3600))?;
+        let response: CinematicEnvelopeAdapterResponse = serde_json::from_slice(&output_bytes)
+            .map_err(|error| {
+                RuntimeError::external("Cinematic adapter response decoding", error)
+            })?;
+        validate_schema(response.schema_version)?;
+        if response.cinematic_envelope.processed_frames == 0 {
+            return Err(RuntimeError::new(
+                "Cinematic adapter protocol",
+                "adapter completed without processing a video frame",
+            ));
+        }
+        if response.cinematic_envelope.disparity_track_written {
+            return Err(RuntimeError::new(
+                "Cinematic adapter protocol",
+                "pending Cinematic envelope unexpectedly materialized a disparity track",
+            ));
+        }
+        Ok(AppleCinematicEnvelopeFacts {
+            processed_frames: response.cinematic_envelope.processed_frames,
+            focal_length_35mm: response.cinematic_envelope.focal_length_35mm,
+            aperture: response.cinematic_envelope.aperture,
+            disparity_track_written: response.cinematic_envelope.disparity_track_written,
+        })
+    }
+
     pub(super) fn imageio_auxiliary_facts(&self, input: &Path) -> Result<AppleImageAuxiliaryFacts> {
         let output = self.invoke_request(AdapterRequest {
             schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
@@ -513,6 +567,16 @@ impl AppleAdapterClient {
         output: &Path,
         payloads: &[AppleAuxiliaryPayload],
     ) -> Result<()> {
+        self.imageio_write_auxiliary_with_properties(input, output, payloads, BTreeMap::new())
+    }
+
+    pub(super) fn imageio_write_auxiliary_with_properties(
+        &self,
+        input: &Path,
+        output: &Path,
+        payloads: &[AppleAuxiliaryPayload],
+        maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
+    ) -> Result<()> {
         if payloads.is_empty() {
             return Err(RuntimeError::new(
                 "Apple ImageIO auxiliary write",
@@ -538,6 +602,7 @@ impl AppleAdapterClient {
             input_path: input_path(input)?,
             output_path: input_path(output)?,
             auxiliary_payloads: wire_payloads,
+            maker_apple_integer_dictionaries,
         };
         let request = serde_json::to_vec(&request)
             .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
@@ -1137,12 +1202,43 @@ struct EncodeSourceImageRequest {
 }
 
 #[derive(Debug, Serialize)]
+struct CinematicEnvelopeAdapterRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    output_path: String,
+    cinematic_envelope: CinematicEnvelopeWire,
+}
+
+#[derive(Debug, Serialize)]
+struct CinematicEnvelopeWire {
+    focal_length_35mm: f32,
+    aperture: f32,
+}
+
+#[derive(Debug, Deserialize)]
+struct CinematicEnvelopeAdapterResponse {
+    schema_version: u32,
+    cinematic_envelope: CinematicEnvelopeResponseFacts,
+}
+
+#[derive(Debug, Deserialize)]
+struct CinematicEnvelopeResponseFacts {
+    processed_frames: u64,
+    focal_length_35mm: f32,
+    aperture: f32,
+    disparity_track_written: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct WriteAuxiliaryRequest {
     schema_version: u32,
     operation: &'static str,
     input_path: String,
     output_path: String,
     auxiliary_payloads: Vec<AuxiliaryPayloadWire>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1381,6 +1477,8 @@ struct ImagePropertiesWire {
     digital_zoom_ratio: Option<f64>,
     lens_model: Option<String>,
     f_number: Option<f64>,
+    #[serde(default)]
+    maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 impl From<ImagePropertiesWire> for AppleImageProperties {
@@ -1394,6 +1492,7 @@ impl From<ImagePropertiesWire> for AppleImageProperties {
             digital_zoom_ratio: value.digital_zoom_ratio,
             lens_model: value.lens_model,
             f_number: value.f_number,
+            maker_apple_integer_dictionaries: value.maker_apple_integer_dictionaries,
         }
     }
 }

@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-liblivephoto-format = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "f314fe85c7c9acfc2e7e97a6e78f32f68e6aa6ad" }
+liblivephoto-format = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "b962d9bc23cc36cdea7411c7d32d7646d0dfc590" }
 
 [lints]
 workspace = true

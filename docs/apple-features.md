@@ -56,6 +56,22 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 研究型 producer、model experiment、donor diagnostic 和 RAW experiment 继续作为 research tooling，不定义公开 CLI 契约，也不构成第二套 runtime。
 
+### SmartStyle 编辑状态
+
+生成的 Standard 风格资源还需要在 Apple MakerNote 标签 84（`0x0054`）中记录 SmartStyle 状态。系数 plist 是另一个独立输入；解析成功不能证明照片具备完整编辑状态。Rust 定义旧 Swift writer 使用的八个整数字段，ImageIO 原语将这些字段合并到已有 MakerApple 字典，不新增相机身份或 UUID，并保留字典中其他条目和未修改的字段。
+
+发布前，Rust 暂存最终组装的完整字节，并要求 ImageIO 回读其中的整数字典字段。必需状态缺失或变化时，转换在替换已有输出前失败。旧 adapter 即使忽略新增的可选元数据请求，也不能静默发布不完整的风格文件。此原生回读不代表 Photos 控件、Tone/Color 响应或保存重开已通过；这些行为仍需实机证据。
+
+### Linear Thumbnail 的 HDR 参照
+
+Styles Linear Thumbnail 使用 base image 和 Gain Map 重建的 HDR look。Rust 将线性 Display P3 各通道除以 Styles plist key `4` 中相同的 `baseline_exposure`，再应用 Apple Log 传递曲线。此资源不再直接复制 SDR 图像码值。
+
+此变换使用 Apple Log 曲线和 Display P3 原色，不会将图像转换为 Apple Log 视频所用的 BT.2020 色彩空间。现有辅助图像色彩标记及解码后的场景方向继续沿用。`encoding_gain` 属于渲染器元数据，不会作为第二次曝光除法应用到缩略图。
+
+当前编码原语接受 RGB8 码值，生成 Main10 4:2:0 HEVC。量化发生在 Log 变换之后，重建结果中超过 SDR 白的数值因而可以保留。该参照仍来自已经渲染过的 HDR look，不能恢复源文件已丢失的 RAW 或拍摄时处理信息。
+
+此改动不将现有 source-derived key1 策略替换为完整原生 constrained solver。缩略图质量和 key1 中性拟合质量是不同的测量。原生 consumer 回归使用 RGB UHDR 和单色 LHDR 夹具，回读编码后的缩略图，检查 HDR Log 目标以及主图 HEVC 是否保持不变。运行命令为 `bash scripts/apple/check_rust_style_consumer.sh`。Photos 导入、编辑、保存和重开仍需单独的设备证据。
+
 ## Apple 人像迁移
 
 Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy、JPEG/container logic、Gain Map policy、REND generation、auxiliary-manifest construction、feature routing、output naming、validation policy 和 atomic publication。ImageIO 只报告 auxiliary-resource facts，adapter 只执行 Rust transaction 要求的 Apple framework operation。

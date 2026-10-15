@@ -56,6 +56,49 @@ Rust owns style-generation semantics, constrained search, source-bound policy, k
 
 Research-only producers, model experiments, donor diagnostics, and RAW experiments remain research tooling. They do not define the public CLI contract or provide a second runtime.
 
+### SmartStyle edit state
+
+The generated Standard Styles resource set also requires its SmartStyle state
+in Apple MakerNote tag 84 (`0x0054`). The coefficient plist is a separate input;
+its successful parsing does not establish the photo's edit state. Rust defines
+the eight integer fields used by the former Swift writer. The ImageIO primitive
+merges those requested fields into the existing MakerApple dictionary without
+adding a camera identity or UUID. Other MakerApple entries and unmodified cells
+remain in the dictionary.
+
+Before publication, Rust stages the final assembled bytes and asks ImageIO to
+read their integer dictionary cells. Missing or changed required state rejects
+the conversion before replacing an existing output. An older adapter that
+ignores the additive metadata request therefore cannot silently publish an
+incomplete Styles file. This native readback does not establish Photos UI,
+Tone/Color response, or save/reopen behavior; those still require device evidence.
+
+### HDR reference for the Linear Thumbnail
+
+The Styles Linear Thumbnail uses the HDR look reconstructed from the base image
+and its Gain Map. Rust divides each linear Display P3 channel by the same
+`baseline_exposure` stored in Styles plist key `4`, then applies the Apple Log
+transfer curve. It does not copy SDR image codes into this resource.
+
+The transform uses the Apple Log curve with Display P3 primaries. It does not
+change the image to the BT.2020 color space used by Apple Log video. The existing
+auxiliary color signaling and decoded scene orientation remain in use.
+`encoding_gain` is renderer metadata; it is not a second exposure division for
+the thumbnail.
+
+The current codec primitive accepts RGB8 codes and produces Main10 4:2:0 HEVC.
+Quantization occurs after the log transform, so reconstructed values above SDR
+white can survive. This remains a reference derived from the rendered HDR look.
+It cannot recover RAW or capture-time processing that the source has lost.
+
+This change does not replace the existing source-derived key1 policy with the
+complete native constrained solver. Thumbnail quality and key1 neutral-fit
+quality are separate measurements. The native consumer regression uses RGB UHDR
+and monochrome LHDR fixtures, decodes the encoded thumbnail, and checks the HDR
+Log target and unchanged primary HEVC. Run it with
+`bash scripts/apple/check_rust_style_consumer.sh`. Photos import, editing, save,
+and reopen require separate device evidence.
+
 ## Apple Portrait migration
 
 Rust owns Portrait preflight, OPPO block parsing, focus/orientation policy, JPEG/container logic, Gain Map policy, REND generation, auxiliary-manifest construction, feature routing, output naming, validation policy, and atomic publication. ImageIO reports auxiliary-resource facts and the adapter performs only the Apple framework operations required by the Rust transaction.
