@@ -56,6 +56,23 @@ Rust owns style-generation semantics, constrained search, source-bound policy, k
 
 Research-only producers, model experiments, donor diagnostics, and RAW experiments remain research tooling. They do not define the public CLI contract or provide a second runtime.
 
+### SmartStyle edit state
+
+The generated Standard Styles resource set also requires its SmartStyle state
+in Apple MakerNote tag 84 (`0x0054`). The coefficient plist is a separate input;
+its successful parsing does not establish the photo's edit state. Rust defines
+the eight integer fields used by the former Swift writer. The ImageIO primitive
+merges those requested fields into the existing MakerApple dictionary without
+adding a camera identity or UUID. Other MakerApple entries and unmodified cells
+remain in the dictionary.
+
+Before publication, Rust stages the final assembled bytes and asks ImageIO to
+read their integer dictionary cells. Missing or changed required state rejects
+the conversion before replacing an existing output. An older adapter that
+ignores the additive metadata request therefore cannot silently publish an
+incomplete Styles file. This native readback does not establish Photos UI,
+Tone/Color response, or save/reopen behavior; those still require device evidence.
+
 ### HDR reference for the Linear Thumbnail
 
 The Styles Linear Thumbnail uses the HDR look reconstructed from the base image

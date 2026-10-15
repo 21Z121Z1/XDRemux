@@ -56,6 +56,12 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 研究型 producer、model experiment、donor diagnostic 和 RAW experiment 继续作为 research tooling，不定义公开 CLI 契约，也不构成第二套 runtime。
 
+### SmartStyle 编辑状态
+
+生成的 Standard 风格资源还需要在 Apple MakerNote 标签 84（`0x0054`）中记录 SmartStyle 状态。系数 plist 是另一个独立输入；解析成功不能证明照片具备完整编辑状态。Rust 定义旧 Swift writer 使用的八个整数字段，ImageIO 原语将这些字段合并到已有 MakerApple 字典，不新增相机身份或 UUID，并保留字典中其他条目和未修改的字段。
+
+发布前，Rust 暂存最终组装的完整字节，并要求 ImageIO 回读其中的整数字典字段。必需状态缺失或变化时，转换在替换已有输出前失败。旧 adapter 即使忽略新增的可选元数据请求，也不能静默发布不完整的风格文件。此原生回读不代表 Photos 控件、Tone/Color 响应或保存重开已通过；这些行为仍需实机证据。
+
 ### Linear Thumbnail 的 HDR 参照
 
 Styles Linear Thumbnail 使用 base image 和 Gain Map 重建的 HDR look。Rust 将线性 Display P3 各通道除以 Styles plist key `4` 中相同的 `baseline_exposure`，再应用 Apple Log 传递曲线。此资源不再直接复制 SDR 图像码值。
