@@ -124,8 +124,7 @@ fn canonical_channel_values(info: &[f64], channel: usize) -> Result<[f64; 5]> {
 }
 
 fn canonical_first_channel_values(info: &[f64]) -> Result<[f64; 7]> {
-    let [gain_min, gain_max, gamma, base_offset, alt_offset] =
-        canonical_channel_values(info, 0)?;
+    let [gain_min, gain_max, gamma, base_offset, alt_offset] = canonical_channel_values(info, 0)?;
     Ok([
         swift_max(swift_max(info[16], 1.0).log2(), 0.0),
         swift_max(info[17], 1.0).log2(),
@@ -157,8 +156,7 @@ pub fn make_apple_tmap_payload_with_colour_space(
         canonical_channel_values(info, 2)?,
     ];
     let multichannel = channels[1] != channels[0] || channels[2] != channels[0];
-    let flags = if multichannel { 0x80 } else { 0 }
-        | if use_base_colour_space { 0x40 } else { 0 };
+    let flags = if multichannel { 0x80 } else { 0 } | if use_base_colour_space { 0x40 } else { 0 };
     let mut output = vec![0, 0, 0, 0, 0, flags];
     append_imageio_rational(cap_min, &mut output);
     append_imageio_rational(cap_max, &mut output);
