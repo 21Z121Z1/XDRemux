@@ -370,116 +370,55 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
             format!("unsupported minimum version {minimum_version}"),
         ));
     }
+    // ISO 21496-1:2025, Annex C.2.2: flag bits are in MSB order.
     let flags = cursor.u8()?;
-    let channel_count = if flags & 0x01 != 0 { 3 } else { 1 };
-    let use_base_color_space = flags & 0x02 != 0;
-    if flags & 0x04 != 0 {
+    if flags & 0x3f != 0 {
         return Err(MetadataError::invalid(
             ISO_CONTEXT,
-            "backward-direction metadata is unsupported for JPEG Ultra HDR",
+            format!("nonzero reserved gain-map flags 0x{flags:02x}"),
         ));
     }
-    let common_denominator = flags & 0x08 != 0;
+    let channel_count = if flags & 0x80 != 0 { 3 } else { 1 };
+    let use_base_color_space = flags & 0x40 != 0;
 
-    let (base_headroom, alternate_headroom, gain_min, gain_max, gamma, base_offset, alt_offset) =
-        if common_denominator {
-            let denominator = cursor.u32()?;
-            if denominator == 0 {
-                return Err(MetadataError::invalid(
-                    ISO_CONTEXT,
-                    "zero common denominator",
-                ));
-            }
-            let base_headroom = fraction_unsigned(cursor.u32()?, denominator, "baseHdrHeadroom")?;
-            let alternate_headroom =
-                fraction_unsigned(cursor.u32()?, denominator, "alternateHdrHeadroom")?;
-            let mut gain_min = Vec::new();
-            let mut gain_max = Vec::new();
-            let mut gamma = Vec::new();
-            let mut base_offset = Vec::new();
-            let mut alt_offset = Vec::new();
-            for channel in 0..channel_count {
-                gain_min.push(fraction_signed(
-                    cursor.i32()?,
-                    denominator,
-                    &format!("gainMapMin[{channel}]"),
-                )?);
-                gain_max.push(fraction_signed(
-                    cursor.i32()?,
-                    denominator,
-                    &format!("gainMapMax[{channel}]"),
-                )?);
-                gamma.push(fraction_unsigned(
-                    cursor.u32()?,
-                    denominator,
-                    &format!("gamma[{channel}]"),
-                )?);
-                base_offset.push(fraction_signed(
-                    cursor.i32()?,
-                    denominator,
-                    &format!("baseOffset[{channel}]"),
-                )?);
-                alt_offset.push(fraction_signed(
-                    cursor.i32()?,
-                    denominator,
-                    &format!("alternateOffset[{channel}]"),
-                )?);
-            }
-            (
-                base_headroom,
-                alternate_headroom,
-                gain_min,
-                gain_max,
-                gamma,
-                base_offset,
-                alt_offset,
-            )
-        } else {
-            let base_headroom = fraction_unsigned(cursor.u32()?, cursor.u32()?, "baseHdrHeadroom")?;
-            let alternate_headroom =
-                fraction_unsigned(cursor.u32()?, cursor.u32()?, "alternateHdrHeadroom")?;
-            let mut gain_min = Vec::new();
-            let mut gain_max = Vec::new();
-            let mut gamma = Vec::new();
-            let mut base_offset = Vec::new();
-            let mut alt_offset = Vec::new();
-            for channel in 0..channel_count {
-                gain_min.push(fraction_signed(
-                    cursor.i32()?,
-                    cursor.u32()?,
-                    &format!("gainMapMin[{channel}]"),
-                )?);
-                gain_max.push(fraction_signed(
-                    cursor.i32()?,
-                    cursor.u32()?,
-                    &format!("gainMapMax[{channel}]"),
-                )?);
-                gamma.push(fraction_unsigned(
-                    cursor.u32()?,
-                    cursor.u32()?,
-                    &format!("gamma[{channel}]"),
-                )?);
-                base_offset.push(fraction_signed(
-                    cursor.i32()?,
-                    cursor.u32()?,
-                    &format!("baseOffset[{channel}]"),
-                )?);
-                alt_offset.push(fraction_signed(
-                    cursor.i32()?,
-                    cursor.u32()?,
-                    &format!("alternateOffset[{channel}]"),
-                )?);
-            }
-            (
-                base_headroom,
-                alternate_headroom,
-                gain_min,
-                gain_max,
-                gamma,
-                base_offset,
-                alt_offset,
-            )
-        };
+    // Each rational carries its own denominator; the 2025 layout has
+    // no optional common-denominator or reverse-direction fields.
+    let base_headroom =
+        fraction_unsigned(cursor.u32()?, cursor.u32()?, "baseHdrHeadroom")?;
+    let alternate_headroom =
+        fraction_unsigned(cursor.u32()?, cursor.u32()?, "alternateHdrHeadroom")?;
+    let mut gain_min = Vec::with_capacity(channel_count);
+    let mut gain_max = Vec::with_capacity(channel_count);
+    let mut gamma = Vec::with_capacity(channel_count);
+    let mut base_offset = Vec::with_capacity(channel_count);
+    let mut alt_offset = Vec::with_capacity(channel_count);
+    for channel in 0..channel_count {
+        gain_min.push(fraction_signed(
+            cursor.i32()?,
+            cursor.u32()?,
+            &format!("gainMapMin[{channel}]"),
+        )?);
+        gain_max.push(fraction_signed(
+            cursor.i32()?,
+            cursor.u32()?,
+            &format!("gainMapMax[{channel}]"),
+        )?);
+        gamma.push(fraction_unsigned(
+            cursor.u32()?,
+            cursor.u32()?,
+            &format!("gamma[{channel}]"),
+        )?);
+        base_offset.push(fraction_signed(
+            cursor.i32()?,
+            cursor.u32()?,
+            &format!("baseOffset[{channel}]"),
+        )?);
+        alt_offset.push(fraction_signed(
+            cursor.i32()?,
+            cursor.u32()?,
+            &format!("alternateOffset[{channel}]"),
+        )?);
+    }
 
     fn three(values: &[f64]) -> [f64; 3] {
         match values {
@@ -583,28 +522,33 @@ mod tests {
     use super::*;
 
     fn iso_payload(flags: u8) -> Vec<u8> {
-        let denominator = 1000_u32;
         let mut output = Vec::new();
         output.extend_from_slice(&0_u16.to_be_bytes());
         output.extend_from_slice(&0_u16.to_be_bytes());
-        output.push(flags | 0x08);
-        output.extend_from_slice(&denominator.to_be_bytes());
+        output.push(flags);
         output.extend_from_slice(&0_u32.to_be_bytes());
-        output.extend_from_slice(&2000_u32.to_be_bytes());
-        let channels = if flags & 0x01 != 0 { 3 } else { 1 };
+        output.extend_from_slice(&1_u32.to_be_bytes());
+        output.extend_from_slice(&2_u32.to_be_bytes());
+        output.extend_from_slice(&1_u32.to_be_bytes());
+        let channels = if flags & 0x80 != 0 { 3 } else { 1 };
         for channel in 0..channels {
             output.extend_from_slice(&0_i32.to_be_bytes());
+            output.extend_from_slice(&1_u32.to_be_bytes());
             output.extend_from_slice(&(1000_i32 + channel * 100).to_be_bytes());
             output.extend_from_slice(&1000_u32.to_be_bytes());
+            output.extend_from_slice(&1_u32.to_be_bytes());
+            output.extend_from_slice(&1_u32.to_be_bytes());
             output.extend_from_slice(&0_i32.to_be_bytes());
+            output.extend_from_slice(&1_u32.to_be_bytes());
             output.extend_from_slice(&0_i32.to_be_bytes());
+            output.extend_from_slice(&1_u32.to_be_bytes());
         }
         output
     }
 
     #[test]
-    fn decodes_iso_common_denominator_metadata() {
-        let metadata = decode_iso_payload(&iso_payload(0x01 | 0x02)).unwrap();
+    fn decodes_iso_multichannel_metadata() {
+        let metadata = decode_iso_payload(&iso_payload(0x80 | 0x40)).unwrap();
         assert_eq!(metadata.channel_count, 3);
         assert_eq!(metadata.gain_map_max, [1.0, 1.1, 1.2]);
         assert_eq!(metadata.hdr_capacity_max, 2.0);
@@ -625,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_backward_iso_direction() {
+    fn rejects_nonzero_iso_reserved_bits() {
         assert!(decode_iso_payload(&iso_payload(0x04)).is_err());
     }
 }
