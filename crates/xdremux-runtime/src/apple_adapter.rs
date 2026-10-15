@@ -53,9 +53,6 @@ pub(super) struct AppleVideoToolboxMain10Facts {
     pub height: u32,
     pub annex_b_length: usize,
     pub hvcc_length: usize,
-    pub color_primaries: Option<String>,
-    pub transfer_function: Option<String>,
-    pub ycbcr_matrix: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -549,9 +546,6 @@ impl AppleAdapterClient {
             height: response.video_toolbox_main10.height,
             annex_b_length: response.video_toolbox_main10.annex_b_length,
             hvcc_length: response.video_toolbox_main10.hvcc_length,
-            color_primaries: response.video_toolbox_main10.color_primaries,
-            transfer_function: response.video_toolbox_main10.transfer_function,
-            ycbcr_matrix: response.video_toolbox_main10.ycbcr_matrix,
         };
         if facts.width != encode.width
             || facts.height != encode.height
@@ -1365,9 +1359,6 @@ struct VideoToolboxMain10WireResponse {
     height: u32,
     annex_b_length: usize,
     hvcc_length: usize,
-    color_primaries: Option<String>,
-    transfer_function: Option<String>,
-    ycbcr_matrix: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
