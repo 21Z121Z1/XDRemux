@@ -90,7 +90,11 @@ pub fn extract(data: &[u8]) -> Result<ExtractedLhdr> {
             unpack_float_array_le(&meta_bytes, 20).unwrap_or_else(|_| vec![0.0; 20]);
         let needs_fallback = meta_floats.iter().all(|value| *value == 0.0)
             || meta_floats.iter().any(|value| !value.is_finite())
-            || meta_floats[0] <= 0.0\n            || meta_floats[4] <= 0.0\n            || meta_floats[7] <= 0.0\n            || meta_floats[16] <= 0.0\n            || meta_floats[17] <= 0.0;
+            || meta_floats[0] <= 0.0
+            || meta_floats[4] <= 0.0
+            || meta_floats[7] <= 0.0
+            || meta_floats[16] <= 0.0
+            || meta_floats[17] <= 0.0;
         if needs_fallback {
             meta_floats = canonical_uhdr_floats();
             meta_bytes = pack_float32_le(&meta_floats);
