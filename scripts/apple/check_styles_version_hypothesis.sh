@@ -75,4 +75,3 @@ PY
 if printenv XDREMUX_STYLE_VERSION_PROBE_REPORT >/dev/null; then
   cp "$work/native-result.json" "$XDREMUX_STYLE_VERSION_PROBE_REPORT"
 fi
-
