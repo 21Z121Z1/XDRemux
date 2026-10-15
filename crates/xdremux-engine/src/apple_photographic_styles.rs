@@ -1245,7 +1245,8 @@ pub struct AppleStyleStatistics {
     pub tone_mapped_image_skin_based: AppleStyleDistribution,
 }
 
-/// Typed input for the version-15 Apple Photographic Styles metadata object.
+/// Typed input for the experimental version-16 Apple Photographic Styles metadata object.
+/// A version-only change is not evidence that Photos supports editing.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AppleStylePropertyListRequest<'a> {
     pub style_data: &'a [u8],
@@ -1296,7 +1297,7 @@ pub fn apple_style_property_list(
 
     let statistics = style_statistics_value(request.statistics);
     let root = plist_dictionary([
-        ("0", PlistValue::Integer(15)),
+        ("0", PlistValue::Integer(16)),
         ("1", PlistValue::Data(request.style_data.to_vec())),
         ("2", PlistValue::Bool(true)),
         ("3", PlistValue::Data(request.global_tone_curve.to_vec())),
