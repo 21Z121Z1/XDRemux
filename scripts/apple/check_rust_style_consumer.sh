@@ -192,7 +192,7 @@ if [[ -n "${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" ]]; then
     "$cli" convert --input "$master" --output "$target" --apple-styles
   test -s "$target"
   "$cli" validate "$target" > "$acceptance/master-validation.txt"
-  "$cli" inspect "$target" --json > "$acceptance/master-inspect.json"
+  python3 scripts/diagnostics/inspect_oppo_heif.py "$target" --json > "$acceptance/master-inspect.json"
   # sips renders an SDR preview for side-by-side inspection. The HEIF itself
   # carries the HDR Gain Map and the Log-encoded Linear Thumbnail.
   sips -s format png "$master" --out "$acceptance/master-source-sdr.png" >/dev/null
