@@ -1259,6 +1259,7 @@ mod tests {
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| temporary.path().to_path_buf());
         fs::create_dir_all(&output_dir).unwrap();
+        let mut evidence = Vec::new();
         for fixture in [
             "oppo/find-x9-ultra/uhdr-portrait-01.heic",
             "oppo/find-x7-ultra/lhdr-v2-01.heic",
@@ -1376,6 +1377,34 @@ mod tests {
             );
             assert_eq!(before.hvcc, after.hvcc);
             eprintln!("hdr-log-thumbnail: fixture={fixture} dimensions={}x{} log_mae={log_mae:.4}/255 sdr_mae={sdr_mae:.4}/255 output={}", decoded.width, decoded.height, output_path.display());
+            let hdr_over_sdr_white = scene
+                .hdr_luminance
+                .iter()
+                .filter(|value| **value > 1.0)
+                .count();
+            evidence.push(serde_json::json!({
+                "fixture": fixture,
+                "output": output_path.file_name().unwrap().to_string_lossy(),
+                "width": decoded.width,
+                "height": decoded.height,
+                "log_mae": log_mae,
+                "sdr_mae": sdr_mae,
+                "hdr_above_sdr_white_pixels": hdr_over_sdr_white,
+                "pixel_count": scene.width * scene.height,
+                "source": "linear SDR RGB + ISO Gain Map; no PQ intermediate",
+                "verification": "decoded Main10 Linear Thumbnail versus expected Apple Log RGB8 codes"
+            }));
+        }
+        if let Some(report_dir) = std::env::var_os("XDREMUX_TEST_STYLES_REPORT")
+            .filter(|value| !value.is_empty())
+        {
+            let report_path = std::path::PathBuf::from(report_dir)
+                .join("linear-thumbnail-roundtrip.json");
+            fs::write(
+                report_path,
+                serde_json::to_vec_pretty(&evidence).unwrap(),
+            )
+            .unwrap();
         }
     }
 
