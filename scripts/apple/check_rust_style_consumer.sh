@@ -220,7 +220,7 @@ for path in sorted(root.iterdir()):
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         }
 (root / "manifest.json").write_text(json.dumps({
-    "schema_version": 1,
+    "manifest_format": 1,
     "purpose": "HDR-first Linear Thumbnail acceptance on public OPPO fixtures",
     "limitation": "SDR preview PNGs are NOT HDR renders or proof of Photos editing.",
     "native_readback": report,
