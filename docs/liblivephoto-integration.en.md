@@ -36,8 +36,8 @@ build and gates in a separate environment.
 
 Original Gallery/Photos acceptance remains a separate requirement. Reader, writer,
 fixture, CI and device status must not be combined into one support claim. See
-[LibLivePhoto support](https://github.com/21Z121Z1/LibLivePhoto/blob/b962d9bc23cc36cdea7411c7d32d7646d0dfc590/FORMAT_SUPPORT.md)
-and [vendor evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/b962d9bc23cc36cdea7411c7d32d7646d0dfc590/evidence/VENDORS.md).
+[LibLivePhoto support](https://github.com/21Z121Z1/LibLivePhoto/blob/794ab552596db0f66095600d23cf7937a631b9ec/FORMAT_SUPPORT.md)
+and [vendor evidence](https://github.com/21Z121Z1/LibLivePhoto/blob/794ab552596db0f66095600d23cf7937a631b9ec/evidence/VENDORS.md).
 
 The public consumer contract uses an original ColorOS 16 dual-stream fixture.
 The default Apple plan blocks its unmapped vendor resources. Explicit sidecar
@@ -57,3 +57,5 @@ helpers. It is not a stable API. Remove each re-export after its consumer uses a
 public resource or Apple primitive API and the associated conformance gate passes.
 Keep payload copying, atomic publication and product geometry local. No removal
 of the compatibility feature is scheduled before these callers are migrated.
+
+The library reader now derives the supported primary movie MIME from `ftyp`. Android JPEG/HEIF directory output retains QuickTime MIME without changing movie bytes. Codec conformance and Gallery acceptance remain separate checks.

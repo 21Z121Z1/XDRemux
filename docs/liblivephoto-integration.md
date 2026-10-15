@@ -42,3 +42,5 @@ workspace 检查可脱离产品栈执行 Android/Apple 往返。Apple 转 Androi
 `xdremux-compat` 仍是不稳定的迁移边界。每个旧 re-export 应在调用方改用公共
 资源或 Apple 基础 API、对应 conformance 门禁通过后移除。文件复制、原子发布和
 产品几何策略保持本地所有权。完成这些调用方迁移前不移除整个兼容 feature。
+
+独立库现从 `ftyp` 读取受支持主视频的 MIME。Android JPEG/HEIF 目录会保留 QuickTime MIME，视频字节保持不变。编码规范符合性及原厂相册验收仍需分别验证。

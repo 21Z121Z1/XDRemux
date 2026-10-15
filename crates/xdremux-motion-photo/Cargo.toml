@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-liblivephoto = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "b962d9bc23cc36cdea7411c7d32d7646d0dfc590", features = ["xdremux-compat"] }
+liblivephoto = { git = "https://github.com/21Z121Z1/LibLivePhoto", rev = "794ab552596db0f66095600d23cf7937a631b9ec", features = ["xdremux-compat"] }
 
 [dev-dependencies]
 serde_json = "1.0"
