@@ -19,6 +19,12 @@ test -x "$cli"
 
 # Decode the actual VideoToolbox resource from RGB UHDR and mono LHDR Styles
 # conversions. This fails if the producer writes SDR codes as the reference.
+# The optional acceptance directory is the CI artifact staging path.
+if [[ -n "${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" ]]; then
+  mkdir -p "$XDREMUX_STYLES_ACCEPTANCE_DIR"
+fi
+XDREMUX_TEST_STYLES_REPORT="${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" \
+XDREMUX_TEST_STYLES_OUTPUT="${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" \
 XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
   cargo test --locked -p xdremux-runtime --lib \
   real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox -- --nocapture
@@ -175,3 +181,53 @@ for path, inspect_path in ((output, inspect_path), (batch_output, batch_inspect_
         f"scene_type={plist['5']}"
     )
 PY
+
+# Acceptance outputs are built from checked-in public fixtures only. Never
+# upload private RAWs, input credentials, or user-owned sample media to Actions.
+if [[ -n "${XDREMUX_STYLES_ACCEPTANCE_DIR:-}" ]]; then
+  acceptance="$XDREMUX_STYLES_ACCEPTANCE_DIR"
+  master="$repo_root/fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic"
+  target="$acceptance/uhdr-master-v2-01-apple-styles.heic"
+  XDREMUX_APPLE_ADAPTER="$adapter" \
+    "$cli" convert --input "$master" --output "$target" --apple-styles
+  test -s "$target"
+  "$cli" validate "$target" > "$acceptance/master-validation.txt"
+  "$cli" inspect "$target" --json > "$acceptance/master-inspect.json"
+  # sips renders an SDR preview for side-by-side inspection. The HEIF itself
+  # carries the HDR Gain Map and the Log-encoded Linear Thumbnail.
+  sips -s format png "$master" --out "$acceptance/master-source-sdr.png" >/dev/null
+  sips -s format png "$target" --out "$acceptance/master-converted-sdr.png" >/dev/null
+  python3 - "$acceptance" <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+report_path = root / "linear-thumbnail-roundtrip.json"
+if not report_path.exists():
+    raise SystemExit("missing native HDR Log thumbnail roundtrip report")
+report = json.loads(report_path.read_text())
+if len(report) != 2 or any(
+    item["log_mae"] >= 3.0 or item["sdr_mae"] <= 10.0
+    for item in report
+):
+    raise SystemExit(f"invalid HDR-first native readback evidence: {report!r}")
+files = {}
+for path in sorted(root.iterdir()):
+    if path.is_file():
+        files[path.name] = {
+            "bytes": path.stat().st_size,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+(root / "manifest.json").write_text(json.dumps({
+    "schema_version": 1,
+    "purpose": "HDR-first Linear Thumbnail acceptance on public OPPO fixtures",
+    "limitation": "SDR preview PNGs are NOT HDR renders or proof of Photos editing.",
+    "native_readback": report,
+    "files": files,
+}, indent=2) + "\n")
+print("styles-acceptance: " + json.dumps({
+    "count": len(report), "files": sorted(files)
+}))
+PY
+fi
