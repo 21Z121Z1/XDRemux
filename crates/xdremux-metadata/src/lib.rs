@@ -10,7 +10,8 @@ pub mod ultrahdr_jpeg;
 pub use apple_portrait::make_apple_portrait_focus_xmp;
 pub use error::{MetadataError, Result};
 pub use iso21496::{
-    make_apple_tmap_payload, make_hdrgm_xmp, make_imageio_native_tmap_payload,
+    make_apple_tmap_payload, make_apple_tmap_payload_with_colour_space, make_hdrgm_xmp,
+    make_imageio_native_tmap_payload,
     make_strict_tmap_payload,
 };
 pub use oppo::{
