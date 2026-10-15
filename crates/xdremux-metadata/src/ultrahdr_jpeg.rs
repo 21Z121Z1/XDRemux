@@ -378,7 +378,7 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
             format!("nonzero reserved gain-map flags 0x{flags:02x}"),
         ));
     }
-    let channel_count = if flags & 0x80 != 0 { 3 } else { 1 };
+    let channel_count: u8 = if flags & 0x80 != 0 { 3 } else { 1 };
     let use_base_color_space = flags & 0x40 != 0;
 
     // Each rational carries its own denominator; the 2025 layout has
@@ -386,11 +386,11 @@ fn decode_iso_payload(payload: &[u8]) -> Result<UltraHdrGainMapMetadata> {
     let base_headroom = fraction_unsigned(cursor.u32()?, cursor.u32()?, "baseHdrHeadroom")?;
     let alternate_headroom =
         fraction_unsigned(cursor.u32()?, cursor.u32()?, "alternateHdrHeadroom")?;
-    let mut gain_min = Vec::with_capacity(channel_count);
-    let mut gain_max = Vec::with_capacity(channel_count);
-    let mut gamma = Vec::with_capacity(channel_count);
-    let mut base_offset = Vec::with_capacity(channel_count);
-    let mut alt_offset = Vec::with_capacity(channel_count);
+    let mut gain_min = Vec::with_capacity(usize::from(channel_count));
+    let mut gain_max = Vec::with_capacity(usize::from(channel_count));
+    let mut gamma = Vec::with_capacity(usize::from(channel_count));
+    let mut base_offset = Vec::with_capacity(usize::from(channel_count));
+    let mut alt_offset = Vec::with_capacity(usize::from(channel_count));
     for channel in 0..channel_count {
         gain_min.push(fraction_signed(
             cursor.i32()?,
