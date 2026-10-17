@@ -221,7 +221,26 @@ pub(crate) fn convert_file(
         )
         .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
     let scene_raster = downsample_raster(&raster, LINEAR_THUMBNAIL_MAX_SIZE)?;
-    let scene_rasters = derive_style_scene(&scene_raster, &gain_raster, &prepared.scale)?;
+    // Reconstruct the HDR alternate in linear light before reducing it to the
+    // Linear Thumbnail size. Reducing 8-bit SDR codes first discards highlight
+    // structure before the Gain Map has a chance to restore it.
+    let scene_rasters = derive_style_scene_at_resolution(
+        &raster,
+        &gain_raster,
+        &prepared.scale,
+        usize::try_from(scene_raster.width).map_err(|_| {
+            RuntimeError::new(
+                "Photographic Styles Linear Thumbnail",
+                "width exceeds usize",
+            )
+        })?,
+        usize::try_from(scene_raster.height).map_err(|_| {
+            RuntimeError::new(
+                "Photographic Styles Linear Thumbnail",
+                "height exceeds usize",
+            )
+        })?,
+    )?;
     let linear_thumbnail_raster = linear_thumbnail_raster(&scene_rasters)?;
     let linear_thumbnail = encode_linear_thumbnail(
         &adapter,
@@ -514,10 +533,31 @@ struct StyleSceneRasters {
     renderer_linear_maximum: f32,
 }
 
+#[cfg(test)]
 fn derive_style_scene(
     raster: &Raster8,
     gain_map: &Raster8,
     scale: &ResolvedScale,
+) -> Result<StyleSceneRasters> {
+    derive_style_scene_at_resolution(
+        raster,
+        gain_map,
+        scale,
+        usize::try_from(raster.width).map_err(|_| {
+            RuntimeError::new("Photographic Styles source raster", "width exceeds usize")
+        })?,
+        usize::try_from(raster.height).map_err(|_| {
+            RuntimeError::new("Photographic Styles source raster", "height exceeds usize")
+        })?,
+    )
+}
+
+fn derive_style_scene_at_resolution(
+    raster: &Raster8,
+    gain_map: &Raster8,
+    scale: &ResolvedScale,
+    width: usize,
+    height: usize,
 ) -> Result<StyleSceneRasters> {
     raster
         .validate()
@@ -556,12 +596,20 @@ fn derive_style_scene(
         ));
     }
 
-    let width = usize::try_from(raster.width).map_err(|_| {
+    let source_width = usize::try_from(raster.width).map_err(|_| {
         RuntimeError::new("Photographic Styles source raster", "width exceeds usize")
     })?;
-    let height = usize::try_from(raster.height).map_err(|_| {
+    let source_height = usize::try_from(raster.height).map_err(|_| {
         RuntimeError::new("Photographic Styles source raster", "height exceeds usize")
     })?;
+    if width == 0 || height == 0 || width > source_width || height > source_height {
+        return Err(RuntimeError::new(
+            "Photographic Styles Linear Thumbnail",
+            "invalid reduced scene geometry",
+        ));
+    }
+    let reduced = width != source_width || height != source_height;
+    let taps = if reduced { 4 } else { 1 };
     let pixel_count = width.checked_mul(height).ok_or_else(|| {
         RuntimeError::new("Photographic Styles source raster", "pixel count overflows")
     })?;
@@ -582,81 +630,106 @@ fn derive_style_scene(
     })?;
     let gain_sampler = GainMapSampler {
         raster: gain_map,
-        target_width: width,
-        target_height: height,
+        target_width: source_width,
+        target_height: source_height,
         source_width: gain_width,
         source_height: gain_height,
     };
 
+    // A stratified 2x2 footprint samples full-resolution SDR and Gain Map
+    // values together, then averages in linear light. Memory stays proportional
+    // to the small thumbnail, even for 50 MP source photographs.
+    // Native-sized rasters retain exact single-sample behavior.
     for y in 0..height {
-        let source_row = y.checked_mul(raster.bytes_per_row).ok_or_else(|| {
-            RuntimeError::new("Photographic Styles source raster", "row offset overflows")
-        })?;
         for x in 0..width {
-            let source_offset = source_row
-                .checked_add(x.checked_mul(3).ok_or_else(|| {
-                    RuntimeError::new(
-                        "Photographic Styles source raster",
-                        "pixel offset overflows",
-                    )
-                })?)
-                .ok_or_else(|| {
-                    RuntimeError::new(
-                        "Photographic Styles source raster",
-                        "pixel offset overflows",
-                    )
-                })?;
+            let mut base_accum = [0.0_f64; 3];
+            let mut hdr_accum = [0.0_f64; 3];
+            for tap in 0..taps {
+                let (source_x, source_y) = if reduced {
+                    let sub_x = tap % 2;
+                    let sub_y = tap / 2;
+                    let sx = ((x as f64 + (sub_x as f64 + 0.5) / 2.0) * source_width as f64
+                        / width as f64)
+                        .floor() as usize;
+                    let sy = ((y as f64 + (sub_y as f64 + 0.5) / 2.0) * source_height as f64
+                        / height as f64)
+                        .floor() as usize;
+                    (sx.min(source_width - 1), sy.min(source_height - 1))
+                } else {
+                    (x, y)
+                };
+                let source_offset = source_y
+                    .checked_mul(raster.bytes_per_row)
+                    .and_then(|row| source_x.checked_mul(3).and_then(|col| row.checked_add(col)))
+                    .ok_or_else(|| {
+                        RuntimeError::new(
+                            "Photographic Styles source raster",
+                            "source pixel offset overflows",
+                        )
+                    })?;
+                for component in 0..3 {
+                    let linear_base =
+                        srgb_decode(f32::from(raster.data[source_offset + component]) / 255.0);
+                    let code = gain_sampler.sample_code(source_x, source_y, component);
+                    let parameter_index = if scale.channel_count == 1 {
+                        0
+                    } else {
+                        component.min(scale.channel_count - 1)
+                    };
+                    let gamma = scale
+                        .per_channel_gamma
+                        .get(parameter_index)
+                        .copied()
+                        .unwrap_or(scale.gamma);
+                    let minimum = scale
+                        .per_channel_gain_map_min
+                        .get(parameter_index)
+                        .copied()
+                        .unwrap_or(scale.gain_map_min);
+                    let maximum = scale
+                        .per_channel_gain_map_max
+                        .get(parameter_index)
+                        .copied()
+                        .unwrap_or(scale.gain_map_max);
+                    let base_offset = scale
+                        .per_channel_base_offset
+                        .get(parameter_index)
+                        .copied()
+                        .unwrap_or(scale.epsilon_sdr);
+                    let alternate_offset = scale
+                        .per_channel_alternate_offset
+                        .get(parameter_index)
+                        .copied()
+                        .unwrap_or(scale.epsilon_hdr);
+                    if gamma <= 0.0 || minimum > maximum {
+                        return Err(RuntimeError::new(
+                            "Photographic Styles source Gain Map",
+                            "resolved Gain Map gamma or gain interval is invalid",
+                        ));
+                    }
+                    let log_gain = minimum + code.powf(gamma) * (maximum - minimum);
+                    let reconstructed = (f64::from(linear_base) + base_offset).max(0.0)
+                        * 2.0_f64.powf(log_gain)
+                        - alternate_offset;
+                    if !reconstructed.is_finite() {
+                        return Err(RuntimeError::new(
+                            "Photographic Styles source Gain Map",
+                            "reconstructed HDR scene contains a non-finite sample",
+                        ));
+                    }
+                    base_accum[component] += f64::from(linear_base);
+                    hdr_accum[component] += reconstructed;
+                }
+            }
             let mut base = [0.0_f32; 3];
             let mut hdr = [0.0_f32; 3];
             for component in 0..3 {
-                base[component] =
-                    srgb_decode(f32::from(raster.data[source_offset + component]) / 255.0);
-                let code = gain_sampler.sample_code(x, y, component);
-                let parameter_index = if scale.channel_count == 1 {
-                    0
-                } else {
-                    component.min(scale.channel_count - 1)
-                };
-                let gamma = scale
-                    .per_channel_gamma
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gamma);
-                let minimum = scale
-                    .per_channel_gain_map_min
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gain_map_min);
-                let maximum = scale
-                    .per_channel_gain_map_max
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gain_map_max);
-                let base_offset = scale
-                    .per_channel_base_offset
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.epsilon_sdr);
-                let alternate_offset = scale
-                    .per_channel_alternate_offset
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.epsilon_hdr);
-                if gamma < 0.0 {
-                    return Err(RuntimeError::new(
-                        "Photographic Styles source Gain Map",
-                        "resolved Gain Map gamma is negative",
-                    ));
-                }
-                let log_gain = minimum + code.powf(gamma) * (maximum - minimum);
-                let reconstructed = (f64::from(base[component]) + base_offset).max(0.0)
-                    * 2.0_f64.powf(log_gain)
-                    - alternate_offset;
-                hdr[component] = reconstructed as f32;
+                base[component] = (base_accum[component] / f64::from(taps)).clamp(0.0, 1.0) as f32;
+                hdr[component] = (hdr_accum[component] / f64::from(taps)) as f32;
                 if !hdr[component].is_finite() {
                     return Err(RuntimeError::new(
                         "Photographic Styles source Gain Map",
-                        "reconstructed HDR scene contains a non-finite sample",
+                        "reduced HDR scene contains a non-finite sample",
                     ));
                 }
             }
@@ -1234,6 +1307,7 @@ mod tests {
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| temporary.path().to_path_buf());
         fs::create_dir_all(&output_dir).unwrap();
+        let mut evidence = Vec::new();
         for fixture in [
             "oppo/find-x9-ultra/uhdr-portrait-01.heic",
             "oppo/find-x7-ultra/lhdr-v2-01.heic",
@@ -1292,7 +1366,20 @@ mod tests {
                     },
                 )
                 .unwrap();
-            let scene = derive_style_scene(&base, &gain, &prepared.scale).unwrap();
+            let scene = derive_style_scene_at_resolution(
+                &runtime
+                    .heif
+                    .decode_raster(&HeifRasterDecodeRequest {
+                        data: output.clone(),
+                        format: RasterPixelFormat::Rgb8,
+                    })
+                    .unwrap(),
+                &gain,
+                &prepared.scale,
+                usize::try_from(base.width).unwrap(),
+                usize::try_from(base.height).unwrap(),
+            )
+            .unwrap();
             let expected = linear_thumbnail_raster(&scene).unwrap();
             assert_eq!(
                 (decoded.width, decoded.height),
@@ -1338,6 +1425,30 @@ mod tests {
             );
             assert_eq!(before.hvcc, after.hvcc);
             eprintln!("hdr-log-thumbnail: fixture={fixture} dimensions={}x{} log_mae={log_mae:.4}/255 sdr_mae={sdr_mae:.4}/255 output={}", decoded.width, decoded.height, output_path.display());
+            let hdr_over_sdr_white = scene
+                .hdr_luminance
+                .iter()
+                .filter(|value| **value > 1.0)
+                .count();
+            evidence.push(serde_json::json!({
+                "fixture": fixture,
+                "output": output_path.file_name().unwrap().to_string_lossy(),
+                "width": decoded.width,
+                "height": decoded.height,
+                "log_mae": log_mae,
+                "sdr_mae": sdr_mae,
+                "hdr_above_sdr_white_pixels": hdr_over_sdr_white,
+                "pixel_count": scene.width * scene.height,
+                "source": "linear SDR RGB + ISO Gain Map; no PQ intermediate",
+                "verification": "decoded Main10 Linear Thumbnail versus expected Apple Log RGB8 codes"
+            }));
+        }
+        if let Some(report_dir) =
+            std::env::var_os("XDREMUX_TEST_STYLES_REPORT").filter(|value| !value.is_empty())
+        {
+            let report_path =
+                std::path::PathBuf::from(report_dir).join("linear-thumbnail-roundtrip.json");
+            fs::write(report_path, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
         }
     }
 
@@ -1398,6 +1509,48 @@ mod tests {
             let expected = (code.clamp(0.0, 1.0) * 255.0).round() as u8;
             assert_eq!(thumbnail.data[index], expected, "RGB index {index}");
         }
+    }
+
+    #[test]
+    fn hdr_first_reconstruction_preserves_subpixel_highlights_before_log() {
+        // The top-left 2x2 footprint contains a single bright red pixel.
+        // Nearest-neighbor SDR reduction would produce a four-times-brighter
+        // false HDR pixel; linear reconstruction first yields the true mean.
+        let mut base_bytes = vec![0_u8; 4 * 4 * 3];
+        let mut gain_bytes = vec![0_u8; 4 * 4 * 3];
+        base_bytes[0] = 255;
+        gain_bytes[0] = 255;
+        let base = Raster8::new(4, 4, 12, RasterPixelFormat::Rgb8, base_bytes).unwrap();
+        let gain = Raster8::new(4, 4, 12, RasterPixelFormat::Rgb8, gain_bytes).unwrap();
+        let mut params = vec![0.0; 20];
+        params[0..3].fill(1.0);
+        params[4..7].fill(4.0);
+        params[7..10].fill(1.0);
+        params[16] = 1.0;
+        params[17] = 4.0;
+        params[18] = 4.0;
+        let scale = xdremux_hdr::resolve(&params, xdremux_hdr::ExtractionMode::Uhdr).unwrap();
+
+        let scene = derive_style_scene_at_resolution(&base, &gain, &scale, 2, 2).unwrap();
+        assert_eq!((scene.width, scene.height), (2, 2));
+        assert!((scene.base_rgb[0] - 0.25).abs() < 1e-6);
+        assert!((scene.hdr_rgb[0] - 1.0).abs() < 1e-6);
+        assert!(scene.hdr_rgb[1..].iter().all(|x| *x == 0.0));
+        let thumbnail = linear_thumbnail_raster(&scene).unwrap();
+        assert_eq!((thumbnail.width, thumbnail.height), (2, 2));
+        assert_eq!(
+            thumbnail.data,
+            apple_style_linear_thumbnail_codes(
+                &scene.hdr_rgb,
+                scene.linear_metadata.baseline_exposure
+            )
+            .unwrap()
+        );
+        // Regression: reduction before Gain Map multiplication incorrectly
+        // picks the 255/255 pixel and retains its entire 4x HDR gain.
+        let old_sdr = downsample_raster(&base, 2).unwrap();
+        let old_scene = derive_style_scene(&old_sdr, &gain, &scale).unwrap();
+        assert!(old_scene.hdr_rgb[0] > scene.hdr_rgb[0]);
     }
 
     #[test]
