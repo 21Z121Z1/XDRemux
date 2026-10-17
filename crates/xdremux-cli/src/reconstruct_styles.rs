@@ -16,33 +16,6 @@ pub(super) struct ReconstructStylesArgs {
     max_edge: u32,
 }
 
-#[cfg(test)]
-mod tests {
-    use clap::Parser;
-    #[test]
-    fn public_command_accepts_multiple_sources_and_a_gain_map_resolution_limit() {
-        let parsed = crate::Cli::try_parse_from([
-            "xdremux",
-            "reconstruct-styles",
-            "--input",
-            "photo.part1.heic",
-            "--input",
-            "other.heic",
-            "--output-dir",
-            "results",
-            "--max-edge",
-            "1024",
-        ])
-        .unwrap();
-        let crate::RootCommand::ReconstructStyles(args) = parsed.command else {
-            panic!("wrong public command")
-        };
-        assert_eq!(args.inputs.len(), 2);
-        assert_eq!(args.max_edge, 1024);
-        assert_eq!(args.output_dir, std::path::PathBuf::from("results"));
-    }
-}
-
 pub(super) fn run(
     args: ReconstructStylesArgs,
     stdout: &mut impl Write,
@@ -92,5 +65,32 @@ pub(super) fn run(
             return 1;
         }
         u8::from(failures > 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+    #[test]
+    fn public_command_accepts_multiple_sources_and_a_gain_map_resolution_limit() {
+        let parsed = crate::Cli::try_parse_from([
+            "xdremux",
+            "reconstruct-styles",
+            "--input",
+            "photo.part1.heic",
+            "--input",
+            "other.heic",
+            "--output-dir",
+            "results",
+            "--max-edge",
+            "1024",
+        ])
+        .unwrap();
+        let crate::RootCommand::ReconstructStyles(args) = parsed.command else {
+            panic!("wrong public command")
+        };
+        assert_eq!(args.inputs.len(), 2);
+        assert_eq!(args.max_edge, 1024);
+        assert_eq!(args.output_dir, std::path::PathBuf::from("results"));
     }
 }
