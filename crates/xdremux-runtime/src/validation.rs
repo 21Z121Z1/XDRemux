@@ -4,10 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use xdremux_format::ChromaSampling;
 use xdremux_heif::validate_gain_map_structure;
-use xdremux_motion_photo::{
-    companion_video_path, read_apple_content_identifier, read_live_photo_content_identifier,
-    read_live_photo_still_time, validate_live_photo_movie,
-};
+use xdremux_motion_photo::{apple, companion_video_path, Input, MotionPhoto, ParseOptions};
 
 use crate::{Result, RuntimeError};
 
@@ -102,7 +99,7 @@ fn validate_live_photo_pair(
     };
     let video_bytes = read_file(video, "Live Photo movie read")?;
 
-    let image_identifier = read_apple_content_identifier(&image_bytes)
+    let image_identifier = apple::read_still_identifier(&image_bytes)
         .map_err(|error| RuntimeError::external("Live Photo still validation", error))?
         .ok_or_else(|| {
             RuntimeError::new(
@@ -110,7 +107,7 @@ fn validate_live_photo_pair(
                 "HEIC/HEIF is missing the Apple ContentIdentifier MakerNote",
             )
         })?;
-    let video_identifier = read_live_photo_content_identifier(&video_bytes)
+    let video_identifier = apple::read_movie_identifier(&video_bytes)
         .map_err(|error| RuntimeError::external("Live Photo movie validation", error))?
         .ok_or_else(|| {
             RuntimeError::new(
@@ -127,7 +124,7 @@ fn validate_live_photo_pair(
         ));
     }
 
-    let still_time_seconds = read_live_photo_still_time(&video_bytes)
+    let presentation = apple::read_presentation(&video_bytes)
         .map_err(|error| RuntimeError::external("Live Photo still-time validation", error))?
         .ok_or_else(|| {
             RuntimeError::new(
@@ -135,8 +132,15 @@ fn validate_live_photo_pair(
                 "MOV is missing the still-image-time metadata sample",
             )
         })?;
-    validate_live_photo_movie(&video_bytes, &image_identifier, still_time_seconds)
-        .map_err(|error| RuntimeError::external("Live Photo movie validation", error))?;
+    MotionPhoto::parse(
+        Input::ApplePair {
+            still: &image_bytes,
+            movie: &video_bytes,
+        },
+        ParseOptions::strict(),
+    )
+    .map_err(|error| RuntimeError::external("Live Photo pair validation", error))?;
+    let still_time_seconds = presentation.seconds();
 
     Ok(ValidationReport::LivePhoto(LivePhotoValidationReport {
         input: input.to_path_buf(),
@@ -186,7 +190,7 @@ pub fn validate_media_file(input: &Path) -> Result<ValidationReport> {
     }
 
     let bytes = read_file(input, "media validation read")?;
-    let apple_identifier = read_apple_content_identifier(&bytes)
+    let apple_identifier = apple::read_still_identifier(&bytes)
         .map_err(|error| RuntimeError::external("Live Photo still probe", error))?;
     if apple_identifier.is_some() {
         let video = companion_video_path(input);

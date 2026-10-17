@@ -11,10 +11,7 @@ use xdremux_classification::{
     PhotoAssetCategorizationDisposition, PhotoAssetCategorizationItem, PhotoAssetPlanningInput,
     PhotoAssetType, PhotoClassificationContract, PhotoResourceRole, ResourceFingerprint,
 };
-use xdremux_motion_photo::{
-    parse_oppo_motion_photo, read_apple_content_identifier, read_live_photo_content_identifier,
-    read_live_photo_still_time, validate_live_photo_movie,
-};
+use xdremux_motion_photo::{Input, MotionPhoto, ParseOptions};
 
 use crate::{PortableRuntime, Result, RuntimeError};
 
@@ -221,26 +218,21 @@ fn companion_video(path: &Path) -> Option<PathBuf> {
 }
 
 fn valid_live_photo_pair(image: &[u8], video_path: &Path) -> bool {
-    let Ok(Some(image_id)) = read_apple_content_identifier(image) else {
-        return false;
-    };
     let Ok(video) = fs::read(video_path) else {
         return false;
     };
-    let Ok(Some(video_id)) = read_live_photo_content_identifier(&video) else {
-        return false;
-    };
-    if image_id != video_id {
-        return false;
-    }
-    let Ok(Some(still_time)) = read_live_photo_still_time(&video) else {
-        return false;
-    };
-    validate_live_photo_movie(&video, &video_id, still_time).is_ok()
+    MotionPhoto::parse(
+        Input::ApplePair {
+            still: image,
+            movie: &video,
+        },
+        ParseOptions::strict(),
+    )
+    .is_ok()
 }
 
 fn inferred_asset_type(data: &[u8]) -> PhotoAssetType {
-    if matches!(parse_oppo_motion_photo(data), Ok(Some(_))) {
+    if MotionPhoto::parse(Input::SingleFile(data), ParseOptions::compatible()).is_ok() {
         PhotoAssetType::LivePhoto
     } else {
         PhotoAssetType::StaticPhoto
