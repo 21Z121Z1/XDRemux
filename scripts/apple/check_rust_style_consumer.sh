@@ -31,6 +31,41 @@ test -s "$fixture"
 
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-rust-style-consumer.XXXXXX")"
 trap 'rm -rf "$test_root"' EXIT
+
+# Capture effective HEVC format-description tags from the native encoder.
+# This probe intentionally does not change the existing private Styles carrier
+# color interpretation; comparison to an Apple-authored thumbnail is still needed.
+python3 - "$adapter" "$test_root" <<'PY'
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+adapter, root = sys.argv[1:]
+root = Path(root)
+raw = root / "color-probe-rgb8.bin"
+raw.write_bytes(bytes([128, 128, 128]) * (64 * 64))
+request = {
+    "schema_version": 2,
+    "operation": "videotoolbox-encode-main10",
+    "input_path": str(raw),
+    "output_path": str(root / "color-probe.hevc"),
+    "video_toolbox_main10": {
+        "raw_width": 64, "raw_height": 64, "raw_bytes_per_row": 192,
+        "quality": 0.85, "hvcc_path": str(root / "color-probe.hvcc"),
+    },
+}
+process = subprocess.run(
+    [adapter], input=(json.dumps(request) + "\n").encode(),
+    check=True, capture_output=True,
+)
+facts = json.loads(process.stdout)["video_toolbox_main10"]
+for name in ("color_primaries", "transfer_function", "ycbcr_matrix"):
+    print("styles-main10-observed-%s=%s" % (name, facts.get(name, "<unspecified>")))
+assert (root / "color-probe.hevc").stat().st_size > 0
+assert (root / "color-probe.hvcc").stat().st_size > 0
+PY
+
 output="$test_root/rust-styles.heic"
 inspect="$test_root/inspect.json"
 batch_output_dir="$test_root/batch"

@@ -31,6 +31,10 @@ struct VideoToolboxMain10Facts: Encodable {
     let hardwareAccelerationAllowed: Bool
     let usingHardwareAcceleratedEncoder: Bool?
     let encoderID: String?
+    // Observed compressed sample format, not merely requested VT properties.
+    let colorPrimaries: String?
+    let transferFunction: String?
+    let yCbCrMatrix: String?
 
     enum CodingKeys: String, CodingKey {
         case width
@@ -40,6 +44,9 @@ struct VideoToolboxMain10Facts: Encodable {
         case hardwareAccelerationAllowed = "hardware_acceleration_allowed"
         case usingHardwareAcceleratedEncoder = "using_hardware_accelerated_encoder"
         case encoderID = "encoder_id"
+        case colorPrimaries = "color_primaries"
+        case transferFunction = "transfer_function"
+        case yCbCrMatrix = "ycbcr_matrix"
     }
 }
 
@@ -48,6 +55,9 @@ private final class Main10EncoderState {
     var hvcc = Data()
     var wroteParameterSets = false
     var error: String?
+    var colorPrimaries: String?
+    var transferFunction: String?
+    var yCbCrMatrix: String?
 }
 
 private func main10Error(_ message: String, status: OSStatus = -1) -> NSError {
@@ -206,6 +216,13 @@ private let main10CompressionCallback: VTCompressionOutputCallback = {
           let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) else {
         state.error = "VideoToolbox callback returned an incomplete sample"
         return
+    }
+    // Capture the effective color information on the actual compressed sample.
+    // VTSessionSetProperty may be ignored or rejected by a hardware encoder.
+    if let extensions = CMFormatDescriptionGetExtensions(formatDescription) as? [String: Any] {
+        state.colorPrimaries = extensions[kCMFormatDescriptionExtension_ColorPrimaries as String] as? String
+        state.transferFunction = extensions[kCMFormatDescriptionExtension_TransferFunction as String] as? String
+        state.yCbCrMatrix = extensions[kCMFormatDescriptionExtension_YCbCrMatrix as String] as? String
     }
     if state.hvcc.isEmpty,
        let extensions = CMFormatDescriptionGetExtensions(formatDescription) as? [String: Any],
@@ -466,6 +483,9 @@ func encodeVideoToolboxMain10(
         hvccLength: state.hvcc.count,
         hardwareAccelerationAllowed: true,
         usingHardwareAcceleratedEncoder: usingHardwareAcceleratedEncoder,
-        encoderID: encoderID
+        encoderID: encoderID,
+        colorPrimaries: state.colorPrimaries,
+        transferFunction: state.transferFunction,
+        yCbCrMatrix: state.yCbCrMatrix
     )
 }

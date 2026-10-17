@@ -104,6 +104,7 @@ fn canonical_channel_values(info: &[f64], channel: usize) -> Result<[f64; 5]> {
         || gain_min_ratio <= 0.0
         || !gain_max_ratio.is_finite()
         || gain_max_ratio <= 0.0
+        || gain_max_ratio < gain_min_ratio
         || !gamma.is_finite()
         || gamma <= 0.0
         || !base_offset.is_finite()
@@ -308,6 +309,32 @@ mod tests {
         let multichannel = make_apple_tmap_payload(&info).unwrap();
         assert_eq!(multichannel.len(), 142);
         assert_eq!(multichannel[5], 0xc0);
+    }
+
+    #[test]
+    fn reversed_per_channel_gain_ranges_are_rejected_by_both_tmap_writers() {
+        // Ratios below unity and equal bounds are valid; only reversed ranges fail.
+        for channel in 0..3 {
+            let mut info = canonical_sample();
+            info[channel] = 4.0;
+            info[4 + channel] = 2.0;
+            assert!(make_apple_tmap_payload(&info).is_err(), "channel {channel}");
+            assert!(
+                make_imageio_native_tmap_payload(&info).is_err(),
+                "channel {channel}"
+            );
+
+            info[4 + channel] = info[channel];
+            assert!(make_apple_tmap_payload(&info).is_ok(), "channel {channel}");
+            assert!(
+                make_imageio_native_tmap_payload(&info).is_ok(),
+                "channel {channel}"
+            );
+
+            info[channel] = 0.5;
+            info[4 + channel] = 1.0;
+            assert!(make_apple_tmap_payload(&info).is_ok(), "channel {channel}");
+        }
     }
 
     #[test]
