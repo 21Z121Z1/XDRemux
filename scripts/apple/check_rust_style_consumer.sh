@@ -108,6 +108,11 @@ def request(operation, path):
     return json.loads(result.stdout)
 
 for output in outputs:
+    properties = request("imageio-image-properties", output)["image_properties"]
+    smart_style = properties.get("maker_apple_integer_dictionaries", {}).get("84", {})
+    expected = dict(zip(map(str, range(8)), (1, 0, 0, 1, 1, 1, 4, 0)))
+    if any(smart_style.get(key) != value for key, value in expected.items()):
+        raise SystemExit(f"{output}: ImageIO did not retain SmartStyle MakerApple 84: {smart_style!r}")
     auxiliary = request("imageio-auxiliary-facts", output)["auxiliary"]
     required = [
         "iso_gain_map",
@@ -126,6 +131,7 @@ for output in outputs:
     print(
         "rust-styles-consumer-pass: "
         f"output={output} "
+        f"maker_apple_84={smart_style!r} "
         f"iso_gain_map={auxiliary['iso_gain_map']} "
         f"portrait_effects_matte={auxiliary['portrait_effects_matte']} "
         f"skin_matte={auxiliary['skin_matte']} "

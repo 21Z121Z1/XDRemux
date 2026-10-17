@@ -8,10 +8,10 @@ use xdremux_engine::{
     apple_style_apply_global_tone_curve, apple_style_data_from_coefficient_deltas,
     apple_style_distribution, apple_style_face_exposure_boost, apple_style_fit_global_polynomial,
     apple_style_light_map, apple_style_linear_metadata, apple_style_linear_thumbnail_codes,
-    apple_style_monotonic_global_tone_curve, apple_style_property_list,
-    resolve_apple_style_scene_type, AppleL8Mask, AppleStyleGlobalToneCurve,
-    AppleStyleLightMapRequest, AppleStyleLinearMetadata, AppleStylePropertyListRequest,
-    AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+    apple_style_maker_apple_dictionary, apple_style_monotonic_global_tone_curve,
+    apple_style_property_list, resolve_apple_style_scene_type, AppleL8Mask,
+    AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
+    AppleStylePropertyListRequest, AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
 };
 
 use crate::apple_adapter::{AppleAdapterClient, AppleVideoToolboxMain10Encode};
@@ -179,7 +179,13 @@ pub(crate) fn convert_file(
         semantic_payloads.push(payload);
     }
 
-    adapter.imageio_write_auxiliary(&base_path, &semantic_scaffold_path, &semantic_payloads)?;
+    let maker_apple = apple_style_maker_apple_dictionary();
+    adapter.imageio_write_auxiliary_with_properties(
+        &base_path,
+        &semantic_scaffold_path,
+        &semantic_payloads,
+        maker_apple.clone(),
+    )?;
     let semantic_scaffold = fs::read(&semantic_scaffold_path).map_err(|error| {
         RuntimeError::external("Photographic Styles semantic scaffold read", error)
     })?;
@@ -339,9 +345,39 @@ pub(crate) fn convert_file(
         RuntimeError::external("Photographic Styles HDR structural validation", error)
     })?;
 
+    // Inspect the exact final bytes, not the intermediate scaffold or the
+    // coefficient plist. An older adapter that ignores the additive metadata
+    // request must fail here before it can replace an existing output.
+    let final_path = staging.path().join("final-styles.heic");
+    fs::write(&final_path, &assembled).map_err(|error| {
+        RuntimeError::external("Photographic Styles final metadata staging", error)
+    })?;
+    let final_properties = adapter.imageio_image_properties(&final_path)?;
+    validate_maker_apple_properties(
+        &maker_apple,
+        &final_properties.maker_apple_integer_dictionaries,
+    )?;
+
     let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
     let published = publisher.publish_bytes(assembled)?;
     Ok(PhotographicStylesFileReceipt { output: published })
+}
+
+fn validate_maker_apple_properties(
+    expected: &BTreeMap<String, BTreeMap<String, i64>>,
+    actual: &BTreeMap<String, BTreeMap<String, i64>>,
+) -> Result<()> {
+    for (tag, fields) in expected {
+        for (key, value) in fields {
+            if actual.get(tag).and_then(|fields| fields.get(key)) != Some(value) {
+                return Err(RuntimeError::new(
+                    "Photographic Styles final metadata",
+                    format!("ImageIO did not retain MakerApple {tag} field {key}={value}"),
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn encode_linear_thumbnail(
@@ -1168,6 +1204,21 @@ fn style_grid_size(width: u32, height: u32) -> (u32, u32, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_or_changed_smartstyle_state_is_rejected_before_publication() {
+        let expected = apple_style_maker_apple_dictionary();
+        assert!(validate_maker_apple_properties(&expected, &BTreeMap::new()).is_err());
+        let mut actual = expected.clone();
+        actual.get_mut("84").unwrap().remove("5");
+        assert!(validate_maker_apple_properties(&expected, &actual).is_err());
+        actual.get_mut("84").unwrap().insert("5".to_owned(), 0);
+        assert!(validate_maker_apple_properties(&expected, &actual).is_err());
+        actual.get_mut("84").unwrap().insert("5".to_owned(), 1);
+        actual.get_mut("84").unwrap().insert("99".to_owned(), 7);
+        validate_maker_apple_properties(&expected, &actual).unwrap();
+        assert_eq!(expected.keys().collect::<Vec<_>>(), vec!["84"]);
+    }
 
     #[test]
     fn real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox() {

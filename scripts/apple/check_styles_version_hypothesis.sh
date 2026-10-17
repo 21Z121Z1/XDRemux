@@ -61,8 +61,13 @@ for name, path, inspect in (("v15", original, inspect_old), ("v16_version_only",
     facts = call("semantic-style-properties-facts", input_path=str(plist_path),
                  output_path=str(plist_path) + ".key1")
     auxiliary = call("imageio-auxiliary-facts", input_path=path)
+    properties = call("imageio-image-properties", input_path=path).get("image_properties", {})
+    maker = properties.get("maker_apple_integer_dictionaries", {})
+    expected = dict(zip(map(str, range(8)), (1, 0, 0, 1, 1, 1, 4, 0)))
+    assert all(maker.get("84", {}).get(key) == value for key, value in expected.items()), maker
     results[name] = {"styles_version": plist["0"], "native_styles_parser": facts.get("style_properties", facts),
-                     "imageio_auxiliary": auxiliary.get("auxiliary", auxiliary)}
+                     "imageio_auxiliary": auxiliary.get("auxiliary", auxiliary),
+                     "maker_apple_integer_dictionaries": maker}
 assert results["v15"]["styles_version"] == 15
 assert results["v16_version_only"]["styles_version"] == 16
 report = {"scope": "version-only macOS native parser, NOT a Photos Tone/Color test",
@@ -97,6 +102,8 @@ Source: checked-in public OPPO Find X9 Ultra fixture
 
 styles-v15.heic
   Real XDRemux --apple-styles conversion with reconstructed HDR Log thumbnail.
+  SmartStyle MakerApple tag 84 was restored by the Rust-owned writer and read
+  back from the final HEIC by ImageIO before publication.
 styles-v16-version-only.heic
   The exact same HEIC with ONLY the root Styles metadata version byte
   changed from 15 to 16. It is NOT a complete native iOS 27 Texture Styles

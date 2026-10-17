@@ -36,6 +36,7 @@ pub(super) struct AppleImageProperties {
     pub digital_zoom_ratio: Option<f64>,
     pub lens_model: Option<String>,
     pub f_number: Option<f64>,
+    pub maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -566,6 +567,16 @@ impl AppleAdapterClient {
         output: &Path,
         payloads: &[AppleAuxiliaryPayload],
     ) -> Result<()> {
+        self.imageio_write_auxiliary_with_properties(input, output, payloads, BTreeMap::new())
+    }
+
+    pub(super) fn imageio_write_auxiliary_with_properties(
+        &self,
+        input: &Path,
+        output: &Path,
+        payloads: &[AppleAuxiliaryPayload],
+        maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
+    ) -> Result<()> {
         if payloads.is_empty() {
             return Err(RuntimeError::new(
                 "Apple ImageIO auxiliary write",
@@ -591,6 +602,7 @@ impl AppleAdapterClient {
             input_path: input_path(input)?,
             output_path: input_path(output)?,
             auxiliary_payloads: wire_payloads,
+            maker_apple_integer_dictionaries,
         };
         let request = serde_json::to_vec(&request)
             .map_err(|error| RuntimeError::external("Apple adapter request encoding", error))?;
@@ -1225,6 +1237,8 @@ struct WriteAuxiliaryRequest {
     input_path: String,
     output_path: String,
     auxiliary_payloads: Vec<AuxiliaryPayloadWire>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1463,6 +1477,8 @@ struct ImagePropertiesWire {
     digital_zoom_ratio: Option<f64>,
     lens_model: Option<String>,
     f_number: Option<f64>,
+    #[serde(default)]
+    maker_apple_integer_dictionaries: BTreeMap<String, BTreeMap<String, i64>>,
 }
 
 impl From<ImagePropertiesWire> for AppleImageProperties {
@@ -1476,6 +1492,7 @@ impl From<ImagePropertiesWire> for AppleImageProperties {
             digital_zoom_ratio: value.digital_zoom_ratio,
             lens_model: value.lens_model,
             f_number: value.f_number,
+            maker_apple_integer_dictionaries: value.maker_apple_integer_dictionaries,
         }
     }
 }
