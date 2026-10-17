@@ -15,12 +15,21 @@ let package = Package(
     ],
     dependencies: [],
     targets: [
+        .target(
+            name: "XDStylesNative",
+            path: "Sources/XDStylesNative",
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .linkedFramework("CoreImage"), .linkedFramework("ImageIO"),
+                .linkedFramework("Metal"), .linkedFramework("CoreMedia")
+            ]
+        ),
         // Process boundary for Apple-only framework calls. The adapter is
         // dependency-free from product business modules so its build graph
         // matches the final architecture.
         .executableTarget(
             name: "XDRemuxAppleAdapter",
-            dependencies: [],
+            dependencies: ["XDStylesNative"],
             path: "Sources/XDRemuxAppleAdapter"
         )
     ],

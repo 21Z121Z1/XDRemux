@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod categorize;
+mod reconstruct_styles;
 mod validate;
 
 use std::collections::BTreeSet;
@@ -32,6 +33,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum RootCommand {
+    /// Reconstruct relative scene HDR using a photo's embedded Photographic Styles resources (macOS).
+    ReconstructStyles(reconstruct_styles::ReconstructStylesArgs),
     /// Inspect one input without converting it.
     Inspect(InspectArgs),
     /// Convert one supported source with the unified Rust engine/runtime.
@@ -788,6 +791,9 @@ where
     }
 
     match parse_cli(args) {
+        Ok(Cli {
+            command: RootCommand::ReconstructStyles(arguments),
+        }) => reconstruct_styles::run(arguments, stdout, stderr),
         Ok(Cli {
             command: RootCommand::Inspect(arguments),
         }) => run_inspect(arguments.input, arguments.json, stdout, stderr),

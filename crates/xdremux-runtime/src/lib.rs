@@ -10,7 +10,11 @@ mod categorize;
 mod live_photo;
 mod oppo_portrait;
 mod oppo_tail;
+#[cfg(target_os = "macos")]
+mod style_reconstruction;
 mod validation;
+#[cfg(target_os = "macos")]
+pub use style_reconstruction::reconstruct_styles_hdr;
 
 #[cfg(target_os = "macos")]
 pub use apple_adapter::AppleStylePropertiesFacts;

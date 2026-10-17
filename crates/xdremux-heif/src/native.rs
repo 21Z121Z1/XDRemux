@@ -2,9 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use xdremux_format::isobmff::{
     make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,
-    make_iref_box, make_irot_box, make_ispe_box, parse_boxes, parse_meta_box, scan_top_level_boxes,
-    BoxHeader, IlocEntry, IlocExtent, IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta,
-    PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE, IPCO, IPMA, IPRP, IREF, MDAT, META,
+    make_iref_box, make_irot_box, make_ispe_box, parse_boxes, parse_irot_quarter_turns,
+    parse_ispe_dimensions, parse_meta_box, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
+    IpmaAssociation, IpmaEntry, IrefEntry, ParsedMeta, PropertyInfo, FTYP, IDAT, IINF, ILOC, INFE,
+    IPCO, IPMA, IPRP, IREF, MDAT, META,
 };
 use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};
 
@@ -401,6 +402,36 @@ fn build_iprp(
             &make_irot_box(0)?,
         )?,
     };
+    // A tmap is a derived image. Its inputs already carry their transforms.
+    // ImageIO requires the tmap's displayed dimensions and an identity rotation;
+    // repeating a portrait primary's transform hides the entire ISO Gain Map.
+    let primary_property = meta
+        .properties
+        .iter()
+        .find(|p| p.index == u32::from(primary_ispe))
+        .ok_or_else(|| invalid("missing primary geometry"))?;
+    let primary_box = parse_boxes(source, primary_property.box_range.clone())?.remove(0);
+    let (mut tmap_width, mut tmap_height) = parse_ispe_dimensions(source, &primary_box)?;
+    let rotation =
+        if let Some(property) = meta.properties.iter().find(|p| p.index == u32::from(irot)) {
+            let header = parse_boxes(source, property.box_range.clone())?.remove(0);
+            parse_irot_quarter_turns(source, &header)?
+        } else {
+            0
+        };
+    if rotation % 2 == 1 {
+        std::mem::swap(&mut tmap_width, &mut tmap_height);
+    }
+    let tmap_ispe = append_property(
+        &mut ipco_payload,
+        &mut next_property_index,
+        &make_ispe_box(tmap_width, tmap_height)?,
+    )?;
+    let tmap_irot = append_property(
+        &mut ipco_payload,
+        &mut next_property_index,
+        &make_irot_box(0)?,
+    )?;
     let auxc = append_property(
         &mut ipco_payload,
         &mut next_property_index,
@@ -520,7 +551,7 @@ fn build_iprp(
                 essential: true,
             },
             IpmaAssociation {
-                property_index: primary_ispe,
+                property_index: tmap_ispe,
                 essential: false,
             },
             IpmaAssociation {
@@ -528,7 +559,7 @@ fn build_iprp(
                 essential: false,
             },
             IpmaAssociation {
-                property_index: irot,
+                property_index: tmap_irot,
                 essential: true,
             },
         ],
@@ -1265,6 +1296,123 @@ pub fn assemble_iso_gain_map_heif(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn portrait_tmap_uses_display_dimensions_without_repeating_primary_rotation() {
+        use xdremux_format::isobmff::{parse_ipco_properties, parse_ipma};
+        let mut source = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic"),
+        )
+        .unwrap();
+        let top = scan_top_level_boxes(&source).unwrap();
+        let header = top.boxes.iter().find(|b| b.kind == META).unwrap();
+        let mut meta = parse_meta_box(&source, header).unwrap();
+        let children = parse_boxes(&source, header.data_start + 4..header.data_end).unwrap();
+        let iprp = children.iter().find(|b| b.kind == IPRP).unwrap();
+        let primary_ispe = associated_property_index(&meta, meta.primary_item_id, ISPE).unwrap();
+        let property = meta
+            .properties
+            .iter()
+            .find(|p| p.index == u32::from(primary_ispe))
+            .unwrap();
+        let dimensions = parse_ispe_dimensions(
+            &source,
+            &parse_boxes(&source, property.box_range.clone()).unwrap()[0],
+        )
+        .unwrap();
+        let index = meta.properties.len() as u16 + 1;
+        let start = source.len();
+        source.extend(make_irot_box(3).unwrap());
+        meta.properties.push(PropertyInfo {
+            index: u32::from(index),
+            kind: IROT,
+            box_range: start..source.len(),
+        });
+        meta.ipma
+            .entries
+            .iter_mut()
+            .find(|e| e.item_id == meta.primary_item_id)
+            .unwrap()
+            .associations
+            .push(IpmaAssociation {
+                property_index: index,
+                essential: true,
+            });
+        let tile = crate::GainMapTile {
+            payload: &[1],
+            width: 4,
+            height: 4,
+        };
+        let gain = DirectHevcGainMap {
+            gain_map_width: 4,
+            gain_map_height: 4,
+            tile_width: 4,
+            tile_height: 4,
+            tiles: std::slice::from_ref(&tile),
+            hvcc: &[1],
+            profile: crate::GainMapEncodeProfile {
+                channels: GainMapChannels::Rgb,
+                chroma: ChromaSampling::Yuv444,
+                luma_bit_depth: 8,
+                chroma_bit_depth: 8,
+            },
+        };
+        let next_id = meta.iinf.entries.iter().map(|i| i.item_id).max().unwrap() + 1;
+        let tmap_id = next_id + 2;
+        let graph = AssemblyGraph {
+            ids: AssemblyItemIds {
+                tile_ids: &[next_id],
+                gain_id: next_id + 1,
+                tmap_id,
+                xmp_id: next_id + 3,
+            },
+            removed: &BTreeSet::new(),
+        };
+        let bytes = build_iprp(&source, iprp, &meta, &gain, graph).unwrap();
+        let root = parse_boxes(&bytes, 0..bytes.len()).unwrap().remove(0);
+        let children = parse_boxes(&bytes, root.payload_range()).unwrap();
+        let props = parse_ipco_properties(&bytes, &root).unwrap();
+        let assocs = parse_ipma(&bytes, children.iter().find(|h| h.kind == IPMA).unwrap()).unwrap();
+        let tmap = assocs
+            .entries
+            .iter()
+            .find(|e| e.item_id == tmap_id)
+            .unwrap();
+        let p = |kind| {
+            let index = tmap
+                .associations
+                .iter()
+                .find(|a| {
+                    props
+                        .iter()
+                        .any(|p| p.index == u32::from(a.property_index) && p.kind == kind)
+                })
+                .unwrap()
+                .property_index;
+            let property = props.iter().find(|p| p.index == u32::from(index)).unwrap();
+            parse_boxes(&bytes, property.box_range.clone())
+                .unwrap()
+                .remove(0)
+        };
+        assert_eq!(
+            parse_ispe_dimensions(&bytes, &p(ISPE)).unwrap(),
+            (dimensions.1, dimensions.0)
+        );
+        assert_eq!(parse_irot_quarter_turns(&bytes, &p(IROT)).unwrap(), 0);
+        assert_eq!(
+            assocs
+                .entries
+                .iter()
+                .find(|e| e.item_id == meta.primary_item_id)
+                .unwrap(),
+            meta.ipma
+                .entries
+                .iter()
+                .find(|e| e.item_id == meta.primary_item_id)
+                .unwrap()
+        );
+    }
 
     #[test]
     fn assembly_rejects_empty_metadata_before_parsing_source() {

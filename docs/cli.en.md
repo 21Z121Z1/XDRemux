@@ -15,6 +15,7 @@ The Swift package is only the Apple platform capability adapter, and the remaini
 | `categorize` | Classify assets by asset type and primary capture mode without conversion. |
 | `inspect` | Inspect input type and important structure. |
 | `validate` | Validate ISO HDR HEIF or Live Photo output. |
+| `reconstruct-styles` | Reconstruct relative scene HDR from embedded Apple Styles data while preserving SDR (macOS). |
 
 Show help with:
 
@@ -22,6 +23,14 @@ Show help with:
 xdremux --help
 xdremux convert --help
 ```
+
+## `reconstruct-styles`
+
+```bash
+xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed
+```
+
+Repeat `--input` for a batch. Existing bundles are never replaced. `--max-edge` limits processing and Gain Map resolution; the final SDR primary keeps its original resolution and compressed bytes. The command returns JSON and fails explicitly when required embedded resources or native capabilities are unavailable. See [Photographic Styles HDR reconstruction](styles-reconstruction.en.md) for supported versions, output files, validation, and limits.
 
 ## `convert`
 

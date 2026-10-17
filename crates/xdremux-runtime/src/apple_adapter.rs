@@ -249,6 +249,24 @@ impl Drop for AppleAdapterSession {
 }
 
 impl AppleAdapterClient {
+    pub(super) fn styles_primitive(
+        &self,
+        request: &serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let bytes = serde_json::to_vec(request)
+            .map_err(|e| RuntimeError::external("Styles adapter request", e))?;
+        let response = self.invoke(&bytes, APPLE_COMPUTE_TIMEOUT)?;
+        let value: serde_json::Value = serde_json::from_slice(&response)
+            .map_err(|e| RuntimeError::external("Styles adapter response", e))?;
+        if value["schema_version"] != APPLE_ADAPTER_SCHEMA_VERSION {
+            return Err(RuntimeError::new(
+                "Styles adapter",
+                "unsupported response schema",
+            ));
+        }
+        Ok(value)
+    }
+
     pub(super) fn new(executable: impl Into<PathBuf>) -> Self {
         Self {
             executable: executable.into(),

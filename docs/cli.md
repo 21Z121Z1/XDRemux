@@ -15,6 +15,7 @@ Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 
 | `categorize` | 不转换，只按资产类型和主要拍摄模式分类。 |
 | `inspect` | 检查输入类型和关键结构。 |
 | `validate` | 验证 ISO HDR HEIF 或 Live Photo 输出。 |
+| `reconstruct-styles` | 保留 SDR，使用内嵌 Apple Styles 数据重建相对场景 HDR（macOS）。 |
 
 运行帮助：
 
@@ -22,6 +23,14 @@ Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 
 xdremux --help
 xdremux convert --help
 ```
+
+## `reconstruct-styles`
+
+```bash
+xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed
+```
+
+重复 `--input` 可以批量处理，已有输出目录不会被替换。`--max-edge` 限制处理及 Gain Map 分辨率，最终 SDR 主图保留原始分辨率和压缩数据。命令返回 JSON；所需内嵌资源或原生能力不可用时明确报错。支持版本、输出文件、验证及限制见[摄影风格 HDR 重建](styles-reconstruction.md)。
 
 ## `convert`
 

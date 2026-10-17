@@ -2,6 +2,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 import Darwin
+import XDStylesNative
 
 private let schemaVersion = 2
 private let persistentTransportArgument = "--persistent-json-lines"
@@ -633,6 +634,17 @@ private func encodedResponse(for input: Data) throws -> Data {
     let request = try JSONDecoder().decode(AdapterRequest.self, from: input)
     guard request.schemaVersion == schemaVersion else {
         fail("unsupported apple adapter schema_version \(request.schemaVersion)")
+    }
+
+    if ["styles-decode-reverse", "styles-encode-linear", "styles-readback"].contains(request.operation) {
+        let object = try JSONSerialization.jsonObject(with: input) as! [String: Any]
+        var nativeError: NSError?
+        guard let result = XDStylesPerform(object, &nativeError) else {
+            throw nativeError ?? NSError(domain: "XDStylesNative", code: 1)
+        }
+        var encoded = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
+        encoded.append(0x0A)
+        return encoded
     }
 
     let response: AdapterResponse
