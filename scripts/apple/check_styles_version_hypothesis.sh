@@ -62,8 +62,13 @@ for name, path, inspect in (("v16", original, inspect_old), ("v15_version_only",
     facts = call("semantic-style-properties-facts", input_path=str(plist_path),
                  output_path=str(plist_path) + ".key1")
     auxiliary = call("imageio-auxiliary-facts", input_path=path)
+    properties = call("imageio-image-properties", input_path=path).get("image_properties", {})
+    maker = properties.get("maker_apple_integer_dictionaries", {})
+    expected = dict(zip(map(str, range(8)), (1, 0, 0, 1, 1, 1, 4, 0)))
+    assert all(maker.get("84", {}).get(key) == value for key, value in expected.items()), maker
     results[name] = {"styles_version": plist["0"], "native_styles_parser": facts.get("style_properties", facts),
-                     "imageio_auxiliary": auxiliary.get("auxiliary", auxiliary)}
+                     "imageio_auxiliary": auxiliary.get("auxiliary", auxiliary),
+                     "maker_apple_integer_dictionaries": maker}
 assert results["v16"]["styles_version"] == 16
 assert results["v15_version_only"]["styles_version"] == 15
 report = {"scope": "version-only macOS native parser, NOT a Photos Tone/Color test",

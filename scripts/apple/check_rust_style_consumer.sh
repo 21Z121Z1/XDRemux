@@ -33,6 +33,41 @@ test -s "$fixture"
 
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-rust-style-consumer.XXXXXX")"
 trap 'rm -rf "$test_root"' EXIT
+
+# Capture effective HEVC format-description tags from the native encoder.
+# This probe intentionally does not change the existing private Styles carrier
+# color interpretation; comparison to an Apple-authored thumbnail is still needed.
+python3 - "$adapter" "$test_root" <<'PY'
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+adapter, root = sys.argv[1:]
+root = Path(root)
+raw = root / "color-probe-rgb8.bin"
+raw.write_bytes(bytes([128, 128, 128]) * (64 * 64))
+request = {
+    "schema_version": 2,
+    "operation": "videotoolbox-encode-main10",
+    "input_path": str(raw),
+    "output_path": str(root / "color-probe.hevc"),
+    "video_toolbox_main10": {
+        "raw_width": 64, "raw_height": 64, "raw_bytes_per_row": 192,
+        "quality": 0.85, "hvcc_path": str(root / "color-probe.hvcc"),
+    },
+}
+process = subprocess.run(
+    [adapter], input=(json.dumps(request) + "\n").encode(),
+    check=True, capture_output=True,
+)
+facts = json.loads(process.stdout)["video_toolbox_main10"]
+for name in ("color_primaries", "transfer_function", "ycbcr_matrix"):
+    print("styles-main10-observed-%s=%s" % (name, facts.get(name, "<unspecified>")))
+assert (root / "color-probe.hevc").stat().st_size > 0
+assert (root / "color-probe.hvcc").stat().st_size > 0
+PY
+
 output="$test_root/rust-styles.heic"
 inspect="$test_root/inspect.json"
 batch_output_dir="$test_root/batch"
@@ -75,6 +110,11 @@ def request(operation, path):
     return json.loads(result.stdout)
 
 for output in outputs:
+    properties = request("imageio-image-properties", output)["image_properties"]
+    smart_style = properties.get("maker_apple_integer_dictionaries", {}).get("84", {})
+    expected = dict(zip(map(str, range(8)), (1, 0, 0, 1, 1, 1, 4, 0)))
+    if any(smart_style.get(key) != value for key, value in expected.items()):
+        raise SystemExit(f"{output}: ImageIO did not retain SmartStyle MakerApple 84: {smart_style!r}")
     auxiliary = request("imageio-auxiliary-facts", output)["auxiliary"]
     required = [
         "iso_gain_map",
@@ -93,6 +133,7 @@ for output in outputs:
     print(
         "rust-styles-consumer-pass: "
         f"output={output} "
+        f"maker_apple_84={smart_style!r} "
         f"iso_gain_map={auxiliary['iso_gain_map']} "
         f"portrait_effects_matte={auxiliary['portrait_effects_matte']} "
         f"skin_matte={auxiliary['skin_matte']} "

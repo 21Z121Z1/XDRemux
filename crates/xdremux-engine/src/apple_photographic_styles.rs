@@ -26,6 +26,22 @@ pub const APPLE_STYLE_LIGHT_MAP_SIDE: usize = 32;
 pub const APPLE_STYLE_LIGHT_MAP_BYTE_COUNT: usize =
     APPLE_STYLE_LIGHT_MAP_SIDE * APPLE_STYLE_LIGHT_MAP_SIDE * 2;
 
+/// SmartStyle state for the Standard, reversible Styles resources we generate.
+///
+/// This is a separate consumer input from the Styles coefficient plist. These
+/// eight integer fields match the former Swift writer and its working carrier;
+/// they describe our generated edit state, not an Apple camera or capture UUID.
+pub fn apple_style_maker_apple_dictionary() -> BTreeMap<String, BTreeMap<String, i64>> {
+    BTreeMap::from([(
+        "84".to_owned(),
+        [1, 0, 0, 1, 1, 1, 4, 0]
+            .into_iter()
+            .enumerate()
+            .map(|(key, value)| (key.to_string(), value))
+            .collect(),
+    )])
+}
+
 const IDENTITY_INDICES: [usize; 3] = [3, 7, 11];
 const DIRECT_PARAMETER_INDICES: [usize; 6] = [0, 1, 2, 3, 7, 11];
 const LINEAR_BOUND: f64 = 1.0 / 8.0;
