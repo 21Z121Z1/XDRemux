@@ -96,11 +96,14 @@ def score_photo(images: dict[float, np.ndarray]) -> dict:
     negative = [value for value in step_values if value < -STEP_EPSILON]
     monotonic = not (positive and negative)
     by_tone = {row["tone"]: row["mean_luminance"] for row in rows}
-    dark_abs = bright_abs = ratio = None
+    dark_abs = bright_abs = luminance_ratio = None
+    signed_minus = signed_plus = None
     if -1.0 in by_tone and 0.0 in by_tone and 1.0 in by_tone:
-        dark_abs = abs(by_tone[-1.0] - by_tone[0.0])
-        bright_abs = abs(by_tone[1.0] - by_tone[0.0])
-        ratio = None if bright_abs < 1e-8 else dark_abs / bright_abs
+        signed_minus = by_tone[-1.0] - by_tone[0.0]
+        signed_plus = by_tone[1.0] - by_tone[0.0]
+        dark_abs = abs(signed_minus)
+        bright_abs = abs(signed_plus)
+        luminance_ratio = None if bright_abs < 1e-8 else dark_abs / bright_abs
     inactive = all(row["max_abs_vs_tone0"] < 1e-3 for row in rows)
     concerns = []
     if inactive:
@@ -117,9 +120,9 @@ def score_photo(images: dict[float, np.ndarray]) -> dict:
         order = np.argsort(np.abs(deltas))
         if abs(deltas[order[-1]]) > 0.05 and abs(deltas[order[-1]]) > 3.0 * abs(deltas[order[-2]]):
             concerns.append(f"tone {row['tone']:g} shifts one channel much more than the others")
-        ratio = _edge_ratio(base, images[row["tone"]])
-        row["edge_to_flat_delta_ratio"] = ratio
-        if ratio > 8.0 and row["mean_abs_vs_tone0"] > 0.02:
+        edge_ratio = _edge_ratio(base, images[row["tone"]])
+        row["edge_to_flat_delta_ratio"] = edge_ratio
+        if edge_ratio > 8.0 and row["mean_abs_vs_tone0"] > 0.02:
             concerns.append(f"tone {row['tone']:g} concentrates its change on edges")
         if row["fraction_above_one"] > 0.25 or row["fraction_below_zero"] > 0.02:
             concerns.append(f"tone {row['tone']:g} clips a large share of samples")
@@ -129,7 +132,9 @@ def score_photo(images: dict[float, np.ndarray]) -> dict:
         "monotonic_mean_luminance": monotonic,
         "darken_abs": dark_abs,
         "brighten_abs": bright_abs,
-        "darken_brighten_ratio": ratio,
+        "signed_luminance_at_minus_1": signed_minus,
+        "signed_luminance_at_plus_1": signed_plus,
+        "darken_brighten_ratio": luminance_ratio,
         "tone_changes_render": not inactive,
         "concerns": concerns,
     }
@@ -286,8 +291,9 @@ def render_markdown(report: dict) -> str:
         ratio_text = "n/a" if ratio is None else f"{ratio:.4f}"
         lines.append(
             f"Monotonic mean luminance: {photo.get('monotonic_mean_luminance')}. "
-            f"|L(-1)-L(0)| / |L(+1)-L(0)| = {ratio_text} "
-            f"({photo.get('darken_abs')} / {photo.get('brighten_abs')})."
+            f"L(-1)-L(0) = {photo.get('signed_luminance_at_minus_1')}. "
+            f"L(+1)-L(0) = {photo.get('signed_luminance_at_plus_1')}. "
+            f"|L(-1)-L(0)| / |L(+1)-L(0)| = {ratio_text}."
         )
         lines.append("")
         lines.append("| tone | mean Y | mean R | mean G | mean B |")
@@ -484,6 +490,8 @@ def write_asymmetry(apple_report: dict, xdremux_report: dict, resources: Path | 
                 "monotonic_mean_luminance": photo.get("monotonic_mean_luminance"),
                 "darken_abs": photo.get("darken_abs"),
                 "brighten_abs": photo.get("brighten_abs"),
+                "signed_luminance_at_minus_1": photo.get("signed_luminance_at_minus_1"),
+                "signed_luminance_at_plus_1": photo.get("signed_luminance_at_plus_1"),
                 "darken_brighten_ratio": photo.get("darken_brighten_ratio"),
             }
             for photo in photos
@@ -507,7 +515,7 @@ def _asymmetry_markdown(payload: dict) -> str:
             f"Apple |L(-1)-L(0)| / |L(+1)-L(0)| ranges from {span['min']:.4f} to {span['max']:.4f}."
         )
     lines.append("")
-    lines.append("| photo | group | monotonic | |L(-1)-L(0)| | |L(+1)-L(0)| | ratio | inside Apple range |")
+    lines.append("| photo | group | monotonic | L(-1)-L(0) | L(+1)-L(0) | ratio | inside Apple range |")
     lines.append("|---|---|---|---:|---:|---:|---|")
     inside = {item["photo"]: item["inside_apple_range"] for item in payload["curves"]["xdremux"]}
     for photo in payload["photos"]:
@@ -515,7 +523,8 @@ def _asymmetry_markdown(payload: dict) -> str:
         ratio_text = "n/a" if ratio is None else f"{ratio:.4f}"
         lines.append(
             f"| {photo['photo']} | {photo['group']} | {photo['monotonic_mean_luminance']} | "
-            f"{photo['darken_abs']} | {photo['brighten_abs']} | {ratio_text} | "
+            f"{photo.get('signed_luminance_at_minus_1', photo.get('darken_abs'))} | "
+            f"{photo.get('signed_luminance_at_plus_1', photo.get('brighten_abs'))} | {ratio_text} | "
             f"{inside.get(photo['photo'], '')} |"
         )
     lines.append("")
@@ -590,6 +599,17 @@ def self_test() -> None:
         raise SystemExit(f"monotonic sweep was not recognized: {scored}")
     if abs(scored["darken_brighten_ratio"] - 1.0) > 1e-6:
         raise SystemExit(f"symmetric sweep ratio was not 1: {scored['darken_brighten_ratio']}")
+    if abs(scored["darken_brighten_ratio"] - scored["darken_abs"] / scored["brighten_abs"]) > 1e-9:
+        raise SystemExit("luminance ratio was overwritten")
+    asymmetric = {}
+    for tone in TONES:
+        shift = 0.01 * min(tone, 0.0) + 0.20 * max(tone, 0.0)
+        asymmetric[tone] = np.clip(base + shift, 0.0, 1.0)
+    uneven = score_photo(asymmetric)
+    if abs(uneven["darken_brighten_ratio"] - 0.05) > 1e-6:
+        raise SystemExit(f"uneven luminance ratio was {uneven['darken_brighten_ratio']}")
+    if uneven["signed_luminance_at_minus_1"] >= 0 or uneven["signed_luminance_at_plus_1"] <= 0:
+        raise SystemExit(uneven)
     flat = {tone: base.copy() for tone in TONES}
     inactive = score_photo(flat)
     if inactive["tone_changes_render"] or "tone bias leaves the native render unchanged" not in inactive["concerns"]:
