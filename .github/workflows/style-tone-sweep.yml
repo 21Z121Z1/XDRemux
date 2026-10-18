@@ -43,7 +43,10 @@ jobs:
         run: |
           brew install libheif
           echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
-          python3 -m pip install --user numpy pillow
+          # xcode-27 Python is externally managed, so the harness packages stay in a job venv.
+          python3 -m venv "$RUNNER_TEMP/tone-venv"
+          "$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow
+          echo "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"
 
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
