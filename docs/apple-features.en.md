@@ -105,13 +105,44 @@ to the encoder. HDR values above SDR white still survive. This remains a
 reference derived from the rendered HDR look. It cannot recover RAW or
 capture-time processing that the source has lost.
 
-This change does not replace the existing source-derived key1 policy with the
-complete native constrained solver. Thumbnail quality and key1 neutral-fit
-quality are separate measurements. The native consumer regression uses RGB UHDR
-and monochrome LHDR fixtures, decodes the encoded thumbnail, and checks the HDR
-Log target and unchanged primary HEVC. Run it with
-`bash scripts/apple/check_rust_style_consumer.sh`. Photos import, editing, save,
-and reopen require separate device evidence.
+The same 26A434 consumer, `PISemanticStyleFilter`, also decides how the style
+metadata is generated:
+
+- Key 3 is one 256-node curve sampled independently on each channel. Its x
+  value is the linear thumbnail code `min(S, 1)` after the plist base gain.
+  There is no luminance reduction and no percentile normalization. The curve is
+  the monotone projection of those observed primary-channel means. The
+  consumer's extra exposure `E` is a render parameter and is not folded in.
+- Keys `c` and `d` stay 32×32. Each cell stores the area mean of one guide:
+  `c` is the primary image and `d` is the linear thumbnail. The consumer
+  upsamples them with its guided filter (`r = 1`, `eps ≈ 0.05`) and forms
+  `q = mix(mix(d, c, l_b), mix(d, c, l_f), m)`. The maps are not scaled by a
+  fixed affine and they are not multiplied onto luminance. The later shader
+  stages that consume `q` are not inverted, so these means are not a solved
+  local tone.
+- Key 1 is a 12×9×8×10×3 half array, x-major, with the quadratic basis
+  `[1, R, G, B, R², RG, RB, G², GB, B²]`. Each spotlight cell and luminance
+  plane is fit separately. The fit is the remove-style direction: the
+  polynomial reads the displayed primary and targets the thumbnail code. A
+  coefficient the local samples do not identify stays on the identity residual.
+  The plane weight uses the verified `inputIsLinear = false` formula in `f64`,
+  not half, and the optional 3×3 spatial filter is not applied.
+
+At background and foreground LTM of 1, which is the captured tone=0 setting,
+the semantic-tone stage returns the primary and does not read the thumbnail or
+the curve. A tone=0 render therefore cannot measure key 3 or the thumbnail.
+The Photos Tone ±1 and Color ±1 slider positions are not source facts, and the
+color stages after semantic tone are not evaluated. `consumer-model.metal` is
+not in the public research repository, and this product does not call the
+private `PISemanticStyleFilter` selector. The portable check is
+`apple_style_semantic_tone_channel`.
+
+The native consumer regression uses RGB UHDR and monochrome LHDR fixtures,
+decodes the encoded thumbnail, and checks the HDR Log target and unchanged
+primary HEVC. Run it with `bash scripts/apple/check_rust_style_consumer.sh`.
+Photos import, editing, save, and reopen require separate device evidence.
+Baseline exposure and base gain still use the existing source-distribution
+calibration; this change does not replace those coefficients.
 
 ## Apple Portrait migration
 

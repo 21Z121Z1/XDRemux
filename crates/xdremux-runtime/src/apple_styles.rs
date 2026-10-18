@@ -5,13 +5,13 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 use xdremux_codec::{EncodedHevcResource, HeifRasterDecodeRequest, Raster8, RasterPixelFormat};
 use xdremux_engine::{
-    apple_style_apply_global_tone_curve, apple_style_data_from_coefficient_deltas,
-    apple_style_distribution, apple_style_face_exposure_boost, apple_style_fit_global_polynomial,
+    apple_style_apply_global_tone_curve, apple_style_distribution, apple_style_face_exposure_boost,
     apple_style_light_map, apple_style_linear_metadata, apple_style_linear_thumbnail_codes,
     apple_style_maker_apple_dictionary, apple_style_monotonic_global_tone_curve,
-    apple_style_property_list, resolve_apple_style_scene_type, AppleL8Mask,
-    AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
-    AppleStylePropertyListRequest, AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
+    apple_style_property_list, apple_style_revert_local_data, resolve_apple_style_scene_type,
+    AppleL8Mask, AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
+    AppleStylePropertyListRequest, AppleStyleRevertRequest, AppleStyleStatistics,
+    APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
 };
 use xdremux_hdr::{
     area_resize_linear_rgb, iso_gain_application_for_alternate, reconstruct_scene_linear_hdr,
@@ -35,14 +35,6 @@ const STYLE_DELTA_ROWS_LANDSCAPE: u32 = 5;
 const STYLE_DELTA_COLUMNS_LANDSCAPE: u32 = 6;
 const STYLE_DELTA_ROWS_PORTRAIT: u32 = 6;
 const STYLE_DELTA_COLUMNS_PORTRAIT: u32 = 5;
-const STYLE_TONE_LIGHT_MAP_SCALE: f32 = 0.713_723_82;
-const STYLE_TONE_LIGHT_MAP_OFFSET: f32 = 0.025_543_4;
-const STYLE_LINEAR_LIGHT_MAP_SCALE: f32 = 0.939_421_03;
-const STYLE_LINEAR_LIGHT_MAP_OFFSET: f32 = 0.064_942_95;
-const STYLE_TONE_LIGHT_MAP_MINIMUM: f32 = 0.040_740_967;
-const STYLE_TONE_LIGHT_MAP_MAXIMUM: f32 = 0.761_230_47;
-const STYLE_LINEAR_LIGHT_MAP_MINIMUM: f32 = 0.040_740_967;
-const STYLE_LINEAR_LIGHT_MAP_MAXIMUM: f32 = 0.758_300_8;
 
 // Apple ImageIO accepts the Styles auxiliary graph only when these resources
 // use the Main10 4:2:0 contract. These bytes are the checked-in neutral Style
@@ -241,36 +233,27 @@ pub(crate) fn convert_file(
     let style_data = source_derived_style_data(&scene_rasters)?;
     let global_tone_curve = scene_rasters.global_tone_curve.data.clone();
     let statistics = style_scene_statistics(&scene_rasters, &semantic_masks)?;
+    let storage_orientation = u8::try_from(storage_orientation).map_err(|_| {
+        RuntimeError::new(
+            "Photographic Styles light map",
+            "ImageIO orientation exceeds the portable wire range",
+        )
+    })?;
+    // Key c is the primary-image guide mean. Key d is the linear-thumbnail
+    // guide mean. The consumer upsamples each with its guided filter and mixes
+    // them; these maps are not multiplied onto luminance.
     let tone_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
         luma: &scene_rasters.base_luminance,
         width: scene_rasters.width,
         height: scene_rasters.height,
-        value_scale: STYLE_TONE_LIGHT_MAP_SCALE,
-        value_offset: STYLE_TONE_LIGHT_MAP_OFFSET,
-        output_minimum: STYLE_TONE_LIGHT_MAP_MINIMUM,
-        output_maximum: STYLE_TONE_LIGHT_MAP_MAXIMUM,
-        storage_orientation: u8::try_from(storage_orientation).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles light map",
-                "ImageIO orientation exceeds the portable wire range",
-            )
-        })?,
+        storage_orientation,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles tone light map", error))?;
     let linear_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
-        luma: &scene_rasters.gtc_mapped_luminance,
+        luma: &scene_rasters.thumbnail_luminance,
         width: scene_rasters.width,
         height: scene_rasters.height,
-        value_scale: STYLE_LINEAR_LIGHT_MAP_SCALE,
-        value_offset: STYLE_LINEAR_LIGHT_MAP_OFFSET,
-        output_minimum: STYLE_LINEAR_LIGHT_MAP_MINIMUM,
-        output_maximum: STYLE_LINEAR_LIGHT_MAP_MAXIMUM,
-        storage_orientation: u8::try_from(storage_orientation).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles linear light map",
-                "ImageIO orientation exceeds the portable wire range",
-            )
-        })?,
+        storage_orientation,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles linear light map", error))?;
     let scene_scores = adapter.vision_scene_scores(&base_path)?;
@@ -506,6 +489,8 @@ struct StyleSceneRasters {
     hdr_luminance: Vec<f32>,
     coded_linear_luminance: Vec<f32>,
     renderer_linear_luminance: Vec<f32>,
+    thumbnail_codes: Vec<f32>,
+    thumbnail_luminance: Vec<f32>,
     gtc_mapped_luminance: Vec<f32>,
     global_tone_curve: AppleStyleGlobalToneCurve,
     linear_metadata: AppleStyleLinearMetadata,
@@ -688,15 +673,29 @@ fn derive_style_scene(
         .iter()
         .map(|value| *value / linear_metadata.baseline_exposure)
         .collect::<Vec<_>>();
-    let global_tone_curve =
-        apple_style_monotonic_global_tone_curve(&coded_linear_luminance, &base_luminance).map_err(
-            |error| RuntimeError::external("Photographic Styles global tone curve", error),
-        )?;
-    let gtc_mapped_luminance = apple_style_apply_global_tone_curve(
-        &coded_linear_luminance,
-        &global_tone_curve.linear_samples,
-    )
-    .map_err(|error| RuntimeError::external("Photographic Styles global tone curve", error))?;
+    // S in the consumer is the decoded thumbnail after one base-gain multiply.
+    // The extra exposure E is a render parameter, so it stays out of this code.
+    let thumbnail_codes = hdr_rgb
+        .iter()
+        .map(|value| {
+            let code = f64::from(*value) / f64::from(linear_metadata.baseline_exposure)
+                * f64::from(linear_metadata.base_gain);
+            code.clamp(0.0, 1.0) as f32
+        })
+        .collect::<Vec<_>>();
+    let global_tone_curve = apple_style_monotonic_global_tone_curve(&thumbnail_codes, &base_rgb)
+        .map_err(|error| RuntimeError::external("Photographic Styles global tone curve", error))?;
+    let gtc_rgb =
+        apple_style_apply_global_tone_curve(&thumbnail_codes, &global_tone_curve.linear_samples)
+            .map_err(|error| {
+                RuntimeError::external("Photographic Styles global tone curve", error)
+            })?;
+    let mut thumbnail_luminance = Vec::with_capacity(width * height);
+    let mut gtc_mapped_luminance = Vec::with_capacity(width * height);
+    for (thumbnail, mapped) in thumbnail_codes.chunks_exact(3).zip(gtc_rgb.chunks_exact(3)) {
+        thumbnail_luminance.push(luminance([thumbnail[0], thumbnail[1], thumbnail[2]]));
+        gtc_mapped_luminance.push(luminance([mapped[0], mapped[1], mapped[2]]));
+    }
     let renderer_linear_luminance = coded_linear_luminance
         .iter()
         .map(|value| *value / linear_metadata.encoding_gain)
@@ -719,6 +718,8 @@ fn derive_style_scene(
         hdr_luminance,
         coded_linear_luminance,
         renderer_linear_luminance,
+        thumbnail_codes,
+        thumbnail_luminance,
         gtc_mapped_luminance,
         global_tone_curve,
         linear_metadata,
@@ -766,43 +767,25 @@ fn linear_thumbnail_raster(scene: &StyleSceneRasters) -> Result<LinearThumbnailC
 }
 
 fn source_derived_style_data(scene: &StyleSceneRasters) -> Result<Vec<u8>> {
-    if scene.base_rgb.len() != scene.base_luminance.len().saturating_mul(3)
-        || scene.base_luminance.is_empty()
-        || scene.base_luminance.len() != scene.gtc_mapped_luminance.len()
-        || scene.base_luminance.iter().any(|value| !value.is_finite())
-        || scene
-            .gtc_mapped_luminance
-            .iter()
-            .any(|value| !value.is_finite())
+    if scene.base_rgb.len() != scene.thumbnail_codes.len()
+        || scene.base_rgb.is_empty()
+        || scene.base_rgb.len() != scene.width.saturating_mul(scene.height).saturating_mul(3)
     {
         return Err(RuntimeError::new(
             "Photographic Styles style data",
             "source-derived style raster geometry or values are invalid",
         ));
     }
-    let base_white = apple_style_distribution(&scene.base_luminance)
-        .high_key
-        .max(1.0 / 4096.0) as f32;
-    let mut source_rgb8 = Vec::with_capacity(scene.base_rgb.len());
-    let mut target_rgb8 = Vec::with_capacity(scene.base_rgb.len());
-    for (pixel, base_luma) in scene.base_luminance.iter().copied().enumerate() {
-        let target_luma = scene.gtc_mapped_luminance[pixel];
-        let base_normalized = (base_luma / base_white).clamp(0.0, 1.0);
-        let ratio = if base_normalized > 1.0 / 65_536.0 {
-            (target_luma / base_normalized).clamp(0.75, 1.25)
-        } else {
-            1.0
-        };
-        for component in 0..3 {
-            let base = scene.base_rgb[pixel * 3 + component].clamp(0.0, 1.0);
-            source_rgb8.push(base * 255.0);
-            target_rgb8.push((base * ratio).clamp(0.0, 1.0) * 255.0);
-        }
-    }
-    let deltas = apple_style_fit_global_polynomial(&source_rgb8, &target_rgb8)
-        .map_err(|error| RuntimeError::external("Photographic Styles style solver", error))?;
-    apple_style_data_from_coefficient_deltas(&deltas)
-        .map_err(|error| RuntimeError::external("Photographic Styles style data", error))
+    // Remove-style reads the displayed primary and applies key1. The recovered
+    // target is the same per-channel thumbnail code the semantic-tone stage
+    // uses. A forward primary-to-styled residual would point the other way.
+    apple_style_revert_local_data(&AppleStyleRevertRequest {
+        width: scene.width,
+        height: scene.height,
+        styled_rgb: &scene.base_rgb,
+        recovered_rgb: &scene.thumbnail_codes,
+    })
+    .map_err(|error| RuntimeError::external("Photographic Styles style data", error))
 }
 
 fn srgb_decode(value: f32) -> f32 {
