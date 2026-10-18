@@ -503,8 +503,8 @@ impl AppleAdapterClient {
     ) -> Result<AppleVideoToolboxMain10Facts> {
         if encode.width == 0
             || encode.height == 0
-            || encode.width % 2 != 0
-            || encode.height % 2 != 0
+            || !encode.width.is_multiple_of(2)
+            || !encode.height.is_multiple_of(2)
         {
             return Err(RuntimeError::new(
                 "Apple VideoToolbox Main10 encode",

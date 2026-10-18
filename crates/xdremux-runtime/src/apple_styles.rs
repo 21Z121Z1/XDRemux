@@ -363,7 +363,11 @@ fn encode_linear_thumbnail(
     raster: &LinearThumbnailCodes,
     quality: f64,
 ) -> Result<EncodedHevcResource> {
-    if raster.width == 0 || raster.height == 0 || raster.width % 2 != 0 || raster.height % 2 != 0 {
+    if raster.width == 0
+        || raster.height == 0
+        || !raster.width.is_multiple_of(2)
+        || !raster.height.is_multiple_of(2)
+    {
         return Err(RuntimeError::new(
             "Photographic Styles Linear Thumbnail",
             "VideoToolbox input geometry must be non-zero and even",
@@ -627,8 +631,10 @@ fn derive_style_scene(
     let mut renderer_linear_maximum = f32::NEG_INFINITY;
     for (base_pixel, hdr_pixel) in base_image
         .samples
-        .chunks_exact(3)
-        .zip(hdr_image.samples.chunks_exact(3))
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .zip(hdr_image.samples.as_chunks::<3>().0)
     {
         let base = [base_pixel[0], base_pixel[1], base_pixel[2]];
         let hdr = [hdr_pixel[0], hdr_pixel[1], hdr_pixel[2]];
@@ -692,7 +698,12 @@ fn derive_style_scene(
             })?;
     let mut thumbnail_luminance = Vec::with_capacity(width * height);
     let mut gtc_mapped_luminance = Vec::with_capacity(width * height);
-    for (thumbnail, mapped) in thumbnail_codes.chunks_exact(3).zip(gtc_rgb.chunks_exact(3)) {
+    for (thumbnail, mapped) in thumbnail_codes
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .zip(gtc_rgb.as_chunks::<3>().0)
+    {
         thumbnail_luminance.push(luminance([thumbnail[0], thumbnail[1], thumbnail[2]]));
         gtc_mapped_luminance.push(luminance([mapped[0], mapped[1], mapped[2]]));
     }
@@ -1006,6 +1017,7 @@ fn resize_semantic_matte(
         .map_err(|error| RuntimeError::external("Photographic Styles semantic matte", error))
 }
 
+#[cfg(test)]
 fn downsample_raster(raster: &Raster8, maximum_size: u32) -> Result<Raster8> {
     raster
         .validate()

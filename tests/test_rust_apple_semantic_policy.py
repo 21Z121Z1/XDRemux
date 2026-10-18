@@ -43,6 +43,7 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
             "build_apple_portrait_rendering_parameters",
             "build_apple_portrait_disparity_payload",
             "apple_style_fit_global_polynomial",
+            "apple_style_revert_local_data",
             "apple_style_monotonic_global_tone_curve",
             "resolve_apple_style_scene_type",
             "apple_style_scene_scores_from_vision_observations",
