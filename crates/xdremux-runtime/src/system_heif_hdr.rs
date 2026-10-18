@@ -18,8 +18,8 @@ use xdremux_codec::{HeifRasterDecodeRequest, RasterPixelFormat};
 use xdremux_engine::{
     content_headroom_from_linear, encode_display_p3_rgba8, linear_difference, pack_linear_rgba_f16,
     provisional_guided_filter, unpack_linear_rgb_f16, GainMapChannels, LinearDifference,
-    PROVISIONAL_GUIDED_EPSILON, PROVISIONAL_GUIDED_RADIUS, PROVISIONAL_HDR_LOCAL_WEIGHT,
-    PROVISIONAL_SDR_LOCAL_WEIGHT,
+    RasterDecoder, PROVISIONAL_GUIDED_EPSILON, PROVISIONAL_GUIDED_RADIUS,
+    PROVISIONAL_HDR_LOCAL_WEIGHT, PROVISIONAL_SDR_LOCAL_WEIGHT,
 };
 use xdremux_hdr::ResolvedScale;
 
