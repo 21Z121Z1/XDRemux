@@ -81,10 +81,14 @@ and its Gain Map. Rust divides each linear Display P3 channel by the same
 transfer curve. It does not copy SDR image codes into this resource.
 
 The transform uses the Apple Log curve with Display P3 primaries. It does not
-change the image to the BT.2020 color space used by Apple Log video. The existing
-auxiliary color signaling and decoded scene orientation remain in use.
-`encoding_gain` is renderer metadata; it is not a second exposure division for
-the thumbnail.
+change the image to the BT.2020 color space used by Apple Log video. Auxiliary
+color signaling is unchanged. The scene used to derive coefficients stays in
+display orientation. The stored Linear Thumbnail and Style Delta Map use the
+primary item's coded orientation and carry that item's `irot`, which is
+non-zero for a rotated photo. The thumbnail is rotated back to coded order
+before it is encoded. A Gain Map or Styles item whose aspect does not match
+the primary coded dimensions is rejected. `encoding_gain` is renderer metadata;
+it is not a second exposure division for the thumbnail.
 
 The current codec primitive accepts RGB8 codes and produces Main10 4:2:0 HEVC.
 Quantization occurs after the log transform, so reconstructed values above SDR

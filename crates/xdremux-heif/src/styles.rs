@@ -16,6 +16,7 @@ const HVCC: FourCC = FourCC::new(*b"hvcC");
 const TMAP: FourCC = FourCC::new(*b"tmap");
 const URI: FourCC = FourCC::new(*b"uri ");
 const IROT: FourCC = FourCC::new(*b"irot");
+const IMIR: FourCC = FourCC::new(*b"imir");
 const COLR: FourCC = FourCC::new(*b"colr");
 const PIXI: FourCC = FourCC::new(*b"pixi");
 const AUXC: FourCC = FourCC::new(*b"auxC");
@@ -353,6 +354,21 @@ fn build_iprp(
     linear_thumbnail_id: u32,
     assembly: &PhotographicStylesAssembly<'_>,
 ) -> Result<Vec<u8>> {
+    let geometry = crate::orientation::coded_geometry(source, meta)?;
+    crate::orientation::require_coded_aspect(
+        geometry.width,
+        geometry.height,
+        assembly.style_delta_grid_width,
+        assembly.style_delta_grid_height,
+        "Style Delta Map",
+    )?;
+    crate::orientation::require_coded_aspect(
+        geometry.width,
+        geometry.height,
+        assembly.linear_thumbnail_width,
+        assembly.linear_thumbnail_height,
+        "Linear Thumbnail",
+    )?;
     let mut properties = meta.properties.iter().collect::<Vec<_>>();
     properties.sort_by_key(|property| property.index);
     for (offset, property) in properties.iter().enumerate() {
@@ -401,15 +417,19 @@ fn build_iprp(
         &mut next_property_index,
         &make_auxc_box(STYLE_DELTA_AUX_TYPE)?,
     )?;
-    let identity_irot_index = append_property(
-        &mut ipco_payload,
-        &mut next_property_index,
-        // `irot` is a one-byte item property, not a FullBox.  Apple native
-        // Styles files use the ISO-BMFF wire form `size + "irot" + angle`;
-        // adding version/flags here changes the property payload to five
-        // bytes and makes ImageIO reject the otherwise valid Styles graph.
-        &make_box(IROT, &[0])?,
-    )?;
+    // Reuse the primary item's irot, including a non-zero angle. Apple stores
+    // the Style Delta Map and Linear Thumbnail in coded orientation and gives
+    // them the same irot as the primary. `irot` is a one-byte item property,
+    // not a FullBox; a version/flags prefix makes ImageIO reject the graph.
+    let shared_irot_index = match associated_property_index(meta, meta.primary_item_id, IROT) {
+        Some(index) => index,
+        None => append_property(
+            &mut ipco_payload,
+            &mut next_property_index,
+            &make_box(IROT, &[0])?,
+        )?,
+    };
+    let shared_imir_index = associated_property_index(meta, meta.primary_item_id, IMIR);
     let linear_hvcc_index = append_property(
         &mut ipco_payload,
         &mut next_property_index,
@@ -471,11 +491,21 @@ fn build_iprp(
                 essential: true,
             },
             IpmaAssociation {
-                property_index: identity_irot_index,
+                property_index: shared_irot_index,
                 essential: true,
             },
         ],
     });
+    if let Some(imir_index) = shared_imir_index {
+        ipma_entries
+            .last_mut()
+            .expect("style-delta ipma entry was just pushed")
+            .associations
+            .push(IpmaAssociation {
+                property_index: imir_index,
+                essential: true,
+            });
+    }
     ipma_entries.push(IpmaEntry {
         item_id: linear_thumbnail_id,
         associations: vec![
@@ -500,11 +530,21 @@ fn build_iprp(
                 essential: true,
             },
             IpmaAssociation {
-                property_index: identity_irot_index,
+                property_index: shared_irot_index,
                 essential: true,
             },
         ],
     });
+    if let Some(imir_index) = shared_imir_index {
+        ipma_entries
+            .last_mut()
+            .expect("linear-thumbnail ipma entry was just pushed")
+            .associations
+            .push(IpmaAssociation {
+                property_index: imir_index,
+                essential: true,
+            });
+    }
 
     let maximum_item_id = ipma_entries
         .iter()
@@ -1326,6 +1366,8 @@ mod tests {
             pixi_box(),
             make_ispe_box(4, 4).unwrap(),
             make_box(HVCC, &[1; 19]).unwrap(),
+            make_ispe_box(10, 6).unwrap(),
+            make_box(IROT, &[3]).unwrap(),
         ] {
             ipco_payload.extend_from_slice(&property);
         }
@@ -1336,10 +1378,20 @@ mod tests {
             &[
                 IpmaEntry {
                     item_id: PRIMARY_ID,
-                    associations: vec![IpmaAssociation {
-                        property_index: 2,
-                        essential: true,
-                    }],
+                    associations: vec![
+                        IpmaAssociation {
+                            property_index: 2,
+                            essential: true,
+                        },
+                        IpmaAssociation {
+                            property_index: 6,
+                            essential: false,
+                        },
+                        IpmaAssociation {
+                            property_index: 7,
+                            essential: true,
+                        },
+                    ],
                 },
                 IpmaEntry {
                     item_id: GAIN_ID,
@@ -1483,8 +1535,8 @@ mod tests {
             style_delta_columns: 6,
             linear_thumbnail_hvcc: &[2; 19],
             linear_thumbnail_payload: b"linear-thumbnail",
-            linear_thumbnail_width: 4,
-            linear_thumbnail_height: 4,
+            linear_thumbnail_width: 5,
+            linear_thumbnail_height: 3,
         }
     }
 
@@ -1557,6 +1609,56 @@ mod tests {
             .entries
             .iter()
             .any(|entry| { entry.kind == CDSC && entry.from_item_id == style_id }));
+    }
+
+    #[test]
+    fn rotated_primary_reuses_its_irot_on_coded_style_items() {
+        let output =
+            assemble_photographic_styles_heif(&fixture(), &assembly(b"bplist00test")).unwrap();
+        let top = scan_top_level_boxes(&output).unwrap();
+        let meta_header = one_top_level(&top.boxes, META, "output meta").unwrap();
+        let meta = parse_meta_box(&output, meta_header).unwrap();
+        let irot_properties = meta
+            .properties
+            .iter()
+            .filter(|property| property.kind == IROT)
+            .collect::<Vec<_>>();
+        assert_eq!(irot_properties.len(), 1);
+        let raw = raw_property(&output, irot_properties[0]).unwrap();
+        assert_eq!(raw.last().copied().unwrap() & 0x03, 3);
+        let irot_index = u16::try_from(irot_properties[0].index).unwrap();
+        let users = meta
+            .ipma
+            .entries
+            .iter()
+            .filter(|entry| {
+                entry
+                    .associations
+                    .iter()
+                    .any(|association| association.property_index == irot_index)
+            })
+            .count();
+        assert_eq!(
+            users, 3,
+            "primary, Style Delta Map, and Linear Thumbnail share irot 3"
+        );
+        assert_eq!(
+            associated_property_index(&meta, PRIMARY_ID, IROT),
+            Some(irot_index)
+        );
+    }
+
+    #[test]
+    fn display_oriented_style_item_is_rejected() {
+        let mut assembly = assembly(b"bplist00test");
+        assembly.linear_thumbnail_width = 3;
+        assembly.linear_thumbnail_height = 5;
+        let error = assemble_photographic_styles_heif(&fixture(), &assembly).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("Linear Thumbnail") && message.contains("coded orientation"),
+            "{message}"
+        );
     }
 
     #[test]

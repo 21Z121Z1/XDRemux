@@ -66,7 +66,7 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 Styles Linear Thumbnail 使用 base image 和 Gain Map 重建的 HDR look。Rust 将线性 Display P3 各通道除以 Styles plist key `4` 中相同的 `baseline_exposure`，再应用 Apple Log 传递曲线。此资源不再直接复制 SDR 图像码值。
 
-此变换使用 Apple Log 曲线和 Display P3 原色，不会将图像转换为 Apple Log 视频所用的 BT.2020 色彩空间。现有辅助图像色彩标记及解码后的场景方向继续沿用。`encoding_gain` 属于渲染器元数据，不会作为第二次曝光除法应用到缩略图。
+此变换使用 Apple Log 曲线和 Display P3 原色，不会将图像转换为 Apple Log 视频所用的 BT.2020 色彩空间。辅助图像色彩标记保持不变。用于推导系数的场景仍是显示方向。存储的 Linear Thumbnail 和 Style Delta Map 使用主图像的编码方向，并携带该主图像的 `irot`；旋转照片上该值非 0。缩略图在编码前旋转回编码顺序。Gain Map 或 Styles 图像的宽高比与主图像编码尺寸不一致时，转换会被拒绝。`encoding_gain` 属于渲染器元数据，不会作为第二次曝光除法应用到缩略图。
 
 当前编码原语接受 RGB8 码值，生成 Main10 4:2:0 HEVC。量化发生在 Log 变换之后，重建结果中超过 SDR 白的数值因而可以保留。该参照仍来自已经渲染过的 HDR look，不能恢复源文件已丢失的 RAW 或拍摄时处理信息。
 

@@ -195,10 +195,13 @@ pub(crate) fn convert_file(
         APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
     )
     .map_err(|error| RuntimeError::external("Photographic Styles semantic graph", error))?;
-    let primary = runtime
+    runtime
         .heif
         .extract_primary_hevc_resource(&semantic_base)
         .map_err(|error| RuntimeError::external("Photographic Styles primary resource", error))?;
+    let geometry = xdremux_heif::primary_coded_geometry(&semantic_base).map_err(|error| {
+        RuntimeError::external("Photographic Styles primary coded geometry", error)
+    })?;
     let structure = xdremux_heif::validate_gain_map_structure(&semantic_base).map_err(|error| {
         RuntimeError::external("Photographic Styles source Gain Map structure", error)
     })?;
@@ -222,7 +225,14 @@ pub(crate) fn convert_file(
         .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
     let scene_raster = downsample_raster(&raster, LINEAR_THUMBNAIL_MAX_SIZE)?;
     let scene_rasters = derive_style_scene(&scene_raster, &gain_raster, &prepared.scale)?;
-    let linear_thumbnail_raster = linear_thumbnail_raster(&scene_rasters)?;
+    let linear_thumbnail_raster = linear_thumbnail_raster(&scene_rasters)?
+        .undo_irot(geometry.quarter_turns_ccw)
+        .map_err(|error| {
+            RuntimeError::external(
+                "Photographic Styles Linear Thumbnail coded orientation",
+                error,
+            )
+        })?;
     let linear_thumbnail = encode_linear_thumbnail(
         &adapter,
         staging.path(),
@@ -323,7 +333,7 @@ pub(crate) fn convert_file(
     let (style_delta_payload, style_delta_hvcc) = verified_neutral_style_delta()?;
 
     let (style_delta_grid_width, style_delta_grid_height, style_delta_rows, style_delta_columns) =
-        style_grid_size(primary.width, primary.height);
+        style_grid_size(geometry.width, geometry.height);
     let assembly = crate::PhotographicStylesAssembly {
         style_property_list: &style_properties,
         style_delta_hvcc,
@@ -747,8 +757,9 @@ fn linear_thumbnail_raster(scene: &StyleSceneRasters) -> Result<Raster8> {
             .map_err(|error| {
                 RuntimeError::external("Photographic Styles Linear Thumbnail", error)
             })?;
-    // Keep the decoded scene geometry used by the auxiliary graph. Applying
-    // another display rotation here would misregister the reference.
+    // This raster stays in the decoded display orientation used for style
+    // coefficients. The caller rotates it back to the primary coded order
+    // before encoding and stamps the primary irot on the stored item.
     Raster8::new(
         u32::try_from(scene.width).map_err(|_| {
             RuntimeError::new("Photographic Styles Linear Thumbnail", "width exceeds u32")

@@ -10,20 +10,24 @@ use xdremux_runtime::PortableRuntime;
 const JXRS_MARKER: &[u8] = b"\0jxrs";
 
 fn tiny_rgb_jpeg() -> Vec<u8> {
-    let mut pixels = Vec::with_capacity(8 * 8 * 3);
-    for y in 0_u8..8 {
-        for x in 0_u8..8 {
+    // 16x12 keeps the public fixture primary's coded 4:3 aspect. An 8x8 mask
+    // would be rejected once the gain map must match that coded orientation.
+    const WIDTH: u8 = 16;
+    const HEIGHT: u8 = 12;
+    let mut pixels = Vec::with_capacity(usize::from(WIDTH) * usize::from(HEIGHT) * 3);
+    for y in 0..HEIGHT {
+        for x in 0..WIDTH {
             pixels.extend_from_slice(&[
-                x.saturating_mul(32),
-                y.saturating_mul(32),
-                x.saturating_add(y).saturating_mul(16),
+                x.saturating_mul(16),
+                y.saturating_mul(16),
+                x.saturating_add(y).saturating_mul(8),
             ]);
         }
     }
 
     let mut jpeg = Vec::new();
     Encoder::new(&mut jpeg, 100)
-        .encode(&pixels, 8, 8, ColorType::Rgb)
+        .encode(&pixels, u16::from(WIDTH), u16::from(HEIGHT), ColorType::Rgb)
         .expect("synthetic JPEG encoding must succeed");
     jpeg
 }
@@ -97,6 +101,6 @@ fn portable_runtime_converts_synthetic_uhdr_end_to_end() {
     assert_eq!(structure.chroma_sampling, ChromaSampling::Yuv444);
     assert_eq!(structure.luma_bit_depth, 8);
     assert_eq!(structure.chroma_bit_depth, 8);
-    assert_eq!(structure.width, 8);
-    assert_eq!(structure.height, 8);
+    assert_eq!(structure.width, 16);
+    assert_eq!(structure.height, 12);
 }
