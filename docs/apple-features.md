@@ -76,7 +76,9 @@ Apple Log 传递函数、[0, 1] 码值范围和现有辅助色彩标记保持不
 - key `c` 和 `d` 保持 32×32。每格保存一个 guide 的面积均值：`c` 是主图，`d` 是线性缩略图。consumer 用自己的 guided filter（`r = 1`，`eps ≈ 0.05`）上采样，再计算 `q = mix(mix(d, c, l_b), mix(d, c, l_f), m)`。这两张图不再乘固定仿射，也不直接乘到亮度上。消费 `q` 的后续 shader 阶段没有反解，因此这些均值不是解出来的局部调性。
 - key 1 是 x-major 的 12×9×8×10×3 half 数组，二次基为 `[1, R, G, B, R², RG, RB, G², GB, B²]`。每个 spotlight 格子和每个亮度 plane 分开拟合。拟合方向是 remove-style：多项式读取显示中的主图，目标是缩略图码值。局部样本无法确定的系数保持恒等残差。plane 权重使用已核实的 `inputIsLinear = false` 公式，计算在 `f64` 中进行，不模拟 half，也不应用可选的 3×3 空间滤波。
 
-背景和前景 LTM 都为 1 时，也就是已捕获的 tone=0 设置，semantic-tone 阶段返回主图，不读取缩略图或曲线。因此 tone=0 的渲染测不到 key 3 和缩略图。Photos 的 Tone ±1 与 Color ±1 滑块位置不是源事实，semantic tone 之后的颜色阶段也没有计算。公开研究仓库里没有 `consumer-model.metal`，本产品也不调用私有 `PISemanticStyleFilter` selector。可移植检查是 `apple_style_semantic_tone_channel`。
+背景和前景 LTM 都为 1 时，也就是已捕获的 tone=0 设置，semantic-tone 阶段返回主图，不读取缩略图或曲线。因此 tone=0 的渲染测不到 key 3 和缩略图。Photos 的 Tone ±1 与 Color ±1 滑块位置不是源事实。可移植公式检查是 `apple_style_semantic_tone_channel`。
+
+原生 tone 检查与产品路径分开。它检出 `21Z121Z1/Photographic_Style_Research` 的 `37dd551`，并在 `xcode-27` 镜像上运行 `consumer-model/harness/run_tone_sweep.py`。该 harness 只设置 `inputToneBias`，没有颜色控制。`Apple_Native_Samples/IMG_0032.HEIC` 在 tone 0 必须报告 0 个不同的 half 分量，之后的 XDRemux 渲染才可采信。工作流是 `.github/workflows/style-tone-sweep.yml`。
 
 原生 consumer 回归使用 RGB UHDR 和单色 LHDR 夹具，回读编码后的缩略图，检查 HDR Log 目标以及主图 HEVC 是否保持不变。运行命令为 `bash scripts/apple/check_rust_style_consumer.sh`。Photos 导入、编辑、保存和重开仍需单独的设备证据。baseline exposure 和 base gain 仍使用现有的源分布校准；这次改动不替换那组系数。
 

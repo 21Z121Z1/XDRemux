@@ -131,11 +131,16 @@ metadata is generated:
 At background and foreground LTM of 1, which is the captured tone=0 setting,
 the semantic-tone stage returns the primary and does not read the thumbnail or
 the curve. A tone=0 render therefore cannot measure key 3 or the thumbnail.
-The Photos Tone ±1 and Color ±1 slider positions are not source facts, and the
-color stages after semantic tone are not evaluated. `consumer-model.metal` is
-not in the public research repository, and this product does not call the
-private `PISemanticStyleFilter` selector. The portable check is
-`apple_style_semantic_tone_channel`.
+The Photos Tone ±1 and Color ±1 slider positions are not source facts. The
+portable formula check is `apple_style_semantic_tone_channel`.
+
+The native tone check is separate from the product. It checks out
+`21Z121Z1/Photographic_Style_Research` at `37dd551` and runs
+`consumer-model/harness/run_tone_sweep.py` on the `xcode-27` image. That
+harness sets `inputToneBias` only. It does not expose a color control. Tone 0
+on `Apple_Native_Samples/IMG_0032.HEIC` must report zero differing half
+components before XDRemux renders are trusted. The workflow is
+`.github/workflows/style-tone-sweep.yml`.
 
 The native consumer regression uses RGB UHDR and monochrome LHDR fixtures,
 decodes the encoded thumbnail, and checks the HDR Log target and unchanged
