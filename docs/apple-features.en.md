@@ -137,9 +137,15 @@ portable formula check is `apple_style_semantic_tone_channel`.
 The native tone check is separate from the product. It checks out
 `21Z121Z1/Photographic_Style_Research` at `37dd551` and runs
 `consumer-model/harness/run_tone_sweep.py` on the `xcode-27` image. That
-harness sets `inputToneBias` only. It does not expose a color control. Tone 0
-on `Apple_Native_Samples/IMG_0032.HEIC` must report zero differing half
-components before XDRemux renders are trusted. The workflow is
+harness sets `inputToneBias` only. It does not expose a color control. The
+sweep uses tones −1, −0.75, −0.5, −0.35, −0.15, 0, 0.15, 0.35, 0.5, 0.75, and
+1. The Apple captures are `Apple_Native_Samples/IMG_0032.HEIC`,
+`IMG_0033.HEIC`, and `research/vm-native/samples/IMG_2600.HEIC`,
+`IMG_2604.HEIC`, and `IMG_2608.HEIC`. The same tones are applied to the three
+ProXDR fixtures after conversion. Tone 0 on `IMG_0032.HEIC` must report zero
+differing half components before the other renders are trusted. The report
+records mean luminance, per-channel means, `|L(−1)−L(0)| / |L(+1)−L(0)|`,
+monotonicity, and the tone-related plist fields. The workflow is
 `.github/workflows/style-tone-sweep.yml`.
 
 The native consumer regression uses RGB UHDR and monochrome LHDR fixtures,

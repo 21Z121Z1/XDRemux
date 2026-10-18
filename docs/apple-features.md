@@ -78,7 +78,7 @@ Apple Log 传递函数、[0, 1] 码值范围和现有辅助色彩标记保持不
 
 背景和前景 LTM 都为 1 时，也就是已捕获的 tone=0 设置，semantic-tone 阶段返回主图，不读取缩略图或曲线。因此 tone=0 的渲染测不到 key 3 和缩略图。Photos 的 Tone ±1 与 Color ±1 滑块位置不是源事实。可移植公式检查是 `apple_style_semantic_tone_channel`。
 
-原生 tone 检查与产品路径分开。它检出 `21Z121Z1/Photographic_Style_Research` 的 `37dd551`，并在 `xcode-27` 镜像上运行 `consumer-model/harness/run_tone_sweep.py`。该 harness 只设置 `inputToneBias`，没有颜色控制。`Apple_Native_Samples/IMG_0032.HEIC` 在 tone 0 必须报告 0 个不同的 half 分量，之后的 XDRemux 渲染才可采信。工作流是 `.github/workflows/style-tone-sweep.yml`。
+原生 tone 检查与产品路径分开。它检出 `21Z121Z1/Photographic_Style_Research` 的 `37dd551`，并在 `xcode-27` 镜像上运行 `consumer-model/harness/run_tone_sweep.py`。该 harness 只设置 `inputToneBias`，没有颜色控制。扫描的 tone 为 −1、−0.75、−0.5、−0.35、−0.15、0、0.15、0.35、0.5、0.75 和 1。Apple 样本是 `Apple_Native_Samples/IMG_0032.HEIC`、`IMG_0033.HEIC`，以及 `research/vm-native/samples/IMG_2600.HEIC`、`IMG_2604.HEIC` 和 `IMG_2608.HEIC`。转换后的三个 ProXDR 夹具使用同一组 tone。`IMG_0032.HEIC` 在 tone 0 必须报告 0 个不同的 half 分量，之后的渲染才可采信。报告记录平均亮度、逐通道均值、`|L(−1)−L(0)| / |L(+1)−L(0)|`、单调性，以及与 tone 相关的 plist 字段。工作流是 `.github/workflows/style-tone-sweep.yml`。
 
 原生 consumer 回归使用 RGB UHDR 和单色 LHDR 夹具，回读编码后的缩略图，检查 HDR Log 目标以及主图 HEVC 是否保持不变。运行命令为 `bash scripts/apple/check_rust_style_consumer.sh`。Photos 导入、编辑、保存和重开仍需单独的设备证据。baseline exposure 和 base gain 仍使用现有的源分布校准；这次改动不替换那组系数。
 

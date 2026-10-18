@@ -12,6 +12,7 @@ The harness sets inputToneBias and does not expose a color control.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -20,7 +21,8 @@ import numpy as np
 
 # Display P3 luminance weights already used by the Styles runtime.
 Y_WEIGHTS = np.array([0.22897456, 0.69173852, 0.07928691], dtype=np.float64)
-TONES = (-1.0, -0.35, 0.0, 0.35, 1.0)
+TONES = (-1.0, -0.75, -0.5, -0.35, -0.15, 0.0, 0.15, 0.35, 0.5, 0.75, 1.0)
+STEP_EPSILON = 1e-4
 
 
 def luminance(rgb: np.ndarray) -> np.ndarray:
@@ -90,9 +92,15 @@ def score_photo(images: dict[float, np.ndarray]) -> dict:
         for index in range(len(rows) - 1)
     ]
     step_values = [step["mean_luminance_step"] for step in steps]
-    positive = [value for value in step_values if value > 0.002]
-    negative = [value for value in step_values if value < -0.002]
+    positive = [value for value in step_values if value > STEP_EPSILON]
+    negative = [value for value in step_values if value < -STEP_EPSILON]
     monotonic = not (positive and negative)
+    by_tone = {row["tone"]: row["mean_luminance"] for row in rows}
+    dark_abs = bright_abs = ratio = None
+    if -1.0 in by_tone and 0.0 in by_tone and 1.0 in by_tone:
+        dark_abs = abs(by_tone[-1.0] - by_tone[0.0])
+        bright_abs = abs(by_tone[1.0] - by_tone[0.0])
+        ratio = None if bright_abs < 1e-8 else dark_abs / bright_abs
     inactive = all(row["max_abs_vs_tone0"] < 1e-3 for row in rows)
     concerns = []
     if inactive:
@@ -119,6 +127,9 @@ def score_photo(images: dict[float, np.ndarray]) -> dict:
         "tones": rows,
         "luminance_steps": steps,
         "monotonic_mean_luminance": monotonic,
+        "darken_abs": dark_abs,
+        "brighten_abs": bright_abs,
+        "darken_brighten_ratio": ratio,
         "tone_changes_render": not inactive,
         "concerns": concerns,
     }
@@ -147,9 +158,11 @@ def read_sweep(path: Path) -> list[dict]:
 
 def sanity_gate(rows: list[dict]) -> dict:
     tone0 = [row for row in rows if row.get("tone") == 0 or row.get("tone") == 0.0]
-    if len(tone0) != 1:
-        return {"trusted": False, "reason": "tone 0 row missing", "rows": tone0}
-    row = tone0[0]
+    named = [row for row in tone0 if str(row.get("photo", "")).startswith("IMG_0032")]
+    chosen = named or tone0
+    if len(chosen) != 1:
+        return {"trusted": False, "reason": "IMG_0032 tone 0 row missing", "rows": chosen}
+    row = chosen[0]
     differing = row.get("differing_components")
     trusted = differing == 0 and not row.get("error")
     return {
@@ -269,13 +282,21 @@ def render_markdown(report: dict) -> str:
     for photo in report["photos"]:
         lines.append(f"## {photo['photo']}")
         lines.append("")
-        lines.append("| tone | mean Y | dY vs 0 | mean dR | mean dG | mean dB | max abs | 8-bit levels |")
-        lines.append("|---:|---:|---:|---:|---:|---:|---:|---:|")
+        ratio = photo.get("darken_brighten_ratio")
+        ratio_text = "n/a" if ratio is None else f"{ratio:.4f}"
+        lines.append(
+            f"Monotonic mean luminance: {photo.get('monotonic_mean_luminance')}. "
+            f"|L(-1)-L(0)| / |L(+1)-L(0)| = {ratio_text} "
+            f"({photo.get('darken_abs')} / {photo.get('brighten_abs')})."
+        )
+        lines.append("")
+        lines.append("| tone | mean Y | mean R | mean G | mean B |")
+        lines.append("|---:|---:|---:|---:|---:|")
         for row in photo.get("tones", []):
-            dr, dg, db = row["mean_delta_rgb"]
+            red, green, blue = row["mean_rgb"]
             lines.append(
-                f"| {row['tone']:g} | {row['mean_luminance']:.5f} | {row['mean_luminance_delta']:.5f} | "
-                f"{dr:.5f} | {dg:.5f} | {db:.5f} | {row['max_abs_vs_tone0']:.5f} | {row['unique_8bit_luma']} |"
+                f"| {row['tone']:g} | {row['mean_luminance']:.5f} | "
+                f"{red:.5f} | {green:.5f} | {blue:.5f} |"
             )
         if photo.get("concerns"):
             lines.append("")
@@ -295,6 +316,268 @@ def render_markdown(report: dict) -> str:
     return "\n".join(lines)
 
 
+def _scalar_leaves(value, prefix: str = ""):
+    if isinstance(value, dict):
+        if set(value) == {"bytes", "sha256"}:
+            yield prefix, value
+            return
+        for key, item in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            yield from _scalar_leaves(item, path)
+        return
+    if isinstance(value, list):
+        yield prefix, value
+        return
+    yield prefix, value
+
+
+def _gtc_summary(path: Path) -> dict:
+    raw = np.fromfile(path, dtype="<u2")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if raw.size < 258:
+        return {"sha256": digest, "error": f"short curve ({raw.size} values)"}
+    nodes = raw[1:257].astype(np.float64) / 65534.0
+    return {
+        "count": int(raw[0]),
+        "sha256": digest,
+        "node0": float(nodes[0]),
+        "node64": float(nodes[64]),
+        "node128": float(nodes[128]),
+        "node192": float(nodes[192]),
+        "node255": float(nodes[255]),
+        "mean": float(nodes.mean()),
+        "minimum": float(nodes.min()),
+        "maximum": float(nodes.max()),
+        "monotonic_nodes": bool(np.all(np.diff(nodes) >= -1e-6)),
+    }
+
+
+def _half_summary(path: Path) -> dict:
+    raw = np.fromfile(path, dtype="<f2").astype(np.float64)
+    finite = raw[np.isfinite(raw)]
+    return {
+        "count": int(raw.size),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "mean": None if finite.size == 0 else float(finite.mean()),
+        "minimum": None if finite.size == 0 else float(finite.min()),
+        "maximum": None if finite.size == 0 else float(finite.max()),
+    }
+
+
+def load_style_metadata(resources: Path) -> list[dict]:
+    if not resources.is_dir():
+        return []
+    records = []
+    for photo in sorted(path for path in resources.iterdir() if path.is_dir()):
+        record = {"photo": photo.name, "scalars": {}}
+        summary_path = photo / "styles-summary.json"
+        if summary_path.is_file():
+            record["scalars"] = dict(_scalar_leaves(json.loads(summary_path.read_text())))
+        else:
+            record["missing_summary"] = True
+        curve = photo / "key3.bin"
+        if curve.is_file():
+            record["gtc"] = _gtc_summary(curve)
+        for key, name in (("c", "light_c"), ("d", "light_d")):
+            blob = photo / f"key{key}.bin"
+            if blob.is_file():
+                record[name] = _half_summary(blob)
+        records.append(record)
+    return records
+
+
+def _flat_metadata(record: dict) -> dict:
+    flat = {}
+    for key, value in record.get("scalars", {}).items():
+        flat[key] = value
+    for group in ("gtc", "light_c", "light_d"):
+        payload = record.get(group)
+        if isinstance(payload, dict):
+            for key, value in payload.items():
+                flat[f"{group}.{key}"] = value
+    return flat
+
+
+def _as_float(value):
+    if isinstance(value, bool) or isinstance(value, (dict, list)) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def metadata_ranges(records: list[dict]) -> dict:
+    apple = [record for record in records if record.get("group") == "apple"]
+    xdremux = [record for record in records if record.get("group") == "xdremux"]
+    paths = sorted({key for record in records for key in _flat_metadata(record)})
+    fields = []
+    for path in paths:
+        apple_values = []
+        for record in apple:
+            number = _as_float(_flat_metadata(record).get(path))
+            if number is not None:
+                apple_values.append(number)
+        if not apple_values:
+            continue
+        low, high = min(apple_values), max(apple_values)
+        outside = []
+        for record in xdremux:
+            number = _as_float(_flat_metadata(record).get(path))
+            if number is None:
+                continue
+            if number < low - 1e-9 or number > high + 1e-9:
+                outside.append({"photo": record["photo"], "value": number})
+        fields.append(
+            {
+                "field": path,
+                "apple_min": low,
+                "apple_max": high,
+                "xdremux_outside": outside,
+            }
+        )
+    return {"fields": fields}
+
+
+def curve_span(photos: list[dict]) -> dict:
+    apple = [
+        photo["darken_brighten_ratio"]
+        for photo in photos
+        if photo.get("group") == "apple" and isinstance(photo.get("darken_brighten_ratio"), (int, float))
+    ]
+    span = None if not apple else {"min": min(apple), "max": max(apple)}
+    verdicts = []
+    for photo in photos:
+        if photo.get("group") != "xdremux":
+            continue
+        ratio = photo.get("darken_brighten_ratio")
+        inside = None
+        if span is not None and isinstance(ratio, (int, float)):
+            inside = span["min"] - 1e-9 <= ratio <= span["max"] + 1e-9
+        verdicts.append({"photo": photo["photo"], "ratio": ratio, "inside_apple_range": inside})
+    return {"apple_ratio_range": span, "xdremux": verdicts}
+
+
+def _group_for(name: str) -> str:
+    if "xdremux" in name:
+        return "xdremux"
+    if name.startswith("IMG_"):
+        return "apple"
+    return "other"
+
+
+def write_asymmetry(apple_report: dict, xdremux_report: dict, resources: Path | None, out_dir: Path) -> dict:
+    photos = []
+    for report, group in ((apple_report, "apple"), (xdremux_report, "xdremux")):
+        for photo in report.get("photos", []):
+            item = dict(photo)
+            item["group"] = group
+            photos.append(item)
+    metadata = load_style_metadata(resources) if resources else []
+    for record in metadata:
+        record["group"] = _group_for(record["photo"])
+    payload = {
+        "curves": curve_span(photos),
+        "photos": [
+            {
+                "photo": photo["photo"],
+                "group": photo["group"],
+                "monotonic_mean_luminance": photo.get("monotonic_mean_luminance"),
+                "darken_abs": photo.get("darken_abs"),
+                "brighten_abs": photo.get("brighten_abs"),
+                "darken_brighten_ratio": photo.get("darken_brighten_ratio"),
+            }
+            for photo in photos
+        ],
+        "metadata": metadata,
+        "metadata_ranges": metadata_ranges(metadata),
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "asymmetry.json").write_text(json.dumps(payload, indent=2) + "\n")
+    (out_dir / "asymmetry.md").write_text(_asymmetry_markdown(payload))
+    return payload
+
+
+def _asymmetry_markdown(payload: dict) -> str:
+    lines = ["# Tone asymmetry", ""]
+    span = payload["curves"]["apple_ratio_range"]
+    if span is None:
+        lines.append("Apple captures produced no darken/brighten ratio.")
+    else:
+        lines.append(
+            f"Apple |L(-1)-L(0)| / |L(+1)-L(0)| ranges from {span['min']:.4f} to {span['max']:.4f}."
+        )
+    lines.append("")
+    lines.append("| photo | group | monotonic | |L(-1)-L(0)| | |L(+1)-L(0)| | ratio | inside Apple range |")
+    lines.append("|---|---|---|---:|---:|---:|---|")
+    inside = {item["photo"]: item["inside_apple_range"] for item in payload["curves"]["xdremux"]}
+    for photo in payload["photos"]:
+        ratio = photo["darken_brighten_ratio"]
+        ratio_text = "n/a" if ratio is None else f"{ratio:.4f}"
+        lines.append(
+            f"| {photo['photo']} | {photo['group']} | {photo['monotonic_mean_luminance']} | "
+            f"{photo['darken_abs']} | {photo['brighten_abs']} | {ratio_text} | "
+            f"{inside.get(photo['photo'], '')} |"
+        )
+    lines.append("")
+    lines.append("## Plist fields outside the Apple numeric range")
+    lines.append("")
+    outside_fields = [field for field in payload["metadata_ranges"]["fields"] if field["xdremux_outside"]]
+    if not outside_fields:
+        lines.append("No numeric plist field on an XDRemux output falls outside the Apple captures.")
+    else:
+        lines.append("| field | Apple min | Apple max | XDRemux outside |")
+        lines.append("|---|---:|---:|---|")
+        for field in outside_fields:
+            rendered = ", ".join(
+                f"{item['photo']}={item['value']:.6g}" for item in field["xdremux_outside"]
+            )
+            lines.append(
+                f"| {field['field']} | {field['apple_min']:.6g} | {field['apple_max']:.6g} | {rendered} |"
+            )
+    lines.append("")
+    lines.append("## Tone-related plist values")
+    lines.append("")
+    interesting = (
+        "0",
+        "4",
+        "5",
+        "h",
+        "j",
+        "k",
+        "7.PeopleRatio",
+        "7.PersonMasksValidHint",
+        "7.SkinRatio",
+        "i.Gain",
+        "i.OriginalRangeMin",
+        "i.OriginalRangeMax",
+        "gtc.node0",
+        "gtc.node64",
+        "gtc.node128",
+        "gtc.node192",
+        "gtc.node255",
+        "gtc.mean",
+        "gtc.monotonic_nodes",
+        "light_c.mean",
+        "light_d.mean",
+    )
+    header = "| field | " + " | ".join(record["photo"] for record in payload["metadata"]) + " |"
+    if payload["metadata"]:
+        lines.append(header)
+        lines.append("|---|" + "|".join("---:" for _ in payload["metadata"]) + "|")
+        flats = [_flat_metadata(record) for record in payload["metadata"]]
+        for field in interesting:
+            cells = []
+            for flat in flats:
+                value = flat.get(field, "")
+                if isinstance(value, float):
+                    cells.append(f"{value:.6g}")
+                else:
+                    cells.append(str(value))
+            lines.append("| " + field + " | " + " | ".join(cells) + " |")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def self_test() -> None:
     height, width = 24, 32
     base = np.full((height, width, 3), 0.4, dtype=np.float32)
@@ -305,6 +588,8 @@ def self_test() -> None:
     scored = score_photo(images)
     if not scored["monotonic_mean_luminance"] or not scored["tone_changes_render"]:
         raise SystemExit(f"monotonic sweep was not recognized: {scored}")
+    if abs(scored["darken_brighten_ratio"] - 1.0) > 1e-6:
+        raise SystemExit(f"symmetric sweep ratio was not 1: {scored['darken_brighten_ratio']}")
     flat = {tone: base.copy() for tone in TONES}
     inactive = score_photo(flat)
     if inactive["tone_changes_render"] or "tone bias leaves the native render unchanged" not in inactive["concerns"]:
@@ -321,6 +606,33 @@ def self_test() -> None:
     bad = sanity_gate([{"photo": "IMG_0032", "tone": 0, "differing_components": 12}])
     if bad["trusted"]:
         raise SystemExit(bad)
+    mixed = sanity_gate(
+        [
+            {"photo": "IMG_0033", "tone": 0, "differing_components": 9},
+            {"photo": "IMG_0032", "tone": 0, "differing_components": 0},
+        ]
+    )
+    if not mixed["trusted"] or mixed["photo"] != "IMG_0032":
+        raise SystemExit(mixed)
+    span = curve_span(
+        [
+            {"photo": "IMG_0032", "group": "apple", "darken_brighten_ratio": 0.2},
+            {"photo": "IMG_0033", "group": "apple", "darken_brighten_ratio": 0.9},
+            {"photo": "sample.xdremux", "group": "xdremux", "darken_brighten_ratio": 0.05},
+        ]
+    )
+    if span["xdremux"][0]["inside_apple_range"] is not False:
+        raise SystemExit(span)
+    ranges = metadata_ranges(
+        [
+            {"photo": "IMG_0032", "group": "apple", "scalars": {"h": 1.2}},
+            {"photo": "IMG_0033", "group": "apple", "scalars": {"h": 1.8}},
+            {"photo": "sample.xdremux", "group": "xdremux", "scalars": {"h": 4.0}},
+        ]
+    )
+    outside = ranges["fields"][0]["xdremux_outside"]
+    if not outside or outside[0]["photo"] != "sample.xdremux":
+        raise SystemExit(ranges)
 
 
 def main() -> int:
@@ -329,10 +641,20 @@ def main() -> int:
     parser.add_argument("--sanity", type=Path)
     parser.add_argument("--renders", type=Path)
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--compare", nargs=2, type=Path, metavar=("APPLE_REPORT", "XDREMUX_REPORT"))
+    parser.add_argument("--metadata", type=Path)
     args = parser.parse_args()
     if args.self_test:
         self_test()
         print("style tone response self-test passed")
+        return 0
+    if args.compare:
+        if not args.out:
+            parser.error("--out is required with --compare")
+        apple_report = json.loads(args.compare[0].read_text())
+        xdremux_report = json.loads(args.compare[1].read_text())
+        write_asymmetry(apple_report, xdremux_report, args.metadata, args.out)
+        print((args.out / "asymmetry.md").read_text())
         return 0
     if not args.sanity or not args.renders or not args.out:
         parser.error("--sanity, --renders, and --out are required")
