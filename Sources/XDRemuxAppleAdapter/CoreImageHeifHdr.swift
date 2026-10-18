@@ -86,7 +86,7 @@ func writeSystemHeifHdr(
     guard let colorSpace = CGColorSpace(name: CGColorSpace.displayP3) else {
         throw adapterError("Display P3 is unavailable")
     }
-    try coreImageContext.writeHEIFRepresentation(
+    try writeAdapterHeifRepresentation(
         of: sdr,
         to: URL(fileURLWithPath: outputPath),
         format: .RGBA8,
@@ -123,7 +123,7 @@ func readSystemHeifHdr(
         width: rendered.width,
         height: rendered.height,
         contentHeadroomSent: contentHeadroomSent,
-        decodedContentHeadroom: CGImageGetContentHeadroom(image),
+        decodedContentHeadroom: image.contentHeadroom,
         decodedWidth: rendered.width,
         decodedHeight: rendered.height,
         readbackByteCount: rendered.byteCount,
@@ -153,8 +153,13 @@ private func representationOption(_ symbol: String) throws -> CIImageRepresentat
 }
 
 private func exportedString(_ symbol: String) throws -> String {
+    // dlfcn.h defines RTLD_DEFAULT as ((void *) -2). The Swift Darwin overlay
+    // exports RTLD_NOW and does not export this pointer macro.
+    guard let handle = UnsafeMutableRawPointer(bitPattern: -2) else {
+        throw adapterError("RTLD_DEFAULT cannot be formed")
+    }
     guard let address = symbol.withCString({ name in
-        dlsym(RTLD_DEFAULT, name)
+        dlsym(handle, name)
     }) else {
         throw adapterError("Core Image export \(symbol) is not available")
     }
@@ -221,7 +226,7 @@ private func renderExtendedLinearHalf(
     var rendered = Data(count: byteCount)
     let wrote = rendered.withUnsafeMutableBytes { bytes -> Bool in
         guard let baseAddress = bytes.baseAddress else { return false }
-        coreImageContext.render(
+        renderAdapterBitmap(
             source,
             toBitmap: baseAddress,
             rowBytes: rowBytes,

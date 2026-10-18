@@ -8,7 +8,41 @@ import ImageIO
 // compiled-kernel caches). Keep one adapter-scoped context so a persistent
 // helper can reuse that state across primitive requests. Product policy stays
 // in Rust; this is only Apple framework execution state.
-let coreImageContext = CIContext(options: [.cacheIntermediates: false])
+private let coreImageContext = CIContext(options: [.cacheIntermediates: false])
+
+func writeAdapterHeifRepresentation(
+    of image: CIImage,
+    to url: URL,
+    format: CIFormat,
+    colorSpace: CGColorSpace,
+    options: [CIImageRepresentationOption: Any]
+) throws {
+    try coreImageContext.writeHEIFRepresentation(
+        of: image,
+        to: url,
+        format: format,
+        colorSpace: colorSpace,
+        options: options
+    )
+}
+
+func renderAdapterBitmap(
+    _ image: CIImage,
+    toBitmap baseAddress: UnsafeMutableRawPointer,
+    rowBytes: Int,
+    bounds: CGRect,
+    format: CIFormat,
+    colorSpace: CGColorSpace?
+) {
+    coreImageContext.render(
+        image,
+        toBitmap: baseAddress,
+        rowBytes: rowBytes,
+        bounds: bounds,
+        format: format,
+        colorSpace: colorSpace
+    )
+}
 
 private func tightL8ByteCount(width: Int, height: Int, context: String) throws -> Int {
     guard width > 0, height > 0 else {
