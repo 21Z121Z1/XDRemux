@@ -33,8 +33,9 @@ test_root="$(mktemp -d "${TMPDIR:-/tmp}/xdremux-rust-style-consumer.XXXXXX")"
 trap 'rm -rf "$test_root"' EXIT
 
 # Capture effective HEVC format-description tags from the native encoder.
-# This probe intentionally does not change the existing private Styles carrier
-# color interpretation; comparison to an Apple-authored thumbnail is still needed.
+# The probe feeds 16-bit codes, the same width as the Styles thumbnail path,
+# and still expects the existing 709 / 709 / 601 identification. It does not
+# retag the carrier. Comparison to an Apple-authored thumbnail is still needed.
 python3 - "$adapter" "$test_root" <<'PY'
 import json
 from pathlib import Path
@@ -43,15 +44,18 @@ import sys
 
 adapter, root = sys.argv[1:]
 root = Path(root)
-raw = root / "color-probe-rgb8.bin"
-raw.write_bytes(bytes([128, 128, 128]) * (64 * 64))
+raw = root / "color-probe-rgb16.bin"
+# Mid-gray little-endian RGB u16. The value is only a legal 16-bit code;
+# the probe checks encoder color tags, not the Apple Log curve.
+raw.write_bytes(bytes([0x00, 0x80, 0x00, 0x80, 0x00, 0x80]) * (64 * 64))
 request = {
     "schema_version": 2,
     "operation": "videotoolbox-encode-main10",
     "input_path": str(raw),
     "output_path": str(root / "color-probe.hevc"),
     "video_toolbox_main10": {
-        "raw_width": 64, "raw_height": 64, "raw_bytes_per_row": 192,
+        "raw_width": 64, "raw_height": 64, "raw_bytes_per_row": 384,
+        "raw_component_bits": 16,
         "quality": 0.85, "hvcc_path": str(root / "color-probe.hvcc"),
     },
 }

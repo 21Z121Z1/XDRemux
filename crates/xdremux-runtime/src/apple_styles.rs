@@ -386,7 +386,7 @@ fn encode_linear_thumbnail(
             "VideoToolbox input geometry must be non-zero and even",
         ));
     }
-    let minimum_row = u32::from(raster.width).checked_mul(6).ok_or_else(|| {
+    let minimum_row = raster.width.checked_mul(6).ok_or_else(|| {
         RuntimeError::new(
             "Photographic Styles Linear Thumbnail",
             "RGB16 row stride overflows",
@@ -584,10 +584,8 @@ fn derive_style_scene(
                         "pixel offset overflows",
                     )
                 })?;
-            for component in 0..3 {
-                full_sdr.push(srgb_decode(
-                    f32::from(raster.data[source_offset + component]) / 255.0,
-                ));
+            for component in &raster.data[source_offset..source_offset + 3] {
+                full_sdr.push(srgb_decode(f32::from(*component) / 255.0));
             }
         }
     }
@@ -642,18 +640,13 @@ fn derive_style_scene(
     let mut hdr_luminance = Vec::with_capacity(width * height);
     let mut renderer_linear_minimum = f32::INFINITY;
     let mut renderer_linear_maximum = f32::NEG_INFINITY;
-    for pixel in 0..width * height {
-        let offset = pixel * 3;
-        let base = [
-            base_image.samples[offset],
-            base_image.samples[offset + 1],
-            base_image.samples[offset + 2],
-        ];
-        let hdr = [
-            hdr_image.samples[offset],
-            hdr_image.samples[offset + 1],
-            hdr_image.samples[offset + 2],
-        ];
+    for (base_pixel, hdr_pixel) in base_image
+        .samples
+        .chunks_exact(3)
+        .zip(hdr_image.samples.chunks_exact(3))
+    {
+        let base = [base_pixel[0], base_pixel[1], base_pixel[2]];
+        let hdr = [hdr_pixel[0], hdr_pixel[1], hdr_pixel[2]];
         let base_y = luminance(base);
         let hdr_y = luminance(hdr);
         if !base_y.is_finite() || !hdr_y.is_finite() {

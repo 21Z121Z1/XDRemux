@@ -197,10 +197,10 @@ pub fn reconstruct_scene_linear_hdr(
     for y in 0..sdr.height {
         for x in 0..sdr.width {
             let source = (y * sdr.width + x) * 3;
-            for component in 0..3 {
+            for (component, sample) in sdr.samples[source..source + 3].iter().enumerate() {
                 let code = sample_gain_code(gain_map, x, y, sdr.width, sdr.height, component);
                 let hdr = apply_iso_gain_sample(
-                    f64::from(sdr.samples[source + component]),
+                    f64::from(*sample),
                     code,
                     &application.channels[component],
                     application.weight,
@@ -286,9 +286,11 @@ pub fn area_resize_linear_rgb(image: &SceneLinearRgb, maximum_edge: u32) -> Resu
                     }
                     let weight = x_coverage * y_coverage;
                     let offset = (source_y * image.width + source_x) * 3;
-                    for component in 0..3 {
-                        accumulator[component] +=
-                            f64::from(image.samples[offset + component]) * weight;
+                    for (accumulated, sample) in accumulator
+                        .iter_mut()
+                        .zip(&image.samples[offset..offset + 3])
+                    {
+                        *accumulated += f64::from(*sample) * weight;
                     }
                     coverage += weight;
                 }
@@ -300,15 +302,18 @@ pub fn area_resize_linear_rgb(image: &SceneLinearRgb, maximum_edge: u32) -> Resu
                 ));
             }
             let destination = (y * target_width + x) * 3;
-            for component in 0..3 {
-                let value = accumulator[component] / coverage;
+            for (sample, accumulated) in samples[destination..destination + 3]
+                .iter_mut()
+                .zip(accumulator)
+            {
+                let value = accumulated / coverage;
                 if !value.is_finite() {
                     return Err(HdrError::invalid(
                         "scene linear resize",
                         "resized sample is non-finite",
                     ));
                 }
-                samples[destination + component] = value as f32;
+                *sample = value as f32;
             }
         }
     }
@@ -540,7 +545,7 @@ mod tests {
             &application(channel(1.0, 0.0, 0.0), 1.0),
         )
         .unwrap();
-        let red = |pixel| f64::from(hdr.samples[pixel * 3]);
+        let red = |pixel: usize| f64::from(hdr.samples[pixel * 3]);
         assert!((red(0) - 0.2).abs() < 1e-6);
         assert!((red(1) - 0.2 * 2.0_f64.powf(0.25)).abs() < 1e-6);
         assert!((red(2) - 0.2 * 2.0_f64.powf(0.75)).abs() < 1e-6);
@@ -573,7 +578,13 @@ mod tests {
             &application(offsets, 1.0),
         )
         .unwrap();
-        assert!(hdr.samples.iter().all(|sample| sample.abs() < 1e-6));
+        // Equal offsets cancel only where the gain is 1. Code 0 stays at black;
+        // code 1 lifts the 1/64 offset by one stop and then subtracts it again.
+        let near_black = |x: usize, y: usize| f64::from(hdr.samples[(y * 2 + x) * 3]);
+        assert!(near_black(0, 0).abs() < 1e-6);
+        assert!(near_black(1, 1).abs() < 1e-6);
+        assert!((near_black(1, 0) - (2.0 / 64.0 - 1.0 / 64.0)).abs() < 1e-6);
+        assert!((near_black(0, 1) - (2.0 / 64.0 - 1.0 / 64.0)).abs() < 1e-6);
 
         let negative = channel(1.0, -0.01, 0.0);
         let below = apply_iso_gain_sample(0.0, 0.0, &negative, 1.0).unwrap();

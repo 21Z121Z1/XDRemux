@@ -240,7 +240,7 @@ pub const APPLE_LOG_C: f64 = 0.693_369_448_184_967;
 /// it.
 pub fn apple_log_encode(linear: f64) -> f64 {
     let lifted = linear + APPLE_LOG_B;
-    if !(lifted > 0.0) {
+    if lifted.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
         return 0.0;
     }
     (APPLE_LOG_A * lifted.log2() + APPLE_LOG_C).clamp(0.0, 1.0)
