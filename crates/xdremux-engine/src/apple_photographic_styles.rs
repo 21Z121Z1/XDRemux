@@ -216,19 +216,65 @@ impl fmt::Display for AppleStyleDataError {
 
 impl Error for AppleStyleDataError {}
 
+/// Apple Log constants from the macOS 26A434 exponential decoder.
+///
+/// `_appleLogToLinear` and `sw_appleLogToLinear` always take this branch.
+/// The second compare in the CI kernel tests the constant positive toe
+/// threshold, so the quadratic toe is never selected. `G` in
+/// `L = (2^((code - C) / A) - B) / G` is 1 for the transfer itself. Styles
+/// still divides by `baseline_exposure` before encoding; that division is not
+/// a second `G`.
+#[allow(clippy::excessive_precision)]
+pub const APPLE_LOG_A: f64 = 0.085_504_792_630_672_45;
+#[allow(clippy::excessive_precision)]
+pub const APPLE_LOG_B: f64 = 0.009_640_520_438_551_903;
+#[allow(clippy::excessive_precision)]
+pub const APPLE_LOG_C: f64 = 0.693_369_448_184_967;
+
+/// Encode one linear sample as an Apple Log code in \[0, 1\].
+///
+/// This is the exact inverse of [`apple_log_decode`]. Values that would fall
+/// below code 0, including a non-positive `linear + B`, clamp to 0. Values
+/// above the code-1 linear value clamp to 1. The camera-side encoder toe is
+/// unverified and is not applied: the macOS consumer decoder does not invert
+/// it.
+pub fn apple_log_encode(linear: f64) -> f64 {
+    let lifted = linear + APPLE_LOG_B;
+    if !(lifted > 0.0) {
+        return 0.0;
+    }
+    (APPLE_LOG_A * lifted.log2() + APPLE_LOG_C).clamp(0.0, 1.0)
+}
+
+/// Decode one Apple Log code with the macOS exponential branch.
+///
+/// `L = (2^((code - C) / A) - B) / G` with `G = 1`. Codes outside the stored
+/// \[0, 1\] range are clamped before the exponential, which is the code-range
+/// limit of this transfer. The CI kernel also clamps the linear result to
+/// caller-supplied bounds; those bounds are not separate numeric immediates
+/// of this decoder, and clamping the code keeps the result inside the range
+/// the encoder can store.
+pub fn apple_log_decode(code: f64) -> f64 {
+    let code = code.clamp(0.0, 1.0);
+    2.0_f64.powf((code - APPLE_LOG_C) / APPLE_LOG_A) - APPLE_LOG_B
+}
+
 /// Encode the reconstructed HDR reference for the Styles Linear Thumbnail.
 ///
-/// Apply the Apple Log transfer curve per channel after normalizing by plist
-/// key 4. The input remains in linear Display P3; this does not convert it to
-/// the BT.2020 gamut of Apple Log video. In particular, encoding_gain belongs
-/// to the renderer metadata and must not be applied a second time here.
+/// Divide each linear Display P3 channel by plist key 4, then apply Apple Log.
+/// The result is a 16-bit code in \[0, 65535\]. The input remains in linear
+/// Display P3; this does not convert it to the BT.2020 gamut of Apple Log
+/// video, and it does not replace Apple Log with sRGB, PQ, HLG, or linear.
+/// `encoding_gain` belongs to the renderer metadata and must not be applied a
+/// second time here.
 ///
-/// The current VideoToolbox primitive accepts RGB8 and encodes Main10 4:2:0.
-/// Quantize only after the log curve so HDR values above SDR white survive.
+/// Quantize to 16-bit only after the log curve so the Main10 encoder receives
+/// the Apple Log codes directly. An 8-bit quantization would leave most of the
+/// 10-bit HEVC range unused. HDR values above SDR white still survive.
 pub fn apple_style_linear_thumbnail_codes(
     hdr_rgb: &[f32],
     baseline_exposure: f32,
-) -> Result<Vec<u8>, AppleStyleDataError> {
+) -> Result<Vec<u16>, AppleStyleDataError> {
     if hdr_rgb.is_empty() || !hdr_rgb.len().is_multiple_of(3) {
         return Err(AppleStyleDataError::InvalidRgbRaster {
             actual: hdr_rgb.len(),
@@ -247,14 +293,8 @@ pub fn apple_style_linear_thumbnail_codes(
             // Float64 division also prevents finite f32 HDR/exposure pairs
             // from overflowing before the log compresses them.
             let linear = f64::from(value) / f64::from(baseline_exposure);
-            let code = if linear >= 0.01 {
-                0.085_504_79 * (linear + 0.009_640_52).log2() + 0.693_369_45
-            } else if linear >= -0.056_410_88 {
-                47.287_112_36 * (linear + 0.056_410_88).powi(2)
-            } else {
-                0.0
-            };
-            Ok((code.clamp(0.0, 1.0) * 255.0).round() as u8)
+            let code = apple_log_encode(linear);
+            Ok((code * 65_535.0).round() as u16)
         })
         .collect()
 }
@@ -1774,18 +1814,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn linear_thumbnail_uses_log_toe_and_preserves_hdr_above_sdr_white() {
-        let rgb = [-0.1, -0.056_410_88, 0.0, 0.01, 0.18, 1.0, 4.0, 16.0, 100.0];
-        assert_eq!(
-            apple_style_linear_thumbnail_codes(&rgb, 1.0).unwrap(),
-            [0, 0, 38, 53, 125, 177, 220, 255, 255]
+    fn linear_thumbnail_log_round_trips_the_exponential_decoder() {
+        let mut worst = 0.0_f64;
+        for step in 0..=4_000 {
+            let linear = -0.005 + (11.5 - (-0.005)) * f64::from(step) / 4_000.0;
+            let code = apple_log_encode(linear);
+            if code <= 0.0 || code >= 1.0 {
+                continue;
+            }
+            let decoded = apple_log_decode(code);
+            worst = worst.max((decoded - linear).abs());
+        }
+        assert!(
+            worst <= 1.0e-5,
+            "Apple Log float round trip max abs {worst}"
+        );
+
+        // The former quadratic toe maps linear 0 to about 0.150. The
+        // exponential inverse maps it back to 0 and uses a different code.
+        let zero = apple_log_encode(0.0);
+        let quadratic_toe = 47.287_112_36 * (0.0_f64 + 0.056_410_88).powi(2);
+        assert!(
+            (zero - quadratic_toe).abs() > 1.0e-2,
+            "dark code {zero} still matches the unverified camera toe {quadratic_toe}"
+        );
+        assert!((apple_log_decode(zero) - 0.0).abs() <= 1.0e-5);
+        assert!((apple_log_decode(apple_log_encode(0.001)) - 0.001).abs() <= 1.0e-5);
+        assert!((apple_log_decode(apple_log_encode(0.009)) - 0.009).abs() <= 1.0e-5);
+
+        // Below linear + B the log is undefined. Clamp the code; do not use the toe.
+        assert_eq!(apple_log_encode(-0.05), 0.0);
+        assert_eq!(apple_log_encode(-0.1), 0.0);
+        let toe_at_dark = 47.287_112_36 * (-0.05_f64 + 0.056_410_88).powi(2);
+        assert!(toe_at_dark > 0.0);
+
+        let rgb = [-0.1_f32, 0.0, 0.001, 0.01, 0.18, 1.0, 4.0, 16.0, 100.0];
+        let codes = apple_style_linear_thumbnail_codes(&rgb, 1.0).unwrap();
+        assert_eq!(codes[0], 0);
+        assert_eq!(codes[7], u16::MAX);
+        assert_eq!(codes[8], u16::MAX);
+        let eight_bit = (apple_log_encode(0.18) * 255.0).round() as u16;
+        assert_ne!(
+            codes[4],
+            eight_bit << 8,
+            "16-bit Apple Log code collapsed to an 8-bit high byte"
         );
         // Normalizing by the same exposure used in the metadata must leave
         // the reference unchanged, including HDR channels above 1.0.
         let exposed = rgb.map(|value| value * 4.0);
         assert_eq!(
             apple_style_linear_thumbnail_codes(&exposed, 4.0).unwrap(),
-            apple_style_linear_thumbnail_codes(&rgb, 1.0).unwrap()
+            codes
         );
     }
 

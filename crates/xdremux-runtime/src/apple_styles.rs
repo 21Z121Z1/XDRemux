@@ -13,6 +13,10 @@ use xdremux_engine::{
     AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
     AppleStylePropertyListRequest, AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
 };
+use xdremux_hdr::{
+    area_resize_linear_rgb, iso_gain_application_for_alternate, reconstruct_scene_linear_hdr,
+    GainMapCodes, SceneLinearRgb,
+};
 
 use crate::apple_adapter::{AppleAdapterClient, AppleVideoToolboxMain10Encode};
 use crate::{
@@ -220,8 +224,12 @@ pub(crate) fn convert_file(
             },
         )
         .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
-    let scene_raster = downsample_raster(&raster, LINEAR_THUMBNAIL_MAX_SIZE)?;
-    let scene_rasters = derive_style_scene(&scene_raster, &gain_raster, &prepared.scale)?;
+    let scene_rasters = derive_style_scene(
+        &raster,
+        &gain_raster,
+        &prepared.scale,
+        LINEAR_THUMBNAIL_MAX_SIZE,
+    )?;
     let linear_thumbnail_raster = linear_thumbnail_raster(&scene_rasters)?;
     let linear_thumbnail = encode_linear_thumbnail(
         &adapter,
@@ -235,12 +243,8 @@ pub(crate) fn convert_file(
     let statistics = style_scene_statistics(&scene_rasters, &semantic_masks)?;
     let tone_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
         luma: &scene_rasters.base_luminance,
-        width: usize::try_from(scene_raster.width).map_err(|_| {
-            RuntimeError::new("Photographic Styles light map", "width exceeds usize")
-        })?,
-        height: usize::try_from(scene_raster.height).map_err(|_| {
-            RuntimeError::new("Photographic Styles light map", "height exceeds usize")
-        })?,
+        width: scene_rasters.width,
+        height: scene_rasters.height,
         value_scale: STYLE_TONE_LIGHT_MAP_SCALE,
         value_offset: STYLE_TONE_LIGHT_MAP_OFFSET,
         output_minimum: STYLE_TONE_LIGHT_MAP_MINIMUM,
@@ -255,18 +259,8 @@ pub(crate) fn convert_file(
     .map_err(|error| RuntimeError::external("Photographic Styles tone light map", error))?;
     let linear_light_map = apple_style_light_map(&AppleStyleLightMapRequest {
         luma: &scene_rasters.gtc_mapped_luminance,
-        width: usize::try_from(scene_raster.width).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles linear light map",
-                "width exceeds usize",
-            )
-        })?,
-        height: usize::try_from(scene_raster.height).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles linear light map",
-                "height exceeds usize",
-            )
-        })?,
+        width: scene_rasters.width,
+        height: scene_rasters.height,
         value_scale: STYLE_LINEAR_LIGHT_MAP_SCALE,
         value_offset: STYLE_LINEAR_LIGHT_MAP_OFFSET,
         output_minimum: STYLE_LINEAR_LIGHT_MAP_MINIMUM,
@@ -383,19 +377,28 @@ fn validate_maker_apple_properties(
 fn encode_linear_thumbnail(
     adapter: &AppleAdapterClient,
     staging: &Path,
-    raster: &Raster8,
+    raster: &LinearThumbnailCodes,
     quality: f64,
 ) -> Result<EncodedHevcResource> {
-    raster
-        .validate()
-        .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
-    if raster.format != RasterPixelFormat::Rgb8 {
+    if raster.width == 0 || raster.height == 0 || raster.width % 2 != 0 || raster.height % 2 != 0 {
         return Err(RuntimeError::new(
             "Photographic Styles Linear Thumbnail",
-            "VideoToolbox input raster is not RGB8",
+            "VideoToolbox input geometry must be non-zero and even",
         ));
     }
-    let raw_path = staging.join("linear-thumbnail-rgb8.bin");
+    let minimum_row = u32::from(raster.width).checked_mul(6).ok_or_else(|| {
+        RuntimeError::new(
+            "Photographic Styles Linear Thumbnail",
+            "RGB16 row stride overflows",
+        )
+    })?;
+    if raster.bytes_per_row < minimum_row {
+        return Err(RuntimeError::new(
+            "Photographic Styles Linear Thumbnail",
+            "VideoToolbox input raster is shorter than 16-bit RGB",
+        ));
+    }
+    let raw_path = staging.join("linear-thumbnail-rgb16.bin");
     let annex_b_path = staging.join("linear-thumbnail.hevc");
     let hvcc_path = staging.join("linear-thumbnail.hvcc");
     fs::write(&raw_path, &raster.data).map_err(|error| {
@@ -407,12 +410,8 @@ fn encode_linear_thumbnail(
         output_hvcc: &hvcc_path,
         width: raster.width,
         height: raster.height,
-        bytes_per_row: u32::try_from(raster.bytes_per_row).map_err(|_| {
-            RuntimeError::new(
-                "Photographic Styles Linear Thumbnail",
-                "RGB8 row stride exceeds the Apple adapter wire range",
-            )
-        })?,
+        bytes_per_row: raster.bytes_per_row,
+        component_bits: 16,
         quality,
     })?;
     let annex_b = fs::read(&annex_b_path).map_err(|error| {
@@ -518,6 +517,7 @@ fn derive_style_scene(
     raster: &Raster8,
     gain_map: &Raster8,
     scale: &ResolvedScale,
+    maximum_edge: u32,
 ) -> Result<StyleSceneRasters> {
     raster
         .validate()
@@ -565,29 +565,7 @@ fn derive_style_scene(
     let pixel_count = width.checked_mul(height).ok_or_else(|| {
         RuntimeError::new("Photographic Styles source raster", "pixel count overflows")
     })?;
-    let mut base_rgb = Vec::with_capacity(pixel_count * 3);
-    let mut hdr_rgb = Vec::with_capacity(pixel_count * 3);
-    let mut base_luminance = Vec::with_capacity(pixel_count);
-    let mut hdr_luminance = Vec::with_capacity(pixel_count);
-    let mut renderer_linear_minimum = f32::INFINITY;
-    let mut renderer_linear_maximum = f32::NEG_INFINITY;
-    let gain_width = usize::try_from(gain_map.width).map_err(|_| {
-        RuntimeError::new("Photographic Styles source Gain Map", "width exceeds usize")
-    })?;
-    let gain_height = usize::try_from(gain_map.height).map_err(|_| {
-        RuntimeError::new(
-            "Photographic Styles source Gain Map",
-            "height exceeds usize",
-        )
-    })?;
-    let gain_sampler = GainMapSampler {
-        raster: gain_map,
-        target_width: width,
-        target_height: height,
-        source_width: gain_width,
-        source_height: gain_height,
-    };
-
+    let mut full_sdr = Vec::with_capacity(pixel_count.saturating_mul(3));
     for y in 0..height {
         let source_row = y.checked_mul(raster.bytes_per_row).ok_or_else(|| {
             RuntimeError::new("Photographic Styles source raster", "row offset overflows")
@@ -606,78 +584,93 @@ fn derive_style_scene(
                         "pixel offset overflows",
                     )
                 })?;
-            let mut base = [0.0_f32; 3];
-            let mut hdr = [0.0_f32; 3];
             for component in 0..3 {
-                base[component] =
-                    srgb_decode(f32::from(raster.data[source_offset + component]) / 255.0);
-                let code = gain_sampler.sample_code(x, y, component);
-                let parameter_index = if scale.channel_count == 1 {
-                    0
-                } else {
-                    component.min(scale.channel_count - 1)
-                };
-                let gamma = scale
-                    .per_channel_gamma
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gamma);
-                let minimum = scale
-                    .per_channel_gain_map_min
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gain_map_min);
-                let maximum = scale
-                    .per_channel_gain_map_max
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.gain_map_max);
-                let base_offset = scale
-                    .per_channel_base_offset
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.epsilon_sdr);
-                let alternate_offset = scale
-                    .per_channel_alternate_offset
-                    .get(parameter_index)
-                    .copied()
-                    .unwrap_or(scale.epsilon_hdr);
-                if gamma < 0.0 {
-                    return Err(RuntimeError::new(
-                        "Photographic Styles source Gain Map",
-                        "resolved Gain Map gamma is negative",
-                    ));
-                }
-                let log_gain = minimum + code.powf(gamma) * (maximum - minimum);
-                let reconstructed = (f64::from(base[component]) + base_offset).max(0.0)
-                    * 2.0_f64.powf(log_gain)
-                    - alternate_offset;
-                hdr[component] = reconstructed as f32;
-                if !hdr[component].is_finite() {
-                    return Err(RuntimeError::new(
-                        "Photographic Styles source Gain Map",
-                        "reconstructed HDR scene contains a non-finite sample",
-                    ));
-                }
-            }
-            let base_y = luminance(base);
-            let hdr_y = luminance(hdr);
-            if !base_y.is_finite() || !hdr_y.is_finite() {
-                return Err(RuntimeError::new(
-                    "Photographic Styles source raster",
-                    "source-derived luminance contains a non-finite sample",
+                full_sdr.push(srgb_decode(
+                    f32::from(raster.data[source_offset + component]) / 255.0,
                 ));
-            }
-            base_rgb.extend_from_slice(&base);
-            hdr_rgb.extend_from_slice(&hdr);
-            base_luminance.push(base_y);
-            hdr_luminance.push(hdr_y);
-            for value in hdr {
-                renderer_linear_minimum = renderer_linear_minimum.min(value);
-                renderer_linear_maximum = renderer_linear_maximum.max(value);
             }
         }
     }
+    let full_sdr = SceneLinearRgb {
+        width,
+        height,
+        samples: full_sdr,
+    };
+    let application = iso_gain_application_for_alternate(scale)
+        .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
+    let gain_channels = match gain_map.format {
+        RasterPixelFormat::Mono8 => 1,
+        RasterPixelFormat::Rgb8 => 3,
+    };
+    let full_hdr = reconstruct_scene_linear_hdr(
+        &full_sdr,
+        GainMapCodes {
+            width: usize::try_from(gain_map.width).map_err(|_| {
+                RuntimeError::new("Photographic Styles source Gain Map", "width exceeds usize")
+            })?,
+            height: usize::try_from(gain_map.height).map_err(|_| {
+                RuntimeError::new(
+                    "Photographic Styles source Gain Map",
+                    "height exceeds usize",
+                )
+            })?,
+            bytes_per_row: gain_map.bytes_per_row,
+            channels: gain_channels,
+            data: &gain_map.data,
+        },
+        &application,
+    )
+    .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
+    // Thumbnail reduction happens only after the gain is applied at the base
+    // resolution. Both images use the same linear-light area footprint.
+    let base_image = area_resize_linear_rgb(&full_sdr, maximum_edge)
+        .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
+    let hdr_image = area_resize_linear_rgb(&full_hdr, maximum_edge)
+        .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
+    if base_image.width != hdr_image.width
+        || base_image.height != hdr_image.height
+        || base_image.samples.len() != hdr_image.samples.len()
+    {
+        return Err(RuntimeError::new(
+            "Photographic Styles Linear Thumbnail",
+            "linear SDR and HDR reductions have different geometry",
+        ));
+    }
+    let width = base_image.width;
+    let height = base_image.height;
+    let mut base_luminance = Vec::with_capacity(width * height);
+    let mut hdr_luminance = Vec::with_capacity(width * height);
+    let mut renderer_linear_minimum = f32::INFINITY;
+    let mut renderer_linear_maximum = f32::NEG_INFINITY;
+    for pixel in 0..width * height {
+        let offset = pixel * 3;
+        let base = [
+            base_image.samples[offset],
+            base_image.samples[offset + 1],
+            base_image.samples[offset + 2],
+        ];
+        let hdr = [
+            hdr_image.samples[offset],
+            hdr_image.samples[offset + 1],
+            hdr_image.samples[offset + 2],
+        ];
+        let base_y = luminance(base);
+        let hdr_y = luminance(hdr);
+        if !base_y.is_finite() || !hdr_y.is_finite() {
+            return Err(RuntimeError::new(
+                "Photographic Styles source raster",
+                "source-derived luminance contains a non-finite sample",
+            ));
+        }
+        base_luminance.push(base_y);
+        hdr_luminance.push(hdr_y);
+        for value in hdr {
+            renderer_linear_minimum = renderer_linear_minimum.min(value);
+            renderer_linear_maximum = renderer_linear_maximum.max(value);
+        }
+    }
+    let base_rgb = base_image.samples;
+    let hdr_rgb = hdr_image.samples;
 
     let gain_map_maximum_stops = scale
         .per_channel_gain_map_max
@@ -741,28 +734,42 @@ fn derive_style_scene(
     })
 }
 
-fn linear_thumbnail_raster(scene: &StyleSceneRasters) -> Result<Raster8> {
-    let data =
+struct LinearThumbnailCodes {
+    width: u32,
+    height: u32,
+    bytes_per_row: u32,
+    data: Vec<u8>,
+}
+
+fn linear_thumbnail_raster(scene: &StyleSceneRasters) -> Result<LinearThumbnailCodes> {
+    let codes =
         apple_style_linear_thumbnail_codes(&scene.hdr_rgb, scene.linear_metadata.baseline_exposure)
             .map_err(|error| {
                 RuntimeError::external("Photographic Styles Linear Thumbnail", error)
             })?;
     // Keep the decoded scene geometry used by the auxiliary graph. Applying
-    // another display rotation here would misregister the reference.
-    Raster8::new(
-        u32::try_from(scene.width).map_err(|_| {
-            RuntimeError::new("Photographic Styles Linear Thumbnail", "width exceeds u32")
-        })?,
-        u32::try_from(scene.height).map_err(|_| {
-            RuntimeError::new("Photographic Styles Linear Thumbnail", "height exceeds u32")
-        })?,
-        scene.width.checked_mul(3).ok_or_else(|| {
-            RuntimeError::new("Photographic Styles Linear Thumbnail", "row size overflows")
-        })?,
-        RasterPixelFormat::Rgb8,
+    // another display rotation here would misregister the reference. The
+    // samples are Apple Log codes at 16-bit, not RGB8 and not a different
+    // transfer function.
+    let width = u32::try_from(scene.width).map_err(|_| {
+        RuntimeError::new("Photographic Styles Linear Thumbnail", "width exceeds u32")
+    })?;
+    let height = u32::try_from(scene.height).map_err(|_| {
+        RuntimeError::new("Photographic Styles Linear Thumbnail", "height exceeds u32")
+    })?;
+    let bytes_per_row = width.checked_mul(6).ok_or_else(|| {
+        RuntimeError::new("Photographic Styles Linear Thumbnail", "row size overflows")
+    })?;
+    let mut data = Vec::with_capacity(codes.len().saturating_mul(2));
+    for code in codes {
+        data.extend_from_slice(&code.to_le_bytes());
+    }
+    Ok(LinearThumbnailCodes {
+        width,
+        height,
+        bytes_per_row,
         data,
-    )
-    .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))
+    })
 }
 
 fn source_derived_style_data(scene: &StyleSceneRasters) -> Result<Vec<u8>> {
@@ -803,43 +810,6 @@ fn source_derived_style_data(scene: &StyleSceneRasters) -> Result<Vec<u8>> {
         .map_err(|error| RuntimeError::external("Photographic Styles style solver", error))?;
     apple_style_data_from_coefficient_deltas(&deltas)
         .map_err(|error| RuntimeError::external("Photographic Styles style data", error))
-}
-
-struct GainMapSampler<'a> {
-    raster: &'a Raster8,
-    target_width: usize,
-    target_height: usize,
-    source_width: usize,
-    source_height: usize,
-}
-
-impl GainMapSampler<'_> {
-    fn sample_code(&self, target_x: usize, target_y: usize, component: usize) -> f64 {
-        let x = (((target_x as f64 + 0.5) * self.source_width as f64 / self.target_width as f64)
-            - 0.5)
-            .clamp(0.0, self.source_width.saturating_sub(1) as f64);
-        let y = (((target_y as f64 + 0.5) * self.source_height as f64 / self.target_height as f64)
-            - 0.5)
-            .clamp(0.0, self.source_height.saturating_sub(1) as f64);
-        let x0 = x.floor() as usize;
-        let y0 = y.floor() as usize;
-        let x1 = (x0 + 1).min(self.source_width - 1);
-        let y1 = (y0 + 1).min(self.source_height - 1);
-        let x_fraction = x - x0 as f64;
-        let y_fraction = y - y0 as f64;
-        let channel = match self.raster.format {
-            RasterPixelFormat::Mono8 => 0,
-            RasterPixelFormat::Rgb8 => component.min(2),
-        };
-        let at = |sample_x: usize, sample_y: usize| {
-            let offset = sample_y * self.raster.bytes_per_row
-                + sample_x * self.raster.format.bytes_per_pixel();
-            f64::from(self.raster.data[offset + channel]) / 255.0
-        };
-        let top = at(x0, y0) * (1.0 - x_fraction) + at(x1, y0) * x_fraction;
-        let bottom = at(x0, y1) * (1.0 - x_fraction) + at(x1, y1) * x_fraction;
-        top * (1.0 - y_fraction) + bottom * y_fraction
-    }
 }
 
 fn srgb_decode(value: f32) -> f32 {
@@ -1279,7 +1249,7 @@ mod tests {
                     format: RasterPixelFormat::Rgb8,
                 })
                 .unwrap();
-            let base = downsample_raster(&base, LINEAR_THUMBNAIL_MAX_SIZE).unwrap();
+            let sdr_preview = downsample_raster(&base, LINEAR_THUMBNAIL_MAX_SIZE).unwrap();
             let prepared = runtime.analyze_proxdr(&source).unwrap();
             let gain = runtime
                 .heif
@@ -1292,20 +1262,38 @@ mod tests {
                     },
                 )
                 .unwrap();
-            let scene = derive_style_scene(&base, &gain, &prepared.scale).unwrap();
+            let scene =
+                derive_style_scene(&base, &gain, &prepared.scale, LINEAR_THUMBNAIL_MAX_SIZE)
+                    .unwrap();
             let expected = linear_thumbnail_raster(&scene).unwrap();
             assert_eq!(
                 (decoded.width, decoded.height),
                 (expected.width, expected.height)
             );
+            assert_eq!(
+                (sdr_preview.width, sdr_preview.height),
+                (decoded.width, decoded.height)
+            );
             let mut log_error = 0.0;
             let mut sdr_error = 0.0;
             for y in 0..scene.height {
-                for x in 0..scene.width * 3 {
-                    let actual = f64::from(decoded.data[y * decoded.bytes_per_row + x]);
-                    log_error +=
-                        (actual - f64::from(expected.data[y * expected.bytes_per_row + x])).abs();
-                    sdr_error += (actual - f64::from(base.data[y * base.bytes_per_row + x])).abs();
+                for x in 0..scene.width {
+                    for component in 0..3 {
+                        let actual =
+                            f64::from(decoded.data[y * decoded.bytes_per_row + x * 3 + component]);
+                        let code_offset = (y * scene.width + x) * 6 + component * 2;
+                        let code = u16::from_le_bytes([
+                            expected.data[code_offset],
+                            expected.data[code_offset + 1],
+                        ]);
+                        let expected_code = f64::from(code) / 65_535.0 * 255.0;
+                        log_error += (actual - expected_code).abs();
+                        sdr_error += (actual
+                            - f64::from(
+                                sdr_preview.data[y * sdr_preview.bytes_per_row + x * 3 + component],
+                            ))
+                        .abs();
+                    }
                 }
             }
             let count = (scene.width * scene.height * 3) as f64;
@@ -1367,18 +1355,16 @@ mod tests {
         parameters[17] = 8.0;
         parameters[18] = 8.0;
         let scale = xdremux_hdr::resolve(&parameters, xdremux_hdr::ExtractionMode::Uhdr).unwrap();
-        let scene = derive_style_scene(&base, &gain, &scale).unwrap();
+        let scene = derive_style_scene(&base, &gain, &scale, LINEAR_THUMBNAIL_MAX_SIZE).unwrap();
         let thumbnail = linear_thumbnail_raster(&scene).unwrap();
         assert_eq!(
             (thumbnail.width, thumbnail.height, thumbnail.bytes_per_row),
-            (2, 2, 6)
+            (2, 2, 12)
         );
-        assert_ne!(
-            thumbnail.data, base.data,
-            "SDR codes are not a Linear Thumbnail"
-        );
+        assert_eq!(thumbnail.data.len(), 24);
         // Independent scalar reconstruction verifies channel order, exposure,
         // and position. There is no display rotation in this storage raster.
+        // Gamma is 1, so the ISO reciprocal exponent matches code ^ gamma.
         for index in 0..12 {
             let channel = index % 3;
             let sdr = f64::from(base.data[index]) / 255.0;
@@ -1390,14 +1376,38 @@ mod tests {
             let hdr =
                 linear * [2.0_f64, 4.0, 8.0][channel].powf(f64::from(gain.data[index]) / 255.0);
             let normalized = hdr / f64::from(scene.linear_metadata.baseline_exposure);
-            let code = if normalized >= 0.01 {
-                0.08550479 * (normalized + 0.00964052).log2() + 0.69336945
-            } else {
-                47.28711236 * (normalized + 0.05641088).powi(2)
-            };
-            let expected = (code.clamp(0.0, 1.0) * 255.0).round() as u8;
-            assert_eq!(thumbnail.data[index], expected, "RGB index {index}");
+            let code = xdremux_engine::apple_log_encode(normalized);
+            let expected = (code.clamp(0.0, 1.0) * 65_535.0).round() as u16;
+            let actual =
+                u16::from_le_bytes([thumbnail.data[index * 2], thumbnail.data[index * 2 + 1]]);
+            assert_eq!(actual, expected, "RGB index {index}");
         }
+    }
+
+    #[test]
+    fn style_scene_applies_gain_at_full_resolution_before_area_resize() {
+        let mut pixels = vec![255_u8; 4 * 2 * 3];
+        pixels[3] = 0;
+        pixels[4] = 0;
+        pixels[5] = 0;
+        let base = Raster8::new(4, 2, 12, RasterPixelFormat::Rgb8, pixels).unwrap();
+        let gain = Raster8::new(2, 2, 2, RasterPixelFormat::Mono8, vec![255; 4]).unwrap();
+        let mut parameters = vec![0.0; 20];
+        parameters[0..3].fill(1.0);
+        parameters[4..7].fill(2.0);
+        parameters[7..10].fill(1.0);
+        parameters[16] = 1.0;
+        parameters[17] = 2.0;
+        parameters[18] = 2.0;
+        let scale = xdremux_hdr::resolve(&parameters, xdremux_hdr::ExtractionMode::Uhdr).unwrap();
+        let scene = derive_style_scene(&base, &gain, &scale, 2).unwrap();
+        assert_eq!((scene.width, scene.height), (2, 2));
+        // The black source pixel shares a 2x1 footprint with a white pixel.
+        // Full-resolution gain application then area averaging yields 1.
+        // Downsampling the SDR first with nearest sampling keeps only white
+        // and stays at 2.
+        assert!((scene.hdr_rgb[0] - 1.0).abs() < 1.0e-5);
+        assert!((scene.hdr_rgb[3] - 2.0).abs() < 1.0e-5);
     }
 
     #[test]

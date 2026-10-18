@@ -71,6 +71,8 @@ pub(super) struct AppleVideoToolboxMain10Encode<'a> {
     pub width: u32,
     pub height: u32,
     pub bytes_per_row: u32,
+    /// Bits per RGB component in the input file. Styles sends 16-bit Apple Log codes.
+    pub component_bits: u32,
     pub quality: f64,
 }
 
@@ -499,22 +501,33 @@ impl AppleAdapterClient {
         &self,
         encode: &AppleVideoToolboxMain10Encode<'_>,
     ) -> Result<AppleVideoToolboxMain10Facts> {
-        if encode.width == 0 || encode.height == 0 {
+        if encode.width == 0
+            || encode.height == 0
+            || encode.width % 2 != 0
+            || encode.height % 2 != 0
+        {
             return Err(RuntimeError::new(
                 "Apple VideoToolbox Main10 encode",
-                "raster geometry must be non-zero",
+                "raster geometry must be non-zero and even",
             ));
         }
-        let minimum_row = encode.width.checked_mul(3).ok_or_else(|| {
+        if encode.component_bits != 16 {
+            return Err(RuntimeError::new(
+                "Apple VideoToolbox Main10 encode",
+                "raster must be 16-bit RGB Apple Log codes",
+            ));
+        }
+        let bytes_per_pixel = 6_u32;
+        let minimum_row = encode.width.checked_mul(bytes_per_pixel).ok_or_else(|| {
             RuntimeError::new(
                 "Apple VideoToolbox Main10 encode",
-                "RGB8 row geometry overflows",
+                "RGB16 row geometry overflows",
             )
         })?;
         if encode.bytes_per_row < minimum_row {
             return Err(RuntimeError::new(
                 "Apple VideoToolbox Main10 encode",
-                "RGB8 row is shorter than width * 3",
+                "RGB16 row is shorter than width * 6",
             ));
         }
         if !encode.quality.is_finite() || !(0.0..=1.0).contains(&encode.quality) {
@@ -532,6 +545,7 @@ impl AppleAdapterClient {
                 raw_width: encode.width,
                 raw_height: encode.height,
                 raw_bytes_per_row: encode.bytes_per_row,
+                raw_component_bits: encode.component_bits,
                 quality: encode.quality,
                 hvcc_path: input_path(encode.output_hvcc)?,
             },
@@ -1188,6 +1202,7 @@ struct VideoToolboxMain10Wire {
     raw_width: u32,
     raw_height: u32,
     raw_bytes_per_row: u32,
+    raw_component_bits: u32,
     quality: f64,
     hvcc_path: String,
 }

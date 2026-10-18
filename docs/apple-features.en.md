@@ -75,21 +75,35 @@ Tone/Color response, or save/reopen behavior; those still require device evidenc
 
 ### HDR reference for the Linear Thumbnail
 
-The Styles Linear Thumbnail uses the HDR look reconstructed from the base image
-and its Gain Map. Rust divides each linear Display P3 channel by the same
-`baseline_exposure` stored in Styles plist key `4`, then applies the Apple Log
-transfer curve. It does not copy SDR image codes into this resource.
+The Styles Linear Thumbnail is an Apple Log encoding of scene-linear Display P3
+HDR reconstructed from the SDR base and its Gain Map. Rust applies that gain
+map at the base image's original resolution. Gain-map samples are bilinearly
+resampled in code space, then the source's ISO 21496-1 / Apple tmap parameters
+reconstruct each sample: log2 minimum and maximum, gamma as the reciprocal
+exponent used by the 26A434 `_flexMap` decoder, per-channel offsets, and the
+alternate-image headroom weight. Reduction to the 1024-pixel-class thumbnail
+happens after that reconstruction, as an area box filter in linear light. Rust
+then divides each channel by the same `baseline_exposure` stored in Styles
+plist key `4` and applies Apple Log. It does not copy SDR image codes into
+this resource.
 
-The transform uses the Apple Log curve with Display P3 primaries. It does not
-change the image to the BT.2020 color space used by Apple Log video. The existing
+The Apple Log transfer, [0, 1] code range, and existing auxiliary color
+signaling stay in place. The encoder is the inverse of the macOS 26A434
+exponential decoder (`_appleLogToLinear` / `sw_appleLogToLinear`). That decoder
+does not use the quadratic toe, so the encoder does not either. The camera-side
+encoder toe is unverified. The transform keeps Display P3 primaries. It does
+not change the image to the BT.2020 color space used by Apple Log video, and it
+does not retag the thumbnail as sRGB, PQ, HLG, or linear. The existing
 auxiliary color signaling and decoded scene orientation remain in use.
 `encoding_gain` is renderer metadata; it is not a second exposure division for
 the thumbnail.
 
-The current codec primitive accepts RGB8 codes and produces Main10 4:2:0 HEVC.
-Quantization occurs after the log transform, so reconstructed values above SDR
-white can survive. This remains a reference derived from the rendered HDR look.
-It cannot recover RAW or capture-time processing that the source has lost.
+The codec primitive receives 16-bit Apple Log codes. VideoToolbox converts
+those codes into 10-bit video-range 4:2:0 and encodes Main10 HEVC. The codes
+are not quantized to RGB8 before that encode, so the 10-bit range is available
+to the encoder. HDR values above SDR white still survive. This remains a
+reference derived from the rendered HDR look. It cannot recover RAW or
+capture-time processing that the source has lost.
 
 This change does not replace the existing source-derived key1 policy with the
 complete native constrained solver. Thumbnail quality and key1 neutral-fit

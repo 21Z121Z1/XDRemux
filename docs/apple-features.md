@@ -64,11 +64,11 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 ### Linear Thumbnail 的 HDR 参照
 
-Styles Linear Thumbnail 使用 base image 和 Gain Map 重建的 HDR look。Rust 将线性 Display P3 各通道除以 Styles plist key `4` 中相同的 `baseline_exposure`，再应用 Apple Log 传递曲线。此资源不再直接复制 SDR 图像码值。
+Styles Linear Thumbnail 是由 SDR base image 与 Gain Map 重建出的 scene-linear Display P3 HDR 的 Apple Log 编码。Rust 在 base image 的原始分辨率上应用 Gain Map：先在码值域对 Gain Map 做双线性重采样，再按源文件实际携带的 ISO 21496-1 / Apple tmap 参数重建每个样本，包括 log2 最小/最大值、26A434 `_flexMap` 解码所用的 gamma 倒数指数、逐通道偏移，以及 alternate image 的 headroom 权重。缩到 1024 像素级缩略图发生在这次重建之后，并在线性光下做面积盒式滤波。随后 Rust 将每个通道除以 Styles plist key `4` 中相同的 `baseline_exposure`，再应用 Apple Log。此资源不再直接复制 SDR 图像码值。
 
-此变换使用 Apple Log 曲线和 Display P3 原色，不会将图像转换为 Apple Log 视频所用的 BT.2020 色彩空间。现有辅助图像色彩标记及解码后的场景方向继续沿用。`encoding_gain` 属于渲染器元数据，不会作为第二次曝光除法应用到缩略图。
+Apple Log 传递函数、[0, 1] 码值范围和现有辅助色彩标记保持不变。编码器是 macOS 26A434 指数解码器（`_appleLogToLinear` / `sw_appleLogToLinear`）的逆变换。该解码器不使用二次 toe，因此编码器也不使用。相机端编码器 toe 尚未核实。此变换使用 Apple Log 曲线和 Display P3 原色，不会将图像转换为 Apple Log 视频所用的 BT.2020 色彩空间，也不会把缩略图改标成 sRGB、PQ、HLG 或线性。现有辅助图像色彩标记及解码后的场景方向继续沿用。`encoding_gain` 属于渲染器元数据，不会作为第二次曝光除法应用到缩略图。
 
-当前编码原语接受 RGB8 码值，生成 Main10 4:2:0 HEVC。量化发生在 Log 变换之后，重建结果中超过 SDR 白的数值因而可以保留。该参照仍来自已经渲染过的 HDR look，不能恢复源文件已丢失的 RAW 或拍摄时处理信息。
+编码原语接收 16 位 Apple Log 码值。VideoToolbox 将这些码值转成 10 位 video-range 4:2:0，并编码为 Main10 HEVC。码值在进入编码前不再量化成 RGB8，因此编码器可以使用 10 位范围。超过 SDR 白的 HDR 数值仍然保留。该参照仍来自已经渲染过的 HDR look，不能恢复源文件已丢失的 RAW 或拍摄时处理信息。
 
 此改动不将现有 source-derived key1 策略替换为完整原生 constrained solver。缩略图质量和 key1 中性拟合质量是不同的测量。原生 consumer 回归使用 RGB UHDR 和单色 LHDR 夹具，回读编码后的缩略图，检查 HDR Log 目标以及主图 HEVC 是否保持不变。运行命令为 `bash scripts/apple/check_rust_style_consumer.sh`。Photos 导入、编辑、保存和重开仍需单独的设备证据。
 
