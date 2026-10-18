@@ -77,3 +77,8 @@ tone measurement. It is read-only, checks out the exact pull-request SHA, and
 renders on the `xcode-27` image with the published consumer harness pinned at
 `37dd551`. Its artifacts expire after one day. It does not write repository
 refs and it does not supply the product `exact-head` check.
+
+`.github/workflows/system-heif-hdr-api.yml` reads the `xcode-27` SDK headers
+for the system HEIF HDR and gain-map encode surface. It is read-only, checks
+out the exact pull-request SHA, and keeps its header transcript for one day.
+It does not encode a product file and it does not supply `exact-head`.

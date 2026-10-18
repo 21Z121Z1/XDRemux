@@ -1,0 +1,41 @@
+name: System HEIF HDR API
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/system-heif-hdr-api.yml"
+      - "scripts/apple/probe_system_heif_hdr_api.sh"
+      - "Sources/XDRemuxAppleAdapter/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-hdr/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xdremux-system-heif-hdr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sdk-api:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Read the SDK HEIF HDR surface
+        shell: bash
+        run: bash scripts/apple/probe_system_heif_hdr_api.sh "$GITHUB_WORKSPACE/artifacts/system-heif-hdr-api"
+
+      - name: Upload SDK HEIF HDR surface
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: system-heif-hdr-api
+          if-no-files-found: warn
+          retention-days: 1
+          path: artifacts/system-heif-hdr-api/

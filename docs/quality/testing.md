@@ -75,3 +75,7 @@ parser test 不是真机测试。
 tone 测量。它只读，检出 PR 的精确 SHA，并在 `xcode-27` 镜像上使用固定在
 `37dd551` 的已发布 consumer harness 渲染。产物保留一天。它不写入仓库引用，
 也不提供产品 `exact-head` 检查。
+
+`.github/workflows/system-heif-hdr-api.yml` 在 `xcode-27` 上读取 SDK 头文件，
+记录系统 HEIF HDR 与 gain map 编码接口。它只读，检出 PR 的精确 SHA，
+产物保留一天。它不编码产品文件，也不提供 `exact-head`。
