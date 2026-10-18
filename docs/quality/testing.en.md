@@ -71,3 +71,9 @@ with research-specific path filters. It neither writes repository refs nor
 supplies the product `exact-head` check. A research pass does not promote a
 hypothesis or establish Photos/Gallery device acceptance. Keep per-experiment
 commands and promotion gates next to their code; do not add one-shot workflows.
+
+`.github/workflows/style-tone-sweep.yml` is the one native Photographic Styles
+tone measurement. It is read-only, checks out the exact pull-request SHA, and
+renders on the `xcode-27` image with the published consumer harness pinned at
+`37dd551`. Its artifacts expire after one day. It does not write repository
+refs and it does not supply the product `exact-head` check.
