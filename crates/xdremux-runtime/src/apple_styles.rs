@@ -118,9 +118,30 @@ pub(crate) fn convert_file(
     // Build the standard HDR base in memory so an in-place Styles conversion
     // cannot publish an intermediate file. The request is intentionally
     // feature-neutral: this operation owns the Styles graph separately.
-    let base = runtime
+    let product_base = runtime
         .convert_proxdr_bytes(source, xdremux_engine::ConversionRequest::default(), |_| {})?
         .bytes;
+    let mut system_encoded = if crate::system_heif_hdr::requested()? {
+        Some(crate::system_heif_hdr::encode_system_base(
+            runtime,
+            executable.as_ref(),
+            &product_base,
+            &prepared.scale,
+            prepared.analysis.gain_map.channels,
+            staging.path(),
+            output,
+        )?)
+    } else {
+        None
+    };
+    let carrier_report = system_encoded
+        .as_ref()
+        .map(|encoded| encoded.report_path.clone());
+    let base = if let Some(encoded) = system_encoded.as_mut() {
+        std::mem::take(&mut encoded.bytes)
+    } else {
+        product_base
+    };
     fs::write(&base_path, &base)
         .map_err(|error| RuntimeError::external("Photographic Styles base staging", error))?;
 
@@ -139,11 +160,9 @@ pub(crate) fn convert_file(
         storage_orientation,
         SEMANTIC_MATTE_MAX_SIZE,
     )?;
-    let semantic_masks = adapter.vision_semantic_mattes(
-        &base_path,
-        &APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
-        None,
-    )?;
+    let semantic_masks = adapter
+        .vision_semantic_mattes(&base_path, &APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES, None)
+        .map_err(|error| note_system_carrier(carrier_report.as_deref(), error))?;
     let mut semantic_payloads = Vec::with_capacity(APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len());
     for role in APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES {
         let matte = semantic_masks.get(&role).ok_or_else(|| {
@@ -190,13 +209,21 @@ pub(crate) fn convert_file(
         &semantic_scaffold,
         APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES.len(),
     )
-    .map_err(|error| RuntimeError::external("Photographic Styles semantic graph", error))?;
+    .map_err(|error| {
+        note_system_carrier(
+            carrier_report.as_deref(),
+            RuntimeError::external("Photographic Styles semantic graph", error),
+        )
+    })?;
     let primary = runtime
         .heif
         .extract_primary_hevc_resource(&semantic_base)
         .map_err(|error| RuntimeError::external("Photographic Styles primary resource", error))?;
     let structure = xdremux_heif::validate_gain_map_structure(&semantic_base).map_err(|error| {
-        RuntimeError::external("Photographic Styles source Gain Map structure", error)
+        note_system_carrier(
+            carrier_report.as_deref(),
+            RuntimeError::external("Photographic Styles source Gain Map structure", error),
+        )
     })?;
     let raster = runtime
         .heif
@@ -215,7 +242,12 @@ pub(crate) fn convert_file(
                 xdremux_engine::GainMapChannels::Rgb => RasterPixelFormat::Rgb8,
             },
         )
-        .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
+        .map_err(|error| {
+            note_system_carrier(
+                carrier_report.as_deref(),
+                RuntimeError::external("Photographic Styles source Gain Map", error),
+            )
+        })?;
     let scene_rasters = derive_style_scene(
         &raster,
         &gain_raster,
@@ -317,9 +349,17 @@ pub(crate) fn convert_file(
         linear_thumbnail_height: linear_thumbnail.height,
     };
     let assembled = xdremux_heif::assemble_photographic_styles_heif(&semantic_base, &assembly)
-        .map_err(|error| RuntimeError::external("Rust Photographic Styles graph", error))?;
+        .map_err(|error| {
+            note_system_carrier(
+                carrier_report.as_deref(),
+                RuntimeError::external("Rust Photographic Styles graph", error),
+            )
+        })?;
     xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
-        RuntimeError::external("Photographic Styles HDR structural validation", error)
+        note_system_carrier(
+            carrier_report.as_deref(),
+            RuntimeError::external("Photographic Styles HDR structural validation", error),
+        )
     })?;
 
     // Inspect the exact final bytes, not the intermediate scaffold or the
@@ -335,9 +375,28 @@ pub(crate) fn convert_file(
         &final_properties.maker_apple_integer_dictionaries,
     )?;
 
+    if let Some(encoded) = &system_encoded {
+        if let Err(error) = crate::system_heif_hdr::record_after_styles(
+            &adapter,
+            &final_path,
+            &encoded.report_path,
+            &encoded.reference_f32_path,
+            &encoded.reference_f16_path,
+        ) {
+            return Err(note_system_carrier(carrier_report.as_deref(), error));
+        }
+    }
+
     let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
     let published = publisher.publish_bytes(assembled)?;
     Ok(PhotographicStylesFileReceipt { output: published })
+}
+
+fn note_system_carrier(report: Option<&Path>, error: RuntimeError) -> RuntimeError {
+    if let Some(report) = report {
+        crate::system_heif_hdr::record_carrier_error(report, &error.to_string());
+    }
+    error
 }
 
 fn validate_maker_apple_properties(
@@ -736,6 +795,28 @@ fn derive_style_scene(
         linear_metadata,
         renderer_linear_minimum,
         renderer_linear_maximum,
+    })
+}
+
+pub(crate) struct SceneLinearPair {
+    pub width: usize,
+    pub height: usize,
+    pub sdr: Vec<f32>,
+    pub hdr: Vec<f32>,
+}
+
+pub(crate) fn scene_linear_pair(
+    raster: &Raster8,
+    gain_map: &Raster8,
+    scale: &ResolvedScale,
+    maximum_edge: u32,
+) -> Result<SceneLinearPair> {
+    let scene = derive_style_scene(raster, gain_map, scale, maximum_edge)?;
+    Ok(SceneLinearPair {
+        width: scene.width,
+        height: scene.height,
+        sdr: scene.base_rgb,
+        hdr: scene.hdr_rgb,
     })
 }
 

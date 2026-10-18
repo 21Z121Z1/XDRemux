@@ -82,6 +82,16 @@ Apple Log 传递函数、[0, 1] 码值范围和现有辅助色彩标记保持不
 
 原生 consumer 回归使用 RGB UHDR 和单色 LHDR 夹具，回读编码后的缩略图，检查 HDR Log 目标以及主图 HEVC 是否保持不变。运行命令为 `bash scripts/apple/check_rust_style_consumer.sh`。Photos 导入、编辑、保存和重开仍需单独的设备证据。baseline exposure 和 base gain 仍使用现有的源分布校准；这次改动不替换那组系数。
 
+### 临时的系统 gain map
+
+默认编码器仍然写入 XDRemux 自己的 log gain。`XDREMUX_SYSTEM_GAIN_MAP=1` 是一条单独的原型路径。Rust 重建 scene-linear Display P3 HDR，用临时 guided filter 生成 HDR look，并用 local weight 1 保持 SDR look，这个权重就是恒等变换。然后把两张图交给 Apple adapter。adapter 调用 `CIContext.writeHEIFRepresentationOfImage`（`format` 为 `.RGBA8`，色彩空间为 Display P3），并通过 `kCIImageRepresentationHDRImage` 传入 half 线性 HDR。headroom 使用头文件方法 `-imageBySettingContentHeadroom:`（macOS 26）。该头文件没有给出这个方法的 Swift overlay 名称。`kCIImageRepresentationHDRGainMapAsRGB` 设为 true，要求 Core Image 计算颜色比值。Rust 不提供 `kCIImageRepresentationHDRGainMapImage`。
+
+这些名称和可用版本来自 macOS 27 SDK 头文件（`CIContext.h`、`CIImage.h`、`CGImage.h`、`CGImageSource.h`、`CGImageDestination.h`、`CGImageProperties.h`），不是猜出来的 selector。`writeHEIFRepresentationOfImage` 从 macOS 10.13.4 起可用。HDR image 选项和 `contentHeadroom` 从 macOS 15 起可用，`imageBySettingContentHeadroom` 从 macOS 26 起可用。Rust 送出的 headroom 是交给编码器的 half 数值的 `max(1, measured peak)`。头文件不允许 `(0, 1)` 区间内的 headroom。ImageIO 的 `kCGImageDestinationEncodeGenerateGainMapWithBaseImage` 从 macOS 16 起存在，但它的字典值类型没有文档，因此原型不调用它。
+
+回读使用 `kCGImageSourceDecodeRequest` = `kCGImageSourceDecodeToHDR`，并把 `kCGImageSourceGenerateImageSpecificLumaScaling` 设为 false，然后渲染成 extended-linear Display P3 half。它同时报告 `kCGImageAuxiliaryDataTypeHDRGainMap` 和 `kCGImageAuxiliaryDataTypeISOGainMap`。系统文件实际包含哪一种是测量结果，不是头文件事实。Styles 组装器仍然要求恰好一个 `tmap` item 及其 `dimg` 图。如果系统文件没有这张图，组装会失败关闭，报告记下这个冲突。Photos 导入和编辑仍需实机证据。
+
+这个 guided filter 不是 `guided.py` 的移植；公开研究仓库里没有该文件。半径 1、epsilon 0.05、以 `f16` 保存的半尺寸系数、HDR local weight 0 和 SDR local weight 1 都是临时值。`XDREMUX_SYSTEM_GAIN_MAP_MAX_EDGE` 限制原型几何尺寸。工作流把它设为 256。
+
 ## Apple 人像迁移
 
 Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy、JPEG/container logic、Gain Map policy、REND generation、auxiliary-manifest construction、feature routing、output naming、validation policy 和 atomic publication。ImageIO 只报告 auxiliary-resource facts，adapter 只执行 Rust transaction 要求的 Apple framework operation。

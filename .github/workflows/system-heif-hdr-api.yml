@@ -6,8 +6,13 @@ on:
       - ".github/workflows/system-heif-hdr-api.yml"
       - "scripts/apple/probe_system_heif_hdr_api.sh"
       - "Sources/XDRemuxAppleAdapter/**"
+      - "crates/xdremux-engine/**"
       - "crates/xdremux-runtime/**"
       - "crates/xdremux-hdr/**"
+      - "crates/xdremux-cli/**"
+      - "scripts/apple/measure_system_heif_hdr.sh"
+      - "scripts/apple/score_system_hdr_tone.py"
+      - "fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic"
   workflow_dispatch:
 
 permissions:
@@ -20,7 +25,7 @@ concurrency:
 jobs:
   sdk-api:
     runs-on: xcode-27
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
         with:
@@ -31,6 +36,53 @@ jobs:
         shell: bash
         run: bash scripts/apple/probe_system_heif_hdr_api.sh "$GITHUB_WORKSPACE/artifacts/system-heif-hdr-api"
 
+      - name: Install the HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+          python3 -m venv "$RUNNER_TEMP/tone-venv"
+          "$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow
+          echo "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+
+      - name: Build the CLI and the Apple adapter
+        shell: bash
+        run: |
+          cargo build --locked -p xdremux-cli
+          swift build --product xdremux-apple-adapter
+          test -x target/debug/xdremux
+          test -x "$(swift build --show-bin-path)/xdremux-apple-adapter"
+
+      - name: Round-trip a synthetic SDR and linear HDR pair
+        shell: bash
+        run: |
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          XDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \
+            cargo test --locked -p xdremux-runtime --test system_heif_hdr -- --nocapture
+
+      - name: Check out the published consumer model
+        uses: actions/checkout@v7
+        with:
+          repository: 21Z121Z1/Photographic_Style_Research
+          ref: 37dd551a949047ed14580efa0c0a2556922791b5
+          path: consumer-research
+          persist-credentials: false
+
+      - name: Encode one fixture and score the three-tone sweep
+        shell: bash
+        env:
+          RESEARCH_ROOT: ${{ github.workspace }}/consumer-research
+          SYSTEM_HDR_OUT: ${{ github.workspace }}/artifacts/system-heif-hdr-measurement
+          XDREMUX_CLI: ${{ github.workspace }}/target/debug/xdremux
+        run: |
+          adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+          XDREMUX_APPLE_ADAPTER="$adapter" \
+            bash scripts/apple/measure_system_heif_hdr.sh
+
       - name: Upload SDK HEIF HDR surface
         if: always()
         uses: actions/upload-artifact@v7
@@ -39,3 +91,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
           path: artifacts/system-heif-hdr-api/
+
+      - name: Upload system gain-map measurement
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: system-heif-hdr-measurement
+          if-no-files-found: warn
+          retention-days: 1
+          path: artifacts/system-heif-hdr-measurement/

@@ -8,7 +8,7 @@ import ImageIO
 // compiled-kernel caches). Keep one adapter-scoped context so a persistent
 // helper can reuse that state across primitive requests. Product policy stays
 // in Rust; this is only Apple framework execution state.
-private let coreImageContext = CIContext(options: [.cacheIntermediates: false])
+let coreImageContext = CIContext(options: [.cacheIntermediates: false])
 
 private func tightL8ByteCount(width: Int, height: Int, context: String) throws -> Int {
     guard width > 0, height > 0 else {

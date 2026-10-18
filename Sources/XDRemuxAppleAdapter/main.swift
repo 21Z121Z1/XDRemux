@@ -25,6 +25,7 @@ private struct AdapterRequest: Decodable {
     let primaryMetadataXMPPath: String?
     let videoToolboxMain10: VideoToolboxMain10Request?
     let cinematicEnvelope: CinematicEnvelopeRequest?
+    let systemHeifHdr: SystemHeifHdrRequest?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -42,6 +43,27 @@ private struct AdapterRequest: Decodable {
         case primaryMetadataXMPPath = "primary_metadata_xmp_path"
         case videoToolboxMain10 = "video_toolbox_main10"
         case cinematicEnvelope = "cinematic_envelope"
+        case systemHeifHdr = "system_heif_hdr"
+    }
+}
+
+private struct SystemHeifHdrRequest: Decodable {
+    let sdrPath: String?
+    let hdrPath: String?
+    let readbackPath: String
+    let width: UInt32?
+    let height: UInt32?
+    let contentHeadroom: Float?
+    let gainMapAsRgb: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case sdrPath = "sdr_path"
+        case hdrPath = "hdr_path"
+        case readbackPath = "readback_path"
+        case width
+        case height
+        case contentHeadroom = "content_headroom"
+        case gainMapAsRgb = "gain_map_as_rgb"
     }
 }
 
@@ -231,6 +253,7 @@ private struct AdapterResponse: Encodable {
     let videoToolboxMain10: VideoToolboxMain10Facts?
     let sceneClassification: VisionSceneClassificationFacts?
     let cinematicEnvelope: CinematicEnvelopeFacts?
+    let systemHeifHdr: SystemHeifHdrFacts?
 
     init(
         schemaVersion: Int,
@@ -242,7 +265,8 @@ private struct AdapterResponse: Encodable {
         styleProperties: StylePropertiesFacts? = nil,
         videoToolboxMain10: VideoToolboxMain10Facts? = nil,
         sceneClassification: VisionSceneClassificationFacts? = nil,
-        cinematicEnvelope: CinematicEnvelopeFacts? = nil
+        cinematicEnvelope: CinematicEnvelopeFacts? = nil,
+        systemHeifHdr: SystemHeifHdrFacts? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.capabilities = capabilities
@@ -254,6 +278,7 @@ private struct AdapterResponse: Encodable {
         self.videoToolboxMain10 = videoToolboxMain10
         self.sceneClassification = sceneClassification
         self.cinematicEnvelope = cinematicEnvelope
+        self.systemHeifHdr = systemHeifHdr
     }
 
     enum CodingKeys: String, CodingKey {
@@ -267,6 +292,7 @@ private struct AdapterResponse: Encodable {
         case videoToolboxMain10 = "video_toolbox_main10"
         case sceneClassification = "scene_classification"
         case cinematicEnvelope = "cinematic_envelope"
+        case systemHeifHdr = "system_heif_hdr"
     }
 }
 
@@ -989,6 +1015,54 @@ private func encodedResponse(for input: Data) throws -> Data {
             gainMap: nil,
             imageProperties: nil,
             semanticMasks: nil
+        )
+    case "coreimage-write-heif-hdr":
+        guard let outputPath = request.outputPath, !outputPath.isEmpty,
+              let configuration = request.systemHeifHdr,
+              let sdrPath = configuration.sdrPath, !sdrPath.isEmpty,
+              let hdrPath = configuration.hdrPath, !hdrPath.isEmpty,
+              let width = configuration.width, width > 0,
+              let height = configuration.height, height > 0,
+              let contentHeadroom = configuration.contentHeadroom,
+              let gainMapAsRgb = configuration.gainMapAsRgb else {
+            fail("coreimage-write-heif-hdr requires output_path and a complete system_heif_hdr payload")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            systemHeifHdr: try writeSystemHeifHdr(
+                outputPath: outputPath,
+                sdrPath: sdrPath,
+                hdrPath: hdrPath,
+                readbackPath: configuration.readbackPath,
+                width: Int(width),
+                height: Int(height),
+                contentHeadroom: contentHeadroom,
+                gainMapAsRgb: gainMapAsRgb
+            )
+        )
+    case "imageio-read-system-hdr":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let configuration = request.systemHeifHdr else {
+            fail("imageio-read-system-hdr requires input_path and system_heif_hdr.readback_path")
+        }
+        response = AdapterResponse(
+            schemaVersion: schemaVersion,
+            capabilities: nil,
+            auxiliary: nil,
+            gainMap: nil,
+            imageProperties: nil,
+            semanticMasks: nil,
+            systemHeifHdr: try readSystemHeifHdr(
+                inputPath: inputPath,
+                readbackPath: configuration.readbackPath,
+                contentHeadroomSent: nil,
+                gainMapAsRgb: nil
+            )
         )
     case "imageio-merge-xmp":
         guard let inputPath = request.inputPath, !inputPath.isEmpty,

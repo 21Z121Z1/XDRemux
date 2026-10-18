@@ -79,6 +79,8 @@ renders on the `xcode-27` image with the published consumer harness pinned at
 refs and it does not supply the product `exact-head` check.
 
 `.github/workflows/system-heif-hdr-api.yml` reads the `xcode-27` SDK headers
-for the system HEIF HDR and gain-map encode surface. It is read-only, checks
-out the exact pull-request SHA, and keeps its header transcript for one day.
-It does not encode a product file and it does not supply `exact-head`.
+for the system HEIF HDR and gain-map encode surface, then runs the opt-in
+prototype that asks Core Image to calculate the gain map. It is read-only,
+checks out the exact pull-request SHA, and keeps its transcript and
+measurement for one day. It does not write repository refs and it does not
+supply `exact-head`.

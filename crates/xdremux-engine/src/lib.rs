@@ -9,6 +9,7 @@ mod apple_scene;
 mod capabilities;
 mod execution;
 mod product_policy;
+mod provisional_guided_filter;
 mod source_profile;
 
 use std::collections::BTreeSet;
@@ -77,6 +78,12 @@ pub use execution::{
     ExecutionReceipt, ExecutionResult, ExecutionStage,
 };
 pub use product_policy::resolve_product_gain_map_encode_profile;
+pub use provisional_guided_filter::{
+    content_headroom_from_linear, encode_display_p3_rgba8, linear_difference, pack_linear_rgba_f16,
+    provisional_guided_filter, unpack_linear_rgb_f16, LinearDifference,
+    ProvisionalGuidedFilterError, PROVISIONAL_GUIDED_EPSILON, PROVISIONAL_GUIDED_RADIUS,
+    PROVISIONAL_HDR_LOCAL_WEIGHT, PROVISIONAL_SDR_LOCAL_WEIGHT,
+};
 pub use source_profile::{
     gain_map_channels_from_count, gain_map_source_profile_from_hevc,
     gain_map_source_profile_from_jpeg,

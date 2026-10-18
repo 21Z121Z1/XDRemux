@@ -92,8 +92,8 @@ class WorkflowConfigurationTests(unittest.TestCase):
             # Native tone measurement. It is not a product gate and not a
             # per-hypothesis writer.
             "style-tone-sweep.yml",
-            # System HEIF HDR encode surface. It records SDK names and does not
-            # encode a product file or supply exact-head.
+            # System HEIF HDR encode surface. It records SDK names and one
+            # opt-in measurement file. It does not supply exact-head.
             "system-heif-hdr-api.yml",
         }
         actual = {path.name for path in WORKFLOW_ROOT.glob("*.yml")}

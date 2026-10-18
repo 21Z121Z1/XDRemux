@@ -155,6 +155,47 @@ Photos import, editing, save, and reopen require separate device evidence.
 Baseline exposure and base gain still use the existing source-distribution
 calibration; this change does not replace those coefficients.
 
+### Provisional system gain map
+
+The default encoder still writes XDRemux's own log gain. `XDREMUX_SYSTEM_GAIN_MAP=1`
+is a separate prototype. Rust reconstructs scene-linear Display P3 HDR, builds
+an HDR look with a provisional guided filter, and keeps the SDR look by using
+local weight 1, which is the identity. It then hands both images to the Apple
+adapter. The adapter calls `CIContext.writeHEIFRepresentationOfImage` (`format`
+`.RGBA8`, Display P3) and passes the half-float linear HDR image under
+`kCIImageRepresentationHDRImage`. Headroom is applied with the header method
+`-imageBySettingContentHeadroom:` (macOS 26). The header does not publish a
+Swift overlay name for that method.
+`kCIImageRepresentationHDRGainMapAsRGB` is set true so Core Image is asked for
+a color ratio. Rust does not supply `kCIImageRepresentationHDRGainMapImage`.
+
+Those names and their availability come from the macOS 27 SDK headers
+(`CIContext.h`, `CIImage.h`, `CGImage.h`, `CGImageSource.h`,
+`CGImageDestination.h`, `CGImageProperties.h`), not from a guessed selector.
+`writeHEIFRepresentationOfImage` is macOS 10.13.4. The HDR-image option and
+`contentHeadroom` are macOS 15, and `imageBySettingContentHeadroom` is macOS 26.
+Headroom sent by Rust is `max(1, measured peak)` of the half values handed to
+the encoder. The header forbids a headroom in `(0, 1)`. ImageIO
+`kCGImageDestinationEncodeGenerateGainMapWithBaseImage` exists from macOS 16,
+but its dictionary value type is not documented, so the prototype does not
+call it.
+
+Readback uses `kCGImageSourceDecodeRequest` = `kCGImageSourceDecodeToHDR` and
+sets `kCGImageSourceGenerateImageSpecificLumaScaling` to false, then renders
+extended-linear Display P3 half. It reports both
+`kCGImageAuxiliaryDataTypeHDRGainMap` and `kCGImageAuxiliaryDataTypeISOGainMap`.
+Which of those the system file actually contains is a measurement, not a
+header fact. The Styles assembler still requires one `tmap` item and its
+`dimg` graph. If the system file does not have that graph, assembly fails
+closed and the report records the conflict. Photos import and editing remain
+device evidence.
+
+The guided filter is not a port of `guided.py`; that file is not in the public
+research checkout. Radius 1, epsilon 0.05, half-size coefficients stored
+through `f16`, HDR local weight 0, and SDR local weight 1 are provisional.
+`XDREMUX_SYSTEM_GAIN_MAP_MAX_EDGE` bounds the prototype geometry. The workflow
+sets it to 256.
+
 ## Apple Portrait migration
 
 Rust owns Portrait preflight, OPPO block parsing, focus/orientation policy, JPEG/container logic, Gain Map policy, REND generation, auxiliary-manifest construction, feature routing, output naming, validation policy, and atomic publication. ImageIO reports auxiliary-resource facts and the adapter performs only the Apple framework operations required by the Rust transaction.

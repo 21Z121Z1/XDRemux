@@ -575,6 +575,76 @@ impl AppleAdapterClient {
         Ok(facts)
     }
 
+    /// Ask Core Image to calculate a gain map from an SDR primary and a linear
+    /// HDR image. Raster selection and headroom stay in Rust.
+    pub(super) fn coreimage_write_heif_hdr(
+        &self,
+        encode: &SystemHeifHdrWrite<'_>,
+    ) -> Result<SystemHeifHdrFacts> {
+        validate_system_heif_geometry(encode.width, encode.height, encode.content_headroom)?;
+        expect_raster_file(
+            encode.sdr_rgba8,
+            encode.width,
+            encode.height,
+            4,
+            "SDR RGBA8",
+        )?;
+        expect_raster_file(
+            encode.hdr_rgba_f16,
+            encode.width,
+            encode.height,
+            8,
+            "HDR RGBAh",
+        )?;
+        let request = SystemHeifHdrWriteRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "coreimage-write-heif-hdr",
+            output_path: input_path(encode.output)?,
+            system_heif_hdr: SystemHeifHdrWriteWire {
+                sdr_path: input_path(encode.sdr_rgba8)?,
+                hdr_path: input_path(encode.hdr_rgba_f16)?,
+                readback_path: input_path(encode.readback)?,
+                width: encode.width,
+                height: encode.height,
+                content_headroom: encode.content_headroom,
+                gain_map_as_rgb: encode.gain_map_as_rgb,
+            },
+        };
+        decode_system_heif_hdr(
+            self.invoke(
+                &serde_json::to_vec(&request).map_err(|error| {
+                    RuntimeError::external("Apple adapter request encoding", error)
+                })?,
+                APPLE_COMPUTE_TIMEOUT,
+            )?,
+        )
+    }
+
+    /// Read the gain-map auxiliary images and the HDR rendition back from a
+    /// HEIF Core Image or Styles assembly already wrote.
+    pub(super) fn imageio_read_system_hdr(
+        &self,
+        input: &Path,
+        readback: &Path,
+    ) -> Result<SystemHeifHdrFacts> {
+        let request = SystemHeifHdrReadRequest {
+            schema_version: APPLE_ADAPTER_SCHEMA_VERSION,
+            operation: "imageio-read-system-hdr",
+            input_path: input_path(input)?,
+            system_heif_hdr: SystemHeifHdrReadWire {
+                readback_path: input_path(readback)?,
+            },
+        };
+        decode_system_heif_hdr(
+            self.invoke(
+                &serde_json::to_vec(&request).map_err(|error| {
+                    RuntimeError::external("Apple adapter request encoding", error)
+                })?,
+                APPLE_COMPUTE_TIMEOUT,
+            )?,
+        )
+    }
+
     pub(super) fn imageio_write_auxiliary(
         &self,
         input: &Path,
@@ -1188,6 +1258,107 @@ struct AdapterRequest {
     lossy_quality: Option<f64>,
 }
 
+#[derive(Debug)]
+pub(super) struct SystemHeifHdrWrite<'a> {
+    pub output: &'a Path,
+    pub sdr_rgba8: &'a Path,
+    pub hdr_rgba_f16: &'a Path,
+    pub readback: &'a Path,
+    pub width: u32,
+    pub height: u32,
+    pub content_headroom: f32,
+    pub gain_map_as_rgb: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct SystemHeifHdrFacts {
+    pub width: u32,
+    pub height: u32,
+    pub content_headroom_sent: Option<f32>,
+    pub decoded_content_headroom: f32,
+    pub decoded_width: u32,
+    pub decoded_height: u32,
+    pub readback_byte_count: usize,
+    pub gain_map_as_rgb: Option<bool>,
+    pub apple_hdr_gain_map: SystemHeifAuxiliaryPlane,
+    pub iso_gain_map: SystemHeifAuxiliaryPlane,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SystemHeifAuxiliaryPlane {
+    pub present: bool,
+    pub pixel_format: Option<u32>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
+fn validate_system_heif_geometry(width: u32, height: u32, content_headroom: f32) -> Result<()> {
+    if width == 0 || height == 0 || !width.is_multiple_of(2) || !height.is_multiple_of(2) {
+        return Err(RuntimeError::new(
+            "system HEIF HDR encode",
+            "raster geometry must be non-zero and even",
+        ));
+    }
+    let unknown = content_headroom.abs() <= f32::EPSILON;
+    if !content_headroom.is_finite() || (!unknown && content_headroom < 1.0) {
+        return Err(RuntimeError::new(
+            "system HEIF HDR encode",
+            "content headroom must be 0 or at least 1",
+        ));
+    }
+    Ok(())
+}
+
+fn expect_raster_file(
+    path: &Path,
+    width: u32,
+    height: u32,
+    bytes_per_pixel: u64,
+    label: &str,
+) -> Result<()> {
+    let length = fs::metadata(path)
+        .map_err(|error| RuntimeError::external("system HEIF HDR encode", error))?
+        .len();
+    let expected = u64::from(width)
+        .checked_mul(u64::from(height))
+        .and_then(|pixels| pixels.checked_mul(bytes_per_pixel))
+        .ok_or_else(|| {
+            RuntimeError::new("system HEIF HDR encode", "raster byte count overflows")
+        })?;
+    if length != expected {
+        return Err(RuntimeError::new(
+            "system HEIF HDR encode",
+            format!("{label} has {length} bytes; expected {expected}"),
+        ));
+    }
+    Ok(())
+}
+
+fn decode_system_heif_hdr(output: Vec<u8>) -> Result<SystemHeifHdrFacts> {
+    let response: SystemHeifHdrResponse = serde_json::from_slice(&output)
+        .map_err(|error| RuntimeError::external("Apple adapter response decoding", error))?;
+    validate_schema(response.schema_version)?;
+    let facts = response.system_heif_hdr;
+    if facts.decoded_width == 0 || facts.decoded_height == 0 || facts.readback_byte_count == 0 {
+        return Err(RuntimeError::new(
+            "system HEIF HDR readback",
+            format!("adapter returned empty HDR geometry: {facts:?}"),
+        ));
+    }
+    Ok(SystemHeifHdrFacts {
+        width: facts.width,
+        height: facts.height,
+        content_headroom_sent: facts.content_headroom_sent,
+        decoded_content_headroom: facts.decoded_content_headroom,
+        decoded_width: facts.decoded_width,
+        decoded_height: facts.decoded_height,
+        readback_byte_count: facts.readback_byte_count,
+        gain_map_as_rgb: facts.gain_map_as_rgb,
+        apple_hdr_gain_map: facts.apple_hdr_gain_map.into(),
+        iso_gain_map: facts.iso_gain_map.into(),
+    })
+}
+
 #[derive(Debug, Serialize)]
 struct VideoToolboxMain10Request {
     schema_version: u32,
@@ -1205,6 +1376,77 @@ struct VideoToolboxMain10Wire {
     raw_component_bits: u32,
     quality: f64,
     hvcc_path: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemHeifHdrWriteRequest {
+    schema_version: u32,
+    operation: &'static str,
+    output_path: String,
+    system_heif_hdr: SystemHeifHdrWriteWire,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemHeifHdrWriteWire {
+    sdr_path: String,
+    hdr_path: String,
+    readback_path: String,
+    width: u32,
+    height: u32,
+    content_headroom: f32,
+    gain_map_as_rgb: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemHeifHdrReadRequest {
+    schema_version: u32,
+    operation: &'static str,
+    input_path: String,
+    system_heif_hdr: SystemHeifHdrReadWire,
+}
+
+#[derive(Debug, Serialize)]
+struct SystemHeifHdrReadWire {
+    readback_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SystemHeifHdrResponse {
+    schema_version: u32,
+    system_heif_hdr: SystemHeifHdrWireFacts,
+}
+
+#[derive(Debug, Deserialize)]
+struct SystemHeifHdrWireFacts {
+    width: u32,
+    height: u32,
+    content_headroom_sent: Option<f32>,
+    decoded_content_headroom: f32,
+    decoded_width: u32,
+    decoded_height: u32,
+    readback_byte_count: usize,
+    gain_map_as_rgb: Option<bool>,
+    apple_hdr_gain_map: SystemHeifAuxiliaryPlaneWire,
+    iso_gain_map: SystemHeifAuxiliaryPlaneWire,
+}
+
+#[derive(Debug, Deserialize)]
+struct SystemHeifAuxiliaryPlaneWire {
+    present: bool,
+    pixel_format: Option<u32>,
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+impl From<SystemHeifAuxiliaryPlaneWire> for SystemHeifAuxiliaryPlane {
+    fn from(value: SystemHeifAuxiliaryPlaneWire) -> Self {
+        Self {
+            present: value.present,
+            pixel_format: value.pixel_format,
+            width: value.width,
+            height: value.height,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
