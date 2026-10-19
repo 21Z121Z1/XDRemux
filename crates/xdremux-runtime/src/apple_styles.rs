@@ -8,8 +8,8 @@ use xdremux_engine::{
     apple_style_apply_global_tone_curve, apple_style_data_from_coefficient_deltas,
     apple_style_distribution, apple_style_face_exposure_boost, apple_style_fit_global_polynomial,
     apple_style_light_map, apple_style_linear_metadata, apple_style_monotonic_global_tone_curve,
-    apple_style_property_list, apple_texture_style_property_list, resolve_apple_style_scene_type,
-    AppleL8Mask, AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
+    apple_style_property_list, resolve_apple_style_scene_type, AppleL8Mask,
+    AppleStyleGlobalToneCurve, AppleStyleLightMapRequest, AppleStyleLinearMetadata,
     AppleStylePropertyListRequest, AppleStyleStatistics, APPLE_PHOTOGRAPHIC_STYLES_SEMANTIC_ROLES,
 };
 
@@ -308,8 +308,6 @@ pub(crate) fn convert_file(
     };
     let style_properties = apple_style_property_list(&style_request)
         .map_err(|error| RuntimeError::external("Photographic Styles metadata", error))?;
-    let texture_style_properties = apple_texture_style_property_list(&style_request)
-        .map_err(|error| RuntimeError::external("Texture Style v16 metadata", error))?;
 
     // Validate the exact Rust-owned key-1 resource at the private consumer
     // boundary before assembling the final file. The adapter cannot choose
@@ -321,7 +319,7 @@ pub(crate) fn convert_file(
     let (style_delta_grid_width, style_delta_grid_height, style_delta_rows, style_delta_columns) =
         style_grid_size(primary.width, primary.height);
     let assembly = crate::PhotographicStylesAssembly {
-        style_property_list: &texture_style_properties,
+        style_property_list: &style_properties,
         style_delta_hvcc,
         style_delta_tile_payload: style_delta_payload,
         style_delta_tile_width: STYLE_DELTA_TILE_SIZE,
@@ -337,14 +335,15 @@ pub(crate) fn convert_file(
     };
     let assembled = xdremux_heif::assemble_photographic_styles_heif(&semantic_base, &assembly)
         .map_err(|error| RuntimeError::external("Rust Photographic Styles graph", error))?;
-    let textured = xdremux_heif::augment_texture_style_heif(&assembled)
-        .map_err(|error| RuntimeError::external("Rust Texture Style carrier", error))?;
-    xdremux_heif::validate_gain_map_structure(&textured).map_err(|error| {
-        RuntimeError::external("Texture Style HDR structural validation", error)
+    // Texture metadata and per-person capture state require a separate,
+    // image-bound native producer. A Photographic Styles conversion must not
+    // fabricate them or alias one skin mask as twelve distinct Texture roles.
+    xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
+        RuntimeError::external("Photographic Styles HDR structural validation", error)
     })?;
 
     let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
-    let published = publisher.publish_bytes(textured)?;
+    let published = publisher.publish_bytes(assembled)?;
     Ok(PhotographicStylesFileReceipt { output: published })
 }
 

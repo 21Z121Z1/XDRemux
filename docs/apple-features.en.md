@@ -56,6 +56,12 @@ Rust owns style-generation semantics, constrained search, source-bound policy, k
 
 Research-only producers, model experiments, donor diagnostics, and RAW experiments remain research tooling. They do not define the public CLI contract or provide a second runtime.
 
+### Texture Styles boundary
+
+`--apple-styles` produces Photographic Styles metadata. It does not generate iOS 27 Texture Styles capture metadata. The runtime does not claim a source iPhone model or synthesize an Apple MakerNote for Texture Styles. It does not relabel one skin matte as twelve Texture semantic roles. A source without RAW or an original LinearThumbnail does not acquire original capture information from conversion. The existing derived LinearThumbnail keeps Apple Log encoding.
+
+The research `xdremux-heif` transport API can inspect an existing Texture URI item and preserve the complete input bytes. It checks local item locations and references. It does not certify opaque metadata, semantic resources, native rendering, or Photos editability. A request to generate Texture data from an image without an existing carrier returns an unsupported error. See [the research record](../research/texture-style/README.md).
+
 ## Apple Portrait migration
 
 Rust owns Portrait preflight, OPPO block parsing, focus/orientation policy, JPEG/container logic, Gain Map policy, REND generation, auxiliary-manifest construction, feature routing, output naming, validation policy, and atomic publication. ImageIO reports auxiliary-resource facts and the adapter performs only the Apple framework operations required by the Rust transaction.

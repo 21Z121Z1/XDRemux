@@ -1293,7 +1293,9 @@ pub fn apple_style_property_list(
     serialize_binary_plist(root)
 }
 
-/// Synthesize the iOS 27 Texture Style v16 metadata object.
+/// Serialize the diagnostic v16 Photographic Styles schema.
+/// This does not produce the separate 2026 Texture metadata, per-person
+/// capture state, or a verified native Texture producer result.
 pub fn apple_texture_style_property_list(
     request: &AppleStylePropertyListRequest<'_>,
 ) -> Result<Vec<u8>, AppleStyleDataError> {

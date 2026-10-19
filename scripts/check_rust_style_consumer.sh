@@ -121,6 +121,7 @@ PY
 python3 - "$output" "$inspect" "$batch_output" "$batch_inspect" <<'PY'
 import hashlib
 import json
+from scripts.inspect_oppo_heif import boxes, payload_for_item
 import plistlib
 import struct
 import sys
@@ -131,33 +132,27 @@ def read_style_plist(path, inspect_path):
     report = json.load(open(inspect_path, encoding="utf-8"))
     candidates = [
         item for item in report["items"]
-        if item.get("type") == "uri " and item.get("name") == "metadata"
+        if item.get("type") == "uri " and item.get("name") == "styleMetadata"
     ]
-    if len(candidates) != 2:
-        raise SystemExit(f"{path}: expected style+Texture metadata items, got {len(candidates)}")
-    metadata = max(candidates, key=lambda item: item.get("payload_length") or 0)
+    if len(candidates) != 1:
+        raise SystemExit(f"{path}: expected one Photographic Styles metadata item, got {len(candidates)}")
+    metadata = candidates[0]
     location = metadata["location"]
-    if location.get("construction_method") != 0:
-        raise SystemExit(f"{path}: Styles v16 metadata is not method-0: {location!r}")
-    extent = location["extents"][0]
+    if location.get("construction_method") != 1:
+        raise SystemExit(f"{path}: Styles metadata is not in idat: {location!r}")
     with open(path, "rb") as stream:
         data = stream.read()
-    start = extent["offset"]
-    payload = data[start : start + extent["length"]]
+    meta = next(b for b in boxes(data, 0, len(data)) if b["type"] == "meta")
+    children = list(boxes(data, meta["payload_start"] + 4, meta["end"]))
+    idat = next(b for b in children if b["type"] == "idat")
+    payload = payload_for_item(data, location, idat)
     plist = plistlib.loads(payload)
-    if plist.get("0") != 16 or plist.get("l") is not False:
-        raise SystemExit(f"{path}: final Styles carrier is not v16+l=false")
-    if b"tag:apple.com,2026:photo:metadata:texture_styles\0" not in data:
-        raise SystemExit(f"{path}: missing Texture Style metadata URI")
-    roles = [
-        b"semanticnosematte", b"semanticskinmattev2", b"semanticnonfaceskinmatte",
-        b"semanticlipsmatte", b"semanticteethmattev2", b"semanticpersonmatte",
-        b"semanticglassesmattev2", b"semanticeyebrowsmatte", b"semantictattoomatte",
-        b"semantichandsmatte", b"semanticearsmatte", b"semanticfaceskinmatte",
-    ]
-    missing = [role.decode() for role in roles if role not in data]
-    if missing:
-        raise SystemExit(f"{path}: missing Texture Style semantic roles {missing}")
+    if plist.get("0") != 15 or "l" in plist:
+        raise SystemExit(f"{path}: final Photographic Styles metadata is not v15")
+    if b"tag:apple.com,2026:photo:metadata:texture_styles\0" in data:
+        raise SystemExit(f"{path}: unbacked Texture Style metadata was generated")
+    if b"tag:apple.com,2026:photo:aux:" in data:
+        raise SystemExit(f"{path}: unbacked 2026 Texture semantic roles were generated")
     return plist
 
 def srgb_encode(linear):

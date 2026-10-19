@@ -56,6 +56,12 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 研究型 producer、model experiment、donor diagnostic 和 RAW experiment 继续作为 research tooling，不定义公开 CLI 契约，也不构成第二套 runtime。
 
+### 纹理风格边界
+
+`--apple-styles` 生成 Photographic Styles 元数据，不生成 iOS 27 Texture Styles 拍摄元数据。runtime 不声明输入来自某款 iPhone，也不为纹理风格补造 Apple MakerNote，不把一张皮肤蒙版重命名成十二种纹理语义。没有 RAW 或原始 LinearThumbnail 的输入不会因转换而获得原始拍摄信息。现有派生 LinearThumbnail 保持 Apple Log 编码。
+
+研究用 `xdremux-heif` 传输 API 可以检查已有的 Texture URI item，并逐字节保留完整输入。它检查本地 item 位置和引用，不认证不透明元数据、语义资源、原生渲染或 Photos 可编辑性。没有已有载体时，请求生成 Texture 数据会返回 unsupported 错误。见[研究记录](../research/texture-style/README.md)。
+
 ## Apple 人像迁移
 
 Rust 持有 Portrait preflight、OPPO block parsing、focus/orientation policy、JPEG/container logic、Gain Map policy、REND generation、auxiliary-manifest construction、feature routing、output naming、validation policy 和 atomic publication。ImageIO 只报告 auxiliary-resource facts，adapter 只执行 Rust transaction 要求的 Apple framework operation。

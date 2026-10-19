@@ -1,0 +1,308 @@
+{
+  "schema": "xdremux-texture-evidence-graph-v1",
+  "audited_xdremux_base": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+  "audited_psr_source": "5fef06eddaff8a8d2fd42c59e33612a5d576b088",
+  "sources": [
+    {
+      "id": "AGENTS.md",
+      "repository": "21Z121Z1/XDRemux",
+      "head_sha": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "path": "AGENTS.md",
+      "sha256": "3810f878261f59d73d6cbb583cb516b48ba0ccb90a654c32a97937b1e41022c9",
+      "url": "https://github.com/21Z121Z1/XDRemux/blob/f8fcf2067c506e87665e9ea113324db1a57d4cf7/AGENTS.md",
+      "level": "static-source"
+    },
+    {
+      "id": "research/texture-style/README.md",
+      "repository": "21Z121Z1/XDRemux",
+      "head_sha": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "path": "research/texture-style/README.md",
+      "sha256": "6b84d75b33ab9532762a4d57ee6d1beb341bc46285c5e93ddd1dc7b95b98ec03",
+      "url": "https://github.com/21Z121Z1/XDRemux/blob/f8fcf2067c506e87665e9ea113324db1a57d4cf7/research/texture-style/README.md",
+      "level": "static-source"
+    },
+    {
+      "id": "crates/xdremux-heif/src/texture_styles.rs",
+      "repository": "21Z121Z1/XDRemux",
+      "head_sha": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "path": "crates/xdremux-heif/src/texture_styles.rs",
+      "sha256": "72c3b2bf570ae17665d4d83f888f77850bd14dc94f53a005f5c1d38add8a753f",
+      "url": "https://github.com/21Z121Z1/XDRemux/blob/f8fcf2067c506e87665e9ea113324db1a57d4cf7/crates/xdremux-heif/src/texture_styles.rs",
+      "level": "static-source"
+    },
+    {
+      "id": "crates/xdremux-engine/src/apple_photographic_styles.rs",
+      "repository": "21Z121Z1/XDRemux",
+      "head_sha": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "path": "crates/xdremux-engine/src/apple_photographic_styles.rs",
+      "sha256": "ac07143c96a59f8a5a5cb2521a77ea50a1dc2f9ffc262808f15f132144ab60a1",
+      "url": "https://github.com/21Z121Z1/XDRemux/blob/f8fcf2067c506e87665e9ea113324db1a57d4cf7/crates/xdremux-engine/src/apple_photographic_styles.rs",
+      "level": "static-source"
+    },
+    {
+      "id": "crates/xdremux-runtime/src/apple_styles.rs",
+      "repository": "21Z121Z1/XDRemux",
+      "head_sha": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "path": "crates/xdremux-runtime/src/apple_styles.rs",
+      "sha256": "15173a08740d6b43ddb7c44c217c874922bdd3e360b165ffe38337290501347d",
+      "url": "https://github.com/21Z121Z1/XDRemux/blob/f8fcf2067c506e87665e9ea113324db1a57d4cf7/crates/xdremux-runtime/src/apple_styles.rs",
+      "level": "static-source"
+    },
+    {
+      "id": "scripts/research/texture_style_native_standard_contract.json",
+      "repository": "21Z121Z1/XDRemux",
+      "head_sha": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "path": "scripts/research/texture_style_native_standard_contract.json",
+      "sha256": "2bb45a9273a270802da6148b21431666a03dd8d0296915532e396bf197277d4d",
+      "url": "https://github.com/21Z121Z1/XDRemux/blob/f8fcf2067c506e87665e9ea113324db1a57d4cf7/scripts/research/texture_style_native_standard_contract.json",
+      "level": "static-source"
+    },
+    {
+      "id": "scripts/research/texture_style_person_spi_probe.md",
+      "repository": "21Z121Z1/XDRemux",
+      "head_sha": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "path": "scripts/research/texture_style_person_spi_probe.md",
+      "sha256": "80c223693425a31a2d578e852ae82289deb607c321778f547eacbf91504cf531",
+      "url": "https://github.com/21Z121Z1/XDRemux/blob/f8fcf2067c506e87665e9ea113324db1a57d4cf7/scripts/research/texture_style_person_spi_probe.md",
+      "level": "static-source"
+    },
+    {
+      "id": "psr-texture-report",
+      "repository": "21Z121Z1/Photographic_Style_Research",
+      "head_sha": "5fef06eddaff8a8d2fd42c59e33612a5d576b088",
+      "path": "research/texture-styles/REPORT.zh-CN.md",
+      "url": "https://github.com/21Z121Z1/Photographic_Style_Research/blob/5fef06eddaff8a8d2fd42c59e33612a5d576b088/research/texture-styles/REPORT.zh-CN.md",
+      "level": "prior-research-record-not-reexecuted"
+    },
+    {
+      "id": "psr-semantic-runtime",
+      "repository": "21Z121Z1/Photographic_Style_Research",
+      "head_sha": "5fef06eddaff8a8d2fd42c59e33612a5d576b088",
+      "path": "research/semantic-styles/semantic_runtime_s1.m",
+      "url": "https://github.com/21Z121Z1/Photographic_Style_Research/blob/5fef06eddaff8a8d2fd42c59e33612a5d576b088/research/semantic-styles/semantic_runtime_s1.m",
+      "level": "prior-probe-source"
+    },
+    {
+      "id": "apple-camera-guide",
+      "url": "https://support.apple.com/guide/iphone/use-photographic-styles-iph629d2cd37/ios",
+      "observed_date": "2026-10-19",
+      "level": "official-documentation"
+    },
+    {
+      "id": "apple-hdr-api",
+      "url": "https://developer.apple.com/videos/play/wwdc2024/10177/",
+      "observed_date": "2026-10-19",
+      "level": "official-documentation"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "pixels",
+      "kind": "input",
+      "name": "pixels, embedded color space, dimensions and orientation",
+      "provenance": "input-observable"
+    },
+    {
+      "id": "capture",
+      "kind": "input",
+      "name": "capture-specific hardware, port, processing state, per-person data",
+      "provenance": "not-recoverable-as-historical-fact-from-pixels-alone"
+    },
+    {
+      "id": "styles",
+      "kind": "metadata",
+      "name": "2023 styles URI, Photographic Styles v15/v16",
+      "sources": [
+        "crates/xdremux-engine/src/apple_photographic_styles.rs"
+      ]
+    },
+    {
+      "id": "texture",
+      "kind": "metadata",
+      "name": "2026 texture_styles URI, Preset/CaptureType/CaptureMode/PortType/HardwareModel/people version/seed",
+      "sources": [
+        "scripts/research/texture_style_native_standard_contract.json"
+      ]
+    },
+    {
+      "id": "maker84",
+      "kind": "metadata",
+      "name": "Apple MakerNote 0x0054 typed bplist numeric slots0..12",
+      "sources": [
+        "crates/xdremux-heif/src/texture_styles.rs"
+      ],
+      "pixel_recompute_formula_known": false
+    },
+    {
+      "id": "roles",
+      "kind": "resource",
+      "name": "2026 Texture semantic auxC resources",
+      "role_names": [
+        "nose",
+        "skin-v2",
+        "nonface-skin",
+        "lips",
+        "teeth-v2",
+        "person",
+        "glasses-v2",
+        "eyebrows",
+        "tattoo",
+        "hands",
+        "ears",
+        "face-skin"
+      ],
+      "content_verified_for_old_aliases": false
+    },
+    {
+      "id": "thumbnail",
+      "kind": "resource",
+      "name": "2023 LinearThumbnail auxiliary",
+      "encoding": "Apple Log in existing XDRemux derived-thumbnail route",
+      "original_raw_or_capture_provenance": false
+    },
+    {
+      "id": "people",
+      "kind": "context",
+      "name": "TextureStylePostProcessedPeopleData / face and instance ROIs / masks / pose / landmarks / image and eye statistics",
+      "sources": [
+        "scripts/research/texture_style_person_spi_probe.md",
+        "psr-texture-report"
+      ],
+      "complete_recompute_contract_known": false
+    },
+    {
+      "id": "semantic-consumer",
+      "kind": "apple-api",
+      "name": "_NUSemanticStyleProperties",
+      "scope": "Photographic Styles consumer"
+    },
+    {
+      "id": "texture-consumer",
+      "kind": "apple-api",
+      "name": "_NUTextureStyleProperties.textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
+      "scope": "Texture metadata consumer; not an image-to-metadata producer"
+    },
+    {
+      "id": "person-utilities",
+      "kind": "apple-api",
+      "name": "CMITextureStylesPersonInputDataUtilities.personInputDataArrayFromDetectedFaces:",
+      "scope": "geometry conversion; capture stats not implied"
+    },
+    {
+      "id": "pipeline",
+      "kind": "apple-api",
+      "name": "PITextureStylePipelineProcessor / PITextureStyleProcessorKernel / CMITextureStylesProcessor",
+      "scope": "native input requirements and whole pipeline still to qualify"
+    },
+    {
+      "id": "producer",
+      "kind": "missing-contract",
+      "name": "image-bound native Texture metadata producer",
+      "status": "unverified"
+    },
+    {
+      "id": "render",
+      "kind": "acceptance",
+      "name": "actual native editing/render parameter effect",
+      "status": "unverified"
+    },
+    {
+      "id": "photos",
+      "kind": "acceptance",
+      "name": "real iPhone Photos Texture UI and persistent edits",
+      "status": "requires-device-evidence"
+    },
+    {
+      "id": "transport",
+      "kind": "implementation",
+      "name": "Rust opaque carrier inspection and byte-identical preservation",
+      "scope": "local item graph only; no semantic or native certification"
+    }
+  ],
+  "edges": [
+    {
+      "from": "pixels",
+      "to": "producer",
+      "relation": "input-contract-not-qualified",
+      "level": "unverified"
+    },
+    {
+      "from": "capture",
+      "to": "producer",
+      "relation": "capture-context-required-by-hypothesis",
+      "level": "unverified"
+    },
+    {
+      "from": "producer",
+      "to": "texture",
+      "relation": "native-serialization-not-established",
+      "level": "unverified"
+    },
+    {
+      "from": "styles",
+      "to": "semantic-consumer",
+      "relation": "2023-schema-consumer",
+      "level": "prior-source"
+    },
+    {
+      "from": "texture",
+      "to": "texture-consumer",
+      "relation": "metadata-parser-input",
+      "level": "prior-source"
+    },
+    {
+      "from": "texture-consumer",
+      "to": "pipeline",
+      "relation": "still-properties-input",
+      "level": "prior-source"
+    },
+    {
+      "from": "people",
+      "to": "pipeline",
+      "relation": "person-input-context",
+      "level": "prior-source"
+    },
+    {
+      "from": "person-utilities",
+      "to": "people",
+      "relation": "geometry-canonicalization-only",
+      "level": "probe-source"
+    },
+    {
+      "from": "thumbnail",
+      "to": "pipeline",
+      "relation": "effect-specific-dependency-to-verify",
+      "level": "unverified"
+    },
+    {
+      "from": "roles",
+      "to": "pipeline",
+      "relation": "effect-specific-dependency-to-verify",
+      "level": "unverified"
+    },
+    {
+      "from": "maker84",
+      "to": "photos",
+      "relation": "admission-condition-not-qualified",
+      "level": "unverified"
+    },
+    {
+      "from": "pipeline",
+      "to": "render",
+      "relation": "requires-full-input-graph",
+      "level": "unverified"
+    },
+    {
+      "from": "render",
+      "to": "photos",
+      "relation": "macOS-render-does-not-establish-device-UI",
+      "level": "requires-device"
+    },
+    {
+      "from": "texture",
+      "to": "transport",
+      "relation": "opaque-existing-carrier-only",
+      "level": "offline-tested"
+    }
+  ]
+}
