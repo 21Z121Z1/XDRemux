@@ -100,7 +100,7 @@ Common options:
 | `--oppo-compatible` | Request OPPO Gallery compatible output for ProXDR still items. |
 | `--apple-portrait` | Request the complete Portrait resource set on macOS. |
 | `--apple-portrait-oppo` | Use OPPO depth and available masks with reduced effects on macOS. |
-| `--apple-styles` | Request Photographic Styles on macOS. |
+| `--apple-styles` | Generate Photographic Styles and inferred Texture Styles on macOS 27. |
 | `--apple-cinematic` | Infer pending Cinematic metadata for ordinary video on macOS 27. |
 | `--json` | Emit a stable machine-readable receipt. |
 

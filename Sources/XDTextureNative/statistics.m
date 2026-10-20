@@ -17,6 +17,23 @@ static id Wrap(id<MTLTexture> texture, CGRect region) {
     return wrapper;
 }
 
+static NSDictionary *ScalarTextureFacts(id<MTLTexture> texture) {
+    if (!texture) return @{@"available": @NO};
+    size_t size = texture.pixelFormat == MTLPixelFormatR8Unorm ? 1 : texture.pixelFormat == MTLPixelFormatR16Float ? 2 : texture.pixelFormat == MTLPixelFormatR32Float ? 4 : 0;
+    NSMutableDictionary *result = [@{@"available": @YES, @"width": @(texture.width), @"height": @(texture.height), @"format": @(texture.pixelFormat), @"type": @(texture.textureType)} mutableCopy];
+    if (!size || texture.textureType != MTLTextureType2D || texture.storageMode == MTLStorageModePrivate) return result;
+    NSMutableData *pixels = [NSMutableData dataWithLength:texture.width * texture.height * size];
+    [texture getBytes:pixels.mutableBytes bytesPerRow:texture.width * size fromRegion:MTLRegionMake2D(0, 0, texture.width, texture.height) mipmapLevel:0];
+    double sum = 0, maxValue = 0; uint64_t nonzero = 0;
+    for (size_t i = 0; i < texture.width * texture.height; i++) {
+        double v = size == 1 ? ((const uint8_t *)pixels.bytes)[i] / 255.0 : size == 2 ? ((const __fp16 *)pixels.bytes)[i] : ((const float *)pixels.bytes)[i];
+        if (isfinite(v)) { sum += v; maxValue = MAX(maxValue, v); nonzero += v > 0.001; }
+    }
+    result[@"mean"] = @(sum / (texture.width * texture.height)); result[@"maximum"] = @(maxValue);
+    result[@"nonzero_over_0_001"] = @(nonzero); result[@"sha256"] = SHA(pixels);
+    return result;
+}
+
 int xdremux_texture_statistics(const char *inputPath, const char *outputPath, const char *directoryPath, uint32_t selectedPerson, const char *effectName, const char *tuningJSON) {
     @autoreleasepool {
         NSString *input = @(inputPath), *out = @(outputPath);

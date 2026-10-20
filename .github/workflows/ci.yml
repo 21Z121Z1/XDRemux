@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   macos-product:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 120
     env:
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}

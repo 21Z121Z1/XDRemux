@@ -15,7 +15,7 @@ concurrency:
 jobs:
   exact-head:
     name: exact-head
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 75
     env:
       XDREMUX_GATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}

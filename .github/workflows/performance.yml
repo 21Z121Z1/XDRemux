@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   rust-performance:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7

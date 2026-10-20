@@ -100,7 +100,7 @@ xdremux batch \
 | `--oppo-compatible` | 对批次中的 ProXDR 静态照片请求 OPPO Gallery 兼容输出。 |
 | `--apple-portrait` | 在 macOS 上请求完整人像资源集。 |
 | `--apple-portrait-oppo` | 在 macOS 上使用 OPPO 深度和有效蒙版，人像效果降级。 |
-| `--apple-styles` | 在 macOS 上请求摄影风格。 |
+| `--apple-styles` | 在 macOS 27 上一并推理生成摄影风格与纹理风格。 |
 | `--apple-cinematic` | 在 macOS 27 上为普通视频推理待处理的电影效果元数据。 |
 | `--json` | 输出稳定的机器可读 receipt。 |
 
