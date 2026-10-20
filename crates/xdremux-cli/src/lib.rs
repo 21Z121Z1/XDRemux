@@ -767,7 +767,10 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
             || arguments.checkpoint.is_some()
             || arguments.categorize)
     {
-        let _ = writeln!(stderr, "error: --apple-cinematic does not support photo categorization or Live Photo checkpoint/resume options");
+        let _ = writeln!(
+            stderr,
+            "error: --apple-cinematic does not support photo categorization or Live Photo checkpoint/resume options"
+        );
         return 2;
     }
     let inputs = match discover_batch_inputs(&arguments) {
@@ -859,6 +862,7 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
                     "kind": batch_kind_name(success.kind),
                     "status": batch_disposition_name(success.disposition),
                     "outputs": success.outputs.iter().map(|path| path_json(path)).collect::<Vec<_>>(),
+                    "omitted_resource_count": success.omitted_resource_count,
                 })
             })
             .collect::<Vec<_>>();
@@ -895,6 +899,13 @@ fn run_batch(arguments: BatchArgs, stdout: &mut impl Write, stderr: &mut impl Wr
         }
     } else {
         for success in &receipt.successes {
+            if let Some(omitted) = success.omitted_resource_count.filter(|count| *count > 0) {
+                let _ = writeln!(
+                    stdout,
+                    "note: {}: {omitted} source resources remain only in the original input",
+                    success.input.display()
+                );
+            }
             let outputs = success
                 .outputs
                 .iter()
