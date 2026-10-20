@@ -60,7 +60,10 @@ class PublicDocumentationTests(unittest.TestCase):
         english = (ROOT / "docs/cli.en.md").read_text(encoding="utf-8")
         chinese = (ROOT / "docs/cli.md").read_text(encoding="utf-8")
 
-        self.assertIn("one cross-platform product entry point: the Rust `xdremux` CLI", english)
+        self.assertIn("one product entry point: the Rust `xdremux` CLI", english)
+        self.assertIn("delivery targets Apple silicon (`arm64`) and macOS 27", english)
+        self.assertIn("Rust core retains Linux, Windows, and macOS builds and portable tests", english)
+        self.assertIn("does not establish availability of Styles SPI", english)
         self.assertIn("detected automatically", english)
         self.assertIn("Motion Photos are automatically converted to Live Photos", english)
         self.assertIn("--oppo-compatible", english)
@@ -69,7 +72,10 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertNotIn("swift run xdremux", english)
         self.assertNotIn("Why there is no `--family`", english)
 
-        self.assertIn("一个跨平台 Rust CLI", chinese)
+        self.assertIn("产品入口是 Rust `xdremux` CLI", chinese)
+        self.assertIn("完整 Mac 产品交付面向 Apple silicon（`arm64`）和 macOS 27", chinese)
+        self.assertIn("Rust 核心保留 Linux、Windows、macOS 构建及可移植测试", chinese)
+        self.assertIn("不证明 Styles SPI", chinese)
         self.assertIn("自动识别", chinese)
         self.assertIn("Motion Photo", chinese)
         self.assertIn("Live Photo", chinese)

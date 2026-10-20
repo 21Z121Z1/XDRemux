@@ -12,13 +12,15 @@ or validate the Rust product; they do not own conversion policy.
 | `apple/` | Apple framework and device acceptance; requires the documented platform. |
 | `diagnostics/` | Read-only media inspection and comparison. |
 | `performance/` | Measurements and budget checks; baselines live in `../benchmarks/`. |
-| `distribution/` | Pinned native builds, macOS package relocation, archive and isolated package checks. |
+| `distribution/` | Pinned native builds, arm64/macOS 27 product package relocation, archive and isolated package checks. |
 
 ```bash
 python3 scripts/ci/agent_completion_gate.py --help
 bash scripts/validation/check_rust_cli_smoke.sh
 python3 -m unittest tests.validation.test_repository_layout -v
 ```
+
+`rust-cli-core.yml` retains Linux, Windows, and macOS tests for the portable Rust core. Its product package job uses `xcode-27`, arm64, and a macOS 27 deployment target. Packaging checks every bundled Mach-O architecture and deployment target, then runs real conversions outside the checkout with only system paths. Feature-specific native and app acceptance remain separate gates.
 
 App-only build and model-test launchers live beside the Xcode project in
 [`apps/macos/XDRemuxApp/scripts/`](../apps/macos/XDRemuxApp/scripts/).

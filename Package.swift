@@ -6,7 +6,7 @@ let package = Package(
     name: "XDRemux",
     defaultLocalization: "en",
     platforms: [
-        .macOS(.v15)
+        .macOS("27.0")
     ],
     products: [
         // The Rust workspace owns the product stack. Swift publishes only the

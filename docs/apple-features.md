@@ -8,6 +8,8 @@ Canonical 公开产品是 Rust `xdremux` CLI。Swift target 只作为无法跨�
 
 ## 当前可用性
 
+完整 XDRemux 产品、App 与 Apple adapter 要求 **arm64 / macOS 27 或更新版本**。adapter 不构建 Intel 版本，并在报告 capability 或执行操作前检查支持的 host。Rust 核心保留 Linux、Windows、macOS 测试，不代表这些 host 有 Apple 功能。满足 OS/架构下限不能替代逐操作 API、资源、GPU 回执和最终文件验证。
+
 标准 HDR、OPPO 兼容输出、Motion Photo → Live Photo、batch、分类、inspect 和 portable validation 已属于 canonical Rust 产品。
 
 摄影风格和 Apple 人像通过 `convert`/`batch` 的产品 intent 表达，不新增 Apple 专用 CLI 子命令，也不把 adapter 或 solver 的底层控制暴露为公开契约。
@@ -107,6 +109,7 @@ Apple Log 传递函数、[0, 1] 码值范围和现有辅助色彩标记保持不
 Styles 系数与 Linear Thumbnail 复用真正提交给系统编码器的 SDR/HDR 图像对，包括 SDR 量化和提交的 half-float HDR，不会继续用原 OPPO Gain Map 的通道或 scale 参数解释新 Gain Map。回读失败会在原子替换已有输出前拒绝测量。
 
 这些名称和可用版本来自 macOS 27 SDK 头文件（`CIContext.h`、`CIImage.h`、`CGImage.h`、`CGImageSource.h`、`CGImageDestination.h`、`CGImageProperties.h`），不是猜出来的 selector。`writeHEIFRepresentationOfImage` 从 macOS 10.13.4 起可用。HDR image 选项和 `contentHeadroom` 从 macOS 15 起可用，`imageBySettingContentHeadroom` 从 macOS 26 起可用。Rust 送出的 headroom 是交给编码器的 half 数值的 `max(1, measured peak)`。头文件不允许 `(0, 1)` 区间内的 headroom。ImageIO 的 `kCGImageDestinationEncodeGenerateGainMapWithBaseImage` 从 macOS 16 起存在，但它的字典值类型没有文档，因此原型不调用它。
+这些是个别 API 的 SDK 引入版本，不是完整 arm64/macOS 27 产品或 Styles/Texture 私有 SPI 的支持下限。
 
 回读使用 `kCGImageSourceDecodeRequest` = `kCGImageSourceDecodeToHDR`，并把 `kCGImageSourceGenerateImageSpecificLumaScaling` 设为 false，然后渲染成 extended-linear Display P3 half。它同时报告 `kCGImageAuxiliaryDataTypeHDRGainMap` 和 `kCGImageAuxiliaryDataTypeISOGainMap`。系统文件实际包含哪一种是测量结果，不是头文件事实。Styles 组装器仍然要求恰好一个 `tmap` item 及其 `dimg` 图。如果系统文件没有这张图，组装会失败关闭，报告记下这个冲突。Photos 导入和编辑仍需实机证据。
 

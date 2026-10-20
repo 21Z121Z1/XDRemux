@@ -63,7 +63,7 @@ enum AppStrings {
     static let oppoGalleryCompatibilityShort = "OPPO 兼容 HDR"
     static let oppoGalleryCompatibilityHelp = "默认关闭并输出标准 ISO HDR；开启后交给 Rust 的 OPPO compatibility intent，生成 OPPO 相册可消费的 Main Still 4:2:0 Gain Map。"
     static let applePhotographicStyles = "Apple 摄影风格"
-    static let applePhotographicStylesHelp = "从当前照片一并生成摄影风格与纹理风格元数据、逐人统计和语义蒙版，保留原图及 HDR。需要 macOS 27 的 Apple Vision/CMImaging 私有运行时；任一步骤失败时不发布输出。"
+    static let applePhotographicStylesHelp = "从当前照片一并生成摄影风格与纹理风格元数据、逐人统计和语义蒙版，保留原图及 HDR。需要 Apple 芯片与 macOS 27 的 Vision/CMImaging 私有运行时；任一步骤失败时不发布输出。"
     static let applePortrait = "Apple 人像编辑"
     static let applePortraitHelp = "使用 OPPO 景深数据与当前照片的 Vision person、skin、hair、teeth、glasses 分割结果生成 Apple 人像辅助项目。非人像照片仍可单独输出摄影风格。"
     static let appleFeaturesOppoIncompatibleHelp = "Apple 输出与 OPPO 相册兼容层互斥；先关闭 OPPO 相册兼容格式。"

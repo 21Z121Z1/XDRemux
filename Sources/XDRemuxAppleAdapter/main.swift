@@ -4,6 +4,14 @@ import UniformTypeIdentifiers
 import Darwin
 import XDCinematicNative
 
+#if !arch(arm64)
+#error("XDRemux Apple adapter requires arm64 and macOS 27 or newer")
+#endif
+
+private let nativeProductHostIsSupported = ProcessInfo.processInfo.isOperatingSystemAtLeast(
+    OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0)
+)
+
 private let schemaVersion = 2
 private let persistentTransportArgument = "--persistent-json-lines"
 private let maxTransportFrameBytes = 8 * 1024 * 1024
@@ -746,6 +754,10 @@ private func encodedResponse(for input: Data) throws -> Data {
     let request = try JSONDecoder().decode(AdapterRequest.self, from: input)
     guard request.schemaVersion == schemaVersion else {
         fail("unsupported apple adapter schema_version \(request.schemaVersion)")
+    }
+
+    guard nativeProductHostIsSupported else {
+        fail("XDRemux Apple adapter requires arm64 and macOS 27 or newer", status: 1)
     }
 
     let response: AdapterResponse

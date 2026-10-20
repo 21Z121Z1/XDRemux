@@ -25,6 +25,8 @@ parser test 不是真机测试。
 
 ## 最低验证要求
 
+完整产品门禁面向 arm64/macOS 27：App、adapter、解包运行、原媒体保全、HDR/Styles 和性能检查均保留。Linux、Windows、macOS 的 Rust 核心测试继续执行，Intel 产品包不再属于分发范围。范围调整不把原生缺测、操作失败或未验设备行为变成通过。
+
 使用最小但完整的证据集。
 
 - 纯文档修改：文档 policy 和链接检查。

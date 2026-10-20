@@ -73,9 +73,13 @@ SwiftPM contains only the adapter executable. Its build verifies the platform pr
 
 ## macOS CLI packages
 
-The existing `rust-cli-core.yml` workflow also builds separate arm64 and x86_64
-packages using `scripts/distribution/`. It keeps the root Swift package and both
-native targets. Native dependencies are checksum-pinned; the archive includes
+The complete macOS product targets Apple silicon (arm64) on macOS 27 or newer.
+The App, Swift package and product archive use a macOS 27.0 deployment target;
+the adapter rejects unsupported hosts before advertising capabilities. The
+existing `rust-cli-core.yml` workflow builds one arm64 product package on the
+standard `xcode-27` runner using `scripts/distribution/`. It keeps the root Swift
+package and both native targets. Linux, Windows and macOS Rust core checks remain
+separate; they do not establish availability of the complete Apple product. Native dependencies are checksum-pinned; the archive includes
 their sources and license notices. The package contains the CLI, Apple adapter,
 and audited loader-relative dylib closure with ad-hoc signatures.
 
@@ -87,10 +91,11 @@ The dyld log must show the bundled libheif and no non-system library outside
 the package. Portable packaging tests run with
 `python3 -m unittest tests.test_macos_distribution`.
 
-This smoke check establishes packaged portable conversion on the tested host,
-not Apple editing capability. Styles/Texture and Cinematic require their current
-macOS 27 SDK/runtime/hardware contract and separate native gates. The Intel
-macOS 26 package does not establish those features. Archives normalize timestamps
+This smoke check establishes packaged portable conversion on the supported
+arm64/macOS 27 host, not Apple editing capability. Styles/Texture and Cinematic
+still require their actual framework/runtime/hardware facts and separate native
+gates. No Intel product package is built. Individual APIs introduced before
+macOS 27 do not lower the complete product or private-SPI support boundary. Archives normalize timestamps
 and owners for fixed staged bytes; this is not a claim of compiler-level
 reproducibility. Packages are CI artifacts, not notarized releases.
 

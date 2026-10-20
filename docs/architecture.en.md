@@ -28,6 +28,8 @@ filesystem publication. See [the integration contract](liblivephoto-integration.
 
 ### Apple capability boundary
 
+The complete Apple product ships only for arm64 on macOS 27 or newer. Its App and native package share that build target, and the adapter rejects unsupported hosts before capability advertisement. Cross-platform Rust core tests remain independent; native framework and device acceptance still require their actual environments.
+
 `Sources/XDRemuxAppleAdapter/` is the minimal Apple-framework primitive adapter invoked by the Rust runtime.
 
 Current responsibilities include:

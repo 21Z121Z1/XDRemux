@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -16,6 +17,20 @@ CI_WORKFLOW = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="ut
 
 
 class SwiftAppArchitectureTests(unittest.TestCase):
+    def test_complete_native_product_targets_arm64_and_macos_27(self) -> None:
+        package = (ROOT / "Package.swift").read_text(encoding="utf-8")
+        self.assertRegex(package, r'\.macOS\("27\.0"\)')
+        deployment_targets = re.findall(r"deploymentTarget:\s*([\d.]+)", PROJECT)
+        self.assertEqual(deployment_targets, ["27.0"] * 3)
+        self.assertEqual(PROJECT.count("ARCHS: arm64"), 3)
+        xcode = (APP_SOURCE_ROOT.parent / "XDRemuxApp.xcodeproj" / "project.pbxproj").read_text(encoding="utf-8")
+        configurations = re.findall(r"buildSettings = \{(.*?)\n\s*\};", xcode, re.S)
+        native_targets = [block for block in configurations if "MACOSX_DEPLOYMENT_TARGET" in block]
+        self.assertEqual(len(native_targets), 6)
+        for block in native_targets:
+            self.assertIn("MACOSX_DEPLOYMENT_TARGET = 27.0;", block)
+            self.assertIn("ARCHS = arm64;", block)
+
     def test_app_uses_rust_cli_without_swift_conversion_engines(self) -> None:
         combined = "\n".join(APP_SOURCES.values())
         for forbidden in (

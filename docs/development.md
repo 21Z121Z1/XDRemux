@@ -73,8 +73,11 @@ SwiftPM 只包含 adapter executable。它的构建验证 platform primitive bou
 
 ## macOS CLI 包
 
-现有 `rust-cli-core.yml` workflow 通过 `scripts/distribution/` 构建独立的 arm64
-和 x86_64 包，保留根 Swift package 与两个 native target。原生依赖固定 checksum；
+完整 macOS 产品要求 Apple 芯片（arm64）和 macOS 27 或更新版本。App、Swift package
+与产品归档统一使用 macOS 27.0 deployment target；adapter 在报告 capability 前拒绝不支持
+的 host。现有 `rust-cli-core.yml` 使用标准 `xcode-27` runner 和 `scripts/distribution/`
+构建单一 arm64 产品包，保留根 Swift package 与两个 native target。Linux、Windows、macOS
+的 Rust 核心检查独立保留，不证明完整 Apple 产品在这些 host 上可用。原生依赖固定 checksum；
 归档包含依赖源代码和许可文本。包内含 CLI、Apple adapter 和经过校验的
 loader-relative dylib 闭包，使用 ad-hoc 签名。
 
@@ -84,9 +87,9 @@ loader-relative dylib 闭包，使用 ad-hoc 签名。
 libheif，且不能从包外加载非系统库。可移植打包测试使用
 `python3 -m unittest tests.test_macos_distribution`。
 
-该 smoke 检查只证明测试 host 上包内的可移植转换，不证明 Apple 编辑能力。
-Styles/Texture 和 Cinematic 仍需各自 macOS 27 SDK/runtime/硬件契约及独立原生 gate。
-Intel macOS 26 包不证明这些功能。归档对固定 staging 字节规范化时间戳和 owner，
+该 smoke 检查只证明支持的 arm64/macOS 27 host 上包内可移植转换，不证明 Apple 编辑能力。
+Styles/Texture 和 Cinematic 仍需真实 framework/runtime/硬件事实及独立原生 gate。
+不再构建 Intel 产品包；个别 API 早于 macOS 27 引入不降低完整产品或私有 SPI 的支持下限。归档对固定 staging 字节规范化时间戳和 owner，
 不声称编译器级构建可复现。包是 CI artifact，不是 notarized release。
 
 ## Python 工具

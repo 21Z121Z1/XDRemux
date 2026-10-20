@@ -2,14 +2,80 @@
 from pathlib import Path
 import io
 import os
+import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scripts.distribution import macos, smoke_macos
 
 
 class MacOSDistributionTests(unittest.TestCase):
+    @staticmethod
+    def package_fixture(root):
+        package = root / "package"
+        for relative in ("bin/xdremux", "libexec/xdremux-apple-adapter",
+                         "lib/libheif.1.dylib", "lib/libde265.0.dylib",
+                         "lib/libx265.1.dylib", "lib/libsharpyuv.0.dylib"):
+            path = package / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"portable fixture; Mach-O observations are injected")
+            path.chmod(0o755)
+        return package
+
+    def test_product_entrypoints_reject_intel_before_creating_output(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temporary:
+            scratch = Path(temporary)
+            commands = [
+                ["build_native.py", "--arch", "x86_64", "--work", str(scratch / "native")],
+                ["macos.py", "audit", "--arch", "x86_64", "--package", str(scratch / "package")],
+                ["smoke_macos.py", "--arch", "x86_64", "--archive", str(scratch / "archive.tar.gz"),
+                 "--fixtures", str(root / "fixtures"), "--expected-head", "0" * 40,
+                 "--output", str(scratch / "evidence")],
+            ]
+            for command in commands:
+                with self.subTest(script=command[0]):
+                    result = subprocess.run([sys.executable, str(root / "scripts/distribution" / command[0]),
+                                             *command[1:]], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("invalid choice: 'x86_64'", result.stderr)
+            self.assertEqual(list(scratch.iterdir()), [])
+
+    def test_package_audit_requires_native_arm64_macos27_host(self):
+        facts = {"architectures": ["arm64"], "minimum_os": "27.0", "dependencies": [],
+                 "rpaths": [], "install_id": None, "dyld_environment": []}
+        for system, arch, version in [("Linux", "arm64", ""), ("Darwin", "x86_64", "27.0"),
+                                      ("Darwin", "arm64", "26.4")]:
+            with self.subTest(system=system, arch=arch, version=version), tempfile.TemporaryDirectory() as temporary:
+                package = self.package_fixture(Path(temporary))
+                with patch.object(macos.platform, "system", return_value=system), \
+                     patch.object(macos.platform, "machine", return_value=arch), \
+                     patch.object(macos.platform, "mac_ver", return_value=(version, (), "")), \
+                     patch.object(macos, "inspect", return_value=facts), patch.object(macos, "call"):
+                    with self.assertRaisesRegex(ValueError, "arm64.*macOS 27"):
+                        macos.audit(package, "arm64")
+
+    def test_package_audit_rejects_wrong_architecture_or_deployment_target(self):
+        baseline = {"architectures": ["arm64"], "minimum_os": "27.0", "dependencies": [],
+                    "rpaths": [], "install_id": None, "dyld_environment": []}
+        cases = [{"architectures": ["x86_64"]}, {"architectures": ["arm64", "x86_64"]},
+                 *[{"minimum_os": value} for value in (None, "15.0", "26.0", "28.0")]]
+        with tempfile.TemporaryDirectory() as temporary:
+            package = self.package_fixture(Path(temporary))
+            with patch.object(macos.platform, "system", return_value="Darwin"), \
+                 patch.object(macos.platform, "machine", return_value="arm64"), \
+                 patch.object(macos.platform, "mac_ver", return_value=("27.0.1", (), "")), \
+                 patch.object(macos, "call"), patch.object(macos, "inspect", return_value=baseline):
+                report = macos.audit(package, "arm64")
+                self.assertEqual(len(report["files"]), 6)
+                for changed in cases:
+                    with self.subTest(changed=changed), patch.object(macos, "inspect", return_value={**baseline, **changed}):
+                        with self.assertRaisesRegex(ValueError, "architecture|deployment target"):
+                            macos.audit(package, "arm64")
+
     def test_all_dynamic_load_kinds_and_environment_are_observed(self):
         text = """Load command 0
           cmd LC_ID_DYLIB

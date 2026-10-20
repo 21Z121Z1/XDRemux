@@ -27,6 +27,8 @@ LibLivePhoto 提供可移植的 Motion/Live Photo 格式实现。XDRemux 保留 
 
 ### Apple capability boundary
 
+完整 Apple 产品仅分发 arm64/macOS 27 或更新版本；App 与原生包使用同一构建目标，adapter 在报告 capability 前拒绝不支持的 host。跨平台 Rust 核心测试独立保留，原生 framework 与设备验收仍须对应真实环境。
+
 `Sources/XDRemuxAppleAdapter/` 是 Rust runtime 调用的最小 Apple framework primitive adapter。
 
 当前职责包括：

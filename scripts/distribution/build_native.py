@@ -6,12 +6,16 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import platform
 import re
 import shutil
 import subprocess
 import tarfile
 from urllib.parse import urlsplit
+
+if __package__:
+    from .macos import MINIMUM_MACOS, PRODUCT_ARCH, require_native_host
+else:
+    from macos import MINIMUM_MACOS, PRODUCT_ARCH, require_native_host
 
 MANIFEST = Path(__file__).with_name("native-dependencies.json")
 
@@ -22,10 +26,12 @@ def run(*args: object, **kwargs: object) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--work", type=Path, required=True)
-    parser.add_argument("--arch", choices=("arm64", "x86_64"), required=True)
+    parser.add_argument("--arch", choices=(PRODUCT_ARCH,), required=True)
     args = parser.parse_args()
-    if platform.system() != "Darwin" or platform.machine() != args.arch:
-        raise SystemExit("Build on a native macOS runner of the requested architecture")
+    try:
+        require_native_host(args.arch)
+    except ValueError as error:
+        parser.error(str(error))
     work = args.work.resolve()
     if work.exists():
         raise SystemExit(f"Refusing to reuse a possibly contaminated native build: {work}")
@@ -64,7 +70,7 @@ def main() -> None:
     common = [
         "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_INSTALL_PREFIX={prefix}",
         "-DCMAKE_INSTALL_LIBDIR=lib", f"-DCMAKE_OSX_ARCHITECTURES={args.arch}",
-        "-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0", "-DCMAKE_INSTALL_NAME_DIR=@rpath",
+        f"-DCMAKE_OSX_DEPLOYMENT_TARGET={MINIMUM_MACOS}", "-DCMAKE_INSTALL_NAME_DIR=@rpath",
         "-DCMAKE_INSTALL_RPATH=", "-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=OFF",
         "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-headerpad_max_install_names",
         "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",

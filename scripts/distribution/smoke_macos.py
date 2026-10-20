@@ -13,9 +13,9 @@ import tempfile
 from urllib.parse import urlsplit
 
 if __package__:
-    from .macos import audit, extract_archive, sha256, system_reference
+    from .macos import MINIMUM_MACOS, PRODUCT_ARCH, audit, extract_archive, require_native_host, sha256, system_reference
 else:
-    from macos import audit, extract_archive, sha256, system_reference
+    from macos import MINIMUM_MACOS, PRODUCT_ARCH, audit, extract_archive, require_native_host, sha256, system_reference
 
 
 def loaded_libraries(stderr: str, package: Path, *, require_heif: bool = True) -> list[str]:
@@ -46,12 +46,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", required=True, type=Path)
     parser.add_argument("--fixtures", required=True, type=Path)
-    parser.add_argument("--arch", required=True, choices=("arm64", "x86_64"))
+    parser.add_argument("--arch", required=True, choices=(PRODUCT_ARCH,))
     parser.add_argument("--expected-head", required=True)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
-    if platform.system() != "Darwin" or platform.machine() != args.arch:
-        parser.error("requires native macOS of the package architecture")
+    try:
+        require_native_host(args.arch)
+    except ValueError as error:
+        parser.error(str(error))
     evidence = args.output.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
     report = {"head": args.expected_head, "architecture": args.arch,
@@ -76,8 +78,9 @@ def main() -> None:
             facts = audit(package, args.arch)
             (evidence / "relocated-linkage.json").write_text(json.dumps(facts, indent=2) + "\n")
             manifest = json.loads((package / "manifest.json").read_text())
-            if manifest["head"] != args.expected_head or manifest["architecture"] != args.arch:
-                raise ValueError("Package identity differs from requested source/architecture")
+            if (manifest["head"] != args.expected_head or manifest["architecture"] != args.arch
+                    or manifest.get("minimum_macos") != MINIMUM_MACOS):
+                raise ValueError("Package identity differs from requested source/architecture/minimum OS")
             report["sources"] = []
             for name, dependency in manifest["packages"].items():
                 source = package / "share/sources" / Path(urlsplit(dependency["url"]).path).name

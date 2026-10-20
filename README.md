@@ -6,6 +6,8 @@ XDRemux 将支持的厂商 HDR 照片转换为 ISO/TS 21496-1 HDR HEIC，并把�
 
 产品只有一个入口：Rust `xdremux` CLI。输入类型、源代际、HDR / Gain Map 结构以及 Motion Photo 路由均由程序自动识别。
 
+完整 Mac 产品面向 Apple silicon（`arm64`）和 macOS 27。Rust 核心保留 Linux、Windows、macOS 构建及可移植测试。这些核心检查不证明每个平台都具备完整 Apple 功能。
+
 ## 能做什么
 
 | 输入 / 意图 | 结果 |
@@ -21,6 +23,7 @@ XDRemux 将支持的厂商 HDR 照片转换为 ISO/TS 21496-1 HDR HEIC，并把�
 ## 构建
 
 跨平台转换栈需要当前 Rust toolchain，以及带 HEVC 支持的 libheif。
+以下命令构建 Rust 核心。Mac 产品包还包含 Apple adapter，使用 Xcode 27，并将 macOS 27 设为部署目标。打包及独立原生验收 gate 见[开发文档](docs/development.md)。
 
 ```bash
 git clone https://github.com/21Z121Z1/XDRemux.git

@@ -8,6 +8,8 @@ The canonical public product is the Rust `xdremux` CLI. The Swift target is only
 
 ## Current availability
 
+The complete XDRemux product, App and Apple adapter require **arm64 / macOS 27 or newer**. The adapter is not built for Intel and checks its supported host before reporting capabilities or executing an operation. The portable Rust core retains Linux, Windows and macOS tests; those checks do not imply Apple feature availability on those hosts. A supported OS and architecture do not replace per-operation API, asset, GPU receipt or final-file validation.
+
 Standard HDR, OPPO-compatible output, Motion Photo → Live Photo, batch processing, categorization, inspection, and portable validation belong to the canonical Rust product.
 
 Photographic Styles and Apple Portrait are expressed as `convert`/`batch` product intents. They do not create Apple-specific CLI subcommands, and low-level adapter or solver controls are not part of the public contract.
@@ -231,6 +233,8 @@ Those names and their availability come from the macOS 27 SDK headers
 `CGImageDestination.h`, `CGImageProperties.h`), not from a guessed selector.
 `writeHEIFRepresentationOfImage` is macOS 10.13.4. The HDR-image option and
 `contentHeadroom` are macOS 15, and `imageBySettingContentHeadroom` is macOS 26.
+These are SDK introduction versions for individual APIs, not the support floor
+for the complete arm64/macOS 27 product or its private Styles/Texture SPI.
 Headroom sent by Rust is `max(1, measured peak)` of the half values handed to
 the encoder. The header forbids a headroom in `(0, 1)`. ImageIO
 `kCGImageDestinationEncodeGenerateGainMapWithBaseImage` exists from macOS 16,

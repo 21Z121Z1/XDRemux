@@ -2,10 +2,11 @@
 
 ## English
 
-Keep this entire directory together. No checkout, Rust, SwiftPM, Xcode project,
-or Homebrew runtime installation is required. Use the architecture recorded in
-`manifest.json`; this is not a Universal 2 binary. CI validates the relocated
-package on the host OS recorded in its evidence.
+Run this package on Apple silicon (`arm64`) with macOS 27. Keep this entire
+directory together. No checkout, Rust, SwiftPM, Xcode project, or Homebrew runtime
+installation is required. `manifest.json` records arm64 and the macOS 27.0
+deployment target. CI validates the relocated package on the host OS recorded
+in its evidence.
 Use artifacts from a successful complete workflow run, not an unfinished build.
 
 ```bash
@@ -18,11 +19,12 @@ Use artifacts from a successful complete workflow run, not an unfinished build.
 runtime dylibs are in `lib/`. libheif's HEVC codecs are built in; no runtime plugin
 search or environment-variable configuration is needed.
 
-The package smoke covers portable Motion Photo and standard HDR conversion,
+The package smoke covers Motion Photo and standard HDR conversion,
 including HEIC/MOV validation and unchanged inputs. Apple editing intents still
 require their documented SDK, OS, frameworks and hardware. Styles/Texture and
-Cinematic require macOS 27 and separate native evidence. An Intel package tested
-on macOS 26 does not establish those capabilities.
+Cinematic require macOS 27 and separate native evidence. A compilation floor or
+successful package smoke does not establish availability of their private APIs,
+native processing, interactive Photos editing, or app acceptance.
 
 Language precedence: `--lang`, `XDREMUX_LANG`, `LC_ALL`, `LC_MESSAGES`, `LANG`, `en`.
 Empty environment values are ignored. `zh_CN.UTF-8` and other `zh` locales select
@@ -43,8 +45,9 @@ The exact product revision is recorded in `manifest.json`.
 
 ## 简体中文
 
-请保留完整目录结构。运行不需要克隆仓库、Rust、SwiftPM、Xcode 项目或
-Homebrew 运行时。使用 `manifest.json` 记录的对应架构，不是 Universal 2。
+请在 Apple silicon（`arm64`）和 macOS 27 上运行此包，并保留完整目录结构。
+运行不需要克隆仓库、Rust、SwiftPM、Xcode 项目或 Homebrew 运行时。
+`manifest.json` 记录 arm64 架构和 macOS 27.0 部署目标。
 CI 在 evidence 记录的 host OS 上验证重定位后的包。
 请使用整个 workflow 已成功完成的产物，不要将未完成的构建视作验收通过。
 
@@ -56,9 +59,10 @@ CI 在 evidence 记录的 host OS 上验证重定位后的包。
 
 CLI 自动找到 `libexec/xdremux-apple-adapter`，所需非系统 dylib 位于 `lib/`。
 HEVC codec 已内置到 libheif，无需手动配置插件或环境变量。
-包 smoke 覆盖可移植 Motion Photo 和标准 HDR 转换、HEIC/MOV 验证及源字节不变。
+包 smoke 覆盖 Motion Photo 和标准 HDR 转换、HEIC/MOV 验证及源字节不变。
 Apple 编辑意图仍需各自的 SDK、OS、framework 和硬件条件。Styles/Texture 与
-Cinematic 需要 macOS 27 及独立原生证据；在 macOS 26 测试的 Intel 包不证明这些能力。
+Cinematic 需要 macOS 27 及独立原生证据。编译下限或包 smoke 通过，不证明
+私有 API 可用、原生处理成功、Photos 交互编辑或 App 验收通过。
 语言优先级为 `--lang` → `XDREMUX_LANG` → `LC_ALL` → `LC_MESSAGES` → `LANG` → `en`。
 忽略空环境变量；`zh_CN.UTF-8` 等 `zh` locale 使用简体中文；`C`、`POSIX` 使用英文。
 不支持的环境 locale 回退英文，显式指定不支持的 `--lang` 则返回参数错误。

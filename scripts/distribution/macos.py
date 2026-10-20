@@ -15,6 +15,14 @@ import tarfile
 
 LOAD_COMMANDS = {"LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LOAD_UPWARD_DYLIB", "LC_LAZY_LOAD_DYLIB"}
 LIBRARIES = ("libheif.", "libde265.", "libx265.", "libsharpyuv.")
+PRODUCT_ARCH = "arm64"
+MINIMUM_MACOS = "27.0"
+
+def require_native_host(arch: str) -> None:
+    version = platform.mac_ver()[0].split(".")[0]
+    if (arch != PRODUCT_ARCH or platform.system() != "Darwin" or platform.machine() != PRODUCT_ARCH
+            or not version.isdecimal() or int(version) < int(MINIMUM_MACOS.split(".")[0])):
+        raise ValueError("Product packaging requires native arm64 on macOS 27 or later")
 
 def output(*args: object) -> str:
     return subprocess.check_output([str(arg) for arg in args], text=True)
@@ -67,6 +75,7 @@ def bundled_reference(package: Path, image: Path, reference: str) -> Path:
     return target
 
 def audit(package: Path, arch: str) -> dict:
+    require_native_host(arch)
     package = package.resolve()
     files = [package / "bin/xdremux", package / "libexec/xdremux-apple-adapter"]
     libraries = sorted((package / "lib").glob("*.dylib"))
@@ -83,6 +92,8 @@ def audit(package: Path, arch: str) -> dict:
         facts = inspect(path)
         if facts["architectures"] != [arch] or facts["dyld_environment"]:
             raise ValueError(f"Unexpected architecture or embedded dyld environment: {path}: {facts}")
+        if facts.get("minimum_os") not in (MINIMUM_MACOS, MINIMUM_MACOS + ".0"):
+            raise ValueError(f"Unexpected deployment target (require {MINIMUM_MACOS}): {path}: {facts.get('minimum_os')}")
         for reference in facts["dependencies"]:
             if not system_reference(reference) and bundled_reference(package, path, reference) not in known:
                 raise ValueError(f"Unaccounted dynamic dependency: {reference}")
@@ -93,9 +104,10 @@ def audit(package: Path, arch: str) -> dict:
             raise ValueError(f"Unrelocated dylib ID: {path}: {facts['install_id']}")
         call("/usr/bin/codesign", "--verify", "--strict", path)
         records.append({"path": path.relative_to(package).as_posix(), "sha256": sha256(path), **facts})
-    return {"schema_version": 1, "architecture": arch, "files": records}
+    return {"schema_version": 1, "architecture": arch, "minimum_macos": MINIMUM_MACOS, "files": records}
 
 def stage(args: argparse.Namespace) -> None:
+    require_native_host(args.arch)
     package = args.output.resolve()
     if package.exists():
         raise ValueError(f"Refusing to overwrite staging directory: {package}")
@@ -153,7 +165,7 @@ def stage(args: argparse.Namespace) -> None:
     for path in (args.native / "sources").iterdir():
         shutil.copy2(path, package / "share/sources" / path.name)
     shutil.copy2(Path(__file__).with_name("package-readme.md"), package / "README.md")
-    manifest.update({"head": args.head, "architecture": args.arch,
+    manifest.update({"head": args.head, "architecture": args.arch, "minimum_macos": MINIMUM_MACOS,
                      "build_os": platform.mac_ver()[0], "plugin_loading": False,
                      "native_features": "Require their documented OS, SDK and runtime capabilities; portable package smoke does not certify them",
                      "signature": "ad-hoc, not Developer ID or notarized"})
@@ -211,10 +223,10 @@ def main() -> None:
     for name in ("cli", "adapter", "native", "output"):
         build.add_argument(f"--{name}", required=True, type=Path)
     build.add_argument("--head", required=True)
-    build.add_argument("--arch", required=True, choices=("arm64", "x86_64"))
+    build.add_argument("--arch", required=True, choices=(PRODUCT_ARCH,))
     check = commands.add_parser("audit")
     check.add_argument("--package", required=True, type=Path)
-    check.add_argument("--arch", required=True, choices=("arm64", "x86_64"))
+    check.add_argument("--arch", required=True, choices=(PRODUCT_ARCH,))
     pack = commands.add_parser("archive")
     pack.add_argument("--package", required=True, type=Path)
     pack.add_argument("--output", required=True, type=Path)
@@ -225,6 +237,7 @@ def main() -> None:
     elif args.command == "audit":
         print(json.dumps(audit(args.package, args.arch), indent=2))
     else:
+        audit(args.package, PRODUCT_ARCH)
         archive(args.package, args.output, args.epoch)
 
 if __name__ == "__main__":

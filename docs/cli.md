@@ -2,7 +2,9 @@
 
 [English](cli.en.md) | 简体中文
 
-XDRemux 的产品入口是一个跨平台 Rust CLI：`xdremux`。输入类型、Motion Photo / ProXDR 路由以及 HDR / Gain Map 源结构都由程序自动识别；标准转换不要求用户选择格式、设备代际或底层处理策略。
+XDRemux 的产品入口是 Rust `xdremux` CLI。输入类型、Motion Photo / ProXDR 路由以及 HDR / Gain Map 源结构都由程序自动识别；标准转换不要求用户选择格式、设备代际或底层处理策略。
+
+完整 Mac 产品交付面向 Apple silicon（`arm64`）和 macOS 27。底层 Rust 核心保留 Linux、Windows、macOS 构建及可移植测试。核心构建或较旧的编译下限不证明 Styles SPI 或其他 Apple 原生功能可用。这些功能仍需文档规定的 macOS 27 SDK、运行时 API、硬件及独立原生验收检查。
 
 Swift package 只作为 Apple 平台 capability adapter，剩余 Python package 只作为研究/训练工具。它们都不是第二套 XDRemux 实现，不再定义新的 CLI 产品语义或产品 policy。
 

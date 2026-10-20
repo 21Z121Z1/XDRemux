@@ -12,13 +12,15 @@
 | `apple/` | Apple framework 与真机验收，需满足相应平台要求。 |
 | `diagnostics/` | 只读媒体检查与比较。 |
 | `performance/` | 测量与预算检查；基线存放在 `../benchmarks/`。 |
-| `distribution/` | 固定原生依赖构建、macOS 包重定位、归档与隔离运行检查。 |
+| `distribution/` | 固定原生依赖构建、arm64/macOS 27 产品包重定位、归档与隔离运行检查。 |
 
 ```bash
 python3 scripts/ci/agent_completion_gate.py --help
 bash scripts/validation/check_rust_cli_smoke.sh
 python3 -m unittest tests.validation.test_repository_layout -v
 ```
+
+`rust-cli-core.yml` 保留面向可移植 Rust 核心的 Linux、Windows、macOS 测试。产品包 job 使用 `xcode-27`、arm64 和 macOS 27 部署目标。打包检查每个内置 Mach-O 的架构及部署目标，再在 checkout 外仅使用系统路径运行真实转换。各功能的原生验收与 App 验收仍是独立 gate。
 
 仅用于 App 的构建与模型测试启动器，与 Xcode 工程一起放在
 [`apps/macos/XDRemuxApp/scripts/`](../apps/macos/XDRemuxApp/scripts/)。

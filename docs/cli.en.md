@@ -2,7 +2,9 @@
 
 English | [简体中文](cli.md)
 
-XDRemux has one cross-platform product entry point: the Rust `xdremux` CLI. Input type, Motion Photo / ProXDR routing, and HDR / Gain Map source structure are detected automatically. Standard conversion does not require users to choose a format, device generation, or low-level processing policy.
+XDRemux has one product entry point: the Rust `xdremux` CLI. Input type, Motion Photo / ProXDR routing, and HDR / Gain Map source structure are detected automatically. Standard conversion does not require users to choose a format, device generation, or low-level processing policy.
+
+Complete Mac product delivery targets Apple silicon (`arm64`) and macOS 27. The underlying Rust core retains Linux, Windows, and macOS builds and portable tests. A core build or an older compilation floor does not establish availability of Styles SPI or other Apple-native features. Those features require the documented macOS 27 SDK, runtime APIs, hardware, and separate native acceptance checks.
 
 The Swift package is only the Apple platform capability adapter, and the remaining Python package is research/training tooling. Neither provides a second XDRemux runtime; they no longer define new CLI product semantics or a source of CLI product policy.
 

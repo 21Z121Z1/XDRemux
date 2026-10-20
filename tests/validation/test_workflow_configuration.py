@@ -206,11 +206,15 @@ class WorkflowConfigurationTests(unittest.TestCase):
     def test_macos_packages_share_portability_owner_and_require_relocated_runtime(self) -> None:
         workflow = self.workflow("rust-cli-core.yml")
         package_job = workflow.split("  macos-package:\n", 1)[1]
-        # These are standard public-repository runners. Keep package portability
-        # evidence distinct from the macOS 27 Apple-feature product gates.
-        self.assertIn("runner: xcode-27", package_job)
-        self.assertIn("runner: macos-26-intel", package_job)
-        self.assertNotRegex(package_job, r"runner: .*-(?:large|xlarge)")
+        # Full product packages target Apple silicon/macOS 27; the portable
+        # Rust core keeps the three-OS job above.
+        self.assertIn("runs-on: xcode-27", package_job)
+        self.assertNotIn("matrix", package_job)
+        self.assertNotIn("x86_64", package_job)
+        self.assertNotIn("macos-26-intel", package_job)
+        self.assertIn('MACOSX_DEPLOYMENT_TARGET: "27.0"', package_job)
+        self.assertIn("--target aarch64-apple-darwin", package_job)
+        self.assertNotRegex(package_job, r"runs-on: .*-(?:large|xlarge)")
         self.assertIn("swift build -c release --product xdremux-apple-adapter", package_job)
         self.assertNotIn("platforms/apple", package_job)
         self.assertIn("scripts/distribution/build_native.py", package_job)
