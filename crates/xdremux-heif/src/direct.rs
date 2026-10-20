@@ -762,6 +762,16 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
         }
     });
 
+    let mirror_before_rotation = primary_ipma
+        .associations
+        .iter()
+        .take_while(|association| u32::from(association.property_index) != irot.index)
+        .any(|association| {
+            property_by_index
+                .get(&u32::from(association.property_index))
+                .is_some_and(|property| property.kind == IMIR)
+        });
+
     for property in &original_codec {
         let index = next_property(
             &mut ipco_payload,
@@ -824,14 +834,25 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
         ],
     });
     if let Some(imir_index) = imir_index {
-        output_ipma_entries
+        let associations = &mut output_ipma_entries
             .last_mut()
             .expect("gain-map ipma entry was just pushed")
-            .associations
-            .push(IpmaAssociation {
+            .associations;
+        let position = if mirror_before_rotation {
+            associations
+                .iter()
+                .position(|association| association.property_index == irot_index)
+                .expect("primary irot association was just added")
+        } else {
+            associations.len()
+        };
+        associations.insert(
+            position,
+            IpmaAssociation {
                 property_index: imir_index,
                 essential: true,
-            });
+            },
+        );
     }
     output_ipma_entries.push(IpmaEntry {
         item_id: output_tmap_id,
@@ -1216,6 +1237,209 @@ mod tests {
         hvcc[1] = 4;
         hvcc[16] = if channel_count == 1 { 0 } else { 3 };
         hvcc
+    }
+
+    // Synthetic private-JPEG carrier: no native codec is needed to verify the
+    // order consumers must apply to the inherited transformative properties.
+    fn mirrored_jpeg_carrier(mirror_first: bool) -> Vec<u8> {
+        let ftyp = make_box(FTYP, b"heic0000mif1heic").unwrap();
+        let properties = [
+            make_ispe_box(4, 4).unwrap(),
+            make_irot_box(3).unwrap(),
+            make_box(IMIR, &[1]).unwrap(),
+            make_box(HVCC, &valid_hvcc(3)).unwrap(),
+            COLR_SRGB_BOX.to_vec(),
+            make_full_box(PIXI, 0, 0, &[3, 8, 8, 8]).unwrap(),
+        ]
+        .concat();
+        let transforms = if mirror_first { [3, 2] } else { [2, 3] };
+        let ipma = make_ipma_box(
+            0,
+            0,
+            &[
+                IpmaEntry {
+                    item_id: 1,
+                    associations: [1, 4, 5, 6]
+                        .into_iter()
+                        .chain(transforms)
+                        .map(|property_index| IpmaAssociation {
+                            property_index,
+                            essential: true,
+                        })
+                        .collect(),
+                },
+                IpmaEntry {
+                    item_id: 3,
+                    associations: [1, 5, 6]
+                        .into_iter()
+                        .map(|property_index| IpmaAssociation {
+                            property_index,
+                            essential: true,
+                        })
+                        .collect(),
+                },
+            ],
+        )
+        .unwrap();
+        let iprp = make_box(IPRP, &[make_box(IPCO, &properties).unwrap(), ipma].concat()).unwrap();
+        let iinf = make_iinf_box(
+            0,
+            &[
+                make_infe_box(1, HVC1, 0).unwrap(),
+                make_infe_box(2, JPEG, 1).unwrap(),
+                make_infe_box(3, TMAP, 0).unwrap(),
+            ],
+        )
+        .unwrap();
+        let iref = make_iref_box(
+            0,
+            &[IrefEntry {
+                kind: DIMG,
+                from_item_id: 3,
+                to_item_ids: vec![1, 2],
+            }],
+        )
+        .unwrap();
+        let meta = |mdat_start: u64| {
+            let iloc = make_iloc_box(
+                1,
+                4,
+                4,
+                0,
+                0,
+                &[
+                    IlocEntry {
+                        item_id: 1,
+                        construction_method: 0,
+                        data_reference_index: 0,
+                        base_offset: 0,
+                        extents: vec![IlocExtent {
+                            index: None,
+                            offset: mdat_start,
+                            length: 1,
+                        }],
+                    },
+                    IlocEntry {
+                        item_id: 2,
+                        construction_method: 0,
+                        data_reference_index: 0,
+                        base_offset: 0,
+                        extents: vec![IlocExtent {
+                            index: None,
+                            offset: mdat_start + 1,
+                            length: 1,
+                        }],
+                    },
+                    IlocEntry {
+                        item_id: 3,
+                        construction_method: 1,
+                        data_reference_index: 0,
+                        base_offset: 0,
+                        extents: vec![IlocExtent {
+                            index: None,
+                            offset: 0,
+                            length: 4,
+                        }],
+                    },
+                ],
+            )
+            .unwrap();
+            make_full_box(
+                META,
+                0,
+                0,
+                &[
+                    make_full_box(
+                        FourCC::new(*b"hdlr"),
+                        0,
+                        0,
+                        b"\0\0\0\0pict\0\0\0\0\0\0\0\0\0\0\0\0\0",
+                    )
+                    .unwrap(),
+                    make_full_box(PITM, 0, 0, &1_u16.to_be_bytes()).unwrap(),
+                    iinf.clone(),
+                    iloc,
+                    iprp.clone(),
+                    iref.clone(),
+                    make_box(IDAT, &[0; 4]).unwrap(),
+                ]
+                .concat(),
+            )
+            .unwrap()
+        };
+        let mdat_start = (ftyp.len() + meta(0).len() + 8) as u64;
+        [ftyp, meta(mdat_start), make_box(MDAT, &[11, 22]).unwrap()].concat()
+    }
+
+    #[test]
+    fn both_gain_map_assemblers_preserve_mirror_rotation_order() {
+        use xdremux_format::isobmff::parse_meta_box;
+        for mirror_first in [false, true] {
+            let source = mirrored_jpeg_carrier(mirror_first);
+            let hvcc = valid_hvcc(3);
+            let tile = GainMapTile {
+                payload: &[1],
+                width: 4,
+                height: 4,
+            };
+            let gain = DirectHevcGainMap {
+                gain_map_width: 4,
+                gain_map_height: 4,
+                tile_width: 4,
+                tile_height: 4,
+                tiles: std::slice::from_ref(&tile),
+                hvcc: &hvcc,
+                profile: GainMapEncodeProfile {
+                    channels: GainMapChannels::Rgb,
+                    chroma: ChromaSampling::Yuv444,
+                    luma_bit_depth: 8,
+                    chroma_bit_depth: 8,
+                },
+            };
+            let legacy = replace_private_jpeg_gain_map_with_hevc_tiles(&source, &gain).unwrap();
+            let canonical = crate::assemble_iso_gain_map_heif(
+                &source,
+                &crate::IsoGainMapAssembly {
+                    gain_map: gain,
+                    tmap_payload: &[0; 4],
+                    xmp_payload: b"xmp",
+                },
+            )
+            .unwrap();
+            for output in [legacy, canonical] {
+                let structure = crate::validate_gain_map_structure(&output).unwrap();
+                let top = scan_top_level_boxes(&output).unwrap();
+                let meta = parse_meta_box(
+                    &output,
+                    top.boxes.iter().find(|header| header.kind == META).unwrap(),
+                )
+                .unwrap();
+                let kinds = |item| {
+                    meta.ipma
+                        .entries
+                        .iter()
+                        .find(|entry| entry.item_id == item)
+                        .unwrap()
+                        .associations
+                        .iter()
+                        .filter_map(|association| {
+                            meta.properties.iter().find(|property| {
+                                property.index == u32::from(association.property_index)
+                            })
+                        })
+                        .map(|property| property.kind)
+                        .filter(|kind| *kind == IROT || *kind == IMIR)
+                        .collect::<Vec<_>>()
+                };
+                let expected = if mirror_first {
+                    vec![IMIR, IROT]
+                } else {
+                    vec![IROT, IMIR]
+                };
+                assert_eq!(kinds(structure.primary_item_id), expected);
+                assert_eq!(kinds(structure.gain_map_item_id), expected);
+            }
+        }
     }
 
     #[test]

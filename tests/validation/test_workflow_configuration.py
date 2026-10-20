@@ -159,6 +159,13 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertNotIn("scripts/validation/check_rust_cli_smoke.sh", workflow)
         self.assertNotIn("XDRemuxAppModelTests", workflow)
 
+    def test_oriented_imageio_readback_uses_the_product_exact_head(self) -> None:
+        workflow = self.workflow("ci.yml")
+        self.assertIn("ref: ${{ env.EXPECTED_HEAD }}", workflow)
+        self.assertIn("XDREMUX_ORIENTATION_OUTPUT:", workflow)
+        self.assertIn("scripts/apple/read_oriented_heif_imageio.swift", workflow)
+        self.assertIn("artifacts/product-integration/orientation/expected.json", workflow)
+
     def test_completion_gate_owns_repository_policy_regressions(self) -> None:
         completion_gate = self.workflow("completion-gate.yml")
         self.assertIn("tests.validation.test_agent_completion_gate", completion_gate)

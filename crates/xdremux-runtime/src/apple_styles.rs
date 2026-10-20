@@ -226,7 +226,11 @@ pub(crate) fn convert_file(
     let scene_raster = downsample_raster(&raster, LINEAR_THUMBNAIL_MAX_SIZE)?;
     let scene_rasters = derive_style_scene(&scene_raster, &gain_raster, &prepared.scale)?;
     let linear_thumbnail_raster = linear_thumbnail_raster(&scene_rasters)?
-        .undo_irot(geometry.quarter_turns_ccw)
+        .undo_heif_transform(
+            geometry.quarter_turns_ccw,
+            geometry.mirror_axis,
+            geometry.mirror_before_rotation,
+        )
         .map_err(|error| {
             RuntimeError::external(
                 "Photographic Styles Linear Thumbnail coded orientation",
