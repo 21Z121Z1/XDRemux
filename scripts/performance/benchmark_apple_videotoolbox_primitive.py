@@ -4,9 +4,10 @@
 This is intentionally not compared as an alternative UHDR Gain Map encoder.
 The current primitive belongs to the Photographic Styles Linear Thumbnail path
 and is validated as Main10 / YUV 4:2:0 / 10-bit. Timings include one-shot helper
-launch, RGB8->BGRA staging, VTCompressionSession setup, encode, and output file
-writes. The adapter explicitly allows hardware acceleration and reports the
-actual encoder selection as framework facts; software fallback remains valid.
+launch, 16-bit RGB staging, VideoToolbox's transfer into 10-bit video-range
+YUV, VTCompressionSession setup, encode, and output file writes. The adapter
+explicitly allows hardware acceleration and reports the actual encoder
+selection as framework facts; software fallback remains valid.
 A future persistent-helper benchmark can separate transport startup.
 """
 
@@ -47,20 +48,22 @@ def git_head() -> str:
     ).strip()
 
 
-def smooth_rgb(width: int, height: int) -> bytes:
-    data = bytearray(width * height * 3)
+def smooth_rgb16(width: int, height: int) -> bytes:
+    data = bytearray(width * height * 6)
     x_denominator = max(width - 1, 1)
     y_denominator = max(height - 1, 1)
     for y in range(height):
-        y_component = y * 255 // y_denominator
-        row = y * width * 3
+        y_component = y * 65535 // y_denominator
+        row = y * width * 6
         for x in range(width):
-            x_component = x * 255 // x_denominator
+            x_component = x * 65535 // x_denominator
             base = (x_component + y_component) // 2
-            offset = row + x * 3
-            data[offset] = base
-            data[offset + 1] = (base + 11) & 0xFF
-            data[offset + 2] = (base + 23) & 0xFF
+            offset = row + x * 6
+            for component, value in enumerate(
+                (base, (base + 11 * 257) & 0xFFFF, (base + 23 * 257) & 0xFFFF)
+            ):
+                data[offset + component * 2] = value & 0xFF
+                data[offset + component * 2 + 1] = (value >> 8) & 0xFF
     return bytes(data)
 
 
@@ -97,7 +100,8 @@ def run_once(
         "video_toolbox_main10": {
             "raw_width": width,
             "raw_height": height,
-            "raw_bytes_per_row": width * 3,
+            "raw_bytes_per_row": width * 6,
+            "raw_component_bits": 16,
             "quality": quality,
             "hvcc_path": str(hvcc_path),
         },
@@ -181,7 +185,7 @@ def main() -> int:
     if args.warmup < 0 or args.iterations < 3:
         parser.error("--warmup must be non-negative and --iterations must be at least 3")
 
-    raster = smooth_rgb(args.width, args.height)
+    raster = smooth_rgb16(args.width, args.height)
     samples: list[float] = []
     encoder_samples: list[dict[str, Any]] = []
     encoded_bytes = 0
@@ -235,12 +239,12 @@ def main() -> int:
         "observed_encoder_ids": observed_encoder_ids,
         "encoder_samples": encoder_samples,
         "includes_helper_launch": True,
-        "includes_rgb_to_bgra_staging": True,
+        "includes_rgb16_to_main10_staging": True,
         "includes_session_creation": True,
         "includes_output_file_io": True,
         "width": args.width,
         "height": args.height,
-        "input_format": "rgb8",
+        "input_format": "rgb16",
         "raw_raster_bytes": len(raster),
         "quality": args.quality,
         "warmup": args.warmup,

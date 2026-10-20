@@ -70,3 +70,13 @@ parser test 不是真机测试。
 仓库引用，也不提供产品 `exact-head` 检查。研究通过不代表假设晋升，
 也不证明 Photos/Gallery 真机验收。实验命令与晋升门槛放在对应代码旁，
 不要为每个实验新增一次性工作流。
+
+`.github/workflows/style-tone-sweep.yml` 是唯一的原生 Photographic Styles
+tone 测量。它只读，检出 PR 的精确 SHA，并在 `xcode-27` 镜像上使用固定在
+`37dd551` 的已发布 consumer harness 渲染。产物保留一天。它不写入仓库引用，
+也不提供产品 `exact-head` 检查。
+
+`.github/workflows/system-heif-hdr-api.yml` 在 `xcode-27` 上读取 SDK 头文件，
+记录系统 HEIF HDR 与 gain map 编码接口，然后运行让 Core Image 计算 gain map
+的可选原型。它只读，检出 PR 的精确 SHA，头文件记录和测量产物保留一天。
+它不写入仓库引用，也不提供 `exact-head`。

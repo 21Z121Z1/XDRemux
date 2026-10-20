@@ -89,6 +89,12 @@ class WorkflowConfigurationTests(unittest.TestCase):
             # One reusable research-evidence workflow, not a product gate or
             # another per-hypothesis writer. Historical one-shot workflows stay out.
             "research.yml",
+            # Native tone measurement. It is not a product gate and not a
+            # per-hypothesis writer.
+            "style-tone-sweep.yml",
+            # System HEIF HDR encode surface. It records SDK names and one
+            # opt-in measurement file. It does not supply exact-head.
+            "system-heif-hdr-api.yml",
         }
         actual = {path.name for path in WORKFLOW_ROOT.glob("*.yml")}
         self.assertEqual(actual, expected)
@@ -158,6 +164,44 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertNotIn("scripts/ci/agent_completion_gate.py", workflow)
         self.assertNotIn("scripts/validation/check_rust_cli_smoke.sh", workflow)
         self.assertNotIn("XDRemuxAppModelTests", workflow)
+
+    def test_style_tone_sweep_is_read_only_and_pins_the_published_harness(self) -> None:
+        workflow = self.workflow("style-tone-sweep.yml")
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn("runs-on: xcode-27", workflow)
+        self.assertIn("ref: 37dd551a949047ed14580efa0c0a2556922791b5", workflow)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn("retention-days: 1", workflow)
+        self.assertIn("cancel-in-progress: true", workflow)
+        self.assertRegex(workflow, r"(?m)^  workflow_dispatch:\s*\n\npermissions:")
+        for forbidden in (
+            "contents: write",
+            "secrets.",
+            "pull_request_target",
+            "git push",
+            "inputs:",
+            "agent_completion_gate.py",
+        ):
+            self.assertNotIn(forbidden, workflow)
+
+    def test_system_heif_hdr_api_probe_is_read_only(self) -> None:
+        workflow = self.workflow("system-heif-hdr-api.yml")
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn("runs-on: xcode-27", workflow)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
+        self.assertIn("retention-days: 1", workflow)
+        self.assertIn("cancel-in-progress: true", workflow)
+        self.assertIn("scripts/apple/probe_system_heif_hdr_api.sh", workflow)
+        self.assertRegex(workflow, r"(?m)^  workflow_dispatch:\s*\n\npermissions:")
+        for forbidden in (
+            "contents: write",
+            "secrets.",
+            "pull_request_target",
+            "git push",
+            "inputs:",
+            "agent_completion_gate.py",
+        ):
+            self.assertNotIn(forbidden, workflow)
 
     def test_completion_gate_owns_repository_policy_regressions(self) -> None:
         completion_gate = self.workflow("completion-gate.yml")

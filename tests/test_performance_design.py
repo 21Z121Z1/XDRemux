@@ -12,7 +12,7 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
     def test_styles_solver_and_resource_policy_are_in_rust(self) -> None:
         source = self.source("crates/xdremux-runtime/src/apple_styles.rs")
         for marker in (
-            "apple_style_fit_global_polynomial",
+            "apple_style_revert_local_data",
             "apple_style_monotonic_global_tone_curve",
             "apple_style_property_list",
             "assemble_photographic_styles_heif",

@@ -12,6 +12,8 @@ mod categorize;
 mod live_photo;
 mod oppo_portrait;
 mod oppo_tail;
+#[cfg(target_os = "macos")]
+mod system_heif_hdr;
 mod validation;
 
 #[cfg(target_os = "macos")]
@@ -36,6 +38,8 @@ pub fn validate_apple_styles_file(
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 pub use live_photo::LivePhotoFileReceipt;
 pub use oppo_portrait::{ApplePortraitSemanticProfile, ApplePortraitSourcePreflight};
+#[cfg(target_os = "macos")]
+pub use system_heif_hdr::SystemHeifHdrReport;
 pub use validation::{
     validate_media_file, IsoHdrValidationReport, LivePhotoValidationReport, ValidationReport,
 };
@@ -381,6 +385,30 @@ impl PortableRuntime {
         output: impl AsRef<Path>,
     ) -> Result<PhotographicStylesFileReceipt> {
         apple_styles::convert_file(self, executable, source, output)
+    }
+
+    /// Encode one SDR/HDR pair with Core Image's gain-map calculation.
+    ///
+    /// This is the opt-in measurement primitive. It does not publish a Styles
+    /// graph and it does not replace the default product encoder.
+    #[cfg(target_os = "macos")]
+    pub fn measure_system_heif_hdr_pair(
+        &self,
+        executable: impl AsRef<Path>,
+        sdr_linear: &[f32],
+        hdr_linear: &[f32],
+        width: u32,
+        height: u32,
+        output: impl AsRef<Path>,
+    ) -> Result<SystemHeifHdrReport> {
+        system_heif_hdr::measure_system_heif_hdr_pair(
+            executable.as_ref(),
+            sdr_linear,
+            hdr_linear,
+            width,
+            height,
+            output.as_ref(),
+        )
     }
 
     #[cfg(target_os = "macos")]

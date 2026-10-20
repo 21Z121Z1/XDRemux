@@ -115,10 +115,17 @@ Tone/Color response, or save/reopen behavior; those still require device evidenc
 
 ### HDR reference for the Linear Thumbnail
 
-The Styles Linear Thumbnail uses the HDR look reconstructed from the base image
-and its Gain Map. Rust divides each linear Display P3 channel by the same
-`baseline_exposure` stored in Styles plist key `4`, then applies the Apple Log
-transfer curve. It does not copy SDR image codes into this resource.
+The Styles Linear Thumbnail is an Apple Log encoding of scene-linear Display P3
+HDR reconstructed from the SDR base and its Gain Map. Rust applies that gain
+map at the base image's original resolution. Gain-map samples are bilinearly
+resampled in code space, then the source's ISO 21496-1 / Apple tmap parameters
+reconstruct each sample: log2 minimum and maximum, gamma as the reciprocal
+exponent used by the 26A434 `_flexMap` decoder, per-channel offsets, and the
+alternate-image headroom weight. Reduction to the 1024-pixel-class thumbnail
+happens after that reconstruction, as an area box filter in linear light. Rust
+then divides each channel by the same `baseline_exposure` stored in Styles
+plist key `4` and applies Apple Log. It does not copy SDR image codes into
+this resource.
 
 The transform uses the Apple Log curve with Display P3 primaries. It does not
 change the image to the BT.2020 color space used by Apple Log video. Auxiliary
@@ -129,19 +136,114 @@ non-zero for a rotated photo. The thumbnail is rotated back to coded order
 before it is encoded. A Gain Map or Styles item whose aspect does not match
 the primary coded dimensions is rejected. `encoding_gain` is renderer metadata;
 it is not a second exposure division for the thumbnail.
+The Apple Log transfer, [0, 1] code range, and existing auxiliary color
+signaling stay in place. The encoder is the inverse of the macOS 26A434
+exponential decoder (`_appleLogToLinear` / `sw_appleLogToLinear`). That decoder
+does not use the quadratic toe, so the encoder does not either. The camera-side
+encoder toe is unverified. The transform keeps Display P3 primaries. It does
+not change the image to the BT.2020 color space used by Apple Log video, and it
+does not retag the thumbnail as sRGB, PQ, HLG, or linear. The existing
+auxiliary color signaling and decoded scene orientation remain in use.
+`encoding_gain` is renderer metadata; it is not a second exposure division for
+the thumbnail.
 
-The current codec primitive accepts RGB8 codes and produces Main10 4:2:0 HEVC.
-Quantization occurs after the log transform, so reconstructed values above SDR
-white can survive. This remains a reference derived from the rendered HDR look.
-It cannot recover RAW or capture-time processing that the source has lost.
+The codec primitive receives 16-bit Apple Log codes. VideoToolbox converts
+those codes into 10-bit video-range 4:2:0 and encodes Main10 HEVC. The codes
+are not quantized to RGB8 before that encode, so the 10-bit range is available
+to the encoder. HDR values above SDR white still survive. This remains a
+reference derived from the rendered HDR look. It cannot recover RAW or
+capture-time processing that the source has lost.
 
-This change does not replace the existing source-derived key1 policy with the
-complete native constrained solver. Thumbnail quality and key1 neutral-fit
-quality are separate measurements. The native consumer regression uses RGB UHDR
-and monochrome LHDR fixtures, decodes the encoded thumbnail, and checks the HDR
-Log target and unchanged primary HEVC. Run it with
-`bash scripts/apple/check_rust_style_consumer.sh`. Photos import, editing, save,
-and reopen require separate device evidence.
+The same 26A434 consumer, `PISemanticStyleFilter`, also decides how the style
+metadata is generated:
+
+- Key 3 is one 256-node curve sampled independently on each channel. Its x
+  value is the linear thumbnail code `min(S, 1)` after the plist base gain.
+  There is no luminance reduction and no percentile normalization. The curve is
+  the monotone projection of those observed primary-channel means. The
+  consumer's extra exposure `E` is a render parameter and is not folded in.
+- Keys `c` and `d` stay 32×32. Each cell stores the area mean of one guide:
+  `c` is the primary image and `d` is the linear thumbnail. The consumer
+  upsamples them with its guided filter (`r = 1`, `eps ≈ 0.05`) and forms
+  `q = mix(mix(d, c, l_b), mix(d, c, l_f), m)`. The maps are not scaled by a
+  fixed affine and they are not multiplied onto luminance. The later shader
+  stages that consume `q` are not inverted, so these means are not a solved
+  local tone.
+- Key 1 is a 12×9×8×10×3 half array, x-major, with the quadratic basis
+  `[1, R, G, B, R², RG, RB, G², GB, B²]`. Each spotlight cell and luminance
+  plane is fit separately. The fit is the remove-style direction: the
+  polynomial reads the displayed primary and targets the thumbnail code. A
+  coefficient the local samples do not identify stays on the identity residual.
+  The plane weight uses the verified `inputIsLinear = false` formula in `f64`,
+  not half, and the optional 3×3 spatial filter is not applied.
+
+At background and foreground LTM of 1, which is the captured tone=0 setting,
+the semantic-tone stage returns the primary and does not read the thumbnail or
+the curve. A tone=0 render therefore cannot measure key 3 or the thumbnail.
+The Photos Tone ±1 and Color ±1 slider positions are not source facts. The
+portable formula check is `apple_style_semantic_tone_channel`.
+
+The native tone check is separate from the product. It checks out
+`21Z121Z1/Photographic_Style_Research` at `37dd551` and runs
+`consumer-model/harness/run_tone_sweep.py` on the `xcode-27` image. That
+harness sets `inputToneBias` only. It does not expose a color control. The
+sweep uses tones −1, −0.75, −0.5, −0.35, −0.15, 0, 0.15, 0.35, 0.5, 0.75, and
+1. The Apple captures are `Apple_Native_Samples/IMG_0032.HEIC`,
+`IMG_0033.HEIC`, and `research/vm-native/samples/IMG_2600.HEIC`,
+`IMG_2604.HEIC`, and `IMG_2608.HEIC`. The same tones are applied to the three
+ProXDR fixtures after conversion. Tone 0 on `IMG_0032.HEIC` must report zero
+differing half components before the other renders are trusted. The report
+records mean luminance, per-channel means, `|L(−1)−L(0)| / |L(+1)−L(0)|`,
+monotonicity, and the tone-related plist fields. The workflow is
+`.github/workflows/style-tone-sweep.yml`.
+
+The native consumer regression uses RGB UHDR and monochrome LHDR fixtures,
+decodes the encoded thumbnail, and checks the HDR Log target and unchanged
+primary HEVC. Run it with `bash scripts/apple/check_rust_style_consumer.sh`.
+Photos import, editing, save, and reopen require separate device evidence.
+Baseline exposure and base gain still use the existing source-distribution
+calibration; this change does not replace those coefficients.
+
+### Provisional system gain map
+
+The default encoder still writes XDRemux's own log gain. `XDREMUX_SYSTEM_GAIN_MAP=1`
+is a separate prototype. Rust reconstructs scene-linear Display P3 HDR, builds
+an HDR look with a provisional guided filter, and keeps the SDR look by using
+local weight 1, which is the identity. It then hands both images to the Apple
+adapter. The adapter calls `CIContext.writeHEIFRepresentationOfImage` (`format`
+`.RGBA8`, Display P3) and passes the half-float linear HDR image under
+`kCIImageRepresentationHDRImage`. Headroom is applied with the header method
+`-imageBySettingContentHeadroom:` (macOS 26). The header does not publish a
+Swift overlay name for that method.
+`kCIImageRepresentationHDRGainMapAsRGB` is set true so Core Image is asked for
+a color ratio. Rust does not supply `kCIImageRepresentationHDRGainMapImage`.
+
+Those names and their availability come from the macOS 27 SDK headers
+(`CIContext.h`, `CIImage.h`, `CGImage.h`, `CGImageSource.h`,
+`CGImageDestination.h`, `CGImageProperties.h`), not from a guessed selector.
+`writeHEIFRepresentationOfImage` is macOS 10.13.4. The HDR-image option and
+`contentHeadroom` are macOS 15, and `imageBySettingContentHeadroom` is macOS 26.
+Headroom sent by Rust is `max(1, measured peak)` of the half values handed to
+the encoder. The header forbids a headroom in `(0, 1)`. ImageIO
+`kCGImageDestinationEncodeGenerateGainMapWithBaseImage` exists from macOS 16,
+but its dictionary value type is not documented, so the prototype does not
+call it.
+
+Readback uses `kCGImageSourceDecodeRequest` = `kCGImageSourceDecodeToHDR` and
+sets `kCGImageSourceGenerateImageSpecificLumaScaling` to false, then renders
+extended-linear Display P3 half. It reports both
+`kCGImageAuxiliaryDataTypeHDRGainMap` and `kCGImageAuxiliaryDataTypeISOGainMap`.
+Which of those the system file actually contains is a measurement, not a
+header fact. The Styles assembler still requires one `tmap` item and its
+`dimg` graph. If the system file does not have that graph, assembly fails
+closed and the report records the conflict. Photos import and editing remain
+device evidence.
+
+The guided filter is not a port of `guided.py`; that file is not in the public
+research checkout. Radius 1, epsilon 0.05, half-size coefficients stored
+through `f16`, HDR local weight 0, and SDR local weight 1 are provisional.
+`XDREMUX_SYSTEM_GAIN_MAP_MAX_EDGE` bounds the prototype geometry. The workflow
+sets it to 256.
 
 ## Apple Portrait migration
 
