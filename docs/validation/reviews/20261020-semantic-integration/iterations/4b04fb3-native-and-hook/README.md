@@ -4,6 +4,8 @@
 
 远端PR source仍为 `4b04fb3168cdc9bf8f54d7755db94fd3677eebb6`，tree `a02a3e8fe5533af5aea10b7a10b56ab797b79022`。**System HEIF失败，未获merge/delete执行批准，也未执行。** 正单独补直接HVC1消费路径；未来新head须独立备份、干净receipt及原生门禁，不能继承4b绿灯冒充新源码验收。
 
+用户于2026-10-20 22:58:19 UTC确认后续完整产品仅**arm64/macOS27**，取消新增Intel产品包门禁，保留跨平台Rust核心检查。本4b快照的Intel/macOS15编译下限仅为历史证据，不代表后续产品或SPI支持范围。构建/打包/App/能力/文档改动须在新最终head复验；直接HVC1失败仍是实际阻塞。
+
 ## 当前准确源码结果
 
 | 证据 | 真实结果 |

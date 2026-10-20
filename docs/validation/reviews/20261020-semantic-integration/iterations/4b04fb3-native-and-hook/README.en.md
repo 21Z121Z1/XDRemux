@@ -4,6 +4,8 @@ English | [简体中文](README.md)
 
 This attachment remains bound to remote PR source `4b04fb3168cdc9bf8f54d7755db94fd3677eebb6`, tree `a02a3e8fe5533af5aea10b7a10b56ab797b79022`. **System HEIF failed; no merge/deletion is authorized or executed.** A new source fix is being implemented separately and must receive its own backup, clean-head receipt and native gates. Existing4b passes cannot be relabeled as that future head.
 
+Subsequent user authorization at2026-10-20 22:58:19 UTC changes the next complete product delivery scope to **arm64/macOS27**, removes the newly added Intel product package gate, and retains cross-platform Rust core checks. The Intel/macOS15 build-floor material in this4b snapshot is historical evidence, not the next supported product/SPI scope. Build/package/App/capability/documentation changes will be verified at their new final head; the direct-HVC1 failure remains a real blocker.
+
 ## Actual current-source results
 
 | Evidence | Verified outcome |
