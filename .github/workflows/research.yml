@@ -193,6 +193,9 @@ jobs:
           "$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow
           echo "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"
 
+      - name: Test tone measurement failure handling
+        run: python3 -m unittest tests.test_style_tone_response -v
+
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
@@ -230,6 +233,10 @@ jobs:
             artifacts/tone-response/report/tone-response.json
             artifacts/tone-response/report/tone-response.md
             artifacts/tone-response/asymmetry/asymmetry.json
+            artifacts/tone-response/apple/consumer-run.json
+            artifacts/tone-response/apple/diagnostics/*.log
+            artifacts/tone-response/xdremux/consumer-run.json
+            artifacts/tone-response/xdremux/diagnostics/*.log
 
   system-heif-hdr-api:
     runs-on: xcode-27

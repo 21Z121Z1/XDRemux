@@ -14,7 +14,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import os
+import signal
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -25,20 +30,175 @@ TONES = (-1.0, -0.75, -0.5, -0.35, -0.15, 0.0, 0.15, 0.35, 0.5, 0.75, 1.0)
 STEP_EPSILON = 1e-4
 
 
+def _finite_number(value) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def sweep_errors(rows: list[dict], photos: list[str]) -> list[str]:
+    errors = []
+    seen = set()
+    for row in rows:
+        photo, tone = row.get("photo"), row.get("tone")
+        if row.get("error") or type(row.get("returncode")) is not int or row["returncode"] != 0:
+            errors.append(f"{photo} tone {tone}: {row.get('error') or 'renderer returncode ' + str(row.get('returncode'))}")
+        if photo not in photos or not _finite_number(tone) or tone not in TONES:
+            errors.append(f"unexpected or missing photo/tone in consumer row: {photo}, {tone}")
+            continue
+        pair = (photo, tone)
+        if pair in seen:
+            errors.append(f"duplicate consumer row: {photo} tone {tone}")
+        seen.add(pair)
+        components, differing = row.get("components"), row.get("differing_components")
+        if (type(components) is not int or components <= 0 or type(differing) is not int
+                or not 0 <= differing <= components or not _finite_number(row.get("max_abs"))
+                or row["max_abs"] < 0):
+            errors.append(f"{photo} tone {tone}: native/model comparison metrics missing or invalid")
+        psnr = row.get("psnr_peak1_db")
+        if not _finite_number(psnr) and not (psnr == "inf" and row.get("max_abs") == 0):
+            errors.append(f"{photo} tone {tone}: native/model PSNR missing or invalid")
+    for photo in photos:
+        for tone in TONES:
+            if (photo, tone) not in seen:
+                errors.append(f"missing consumer row: {photo} tone {tone}")
+    return errors
+
+
+def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *, timeout: float = 3600) -> dict:
+    """Run the pinned consumer unchanged, retaining text diagnostics before scoring."""
+    research_root, out_dir = research_root.resolve(), out_dir.resolve()
+    out_dir.mkdir(parents=True, exist_ok=False)
+    diagnostics = out_dir / "diagnostics"
+    diagnostics.mkdir()
+    script = research_root / "consumer-model/harness/run_tone_sweep.py"
+    names = [photo.stem for photo in photos]
+    command = [sys.executable, str(script), str(out_dir), *(str(photo) for photo in photos),
+               "--tones", *(str(value) for value in TONES)]
+    receipt = {"status": "running", "photos": names, "tones": list(TONES), "command": command,
+               "returncode": None, "errors": [], "diagnostics": []}
+    receipt_path = out_dir / "consumer-run.json"
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+    started = time.monotonic()
+    try:
+        if not names or len(set(names)) != len(names):
+            raise ValueError("consumer photos must have distinct nonempty stems")
+        receipt["consumer_script_sha256"] = hashlib.sha256(script.read_bytes()).hexdigest()
+        with (diagnostics / "consumer.stdout.log").open("w") as stdout, (diagnostics / "consumer.stderr.log").open("w") as stderr:
+            with subprocess.Popen(command, cwd=research_root, stdout=stdout, stderr=stderr,
+                                  start_new_session=os.name == "posix") as child:
+                try:
+                    receipt["returncode"] = child.wait(timeout=timeout)
+                except BaseException:
+                    try:
+                        if os.name == "posix":
+                            os.killpg(child.pid, signal.SIGKILL)
+                        else:
+                            child.kill()
+                    except ProcessLookupError:
+                        pass
+                    child.wait()
+                    receipt["returncode"] = child.returncode
+                    raise
+        if receipt["returncode"] != 0:
+            receipt["errors"].append(f"consumer process exited {receipt['returncode']}")
+        receipt["errors"].extend(sweep_errors(read_sweep(out_dir / "tone-sweep.json"), names))
+        receipt["status"] = "failed" if receipt["errors"] else "completed"
+    except Exception as error:
+        receipt["status"] = "failed"
+        receipt["errors"].append(str(error))
+    finally:
+        receipt["wall_seconds"] = time.monotonic() - started
+        if receipt["status"] == "running":
+            receipt["status"] = "cancelled"
+        # Only known text logs leave this boundary. Never copy trace/pixels
+        # dictionaries, resource blobs, HEIF files or rendered images.
+        logs = [("build", out_dir / "build.log")]
+        for name in names:
+            logs.append((f"{name}-extract", out_dir / name / "extract.log"))
+            logs.extend((f"{name}-tone-{tone:g}", out_dir / name / f"tone-{tone:g}.log") for tone in TONES)
+        for label, path in logs:
+            if not path.is_file():
+                continue
+            raw = path.read_bytes()
+            lines, omitted, omitted_facts = [], 0, 0
+            in_native_facts = False
+            for line in raw.decode("utf-8", errors="replace").splitlines():
+                # native_filter_probe.m prints its final NSDictionary with
+                # facts.description. Keep preceding stderr, not that multiline
+                # stdout dictionary. These are the fixed probe's stderr tags.
+                if path.name.startswith("tone-") and line.lstrip().startswith("{"):
+                    in_native_facts = True
+                if in_native_facts and not line.startswith(("Trace exception:", "NATIVE ASSERTION:")):
+                    omitted_facts += 1
+                    continue
+                try:
+                    value = json.loads(line)
+                except ValueError:
+                    value = None
+                # The extractor prints its raw inventory to combined stdout;
+                # retain stderr/traceback while excluding that dictionary.
+                if isinstance(value, dict) and {"source_sha256", "primary_id", "items"} <= value.keys():
+                    omitted += 1
+                else:
+                    lines.append(line)
+            target = diagnostics / f"{label}.log"
+            target.write_text("\n".join(lines) + ("\n" if lines else ""))
+            receipt["diagnostics"].append({"log": target.name, "source_log_sha256": hashlib.sha256(raw).hexdigest(),
+                                           "omitted_inventory_lines": omitted,
+                                           "omitted_native_facts_lines": omitted_facts})
+        receipt["native_failures"] = []
+        for name in names:
+            for tone in TONES:
+                facts_path = out_dir / name / f"tone-{tone:g}" / "facts.json"
+                if not facts_path.is_file():
+                    continue
+                try:
+                    facts = json.loads(facts_path.read_text())
+                    if isinstance(facts.get("exception"), str):
+                        receipt["native_failures"].append({"photo": name, "tone": tone, "exception": facts["exception"]})
+                    for trial in facts.get("trials", []):
+                        if isinstance(trial.get("exception"), str):
+                            receipt["native_failures"].append({"photo": name, "tone": tone,
+                                                               "use_style_engine": trial.get("use_style_engine")
+                                                               if type(trial.get("use_style_engine")) is bool else None,
+                                                               "exception": trial["exception"]})
+                except (OSError, ValueError, TypeError, AttributeError):
+                    receipt["native_failures"].append({"photo": name, "tone": tone,
+                                                       "error": "native exception diagnostic is unreadable"})
+        receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+    stdout_path = diagnostics / "consumer.stdout.log"
+    if stdout_path.is_file():
+        print(stdout_path.read_text(), end="")
+    if receipt["status"] != "completed":
+        print("Tone consumer failed: " + "; ".join(receipt["errors"]), file=sys.stderr)
+        for path in sorted(diagnostics.glob("*.log")):
+            text = path.read_text()
+            if text:
+                print(f"--- {path.name} ---\n{text}", file=sys.stderr)
+    return receipt
+
+
 def luminance(rgb: np.ndarray) -> np.ndarray:
     return rgb.astype(np.float64) @ Y_WEIGHTS
 
 
 def load_native_rgb(renderer: Path) -> np.ndarray:
     trace = json.loads((renderer / "trace.json").read_text())
+    for field in ("process_status", "finish_status"):
+        if type(trace.get(field)) is not int:
+            raise ValueError(f"{renderer}: native {field} missing or malformed")
     texture = trace["textures"]["_outputImageTexture"]
-    width = int(texture["width"])
-    height = int(texture["height"])
-    raw = np.fromfile(renderer / "_outputImageTexture.bin", dtype="<f2")
+    width, height = texture["width"], texture["height"]
+    if type(width) is not int or type(height) is not int or width <= 0 or height <= 0:
+        raise ValueError(f"{renderer}: invalid native render dimensions")
+    path = renderer / "_outputImageTexture.bin"
     expected = height * width * 4
-    if raw.size != expected:
-        raise ValueError(f"{renderer}: expected {expected} half values, got {raw.size}")
-    return raw.reshape(height, width, 4)[:, :, :3].astype(np.float32)
+    if path.stat().st_size != expected * 2:
+        raise ValueError(f"{renderer}: expected {expected * 2} native render bytes, got {path.stat().st_size}")
+    raw = np.fromfile(path, dtype="<f2")
+    rgb = raw.reshape(height, width, 4)[:, :, :3].astype(np.float32)
+    if not np.isfinite(rgb).all():
+        raise ValueError(f"{renderer}: native RGB contains nonfinite samples")
+    return rgb
 
 
 def _edge_ratio(base: np.ndarray, other: np.ndarray) -> float:
@@ -147,8 +307,10 @@ def tone_dirs(photo_dir: Path) -> dict[float, Path]:
             continue
         try:
             tone = float(child.name.removeprefix("tone-"))
-        except ValueError:
-            continue
+        except ValueError as error:
+            raise ValueError(f"invalid tone directory: {child.name}") from error
+        if tone not in TONES or tone in found:
+            raise ValueError(f"unexpected or duplicate tone directory: {child.name}")
         renderer = child / "renderer-0"
         if (renderer / "_outputImageTexture.bin").is_file():
             found[tone] = renderer
@@ -157,19 +319,24 @@ def tone_dirs(photo_dir: Path) -> dict[float, Path]:
 
 def read_sweep(path: Path) -> list[dict]:
     if not path.is_file():
-        return []
-    return json.loads(path.read_text())
+        raise ValueError(f"consumer sweep receipt missing: {path}")
+    rows = json.loads(path.read_text())
+    if not isinstance(rows, list) or not rows or not all(isinstance(row, dict) for row in rows):
+        raise ValueError(f"consumer sweep receipt is empty or malformed: {path}")
+    return rows
 
 
 def sanity_gate(rows: list[dict]) -> dict:
     tone0 = [row for row in rows if row.get("tone") == 0 or row.get("tone") == 0.0]
     named = [row for row in tone0 if str(row.get("photo", "")).startswith("IMG_0032")]
-    chosen = named or tone0
+    chosen = named
     if len(chosen) != 1:
         return {"trusted": False, "reason": "IMG_0032 tone 0 row missing", "rows": chosen}
     row = chosen[0]
     differing = row.get("differing_components")
-    trusted = differing == 0 and not row.get("error")
+    trusted = (type(row.get("returncode")) is int and row["returncode"] == 0 and type(row.get("components")) is int
+               and row["components"] > 0 and type(differing) is int and differing == 0
+               and _finite_number(row.get("max_abs")) and row["max_abs"] == 0 and not row.get("error"))
     return {
         "trusted": trusted,
         "photo": row.get("photo"),
@@ -238,33 +405,71 @@ def input_keys(photo_dir: Path) -> list[str]:
 
 
 def analyze(sanity_path: Path, render_root: Path, out_dir: Path) -> dict:
-    sanity_rows = read_sweep(sanity_path)
+    errors = []
+    sanity_rows, agreement, expected = [], [], []
+    try:
+        sanity_rows = read_sweep(sanity_path)
+    except (OSError, ValueError) as error:
+        errors.append(str(error))
     gate = sanity_gate(sanity_rows)
+    try:
+        receipt = json.loads((render_root / "consumer-run.json").read_text())
+        expected = receipt["photos"]
+        if (not isinstance(expected, list) or not expected or not all(isinstance(name, str) and name for name in expected)
+                or len(set(expected)) != len(expected) or receipt.get("tones") != list(TONES)):
+            raise ValueError("consumer request identity has missing/duplicate photos or tones")
+        if (receipt.get("status") != "completed" or type(receipt.get("returncode")) is not int
+                or receipt["returncode"] != 0):
+            errors.append(f"consumer execution failed: {receipt.get('errors', receipt.get('status'))}")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        errors.append(f"consumer execution receipt invalid: {error}")
+        expected = []
+    try:
+        agreement = read_sweep(render_root / "tone-sweep.json")
+        errors.extend(sweep_errors(agreement, expected))
+    except (OSError, ValueError) as error:
+        errors.append(str(error))
     photos = []
-    if render_root.is_dir():
-        for photo_dir in sorted(path for path in render_root.iterdir() if path.is_dir()):
+    for name in expected:
+        photo_dir = render_root / name
+        entry = {"photo": name, "rendered_tones": [], "input_keys": []}
+        try:
             renders = tone_dirs(photo_dir)
-            entry = {
-                "photo": photo_dir.name,
-                "rendered_tones": sorted(renders),
-                "input_keys": input_keys(photo_dir),
-            }
-            if 0.0 not in renders or len(renders) < 2:
-                entry["concerns"] = ["native render missing for tone 0 or for a comparison tone"]
-                photos.append(entry)
-                continue
+            entry.update(rendered_tones=sorted(renders), input_keys=input_keys(photo_dir))
+            if set(renders) != set(TONES):
+                raise ValueError("native render missing for a requested comparison tone")
             images = {tone: load_native_rgb(path) for tone, path in renders.items()}
+            entry["native_statuses"] = {
+                tone: {key: value for key, value in json.loads((path / "trace.json").read_text()).items()
+                       if key in ("process_status", "finish_status")}
+                for tone, path in renders.items()
+            }
+            shapes = {image.shape for image in images.values()}
+            if len(shapes) != 1:
+                raise ValueError("native render geometry changes across the tone sweep")
+            components = images[0.0].size
+            if any(row.get("components") != components for row in agreement if row.get("photo") == name):
+                raise ValueError("native/model comparison components differ from the native texture")
             entry.update(score_photo(images))
             write_comparison(images, out_dir / "comparisons" / f"{photo_dir.name}.png")
-            photos.append(entry)
-    agreement = read_sweep(render_root / "tone-sweep.json") if render_root else []
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as error:
+            entry["errors"] = [str(error)]
+            entry["concerns"] = [str(error)]
+            errors.append(f"{name}: {error}")
+        photos.append(entry)
+    if not expected:
+        errors.append("no requested photos with complete native measurements")
     report = {
         "sanity": gate,
         "sanity_rows": sanity_rows,
         "model_agreement": agreement,
         "photos": photos,
         "color_control": "The harness sets inputToneBias only. It has no color-bias argument.",
-        "trusted": bool(gate.get("trusted")),
+        "evidence_scope": "Complete native Tone measurements do not establish Photos Tone/Color editing admission or private status-code domains.",
+        "status": "failed" if errors or not gate.get("trusted") else "completed",
+        "measurement_complete": not errors,
+        "errors": errors,
+        "trusted": bool(gate.get("trusted")) and not errors,
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "tone-response.json").write_text(json.dumps(report, indent=2) + "\n")
@@ -279,10 +484,14 @@ def render_markdown(report: dict) -> str:
         f"Host gate trusted: {gate.get('trusted')}. "
         f"Tone 0 differing components: {gate.get('differing_components')}."
     )
+    lines.append(f"Measurement status: {report.get('status')}. Product measurements complete: {report.get('measurement_complete')}.")
+    for error in report.get("errors", []):
+        lines.append(f"- {error}")
     if gate.get("reason"):
         lines.append(gate["reason"])
     lines.append("")
     lines.append(report["color_control"])
+    lines.append(report["evidence_scope"])
     lines.append("")
     for photo in report["photos"]:
         lines.append(f"## {photo['photo']}")
@@ -340,8 +549,8 @@ def _scalar_leaves(value, prefix: str = ""):
 def _gtc_summary(path: Path) -> dict:
     raw = np.fromfile(path, dtype="<u2")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    if raw.size < 258:
-        return {"sha256": digest, "error": f"short curve ({raw.size} values)"}
+    if path.stat().st_size % 2 or raw.size < 258:
+        raise ValueError(f"{path}: short or damaged curve ({raw.size} values)")
     nodes = raw[1:257].astype(np.float64) / 65534.0
     return {
         "count": int(raw[0]),
@@ -361,6 +570,8 @@ def _gtc_summary(path: Path) -> dict:
 def _half_summary(path: Path) -> dict:
     raw = np.fromfile(path, dtype="<f2").astype(np.float64)
     finite = raw[np.isfinite(raw)]
+    if path.stat().st_size % 2 or not raw.size or finite.size != raw.size:
+        raise ValueError(f"{path}: empty, damaged or nonfinite light map")
     return {
         "count": int(raw.size),
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -378,7 +589,10 @@ def load_style_metadata(resources: Path) -> list[dict]:
         record = {"photo": photo.name, "scalars": {}}
         summary_path = photo / "styles-summary.json"
         if summary_path.is_file():
-            record["scalars"] = dict(_scalar_leaves(json.loads(summary_path.read_text())))
+            summary = json.loads(summary_path.read_text())
+            if not isinstance(summary, dict) or not summary:
+                raise ValueError(f"{summary_path}: style metadata dictionary is empty or malformed")
+            record["scalars"] = dict(_scalar_leaves(summary))
         else:
             record["missing_summary"] = True
         curve = photo / "key3.bin"
@@ -407,7 +621,7 @@ def _flat_metadata(record: dict) -> dict:
 def _as_float(value):
     if isinstance(value, bool) or isinstance(value, (dict, list)) or value is None:
         return None
-    if isinstance(value, (int, float)):
+    if _finite_number(value):
         return float(value)
     return None
 
@@ -472,16 +686,56 @@ def _group_for(name: str) -> str:
 
 
 def write_asymmetry(apple_report: dict, xdremux_report: dict, resources: Path | None, out_dir: Path) -> dict:
+    if not isinstance(apple_report, dict) or not isinstance(xdremux_report, dict):
+        raise ValueError("Apple/product tone reports must be dictionaries")
+    errors = []
     photos = []
     for report, group in ((apple_report, "apple"), (xdremux_report, "xdremux")):
-        for photo in report.get("photos", []):
+        if report.get("trusted") is not True or report.get("status") != "completed" or not report.get("measurement_complete"):
+            errors.append(f"{group} native measurement report is incomplete or untrusted")
+        report_photos = report.get("photos")
+        if not isinstance(report_photos, list) or not report_photos:
+            errors.append(f"{group} photo measurements missing")
+            report_photos = []
+        for photo in report_photos:
+            if not isinstance(photo, dict) or not isinstance(photo.get("photo"), str):
+                errors.append(f"{group} photo measurement identity malformed")
+                continue
             item = dict(photo)
             item["group"] = group
             photos.append(item)
-    metadata = load_style_metadata(resources) if resources else []
+            rows = photo.get("tones", [])
+            if (not isinstance(rows, list) or len(rows) != len(TONES)
+                    or not all(isinstance(row, dict) for row in rows)
+                    or {row.get("tone") for row in rows} != set(TONES)
+                    or any(not _finite_number(row.get("mean_luminance"))
+                           or not isinstance(row.get("mean_rgb"), list) or len(row["mean_rgb"]) != 3
+                           or not all(_finite_number(value) for value in row["mean_rgb"]) for row in rows)):
+                errors.append(f"{group} {photo.get('photo')}: complete finite native tone statistics missing")
+            fields = ("darken_abs", "brighten_abs", "signed_luminance_at_minus_1", "signed_luminance_at_plus_1",
+                      "darken_brighten_ratio")
+            if (any(not _finite_number(photo.get(field)) for field in fields)
+                    or type(photo.get("monotonic_mean_luminance")) is not bool):
+                errors.append(f"{group} {photo.get('photo')}: required asymmetry comparison values missing")
+    metadata = []
+    try:
+        metadata = load_style_metadata(resources) if resources else []
+    except (OSError, ValueError, TypeError) as error:
+        errors.append(f"metadata comparison unavailable: {error}")
     for record in metadata:
         record["group"] = _group_for(record["photo"])
+    by_name = {record["photo"]: record for record in metadata}
+    for photo in photos:
+        record = by_name.get(photo["photo"], {})
+        if not record.get("scalars") or any(key not in record for key in ("gtc", "light_c", "light_d")):
+            errors.append(f"{photo['photo']}: required style metadata/curve/light-map comparison data missing")
+    ranges = metadata_ranges(metadata)
+    if not ranges["fields"]:
+        errors.append("no comparable Apple/product numeric metadata fields")
     payload = {
+        "status": "failed" if errors else "completed",
+        "trusted": not errors,
+        "errors": errors,
         "curves": curve_span(photos),
         "photos": [
             {
@@ -497,7 +751,7 @@ def write_asymmetry(apple_report: dict, xdremux_report: dict, resources: Path | 
             for photo in photos
         ],
         "metadata": metadata,
-        "metadata_ranges": metadata_ranges(metadata),
+        "metadata_ranges": ranges,
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "asymmetry.json").write_text(json.dumps(payload, indent=2) + "\n")
@@ -507,6 +761,10 @@ def write_asymmetry(apple_report: dict, xdremux_report: dict, resources: Path | 
 
 def _asymmetry_markdown(payload: dict) -> str:
     lines = ["# Tone asymmetry", ""]
+    lines.append(f"Comparison status: {payload.get('status')}.")
+    for error in payload.get("errors", []):
+        lines.append(f"- {error}")
+    lines.append("")
     span = payload["curves"]["apple_ratio_range"]
     if span is None:
         lines.append("Apple captures produced no darken/brighten ratio.")
@@ -531,7 +789,9 @@ def _asymmetry_markdown(payload: dict) -> str:
     lines.append("## Plist fields outside the Apple numeric range")
     lines.append("")
     outside_fields = [field for field in payload["metadata_ranges"]["fields"] if field["xdremux_outside"]]
-    if not outside_fields:
+    if payload.get("errors"):
+        lines.append("Metadata comparison is incomplete; no range-admission conclusion is available.")
+    elif not outside_fields:
         lines.append("No numeric plist field on an XDRemux output falls outside the Apple captures.")
     else:
         lines.append("| field | Apple min | Apple max | XDRemux outside |")
@@ -620,7 +880,8 @@ def self_test() -> None:
     colored = score_photo(cast)
     if not any("one channel" in concern for concern in colored["concerns"]):
         raise SystemExit(f"channel imbalance was not recognized: {colored['concerns']}")
-    gate = sanity_gate([{"photo": "IMG_0032", "tone": 0, "differing_components": 0}])
+    gate = sanity_gate([{"photo": "IMG_0032", "tone": 0, "returncode": 0, "components": 12,
+                         "differing_components": 0, "max_abs": 0}])
     if not gate["trusted"]:
         raise SystemExit(gate)
     bad = sanity_gate([{"photo": "IMG_0032", "tone": 0, "differing_components": 12}])
@@ -629,7 +890,8 @@ def self_test() -> None:
     mixed = sanity_gate(
         [
             {"photo": "IMG_0033", "tone": 0, "differing_components": 9},
-            {"photo": "IMG_0032", "tone": 0, "differing_components": 0},
+            {"photo": "IMG_0032", "tone": 0, "returncode": 0, "components": 12,
+             "differing_components": 0, "max_abs": 0},
         ]
     )
     if not mixed["trusted"] or mixed["photo"] != "IMG_0032":
@@ -663,19 +925,33 @@ def main() -> int:
     parser.add_argument("--out", type=Path)
     parser.add_argument("--compare", nargs=2, type=Path, metavar=("APPLE_REPORT", "XDREMUX_REPORT"))
     parser.add_argument("--metadata", type=Path)
+    parser.add_argument("--run-consumer", type=Path, metavar="RESEARCH_ROOT")
+    parser.add_argument("--photos", nargs="+", type=Path)
     args = parser.parse_args()
     if args.self_test:
         self_test()
         print("style tone response self-test passed")
         return 0
+    if args.run_consumer:
+        if not args.out or not args.photos:
+            parser.error("--out and --photos are required with --run-consumer")
+        receipt = run_consumer(args.run_consumer, args.photos, args.out)
+        print(json.dumps(receipt, indent=2))
+        return 0 if receipt["status"] == "completed" else 3
     if args.compare:
         if not args.out:
             parser.error("--out is required with --compare")
-        apple_report = json.loads(args.compare[0].read_text())
-        xdremux_report = json.loads(args.compare[1].read_text())
-        write_asymmetry(apple_report, xdremux_report, args.metadata, args.out)
+        try:
+            apple_report = json.loads(args.compare[0].read_text())
+            xdremux_report = json.loads(args.compare[1].read_text())
+            report = write_asymmetry(apple_report, xdremux_report, args.metadata, args.out)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            report = {"status": "failed", "trusted": False, "errors": [str(error)]}
+            args.out.mkdir(parents=True, exist_ok=True)
+            (args.out / "asymmetry.json").write_text(json.dumps(report, indent=2) + "\n")
+            (args.out / "asymmetry.md").write_text("Tone comparison failed: " + str(error) + "\n")
         print((args.out / "asymmetry.md").read_text())
-        return 0
+        return 0 if report["trusted"] else 3
     if not args.sanity or not args.renders or not args.out:
         parser.error("--sanity, --renders, and --out are required")
     report = analyze(args.sanity, args.renders, args.out)

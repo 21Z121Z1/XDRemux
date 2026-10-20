@@ -11,8 +11,6 @@ cli="${XDREMUX_CLI:?XDREMUX_CLI is required}"
 adapter="${XDREMUX_APPLE_ADAPTER:?XDREMUX_APPLE_ADAPTER is required}"
 resources="${RUNNER_TEMP:-/tmp}/photo-resources"
 
-tones=(-1 -0.75 -0.5 -0.35 -0.15 0 0.15 0.35 0.5 0.75 1)
-
 python3 "$repo_root/scripts/apple/check_style_tone_response.py" --self-test
 
 mkdir -p "$out_dir"
@@ -33,17 +31,13 @@ prune_renders() {
   find "$root" -type f -name '*.bin' ! -name '_outputImageTexture.bin' -delete
 }
 
-(
-  cd "$research_root"
-  python3 consumer-model/harness/run_tone_sweep.py \
-    "$out_dir/apple" \
+python3 "$repo_root/scripts/apple/check_style_tone_response.py" \
+    --run-consumer "$research_root" --out "$out_dir/apple" --photos \
     Apple_Native_Samples/IMG_0032.HEIC \
     Apple_Native_Samples/IMG_0033.HEIC \
     research/vm-native/samples/IMG_2600.HEIC \
     research/vm-native/samples/IMG_2604.HEIC \
-    research/vm-native/samples/IMG_2608.HEIC \
-    --tones "${tones[@]}"
-)
+    research/vm-native/samples/IMG_2608.HEIC
 prune_renders "$out_dir/apple"
 
 python3 "$repo_root/scripts/apple/check_style_tone_response.py" \
@@ -74,13 +68,8 @@ fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic
 fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic
 EOF
 
-(
-  cd "$research_root"
-  python3 consumer-model/harness/run_tone_sweep.py \
-    "$out_dir/xdremux" \
-    "${photos[@]}" \
-    --tones "${tones[@]}"
-)
+python3 "$repo_root/scripts/apple/check_style_tone_response.py" \
+    --run-consumer "$research_root" --out "$out_dir/xdremux" --photos "${photos[@]}"
 prune_renders "$out_dir/xdremux"
 
 python3 "$repo_root/scripts/apple/check_style_tone_response.py" \
