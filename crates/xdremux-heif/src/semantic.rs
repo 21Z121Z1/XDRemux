@@ -309,21 +309,54 @@ fn source_maximum_item_id(meta: &ParsedMeta) -> Result<u32> {
 fn semantic_items(scaffold: &Graph) -> Result<(u32, Vec<u32>, Vec<u32>)> {
     let scaffold_tmap = find_tmap(&scaffold.meta, "semantic scaffold")?;
     let scaffold_primary = scaffold.meta.primary_item_id;
+    let (gain_image, primary_items, gain_items) =
+        hdr_image_items(&scaffold.meta, "semantic scaffold")?;
+    let hdr_items = primary_items
+        .into_iter()
+        .chain(gain_items)
+        .chain([scaffold_primary, gain_image])
+        .collect::<BTreeSet<_>>();
     let mut images = Vec::new();
     let mut seen_images = BTreeSet::new();
+    let mut seen_gain_auxiliary = false;
     if let Some(iref) = scaffold.meta.iref.as_ref() {
         for reference in &iref.entries {
-            if reference.kind != AUXL
-                || !reference.to_item_ids.contains(&scaffold_primary)
-                || !reference.to_item_ids.contains(&scaffold_tmap)
-                || item_info(&scaffold.meta, reference.from_item_id, "semantic scaffold")?.item_type
-                    != Some(HVC1)
-            {
+            if reference.kind != AUXL {
                 continue;
             }
-            if seen_images.insert(reference.from_item_id) {
-                images.push(reference.from_item_id);
+            if reference.to_item_ids.len() != 2
+                || !reference.to_item_ids.contains(&scaffold_primary)
+                || !reference.to_item_ids.contains(&scaffold_tmap)
+            {
+                return Err(invalid(
+                    "semantic scaffold has an unsupported auxiliary relationship",
+                ));
             }
+            // The tmap dimg graph identifies the Gain Map even when ImageIO
+            // encodes it as a direct hvc1 with the same auxl targets as mattes.
+            if reference.from_item_id == gain_image {
+                if seen_gain_auxiliary {
+                    return Err(invalid(
+                        "semantic scaffold has multiple Gain Map auxl references",
+                    ));
+                }
+                seen_gain_auxiliary = true;
+                continue;
+            }
+            if item_info(&scaffold.meta, reference.from_item_id, "semantic scaffold")?.item_type
+                != Some(HVC1)
+                || hdr_items.contains(&reference.from_item_id)
+            {
+                return Err(invalid(
+                    "semantic scaffold has an unsupported auxiliary image",
+                ));
+            }
+            if !seen_images.insert(reference.from_item_id) {
+                return Err(invalid(
+                    "semantic scaffold image has multiple auxl references",
+                ));
+            }
+            images.push(reference.from_item_id);
         }
     }
     if images.is_empty() {
@@ -334,18 +367,40 @@ fn semantic_items(scaffold: &Graph) -> Result<(u32, Vec<u32>, Vec<u32>)> {
     let image_set = images.iter().copied().collect::<BTreeSet<_>>();
     let mut metadata = Vec::new();
     let mut seen_metadata = BTreeSet::new();
+    let mut described_images = BTreeSet::new();
     if let Some(iref) = scaffold.meta.iref.as_ref() {
         for reference in &iref.entries {
             if reference.kind != CDSC
-                || reference.to_item_ids.len() != 1
-                || !image_set.contains(&reference.to_item_ids[0])
-                || item_info(&scaffold.meta, reference.from_item_id, "semantic scaffold")?.item_type
-                    != Some(MIME)
+                || !reference
+                    .to_item_ids
+                    .iter()
+                    .any(|id| image_set.contains(id))
             {
                 continue;
             }
-            if seen_metadata.insert(reference.from_item_id) {
-                metadata.push(reference.from_item_id);
+            if reference.to_item_ids.len() != 1
+                || item_info(&scaffold.meta, reference.from_item_id, "semantic scaffold")?.item_type
+                    != Some(MIME)
+                || !seen_metadata.insert(reference.from_item_id)
+                || !described_images.insert(reference.to_item_ids[0])
+            {
+                return Err(invalid(
+                    "semantic scaffold requires one unique MIME descriptor per image",
+                ));
+            }
+            metadata.push(reference.from_item_id);
+        }
+        for descriptor in &metadata {
+            if iref
+                .entries
+                .iter()
+                .filter(|reference| reference.kind == CDSC && reference.from_item_id == *descriptor)
+                .count()
+                != 1
+            {
+                return Err(invalid(
+                    "semantic scaffold descriptor has multiple cdsc references",
+                ));
             }
         }
     }
@@ -776,6 +831,7 @@ pub fn merge_apple_semantic_auxiliary_heif(
     let source = parse_graph(source_data, "source HDR")?;
     let scaffold = parse_graph(scaffold_data, "semantic scaffold")?;
     let source_tmap = find_tmap(&source.meta, "source HDR")?;
+    let _ = hdr_image_items(&source.meta, "source HDR")?;
     let (scaffold_tmap, semantic_images, semantic_metadata) = semantic_items(&scaffold)?;
     if semantic_images.len() != expected_semantic_roles {
         return Err(invalid(format!(
@@ -1243,43 +1299,59 @@ fn item_is_type(meta: &ParsedMeta, item_id: u32, item_type: FourCC) -> bool {
         .any(|item| item.item_id == item_id && item.item_type == Some(item_type))
 }
 
-fn primary_tiles(meta: &ParsedMeta, context: &str) -> Result<Vec<u32>> {
-    let targets = dimg_targets(meta, meta.primary_item_id, context)?;
-    if targets
-        .iter()
-        .all(|item_id| item_is_type(meta, *item_id, HVC1))
-    {
-        Ok(targets)
-    } else {
-        Err(invalid(format!(
-            "{context} primary dimg graph contains a non-hvc1 item"
-        )))
+fn coded_image_items(meta: &ParsedMeta, image_id: u32, context: &str) -> Result<Vec<u32>> {
+    let targets = match item_info(meta, image_id, context)?.item_type {
+        Some(HVC1) => vec![image_id],
+        Some(GRID) => dimg_targets(meta, image_id, context)?,
+        _ => {
+            return Err(invalid(format!(
+                "{context} image {image_id} is neither hvc1 nor grid"
+            )))
+        }
+    };
+    let mut seen = BTreeSet::new();
+    for item_id in &targets {
+        if !seen.insert(*item_id) || !item_is_type(meta, *item_id, HVC1) {
+            return Err(invalid(format!(
+                "{context} image {image_id} has invalid or repeated hvc1 items"
+            )));
+        }
+        if meta.iref.as_ref().is_some_and(|iref| {
+            iref.entries
+                .iter()
+                .any(|reference| reference.kind == DIMG && reference.from_item_id == *item_id)
+        }) {
+            return Err(invalid(format!(
+                "{context} hvc1 item {item_id} has a dimg reference"
+            )));
+        }
     }
+    Ok(targets)
 }
 
-fn gain_tiles(meta: &ParsedMeta, context: &str) -> Result<Vec<u32>> {
+fn hdr_image_items(meta: &ParsedMeta, context: &str) -> Result<(u32, Vec<u32>, Vec<u32>)> {
     let tmap_id = find_tmap(meta, context)?;
     let tmap_targets = dimg_targets(meta, tmap_id, context)?;
-    let gain_grids = tmap_targets
-        .into_iter()
-        .filter(|item_id| *item_id != meta.primary_item_id && item_is_type(meta, *item_id, GRID))
-        .collect::<Vec<_>>();
-    let gain_grid = match gain_grids.as_slice() {
-        [only] => *only,
-        [] => return Err(invalid(format!("{context} tmap has no gain grid"))),
-        _ => return Err(invalid(format!("{context} tmap has multiple gain grids"))),
-    };
-    let targets = dimg_targets(meta, gain_grid, context)?;
-    if targets
-        .iter()
-        .all(|item_id| item_is_type(meta, *item_id, HVC1))
+    if tmap_targets.len() != 2
+        || !tmap_targets.contains(&meta.primary_item_id)
+        || tmap_targets[0] == tmap_targets[1]
     {
-        Ok(targets)
-    } else {
-        Err(invalid(format!(
-            "{context} gain dimg graph contains a non-hvc1 item"
-        )))
+        return Err(invalid(format!(
+            "{context} tmap must reference the primary and one Gain Map image"
+        )));
     }
+    let gain_image = tmap_targets
+        .into_iter()
+        .find(|id| *id != meta.primary_item_id)
+        .ok_or_else(|| invalid(format!("{context} tmap has no Gain Map image")))?;
+    let primary_items = coded_image_items(meta, meta.primary_item_id, context)?;
+    let gain_items = coded_image_items(meta, gain_image, context)?;
+    if gain_items.iter().any(|id| primary_items.contains(id)) {
+        return Err(invalid(format!(
+            "{context} primary and Gain Map share coded image items"
+        )));
+    }
+    Ok((gain_image, primary_items, gain_items))
 }
 
 fn rebuild_iprp_properties(
@@ -1595,10 +1667,9 @@ pub fn transplant_apple_semantic_auxiliary_heif(
         )));
     }
 
-    let source_primary_tiles = primary_tiles(&source.meta, "source HDR")?;
-    let scaffold_primary_tiles = primary_tiles(&scaffold.meta, "semantic scaffold")?;
-    let source_gain_tiles = gain_tiles(&source.meta, "source HDR")?;
-    let scaffold_gain_tiles = gain_tiles(&scaffold.meta, "semantic scaffold")?;
+    let (_, source_primary_tiles, source_gain_tiles) = hdr_image_items(&source.meta, "source HDR")?;
+    let (_, scaffold_primary_tiles, scaffold_gain_tiles) =
+        hdr_image_items(&scaffold.meta, "semantic scaffold")?;
     if source_primary_tiles.len() != scaffold_primary_tiles.len()
         || source_gain_tiles.len() != scaffold_gain_tiles.len()
     {
@@ -1771,4 +1842,510 @@ pub fn transplant_apple_semantic_auxiliary_heif(
         }
     }
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use xdremux_format::isobmff::{make_infe_box, make_pitm_box};
+
+    const PRIMARY: u32 = 1;
+    const GAIN: u32 = 2;
+    const TONE_MAP: u32 = 3;
+    const EXIF_ID: u32 = 4;
+    const SEMANTICS: [u32; 3] = [10, 11, 12];
+    const DESCRIPTORS: [u32; 3] = [20, 21, 22];
+    const PRIMARY_TILES: [u32; 2] = [100, 101];
+    const GAIN_TILES: [u32; 2] = [110, 111];
+
+    // These are synthetic container graphs and opaque compressed payloads;
+    // they exercise the public assembly contract, not native HEVC decoding.
+    struct Fixture {
+        items: Vec<(u32, FourCC, Vec<u8>)>,
+        references: Vec<IrefEntry>,
+        codec_marker: u8,
+    }
+
+    impl Fixture {
+        fn new(grid: bool, semantic: bool, label: &str) -> Self {
+            let root_type = if grid { GRID } else { HVC1 };
+            let mut items = vec![
+                (PRIMARY, root_type, format!("{label}-primary").into_bytes()),
+                (GAIN, root_type, format!("{label}-gain").into_bytes()),
+                (TONE_MAP, TMAP, b"tone-map-metadata".to_vec()),
+                (EXIF_ID, EXIF, format!("{label}-exif").into_bytes()),
+            ];
+            let mut references = vec![
+                IrefEntry {
+                    kind: DIMG,
+                    from_item_id: TONE_MAP,
+                    to_item_ids: vec![PRIMARY, GAIN],
+                },
+                IrefEntry {
+                    kind: AUXL,
+                    from_item_id: GAIN,
+                    to_item_ids: vec![PRIMARY, TONE_MAP],
+                },
+                IrefEntry {
+                    kind: CDSC,
+                    from_item_id: EXIF_ID,
+                    to_item_ids: vec![PRIMARY, TONE_MAP],
+                },
+            ];
+            if grid {
+                for (root, tiles, role) in [
+                    (PRIMARY, PRIMARY_TILES, "primary"),
+                    (GAIN, GAIN_TILES, "gain"),
+                ] {
+                    references.push(IrefEntry {
+                        kind: DIMG,
+                        from_item_id: root,
+                        to_item_ids: tiles.to_vec(),
+                    });
+                    for (index, item_id) in tiles.into_iter().enumerate() {
+                        items.push((
+                            item_id,
+                            HVC1,
+                            format!("{label}-{role}-tile-{index}").into_bytes(),
+                        ));
+                    }
+                }
+            }
+            if semantic {
+                for (index, (image, descriptor)) in
+                    SEMANTICS.into_iter().zip(DESCRIPTORS).enumerate()
+                {
+                    items.push((
+                        image,
+                        HVC1,
+                        format!("scaffold-semantic-{index}").into_bytes(),
+                    ));
+                    items.push((descriptor, MIME, format!("descriptor-{index}").into_bytes()));
+                    references.extend([
+                        IrefEntry {
+                            kind: AUXL,
+                            from_item_id: image,
+                            to_item_ids: vec![PRIMARY, TONE_MAP],
+                        },
+                        IrefEntry {
+                            kind: CDSC,
+                            from_item_id: descriptor,
+                            to_item_ids: vec![image],
+                        },
+                    ]);
+                }
+            }
+            Self {
+                items,
+                references,
+                codec_marker: if semantic { 7 } else { 9 },
+            }
+        }
+
+        fn bytes(&self) -> Vec<u8> {
+            let infos = self
+                .items
+                .iter()
+                .map(|(id, kind, _)| make_infe_box(*id, *kind, 0).unwrap())
+                .collect::<Vec<_>>();
+            let iinf = make_iinf_box(0, &infos).unwrap();
+            let properties = [
+                make_box(HVCC, &[self.codec_marker; 19]).unwrap(),
+                make_box(HVCC, &[self.codec_marker + 1; 21]).unwrap(),
+                make_box(HVCC, &[5; 19]).unwrap(),
+            ]
+            .concat();
+            let associations = self
+                .items
+                .iter()
+                .map(|(id, kind, _)| IpmaEntry {
+                    item_id: *id,
+                    associations: if *kind == HVC1 {
+                        vec![IpmaAssociation {
+                            property_index: if *id == PRIMARY || PRIMARY_TILES.contains(id) {
+                                1
+                            } else if *id == GAIN || GAIN_TILES.contains(id) {
+                                2
+                            } else {
+                                3
+                            },
+                            essential: true,
+                        }]
+                    } else {
+                        Vec::new()
+                    },
+                })
+                .collect::<Vec<_>>();
+            let iprp = make_box(
+                IPRP,
+                &[
+                    make_box(IPCO, &properties).unwrap(),
+                    make_ipma_box(0, 0, &associations).unwrap(),
+                ]
+                .concat(),
+            )
+            .unwrap();
+            let iref = make_iref_box(0, &self.references).unwrap();
+            let ftyp = make_box(FourCC::new(*b"ftyp"), b"mif1\0\0\0\0").unwrap();
+            let build_meta = |mdat_start: u64| {
+                let mut offset = mdat_start;
+                let locations = self
+                    .items
+                    .iter()
+                    .map(|(id, _, payload)| {
+                        let entry = IlocEntry {
+                            item_id: *id,
+                            construction_method: 0,
+                            data_reference_index: 0,
+                            base_offset: 0,
+                            extents: vec![IlocExtent {
+                                index: None,
+                                offset,
+                                length: payload.len() as u64,
+                            }],
+                        };
+                        offset += payload.len() as u64;
+                        entry
+                    })
+                    .collect::<Vec<_>>();
+                make_box(
+                    META,
+                    &[
+                        vec![0; 4],
+                        make_pitm_box(0, PRIMARY).unwrap(),
+                        iinf.clone(),
+                        make_iloc_box(1, 4, 4, 0, 0, &locations).unwrap(),
+                        iprp.clone(),
+                        iref.clone(),
+                    ]
+                    .concat(),
+                )
+                .unwrap()
+            };
+            let preliminary = build_meta(0);
+            let meta = build_meta((ftyp.len() + preliminary.len() + 8) as u64);
+            let payload = self
+                .items
+                .iter()
+                .flat_map(|(_, _, bytes)| bytes.iter().copied())
+                .collect::<Vec<_>>();
+            [ftyp, meta, make_box(MDAT, &payload).unwrap()].concat()
+        }
+    }
+
+    fn assert_payload(data: &[u8], item_id: u32, expected: &[u8]) {
+        let graph = parse_graph(data, "test output").unwrap();
+        assert_eq!(
+            item_payload(data, &graph, item_id, "test item").unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn transplant_direct_hdr_keeps_gain_out_of_three_semantic_roles() {
+        let source = Fixture::new(false, false, "rust-owned-hdr").bytes();
+        let scaffold = Fixture::new(false, true, "framework").bytes();
+        let output = transplant_apple_semantic_auxiliary_heif(&source, &scaffold, 3).unwrap();
+        assert_payload(&output, PRIMARY, b"rust-owned-hdr-primary");
+        assert_payload(&output, GAIN, b"rust-owned-hdr-gain");
+        for (id, expected) in [
+            (10, b"scaffold-semantic-0".as_slice()),
+            (11, b"scaffold-semantic-1".as_slice()),
+            (12, b"scaffold-semantic-2".as_slice()),
+            (20, b"descriptor-0".as_slice()),
+            (21, b"descriptor-1".as_slice()),
+            (22, b"descriptor-2".as_slice()),
+        ] {
+            assert_payload(&output, id, expected);
+        }
+        let graph = parse_graph(&output, "test output").unwrap();
+        assert_eq!(
+            graph.meta.iref.unwrap().entries,
+            parse_graph(&scaffold, "test scaffold")
+                .unwrap()
+                .meta
+                .iref
+                .unwrap()
+                .entries
+        );
+        for (index, expected) in [
+            (1, make_box(HVCC, &[9; 19]).unwrap()),
+            (2, make_box(HVCC, &[10; 21]).unwrap()),
+            (3, make_box(HVCC, &[5; 19]).unwrap()),
+        ] {
+            let property = graph
+                .meta
+                .properties
+                .iter()
+                .find(|p| p.index == index)
+                .unwrap();
+            assert_eq!(raw_property(&output, property).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn merge_direct_hdr_imports_three_described_semantics_without_importing_gain() {
+        let source = Fixture::new(false, false, "rust-owned-hdr").bytes();
+        let scaffold = Fixture::new(false, true, "framework").bytes();
+        let output = merge_apple_semantic_auxiliary_heif(&source, &scaffold, 3).unwrap();
+        assert_payload(&output, PRIMARY, b"rust-owned-hdr-primary");
+        assert_payload(&output, GAIN, b"rust-owned-hdr-gain");
+        let graph = parse_graph(&output, "test output").unwrap();
+        assert_eq!(graph.meta.iinf.entries.len(), 10);
+        for (image, descriptor, image_bytes, descriptor_bytes) in [
+            (
+                5,
+                8,
+                b"scaffold-semantic-0".as_slice(),
+                b"descriptor-0".as_slice(),
+            ),
+            (
+                6,
+                9,
+                b"scaffold-semantic-1".as_slice(),
+                b"descriptor-1".as_slice(),
+            ),
+            (
+                7,
+                10,
+                b"scaffold-semantic-2".as_slice(),
+                b"descriptor-2".as_slice(),
+            ),
+        ] {
+            assert_payload(&output, image, image_bytes);
+            assert_payload(&output, descriptor, descriptor_bytes);
+            assert!(graph
+                .meta
+                .iref
+                .as_ref()
+                .unwrap()
+                .entries
+                .iter()
+                .any(|r| r.kind == CDSC
+                    && r.from_item_id == descriptor
+                    && r.to_item_ids == [image]));
+        }
+    }
+
+    #[test]
+    fn transplant_preserves_multi_tile_grid_payload_order_and_semantics() {
+        let source = Fixture::new(true, false, "rust-owned-hdr").bytes();
+        let scaffold = Fixture::new(true, true, "framework").bytes();
+        let output = transplant_apple_semantic_auxiliary_heif(&source, &scaffold, 3).unwrap();
+        for (id, expected) in [
+            (100, b"rust-owned-hdr-primary-tile-0".as_slice()),
+            (101, b"rust-owned-hdr-primary-tile-1".as_slice()),
+            (110, b"rust-owned-hdr-gain-tile-0".as_slice()),
+            (111, b"rust-owned-hdr-gain-tile-1".as_slice()),
+            (1, b"framework-primary".as_slice()),
+            (2, b"framework-gain".as_slice()),
+            (10, b"scaffold-semantic-0".as_slice()),
+        ] {
+            assert_payload(&output, id, expected);
+        }
+    }
+
+    #[test]
+    fn semantic_descriptors_must_cover_each_image_once_even_when_counts_match() {
+        let source = Fixture::new(true, false, "rust").bytes();
+        let mut scaffold = Fixture::new(true, true, "framework");
+        scaffold
+            .references
+            .iter_mut()
+            .find(|r| r.from_item_id == 22)
+            .unwrap()
+            .to_item_ids = vec![11];
+        for assemble in [
+            transplant_apple_semantic_auxiliary_heif,
+            merge_apple_semantic_auxiliary_heif,
+        ] {
+            assert!(
+                assemble(&source, &scaffold.bytes(), 3).is_err(),
+                "two descriptors for image 11 must not hide missing descriptor for image 12"
+            );
+        }
+    }
+
+    #[test]
+    fn semantic_assembly_rejects_unknown_auxiliary_instead_of_dropping_it() {
+        let source = Fixture::new(true, false, "rust").bytes();
+        let mut scaffold = Fixture::new(true, true, "framework");
+        scaffold
+            .items
+            .push((30, FourCC::new(*b"jpeg"), b"unknown-image".to_vec()));
+        scaffold.references.push(IrefEntry {
+            kind: AUXL,
+            from_item_id: 30,
+            to_item_ids: vec![PRIMARY, TONE_MAP],
+        });
+        for assemble in [
+            transplant_apple_semantic_auxiliary_heif,
+            merge_apple_semantic_auxiliary_heif,
+        ] {
+            assert!(
+                assemble(&source, &scaffold.bytes(), 3).is_err(),
+                "an unsupported auxiliary image must not disappear behind the expected count"
+            );
+        }
+    }
+
+    #[test]
+    fn semantic_assembly_rejects_ambiguous_or_incomplete_hdr_graphs() {
+        let source = Fixture::new(true, false, "rust").bytes();
+        for case in [
+            "missing tmap dimg",
+            "empty tmap dimg",
+            "missing primary",
+            "missing gain",
+            "extra target",
+            "missing target item",
+            "duplicate tmap dimg",
+            "duplicate target",
+            "unknown gain type",
+            "missing grid dimg",
+            "duplicate grid dimg",
+            "duplicate tile",
+            "missing tile",
+            "direct image with dimg",
+            "shared primary and gain tiles",
+        ] {
+            let mut scaffold = Fixture::new(true, true, "framework");
+            let tmap = scaffold
+                .references
+                .iter_mut()
+                .find(|r| r.kind == DIMG && r.from_item_id == TONE_MAP)
+                .unwrap();
+            match case {
+                "empty tmap dimg" => tmap.to_item_ids.clear(),
+                "missing primary" => tmap.to_item_ids = vec![GAIN],
+                "missing gain" => tmap.to_item_ids = vec![PRIMARY],
+                "extra target" => tmap.to_item_ids.push(100),
+                "missing target item" => tmap.to_item_ids = vec![PRIMARY, 999],
+                "duplicate target" => tmap.to_item_ids = vec![PRIMARY, GAIN, GAIN],
+                _ => {}
+            }
+            match case {
+                "missing tmap dimg" => scaffold
+                    .references
+                    .retain(|r| r.kind != DIMG || r.from_item_id != TONE_MAP),
+                "duplicate tmap dimg" => scaffold.references.push(scaffold.references[0].clone()),
+                "unknown gain type" => {
+                    scaffold.items.iter_mut().find(|i| i.0 == GAIN).unwrap().1 = MIME
+                }
+                "missing grid dimg" => scaffold
+                    .references
+                    .retain(|r| r.kind != DIMG || r.from_item_id != GAIN),
+                "duplicate grid dimg" => scaffold.references.push(IrefEntry {
+                    kind: DIMG,
+                    from_item_id: GAIN,
+                    to_item_ids: GAIN_TILES.to_vec(),
+                }),
+                "duplicate tile" | "missing tile" | "shared primary and gain tiles" => {
+                    scaffold
+                        .references
+                        .iter_mut()
+                        .find(|r| r.kind == DIMG && r.from_item_id == GAIN)
+                        .unwrap()
+                        .to_item_ids = match case {
+                        "duplicate tile" => vec![110, 110],
+                        "missing tile" => vec![110, 999],
+                        _ => PRIMARY_TILES.to_vec(),
+                    };
+                }
+                "direct image with dimg" => {
+                    scaffold
+                        .items
+                        .iter_mut()
+                        .find(|i| i.0 == PRIMARY)
+                        .unwrap()
+                        .1 = HVC1
+                }
+                _ => {}
+            }
+            for assemble in [
+                transplant_apple_semantic_auxiliary_heif,
+                merge_apple_semantic_auxiliary_heif,
+            ] {
+                assert!(
+                    assemble(&source, &scaffold.bytes(), 3).is_err(),
+                    "accepted {case}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn semantic_assembly_rejects_ambiguous_auxiliary_and_descriptor_edges() {
+        let source = Fixture::new(true, false, "rust").bytes();
+        for case in [
+            "extra aux target",
+            "duplicate aux edge",
+            "multiple descriptor targets",
+            "duplicate descriptor edge",
+            "non-mime descriptor",
+        ] {
+            let mut scaffold = Fixture::new(true, true, "framework");
+            match case {
+                "extra aux target" => scaffold
+                    .references
+                    .iter_mut()
+                    .find(|r| r.kind == AUXL && r.from_item_id == 10)
+                    .unwrap()
+                    .to_item_ids
+                    .push(999),
+                "duplicate aux edge" => scaffold.references.push(IrefEntry {
+                    kind: AUXL,
+                    from_item_id: 10,
+                    to_item_ids: vec![PRIMARY, TONE_MAP],
+                }),
+                "multiple descriptor targets" => scaffold
+                    .references
+                    .iter_mut()
+                    .find(|r| r.from_item_id == 20)
+                    .unwrap()
+                    .to_item_ids
+                    .push(11),
+                "duplicate descriptor edge" => scaffold.references.push(IrefEntry {
+                    kind: CDSC,
+                    from_item_id: 20,
+                    to_item_ids: vec![10],
+                }),
+                "non-mime descriptor" => {
+                    scaffold.items.iter_mut().find(|i| i.0 == 20).unwrap().1 = EXIF
+                }
+                _ => unreachable!(),
+            }
+            for assemble in [
+                transplant_apple_semantic_auxiliary_heif,
+                merge_apple_semantic_auxiliary_heif,
+            ] {
+                assert!(
+                    assemble(&source, &scaffold.bytes(), 3).is_err(),
+                    "accepted {case}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn semantic_merge_rejects_ambiguous_source_gain_map_graph() {
+        let mut source = Fixture::new(true, false, "rust");
+        source.references[0].to_item_ids.push(PRIMARY_TILES[0]);
+        let scaffold = Fixture::new(true, true, "framework").bytes();
+        assert!(merge_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold, 3).is_err());
+    }
+
+    #[test]
+    fn transplant_identifies_gain_map_by_relationship_with_reversed_tmap_targets() {
+        let mut source = Fixture::new(false, false, "rust");
+        let mut scaffold = Fixture::new(false, true, "framework");
+        source.references[0].to_item_ids.reverse();
+        scaffold.references[0].to_item_ids.reverse();
+        let output =
+            transplant_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold.bytes(), 3)
+                .unwrap();
+        assert_payload(&output, PRIMARY, b"rust-primary");
+        assert_payload(&output, GAIN, b"rust-gain");
+        assert_payload(&output, 10, b"scaffold-semantic-0");
+    }
 }
