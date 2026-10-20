@@ -199,6 +199,13 @@ Photos import, editing, save, and reopen require separate device evidence.
 Baseline exposure and base gain still use the existing source-distribution
 calibration; this change does not replace those coefficients.
 
+When `XDREMUX_STYLES_ACCEPTANCE_DIR` is set, that check retains the actual v15
+product HEIC with native Texture resources and the per-fixture
+`linear-thumbnail-roundtrip.json` report. These are diagnostics, not Photos
+acceptance. The read-only inspection follows the item's declared file/idat
+storage and validates extent bounds; it does not patch the product to v16.
+The separate version-only research control remains a one-byte experiment.
+
 ### Provisional system gain map
 
 The default encoder still writes XDRemux's own log gain. `XDREMUX_SYSTEM_GAIN_MAP=1`

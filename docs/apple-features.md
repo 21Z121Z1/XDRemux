@@ -98,6 +98,8 @@ Apple Log 传递函数、[0, 1] 码值范围和现有辅助色彩标记保持不
 
 原生 consumer 回归使用 RGB UHDR 和单色 LHDR 夹具，回读编码后的缩略图，检查 HDR Log 目标以及主图 HEVC 是否保持不变。运行命令为 `bash scripts/apple/check_rust_style_consumer.sh`。Photos 导入、编辑、保存和重开仍需单独的设备证据。baseline exposure 和 base gain 仍使用现有的源分布校准；这次改动不替换那组系数。
 
+设置 `XDREMUX_STYLES_ACCEPTANCE_DIR` 时，该检查保留真实 v15 产品 HEIC、原生 Texture 资源及逐 fixture 的 `linear-thumbnail-roundtrip.json`。它们是诊断，不是 Photos 验收。只读检查根据 item 声明的 file/idat 存储读取并验证 extent 边界，不把产品修改为 v16。独立的版本号研究对照仍是单字节实验。
+
 ### 临时的系统 gain map
 
 默认编码器仍然写入 XDRemux 自己的 log gain。`XDREMUX_SYSTEM_GAIN_MAP=1` 是一条单独的原型路径。Rust 重建 scene-linear Display P3 HDR，用临时 guided filter 生成 HDR look，并用 local weight 1 保持 SDR look，这个权重就是恒等变换。然后把两张图交给 Apple adapter。adapter 调用 `CIContext.writeHEIFRepresentationOfImage`（`format` 为 `.RGBA8`，色彩空间为 Display P3），并通过 `kCIImageRepresentationHDRImage` 传入 half 线性 HDR。headroom 使用头文件方法 `-imageBySettingContentHeadroom:`（macOS 26）。该头文件没有给出这个方法的 Swift overlay 名称。`kCIImageRepresentationHDRGainMapAsRGB` 设为 true，要求 Core Image 计算颜色比值。Rust 不提供 `kCIImageRepresentationHDRGainMapImage`。

@@ -13,6 +13,8 @@ from pathlib import Path
 import plistlib
 import struct
 
+from scripts.diagnostics.inspect_oppo_heif import box_header
+
 
 def root_version_offset(plist: bytes, expected_version: int = 15) -> int:
     if not plist.startswith(b"bplist00") or len(plist) < 40:
@@ -84,9 +86,7 @@ def change_only_version(payload: bytes, target_version: int = 16) -> bytes:
     return bytes(changed)
 
 
-def patch_heic(
-    source: bytes, inspection: dict, target_version: int = 16
-) -> tuple[bytes, dict]:
+def _style_metadata_extent(source: bytes, inspection: dict) -> tuple[int, int]:
     items = [
         item for item in inspection["items"]
         if item.get("type") == "uri " and item.get("name") == "styleMetadata"
@@ -102,16 +102,36 @@ def patch_heic(
         raise ValueError("Styles metadata is not local")
     extent = extents[0]
     method = location.get("construction_method", 1)
-    start = extent["offset"]  # The inspector already resolves base_offset.
+    offset, length = extent["offset"], extent["length"]
+    if not isinstance(offset, int) or not isinstance(length, int) or offset < 0 or length <= 0:
+        raise ValueError("Invalid Styles metadata extent")
+    start = offset  # The inspector already resolves base_offset.
+    limit = len(source)
     if method == 1:
         if len(idats) != 1:
             raise ValueError("Expected one idat box for an idat extent")
-        start += idats[0]["start"] + 8
+        kind, payload_start, limit, _ = box_header(source, idats[0]["start"], len(source))
+        if kind != "idat":
+            raise ValueError("Styles idat location does not identify an idat box")
+        start += payload_start
     elif method != 0:
         raise ValueError("Unsupported Styles construction method")
-    end = start + extent["length"]
-    if start < 0 or end > len(source) or start >= end:
+    end = start + length
+    if end > limit or start >= end:
         raise ValueError("Styles extent is outside the source container")
+    return start, end
+
+
+def style_metadata_payload(source: bytes, inspection: dict) -> bytes:
+    """Read the single Styles payload without assuming its storage method."""
+    start, end = _style_metadata_extent(source, inspection)
+    return source[start:end]
+
+
+def patch_heic(
+    source: bytes, inspection: dict, target_version: int = 16
+) -> tuple[bytes, dict]:
+    start, end = _style_metadata_extent(source, inspection)
     original = source[start:end]
     changed = change_only_version(original, target_version)
     patched = source[:start] + changed + source[end:]

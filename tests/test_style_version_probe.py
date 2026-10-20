@@ -1,10 +1,16 @@
 """Verify the Styles version-only research control changes exactly one byte."""
 import hashlib
 import plistlib
+import struct
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 from research.oppo_styles.tools.probe_style_version import (
-    change_only_version, patch_heic, root_version_offset,
+    change_only_version, patch_heic, root_version_offset, style_metadata_payload,
 )
 
 
@@ -43,7 +49,7 @@ class StyleVersionProbeTests(unittest.TestCase):
 
     def test_heif_scope_and_refusal(self):
         raw = plistlib.dumps({"0": 15, "1": b"xyz"}, fmt=plistlib.FMT_BINARY)
-        source = b"header" + b"12345678" + raw + b"trailer"
+        source = b"header" + struct.pack(">I4s", 8 + len(raw), b"idat") + raw + b"trailer"
         report = {
             "items": [{"type": "uri ", "name": "styleMetadata",
                        "location": {"extents": [{"offset": 0, "length": len(raw)}]}}],
@@ -68,6 +74,41 @@ class StyleVersionProbeTests(unittest.TestCase):
         self.assertEqual(changed[-len(texture):], texture)
         self.assertTrue(receipt["other_bytes_identical"])
         self.assertEqual(sum(a != b for a, b in zip(source, changed)), 1)
+
+    def test_idat_extent_uses_real_header_and_cannot_escape_its_box(self):
+        raw = plistlib.dumps({"0": 15}, fmt=plistlib.FMT_BINARY)
+        for header in (struct.pack(">I4s", len(raw) + 8, b"idat"),
+                       struct.pack(">I4sQ", 1, b"idat", len(raw) + 16)):
+            source = b"prefix" + header + raw + b"unrelated-tail"
+            report = {"items": [{"type": "uri ", "name": "styleMetadata",
+                      "location": {"construction_method": 1,
+                                   "extents": [{"offset": 0, "length": len(raw)}]}}],
+                      "meta_children": [{"type": "idat", "start": 6}]}
+            self.assertEqual(style_metadata_payload(source, report), raw)
+            report["items"][0]["location"]["extents"][0]["length"] += 1
+            with self.assertRaises(ValueError):
+                style_metadata_payload(source, report)
+
+    def test_research_module_cli_preserves_its_single_byte_contract(self):
+        raw = plistlib.dumps({"0": 15, "1": b"actual-existing-style"}, fmt=plistlib.FMT_BINARY)
+        with tempfile.TemporaryDirectory(prefix="xdremux-version-cli-") as tmp:
+            root = Path(tmp)
+            source = root / "input.heic"
+            source.write_bytes(raw)
+            inspection = root / "inspect.json"
+            inspection.write_text(json.dumps({"items": [{"type": "uri ", "name": "styleMetadata",
+                "location": {"construction_method": 0,
+                             "extents": [{"offset": 0, "length": len(raw)}]}}], "meta_children": []}))
+            command = [sys.executable, "-m", "research.oppo_styles.tools.probe_style_version",
+                       "--input", str(source), "--inspect", str(inspection),
+                       "--output", str(root / "output.heic"), "--report", str(root / "report.json")]
+            result = subprocess.run(command, cwd=Path(__file__).resolve().parents[1],
+                                    capture_output=True, text=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(source.read_bytes(), raw)
+            edited = (root / "output.heic").read_bytes()
+            self.assertEqual(sum(a != b for a, b in zip(raw, edited)), 1)
+            self.assertEqual(plistlib.loads(edited), {"0": 16, "1": b"actual-existing-style"})
 
 
 if __name__ == "__main__":
