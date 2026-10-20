@@ -34,6 +34,12 @@ static NSDictionary *ScalarTextureFacts(id<MTLTexture> texture) {
     return result;
 }
 
+static void RecordGPUExecution(NSMutableDictionary *report, id executionStatus, NSMutableArray *failures) {
+    for (id<MTLCommandBuffer> failed in Call(executionStatus, @"failedCommandBuffers", @[]))
+        [failures addObject:@{@"status": @(failed.status), @"error": failed.error.description ?: @"", @"label": failed.label ?: @""}];
+    report[@"native_GPU_execution"] = @{@"diagnostic_counters_are_not_execution_proof": @YES, @"status": Call(executionStatus, @"status", @[]), @"completed_command_buffers": Call(executionStatus, @"completedCommandBuffersCount", @[]), @"failures": [failures copy]};
+}
+
 int xdremux_texture_statistics(const char *inputPath, const char *outputPath, const char *directoryPath, uint32_t selectedPerson, const char *effectName, const char *tuningJSON) {
     @autoreleasepool {
         NSString *input = @(inputPath), *out = @(outputPath);
@@ -206,6 +212,7 @@ int xdremux_texture_statistics(const char *inputPath, const char *outputPath, co
             report[@"native_queue_explicitly_bound"] = @(Call(effect, @"metalCommandQueue", @[]) != nil);
             id executionStatus = Make(@"FigMetalExecutionStatus");
             Call(nativeContext, @"setExecutionStatus:", @[executionStatus]);
+            NSMutableArray *gpuFailures = [NSMutableArray new];
             NSMutableArray *callOrder=[NSMutableArray new];report[@"native_call_order"]=callOrder;
             for (NSString *stage in @[@"setup", @"prewarm", @"prepareToProcess:", @"calculateStats", @"process"]) {
                 [callOrder addObject:stage];
@@ -228,10 +235,7 @@ int xdremux_texture_statistics(const char *inputPath, const char *outputPath, co
                     [explicitCommand waitUntilCompleted];
                     report[[stage stringByAppendingString:@"_command"]] = @{@"status": @(explicitCommand.status), @"error": explicitCommand.error.description ?: @""};
                 }
-                NSMutableArray *failures = [NSMutableArray new];
-                for (id<MTLCommandBuffer> failed in Call(executionStatus, @"failedCommandBuffers", @[]))
-                    [failures addObject:@{@"status": @(failed.status), @"error": failed.error.description ?: @"", @"label": failed.label ?: @""}];
-                report[@"native_GPU_execution"] = @{@"diagnostic_counters_are_not_execution_proof": @YES, @"status": Call(executionStatus, @"status", @[]), @"completed_command_buffers": Call(executionStatus, @"completedCommandBuffersCount", @[]), @"failures": failures};
+                RecordGPUExecution(report, executionStatus, gpuFailures);
                 Write(report, out);
                 @try {
                     NSDictionary *states = [effect valueForKey:@"_perPersonIntermediatesAndStats"];
@@ -265,6 +269,7 @@ int xdremux_texture_statistics(const char *inputPath, const char *outputPath, co
             [callOrder addObject:@"finishProcessing"];report[@"stage"]=@"finishProcessing";Write(report,out);
             report[@"finishProcessing"]=Call(effect,@"finishProcessing",@[]);
             Call(nativeContext,@"forceCommit",@[]);Call(nativeContext,@"waitForIdle",@[]);
+            RecordGPUExecution(report, executionStatus, gpuFailures);
             BOOL operationsCompleted=productionCompleted && [report[@"finishProcessing"] intValue]==0 && fence.status==MTLCommandBufferStatusCompleted;
             report[@"native_statistics_operations_completed"]=@(operationsCompleted);
             report[@"native_returned_empty_statistics"]=@(operationsCompleted && !nativeStats.count);

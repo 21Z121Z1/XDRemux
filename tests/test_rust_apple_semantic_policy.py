@@ -20,6 +20,9 @@ ADAPTER_MAIN = (
 VISION_MATTES = (
     ROOT / "Sources" / "XDRemuxAppleAdapter" / "VisionSemanticMattes.swift"
 ).read_text(encoding="utf-8")
+TEXTURE_INFERENCE = (
+    ROOT / "Sources" / "XDTextureNative" / "infer.m"
+).read_text(encoding="utf-8")
 ADAPTER = "\n".join(
     path.read_text(encoding="utf-8")
     for path in sorted((ROOT / "Sources" / "XDRemuxAppleAdapter").glob("*.swift"))
@@ -114,6 +117,18 @@ class RustAppleSemanticPolicyTests(unittest.TestCase):
         )
         self.assertIn("performVisionRequests(requests)", VISION_MATTES)
         self.assertIn("try handler.perform(requestBatch)", VISION_MATTES)
+
+    def test_texture_vision_requests_only_submit_singleton_batches(self) -> None:
+        # Batch cardinality is the source contract that avoids the native
+        # compound-request crash; this is not Apple-framework execution evidence.
+        batches = re.findall(r"performRequests:\s*@\[([^\]]*)\]", TEXTURE_INFERENCE)
+        self.assertTrue(batches, "Texture must retain its native Vision requests")
+        for batch in batches:
+            self.assertTrue(batch.strip())
+            self.assertNotIn(
+                ",", batch,
+                "Texture must not reintroduce a heterogeneous Vision compound batch",
+            )
 
     def test_adapter_schema_version_is_atomic_across_runtime_helper_and_clients(self) -> None:
         rust_match = re.search(
