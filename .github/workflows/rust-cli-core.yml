@@ -6,6 +6,10 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "Package.swift"
+      - "Sources/**"
+      - "scripts/distribution/**"
+      - "tests/test_macos_distribution.py"
       - "crates/xdremux-classification/**"
       - "crates/xdremux-cli/**"
       - "crates/xdremux-runtime/**"
@@ -23,6 +27,10 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "Package.swift"
+      - "Sources/**"
+      - "scripts/distribution/**"
+      - "tests/test_macos_distribution.py"
       - "crates/xdremux-classification/**"
       - "crates/xdremux-cli/**"
       - "crates/xdremux-runtime/**"
@@ -99,3 +107,92 @@ jobs:
 
       - name: Test portable Rust CLI semantics
         run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli
+
+  macos-package:
+    name: macos-package (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: xcode-27
+            target: aarch64-apple-darwin
+          - arch: x86_64
+            runner: macos-26-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      MACOSX_DEPLOYMENT_TARGET: "15.0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact checked-out head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+      - name: Install build tools and check portable packaging contracts
+        shell: bash
+        run: |
+          brew install cmake ninja nasm pkgconf
+          python3 -m unittest tests.test_macos_distribution -v
+      - name: Build checksum-pinned native dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/distribution-artifacts/evidence"
+          python3 scripts/distribution/build_native.py --arch '${{ matrix.arch }}' \
+            --work "$RUNNER_TEMP/xdremux-native" \
+            2>&1 | tee "$RUNNER_TEMP/distribution-artifacts/evidence/native-build.log"
+      - name: Build and archive the current Rust CLI and complete Apple adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PKG_CONFIG_PATH="$RUNNER_TEMP/xdremux-native/prefix/lib/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
+          export RUSTFLAGS='-C link-arg=-Wl,-headerpad_max_install_names'
+          cargo build --locked --release --target '${{ matrix.target }}' -p xdremux-cli
+          swift build -c release --product xdremux-apple-adapter -Xlinker -headerpad_max_install_names
+          adapter="$(swift build -c release --show-bin-path)/xdremux-apple-adapter"
+          package="$RUNNER_TEMP/staging/XDRemux-macOS-${{ matrix.arch }}"
+          python3 scripts/distribution/macos.py stage \
+            --cli 'target/${{ matrix.target }}/release/xdremux' --adapter "$adapter" \
+            --native "$RUNNER_TEMP/xdremux-native" --output "$package" \
+            --arch '${{ matrix.arch }}' --head "$EXPECTED_HEAD"
+          python3 scripts/distribution/macos.py archive --package "$package" \
+            --output "$RUNNER_TEMP/distribution-artifacts/XDRemux-macOS-${{ matrix.arch }}.tar.gz" \
+            --epoch "$(git show -s --format=%ct HEAD)"
+          cp "$RUNNER_TEMP/staging/XDRemux-macOS-${{ matrix.arch }}-linkage.json" "$RUNNER_TEMP/distribution-artifacts/evidence/"
+          cp "$RUNNER_TEMP/xdremux-native/build/libheif/CMakeCache.txt" "$RUNNER_TEMP/distribution-artifacts/evidence/libheif-cmake-cache.txt"
+          {
+            git rev-parse HEAD
+            rustc --version
+            cargo --version
+            swift --version
+            xcodebuild -version
+            sw_vers
+            printf 'ImageVersion=%s\n' "${ImageVersion:-unknown}"
+          } > "$RUNNER_TEMP/distribution-artifacts/evidence/toolchain.txt"
+      - name: Run the extracted package outside the checkout with only system environment
+        shell: bash
+        run: |
+          python3 scripts/distribution/smoke_macos.py \
+            --archive "$RUNNER_TEMP/distribution-artifacts/XDRemux-macOS-${{ matrix.arch }}.tar.gz" \
+            --fixtures "$GITHUB_WORKSPACE/fixtures" --arch '${{ matrix.arch }}' \
+            --expected-head "$EXPECTED_HEAD" \
+            --output "$RUNNER_TEMP/distribution-artifacts/evidence/relocated"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: XDRemux-macOS-${{ matrix.arch }}
+          path: ${{ runner.temp }}/distribution-artifacts/
+          retention-days: 14
+          if-no-files-found: error

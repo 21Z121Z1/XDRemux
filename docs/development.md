@@ -71,6 +71,24 @@ ImageIO auxiliary-resource probing 是第一项迁移后的真实 operation。Sw
 
 SwiftPM 只包含 adapter executable。它的构建验证 platform primitive boundary；产品契约由 Rust tests 和 Rust-driven consumer checks 定义。
 
+## macOS CLI 包
+
+现有 `rust-cli-core.yml` workflow 通过 `scripts/distribution/` 构建独立的 arm64
+和 x86_64 包，保留根 Swift package 与两个 native target。原生依赖固定 checksum；
+归档包含依赖源代码和许可文本。包内含 CLI、Apple adapter 和经过校验的
+loader-relative dylib 闭包，使用 ad-hoc 签名。
+
+上传前，CI 在 checkout 外解包，以 `env -i` 和仅含系统目录的 `PATH` 启动包内程序。
+它转换真实 Samsung HEIF Motion Photo 和 OPPO ProXDR fixture，验证 HEIC/MOV pair
+与 HDR 输出，检查源字节不变，并拒绝第二次写入现有 pair。dyld 日志必须显示包内
+libheif，且不能从包外加载非系统库。可移植打包测试使用
+`python3 -m unittest tests.test_macos_distribution`。
+
+该 smoke 检查只证明测试 host 上包内的可移植转换，不证明 Apple 编辑能力。
+Styles/Texture 和 Cinematic 仍需各自 macOS 27 SDK/runtime/硬件契约及独立原生 gate。
+Intel macOS 26 包不证明这些功能。归档对固定 staging 字节规范化时间戳和 owner，
+不声称编译器级构建可复现。包是 CI artifact，不是 notarized release。
+
 ## Python 工具
 
 Python package 需要 Python 3.11 或更高版本，只包含研究/训练代码。它不安装 CLI、不参与 runtime，也不得定义产品语义。
@@ -96,7 +114,7 @@ python -m unittest tests.test_apple_reverse_key1_training
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI 界面、Xcode 工程、App 测试与 App 自有的构建和测试脚本。 |
 | `tests/` | Python 回归测试、验证框架自测与小型合成 fixture；Rust 测试仍与所属 crate 放在一起。 |
 | `fixtures/` | strict gate 使用的版本化真实媒体 fixture。 |
-| `scripts/` | 按 CI、validation、Apple、diagnostics、performance 分类的[仓库自动化](../scripts/README.md)。 |
+| `scripts/` | 按 CI、validation、Apple、diagnostics、distribution、performance 分类的[仓库自动化](../scripts/README.md)。 |
 | `docs/` | 当前指导文档；带日期的审计记录单独放在 `docs/history/`。 |
 | `research/` | 隔离的 OPPO Styles、Texture Styles、视频 Styles 与 Palette 研究。 |
 | `benchmarks/` | 版本化性能基线，与测量脚本及生成的报告分开存放。 |

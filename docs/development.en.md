@@ -71,6 +71,29 @@ ImageIO auxiliary-resource probing is the first migrated operation. The Swift ad
 
 SwiftPM contains only the adapter executable. Its build verifies the platform primitive boundary; Rust tests and Rust-driven consumer checks define the product contract.
 
+## macOS CLI packages
+
+The existing `rust-cli-core.yml` workflow also builds separate arm64 and x86_64
+packages using `scripts/distribution/`. It keeps the root Swift package and both
+native targets. Native dependencies are checksum-pinned; the archive includes
+their sources and license notices. The package contains the CLI, Apple adapter,
+and audited loader-relative dylib closure with ad-hoc signatures.
+
+Before upload, CI extracts the archive outside the checkout and invokes the
+packaged programs with `env -i` and a system-only `PATH`. It converts the real
+Samsung HEIF Motion Photo and an OPPO ProXDR fixture, validates the HEIC/MOV pair
+and HDR output, preserves input bytes, and rejects a second write to the pair.
+The dyld log must show the bundled libheif and no non-system library outside
+the package. Portable packaging tests run with
+`python3 -m unittest tests.test_macos_distribution`.
+
+This smoke check establishes packaged portable conversion on the tested host,
+not Apple editing capability. Styles/Texture and Cinematic require their current
+macOS 27 SDK/runtime/hardware contract and separate native gates. The Intel
+macOS 26 package does not establish those features. Archives normalize timestamps
+and owners for fixed staged bytes; this is not a claim of compiler-level
+reproducibility. Packages are CI artifacts, not notarized releases.
+
 ## Python tooling
 
 The Python package requires Python 3.11 or newer and contains only research/training code. It does not install a CLI, participate in the runtime, or define product semantics.
@@ -96,7 +119,7 @@ Training and evaluation scripts may remain in the Python research package becaus
 | `apps/macos/XDRemuxApp/` | macOS SwiftUI shell, Xcode project, app tests, and app-owned build/test scripts. |
 | `tests/` | Python regression suites, validation-framework self-tests, and small synthetic fixtures; Rust tests remain with their crates. |
 | `fixtures/` | Versioned real media fixtures used by strict gates. |
-| `scripts/` | [Repository automation](../scripts/README.en.md), grouped by CI, validation, Apple, diagnostics, and performance. |
+| `scripts/` | [Repository automation](../scripts/README.en.md), grouped by CI, validation, Apple, diagnostics, distribution, and performance. |
 | `docs/` | Current guidance; dated audits are isolated in `docs/history/`. |
 | `research/` | Isolated OPPO Styles, Texture Styles, video Styles, and Palette investigations. |
 | `benchmarks/` | Versioned performance baselines, separate from measurement scripts and generated reports. |

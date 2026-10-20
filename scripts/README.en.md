@@ -12,6 +12,7 @@ or validate the Rust product; they do not own conversion policy.
 | `apple/` | Apple framework and device acceptance; requires the documented platform. |
 | `diagnostics/` | Read-only media inspection and comparison. |
 | `performance/` | Measurements and budget checks; baselines live in `../benchmarks/`. |
+| `distribution/` | Pinned native builds, macOS package relocation, archive and isolated package checks. |
 
 ```bash
 python3 scripts/ci/agent_completion_gate.py --help

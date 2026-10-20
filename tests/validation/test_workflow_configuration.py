@@ -153,6 +153,29 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertNotIn("cargo clippy", workflow)
         self.assertNotIn("cargo fmt", workflow)
 
+    def test_macos_packages_share_portability_owner_and_require_relocated_runtime(self) -> None:
+        workflow = self.workflow("rust-cli-core.yml")
+        package_job = workflow.split("  macos-package:\n", 1)[1]
+        # These are standard public-repository runners. Keep package portability
+        # evidence distinct from the macOS 27 Apple-feature product gates.
+        self.assertIn("runner: xcode-27", package_job)
+        self.assertIn("runner: macos-26-intel", package_job)
+        self.assertNotRegex(package_job, r"runner: .*-(?:large|xlarge)")
+        self.assertIn("swift build -c release --product xdremux-apple-adapter", package_job)
+        self.assertNotIn("platforms/apple", package_job)
+        self.assertIn("scripts/distribution/build_native.py", package_job)
+        self.assertIn("scripts/distribution/macos.py archive", package_job)
+        self.assertIn("scripts/distribution/smoke_macos.py", package_job)
+        self.assertIn('--fixtures "$GITHUB_WORKSPACE/fixtures"', package_job)
+        self.assertLess(package_job.index("scripts/distribution/smoke_macos.py"),
+                        package_job.index("actions/upload-artifact@"))
+        self.assertNotIn("continue-on-error", package_job)
+        self.assertNotIn("|| true", package_job)
+        for event in ("push", "pull_request"):
+            self.assertIn('"scripts/distribution/**"', self.event_block(workflow, event))
+            self.assertIn('"Package.swift"', self.event_block(workflow, event))
+            self.assertIn('"Sources/**"', self.event_block(workflow, event))
+
     def test_performance_workflow_does_not_duplicate_completion(self) -> None:
         workflow = self.workflow("performance.yml")
         self.assertIn("scripts/performance/benchmark_rust_product.py", workflow)

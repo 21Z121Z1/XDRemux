@@ -23,6 +23,21 @@ xdremux --help
 xdremux convert --help
 ```
 
+## Terminal language
+
+Use `xdremux --lang en --help` or `xdremux --lang zh-CN --help` for English or
+Simplified Chinese terminal presentation. The global option also works after a
+subcommand. Selection order is `--lang`, `XDREMUX_LANG`, `LC_ALL`, `LC_MESSAGES`,
+`LANG`, then English. Empty environment values are ignored. Supported `zh`
+locales, such as `zh_CN.UTF-8`, select Simplified Chinese; `C` and `POSIX` select
+English. An unsupported environment locale falls back to English. An unsupported
+explicit `--lang` is a usage error.
+
+JSON documents, command and option names, enum values, exit codes, and input
+path arguments do not change with language. Human help, labels, and CLI-owned
+error context are translated. Clap's detailed parser diagnostics and lower-level
+library/native errors may remain English.
+
 ## `convert`
 
 Standard conversion needs no mode option:

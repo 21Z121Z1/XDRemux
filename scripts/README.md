@@ -12,6 +12,7 @@
 | `apple/` | Apple framework 与真机验收，需满足相应平台要求。 |
 | `diagnostics/` | 只读媒体检查与比较。 |
 | `performance/` | 测量与预算检查；基线存放在 `../benchmarks/`。 |
+| `distribution/` | 固定原生依赖构建、macOS 包重定位、归档与隔离运行检查。 |
 
 ```bash
 python3 scripts/ci/agent_completion_gate.py --help

@@ -13,7 +13,7 @@ from urllib.parse import unquote, urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_GROUPS = {"apple", "ci", "diagnostics", "performance", "validation"}
+SCRIPT_GROUPS = {"apple", "ci", "diagnostics", "distribution", "performance", "validation"}
 HARNESSES = (
     "scripts/validation/verify_batch_categorize_idempotence.sh",
     "scripts/validation/verify_error_messages.sh",

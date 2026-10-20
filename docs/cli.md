@@ -23,6 +23,18 @@ xdremux --help
 xdremux convert --help
 ```
 
+## 终端语言
+
+使用 `xdremux --lang en --help` 或 `xdremux --lang zh-CN --help` 选择英文或
+简体中文终端显示。全局选项也可放在子命令后。选择顺序为 `--lang`、
+`XDREMUX_LANG`、`LC_ALL`、`LC_MESSAGES`、`LANG`，最后默认英文。忽略空环境变量。
+`zh_CN.UTF-8` 等受支持的 `zh` locale 选择简体中文；`C` 和 `POSIX` 选择英文。
+不支持的环境 locale 回退英文；显式指定不支持的 `--lang` 则返回用法错误。
+
+语言不改变 JSON 文档、命令/选项名称、枚举值、退出码或输入路径参数。
+翻译范围为人类可读帮助、标签和 CLI 持有的错误上下文。Clap 详细参数诊断和
+底层库/原生错误仍可能使用英文。
+
 ## `convert`
 
 标准转换不需要模式参数：
