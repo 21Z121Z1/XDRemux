@@ -103,6 +103,9 @@ pub struct BatchSuccess {
     pub outputs: Vec<PathBuf>,
     pub kind: BatchAssetKind,
     pub disposition: BatchSuccessDisposition,
+    /// Known source resources omitted by this conversion. Reused pairs have
+    /// no new conversion report, so their count remains unknown.
+    pub omitted_resource_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -152,6 +155,29 @@ fn create_output_parent(path: &Path) -> Result<()> {
     }
     fs::create_dir_all(parent)
         .map_err(|error| RuntimeError::external("batch output directory", error))
+}
+
+fn publish_new_batch_output(
+    output: &Path,
+    convert: impl FnOnce(&Path) -> Result<()>,
+) -> Result<()> {
+    let parent = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let staged = tempfile::Builder::new()
+        .prefix(".xdremux-batch-")
+        .suffix(".heic")
+        .tempfile_in(parent)
+        .map_err(|error| RuntimeError::external("batch staging", error))?
+        .into_temp_path();
+    // Converters atomically replace this private path. Close the original
+    // handle first, then publish the resulting inode without replacing a
+    // destination that may have appeared since planning or the preflight.
+    convert(staged.as_ref())?;
+    staged
+        .persist_noclobber(output)
+        .map_err(|error| RuntimeError::external("batch no-clobber publication", error.error))
 }
 
 fn output_candidate(input: &Path, parent: &Path, suffix: u32, cinematic: bool) -> Result<PathBuf> {
@@ -412,6 +438,7 @@ fn process_batch_item_with_options(
                     outputs: vec![receipt.output],
                     kind: BatchAssetKind::Cinematic,
                     disposition: BatchSuccessDisposition::Converted,
+                    omitted_resource_count: None,
                 });
             }
             #[cfg(not(target_os = "macos"))]
@@ -455,6 +482,7 @@ fn process_batch_item_with_options(
                                     outputs: vec![item.output.clone(), output_video],
                                     kind: BatchAssetKind::LivePhoto,
                                     disposition: BatchSuccessDisposition::SkippedExisting,
+                                    omitted_resource_count: None,
                                 });
                             }
                             if item.output.exists() || output_video.exists() {
@@ -485,6 +513,7 @@ fn process_batch_item_with_options(
                     request,
                 ) {
                     Ok(converted) => {
+                        let omitted_resource_count = Some(converted.omitted_resource_count());
                         checkpoint_event = Some(BatchCheckpointEvent {
                             source: item.input.clone(),
                             image: converted.image.clone(),
@@ -499,6 +528,7 @@ fn process_batch_item_with_options(
                             outputs: vec![converted.image, converted.video],
                             kind: BatchAssetKind::LivePhoto,
                             disposition: BatchSuccessDisposition::Converted,
+                            omitted_resource_count,
                         })
                     }
                     Err(error) => {
@@ -520,73 +550,66 @@ fn process_batch_item_with_options(
                         "output already exists; refusing to overwrite",
                     ));
                 }
-                let converted = if request.apple_features.portrait {
-                    #[cfg(target_os = "macos")]
-                    {
-                        let adapter = apple_adapter_executable.ok_or_else(|| {
-                            RuntimeError::new(
+                publish_new_batch_output(&item.output, |staged| {
+                    if request.apple_features.portrait {
+                        #[cfg(target_os = "macos")]
+                        {
+                            let adapter = apple_adapter_executable.ok_or_else(|| {
+                                RuntimeError::new(
+                                    "Apple Portrait conversion",
+                                    "the macOS Apple adapter executable was not resolved",
+                                )
+                            })?;
+                            runtime
+                                .convert_apple_portrait_file_with_profile(
+                                    adapter,
+                                    &source,
+                                    staged,
+                                    apple_options.portrait_profile,
+                                )
+                                .map(|_| ())
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        {
+                            let _ = apple_adapter_executable;
+                            Err(RuntimeError::new(
                                 "Apple Portrait conversion",
-                                "the macOS Apple adapter executable was not resolved",
-                            )
-                        })?;
-                        let receipt = runtime.convert_apple_portrait_file_with_profile(
-                            adapter,
-                            &source,
-                            &item.output,
-                            apple_options.portrait_profile,
-                        )?;
-                        return Ok(BatchSuccess {
-                            input: item.input.clone(),
-                            outputs: vec![receipt.output],
-                            kind: BatchAssetKind::ProXdr,
-                            disposition: BatchSuccessDisposition::Converted,
-                        });
-                    }
-                    #[cfg(not(target_os = "macos"))]
-                    {
-                        let _ = apple_adapter_executable;
-                        return Err(RuntimeError::new(
-                            "Apple Portrait conversion",
-                            "Portrait conversion requires macOS ImageIO/Core Image; the complete profile also requires Vision semantics",
-                        ));
-                    }
-                } else if request.apple_features.photographic_styles {
-                    #[cfg(target_os = "macos")]
-                    {
-                        let adapter = apple_adapter_executable.ok_or_else(|| {
-                            RuntimeError::new(
+                                "Portrait conversion requires macOS ImageIO/Core Image; the complete profile also requires Vision semantics",
+                            ))
+                        }
+                    } else if request.apple_features.photographic_styles {
+                        #[cfg(target_os = "macos")]
+                        {
+                            let adapter = apple_adapter_executable.ok_or_else(|| {
+                                RuntimeError::new(
+                                    "Photographic Styles conversion",
+                                    "the macOS Apple adapter executable was not resolved",
+                                )
+                            })?;
+                            runtime
+                                .convert_apple_photographic_styles_file(adapter, &source, staged)
+                                .map(|_| ())
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        {
+                            let _ = apple_adapter_executable;
+                            Err(RuntimeError::new(
                                 "Photographic Styles conversion",
-                                "the macOS Apple adapter executable was not resolved",
-                            )
-                        })?;
-                        let receipt = runtime.convert_apple_photographic_styles_file(
-                            adapter,
-                            &source,
-                            &item.output,
-                        )?;
-                        return Ok(BatchSuccess {
-                            input: item.input.clone(),
-                            outputs: vec![receipt.output],
-                            kind: BatchAssetKind::ProXdr,
-                            disposition: BatchSuccessDisposition::Converted,
-                        });
+                                "Photographic Styles requires macOS ImageIO/Vision capabilities",
+                            ))
+                        }
+                    } else {
+                        runtime
+                            .convert_proxdr_file(&source, staged, request, |_| {})
+                            .map(|_| ())
                     }
-                    #[cfg(not(target_os = "macos"))]
-                    {
-                        let _ = apple_adapter_executable;
-                        return Err(RuntimeError::new(
-                            "Photographic Styles conversion",
-                            "Photographic Styles requires macOS ImageIO/Vision capabilities",
-                        ));
-                    }
-                } else {
-                    runtime.convert_proxdr_file(&source, &item.output, request, |_| {})?
-                };
+                })?;
                 Ok(BatchSuccess {
                     input: item.input.clone(),
-                    outputs: vec![converted.output],
+                    outputs: vec![item.output.clone()],
                     kind: BatchAssetKind::ProXdr,
                     disposition: BatchSuccessDisposition::Converted,
+                    omitted_resource_count: None,
                 })
             }
         }
@@ -801,6 +824,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn new_batch_publication_preserves_a_destination_created_during_conversion() {
+        let root = tempfile::tempdir().unwrap();
+        let output = root.path().join("output.heic");
+        let error = publish_new_batch_output(&output, |staged| {
+            assert!(!output.exists());
+            crate::AtomicFilePublisher::new(staged.to_path_buf())
+                .publish_bytes(b"converted candidate".to_vec())?;
+            fs::write(&output, b"independent output appeared").unwrap();
+            Ok(())
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains("batch no-clobber publication"));
+        assert_eq!(fs::read(&output).unwrap(), b"independent output appeared");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn new_batch_publication_uses_the_converted_file_and_cleans_private_paths() {
+        let root = tempfile::tempdir().unwrap();
+        let output = root.path().join("output.heic");
+        publish_new_batch_output(&output, |staged| {
+            crate::AtomicFilePublisher::new(staged.to_path_buf())
+                .publish_bytes(b"converted candidate".to_vec())?;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(fs::read(&output).unwrap(), b"converted candidate");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn failed_batch_conversion_never_publishes_and_cleans_private_paths() {
+        let root = tempfile::tempdir().unwrap();
+        let output = root.path().join("output.heic");
+        let error = publish_new_batch_output(&output, |staged| {
+            fs::write(staged, b"partial candidate").unwrap();
+            Err(RuntimeError::new("conversion", "synthetic failure"))
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains("synthetic failure"));
+        assert!(!output.exists());
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[test]
     fn receipt_counts_are_derived_from_outcomes() {
         let receipt = BatchReceipt {
             successes: vec![BatchSuccess {
@@ -808,6 +876,7 @@ mod tests {
                 outputs: vec![PathBuf::from("out/a.heic")],
                 kind: BatchAssetKind::ProXdr,
                 disposition: BatchSuccessDisposition::Converted,
+                omitted_resource_count: None,
             }],
             failures: vec![BatchFailure {
                 input: PathBuf::from("b.heic"),
