@@ -4,6 +4,8 @@
 mod apple_adapter;
 #[cfg(target_os = "macos")]
 mod apple_styles;
+#[cfg(target_os = "macos")]
+mod apple_texture;
 mod batch;
 mod batch_checkpoint;
 mod categorize;

@@ -341,6 +341,11 @@ pub(crate) fn convert_file(
     };
     let assembled = xdremux_heif::assemble_photographic_styles_heif(&semantic_base, &assembly)
         .map_err(|error| RuntimeError::external("Rust Photographic Styles graph", error))?;
+    let styles_path = staging.path().join("styles-for-texture.heic");
+    fs::write(&styles_path, &assembled)
+        .map_err(|error| RuntimeError::external("Texture source staging", error))?;
+    let assembled =
+        crate::apple_texture::generate(&adapter, &styles_path, &assembled, staging.path())?;
     xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
         RuntimeError::external("Photographic Styles HDR structural validation", error)
     })?;

@@ -25,6 +25,7 @@ private struct AdapterRequest: Decodable {
     let primaryMetadataXMPPath: String?
     let videoToolboxMain10: VideoToolboxMain10Request?
     let cinematicEnvelope: CinematicEnvelopeRequest?
+    let texture: TexturePrimitiveRequest?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
@@ -42,6 +43,7 @@ private struct AdapterRequest: Decodable {
         case primaryMetadataXMPPath = "primary_metadata_xmp_path"
         case videoToolboxMain10 = "video_toolbox_main10"
         case cinematicEnvelope = "cinematic_envelope"
+        case texture
     }
 }
 
@@ -803,6 +805,21 @@ private func encodedResponse(for input: Data) throws -> Data {
                 outputPath: outputPath,
                 configuration: configuration
             )
+        )
+    case "texture-prepare", "texture-infer", "texture-statistics", "texture-readback":
+        guard let inputPath = request.inputPath, !inputPath.isEmpty,
+              let outputPath = request.outputPath, !outputPath.isEmpty else {
+            fail("Texture primitive requires input_path and output_path")
+        }
+        try runTexturePrimitive(
+            operation: request.operation,
+            input: inputPath,
+            output: outputPath,
+            configuration: request.texture
+        )
+        response = AdapterResponse(
+            schemaVersion: schemaVersion, capabilities: nil, auxiliary: nil,
+            gainMap: nil, imageProperties: nil, semanticMasks: nil
         )
     case "cinematic-envelope":
         guard let inputPath = request.inputPath, !inputPath.isEmpty,

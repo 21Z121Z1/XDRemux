@@ -6,6 +6,7 @@ mod apple_photographic_styles;
 mod apple_portrait;
 mod apple_portrait_geometry;
 mod apple_scene;
+mod apple_texture;
 mod capabilities;
 mod execution;
 mod product_policy;
@@ -14,6 +15,10 @@ mod source_profile;
 use std::collections::BTreeSet;
 
 use xdremux_format::ChromaSampling;
+
+pub use apple_texture::{
+    apple_texture_property_list, apple_texture_tuning_profile, APPLE_TEXTURE_ANALYSIS_MAX_DIMENSION,
+};
 
 pub use apple::{
     fuse_apple_portrait_hair_mask, fuse_apple_portrait_person_mask, AppleGainMapFacts,
