@@ -1,0 +1,636 @@
+   Compiling xdremux-runtime v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-runtime)
+   Compiling xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+   Compiling xdremux-codec v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-codec)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.81s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_classification-2e1eda4ff07e5233)
+
+running 12 tests
+test capabilities::tests::requires_complete_depth_manifest_evidence ... ok
+test oppo::tests::keeps_all_activated_modes_but_projects_one_folder ... ok
+test oppo::tests::parses_json_and_embedded_prefix_forms ... ok
+test oppo::tests::separates_known_unmapped_and_unknown_flags ... ok
+test planning::tests::identical_existing_resources_are_duplicates_without_renaming ... ok
+test planning::tests::asset_planning_contract_keeps_validated_live_pair_on_shared_collision_sequence ... ok
+test planning::tests::reservations_keep_cross_asset_collisions_deterministic ... ok
+test planning::tests::planner_rejects_asset_classification_type_drift ... ok
+test planning::tests::resolve_asset_claims_only_validated_same_stem_sibling_mov ... ok
+test planning::tests::resolve_asset_preserves_inferred_embedded_live_photo_without_companion ... ok
+test tests::photo_asset_keeps_live_photo_resources_together ... ok
+test tests::matches_shared_swift_python_golden_contract ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_cli-e2dd1d90af1b738f)
+
+running 25 tests
+test categorize::tests::in_place_discovery_skips_existing_category_roots ... ok
+test tests::apple_portrait_and_oppo_compatibility_are_incompatible_usage ... ok
+test tests::batch_accepts_repeatable_inputs ... ok
+test tests::batch_accepts_oppo_gallery_product_intent ... ok
+test tests::batch_discovery_is_non_recursive_by_default_and_recursive_on_request ... ok
+test tests::batch_failure_human_name_does_not_leak_workspace_paths ... ok
+test tests::batch_output_planning_is_source_safe_and_reserves_live_photo_companions ... ok
+test tests::batch_rejects_zero_jobs_as_usage_error ... ok
+test tests::batch_requires_a_source ... ok
+test tests::clap_command_definition_is_internally_consistent ... ok
+test tests::conversion_accepts_apple_portrait_product_intent ... ok
+test tests::cinematic_requests_and_video_discovery_follow_the_selected_intent ... ok
+test tests::conversion_help_exposes_intent_not_internal_policy ... ok
+test tests::convert_accepts_oppo_gallery_product_intent ... ok
+test tests::convert_accepts_oppo_native_portrait_profile ... ok
+test tests::convert_defaults_to_in_place_publication ... ok
+test tests::convert_rejects_combining_complete_and_oppo_native_portrait ... ok
+test tests::convert_accepts_explicit_output ... ok
+test tests::convert_requires_named_input ... ok
+test tests::help_and_version_are_successful_control_flow ... ok
+test tests::double_dash_allows_paths_that_start_with_dash ... ok
+test tests::inspect_requires_exactly_one_input ... ok
+test tests::no_arguments_prints_help ... ok
+test tests::unknown_command_is_a_usage_error ... ok
+test validate::tests::feature_validation_uses_the_same_styles_intent ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (target/debug/deps/xdremux-b70d1384a234c168)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/batch.rs (target/debug/deps/batch-7dd7f0d1ffaf4cf9)
+
+running 2 tests
+test batch_command_is_deterministic_machine_readable_and_failure_isolating ... ok
+test live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media has been running for over 60 seconds
+test live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 207.62s
+
+     Running tests/batch_categorize.rs (target/debug/deps/batch_categorize-6a2a9419e1bb2b11)
+
+running 1 test
+test batch_categorize_projects_final_outputs_before_conversion ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.92s
+
+     Running tests/batch_jobs.rs (target/debug/deps/batch_jobs-e431255b567593d4)
+
+running 1 test
+test bounded_parallel_batch_keeps_receipts_ordered_and_checkpoint_reusable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 48.91s
+
+     Running tests/batch_resume.rs (target/debug/deps/batch_resume-5f3bd91e0ac95413)
+
+running 1 test
+test resume_reuses_only_the_checkpoint_proven_live_photo_pair ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.23s
+
+     Running tests/categorize.rs (target/debug/deps/categorize-8c3574f0b9808d1d)
+
+running 1 test
+test categorize_command_copies_then_reports_duplicate_on_rerun ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/cinematic_envelope.rs (target/debug/deps/cinematic_envelope-0d4a56db3944d2dd)
+
+running 3 tests
+test cinematic_command_rejects_unsupported_platform_before_opening_input ... ok
+test cinematic_is_a_conversion_flag_on_both_entry_points ... ok
+test cinematic_configuration_requires_the_feature_and_rejects_image_intents ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/convert.rs (target/debug/deps/convert-fcb22524134a8127)
+
+running 1 test
+test convert_command_executes_full_rust_proxdr_pipeline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.32s
+
+     Running tests/live_photo.rs (target/debug/deps/live_photo-07932ee10dd23f76)
+
+running 2 tests
+test convert_command_executes_full_rust_heif_live_photo_pipeline ... ok
+test convert_command_executes_full_rust_jpeg_ultrahdr_live_photo_pipeline ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.99s
+
+     Running tests/validate.rs (target/debug/deps/validate-5dd6a809654363a1)
+
+running 1 test
+test validate_reports_iso_hdr_live_photo_and_failures_as_stable_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.27s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_codec-745d9172f0b83635)
+
+running 11 tests
+test model::tests::undo_irot_returns_coded_pixels_for_a_quarter_turn ... ok
+test portable::jpeg::tests::advertises_only_jpeg_raster_decode ... ok
+test model::tests::rgb16_inverse_preserves_channels_for_all_rotations_and_mirror_orders ... ok
+test portable::libheif::tests::advertises_only_reference_verified_operations ... ok
+test portable::libheif::tests::edge_tiles_report_padded_coded_geometry ... ok
+test portable::libheif::tests::libheif_rgb444_tile_roundtrips_through_raster_decoder ... ok
+test portable::libheif::tests::reference_compatible_request_pins_512_and_quality_90 ... ok
+test portable::libheif::tests::rejects_native_422_instead_of_silently_falling_back ... ok
+test portable::primary_heif::tests::encodes_primary_heif_that_libheif_can_decode ... ok
+test portable::primary_heif::tests::rejects_non_tiff_exif_before_calling_libheif ... ok
+test portable::jpeg::tests::decodes_real_jpeg_with_trailing_motion_data_as_mono_and_rgb ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.27s
+
+     Running unittests src/bin/xdremux-codec-gainmap-bench.rs (target/debug/deps/xdremux_codec_gainmap_bench-c2382297c8f259d1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/orientation_roundtrip.rs (target/debug/deps/orientation_roundtrip-2450a56e62d5cc78)
+
+running 1 test
+test rotated_gain_map_matches_primary_coded_orientation_after_libheif_transform ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.92s
+
+     Running tests/portable_final_file.rs (target/debug/deps/portable_final_file-562b42a1a73bb755)
+
+running 1 test
+test portable_libheif_profiles_produce_valid_final_gain_map_files_without_swift_intermediate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.52s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_container-606923b401e3e658)
+
+running 23 tests
+test extractor::tests::manifest_without_qti_or_valid_jxrs_fails_closed ... ok
+test extractor::tests::coincidental_qti_text_with_invalid_box_size_is_rejected ... ok
+test extractor::tests::negative_manifest_lengths_never_form_slices ... ok
+test extractor::tests::valid_jxrs_footer_allows_manifest_without_qti_marker ... ok
+test extractor::tests::uhdr_non_finite_metadata_uses_canonical_fallback ... ok
+test oppo_portrait::tests::depth_rank_mapping_matches_producer_round_trip ... ok
+test oppo_portrait::tests::parses_depth_header_and_flagged_planes ... ok
+test oppo_portrait::tests::parses_version_four_face_table_into_fixed_shape_records ... ok
+test oppo_portrait::tests::parses_version_one_without_inventing_newer_fields ... ok
+test oppo_portrait::tests::rejects_committed_non_portrait_fixture_as_portrait_source ... ok
+test oppo_portrait::tests::rejects_invalid_depth_quantization_and_missing_flagged_plane ... ok
+test oppo_portrait::tests::rejects_non_finite_or_truncated_config_records ... ok
+test oppo_portrait_focus::tests::blur_response_uses_source_curve_and_zoom_region ... ok
+test oppo_portrait_focus::tests::center_focus_averages_native_depth_not_rank ... ok
+test oppo_portrait_focus::tests::focus_dispatch_matches_recovered_swift_regression_vectors ... ok
+test oppo_portrait_focus::tests::no_rectangle_focus_fallback_centers_roi_on_focus_point ... ok
+test oppo_portrait_focus::tests::pet_no_rectangle_histogram_keeps_recovered_two_percent_behavior ... ok
+test oppo_tail::tests::default_private_hdr_filter_keeps_unrelated_vendor_payloads ... ok
+test oppo_tail::tests::filtered_repack_preserves_physical_payload_and_manifest_order ... ok
+test oppo_tail::tests::neutralization_changes_only_quoted_manifest_name_byte ... ok
+test oppo_tail::tests::preserve_returns_exact_post_extension_bytes ... ok
+test oppo_tail::tests::private_hdr_name_policy_matches_product_contract ... ok
+test oppo_portrait::tests::extracts_typed_source_from_committed_portrait_fixture ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running unittests src/bin/xdremux-container-extract.rs (target/debug/deps/xdremux_container_extract-784b9d8fb0f3ee3f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_engine-514f113ef148604f)
+
+running 94 tests
+test apple::tests::credible_foreground_requires_sixteen_high_confidence_pixels ... ok
+test apple::tests::l8_mask_rejects_invalid_shape ... ok
+test apple::tests::oppo_native_portrait_contract_accepts_only_producer_backed_resources ... ok
+test apple::tests::oppo_native_portrait_contract_binds_every_optional_resource ... ok
+test apple::tests::morphology_support_uses_a_disk_not_a_square ... ok
+test apple::tests::portrait_hair_prior_is_gated_by_fused_person_matte ... ok
+test apple::tests::portrait_hair_preserves_low_confidence_prior_without_claiming_acceptance ... ok
+test apple::tests::portrait_hair_requires_shared_geometry ... ok
+test apple::tests::portrait_hair_without_prior_is_vision_only ... ok
+test apple::tests::portrait_person_prior_is_ignored_without_legacy_overlap_threshold ... ok
+test apple::tests::portrait_person_prior_is_clipped_to_dilated_vision_support ... ok
+test apple::tests::portrait_policy_requires_the_complete_auxiliary_resource_set ... ok
+test apple::tests::portrait_semantic_contract_is_explicit_and_stable ... ok
+test apple::tests::portrait_source_gain_map_policy_accepts_only_observed_apple_formats ... ok
+test apple_auxiliary::tests::l8_matte_payloads_encode_only_rust_owned_role_policy ... ok
+test apple_auxiliary::tests::disparity_payload_matches_the_legacy_imageio_contract ... ok
+test apple_auxiliary::tests::payload_builders_reject_invalid_shape_and_product_values ... ok
+test apple_auxiliary::tests::standard_base64_matches_rfc_4648_vectors ... ok
+test apple_photographic_styles::tests::direct_parameters_change_only_the_six_owned_coefficients ... ok
+test apple_photographic_styles::tests::distribution_matches_swift_percentiles_and_empty_contract ... ok
+test apple_photographic_styles::tests::coefficient_bounds_and_malformed_payloads_fail_closed ... ok
+test apple_photographic_styles::tests::face_exposure_boost_matches_swift_formula_and_neutral_fallback ... ok
+test apple_photographic_styles::tests::existing_payload_deltas_are_applied_per_repeated_block ... ok
+test apple_photographic_styles::tests::identity_global_tone_curve_matches_257_sample_wire_contract ... ok
+test apple_photographic_styles::tests::global_polynomial_fit_recovers_a_bounded_known_transform ... ok
+test apple_photographic_styles::tests::light_map_rejects_invalid_geometry_orientation_and_samples ... ok
+test apple_photographic_styles::tests::light_map_storage_orientation_matches_all_eight_exif_mappings ... ok
+test apple_photographic_styles::tests::linear_metadata_changes_with_photo_distribution_and_gain_range ... ok
+test apple_photographic_styles::tests::identity_layout_matches_verified_dimensions_and_values ... ok
+test apple_photographic_styles::tests::linear_thumbnail_log_round_trips_the_exponential_decoder ... ok
+test apple_photographic_styles::tests::linear_thumbnail_rejects_invalid_reference_before_quantization ... ok
+test apple_photographic_styles::tests::polynomial_basis_matches_swift_contract ... ok
+test apple_photographic_styles::tests::property_list_rejects_incomplete_resources_and_nonfinite_statistics ... ok
+test apple_photographic_styles::tests::refinement_inputs_fail_closed ... ok
+test apple_photographic_styles::tests::refinement_scalar_rows_are_typed_and_updates_are_clamped ... ok
+test apple_photographic_styles::tests::property_list_serialization_emits_complete_deterministic_contract ... ok
+test apple_photographic_styles::tests::sampled_jacobian_recovers_bounded_refinement_update ... ok
+test apple_photographic_styles::tests::scene_policy_preserves_priority_and_native_default ... ok
+test apple_photographic_styles::tests::semantic_tone_at_neutral_ltm_ignores_thumbnail_and_curve ... ok
+test apple_photographic_styles::tests::source_derived_global_tone_curve_follows_channel_codes_without_percentile_scaling ... ok
+test apple_portrait::tests::committed_static_profiles_are_byte_stable_and_exclude_dynamic_records ... ok
+test apple_portrait::tests::rend_rejects_duplicate_identifiers_and_unknown_types ... ok
+test apple_portrait::tests::rend_round_trips_byte_identically ... ok
+test apple_portrait::tests::rendering_parameters_add_dynamic_records_for_every_lens_profile ... ok
+test apple_portrait::tests::scene_activation_matches_the_swift_oracle_formula ... ok
+test apple_portrait::tests::scene_activation_rejects_non_finite_inputs ... ok
+test apple_portrait::tests::signed_identifier_sort_matches_swift_int16_order ... ok
+test apple_portrait::tests::xhlrb_clamps_finite_inputs_and_rejects_non_finite_inputs ... ok
+test apple_portrait::tests::xhlrb_dynamic_records_match_recovered_swift_formulas ... ok
+test apple_portrait::tests::xhlrb_records_replace_static_profile_without_duplicate_scene_ids ... ok
+test apple_portrait_geometry::tests::calibration_saturates_tele_profile_without_fabricating_new_profile ... ok
+test apple_portrait_geometry::tests::calibration_uses_lens_anchor_and_repairs_inconsistent_exif_zoom ... ok
+test apple_portrait_geometry::tests::disparity_pixels_match_swift_endpoint_semantics ... ok
+test apple_portrait_geometry::tests::focus_disparity_uses_source_exponent_without_extra_focal_scaling ... ok
+test apple_portrait_geometry::tests::focus_orientation_transform_matches_all_eight_producer_mappings ... ok
+test apple_portrait_geometry::tests::focus_orientation_transform_rejects_invalid_input ... ok
+test apple_portrait_geometry::tests::lens_model_parser_matches_swift_camera_number_contract ... ok
+test apple_portrait_geometry::tests::lens_profile_dispatch_matches_swift_thresholds ... ok
+test apple_portrait_geometry::tests::orientation_resolution_matches_swift_fallback_policy ... ok
+test apple_scene::tests::aliases_are_rust_policy_and_max_confidence_wins ... ok
+test apple_scene::tests::invalid_known_confidence_fails_closed ... ok
+test apple_scene::tests::unknown_vision_identifiers_do_not_change_product_scores ... ok
+test apple_texture::tests::duplicate_instances_empty_statistics_and_corrupt_angles_fail ... ok
+test apple_texture::tests::texture_contains_measured_people_signed_angles_and_empty_context ... ok
+test capabilities::tests::concrete_codec_ports_remain_individually_dyn_compatible ... ok
+test capabilities::tests::inventory_is_only_a_set_of_composed_operation_facts ... ok
+test execution::tests::lifecycle_is_plan_build_validate_publish ... ok
+test execution::tests::planning_failure_prevents_all_side_effect_ports ... ok
+test execution::tests::validation_failure_prevents_publication ... ok
+test product_policy::tests::oppo_gallery_output_requires_rgb420_even_for_lhdr_mono ... ok
+test product_policy::tests::product_policy_fails_closed_when_required_layout_is_unavailable ... ok
+test product_policy::tests::standard_mono_output_stays_mono400 ... ok
+test product_policy::tests::standard_rgb_output_is_444_even_when_private_jpeg_is_420 ... ok
+test provisional_guided_filter::tests::checkerboard_changes_when_local_detail_is_removed ... ok
+test provisional_guided_filter::tests::constant_image_stays_constant_without_local_detail ... ok
+test provisional_guided_filter::tests::exact_buffers_have_no_finite_psnr ... ok
+test provisional_guided_filter::tests::half_packing_round_trips_exact_values_and_sets_alpha ... ok
+test provisional_guided_filter::tests::headroom_is_at_least_sdr_white ... ok
+test provisional_guided_filter::tests::unit_local_weight_is_the_primary ... ok
+test source_profile::tests::hvcc_probe_keeps_semantic_channels_separate_from_storage_sampling ... ok
+test source_profile::tests::jpeg_probe_flows_into_source_profile_without_decoding ... ok
+test source_profile::tests::source_profile_boundary_rejects_non_gain_map_channel_counts ... ok
+test source_profile::tests::source_profile_boundary_rejects_semantic_storage_mismatch ... ok
+test tests::adaptive_policy_preserves_known_mono_420_and_444_layouts ... ok
+test tests::cinematic_intent_is_not_silently_ignored_by_the_still_planner ... ok
+test tests::plan_contains_only_execution_relevant_decisions ... ok
+test tests::planner_never_silently_downconverts_bit_depth_or_444_chroma ... ok
+test tests::planner_rejects_apple_features_with_oppo_gallery_compatibility ... ok
+test tests::planner_rejects_requested_apple_feature_without_its_adapter ... ok
+test tests::planner_requires_decoder_for_the_probed_source_codec ... ok
+test tests::request_exposes_product_intent_only ... ok
+test tests::rgb_422_may_promote_losslessly_to_444_when_backend_lacks_422 ... ok
+test tests::unknown_rgb_sampling_uses_444_as_information_safe_target ... ok
+test apple_photographic_styles::tests::revert_key1_is_local_and_points_from_styled_primary_to_recovered_scene ... ok
+
+test result: ok. 94 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running unittests src/bin/xdremux-engine-vectors.rs (target/debug/deps/xdremux_engine_vectors-8f5c10d6cca6f9a8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_format-43dbd0d6c678bae2)
+
+running 8 tests
+test hevc::tests::preserves_declared_bit_depth ... ok
+test hevc::tests::parses_all_hevc_chroma_classes ... ok
+test hevc::tests::rejects_truncated_or_wrong_version_records ... ok
+test jpeg::tests::distinguishes_three_channel_sampling_classes ... ok
+test jpeg::tests::preserves_unusual_component_layout_without_guessing_sampling ... ok
+test jpeg::tests::probes_monochrome_sampling ... ok
+test jpeg::tests::rejects_scan_before_frame_header ... ok
+test jpeg::tests::rejects_truncated_segment ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xdremux-format-inspect.rs (target/debug/deps/xdremux_format_inspect-9b636445aca154c9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xdremux-format-vectors.rs (target/debug/deps/xdremux_format_vectors-5f67ba96fec76ad7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_hdr-13aa0c8e0acaae28)
+
+running 16 tests
+test edr::tests::early_cfg_uses_float32_subnormal_sentinel_not_numeric_one ... ok
+test edr::tests::modern_cfg_is_numeric_interval_and_precomputed_remains_f64 ... ok
+test edr::tests::rejects_wrong_metadata_lengths ... ok
+test edr::tests::uhdr_keeps_distinct_channels ... ok
+test gainmap::tests::output_stride_is_256_aligned_and_padding_stays_zero ... ok
+test gainmap::tests::rejects_malformed_masks_fail_closed ... ok
+test info::tests::invalid_positive_per_channel_max_falls_back_to_scalar ... ok
+test info::tests::repeats_first_channel_and_preserves_float32_boundary ... ok
+test scene_linear::tests::alternate_application_uses_resolved_channel_metadata_and_full_weight ... ok
+test scene_linear::tests::area_resize_follows_full_resolution_reconstruction ... ok
+test scene_linear::tests::edge_and_near_black_samples_stay_on_the_gain_formula ... ok
+test scene_linear::tests::gain_application_matches_known_hdr_for_gamma_offsets_and_weight ... ok
+test scene_linear::tests::headroom_weight_selects_the_alternate_image_or_a_fraction ... ok
+test scene_linear::tests::invalid_gain_metadata_and_rasters_fail_closed ... ok
+test scene_linear::tests::reconstruction_upsamples_gain_codes_before_application ... ok
+test gainmap::tests::quantization_truncates_instead_of_rounding ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/bin/xdremux-gainmap-vectors.rs (target/debug/deps/xdremux_gainmap_vectors-db41e818d8e1369c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xdremux-hdr-vectors.rs (target/debug/deps/xdremux_hdr_vectors-00ba7739009cd7b1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 36 tests
+test canonical::tests::altr_group_encodes_tmap_before_primary ... ok
+test canonical::tests::consumer_iref_replaces_gain_auxl_with_primary_and_tmap_targets ... ok
+test data_information::tests::dinf_contains_one_self_contained_url_reference ... ok
+test canonical::tests::essential_normalization_changes_only_requested_associations ... ok
+test direct::tests::accepts_explicit_chroma_and_bit_depth_profiles ... ok
+test direct::tests::grid_payload_uses_large_dimension_form_only_when_required ... ok
+test direct::tests::rejects_bad_tile_geometry_before_parsing_source ... ok
+test direct::tests::rejects_codec_channel_mismatch_before_parsing_source ... ok
+test direct::tests::both_gain_map_assemblers_preserve_mirror_rotation_order ... ok
+test native::tests::assembly_rejects_empty_metadata_before_parsing_source ... ok
+test orientation::tests::coded_aspect_accepts_an_integer_scale_and_rejects_a_transpose ... ok
+test orientation::tests::odd_irot_swaps_display_dimensions ... ok
+test semantic::tests::merge_direct_hdr_imports_three_described_semantics_without_importing_gain ... ok
+test semantic::tests::semantic_assembly_rejects_ambiguous_auxiliary_and_descriptor_edges ... ok
+test semantic::tests::semantic_assembly_rejects_unknown_auxiliary_instead_of_dropping_it ... ok
+test semantic::tests::semantic_descriptors_must_cover_each_image_once_even_when_counts_match ... ok
+test semantic::tests::semantic_merge_rejects_ambiguous_source_gain_map_graph ... ok
+test semantic::tests::transplant_direct_hdr_keeps_gain_out_of_three_semantic_roles ... ok
+test semantic::tests::semantic_assembly_rejects_ambiguous_or_incomplete_hdr_graphs ... ok
+test semantic::tests::transplant_preserves_multi_tile_grid_payload_order_and_semantics ... ok
+test semantic::tests::transplant_identifies_gain_map_by_relationship_with_reversed_tmap_targets ... ok
+test styles::tests::appends_rust_resources_and_preserves_source_mdat_prefix ... ok
+test styles::tests::derives_primary_color_from_grid_components_when_grid_has_geometry_only ... ok
+test styles::tests::display_oriented_style_item_is_rejected ... ok
+test styles::tests::rejects_non_binary_style_metadata_before_parsing_source ... ok
+test styles::tests::rejects_a_second_style_metadata_item ... ok
+test styles::tests::rotated_primary_reuses_its_irot_on_coded_style_items ... ok
+test texture::tests::a_role_label_cannot_replace_a_missing_native_codec_or_distinct_instance ... ok
+test texture::tests::appends_measured_masks_without_changing_original_payloads ... ok
+test validation::tests::accepts_mono_420_422_444_and_ten_bit_profiles ... ok
+test validation::tests::accepts_valid_tiled_gain_map_graph ... ok
+test validation::tests::rejects_grid_tile_count_mismatch ... ok
+test validation::tests::rejects_idat_extent_past_storage ... ok
+test validation::tests::rejects_pixi_hvcc_channel_mismatch ... ok
+test styles::tests::style_items_preserve_primary_mirror_rotation_order ... ok
+test validation::tests::rejects_tmap_reference_to_unknown_gain_map ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/fail_closed.rs (target/debug/deps/fail_closed-4cff4075cdb70a94)
+
+running 2 tests
+test malformed_source_fails_closed_after_validating_spec ... ok
+test structurally_incomplete_source_is_rejected ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/heif_conformance.rs (target/debug/examples/heif_conformance-19f57805e666b9f0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_metadata-e103b82a4f5fd8d8)
+
+running 16 tests
+test apple_portrait::tests::focus_xmp_contains_consumer_region_and_type ... ok
+test apple_portrait::tests::focus_xmp_rejects_invalid_geometry_and_coordinates ... ok
+test iso21496::tests::distinct_channels_are_preserved_in_xmp_and_tmap ... ok
+test iso21496::tests::apple_tmap_matches_current_swift_golden_bytes ... ok
+test iso21496::tests::hdrgm_xmp_preserves_current_swift_indentation_contract ... ok
+test iso21496::tests::native_and_strict_lengths_match_swift_contract ... ok
+test iso21496::tests::malformed_lengths_and_strict_payloads_fail_closed ... ok
+test iso21496::tests::reversed_per_channel_gain_ranges_are_rejected_by_both_tmap_writers ... ok
+test oppo::tests::adjustment_preserves_digit_width_and_expands_when_required ... ok
+test oppo::tests::malformed_decimal_overflow_is_not_misparsed ... ok
+test oppo::tests::extent_adjustment_matches_swift_overlap_policy ... ok
+test oppo::tests::routing_matches_current_swift_contract ... ok
+test ultrahdr_jpeg::tests::decodes_iso_multichannel_metadata ... ok
+test ultrahdr_jpeg::tests::parses_hdrgm_scalar_values ... ok
+test oppo::tests::usercomment_patch_repoints_tiff_value_and_tracks_extent_delta ... ok
+test ultrahdr_jpeg::tests::rejects_nonzero_iso_reserved_bits ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/bin/xdremux-metadata-fixture.rs (target/debug/deps/xdremux_metadata_fixture-be89c13541527e55)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xdremux-metadata-vectors.rs (target/debug/deps/xdremux_metadata_vectors-a6206a6e76cd74f1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_motion_photo-4ea69528ca3dee0f)
+
+running 11 tests
+test geometry::tests::coloros16_transform_matches_existing_product_policy ... ok
+test geometry::tests::coloros15_uses_closest_cover_frame_and_inverts_matrix ... ok
+test payload::tests::copies_exact_range_replaces_destination_and_creates_parent ... ok
+test payload::tests::out_of_file_range_leaves_existing_destination_untouched ... ok
+test payload::tests::payload_limit_failure_leaves_existing_destination_untouched ... ok
+test payload::tests::same_path_misuse_fails_closed_and_removes_partial_destination ... ok
+test publication::tests::companion_movie_uses_same_stem ... ok
+test payload::tests::zero_buffer_failure_leaves_existing_destination_untouched ... ok
+test publication::tests::publication_installs_both_resources_and_cleans_backups ... ok
+test publication::tests::reconcile_keeps_only_a_valid_complete_pair ... ok
+test publication::tests::stale_temporary_and_backup_artifacts_are_removed_before_reconcile ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/liblivephoto_interop.rs (target/debug/deps/liblivephoto_interop-b3df2c110abea56a)
+
+running 1 test
+test coloros16_public_writer_retains_unmapped_resources_as_explicit_sidecars ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.06s
+
+     Running tests/live_photo_heif_still_fixture.rs (target/debug/deps/live_photo_heif_still_fixture-d0ab63ca3766d15c)
+
+running 1 test
+test samsung_heif_motion_photo_becomes_portable_apple_live_photo_still ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+     Running tests/live_photo_mov_fixture.rs (target/debug/deps/live_photo_mov_fixture-9bdfa0aba9af539b)
+
+running 1 test
+test real_coloros_motion_video_rewrap_preserves_compressed_media ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.11s
+
+     Running unittests examples/motion_photo_conformance.rs (target/debug/examples/motion_photo_conformance-b096a02e19404a2f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/payload_conformance.rs (target/debug/examples/payload_conformance-4d554f63117c9b8d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_runtime-70787547e22e43d3)
+
+running 28 tests
+test batch::tests::failed_batch_conversion_never_publishes_and_cleans_private_paths ... ok
+test batch::tests::new_batch_publication_preserves_a_destination_created_during_conversion ... ok
+test batch::tests::receipt_counts_are_derived_from_outcomes ... ok
+test batch::tests::new_batch_publication_uses_the_converted_file_and_cleans_private_paths ... ok
+test batch_checkpoint::tests::changed_source_digest_invalidates_reuse_even_when_mtime_is_irrelevant ... ok
+test batch_checkpoint::tests::truncated_tail_record_never_grants_reuse ... ok
+test categorize::tests::categorization_is_idempotent_and_never_clobbers_conflicts ... ok
+test categorize::tests::dry_run_plans_without_creating_output ... ok
+test live_photo::tests::candidate_scanner_ignores_unvalidated_jpeg_blobs ... ok
+test live_photo::tests::generated_pair_identifier_is_uuid_v4 ... ok
+test batch_checkpoint::tests::streamed_signature_matches_in_memory_signature_for_large_input ... ok
+test oppo_portrait::tests::committed_portrait_fixture_has_depth_without_subject_matte ... ok
+test live_photo::tests::sef_hdr_without_a_mapped_gain_map_cannot_be_classified_as_sdr ... ok
+test oppo_portrait::tests::private_gain_map_headroom_matches_the_swift_stop_mapping ... ok
+test oppo_portrait::tests::producer_focus_region_uses_the_stored_oppo_focus_point ... ok
+test oppo_portrait::tests::decodes_committed_portrait_depth_without_external_zstd ... ok
+test oppo_portrait::tests::rejects_empty_compressed_depth ... ok
+test oppo_portrait::tests::rejects_one_jpeg_from_the_portrait_pair_as_a_complete_source_image ... ok
+test oppo_portrait::tests::simulated_aperture_matches_the_swift_oracle_precedence ... ok
+test oppo_portrait::tests::producer_focus_region_uses_valid_focus_rectangle_dimensions ... ok
+test tests::atomic_publisher_replaces_destination_only_on_commit ... ok
+test tests::diagnostic_only_error_has_no_invented_source ... ok
+test tests::mono_replication_preserves_logical_pixels_not_padding ... ok
+test tests::relative_publication_uses_current_directory_parent ... ok
+test tests::runtime_error_retains_typed_sources_through_context_and_clone ... ok
+test tests::standard_heif_body_drops_post_mdat_vendor_tail ... ok
+test validation::tests::chroma_names_are_stable_machine_values ... ok
+test oppo_portrait::tests::splits_committed_portrait_source_with_hardened_jpeg_boundaries ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.06s
+
+     Running tests/apple_adapter.rs (target/debug/deps/apple_adapter-3bd634f26cd52b11)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/apple_portrait_rend.rs (target/debug/deps/apple_portrait_rend-8cb5a398f1e9cbe4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cinematic_envelope.rs (target/debug/deps/cinematic_envelope-b63a4bf4dd313d03)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/live_photo_fixture.rs (target/debug/deps/live_photo_fixture-89d97545702cc204)
+
+running 1 test
+test real_samsung_heif_motion_photo_becomes_valid_live_photo_pair ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+
+     Running tests/live_photo_jpeg_fixtures.rs (target/debug/deps/live_photo_jpeg_fixtures-fabc0e2f1c70052b)
+
+running 2 tests
+test real_jpeg_motion_photo_vendor_matrix ... ignored, real-device vendor matrix; invoked explicitly by the Rust CLI gate
+test samsung_ultrahdr_jpeg_becomes_valid_hdr_live_photo ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 27.52s
+
+     Running tests/live_photo_negative.rs (target/debug/deps/live_photo_negative-d59096718d03f8d2)
+
+running 4 tests
+test known_timestamp_without_video_samples_is_rejected_before_publication ... ok
+test sef_fallback_hdr_without_mapped_gain_map_is_rejected_before_publication ... ok
+test known_timestamp_without_video_track_is_rejected_before_publication ... ok
+test sef_fallback_with_real_sdr_still_and_movie_remains_supported ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.45s
+
+     Running tests/oppo_compat_fixture.rs (target/debug/deps/oppo_compat_fixture-57bd3f76eda6cab7)
+
+running 2 tests
+test standard_output_keeps_x6_gain_map_monochrome ... ok
+test oppo_gallery_output_expands_x6_mono_to_rgb420_and_preserves_vendor_routing ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.17s
+
+     Running tests/oppo_tail_fixture.rs (target/debug/deps/oppo_tail_fixture-a4204559f51a5959)
+
+running 2 tests
+test standard_output_removes_private_hdr_tail_resources ... ok
+test oppo_gallery_output_appends_exact_source_tail_bytes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.32s
+
+     Running tests/private_fixture.rs (target/debug/deps/private_fixture-9a7a5c981e6f67a5)
+
+running 1 test
+test standard_private_proxdr_fixture_reaches_portable_final_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_detection_fixtures.rs (target/debug/deps/source_detection_fixtures-03e17fbd245eccc5)
+
+running 3 tests
+test find_x7_lhdr_source_is_monochrome_jpeg8 ... ok
+test find_x6_lhdr_source_is_monochrome_jpeg8 ... ok
+test find_x9_uhdr_source_is_rgb_jpeg8 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/synthetic_uhdr.rs (target/debug/deps/synthetic_uhdr-9e2a8cfca774aa77)
+
+running 1 test
+test portable_runtime_converts_synthetic_uhdr_end_to_end ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+
+     Running tests/system_heif_hdr.rs (target/debug/deps/system_heif_hdr-d4f84c6d67ffbd4b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xdremux_source-7422e040fadceaef)
+
+running 3 tests
+test tests::malformed_motion_metadata_is_not_silently_treated_as_hdr ... ok
+test tests::routes_android_motion_photo_before_hdr_probe ... ok
+test tests::unsupported_bytes_do_not_claim_a_product_route ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

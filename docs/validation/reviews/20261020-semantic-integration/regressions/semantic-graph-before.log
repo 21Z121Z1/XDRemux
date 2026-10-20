@@ -1,0 +1,45 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.38s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 7 tests
+
+thread 'semantic::tests::merge_direct_hdr_imports_three_described_semantics_without_importing_gain' (25934) panicked at crates/xdremux-heif/src/semantic.rs:1971:81:
+called `Result::unwrap()` on an `Err` value: Invalid("semantic scaffold has 4 semantic images but 3 metadata descriptors")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'semantic::tests::semantic_assembly_rejects_ambiguous_auxiliary_and_descriptor_edges' (25935) panicked at crates/xdremux-heif/src/semantic.rs:2100:17:
+accepted extra aux target
+test semantic::tests::merge_direct_hdr_imports_three_described_semantics_without_importing_gain ... FAILED
+test semantic::tests::semantic_assembly_rejects_ambiguous_auxiliary_and_descriptor_edges ... FAILED
+
+thread 'semantic::tests::semantic_assembly_rejects_ambiguous_or_incomplete_hdr_graphs' (25936) panicked at crates/xdremux-heif/src/semantic.rs:2075:17:
+accepted missing tmap dimg
+
+thread 'semantic::tests::semantic_assembly_rejects_unknown_auxiliary_instead_of_dropping_it' (25937) panicked at crates/xdremux-heif/src/semantic.rs:2028:13:
+an unsupported auxiliary image must not disappear behind the expected count
+test semantic::tests::semantic_assembly_rejects_ambiguous_or_incomplete_hdr_graphs ... FAILED
+test semantic::tests::semantic_assembly_rejects_unknown_auxiliary_instead_of_dropping_it ... FAILED
+
+thread 'semantic::tests::transplant_direct_hdr_keeps_gain_out_of_three_semantic_roles' (25939) panicked at crates/xdremux-heif/src/semantic.rs:1944:86:
+called `Result::unwrap()` on an `Err` value: Invalid("semantic scaffold has 4 semantic images but 3 metadata descriptors")
+test semantic::tests::transplant_direct_hdr_keeps_gain_out_of_three_semantic_roles ... FAILED
+test semantic::tests::transplant_preserves_multi_tile_grid_payload_order_and_semantics ... ok
+
+thread 'semantic::tests::semantic_descriptors_must_cover_each_image_once_even_when_counts_match' (25938) panicked at crates/xdremux-heif/src/semantic.rs:2014:13:
+two descriptors for image 11 must not hide missing descriptor for image 12
+test semantic::tests::semantic_descriptors_must_cover_each_image_once_even_when_counts_match ... FAILED
+
+failures:
+
+failures:
+    semantic::tests::merge_direct_hdr_imports_three_described_semantics_without_importing_gain
+    semantic::tests::semantic_assembly_rejects_ambiguous_auxiliary_and_descriptor_edges
+    semantic::tests::semantic_assembly_rejects_ambiguous_or_incomplete_hdr_graphs
+    semantic::tests::semantic_assembly_rejects_unknown_auxiliary_instead_of_dropping_it
+    semantic::tests::semantic_descriptors_must_cover_each_image_once_even_when_counts_match
+    semantic::tests::transplant_direct_hdr_keeps_gain_out_of_three_semantic_roles
+
+test result: FAILED. 1 passed; 6 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p xdremux-heif --lib`

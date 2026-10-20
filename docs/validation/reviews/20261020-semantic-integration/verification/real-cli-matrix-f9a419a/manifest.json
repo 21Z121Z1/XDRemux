@@ -1,0 +1,358 @@
+{
+  "head": "f9a419aa4eeb33214e2dfac2205719e6cb97d598",
+  "fixture_count": 14,
+  "output_file_count": 28,
+  "files": [
+    {
+      "path": "android-v1-sdr-01/android-v1-sdr-01.heic",
+      "size": 4736489,
+      "sha256": "eabc6db4f2d8a0c72aae459e03d87684ea2837aa63a8ce3050336be271f0b31a"
+    },
+    {
+      "path": "android-v1-sdr-01/android-v1-sdr-01.mov",
+      "size": 2726869,
+      "sha256": "3d8cc318f370cb1baaf330dad4d616f51210b0bb2707e2b9a5a5090733caa925"
+    },
+    {
+      "path": "android-v1-sdr-01/convert.log",
+      "size": 323,
+      "sha256": "a66b8be783dc58fd81dc105332e4df7e709653e139cdafdda732512dfdb7d763"
+    },
+    {
+      "path": "android-v1-sdr-01/movie-validation.txt",
+      "size": 375,
+      "sha256": "59228b7a3f8f66fd64b851fa6943466a6bc692238fd99ef9d0fac77b8a01d4c2"
+    },
+    {
+      "path": "android-v1-sdr-01/still-validation.txt",
+      "size": 376,
+      "sha256": "28cab5ec375728c42c1ef2c689fc8d7f4626ec69f4d033b5106970775503172d"
+    },
+    {
+      "path": "android-v1-sdr-02/android-v1-sdr-02.heic",
+      "size": 5191547,
+      "sha256": "491621178b42aa78e0b48afbe4dbd890e2a94169d8ea9b2751b40d9e0f74d192"
+    },
+    {
+      "path": "android-v1-sdr-02/android-v1-sdr-02.mov",
+      "size": 6606060,
+      "sha256": "75d70f14e7b2a314d44da4ede51b2db51865477ce81ec6d2513658256f1ec60b"
+    },
+    {
+      "path": "android-v1-sdr-02/convert.log",
+      "size": 322,
+      "sha256": "00154a540a21b4a2a42865d12ddee15a270eb17672e7f6485ea08e52b1436f5a"
+    },
+    {
+      "path": "android-v1-sdr-02/movie-validation.txt",
+      "size": 375,
+      "sha256": "96b25678770979c068015eaeaca84334ad7bc7b67591e446e36fec2e3f67ee6d"
+    },
+    {
+      "path": "android-v1-sdr-02/still-validation.txt",
+      "size": 376,
+      "sha256": "67310849221072466a5bc0eb374cc0d3e809d67478dce243b1d1e3989cf5af3a"
+    },
+    {
+      "path": "android-v1-ultrahdr-01/android-v1-ultrahdr-01.heic",
+      "size": 8902375,
+      "sha256": "a4ea9be3c0bdf238f187ae745a704f3d321c70fc59653472b86b7ef62ca3fbbd"
+    },
+    {
+      "path": "android-v1-ultrahdr-01/android-v1-ultrahdr-01.mov",
+      "size": 1010669,
+      "sha256": "1b08cbaa844ebd320e4230bfc3f54d6c11bfaabdd5dc245563e11362ffaf4a57"
+    },
+    {
+      "path": "android-v1-ultrahdr-01/convert.log",
+      "size": 350,
+      "sha256": "3865cde99ee0dabb33ed6182f0a32697179a9ca6255a36e00282ba9a7fc2a721"
+    },
+    {
+      "path": "android-v1-ultrahdr-01/movie-validation.txt",
+      "size": 405,
+      "sha256": "62a65e474c1793e44e7d726093541430377e3ebaa27b64196964c02deca02280"
+    },
+    {
+      "path": "android-v1-ultrahdr-01/still-validation.txt",
+      "size": 406,
+      "sha256": "7bda94c9d43ee361d3ee6c34a8c607c2234e14d0a8f9e9d28aa08801152552bd"
+    },
+    {
+      "path": "coloros15-ultrahdr-01/coloros15-ultrahdr-01.heic",
+      "size": 7511856,
+      "sha256": "526c7712375ee777f68082a54029cd40b9cf6ecb16e27b6a3ad35f479a0e8b99"
+    },
+    {
+      "path": "coloros15-ultrahdr-01/coloros15-ultrahdr-01.mov",
+      "size": 9954535,
+      "sha256": "cf665c5865ac148ab91ccf1f6eba1b81093f1abfe676f4a96bad8ea43a9f9bd7"
+    },
+    {
+      "path": "coloros15-ultrahdr-01/convert.log",
+      "size": 342,
+      "sha256": "f423cccc6459c77935b38470363f9598d0812ec30c859db879d07b29bab55262"
+    },
+    {
+      "path": "coloros15-ultrahdr-01/movie-validation.txt",
+      "size": 399,
+      "sha256": "b75cb7401e18d93e05e0112f6f7e1f3e2823c4cd48b8e36b9dc03a30d839665c"
+    },
+    {
+      "path": "coloros15-ultrahdr-01/still-validation.txt",
+      "size": 400,
+      "sha256": "1845fdc2e8a1720c83d58dd82d511942798e416c990eb08b9262721c5fde0077"
+    },
+    {
+      "path": "coloros15-ultrahdr-02/coloros15-ultrahdr-02.heic",
+      "size": 6832254,
+      "sha256": "7c188e7a3b95da9d0cce9f4213d6af97f595442b2a199f5232f7267b15db8073"
+    },
+    {
+      "path": "coloros15-ultrahdr-02/coloros15-ultrahdr-02.mov",
+      "size": 8750996,
+      "sha256": "4bc3d091c71496b92360b88598356293107bc0a2e3c5c9396619b2ec9ccd5e30"
+    },
+    {
+      "path": "coloros15-ultrahdr-02/convert.log",
+      "size": 342,
+      "sha256": "f4c34715943462f0368fd4ebad7ff6a3c48b5c00100011413d2e3761088fb64f"
+    },
+    {
+      "path": "coloros15-ultrahdr-02/movie-validation.txt",
+      "size": 399,
+      "sha256": "bbf1da9cfa95a72ac36f17b4a8ad3fdd4667245e76bb2f0c315a1bd487adf8bc"
+    },
+    {
+      "path": "coloros15-ultrahdr-02/still-validation.txt",
+      "size": 400,
+      "sha256": "6c192c78b886fda9e116c7a12dd723626d53851f83988bc52e5a1683fc9534ff"
+    },
+    {
+      "path": "coloros15-ultrahdr-03/coloros15-ultrahdr-03.heic",
+      "size": 23159957,
+      "sha256": "007b06b0fccaef7b7ee842c470b629d3febea9fed8a9a5ab4dedaf5f20663bb5"
+    },
+    {
+      "path": "coloros15-ultrahdr-03/coloros15-ultrahdr-03.mov",
+      "size": 11317254,
+      "sha256": "25d56d121d8d0045fc5ed7b252f2ba5421a290ad3d0b58a78d2a2e166aca4160"
+    },
+    {
+      "path": "coloros15-ultrahdr-03/convert.log",
+      "size": 342,
+      "sha256": "af3f99a409c92b83366a25cb30eaf0d3e4bd670c9dcf145d449288ad754c71b2"
+    },
+    {
+      "path": "coloros15-ultrahdr-03/movie-validation.txt",
+      "size": 399,
+      "sha256": "e24cb589183f4fc1f42714748d6b785a1d9e93a4ea16910bc9977628e3556c8e"
+    },
+    {
+      "path": "coloros15-ultrahdr-03/still-validation.txt",
+      "size": 400,
+      "sha256": "cda610341b9506b53dc8def623834b84d7a4bd48ceee52a8a407e7e77589b651"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-01/coloros16-dualstream-ultrahdr-01.heic",
+      "size": 9038362,
+      "sha256": "026c20f8335b6b7f0fdbe7634d8b9c0f39452348ef04faad567b43317062d985"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-01/coloros16-dualstream-ultrahdr-01.mov",
+      "size": 16386344,
+      "sha256": "ff7aeb73220a8178eac9c76cd0a6173b2eae03f52cb7b3ed7de02681716a3945"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-01/convert.log",
+      "size": 398,
+      "sha256": "ebb03577c0706dfb20e5aed73a058796725a2751b33f33cd7bb47501ddcaaaca"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-01/movie-validation.txt",
+      "size": 465,
+      "sha256": "6d692c6448228ef1e0675c9726e2f11e6c3867e3679545f73efb40fb1dbb389f"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-01/still-validation.txt",
+      "size": 466,
+      "sha256": "914bb6006392b826f5bd27a017ad4ef507cd500782796863c804d922915eb7ca"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-02/coloros16-dualstream-ultrahdr-02.heic",
+      "size": 17398214,
+      "sha256": "a871e3b5c2708c2064bbd5faafada42d4514a891e10261be96e230dbda0c9416"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-02/coloros16-dualstream-ultrahdr-02.mov",
+      "size": 13642433,
+      "sha256": "af13c37358490cfc10fd86da7eca89c59874532ad05d9639fe06566c6fddddfc"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-02/convert.log",
+      "size": 397,
+      "sha256": "714c105bebe67718291943b56c455096ff5cdacad0de6e0155239cff3149a31c"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-02/movie-validation.txt",
+      "size": 465,
+      "sha256": "1e3fa6ea90b8d75735d214c04961d14c6bc306cc5262482916946cdee41bcda8"
+    },
+    {
+      "path": "coloros16-dualstream-ultrahdr-02/still-validation.txt",
+      "size": 466,
+      "sha256": "fc5b47ba980b1d7223b29cd080979341e06d782a795abeeba8b06b8932b480f1"
+    },
+    {
+      "path": "heif-ultrahdr-01/convert.log",
+      "size": 322,
+      "sha256": "7f7c812fa6045a500fa6c26f1db61f847389618082cf38fc95d71485c95dd3fc"
+    },
+    {
+      "path": "heif-ultrahdr-01/heif-ultrahdr-01.heic",
+      "size": 1245467,
+      "sha256": "af867a561f51dee98671dc80aa696cd987d95d935a7cbccd1618760e9aaa1062"
+    },
+    {
+      "path": "heif-ultrahdr-01/heif-ultrahdr-01.mov",
+      "size": 3953044,
+      "sha256": "3e9bc017b28bd2099217e9de71fbce3e87e3df0035a70f3e8b7793db293b292e"
+    },
+    {
+      "path": "heif-ultrahdr-01/movie-validation.txt",
+      "size": 369,
+      "sha256": "a64cbc2c762a4767c20aeb4fb97df80112c48e74d03f59849292a506367d38d6"
+    },
+    {
+      "path": "heif-ultrahdr-01/still-validation.txt",
+      "size": 370,
+      "sha256": "82e4310fc8888a0818c803f9c7e0a35f894e932b9294e83bcfa7c6392d62997b"
+    },
+    {
+      "path": "heif-ultrahdr-01-duplicate-r002/convert.log",
+      "size": 397,
+      "sha256": "fb26990242a283928c8c141d66127e1679807ac7e1e79aa473c00bb90751a1bd"
+    },
+    {
+      "path": "heif-ultrahdr-01-duplicate-r002/heif-ultrahdr-01-duplicate-r002.heic",
+      "size": 1245467,
+      "sha256": "044754d3eafe6f210cd4e0d407c898f3f6f7fdcccf53cdb2c148563b8b082ddd"
+    },
+    {
+      "path": "heif-ultrahdr-01-duplicate-r002/heif-ultrahdr-01-duplicate-r002.mov",
+      "size": 3953044,
+      "sha256": "459fbb93f874f9d21f1ae593c1e3dab0b80e5b39b886c5980396773488d04a91"
+    },
+    {
+      "path": "heif-ultrahdr-01-duplicate-r002/movie-validation.txt",
+      "size": 459,
+      "sha256": "24bb78fc70d4692b9b2e3e9e1db13e708176ab0f7deb250073049a8f490ef704"
+    },
+    {
+      "path": "heif-ultrahdr-01-duplicate-r002/still-validation.txt",
+      "size": 460,
+      "sha256": "6cff58bea99670e5186f4929f68320e2e5a60b80e0924d4a4e927601387904a3"
+    },
+    {
+      "path": "heif-ultrahdr-02/convert.log",
+      "size": 322,
+      "sha256": "db9a9be53095ec32f0e1397af0b46feedd1c5a3ddcf6bfe5e6fef222b885762a"
+    },
+    {
+      "path": "heif-ultrahdr-02/heif-ultrahdr-02.heic",
+      "size": 1230484,
+      "sha256": "f702d813eec47a767fd2ec8363852e2c614f451eb03b407a4979b2b34b54f164"
+    },
+    {
+      "path": "heif-ultrahdr-02/heif-ultrahdr-02.mov",
+      "size": 4373413,
+      "sha256": "26342d13aaed9ffdc23de7b49dc0983d2842029791aeba5c651c673bdff5cdbf"
+    },
+    {
+      "path": "heif-ultrahdr-02/movie-validation.txt",
+      "size": 369,
+      "sha256": "3bbd23565e43452fd09997530ef7b8870b04286f4d7b1a1f20836fe77c8a92c6"
+    },
+    {
+      "path": "heif-ultrahdr-02/still-validation.txt",
+      "size": 370,
+      "sha256": "c9f2e1dddce349276a0e13b893f93b1f64502afc0cc41fbf5c6053e057464578"
+    },
+    {
+      "path": "heif-ultrahdr-02-duplicate-r003/convert.log",
+      "size": 397,
+      "sha256": "6b23323c227e881dda68f2c82f3e5bb180e79c745f80061c0079d1eb4e2e169d"
+    },
+    {
+      "path": "heif-ultrahdr-02-duplicate-r003/heif-ultrahdr-02-duplicate-r003.heic",
+      "size": 1230484,
+      "sha256": "b3fcc658eba852709f6e2fe334913579472ed2b4f4a27a95e84f3ddea894c7ab"
+    },
+    {
+      "path": "heif-ultrahdr-02-duplicate-r003/heif-ultrahdr-02-duplicate-r003.mov",
+      "size": 4373413,
+      "sha256": "14aa37edb769ddb26cff54513c6876b05a6dc943013862743c54ed7ac03c3699"
+    },
+    {
+      "path": "heif-ultrahdr-02-duplicate-r003/movie-validation.txt",
+      "size": 459,
+      "sha256": "8a2571efec12f671e549e68683f90e4532ff15b488e9d755132267a2118cf449"
+    },
+    {
+      "path": "heif-ultrahdr-02-duplicate-r003/still-validation.txt",
+      "size": 460,
+      "sha256": "338692da1fa26304b91c04b1d0a7e36e99e43eebf439284c84333a22ef55fc75"
+    },
+    {
+      "path": "jpeg-ultrahdr-01/convert.log",
+      "size": 321,
+      "sha256": "1ea0fb87961f7eb6085354506ec0d73a823dd38e65bd581237d1b3ce8ac4046f"
+    },
+    {
+      "path": "jpeg-ultrahdr-01/jpeg-ultrahdr-01.heic",
+      "size": 3991848,
+      "sha256": "5c685834cf1f8931af3128f42741c9b5f91e22363442038daf1a1ff37c08c3eb"
+    },
+    {
+      "path": "jpeg-ultrahdr-01/jpeg-ultrahdr-01.mov",
+      "size": 4156988,
+      "sha256": "3219522a3f7461f4b7494f1c4fe48a67cf3256dbb47730bcba3a6fd339473c6d"
+    },
+    {
+      "path": "jpeg-ultrahdr-01/movie-validation.txt",
+      "size": 369,
+      "sha256": "cf7e1140901d45092ed2685ae44f5e63d4fcb82b8b8dea4a4a872ee2a7788a5c"
+    },
+    {
+      "path": "jpeg-ultrahdr-01/still-validation.txt",
+      "size": 370,
+      "sha256": "270abeedadccd3126dbb4010851bdfa8b54bb85b7bc1d56b27934352549e1d36"
+    },
+    {
+      "path": "jpeg-ultrahdr-02/convert.log",
+      "size": 321,
+      "sha256": "a2316853dfdc90dbd89705c1f57f93e55ab67eaac0917d7422a11fe800811f97"
+    },
+    {
+      "path": "jpeg-ultrahdr-02/jpeg-ultrahdr-02.heic",
+      "size": 4007931,
+      "sha256": "59e01bce08950e31c599962b493f85169cf5a1b2bf508ccd5d310c5d2329e2fa"
+    },
+    {
+      "path": "jpeg-ultrahdr-02/jpeg-ultrahdr-02.mov",
+      "size": 1064368,
+      "sha256": "30604a2e58ce843bdf6897759ab58a9f976edbfb2fcee6b4fcf8868ac75141c9"
+    },
+    {
+      "path": "jpeg-ultrahdr-02/movie-validation.txt",
+      "size": 369,
+      "sha256": "13f2e11e3c3ab24afa73a3666ea31fb5c523107d0c6e9e0332406e0cd21da094"
+    },
+    {
+      "path": "jpeg-ultrahdr-02/still-validation.txt",
+      "size": 370,
+      "sha256": "faf0493df7f8074f5563dd4b907fcb091a4cbc3af05986f70b54ebf4b7506794"
+    }
+  ],
+  "scratch_cleaned": true
+}

@@ -1,0 +1,6 @@
+valid: live-photo
+input: /tmp/xdremux-rust-motion-photo-real.MOlTDf/coloros15-ultrahdr-01/coloros15-ultrahdr-01.mov
+still: /tmp/xdremux-rust-motion-photo-real.MOlTDf/coloros15-ultrahdr-01/coloros15-ultrahdr-01.heic
+movie: /tmp/xdremux-rust-motion-photo-real.MOlTDf/coloros15-ultrahdr-01/coloros15-ultrahdr-01.mov
+content-identifier: 566D11D5-87EF-4A68-8C56-5F03B0D13D46
+still-time-seconds: 1.469600

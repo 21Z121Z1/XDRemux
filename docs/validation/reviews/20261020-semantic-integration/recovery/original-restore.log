@@ -1,0 +1,15 @@
+Restore proof 2026-10-20T18:54:38.523937+00:00
+Remote: https://github.com/21Z121Z1/XDRemux.git
+Fresh bare repository created and backup tags fetched during preceding verified restore.
+PASS refs/tags/backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004 commit=0688ea7d6270df52cc5968e2c36dd016f13bd31b tree=1e77bb34ff295dbbc7db7696f58fc6f5c9a9fa67
+PASS refs/tags/backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174 commit=1f29e3cdc1b8fd49d56718ceecf96b8de80ec817 tree=f3bd36cecfee7b58b1c5eda81b1d933ee94c74a9
+PASS refs/tags/backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765 commit=7952d0b19c6b47738cc0722acae57465a243186f tree=a0ce850dcaccc02eca9d805fa218ba832f6d6141
+PASS refs/tags/backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924 commit=c6d307af662ed516f6e3994c039513359cb98610 tree=b8fa7f38160334e24efd6b61c0195e23bfc6e028
+PASS refs/tags/backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015 commit=bc4d54753f18905dbe73f595a06a6eaf21aaa014 tree=da1df94a3638f61732c6dfbacd9f94bd20699f99
+PASS refs/tags/backup/semantic-review-20261020/main commit=89d806c8aec961a7991eb3e6d6e2b1370aed8791 tree=c552b5b725c91aadb40926699063898b2225f1e8
+PASS refs/tags/backup/semantic-review-20261020/research/texture-native-20261019 commit=18340989590d451f5676924feb03c70baa503e1a tree=4b4ce423a0873c4ff5d4d355cc5b09f1e17fb214
+PASS refs/tags/backup/semantic-review-20261020/research/texture-style commit=f8fcf2067c506e87665e9ea113324db1a57d4cf7 tree=26667fc62ab59e888a5f83eedab4cd69f69fd344
+Command: git --git-dir=/workspace/xdremux-audit/restore-test.git fsck --full --no-reflogs
+exit=0
+notice: HEAD points to an unborn branch (master)
+

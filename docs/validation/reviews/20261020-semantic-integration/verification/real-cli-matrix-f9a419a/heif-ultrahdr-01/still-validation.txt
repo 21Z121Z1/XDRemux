@@ -1,0 +1,6 @@
+valid: live-photo
+input: /tmp/xdremux-rust-motion-photo-real.MOlTDf/heif-ultrahdr-01/heif-ultrahdr-01.heic
+still: /tmp/xdremux-rust-motion-photo-real.MOlTDf/heif-ultrahdr-01/heif-ultrahdr-01.heic
+movie: /tmp/xdremux-rust-motion-photo-real.MOlTDf/heif-ultrahdr-01/heif-ultrahdr-01.mov
+content-identifier: B1FF7593-A9FA-4DFA-87A1-93907B32F824
+still-time-seconds: 1.540401

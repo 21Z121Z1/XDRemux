@@ -1,0 +1,422 @@
+     Locking 41 packages to highest compatible versions
+   Compiling libc v0.2.189
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.4.3
+   Compiling xdremux-format v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-format)
+   Compiling memchr v2.8.3
+   Compiling linux-raw-sys v0.12.1
+   Compiling sha2 v0.11.1
+   Compiling serde_json v1.0.154
+   Compiling half v2.7.1
+   Compiling serde v1.0.229
+   Compiling once_cell v1.21.4
+   Compiling fastrand v2.5.0
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+   Compiling xdremux-engine v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-engine)
+   Compiling tempfile v3.27.0
+   Compiling xdremux-texture-policy-harness v0.0.0 (/tmp/xdremux-texture-policy-harness)
+warning: constant `MAX_APPLE_L8_MASK_BYTES` is never used
+  --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:27:7
+   |
+27 | const MAX_APPLE_L8_MASK_BYTES: usize = 128 * 1024 * 1024;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `AppleStylePropertiesFacts` is never constructed
+  --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:43:12
+   |
+43 | pub struct AppleStylePropertiesFacts {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `AppleVideoToolboxMain10Facts` is never constructed
+  --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:52:19
+   |
+52 | pub(super) struct AppleVideoToolboxMain10Facts {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `AppleCinematicEnvelopeFacts` is never constructed
+  --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:60:19
+   |
+60 | pub(super) struct AppleCinematicEnvelopeFacts {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `AppleVideoToolboxMain10Encode` is never constructed
+  --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:67:19
+   |
+67 | pub(super) struct AppleVideoToolboxMain10Encode<'a> {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `operation_capabilities` is never used
+  --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:86:19
+   |
+85 | impl AppleAdapterCapabilities {
+   | ----------------------------- method in this implementation
+86 |     pub(super) fn operation_capabilities(&self) -> Vec<OperationCapability> {
+   |                   ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple methods are never used
+   --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:305:19
+    |
+262 | impl AppleAdapterClient {
+    | ----------------------- methods in this implementation
+...
+305 |     pub(super) fn supports_photographic_styles(&self) -> Result<bool> {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+331 |     pub(super) fn generate_cinematic_envelope(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+376 |     pub(super) fn imageio_auxiliary_facts(&self, input: &Path) -> Result<AppleImageAuxiliaryFacts> {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^
+...
+393 |     pub(super) fn imageio_gain_map_facts(&self, input: &Path) -> Result<AppleGainMapFacts> {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^
+...
+440 |     pub(super) fn semantic_style_properties_facts(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+498 |     pub(super) fn vision_scene_scores(&self, input: &Path) -> Result<AppleStyleSceneScores> {
+    |                   ^^^^^^^^^^^^^^^^^^^
+...
+522 |     pub(super) fn videotoolbox_encode_main10(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+602 |     pub(super) fn coreimage_write_heif_hdr(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+647 |     pub(super) fn imageio_read_system_hdr(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^
+...
+670 |     pub(super) fn imageio_write_auxiliary(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^
+...
+679 |     pub(super) fn imageio_write_auxiliary_with_properties(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+726 |     pub(super) fn imageio_encode_source_image(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+753 |     pub(super) fn imageio_merge_metadata(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^
+...
+769 |     pub(super) fn imageio_merge_xmp_metadata(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+790 |     fn invoke_ack<T: Serialize>(&self, request: T) -> Result<()> {
+    |        ^^^^^^^^^^
+...
+799 |     pub(super) fn coreimage_render_l8(
+    |                   ^^^^^^^^^^^^^^^^^^^
+...
+873 |     pub(super) fn coreimage_edge_preserve_upsample_l8(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+955 |     pub(super) fn vision_semantic_mattes(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `checked_l8_byte_count` is never used
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1151:4
+     |
+1151 | fn checked_l8_byte_count(width: u32, height: u32, context: &'static str) -> Result<usize> {
+     |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `semantic_role_wire` is never used
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1181:4
+     |
+1181 | fn semantic_role_wire(role: AppleSemanticRole) -> &'static str {
+     |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `parse_semantic_role` is never used
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1192:4
+     |
+1192 | fn parse_semantic_role(role: &str) -> Result<AppleSemanticRole> {
+     |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `auxiliary_kind_wire` is never used
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1207:4
+     |
+1207 | fn auxiliary_kind_wire(kind: AppleAuxiliaryKind) -> Result<&'static str> {
+     |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `auxiliary_payload_wire` is never used
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1225:4
+     |
+1225 | fn auxiliary_payload_wire(
+     |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifHdrWrite` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1284:19
+     |
+1284 | pub(super) struct SystemHeifHdrWrite<'a> {
+     |                   ^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifHdrFacts` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1296:19
+     |
+1296 | pub(super) struct SystemHeifHdrFacts {
+     |                   ^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifAuxiliaryPlane` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1310:19
+     |
+1310 | pub(super) struct SystemHeifAuxiliaryPlane {
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `validate_system_heif_geometry` is never used
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1317:4
+     |
+1317 | fn validate_system_heif_geometry(width: u32, height: u32, content_headroom: f32) -> Result<()> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `expect_raster_file` is never used
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1334:4
+     |
+1334 | fn expect_raster_file(
+     |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `decode_system_heif_hdr` is never used
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1359:4
+     |
+1359 | fn decode_system_heif_hdr(output: Vec<u8>) -> Result<SystemHeifHdrFacts> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `VideoToolboxMain10Request` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1385:8
+     |
+1385 | struct VideoToolboxMain10Request {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `VideoToolboxMain10Wire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1394:8
+     |
+1394 | struct VideoToolboxMain10Wire {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifHdrWriteRequest` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1404:8
+     |
+1404 | struct SystemHeifHdrWriteRequest {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifHdrWriteWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1412:8
+     |
+1412 | struct SystemHeifHdrWriteWire {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifHdrReadRequest` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1423:8
+     |
+1423 | struct SystemHeifHdrReadRequest {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifHdrReadWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1431:8
+     |
+1431 | struct SystemHeifHdrReadWire {
+     |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifHdrResponse` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1436:8
+     |
+1436 | struct SystemHeifHdrResponse {
+     |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifHdrWireFacts` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1442:8
+     |
+1442 | struct SystemHeifHdrWireFacts {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SystemHeifAuxiliaryPlaneWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1456:8
+     |
+1456 | struct SystemHeifAuxiliaryPlaneWire {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `EncodeSourceImageRequest` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1475:8
+     |
+1475 | struct EncodeSourceImageRequest {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `CinematicEnvelopeAdapterRequest` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1484:8
+     |
+1484 | struct CinematicEnvelopeAdapterRequest {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `CinematicEnvelopeWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1493:8
+     |
+1493 | struct CinematicEnvelopeWire {
+     |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `CinematicEnvelopeAdapterResponse` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1499:8
+     |
+1499 | struct CinematicEnvelopeAdapterResponse {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `CinematicEnvelopeResponseFacts` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1505:8
+     |
+1505 | struct CinematicEnvelopeResponseFacts {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `WriteAuxiliaryRequest` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1513:8
+     |
+1513 | struct WriteAuxiliaryRequest {
+     |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `MergeMetadataRequest` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1524:8
+     |
+1524 | struct MergeMetadataRequest {
+     |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `XmpMergeRequest` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1533:8
+     |
+1533 | struct XmpMergeRequest {
+     |        ^^^^^^^^^^^^^^^
+
+warning: struct `CoreImageRenderL8Request` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1542:8
+     |
+1542 | struct CoreImageRenderL8Request {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `RenderL8Wire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1550:8
+     |
+1550 | struct RenderL8Wire {
+     |        ^^^^^^^^^^^^
+
+warning: struct `CoreImageEdgePreserveUpsampleRequest` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1560:8
+     |
+1560 | struct CoreImageEdgePreserveUpsampleRequest {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `EdgePreserveUpsampleWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1569:8
+     |
+1569 | struct EdgePreserveUpsampleWire {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `AuxiliaryPayloadWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1580:8
+     |
+1580 | struct AuxiliaryPayloadWire {
+     |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `MetadataNamespaceWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1594:8
+     |
+1594 | struct MetadataNamespaceWire {
+     |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `MetadataTagWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1600:8
+     |
+1600 | struct MetadataTagWire {
+     |        ^^^^^^^^^^^^^^^
+
+warning: struct `AckResponse` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1609:8
+     |
+1609 | struct AckResponse {
+     |        ^^^^^^^^^^^
+
+warning: struct `AuxiliaryResponse` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1620:8
+     |
+1620 | struct AuxiliaryResponse {
+     |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `GainMapResponse` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1626:8
+     |
+1626 | struct GainMapResponse {
+     |        ^^^^^^^^^^^^^^^
+
+warning: struct `StylePropertiesResponse` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1638:8
+     |
+1638 | struct StylePropertiesResponse {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `VideoToolboxMain10Response` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1644:8
+     |
+1644 | struct VideoToolboxMain10Response {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `VideoToolboxMain10WireResponse` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1650:8
+     |
+1650 | struct VideoToolboxMain10WireResponse {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `StylePropertiesWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1658:8
+     |
+1658 | struct StylePropertiesWire {
+     |        ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SemanticResponse` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1679:8
+     |
+1679 | struct SemanticResponse {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: field `schema_version` is never read
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1686:5
+     |
+1685 | struct SceneClassificationResponse {
+     |        --------------------------- field in this struct
+1686 |     schema_version: u32,
+     |     ^^^^^^^^^^^^^^
+     |
+     = note: `SceneClassificationResponse` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `GainMapWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1743:8
+     |
+1743 | struct GainMapWire {
+     |        ^^^^^^^^^^^
+
+warning: struct `SemanticMaskWire` is never constructed
+    --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_adapter.rs:1780:8
+     |
+1780 | struct SemanticMaskWire {
+     |        ^^^^^^^^^^^^^^^^
+
+warning: function `resource` is never used
+  --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_texture.rs:37:4
+   |
+37 | fn resource(root: &Path, name: &Value) -> Result<Vec<u8>> {
+   |    ^^^^^^^^
+
+warning: function `generate` is never used
+   --> /workspace/XDRemux-integration/crates/xdremux-runtime/src/apple_texture.rs:110:15
+    |
+110 | pub(super) fn generate(
+    |               ^^^^^^^^
+
+warning: `xdremux-texture-policy-harness` (lib test) generated 55 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.39s
+     Running unittests src/lib.rs (/tmp/xdremux-styles-review-target/debug/deps/xdremux_texture_policy_harness-bc258d79d53a9cd9)
+
+running 5 tests
+test apple_texture::tests::empty_people_context_admits_but_a_dropped_instance_fails ... ok
+test apple_texture::tests::internal_gpu_failure_rejects_even_when_explicit_commands_completed ... ok
+test apple_texture::tests::missing_or_malformed_gpu_receipts_cannot_admit_optional_empty_statistics ... ok
+test apple_texture::tests::missing_texture_and_partial_gpu_work_fail_before_publication ... ok
+test apple_texture::tests::existing_styles_require_edit_state_even_when_texture_parser_would_admit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.17s
+

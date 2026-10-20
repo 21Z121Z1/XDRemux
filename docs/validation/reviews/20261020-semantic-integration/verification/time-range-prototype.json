@@ -1,0 +1,11 @@
+{
+  "head": "f9a419aa4eeb33214e2dfac2205719e6cb97d598",
+  "case": "known 9.999999-second cover time in ~3-second movie",
+  "returncode": 1,
+  "stdout": "",
+  "stderr": "error: Live Photo MOV: motion asset presentation time is invalid\n",
+  "output_exists": false,
+  "movie_exists": false,
+  "source_unchanged": true,
+  "fixture_sha256": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0"
+}

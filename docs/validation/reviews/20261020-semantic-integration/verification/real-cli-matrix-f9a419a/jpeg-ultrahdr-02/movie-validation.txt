@@ -1,0 +1,6 @@
+valid: live-photo
+input: /tmp/xdremux-rust-motion-photo-real.MOlTDf/jpeg-ultrahdr-02/jpeg-ultrahdr-02.mov
+still: /tmp/xdremux-rust-motion-photo-real.MOlTDf/jpeg-ultrahdr-02/jpeg-ultrahdr-02.heic
+movie: /tmp/xdremux-rust-motion-photo-real.MOlTDf/jpeg-ultrahdr-02/jpeg-ultrahdr-02.mov
+content-identifier: 92399FE8-70E4-4E4B-B694-F19C01D92B92
+still-time-seconds: 1.585246

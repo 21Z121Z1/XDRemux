@@ -1,0 +1,6 @@
+valid: live-photo
+input: /tmp/xdremux-rust-motion-photo-real.MOlTDf/android-v1-sdr-02/android-v1-sdr-02.mov
+still: /tmp/xdremux-rust-motion-photo-real.MOlTDf/android-v1-sdr-02/android-v1-sdr-02.heic
+movie: /tmp/xdremux-rust-motion-photo-real.MOlTDf/android-v1-sdr-02/android-v1-sdr-02.mov
+content-identifier: E46AC268-9226-4A68-9DA2-7019E91A6DB8
+still-time-seconds: 0.838055

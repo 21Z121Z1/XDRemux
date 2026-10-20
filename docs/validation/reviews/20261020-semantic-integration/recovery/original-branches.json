@@ -1,0 +1,72 @@
+{
+  "captured_at": "2026-10-20T18:45:23.534928+00:00",
+  "repository": "21Z121Z1/XDRemux",
+  "backups": [
+    {
+      "branch": "codex/liblivephoto-consumer-20261004",
+      "head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004",
+      "remote_verified": true,
+      "restored_head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "tree": "1e77bb34ff295dbbc7db7696f58fc6f5c9a9fa67"
+    },
+    {
+      "branch": "cursor/full-res-linear-hdr-e174",
+      "head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174",
+      "remote_verified": true,
+      "restored_head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "tree": "f3bd36cecfee7b58b1c5eda81b1d933ee94c74a9"
+    },
+    {
+      "branch": "cursor/portrait-heic-orientation-4765",
+      "head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765",
+      "remote_verified": true,
+      "restored_head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "tree": "a0ce850dcaccc02eca9d805fa218ba832f6d6141"
+    },
+    {
+      "branch": "feat/rust-cli-distribution-i18n-20260924",
+      "head": "c6d307af662ed516f6e3994c039513359cb98610",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924",
+      "remote_verified": true,
+      "restored_head": "c6d307af662ed516f6e3994c039513359cb98610",
+      "tree": "b8fa7f38160334e24efd6b61c0195e23bfc6e028"
+    },
+    {
+      "branch": "feat/styles-hdr-first-linear-thumbnail-20261015",
+      "head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015",
+      "remote_verified": true,
+      "restored_head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "tree": "da1df94a3638f61732c6dfbacd9f94bd20699f99"
+    },
+    {
+      "branch": "main",
+      "head": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/main",
+      "remote_verified": true,
+      "restored_head": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "tree": "c552b5b725c91aadb40926699063898b2225f1e8"
+    },
+    {
+      "branch": "research/texture-native-20261019",
+      "head": "18340989590d451f5676924feb03c70baa503e1a",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/research/texture-native-20261019",
+      "remote_verified": true,
+      "restored_head": "18340989590d451f5676924feb03c70baa503e1a",
+      "tree": "4b4ce423a0873c4ff5d4d355cc5b09f1e17fb214"
+    },
+    {
+      "branch": "research/texture-style",
+      "head": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/research/texture-style",
+      "remote_verified": true,
+      "restored_head": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "tree": "26667fc62ab59e888a5f83eedab4cd69f69fd344"
+    }
+  ],
+  "restore_verified_at": "2026-10-20T18:46:30.807579+00:00",
+  "restore_method": "Fresh bare repository fetched each durable GitHub backup tag; exact commit + tree checked; git fsck --full --no-reflogs passed"
+}

@@ -1,0 +1,19 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.98s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 1 test
+
+thread 'semantic::tests::semantic_merge_rejects_ambiguous_source_gain_map_graph' (28458) panicked at crates/xdremux-heif/src/semantic.rs:2334:9:
+assertion failed: merge_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold, 3).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test semantic::tests::semantic_merge_rejects_ambiguous_source_gain_map_graph ... FAILED
+
+failures:
+
+failures:
+    semantic::tests::semantic_merge_rejects_ambiguous_source_gain_map_graph
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 35 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p xdremux-heif --lib`

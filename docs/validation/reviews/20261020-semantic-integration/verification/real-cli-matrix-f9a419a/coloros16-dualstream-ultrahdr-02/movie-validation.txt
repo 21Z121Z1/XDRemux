@@ -1,0 +1,6 @@
+valid: live-photo
+input: /tmp/xdremux-rust-motion-photo-real.MOlTDf/coloros16-dualstream-ultrahdr-02/coloros16-dualstream-ultrahdr-02.mov
+still: /tmp/xdremux-rust-motion-photo-real.MOlTDf/coloros16-dualstream-ultrahdr-02/coloros16-dualstream-ultrahdr-02.heic
+movie: /tmp/xdremux-rust-motion-photo-real.MOlTDf/coloros16-dualstream-ultrahdr-02/coloros16-dualstream-ultrahdr-02.mov
+content-identifier: 96E7B80A-D002-487D-B69E-FC652342310A
+still-time-seconds: 1.298732

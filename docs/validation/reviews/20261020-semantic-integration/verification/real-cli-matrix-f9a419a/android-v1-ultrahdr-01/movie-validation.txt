@@ -1,0 +1,6 @@
+valid: live-photo
+input: /tmp/xdremux-rust-motion-photo-real.MOlTDf/android-v1-ultrahdr-01/android-v1-ultrahdr-01.mov
+still: /tmp/xdremux-rust-motion-photo-real.MOlTDf/android-v1-ultrahdr-01/android-v1-ultrahdr-01.heic
+movie: /tmp/xdremux-rust-motion-photo-real.MOlTDf/android-v1-ultrahdr-01/android-v1-ultrahdr-01.mov
+content-identifier: 7241453E-3E0A-40A7-A95B-3385F6F4B388
+still-time-seconds: 0.430574
