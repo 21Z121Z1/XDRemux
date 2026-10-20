@@ -1809,16 +1809,26 @@ pub fn apple_style_revert_local_data(
                             * APPLE_STYLE_PLANE_COUNT
                             + plane)
                             * APPLE_STYLE_BLOCK_VALUE_COUNT;
-                        for row in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
-                            for column in row..APPLE_STYLE_POLYNOMIAL_COUNT {
-                                normal[(cell + row) * APPLE_STYLE_POLYNOMIAL_COUNT + column] +=
-                                    weight * basis[row] * basis[column];
-                            }
-                            for (channel, (&source, target)) in
-                                styled.iter().zip(recovered).enumerate()
+                        let normal_cell = &mut normal[cell * APPLE_STYLE_POLYNOMIAL_COUNT
+                            ..(cell + APPLE_STYLE_POLYNOMIAL_COUNT) * APPLE_STYLE_POLYNOMIAL_COUNT];
+                        let rhs_cell = &mut rhs[rhs_cell..rhs_cell + APPLE_STYLE_BLOCK_VALUE_COUNT];
+                        for (row, (normal_row, rhs_row)) in normal_cell
+                            .as_chunks_mut::<APPLE_STYLE_POLYNOMIAL_COUNT>()
+                            .0
+                            .iter_mut()
+                            .zip(rhs_cell.as_chunks_mut::<APPLE_STYLE_CHANNEL_COUNT>().0)
+                            .enumerate()
+                        {
+                            let weighted_basis = weight * basis[row];
+                            for (value, &column_basis) in
+                                normal_row[row..].iter_mut().zip(&basis[row..])
                             {
-                                rhs[rhs_cell + row * APPLE_STYLE_CHANNEL_COUNT + channel] +=
-                                    weight * basis[row] * (target - source);
+                                *value += weighted_basis * column_basis;
+                            }
+                            for (value, (&source, target)) in
+                                rhs_row.iter_mut().zip(styled.iter().zip(recovered))
+                            {
+                                *value += weighted_basis * (target - source);
                             }
                         }
                     }
