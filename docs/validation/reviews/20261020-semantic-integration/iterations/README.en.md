@@ -1,5 +1,8 @@
 # Subsequent review evidence
 
+The [1b2c07d diagnostic/acceptance appendix](1b2c07d/README.en.md) records the separately timed profile, clean251-test delta receipt, all21 source recoveries and new pending native checks. Its [8dbe01d alpha appendix](8dbe01d/README.en.md) retains source metadata and RED/GREEN evidence. Parent selected one ordinary merge#71 after final gates and explicit execution review; no merge/delete is released.
+
+
 
 The [fc3f04d ownership and comparable-performance appendix](fc3f04d/README.en.md) adds a clean full-workspace portable receipt, existing Live Photo media-loss RED/GREEN, conservative subtype diagnostics, same-runner performance instrumentation and a refreshed 19-tag recovery proof. It retains all b049 native results separately and does not release merge/deletion.
 

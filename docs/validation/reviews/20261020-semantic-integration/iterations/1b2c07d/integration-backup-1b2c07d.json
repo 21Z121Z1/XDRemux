@@ -1,0 +1,11 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-20T21:56:36.986902+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/1b2c07d",
+  "head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+  "tree": "53fc1b202711f2554bc6af0f70b880920c932392",
+  "source_state": "committed alpha repair plus separate candidate-only stage profile; no final native pass yet",
+  "restore_status": "remote fetched, commit/tree matched, git fsck --full --no-reflogs exit 0",
+  "restore_log": "integration-restore-1b2c07d.log",
+  "validation": "31 targeted Python checks and Rust format pass; Linux delta gate running; final native CI not yet established"
+}

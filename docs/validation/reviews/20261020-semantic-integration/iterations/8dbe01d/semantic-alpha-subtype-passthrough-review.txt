@@ -1,0 +1,70 @@
+Scope: only crates/xdremux-heif/src/semantic.rs and its inline tests were edited by semantic_scaffold_fix.
+Source base: fc3f04db604e8d7f72a9dbe1305c5a9829472327 plus the uncommitted semantic patch.
+Frozen semantic.rs SHA256: 5c49185d0f70471f2fb95668fb216aeb9fb9d33f2bd08d3083521a49bf071c4f
+Patch SHA256: 05bf0f34b3a093795f1bad140d771ebad85df69dc9b6231c573278cb49e6e920
+No staging, commit, push, dispatch, native artifact download, or media upload.
+
+Native evidence personally read via GitHub fetch_workflow_job_logs:
+repo 21Z121Z1/XDRemux, run 39498974126, job 118891280473, 2026-10-20 21:32:14Z.
+Source and scaffold alpha-hevc subtype len=16, diagnostic shape=hevc-sei-envelope,
+alpha_subtype_pair={uri_match=true,bytes_match=true}; blanket unsupported subtype error.
+The exact subtype payload was not disclosed by the bounded diagnostic.
+
+Implementation:
+- Exact known alpha roles and all prior relationship/geometry/transform/prem/grid uniqueness checks remain.
+- Both empty subtypes preserve existing HEVC/MIAF alias compatibility.
+- If either subtype is nonempty, the complete original source/scaffold auxC boxes must match byte-for-byte.
+- The auxC full-box version/flags remain strictly zero; unknown URI, duplicate properties and mismatches reject.
+- Transplant carries source auxC through the existing property writer without changing IPMA/reference order;
+  original alpha compressed payload and hvcC remain source-authoritative. Merge retains the source alpha graph.
+- Both public APIs re-read the output auxC and require exact source equality, including empty aliases.
+- Shared-property changes cannot alter another resource's auxC or an uncopied GRID root's hvcC.
+- This is opaque metadata carriage for an identified alpha role, not alpha SEI decoding or validation.
+  No diagnostic length/shape is used as an admission condition.
+
+Primary consumer source read:
+https://github.com/strukturag/libheif/blob/364905fc9841bdda229e0ae2c5fda13b5fc98d1a/libheif/context.cc#L861
+https://github.com/strukturag/libheif/blob/364905fc9841bdda229e0ae2c5fda13b5fc98d1a/libheif/box.cc#L3376
+The pinned consumer recognizes the two alpha roles and parses/writes all auxC subtype bytes unchanged.
+
+Commands from /workspace/XDRemux-integration; all Cargo commands used:
+RUSTUP_HOME=/tmp/xdremux-toolchain/rustup
+CARGO_HOME=/tmp/xdremux-toolchain/cargo
+PATH=/tmp/xdremux-toolchain/cargo/bin:$PATH
+CARGO_TARGET_DIR=/workspace/XDRemux-integration/target
+PKG_CONFIG_PATH=/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu/pkgconfig
+LIBHEIF_PLUGIN_PATH=/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu/libheif/plugins
+CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2
+
+RED: cargo test --locked -p xdremux-heif --lib alpha_subtype_passthrough -- --nocapture
+semantic-alpha-subtype-passthrough-red.log: exit 101; positive public API regression fails at the intended
+source HDR alpha subtype is unsupported error for same-URI, equal 16-byte synthetic envelope.
+The mismatch/unknown negative test passed before the implementation change.
+
+Additional boundary RED: cargo test --locked -p xdremux-heif --lib alpha_subtype_passthrough_rejects_property_changes_on_other_resources -- --nocapture
+semantic-alpha-subtype-passthrough-shared-property-red.log: exit 101; accepted shared property for grid=false.
+This demonstrated the new auxC writer needed a per-property/per-resource shared-use guard.
+The temporary unused-variable warning in this RED test was removed before final GREEN/clippy.
+
+GREEN: cargo test --locked -p xdremux-heif --all-targets
+semantic-alpha-subtype-passthrough-green.log: exit 0; 52 unit tests, 2 integration fail-closed tests; example target 0 tests.
+The new tests cover opaque and synthetic envelope subtype carriage through both public APIs, direct/GRID alpha,
+both standard empty aliases, original auxC/payload/hvcC/order, changed bytes, truncation, appended bytes,
+empty/nonempty mismatch, nonempty mixed URI, invalid source/scaffold version or flags, same unknown URI,
+duplicate auxC, shared-property side effects, and actual returned-artifact byte corruption.
+The returned-artifact corruption test requires the source/output equality validator to return its concrete error,
+and both public APIs to reject re-import; expected source bytes are not calculated by the validator.
+All prior unknown/ambiguous/missing/multiple graphs, descriptor coverage, codec-sharing, prem, transform,
+and GRID child-resource-edge negative regressions remain and passed.
+
+CLIPPY: cargo clippy --locked -p xdremux-heif --all-targets -- --deny warnings
+semantic-alpha-subtype-passthrough-clippy.log: exit 0.
+FORMAT: rustfmt --edition 2021 --check crates/xdremux-heif/src/semantic.rs
+semantic-alpha-subtype-passthrough-rustfmt.log: exit 0.
+DIFF: git diff --check -- crates/xdremux-heif/src/semantic.rs: exit 0.
+
+Author review: scoped implementation is ready for parent review/commit. No known local regression remains.
+Residual evidence gap: native System HEIF runtime uses transplant, not merge. Linux synthetic/public API tests
+are not native execution. The next committed integration SHA must run the real find-x6-pro/lhdr-v1-01 System HEIF
+Styles path at MAX_EDGE=256/GainMapAsRGB=true, verify original alpha/HDR resources and actual output consumer
+validation. Do not report the previous failed SHA or the portable tests as native success.

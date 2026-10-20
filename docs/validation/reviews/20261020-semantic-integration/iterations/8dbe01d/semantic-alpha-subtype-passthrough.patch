@@ -1,0 +1,559 @@
+diff --git a/crates/xdremux-heif/src/semantic.rs b/crates/xdremux-heif/src/semantic.rs
+index 9f1bbeb..6cb3602 100644
+--- a/crates/xdremux-heif/src/semantic.rs
++++ b/crates/xdremux-heif/src/semantic.rs
+@@ -478,7 +478,7 @@ fn auxiliary_type_bytes<'a>(
+ 
+ fn is_alpha_type(uri: &[u8]) -> bool {
+     // HEIF/MIAF identifiers consumed as alpha by libheif's auxl reader:
+-    // https://github.com/strukturag/libheif/blob/v1.19.8/libheif/context.cc
++    // https://github.com/strukturag/libheif/blob/364905fc9841bdda229e0ae2c5fda13b5fc98d1a/libheif/context.cc#L861
+     matches!(
+         uri,
+         b"urn:mpeg:hevc:2015:auxid:1" | b"urn:mpeg:mpegB:cicp:systems:auxiliary:alpha"
+@@ -524,16 +524,13 @@ fn primary_alpha_image(data: &[u8], graph: &Graph, context: &str) -> Result<Opti
+                 )))
+             }
+         };
+-        let (uri, subtype) = auxiliary_type_bytes(data, property)?;
++        let (uri, _) = auxiliary_type_bytes(data, property)?;
+         if !is_alpha_type(uri) {
+             continue;
+         }
+         if alpha.is_some() {
+             return Err(invalid(format!("{context} has multiple alpha resources")));
+         }
+-        if !subtype.is_empty() {
+-            return Err(invalid(format!("{context} alpha subtype is unsupported")));
+-        }
+         let includes_tmap = reference.to_item_ids.contains(&tmap);
+         if !reference.to_item_ids.contains(&meta.primary_item_id)
+             || reference.to_item_ids.len() != if includes_tmap { 2 } else { 1 }
+@@ -645,6 +642,34 @@ fn alpha_properties(
+     Ok(properties)
+ }
+ 
++fn alpha_auxiliary_metadata(data: &[u8], graph: &Graph, id: u32) -> Result<(Vec<u8>, bool)> {
++    let index = required_property_index(&graph.meta, id, AUXC, "alpha")?;
++    let property = graph
++        .meta
++        .properties
++        .iter()
++        .find(|property| property.index == u32::from(index))
++        .ok_or_else(|| invalid("alpha auxC property is missing"))?;
++    let (_, subtype) = auxiliary_type_bytes(data, property)?;
++    Ok((raw_property(data, property)?.to_vec(), subtype.is_empty()))
++}
++
++fn validate_alpha_auxiliary_metadata_preserved(
++    source_data: &[u8],
++    source: &Graph,
++    source_id: u32,
++    output_data: &[u8],
++    output: &Graph,
++    output_id: u32,
++) -> Result<()> {
++    if alpha_auxiliary_metadata(source_data, source, source_id)?.0
++        != alpha_auxiliary_metadata(output_data, output, output_id)?.0
++    {
++        return Err(invalid("alpha auxiliary metadata differs from source"));
++    }
++    Ok(())
++}
++
+ fn paired_alpha_images(
+     source_data: &[u8],
+     source: &Graph,
+@@ -666,6 +691,20 @@ fn paired_alpha_images(
+                     "source and scaffold alpha relationships or tile graphs differ",
+                 ));
+             }
++            // libheif carries the entire auxC subtype without interpreting
++            // alpha SEI: box.cc parse/write at the pinned consumer revision.
++            // https://github.com/strukturag/libheif/blob/364905fc9841bdda229e0ae2c5fda13b5fc98d1a/libheif/box.cc#L3376
++            // Preserve opaque source metadata, rather than admitting it by
++            // diagnostic shape. Empty standard alpha aliases remain compatible.
++            let (source_auxc, source_empty) =
++                alpha_auxiliary_metadata(source_data, source, original.root)?;
++            let (scaffold_auxc, scaffold_empty) =
++                alpha_auxiliary_metadata(scaffold_data, scaffold, encoded.root)?;
++            if !(source_empty && scaffold_empty) && source_auxc != scaffold_auxc {
++                return Err(invalid(
++                    "source and scaffold alpha auxiliary metadata differ",
++                ));
++            }
+             for (source_id, scaffold_id) in std::iter::once((original.root, encoded.root)).chain(
+                 original
+                     .coded_items
+@@ -1407,10 +1446,10 @@ pub fn merge_apple_semantic_auxiliary_heif(
+     let scaffold = parse_graph(scaffold_data, "semantic scaffold")?;
+     let source_tmap = find_tmap(&source.meta, "source HDR")?;
+     let _ = hdr_image_items(&source.meta, "source HDR")?;
+-    let (_, scaffold_alpha) = paired_alpha_images(source_data, &source, scaffold_data, &scaffold)
+-        .map_err(|error| {
+-        semantic_graph_error(error, source_data, &source, scaffold_data, &scaffold)
+-    })?;
++    let (source_alpha, scaffold_alpha) =
++        paired_alpha_images(source_data, &source, scaffold_data, &scaffold).map_err(|error| {
++            semantic_graph_error(error, source_data, &source, scaffold_data, &scaffold)
++        })?;
+     let (scaffold_tmap, semantic_images, semantic_metadata) =
+         semantic_items(scaffold_data, &scaffold, scaffold_alpha.as_ref()).map_err(|error| {
+             semantic_graph_error(error, source_data, &source, scaffold_data, &scaffold)
+@@ -1761,6 +1800,16 @@ pub fn merge_apple_semantic_auxiliary_heif(
+     if output_graph.meta.primary_item_id != source.meta.primary_item_id {
+         return Err(invalid("semantic merge changed the primary item"));
+     }
++    if let Some(alpha) = &source_alpha {
++        validate_alpha_auxiliary_metadata_preserved(
++            source_data,
++            &source,
++            alpha.root,
++            &output,
++            &output_graph,
++            alpha.root,
++        )?;
++    }
+     if output_graph.mdat.payload_range().len() < source_mdat_payload.len()
+         || output[output_graph.mdat.payload_range().start
+             ..output_graph.mdat.payload_range().start + source_mdat_payload.len()]
+@@ -2291,7 +2340,7 @@ pub fn transplant_apple_semantic_auxiliary_heif(
+         ));
+     }
+ 
+-    let mut codec_replacements = BTreeMap::new();
++    let mut property_replacements = BTreeMap::new();
+     for (source_ids, scaffold_ids, context) in [
+         (
+             source_primary_tiles.as_slice(),
+@@ -2312,7 +2361,7 @@ pub fn transplant_apple_semantic_auxiliary_heif(
+             uniform_property(source_data, &source.meta, source_ids, HVCC, context)?;
+         let scaffold_index = uniform_property_index(&scaffold.meta, scaffold_ids, HVCC, context)?;
+         let property_index = u32::from(scaffold_index);
+-        if let Some(existing) = codec_replacements.get(&property_index) {
++        if let Some(existing) = property_replacements.get(&property_index) {
+             if *existing != source_raw {
+                 return Err(invalid(format!(
+                     "semantic scaffold reuses hvcC property {} for incompatible codecs",
+@@ -2320,9 +2369,16 @@ pub fn transplant_apple_semantic_auxiliary_heif(
+                 )));
+             }
+         } else {
+-            codec_replacements.insert(property_index, source_raw);
++            property_replacements.insert(property_index, source_raw);
+         }
+     }
++    if let (Some(original), Some(encoded)) = (&source_alpha, &scaffold_alpha) {
++        let index = required_property_index(&scaffold.meta, encoded.root, AUXC, "scaffold alpha")?;
++        property_replacements.insert(
++            u32::from(index),
++            alpha_auxiliary_metadata(source_data, &source, original.root)?.0,
++        );
++    }
+     let replaced_items = scaffold_primary_tiles
+         .iter()
+         .chain(&scaffold_gain_tiles)
+@@ -2330,28 +2386,32 @@ pub fn transplant_apple_semantic_auxiliary_heif(
+         .copied()
+         .collect::<BTreeSet<_>>();
+     for entry in &scaffold.meta.ipma.entries {
+-        if replaced_items.contains(&entry.item_id) {
+-            continue;
+-        }
+         for association in &entry.associations {
+             if let Some(replacement) =
+-                codec_replacements.get(&u32::from(association.property_index))
++                property_replacements.get(&u32::from(association.property_index))
+             {
+                 let property = scaffold
+                     .meta
+                     .properties
+                     .iter()
+                     .find(|property| property.index == u32::from(association.property_index))
+-                    .ok_or_else(|| invalid("shared codec property is missing"))?;
+-                if replacement.as_slice() != raw_property(scaffold_data, property)? {
++                    .ok_or_else(|| invalid("shared replacement property is missing"))?;
++                let replaced = if property.kind == AUXC {
++                    scaffold_alpha
++                        .as_ref()
++                        .is_some_and(|alpha| alpha.root == entry.item_id)
++                } else {
++                    replaced_items.contains(&entry.item_id)
++                };
++                if !replaced && replacement.as_slice() != raw_property(scaffold_data, property)? {
+                     return Err(invalid(
+-                        "semantic transplant would change an unreplaced item's shared codec",
++                        "semantic transplant would change an unreplaced item's shared property",
+                     ));
+                 }
+             }
+         }
+     }
+-    let iprp = rebuild_iprp_properties(scaffold_data, &scaffold, &codec_replacements)?;
++    let iprp = rebuild_iprp_properties(scaffold_data, &scaffold, &property_replacements)?;
+     let preliminary_iloc = make_iloc_box(
+         scaffold.meta.iloc.version,
+         scaffold.meta.iloc.offset_size,
+@@ -2461,6 +2521,16 @@ pub fn transplant_apple_semantic_auxiliary_heif(
+     if output_graph.meta.primary_item_id != scaffold.meta.primary_item_id {
+         return Err(invalid("semantic transplant changed the primary item"));
+     }
++    if let (Some(original), Some(encoded)) = (&source_alpha, &scaffold_alpha) {
++        validate_alpha_auxiliary_metadata_preserved(
++            source_data,
++            &source,
++            original.root,
++            &output,
++            &output_graph,
++            encoded.root,
++        )?;
++    }
+     for (source_id, scaffold_id) in source_primary_tiles
+         .iter()
+         .chain(source_gain_tiles.iter())
+@@ -2489,16 +2559,20 @@ pub fn transplant_apple_semantic_auxiliary_heif(
+             )));
+         }
+     }
+-    for (index, raw) in &codec_replacements {
++    for (index, raw) in &property_replacements {
+         let property = output_graph
+             .meta
+             .properties
+             .iter()
+             .find(|property| property.index == *index)
+-            .ok_or_else(|| invalid(format!("semantic output hvcC property {index} is missing")))?;
++            .ok_or_else(|| {
++                invalid(format!(
++                    "semantic output replacement property {index} is missing"
++                ))
++            })?;
+         if raw_property(&output, property)? != raw {
+             return Err(invalid(format!(
+-                "semantic output hvcC property {index} differs from Rust codec"
++                "semantic output replacement property {index} differs from source"
+             )));
+         }
+     }
+@@ -3466,6 +3540,10 @@ mod tests {
+             transplant_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold_bytes, 3).unwrap();
+         assert_payload(&output, 31, b"original-alpha-payload");
+         let actual = parse_graph(&output, "output").unwrap();
++        assert_eq!(
++            alpha_properties(&output, &actual.meta, 31, &[AUXC]).unwrap(),
++            vec![auxiliary_property(HEVC_ALPHA)]
++        );
+         let expected = parse_graph(&scaffold_bytes, "scaffold").unwrap();
+         assert_eq!(
+             actual.meta.iref.unwrap().entries,
+@@ -3487,7 +3565,296 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn alpha_subtype_diagnostic_reports_bounded_structure_and_keeps_unsupported_bytes_rejected() {
++    fn alpha_subtype_passthrough_preserves_complete_source_metadata_and_coded_resources() {
++        // Synthetic opaque metadata, including an outer HEVC envelope. These
++        // bytes exercise lossless carriage; no alpha SEI decoding is claimed.
++        let envelope = [0, 0, 0, 12, 0, 0, 0, 8, 0x4e, 1, 165, 4, 0, 0, 0, 0x80];
++        for source_uri in [HEVC_ALPHA, MIAF_ALPHA] {
++            for scaffold_uri in [HEVC_ALPHA, MIAF_ALPHA] {
++                for subtype in [b"".as_slice(), envelope.as_slice(), b"opaque\0metadata\xff"] {
++                    if !subtype.is_empty() && source_uri != scaffold_uri {
++                        continue;
++                    }
++                    for grid in [false, true] {
++                        let mut source = Fixture::new(false, false, "source");
++                        let mut scaffold = Fixture::new(false, true, "framework");
++                        add_alpha(&mut source, 30, source_uri, grid, true);
++                        add_alpha(&mut scaffold, 31, scaffold_uri, grid, false);
++                        for (fixture, id, uri) in [
++                            (&mut source, 30, source_uri),
++                            (&mut scaffold, 31, scaffold_uri),
++                        ] {
++                            fixture
++                                .auxiliary_properties
++                                .iter_mut()
++                                .find(|(item, property)| {
++                                    *item == id && property.get(4..8) == Some(AUXC.as_bytes())
++                                })
++                                .unwrap()
++                                .1 = make_box(
++                                AUXC,
++                                &[vec![0; 4], uri.to_vec(), subtype.to_vec()].concat(),
++                            )
++                            .unwrap();
++                        }
++                        let source_bytes = source.bytes();
++                        let scaffold_bytes = scaffold.bytes();
++                        for transplant in [false, true] {
++                            let assemble = if transplant {
++                                transplant_apple_semantic_auxiliary_heif
++                            } else {
++                                merge_apple_semantic_auxiliary_heif
++                            };
++                            let output = assemble(&source_bytes, &scaffold_bytes, 3).unwrap();
++                            let root = if transplant { 31 } else { 30 };
++                            let graph = parse_graph(&output, "output").unwrap();
++                            assert_eq!(
++                                alpha_properties(&output, &graph.meta, root, &[AUXC]).unwrap(),
++                                vec![make_box(
++                                    AUXC,
++                                    &[vec![0; 4], source_uri.to_vec(), subtype.to_vec()].concat(),
++                                )
++                                .unwrap()]
++                            );
++                            let coded = if grid {
++                                vec![root + 1000, root + 1001]
++                            } else {
++                                vec![root]
++                            };
++                            if grid {
++                                assert_payload(&output, root, b"alpha-grid-geometry");
++                                assert_payload(&output, coded[0], b"original-alpha-tile-0");
++                                assert_payload(&output, coded[1], b"original-alpha-tile-1");
++                                assert!(graph.meta.iref.as_ref().unwrap().entries.iter().any(
++                                    |edge| {
++                                        edge.kind == DIMG
++                                            && edge.from_item_id == root
++                                            && edge.to_item_ids == coded
++                                    }
++                                ));
++                            } else {
++                                assert_payload(&output, root, b"original-alpha-payload");
++                            }
++                            let (_, codec) =
++                                uniform_property(&output, &graph.meta, &coded, HVCC, "alpha")
++                                    .unwrap();
++                            assert_eq!(
++                                codec,
++                                make_box(HVCC, &[if grid { 5 } else { 41 }; 19]).unwrap()
++                            );
++                            assert_payload(&output, PRIMARY, b"source-primary");
++                            assert_payload(&output, GAIN, b"source-gain");
++                            if transplant {
++                                let expected = parse_graph(&scaffold_bytes, "scaffold").unwrap();
++                                assert_eq!(
++                                    graph.meta.iref.unwrap().entries,
++                                    expected.meta.iref.unwrap().entries
++                                );
++                                assert_eq!(graph.meta.ipma.entries, expected.meta.ipma.entries);
++                            }
++                        }
++                    }
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn alpha_subtype_passthrough_rejects_changed_metadata_or_unknown_identity() {
++        for case in [
++            "changed byte",
++            "truncated",
++            "appended",
++            "source empty",
++            "scaffold empty",
++            "mixed URI",
++            "source version",
++            "scaffold version",
++            "source flags",
++            "scaffold flags",
++            "unknown URI",
++            "duplicate property",
++        ] {
++            let mut source = Fixture::new(false, false, "source");
++            let mut scaffold = Fixture::new(false, true, "framework");
++            let subtype = b"original\0opaque\xff";
++            add_alpha_subtype(&mut source, 30, HEVC_ALPHA, subtype, true);
++            add_alpha_subtype(&mut scaffold, 31, HEVC_ALPHA, subtype, false);
++            let (fixture, id) = if case.starts_with("source") {
++                (&mut source, 30)
++            } else {
++                (&mut scaffold, 31)
++            };
++            let property = &mut fixture
++                .auxiliary_properties
++                .iter_mut()
++                .find(|(item, property)| *item == id && property.get(4..8) == Some(AUXC.as_bytes()))
++                .unwrap()
++                .1;
++            match case {
++                "changed byte" => *property.last_mut().unwrap() ^= 1,
++                "truncated" => {
++                    *property = make_box(
++                        AUXC,
++                        &[
++                            vec![0; 4],
++                            HEVC_ALPHA.to_vec(),
++                            subtype[..subtype.len() - 1].to_vec(),
++                        ]
++                        .concat(),
++                    )
++                    .unwrap()
++                }
++                "appended" => {
++                    *property = make_box(
++                        AUXC,
++                        &[vec![0; 4], HEVC_ALPHA.to_vec(), subtype.to_vec(), vec![0]].concat(),
++                    )
++                    .unwrap()
++                }
++                "source empty" | "scaffold empty" => *property = auxiliary_property(HEVC_ALPHA),
++                "mixed URI" => {
++                    *property = make_box(
++                        AUXC,
++                        &[vec![0; 4], MIAF_ALPHA.to_vec(), subtype.to_vec()].concat(),
++                    )
++                    .unwrap()
++                }
++                "source version" | "scaffold version" => property[8] = 1,
++                "source flags" | "scaffold flags" => property[11] = 1,
++                "unknown URI" => {
++                    *property = make_box(
++                        AUXC,
++                        &[
++                            vec![0; 4],
++                            b"urn:unknown:alpha\0".to_vec(),
++                            subtype.to_vec(),
++                        ]
++                        .concat(),
++                    )
++                    .unwrap();
++                    source.auxiliary_properties[0].1 = scaffold.auxiliary_properties[0].1.clone();
++                }
++                "duplicate property" => scaffold
++                    .auxiliary_properties
++                    .push((31, auxiliary_property(HEVC_ALPHA))),
++                _ => unreachable!(),
++            }
++            for assemble in [
++                transplant_apple_semantic_auxiliary_heif,
++                merge_apple_semantic_auxiliary_heif,
++            ] {
++                assert!(
++                    assemble(&source.bytes(), &scaffold.bytes(), 3).is_err(),
++                    "accepted {case}"
++                );
++            }
++        }
++    }
++
++    #[test]
++    fn alpha_subtype_passthrough_rejects_property_changes_on_other_resources() {
++        for grid in [false, true] {
++            let mut source = Fixture::new(false, false, "source");
++            let mut scaffold = Fixture::new(false, true, "framework");
++            add_alpha(&mut source, 30, HEVC_ALPHA, grid, true);
++            add_alpha(&mut scaffold, 31, MIAF_ALPHA, grid, false);
++            let (item_id, shared_index) = if grid { (31, 1) } else { (PRIMARY, 4) };
++            let placeholder = if grid {
++                make_box(HVCC, &[7; 19]).unwrap()
++            } else {
++                auxiliary_property(MIAF_ALPHA)
++            };
++            scaffold.auxiliary_properties.push((item_id, placeholder));
++            let mut scaffold = scaffold.bytes();
++            let mut graph = parse_graph(&scaffold, "scaffold").unwrap();
++            let association = graph
++                .meta
++                .ipma
++                .entries
++                .iter_mut()
++                .find(|entry| entry.item_id == item_id)
++                .unwrap()
++                .associations
++                .last_mut()
++                .unwrap();
++            association.property_index = shared_index;
++            let replacement = make_ipma_box(0, 0, &graph.meta.ipma.entries).unwrap();
++            let iprp = child(&graph.meta_children, IPRP, "scaffold").unwrap();
++            let children = parse_boxes(&scaffold, iprp.payload_range()).unwrap();
++            let ipma = child(&children, IPMA, "scaffold").unwrap();
++            assert_eq!(replacement.len(), ipma.size);
++            scaffold[ipma.box_range()].copy_from_slice(&replacement);
++            // Changing alpha auxC must not also change primary metadata;
++            // replacing a coded codec must not change an alpha GRID root.
++            assert!(
++                transplant_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold, 3).is_err(),
++                "accepted shared property for grid={grid}"
++            );
++            assert!(merge_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold, 3).is_ok());
++        }
++    }
++
++    #[test]
++    fn alpha_subtype_passthrough_readback_rejects_changed_returned_auxiliary_bytes() {
++        let mut source = Fixture::new(false, false, "source");
++        let mut scaffold = Fixture::new(false, true, "framework");
++        add_alpha_subtype(&mut source, 30, HEVC_ALPHA, b"source\0metadata\xff", true);
++        add_alpha_subtype(
++            &mut scaffold,
++            31,
++            HEVC_ALPHA,
++            b"source\0metadata\xff",
++            false,
++        );
++        let source = source.bytes();
++        let source_graph = parse_graph(&source, "source").unwrap();
++        for transplant in [false, true] {
++            let assemble = if transplant {
++                transplant_apple_semantic_auxiliary_heif
++            } else {
++                merge_apple_semantic_auxiliary_heif
++            };
++            let output = assemble(&source, &scaffold.bytes(), 3).unwrap();
++            let root = if transplant { 31 } else { 30 };
++            let graph = parse_graph(&output, "output").unwrap();
++            let property_index = required_property_index(&graph.meta, root, AUXC, "alpha").unwrap();
++            let property = graph
++                .meta
++                .properties
++                .iter()
++                .find(|property| property.index == u32::from(property_index))
++                .unwrap();
++            // Corrupt real returned bytes while keeping box sizes, items,
++            // codec bytes, payloads, and all graph relationships unchanged.
++            let mut altered = output.clone();
++            altered[property.box_range.end - 1] ^= 1;
++            let altered_graph = parse_graph(&altered, "altered output").unwrap();
++            let error = validate_alpha_auxiliary_metadata_preserved(
++                &source,
++                &source_graph,
++                30,
++                &altered,
++                &altered_graph,
++                root,
++            )
++            .unwrap_err()
++            .to_string();
++            assert!(
++                error.contains("alpha auxiliary metadata differs from source"),
++                "{error}"
++            );
++            for reimport in [
++                transplant_apple_semantic_auxiliary_heif,
++                merge_apple_semantic_auxiliary_heif,
++            ] {
++                assert!(reimport(&source, &altered, 3).is_err());
++            }
++        }
++    }
++
++    #[test]
++    fn alpha_subtype_diagnostic_reports_bounded_structure_for_invalid_resource_graph() {
+         // Only the outer length/NAL-header envelope is recognizable here.
+         // This deliberately does not establish valid alpha SEI semantics.
+         let framed = [0, 0, 0, 8, 0, 0, 0, 4, 0x4e, 1, 165, 0];
+@@ -3520,12 +3887,6 @@ mod tests {
+                     error.contains("alpha_subtype_pair={uri_match=true,bytes_match=true}"),
+                     "{error}"
+                 );
+-                if !subtype.is_empty() {
+-                    assert!(
+-                        error.contains("source HDR alpha subtype is unsupported"),
+-                        "{error}"
+-                    );
+-                }
+                 assert!(!error.contains("SECRET"), "{error}");
+                 assert!(error.len() < 32_768);
+             }

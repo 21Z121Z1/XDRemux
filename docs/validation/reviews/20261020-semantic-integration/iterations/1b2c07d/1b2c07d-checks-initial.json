@@ -1,0 +1,201 @@
+{
+  "source": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+  "captured_at": "2026-10-20 21:58:53 UTC",
+  "runs": [
+    {
+      "id": 39504421369,
+      "name": "XDRemux Completion Gate",
+      "status": "pending",
+      "conclusion": null,
+      "run_number": 452,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421369/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421369/logs",
+      "workflow_id": 337441246
+    },
+    {
+      "id": 39504421278,
+      "name": "Rust ProXDR real fixtures",
+      "status": "in_progress",
+      "conclusion": null,
+      "run_number": 349,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421278/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421278/logs",
+      "workflow_id": 347463427
+    },
+    {
+      "id": 39504421267,
+      "name": "Rust CLI portability",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 402,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421267/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421267/logs",
+      "workflow_id": 347223704
+    },
+    {
+      "id": 39504421273,
+      "name": "XDRemux Rust Performance and Design",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 179,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421273/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421273/logs",
+      "workflow_id": 337168196
+    },
+    {
+      "id": 39504421318,
+      "name": "XDRemux Rust Product Integration",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 527,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421318/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421318/logs",
+      "workflow_id": 315568847
+    },
+    {
+      "id": 39504421379,
+      "name": "Research evidence",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 91,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421379/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39504421379/logs",
+      "workflow_id": 364655225
+    }
+  ],
+  "checks": [
+    {
+      "id": 118909971378,
+      "name": "CodeQL",
+      "status": "completed",
+      "conclusion": "neutral",
+      "url": "https://github.com/21Z121Z1/XDRemux/runs/118909971378"
+    },
+    {
+      "id": 118909656183,
+      "name": "system-heif-hdr-api",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421379/job/118909656183"
+    },
+    {
+      "id": 118909656119,
+      "name": "video-carrier",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421379/job/118909656119"
+    },
+    {
+      "id": 118909656063,
+      "name": "portable-evidence",
+      "status": "in_progress",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421379/job/118909656063"
+    },
+    {
+      "id": 118909655953,
+      "name": "texture-probe-build",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421379/job/118909655953"
+    },
+    {
+      "id": 118909655885,
+      "name": "styles-version-control",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421379/job/118909655885"
+    },
+    {
+      "id": 118909655865,
+      "name": "coreml-candidate",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421379/job/118909655865"
+    },
+    {
+      "id": 118909655525,
+      "name": "style-tone-response",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421379/job/118909655525"
+    },
+    {
+      "id": 118909654781,
+      "name": "macos-package (arm64)",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421267/job/118909654781"
+    },
+    {
+      "id": 118909654754,
+      "name": "portable-cli (windows-latest)",
+      "status": "in_progress",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421267/job/118909654754"
+    },
+    {
+      "id": 118909654689,
+      "name": "macos-product",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421318/job/118909654689"
+    },
+    {
+      "id": 118909654682,
+      "name": "portable-cli (ubuntu-latest)",
+      "status": "in_progress",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421267/job/118909654682"
+    },
+    {
+      "id": 118909654559,
+      "name": "portable-cli (macos-latest)",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421267/job/118909654559"
+    },
+    {
+      "id": 118909654402,
+      "name": "macos-package (x86_64)",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421267/job/118909654402"
+    },
+    {
+      "id": 118909654219,
+      "name": "rust-performance",
+      "status": "in_progress",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421273/job/118909654219"
+    },
+    {
+      "id": 118909654136,
+      "name": "real-proxdr",
+      "status": "in_progress",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421278/job/118909654136"
+    },
+    {
+      "id": 118909631722,
+      "name": "Analyze (rust)",
+      "status": "in_progress",
+      "conclusion": null,
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504412993/job/118909631722"
+    },
+    {
+      "id": 118909631638,
+      "name": "Analyze (python)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504412993/job/118909631638"
+    },
+    {
+      "id": 118909631083,
+      "name": "Analyze (actions)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504412993/job/118909631083"
+    }
+  ]
+}

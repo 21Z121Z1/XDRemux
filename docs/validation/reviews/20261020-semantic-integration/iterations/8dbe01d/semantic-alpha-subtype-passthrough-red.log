@@ -1,0 +1,20 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.06s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 2 tests
+
+thread 'semantic::tests::alpha_subtype_passthrough_preserves_complete_source_metadata_and_coded_resources' (109737) panicked at crates/xdremux-heif/src/semantic.rs:3530:86:
+called `Result::unwrap()` on an `Err` value: Invalid("source HDR alpha subtype is unsupported; resource graphs: source={primary=1,items=5,resources=[1:hvc1:auxC=[none]:subtype=[],2:hvc1:auxC=[none]:subtype=[],30:hvc1:auxC=[alpha-hevc]:subtype=[len=16,shape=hevc-sei-envelope]],dimg=[3->[1,2]],auxl=[2->[1,3],30->[1,3]],cdsc=[4->[1,3]]}; scaffold={primary=1,items=11,resources=[1:hvc1:auxC=[none]:subtype=[],2:hvc1:auxC=[none]:subtype=[],10:hvc1:auxC=[none]:subtype=[],11:hvc1:auxC=[none]:subtype=[],12:hvc1:auxC=[none]:subtype=[],31:hvc1:auxC=[alpha-hevc]:subtype=[len=16,shape=hevc-sei-envelope]],dimg=[3->[1,2]],auxl=[2->[1,3],10->[1,3],11->[1,3],12->[1,3],31->[1,3]],cdsc=[4->[1,3],20->[10],21->[11],22->[12]]}; alpha_subtype_pair={uri_match=true,bytes_match=true}")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test semantic::tests::alpha_subtype_passthrough_preserves_complete_source_metadata_and_coded_resources ... FAILED
+test semantic::tests::alpha_subtype_passthrough_rejects_changed_metadata_or_unknown_identity ... ok
+
+failures:
+
+failures:
+    semantic::tests::alpha_subtype_passthrough_preserves_complete_source_metadata_and_coded_resources
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 48 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p xdremux-heif --lib`

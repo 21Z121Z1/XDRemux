@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "scope": "Delta-only verification after fc3f04d: source-preserving alpha assembly plus opt-in Styles stage diagnostics, equal-scope exact-revision builds, untimed native validation and a separately validated candidate-only profile. Original absolute budget and unprofiled 5+5 samples remain unchanged. Source/body native compilation and actual CPU stage results require the new SHA on macOS; this Linux receipt does not establish them. Each Cargo/CLI path uses this worktree own target.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "complete-heif-and-runtime-regressions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-heif",
+        "-p",
+        "xdremux-runtime",
+        "--all-targets"
+      ],
+      "timeout_seconds": 900,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "real-cli-pair-conversion-and-readback",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux"
+      }
+    }
+  ]
+}

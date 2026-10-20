@@ -1,5 +1,8 @@
 # 后续审查证据
 
+[1b2c07d 诊断/验收附件](1b2c07d/README.md)记录独立 profile、251测试干净增量回执、21个源恢复及新排队原生检查；[8dbe01d alpha 附件](8dbe01d/README.md)保留元数据与 RED/GREEN。父已选最终门禁后普通 merge #71 一次，仍须明确执行审核，未放行 merge/delete。
+
+
 
 [fc3f04d 所有权与可比较性能附件](fc3f04d/README.md)补充干净的完整 workspace 可移植回执、既存 Live Photo 媒体损失 RED/GREEN、保守 subtype 诊断、同 runner 性能对照和重新核实的19个恢复 tag。b049 原生结果仍独立绑定，本附件不放行合并/删除。
 
