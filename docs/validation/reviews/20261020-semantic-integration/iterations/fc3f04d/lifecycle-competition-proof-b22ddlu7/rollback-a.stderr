@@ -1,0 +1,2 @@
+audit: paused before filesystem operation: /workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/rollback/.capture.93af632eb3184c27843709b2e19fc51e.tmp.mov
+error: Live Photo pair publication: could not rename /workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/rollback/.capture.93af632eb3184c27843709b2e19fc51e.tmp.mov: Input/output error (os error 5)

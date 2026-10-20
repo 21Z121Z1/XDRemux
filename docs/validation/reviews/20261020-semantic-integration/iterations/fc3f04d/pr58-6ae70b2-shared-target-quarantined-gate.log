@@ -1,0 +1,12 @@
+PASS [static] locked-workspace (0.027s)
+PASS [static] rust-format (0.738s)
+PASS [static] rust-workspace-clippy (9.864s)
+PASS [regression] media-safe-pair-publication (1.318s)
+PASS [regression] liblivephoto-resource-consumer (2.464s)
+PASS [regression] batch-publication-regressions (7.303s)
+PASS [regression] movie-resource-negative-regressions (24.997s)
+PASS [regression] all-portable-python-regressions (11.234s)
+PASS [functional] build-current-cli (4.355s)
+PASS [functional] real-cli-pair-conversion-and-readback (1.543s)
+PASS completion gate for 6ae70b2b2ffcdc258808cceb5ae8263b2150073c
+receipt: /workspace/xdremux-audit/pr58-6ae70b2-portable-receipt.json

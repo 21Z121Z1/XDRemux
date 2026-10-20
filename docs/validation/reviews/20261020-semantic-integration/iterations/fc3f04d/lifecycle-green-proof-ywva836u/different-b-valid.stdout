@@ -1,0 +1,16 @@
+{
+  "command": "validate",
+  "details": {
+    "kind": "live-photo",
+    "value": {
+      "content_identifier": "0BBEA014-3299-4B25-8F6F-6D33F229DF18",
+      "image": "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/different/beta.heic",
+      "input": "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/different/beta.heic",
+      "still_time_seconds": 1.540401,
+      "video": "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/different/beta.mov"
+    }
+  },
+  "kind": "live-photo",
+  "schema_version": 1,
+  "valid": true
+}

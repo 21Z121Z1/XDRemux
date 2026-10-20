@@ -1,0 +1,45 @@
+{
+  "canonical_fix": "5748768eaf2d8293b09e53b1d870b894808f916d",
+  "pr58_candidate": "6ae70b2b2ffcdc258808cceb5ae8263b2150073c",
+  "canonical_patch_id": "7f2de5ebc31f988d9f05d9677c2884f664c370a2",
+  "pr58_patch_id": "2c6645dd2fdf9c9034bcbd4517f64750ff278756",
+  "patch_id_matches": false,
+  "scope": "Only added/removed lines of the seven-file publisher fix match; surrounding earlier PR58 code differs, and candidate-native acceptance is not established. English context conflict retained the earlier runtime paragraph rather than importing unrelated newer prose.",
+  "files": [
+    {
+      "path": "crates/xdremux-motion-photo/src/publication.rs",
+      "same_added_removed_lines": true,
+      "canonical_delta_sha256": "f8cea33b7997da8d2b8b355c1403ccb76458804f658d4dc684e505b7b3640bb2"
+    },
+    {
+      "path": "crates/xdremux-runtime/src/live_photo.rs",
+      "same_added_removed_lines": true,
+      "canonical_delta_sha256": "357ea15a7d5946b0c77a4208a050ce97e7635d1a6ee14f2c3a1c63bbfb057ae5"
+    },
+    {
+      "path": "crates/xdremux-runtime/tests/live_photo_negative.rs",
+      "same_added_removed_lines": true,
+      "canonical_delta_sha256": "7eab7012e674266a5d2869329592042e6f93d97d79edc256b98eaa52013d417e"
+    },
+    {
+      "path": "docs/architecture.en.md",
+      "same_added_removed_lines": true,
+      "canonical_delta_sha256": "1dc8830c4dcfe4fe55e8c3e38c0f10ee5eda7b083f146972c099d82c95f4d734"
+    },
+    {
+      "path": "docs/architecture.md",
+      "same_added_removed_lines": true,
+      "canonical_delta_sha256": "5255267a577f987c4de48229fcab1f73ba49998c9591924a861a3da3202d2c00"
+    },
+    {
+      "path": "docs/liblivephoto-integration.en.md",
+      "same_added_removed_lines": true,
+      "canonical_delta_sha256": "0004a91e4e5e8e1334760baea45e07c4b1c293904a6ec461347e74650a21e59d"
+    },
+    {
+      "path": "docs/liblivephoto-integration.md",
+      "same_added_removed_lines": true,
+      "canonical_delta_sha256": "38c6772f7ed8d9767ffa0491dbb348271eca13725164f697e328301997bc077d"
+    }
+  ]
+}

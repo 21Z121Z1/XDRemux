@@ -1,0 +1,10 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-20T21:06:07.460765+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/ab37567",
+  "head": "ab3756746b6482da704f921de207fb12c5bc86a6",
+  "tree": "a486a44c54b8f84bcc6e39e1d5f5a42bcfa817f6",
+  "source_branch": "integrate/semantic-review-20261020",
+  "scope": "Committed CLI fixture isolation and bounded alpha diagnostics only; new native acceptance pending, original PR head remains b049b7a.",
+  "restore_status": "remote fetched, commit/tree matched, git fsck --full --no-reflogs exit 0"
+}

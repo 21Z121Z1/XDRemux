@@ -1,0 +1,17 @@
+   Compiling xdremux-motion-photo v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-motion-photo)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.55s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_motion_photo-7a52a561279369b7)
+
+running 9 tests
+test publication::tests::companion_movie_uses_same_stem ... ok
+test publication::tests::publication_refuses_existing_resources_and_preserves_staging ... ok
+test publication::tests::publication_rejects_identical_final_paths_without_effects ... ok
+test publication::tests::publication_retains_a_recoverable_partial_pair_after_second_link_failure ... ok
+test publication::tests::reconcile_preserves_partial_invalid_and_valid_pairs ... ok
+test publication::tests::publication_accepts_owned_staging_under_destination_directory ... ok
+test publication::tests::publication_claims_shared_movie_before_either_still_extension ... ok
+test publication::tests::publication_preserves_a_dangling_competitor_symlink ... ok
+test publication::tests::reconcile_preserves_unowned_artifacts_and_directories ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+

@@ -1,0 +1,44 @@
+Source: https://github.com/21Z121Z1/XDRemux/actions/runs/39493276015/job/118871690275
+Exact source: b049b7a4bf41934bacf93514e5899567a54000ca
+
+2026-10-20T20:48:14.6418510Z hw.model: VirtualMac2,1
+2026-10-20T20:48:14.6419020Z machdep.cpu.brand_string: Apple M1 (Virtual)
+2026-10-20T20:48:14.6419350Z hw.physicalcpu: 3
+2026-10-20T20:48:14.6419550Z hw.logicalcpu: 3
+2026-10-20T20:48:14.6419810Z hw.memsize: 7516192768
+2026-10-20T20:48:14.6663020Z 20:48  up 4 mins, 1 user, load averages: 21.71 39.43 20.57
+2026-10-20T20:51:47.5322420Z hdr-lhdr-mono400: median=2.157s p95=2.576s max_rss=53.7MiB
+2026-10-20T20:52:53.4327260Z hdr-uhdr-rgb444: median=10.615s p95=12.246s max_rss=115.8MiB
+2026-10-20T20:53:06.9704670Z oppo-compatible-lhdr-rgb420: median=2.168s p95=2.475s max_rss=64.9MiB
+2026-10-20T20:53:57.7064970Z oppo-compatible-uhdr-rgb420: median=8.457s p95=9.034s max_rss=111.7MiB
+2026-10-20T20:54:49.8587510Z motion-jpeg: median=8.635s p95=9.084s max_rss=314.3MiB
+2026-10-20T20:54:50.4301640Z motion-heif: median=0.094s p95=0.099s max_rss=25.7MiB
+2026-10-20T20:57:12.0920100Z batch-3: median=24.174s p95=24.721s max_rss=248.3MiB
+2026-10-20T20:57:43.8445500Z apple-portrait: median=4.840s p95=5.099s max_rss=896.4MiB
+2026-10-20T20:59:20.3464910Z apple-styles: median=15.467s p95=18.216s max_rss=1084.0MiB
+2026-10-20T20:59:33.4421860Z VideoToolbox Main10 adapter primitive: median=0.311s p95=0.402s profile={'general_profile_idc': 2, 'chroma': '420', 'luma_bit_depth': 10, 'chroma_bit_depth': 10} hardware_samples=5/5 encoder_ids=['paravirtualized:com.apple.videotoolbox.videoencoder.ave.hevc']
+2026-10-20T20:59:52.6743510Z performance regression gate failed:
+2026-10-20T20:59:52.6745190Z   - apple-styles median_wall_seconds regressed: 15.467s > 11.732s
+2026-10-20T20:59:52.6746470Z   - apple-styles p95_wall_seconds regressed: 18.216s > 15.406s
+2026-10-20T20:59:52.6748690Z   hdr-uhdr-rgb444 median_wall_seconds: observed=10.615s reference=9.687s budget=13.077s
+2026-10-20T20:59:52.6750440Z   hdr-uhdr-rgb444 p95_wall_seconds: observed=12.246s reference=11.133s budget=15.030s
+2026-10-20T20:59:52.6752050Z   hdr-uhdr-rgb444 max_peak_rss_mib: observed=115.766MiB reference=120.600MiB budget=152.600MiB
+2026-10-20T20:59:52.6753850Z   oppo-compatible-uhdr-rgb420 median_wall_seconds: observed=8.457s reference=8.757s budget=11.822s
+2026-10-20T20:59:52.6755490Z   oppo-compatible-uhdr-rgb420 p95_wall_seconds: observed=9.034s reference=10.069s budget=13.593s
+2026-10-20T20:59:52.6757430Z   oppo-compatible-uhdr-rgb420 max_peak_rss_mib: observed=111.719MiB reference=116.400MiB budget=148.400MiB
+2026-10-20T20:59:52.6759110Z   motion-jpeg median_wall_seconds: observed=8.635s reference=8.432s budget=11.383s
+2026-10-20T20:59:52.6760430Z   motion-jpeg p95_wall_seconds: observed=9.084s reference=8.628s budget=11.648s
+2026-10-20T20:59:52.6761910Z   motion-jpeg max_peak_rss_mib: observed=314.281MiB reference=313.600MiB budget=392.000MiB
+2026-10-20T20:59:52.6763430Z   motion-heif median_wall_seconds: observed=0.094s reference=0.143s budget=0.393s
+2026-10-20T20:59:52.6764760Z   motion-heif p95_wall_seconds: observed=0.099s reference=0.184s budget=0.434s
+2026-10-20T20:59:52.6766260Z   motion-heif max_peak_rss_mib: observed=25.656MiB reference=27.500MiB budget=59.500MiB
+2026-10-20T20:59:52.6767750Z   batch-3 median_wall_seconds: observed=24.174s reference=21.280s budget=28.728s
+2026-10-20T20:59:52.6769030Z   batch-3 p95_wall_seconds: observed=24.721s reference=21.726s budget=29.330s
+2026-10-20T20:59:52.6770460Z   batch-3 max_peak_rss_mib: observed=248.281MiB reference=259.100MiB budget=323.875MiB
+2026-10-20T20:59:52.6771850Z   apple-portrait median_wall_seconds: observed=4.840s reference=4.789s budget=6.465s
+2026-10-20T20:59:52.6773420Z   apple-portrait p95_wall_seconds: observed=5.099s reference=6.789s budget=9.165s
+2026-10-20T20:59:52.6774970Z   apple-portrait max_peak_rss_mib: observed=896.422MiB reference=821.200MiB budget=1026.500MiB
+2026-10-20T20:59:52.6778670Z   apple-styles median_wall_seconds: observed=15.467s reference=8.691s budget=11.732s
+2026-10-20T20:59:52.6780450Z   apple-styles p95_wall_seconds: observed=18.216s reference=11.412s budget=15.406s
+2026-10-20T20:59:52.6782620Z   apple-styles max_peak_rss_mib: observed=1084.000MiB reference=1089.094MiB budget=1361.367MiB
+2026-10-20T20:59:52.6831830Z ##[error]Process completed with exit code 1.

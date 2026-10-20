@@ -1,0 +1,10 @@
+command: tempdir-ownership-probe legacy
+exit=101
+mode=legacy-coarse-clock first=/tmp/.tmpsfrsDm/xdremux-cli-batch-78090-42 second=/tmp/.tmpsfrsDm/xdremux-cli-batch-78090-42 same_path=true
+after first cleanup: second_parent_exists=false second_sentinel_exists=false create_error=Some((NotFound, Some(2)))
+
+thread 'main' (78090) panicked at /workspace/xdremux-audit/tempdir-ownership-probe.rs:26:2:
+assertion `left != right` failed: independent tests must never share their directory lease
+  left: "/tmp/.tmpsfrsDm/xdremux-cli-batch-78090-42"
+ right: "/tmp/.tmpsfrsDm/xdremux-cli-batch-78090-42"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

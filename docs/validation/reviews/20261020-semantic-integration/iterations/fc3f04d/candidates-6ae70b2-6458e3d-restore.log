@@ -1,0 +1,28 @@
+Command: git fetch --no-tags https://github.com/21Z121Z1/XDRemux.git refs/tags/backup/semantic-review-20261020/candidate/pr58-6ae70b2:refs/tags/backup/semantic-review-20261020/candidate/pr58-6ae70b2 refs/tags/backup/semantic-review-20261020/candidate/pr69-6458e3d:refs/tags/backup/semantic-review-20261020/candidate/pr69-6458e3d
+exit=0
+From https://github.com/21Z121Z1/XDRemux
+ * [new tag]         backup/semantic-review-20261020/candidate/pr58-6ae70b2 -> backup/semantic-review-20261020/candidate/pr58-6ae70b2
+ * [new tag]         backup/semantic-review-20261020/candidate/pr69-6458e3d -> backup/semantic-review-20261020/candidate/pr69-6458e3d
+
+Command: git rev-parse refs/tags/backup/semantic-review-20261020/candidate/pr58-6ae70b2
+exit=0
+6ae70b2b2ffcdc258808cceb5ae8263b2150073c
+
+Command: git rev-parse refs/tags/backup/semantic-review-20261020/candidate/pr58-6ae70b2^{tree}
+exit=0
+f46af7f3edc11a275b29b745af4328e7e7ebcb5e
+
+Command: git rev-parse refs/tags/backup/semantic-review-20261020/candidate/pr69-6458e3d
+exit=0
+6458e3d2c7a6da3ae378b867377047bd8a59595e
+
+Command: git rev-parse refs/tags/backup/semantic-review-20261020/candidate/pr69-6458e3d^{tree}
+exit=0
+07772237825199fb852ca889fde53799879ce880
+
+Command: git fsck --full --no-reflogs
+exit=0
+notice: HEAD points to an unborn branch (master)
+
+PASS refs/tags/backup/semantic-review-20261020/candidate/pr58-6ae70b2 6ae70b2b2ffcdc258808cceb5ae8263b2150073c tree=f46af7f3edc11a275b29b745af4328e7e7ebcb5e
+PASS refs/tags/backup/semantic-review-20261020/candidate/pr69-6458e3d 6458e3d2c7a6da3ae378b867377047bd8a59595e tree=07772237825199fb852ca889fde53799879ce880

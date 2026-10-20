@@ -1,0 +1,16 @@
+   Compiling xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.97s
+     Running tests/i18n.rs (target/debug/deps/i18n-5909fb05b1d9c0e1)
+
+running 8 tests
+test environment_precedence_and_global_option_are_observable ... ok
+test current_feature_conflicts_remain_usage_errors_in_both_languages ... ok
+test every_help_page_supports_both_languages ... ok
+test json_inspection_and_validation_failure_are_byte_identical ... ok
+test human_output_translates_labels_but_not_user_paths ... ok
+test parse_errors_keep_stdout_empty_and_exit_code_two ... ok
+test non_unicode_input_arguments_remain_opaque_and_locale_independent ... ok
+test successful_batch_validation_and_categorization_json_are_locale_independent ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.66s
+

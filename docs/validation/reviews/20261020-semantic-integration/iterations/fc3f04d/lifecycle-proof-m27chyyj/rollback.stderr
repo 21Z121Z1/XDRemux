@@ -1,0 +1,2 @@
+audit: valid competitor pair installed; fail original movie rename with EIO
+error: Live Photo pair publication: could not rename /workspace/xdremux-audit/lifecycle-work-3uvlefhs/rollback/.capture.ff11cc28dcef4f199aa2a2dece67bd70.tmp.mov: Input/output error (os error 5)

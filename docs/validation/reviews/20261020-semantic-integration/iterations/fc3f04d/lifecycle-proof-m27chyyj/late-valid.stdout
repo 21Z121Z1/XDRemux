@@ -1,0 +1,16 @@
+{
+  "command": "validate",
+  "details": {
+    "kind": "live-photo",
+    "value": {
+      "content_identifier": "C9E86B1F-44DB-4B87-9732-45256BA604E4",
+      "image": "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/late/capture.heic",
+      "input": "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/late/capture.heic",
+      "still_time_seconds": 1.540401,
+      "video": "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/late/capture.mov"
+    }
+  },
+  "kind": "live-photo",
+  "schema_version": 1,
+  "valid": true
+}

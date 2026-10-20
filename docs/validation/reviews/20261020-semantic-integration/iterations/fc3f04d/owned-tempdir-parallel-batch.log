@@ -1,0 +1,13 @@
+   Compiling xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.78s
+     Running tests/batch.rs (target/debug/deps/batch-ce5f4c66ee69df91)
+
+running 2 tests
+batch fixture owner=Some("live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media") path=/tmp/xdremux-cli-batch-RAvAyt
+batch fixture owner=Some("batch_command_is_deterministic_machine_readable_and_failure_isolating") path=/tmp/xdremux-cli-batch-mqGHN5
+test batch_command_is_deterministic_machine_readable_and_failure_isolating ... ok
+test live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media has been running for over 60 seconds
+test live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 339.06s
+

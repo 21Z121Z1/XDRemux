@@ -1,0 +1,2 @@
+audit: paused before filesystem operation: /workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/cooperative-partial/.xdremux-live-photo-W97IJB/capture.heic
+error: Live Photo pair publication: could not publish movie with a no-clobber hard link (filesystem hard-link support required) /workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/cooperative-partial/capture.mov: File exists (os error 17)

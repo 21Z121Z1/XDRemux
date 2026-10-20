@@ -1,0 +1,32 @@
+    Blocking waiting for file lock on package cache
+   Compiling xdremux-motion-photo v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-motion-photo)
+   Compiling xdremux-source v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-source)
+   Compiling xdremux-runtime v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 34.88s
+     Running tests/live_photo_negative.rs (target/debug/deps/live_photo_negative-1a0a0a1ee61aaca4)
+
+running 2 tests
+test second_member_failure_retains_partial_movie_and_complete_staged_pair ... FAILED
+test conversion_preserves_a_source_directory_with_a_temporary_looking_name ... FAILED
+
+failures:
+
+---- second_member_failure_retains_partial_movie_and_complete_staged_pair stdout ----
+
+thread 'second_member_failure_retains_partial_movie_and_complete_staged_pair' (82332) panicked at crates/xdremux-runtime/tests/live_photo_negative.rs:67:5:
+Live Photo temporary create: File name too long (os error 36)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- conversion_preserves_a_source_directory_with_a_temporary_looking_name stdout ----
+
+thread 'conversion_preserves_a_source_directory_with_a_temporary_looking_name' (82331) panicked at crates/xdremux-runtime/tests/live_photo_negative.rs:42:33:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    conversion_preserves_a_source_directory_with_a_temporary_looking_name
+    second_member_failure_retains_partial_movie_and_complete_staged_pair
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.78s
+
+error: test failed, to rerun pass `-p xdremux-runtime --test live_photo_negative`

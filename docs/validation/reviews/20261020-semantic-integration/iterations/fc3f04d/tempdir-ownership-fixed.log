@@ -1,0 +1,4 @@
+command: tempdir-ownership-probe fixed
+exit=0
+mode=fixed first=/tmp/.tmp3wNv2O/xdremux-cli-batch-jNSOqq second=/tmp/.tmp3wNv2O/xdremux-cli-batch-3SzyhG same_path=false
+after first cleanup: second_parent_exists=true second_sentinel_exists=true create_error=None

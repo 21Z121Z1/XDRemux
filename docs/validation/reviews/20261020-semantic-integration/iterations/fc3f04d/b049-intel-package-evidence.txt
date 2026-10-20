@@ -1,0 +1,89 @@
+Source: https://github.com/21Z121Z1/XDRemux/actions/runs/39493276049/job/118872163837
+Exact source: b049b7a4bf41934bacf93514e5899567a54000ca
+Job conclusion: success
+
+2026-10-20T21:05:06.3388210Z [90/116] Building CXX object libheif/CMakeFiles/heif.dir/sequences/track_visual.cc.o
+2026-10-20T21:05:07.1644640Z [91/116] Building CXX object libheif/CMakeFiles/heif.dir/sequences/track_metadata.cc.o
+2026-10-20T21:05:07.2572000Z [92/116] Building CXX object libheif/CMakeFiles/heif.dir/plugins/encoder_x265.cc.o
+2026-10-20T21:05:08.2968910Z [93/116] Building CXX object libheif/CMakeFiles/heif.dir/sequences/track.cc.o
+2026-10-20T21:05:08.6308960Z [94/116] Building CXX object libheif/CMakeFiles/heif.dir/plugins/decoder_libde265.cc.o
+2026-10-20T21:05:09.2377300Z [95/116] Building CXX object libheif/CMakeFiles/heif.dir/plugins/nalu_utils.cc.o
+2026-10-20T21:05:09.3191990Z [96/116] Building CXX object libheif/CMakeFiles/heif.dir/plugins/encoder_mask.cc.o
+2026-10-20T21:05:11.4657860Z [97/116] Building CXX object heifio/CMakeFiles/heifio.dir/decoder_heif.cc.o
+2026-10-20T21:05:11.5820160Z [98/116] Building CXX object heifio/CMakeFiles/heifio.dir/decoder_raw.cc.o
+2026-10-20T21:05:11.8237450Z [99/116] Building CXX object libheif/CMakeFiles/heif.dir/omaf_boxes.cc.o
+2026-10-20T21:05:13.9777130Z [100/116] Building CXX object heifio/CMakeFiles/heifio.dir/encoder.cc.o
+2026-10-20T21:05:14.1802830Z [101/116] Building CXX object heifio/CMakeFiles/heifio.dir/encoder_y4m.cc.o
+2026-10-20T21:05:15.8013710Z [102/116] Building CXX object heifio/CMakeFiles/heifio.dir/decoder_y4m.cc.o
+2026-10-20T21:05:16.9787500Z [103/116] Building CXX object heifio/CMakeFiles/heifio.dir/stubs.cc.o
+2026-10-20T21:05:17.6945650Z [104/116] Building CXX object heifio/CMakeFiles/heifio.dir/exif.cc.o
+2026-10-20T21:05:18.3365680Z [105/116] Building CXX object libheif/CMakeFiles/heif.dir/mini.cc.o
+2026-10-20T21:05:18.5152880Z [106/116] Linking CXX shared library libheif/libheif.1.23.4.dylib
+2026-10-20T21:05:19.4393010Z [107/116] Building CXX object heifio/CMakeFiles/heifio.dir/encoder_tiff.cc.o
+2026-10-20T21:05:20.2444550Z [108/116] Building CXX object heifio/CMakeFiles/heifio.dir/decoder_tiff.cc.o
+2026-10-20T21:05:20.9084310Z [109/116] Building CXX object heifio/CMakeFiles/heifio.dir/encoder_jpeg.cc.o
+2026-10-20T21:05:21.6398180Z [110/116] Building CXX object heifio/CMakeFiles/heifio.dir/decoder_jpeg.cc.o
+2026-10-20T21:05:22.0437600Z [111/116] Building CXX object heifio/CMakeFiles/heifio.dir/encoder_png.cc.o
+2026-10-20T21:05:22.0823550Z [112/116] Creating library symlink libheif/libheif.1.dylib libheif/libheif.dylib
+2026-10-20T21:05:22.5795680Z [113/116] Building CXX object heifio/CMakeFiles/heifio.dir/decoder_png.cc.o
+2026-10-20T21:05:22.9981720Z [114/116] Building CXX object heifio/CMakeFiles/heifio.dir/encoder_webp.cc.o
+2026-10-20T21:05:23.5002780Z [115/116] Building CXX object heifio/CMakeFiles/heifio.dir/decoder_webp.cc.o
+2026-10-20T21:05:23.6352960Z [116/116] Linking CXX static library heifio/libheifio.a
+2026-10-20T21:05:23.6387160Z + cmake --install /Users/runner/work/_temp/xdremux-native/build/libheif
+2026-10-20T21:05:23.6649580Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/lib/pkgconfig/libheif.pc
+2026-10-20T21:05:23.6664250Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/lib/libheif.1.23.4.dylib
+2026-10-20T21:05:23.6670660Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/lib/libheif.1.dylib
+2026-10-20T21:05:23.7036920Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/lib/libheif.dylib
+2026-10-20T21:05:23.7047010Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif.h
+2026-10-20T21:05:23.7051120Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_export.h
+2026-10-20T21:05:23.7055840Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_library.h
+2026-10-20T21:05:23.7060120Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_image.h
+2026-10-20T21:05:23.7066000Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_color.h
+2026-10-20T21:05:23.7072600Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_error.h
+2026-10-20T21:05:23.7075190Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_plugin.h
+2026-10-20T21:05:23.7079940Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_properties.h
+2026-10-20T21:05:23.7085870Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_regions.h
+2026-10-20T21:05:23.7088510Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_items.h
+2026-10-20T21:05:23.7094310Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_sequences.h
+2026-10-20T21:05:23.7099100Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_tai_timestamps.h
+2026-10-20T21:05:23.7102670Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_brands.h
+2026-10-20T21:05:23.7111630Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_metadata.h
+2026-10-20T21:05:23.7113720Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_aux_images.h
+2026-10-20T21:05:23.7119590Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_entity_groups.h
+2026-10-20T21:05:23.7188720Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_security.h
+2026-10-20T21:05:23.7192090Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_encoding.h
+2026-10-20T21:05:23.7335580Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_decoding.h
+2026-10-20T21:05:23.7339520Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_image_handle.h
+2026-10-20T21:05:23.8394590Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_context.h
+2026-10-20T21:05:23.8405910Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_tiling.h
+2026-10-20T21:05:23.8554780Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_components.h
+2026-10-20T21:05:23.8572570Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_uncompressed.h
+2026-10-20T21:05:23.8575420Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_text.h
+2026-10-20T21:05:23.8577600Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_omaf.h
+2026-10-20T21:05:23.8579610Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_cxx.h
+2026-10-20T21:05:23.8581740Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/include/libheif/heif_version.h
+2026-10-20T21:05:23.8583970Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/lib/cmake/libheif/libheif-config.cmake
+2026-10-20T21:05:23.8586360Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/lib/cmake/libheif/libheif-config-release.cmake
+2026-10-20T21:05:23.8588830Z -- Installing: /Users/runner/work/_temp/xdremux-native/prefix/lib/cmake/libheif/libheif-config-version.cmake
+2026-10-20T21:05:25.4879230Z [36;1m  --output "$RUNNER_TEMP/distribution-artifacts/XDRemux-macOS-x86_64.tar.gz" \[0m
+2026-10-20T21:05:25.4882580Z [36;1mcp "$RUNNER_TEMP/staging/XDRemux-macOS-x86_64-linkage.json" "$RUNNER_TEMP/distribution-artifacts/evidence/"[0m
+2026-10-20T21:05:25.4886620Z [36;1mcp "$RUNNER_TEMP/xdremux-native/build/libheif/CMakeCache.txt" "$RUNNER_TEMP/distribution-artifacts/evidence/libheif-cmake-cache.txt"[0m
+2026-10-20T21:05:25.4898070Z [36;1m} > "$RUNNER_TEMP/distribution-artifacts/evidence/toolchain.txt"[0m
+2026-10-20T21:05:59.6458060Z [1m[92m   Compiling[0m libheif-sys v5.3.1+1.23.1
+2026-10-20T21:06:14.2090130Z [1m[92m   Compiling[0m libheif-rs v3.0.0
+2026-10-20T21:06:44.4714560Z [1m[92m   Compiling[0m xdremux-heif v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif)
+2026-10-20T21:08:58.0546210Z ##[group]Run python3 scripts/distribution/smoke_macos.py \
+2026-10-20T21:08:58.0548570Z [36;1mpython3 scripts/distribution/smoke_macos.py \[0m
+2026-10-20T21:08:58.0549900Z [36;1m  --archive "$RUNNER_TEMP/distribution-artifacts/XDRemux-macOS-x86_64.tar.gz" \[0m
+2026-10-20T21:08:58.0553780Z [36;1m  --output "$RUNNER_TEMP/distribution-artifacts/evidence/relocated"[0m
+2026-10-20T21:09:03.5176320Z ##[group]Run actions/upload-artifact@v7
+2026-10-20T21:09:03.5178250Z   path: /Users/runner/work/_temp/distribution-artifacts/
+2026-10-20T21:09:04.2266760Z Artifact name is valid!
+2026-10-20T21:09:04.7486600Z Uploading artifact: XDRemux-macOS-x86_64.zip
+2026-10-20T21:09:04.7524940Z Beginning upload of artifact content to blob storage
+2026-10-20T21:09:07.3050380Z Finished uploading artifact content to blob storage!
+2026-10-20T21:09:07.3077940Z SHA256 digest of uploaded artifact is 0aa8e0ded0ce2bac283fdd35be7536d3a69670ab0992a00aabe5023460ff0ab7
+2026-10-20T21:09:07.3079890Z Finalizing artifact upload
+2026-10-20T21:09:07.7284310Z Artifact XDRemux-macOS-x86_64 successfully finalized. Artifact ID 12297444554
+2026-10-20T21:09:07.7286590Z Artifact XDRemux-macOS-x86_64 has been successfully uploaded! Final size is 16435805 bytes. Artifact ID is 12297444554
+2026-10-20T21:09:07.7302990Z Artifact download URL: https://github.com/21Z121Z1/XDRemux/actions/runs/39493276049/artifacts/12297444554

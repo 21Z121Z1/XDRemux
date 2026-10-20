@@ -1,0 +1,68 @@
+   Compiling serde_core v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling liblivephoto v0.1.0 (https://github.com/21Z121Z1/LibLivePhoto?rev=794ab552596db0f66095600d23cf7937a631b9ec#794ab552)
+   Compiling xdremux-motion-photo v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-motion-photo)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.20s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_motion_photo-7a52a561279369b7)
+
+running 8 tests
+test publication::tests::companion_movie_uses_same_stem ... ok
+test publication::tests::publication_accepts_owned_staging_under_destination_directory ... FAILED
+test publication::tests::publication_refuses_existing_resources_and_preserves_staging ... FAILED
+test publication::tests::publication_preserves_a_dangling_competitor_symlink ... FAILED
+test publication::tests::publication_rejects_identical_final_paths_without_effects ... FAILED
+test publication::tests::reconcile_preserves_partial_invalid_and_valid_pairs ... FAILED
+test publication::tests::publication_retains_a_recoverable_partial_pair_after_second_link_failure ... FAILED
+test publication::tests::reconcile_preserves_unowned_artifacts_and_directories ... FAILED
+
+failures:
+
+---- publication::tests::publication_accepts_owned_staging_under_destination_directory stdout ----
+
+thread 'publication::tests::publication_accepts_owned_staging_under_destination_directory' (81833) panicked at crates/xdremux-motion-photo/src/publication.rs:392:85:
+called `Result::unwrap()` on an `Err` value: PairPublicationError { detail: "Live Photo publication resources must share the destination directory/filesystem", source: None }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- publication::tests::publication_refuses_existing_resources_and_preserves_staging stdout ----
+
+thread 'publication::tests::publication_refuses_existing_resources_and_preserves_staging' (81835) panicked at crates/xdremux-motion-photo/src/publication.rs:291:85:
+called `Result::unwrap_err()` on an `Ok` value: ()
+
+---- publication::tests::publication_preserves_a_dangling_competitor_symlink stdout ----
+
+thread 'publication::tests::publication_preserves_a_dangling_competitor_symlink' (81834) panicked at crates/xdremux-motion-photo/src/publication.rs:428:85:
+called `Result::unwrap_err()` on an `Ok` value: ()
+
+---- publication::tests::publication_rejects_identical_final_paths_without_effects stdout ----
+
+thread 'publication::tests::publication_rejects_identical_final_paths_without_effects' (81836) panicked at crates/xdremux-motion-photo/src/publication.rs:408:85:
+called `Result::unwrap_err()` on an `Ok` value: ()
+
+---- publication::tests::reconcile_preserves_partial_invalid_and_valid_pairs stdout ----
+
+thread 'publication::tests::reconcile_preserves_partial_invalid_and_valid_pairs' (81838) panicked at crates/xdremux-motion-photo/src/publication.rs:312:64:
+called `Result::unwrap_err()` on an `Ok` value: ()
+
+---- publication::tests::publication_retains_a_recoverable_partial_pair_after_second_link_failure stdout ----
+
+thread 'publication::tests::publication_retains_a_recoverable_partial_pair_after_second_link_failure' (81837) panicked at crates/xdremux-motion-photo/src/publication.rs:375:36:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+---- publication::tests::reconcile_preserves_unowned_artifacts_and_directories stdout ----
+
+thread 'publication::tests::reconcile_preserves_unowned_artifacts_and_directories' (81839) panicked at crates/xdremux-motion-photo/src/publication.rs:350:42:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    publication::tests::publication_accepts_owned_staging_under_destination_directory
+    publication::tests::publication_preserves_a_dangling_competitor_symlink
+    publication::tests::publication_refuses_existing_resources_and_preserves_staging
+    publication::tests::publication_rejects_identical_final_paths_without_effects
+    publication::tests::publication_retains_a_recoverable_partial_pair_after_second_link_failure
+    publication::tests::reconcile_preserves_partial_invalid_and_valid_pairs
+    publication::tests::reconcile_preserves_unowned_artifacts_and_directories
+
+test result: FAILED. 1 passed; 7 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p xdremux-motion-photo --lib`

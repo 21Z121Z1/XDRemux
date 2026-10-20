@@ -1,0 +1,84 @@
+Source head fc3f04db604e8d7f72a9dbe1305c5a9829472327
+https://github.com/21Z121Z1/XDRemux/actions/runs/39498974839/job/118891282005
+Selected unmodified log lines; full report remains in the run artifact.
+
+2026-10-20T21:33:12.1819140Z performance regression gate failed:
+2026-10-20T21:33:12.1820460Z   - apple-styles median_wall_seconds regressed: 17.005s > 11.732s
+2026-10-20T21:33:12.1821660Z   - apple-styles p95_wall_seconds regressed: 21.875s > 15.406s
+2026-10-20T21:33:12.1822570Z product performance regression budget:
+2026-10-20T21:33:12.1823840Z   hdr-uhdr-rgb444 median_wall_seconds: observed=11.899s reference=9.687s budget=13.077s
+2026-10-20T21:33:12.1825470Z   hdr-uhdr-rgb444 p95_wall_seconds: observed=12.056s reference=11.133s budget=15.030s
+2026-10-20T21:33:12.1826930Z   hdr-uhdr-rgb444 max_peak_rss_mib: observed=115.703MiB reference=120.600MiB budget=152.600MiB
+2026-10-20T21:33:12.1828630Z   oppo-compatible-uhdr-rgb420 median_wall_seconds: observed=9.367s reference=8.757s budget=11.822s
+2026-10-20T21:33:12.1830310Z   oppo-compatible-uhdr-rgb420 p95_wall_seconds: observed=10.070s reference=10.069s budget=13.593s
+2026-10-20T21:33:12.1832090Z   oppo-compatible-uhdr-rgb420 max_peak_rss_mib: observed=111.797MiB reference=116.400MiB budget=148.400MiB
+2026-10-20T21:33:12.1833740Z   motion-jpeg median_wall_seconds: observed=9.424s reference=8.432s budget=11.383s
+2026-10-20T21:33:12.1835090Z   motion-jpeg p95_wall_seconds: observed=10.468s reference=8.628s budget=11.648s
+2026-10-20T21:33:12.1836610Z   motion-jpeg max_peak_rss_mib: observed=314.312MiB reference=313.600MiB budget=392.000MiB
+2026-10-20T21:33:12.1838090Z   motion-heif median_wall_seconds: observed=0.098s reference=0.143s budget=0.393s
+2026-10-20T21:33:12.1839390Z   motion-heif p95_wall_seconds: observed=0.102s reference=0.184s budget=0.434s
+2026-10-20T21:33:12.1840840Z   motion-heif max_peak_rss_mib: observed=25.656MiB reference=27.500MiB budget=59.500MiB
+2026-10-20T21:33:12.1843540Z   batch-3 median_wall_seconds: observed=25.333s reference=21.280s budget=28.728s
+2026-10-20T21:33:12.1844820Z   batch-3 p95_wall_seconds: observed=26.534s reference=21.726s budget=29.330s
+2026-10-20T21:33:12.1846280Z   batch-3 max_peak_rss_mib: observed=247.016MiB reference=259.100MiB budget=323.875MiB
+2026-10-20T21:33:12.1847780Z   apple-portrait median_wall_seconds: observed=5.693s reference=4.789s budget=6.465s
+2026-10-20T21:33:12.1849140Z   apple-portrait p95_wall_seconds: observed=6.074s reference=6.789s budget=9.165s
+2026-10-20T21:33:12.1850700Z   apple-portrait max_peak_rss_mib: observed=896.406MiB reference=821.200MiB budget=1026.500MiB
+2026-10-20T21:33:12.1853390Z   apple-styles median_wall_seconds: observed=17.005s reference=8.691s budget=11.732s
+2026-10-20T21:33:12.1855010Z   apple-styles p95_wall_seconds: observed=21.875s reference=11.412s budget=15.406s
+2026-10-20T21:33:12.1856560Z   apple-styles max_peak_rss_mib: observed=1083.297MiB reference=1089.094MiB budget=1361.367MiB
+2026-10-20T21:33:12.1858400Z Apple adapter structural launch budget:
+2026-10-20T21:33:12.1859200Z   apple-portrait: observed=1 max=1
+2026-10-20T21:33:12.1859840Z   apple-styles: observed=1 max=1
+2026-10-20T21:33:12.1898120Z ##[error]Process completed with exit code 1.
+2026-10-20T21:33:12.2146790Z ##[group]Run python3 scripts/performance/compare_apple_styles_revisions.py \
+2026-10-20T21:33:12.2147990Z [36;1mpython3 scripts/performance/compare_apple_styles_revisions.py \[0m
+2026-10-20T21:33:12.2148490Z [36;1m  --cli "$GITHUB_WORKSPACE/target/release/xdremux" \[0m
+2026-10-20T21:33:12.2149040Z [36;1m  --apple-adapter "$XDREMUX_PERF_APPLE_ADAPTER" \[0m
+2026-10-20T21:33:12.2149590Z [36;1m  --baseline-ref "${XDREMUX_PERF_PR_BASE_SHA:-refs/remotes/origin/main}" \[0m
+2026-10-20T21:33:12.2149990Z [36;1m  --expected-head "$(git rev-parse HEAD)" \[0m
+2026-10-20T21:33:12.2150570Z [36;1m  --output-dir artifacts/performance/styles-revision-comparison \[0m
+2026-10-20T21:33:12.2151120Z [36;1m  2>&1 | tee artifacts/performance/styles-revision-comparison.log[0m
+2026-10-20T21:33:12.2166260Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T21:33:12.2166620Z env:
+2026-10-20T21:33:12.2166940Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T21:33:12.2167460Z   CARGO_INCREMENTAL: 0
+2026-10-20T21:33:12.2167870Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T21:33:12.2168150Z   CARGO_TERM_COLOR: always
+2026-10-20T21:33:12.2168460Z   RUST_BACKTRACE: short
+2026-10-20T21:33:12.2168730Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T21:33:12.2168940Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T21:33:12.2169230Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T21:33:12.2169490Z   CACHE_ON_FAILURE: true
+
+2026-10-20T21:33:12.2170770Z   XDREMUX_PERF_PR_BASE_SHA: 89d806c8aec961a7991eb3e6d6e2b1370aed8791
+2026-10-20T21:33:12.2171160Z ##[endgroup]
+2026-10-20T21:37:17.5592930Z swift-driver version: 1.168.6 {
+2026-10-20T21:37:17.5593810Z   "distinct_revisions": true,
+2026-10-20T21:37:17.5594150Z   "diagnostic_only": true,
+2026-10-20T21:37:17.5594590Z   "summary": {
+2026-10-20T21:37:17.5594930Z     "baseline": {
+2026-10-20T21:37:17.5595560Z       "median_wall_seconds": 10.381279250000034,
+2026-10-20T21:37:17.5596040Z       "median_user_seconds": 9.54,
+2026-10-20T21:37:17.5596350Z       "median_sys_seconds": 1.05,
+2026-10-20T21:37:17.5596910Z       "max_peak_rss_bytes": 1141325824
+2026-10-20T21:37:17.5597350Z     },
+2026-10-20T21:37:17.5597560Z     "candidate": {
+2026-10-20T21:37:17.5597920Z       "median_wall_seconds": 11.946218249999902,
+2026-10-20T21:37:17.5598270Z       "median_user_seconds": 11.32,
+2026-10-20T21:37:17.5598630Z       "median_sys_seconds": 1.29,
+2026-10-20T21:37:17.5599040Z       "max_peak_rss_bytes": 1135869952
+2026-10-20T21:37:17.5599280Z     },
+2026-10-20T21:37:17.5599610Z     "candidate_over_baseline_median": 1.1507462579816319
+2026-10-20T21:37:17.5603220Z   }
+2026-10-20T21:37:17.5603510Z }
+2026-10-20T21:37:17.6042210Z ##[group]Run {
+2026-10-20T21:37:17.6042740Z [36;1m{[0m
+2026-10-20T21:37:17.6042920Z [36;1m  echo "## XDRemux Rust performance and design"[0m
+2026-10-20T21:37:17.6043250Z [36;1m  echo[0m
+2026-10-20T21:37:17.6043780Z [36;1m  echo "Runner: GitHub Actions hosted $(sw_vers -productName) $(sw_vers -productVersion) ($(uname -m)), label xcode-27. These are not local-device measurements."[0m
+2026-10-20T21:37:17.6044840Z [36;1m  echo "Product E2E timings include source I/O, parsing, Gain Map decode/reconstruction, codec work, HEIF assembly/publication, and Apple adapter/framework overhead where applicable."[0m
+2026-10-20T21:37:17.6046030Z [36;1m  echo "Standard HDR uses the portable Rust/libheif Gain Map encoder even on macOS; the Apple VideoToolbox Main10 primitive belongs to the Photographic Styles Linear Thumbnail path and is not treated as an RGB 4:4:4 Gain Map backend."[0m
+2026-10-20T21:37:17.6047520Z [36;1m  echo "The committed macOS 27 arm64 reference includes joint Styles and Texture production and is a regression baseline, not a performance target; committed tolerances absorb normal hosted-runner noise while structural helper-launch maxima remain hard limits."[0m
+2026-10-20T21:37:17.6048360Z [36;1m  echo[0m
+2026-10-20T21:37:17.6048590Z [36;1m} >> "$GITHUB_STEP_SUMMARY"[0m

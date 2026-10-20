@@ -1,0 +1,205 @@
+{
+  "source": "GitHub read-only job logs",
+  "runs": {
+    "f9": {
+      "run_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39481011670/job/118829264132",
+      "metrics": {
+        "hdr-lhdr-mono400": {
+          "median_seconds": 1.564,
+          "p95_seconds": 1.774,
+          "max_rss_mib": 49.7
+        },
+        "hdr-uhdr-rgb444": {
+          "median_seconds": 6.823,
+          "p95_seconds": 6.88,
+          "max_rss_mib": 115.6
+        },
+        "oppo-compatible-lhdr-rgb420": {
+          "median_seconds": 1.513,
+          "p95_seconds": 1.686,
+          "max_rss_mib": 64.7
+        },
+        "oppo-compatible-uhdr-rgb420": {
+          "median_seconds": 5.766,
+          "p95_seconds": 6.337,
+          "max_rss_mib": 111.6
+        },
+        "motion-jpeg": {
+          "median_seconds": 6.051,
+          "p95_seconds": 6.292,
+          "max_rss_mib": 314.3
+        },
+        "motion-heif": {
+          "median_seconds": 0.076,
+          "p95_seconds": 0.079,
+          "max_rss_mib": 25.6
+        },
+        "batch-3": {
+          "median_seconds": 16.021,
+          "p95_seconds": 16.926,
+          "max_rss_mib": 247
+        },
+        "apple-portrait": {
+          "median_seconds": 3.22,
+          "p95_seconds": 3.524,
+          "max_rss_mib": 896.5
+        },
+        "apple-styles": {
+          "median_seconds": 10.323,
+          "p95_seconds": 10.856,
+          "max_rss_mib": 1084.4
+        }
+      },
+      "environment_lines": [
+        "2026-10-20T19:38:46.6819970Z Image: xcode-27-arm64",
+        "2026-10-20T19:38:46.6820510Z Version: 20261012.0260.1",
+        "2026-10-20T19:39:05.2714930Z ProductVersion:\t\t27.0.1",
+        "2026-10-20T19:39:05.2715700Z BuildVersion:\t\t26A434",
+        "2026-10-20T19:39:10.5639230Z ✔︎ Bottle Manifest libheif (1.23.6)",
+        "2026-10-20T19:39:11.3802630Z ✔︎ Bottle Manifest x265 (4.3)",
+        "2026-10-20T19:39:29.6065830Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))",
+        "2026-10-20T19:39:29.7562030Z rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "2026-10-20T19:46:24.8629610Z VideoToolbox Main10 adapter primitive: median=0.213s p95=0.215s profile={'general_profile_idc': 2, 'chroma': '420', 'luma_bit_depth': 10, 'chroma_bit_depth': 10} hardware_samples=5/5 encoder_ids=['paravirtualized:com.apple.videotoolbox.videoencoder.ave.hevc']",
+        "2026-10-20T19:46:38.7506200Z apple-portrait: 1 Apple adapter launches",
+        "2026-10-20T19:46:38.7506760Z apple-styles: 1 Apple adapter launches"
+      ]
+    },
+    "ba2": {
+      "run_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770093/job/118849106059",
+      "metrics": {
+        "hdr-lhdr-mono400": {
+          "median_seconds": 2.009,
+          "p95_seconds": 2.246,
+          "max_rss_mib": 49.7
+        },
+        "hdr-uhdr-rgb444": {
+          "median_seconds": 9.871,
+          "p95_seconds": 10.629,
+          "max_rss_mib": 115.6
+        },
+        "oppo-compatible-lhdr-rgb420": {
+          "median_seconds": 2.206,
+          "p95_seconds": 3.075,
+          "max_rss_mib": 64.8
+        },
+        "oppo-compatible-uhdr-rgb420": {
+          "median_seconds": 8.812,
+          "p95_seconds": 9.185,
+          "max_rss_mib": 111.6
+        },
+        "motion-jpeg": {
+          "median_seconds": 9.21,
+          "p95_seconds": 10.22,
+          "max_rss_mib": 314.1
+        },
+        "motion-heif": {
+          "median_seconds": 0.116,
+          "p95_seconds": 0.129,
+          "max_rss_mib": 25.6
+        },
+        "batch-3": {
+          "median_seconds": 23.125,
+          "p95_seconds": 25.056,
+          "max_rss_mib": 249
+        },
+        "apple-portrait": {
+          "median_seconds": 4.309,
+          "p95_seconds": 5.132,
+          "max_rss_mib": 896.5
+        },
+        "apple-styles": {
+          "median_seconds": 15.14,
+          "p95_seconds": 15.859,
+          "max_rss_mib": 1083.3
+        }
+      },
+      "environment_lines": [
+        "2026-10-20T19:53:58.6383120Z Image: xcode-27-arm64",
+        "2026-10-20T19:53:58.6383540Z Version: 20261012.0260.1",
+        "2026-10-20T19:54:10.4592430Z ProductVersion:\t\t27.0.1",
+        "2026-10-20T19:54:10.4694110Z BuildVersion:\t\t26A434",
+        "2026-10-20T19:54:18.6718990Z ✔︎ Bottle Manifest libheif (1.23.6)",
+        "2026-10-20T19:54:19.8230920Z ✔︎ Bottle Manifest x265 (4.3)",
+        "2026-10-20T19:54:43.3016660Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))",
+        "2026-10-20T19:54:43.7176410Z rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "2026-10-20T20:05:07.2527800Z VideoToolbox Main10 adapter primitive: median=0.314s p95=0.317s profile={'general_profile_idc': 2, 'chroma': '420', 'luma_bit_depth': 10, 'chroma_bit_depth': 10} hardware_samples=5/5 encoder_ids=['paravirtualized:com.apple.videotoolbox.videoencoder.ave.hevc']",
+        "2026-10-20T20:05:29.1554950Z apple-portrait: 1 Apple adapter launches",
+        "2026-10-20T20:05:29.1556870Z apple-styles: 1 Apple adapter launches"
+      ]
+    },
+    "b049": {
+      "run_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39493276015/job/118871690275",
+      "metrics": {
+        "hdr-lhdr-mono400": {
+          "median_seconds": 2.157,
+          "p95_seconds": 2.576,
+          "max_rss_mib": 53.7
+        },
+        "hdr-uhdr-rgb444": {
+          "median_seconds": 10.615,
+          "p95_seconds": 12.246,
+          "max_rss_mib": 115.8
+        },
+        "oppo-compatible-lhdr-rgb420": {
+          "median_seconds": 2.168,
+          "p95_seconds": 2.475,
+          "max_rss_mib": 64.9
+        },
+        "oppo-compatible-uhdr-rgb420": {
+          "median_seconds": 8.457,
+          "p95_seconds": 9.034,
+          "max_rss_mib": 111.7
+        },
+        "motion-jpeg": {
+          "median_seconds": 8.635,
+          "p95_seconds": 9.084,
+          "max_rss_mib": 314.3
+        },
+        "motion-heif": {
+          "median_seconds": 0.094,
+          "p95_seconds": 0.099,
+          "max_rss_mib": 25.7
+        },
+        "batch-3": {
+          "median_seconds": 24.174,
+          "p95_seconds": 24.721,
+          "max_rss_mib": 248.3
+        },
+        "apple-portrait": {
+          "median_seconds": 4.84,
+          "p95_seconds": 5.099,
+          "max_rss_mib": 896.4
+        },
+        "apple-styles": {
+          "median_seconds": 15.467,
+          "p95_seconds": 18.216,
+          "max_rss_mib": 1084
+        }
+      },
+      "environment_lines": [
+        "2026-10-20T20:47:59.3656650Z Image: xcode-27-arm64",
+        "2026-10-20T20:47:59.3659370Z Version: 20261012.0260.1",
+        "2026-10-20T20:48:14.6256400Z ProductVersion:\t\t27.0.1",
+        "2026-10-20T20:48:14.6256600Z BuildVersion:\t\t26A434",
+        "2026-10-20T20:48:22.1149090Z ✔︎ Bottle Manifest libheif (1.23.6)",
+        "2026-10-20T20:48:23.1920320Z ✔︎ Bottle Manifest x265 (4.3)",
+        "2026-10-20T20:48:47.8570960Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))",
+        "2026-10-20T20:48:48.1440280Z rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+        "2026-10-20T20:59:33.4421860Z VideoToolbox Main10 adapter primitive: median=0.311s p95=0.402s profile={'general_profile_idc': 2, 'chroma': '420', 'luma_bit_depth': 10, 'chroma_bit_depth': 10} hardware_samples=5/5 encoder_ids=['paravirtualized:com.apple.videotoolbox.videoencoder.ave.hevc']",
+        "2026-10-20T20:59:52.4187980Z apple-portrait: 1 Apple adapter launches",
+        "2026-10-20T20:59:52.4190760Z apple-styles: 1 Apple adapter launches"
+      ]
+    }
+  },
+  "f9_to_b049_ratios": {
+    "hdr-lhdr-mono400": 1.379156010230179,
+    "hdr-uhdr-rgb444": 1.5557672578044848,
+    "oppo-compatible-lhdr-rgb420": 1.4329147389292798,
+    "oppo-compatible-uhdr-rgb420": 1.4667013527575443,
+    "motion-jpeg": 1.427036853412659,
+    "motion-heif": 1.236842105263158,
+    "batch-3": 1.5088945758691716,
+    "apple-portrait": 1.5031055900621118,
+    "apple-styles": 1.4983047563692724
+  }
+}

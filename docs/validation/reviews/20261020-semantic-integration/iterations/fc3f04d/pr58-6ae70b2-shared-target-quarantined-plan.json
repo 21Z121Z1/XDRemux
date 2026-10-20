@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "scope": "Provisional revised PR58 consumer stage on recorded main. Adds the main-existing publisher ownership repair with no-clobber final links and explicit recoverable partial errors. This exact local candidate is not an advanced original PR or native-accepted server merge.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "name": "media-safe-pair-publication",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-motion-photo",
+        "--lib",
+        "publication::tests"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "liblivephoto-resource-consumer",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-motion-photo",
+        "--test",
+        "liblivephoto_interop"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "batch-publication-regressions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-runtime",
+        "--lib",
+        "batch::tests"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "movie-resource-negative-regressions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-runtime",
+        "--test",
+        "live_photo_negative"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "real-cli-pair-conversion-and-readback",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/tmp/xdremux-pr58-target/debug/xdremux"
+      }
+    }
+  ]
+}

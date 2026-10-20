@@ -1,0 +1,6 @@
+Source: https://github.com/21Z121Z1/XDRemux/actions/runs/39498974126/job/118891280473
+XDRemux source: fc3f04db604e8d7f72a9dbe1305c5a9829472327
+Job conclusion: failure. This diagnostic does not accept the native subtype.
+
+2026-10-20T21:32:14.7446920Z error: Photographic Styles semantic graph: invalid HEIF: source HDR alpha subtype is unsupported; resource graphs: source={primary=1,items=5,resources=[1:hvc1:auxC=[none]:subtype=[],2:hvc1:auxC=[alpha-hevc]:subtype=[len=16,shape=hevc-sei-envelope],3:hvc1:auxC=[none]:subtype=[]],dimg=[4->[1,3]],auxl=[2->[1,4]],cdsc=[6->[1,4]]}; scaffold={primary=1,items=11,resources=[1:hvc1:auxC=[none]:subtype=[],2:hvc1:auxC=[alpha-hevc]:subtype=[len=16,shape=hevc-sei-envelope],4:hvc1:auxC=[portrait-effects-matte]:subtype=[len=0,shape=empty],6:hvc1:auxC=[semantic-skin]:subtype=[len=0,shape=empty],8:hvc1:auxC=[semantic-sky]:subtype=[len=0,shape=empty],10:hvc1:auxC=[none]:subtype=[]],dimg=[11->[1,10]],auxl=[2->[1,11],4->[1,11],6->[1,11],8->[1,11]],cdsc=[3->[1,11],5->[4],7->[6],9->[8]]}; alpha_subtype_pair={uri_match=true,bytes_match=true}
+2026-10-20T21:32:14.7591340Z ##[error]Process completed with exit code 1.

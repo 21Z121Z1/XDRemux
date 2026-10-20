@@ -1,0 +1,39 @@
+{
+  "shared_target": "/tmp/xdremux-pr58-target",
+  "source_files_unchanged_between_failed_and_fresh_runs": true,
+  "dependency_receipts": [
+    {
+      "file": "/tmp/xdremux-pr58-target/debug/deps/xdremux_heif-0bd38443cdb61f33.d",
+      "sha256": "4b34a6a1e18698e12e8aec706180f9bcf2455305108b70bb67b3c14ae9bd802a",
+      "source_roots_in_dependency_receipt": [],
+      "first_target": "/tmp/xdremux-pr58-target/debug/deps/xdremux_heif-0bd38443cdb61f33.d",
+      "lists_orientation_module": false,
+      "source_paths_are_relative": true
+    },
+    {
+      "file": "/tmp/xdremux-pr58-target/debug/deps/xdremux_heif-1732a0564dc83de8.d",
+      "sha256": "7c43379b5158cf5851c1dafd3160756b02448279d320a6db6b1a4b1b0aff67a9",
+      "source_roots_in_dependency_receipt": [],
+      "first_target": "/tmp/xdremux-pr58-target/debug/deps/xdremux_heif-1732a0564dc83de8.d",
+      "lists_orientation_module": false,
+      "source_paths_are_relative": true
+    },
+    {
+      "file": "/tmp/xdremux-pr58-target/debug/deps/xdremux_heif-29224bef42d11615.d",
+      "sha256": "b71e988cffec3e2fcc1e5890ed31c89231edee0bcea35cfd19ce16015cf50ea4",
+      "source_roots_in_dependency_receipt": [],
+      "first_target": "/tmp/xdremux-pr58-target/debug/deps/xdremux_heif-29224bef42d11615.d",
+      "lists_orientation_module": true,
+      "source_paths_are_relative": true
+    },
+    {
+      "file": "/tmp/xdremux-pr58-target/debug/deps/xdremux_heif-81013143bb8d6dc7.d",
+      "sha256": "c82e7578da940c339cfc9cd89db16332a2cc91c53aab13f0d5b20b8832aa7f2a",
+      "source_roots_in_dependency_receipt": [],
+      "first_target": "/tmp/xdremux-pr58-target/debug/deps/xdremux_heif-81013143bb8d6dc7.d",
+      "lists_orientation_module": false,
+      "source_paths_are_relative": true
+    }
+  ],
+  "observation": "The shared target has non-test HEIF dependency receipts without orientation.rs while the PR69 source exports primary_coded_geometry from that module. All paths in those depfiles are relative, so they do not identify an absolute checkout root. Isolated rebuild remains the causal check."
+}

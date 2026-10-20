@@ -1,0 +1,83 @@
+{
+  "proof": "/workspace/xdremux-audit/lifecycle-green-proof-ywva836u",
+  "results": {
+    "existing_pair": {
+      "exit": 1,
+      "bytes_preserved": true
+    },
+    "late_competitor": {
+      "exit": 1,
+      "both_entries_preserved": true,
+      "owned_staging_removed_before_first_claim": true
+    },
+    "temporary_looking_source_directory": {
+      "exit": 0,
+      "source_and_parent_preserved": true
+    },
+    "same_output_competition": {
+      "a_exit": 1,
+      "b_exit": 0,
+      "complete_competitor_pair_preserved": true
+    },
+    "shared_mov_different_still_extensions": {
+      "a_exit": 1,
+      "b_exit": 0,
+      "complete_competitor_pair_preserved": true
+    },
+    "prefix_parallel_output": {
+      "a_exit": 0,
+      "b_exit": 0,
+      "active_staging_and_parent_preserved": true
+    },
+    "nested-parent_parallel_output": {
+      "a_exit": 0,
+      "b_exit": 0,
+      "active_staging_and_parent_preserved": true
+    },
+    "different_parallel_output": {
+      "a_exit": 0,
+      "b_exit": 0,
+      "active_staging_and_parent_preserved": true
+    },
+    "second_member_failure": {
+      "exit": 1,
+      "competitor_still_preserved": true,
+      "retained_directory_reported": true,
+      "complete_staged_pair_valid": true,
+      "staged_pair_hashes": [
+        "e36c0eb0067a7770de22a77c20234f852196ac39ae2e63ac6d48740328e111df",
+        "13d19abed30e1d9210d5d935ae7c1835e2d80a6bba2c29cb700b10227e3dc85c"
+      ],
+      "partial_movie_matches_staging": true
+    },
+    "cooperative_writer_rejects_partial_claim": {
+      "a_exit": 1,
+      "b_exit": 1,
+      "retained_directory_reported": true,
+      "complete_staged_pair_valid": true,
+      "staged_pair_hashes": [
+        "bdb5a0ecf19854e81709c6de27651e6e538b05e8009c5a7fb355ff2b768f0982",
+        "acddf41f6fa7d9adb60a05d2d51852aedf919c66069e7a8e19bf23cd2ea27086"
+      ],
+      "partial_movie_matches_staging": true
+    },
+    "failure_preserves_noncooperating_writer_pair": {
+      "exit": 1,
+      "both_competitor_hashes_preserved": true,
+      "retained_directory_reported": true,
+      "complete_staged_pair_valid": true,
+      "staged_pair_hashes": [
+        "eeab24ae4624352ffe0f3e473f0f56a73f4d57e8c511ec6a4dace06a6cddfa36",
+        "bfff976b135021ec73dccaa74c283900208b8fd37f7182951208c3ce949c0dc5"
+      ],
+      "partial_movie_matches_staging": false
+    },
+    "unsupported_hard_links": {
+      "exit": 1,
+      "no_final_members": true,
+      "unrelated_bytes_preserved": true,
+      "explicit_requirement_and_original_os_error": true,
+      "injected_errno": "EOPNOTSUPP; not a mounted FAT/exFAT test"
+    }
+  }
+}

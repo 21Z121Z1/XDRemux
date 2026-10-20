@@ -1,0 +1,35 @@
+Source head fc3f04db604e8d7f72a9dbe1305c5a9829472327
+https://github.com/21Z121Z1/XDRemux/actions/runs/39498974051/job/118891279625
+Selected unmodified log lines.
+
+2026-10-20T21:39:25.8353090Z [36;1m  build[0m
+2026-10-20T21:39:25.8353330Z [36;1mxcodebuild \[0m
+2026-10-20T21:39:25.8353570Z [36;1m  -quiet \[0m
+2026-10-20T21:39:25.8353840Z [36;1m  -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \[0m
+2026-10-20T21:39:25.8354230Z [36;1m  -scheme XDRemuxAppModelTests \[0m
+2026-10-20T21:39:25.8354490Z [36;1m  -configuration Debug \[0m
+2026-10-20T21:39:25.8354790Z [36;1m  -derivedDataPath "$XDREMUX_DERIVED_DATA" \[0m
+2026-10-20T21:39:25.8355170Z [36;1m  CODE_SIGNING_ALLOWED=NO \[0m
+2026-10-20T21:39:25.8355360Z [36;1m  build[0m
+2026-10-20T21:39:25.8355620Z [36;1mXDREMUX_CLI="$GITHUB_WORKSPACE/target/debug/xdremux" \[0m
+2026-10-20T21:39:25.8356020Z [36;1m  "$XDREMUX_DERIVED_DATA/Build/Products/Debug/XDRemuxAppModelTests" \[0m
+2026-10-20T21:39:25.8356500Z [36;1m  2>&1 | tee artifacts/product-integration/app-model.log[0m
+2026-10-20T21:39:25.8479480Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T21:39:25.8480110Z env:
+2026-10-20T21:39:25.8480440Z   EXPECTED_HEAD: fc3f04db604e8d7f72a9dbe1305c5a9829472327
+2026-10-20T21:39:25.8480920Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T21:39:25.8481330Z   CARGO_INCREMENTAL: 0
+2026-10-20T21:39:25.8481550Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T21:39:25.8481760Z   CARGO_TERM_COLOR: always
+2026-10-20T21:39:25.8482010Z   RUST_BACKTRACE: short
+2026-10-20T21:39:25.8482290Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T21:39:25.8482580Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T21:39:25.8482970Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T21:39:25.8483260Z   CACHE_ON_FAILURE: true
+2026-10-20T21:39:25.8483850Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-20T21:39:25.8485130Z   XDREMUX_DERIVED_DATA: /Users/runner/work/_temp/xdremux-app-model-tests
+2026-10-20T21:39:25.8485630Z ##[endgroup]
+2026-10-20T21:39:29.5484780Z 2026-10-20 21:39:29.547 xcodebuild[65278:161118] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-10-20T21:39:29.5616230Z --- xcodebuild: WARNING: Using the first of multiple matching destinations:
+
+2026-10-20T21:40:06.3029500Z XDRemuxAppModelTests passed

@@ -1,0 +1,89 @@
+{
+  "base": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "candidate": "fc3f04db604e8d7f72a9dbe1305c5a9829472327",
+  "candidate_tree": "30658a3a63fb3ebb1907b2555f9b0678e9d98711",
+  "base_is_ancestor": true,
+  "branches_unchanged_local": "",
+  "prs": {
+    "58": {
+      "head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "head_is_ancestor_of_candidate": true,
+      "head_is_ancestor_of_main": false,
+      "independent_commits_not_in_main": 5,
+      "commits_missing_from_candidate": 0,
+      "introducing_merge": "96bb9391ecf34b59a2ca0a3554814acc843eb737",
+      "introducing_merge_parents": [
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "0688ea7d6270df52cc5968e2c36dd016f13bd31b"
+      ],
+      "changed_paths_head_to_candidate": 146
+    },
+    "69": {
+      "head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "head_is_ancestor_of_candidate": true,
+      "head_is_ancestor_of_main": false,
+      "independent_commits_not_in_main": 2,
+      "commits_missing_from_candidate": 0,
+      "introducing_merge": "f0292a994de5ff265d1d0aa19426bf3aa1ff1da9",
+      "introducing_merge_parents": [
+        "96bb9391ecf34b59a2ca0a3554814acc843eb737",
+        "7952d0b19c6b47738cc0722acae57465a243186f"
+      ],
+      "changed_paths_head_to_candidate": 158
+    },
+    "65": {
+      "head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "head_is_ancestor_of_candidate": true,
+      "head_is_ancestor_of_main": false,
+      "independent_commits_not_in_main": 15,
+      "commits_missing_from_candidate": 0,
+      "introducing_merge": "6f637aeae5abc8df403a06be383c54021309aa7f",
+      "introducing_merge_parents": [
+        "f0292a994de5ff265d1d0aa19426bf3aa1ff1da9",
+        "bc4d54753f18905dbe73f595a06a6eaf21aaa014"
+      ],
+      "changed_paths_head_to_candidate": 178
+    },
+    "68": {
+      "head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "head_is_ancestor_of_candidate": true,
+      "head_is_ancestor_of_main": false,
+      "independent_commits_not_in_main": 13,
+      "commits_missing_from_candidate": 0,
+      "introducing_merge": "083b9d35d4f88ef3406ff44c294edded2aea996f",
+      "introducing_merge_parents": [
+        "6f637aeae5abc8df403a06be383c54021309aa7f",
+        "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817"
+      ],
+      "changed_paths_head_to_candidate": 165
+    }
+  },
+  "integration_first_parent": [
+    "fc3f04db604e8d7f72a9dbe1305c5a9829472327 5748768eaf2d8293b09e53b1d870b894808f916d Compare exact Styles revisions interleaved on one standard runner",
+    "5748768eaf2d8293b09e53b1d870b894808f916d ab3756746b6482da704f921de207fb12c5bc86a6 Preserve media ownership during competing Live Photo publication",
+    "ab3756746b6482da704f921de207fb12c5bc86a6 69e544c65f4bd9bccf82f4186b81ada98839e17b Report bounded alpha subtype facts without accepting unknown formats",
+    "69e544c65f4bd9bccf82f4186b81ada98839e17b b049b7a4bf41934bacf93514e5899567a54000ca Allocate atomic owned directories for parallel CLI fixtures",
+    "b049b7a4bf41934bacf93514e5899567a54000ca c484046c24d50dd34e12cf95c5fbd7b71654be3c Exercise real Unicode paths on macOS and retain Linux opaque-byte regressions",
+    "c484046c24d50dd34e12cf95c5fbd7b71654be3c 0a2c7c94765a6fd52a83331d66b74f26259d1141 Compare canonical package library paths in portable boundary tests",
+    "0a2c7c94765a6fd52a83331d66b74f26259d1141 45d7bac93bdc9bb7c0f15527e7466c5a23412b47 Port CLI bilingual presentation and verify relocated checksum-pinned macOS packages",
+    "45d7bac93bdc9bb7c0f15527e7466c5a23412b47 422781d3f8275ab195db1b57e260c984809d9280 Preserve paired HEIF alpha resources and reject unclassified auxiliary loss",
+    "422781d3f8275ab195db1b57e260c984809d9280 0facc0a5d22b630ab88474c62e4a4b14fb3e2323 Require functional evidence for distribution build inputs and record performance host facts",
+    "0facc0a5d22b630ab88474c62e4a4b14fb3e2323 ba2b16918164b8700b57c0bdbaccec7fac5bf9c7 Preserve both research version-probe CLI entry points",
+    "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7 34aa1869cc948db57fb922eb13852734fdecdd67 Report bounded resource relationships on semantic scaffold failure",
+    "34aa1869cc948db57fb922eb13852734fdecdd67 f9a419aa4eeb33214e2dfac2205719e6cb97d598 Read native Styles diagnostics by declared storage and retain actual v15 evidence",
+    "f9a419aa4eeb33214e2dfac2205719e6cb97d598 a0249dee6f2525845d8621fae3f94a83b265637b Add pinned pstack project workflows and a demonstrated XDRemux verification skill",
+    "a0249dee6f2525845d8621fae3f94a83b265637b 2a9967ef111ec4630c0092524beb2d44885217e5 Publish batch stills without clobbering and report actual Live Photo omissions",
+    "2a9967ef111ec4630c0092524beb2d44885217e5 2434f8ace1da1794a04809729a9931dc860d349d Identify semantic scaffolds by complete HDR and descriptor relationships",
+    "2434f8ace1da1794a04809729a9931dc860d349d 7c3e70ff6fedf202c570c6aaff4582c7a2e1f6d3 Validate primary movie samples and reject unmapped HDR before Live Photo publication",
+    "7c3e70ff6fedf202c570c6aaff4582c7a2e1f6d3 4453e3d5ad7446f86a941961e6da749f9fc9dbd9 Protect imported app media and drain CLI pipes during execution",
+    "4453e3d5ad7446f86a941961e6da749f9fc9dbd9 9647b290ade1fa6c49e7a19194a5ecd250fde371 Reject incomplete native Texture execution and validate edit state before reuse",
+    "9647b290ade1fa6c49e7a19194a5ecd250fde371 74d95b07c5781bb3d41615f331f61d6cf2422f14 Preserve complete coded transforms and bind Styles to the submitted HDR scene",
+    "74d95b07c5781bb3d41615f331f61d6cf2422f14 083b9d35d4f88ef3406ff44c294edded2aea996f Consolidate native evidence in existing workflows and keep validation contracts explicit",
+    "083b9d35d4f88ef3406ff44c294edded2aea996f 6f637aeae5abc8df403a06be383c54021309aa7f 1f29e3cdc1b8fd49d56718ceecf96b8de80ec817 Merge PR #68 full-resolution linear HDR while retaining native Texture and coded geometry",
+    "6f637aeae5abc8df403a06be383c54021309aa7f f0292a994de5ff265d1d0aa19426bf3aa1ff1da9 bc4d54753f18905dbe73f595a06a6eaf21aaa014 Merge PR #65 HDR-before-reduction with v15 and native Texture contracts preserved",
+    "f0292a994de5ff265d1d0aa19426bf3aa1ff1da9 96bb9391ecf34b59a2ca0a3554814acc843eb737 7952d0b19c6b47738cc0722acae57465a243186f Merge PR #69 coded-orientation invariants into isolated integration",
+    "96bb9391ecf34b59a2ca0a3554814acc843eb737 89d806c8aec961a7991eb3e6d6e2b1370aed8791 0688ea7d6270df52cc5968e2c36dd016f13bd31b Merge PR #58 LibLivePhoto consumer into isolated semantic integration"
+  ],
+  "diffstat_base_candidate": "163 files changed, 14959 insertions(+), 8244 deletions(-)",
+  "changed_paths_base_candidate": 163
+}

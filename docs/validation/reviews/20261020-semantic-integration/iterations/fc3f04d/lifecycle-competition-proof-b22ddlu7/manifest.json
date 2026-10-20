@@ -1,0 +1,166 @@
+{
+  "head": "b049b7a4bf41934bacf93514e5899567a54000ca",
+  "source_status": " M Cargo.lock\n M crates/xdremux-cli/Cargo.toml\n M crates/xdremux-cli/tests/batch.rs\n M crates/xdremux-cli/tests/i18n.rs\n",
+  "binary_sha256": "944301ac1ce06f322dbb4dda8eeb388be7320ee5dbbb20981b58626765c1a4c0",
+  "fixture_sha256_before": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
+  "build_binding": "copied existing binary; current-HEAD build binding not established",
+  "results": {
+    "same_output": {
+      "a_exit": 0,
+      "b_exit": 0,
+      "b_pair_hashes": [
+        "4589a192ce7a1e13bdc072419671bdabe7b0ea0bdb04767b4dee16efcb71a58d",
+        "a7b8505fef9fadada86841954d69e9453b5bf53d52adc40706c8c5ec899acd3d"
+      ],
+      "final_hashes": [
+        "c6d32437943b0910edae918e891e9af8353ec019f52b03c909bd5d0e7849658e",
+        "18fc5df6e0b3fad9e354c7912cf7ff44affea07c33290af71023ba5ad4254ade"
+      ],
+      "b_pair_preserved": false
+    },
+    "different_output": {
+      "a_exit": 0,
+      "b_exit": 0,
+      "b_pair_preserved": true
+    },
+    "failed_rollback_after_competitor": {
+      "a_exit": 1,
+      "b_exit": 0,
+      "b_valid_before_failure": true,
+      "b_hashes": [
+        "88fa8bd1cd74945cd9994d95cae26b03ee76709d704f7e02eb543d921cbc7175",
+        "573a121a281319bb4821e89437148a21ca9e2c03119990b11cfd5ec4c5211d42"
+      ],
+      "image_exists": false,
+      "movie_exists": true,
+      "competitor_movie_preserved": true
+    }
+  },
+  "commands": [
+    {
+      "name": "same-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/same/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "same-b-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/same/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "same-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/same/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "same-a-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/same/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "different-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/different/beta.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "different-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/different/alpha.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "different-a-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/different/alpha.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "different-b-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/different/beta.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "rollback-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/rollback/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "rollback-b-valid-before-a-failure",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/rollback/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "rollback-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/rollback/capture.heic"
+      ],
+      "exit_code": 1
+    }
+  ],
+  "fixture_sha256_after": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
+  "snapshot_sha256_after": "944301ac1ce06f322dbb4dda8eeb388be7320ee5dbbb20981b58626765c1a4c0",
+  "scratch_removed": true
+}

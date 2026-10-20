@@ -1,0 +1,9 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-20T20:50:29.611481+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/candidate/pr69-01ccece",
+  "head": "01cceceb3c94636df7d7857707970c3888635bd4",
+  "tree": "caa6df8f539fe1b2a39f76b81808b9de519506ee",
+  "role": "provisional PR69 after provisional PR58; not an accepted source branch or actual final main ancestor yet",
+  "restore_status": "remote fetched, commit/tree matched, git fsck --full --no-reflogs exit 0"
+}

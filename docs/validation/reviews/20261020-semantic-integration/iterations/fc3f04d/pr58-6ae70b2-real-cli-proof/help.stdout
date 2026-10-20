@@ -1,0 +1,14 @@
+Convert and inspect ProXDR and Motion Photo assets with the canonical Rust runtime.
+
+Usage: xdremux <COMMAND>
+
+Commands:
+  inspect     Inspect one input without converting it
+  convert     Convert one supported source with the unified Rust engine/runtime
+  batch       Convert a deterministic batch of supported assets
+  categorize  Classify photo assets and publish them into deterministic folders
+  validate    Validate one canonical output without converting it
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version

@@ -1,5 +1,8 @@
 # 后续审查证据
 
+
+[fc3f04d 所有权与可比较性能附件](fc3f04d/README.md)补充干净的完整 workspace 可移植回执、既存 Live Photo 媒体损失 RED/GREEN、保守 subtype 诊断、同 runner 性能对照和重新核实的19个恢复 tag。b049 原生结果仍独立绑定，本附件不放行合并/删除。
+
 [English](README.en.md) | 简体中文
 
 [b049b7a 文件系统 fixture 附录](b049b7a/README.md) 记录后续两项真实 macOS 测试失败及对应修正、全新准确 HEAD receipt 和远端恢复证明。生产源码与 0a2c7c9 相同，新原生检查单独标明身份。

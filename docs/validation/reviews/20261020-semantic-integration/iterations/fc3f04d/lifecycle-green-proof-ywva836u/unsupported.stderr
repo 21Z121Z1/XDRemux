@@ -1,0 +1,2 @@
+audit: injected EOPNOTSUPP at first hard link
+error: Live Photo pair publication: could not publish movie with a no-clobber hard link (filesystem hard-link support required) /workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/unsupported/capture.mov: Operation not supported (os error 95)

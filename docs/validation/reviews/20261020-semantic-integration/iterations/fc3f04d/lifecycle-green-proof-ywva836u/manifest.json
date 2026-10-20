@@ -1,0 +1,457 @@
+{
+  "head": "ab3756746b6482da704f921de207fb12c5bc86a6",
+  "source_status": " M .github/workflows/performance.yml\n M crates/xdremux-motion-photo/src/publication.rs\n M crates/xdremux-runtime/src/live_photo.rs\n M crates/xdremux-runtime/tests/live_photo_negative.rs\n M docs/architecture.en.md\n M docs/architecture.md\n M docs/liblivephoto-integration.en.md\n M docs/liblivephoto-integration.md\n?? scripts/performance/compare_apple_styles_revisions.py\n?? tests/test_styles_revision_comparison.py\n",
+  "binary_sha256": "21bb34074e2007e1bfa631fa9e1461b14b12bd1126bdeb46f48656be70df6b76",
+  "fixture_sha256_before": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
+  "build_binding": "cargo build --locked -p xdremux-cli against the recorded uncommitted product files; copied snapshot",
+  "source_sha256": {
+    "crates/xdremux-motion-photo/src/publication.rs": "385bb1fad376e2660c64fe5e270d492645127ae635bea039e7a2b81c520ec61e",
+    "crates/xdremux-runtime/src/live_photo.rs": "79c846cf0515846306d549b329b7601a25895bcb587c64fdb06fd6fdef7c2a7b",
+    "crates/xdremux-runtime/tests/live_photo_negative.rs": "c1a71bfe0828bc5828b89e49b5f4ef34c46f23c03cdcab96164be880a74dfacf",
+    "docs/architecture.en.md": "da42ec566532ce6f615d7818189a851e2b3f4419925cc2d66a47bd3af778d56a",
+    "docs/architecture.md": "b759e6fe3d28cd3bcfd79a1cdd5fb368169740939ba3e0ad90dc888d9f63f713",
+    "docs/liblivephoto-integration.en.md": "7f56d61dd22c2ea9ebe158a69795764168eaa2162ed75d6f80298d432cd39868",
+    "docs/liblivephoto-integration.md": "4eb666b7446598e07d8ae68a192391d73bd38d7ddbb3781631ec8bc9e3ead84e"
+  },
+  "results": {
+    "existing_pair": {
+      "exit": 1,
+      "bytes_preserved": true
+    },
+    "late_competitor": {
+      "exit": 1,
+      "both_entries_preserved": true,
+      "owned_staging_removed_before_first_claim": true
+    },
+    "temporary_looking_source_directory": {
+      "exit": 0,
+      "source_and_parent_preserved": true
+    },
+    "same_output_competition": {
+      "a_exit": 1,
+      "b_exit": 0,
+      "complete_competitor_pair_preserved": true
+    },
+    "shared_mov_different_still_extensions": {
+      "a_exit": 1,
+      "b_exit": 0,
+      "complete_competitor_pair_preserved": true
+    },
+    "prefix_parallel_output": {
+      "a_exit": 0,
+      "b_exit": 0,
+      "active_staging_and_parent_preserved": true
+    },
+    "nested-parent_parallel_output": {
+      "a_exit": 0,
+      "b_exit": 0,
+      "active_staging_and_parent_preserved": true
+    },
+    "different_parallel_output": {
+      "a_exit": 0,
+      "b_exit": 0,
+      "active_staging_and_parent_preserved": true
+    },
+    "second_member_failure": {
+      "exit": 1,
+      "competitor_still_preserved": true,
+      "retained_directory_reported": true,
+      "complete_staged_pair_valid": true,
+      "staged_pair_hashes": [
+        "e36c0eb0067a7770de22a77c20234f852196ac39ae2e63ac6d48740328e111df",
+        "13d19abed30e1d9210d5d935ae7c1835e2d80a6bba2c29cb700b10227e3dc85c"
+      ],
+      "partial_movie_matches_staging": true
+    },
+    "cooperative_writer_rejects_partial_claim": {
+      "a_exit": 1,
+      "b_exit": 1,
+      "retained_directory_reported": true,
+      "complete_staged_pair_valid": true,
+      "staged_pair_hashes": [
+        "bdb5a0ecf19854e81709c6de27651e6e538b05e8009c5a7fb355ff2b768f0982",
+        "acddf41f6fa7d9adb60a05d2d51852aedf919c66069e7a8e19bf23cd2ea27086"
+      ],
+      "partial_movie_matches_staging": true
+    },
+    "failure_preserves_noncooperating_writer_pair": {
+      "exit": 1,
+      "both_competitor_hashes_preserved": true,
+      "retained_directory_reported": true,
+      "complete_staged_pair_valid": true,
+      "staged_pair_hashes": [
+        "eeab24ae4624352ffe0f3e473f0f56a73f4d57e8c511ec6a4dace06a6cddfa36",
+        "bfff976b135021ec73dccaa74c283900208b8fd37f7182951208c3ce949c0dc5"
+      ],
+      "partial_movie_matches_staging": false
+    },
+    "unsupported_hard_links": {
+      "exit": 1,
+      "no_final_members": true,
+      "unrelated_bytes_preserved": true,
+      "explicit_requirement_and_original_os_error": true,
+      "injected_errno": "EOPNOTSUPP; not a mounted FAT/exFAT test"
+    }
+  },
+  "commands": [
+    {
+      "name": "existing",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/entry/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "late",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/late/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "source-directory",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/source/.capture.unowned.tmp.heic/source.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/source/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "source-directory-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/source/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "same-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/same/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "same-b-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/same/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "same-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/same/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "extension-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/extension/capture.heif"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "extension-b-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/extension/capture.heif",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "extension-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/extension/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "prefix-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/prefix/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "prefix-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/prefix/capture.variant.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "prefix-a-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/prefix/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "prefix-b-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/prefix/capture.variant.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "nested-parent-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/nested/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "nested-parent-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/nested/.capture.unowned.tmp.heic/beta.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "nested-parent-a-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/nested/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "nested-parent-b-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/nested/.capture.unowned.tmp.heic/beta.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "different-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/different/alpha.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "different-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/different/beta.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "different-a-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/different/alpha.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "different-b-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/different/beta.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "partial",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/partial/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "partial-retained-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/partial/.xdremux-live-photo-HXsmar/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "cooperative-b",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/cooperative-partial/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "cooperative-a",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/cooperative-partial/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "cooperative-retained-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/cooperative-partial/.xdremux-live-photo-izcSxp/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "noncooperative",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/noncooperative/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "noncooperative-final-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/noncooperative/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "noncooperative-retained-valid",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/noncooperative/.xdremux-live-photo-hCweHs/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "unsupported",
+      "command": [
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/xdremux-snapshot",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/unsupported/capture.heic"
+      ],
+      "exit_code": 1
+    }
+  ],
+  "fault_scope": "Linux LD_PRELOAD schedules actual CLI operations; EIO/EOPNOTSUPP are injected, not actual disk/mount failures",
+  "fixture_sha256_after": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
+  "binary_sha256_after": "21bb34074e2007e1bfa631fa9e1461b14b12bd1126bdeb46f48656be70df6b76",
+  "source_sha256_after": {
+    "crates/xdremux-motion-photo/src/publication.rs": "385bb1fad376e2660c64fe5e270d492645127ae635bea039e7a2b81c520ec61e",
+    "crates/xdremux-runtime/src/live_photo.rs": "79c846cf0515846306d549b329b7601a25895bcb587c64fdb06fd6fdef7c2a7b",
+    "crates/xdremux-runtime/tests/live_photo_negative.rs": "c1a71bfe0828bc5828b89e49b5f4ef34c46f23c03cdcab96164be880a74dfacf",
+    "docs/architecture.en.md": "da42ec566532ce6f615d7818189a851e2b3f4419925cc2d66a47bd3af778d56a",
+    "docs/architecture.md": "b759e6fe3d28cd3bcfd79a1cdd5fb368169740939ba3e0ad90dc888d9f63f713",
+    "docs/liblivephoto-integration.en.md": "7f56d61dd22c2ea9ebe158a69795764168eaa2162ed75d6f80298d432cd39868",
+    "docs/liblivephoto-integration.md": "4eb666b7446598e07d8ae68a192391d73bd38d7ddbb3781631ec8bc9e3ead84e"
+  },
+  "scratch_removed": true
+}

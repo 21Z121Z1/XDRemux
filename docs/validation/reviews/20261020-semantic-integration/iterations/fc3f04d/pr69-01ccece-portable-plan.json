@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "scope": "Portable exact-head validation of provisional PR69 after the provisional PR58 candidate: complete RGB8 inverse mirror/rotation, HEIF ordered associations and ImageIO evidence in the existing product CI owner. Actual preceding server merge ancestry and all native/ImageIO/App/performance checks remain required before any original-source advancement/merge.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "name": "codec-and-heif-unit-regressions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-codec",
+        "-p",
+        "xdremux-heif",
+        "--lib"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "heif-boundary-negatives",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-heif",
+        "--test",
+        "fail_closed"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "real-oriented-samsung-codec-roundtrip",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-codec",
+        "--test",
+        "orientation_roundtrip"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "real-cli-pair-conversion-and-readback",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/tmp/xdremux-pr58-target/debug/xdremux"
+      }
+    }
+  ]
+}

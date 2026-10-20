@@ -1,0 +1,5 @@
+   Compiling xdremux-motion-photo v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-motion-photo)
+   Compiling xdremux-source v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-source)
+   Compiling xdremux-runtime v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-runtime)
+   Compiling xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.01s

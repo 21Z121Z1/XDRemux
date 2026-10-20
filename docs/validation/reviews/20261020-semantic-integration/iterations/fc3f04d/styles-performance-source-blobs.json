@@ -1,0 +1,67 @@
+{
+  "Sources/XDTextureNative/infer.m": {
+    "f9a419a": "53bcdbbea1b2b962c8bce0619b04e2f6f8ec0881",
+    "ba2b169": "53bcdbbea1b2b962c8bce0619b04e2f6f8ec0881",
+    "b049b7a": "53bcdbbea1b2b962c8bce0619b04e2f6f8ec0881"
+  },
+  "Sources/XDTextureNative/statistics.m": {
+    "f9a419a": "844606332b25a874a5c3b4957c8212407dcb6465",
+    "ba2b169": "844606332b25a874a5c3b4957c8212407dcb6465",
+    "b049b7a": "844606332b25a874a5c3b4957c8212407dcb6465"
+  },
+  "Sources/XDTextureNative/readback.m": {
+    "f9a419a": "bdb20730d36aa3b73e5f68446bf6b1e9f44df82a",
+    "ba2b169": "bdb20730d36aa3b73e5f68446bf6b1e9f44df82a",
+    "b049b7a": "bdb20730d36aa3b73e5f68446bf6b1e9f44df82a"
+  },
+  "Sources/XDRemuxAppleAdapter/main.swift": {
+    "f9a419a": "8ab694727f400e9bb24a17fda6e19773705f7e64",
+    "ba2b169": "8ab694727f400e9bb24a17fda6e19773705f7e64",
+    "b049b7a": "8ab694727f400e9bb24a17fda6e19773705f7e64"
+  },
+  "Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift": {
+    "f9a419a": "09ef70104e8e29c6e5248142433f8058f92eb635",
+    "ba2b169": "09ef70104e8e29c6e5248142433f8058f92eb635",
+    "b049b7a": "09ef70104e8e29c6e5248142433f8058f92eb635"
+  },
+  "crates/xdremux-runtime/src/apple_styles.rs": {
+    "f9a419a": "7e1b27eb935b8e90d81a08c9084e0b41f37e7be7",
+    "ba2b169": "7e1b27eb935b8e90d81a08c9084e0b41f37e7be7",
+    "b049b7a": "7e1b27eb935b8e90d81a08c9084e0b41f37e7be7"
+  },
+  "crates/xdremux-runtime/src/apple_texture.rs": {
+    "f9a419a": "843dabf30c3eabd97767454b1fb86efa7b347207",
+    "ba2b169": "843dabf30c3eabd97767454b1fb86efa7b347207",
+    "b049b7a": "843dabf30c3eabd97767454b1fb86efa7b347207"
+  },
+  "crates/xdremux-runtime/src/apple_adapter.rs": {
+    "f9a419a": "e359387d0fb24f46f5ba7e546b338c68ce27143d",
+    "ba2b169": "e359387d0fb24f46f5ba7e546b338c68ce27143d",
+    "b049b7a": "e359387d0fb24f46f5ba7e546b338c68ce27143d"
+  },
+  "crates/xdremux-heif/src/styles.rs": {
+    "f9a419a": "3044b3acb6b306b32cbceef7b4228c08665c6c00",
+    "ba2b169": "3044b3acb6b306b32cbceef7b4228c08665c6c00",
+    "b049b7a": "3044b3acb6b306b32cbceef7b4228c08665c6c00"
+  },
+  "crates/xdremux-heif/src/semantic.rs": {
+    "f9a419a": "84ce3be25a22f71e36d41a61e6cf20799793d5e7",
+    "ba2b169": "703aaf87adbeaf141673aa1da304f980e9e8f038",
+    "b049b7a": "0b03465588f91ea23d248b45eb5438c677f8a617"
+  },
+  "scripts/performance/benchmark_rust_product.py": {
+    "f9a419a": "45432cc421e75b74e45a230cc56e5578296fa828",
+    "ba2b169": "45432cc421e75b74e45a230cc56e5578296fa828",
+    "b049b7a": "45432cc421e75b74e45a230cc56e5578296fa828"
+  },
+  "scripts/performance/characterize_apple_adapter_launches.py": {
+    "f9a419a": "7436247d3b4fdd3acc848e3f013a31adcbd68992",
+    "ba2b169": "7436247d3b4fdd3acc848e3f013a31adcbd68992",
+    "b049b7a": "7436247d3b4fdd3acc848e3f013a31adcbd68992"
+  },
+  "Cargo.lock": {
+    "f9a419a": "c1663d8c99e2705620aef3caf35288551eb06a29",
+    "ba2b169": "c1663d8c99e2705620aef3caf35288551eb06a29",
+    "b049b7a": "c1663d8c99e2705620aef3caf35288551eb06a29"
+  }
+}

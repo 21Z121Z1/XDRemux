@@ -1,0 +1,18 @@
+Source: https://github.com/21Z121Z1/XDRemux/actions/runs/39493275887/job/118871682262
+Exact source: b049b7a4bf41934bacf93514e5899567a54000ca
+Job conclusion: success
+
+2026-10-20T21:05:46.1251510Z ##[group]Run xcodebuild \
+2026-10-20T21:05:46.1252080Z [36;1mxcodebuild \[0m
+2026-10-20T21:05:46.1254160Z [36;1m  CODE_SIGNING_ALLOWED=NO \[0m
+2026-10-20T21:05:46.1254660Z [36;1mxcodebuild \[0m
+2026-10-20T21:05:46.1255630Z [36;1m  -scheme XDRemuxAppModelTests \[0m
+2026-10-20T21:05:46.1256320Z [36;1m  -derivedDataPath "$XDREMUX_DERIVED_DATA" \[0m
+2026-10-20T21:05:46.1256710Z [36;1m  CODE_SIGNING_ALLOWED=NO \[0m
+2026-10-20T21:05:46.1257650Z [36;1m  "$XDREMUX_DERIVED_DATA/Build/Products/Debug/XDRemuxAppModelTests" \[0m
+2026-10-20T21:05:46.1378220Z   XDREMUX_DERIVED_DATA: /Users/runner/work/_temp/xdremux-app-model-tests
+2026-10-20T21:05:51.9082700Z 2026-10-20 21:05:51.907 xcodebuild[51050:130804] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-10-20T21:05:51.9266460Z --- xcodebuild: WARNING: Using the first of multiple matching destinations:
+2026-10-20T21:06:26.2264630Z 2026-10-20 21:06:26.206 xcodebuild[52487:134519] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-10-20T21:06:26.2605500Z --- xcodebuild: WARNING: Using the first of multiple matching destinations:
+2026-10-20T21:06:44.7675240Z XDRemuxAppModelTests passed

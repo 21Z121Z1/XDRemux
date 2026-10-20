@@ -1,0 +1,16 @@
+{
+  "command": "validate",
+  "details": {
+    "kind": "live-photo",
+    "value": {
+      "content_identifier": "004B0E1C-5627-4B3B-B28A-48AD93425542",
+      "image": "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/different/beta.heic",
+      "input": "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/different/beta.heic",
+      "still_time_seconds": 1.540401,
+      "video": "/workspace/xdremux-audit/lifecycle-competition-work-u0fmy7_m/different/beta.mov"
+    }
+  },
+  "kind": "live-photo",
+  "schema_version": 1,
+  "valid": true
+}

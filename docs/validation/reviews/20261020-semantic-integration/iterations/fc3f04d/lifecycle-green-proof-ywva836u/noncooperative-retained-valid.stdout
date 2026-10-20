@@ -1,0 +1,16 @@
+{
+  "command": "validate",
+  "details": {
+    "kind": "live-photo",
+    "value": {
+      "content_identifier": "B79BD2FB-0BB9-4918-8242-2DADF6CF2133",
+      "image": "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/noncooperative/.xdremux-live-photo-hCweHs/capture.heic",
+      "input": "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/noncooperative/.xdremux-live-photo-hCweHs/capture.heic",
+      "still_time_seconds": 1.540401,
+      "video": "/workspace/xdremux-audit/lifecycle-green-work-zb2s1_ws/noncooperative/.xdremux-live-photo-hCweHs/capture.mov"
+    }
+  },
+  "kind": "live-photo",
+  "schema_version": 1,
+  "valid": true
+}

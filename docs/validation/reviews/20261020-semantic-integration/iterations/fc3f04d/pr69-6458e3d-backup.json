@@ -1,0 +1,11 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-20T21:19:51.788330+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/candidate/pr69-6458e3d",
+  "head": "6458e3d2c7a6da3ae378b867377047bd8a59595e",
+  "tree": "07772237825199fb852ca889fde53799879ce880",
+  "source_state": "isolated provisional candidate, original PR source not advanced",
+  "restore_status": "remote fetched, commit/tree matched, git fsck --full --no-reflogs exit 0",
+  "restore_log": "candidates-6ae70b2-6458e3d-restore.log",
+  "validation": "new publisher fix present; new exact-head portable/native checks not yet established"
+}

@@ -1,5 +1,8 @@
 # Subsequent review evidence
 
+
+The [fc3f04d ownership and comparable-performance appendix](fc3f04d/README.en.md) adds a clean full-workspace portable receipt, existing Live Photo media-loss RED/GREEN, conservative subtype diagnostics, same-runner performance instrumentation and a refreshed 19-tag recovery proof. It retains all b049 native results separately and does not release merge/deletion.
+
 English | [简体中文](README.md)
 
 The [b049b7a filesystem-fixture appendix](b049b7a/README.en.md) records the two subsequent real macOS fixture failures and their scoped corrections, with new committed-HEAD receipt and remote recovery proof. Production source remains identical to 0a2c7c9; its new native checks are separately identified.

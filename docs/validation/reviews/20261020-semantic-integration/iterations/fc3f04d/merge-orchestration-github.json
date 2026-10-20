@@ -1,0 +1,214 @@
+{
+  "captured_at": "2026-10-20T21:24:01.173Z",
+  "main": {
+    "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "protected": true
+  },
+  "ruleset": {
+    "id": 21932863,
+    "name": "XDRemux default branch protection",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "21Z121Z1/XDRemux",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "exclude": [],
+        "include": [
+          "~DEFAULT_BRANCH"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": false,
+          "required_reviewers": [],
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true,
+          "require_extra_approval_for_unattributed_changes": true,
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "exact-head"
+            }
+          ]
+        }
+      },
+      {
+        "type": "code_scanning",
+        "parameters": {
+          "code_scanning_tools": [
+            {
+              "tool": "CodeQL",
+              "security_alerts_threshold": "high_or_higher",
+              "alerts_threshold": "errors"
+            }
+          ]
+        }
+      }
+    ],
+    "node_id": "RRS_lACqUmVwb3NpdG9yec5IzQu8zgFOqz8",
+    "created_at": "2026-08-31T07:05:46.756-07:00",
+    "updated_at": "2026-08-31T07:19:19.183-07:00",
+    "bypass_actors": [],
+    "current_user_can_bypass": "never",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/21Z121Z1/XDRemux/rulesets/21932863"
+      },
+      "html": {
+        "href": "https://github.com/21Z121Z1/XDRemux/rules/21932863"
+      }
+    }
+  },
+  "rules_endpoint_denied": {
+    "error": "HTTPError: 400: GitHub Fetch URL is not an allowed public GitHub repository or search endpoint. (Response: None)",
+    "error_code": "INVALID_ARGUMENT"
+  },
+  "prs": {
+    "58": {
+      "number": 58,
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/58",
+      "head": "codex/liblivephoto-consumer-20261004",
+      "head_sha": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "base": "main",
+      "base_sha": "9b59e4f9b3e13b48d2dbae4861a6db4c71a497b4",
+      "state": "open",
+      "merged": false,
+      "draft": true,
+      "mergeable": true,
+      "merge_commit_sha": "30ad9c610ebace1a27a2eb73a0f3b9567dc2ed42"
+    },
+    "65": {
+      "number": 65,
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/65",
+      "head": "feat/styles-hdr-first-linear-thumbnail-20261015",
+      "head_sha": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "base": "main",
+      "base_sha": "9838fd538cc86da5668e628e65d4f1777ca568bb",
+      "state": "open",
+      "merged": false,
+      "draft": true,
+      "mergeable": false,
+      "merge_commit_sha": null
+    },
+    "68": {
+      "number": 68,
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/68",
+      "head": "cursor/full-res-linear-hdr-e174",
+      "head_sha": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "base": "main",
+      "base_sha": "9838fd538cc86da5668e628e65d4f1777ca568bb",
+      "state": "open",
+      "merged": false,
+      "draft": false,
+      "mergeable": false,
+      "merge_commit_sha": null
+    },
+    "69": {
+      "number": 69,
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/69",
+      "head": "cursor/portrait-heic-orientation-4765",
+      "head_sha": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "base": "main",
+      "base_sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "state": "open",
+      "merged": false,
+      "draft": false,
+      "mergeable": true,
+      "merge_commit_sha": "4100327b2d81a606c797fd1d7e1ac55d48198b67"
+    },
+    "71": {
+      "number": 71,
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "head": "integrate/semantic-review-20261020",
+      "head_sha": "fc3f04db604e8d7f72a9dbe1305c5a9829472327",
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "base": "main",
+      "base_sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "state": "open",
+      "merged": false,
+      "draft": true,
+      "mergeable": true,
+      "merge_commit_sha": "eaf61e264a9de9f512439eebea9d8b3739bd2035"
+    }
+  },
+  "threads": {
+    "58": {
+      "review_threads": []
+    },
+    "65": {
+      "review_threads": []
+    },
+    "68": {
+      "review_threads": []
+    },
+    "69": {
+      "review_threads": []
+    },
+    "71": {
+      "review_threads": []
+    }
+  },
+  "rulesets": [
+    {
+      "id": 21932863,
+      "name": "XDRemux default branch protection",
+      "target": "branch",
+      "source_type": "Repository",
+      "source": "21Z121Z1/XDRemux",
+      "enforcement": "active",
+      "node_id": "RRS_lACqUmVwb3NpdG9yec5IzQu8zgFOqz8",
+      "_links": {
+        "self": {
+          "href": "https://api.github.com/repos/21Z121Z1/XDRemux/rulesets/21932863"
+        },
+        "html": {
+          "href": "https://github.com/21Z121Z1/XDRemux/rules/21932863"
+        }
+      },
+      "created_at": "2026-08-31T07:05:46.756-07:00",
+      "updated_at": "2026-08-31T07:19:19.183-07:00"
+    }
+  ],
+  "repository": {
+    "default_branch": "main",
+    "visibility": "public",
+    "allow_merge_commit": true,
+    "delete_branch_on_merge": true
+  },
+  "test_merge": {
+    "sha": "eaf61e264a9de9f512439eebea9d8b3739bd2035",
+    "tree": "30658a3a63fb3ebb1907b2555f9b0678e9d98711",
+    "parents": [
+      "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "fc3f04db604e8d7f72a9dbe1305c5a9829472327"
+    ],
+    "is_future_actual_merge_sha": false
+  }
+}

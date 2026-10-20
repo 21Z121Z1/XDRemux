@@ -1,0 +1,13 @@
+PASS [static] locked-workspace (0.029s)
+PASS [static] rust-format (0.717s)
+PASS [static] rust-workspace-clippy (31.615s)
+PASS [regression] media-safe-pair-publication (5.890s)
+PASS [regression] media-publication-runtime-negatives (67.724s)
+PASS [regression] codec-and-heif-unit-regressions (15.511s)
+PASS [regression] heif-boundary-negatives (0.258s)
+PASS [functional] real-oriented-samsung-codec-roundtrip (6.449s)
+PASS [regression] all-portable-python-regressions (15.058s)
+PASS [functional] build-current-cli (40.470s)
+PASS [functional] real-cli-pair-conversion-and-readback (6.491s)
+PASS completion gate for 6458e3d2c7a6da3ae378b867377047bd8a59595e
+receipt: /workspace/xdremux-audit/pr69-6458e3d-portable-receipt.json

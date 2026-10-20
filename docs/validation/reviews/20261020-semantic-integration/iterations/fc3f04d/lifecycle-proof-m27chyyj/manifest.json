@@ -1,0 +1,265 @@
+{
+  "head": "b049b7a4bf41934bacf93514e5899567a54000ca",
+  "binary": "/workspace/XDRemux-integration/target/debug/xdremux",
+  "binary_sha256": "944301ac1ce06f322dbb4dda8eeb388be7320ee5dbbb20981b58626765c1a4c0",
+  "build_binding": "existing binary; build-to-current-HEAD binding not established",
+  "fixture_sha256_before": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
+  "results": {
+    "existing_at_entry": {
+      "exit_code": 1,
+      "image_preserved": true,
+      "movie_preserved": true
+    },
+    "late_competitor": {
+      "exit_code": 0,
+      "image_preserved": false,
+      "movie_preserved": false,
+      "hook_fired": true
+    },
+    "source_directory": {
+      "exit_code": 0,
+      "source_exists": false,
+      "source_parent_exists": false,
+      "image_exists": true,
+      "movie_exists": true
+    },
+    "active_prefix": {
+      "exit_code": 1,
+      "stderr": "audit: paused before temporary create: /workspace/xdremux-audit/lifecycle-work-3uvlefhs/siblings/.capture.variant.bfc514b246a9485f8995424031798156.tmp.mov\nerror: Live Photo pair publication: validated Live Photo temporary pair is incomplete\n",
+      "before_other": [
+        "existing",
+        "existing/capture.heic",
+        "existing/capture.mov",
+        "late",
+        "late/capture.heic",
+        "late/capture.mov",
+        "siblings",
+        "siblings/.capture.variant.bfc514b246a9485f8995424031798156.tmp.heic",
+        "source-directory",
+        "source-directory/capture.heic",
+        "source-directory/capture.mov"
+      ],
+      "after_other": [
+        "existing",
+        "existing/capture.heic",
+        "existing/capture.mov",
+        "late",
+        "late/capture.heic",
+        "late/capture.mov",
+        "siblings",
+        "siblings/capture.heic",
+        "siblings/capture.mov",
+        "source-directory",
+        "source-directory/capture.heic",
+        "source-directory/capture.mov"
+      ],
+      "image_exists": false,
+      "movie_exists": false
+    },
+    "removed_parent": {
+      "exit_code": 1,
+      "stderr": "audit: paused before temporary create: /workspace/xdremux-audit/lifecycle-work-3uvlefhs/nested/.capture.unowned.tmp.heic/.nested.5a15b09d0e0e4af98d5f107002cfd600.tmp.heic\nerror: Live Photo temporary create: No such file or directory (os error 2)\n",
+      "before_other": [
+        "existing",
+        "existing/capture.heic",
+        "existing/capture.mov",
+        "late",
+        "late/capture.heic",
+        "late/capture.mov",
+        "nested",
+        "nested/.capture.unowned.tmp.heic",
+        "siblings",
+        "siblings/capture.heic",
+        "siblings/capture.mov",
+        "source-directory",
+        "source-directory/capture.heic",
+        "source-directory/capture.mov"
+      ],
+      "after_other": [
+        "existing",
+        "existing/capture.heic",
+        "existing/capture.mov",
+        "late",
+        "late/capture.heic",
+        "late/capture.mov",
+        "nested",
+        "nested/capture.heic",
+        "nested/capture.mov",
+        "siblings",
+        "siblings/capture.heic",
+        "siblings/capture.mov",
+        "source-directory",
+        "source-directory/capture.heic",
+        "source-directory/capture.mov"
+      ],
+      "image_exists": false,
+      "movie_exists": false
+    },
+    "rollback_competitor": {
+      "exit_code": 1,
+      "image_exists": false,
+      "movie_exists": true,
+      "remaining_movie_is_competitor": true,
+      "hook_fired": true
+    }
+  },
+  "fixture_sha256_after": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
+  "binary_sha256_after": "944301ac1ce06f322dbb4dda8eeb388be7320ee5dbbb20981b58626765c1a4c0",
+  "commands": [
+    {
+      "name": "help",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "--help"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "inspect",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "inspect",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "existing",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/existing/capture.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "late",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/late/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "late-valid",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/late/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "source-directory",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/source-directory/.capture.unowned.tmp.heic/source.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/source-directory/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "source-directory-valid",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/source-directory/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "active-prefix-other",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/siblings/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "active-prefix",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/siblings/capture.variant.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "active-prefix-other-valid",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/siblings/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "removed-parent-other",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/nested/capture.heic"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "removed-parent",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/nested/.capture.unowned.tmp.heic/nested.heic"
+      ],
+      "exit_code": 1
+    },
+    {
+      "name": "removed-parent-other-valid",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "validate",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/nested/capture.heic",
+        "--json"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "rollback",
+      "command": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+        "--output",
+        "/workspace/xdremux-audit/lifecycle-work-3uvlefhs/rollback/capture.heic"
+      ],
+      "exit_code": 1
+    }
+  ],
+  "scratch_removed": true
+}
