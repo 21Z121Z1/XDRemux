@@ -4,6 +4,8 @@
 mod apple_adapter;
 #[cfg(target_os = "macos")]
 mod apple_styles;
+#[cfg(target_os = "macos")]
+mod apple_texture;
 mod batch;
 mod batch_checkpoint;
 mod categorize;
@@ -23,6 +25,14 @@ pub use batch_checkpoint::{
     motion_photo_checkpoint_path, DEFAULT_MOTION_PHOTO_CHECKPOINT_NAME,
     MOTION_PHOTO_CHECKPOINT_SCHEMA_VERSION,
 };
+
+#[cfg(target_os = "macos")]
+pub fn validate_apple_styles_file(
+    executable: impl AsRef<Path>,
+    input: impl AsRef<Path>,
+) -> Result<()> {
+    apple_texture::validate_existing(executable.as_ref(), input.as_ref())
+}
 pub use categorize::{CategorizeDisposition, CategorizeItemReceipt, CategorizeReceipt};
 pub use live_photo::LivePhotoFileReceipt;
 pub use oppo_portrait::{ApplePortraitSemanticProfile, ApplePortraitSourcePreflight};

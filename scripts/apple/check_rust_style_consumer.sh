@@ -171,6 +171,7 @@ import json
 import plistlib
 import struct
 import sys
+from scripts.diagnostics.inspect_oppo_heif import boxes, payload_for_item
 
 output, inspect_path, batch_output, batch_inspect_path = sys.argv[1:]
 
@@ -181,12 +182,12 @@ def read_style_plist(path, inspect_path):
         for item in report["items"]
         if item.get("type") == "uri " and item.get("name") == "styleMetadata"
     )
-    idat = next(child for child in report["meta_children"] if child["type"] == "idat")
-    extent = metadata["location"]["extents"][0]
     with open(path, "rb") as stream:
         data = stream.read()
-    start = idat["start"] + 8 + extent["offset"]
-    payload = data[start : start + extent["length"]]
+    meta = next(box for box in boxes(data, 0, len(data)) if box["type"] == "meta")
+    children = boxes(data, meta["payload_start"] + 4, meta["end"])
+    idat = next((child for child in children if child["type"] == "idat"), None)
+    payload = payload_for_item(data, metadata["location"], idat)
     return plistlib.loads(payload)
 
 def srgb_encode(linear):

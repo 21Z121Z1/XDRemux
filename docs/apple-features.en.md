@@ -56,12 +56,52 @@ Rust owns style-generation semantics, constrained search, source-bound policy, k
 
 Research-only producers, model experiments, donor diagnostics, and RAW experiments remain research tooling. They do not define the public CLI contract or provide a second runtime.
 
+### Texture Styles from the same switch
+
+`--apple-styles` and the app's Photographic Styles switch also generate Texture
+Styles. There is no separate Texture option. The app uses `validate --apple-styles` before it skips an existing output. Plain HDR outputs do not satisfy this check. This operation requires the private
+Vision and CMImaging APIs tested on macOS 27. A missing API or failed native
+operation rejects the whole Styles transaction before publication.
+
+Rust asks ImageIO for an upright sRGB analysis raster with a maximum dimension
+of 1024 pixels. This raster is only an analysis input. The output keeps the full
+primary image, HDR Gain Map, Styles Linear Thumbnail, and existing item payloads.
+The analysis does not reconstruct RAW data or capture-time Apple processing.
+
+Vision supplies face landmarks, signed pose angles, person instances, and semantic
+masks. Each measured face is matched to a distinct instance by maximum total
+mask overlap. Rust requests the original Mattify, UnderEyeBrighten, and
+SkinSmoothStandalone statistics operations for each matched person. Each effect
+uses the same inferred geometry and masks. The native order is setup, prewarm,
+prepare, calculateStats, process, GPU fence, and terminal finishProcessing.
+
+Rust combines only the native statistics that each effect actually returned.
+A successful empty optional group is omitted. A scene with no matched faces gets
+an empty people array. It does not get a template person. Nose, lips, eyebrows,
+and hand protection use regions derived from native landmarks or hand poses.
+Ears and tattoo protection are disabled in this derived edit context. This is
+not the complete camera FSINC producer.
+
+The Rust HEIF writer adds the version-3 Texture plist, separate encoded masks,
+and exact per-instance XMP reference keys to the existing Styles output. Its
+tuning profile selects a derived edit; it does not replace EXIF camera identity,
+exposure, lens, date, or capture UUID. The writer checks every original item
+payload after relocation. Before atomic publication, the original Apple parser
+must read back the same person count, reference keys, geometry, and statistics.
+
+Run `python3 scripts/apple/check_texture_styles.py --all-fixtures --output <dir>`
+on macOS 27 for real ProXDR fixture conversions, batch conversion, unchanged
+primary/Gain Map HEVC, and failure-preserves-output checks. The earlier SDR
+research candidates have user-reported Photos activation. That feedback does
+not certify every new full-resolution HDR product output, effect response,
+save, or reopen on a device.
+
 ### SmartStyle edit state
 
 The generated Standard Styles resource set also requires its SmartStyle state
 in Apple MakerNote tag 84 (`0x0054`). The coefficient plist is a separate input;
 its successful parsing does not establish the photo's edit state. Rust defines
-the eight integer fields used by the former Swift writer. The ImageIO primitive
+the required integer edit fields, including the Standard Texture state. The ImageIO primitive
 merges those requested fields into the existing MakerApple dictionary without
 adding a camera identity or UUID. Other MakerApple entries and unmodified cells
 remain in the dictionary.

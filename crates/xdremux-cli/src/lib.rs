@@ -77,7 +77,7 @@ struct ProductConversionArgs {
     /// Use OPPO depth and available masks without Vision; reduced portrait effects (macOS).
     #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_styles", "apple_cinematic"])]
     apple_portrait_oppo: bool,
-    /// Attach the Rust-owned Photographic Styles graph to a ProXDR still.
+    /// Generate Photographic Styles and inferred Texture Styles for a ProXDR still (macOS 27).
     #[arg(long, conflicts_with_all = ["oppo_compatible", "apple_portrait", "apple_portrait_oppo", "apple_cinematic"])]
     apple_styles: bool,
     /// Infer pending Cinematic editing metadata for ordinary video (macOS 27).

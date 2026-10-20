@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "purpose": "Regression reference for joint Photographic Styles and inferred Texture on macOS 27 arm64 (xcode-27). The joint Styles reference pools all 15 measured samples from three independent runs, each after one warmup. Unchanged workloads retain their established macOS 26 references. New LHDR workloads remain observation-only. This is not a performance target.",
+  "source_head": "1a52db02f3e54eeb511019abdafe54155d06a7a6",
+  "source_evidence": {
+    "repository": "21Z121Z1/Photographic_Style_Research",
+    "run_id": "39400277870",
+    "file": "build.zip",
+    "sha256": "59b2b9639e3435af7ff185866e1e2eba3c7686b5cbcd35c58d65b1a5f357e555",
+    "platform": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434"
+  },
+  "runner": {
+    "provider": "GitHub Actions runner",
+    "runs_on": "xcode-27",
+    "os": "macOS 27",
+    "arch": "arm64"
+  },
+  "tolerances": {
+    "wall_fraction": 0.35,
+    "wall_absolute_seconds": 0.25,
+    "rss_fraction": 0.25,
+    "rss_absolute_mib": 32.0
+  },
+  "cases": {
+    "hdr-uhdr-rgb444": {
+      "median_wall_seconds": 9.687,
+      "p95_wall_seconds": 11.133,
+      "max_peak_rss_mib": 120.6
+    },
+    "oppo-compatible-uhdr-rgb420": {
+      "median_wall_seconds": 8.757,
+      "p95_wall_seconds": 10.069,
+      "max_peak_rss_mib": 116.4
+    },
+    "motion-jpeg": {
+      "median_wall_seconds": 8.432,
+      "p95_wall_seconds": 8.628,
+      "max_peak_rss_mib": 313.6
+    },
+    "motion-heif": {
+      "median_wall_seconds": 0.143,
+      "p95_wall_seconds": 0.184,
+      "max_peak_rss_mib": 27.5
+    },
+    "batch-3": {
+      "median_wall_seconds": 21.28,
+      "p95_wall_seconds": 21.726,
+      "max_peak_rss_mib": 259.1
+    },
+    "apple-portrait": {
+      "median_wall_seconds": 4.789,
+      "p95_wall_seconds": 6.789,
+      "max_peak_rss_mib": 821.2
+    },
+    "apple-styles": {
+      "median_wall_seconds": 8.690738750000037,
+      "p95_wall_seconds": 11.411910766899974,
+      "max_peak_rss_mib": 1089.09375
+    }
+  },
+  "apple_adapter_process_launches": {
+    "apple-portrait": 1,
+    "apple-styles": 1
+  },
+  "inherited_reference": {
+    "file": "macos26-arm64-product-baseline.json",
+    "source_head": "5c568b6ed2a9facad152509066e2449db709e548",
+    "cases": [
+      "hdr-uhdr-rgb444",
+      "oppo-compatible-uhdr-rgb420",
+      "motion-jpeg",
+      "motion-heif",
+      "batch-3",
+      "apple-portrait"
+    ]
+  },
+  "measurement_runs": [
+    {
+      "run_id": "39400277870",
+      "source_head": "1a52db02f3e54eeb511019abdafe54155d06a7a6",
+      "report_sha256": "c9ffdaef2692f4e6df6d14df85643f096b00f7cfb1ae1b19111636b64f163dcf",
+      "sample_count": 5
+    },
+    {
+      "run_id": "39402714607",
+      "source_head": "666246288791888813f53f81882c033714cda718",
+      "report_sha256": "57f6ab5b3fff3ce453fafc15966570331559ad4337977b304f31e9b7b1775c05",
+      "sample_count": 5
+    },
+    {
+      "run_id": "39405666917",
+      "source_head": "3d37f0dd126da96677cc95eb5c8b7c43bbccbf06",
+      "report_sha256": "8f3066febf157a5abf401e6183a89cd8eee22b6b3440f738aa60a2b7afbe11f1",
+      "sample_count": 5
+    }
+  ],
+  "aggregation": "Median and linearly interpolated p95 of all 15 wall-time samples; maximum measured RSS. No samples excluded. Production source is identical across these revisions."
+}

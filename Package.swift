@@ -20,8 +20,24 @@ let package = Package(
         // matches the final architecture.
         .executableTarget(
             name: "XDRemuxAppleAdapter",
-            dependencies: ["XDCinematicNative"],
+            dependencies: ["XDCinematicNative", "XDTextureNative"],
             path: "Sources/XDRemuxAppleAdapter"
+        ),
+        .target(
+            name: "XDTextureNative",
+            path: "Sources/XDTextureNative",
+            publicHeadersPath: "include",
+            cSettings: [.unsafeFlags(["-fobjc-arc", "-fblocks"])],
+            linkerSettings: [
+                .linkedFramework("Foundation"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("CoreImage"),
+                .linkedFramework("CoreVideo"),
+                .linkedFramework("ImageIO"),
+                .linkedFramework("Vision"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+            ]
         ),
         .target(
             name: "XDCinematicNative",

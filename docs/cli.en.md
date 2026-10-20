@@ -100,7 +100,7 @@ Common options:
 | `--oppo-compatible` | Request OPPO Gallery compatible output for ProXDR still items. |
 | `--apple-portrait` | Request the complete Portrait resource set on macOS. |
 | `--apple-portrait-oppo` | Use OPPO depth and available masks with reduced effects on macOS. |
-| `--apple-styles` | Request Photographic Styles on macOS. |
+| `--apple-styles` | Generate Photographic Styles and inferred Texture Styles on macOS 27. |
 | `--apple-cinematic` | Infer pending Cinematic metadata for ordinary video on macOS 27. |
 | `--json` | Emit a stable machine-readable receipt. |
 
@@ -160,6 +160,8 @@ For this intent, batch directory discovery selects MOV, MP4, M4V, AVI, and MKV c
 The normal CLI exposes only product intents that change the result a user actually wants. Source recognition, reconstruction algorithms, Gain Map layout, metadata routing, camera-tail handling, and codec/backend selection are engine/runtime decisions derived from the input and available platform capabilities.
 
 For diagnostics, observe those automatic decisions through `inspect`, structured logs, and development tests rather than turning internal policy back into command-line configuration.
+
+With `validate --apple-styles`, Rust also requires native Photographic Styles and Texture readback on macOS 27. The app uses this check before it skips an existing Styles output. A plain HDR file does not pass this feature check.
 
 ## Exit status
 

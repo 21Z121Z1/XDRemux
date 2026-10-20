@@ -43,6 +43,19 @@ class StyleVersionProbeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             patch_heic(source, {"items": [], "meta_children": []})
 
+    def test_file_backed_styles_keep_existing_texture_bytes(self):
+        raw = plistlib.dumps({"0": 15, "1": b"xyz"}, fmt=plistlib.FMT_BINARY)
+        texture = b"tag:apple.com,2026:photo:metadata:texture_styles\0bplist00actual"
+        source = b"header" + raw + texture
+        report = {"items": [{"type": "uri ", "name": "styleMetadata",
+                  "location": {"construction_method": 0, "data_reference": 0,
+                               "extents": [{"offset": 6, "length": len(raw)}]}}],
+                  "meta_children": []}
+        changed, receipt = patch_heic(source, report)
+        self.assertEqual(changed[-len(texture):], texture)
+        self.assertTrue(receipt["other_bytes_identical"])
+        self.assertEqual(sum(a != b for a, b in zip(source, changed)), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
