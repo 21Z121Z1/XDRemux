@@ -70,17 +70,25 @@ int xdremux_texture_infer(const char *inputPath, const char *directoryPath) {
             if (!image) @throw [NSException exceptionWithName:@"Input" reason:@"upright decode failed" userInfo:nil];
             size_t w = CGImageGetWidth(image), h = CGImageGetHeight(image);
             report[@"width"] = @(w); report[@"height"] = @(h);
-            VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
             VNRequest *attributes = [NSClassFromString(@"VNGenerateHumanAttributesSegmentationRequest") new];
             VNRequest *glasses = [NSClassFromString(@"VNGenerateGlassesSegmentationRequest") new];
             VNGeneratePersonInstanceMaskRequest *instances = [VNGeneratePersonInstanceMaskRequest new];
             VNDetectFaceLandmarksRequest *faces = [VNDetectFaceLandmarksRequest new];
             VNRequest *faceSegments = [NSClassFromString(@"VNGenerateFaceSegmentsRequest") new];
             NSError *error = nil;
-            if (![handler performRequests:@[attributes, glasses, instances, faceSegments] error:&error])
-                @throw [NSException exceptionWithName:@"Inference" reason:error.description userInfo:nil];
+            // Heterogeneous segmentation batches enter Vision's compound path,
+            // which has crashed on macOS 27. Keep each request and its handler
+            // separate, retaining the instance handler for mask generation.
+            VNImageRequestHandler *instanceHandler = nil;
+            for (VNRequest *request in @[attributes, glasses, instances, faceSegments]) {
+                VNImageRequestHandler *requestHandler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
+                if (![requestHandler performRequests:@[request] error:&error])
+                    @throw [NSException exceptionWithName:@"Inference" reason:error.description userInfo:nil];
+                if (request == instances) instanceHandler = requestHandler;
+            }
             faces.inputFaceObservations = (NSArray<VNFaceObservation *> *)faceSegments.results;
-            if (![handler performRequests:@[faces] error:&error]) @throw [NSException exceptionWithName:@"Inference" reason:error.description userInfo:nil];
+            VNImageRequestHandler *faceHandler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
+            if (![faceHandler performRequests:@[faces] error:&error]) @throw [NSException exceptionWithName:@"Inference" reason:error.description userInfo:nil];
             NSMutableDictionary *masks = [NSMutableDictionary new];
             NSMutableDictionary *individualMasks = [NSMutableDictionary new];
             report[@"instance_count"] = @0;
@@ -94,12 +102,12 @@ int xdremux_texture_infer(const char *inputPath, const char *directoryPath) {
                 VNInstanceMaskObservation *observation = instances.results[0];
                 report[@"instance_count"] = @(observation.allInstances.count);
                 if (observation.allInstances.count) {
-                    CVPixelBufferRef mask = [observation generateScaledMaskForImageForInstances:observation.allInstances fromRequestHandler:handler error:&error];
+                    CVPixelBufferRef mask = [observation generateScaledMaskForImageForInstances:observation.allInstances fromRequestHandler:instanceHandler error:&error];
                     if (!mask) @throw [NSException exceptionWithName:@"InstanceMask" reason:error.description userInfo:nil];
                     masks[@"semanticpersonmatte"] = Mask(mask,w,h); CVPixelBufferRelease(mask);
                     [observation.allInstances enumerateIndexesUsingBlock:^(NSUInteger index, BOOL *stop) {
                         (void)stop; NSError *instanceError = nil;
-                        CVPixelBufferRef one = [observation generateScaledMaskForImageForInstances:[NSIndexSet indexSetWithIndex:index] fromRequestHandler:handler error:&instanceError];
+                        CVPixelBufferRef one = [observation generateScaledMaskForImageForInstances:[NSIndexSet indexSetWithIndex:index] fromRequestHandler:instanceHandler error:&instanceError];
                         if (!one) @throw [NSException exceptionWithName:@"InstanceMask" reason:instanceError.description userInfo:nil];
                         individualMasks[[NSString stringWithFormat:@"instance-%lu",(unsigned long)index]] = Mask(one,w,h);
                         CVPixelBufferRelease(one);
@@ -176,7 +184,8 @@ int xdremux_texture_infer(const char *inputPath, const char *directoryPath) {
                     resourceSources[role] = @"convex regions derived from the current image's native Vision face landmarks; not FSINC segmentation";
                 }
                 VNDetectHumanHandPoseRequest *hands = [VNDetectHumanHandPoseRequest new]; hands.maximumHandCount = 2;
-                NSError *handError = nil; BOOL handSuccess = [handler performRequests:@[hands] error:&handError];
+                VNImageRequestHandler *handHandler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
+                NSError *handError = nil; BOOL handSuccess = [handHandler performRequests:@[hands] error:&handError];
                 report[@"hand_inference"] = @{@"success": @(handSuccess), @"count": @(hands.results.count), @"error": handError.description ?: @"", @"minimum_joint_confidence": @0.3};
                 NSMutableData *handData = [NSMutableData dataWithLength:mw * mh];
                 if (handSuccess) for (VNHumanHandPoseObservation *hand in hands.results) {
