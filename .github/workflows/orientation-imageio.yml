@@ -1,0 +1,55 @@
+name: Oriented HEIF ImageIO readback
+
+on:
+  pull_request:
+    paths:
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-runtime/src/apple_styles.rs"
+      - "scripts/apple/read_oriented_heif_imageio.swift"
+      - ".github/workflows/orientation-imageio.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  imageio-readback:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install portable HEVC provider
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+
+      - name: Write oriented HEIF and expected facts
+        shell: bash
+        run: |
+          mkdir -p artifacts/orientation-imageio
+          XDREMUX_ORIENTATION_OUTPUT="$GITHUB_WORKSPACE/artifacts/orientation-imageio" \
+            cargo test --locked -p xdremux-codec --test orientation_roundtrip -- --nocapture
+
+      - name: Read the synthetic file back with ImageIO
+        shell: bash
+        run: |
+          swift scripts/apple/read_oriented_heif_imageio.swift \
+            artifacts/orientation-imageio/oriented-gain-map.heic \
+            artifacts/orientation-imageio/expected.json \
+            | tee artifacts/orientation-imageio/imageio.json
+
+      - name: Upload ImageIO readback
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: orientation-imageio
+          if-no-files-found: warn
+          retention-days: 1
+          path: artifacts/orientation-imageio/

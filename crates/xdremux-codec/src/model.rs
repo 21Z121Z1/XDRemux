@@ -74,6 +74,73 @@ impl Raster8 {
         }
         Ok(())
     }
+
+    /// Undo a HEIF `irot` that libheif has already applied to this raster.
+    ///
+    /// `quarter_turns_ccw` is the angle stored on the item. The returned raster
+    /// is the coded orientation Apple keeps for a gain map, Style Delta Map,
+    /// and Linear Thumbnail.
+    pub fn undo_irot(&self, quarter_turns_ccw: u8) -> Result<Self> {
+        self.validate()?;
+        let inverse_ccw = (4 - (quarter_turns_ccw & 0x03)) & 0x03;
+        self.rotate_ccw(inverse_ccw)
+    }
+
+    fn rotate_ccw(&self, quarter_turns_ccw: u8) -> Result<Self> {
+        match quarter_turns_ccw & 0x03 {
+            0 => Ok(self.clone()),
+            1 => self.rotate_ccw_once(),
+            turns => {
+                let mut raster = self.rotate_ccw_once()?;
+                for _ in 1..turns {
+                    raster = raster.rotate_ccw_once()?;
+                }
+                Ok(raster)
+            }
+        }
+    }
+
+    fn rotate_ccw_once(&self) -> Result<Self> {
+        let bytes_per_pixel = self.format.bytes_per_pixel();
+        let source_width = usize::try_from(self.width)
+            .map_err(|_| CodecError::invalid("raster width exceeds usize"))?;
+        let source_height = usize::try_from(self.height)
+            .map_err(|_| CodecError::invalid("raster height exceeds usize"))?;
+        let destination_width = source_height;
+        let destination_height = source_width;
+        let destination_row = destination_width
+            .checked_mul(bytes_per_pixel)
+            .ok_or_else(|| CodecError::invalid("rotated row size overflows"))?;
+        let destination_len = destination_row
+            .checked_mul(destination_height)
+            .ok_or_else(|| CodecError::invalid("rotated raster size overflows"))?;
+        let mut data = vec![0_u8; destination_len];
+        for y in 0..source_height {
+            for x in 0..source_width {
+                let destination_x = y;
+                let destination_y = source_width - 1 - x;
+                let source_offset = y
+                    .checked_mul(self.bytes_per_row)
+                    .and_then(|row| row.checked_add(x.checked_mul(bytes_per_pixel)?))
+                    .ok_or_else(|| CodecError::invalid("source pixel offset overflows"))?;
+                let destination_offset = destination_y
+                    .checked_mul(destination_row)
+                    .and_then(|row| row.checked_add(destination_x.checked_mul(bytes_per_pixel)?))
+                    .ok_or_else(|| CodecError::invalid("rotated pixel offset overflows"))?;
+                data[destination_offset..destination_offset + bytes_per_pixel]
+                    .copy_from_slice(&self.data[source_offset..source_offset + bytes_per_pixel]);
+            }
+        }
+        Self::new(
+            u32::try_from(destination_width)
+                .map_err(|_| CodecError::invalid("rotated width exceeds u32"))?,
+            u32::try_from(destination_height)
+                .map_err(|_| CodecError::invalid("rotated height exceeds u32"))?,
+            destination_row,
+            self.format,
+            data,
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,5 +243,23 @@ impl PrimaryHeifEncodeRequest {
     pub fn with_exif_tiff(mut self, exif_tiff: Vec<u8>) -> Self {
         self.exif_tiff = Some(exif_tiff);
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn undo_irot_returns_coded_pixels_for_a_quarter_turn() {
+        let display =
+            Raster8::new(2, 1, 6, RasterPixelFormat::Rgb8, vec![1, 2, 3, 4, 5, 6]).unwrap();
+        assert_eq!(display.undo_irot(0).unwrap(), display);
+        let coded = display.undo_irot(3).unwrap();
+        assert_eq!((coded.width, coded.height), (1, 2));
+        assert_eq!(coded.data, vec![4, 5, 6, 1, 2, 3]);
+        let restored = coded.undo_irot(1).unwrap();
+        assert_eq!(restored.data, display.data);
+        assert_eq!((restored.width, restored.height), (2, 1));
     }
 }

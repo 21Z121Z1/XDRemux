@@ -521,6 +521,15 @@ pub fn validate_gain_map_structure(source: &[u8]) -> Result<GainMapStructure> {
 
     let gain_ispe = associated_property(gain_map_item_id, ISPE, &ipma_by_item, &properties)?;
     let (ispe_width, ispe_height) = parse_ispe(source, gain_ispe)?;
+    if let Some(geometry) = crate::orientation::coded_geometry_if_present(source, &meta)? {
+        crate::orientation::require_coded_aspect(
+            geometry.width,
+            geometry.height,
+            ispe_width,
+            ispe_height,
+            "Gain Map",
+        )?;
+    }
     if (ispe_width, ispe_height) != (grid.width, grid.height) {
         return Err(invalid(format!(
             "grid payload dimensions {}x{} disagree with ispe {}x{}",
