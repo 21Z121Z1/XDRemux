@@ -9,9 +9,16 @@ LibLivePhoto 可以在 XDRemux workspace 外构建。
 
 `xdremux-format` 重新导出 `liblivephoto-format` 的 cursor、error、FourCC、
 JPEG、原始 EXIF 和 BMFF 基础类型。产品 codec profile 检查仍在本地。
-`xdremux-motion-photo` 保留产品几何策略、文件复制和原子 pair 发布。
+`xdremux-motion-photo` 保留产品几何策略、文件复制和 no-clobber pair 发布。
 旧名称通过不稳定的迁移 feature 重新导出。新格式操作应使用 `MotionPhoto`、
 `Input`、资源和 `MediaTime`，不得在 consumer crate 增加另一套 parser。
+
+公共 pair 发布 helper 在成功和失败时都保留调用方所有的 staging 文件，允许使用
+同一文件系统的子目录。helper 不替换或删除最终路径。第二个成员发布失败时，
+`PairPublicationError::partial_output()` 返回 partial 路径；其他 writer 可能已修改
+该路径，因此它不构成删除权限。runtime 在此错误下保留自己的独占 staging 目录。
+reconcile 保留未知 partial、无效 pair 及全部 sidecar。文件系统要求与两文件事务
+边界见 [发布与恢复契约](architecture.md#发布)。
 
 runtime 保留已知的整数和 timescale 时间，不再把已知 XMP 时间舍入到视频帧。
 源时间未知时，现有产品 fallback 选择一个位置，并在回执中标记为推断。
@@ -40,7 +47,7 @@ workspace 检查可脱离产品栈执行 Android/Apple 往返。Apple 转 Androi
 微秒限制见独立库兼容性文档。
 
 `xdremux-compat` 仍是不稳定的迁移边界。每个旧 re-export 应在调用方改用公共
-资源或 Apple 基础 API、对应 conformance 门禁通过后移除。文件复制、原子发布和
+资源或 Apple 基础 API、对应 conformance 门禁通过后移除。文件复制、no-clobber 发布和
 产品几何策略保持本地所有权。完成这些调用方迁移前不移除整个兼容 feature。
 
 独立库现从 `ftyp` 读取受支持主视频的 MIME。Android JPEG/HEIF 目录会保留 QuickTime MIME，视频字节保持不变。编码规范符合性及原厂相册验收仍需分别验证。

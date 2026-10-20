@@ -22,7 +22,7 @@ use xdremux_metadata::{
 };
 use xdremux_motion_photo::{
     apple, build_live_photo_jpeg_exif, companion_video_path, parse_first_lpex_object,
-    presentation_geometry, product_source_kind, publish_live_photo_pair, reconcile_live_photo_pair,
+    presentation_geometry, product_source_kind, publish_live_photo_pair,
     resolve_live_photo_still_time, write_live_photo_heif_still, ConversionReport, Disposition,
     Input, MediaTime, MotionAsset, MotionPhoto, PairingMetadata, ParseOptions,
     PreservationEvidence, RelationshipKind, ResourceConversion, ResourceRole, TargetProfile,
@@ -81,39 +81,6 @@ fn write_synced_new(path: &Path, data: &[u8]) -> Result<()> {
         .map_err(|error| RuntimeError::external("Live Photo temporary write", error))?;
     file.sync_all()
         .map_err(|error| RuntimeError::external("Live Photo temporary sync", error))
-}
-
-fn pair_matches(image: &Path, video: &Path) -> bool {
-    let Ok(image_bytes) = fs::read(image) else {
-        return false;
-    };
-    let Ok(video_bytes) = fs::read(video) else {
-        return false;
-    };
-    MotionPhoto::parse(
-        Input::ApplePair {
-            still: &image_bytes,
-            movie: &video_bytes,
-        },
-        ParseOptions::strict(),
-    )
-    .is_ok()
-}
-
-fn temporary_pair_paths(output_image: &Path, identifier: &str) -> Result<(PathBuf, PathBuf)> {
-    let parent = match output_image.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
-    let stem = output_image
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| RuntimeError::new("Live Photo output", "output has no UTF-8 stem"))?;
-    let token = identifier.replace('-', "").to_ascii_lowercase();
-    Ok((
-        parent.join(format!(".{stem}.{token}.tmp.heic")),
-        parent.join(format!(".{stem}.{token}.tmp.mov")),
-    ))
 }
 
 fn source_declares_gain_map(asset: &MotionAsset) -> bool {
@@ -522,8 +489,12 @@ pub(crate) fn convert_motion_photo_file(
         ));
     }
 
-    reconcile_live_photo_pair(output_image, &output_video, pair_matches)
-        .map_err(|error| RuntimeError::external("Live Photo pair reconciliation", error))?;
+    let parent = output_image
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|error| RuntimeError::external("Live Photo output directory", error))?;
 
     let static_bytes = photo
         .still_bytes()
@@ -608,25 +579,30 @@ pub(crate) fn convert_motion_photo_file(
 
     let conversion_report =
         product_conversion_report(&photo, &content_identifier, still.had_gain_map)?;
-    let (temporary_image, temporary_video) =
-        temporary_pair_paths(output_image, &content_identifier)?;
-    let publish_result: Result<()> = (|| {
-        write_synced_new(&temporary_image, &still.bytes)?;
-        write_synced_new(&temporary_video, &movie)?;
-        publish_live_photo_pair(
-            &temporary_image,
-            &temporary_video,
-            output_image,
-            &output_video,
-        )
-        .map_err(|error| RuntimeError::external("Live Photo pair publication", error))?;
-        Ok(())
-    })();
-    if publish_result.is_err() {
-        let _ = fs::remove_file(&temporary_image);
-        let _ = fs::remove_file(&temporary_video);
+    let staging = tempfile::Builder::new()
+        .prefix(".xdremux-live-photo-")
+        .tempdir_in(parent)
+        .map_err(|error| RuntimeError::external("Live Photo staging directory", error))?;
+    let temporary_image = staging.path().join("capture.heic");
+    let temporary_video = staging.path().join("capture.mov");
+    write_synced_new(&temporary_image, &still.bytes)?;
+    write_synced_new(&temporary_video, &movie)?;
+    if let Err(error) = publish_live_photo_pair(
+        &temporary_image,
+        &temporary_video,
+        output_image,
+        &output_video,
+    ) {
+        let retained = error.partial_output().is_some().then(|| staging.keep());
+        let mut error = RuntimeError::external("Live Photo pair publication", error);
+        if let Some(directory) = retained {
+            error.detail.push_str(&format!(
+                "; complete staged pair retained at {}; inspect both final entries before explicit recovery",
+                directory.display()
+            ));
+        }
+        return Err(error);
     }
-    publish_result?;
 
     Ok(LivePhotoFileReceipt {
         image: output_image.to_path_buf(),

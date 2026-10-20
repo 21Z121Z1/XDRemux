@@ -11,9 +11,19 @@ The library builds outside the XDRemux workspace.
 `xdremux-format` re-exports `liblivephoto-format` cursor, error, FourCC, JPEG,
 raw EXIF and BMFF primitives. Product codec profile inspection remains local.
 `xdremux-motion-photo` retains product geometry policy, payload file copy and
-atomic pair publication. Its legacy names re-export an unstable migration feature.
+no-clobber pair publication. Its legacy names re-export an unstable migration feature.
 New product format operations must use `MotionPhoto`, `Input`, resources and
 `MediaTime`. Do not add an independent parser to the consumer crate.
+
+The public pair publication helper keeps caller-owned staging files on success
+and failure, including staging in a same-filesystem child directory. It never
+replaces or unlinks final paths. A second-member failure exposes the partial
+output path through `PairPublicationError::partial_output()`; that path is not
+authority to delete an entry that another writer may have changed. The runtime
+retains its private staging directory on this error. The reconciliation helper
+preserves unknown partial/invalid pairs and all sidecars. See the
+[publication and recovery contract](architecture.en.md#publication) for filesystem
+requirements and the two-file transaction boundary.
 
 The runtime preserves a known integer/timescale presentation time. It does not
 round a known XMP timestamp to a video frame. When no source time exists, the
@@ -55,7 +65,7 @@ integer-microsecond restriction on Apple-to-Android output.
 The `xdremux-compat` feature remains a migration boundary for existing low-level
 helpers. It is not a stable API. Remove each re-export after its consumer uses a
 public resource or Apple primitive API and the associated conformance gate passes.
-Keep payload copying, atomic publication and product geometry local. No removal
+Keep payload copying, no-clobber publication and product geometry local. No removal
 of the compatibility feature is scheduled before these callers are migrated.
 
 The library reader now derives the supported primary movie MIME from `ftyp`. Android JPEG/HEIF directory output retains QuickTime MIME without changing movie bytes. Codec conformance and Gallery acceptance remain separate checks.
