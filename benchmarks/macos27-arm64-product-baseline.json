@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "purpose": "Regression reference for the canonical Rust product on macOS 27 arm64 (xcode-27), including combined Photographic Styles and inferred Texture production. Five measured runs follow one warmup. This is not a performance target. The earlier macOS 26 reference remains unchanged.",
+  "purpose": "Regression reference for joint Photographic Styles and inferred Texture on macOS 27 arm64 (xcode-27). The joint Styles case uses five measured runs after one warmup. Unchanged workloads retain their established macOS 26 regression references. New LHDR workloads remain observation-only until repeated stable-runner samples justify references. This is not a performance target.",
   "source_head": "1a52db02f3e54eeb511019abdafe54155d06a7a6",
   "source_evidence": {
     "repository": "21Z121Z1/Photographic_Style_Research",
@@ -22,45 +22,35 @@
     "rss_absolute_mib": 32.0
   },
   "cases": {
-    "hdr-lhdr-mono400": {
-      "median_wall_seconds": 1.4107487499999252,
-      "p95_wall_seconds": 1.596992583600013,
-      "max_peak_rss_mib": 53.46875
-    },
     "hdr-uhdr-rgb444": {
-      "median_wall_seconds": 6.896517542000083,
-      "p95_wall_seconds": 6.939474816999928,
-      "max_peak_rss_mib": 115.34375
-    },
-    "oppo-compatible-lhdr-rgb420": {
-      "median_wall_seconds": 1.511516125000071,
-      "p95_wall_seconds": 1.5715301001999251,
-      "max_peak_rss_mib": 64.640625
+      "median_wall_seconds": 9.687,
+      "p95_wall_seconds": 11.133,
+      "max_peak_rss_mib": 120.6
     },
     "oppo-compatible-uhdr-rgb420": {
-      "median_wall_seconds": 5.94635366600005,
-      "p95_wall_seconds": 6.234996341599935,
-      "max_peak_rss_mib": 111.484375
+      "median_wall_seconds": 8.757,
+      "p95_wall_seconds": 10.069,
+      "max_peak_rss_mib": 116.4
     },
     "motion-jpeg": {
-      "median_wall_seconds": 6.02358716699996,
-      "p95_wall_seconds": 6.449253733199885,
-      "max_peak_rss_mib": 313.953125
+      "median_wall_seconds": 8.432,
+      "p95_wall_seconds": 8.628,
+      "max_peak_rss_mib": 313.6
     },
     "motion-heif": {
-      "median_wall_seconds": 0.09827787499989427,
-      "p95_wall_seconds": 0.1009045750000496,
-      "max_peak_rss_mib": 27.765625
+      "median_wall_seconds": 0.143,
+      "p95_wall_seconds": 0.184,
+      "max_peak_rss_mib": 27.5
     },
     "batch-3": {
-      "median_wall_seconds": 16.19711162500016,
-      "p95_wall_seconds": 16.75415994200007,
-      "max_peak_rss_mib": 249.0
+      "median_wall_seconds": 21.28,
+      "p95_wall_seconds": 21.726,
+      "max_peak_rss_mib": 259.1
     },
     "apple-portrait": {
-      "median_wall_seconds": 3.3668258340001103,
-      "p95_wall_seconds": 3.5060585000000173,
-      "max_peak_rss_mib": 896.6875
+      "median_wall_seconds": 4.789,
+      "p95_wall_seconds": 6.789,
+      "max_peak_rss_mib": 821.2
     },
     "apple-styles": {
       "median_wall_seconds": 7.976145249999945,
@@ -71,5 +61,17 @@
   "apple_adapter_process_launches": {
     "apple-portrait": 1,
     "apple-styles": 1
+  },
+  "inherited_reference": {
+    "file": "macos26-arm64-product-baseline.json",
+    "source_head": "5c568b6ed2a9facad152509066e2449db709e548",
+    "cases": [
+      "hdr-uhdr-rgb444",
+      "oppo-compatible-uhdr-rgb420",
+      "motion-jpeg",
+      "motion-heif",
+      "batch-3",
+      "apple-portrait"
+    ]
   }
 }
