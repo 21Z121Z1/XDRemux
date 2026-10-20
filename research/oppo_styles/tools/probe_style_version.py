@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Research-only, byte-exact Styles v15 -> v16 single-variable carrier probe.
 
-This does not create a complete v16 Texture Styles asset and must never be
-used as a product conversion or as proof that Photos adjustments are active.
+The version patch generates no Texture resources. It preserves resources that
+the input already contains. It is not a product converter or a Photos UI test.
 """
 from __future__ import annotations
 
@@ -87,13 +87,23 @@ def patch_heic(source: bytes, inspection: dict) -> tuple[bytes, dict]:
         if item.get("type") == "uri " and item.get("name") == "styleMetadata"
     ]
     idats = [box for box in inspection["meta_children"] if box.get("type") == "idat"]
-    if len(items) != 1 or len(idats) != 1:
-        raise ValueError("Expected one Styles metadata item and one idat box")
-    extents = items[0]["location"]["extents"]
+    if len(items) != 1:
+        raise ValueError("Expected one Styles metadata item")
+    location = items[0]["location"]
+    extents = location["extents"]
     if len(extents) != 1:
-        raise ValueError("Styles metadata is not one contiguous idat extent")
+        raise ValueError("Styles metadata is not one contiguous extent")
+    if location.get("data_reference", 0) != 0:
+        raise ValueError("Styles metadata is not local")
     extent = extents[0]
-    start = idats[0]["start"] + 8 + extent["offset"]
+    method = location.get("construction_method", 1)
+    start = extent["offset"]  # The inspector already resolves base_offset.
+    if method == 1:
+        if len(idats) != 1:
+            raise ValueError("Expected one idat box for an idat extent")
+        start += idats[0]["start"] + 8
+    elif method != 0:
+        raise ValueError("Unsupported Styles construction method")
     end = start + extent["length"]
     if start < 0 or end > len(source) or start >= end:
         raise ValueError("Styles extent is outside the source container")
@@ -106,7 +116,7 @@ def patch_heic(source: bytes, inspection: dict) -> tuple[bytes, dict]:
     if len(differences) != 1:
         raise ValueError("Other HEIF resources changed")
     receipt = {
-        "hypothesis": "version field only; no Texture Style carrier",
+        "hypothesis": "Styles version field only; existing Texture resources unchanged",
         "source_sha256": hashlib.sha256(source).hexdigest(),
         "candidate_sha256": hashlib.sha256(patched).hexdigest(),
         "changed_byte_offset": differences[0],

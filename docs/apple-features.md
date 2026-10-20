@@ -56,9 +56,23 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 研究型 producer、model experiment、donor diagnostic 和 RAW experiment 继续作为 research tooling，不定义公开 CLI 契约，也不构成第二套 runtime。
 
+### 同一开关生成纹理风格
+
+`--apple-styles` 与 App 的“Apple 摄影风格”开关会一并生成纹理风格，不增加独立的 Texture 选项。App 在跳过已有输出前调用 `validate --apple-styles`；普通 HDR 输出不能通过此检查。此功能需要已在 macOS 27 验证的私有 Vision 和 CMImaging API。API 缺失或任一步骤失败时，整个摄影风格事务在发布前报错。
+
+Rust 请求 ImageIO 生成已校正方向、长边最多 1024 像素的 sRGB 推理图。此图仅用于分析；输出保留完整尺寸主图、HDR Gain Map、Styles Linear Thumbnail 和已有项目载荷。分析不能恢复 RAW 或 Apple 拍摄时的处理数据。
+
+Vision 提供人脸关键点、有符号姿态角、人物实例与语义蒙版。通过最大总重叠匹配，每个人脸只关联一个独立实例。Rust 为每人调用原生 Mattify、UnderEyeBrighten 和 SkinSmoothStandalone 统计生产端，共享同一套实际几何与蒙版。调用顺序为 setup、prewarm、prepare、calculateStats、process、GPU 等待及最后一次 finishProcessing。
+
+Rust 只合并原生实际返回的统计。成功但为空的可选统计组会省略。没有匹配人脸时写入空人物数组，不创建模板人物。鼻、唇、眉和手部保护使用原生关键点或手势检测推导的区域；本次派生编辑禁用耳部和纹身保护。这不等同于完整的相机 FSINC 生产端。
+
+Rust HEIF 写入器向已有摄影风格输出添加 v3 Texture plist、独立编码的蒙版和精确的实例 XMP 引用键。调参配置仅选择派生编辑，不替换 EXIF 相机身份、曝光、镜头、时间或拍摄 UUID。搬移后逐项核对原有载荷。原子发布前，由原始 Apple 解析器读回并校验人物数量、引用键、几何和统计。
+
+在 macOS 27 运行 `python3 scripts/apple/check_texture_styles.py --all-fixtures --output <dir>`，验证真实 ProXDR fixture、批处理、主图与 Gain Map HEVC 保持一致，以及失败时保留已有输出。此前 SDR 研究候选已有用户报告 Photos 激活成功。该反馈不代表每份新生成的完整尺寸 HDR 产品输出、效果响应、保存及重新打开均已通过设备测试。
+
 ### SmartStyle 编辑状态
 
-生成的 Standard 风格资源还需要在 Apple MakerNote 标签 84（`0x0054`）中记录 SmartStyle 状态。系数 plist 是另一个独立输入；解析成功不能证明照片具备完整编辑状态。Rust 定义旧 Swift writer 使用的八个整数字段，ImageIO 原语将这些字段合并到已有 MakerApple 字典，不新增相机身份或 UUID，并保留字典中其他条目和未修改的字段。
+生成的 Standard 风格资源还需要在 Apple MakerNote 标签 84（`0x0054`）中记录 SmartStyle 状态。系数 plist 是另一个独立输入；解析成功不能证明照片具备完整编辑状态。Rust 定义旧 Swift writer 使用的所需的整数编辑字段（包括 Standard 纹理状态），ImageIO 原语将这些字段合并到已有 MakerApple 字典，不新增相机身份或 UUID，并保留字典中其他条目和未修改的字段。
 
 发布前，Rust 暂存最终组装的完整字节，并要求 ImageIO 回读其中的整数字典字段。必需状态缺失或变化时，转换在替换已有输出前失败。旧 adapter 即使忽略新增的可选元数据请求，也不能静默发布不完整的风格文件。此原生回读不代表 Photos 控件、Tone/Color 响应或保存重开已通过；这些行为仍需实机证据。
 

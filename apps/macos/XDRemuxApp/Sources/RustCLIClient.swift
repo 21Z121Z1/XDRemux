@@ -78,10 +78,12 @@ enum RustCLIClient {
         _ = try run(arguments)
     }
 
-    static func isValidOutput(_ outputURL: URL) -> Bool {
+    static func isValidOutput(_ outputURL: URL, config: ConversionConfig = ConversionConfig()) -> Bool {
         guard FileManager.default.fileExists(atPath: outputURL.path) else { return false }
         do {
-            _ = try run(["validate", outputURL.path])
+            var arguments = ["validate", outputURL.path]
+            if config.applePhotographicStyles { arguments.append("--apple-styles") }
+            _ = try run(arguments)
             return true
         } catch {
             return false

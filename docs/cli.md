@@ -100,7 +100,7 @@ xdremux batch \
 | `--oppo-compatible` | 对批次中的 ProXDR 静态照片请求 OPPO Gallery 兼容输出。 |
 | `--apple-portrait` | 在 macOS 上请求完整人像资源集。 |
 | `--apple-portrait-oppo` | 在 macOS 上使用 OPPO 深度和有效蒙版，人像效果降级。 |
-| `--apple-styles` | 在 macOS 上请求摄影风格。 |
+| `--apple-styles` | 在 macOS 27 上一并推理生成摄影风格与纹理风格。 |
 | `--apple-cinematic` | 在 macOS 27 上为普通视频推理待处理的电影效果元数据。 |
 | `--json` | 输出稳定的机器可读 receipt。 |
 
@@ -162,6 +162,8 @@ xdremux batch --input-dir videos/ --output-dir converted/ --apple-cinematic --jo
 普通 CLI 只暴露会改变用户所需结果的产品意图。源结构识别、重建算法、Gain Map layout、metadata routing、camera tail 和 codec/backend 选择由 engine/runtime 根据输入与平台能力决定，不要求最终用户配置。
 
 需要排障时，应通过 `inspect`、结构化日志和开发测试观察自动决策，而不是把内部策略重新变成命令行参数。
+
+`validate --apple-styles` 还会在 macOS 27 要求原生摄影风格与纹理风格读回通过。App 在跳过已有摄影风格输出前调用此检查；普通 HDR 文件不能通过该功能检查。
 
 ## 退出状态
 

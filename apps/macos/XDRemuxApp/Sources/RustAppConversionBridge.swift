@@ -10,7 +10,6 @@ enum AppConversionEngine {
     }
 
     static func isValidOutput(_ outputURL: URL, config: ConversionConfig) -> Bool {
-        _ = config
-        return RustCLIClient.isValidOutput(outputURL)
+        return RustCLIClient.isValidOutput(outputURL, config: config)
     }
 }

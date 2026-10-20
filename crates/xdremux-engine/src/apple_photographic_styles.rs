@@ -29,12 +29,12 @@ pub const APPLE_STYLE_LIGHT_MAP_BYTE_COUNT: usize =
 /// SmartStyle state for the Standard, reversible Styles resources we generate.
 ///
 /// This is a separate consumer input from the Styles coefficient plist. These
-/// eight integer fields match the former Swift writer and its working carrier;
+/// fields include the Standard Texture edit marker from the native carrier;
 /// they describe our generated edit state, not an Apple camera or capture UUID.
 pub fn apple_style_maker_apple_dictionary() -> BTreeMap<String, BTreeMap<String, i64>> {
     BTreeMap::from([(
         "84".to_owned(),
-        [1, 0, 0, 1, 1, 1, 4, 0]
+        [1, 0, 0, 1, 1, 1, 4, 0, 1, 1, 0, 0, 1]
             .into_iter()
             .enumerate()
             .map(|(key, value)| (key.to_string(), value))
@@ -1389,12 +1389,13 @@ fn validate_style_statistics(statistics: &AppleStyleStatistics) -> Result<(), Ap
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum PlistValue {
+pub enum PlistValue {
     Bool(bool),
     Integer(u64),
     Real(f64),
     String(String),
     Data(Vec<u8>),
+    Array(Vec<PlistValue>),
     Dictionary(BTreeMap<String, PlistValue>),
 }
 
@@ -1470,10 +1471,11 @@ enum PlistObject {
     Real(f64),
     String(String),
     Data(Vec<u8>),
+    Array(Vec<usize>),
     Dictionary(Vec<(usize, usize)>),
 }
 
-fn serialize_binary_plist(root: PlistValue) -> Result<Vec<u8>, AppleStyleDataError> {
+pub(super) fn serialize_binary_plist(root: PlistValue) -> Result<Vec<u8>, AppleStyleDataError> {
     let mut objects = Vec::new();
     let top_object = collect_plist_object(root, &mut objects)?;
     let object_ref_size = integer_width(
@@ -1523,6 +1525,12 @@ fn collect_plist_object(
         PlistValue::Real(value) => PlistObject::Real(value),
         PlistValue::String(value) => PlistObject::String(value),
         PlistValue::Data(value) => PlistObject::Data(value),
+        PlistValue::Array(values) => PlistObject::Array(
+            values
+                .into_iter()
+                .map(|value| collect_plist_object(value, objects))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
         PlistValue::Dictionary(entries) => {
             let mut references = Vec::with_capacity(entries.len());
             for (key, value) in entries {
@@ -1554,6 +1562,12 @@ fn encode_plist_object(
         PlistObject::Data(value) => {
             encode_count_marker(0x40, value.len(), output)?;
             output.extend_from_slice(value);
+        }
+        PlistObject::Array(references) => {
+            encode_count_marker(0xA0, references.len(), output)?;
+            for reference in references {
+                write_fixed_width(output, *reference as u64, object_ref_size);
+            }
         }
         PlistObject::Dictionary(references) => {
             encode_count_marker(0xD0, references.len(), output)?;

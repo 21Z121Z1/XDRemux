@@ -8,6 +8,7 @@ mod native;
 mod orientation;
 mod semantic;
 mod styles;
+mod texture;
 mod validation;
 
 pub use direct::{
@@ -22,6 +23,10 @@ pub use native::IsoGainMapAssembly;
 pub use orientation::{primary_coded_geometry, PrimaryCodedGeometry};
 pub use semantic::{merge_apple_semantic_auxiliary_heif, transplant_apple_semantic_auxiliary_heif};
 pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};
+pub use texture::{
+    assemble_texture_styles_heif, has_texture_style_metadata, TextureStyleMask,
+    TEXTURE_METADATA_URI,
+};
 pub use validation::{validate_gain_map_structure, GainMapStructure};
 
 pub fn assemble_iso_gain_map_heif(
