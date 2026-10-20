@@ -15,7 +15,8 @@ atomic pair publication. Its legacy names re-export an unstable migration featur
 New product format operations must use `MotionPhoto`, `Input`, resources and
 `MediaTime`. Do not add an independent parser to the consumer crate.
 
-The runtime preserves a known integer/timescale presentation time. It does not
+The runtime validates the primary movie's video track and sample table even
+when a presentation time is already known. It preserves a known integer/timescale presentation time. It does not
 round a known XMP timestamp to a video frame. When no source time exists, the
 existing product fallback selects a position and marks the receipt as inferred.
 Apple on-disk geometry accepts explicit caller values. The existing OPPO matrix
@@ -24,7 +25,9 @@ and stabilization policy remains in XDRemux; it is not a format-library default.
 JPEG and Gain Map encoding remain product operations. The Live Photo receipt
 reports exact presentation, encoded movie payload comparisons, metadata rewrites,
 reencoding requirements, generated identity and resources omitted from the pair.
-The CLI reports omissions. The original source remains intact. The product pair
+Both `convert` and newly converted `batch` items report omissions. A resumed
+batch item reports an unknown omission count because its checkpoint does not
+store a conversion report. The original source remains intact. The product pair
 conversion does not claim complete vendor-resource preservation or losslessness.
 Use the library's source-copy or explicit sidecar policy for that requirement.
 

@@ -127,25 +127,20 @@ then divides each channel by the same `baseline_exposure` stored in Styles
 plist key `4` and applies Apple Log. It does not copy SDR image codes into
 this resource.
 
-The transform uses the Apple Log curve with Display P3 primaries. It does not
-change the image to the BT.2020 color space used by Apple Log video. Auxiliary
-color signaling is unchanged. The scene used to derive coefficients stays in
-display orientation. The stored Linear Thumbnail and Style Delta Map use the
-primary item's coded orientation and carry that item's `irot`, which is
-non-zero for a rotated photo. The thumbnail is rotated back to coded order
-before it is encoded. A Gain Map or Styles item whose aspect does not match
-the primary coded dimensions is rejected. `encoding_gain` is renderer metadata;
-it is not a second exposure division for the thumbnail.
 The Apple Log transfer, [0, 1] code range, and existing auxiliary color
 signaling stay in place. The encoder is the inverse of the macOS 26A434
 exponential decoder (`_appleLogToLinear` / `sw_appleLogToLinear`). That decoder
 does not use the quadratic toe, so the encoder does not either. The camera-side
 encoder toe is unverified. The transform keeps Display P3 primaries. It does
-not change the image to the BT.2020 color space used by Apple Log video, and it
-does not retag the thumbnail as sRGB, PQ, HLG, or linear. The existing
-auxiliary color signaling and decoded scene orientation remain in use.
-`encoding_gain` is renderer metadata; it is not a second exposure division for
-the thumbnail.
+not change the image to the BT.2020 color space used by Apple Log video or
+retag the thumbnail as sRGB, PQ, HLG, or linear.
+
+Coefficients use the decoded display scene. Before encoding the RGB16 Linear
+Thumbnail, Rust reverses the primary item's complete rotation/mirror sequence.
+The stored Linear Thumbnail and Style Delta Map use the primary coded geometry
+and preserve the relative order of its `irot` and `imir` properties. A Gain Map
+or Styles item whose aspect does not match the primary coded dimensions is
+rejected. `encoding_gain` is renderer metadata, not another exposure division.
 
 The codec primitive receives 16-bit Apple Log codes. VideoToolbox converts
 those codes into 10-bit video-range 4:2:0 and encodes Main10 HEVC. The codes
@@ -195,7 +190,7 @@ ProXDR fixtures after conversion. Tone 0 on `IMG_0032.HEIC` must report zero
 differing half components before the other renders are trusted. The report
 records mean luminance, per-channel means, `|L(−1)−L(0)| / |L(+1)−L(0)|`,
 monotonicity, and the tone-related plist fields. The workflow is
-`.github/workflows/style-tone-sweep.yml`.
+`.github/workflows/research.yml`.
 
 The native consumer regression uses RGB UHDR and monochrome LHDR fixtures,
 decodes the encoded thumbnail, and checks the HDR Log target and unchanged
@@ -217,6 +212,12 @@ adapter. The adapter calls `CIContext.writeHEIFRepresentationOfImage` (`format`
 Swift overlay name for that method.
 `kCIImageRepresentationHDRGainMapAsRGB` is set true so Core Image is asked for
 a color ratio. Rust does not supply `kCIImageRepresentationHDRGainMapImage`.
+
+Styles coefficients and the Linear Thumbnail reuse the exact SDR/HDR pair
+submitted to the system encoder, including SDR quantization and the submitted
+half-float HDR. They do not reinterpret the newly generated Gain Map with the
+original OPPO map's channels or scale parameters. Failed readback rejects a
+measurement before an existing output can be atomically replaced.
 
 Those names and their availability come from the macOS 27 SDK headers
 (`CIContext.h`, `CIImage.h`, `CGImage.h`, `CGImageSource.h`,

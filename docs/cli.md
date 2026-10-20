@@ -86,6 +86,8 @@ xdremux batch \
 
 常用参数：
 
+每个新转换的 Live Photo 批处理成功项在 JSON 中包含 `omitted_resource_count`，终端输出会报告非零遗漏。复用 checkpoint 不产生新转换报告，该字段为 `null`，不假定为零。规划后若其他写入者发布了相同输出，批处理发布会拒绝替换，保留已有文件。
+
 | 参数 | 作用 |
 | --- | --- |
 | `--input FILE` | 添加一个输入文件，可重复。 |

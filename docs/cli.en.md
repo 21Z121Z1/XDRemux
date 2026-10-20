@@ -84,6 +84,12 @@ xdremux batch \
 
 `--input FILE` may also be repeated. Directories are non-recursive by default; add `--recursive` to descend into subdirectories. Hidden files and XDRemux-generated `.xdremux` outputs are not rediscovered.
 
+Each converted Live Photo batch success includes `omitted_resource_count` in
+JSON. Human output reports nonzero omissions. A reused checkpoint has no new
+conversion report, so this field is `null` rather than an assumed zero.
+Existing batch outputs remain unchanged if a competing writer publishes after
+planning; publication refuses to replace that file.
+
 Common options:
 
 | Option | Purpose |

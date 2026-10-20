@@ -105,7 +105,8 @@ class PerformanceDesignArchitectureTests(unittest.TestCase):
 
         workflow = self.source(".github/workflows/performance.yml")
         self.assertIn("Measure isolated portable Gain Map codec primitives", workflow)
-        self.assertIn("GitHub Actions hosted macOS 26 (arm64)", workflow)
+        self.assertIn("GitHub Actions hosted $(sw_vers -productName)", workflow)
+        self.assertIn("$(sw_vers -productVersion) ($(uname -m))", workflow)
         self.assertIn("not treated as an RGB 4:4:4 Gain Map backend", workflow)
 
     def test_app_queue_status_projection_avoids_filter_arrays(self) -> None:

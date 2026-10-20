@@ -161,7 +161,7 @@ jobs:
           {
             echo "## XDRemux Rust performance and design"
             echo
-            echo "Runner: GitHub Actions hosted macOS 26 (arm64). These are not local-device measurements."
+            echo "Runner: GitHub Actions hosted $(sw_vers -productName) $(sw_vers -productVersion) ($(uname -m)), label xcode-27. These are not local-device measurements."
             echo "Product E2E timings include source I/O, parsing, Gain Map decode/reconstruction, codec work, HEIF assembly/publication, and Apple adapter/framework overhead where applicable."
             echo "Standard HDR uses the portable Rust/libheif Gain Map encoder even on macOS; the Apple VideoToolbox Main10 primitive belongs to the Photographic Styles Linear Thumbnail path and is not treated as an RGB 4:4:4 Gain Map backend."
             echo "The committed macOS 27 arm64 reference includes joint Styles and Texture production and is a regression baseline, not a performance target; committed tolerances absorb normal hosted-runner noise while structural helper-launch maxima remain hard limits."

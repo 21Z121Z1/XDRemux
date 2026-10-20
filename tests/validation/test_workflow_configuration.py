@@ -89,12 +89,6 @@ class WorkflowConfigurationTests(unittest.TestCase):
             # One reusable research-evidence workflow, not a product gate or
             # another per-hypothesis writer. Historical one-shot workflows stay out.
             "research.yml",
-            # Native tone measurement. It is not a product gate and not a
-            # per-hypothesis writer.
-            "style-tone-sweep.yml",
-            # System HEIF HDR encode surface. It records SDK names and one
-            # opt-in measurement file. It does not supply exact-head.
-            "system-heif-hdr-api.yml",
         }
         actual = {path.name for path in WORKFLOW_ROOT.glob("*.yml")}
         self.assertEqual(actual, expected)
@@ -166,7 +160,7 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertNotIn("XDRemuxAppModelTests", workflow)
 
     def test_style_tone_sweep_is_read_only_and_pins_the_published_harness(self) -> None:
-        workflow = self.workflow("style-tone-sweep.yml")
+        workflow = self.workflow("research.yml")
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertIn("runs-on: xcode-27", workflow)
         self.assertIn("ref: 37dd551a949047ed14580efa0c0a2556922791b5", workflow)
@@ -185,7 +179,7 @@ class WorkflowConfigurationTests(unittest.TestCase):
             self.assertNotIn(forbidden, workflow)
 
     def test_system_heif_hdr_api_probe_is_read_only(self) -> None:
-        workflow = self.workflow("system-heif-hdr-api.yml")
+        workflow = self.workflow("research.yml")
         self.assertIn("permissions:\n  contents: read", workflow)
         self.assertIn("runs-on: xcode-27", workflow)
         self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
@@ -202,6 +196,13 @@ class WorkflowConfigurationTests(unittest.TestCase):
             "agent_completion_gate.py",
         ):
             self.assertNotIn(forbidden, workflow)
+
+    def test_oriented_imageio_readback_uses_the_product_exact_head(self) -> None:
+        workflow = self.workflow("ci.yml")
+        self.assertIn("ref: ${{ env.EXPECTED_HEAD }}", workflow)
+        self.assertIn("XDREMUX_ORIENTATION_OUTPUT:", workflow)
+        self.assertIn("scripts/apple/read_oriented_heif_imageio.swift", workflow)
+        self.assertIn("artifacts/product-integration/orientation/expected.json", workflow)
 
     def test_completion_gate_owns_repository_policy_regressions(self) -> None:
         completion_gate = self.workflow("completion-gate.yml")

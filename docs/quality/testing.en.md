@@ -65,22 +65,15 @@ Current technical documentation follows the [technical writing guide](../style-g
 
 ## Research regression evidence
 
-A single reusable `research.yml` workflow owns portable research tests and native
-carrier readback. It runs read-only against the exact pull-request or main SHA,
-with research-specific path filters. It neither writes repository refs nor
-supplies the product `exact-head` check. A research pass does not promote a
-hypothesis or establish Photos/Gallery device acceptance. Keep per-experiment
-commands and promotion gates next to their code; do not add one-shot workflows.
+A single reusable `research.yml` workflow owns portable research tests, native
+carrier readback, the pinned Photographic Styles tone sweep, and the provisional
+system HEIF HDR measurement. Its jobs use the exact pull-request or main SHA
+with read-only permissions. A manual replay accepts no alternate source or secrets.
+The native tone and system HEIF jobs use the standard `xcode-27` runner and retain
+measurement artifacts for one day. Their results do not supply `exact-head` or
+establish Photos editing, slider response, save/reopen, or Gallery acceptance.
 
-`.github/workflows/style-tone-sweep.yml` is the one native Photographic Styles
-tone measurement. It is read-only, checks out the exact pull-request SHA, and
-renders on the `xcode-27` image with the published consumer harness pinned at
-`37dd551`. Its artifacts expire after one day. It does not write repository
-refs and it does not supply the product `exact-head` check.
-
-`.github/workflows/system-heif-hdr-api.yml` reads the `xcode-27` SDK headers
-for the system HEIF HDR and gain-map encode surface, then runs the opt-in
-prototype that asks Core Image to calculate the gain map. It is read-only,
-checks out the exact pull-request SHA, and keeps its transcript and
-measurement for one day. It does not write repository refs and it does not
-supply `exact-head`.
+Keep experiment commands and promotion criteria beside their code rather than
+creating a workflow per hypothesis. Product orientation readback runs inside
+`ci.yml` against the same exact SHA as the Rust product tests. It reads the
+synthetic oriented HEIF and its expected geometry with ImageIO.

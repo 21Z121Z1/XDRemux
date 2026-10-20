@@ -44,3 +44,5 @@ workspace 检查可脱离产品栈执行 Android/Apple 往返。Apple 转 Androi
 产品几何策略保持本地所有权。完成这些调用方迁移前不移除整个兼容 feature。
 
 独立库现从 `ftyp` 读取受支持主视频的 MIME。Android JPEG/HEIF 目录会保留 QuickTime MIME，视频字节保持不变。编码规范符合性及原厂相册验收仍需分别验证。
+
+主视频即使已有呈现时刻，也必须通过视频轨与 sample table 验证。已知整数/时间尺度保持原值，只有缺失时刻才使用推断值。`convert` 和新转换的 `batch` 项均报告遗漏资源数量；复用 checkpoint 的项没有新转换报告，遗漏数量保持未知。SEF 回退中发现有效 HDR Gain Map 但没有映射关系时，转换会拒绝，不会静默输出 SDR。
