@@ -57,7 +57,8 @@ Load command 8
             library = package / "lib/libheif.1.dylib"
             library.write_bytes(b"library")
             (root / "outside.dylib").write_bytes(b"outside")
-            self.assertEqual(macos.bundled_reference(package, image, "@loader_path/../lib/libheif.1.dylib"), library)
+            # macOS /var is a symlink; this boundary returns canonical paths.
+            self.assertEqual(macos.bundled_reference(package, image, "@loader_path/../lib/libheif.1.dylib"), library.resolve())
             for reference in ["@rpath/libheif.1.dylib", "/opt/homebrew/lib/libheif.1.dylib", "@loader_path/../../outside.dylib"]:
                 with self.subTest(reference=reference), self.assertRaises(ValueError):
                     macos.bundled_reference(package, image, reference)
