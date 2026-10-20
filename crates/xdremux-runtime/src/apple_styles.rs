@@ -368,7 +368,7 @@ pub(crate) fn convert_file(
     Ok(PhotographicStylesFileReceipt { output: published })
 }
 
-fn validate_maker_apple_properties(
+pub(super) fn validate_maker_apple_properties(
     expected: &BTreeMap<String, BTreeMap<String, i64>>,
     actual: &BTreeMap<String, BTreeMap<String, i64>>,
 ) -> Result<()> {
