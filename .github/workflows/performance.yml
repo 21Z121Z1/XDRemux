@@ -66,6 +66,8 @@ jobs:
             echo "head=$(git rev-parse HEAD)"
             sw_vers
             echo "arch=$(uname -m)"
+            sysctl hw.model machdep.cpu.brand_string hw.physicalcpu hw.logicalcpu hw.memsize
+            uptime
             xcodebuild -version
             swift --version
           } | tee artifacts/performance/environment.txt

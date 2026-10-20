@@ -109,6 +109,9 @@ class CompletionGateTests(unittest.TestCase):
     def test_build_inputs_require_regression_and_functional_evidence(self) -> None:
         for name in ("Cargo.toml", "Cargo.lock", "Package.swift", "Package.resolved",
                      "rust-toolchain", "rust-toolchain.toml", "build.rs", ".cargo/config.toml",
+                     "scripts/distribution/build_native.py",
+                     "scripts/distribution/macos.py",
+                     "scripts/distribution/native-dependencies.json",
                      "crates/xdremux-runtime/Cargo.toml",
                      "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj"):
             with self.subTest(path=name):
@@ -121,6 +124,12 @@ class CompletionGateTests(unittest.TestCase):
                 result = self.run_gate(self.write_plan([self.passing_check("regression", "regression")]), receipt)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertIn("functional, integration, or device", result.stderr)
+
+    def test_distribution_documentation_does_not_require_product_evidence(self) -> None:
+        self.add_tracked_file("scripts/distribution/package-readme.md", "# Archive contents\n")
+        result = self.run_gate(self.write_plan([self.passing_check("docs", "static")]),
+                               self.repo / "receipt.json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_research_rust_is_source_not_product(self) -> None:
         self.add_tracked_file("research/probe.rs")
