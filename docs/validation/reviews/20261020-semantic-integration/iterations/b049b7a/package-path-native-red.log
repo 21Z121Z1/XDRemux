@@ -1,0 +1,7 @@
+2026-10-20T20:29:28.5853120Z test_loader_relative_reference_cannot_escape_package (tests.test_macos_distribution.MacOSDistributionTests.test_loader_relative_reference_cannot_escape_package) ... FAIL
+2026-10-20T20:29:28.5863530Z FAIL: test_loader_relative_reference_cannot_escape_package (tests.test_macos_distribution.MacOSDistributionTests.test_loader_relative_reference_cannot_escape_package)
+2026-10-20T20:29:28.5868800Z Traceback (most recent call last):
+2026-10-20T20:29:28.5881760Z   File "/Users/runner/work/XDRemux/XDRemux/tests/test_macos_distribution.py", line 60, in test_loader_relative_reference_cannot_escape_package
+2026-10-20T20:29:28.5889360Z AssertionError: PosixPath('/private/var/folders/fq/bhsbs5bd52791c8x2z[51 chars]lib') != PosixPath('/var/folders/fq/bhsbs5bd52791c8x2z6s3dh400[43 chars]lib')
+2026-10-20T20:29:28.5895590Z Ran 5 tests in 0.047s
+2026-10-20T20:29:28.5897880Z FAILED (failures=1)

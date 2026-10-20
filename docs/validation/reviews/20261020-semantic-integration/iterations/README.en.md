@@ -2,6 +2,8 @@
 
 English | [简体中文](README.md)
 
+The [b049b7a filesystem-fixture appendix](b049b7a/README.en.md) records the two subsequent real macOS fixture failures and their scoped corrections, with new committed-HEAD receipt and remote recovery proof. Production source remains identical to 0a2c7c9; its new native checks are separately identified.
+
 The [0a2c7c9 candidate appendix](0a2c7c9/README.en.md) adds the selective distribution/i18n port, strict alpha/resource preservation, its clean HEAD-bound portable receipt and persistent recovery proof. It also records completed ba2 App results and the ba2 performance failure. The historical observations below retain their capture time and scope.
 
 The parent accepted the original nine-backup recovery/receipt preparation in the first attachment. It did not release merge/deletion. This appendix adds two independently bound source identities and completed old-head CI results; it does not relabel the original receipt or declare a final green integration.

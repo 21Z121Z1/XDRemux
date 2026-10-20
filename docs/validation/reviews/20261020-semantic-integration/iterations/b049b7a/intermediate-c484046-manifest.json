@@ -1,0 +1,9 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-20T20:32:22.069274+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/c484046",
+  "head": "c484046c24d50dd34e12cf95c5fbd7b71654be3c",
+  "tree": "fef93cb99533f92e8d9e1297c6da85b5bda1a29f",
+  "source_branch": "integrate/semantic-review-20261020",
+  "restore_status": "remote fetched, commit/tree matched, git fsck --full --no-reflogs exit 0"
+}

@@ -2,6 +2,8 @@
 
 [English](README.en.md) | 简体中文
 
+[b049b7a 文件系统 fixture 附录](b049b7a/README.md) 记录后续两项真实 macOS 测试失败及对应修正、全新准确 HEAD receipt 和远端恢复证明。生产源码与 0a2c7c9 相同，新原生检查单独标明身份。
+
 [0a2c7c9 候选附录](0a2c7c9/README.md) 补充分发/i18n 选择性移植、严格 alpha/资源保留、干净准确 HEAD portable receipt 及持久恢复证明，并记录 ba2 App 已完成和性能失败。下方历史观测保留原采集时间与范围。
 
 父审核已接受第一份附件的九个备份恢复/receipt 准备，未放行合并或删除。本附录分别绑定后续两个源码身份并补齐旧 HEAD 的 CI 结果，不重标旧 receipt，也不声明最终整合全绿。

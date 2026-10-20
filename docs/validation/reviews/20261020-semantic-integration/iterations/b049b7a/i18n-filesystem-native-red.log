@@ -1,0 +1,9 @@
+2026-10-20T20:30:36.1649910Z test non_unicode_input_arguments_remain_opaque_and_locale_independent ... FAILED
+2026-10-20T20:30:39.5744030Z ---- non_unicode_input_arguments_remain_opaque_and_locale_independent stdout ----
+2026-10-20T20:30:39.5745440Z thread 'non_unicode_input_arguments_remain_opaque_and_locale_independent' (20498) panicked at crates/xdremux-cli/tests/i18n.rs:293:33:
+2026-10-20T20:30:39.5752040Z called `Result::unwrap()` on an `Err` value: Os { code: 92, kind: Uncategorized, message: "Illegal byte sequence" }
+2026-10-20T20:30:39.5755360Z    3: i18n::non_unicode_input_arguments_remain_opaque_and_locale_independent
+2026-10-20T20:30:39.5756100Z    4: i18n::non_unicode_input_arguments_remain_opaque_and_locale_independent::{closure#0}
+2026-10-20T20:30:39.5757710Z    5: <i18n::non_unicode_input_arguments_remain_opaque_and_locale_independent::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+2026-10-20T20:30:39.5760430Z     non_unicode_input_arguments_remain_opaque_and_locale_independent
+2026-10-20T20:30:39.5761050Z test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.08s
