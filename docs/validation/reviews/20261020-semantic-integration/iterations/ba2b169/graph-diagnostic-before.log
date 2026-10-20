@@ -1,0 +1,24 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.23s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 2 tests
+
+thread 'semantic::tests::unclassified_auxiliary_failure_diagnostic_reports_roles_and_edges_without_media' (48627) panicked at crates/xdremux-heif/src/semantic.rs:2390:13:
+invalid HEIF: semantic scaffold has 4 semantic images but 3 metadata descriptors
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test semantic::tests::unclassified_auxiliary_failure_diagnostic_reports_roles_and_edges_without_media ... FAILED
+
+thread 'semantic::tests::auxiliary_graph_diagnostic_bounds_unknown_and_malformed_properties' (48626) panicked at crates/xdremux-heif/src/semantic.rs:2419:13:
+invalid HEIF: semantic scaffold has an unsupported auxiliary relationship
+test semantic::tests::auxiliary_graph_diagnostic_bounds_unknown_and_malformed_properties ... FAILED
+
+failures:
+
+failures:
+    semantic::tests::auxiliary_graph_diagnostic_bounds_unknown_and_malformed_properties
+    semantic::tests::unclassified_auxiliary_failure_diagnostic_reports_roles_and_edges_without_media
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 36 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p xdremux-heif --lib`

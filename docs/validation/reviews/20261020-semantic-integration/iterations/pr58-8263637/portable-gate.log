@@ -1,0 +1,12 @@
+PASS [static] locked-workspace (0.022s)
+PASS [static] rust-format (0.795s)
+PASS [static] rust-workspace-clippy (0.191s)
+PASS [regression] liblivephoto-resource-consumer (7.603s)
+PASS [regression] batch-publication-regressions (10.015s)
+PASS [regression] movie-resource-negative-regressions (28.941s)
+PASS [regression] all-portable-python-regressions (11.670s)
+PASS [functional] build-current-cli (0.100s)
+PASS [functional] real-cli-pair-conversion-and-readback (1.635s)
+PASS completion gate for 8263637fa9cb94c34c01892af80a4ecc97f48275
+receipt: /workspace/XDRemux-pr58-candidate/.codex/verification-receipts/8263637fa9cb94c34c01892af80a4ecc97f48275.json
+PASS verified completion receipt for 8263637fa9cb94c34c01892af80a4ecc97f48275

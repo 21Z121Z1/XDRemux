@@ -6,6 +6,8 @@
 
 被验证的产品提交为 `f9a419aa4eeb33214e2dfac2205719e6cb97d598`，tree 为 `02cda5ccb3daead965e35aba121bcc624a4cd63a`。记录的 main 为 `89d806c8aec961a7991eb3e6d6e2b1370aed8791`。附件提交只添加审查材料，SHA 不同；不得把产品提交的通过证据重新标成附件或后续产品 HEAD 的验收。
 
+[后续证据附录](iterations/README.md) 记录 f9 已完成检查、单独标明身份的 ba2b169 诊断迭代，以及首个具体 PR58 候选。下方原始记录保留原来的范围与采集时间；两个快照均未宣称最终整合已通过验收。
+
 | 证据 | 可读取的完整文件 | 范围 |
 | --- | --- | --- |
 | 九个持久备份 ref、commit/tree | [恢复 manifest](recovery/manifest.json) | 八个原始 head 加整合 head。 |

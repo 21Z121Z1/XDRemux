@@ -1,0 +1,9 @@
+{
+  "verified_at": "2026-10-20T19:48:32.988255+00:00",
+  "repository": "21Z121Z1/XDRemux",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/ba2b169",
+  "head": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7",
+  "tree": "6d1b7005a8096c20e8b89c7b9ed59dccb1e70daa",
+  "restored_from_remote": true,
+  "fsck_exit": 0
+}

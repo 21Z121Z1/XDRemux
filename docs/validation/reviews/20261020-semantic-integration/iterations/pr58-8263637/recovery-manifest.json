@@ -1,0 +1,9 @@
+{
+  "verified_at": "2026-10-20T19:54:36.318156+00:00",
+  "repository": "21Z121Z1/XDRemux",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/candidate/pr58-8263637",
+  "head": "8263637fa9cb94c34c01892af80a4ecc97f48275",
+  "tree": "dc732f9c449536649e52b58d337c13c28092ffa2",
+  "restored_from_remote": true,
+  "fsck_exit": 0
+}

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "scope": "First PR58 landing candidate on recorded main, including source movie/HDR validation and safe app/batch/native-Texture policies. Portable CLI and Rust behavior only; original PR is not advanced and native/App acceptance remains pending.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "name": "liblivephoto-resource-consumer",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-motion-photo",
+        "--test",
+        "liblivephoto_interop"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "batch-publication-regressions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-runtime",
+        "--lib",
+        "batch::tests"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "movie-resource-negative-regressions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-runtime",
+        "--test",
+        "live_photo_negative"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "real-cli-pair-conversion-and-readback",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600
+    }
+  ]
+}

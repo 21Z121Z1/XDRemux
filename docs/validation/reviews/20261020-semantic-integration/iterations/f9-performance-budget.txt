@@ -1,0 +1,4 @@
+2026-10-20T19:46:38.9107560Z   apple-styles median_wall_seconds: observed=10.323s reference=8.691s budget=11.732s
+2026-10-20T19:46:38.9108140Z   apple-styles p95_wall_seconds: observed=10.856s reference=11.412s budget=15.406s
+2026-10-20T19:46:38.9108710Z   apple-styles max_peak_rss_mib: observed=1084.406MiB reference=1089.094MiB budget=1361.367MiB
+2026-10-20T19:46:38.9110830Z performance regression gate passed

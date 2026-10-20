@@ -6,6 +6,8 @@ This dated review attachment records the evidence submitted for [PR #71](https:/
 
 Product source under review is `f9a419aa4eeb33214e2dfac2205719e6cb97d598`, tree `02cda5ccb3daead965e35aba121bcc624a4cd63a`. The recorded default branch is `89d806c8aec961a7991eb3e6d6e2b1370aed8791`. The attachment commit is documentation/evidence only and has a different SHA. Evidence for the product source must not be relabeled as verification of that attachment or a later product head.
 
+The [subsequent evidence appendix](iterations/README.en.md) records completed f9 checks, a separately identified ba2b169 diagnostic iteration and the first concrete PR58 candidate. The original records below retain their original scope and capture time. Neither snapshot declares the final integration accepted.
+
 ## Inspect the original evidence
 
 | Evidence | Inspectable file | Scope |
