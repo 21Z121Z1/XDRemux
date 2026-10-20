@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import fnmatch
 import re
 import unittest
 
@@ -18,6 +19,55 @@ CONCURRENCY = (
 
 
 class WorkflowConfigurationTests(unittest.TestCase):
+    @classmethod
+    def uploaded(cls, workflow: str, path: str) -> bool:
+        for step in re.split(r"(?m)^      - ", cls.workflow(workflow)):
+            if "uses: actions/upload-artifact@" not in step:
+                continue
+            match = re.search(r"(?m)^          path: (.+)$", step)
+            if match is None:
+                continue
+            if match[1] == "|":
+                patterns = re.findall(r"(?m)^            (\S.*)$", step[match.end():])
+            else:
+                patterns = [match[1]]
+            for pattern in patterns:
+                if path.startswith(pattern.rstrip("/") + "/") or fnmatch.fnmatchcase(path, pattern):
+                    return True
+        return False
+
+    def test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries(self):
+        for path in ("artifacts/product-integration/rust-tests.log",
+                     "artifacts/product-integration/texture/result.json",
+                     "artifacts/product-integration/orientation/expected.json",
+                     "artifacts/styles-acceptance/linear-thumbnail-roundtrip.json"):
+            with self.subTest(path=path):
+                self.assertTrue(self.uploaded("ci.yml", path))
+        for path in ("artifacts/product-integration/texture/case/styles-texture.heic",
+                     "artifacts/product-integration/texture/native/context/working.png",
+                     "artifacts/product-integration/texture/native/context/face.l8",
+                     "artifacts/product-integration/texture/native/context/stored-person-pixels.json",
+                     "artifacts/styles-acceptance/photo.heic"):
+            with self.subTest(path=path):
+                self.assertFalse(self.uploaded("ci.yml", path), "media must stay on the runner")
+
+    def test_research_uploads_keep_scores_without_photos_or_render_buffers(self):
+        for path in ("${{ runner.temp }}/styles-version-native.json",
+                     "artifacts/tone-response/report/tone-response.json",
+                     "artifacts/tone-response/asymmetry/asymmetry.json",
+                     "artifacts/system-heif-hdr-measurement/tone-shape.json"):
+            with self.subTest(path=path):
+                self.assertTrue(self.uploaded("research.yml", path))
+        for path in ("${{ runner.temp }}/styles-photos-import/styles-v15.heic",
+                     "artifacts/tone-response/generated/portrait.heic",
+                     "artifacts/tone-response/report/comparisons/portrait.png",
+                     "artifacts/tone-response/xdremux/photo/tone-0/renderer-0/_outputImageTexture.bin",
+                     "artifacts/tone-response/xdremux/photo/pixels.json",
+                     "artifacts/system-heif-hdr-measurement/lhdr-v1-01.system.heic",
+                     "artifacts/system-heif-hdr-measurement/tone/photo/pixels.f32"):
+            with self.subTest(path=path):
+                self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+
     @staticmethod
     def workflow(name: str) -> str:
         return (WORKFLOW_ROOT / name).read_text(encoding="utf-8")

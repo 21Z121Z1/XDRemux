@@ -47,6 +47,13 @@ Strict Rust CI gates use these fixtures to test multiple JPEG and HEIC/HEIF Moti
 
 Do not describe all real samples as private. Some older ProXDR, device-only, and Apple-feature samples can still be external or private.
 
+Native checks may create media and pixel buffers on their runner. Automatic
+Actions uploads contain named diagnostic reports, hashes and logs, not source
+photos, converted portraits, rendered comparisons or pixel dictionaries. Keep
+media generation, native readback and failure assertions in the test; restrict
+the upload boundary rather than skipping those checks. Produce Photos import
+files locally when device validation is required.
+
 ## Device-dependent claims
 
 A claim about Apple Photos editing, OPPO Gallery display, or another device UI requires evidence from that environment.

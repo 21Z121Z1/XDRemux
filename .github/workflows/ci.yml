@@ -194,7 +194,12 @@ jobs:
           name: xdremux-rust-product-integration
           if-no-files-found: warn
           retention-days: 14
-          path: artifacts/product-integration/
+          # Native media and pixel dictionaries remain runner-local.
+          path: |
+            artifacts/product-integration/*.log
+            artifacts/product-integration/**/*.log
+            artifacts/product-integration/orientation/*.json
+            artifacts/product-integration/texture/result.json
 
       - name: Upload HDR-first Linear Thumbnail diagnostics
         if: always()
@@ -203,4 +208,4 @@ jobs:
           name: xdremux-hdr-first-styles-diagnostics
           retention-days: 14
           if-no-files-found: warn
-          path: artifacts/styles-acceptance/
+          path: artifacts/styles-acceptance/linear-thumbnail-roundtrip.json

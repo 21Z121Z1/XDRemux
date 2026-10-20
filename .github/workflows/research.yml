@@ -157,12 +157,7 @@ jobs:
           test -s "$RUNNER_TEMP/styles-photos-import/styles-v16-version-only.heic"
           test -s "$RUNNER_TEMP/styles-photos-import/native-result.json"
           test -s "$RUNNER_TEMP/styles-photos-import/README.txt"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: photos-import-styles-v15-v16-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/styles-photos-import/
-          if-no-files-found: error
-          retention-days: 14
+      # Generate and validate both media locally; export only native facts.
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -228,7 +223,13 @@ jobs:
           name: style-tone-response
           if-no-files-found: warn
           retention-days: 1
-          path: artifacts/tone-response/
+          path: |
+            artifacts/tone-response/host.txt
+            artifacts/tone-response/apple-report/tone-response.json
+            artifacts/tone-response/apple-report/tone-response.md
+            artifacts/tone-response/report/tone-response.json
+            artifacts/tone-response/report/tone-response.md
+            artifacts/tone-response/asymmetry/asymmetry.json
 
   system-heif-hdr-api:
     runs-on: xcode-27
@@ -306,4 +307,7 @@ jobs:
           name: system-heif-hdr-measurement
           if-no-files-found: warn
           retention-days: 1
-          path: artifacts/system-heif-hdr-measurement/
+          path: |
+            artifacts/system-heif-hdr-measurement/host.txt
+            artifacts/system-heif-hdr-measurement/lhdr-v1-01.system-hdr.json
+            artifacts/system-heif-hdr-measurement/tone-shape.json
