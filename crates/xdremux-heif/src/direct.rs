@@ -2,10 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use xdremux_format::isobmff::{
     make_box, make_full_box, make_iinf_box, make_iloc_box, make_infe_box, make_ipma_box,
-    make_iref_box, make_ispe_box, parse_boxes, parse_iinf, parse_iloc, parse_ipco_properties,
-    parse_ipma, parse_iref, parse_pitm, scan_top_level_boxes, BoxHeader, IlocEntry, IlocExtent,
-    IpmaAssociation, IpmaEntry, IrefEntry, ItemInfo, PropertyInfo, FTYP, IDAT, IINF, ILOC, IPMA,
-    IPRP, IREF, MDAT, META, PITM,
+    make_iref_box, make_irot_box, make_ispe_box, parse_boxes, parse_iinf, parse_iloc,
+    parse_ipco_properties, parse_ipma, parse_iref, parse_pitm, scan_top_level_boxes, BoxHeader,
+    IlocEntry, IlocExtent, IpmaAssociation, IpmaEntry, IrefEntry, ItemInfo, PropertyInfo, FTYP,
+    IDAT, IINF, ILOC, IPMA, IPRP, IREF, MDAT, META, PITM,
 };
 use xdremux_format::{parse_hvcc_profile, ChromaSampling, FourCC};
 
@@ -21,6 +21,7 @@ const EXIF: FourCC = FourCC::new(*b"Exif");
 const IPCO: FourCC = FourCC::new(*b"ipco");
 const ISPE: FourCC = FourCC::new(*b"ispe");
 const IROT: FourCC = FourCC::new(*b"irot");
+const IMIR: FourCC = FourCC::new(*b"imir");
 const COLR: FourCC = FourCC::new(*b"colr");
 const PIXI: FourCC = FourCC::new(*b"pixi");
 const DIMG: FourCC = FourCC::new(*b"dimg");
@@ -270,11 +271,9 @@ fn make_imageio_tmap_ispe(primary_ispe: &[u8], irot: &[u8]) -> Result<Vec<u8>> {
     let width = u32::from_be_bytes(primary_ispe[12..16].try_into().expect("checked length"));
     let height = u32::from_be_bytes(primary_ispe[16..20].try_into().expect("checked length"));
     let quarter_turns = irot[8] & 0x03;
-    if quarter_turns.is_multiple_of(2) {
-        Ok(make_ispe_box(width, height)?)
-    } else {
-        Ok(make_ispe_box(height, width)?)
-    }
+    let (display_width, display_height) =
+        crate::orientation::display_dimensions(width, height, quarter_turns);
+    Ok(make_ispe_box(display_width, display_height)?)
 }
 
 fn next_property(output: &mut Vec<u8>, next_index: &mut u16, raw: &[u8]) -> Result<u16> {
@@ -710,15 +709,58 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
     let irot_index = *remapped_property_indices
         .get(&irot.index)
         .ok_or_else(|| invalid("irot property remap is missing"))?;
-    let tmap_ispe = make_imageio_tmap_ispe(
-        raw_property(source, primary_ispe)?,
-        raw_property(source, irot)?,
+    let primary_ispe_bytes = raw_property(source, primary_ispe)?;
+    let irot_bytes = raw_property(source, irot)?;
+    if primary_ispe_bytes.len() < 20 {
+        return Err(invalid("primary ispe property is truncated"));
+    }
+    let primary_width = u32::from_be_bytes(
+        primary_ispe_bytes[12..16]
+            .try_into()
+            .map_err(|_| invalid("primary ispe width is truncated"))?,
+    );
+    let primary_height = u32::from_be_bytes(
+        primary_ispe_bytes[16..20]
+            .try_into()
+            .map_err(|_| invalid("primary ispe height is truncated"))?,
+    );
+    crate::orientation::require_coded_aspect(
+        primary_width,
+        primary_height,
+        spec.gain_map_width,
+        spec.gain_map_height,
+        "Gain Map",
     )?;
-    let tmap_ispe_index = if raw_property(source, primary_ispe)? == tmap_ispe {
+    let quarter_turns = if irot_bytes.len() >= 9 {
+        irot_bytes[8] & 0x03
+    } else {
+        return Err(invalid("primary irot property is truncated"));
+    };
+    let tmap_ispe = make_imageio_tmap_ispe(primary_ispe_bytes, irot_bytes)?;
+    let tmap_ispe_index = if primary_ispe_bytes == tmap_ispe {
         primary_ispe_index
     } else {
         next_property(&mut ipco_payload, &mut next_property_index, &tmap_ispe)?
     };
+    let tmap_irot_index = if quarter_turns == 0 {
+        irot_index
+    } else {
+        next_property(
+            &mut ipco_payload,
+            &mut next_property_index,
+            &make_irot_box(0)?,
+        )?
+    };
+    let imir_index = primary_ipma.associations.iter().find_map(|association| {
+        let property = property_by_index
+            .get(&u32::from(association.property_index))
+            .copied()?;
+        if property.kind == IMIR {
+            remapped_property_indices.get(&property.index).copied()
+        } else {
+            None
+        }
+    });
 
     for property in &original_codec {
         let index = next_property(
@@ -781,6 +823,16 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
             },
         ],
     });
+    if let Some(imir_index) = imir_index {
+        output_ipma_entries
+            .last_mut()
+            .expect("gain-map ipma entry was just pushed")
+            .associations
+            .push(IpmaAssociation {
+                property_index: imir_index,
+                essential: true,
+            });
+    }
     output_ipma_entries.push(IpmaEntry {
         item_id: output_tmap_id,
         associations: vec![
@@ -797,7 +849,7 @@ pub fn replace_private_jpeg_gain_map_with_hevc_tiles(
                 essential: false,
             },
             IpmaAssociation {
-                property_index: irot_index,
+                property_index: tmap_irot_index,
                 essential: true,
             },
         ],
