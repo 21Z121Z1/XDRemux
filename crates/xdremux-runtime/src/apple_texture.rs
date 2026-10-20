@@ -8,7 +8,8 @@ use crate::{Result, RuntimeError};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use xdremux_engine::{
-    apple_texture_property_list, apple_texture_tuning_profile, APPLE_TEXTURE_ANALYSIS_MAX_DIMENSION,
+    apple_texture_property_list, apple_texture_tuning_profile, AppleTextureValue,
+    APPLE_TEXTURE_ANALYSIS_MAX_DIMENSION,
 };
 use xdremux_heif::TextureStyleMask;
 
@@ -241,8 +242,7 @@ pub(super) fn generate(
             instance_reference_key: *key,
         })
         .collect();
-    let plist = apple_texture_property_list(&people)
-        .map_err(|e| RuntimeError::external("Texture metadata", e))?;
+    let plist = metadata(&people)?;
     let assembled = xdremux_heif::assemble_texture_styles_heif(source, &plist, &masks)
         .map_err(|e| RuntimeError::external("Rust Texture graph", e))?;
     let final_path = root.join("final.heic");
@@ -253,6 +253,41 @@ pub(super) fn generate(
     let report = read(&report_path)?;
     validate_readback(&report, &people, &assembled)?;
     Ok(assembled)
+}
+
+fn metadata(people: &[Value]) -> Result<Vec<u8>> {
+    let people = people
+        .iter()
+        .map(texture_value)
+        .collect::<Result<Vec<_>>>()?;
+    apple_texture_property_list(&people).map_err(|e| RuntimeError::external("Texture metadata", e))
+}
+
+fn texture_value(value: &Value) -> Result<AppleTextureValue> {
+    Ok(match value {
+        Value::Bool(v) => AppleTextureValue::Bool(*v),
+        Value::Number(v) => {
+            if let Some(v) = v.as_u64() {
+                AppleTextureValue::Integer(v)
+            } else {
+                AppleTextureValue::Real(
+                    v.as_f64()
+                        .filter(|v| v.is_finite())
+                        .ok_or_else(|| invalid("non-finite native value"))?,
+                )
+            }
+        }
+        Value::String(v) => AppleTextureValue::String(v.clone()),
+        Value::Array(v) => {
+            AppleTextureValue::Array(v.iter().map(texture_value).collect::<Result<_>>()?)
+        }
+        Value::Object(v) => AppleTextureValue::Dictionary(
+            v.iter()
+                .map(|(k, v)| Ok((k.clone(), texture_value(v)?)))
+                .collect::<Result<_>>()?,
+        ),
+        Value::Null => return Err(invalid("native metadata contains a null value")),
+    })
 }
 
 fn same(actual: &Value, expected: &Value) -> bool {
@@ -318,8 +353,7 @@ pub(super) fn validate_existing(executable: &Path, input: &Path) -> Result<()> {
     )?;
     let report = read(&path)?;
     let people = array(&report, "native_person_data_readback")?;
-    apple_texture_property_list(people)
-        .map_err(|e| RuntimeError::external("Styles native people validation", e))?;
+    let _ = metadata(people)?;
     validate_readback(&report, people, &bytes)
 }
 

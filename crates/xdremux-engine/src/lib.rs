@@ -17,7 +17,8 @@ use std::collections::BTreeSet;
 use xdremux_format::ChromaSampling;
 
 pub use apple_texture::{
-    apple_texture_property_list, apple_texture_tuning_profile, APPLE_TEXTURE_ANALYSIS_MAX_DIMENSION,
+    apple_texture_property_list, apple_texture_tuning_profile, AppleTextureTuningProfile,
+    AppleTextureValue, APPLE_TEXTURE_ANALYSIS_MAX_DIMENSION,
 };
 
 pub use apple::{

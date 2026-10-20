@@ -1389,7 +1389,7 @@ fn validate_style_statistics(statistics: &AppleStyleStatistics) -> Result<(), Ap
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum PlistValue {
+pub enum PlistValue {
     Bool(bool),
     Integer(u64),
     Real(f64),
