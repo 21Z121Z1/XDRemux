@@ -12,8 +12,8 @@ enum TestFailure: Error, CustomStringConvertible {
 }
 
 @MainActor
-func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
-    guard condition() else {
+func expect(_ condition: @autoclosure () throws -> Bool, _ message: String) throws {
+    guard try condition() else {
         throw TestFailure.assertion(message)
     }
 }
@@ -55,6 +55,12 @@ struct XDRemuxAppModelTests {
         try testProductPolicyDefaults()
         try testSimplifiedProductSwitches()
         try testIndependentAppleFeatureConfiguration()
+        try await testCLIClientDrainsBothPipesWhileRunning()
+        try await testSkipRequiresValidationForTheRequestedFeature()
+        try testOutputCannotOverwriteQueuedInputsOrAliases()
+        try await testCategorizedConversionCreatesDirectories()
+        try await testExistingOutputReplacementPreservesFailureAndSuccess()
+        try await testExistingMotionPhotoOutputIsNeverReplacedAsOneFile()
         print("XDRemuxAppModelTests passed")
     }
 
@@ -69,6 +75,232 @@ struct XDRemuxAppModelTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         try expect(!viewModel.isBusy, "categorization operation timed out")
+    }
+
+    @MainActor
+    private static func withCLI(
+        _ script: String,
+        body: @MainActor (URL) async throws -> Void
+    ) async throws {
+        let root = try makeTempDirectory("cli-client")
+        let executable = root.appendingPathComponent("xdremux-test-cli")
+        try Data(("#!/bin/sh\nset -eu\n" + script + "\n").utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        let previous = ProcessInfo.processInfo.environment["XDREMUX_CLI"]
+        setenv("XDREMUX_CLI", executable.path, 1)
+        defer {
+            if let previous { setenv("XDREMUX_CLI", previous, 1) }
+            else { unsetenv("XDREMUX_CLI") }
+            try? FileManager.default.removeItem(at: root.deletingLastPathComponent())
+        }
+        try await body(root)
+    }
+
+    private static let conversionCLI = #"""
+    [ "$1" = convert ] || exit 64
+    shift
+    input=''
+    output=''
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --input) input="$2"; shift 2 ;;
+            --output) output="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+    [ -d "$(dirname "$output")" ] || exit 65
+    printf 'new-output' > "$output"
+    case "$input" in
+        *motion*) printf 'new-movie' > "${output%.*}.mov" ;;
+    esac
+    """#
+
+    @MainActor
+    private static func runConversion(_ model: XDRemuxViewModel) async throws {
+        model.startConversion()
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(10))
+        while clock.now < deadline,
+              model.isBusy || model.queue.contains(where: { !$0.status.isTerminal }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try expect(!model.isBusy && model.queue.allSatisfy { $0.status.isTerminal }, "conversion operation timed out")
+    }
+
+    @MainActor
+    private static func testCLIClientDrainsBothPipesWhileRunning() async throws {
+        try await withCLI(#"""
+        helper_pid=$$
+        (
+            sleep 5 &
+            timer=$!
+            trap 'kill "$timer" 2>/dev/null || true; wait "$timer" 2>/dev/null || true; exit' TERM
+            wait "$timer"
+            kill -TERM "$helper_pid" 2>/dev/null || true
+        ) </dev/null >/dev/null 2>&1 &
+        watchdog=$!
+        trap 'kill "$watchdog" 2>/dev/null || true; wait "$watchdog" 2>/dev/null || true' EXIT
+        error_chunk=e
+        output_chunk=' '
+        count=0
+        while [ "$count" -lt 10 ]; do
+            error_chunk="$error_chunk$error_chunk"
+            output_chunk="$output_chunk$output_chunk"
+            count=$((count + 1))
+        done
+        count=0
+        while [ "$count" -lt 256 ]; do
+            printf '%s' "$error_chunk" >&2
+            count=$((count + 1))
+        done
+        count=0
+        while [ "$count" -lt 256 ]; do
+            printf '%s' "$output_chunk"
+            count=$((count + 1))
+        done
+        printf '{"items": []}\n'
+        """#) { root in
+            let input = root.appendingPathComponent("input.heic")
+            try writeFile(input)
+            let result = try RustCLIClient.classify(inputs: [input])
+            try expect(result.isEmpty, "CLI output larger than either pipe must be drained and decoded without deadlock")
+        }
+    }
+
+    @MainActor
+    private static func testSkipRequiresValidationForTheRequestedFeature() async throws {
+        try await withCLI(#"""
+        printf '%s\n' "$*" >> "$0.log"
+        """#) { root in
+            let output = root.appendingPathComponent("output.heic")
+            try writeFile(output)
+            try expect(RustCLIClient.isValidOutput(output), "standard output should use Rust validation")
+            var config = ConversionConfig()
+            config.applePhotographicStyles = true
+            try expect(RustCLIClient.isValidOutput(output, config: config), "Styles should use its supported feature validation")
+            config.applePhotographicStyles = false
+            config.applePortrait = true
+            try expect(!RustCLIClient.isValidOutput(output, config: config), "generic HDR validation cannot justify skipping Portrait")
+            config.oppoGalleryCompatibilityEnabled = true
+            try expect(!RustCLIClient.isValidOutput(output, config: config), "generic HDR validation cannot justify skipping OPPO compatibility")
+            let calls = try String(contentsOf: root.appendingPathComponent("xdremux-test-cli.log"), encoding: .utf8)
+                .split(separator: "\n")
+            try expect(calls.count == 2 && calls[1].hasSuffix("--apple-styles"), "only supported validation requests should reach the CLI")
+        }
+    }
+
+    @MainActor
+    private static func testOutputCannotOverwriteQueuedInputsOrAliases() throws {
+        let root = try makeTempDirectory("protect-inputs")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let input = root.appendingPathComponent("a.heic")
+        let otherInput = root.appendingPathComponent("a_iso.heic")
+        try writeFile(input)
+        try writeFile(otherInput, bytes: 32)
+        let model = XDRemuxViewModel()
+        model.config.skipExisting = false
+        model.queue = [
+            ConversionQueueItem(inputURL: input, outputURL: otherInput),
+            ConversionQueueItem(inputURL: otherInput, outputURL: root.appendingPathComponent("a_iso_iso.heic")),
+        ]
+        _ = model.markOutputCollisionsForTesting()
+        try expect(model.queue[0].status == .failed && model.queue[0].outputPlanStatus == .overwritesInput, "suffix naming must not replace another imported original")
+
+        for symbolic in [true, false] {
+            let output = root.appendingPathComponent(symbolic ? "symlink-output" : "hardlink-output", isDirectory: true)
+            try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+            let alias = output.appendingPathComponent("a.heic")
+            if symbolic {
+                try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: otherInput)
+            } else {
+                try FileManager.default.linkItem(at: otherInput, to: alias)
+            }
+            let aliases = XDRemuxViewModel()
+            aliases.config.skipExisting = false
+            aliases.config.outputDirectory = output
+            aliases.queue = [
+                ConversionQueueItem(inputURL: input, outputURL: alias),
+                ConversionQueueItem(inputURL: otherInput, outputURL: output.appendingPathComponent("a_iso.heic")),
+            ]
+            _ = aliases.markOutputCollisionsForTesting()
+            try expect(aliases.queue[0].outputPlanStatus == .overwritesInput, "output aliases must protect the original file identity")
+        }
+        let inPlace = XDRemuxViewModel()
+        inPlace.config.outputDirectory = root
+        inPlace.config.skipExisting = false
+        inPlace.queue = [ConversionQueueItem(inputURL: input, outputURL: input)]
+        _ = inPlace.markOutputCollisionsForTesting()
+        try expect(!inPlace.canStart && inPlace.queue[0].outputPlanStatus == .overwritesInput, "app output directories must preserve imported originals")
+        try expect((try Data(contentsOf: otherInput)) == Data(repeating: 0x41, count: 32), "planning cannot alter original media")
+    }
+
+    @MainActor
+    private static func testCategorizedConversionCreatesDirectories() async throws {
+        try await withCLI(conversionCLI) { root in
+            let input = root.appendingPathComponent("input.heic")
+            try writeFile(input)
+            let model = XDRemuxViewModel()
+            model.config.skipExisting = false
+            model.config.outputDirectory = root.appendingPathComponent("new-output")
+            model.config.categorizeOutputByCaptureMode = true
+            model.queue = [ConversionQueueItem(inputURL: input, outputURL: input, captureMode: .portrait)]
+            try await runConversion(model)
+            let expected = root.appendingPathComponent("new-output/静态照片/人像/input.heic")
+            try expect(model.queue[0].status == .converted, "first categorized conversion must create its directories")
+            try expect((try Data(contentsOf: expected)) == Data("new-output".utf8), "CLI should write the planned categorized output")
+        }
+    }
+
+    @MainActor
+    private static func testExistingOutputReplacementPreservesFailureAndSuccess() async throws {
+        for fail in [false, true] {
+            try await withCLI(conversionCLI + (fail ? "\nexit 7" : "")) { root in
+                let input = root.appendingPathComponent("input.heic")
+                let outputDirectory = root.appendingPathComponent("output")
+                try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+                let output = outputDirectory.appendingPathComponent("input.heic")
+                try Data("source".utf8).write(to: input)
+                try Data("old-output".utf8).write(to: output)
+                let model = XDRemuxViewModel()
+                model.config.skipExisting = false
+                model.config.outputDirectory = outputDirectory
+                model.queue = [ConversionQueueItem(inputURL: input, outputURL: output)]
+                try await runConversion(model)
+                try expect(model.queue[0].status == (fail ? .failed : .converted), "replacement should reflect the CLI outcome")
+                try expect((try Data(contentsOf: output)) == Data((fail ? "old-output" : "new-output").utf8), "failed conversion must retain the prior output; success should replace it")
+                try expect((try Data(contentsOf: input)) == Data("source".utf8), "overwrite intent cannot change the source")
+                let files = try FileManager.default.contentsOfDirectory(atPath: outputDirectory.path)
+                try expect(files == ["input.heic"], "replacement staging files should always be cleaned")
+            }
+        }
+    }
+
+    @MainActor
+    private static func testExistingMotionPhotoOutputIsNeverReplacedAsOneFile() async throws {
+        try await withCLI(conversionCLI) { root in
+            // Exercise both the Rust classification and the actual two-file
+            // result when classification was unavailable during import.
+            for assetType in [PhotoAssetType.livePhoto, .staticPhoto] {
+                let input = root.appendingPathComponent("motion.heic")
+                try Data("source".utf8).write(to: input)
+                let outputDirectory = root.appendingPathComponent(assetType.rawValue)
+                try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+                let output = outputDirectory.appendingPathComponent("motion.heic")
+                let movie = output.deletingPathExtension().appendingPathExtension("mov")
+                try Data("old-still".utf8).write(to: output)
+                try Data("old-movie".utf8).write(to: movie)
+                let model = XDRemuxViewModel()
+                model.config.skipExisting = false
+                model.config.outputDirectory = outputDirectory
+                model.queue = [ConversionQueueItem(inputURL: input, outputURL: output, assetType: assetType)]
+                try await runConversion(model)
+                try expect(model.queue[0].status == .failed, "existing Motion Photo output needs pair publication owned by Rust")
+                try expect((try Data(contentsOf: output)) == Data("old-still".utf8), "failed pair replacement must retain the still")
+                try expect((try Data(contentsOf: movie)) == Data("old-movie".utf8), "failed pair replacement must retain the movie")
+                let files = try FileManager.default.contentsOfDirectory(atPath: outputDirectory.path).sorted()
+                try expect(files == ["motion.heic", "motion.mov"], "unexpected pair staging must clean both resources")
+            }
+        }
     }
 
     @MainActor

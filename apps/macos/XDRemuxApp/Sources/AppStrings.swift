@@ -27,6 +27,7 @@ enum AppStrings {
     static let outputPlanOverwriteExisting = "将覆盖已有文件"
     static let outputPlanSkipExisting = "已有有效输出，将跳过"
     static let outputPlanDuplicate = "输出路径冲突"
+    static let outputPlanOverwritesInput = "输出会覆盖已导入的原始文件"
     static let outputPlanInputMissing = "源文件不存在"
     static let outputPlanParentIsFile = "输出目录位置是文件"
 
@@ -67,7 +68,7 @@ enum AppStrings {
     static let applePortraitHelp = "使用 OPPO 景深数据与当前照片的 Vision person、skin、hair、teeth、glasses 分割结果生成 Apple 人像辅助项目。非人像照片仍可单独输出摄影风格。"
     static let appleFeaturesOppoIncompatibleHelp = "Apple 输出与 OPPO 相册兼容层互斥；先关闭 OPPO 相册兼容格式。"
     static let skipExisting = "跳过已有有效输出"
-    static let skipExistingHelp = "目标文件已经满足当前 Rust validation contract 时不重复转换。"
+    static let skipExistingHelp = "仅跳过 Rust 已验证满足当前功能的输出；Portrait 和 OPPO 兼容输出会重新转换。"
     static let categorizeOutput = "按拍摄模式分类输出"
     static let categorizeOutputHelp = "根据源照片的 OPPO UserComment，将转换结果写入普通拍照、大师模式、专业模式、人像等子目录；无法可靠识别的文件保留在输出根目录。"
     static let concurrentJobs = "并发任务"
