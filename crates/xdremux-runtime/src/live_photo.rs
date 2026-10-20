@@ -167,9 +167,7 @@ fn validated_gain_jpeg<'a>(
     primary_end: usize,
     asset: &MotionAsset,
 ) -> Result<Option<ValidatedGainJpeg<'a>>> {
-    if !source_declares_gain_map(asset) {
-        return Ok(None);
-    }
+    let declared = source_declares_gain_map(asset);
     let declared_lengths = declared_gain_map_lengths(asset);
     let mut search = primary_end;
     while let Some(start) = next_soi(static_bytes, search) {
@@ -195,12 +193,21 @@ fn validated_gain_jpeg<'a>(
             search = start.saturating_add(2);
             continue;
         }
+        if !declared {
+            return Err(RuntimeError::new(
+                "Ultra HDR JPEG/R",
+                "static JPEG contains validated HDR data without a mapped GainMap resource; refusing SDR conversion",
+            ));
+        }
         return Ok(Some(ValidatedGainJpeg {
             bytes: candidate,
             metadata,
         }));
     }
 
+    if !declared {
+        return Ok(None);
+    }
     Err(RuntimeError::new(
         "Ultra HDR JPEG/R",
         if declared_lengths.is_empty() {
@@ -338,6 +345,7 @@ fn prepare_jpeg_still(
             "primary range is outside static resource",
         )
     })?;
+    let gain = validated_gain_jpeg(static_bytes, primary_end, asset)?;
     let raster = jpeg
         .decode_raster(&JpegRasterDecodeRequest {
             data: primary.to_vec(),
@@ -354,7 +362,6 @@ fn prepare_jpeg_still(
         )
         .map_err(|error| RuntimeError::external("Motion Photo primary HEIC encode", error))?;
 
-    let gain = validated_gain_jpeg(static_bytes, primary_end, asset)?;
     match gain {
         Some(gain) => Ok(PreparedStill {
             bytes: assemble_jpeg_gain_map(jpeg, heif, &encoded_base, &gain)?,
@@ -524,13 +531,13 @@ pub(crate) fn convert_motion_photo_file(
     let primary_video = photo
         .motion_video_bytes()
         .map_err(|error| RuntimeError::external("Motion Photo primary motion resource", error))?;
+    let fallback_seconds = resolve_live_photo_still_time(primary_video, None)
+        .map_err(|error| RuntimeError::external("Live Photo video sample validation", error))?;
     let presentation = match photo.presentation_time() {
         Some(time) => time,
         None => {
             // The existing product fallback chooses a presentation position.
             // Its inferred time is not a source-format fact.
-            let seconds = resolve_live_photo_still_time(primary_video, None)
-                .map_err(|error| RuntimeError::external("Live Photo still-time fallback", error))?;
             let timescale = asset
                 .containers
                 .iter()
@@ -539,9 +546,13 @@ pub(crate) fn convert_motion_photo_file(
                 .ok_or_else(|| {
                     RuntimeError::new("Live Photo still-time fallback", "movie timescale missing")
                 })?;
-            MediaTime::new((seconds * f64::from(timescale)).round() as i64, timescale).ok_or_else(
-                || RuntimeError::new("Live Photo still-time fallback", "invalid movie timescale"),
-            )?
+            MediaTime::new(
+                (fallback_seconds * f64::from(timescale)).round() as i64,
+                timescale,
+            )
+            .ok_or_else(|| {
+                RuntimeError::new("Live Photo still-time fallback", "invalid movie timescale")
+            })?
         }
     };
     let still_time_seconds = presentation.seconds();
@@ -650,6 +661,23 @@ mod tests {
         let parsed = Uuid::parse_str(&value).expect("generated identifier must parse as UUID");
         assert_eq!(parsed.get_version_num(), 4);
         assert_eq!(value, value.to_ascii_uppercase());
+    }
+
+    #[test]
+    fn sef_hdr_without_a_mapped_gain_map_cannot_be_classified_as_sdr() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg");
+        let mut source = fs::read(path).unwrap();
+        let flag = b":MotionPhoto=\"1\"";
+        let start = source.windows(flag.len()).position(|w| w == flag).unwrap();
+        source[start + flag.len() - 2] = b'0';
+        let photo =
+            MotionPhoto::parse(Input::SingleFile(&source), ParseOptions::compatible()).unwrap();
+        assert_eq!(photo.asset().dialect, VendorDialect::SamsungSef);
+        assert!(!source_declares_gain_map(photo.asset()));
+        let still = photo.still_bytes().unwrap();
+        let primary_end = jpeg_image_end(still, 0).unwrap();
+        assert!(validated_gain_jpeg(still, primary_end, photo.asset()).is_err());
     }
 
     #[test]
