@@ -7,7 +7,10 @@ on:
       - "Cargo.lock"
       - "crates/**"
       - "Sources/XDRemuxAppleAdapter/**"
+      - "Sources/XDTextureNative/**"
+      - "Package.swift"
       - "benchmarks/macos26-arm64-product-baseline.json"
+      - "benchmarks/macos27-arm64-product-baseline.json"
       - "tests/test_performance_design.py"
       - "tests/test_performance_budget.py"
       - "scripts/performance/benchmark_rust_product.py"
@@ -23,7 +26,10 @@ on:
       - "Cargo.lock"
       - "crates/**"
       - "Sources/XDRemuxAppleAdapter/**"
+      - "Sources/XDTextureNative/**"
+      - "Package.swift"
       - "benchmarks/macos26-arm64-product-baseline.json"
+      - "benchmarks/macos27-arm64-product-baseline.json"
       - "tests/test_performance_design.py"
       - "tests/test_performance_budget.py"
       - "scripts/performance/benchmark_rust_product.py"
@@ -56,7 +62,7 @@ jobs:
           mkdir -p artifacts/performance
           {
             echo "runner_provider=GitHub Actions hosted runner"
-            echo "runs_on=macos-26"
+            echo "runs_on=xcode-27"
             echo "head=$(git rev-parse HEAD)"
             sw_vers
             echo "arch=$(uname -m)"
@@ -142,7 +148,7 @@ jobs:
         shell: bash
         run: |
           python3 scripts/performance/check_performance_budget.py \
-            --baseline benchmarks/macos26-arm64-product-baseline.json \
+            --baseline benchmarks/macos27-arm64-product-baseline.json \
             --benchmark artifacts/performance/product-benchmark.json \
             --launches artifacts/performance/apple-adapter-launches.json \
             --expected-head "$(git rev-parse HEAD)" \
@@ -158,7 +164,7 @@ jobs:
             echo "Runner: GitHub Actions hosted macOS 26 (arm64). These are not local-device measurements."
             echo "Product E2E timings include source I/O, parsing, Gain Map decode/reconstruction, codec work, HEIF assembly/publication, and Apple adapter/framework overhead where applicable."
             echo "Standard HDR uses the portable Rust/libheif Gain Map encoder even on macOS; the Apple VideoToolbox Main10 primitive belongs to the Photographic Styles Linear Thumbnail path and is not treated as an RGB 4:4:4 Gain Map backend."
-            echo "The committed macOS 26 arm64 reference is a regression baseline, not a performance target; committed tolerances absorb normal hosted-runner noise while structural helper-launch maxima remain hard limits."
+            echo "The committed macOS 27 arm64 reference includes joint Styles and Texture production and is a regression baseline, not a performance target; committed tolerances absorb normal hosted-runner noise while structural helper-launch maxima remain hard limits."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           if [[ -s artifacts/performance/product-benchmark.json ]]; then
