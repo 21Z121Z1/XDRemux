@@ -5,6 +5,7 @@ mod data_information;
 mod direct;
 pub mod error;
 mod native;
+mod orientation;
 mod semantic;
 mod styles;
 mod texture;
@@ -19,6 +20,7 @@ pub use error::{HeifError, Result};
 // directly, replaces an existing canonical gain-map graph when present, and
 // does not depend on an externally generated intermediate graph.
 pub use native::IsoGainMapAssembly;
+pub use orientation::{primary_coded_geometry, PrimaryCodedGeometry};
 pub use semantic::{merge_apple_semantic_auxiliary_heif, transplant_apple_semantic_auxiliary_heif};
 pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};
 pub use texture::{
