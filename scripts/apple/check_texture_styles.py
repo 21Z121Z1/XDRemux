@@ -33,7 +33,10 @@ def run(args, log, env=None, success=True):
 
 def texture(path):
     raw = Path(path).read_bytes()
-    top = list(boxes(raw, 0, len(raw)))
+    top = []
+    for box in boxes(raw, 0, len(raw)):
+        top.append(box)
+        if box['type'] == 'mdat': break  # A real OPPO extension can follow mdat.
     meta = next(b for b in top if b['type'] == 'meta')
     children = list(boxes(raw, meta['payload_start']+4, meta['end']))
     iinf = next(b for b in children if b['type'] == 'iinf')
@@ -102,11 +105,11 @@ try:
    sys.stderr.write('injected native statistics failure for publication regression\n');sys.exit(73)
   child.stdin.write(line);child.stdin.flush();response=child.stdout.readline()
   if not response: sys.exit(child.wait())
-  if operation=='texture-readback':
-   root=Path(request['output_path']).parent
+  if operation in {'texture-infer','texture-statistics','texture-readback'}:
+   root=Path(request['texture']['context_path']) if operation=='texture-statistics' else Path(request['output_path']) if operation=='texture-infer' else Path(request['output_path']).parent
    if (root/'carrier-production.json').is_file():
     target=evidence/root.parent.name
-    shutil.copytree(root,target)
+    shutil.copytree(root,target,dirs_exist_ok=True)
   sys.stdout.buffer.write(response);sys.stdout.buffer.flush()
 finally:
  if child.poll() is None:
@@ -145,13 +148,22 @@ def main():
             baseline=case/'standard-hdr.heic';styled=case/'styles-texture.heic'
             run([cli,'convert','--input',fixture,'--output',baseline],case/'baseline.log',env)
             run([cli,'convert','--input',fixture,'--output',styled,'--apple-styles'],case/'convert.log',env)
-            run([cli,'validate',styled],case/'validate.log')
+            run([cli,'validate',styled,'--apple-styles'],case/'validate.log',env)
+            run([cli,'validate',baseline,'--apple-styles'],case/'baseline-feature-validation.log',env,success=False)
             facts=check(styled,baseline,adapter,case);facts['fixture']=str(fixture.relative_to(ROOT));summary['cases'].append(facts)
             if index==0:
                 batch=case/'batch';batch.mkdir()
                 run([cli,'batch','--input',fixture,'--output-dir',batch,'--apple-styles','--jobs','2','--json'],case/'batch.log',env)
                 paths=list(batch.glob('*.heic'));assert len(paths)==1
                 facts=check(paths[0],baseline,adapter,case);facts['entry_point']='batch';summary['cases'].append(facts)
+                app_smoke=out/'app-texture-smoke'
+                app=ROOT/'apps/macos/XDRemuxApp'
+                run(['swiftc','-O','-parse-as-library',app/'Sources/AppModels.swift',
+                     app/'Sources/RustCLIClient.swift',app/'Sources/RustAppConversionBridge.swift',
+                     app/'Tests/XDRemuxAppTextureSmoke.swift','-o',app_smoke],case/'app-build.log')
+                app_output=case/'app-styles-texture.heic'
+                run([app_smoke,fixture,baseline,app_output],case/'app-bridge.log',{**env,'XDREMUX_CLI':str(cli)})
+                facts=check(app_output,baseline,adapter,case);facts['entry_point']='app';summary['cases'].append(facts)
                 sentinel=case/'existing.heic';sentinel.write_bytes(b'previous published output')
                 failing={**env,'XDREMUX_TEXTURE_INJECT_FAILURE':'1'}
                 run([cli,'convert','--input',fixture,'--output',sentinel,'--apple-styles'],case/'expected-failure.log',failing,success=False)

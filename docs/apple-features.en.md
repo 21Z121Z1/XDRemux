@@ -59,7 +59,7 @@ Research-only producers, model experiments, donor diagnostics, and RAW experimen
 ### Texture Styles from the same switch
 
 `--apple-styles` and the app's Photographic Styles switch also generate Texture
-Styles. There is no separate Texture option. This operation requires the private
+Styles. There is no separate Texture option. The app uses `validate --apple-styles` before it skips an existing output. Plain HDR outputs do not satisfy this check. This operation requires the private
 Vision and CMImaging APIs tested on macOS 27. A missing API or failed native
 operation rejects the whole Styles transaction before publication.
 

@@ -58,7 +58,7 @@ Rust 持有 style generation 语义、constrained search、source-bound policy�
 
 ### 同一开关生成纹理风格
 
-`--apple-styles` 与 App 的“Apple 摄影风格”开关会一并生成纹理风格，不增加独立的 Texture 选项。此功能需要已在 macOS 27 验证的私有 Vision 和 CMImaging API。API 缺失或任一步骤失败时，整个摄影风格事务在发布前报错。
+`--apple-styles` 与 App 的“Apple 摄影风格”开关会一并生成纹理风格，不增加独立的 Texture 选项。App 在跳过已有输出前调用 `validate --apple-styles`；普通 HDR 输出不能通过此检查。此功能需要已在 macOS 27 验证的私有 Vision 和 CMImaging API。API 缺失或任一步骤失败时，整个摄影风格事务在发布前报错。
 
 Rust 请求 ImageIO 生成已校正方向、长边最多 1024 像素的 sRGB 推理图。此图仅用于分析；输出保留完整尺寸主图、HDR Gain Map、Styles Linear Thumbnail 和已有项目载荷。分析不能恢复 RAW 或 Apple 拍摄时的处理数据。
 

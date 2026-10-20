@@ -298,6 +298,31 @@ fn validate_readback(report: &Value, people: &[Value], bytes: &[u8]) -> Result<(
     Ok(())
 }
 
+/// The app must not reuse a plain HDR output for the combined Styles intent.
+pub(super) fn validate_existing(executable: &Path, input: &Path) -> Result<()> {
+    let bytes =
+        fs::read(input).map_err(|e| RuntimeError::external("Styles validation input", e))?;
+    if !xdremux_heif::has_texture_style_metadata(&bytes)
+        .map_err(|e| RuntimeError::external("Styles Texture validation", e))?
+    {
+        return Err(invalid("output has no generated Texture metadata"));
+    }
+    let temporary =
+        tempfile::tempdir().map_err(|e| RuntimeError::external("Styles validation staging", e))?;
+    let path = temporary.path().join("native-readback.json");
+    AppleAdapterClient::new(executable.to_path_buf()).texture_primitive(
+        "texture-readback",
+        input,
+        &path,
+        Value::Null,
+    )?;
+    let report = read(&path)?;
+    let people = array(&report, "native_person_data_readback")?;
+    apple_texture_property_list(people)
+        .map_err(|e| RuntimeError::external("Styles native people validation", e))?;
+    validate_readback(&report, people, &bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

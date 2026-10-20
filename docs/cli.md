@@ -163,6 +163,8 @@ xdremux batch --input-dir videos/ --output-dir converted/ --apple-cinematic --jo
 
 需要排障时，应通过 `inspect`、结构化日志和开发测试观察自动决策，而不是把内部策略重新变成命令行参数。
 
+`validate --apple-styles` 还会在 macOS 27 要求原生摄影风格与纹理风格读回通过。App 在跳过已有摄影风格输出前调用此检查；普通 HDR 文件不能通过该功能检查。
+
 ## 退出状态
 
 成功、帮助和版本输出使用 `0`。运行时转换或验证失败使用 `1`。命令行语法或参数错误使用 `2`。

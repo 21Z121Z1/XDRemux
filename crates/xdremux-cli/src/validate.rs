@@ -15,6 +15,9 @@ pub(crate) struct ValidateArgs {
     /// Emit one stable machine-readable validation document.
     #[arg(long)]
     json: bool,
+    /// Also require generated Photographic Styles and Texture data (macOS 27).
+    #[arg(long)]
+    apple_styles: bool,
 }
 
 fn write_human(report: &ValidationReport, output: &mut impl Write) -> io::Result<()> {
@@ -55,7 +58,25 @@ fn write_json(value: &serde_json::Value, output: &mut impl Write) -> io::Result<
 }
 
 pub(crate) fn run(arguments: ValidateArgs, stdout: &mut impl Write, stderr: &mut impl Write) -> u8 {
-    match validate_media_file(&arguments.input) {
+    let result = validate_media_file(&arguments.input)
+        .map_err(|e| e.to_string())
+        .and_then(|report| {
+            if arguments.apple_styles {
+                #[cfg(target_os = "macos")]
+                {
+                    let adapter = super::resolve_apple_adapter_executable()?;
+                    xdremux_runtime::validate_apple_styles_file(adapter, &arguments.input)
+                        .map_err(|e| e.to_string())?;
+                }
+                #[cfg(not(target_os = "macos"))]
+                return Err(
+                    "native Photographic Styles and Texture validation requires macOS 27"
+                        .to_owned(),
+                );
+            }
+            Ok(report)
+        });
+    match result {
         Ok(report) => {
             let result = if arguments.json {
                 write_json(
@@ -97,5 +118,28 @@ pub(crate) fn run(arguments: ValidateArgs, stdout: &mut impl Write, stderr: &mut
             let _ = writeln!(stderr, "error: {error}");
             1
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn feature_validation_uses_the_same_styles_intent() {
+        #[derive(clap::Parser)]
+        struct TestCli {
+            #[command(flatten)]
+            args: ValidateArgs,
+        }
+        let cli = TestCli::try_parse_from(["validate", "result.heic", "--apple-styles"]).unwrap();
+        assert!(cli.args.apple_styles);
+        assert!(
+            !TestCli::try_parse_from(["validate", "result.heic"])
+                .unwrap()
+                .args
+                .apple_styles
+        );
     }
 }

@@ -161,6 +161,8 @@ The normal CLI exposes only product intents that change the result a user actual
 
 For diagnostics, observe those automatic decisions through `inspect`, structured logs, and development tests rather than turning internal policy back into command-line configuration.
 
+With `validate --apple-styles`, Rust also requires native Photographic Styles and Texture readback on macOS 27. The app uses this check before it skips an existing Styles output. A plain HDR file does not pass this feature check.
+
 ## Exit status
 
 Success, help, and version output use `0`. Runtime conversion or validation failures use `1`. Command-line syntax and usage errors use `2`.

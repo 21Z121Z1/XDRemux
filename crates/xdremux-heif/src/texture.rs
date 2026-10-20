@@ -299,9 +299,30 @@ pub fn assemble_texture_styles_heif(
             to_item_ids: vec![parsed.primary_item_id],
         });
         let key = mask.instance_reference_key.map(|k| format!("<fsincMattes:InstanceMaskReferenceKey>{}</fsincMattes:InstanceMaskReferenceKey>", xml(k))).unwrap_or_default();
-        let xmp = format!("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"><rdf:Description rdf:about=\"\" xmlns:fsincMattes=\"http://ns.apple.com/fsinc/1.0/\"><fsincMattes:FSINCMatteVersion>0</fsincMattes:FSINCMatteVersion>{key}</rdf:Description></rdf:RDF></x:xmpmeta>");
+        let xmp = if mask.auxiliary_type.starts_with("tag:apple.com,2026:") {
+            format!("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"><rdf:Description rdf:about=\"\" xmlns:fsincMattes=\"http://ns.apple.com/fsinc/1.0/\"><fsincMattes:FSINCMatteVersion>0</fsincMattes:FSINCMatteVersion>{key}</rdf:Description></rdf:RDF></x:xmpmeta>").into_bytes()
+        } else {
+            // Hair keeps the native 2019 semantic metadata and its actual
+            // version. It is shared by the two editing schemas.
+            let ids: Vec<_> = codec_refs
+                .entries
+                .iter()
+                .filter(|r| r.kind == CDSC && r.to_item_ids.contains(&root))
+                .map(|r| r.from_item_id)
+                .collect();
+            if ids.len() != 1 {
+                return Err(invalid("native hair mask needs one metadata descriptor"));
+            }
+            let location = codec
+                .iloc
+                .entries
+                .iter()
+                .find(|e| e.item_id == ids[0])
+                .ok_or_else(|| invalid("native hair metadata location missing"))?;
+            read_item_payload(mask.codec, location, codec.idat.as_ref())?
+        };
         infos.insert(next, metadata_info(next, MIME, b"application/rdf+xml\0\0")?);
-        payloads.insert(next, xmp.into_bytes());
+        payloads.insert(next, xmp);
         refs.push(IrefEntry {
             kind: CDSC,
             from_item_id: next,
