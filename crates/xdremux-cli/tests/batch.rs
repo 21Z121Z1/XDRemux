@@ -1,7 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 use xdremux_heif::validate_gain_map_structure;
@@ -11,12 +10,17 @@ fn public_proxdr_fixture() -> PathBuf {
         .join("../../fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic")
 }
 
-fn unique_dir() -> PathBuf {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time must be after epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("xdremux-cli-batch-{}-{stamp}", std::process::id()))
+fn unique_dir() -> tempfile::TempDir {
+    let directory = tempfile::Builder::new()
+        .prefix("xdremux-cli-batch-")
+        .tempdir()
+        .expect("test directory must be atomically allocated");
+    eprintln!(
+        "batch fixture owner={:?} path={}",
+        std::thread::current().name(),
+        directory.path().display()
+    );
+    directory
 }
 
 fn path_arg(path: &Path) -> OsString {
@@ -25,7 +29,8 @@ fn path_arg(path: &Path) -> OsString {
 
 #[test]
 fn batch_command_is_deterministic_machine_readable_and_failure_isolating() {
-    let work = unique_dir();
+    let directory = unique_dir();
+    let work = directory.path();
     let inputs = work.join("inputs");
     let outputs = work.join("outputs");
     fs::create_dir_all(&inputs).expect("input directory must be created");
@@ -74,8 +79,6 @@ fn batch_command_is_deterministic_machine_readable_and_failure_isolating() {
     let converted = fs::read(&good_output).expect("successful batch output must exist");
     validate_gain_map_structure(&converted)
         .expect("successful batch output must be a valid ISO Gain Map HEIF");
-
-    fs::remove_dir_all(work).expect("temporary test directory must be removed");
 }
 
 #[test]
@@ -83,8 +86,8 @@ fn live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_med
     use xdremux_motion_photo::{apple, Input, MotionPhoto, ParseOptions};
     use xdremux_runtime::PortableRuntime;
 
-    let work = unique_dir();
-    fs::create_dir_all(&work).unwrap();
+    let directory = unique_dir();
+    let work = directory.path();
     for (name, relative) in [
         ("coloros16", "oppo/coloros16-dualstream-ultrahdr-01.jpg"),
         ("samsung", "samsung/jpeg-ultrahdr-01.jpg"),
@@ -102,7 +105,14 @@ fn live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_med
         let source_media = apple::media_payloads(&source_movie).unwrap();
         let direct = PortableRuntime::new()
             .convert_motion_photo_file(&before, &input, work.join(format!("{name}-direct.heic")))
-            .unwrap();
+            .unwrap_or_else(|error| {
+                panic!(
+                    "direct conversion input={} output_parent={} parent_exists={} error={error:?}",
+                    input.display(),
+                    work.display(),
+                    work.is_dir()
+                )
+            });
         let omitted = direct.omitted_resource_count();
         if name == "coloros16" {
             assert!(
@@ -185,5 +195,4 @@ fn live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_med
             "direct, batch, and reuse must preserve the original input exactly"
         );
     }
-    fs::remove_dir_all(work).unwrap();
 }

@@ -3,7 +3,6 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 fn run(args: &[&OsStr], env: &[(&str, &str)]) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_xdremux"));
@@ -19,22 +18,15 @@ fn run(args: &[&OsStr], env: &[(&str, &str)]) -> Output {
 fn strings(args: &[&str], env: &[(&str, &str)]) -> Output {
     run(&args.iter().map(OsStr::new).collect::<Vec<_>>(), env)
 }
-struct Scratch(PathBuf);
+struct Scratch(tempfile::TempDir);
 impl Scratch {
     fn new() -> Self {
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path =
-            std::env::temp_dir().join(format!("xdremux-i18n-{}-{stamp} 空格", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-}
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        Self(
+            tempfile::Builder::new()
+                .prefix("xdremux-i18n-空格 ")
+                .tempdir()
+                .unwrap(),
+        )
     }
 }
 fn fixture() -> PathBuf {
@@ -164,7 +156,7 @@ fn successful_batch_validation_and_categorization_json_are_locale_independent() 
     let scratch = Scratch::new();
     let input = fixture();
     assert!(input.is_file());
-    let out = scratch.0.join("output");
+    let out = scratch.0.path().join("output");
     let batch = [
         OsStr::new("batch"),
         OsStr::new("--input"),
@@ -203,7 +195,7 @@ fn successful_batch_validation_and_categorization_json_are_locale_independent() 
         assert_eq!(result["valid"], true);
         assert_eq!(result["kind"], "live-photo");
     }
-    let categories = scratch.0.join("categories");
+    let categories = scratch.0.path().join("categories");
     let categorize = [
         OsStr::new("categorize"),
         OsStr::new("--input"),
@@ -223,7 +215,7 @@ fn human_output_translates_labels_but_not_user_paths() {
     let scratch = Scratch::new();
     // These real Unicode/special-character names work on APFS, NTFS and the
     // Linux runner filesystem. Keep translation-like words inside the path.
-    let name = scratch.0.join("原片 error converted '[]#🟦.heic");
+    let name = scratch.0.path().join("原片 error converted '[]#🟦.heic");
     let original = fs::read(fixture()).unwrap();
     fs::copy(fixture(), &name).unwrap();
     for (language, label) in [("en", "input:"), ("zh-CN", "输入：")] {
@@ -308,6 +300,7 @@ fn non_unicode_input_arguments_remain_opaque_and_locale_independent() {
     let scratch = Scratch::new();
     let path = scratch
         .0
+        .path()
         .join(std::ffi::OsString::from_vec(b"source-\xff.heic".to_vec()));
     let original = fs::read(fixture()).unwrap();
     fs::write(&path, &original).unwrap();
