@@ -121,8 +121,10 @@ jobs:
           python3 scripts/apple/check_rust_cli_oppo_portrait.py \
             2>&1 | tee artifacts/product-integration/oppo-native-portrait.log
 
-      - name: Verify Rust-driven Photographic Styles path
+      - name: Verify Rust-driven Photographic Styles path and produce acceptance
         shell: bash
+        env:
+          XDREMUX_STYLES_ACCEPTANCE_DIR: ${{ github.workspace }}/artifacts/styles-acceptance
         run: |
           bash scripts/apple/check_rust_style_consumer.sh \
             2>&1 | tee artifacts/product-integration/apple-styles.log
@@ -183,3 +185,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           path: artifacts/product-integration/
+
+      - name: Upload HDR-first Linear Thumbnail acceptance
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: xdremux-hdr-first-styles-acceptance
+          retention-days: 14
+          if-no-files-found: warn
+          path: artifacts/styles-acceptance/
