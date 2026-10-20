@@ -131,7 +131,7 @@ jobs:
             artifacts/product-integration/orientation/expected.json \
             | tee artifacts/product-integration/orientation/imageio.json
 
-      - name: Verify Rust-driven Photographic Styles path and produce acceptance
+      - name: Verify Rust-driven Photographic Styles path and produce diagnostics
         shell: bash
         env:
           XDREMUX_STYLES_ACCEPTANCE_DIR: ${{ github.workspace }}/artifacts/styles-acceptance
@@ -196,11 +196,11 @@ jobs:
           retention-days: 14
           path: artifacts/product-integration/
 
-      - name: Upload HDR-first Linear Thumbnail acceptance
+      - name: Upload HDR-first Linear Thumbnail diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: xdremux-hdr-first-styles-acceptance
+          name: xdremux-hdr-first-styles-diagnostics
           retention-days: 14
           if-no-files-found: warn
           path: artifacts/styles-acceptance/

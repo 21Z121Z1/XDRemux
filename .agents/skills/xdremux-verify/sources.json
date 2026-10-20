@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "skill": "xdremux-verify",
+  "upstream_repository": "https://github.com/cursor/plugins",
+  "upstream_revision": "a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4",
+  "upstream_plugin": "pstack",
+  "upstream_plugin_version": "0.15.29",
+  "license": {
+    "spdx": "MIT",
+    "copyright": "Copyright (c) 2026 Lauren Tan",
+    "local_path": "LICENSE",
+    "upstream_path": "pstack/LICENSE"
+  },
+  "source_files": [
+    {
+      "path": "pstack/skills/create-verification-skill/SKILL.md",
+      "git_blob": "140d033a001e8d27acd14b06004506c43053b199",
+      "sha256": "d353973547bf8ad8977eca645f4cd4feaed0d32f4b43d1448f906b0a76c4d694",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/create-verification-skill/SKILL.md"
+    },
+    {
+      "path": "pstack/skills/create-verification-skill/references/feature-map-example/README.md",
+      "git_blob": "fb64570cfab3bbe672fe80925651933ebd57aa33",
+      "sha256": "cb7bd782cf89968a4ba3d58a5151db837430db92d19a6f52a906973b77b516ba",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/create-verification-skill/references/feature-map-example/README.md"
+    },
+    {
+      "path": "pstack/skills/correct/SKILL.md",
+      "git_blob": "c45e06f48a0982ae19f92c6e83a8cd05988097a3",
+      "sha256": "e347045d00c967a0b831ef883cc6ac79d21329aa10b5968637df95de7febf0ba",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/skills/correct/SKILL.md"
+    },
+    {
+      "path": "pstack/LICENSE",
+      "git_blob": "6b5400237fdf6545be0b8fae370d6f2fcff8fb25",
+      "sha256": "bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e",
+      "url": "https://github.com/cursor/plugins/blob/a66a8931c2dd71f1ed6abf6a52b1898a9f389ae4/pstack/LICENSE"
+    }
+  ],
+  "adapted_files": [
+    "SKILL.md",
+    "features/README.md",
+    "features/batch-categorize.md",
+    "features/hdr-apple.md",
+    "features/inspect-validate.md",
+    "features/motion-photo.md"
+  ],
+  "adaptation": "Generate a project-local CLI verification map from current XDRemux docs/source and existing scripts, CI and exact-HEAD gate. Use isolated scratch/proof directories, exercise a public Samsung HEIF Motion Photo journey, retain evidence after cleanup, and label existing-binary and native/device limits. No new acceptance ledger, installer, automatic external action, or background process.",
+  "project_sources": [
+    "AGENTS.md",
+    "docs/development.en.md",
+    "docs/quality/testing.en.md",
+    "docs/validation/README.en.md",
+    "docs/cli.en.md",
+    "docs/apple-features.en.md",
+    "tests/README.en.md",
+    "scripts/validation/check_rust_motion_photo_real_fixtures.sh",
+    "scripts/validation/check_rust_cli_smoke.sh",
+    "scripts/ci/agent_completion_gate.py"
+  ]
+}

@@ -91,7 +91,9 @@ class WorkflowConfigurationTests(unittest.TestCase):
             "research.yml",
         }
         actual = {path.name for path in WORKFLOW_ROOT.glob("*.yml")}
-        self.assertEqual(actual, expected)
+        self.assertEqual(actual, expected,
+                         "Use ci.yml for product regressions or research.yml for experiments; "
+                         "a new workflow needs a distinct maintained owner.")
 
     def test_research_evidence_is_read_only_exact_head_and_separate(self) -> None:
         workflow = self.workflow("research.yml")
