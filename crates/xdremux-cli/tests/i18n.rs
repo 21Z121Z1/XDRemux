@@ -221,16 +221,33 @@ fn successful_batch_validation_and_categorization_json_are_locale_independent() 
 #[test]
 fn human_output_translates_labels_but_not_user_paths() {
     let scratch = Scratch::new();
-    let name = scratch.0.join("error converted input.heic");
+    // These real Unicode/special-character names work on APFS, NTFS and the
+    // Linux runner filesystem. Keep translation-like words inside the path.
+    let name = scratch.0.join("原片 error converted '[]#🟦.heic");
+    let original = fs::read(fixture()).unwrap();
     fs::copy(fixture(), &name).unwrap();
-    let output = run(
-        &[OsStr::new("inspect"), name.as_os_str()],
-        &[("XDREMUX_LANG", "zh-CN")],
-    );
-    assert!(output.status.success());
-    let text = String::from_utf8(output.stdout).unwrap();
-    assert!(text.starts_with("输入："));
-    assert!(text.contains("error converted input.heic"));
+    for (language, label) in [("en", "input:"), ("zh-CN", "输入：")] {
+        let output = run(
+            &[OsStr::new("inspect"), name.as_os_str()],
+            &[("XDREMUX_LANG", language)],
+        );
+        assert!(output.status.success(), "{output:?}");
+        let text = String::from_utf8(output.stdout).unwrap();
+        assert!(text.starts_with(label), "{text}");
+        assert!(text.contains(name.to_str().unwrap()), "{text}");
+    }
+    let args = [
+        OsStr::new("inspect"),
+        name.as_os_str(),
+        OsStr::new("--json"),
+    ];
+    let english = run(&args, &[("XDREMUX_LANG", "en")]);
+    let chinese = run(&args, &[("XDREMUX_LANG", "zh-CN")]);
+    assert!(english.status.success() && chinese.status.success());
+    assert_eq!(english.stdout, chinese.stdout);
+    let json: serde_json::Value = serde_json::from_slice(&english.stdout).unwrap();
+    assert_eq!(json["input"].as_str(), name.to_str());
+    assert_eq!(fs::read(&name).unwrap(), original);
     let output = strings(
         &["inspect", "--", "--lang=zh-CN"],
         &[("XDREMUX_LANG", "en")],
@@ -281,7 +298,10 @@ fn current_feature_conflicts_remain_usage_errors_in_both_languages() {
     assert!(english.stderr.is_empty() && chinese.stderr.is_empty());
 }
 
-#[cfg(unix)]
+// Linux's runner filesystem accepts opaque byte names. APFS rejects these at
+// fixture creation (EILSEQ), before the CLI can run; its real path coverage is
+// the Unicode/special-character process regression above.
+#[cfg(target_os = "linux")]
 #[test]
 fn non_unicode_input_arguments_remain_opaque_and_locale_independent() {
     use std::os::unix::ffi::OsStringExt;
