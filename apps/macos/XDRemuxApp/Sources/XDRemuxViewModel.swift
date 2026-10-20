@@ -45,12 +45,13 @@ enum OutputPlanStatus: String, Sendable, Equatable {
     case willOverwriteExisting
     case skipsExistingValidOutput
     case duplicateOutput
+    case overwritesInput
     case inputMissing
     case outputParentIsFile
 
     var blocksConversion: Bool {
         switch self {
-        case .duplicateOutput, .inputMissing, .outputParentIsFile:
+        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile:
             return true
         case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
             return false
@@ -439,14 +440,21 @@ final class XDRemuxViewModel {
     }
 
     private func markDuplicateOutputPlans() {
+        let protectedInputKeys = Set(queue.flatMap { Self.fileKeys($0.inputURL) })
         var indexesByOutput: [String: [Int]] = [:]
         for index in queue.indices where queue[index].status == .pending || queue[index].status == .failed || queue[index].status == .cancelled {
-            indexesByOutput[Self.pathKey(queue[index].outputURL), default: []].append(index)
+            let output = queue[index].outputURL
+            if !Self.fileKeys(output).isDisjoint(with: protectedInputKeys) {
+                queue[index].outputPlanStatus = .overwritesInput
+            }
+            indexesByOutput[Self.resolvedPathKey(output), default: []].append(index)
         }
 
         for (_, indexes) in indexesByOutput where indexes.count > 1 {
             for index in indexes {
-                queue[index].outputPlanStatus = .duplicateOutput
+                if queue[index].outputPlanStatus != .overwritesInput {
+                    queue[index].outputPlanStatus = .duplicateOutput
+                }
             }
         }
     }
@@ -478,7 +486,7 @@ final class XDRemuxViewModel {
 
         let runnableItems = queue.compactMap { item -> WorkItem? in
             guard item.status == .pending, !item.outputPlanStatus.blocksConversion else { return nil }
-            return WorkItem(id: item.id, inputURL: item.inputURL, outputURL: item.outputURL)
+            return WorkItem(id: item.id, inputURL: item.inputURL, outputURL: item.outputURL, assetType: item.assetType)
         }
 
         guard !runnableItems.isEmpty else {
@@ -497,6 +505,7 @@ final class XDRemuxViewModel {
         }
 
         let runConfig = config
+        let protectedInputKeys = Set(queue.flatMap { Self.fileKeys($0.inputURL) })
         let fileSizes = runnableItems.map { Self.fileSize($0.inputURL) }
         let concurrencyLimit = Self.effectiveConcurrency(
             configuredLimit: runConfig.maxConcurrentJobs,
@@ -523,7 +532,7 @@ final class XDRemuxViewModel {
                 currentFileName = item.inputURL.lastPathComponent
                 active += 1
                 group.addTask {
-                    Self.convertOne(item, config: runConfig)
+                    Self.convertOne(item, config: runConfig, protectedInputKeys: protectedInputKeys)
                 }
             }
 
@@ -613,6 +622,7 @@ final class XDRemuxViewModel {
         let id: UUID
         let inputURL: URL
         let outputURL: URL
+        let assetType: PhotoAssetType
     }
 
     nonisolated private struct QueueWorkResult: Sendable {
@@ -622,13 +632,16 @@ final class XDRemuxViewModel {
         let finishedAt: Date
     }
 
-    nonisolated private static func convertOne(_ item: WorkItem, config: ConversionConfig) -> QueueWorkResult {
+    nonisolated private static func convertOne(_ item: WorkItem, config: ConversionConfig, protectedInputKeys: Set<String>) -> QueueWorkResult {
         autoreleasepool {
             if Task.isCancelled {
                 return QueueWorkResult(id: item.id, status: .cancelled, errorMessage: nil, finishedAt: Date())
             }
 
             do {
+                guard fileKeys(item.outputURL).isDisjoint(with: protectedInputKeys) else {
+                    throw RustCLIClient.ClientError.unsupportedConfiguration("输出路径会覆盖已导入的原始文件：\(item.outputURL.path)")
+                }
                 if config.skipExisting, AppConversionEngine.isValidOutput(item.outputURL, config: config) {
                     return QueueWorkResult(id: item.id, status: .skippedExisting, errorMessage: nil, finishedAt: Date())
                 }
@@ -644,7 +657,9 @@ final class XDRemuxViewModel {
                     try convertReplacingExistingOutput(
                         inputURL: item.inputURL,
                         outputURL: item.outputURL,
-                        config: config
+                        config: config,
+                        assetType: item.assetType,
+                        protectedInputKeys: protectedInputKeys
                     )
                 } else {
                     try AppConversionEngine.convert(inputURL: item.inputURL, outputURL: item.outputURL, config: config)
@@ -718,6 +733,20 @@ final class XDRemuxViewModel {
         url.standardizedFileURL.path
     }
 
+    nonisolated private static func resolvedPathKey(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    nonisolated private static func fileKeys(_ url: URL) -> Set<String> {
+        var keys: Set<String> = ["path:\(resolvedPathKey(url))"]
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path),
+           let device = attributes[.systemNumber] as? NSNumber,
+           let inode = attributes[.systemFileNumber] as? NSNumber {
+            keys.insert("inode:\(device):\(inode)")
+        }
+        return keys
+    }
+
     nonisolated private static func outputPlanStatus(
         inputURL: URL,
         outputURL: URL,
@@ -748,6 +777,8 @@ final class XDRemuxViewModel {
         switch item.outputPlanStatus {
         case .duplicateOutput:
             return "输出路径冲突: \(item.outputURL.path)"
+        case .overwritesInput:
+            return "输出路径会覆盖已导入的原始文件: \(item.outputURL.path)"
         case .inputMissing:
             return "输入文件不存在: \(item.inputURL.path)"
         case .outputParentIsFile:
@@ -780,13 +811,28 @@ final class XDRemuxViewModel {
     nonisolated private static func convertReplacingExistingOutput(
         inputURL: URL,
         outputURL: URL,
-        config: ConversionConfig
+        config: ConversionConfig,
+        assetType: PhotoAssetType,
+        protectedInputKeys: Set<String>
     ) throws {
+        guard assetType != .livePhoto else {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("已有实况照片输出需要成对发布，请选择新的输出路径。")
+        }
         let staging = outputURL
             .deletingLastPathComponent()
             .appendingPathComponent(".xdremux-\(UUID().uuidString).heic")
-        defer { try? FileManager.default.removeItem(at: staging) }
+        let stagingMovie = staging.deletingPathExtension().appendingPathExtension("mov")
+        defer {
+            try? FileManager.default.removeItem(at: staging)
+            try? FileManager.default.removeItem(at: stagingMovie)
+        }
         try AppConversionEngine.convert(inputURL: inputURL, outputURL: staging, config: config)
+        guard !FileManager.default.fileExists(atPath: stagingMovie.path) else {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("Rust 返回了实况照片资源对，请选择新的输出路径。")
+        }
+        guard fileKeys(outputURL).isDisjoint(with: protectedInputKeys) else {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("输出路径会覆盖已导入的原始文件：\(outputURL.path)")
+        }
         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: staging)
     }
 
