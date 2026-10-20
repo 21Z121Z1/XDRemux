@@ -1,0 +1,15 @@
+{
+  "source_head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "native_product_job": 118919789946,
+  "raw_log_sha256": "23865520470691a34cb68f7cab1db4fae64dcfcedce27351e28cc696351ea448",
+  "workspace_cargo_test_scope_only": {
+    "binary_summaries": 53,
+    "passed": 385,
+    "failed": 0,
+    "ignored": 1
+  },
+  "app_model_main_completed": true,
+  "app_models_main_calls": 25,
+  "new_app_regression_calls": 6,
+  "device_acceptance": false
+}

@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "status": "PREPARED_NOT_APPROVED_NOT_EXECUTED",
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-20T22:39:29.499420+00:00",
+  "expected_source_head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "expected_source_tree": "a02a3e8fe5533af5aea10b7a10b56ab797b79022",
+  "expected_main_head": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "source_recovery_manifest": "all-22-backup-manifest.json",
+  "source_recovery_fsck_log": "all-22-backup-restore.log",
+  "merge_operation": {
+    "tool": "github_merge_pull_request",
+    "arguments": {
+      "repository_full_name": "21Z121Z1/XDRemux",
+      "pr_number": 71,
+      "expected_head_sha": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+      "merge_method": "merge"
+    }
+  },
+  "original_pr_dispositions": [
+    {
+      "pr": 58,
+      "unchanged_head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "ancestor_of_candidate": true,
+      "behavior": "LibLivePhoto public consumption; primary samples, HDR omissions, media-preserving pair publication",
+      "proposed_handling": "Observe GitHub indirect merged state after approved ordinary PR71 merge; never manually close to imply success"
+    },
+    {
+      "pr": 69,
+      "unchanged_head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "ancestor_of_candidate": true,
+      "behavior": "Coded/display orientation and mirror order through HDR/Styles/RGB16 plus ImageIO",
+      "proposed_handling": "Observe GitHub indirect merged state after approved ordinary PR71 merge; never manually close to imply success"
+    },
+    {
+      "pr": 65,
+      "unchanged_head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "ancestor_of_candidate": true,
+      "behavior": "HDR before linear reduction, genuine v15 Styles and native Texture; no fake capture metadata",
+      "proposed_handling": "Observe GitHub indirect merged state after approved ordinary PR71 merge; never manually close to imply success"
+    },
+    {
+      "pr": 68,
+      "unchanged_head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "ancestor_of_candidate": true,
+      "behavior": "Full-resolution scene HDR, local inverse key1, actual native SDR/HDR pair and explicit system encoder evidence",
+      "proposed_handling": "Observe GitHub indirect merged state after approved ordinary PR71 merge; never manually close to imply success"
+    }
+  ],
+  "potential_remaining_remote_deletions": [
+    {
+      "ref": "refs/heads/codex/liblivephoto-consumer-20261004",
+      "head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "matching_durable_refs": [
+        "refs/tags/backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004"
+      ]
+    },
+    {
+      "ref": "refs/heads/cursor/full-res-linear-hdr-e174",
+      "head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "matching_durable_refs": [
+        "refs/tags/backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174"
+      ]
+    },
+    {
+      "ref": "refs/heads/cursor/portrait-heic-orientation-4765",
+      "head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "matching_durable_refs": [
+        "refs/tags/backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765"
+      ]
+    },
+    {
+      "ref": "refs/heads/feat/rust-cli-distribution-i18n-20260924",
+      "head": "c6d307af662ed516f6e3994c039513359cb98610",
+      "matching_durable_refs": [
+        "refs/tags/backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924"
+      ]
+    },
+    {
+      "ref": "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015",
+      "head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "matching_durable_refs": [
+        "refs/tags/backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015"
+      ]
+    },
+    {
+      "ref": "refs/heads/integrate/semantic-review-20261020",
+      "head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+      "matching_durable_refs": [
+        "refs/tags/backup/semantic-review-20261020/integration/4b04fb3"
+      ]
+    },
+    {
+      "ref": "refs/heads/research/texture-native-20261019",
+      "head": "18340989590d451f5676924feb03c70baa503e1a",
+      "matching_durable_refs": [
+        "refs/tags/backup/semantic-review-20261020/research/texture-native-20261019"
+      ]
+    },
+    {
+      "ref": "refs/heads/research/texture-style",
+      "head": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "matching_durable_refs": [
+        "refs/tags/backup/semantic-review-20261020/research/texture-style"
+      ]
+    }
+  ],
+  "must_recheck_before_merge": [
+    "Parent final execution approval binds this source/head/tree and automatic source-branch deletion",
+    "All current-source product/native/research/performance/portable/packages/exact-head and CodeQL checks complete and pass; app build/model steps actually execute",
+    "Then-current PR71 head and main match expected observations; no unresolved review threads or changes requested",
+    "Re-read repository/ruleset and all source backup commit/tree matches; no protection changes",
+    "All worktrees and parallel writers reconciled; no uncommitted source lost"
+  ],
+  "after_merge": [
+    "Record actual returned merged flag and main SHA; verify main ref, two parents, exact candidate tree and four original-tip ancestry",
+    "Observe actual merged/merged_at for PR58/69/65/68; if missing, report exact states and stop rather than manually close",
+    "Observe automatic branch deletion first; submit exact remaining-ref manifest/command and new pinned hook hashes for parent execution review",
+    "For any approved client deletion use only explicit remaining non-main refs, temporary pinned no-active-original-hook guard, and ordinary atomic push; reject changed OIDs, partial batch or unsupported atomic transport",
+    "Check actual refs before retrying uncertain network results; no force/lease/mirror/no-verify fallback",
+    "After remote cleanup, keep local main at actual server merge; detach integration worktree and delete only merged local integration branch; all retained audit worktrees remain detached",
+    "Verify remote and local branch lists each contain only main at capture; retain all recovery/evidence tags and report actual main CI separately"
+  ],
+  "limits": [
+    "No direct old/new ARM64 key1 full-byte comparison yet; native whole-product readback and Linux43 byte comparisons are distinct evidence",
+    "Photos Tone/Color/edit/save/reopen and original Gallery require real device acceptance",
+    "Client hook cannot protect GitHub automatic deletion, lock other writers or prevent later branch recreation",
+    "Final main SHA does not exist yet; never substitute candidate SHA for actual main"
+  ]
+}

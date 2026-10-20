@@ -1,0 +1,245 @@
+{
+  "fixture_root": "/workspace/xdremux-audit/cleanup-guard/hook-race-repair/local-fixtures-74goh9xg",
+  "git_version": "git version 2.52.0",
+  "tested_source_sha256": {
+    "guard.py": "29e4d565f92c6e6e4041949309e7a8b79ad4864b4e2af8feebb2c770aff156c2",
+    "prepare.py": "5b141a8aaaaf6f441bb80b1a2697d31ee4886a7b4c3d44e07a703c06b4878297",
+    "pre-push.template.py": "be94ed466471fd70f2e42822afb2e7abe37764667e13ffad849813325a71a2af",
+    "exercise_local.py": "d6eef28e9876fa3d17a5a7da9fa381bd14bcb371206e0821a7ff83614d85d33d"
+  },
+  "completed": [
+    {
+      "name": "v7-red-delete",
+      "passed": true,
+      "demonstrates_v7_bug": true,
+      "git_push_exit": 0,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "restored_exactly": true,
+      "rendered_initial_mode": "0o755",
+      "original_executed": false,
+      "replacement_executed": false,
+      "interleaving_executed": true,
+      "manifest_sha256": "9a56a2e4c1cbbfe8aaf3864d0d1e6f1ebee5b609960ed8dd5eb3fb89fae7af45",
+      "effective_test_hook_sha256": "cb617bfa11fb5aa7a6b4cd95639acb601445abdb2c28223fdde536c144b9dce9"
+    },
+    {
+      "name": "v7-red-replace",
+      "passed": true,
+      "demonstrates_v7_bug": true,
+      "git_push_exit": 0,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "restored_exactly": true,
+      "rendered_initial_mode": "0o755",
+      "original_executed": false,
+      "replacement_executed": true,
+      "interleaving_executed": true,
+      "manifest_sha256": "81d2eb0559cca64b7dc7a1746c6d2828d9d6942d5226270aba6b0100bc741cfa",
+      "effective_test_hook_sha256": "5898d5567335d1eb4a97b7c48eed5bfa01dcd05a07a0ea71ab0fdaa1eb3f70de"
+    },
+    {
+      "name": "matching-empty-hooks",
+      "passed": true,
+      "demonstrates_v7_bug": false,
+      "git_push_exit": 0,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "restored_exactly": true,
+      "rendered_initial_mode": "0o644",
+      "original_executed": false,
+      "replacement_executed": false,
+      "interleaving_executed": false,
+      "manifest_sha256": "d86513bb24af2479967714bf832997ce4ed7ea674272013b6b06e17ea9001cff",
+      "effective_test_hook_sha256": "67b3cdf9864f0fa691a95b15ba982eb0a51845ac5ac0b3bdd22f90a51dda17d2"
+    },
+    {
+      "name": "prepare-active-hook-rejected",
+      "passed": true,
+      "prepare_exit": 1,
+      "git_push_executed": false,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      }
+    },
+    {
+      "name": "green-delete",
+      "passed": true,
+      "demonstrates_v7_bug": false,
+      "git_push_exit": 1,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "restored_exactly": true,
+      "rendered_initial_mode": "0o644",
+      "original_executed": false,
+      "replacement_executed": false,
+      "interleaving_executed": true,
+      "manifest_sha256": "4769aff8016dcc40e17ce19c22c59f713aa14891f13b853cd466f7f4f2033950",
+      "effective_test_hook_sha256": "9366983d85ff4dfac75080ebfc295fdc4926e4e5736d1fba49d0a296d9ea3f2d"
+    },
+    {
+      "name": "green-replace",
+      "passed": true,
+      "demonstrates_v7_bug": false,
+      "git_push_exit": 1,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "restored_exactly": true,
+      "rendered_initial_mode": "0o644",
+      "original_executed": false,
+      "replacement_executed": false,
+      "interleaving_executed": true,
+      "manifest_sha256": "528aac1f036141cbcd5fe5ecaa18c5a27f5a1ff707aa113f42f11d83c8e30078",
+      "effective_test_hook_sha256": "0eaa97485ef2eef6481545b6fb675448eba3709cfc15eff633e99d4a5a8916a6"
+    },
+    {
+      "name": "config-change-rejected",
+      "passed": true,
+      "demonstrates_v7_bug": false,
+      "git_push_exit": 1,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "restored_exactly": true,
+      "rendered_initial_mode": "0o644",
+      "original_executed": false,
+      "replacement_executed": false,
+      "interleaving_executed": false,
+      "manifest_sha256": "32902f8c1285e5455aeaa06f22ec9f8083e5c573bf867e200ef65b11c9671693",
+      "effective_test_hook_sha256": "7a82ed96b3f5f3cb7e13800ee11c07af47b626efde17aed9b5c937cb9a69b3fb"
+    },
+    {
+      "name": "permissions-change-rejected",
+      "passed": true,
+      "demonstrates_v7_bug": false,
+      "git_push_exit": 1,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "restored_exactly": true,
+      "rendered_initial_mode": "0o644",
+      "original_executed": false,
+      "replacement_executed": false,
+      "interleaving_executed": false,
+      "manifest_sha256": "a0d875d22add1defe14e045fc7d6b7ffc8fb917a3464a17dfb1e5c6c83809198",
+      "effective_test_hook_sha256": "0019ec0f5e42b11ff6b46e0db90e3618fe270a27383e74f424fde532d03a4307"
+    },
+    {
+      "name": "directory-replacement-rejected",
+      "passed": true,
+      "demonstrates_v7_bug": false,
+      "git_push_exit": 1,
+      "before": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "after": {
+        "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+        "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      },
+      "restored_exactly": true,
+      "rendered_initial_mode": "0o644",
+      "original_executed": false,
+      "replacement_executed": false,
+      "interleaving_executed": false,
+      "manifest_sha256": "28fd87e1ad89a117d83a017856177a958e3d07236b2e4af18f35087ebe03de20",
+      "effective_test_hook_sha256": "26903a0453bf25a0f00bd66c76b81c609db2257ab810792c848bb48e8200f9c2"
+    }
+  ],
+  "all_nine_passed": true,
+  "production_executed": false,
+  "github_contacted": false
+}

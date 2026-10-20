@@ -1,0 +1,82 @@
+{
+  "source_head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "job": 118919303603,
+  "raw_log_sha256": "a7c8eeedd0f290a16ad5930c63a6b98858dde9c3ddda6bea9d064ab5db9b5433",
+  "checks": [
+    {
+      "kind": "static",
+      "name": "rust-workspace-lock",
+      "duration_seconds": 0.031
+    },
+    {
+      "kind": "static",
+      "name": "rust-workspace-format",
+      "duration_seconds": 0.529
+    },
+    {
+      "kind": "static",
+      "name": "rust-workspace-clippy",
+      "duration_seconds": 4.91
+    },
+    {
+      "kind": "regression",
+      "name": "rust-workspace-tests",
+      "duration_seconds": 202.254
+    },
+    {
+      "kind": "functional",
+      "name": "canonical-rust-cli-entrypoint",
+      "duration_seconds": 5.183
+    },
+    {
+      "kind": "functional",
+      "name": "apple-capability-adapter-handshake",
+      "duration_seconds": 70.537
+    },
+    {
+      "kind": "functional",
+      "name": "rust-driven-apple-portrait-cli",
+      "duration_seconds": 14.139
+    },
+    {
+      "kind": "functional",
+      "name": "rust-driven-oppo-native-portrait-cli",
+      "duration_seconds": 24.857
+    },
+    {
+      "kind": "integration",
+      "name": "rust-driven-apple-styles-consumer",
+      "duration_seconds": 313.062
+    },
+    {
+      "kind": "integration",
+      "name": "rust-native-texture-and-app-switch",
+      "duration_seconds": 592.926
+    },
+    {
+      "kind": "integration",
+      "name": "rust-component-conformance",
+      "duration_seconds": 15.856
+    },
+    {
+      "kind": "integration",
+      "name": "engine-plan-vectors",
+      "duration_seconds": 2.006
+    },
+    {
+      "kind": "functional",
+      "name": "rust-motion-photo-real-fixtures",
+      "duration_seconds": 253.165
+    },
+    {
+      "kind": "regression",
+      "name": "repository-policy-regressions",
+      "duration_seconds": 14.29
+    }
+  ],
+  "gate_passed": true,
+  "runner_verified_clean_head_receipt": true,
+  "receipt_artifact_id": 12305292396,
+  "receipt_archive_downloaded_into_executor": false,
+  "scope": "14 existing macOS exact-head static/regression/functional/integration checks; device UI not proven"
+}

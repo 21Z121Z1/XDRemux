@@ -1,0 +1,24 @@
+{
+  "state": "FROZEN_FOR_PARENT_REVIEW_NOT_APPROVED",
+  "production_executed": false,
+  "github_write": false,
+  "source_directory": "/workspace/xdremux-audit/cleanup-guard/hook-race-repair",
+  "final_local_fixture_run": "local-fixtures-74goh9xg",
+  "final_cases_passed": 9,
+  "original_v7_files_preserved": 113,
+  "production_template_mode": "0644",
+  "supported_original_hooks": "none; ordinary .sample entries only; original core.hooksPath unset",
+  "limitation": "No exclusion against arbitrary same-UID future configuration/directory writes; recheck before any separately authorized operation.",
+  "sha256sums_file_sha256": "ee6d9e41c88be77e46764b3210a57825a11ff55f45157c3797e5872bfb71828b",
+  "review_files_sha256": "59f825dff951f61d95fab0bde4d237d3a2e94e9c18865b1b466908b950dd8b7b",
+  "core_sha256": {
+    "guard.py": "29e4d565f92c6e6e4041949309e7a8b79ad4864b4e2af8feebb2c770aff156c2",
+    "prepare.py": "5b141a8aaaaf6f441bb80b1a2697d31ee4886a7b4c3d44e07a703c06b4878297",
+    "pre-push.template.py": "be94ed466471fd70f2e42822afb2e7abe37764667e13ffad849813325a71a2af",
+    "exercise_local.py": "d6eef28e9876fa3d17a5a7da9fa381bd14bcb371206e0821a7ff83614d85d33d",
+    "README.md": "a1b0b17ed5abec6b6bf18c8784dd8164d314ea2a9ae206cb59a00c8a01e83579",
+    "production-template-hooks/pre-push": "f7e42350ff85a93d490f19a542512f0700500d3f89c04a565f61dde935a608cd"
+  },
+  "hashed_payload_file_count": 98,
+  "self_hash_note": "SHA256SUMS omits itself and FREEZE.json to avoid circular hashes; parent receipt may pin FREEZE.json separately."
+}

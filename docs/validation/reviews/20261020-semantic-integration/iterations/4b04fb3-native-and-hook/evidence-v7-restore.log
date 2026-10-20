@@ -1,0 +1,18 @@
+Captured 2026-10-20T22:37:02.973179+00:00
+$ git fetch --no-tags https://github.com/21Z121Z1/XDRemux.git refs/tags/review/semantic-integration-20261020-evidence-v7:refs/tags/review/semantic-integration-20261020-evidence-v7
+From https://github.com/21Z121Z1/XDRemux
+ * [new tag]         review/semantic-integration-20261020-evidence-v7 -> review/semantic-integration-20261020-evidence-v7
+
+exit=0
+$ git rev-parse refs/tags/review/semantic-integration-20261020-evidence-v7^{commit}
+d13468387ce0706461c9b572b915ec1b7f9c6c7a
+
+exit=0
+$ git rev-parse refs/tags/review/semantic-integration-20261020-evidence-v7^{tree}
+5cf9b28015011626d3d8eabd2f5c77f3197b6fb7
+
+exit=0
+$ git fsck --full
+notice: HEAD points to an unborn branch (master)
+
+exit=0

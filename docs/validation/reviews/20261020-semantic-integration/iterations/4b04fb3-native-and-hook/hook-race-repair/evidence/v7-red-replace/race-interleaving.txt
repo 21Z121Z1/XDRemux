@@ -1,0 +1,1 @@
+Observed original hook snapshot; fixture writer replace before subsequent decision

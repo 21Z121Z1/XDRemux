@@ -1,0 +1,29 @@
+22:55:11.704126 pkt-line.c:85           packet: receive-pack> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/a\0report-status report-status-v2 delete-refs side-band-64k quiet atomic ofs-delta object-format=sha1 agent=git/2.52.0-Linux
+22:55:11.704184 pkt-line.c:85           packet: receive-pack> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/b
+22:55:11.704188 pkt-line.c:85           packet: receive-pack> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/unapproved
+22:55:11.704190 pkt-line.c:85           packet: receive-pack> 89d806c8aec961a7991eb3e6d6e2b1370aed8791 refs/heads/main
+22:55:11.704192 pkt-line.c:85           packet: receive-pack> 89d806c8aec961a7991eb3e6d6e2b1370aed8791 refs/tags/control
+22:55:11.704235 pkt-line.c:85           packet:         push< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/a\0report-status report-status-v2 delete-refs side-band-64k quiet atomic ofs-delta object-format=sha1 agent=git/2.52.0-Linux
+22:55:11.704405 pkt-line.c:85           packet:         push< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/b
+22:55:11.704408 pkt-line.c:85           packet:         push< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/unapproved
+22:55:11.704410 pkt-line.c:85           packet:         push< 89d806c8aec961a7991eb3e6d6e2b1370aed8791 refs/heads/main
+22:55:11.704412 pkt-line.c:85           packet:         push< 89d806c8aec961a7991eb3e6d6e2b1370aed8791 refs/tags/control
+22:55:11.713882 pkt-line.c:85           packet: receive-pack> 0000
+22:55:11.713932 pkt-line.c:85           packet:         push< 0000
+22:55:11.835082 pkt-line.c:85           packet:         push> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 0000000000000000000000000000000000000000 refs/heads/fixture/a\0 report-status-v2 side-band-64k quiet atomic object-format=sha1 agent=git/2.52.0-Linux
+22:55:11.835100 pkt-line.c:85           packet:         push> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 0000000000000000000000000000000000000000 refs/heads/fixture/b
+22:55:11.835120 pkt-line.c:85           packet:         push> 0000
+22:55:11.835222 pkt-line.c:85           packet: receive-pack< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 0000000000000000000000000000000000000000 refs/heads/fixture/a\0 report-status-v2 side-band-64k quiet atomic object-format=sha1 agent=git/2.52.0-Linux
+22:55:11.835358 pkt-line.c:85           packet: receive-pack< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 0000000000000000000000000000000000000000 refs/heads/fixture/b
+22:55:11.835363 pkt-line.c:85           packet: receive-pack< 0000
+22:55:11.836734 pkt-line.c:85           packet: receive-pack> unpack ok
+22:55:11.836740 pkt-line.c:85           packet: receive-pack> ok refs/heads/fixture/a
+22:55:11.836742 pkt-line.c:85           packet: receive-pack> ok refs/heads/fixture/b
+22:55:11.836743 pkt-line.c:85           packet: receive-pack> 0000
+22:55:11.836823 pkt-line.c:85           packet:     sideband< \1000eunpack ok001cok refs/heads/fixture/a001cok refs/heads/fixture/b0000
+22:55:11.836882 pkt-line.c:85           packet:         push< unpack ok
+22:55:11.836892 pkt-line.c:85           packet:         push< ok refs/heads/fixture/a
+22:55:11.836895 pkt-line.c:85           packet:         push< ok refs/heads/fixture/b
+22:55:11.836898 pkt-line.c:85           packet:         push< 0000
+22:55:11.839850 pkt-line.c:85           packet: receive-pack> 0000
+22:55:11.839902 pkt-line.c:85           packet:     sideband< 0000

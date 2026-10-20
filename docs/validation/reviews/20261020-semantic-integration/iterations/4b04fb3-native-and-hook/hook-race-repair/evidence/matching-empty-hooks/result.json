@@ -1,0 +1,25 @@
+{
+  "name": "matching-empty-hooks",
+  "passed": true,
+  "demonstrates_v7_bug": false,
+  "git_push_exit": 0,
+  "before": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "after": {
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "restored_exactly": true,
+  "rendered_initial_mode": "0o644",
+  "original_executed": false,
+  "replacement_executed": false,
+  "interleaving_executed": false,
+  "manifest_sha256": "d86513bb24af2479967714bf832997ce4ed7ea674272013b6b06e17ea9001cff",
+  "effective_test_hook_sha256": "67b3cdf9864f0fa691a95b15ba982eb0a51845ac5ac0b3bdd22f90a51dda17d2"
+}

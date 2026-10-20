@@ -1,0 +1,4 @@
+cleanup guard approved advertised deletion batch: refs/heads/fixture/a, refs/heads/fixture/b
+To /workspace/xdremux-audit/cleanup-guard/hook-race-repair/local-fixtures-74goh9xg/v7-red-delete/remote.git
+ - [deleted]         fixture/a
+ - [deleted]         fixture/b

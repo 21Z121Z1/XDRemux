@@ -1,0 +1,1 @@
+Initial harness used the template line number before pprint expansion. It changed the original hook too early; old snapshot validation rejected and the intended RED assertion failed. The successful harness finds the original= line in the rendered old launcher. Original failed run and command/status evidence remain intact. No production refs were contacted or changed.

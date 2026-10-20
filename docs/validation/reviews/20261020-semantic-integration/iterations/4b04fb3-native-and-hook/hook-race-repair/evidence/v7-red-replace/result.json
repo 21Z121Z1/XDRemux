@@ -1,0 +1,25 @@
+{
+  "name": "v7-red-replace",
+  "passed": true,
+  "demonstrates_v7_bug": true,
+  "git_push_exit": 0,
+  "before": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "after": {
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "restored_exactly": true,
+  "rendered_initial_mode": "0o755",
+  "original_executed": false,
+  "replacement_executed": true,
+  "interleaving_executed": true,
+  "manifest_sha256": "81d2eb0559cca64b7dc7a1746c6d2828d9d6942d5226270aba6b0100bc741cfa",
+  "effective_test_hook_sha256": "5898d5567335d1eb4a97b7c48eed5bfa01dcd05a07a0ea71ab0fdaa1eb3f70de"
+}

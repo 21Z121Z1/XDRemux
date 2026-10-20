@@ -1,0 +1,27 @@
+{
+  "name": "config-change-rejected",
+  "passed": true,
+  "demonstrates_v7_bug": false,
+  "git_push_exit": 1,
+  "before": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "after": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "restored_exactly": true,
+  "rendered_initial_mode": "0o644",
+  "original_executed": false,
+  "replacement_executed": false,
+  "interleaving_executed": false,
+  "manifest_sha256": "32902f8c1285e5455aeaa06f22ec9f8083e5c573bf867e200ef65b11c9671693",
+  "effective_test_hook_sha256": "7a82ed96b3f5f3cb7e13800ee11c07af47b626efde17aed9b5c937cb9a69b3fb"
+}

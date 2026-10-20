@@ -1,0 +1,10 @@
+{
+  "allowed_tips": [
+    "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97"
+  ],
+  "commit_object_count": 1314,
+  "matches_backed_ancestor_closure": true,
+  "new_commit_count": 0,
+  "read_only_seed": "/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/seed.git"
+}

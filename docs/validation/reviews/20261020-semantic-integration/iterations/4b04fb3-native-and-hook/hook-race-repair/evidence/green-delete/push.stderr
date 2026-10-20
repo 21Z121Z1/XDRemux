@@ -1,0 +1,2 @@
+cleanup guard rejected: active or unknown original hooks require parent review: pre-push
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/hook-race-repair/local-fixtures-74goh9xg/green-delete/remote.git'

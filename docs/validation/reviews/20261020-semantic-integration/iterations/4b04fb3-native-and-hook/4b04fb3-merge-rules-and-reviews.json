@@ -1,0 +1,118 @@
+{
+  "captured_at": "2026-10-20T22:40:28.825Z",
+  "repository": "21Z121Z1/XDRemux",
+  "source_head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "repository_settings": {
+    "default_branch": "main",
+    "delete_branch_on_merge": true,
+    "allow_merge_commit": true,
+    "visibility": "public"
+  },
+  "ruleset": {
+    "id": 21932863,
+    "enforcement": "active",
+    "current_user_can_bypass": "never",
+    "conditions": {
+      "ref_name": {
+        "exclude": [],
+        "include": [
+          "~DEFAULT_BRANCH"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": false,
+          "required_reviewers": [],
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true,
+          "require_extra_approval_for_unattributed_changes": true,
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "exact-head"
+            }
+          ]
+        }
+      },
+      {
+        "type": "code_scanning",
+        "parameters": {
+          "code_scanning_tools": [
+            {
+              "tool": "CodeQL",
+              "security_alerts_threshold": "high_or_higher",
+              "alerts_threshold": "errors"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "pr71_reviews": {
+    "reviews": []
+  },
+  "original_and_integration_review_threads": [
+    {
+      "pr": 58,
+      "result": {
+        "review_threads": []
+      }
+    },
+    {
+      "pr": 65,
+      "result": {
+        "review_threads": []
+      }
+    },
+    {
+      "pr": 68,
+      "result": {
+        "review_threads": []
+      }
+    },
+    {
+      "pr": 69,
+      "result": {
+        "review_threads": []
+      }
+    },
+    {
+      "pr": 71,
+      "result": {
+        "review_threads": []
+      }
+    }
+  ],
+  "test_merge": {
+    "sha": "0d3b6a9900c63e4bbdab11bb00f609b6394828a7",
+    "tree": "a02a3e8fe5533af5aea10b7a10b56ab797b79022",
+    "parents": [
+      "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6"
+    ],
+    "equal_to_source_tree": true
+  },
+  "operation_status": "READ_ONLY_REVIEW_ONLY_NO_MERGE_OR_DELETE_APPROVAL"
+}

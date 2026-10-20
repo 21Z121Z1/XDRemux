@@ -1,0 +1,27 @@
+{
+  "name": "permissions-change-rejected",
+  "passed": true,
+  "demonstrates_v7_bug": false,
+  "git_push_exit": 1,
+  "before": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "after": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "restored_exactly": true,
+  "rendered_initial_mode": "0o644",
+  "original_executed": false,
+  "replacement_executed": false,
+  "interleaving_executed": false,
+  "manifest_sha256": "a0d875d22add1defe14e045fc7d6b7ffc8fb917a3464a17dfb1e5c6c83809198",
+  "effective_test_hook_sha256": "0019ec0f5e42b11ff6b46e0db90e3618fe270a27383e74f424fde532d03a4307"
+}

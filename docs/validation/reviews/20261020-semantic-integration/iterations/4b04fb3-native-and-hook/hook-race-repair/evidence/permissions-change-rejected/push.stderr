@@ -1,0 +1,2 @@
+cleanup guard rejected: original hooks directory identity or permissions changed
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/hook-race-repair/local-fixtures-74goh9xg/permissions-change-rejected/remote.git'

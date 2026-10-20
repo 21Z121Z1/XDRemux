@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "approval": "approved",
+  "remote": {
+    "name": "origin",
+    "url": "/workspace/xdremux-audit/cleanup-guard/hook-race-repair/local-fixtures-74goh9xg/green-delete/remote.git"
+  },
+  "approved_deletions": {
+    "refs/heads/fixture/a": {
+      "oid": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/1b2c07d"
+    },
+    "refs/heads/fixture/b": {
+      "oid": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/1b2c07d"
+    }
+  }
+}

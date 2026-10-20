@@ -1,0 +1,274 @@
+{
+  "timestamp_utc": "2026-10-20T22:52:22.044321+00:00",
+  "uid": 1000,
+  "gid": 1000,
+  "commands": [
+    {
+      "command": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "config",
+        "--show-origin",
+        "--get",
+        "core.hooksPath"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "config",
+        "--null",
+        "--show-scope",
+        "--show-origin",
+        "--get-all",
+        "core.hooksPath"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "rev-parse",
+        "--absolute-git-dir"
+      ],
+      "exit_code": 0,
+      "stdout": "/workspace/XDRemux/.git\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "hooks"
+      ],
+      "exit_code": 0,
+      "stdout": "/workspace/XDRemux/.git/hooks\n",
+      "stderr": ""
+    }
+  ],
+  "directories": [
+    {
+      "path": "/workspace/XDRemux",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269111,
+      "symlink": false,
+      "regular_file": false,
+      "directory": true,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269112,
+      "symlink": false,
+      "regular_file": false,
+      "directory": true,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269114,
+      "symlink": false,
+      "regular_file": false,
+      "directory": true,
+      "current_user_writable": true
+    }
+  ],
+  "entries": [
+    {
+      "path": "/workspace/XDRemux/.git/hooks/applypatch-msg.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269115,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/commit-msg.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269116,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/fsmonitor-watchman.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269117,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/post-update.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269118,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/pre-applypatch.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269119,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/pre-commit.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269120,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/pre-merge-commit.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269121,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/pre-push.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269122,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/pre-rebase.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269123,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/pre-receive.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269124,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/prepare-commit-msg.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269125,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/push-to-checkout.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269126,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/sendemail-validate.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269127,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    },
+    {
+      "path": "/workspace/XDRemux/.git/hooks/update.sample",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o700",
+      "device": 27,
+      "inode": 269128,
+      "symlink": false,
+      "regular_file": true,
+      "directory": false,
+      "current_user_writable": true
+    }
+  ],
+  "active_pre_push_present": false,
+  "config_or_permissions_changed": false,
+  "boundary": "Observation only; no exclusion against future same-UID config or directory writes."
+}
