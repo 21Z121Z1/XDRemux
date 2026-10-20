@@ -11,6 +11,7 @@ import argparse
 from contextlib import contextmanager
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -28,6 +29,14 @@ FIXTURE = Path("fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic")
 TIME = Path("/usr/bin/time")
 WARMUP = 1
 ITERATIONS = 5
+CARGO_RELEASE_COMMAND = ["cargo", "build", "--locked", "--workspace", "--all-targets", "--release"]
+PROFILE_ENV = "XDREMUX_STYLES_PROFILE"
+PROFILE_STAGES = (
+    "source_analysis", "base_conversion", "semantic_production", "resource_decode",
+    "scene_derivation", "thumbnail_encode", "key1_fit", "style_metadata",
+    "native_style_properties", "style_assembly", "texture_generation",
+    "final_validation", "publication",
+)
 
 
 def digest(path: Path) -> str:
@@ -93,6 +102,19 @@ def binary(path: Path) -> dict:
     return {"path": str(path), "sha256": digest(path), "bytes": path.stat().st_size}
 
 
+def feature_graph(source: Path, env: dict, directory: Path, name: str) -> dict:
+    command = ["cargo", "tree", "--locked", "--workspace", "--edges", "features"]
+    log = directory / f"{name}-cargo-features.log"
+    run_logged(command, source, env, log, 120)
+    normalized = log.read_text()
+    # Darwin temporary paths can be spelled /var/... while Cargo prints the
+    # canonical /private/var/... path. Normalize both without masking features.
+    for prefix in sorted({str(source), str(source.resolve())}, key=len, reverse=True):
+        normalized = normalized.replace(prefix, "<source>")
+    return {"command": command, "log": log.name, "sha256": digest(log),
+            "source_path_normalized_sha256": hashlib.sha256(normalized.encode()).hexdigest()}
+
+
 @contextmanager
 def reference_build(root: Path, sha: str, owned: Path, logs: Path, report: dict):
     source = owned / "reference-source"
@@ -106,8 +128,7 @@ def reference_build(root: Path, sha: str, owned: Path, logs: Path, report: dict)
                    os.environ.copy(), logs / "worktree-add.log", 120)
         added = True
         env = {**os.environ, "CARGO_TARGET_DIR": str(cargo_target)}
-        run_logged(["cargo", "build", "--locked", "--release", "-p", "xdremux-cli",
-                    "--bin", "xdremux"], source, env, logs / "reference-rust-build.log", 1800)
+        run_logged(CARGO_RELEASE_COMMAND, source, env, logs / "reference-rust-build.log", 1800)
         swift = ["swift", "build", "--package-path", str(source), "--scratch-path",
                  str(swift_scratch), "-c", "release"]
         run_logged([*swift, "--product", "xdremux-apple-adapter"], source, env,
@@ -120,6 +141,8 @@ def reference_build(root: Path, sha: str, owned: Path, logs: Path, report: dict)
             "cli": binary(cargo_target / "release/xdremux"),
             "adapter": binary(Path(bin_path) / "xdremux-apple-adapter"),
             "fixture_sha256": checked_fixture(source),
+            "build_commands": [CARGO_RELEASE_COMMAND, [*swift, "--product", "xdremux-apple-adapter"]],
+            "feature_graph": feature_graph(source, env, logs, "reference"),
         }
     finally:
         registered = any(line == f"worktree {source}" for line in git(root, "worktree", "list", "--porcelain").splitlines())
@@ -151,8 +174,31 @@ def time_facts(stderr: str) -> dict:
             "sys_seconds": float(cpu[3]), "peak_rss_bytes": int(rss[1])}
 
 
-def measure(arm: dict, fixture: Path, output: Path, logs: Path) -> dict:
+def profile_facts(stderr: str, *, require_complete: bool = True) -> list[dict]:
+    stages = []
+    for line in stderr.splitlines():
+        if not line.startswith("xdremux_styles_profile"):
+            continue
+        match = re.fullmatch(r"xdremux_styles_profile stage=([a-z0-9_]+) seconds=([0-9]+(?:\.[0-9]+)?)", line)
+        if not match or not math.isfinite(float(match[2])):
+            raise RuntimeError("malformed Styles profile receipt")
+        stages.append({"stage": match[1], "wall_seconds": float(match[2])})
+    expected = PROFILE_STAGES if require_complete else PROFILE_STAGES[:len(stages)]
+    if tuple(stage["stage"] for stage in stages) != expected:
+        raise RuntimeError("incomplete, duplicate, or out-of-order Styles profile receipt")
+    return stages
+
+
+def conversion_environment(arm: dict, *, profile: bool = False) -> dict:
     env = {**os.environ, "XDREMUX_APPLE_ADAPTER": arm["adapter"]["path"]}
+    env.pop(PROFILE_ENV, None)
+    if profile:
+        env[PROFILE_ENV] = "1"
+    return env
+
+
+def measure(arm: dict, fixture: Path, output: Path, logs: Path, *, profile: bool = False) -> dict:
+    env = conversion_environment(arm, profile=profile)
     command = [str(TIME), "-l", arm["cli"]["path"], "convert", "--input", str(fixture),
                "--output", str(output), "--apple-styles"]
     started = time.perf_counter()
@@ -163,8 +209,12 @@ def measure(arm: dict, fixture: Path, output: Path, logs: Path) -> dict:
         raise RuntimeError(f"Styles conversion exited {status}; see {logs}")
     if not output.is_file() or not output.stat().st_size:
         raise RuntimeError(f"Styles conversion did not produce a nonempty output; see {logs}")
-    return {"wall_seconds": elapsed, **time_facts((logs / "convert.stderr.log").read_text()),
-            "output_bytes": output.stat().st_size, "output_sha256": digest(output)}
+    stderr = (logs / "convert.stderr.log").read_text()
+    result = {"wall_seconds": elapsed, **time_facts(stderr),
+              "output_bytes": output.stat().st_size, "output_sha256": digest(output)}
+    if profile:
+        result["stages"] = profile_facts(stderr)
+    return result
 
 
 def collect(arms: dict, fixture: Path, owned: Path, directory: Path, report: dict) -> None:
@@ -187,11 +237,14 @@ def collect(arms: dict, fixture: Path, owned: Path, directory: Path, report: dic
             write_report(directory, report)
             raise
         row["status"] = "converted"
+        print(json.dumps({"sample": {key: row[key] for key in (
+            "ordinal", "arm", "warmup", "iteration", "wall_seconds", "time_real_seconds",
+            "user_seconds", "sys_seconds", "peak_rss_bytes")}}, sort_keys=True), flush=True)
         outputs.append((arms[name], output, logs, row))
         write_report(directory, report)
     # These are real native validations, deliberately outside all timed samples.
     for arm, output, logs, row in outputs:
-        env = {**os.environ, "XDREMUX_APPLE_ADAPTER": arm["adapter"]["path"]}
+        env = conversion_environment(arm)
         try:
             run_logged([arm["cli"]["path"], "validate", str(output), "--apple-styles"],
                        ROOT, env, logs / "validate.log", 300)
@@ -203,6 +256,44 @@ def collect(arms: dict, fixture: Path, owned: Path, directory: Path, report: dic
             raise
         row["status"] = "validated"
         write_report(directory, report)
+
+
+def profile_candidate(arm: dict, fixture: Path, owned: Path, directory: Path, report: dict) -> None:
+    logs = directory / "candidate-profile"
+    work = owned / "candidate-profile-output"
+    logs.mkdir(); work.mkdir()
+    output = work / "styles.heic"
+    row = {"arm": "candidate", "status": "running", "logs": logs.name,
+           "outside_budget_and_comparison_samples": True,
+           "limits": "One candidate-only diagnostic conversion; no baseline stage comparison."}
+    report["candidate_profile"] = row
+    write_report(directory, report)
+    try:
+        row.update(measure(arm, fixture, output, logs, profile=True))
+        row["status"] = "converted"
+        write_report(directory, report)
+        run_logged([arm["cli"]["path"], "validate", str(output), "--apple-styles"],
+                   ROOT, conversion_environment(arm), logs / "validate.log", 300)
+        if digest(output) != row["output_sha256"]:
+            raise RuntimeError("profile validation changed the measured output bytes")
+    except Exception as error:
+        row.update(status="validation_failed" if row["status"] == "converted" else "failed", error=str(error))
+        stderr_log = logs / "convert.stderr.log"
+        if stderr_log.is_file():
+            stderr = stderr_log.read_text()
+            try:
+                row["partial_stages"] = profile_facts(stderr, require_complete=False)
+            except RuntimeError as receipt_error:
+                row["profile_receipt_error"] = str(receipt_error)
+            try:
+                row.update(time_facts(stderr))
+            except RuntimeError:
+                pass
+        write_report(directory, report)
+        print(json.dumps({"candidate_profile": row}, indent=2), flush=True)
+        raise
+    row["status"] = "validated"
+    write_report(directory, report)
 
 
 def summarize(report: dict) -> dict:
@@ -240,6 +331,7 @@ def main() -> int:
                   "Cross-revision costs include all real producer and validation differences.",
                   "A main/candidate ratio does not establish the cause of a f9/ba2 cross-run change.",
                   "Independent validation is outside timing and uses each revision's own CLI/adapter.",
+                  "The additional candidate profile is outside both the budget and interleaved samples.",
               ]}
     try:
         if platform.system() != "Darwin":
@@ -265,7 +357,13 @@ def main() -> int:
         write_report(directory, report)
         candidate = {"sha": candidate_sha, "tracked_status": report["candidate_tracked_status"],
                      "cli": binary(args.cli), "adapter": binary(args.apple_adapter),
-                     "fixture_sha256": report["fixture_sha256"]}
+                     "fixture_sha256": report["fixture_sha256"],
+                     "build_commands": [CARGO_RELEASE_COMMAND,
+                                        ["swift", "build", "-c", "release", "--product", "xdremux-apple-adapter"]],
+                     "build_owner": "performance.yml existing candidate release build",
+                     "feature_graph": feature_graph(ROOT, os.environ.copy(), directory, "candidate")}
+        report["arms"] = {"candidate": candidate}
+        write_report(directory, report)
         with tempfile.TemporaryDirectory(prefix="xdremux-styles-compare-") as raw:
             owned = Path(raw)
             with reference_build(ROOT, baseline_sha, owned, directory, report) as baseline:
@@ -274,11 +372,14 @@ def main() -> int:
                     raise RuntimeError("reference build changed its exact revision")
                 if baseline["fixture_sha256"] != report["fixture_sha256"]:
                     raise RuntimeError("reference and candidate fixture identities differ")
+                print(json.dumps({"arms": report["arms"]}, indent=2), flush=True)
                 collect(report["arms"], ROOT / FIXTURE, owned, directory, report)
                 report["summary"] = summarize(report)
+                profile_candidate(candidate, ROOT / FIXTURE, owned, directory, report)
         report["status"] = "completed"
         print(json.dumps({"distinct_revisions": report["distinct_revisions"],
-                          "diagnostic_only": True, "summary": report["summary"]}, indent=2))
+                          "diagnostic_only": True, "summary": report["summary"],
+                          "candidate_profile": report["candidate_profile"]}, indent=2))
         return 0
     except Exception as error:
         report["status"] = "failed"

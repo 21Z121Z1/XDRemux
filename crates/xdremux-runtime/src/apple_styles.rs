@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::time::Instant;
 
 use sha2::{Digest, Sha256};
 use xdremux_codec::{EncodedHevcResource, HeifRasterDecodeRequest, Raster8, RasterPixelFormat};
@@ -35,6 +36,18 @@ const STYLE_DELTA_ROWS_LANDSCAPE: u32 = 5;
 const STYLE_DELTA_COLUMNS_LANDSCAPE: u32 = 6;
 const STYLE_DELTA_ROWS_PORTRAIT: u32 = 6;
 const STYLE_DELTA_COLUMNS_PORTRAIT: u32 = 5;
+
+// Opt-in diagnostics contain fixed stage labels and elapsed time only. Keep
+// stdout and the native adapter protocol unchanged.
+fn profile_stage(profile: &mut Option<Instant>, stage: &'static str) {
+    if let Some(started) = profile {
+        eprintln!(
+            "xdremux_styles_profile stage={stage} seconds={:.9}",
+            started.elapsed().as_secs_f64()
+        );
+        *started = Instant::now();
+    }
+}
 
 // Apple ImageIO accepts the Styles auxiliary graph only when these resources
 // use the Main10 4:2:0 contract. These bytes are the checked-in neutral Style
@@ -98,6 +111,9 @@ pub(crate) fn convert_file(
     source: &[u8],
     output: impl AsRef<Path>,
 ) -> Result<PhotographicStylesFileReceipt> {
+    let mut profile = std::env::var("XDREMUX_STYLES_PROFILE")
+        .is_ok_and(|value| value == "1")
+        .then(Instant::now);
     let output = output.as_ref();
     let parent = publication_parent(output);
     if !parent.is_dir() {
@@ -107,6 +123,7 @@ pub(crate) fn convert_file(
         ));
     }
     let prepared = runtime.analyze_proxdr(source)?;
+    profile_stage(&mut profile, "source_analysis");
 
     let staging = tempfile::Builder::new()
         .prefix(".xdremux-styles-")
@@ -144,6 +161,7 @@ pub(crate) fn convert_file(
     };
     fs::write(&base_path, &base)
         .map_err(|error| RuntimeError::external("Photographic Styles base staging", error))?;
+    profile_stage(&mut profile, "base_conversion");
 
     let adapter = AppleAdapterClient::new(executable.as_ref().to_path_buf());
     if !adapter.supports_photographic_styles()? {
@@ -215,6 +233,7 @@ pub(crate) fn convert_file(
             RuntimeError::external("Photographic Styles semantic graph", error),
         )
     })?;
+    profile_stage(&mut profile, "semantic_production");
     runtime
         .heif
         .extract_primary_hevc_resource(&semantic_base)
@@ -235,6 +254,7 @@ pub(crate) fn convert_file(
                 "submitted scene was already consumed",
             )
         })?;
+        profile_stage(&mut profile, "resource_decode");
         derive_style_scene_from_pair(
             pair,
             encoded.content_headroom.log2(),
@@ -261,6 +281,7 @@ pub(crate) fn convert_file(
             .map_err(|error| {
                 RuntimeError::external("Photographic Styles source Gain Map", error)
             })?;
+        profile_stage(&mut profile, "resource_decode");
         derive_style_scene(
             &raster,
             &gain_raster,
@@ -268,6 +289,7 @@ pub(crate) fn convert_file(
             LINEAR_THUMBNAIL_MAX_SIZE,
         )?
     };
+    profile_stage(&mut profile, "scene_derivation");
     let display_thumbnail = linear_thumbnail_raster(&scene_rasters)?;
     let (width, height, data) = xdremux_codec::undo_heif_rgb16(
         &display_thumbnail.data,
@@ -297,8 +319,10 @@ pub(crate) fn convert_file(
         &linear_thumbnail_raster,
         LINEAR_THUMBNAIL_QUALITY,
     )?;
+    profile_stage(&mut profile, "thumbnail_encode");
 
     let style_data = source_derived_style_data(&scene_rasters)?;
+    profile_stage(&mut profile, "key1_fit");
     let global_tone_curve = scene_rasters.global_tone_curve.data.clone();
     let statistics = style_scene_statistics(&scene_rasters, &semantic_masks)?;
     let storage_orientation = u8::try_from(storage_orientation).map_err(|_| {
@@ -359,11 +383,13 @@ pub(crate) fn convert_file(
         face_exposure_boost,
     })
     .map_err(|error| RuntimeError::external("Photographic Styles metadata", error))?;
+    profile_stage(&mut profile, "style_metadata");
 
     // Validate the exact Rust-owned key-1 resource at the private consumer
     // boundary before assembling the final file. The adapter cannot choose
     // style data or alter the property-list policy.
     adapter.semantic_style_properties_facts(&style_properties, &style_data)?;
+    profile_stage(&mut profile, "native_style_properties");
 
     let (style_delta_payload, style_delta_hvcc) = verified_neutral_style_delta()?;
 
@@ -394,8 +420,10 @@ pub(crate) fn convert_file(
     let styles_path = staging.path().join("styles-for-texture.heic");
     fs::write(&styles_path, &assembled)
         .map_err(|error| RuntimeError::external("Texture source staging", error))?;
+    profile_stage(&mut profile, "style_assembly");
     let assembled =
         crate::apple_texture::generate(&adapter, &styles_path, &assembled, staging.path())?;
+    profile_stage(&mut profile, "texture_generation");
     xdremux_heif::validate_gain_map_structure(&assembled).map_err(|error| {
         note_system_carrier(
             carrier_report.as_deref(),
@@ -428,8 +456,10 @@ pub(crate) fn convert_file(
         }
     }
 
+    profile_stage(&mut profile, "final_validation");
     let mut publisher = AtomicFilePublisher::new(output.to_path_buf());
     let published = publisher.publish_bytes(assembled)?;
+    profile_stage(&mut profile, "publication");
     Ok(PhotographicStylesFileReceipt { output: published })
 }
 
