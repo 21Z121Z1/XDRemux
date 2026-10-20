@@ -1,0 +1,137 @@
+{
+  "commands": [
+    {
+      "repo": "current",
+      "kind": "refs",
+      "command": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-integration",
+        "for-each-ref",
+        "--format=%(refname)"
+      ],
+      "exit": 0,
+      "stdout": "refs/heads/integrate/semantic-review-20261020\nrefs/heads/work\nrefs/remotes/origin/HEAD\nrefs/remotes/origin/codex/liblivephoto-consumer-20261004\nrefs/remotes/origin/cursor/full-res-linear-hdr-e174\nrefs/remotes/origin/cursor/portrait-heic-orientation-4765\nrefs/remotes/origin/feat/rust-cli-distribution-i18n-20260924\nrefs/remotes/origin/feat/styles-hdr-first-linear-thumbnail-20261015\nrefs/remotes/origin/main\nrefs/remotes/origin/research/texture-native-20261019\nrefs/remotes/origin/research/texture-style\nrefs/remotes/review/pr-58\nrefs/remotes/review/pr-65\nrefs/remotes/review/pr-68\nrefs/remotes/review/pr-69\nrefs/tags/backup/semantic-review-20261020/candidate/pr58-8263637\nrefs/tags/backup/semantic-review-20261020/candidate/pr69-01ccece\nrefs/tags/backup/semantic-review-20261020/integration/0a2c7c9\nrefs/tags/backup/semantic-review-20261020/integration/b049b7a\nrefs/tags/backup/semantic-review-20261020/integration/ba2b169\nrefs/tags/backup/semantic-review-20261020/integration/c484046\nrefs/tags/review/semantic-integration-20261020-evidence-v1\nrefs/tags/review/semantic-integration-20261020-evidence-v2\nrefs/tags/review/semantic-integration-20261020-evidence-v3\nrefs/tags/review/semantic-integration-20261020-evidence-v4\n",
+      "stderr": ""
+    },
+    {
+      "repo": "current",
+      "kind": "history-message",
+      "command": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-integration",
+        "log",
+        "--all",
+        "--oneline",
+        "--regexp-ignore-case",
+        "--grep=pvt\\|makelive\\|videocomplement"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "repo": "current",
+      "kind": "history-content",
+      "command": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-integration",
+        "log",
+        "--all",
+        "--oneline",
+        "-i",
+        "-G",
+        "PFVideoComplement|makelive|\\.pvt\\b",
+        "--",
+        ".",
+        ":!fixtures",
+        ":!docs/validation/reviews"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "repo": "current",
+      "kind": "path-objects",
+      "command": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-integration",
+        "rev-list",
+        "--all",
+        "--objects"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "repo": "backups",
+      "kind": "refs",
+      "command": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "for-each-ref",
+        "--format=%(refname)"
+      ],
+      "exit": 0,
+      "stdout": "refs/tags/backup/semantic-review-20261020/candidate/pr58-6ae70b2\nrefs/tags/backup/semantic-review-20261020/candidate/pr58-8263637\nrefs/tags/backup/semantic-review-20261020/candidate/pr69-01ccece\nrefs/tags/backup/semantic-review-20261020/candidate/pr69-6458e3d\nrefs/tags/backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004\nrefs/tags/backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174\nrefs/tags/backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765\nrefs/tags/backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924\nrefs/tags/backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015\nrefs/tags/backup/semantic-review-20261020/integration/0a2c7c9\nrefs/tags/backup/semantic-review-20261020/integration/1b2c07d\nrefs/tags/backup/semantic-review-20261020/integration/4b04fb3\nrefs/tags/backup/semantic-review-20261020/integration/8dbe01d\nrefs/tags/backup/semantic-review-20261020/integration/ab37567\nrefs/tags/backup/semantic-review-20261020/integration/b049b7a\nrefs/tags/backup/semantic-review-20261020/integration/ba2b169\nrefs/tags/backup/semantic-review-20261020/integration/c484046\nrefs/tags/backup/semantic-review-20261020/integration/f9a419a\nrefs/tags/backup/semantic-review-20261020/integration/fc3f04d\nrefs/tags/backup/semantic-review-20261020/main\nrefs/tags/backup/semantic-review-20261020/research/texture-native-20261019\nrefs/tags/backup/semantic-review-20261020/research/texture-style\nrefs/tags/review/semantic-integration-20261020-evidence-v1\nrefs/tags/review/semantic-integration-20261020-evidence-v2\nrefs/tags/review/semantic-integration-20261020-evidence-v3\nrefs/tags/review/semantic-integration-20261020-evidence-v4\nrefs/tags/review/semantic-integration-20261020-evidence-v5\nrefs/tags/review/semantic-integration-20261020-evidence-v6\nrefs/tags/review/semantic-integration-20261020-evidence-v7\nrefs/tags/review/semantic-integration-20261020-evidence-v8\n",
+      "stderr": ""
+    },
+    {
+      "repo": "backups",
+      "kind": "history-message",
+      "command": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "log",
+        "--all",
+        "--oneline",
+        "--regexp-ignore-case",
+        "--grep=pvt\\|makelive\\|videocomplement"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "repo": "backups",
+      "kind": "history-content",
+      "command": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "log",
+        "--all",
+        "--oneline",
+        "-i",
+        "-G",
+        "PFVideoComplement|makelive|\\.pvt\\b",
+        "--",
+        ".",
+        ":!fixtures",
+        ":!docs/validation/reviews"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "repo": "backups",
+      "kind": "path-objects",
+      "command": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-list",
+        "--all",
+        "--objects"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "scope_note": "all current local refs and all 22 restored backup refs; content search excludes public fixture bytes and historical audit report prose"
+}

@@ -1,0 +1,129 @@
+test_all_dynamic_load_kinds_and_environment_are_observed (tests.test_macos_distribution.MacOSDistributionTests.test_all_dynamic_load_kinds_and_environment_are_observed) ... ok
+test_archive_roundtrip_is_reproducible_across_mtimes (tests.test_macos_distribution.MacOSDistributionTests.test_archive_roundtrip_is_reproducible_across_mtimes) ... ok
+test_dyld_evidence_rejects_host_dependency_even_when_bundled_heif_loaded (tests.test_macos_distribution.MacOSDistributionTests.test_dyld_evidence_rejects_host_dependency_even_when_bundled_heif_loaded) ... ok
+test_extraction_rejects_escape_links_duplicates_and_multiple_roots (tests.test_macos_distribution.MacOSDistributionTests.test_extraction_rejects_escape_links_duplicates_and_multiple_roots) ... ok
+test_loader_relative_reference_cannot_escape_package (tests.test_macos_distribution.MacOSDistributionTests.test_loader_relative_reference_cannot_escape_package) ... ok
+test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) ... 
+  test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) (changed={'minimum_os': None}) ... FAIL
+  test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) (changed={'minimum_os': '15.0'}) ... FAIL
+  test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) (changed={'minimum_os': '26.0'}) ... FAIL
+  test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) (changed={'minimum_os': '28.0'}) ... FAIL
+test_package_audit_requires_native_arm64_macos27_host (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_requires_native_arm64_macos27_host) ... 
+  test_package_audit_requires_native_arm64_macos27_host (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_requires_native_arm64_macos27_host) (system='Linux', arch='arm64', version='') ... FAIL
+  test_package_audit_requires_native_arm64_macos27_host (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_requires_native_arm64_macos27_host) (system='Darwin', arch='x86_64', version='27.0') ... FAIL
+  test_package_audit_requires_native_arm64_macos27_host (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_requires_native_arm64_macos27_host) (system='Darwin', arch='arm64', version='26.4') ... FAIL
+test_product_entrypoints_reject_intel_before_creating_output (tests.test_macos_distribution.MacOSDistributionTests.test_product_entrypoints_reject_intel_before_creating_output) ... 
+  test_product_entrypoints_reject_intel_before_creating_output (tests.test_macos_distribution.MacOSDistributionTests.test_product_entrypoints_reject_intel_before_creating_output) (script='build_native.py') ... FAIL
+  test_product_entrypoints_reject_intel_before_creating_output (tests.test_macos_distribution.MacOSDistributionTests.test_product_entrypoints_reject_intel_before_creating_output) (script='macos.py') ... FAIL
+  test_product_entrypoints_reject_intel_before_creating_output (tests.test_macos_distribution.MacOSDistributionTests.test_product_entrypoints_reject_intel_before_creating_output) (script='smoke_macos.py') ... FAIL
+test_macos_packages_share_portability_owner_and_require_relocated_runtime (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_macos_packages_share_portability_owner_and_require_relocated_runtime) ... FAIL
+
+======================================================================
+FAIL: test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) (changed={'minimum_os': None})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 76, in test_package_audit_rejects_wrong_architecture_or_deployment_target
+    with self.assertRaisesRegex(ValueError, "architecture|deployment target"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) (changed={'minimum_os': '15.0'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 76, in test_package_audit_rejects_wrong_architecture_or_deployment_target
+    with self.assertRaisesRegex(ValueError, "architecture|deployment target"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) (changed={'minimum_os': '26.0'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 76, in test_package_audit_rejects_wrong_architecture_or_deployment_target
+    with self.assertRaisesRegex(ValueError, "architecture|deployment target"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_package_audit_rejects_wrong_architecture_or_deployment_target (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_rejects_wrong_architecture_or_deployment_target) (changed={'minimum_os': '28.0'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 76, in test_package_audit_rejects_wrong_architecture_or_deployment_target
+    with self.assertRaisesRegex(ValueError, "architecture|deployment target"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_package_audit_requires_native_arm64_macos27_host (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_requires_native_arm64_macos27_host) (system='Linux', arch='arm64', version='')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 58, in test_package_audit_requires_native_arm64_macos27_host
+    with self.assertRaisesRegex(ValueError, "arm64.*macOS 27"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_package_audit_requires_native_arm64_macos27_host (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_requires_native_arm64_macos27_host) (system='Darwin', arch='x86_64', version='27.0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 58, in test_package_audit_requires_native_arm64_macos27_host
+    with self.assertRaisesRegex(ValueError, "arm64.*macOS 27"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_package_audit_requires_native_arm64_macos27_host (tests.test_macos_distribution.MacOSDistributionTests.test_package_audit_requires_native_arm64_macos27_host) (system='Darwin', arch='arm64', version='26.4')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 58, in test_package_audit_requires_native_arm64_macos27_host
+    with self.assertRaisesRegex(ValueError, "arm64.*macOS 27"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_product_entrypoints_reject_intel_before_creating_output (tests.test_macos_distribution.MacOSDistributionTests.test_product_entrypoints_reject_intel_before_creating_output) (script='build_native.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 43, in test_product_entrypoints_reject_intel_before_creating_output
+    self.assertEqual(result.returncode, 2, result.stderr)
+AssertionError: 1 != 2 : Build on a native macOS runner of the requested architecture
+
+
+======================================================================
+FAIL: test_product_entrypoints_reject_intel_before_creating_output (tests.test_macos_distribution.MacOSDistributionTests.test_product_entrypoints_reject_intel_before_creating_output) (script='macos.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 43, in test_product_entrypoints_reject_intel_before_creating_output
+    self.assertEqual(result.returncode, 2, result.stderr)
+AssertionError: 1 != 2 : Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/scripts/distribution/macos.py", line 231, in <module>
+    main()
+  File "/workspace/XDRemux-integration/scripts/distribution/macos.py", line 226, in main
+    print(json.dumps(audit(args.package, args.arch), indent=2))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/scripts/distribution/macos.py", line 74, in audit
+    raise ValueError(f"Expected exactly the pinned HEVC/SharpYUV closure, got {libraries}")
+ValueError: Expected exactly the pinned HEVC/SharpYUV closure, got []
+
+
+======================================================================
+FAIL: test_product_entrypoints_reject_intel_before_creating_output (tests.test_macos_distribution.MacOSDistributionTests.test_product_entrypoints_reject_intel_before_creating_output) (script='smoke_macos.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_macos_distribution.py", line 44, in test_product_entrypoints_reject_intel_before_creating_output
+    self.assertIn("invalid choice: 'x86_64'", result.stderr)
+AssertionError: "invalid choice: 'x86_64'" not found in 'usage: smoke_macos.py [-h] --archive ARCHIVE --fixtures FIXTURES --arch\n                      {arm64,x86_64} --expected-head EXPECTED_HEAD --output\n                      OUTPUT\nsmoke_macos.py: error: requires native macOS of the package architecture\n'
+
+======================================================================
+FAIL: test_macos_packages_share_portability_owner_and_require_relocated_runtime (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_macos_packages_share_portability_owner_and_require_relocated_runtime)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 211, in test_macos_packages_share_portability_owner_and_require_relocated_runtime
+    self.assertIn("runs-on: xcode-27", package_job)
+AssertionError: 'runs-on: xcode-27' not found in '    name: macos-package (${{ matrix.arch }})\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - arch: arm64\n            runner: xcode-27\n            target: aarch64-apple-darwin\n          - arch: x86_64\n            runner: macos-26-intel\n            target: x86_64-apple-darwin\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 60\n    env:\n      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}\n      MACOSX_DEPLOYMENT_TARGET: "15.0"\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          ref: ${{ github.event.pull_request.head.sha || github.sha }}\n          persist-credentials: false\n      - name: Verify exact checked-out head\n        shell: bash\n        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"\n      - uses: actions/setup-python@v7\n        with:\n          python-version: "3.12"\n      - uses: actions-rust-lang/setup-rust-toolchain@v2\n        with:\n          toolchain: stable\n      - name: Install build tools and check portable packaging contracts\n        shell: bash\n        run: |\n          brew install cmake ninja nasm pkgconf\n          python3 -m unittest tests.test_macos_distribution -v\n      - name: Build checksum-pinned native dependencies\n        shell: bash\n        run: |\n          set -euo pipefail\n          mkdir -p "$RUNNER_TEMP/distribution-artifacts/evidence"\n          python3 scripts/distribution/build_native.py --arch \'${{ matrix.arch }}\' \\\n            --work "$RUNNER_TEMP/xdremux-native" \\\n            2>&1 | tee "$RUNNER_TEMP/distribution-artifacts/evidence/native-build.log"\n      - name: Build and archive the current Rust CLI and complete Apple adapter\n        shell: bash\n        run: |\n          set -euo pipefail\n          export PKG_CONFIG_PATH="$RUNNER_TEMP/xdremux-native/prefix/lib/pkgconfig"\n          export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"\n          export RUSTFLAGS=\'-C link-arg=-Wl,-headerpad_max_install_names\'\n          cargo build --locked --release --target \'${{ matrix.target }}\' -p xdremux-cli\n          swift build -c release --product xdremux-apple-adapter -Xlinker -headerpad_max_install_names\n          adapter="$(swift build -c release --show-bin-path)/xdremux-apple-adapter"\n          package="$RUNNER_TEMP/staging/XDRemux-macOS-${{ matrix.arch }}"\n          python3 scripts/distribution/macos.py stage \\\n            --cli \'target/${{ matrix.target }}/release/xdremux\' --adapter "$adapter" \\\n            --native "$RUNNER_TEMP/xdremux-native" --output "$package" \\\n            --arch \'${{ matrix.arch }}\' --head "$EXPECTED_HEAD"\n          python3 scripts/distribution/macos.py archive --package "$package" \\\n            --output "$RUNNER_TEMP/distribution-artifacts/XDRemux-macOS-${{ matrix.arch }}.tar.gz" \\\n            --epoch "$(git show -s --format=%ct HEAD)"\n          cp "$RUNNER_TEMP/staging/XDRemux-macOS-${{ matrix.arch }}-linkage.json" "$RUNNER_TEMP/distribution-artifacts/evidence/"\n          cp "$RUNNER_TEMP/xdremux-native/build/libheif/CMakeCache.txt" "$RUNNER_TEMP/distribution-artifacts/evidence/libheif-cmake-cache.txt"\n          {\n            git rev-parse HEAD\n            rustc --version\n            cargo --version\n            swift --version\n            xcodebuild -version\n            sw_vers\n            printf \'ImageVersion=%s\\n\' "${ImageVersion:-unknown}"\n          } > "$RUNNER_TEMP/distribution-artifacts/evidence/toolchain.txt"\n      - name: Run the extracted package outside the checkout with only system environment\n        shell: bash\n        run: |\n          python3 scripts/distribution/smoke_macos.py \\\n            --archive "$RUNNER_TEMP/distribution-artifacts/XDRemux-macOS-${{ matrix.arch }}.tar.gz" \\\n            --fixtures "$GITHUB_WORKSPACE/fixtures" --arch \'${{ matrix.arch }}\' \\\n            --expected-head "$EXPECTED_HEAD" \\\n            --output "$RUNNER_TEMP/distribution-artifacts/evidence/relocated"\n      - uses: actions/upload-artifact@v7\n        if: always()\n        with:\n          name: XDRemux-macOS-${{ matrix.arch }}\n          path: ${{ runner.temp }}/distribution-artifacts/\n          retention-days: 14\n          if-no-files-found: error\n'
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.273s
+
+FAILED (failures=11)

@@ -1,0 +1,79 @@
+{
+  "scope": "arm64/macOS27 product distribution; portable Rust core retained",
+  "timestamp_utc": "2026-10-20T23:09:49.157627+00:00",
+  "head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "dirty_status": " M .github/workflows/rust-cli-core.yml\n M README.en.md\n M README.md\n M crates/xdremux-heif/src/styles.rs\n M crates/xdremux-heif/src/validation.rs\n M docs/cli.en.md\n M docs/cli.md\n M scripts/README.en.md\n M scripts/README.md\n M scripts/distribution/build_native.py\n M scripts/distribution/macos.py\n M scripts/distribution/package-readme.md\n M scripts/distribution/smoke_macos.py\n M tests/test_macos_distribution.py\n M tests/test_public_documentation.py\n M tests/validation/test_workflow_configuration.py\n?? tests/test_style_tone_response.py\n",
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tests.test_macos_distribution",
+        "tests.validation.test_workflow_configuration",
+        "tests.validation.test_repository_layout",
+        "tests.test_public_documentation",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "/workspace/xdremux-audit/arm64-macos27-distribution-final-0.log"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        ".github/workflows/rust-cli-core.yml",
+        "scripts/distribution/build_native.py",
+        "scripts/distribution/macos.py",
+        "scripts/distribution/smoke_macos.py",
+        "scripts/distribution/package-readme.md",
+        "tests/test_macos_distribution.py",
+        "tests/validation/test_workflow_configuration.py",
+        "tests/test_public_documentation.py",
+        "README.en.md",
+        "README.md",
+        "docs/cli.en.md",
+        "docs/cli.md",
+        "scripts/README.en.md",
+        "scripts/README.md"
+      ],
+      "exit_code": 0,
+      "log": "/workspace/xdremux-audit/arm64-macos27-distribution-final-1.log"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/distribution/build_native.py",
+        "--arch",
+        "arm64",
+        "--work",
+        "/tmp/xdremux-macos27-linux-negative-6jcvumjj/native"
+      ],
+      "exit_code": 2,
+      "expected_exit": 2,
+      "created_work_directory": false,
+      "log": "/workspace/xdremux-audit/arm64-macos27-linux-host-negative-final.log"
+    }
+  ],
+  "tested_source_sha256": {
+    ".github/workflows/rust-cli-core.yml": "9d924df281996c904b197170c9ef3d302f8fbb270b4b297d291d3e9c4944c38e",
+    "scripts/distribution/build_native.py": "439e8898a8dc60cea3479b74ea305ee6c386e149b63c47e9c640adb0ce976031",
+    "scripts/distribution/macos.py": "572f40ae3da24b5b9c59c9b1dc3c94b54c1a378e9b40059a260811a608ee610a",
+    "scripts/distribution/smoke_macos.py": "a8f5a0642ee2b626bcaee2e1c71294b7dab3169c9f356cf1c90d0196039f2949",
+    "scripts/distribution/package-readme.md": "4cf410ab45e318d86ed46a6182c9df35bc11dd20c444f1c3f4eeb194025b1b7e",
+    "tests/test_macos_distribution.py": "7e44190fe013e4822bfb0c48b8b91d93dbcbf452fa9f4e68b0cbe568189ff8b0",
+    "tests/validation/test_workflow_configuration.py": "0f276e2915c78ea6265147e54b32dfe2d207b7a95500003236c173a9fea84b91",
+    "tests/test_public_documentation.py": "202dcae1dec4b8f5f8190d4f0946370fa3cea11aeae72ef5b56f2c0f4d2cea0b",
+    "README.en.md": "a6bb412522eaac4d9751b1cf99c8724fa7b7b7e3b663115d6aded091a8ef2a9f",
+    "README.md": "41b0a5b8bef03f3c777d11275a6e01b1cf1c4d4b5c15d401aaaffd05f9ce0f9f",
+    "docs/cli.en.md": "979ce13c43bc03a503e95f741c50706e8e9f9e27c2c96335fa6e25b2738bd6dc",
+    "docs/cli.md": "7515190ba60444734e9fbd6c16eb0d90fa03e9c943aa843abb0d8d03d94e18a7",
+    "scripts/README.en.md": "c12d79400512884c3ebcc2dff4463a68eed66650d46ef0415bde697d05ad93b9",
+    "scripts/README.md": "1aeb10892c1d147eb5951436c784988d193a6a482d02f9f25fcbaca24665ba07"
+  },
+  "owned_sources_unchanged_during_checks": true,
+  "native_macos_executed": false,
+  "committed_head_receipt": false
+}

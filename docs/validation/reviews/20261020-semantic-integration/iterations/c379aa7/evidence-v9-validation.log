@@ -1,0 +1,29 @@
+.........FFF.........................
+======================================================================
+FAIL: test_active_document_links_resolve_with_exact_case (tests.validation.test_repository_layout.RepositoryLayoutTests.test_active_document_links_resolve_with_exact_case) (source='docs/validation/reviews/20261020-semantic-integration/iterations/c379aa7/pvt-output-research.public.md', target='pvt-makelive-source/makelive.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-review-evidence/tests/validation/test_repository_layout.py", line 86, in test_active_document_links_resolve_with_exact_case
+    self.assertTrue(
+AssertionError: False is not true : missing or incorrectly cased documentation target
+
+======================================================================
+FAIL: test_active_document_links_resolve_with_exact_case (tests.validation.test_repository_layout.RepositoryLayoutTests.test_active_document_links_resolve_with_exact_case) (source='docs/validation/reviews/20261020-semantic-integration/iterations/c379aa7/pvt-output-research.public.md', target='pvt-makelive-source/test_makelive.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-review-evidence/tests/validation/test_repository_layout.py", line 86, in test_active_document_links_resolve_with_exact_case
+    self.assertTrue(
+AssertionError: False is not true : missing or incorrectly cased documentation target
+
+======================================================================
+FAIL: test_active_document_links_resolve_with_exact_case (tests.validation.test_repository_layout.RepositoryLayoutTests.test_active_document_links_resolve_with_exact_case) (source='docs/validation/reviews/20261020-semantic-integration/iterations/c379aa7/pvt-output-research.public.md', target='pvt-makelive-source/README.md')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-review-evidence/tests/validation/test_repository_layout.py", line 86, in test_active_document_links_resolve_with_exact_case
+    self.assertTrue(
+AssertionError: False is not true : missing or incorrectly cased documentation target
+
+----------------------------------------------------------------------
+Ran 35 tests in 0.510s
+
+FAILED (failures=3)

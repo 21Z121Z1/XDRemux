@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tests.test_macos_distribution",
+    "tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_macos_packages_share_portability_owner_and_require_relocated_runtime",
+    "-v"
+  ],
+  "cwd": "/workspace/XDRemux-integration",
+  "exit_code": 1,
+  "head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "dirty_status": " M crates/xdremux-heif/src/styles.rs\n M crates/xdremux-heif/src/validation.rs\n M tests/test_macos_distribution.py\n M tests/validation/test_workflow_configuration.py\n",
+  "timestamp_utc": "2026-10-20T23:06:02.098861+00:00"
+}

@@ -1,0 +1,56 @@
+{
+  "proof": "/workspace/xdremux-audit/pvt-packaging-proof-pvdkhwdy",
+  "results": {
+    "package_roundtrip": {
+      "directory": true,
+      "plist_version_type": "str",
+      "plist_version": "1",
+      "all_pair_bytes_identical": true,
+      "source_pair_hashes": [
+        "88e2a35ece6bf9243f9b594199ed18e114bf21c922e1ede06cb25d775ceec134",
+        "85b2c13448b4e899b77f3c5ecd8a888eeacd93a5204c16a1cb11b1d7f6c3d17e"
+      ],
+      "package_members_validate": true,
+      "unwrapped_pair_validates": true,
+      "direct_moov_meta_content_identifier": true,
+      "current_cli_accepts_package_directory": false,
+      "native_acceptance": "not executed"
+    },
+    "empty-directory": {
+      "errno": 17,
+      "existing_inode_preserved": true,
+      "staged_pair_preserved": true
+    },
+    "nonempty-directory": {
+      "errno": 17,
+      "existing_inode_preserved": true,
+      "staged_pair_preserved": true
+    },
+    "regular-file": {
+      "errno": 17,
+      "existing_inode_preserved": true,
+      "staged_pair_preserved": true
+    },
+    "dangling-symlink": {
+      "errno": 17,
+      "existing_inode_preserved": true,
+      "staged_pair_preserved": true
+    },
+    "same-output-concurrent": {
+      "errno_by_writer": [
+        17,
+        0
+      ],
+      "winner_inode_preserved": true,
+      "loser_staging_preserved": true,
+      "complete_winning_pair_valid": true
+    },
+    "different-output-concurrent": {
+      "errno_by_writer": [
+        0,
+        0
+      ],
+      "both_complete_pair_bytes_preserved": true
+    }
+  }
+}

@@ -1,0 +1,34 @@
+Captured 2026-10-20T23:07:22.809308+00:00
+$ git remote get-url --push origin
+https://github.com/21Z121Z1/XDRemux.git
+
+exit=0
+$ git ls-remote origin refs/heads/integrate/semantic-review-20261020
+4b04fb3168cdc9bf8f54d7755db94fd3677eebb6	refs/heads/integrate/semantic-review-20261020
+
+exit=0
+$ git ls-remote origin refs/tags/review/semantic-integration-20261020-evidence-v8
+
+exit=0
+$ git push origin f745c0ae3266957afe203eca131e60a04bf77868:refs/tags/review/semantic-integration-20261020-evidence-v8
+To https://github.com/21Z121Z1/XDRemux.git
+ * [new tag]         f745c0ae3266957afe203eca131e60a04bf77868 -> review/semantic-integration-20261020-evidence-v8
+
+exit=0
+$ git fetch --no-tags https://github.com/21Z121Z1/XDRemux.git refs/tags/review/semantic-integration-20261020-evidence-v8:refs/tags/review/semantic-integration-20261020-evidence-v8
+From https://github.com/21Z121Z1/XDRemux
+ * [new tag]         review/semantic-integration-20261020-evidence-v8 -> review/semantic-integration-20261020-evidence-v8
+
+exit=0
+$ git rev-parse refs/tags/review/semantic-integration-20261020-evidence-v8^{commit}
+f745c0ae3266957afe203eca131e60a04bf77868
+
+exit=0
+$ git rev-parse refs/tags/review/semantic-integration-20261020-evidence-v8^{tree}
+419fa68f308843990f2155406b54d0b37c1624ec
+
+exit=0
+$ git fsck --full
+notice: HEAD points to an unborn branch (master)
+
+exit=0

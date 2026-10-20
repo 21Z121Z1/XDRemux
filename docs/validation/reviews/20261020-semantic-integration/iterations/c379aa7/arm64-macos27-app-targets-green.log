@@ -1,0 +1,20 @@
+test_app_and_model_tools_have_no_swift_product_dependencies (tests.test_app_architecture.SwiftAppArchitectureTests.test_app_and_model_tools_have_no_swift_product_dependencies) ... ok
+test_app_build_bundles_the_rust_product_and_adapter (tests.test_app_architecture.SwiftAppArchitectureTests.test_app_build_bundles_the_rust_product_and_adapter) ... ok
+test_app_uses_rust_cli_without_swift_conversion_engines (tests.test_app_architecture.SwiftAppArchitectureTests.test_app_uses_rust_cli_without_swift_conversion_engines) ... ok
+test_categorization_ui_uses_rust_cli_receipts (tests.test_app_architecture.SwiftAppArchitectureTests.test_categorization_ui_uses_rust_cli_receipts) ... ok
+test_ci_runs_architecture_and_app_model_checks (tests.test_app_architecture.SwiftAppArchitectureTests.test_ci_runs_architecture_and_app_model_checks) ... ok
+test_complete_native_product_targets_arm64_and_macos_27 (tests.test_app_architecture.SwiftAppArchitectureTests.test_complete_native_product_targets_arm64_and_macos_27) ... ok
+test_adapter_returns_facts_and_primitives_not_product_decisions (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_adapter_returns_facts_and_primitives_not_product_decisions) ... ok
+test_adapter_schema_version_is_atomic_across_runtime_helper_and_clients (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_adapter_schema_version_is_atomic_across_runtime_helper_and_clients) ... ok
+test_no_swift_product_sources_survive_outside_adapter (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_no_swift_product_sources_survive_outside_adapter) ... ok
+test_person_segmentation_quality_is_a_fixed_primitive_contract (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_person_segmentation_quality_is_a_fixed_primitive_contract) ... ok
+test_rust_owns_portrait_and_styles_policy (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_rust_owns_portrait_and_styles_policy) ... ok
+test_rust_runtime_composes_adapter_at_one_boundary (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_rust_runtime_composes_adapter_at_one_boundary) ... ok
+test_texture_vision_requests_only_submit_singleton_batches (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_texture_vision_requests_only_submit_singleton_batches) ... ok
+test_vision_scene_alias_policy_does_not_live_in_swift (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_vision_scene_alias_policy_does_not_live_in_swift) ... ok
+test_vision_segmentation_requests_are_not_submitted_as_one_compound_batch (tests.test_rust_apple_semantic_policy.RustAppleSemanticPolicyTests.test_vision_segmentation_requests_are_not_submitted_as_one_compound_batch) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.006s
+
+OK

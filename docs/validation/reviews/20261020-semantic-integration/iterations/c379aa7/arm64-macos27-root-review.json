@@ -1,0 +1,62 @@
+{
+  "source_commit": "2ea21ed6e0df09a2641a650e1407cfab657ad8e4",
+  "scope": "Native arm64/macOS27 root target, adapter host boundary and English/Chinese canonical docs. Swift compilation/native execution not available on Linux.",
+  "files_sha256": {
+    "Package.swift": "f36b6d20c58e1e322e791ed1879022f0e16b737dd9a4bef3d4fc16c8b5a8d058",
+    "Sources/XDRemuxAppleAdapter/main.swift": "8931f556e8198ce16f853e99af7a7755304724978ab3ab67c2a2300aa34e40f3",
+    "apps/macos/XDRemuxApp/Sources/AppStrings.swift": "987cb079a371ea393ca724de7be1a5335412d13cce5900597b45c57d6392bd63",
+    "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj": "58cbe51c6b36347687a0ddf7fa7026a91e76f634c64c53d25adeaa31f607b751",
+    "apps/macos/XDRemuxApp/project.yml": "48cb209b652fda054e5c2aca3115d833af8200566f5200203bbd67b739e5fbca",
+    "tests/test_app_architecture.py": "65cf3234feace3dd4b32714313b35956ed432439945ef7b054665ede79971793",
+    "docs/apple-features.en.md": "e8f6eab344b46efcd94cec604be62270f9fc80c4fc004806ce791658c0f3c5c8",
+    "docs/apple-features.md": "ff266cb5df3ba9b366b065eb3b9c3cf6f1c6ac5916d20f850b25ea4ecd14131a",
+    "docs/architecture.en.md": "ec8ffa2be1bb54f81d65b47049c441b53ed3590e31467d2f72facbdbf70f1cec",
+    "docs/architecture.md": "55121a6b63de0bb36de48c3cc97759f8417982d3670b80c340f896d7e61d3a8c",
+    "docs/development.en.md": "f03c90045391d5036518500bd29f197bd2687b909ff9cc715736d4cdfae04ba4",
+    "docs/development.md": "f81ab92b18438ae9aec0942dd94d6d7e7e65057ca63d9159efa57c504c9c1bd7",
+    "docs/quality/testing.en.md": "bde996f45f210fcbc370296171a295deadec3addbef462f5b972bb6c604abf94",
+    "docs/quality/testing.md": "da53ec320149b4e82c9f76e0003aa740138af2b9dbc27ac38f74b806d46df8eb"
+  },
+  "checks": {
+    "arm64-macos27-app-targets-red.log": {
+      "sha256": "80746ba65c5b8a0ed29b65e31798cde2366e7078d3445ca2f2daf218fd4d31fa",
+      "last_lines": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 1 test in 0.000s",
+        "",
+        "FAILED (failures=1)"
+      ]
+    },
+    "arm64-macos27-app-targets-green.log": {
+      "sha256": "4bcf80fcdde7d62968294656a85c9babc14cb1012faba33275c4876edfa14f03",
+      "last_lines": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 15 tests in 0.006s",
+        "",
+        "OK"
+      ]
+    },
+    "arm64-macos27-root-nearby.log": {
+      "sha256": "4590b4b8d00fa1d590e70f2f93182e2f31c6f720319ffd3c4eaf749f30eda16e",
+      "last_lines": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 44 tests in 0.288s",
+        "",
+        "OK"
+      ]
+    },
+    "native-support-tone-combined-review.log": {
+      "sha256": "c4dc77c10b240bb02a1151498914c9932998dd0787b2a6ac7c875577c98181b5",
+      "last_lines": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 65 tests in 1.485s",
+        "",
+        "OK"
+      ]
+    }
+  }
+}

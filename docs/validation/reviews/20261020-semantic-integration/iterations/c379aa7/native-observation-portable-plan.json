@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "scope": "Portable delta after committed4b04fb3: direct hvc1 gain-map validation/Styles assembly, arm64/macOS27 native product configuration/packaging contract and fail-closed Tone measurement diagnostics. Linux proves Rust/fixture and script behavior only; native SystemHEIF/Tone/App/performance/relocated arm64 package require new-head Apple CI. PVT is not included in this intermediate observation head.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "complete-engine-heif-runtime-regressions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-engine",
+        "-p",
+        "xdremux-heif",
+        "-p",
+        "xdremux-runtime",
+        "--all-targets"
+      ],
+      "timeout_seconds": 900,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300,
+      "env": {
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "real-cli-pair-conversion-and-readback",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "state": "FROZEN_FOR_PARENT_REVIEW_UNCOMMITTED",
+  "native_macos_executed": false,
+  "source_head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "source_sha256": {
+    ".github/workflows/rust-cli-core.yml": "9d924df281996c904b197170c9ef3d302f8fbb270b4b297d291d3e9c4944c38e",
+    "scripts/distribution/build_native.py": "439e8898a8dc60cea3479b74ea305ee6c386e149b63c47e9c640adb0ce976031",
+    "scripts/distribution/macos.py": "572f40ae3da24b5b9c59c9b1dc3c94b54c1a378e9b40059a260811a608ee610a",
+    "scripts/distribution/smoke_macos.py": "a8f5a0642ee2b626bcaee2e1c71294b7dab3169c9f356cf1c90d0196039f2949",
+    "scripts/distribution/package-readme.md": "4cf410ab45e318d86ed46a6182c9df35bc11dd20c444f1c3f4eeb194025b1b7e",
+    "tests/test_macos_distribution.py": "7e44190fe013e4822bfb0c48b8b91d93dbcbf452fa9f4e68b0cbe568189ff8b0",
+    "tests/validation/test_workflow_configuration.py": "0f276e2915c78ea6265147e54b32dfe2d207b7a95500003236c173a9fea84b91",
+    "tests/test_public_documentation.py": "202dcae1dec4b8f5f8190d4f0946370fa3cea11aeae72ef5b56f2c0f4d2cea0b",
+    "README.en.md": "a6bb412522eaac4d9751b1cf99c8724fa7b7b7e3b663115d6aded091a8ef2a9f",
+    "README.md": "41b0a5b8bef03f3c777d11275a6e01b1cf1c4d4b5c15d401aaaffd05f9ce0f9f",
+    "docs/cli.en.md": "979ce13c43bc03a503e95f741c50706e8e9f9e27c2c96335fa6e25b2738bd6dc",
+    "docs/cli.md": "7515190ba60444734e9fbd6c16eb0d90fa03e9c943aa843abb0d8d03d94e18a7",
+    "scripts/README.en.md": "c12d79400512884c3ebcc2dff4463a68eed66650d46ef0415bde697d05ad93b9",
+    "scripts/README.md": "1aeb10892c1d147eb5951436c784988d193a6a482d02f9f25fcbaca24665ba07"
+  },
+  "portable_workflow_block_byte_unchanged": true,
+  "pinned_native_manifest_byte_unchanged": true,
+  "artifact_sha256": {
+    "arm64-macos27-distribution-final.json": "1b0d94a0074ad310aa9b4fbd1848c434ba5a91f235e63c429e5e2064820c5131",
+    "arm64-macos27-distribution-final-0.log": "01e1a4a151679aa781cb59942450cc12ba88347ebf107ba27a3eb1ae57dc2cf8",
+    "arm64-macos27-distribution-final-1.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "arm64-macos27-linux-host-negative-final.log": "aed7d2b2fdd7ba3f1adafde350f66349c05babe21b819e8f2be85d01d733705a",
+    "arm64-macos27-distribution-review.md": "5897ee673902320cf1be95189fdc5dec16b5ca1c636a696214b2db93cc62f0c9",
+    "arm64-macos27-distribution.patch": "af161c4114ed393232e33bda79d5baa85e36dcc1cc3610374893b3b08f6b4f2b"
+  }
+}

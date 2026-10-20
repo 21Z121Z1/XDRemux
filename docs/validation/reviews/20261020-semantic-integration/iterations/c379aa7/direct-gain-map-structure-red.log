@@ -1,0 +1,25 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.22s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 3 tests
+
+thread 'styles::tests::direct_gain_map_styles_assembly_preserves_source_resources_and_color' (131549) panicked at crates/xdremux-heif/src/styles.rs:1606:84:
+called `Result::unwrap()` on an `Err` value: Invalid("Photographic Styles source has no unambiguous Gain Map grid item")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test styles::tests::direct_gain_map_styles_assembly_preserves_source_resources_and_color ... FAILED
+test validation::tests::direct_gain_map_rejects_incomplete_ambiguous_or_conflicting_resources ... ok
+
+thread 'validation::tests::direct_gain_map_reports_its_actual_coded_resource_and_precision' (131551) panicked at crates/xdremux-heif/src/validation.rs:921:63:
+called `Result::unwrap()` on an `Err` value: Invalid("gain-map item 2 is Some(FourCC(\"hvc1\")), expected grid")
+test validation::tests::direct_gain_map_reports_its_actual_coded_resource_and_precision ... FAILED
+
+failures:
+
+failures:
+    styles::tests::direct_gain_map_styles_assembly_preserves_source_resources_and_color
+    validation::tests::direct_gain_map_reports_its_actual_coded_resource_and_precision
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 52 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p xdremux-heif --lib`

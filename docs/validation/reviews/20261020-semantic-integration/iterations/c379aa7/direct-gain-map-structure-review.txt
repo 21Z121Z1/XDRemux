@@ -1,0 +1,96 @@
+Scope and binding
+Only crates/xdremux-heif/src/validation.rs and styles.rs, including their inline tests, were edited by semantic_scaffold_fix.
+Base HEAD: 4b04fb3168cdc9bf8f54d7755db94fd3677eebb6; tests cover the uncommitted scoped patch, not a final committed SHA.
+Frozen validation.rs SHA256: 5375b4e209ad920ee63d73979e70c70649b8f1eb2b7a3b8f9da026c09b868da9
+Frozen styles.rs SHA256: cfd48b23510d07fb5985f1e3ce4ee9613dcf7c8ee3a670cf2736e5bc7ddfbbe0
+Patch: direct-gain-map-structure.patch, SHA256 c7504245f9de8e83dd4a2363e4e7d0da301eb88fb9b6298dbdee70714c143873
+No stage, commit, push, dispatch, upstream write, media upload, or runtime source edit.
+Other concurrently dirty files belong to root and were not edited by this agent.
+
+Actual native evidence personally read
+/workspace/xdremux-audit/4b-system-job118919132084.log:894, 2026-10-20T22:53:53.2612680Z:
+Photographic Styles source Gain Map structure: invalid HEIF: gain-map item 10 is Some(FourCC("hvc1")), expected grid.
+This is after the previous alpha metadata rejection and before Styles scene derivation/resource assembly.
+It does not establish that the new patch passes the entire native pipeline.
+
+Reviewed call chain and remaining assumptions
+- runtime/apple_styles.rs:225 transplants semantic scaffold; 237 extracts primary resource; 241 reads coded geometry;
+  244 calls the shared Gain Map validator before selecting submitted system scene or portable source decode.
+- system branch at 250 uses the measured submitted scene pair; portable branch at 273 decodes the selected item ID.
+  codec/portable/libheif.rs:57-69 image_handle(item_id) decoder has no GRID-only selection.
+- styles.rs previously independently guessed a GRID Gain Map among auxl candidates. That entire helper was removed.
+- styles.rs:1004 now calls the existing complete public validator at its public source boundary, then passes the
+  validated tmap ID into private build_iref and final metadata descriptor checks. No repeated local root guessing.
+- runtime/apple_styles.rs:427 final Gain Map validation remains unchanged and uses the same corrected validator.
+- Styles' new Style Delta GRID is its own fixed thirty-tile resource, not a wrapper around the source Gain Map;
+  it retains the existing coded-aspect, color-property, geometry, orientation, metadata and native validation gates.
+- canonical.rs consumer normalization uses item/property/reference IDs, not a Gain Map GRID payload assumption.
+  Its portable writer still deliberately creates GRID gain images; native.rs:1309-1314 exact tile-ID post-write
+  comparison remains valid and unchanged for those generated outputs.
+- texture.rs and runtime/apple_texture.rs do not select the ISO Gain Map by GRID item type.
+- runtime validation reports retain rows/columns and coded IDs. CLI human text still labels rows/columns as
+  "grid"; direct hvc1 is reported as a single 1x1 coded-resource layout. No GRID is authored or source re-encoded.
+
+Implementation/invariants
+The common validator identifies exactly one tmap and one ordered dimg [primary, gain-map] relationship.
+The primary, tmap and gain roots must be distinct, with a known HVC1/GRID gain type; item/iloc/ipma IDs,
+resolved associations, every extent's backing bytes, and all unknown reference targets retain strict checks.
+GRID keeps exactly one nonempty dimg list, unique tiles, valid descriptor/version/flags, matching row*column count,
+nonzero ispe, descriptor/ispe agreement, coded primary aspect and hvc1 tile codec/precision consistency.
+Direct HVC1 has no outgoing dimg (including empty derived references), uses its own coded item ID, real nonempty
+in-bounds coded data, unique required ispe/PIXI/hvcC, and the same channel/bit-depth/chroma/aspect checks.
+Both direct and GRID coded resources reject overlap with primary or its dimg children, and derived hvc1 tiles.
+GainMapStructure docs identify tile_item_ids as actual coded resource IDs and direct rows/columns as 1x1 layout.
+No new public type/export/option was introduced. No producer PIXI/COLR value is invented or substituted.
+Styles still requires a verifiable source primary color property and copies all source properties, source IPMA
+and references in order, all source idat resource bytes and the source mdat prefix before appending its resources.
+Unknown auxC role classification remains owned by the unchanged semantic transplant; its existing rejection
+regressions passed. This patch does not broaden those roles or use arbitrary auxl resources to choose a gain map.
+The semantic transplant's reversed-tmap-target contract is unchanged and its regression still passes.
+
+Behavioral regressions / TDD
+1. direct-gain-map-structure-red.log, exit101:
+   cargo test --locked -p xdremux-heif --lib direct_gain_map -- --nocapture
+   Public validator positive fails on expected grid; public Styles assembly positive independently fails on
+   no unambiguous Gain Map grid item. The positive source has real synthetic ispe/PIXI/hvcC metadata.
+2. direct-gain-map-styles-validation-red.log, exit101:
+   cargo test --locked -p xdremux-heif --lib direct_gain_map_styles_assembly_rejects -- --nocapture
+   Before guarding the public assembler, its negative fixtures were accepted for missing hvcC and derived dimg.
+3. direct-gain-map-primary-alias-red.log, exit101:
+   cargo test --locked -p xdremux-heif --lib direct_gain_map_rejects_incomplete_ambiguous_or_conflicting_resources -- --nocapture
+   A primary GRID sharing the direct gain's coded resource was accepted before the explicit overlap guard.
+4. direct-gain-map-structure-green.log, exit0:
+   cargo test --locked -p xdremux-heif --all-targets
+   57 unit tests + 2 fail-closed integration tests passed; example target 0 tests.
+5. direct-gain-map-structure-clippy.log, exit0:
+   cargo clippy --locked -p xdremux-heif --all-targets -- --deny warnings
+6. direct-gain-map-structure-rustfmt.log, exit0:
+   rustfmt --edition 2021 --check crates/xdremux-heif/src/validation.rs crates/xdremux-heif/src/styles.rs
+   git diff --check on the same two files: exit0.
+
+All cargo commands ran from /workspace/XDRemux-integration with this explicit per-worktree target/environment:
+CARGO_TARGET_DIR=/workspace/XDRemux-integration/target
+RUSTUP_HOME=/tmp/xdremux-toolchain/rustup
+CARGO_HOME=/tmp/xdremux-toolchain/cargo
+PATH=/tmp/xdremux-toolchain/cargo/bin:$PATH
+PKG_CONFIG_PATH=/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu/pkgconfig
+LIBHEIF_PLUGIN_PATH=/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu/libheif/plugins
+CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2
+
+Positive coverage: actual direct coded ID/1x1/ispe dimensions; mono/420/422/444 and 8/10-bit metadata profiles;
+public Styles assembly plus revalidation preserves source structure, coded payload backing bytes, hvcC and all
+source color/property boxes, IPMA and reference order, with no added direct gain dimg.
+Negative coverage asserts concrete causes: missing/duplicate codec, missing PIXI/ispe, channel/precision mismatch,
+empty/outside payload, derived/empty dimg, unknown type/reference, duplicate tmap dimg, primary/tmap root aliases,
+primary GRID coded-resource alias, wrong coded aspect, missing primary color. All existing GRID, semantic,
+alpha, orientation, texture and strict-reference regressions remain and passed.
+Existing Styles test fixtures were strengthened from fake GRID descriptors/missing PIXI to complete synthetic
+structural facts. No production metadata synthesis or test assertion weakening was used.
+
+Author review conclusion / remaining evidence
+The scoped patch is coherent and ready for parent review/commit. There is no known local failing regression.
+Linux structural tests do not decode these synthetic payloads and do not prove native System HEIF success.
+Native Gain Map PIXI/COLR availability after this newly reached branch has not been proven by the old failure;
+missing required source properties will still reject. A new committed SHA must run the actual System HEIF
+Styles fixture through its complete consumer/output validation, plus the existing full performance gate for
+cost of the additional public assembler input validation. Root owns those checks and publication decisions.

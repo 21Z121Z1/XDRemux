@@ -1,0 +1,2 @@
+usage: build_native.py [-h] --work WORK --arch {arm64}
+build_native.py: error: Product packaging requires native arm64 on macOS 27 or later

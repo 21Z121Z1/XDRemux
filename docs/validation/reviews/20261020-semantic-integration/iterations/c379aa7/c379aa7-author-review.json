@@ -1,0 +1,65 @@
+{
+  "source_head": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+  "source_tree": "f618057269722e87be12636b46f5292c5e0d3baf",
+  "reviewed_commits": [
+    {
+      "head": "eca4bf968eb3a033a435ae3f007781db11d9d1aa",
+      "subject": "Validate direct HEVC gain maps before Styles assembly",
+      "paths": [
+        "crates/xdremux-heif/src/styles.rs",
+        "crates/xdremux-heif/src/validation.rs"
+      ]
+    },
+    {
+      "head": "2ea21ed6e0df09a2641a650e1407cfab657ad8e4",
+      "subject": "Scope native product delivery to arm64 and macOS 27",
+      "paths": [
+        ".github/workflows/rust-cli-core.yml",
+        "Package.swift",
+        "README.en.md",
+        "README.md",
+        "Sources/XDRemuxAppleAdapter/main.swift",
+        "apps/macos/XDRemuxApp/Sources/AppStrings.swift",
+        "apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj",
+        "apps/macos/XDRemuxApp/project.yml",
+        "docs/apple-features.en.md",
+        "docs/apple-features.md",
+        "docs/architecture.en.md",
+        "docs/architecture.md",
+        "docs/cli.en.md",
+        "docs/cli.md",
+        "docs/development.en.md",
+        "docs/development.md",
+        "docs/quality/testing.en.md",
+        "docs/quality/testing.md",
+        "scripts/README.en.md",
+        "scripts/README.md",
+        "scripts/distribution/build_native.py",
+        "scripts/distribution/macos.py",
+        "scripts/distribution/package-readme.md",
+        "scripts/distribution/smoke_macos.py",
+        "tests/test_app_architecture.py",
+        "tests/test_macos_distribution.py",
+        "tests/test_public_documentation.py",
+        "tests/validation/test_workflow_configuration.py"
+      ]
+    },
+    {
+      "head": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+      "subject": "Fail closed on missing native Tone measurements and retain first faults",
+      "paths": [
+        ".github/workflows/research.yml",
+        "scripts/apple/check_style_tone_response.py",
+        "scripts/apple/run_style_tone_sweep.sh",
+        "tests/test_style_tone_response.py"
+      ]
+    }
+  ],
+  "claims": {
+    "direct_gain_map": "direct hvc1 and grid share graph/codec/precision/aspect/byte-storage validation; actual native still pending",
+    "support_scope": "all native product targets arm64/macOS27; three portable Rust host checks kept",
+    "tone": "complete consumer process/render/numeric measurements required, no guessed private status success value; actual old extractor inner fault still unknown",
+    "pvt": "not implemented in this head; fixed public package format prototype only"
+  },
+  "merge_delete_approval": "NOT APPROVED"
+}

@@ -1,0 +1,61 @@
+test_reference_pass_cannot_admit_an_empty_product_sweep (tests.test_style_tone_response.StyleToneResponseTests.test_reference_pass_cannot_admit_an_empty_product_sweep) ... FAIL
+test_all_requested_tones_and_photos_are_required (tests.test_style_tone_response.StyleToneResponseTests.test_all_requested_tones_and_photos_are_required) ... 
+  test_all_requested_tones_and_photos_are_required (tests.test_style_tone_response.StyleToneResponseTests.test_all_requested_tones_and_photos_are_required) (missing='tone') ... FAIL
+  test_all_requested_tones_and_photos_are_required (tests.test_style_tone_response.StyleToneResponseTests.test_all_requested_tones_and_photos_are_required) (missing='photo') ... FAIL
+test_failed_process_or_model_comparison_cannot_reuse_present_renders (tests.test_style_tone_response.StyleToneResponseTests.test_failed_process_or_model_comparison_cannot_reuse_present_renders) ... 
+  test_failed_process_or_model_comparison_cannot_reuse_present_renders (tests.test_style_tone_response.StyleToneResponseTests.test_failed_process_or_model_comparison_cannot_reuse_present_renders) (target='consumer-run.json') ... FAIL
+  test_failed_process_or_model_comparison_cannot_reuse_present_renders (tests.test_style_tone_response.StyleToneResponseTests.test_failed_process_or_model_comparison_cannot_reuse_present_renders) (target='tone-sweep.json') ... FAIL
+test_host_gate_requires_a_successful_nonempty_native_comparison (tests.test_style_tone_response.StyleToneResponseTests.test_host_gate_requires_a_successful_nonempty_native_comparison) ... FAIL
+
+======================================================================
+FAIL: test_reference_pass_cannot_admit_an_empty_product_sweep (tests.test_style_tone_response.StyleToneResponseTests.test_reference_pass_cannot_admit_an_empty_product_sweep)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 56, in test_reference_pass_cannot_admit_an_empty_product_sweep
+    self.assertFalse(report["trusted"])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_all_requested_tones_and_photos_are_required (tests.test_style_tone_response.StyleToneResponseTests.test_all_requested_tones_and_photos_are_required) (missing='tone')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 71, in test_all_requested_tones_and_photos_are_required
+    self.assertFalse(tone.analyze(sanity, root / "renders", root / "report")["trusted"])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_all_requested_tones_and_photos_are_required (tests.test_style_tone_response.StyleToneResponseTests.test_all_requested_tones_and_photos_are_required) (missing='photo')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 71, in test_all_requested_tones_and_photos_are_required
+    self.assertFalse(tone.analyze(sanity, root / "renders", root / "report")["trusted"])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_failed_process_or_model_comparison_cannot_reuse_present_renders (tests.test_style_tone_response.StyleToneResponseTests.test_failed_process_or_model_comparison_cannot_reuse_present_renders) (target='consumer-run.json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 85, in test_failed_process_or_model_comparison_cannot_reuse_present_renders
+    self.assertFalse(tone.analyze(sanity, root / "renders", root / "report")["trusted"])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_failed_process_or_model_comparison_cannot_reuse_present_renders (tests.test_style_tone_response.StyleToneResponseTests.test_failed_process_or_model_comparison_cannot_reuse_present_renders) (target='tone-sweep.json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 85, in test_failed_process_or_model_comparison_cannot_reuse_present_renders
+    self.assertFalse(tone.analyze(sanity, root / "renders", root / "report")["trusted"])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_host_gate_requires_a_successful_nonempty_native_comparison (tests.test_style_tone_response.StyleToneResponseTests.test_host_gate_requires_a_successful_nonempty_native_comparison)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 119, in test_host_gate_requires_a_successful_nonempty_native_comparison
+    self.assertFalse(tone.sanity_gate([row])["trusted"])
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.080s
+
+FAILED (failures=6)

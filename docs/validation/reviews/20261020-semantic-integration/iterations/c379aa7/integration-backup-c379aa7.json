@@ -1,0 +1,10 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-20T23:21:54.383306+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/c379aa7",
+  "head": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+  "tree": "f618057269722e87be12636b46f5292c5e0d3baf",
+  "restore": "remote fetched, exact commit/tree matched, full fsck exit0",
+  "restore_log": "integration-restore-c379aa7.log",
+  "validation": "7-check clean committed-head portable delta gate running; new native System HEIF/Tone/App/performance/arm64 macOS27 package pending; PVT not in this intermediate observation head"
+}
