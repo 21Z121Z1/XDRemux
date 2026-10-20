@@ -13,6 +13,7 @@ use crate::error::{HeifError, Result};
 const GRID: FourCC = FourCC::new(*b"grid");
 const HVC1: FourCC = FourCC::new(*b"hvc1");
 const HVCC: FourCC = FourCC::new(*b"hvcC");
+#[cfg(test)]
 const TMAP: FourCC = FourCC::new(*b"tmap");
 const URI: FourCC = FourCC::new(*b"uri ");
 const IROT: FourCC = FourCC::new(*b"irot");
@@ -159,73 +160,6 @@ fn find_style_metadata_item(source: &[u8], meta: &ParsedMeta) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn find_style_graph_roots(meta: &ParsedMeta) -> Result<(u32, u32)> {
-    let tmap_ids = meta
-        .iinf
-        .entries
-        .iter()
-        .filter(|item| item.item_type == Some(TMAP))
-        .map(|item| item.item_id)
-        .collect::<Vec<_>>();
-    let tmap_id = match tmap_ids.as_slice() {
-        [only] => *only,
-        [] => return Err(invalid("Photographic Styles source has no tmap item")),
-        _ => {
-            return Err(invalid(
-                "Photographic Styles source has multiple tmap items",
-            ));
-        }
-    };
-    let Some(iref) = meta.iref.as_ref() else {
-        return Err(invalid(
-            "Photographic Styles source has no iref graph for its Gain Map",
-        ));
-    };
-    let mut candidates = BTreeSet::new();
-    for reference in &iref.entries {
-        if reference.kind == DIMG && reference.from_item_id == tmap_id {
-            for item_id in &reference.to_item_ids {
-                if *item_id != meta.primary_item_id {
-                    candidates.insert(*item_id);
-                }
-            }
-        }
-        if reference.kind == AUXL
-            && reference.to_item_ids.contains(&meta.primary_item_id)
-            && reference.to_item_ids.contains(&tmap_id)
-        {
-            candidates.insert(reference.from_item_id);
-        }
-    }
-    // ImageIO may add an auxiliary item that also references the primary and
-    // tmap roots (for example, a Vision sky matte). The Gain Map item is the
-    // grid among those candidates; accepting every auxl source would make a
-    // valid source ambiguous as soon as a semantic resource is present.
-    let gain_grid_candidates = candidates
-        .into_iter()
-        .filter(|item_id| {
-            meta.iinf
-                .entries
-                .iter()
-                .any(|item| item.item_id == *item_id && item.item_type == Some(GRID))
-        })
-        .collect::<Vec<_>>();
-    let gain_id = match gain_grid_candidates.as_slice() {
-        [only] => *only,
-        [] => {
-            return Err(invalid(
-                "Photographic Styles source has no unambiguous Gain Map grid item",
-            ));
-        }
-        _ => {
-            return Err(invalid(
-                "Photographic Styles source has multiple Gain Map grid candidates",
-            ));
-        }
-    };
-    Ok((tmap_id, gain_id))
 }
 
 fn associated_property_index(meta: &ParsedMeta, item_id: u32, kind: FourCC) -> Option<u16> {
@@ -644,6 +578,7 @@ fn build_iinf(
 
 fn build_iref(
     meta: &ParsedMeta,
+    tmap_item_id: u32,
     tile_ids: &[u32],
     delta_grid_id: u32,
     linear_thumbnail_id: u32,
@@ -661,17 +596,17 @@ fn build_iref(
     entries.push(IrefEntry {
         kind: AUXL,
         from_item_id: delta_grid_id,
-        to_item_ids: vec![meta.primary_item_id, find_tmap_id(meta)?],
+        to_item_ids: vec![meta.primary_item_id, tmap_item_id],
     });
     entries.push(IrefEntry {
         kind: AUXL,
         from_item_id: linear_thumbnail_id,
-        to_item_ids: vec![meta.primary_item_id, find_tmap_id(meta)?],
+        to_item_ids: vec![meta.primary_item_id, tmap_item_id],
     });
     entries.push(IrefEntry {
         kind: CDSC,
         from_item_id: style_metadata_id,
-        to_item_ids: vec![meta.primary_item_id, find_tmap_id(meta)?],
+        to_item_ids: vec![meta.primary_item_id, tmap_item_id],
     });
     let maximum_item_id = entries
         .iter()
@@ -686,24 +621,6 @@ fn build_iref(
         meta.iref.as_ref().map_or(0, |iref| iref.version)
     };
     Ok(make_iref_box(version, &entries)?)
-}
-
-fn find_tmap_id(meta: &ParsedMeta) -> Result<u32> {
-    let mut ids = meta
-        .iinf
-        .entries
-        .iter()
-        .filter(|item| item.item_type == Some(TMAP))
-        .map(|item| item.item_id);
-    let Some(id) = ids.next() else {
-        return Err(invalid("Photographic Styles source has no tmap item"));
-    };
-    if ids.next().is_some() {
-        return Err(invalid(
-            "Photographic Styles source has multiple tmap items",
-        ));
-    }
-    Ok(id)
 }
 
 fn entity_group_ids(source: &[u8], children: &[BoxHeader]) -> Result<Vec<u32>> {
@@ -1082,13 +999,15 @@ pub fn assemble_photographic_styles_heif(
     assembly: &PhotographicStylesAssembly<'_>,
 ) -> Result<Vec<u8>> {
     validate_assembly(assembly)?;
+    // Validate the complete source graph before appending any Styles resources.
+    // This also supplies authoritative roots for direct hvc1 and grid Gain Maps.
+    let source_structure = crate::validation::validate_gain_map_structure(source)?;
     let top = scan_top_level_boxes(source)?;
     let _ = one_top_level(&top.boxes, FTYP, "ftyp")?;
     let meta_header = one_top_level(&top.boxes, META, "meta")?;
     let mdat = one_top_level(&top.boxes, MDAT, "mdat")?;
     let meta = parse_meta_box(source, meta_header)?;
     find_style_metadata_item(source, &meta)?;
-    let _ = find_style_graph_roots(&meta)?;
     let meta_children_start = meta_header
         .data_start
         .checked_add(4)
@@ -1159,6 +1078,7 @@ pub fn assemble_photographic_styles_heif(
     )?;
     let iref = build_iref(
         &meta,
+        source_structure.tmap_item_id,
         &tile_ids,
         delta_grid_id,
         linear_thumbnail_id,
@@ -1328,10 +1248,7 @@ pub fn assemble_photographic_styles_heif(
                 entry.kind == CDSC
                     && entry.from_item_id == style_metadata_id
                     && entry.to_item_ids
-                        == vec![
-                            reparsed_meta.primary_item_id,
-                            find_tmap_id(&reparsed_meta).unwrap_or(0),
-                        ]
+                        == vec![reparsed_meta.primary_item_id, source_structure.tmap_item_id]
             })
         })
         .unwrap_or(false);
@@ -1371,8 +1288,16 @@ mod tests {
     }
 
     fn fixture_with_mirror(mirror_first: Option<bool>) -> Vec<u8> {
+        fixture_with_gain(mirror_first, false)
+    }
+
+    fn fixture_with_gain(mirror_first: Option<bool>, direct_gain: bool) -> Vec<u8> {
         let primary = b"primary";
-        let gain = b"gain";
+        let gain = if direct_gain {
+            b"gain".as_slice()
+        } else {
+            &[0, 0, 0, 0, 0, 5, 0, 3]
+        };
         let tmap = b"tmap";
         let tile = b"tile";
         let mut idat_payload = Vec::new();
@@ -1387,11 +1312,15 @@ mod tests {
 
         let mut ipco_payload = Vec::new();
         for property in [
-            make_ispe_box(4, 4).unwrap(),
+            make_ispe_box(5, 3).unwrap(),
             colr_box(),
             pixi_box(),
             make_ispe_box(4, 4).unwrap(),
-            make_box(HVCC, &[1; 19]).unwrap(),
+            make_box(
+                HVCC,
+                &[1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0],
+            )
+            .unwrap(),
             make_ispe_box(10, 6).unwrap(),
             make_box(IROT, &[3]).unwrap(),
             make_box(IMIR, &[1]).unwrap(),
@@ -1432,24 +1361,34 @@ mod tests {
                 },
                 IpmaEntry {
                     item_id: GAIN_ID,
-                    associations: vec![IpmaAssociation {
-                        property_index: 1,
-                        essential: true,
-                    }],
+                    associations: [1, 3]
+                        .into_iter()
+                        .chain(direct_gain.then_some(5))
+                        .map(|property_index| IpmaAssociation {
+                            property_index,
+                            essential: true,
+                        })
+                        .collect(),
                 },
                 IpmaEntry {
                     item_id: TMAP_ID,
-                    associations: vec![IpmaAssociation {
-                        property_index: 4,
-                        essential: true,
-                    }],
+                    associations: [4, 3]
+                        .into_iter()
+                        .map(|property_index| IpmaAssociation {
+                            property_index,
+                            essential: true,
+                        })
+                        .collect(),
                 },
                 IpmaEntry {
                     item_id: TILE_ID,
-                    associations: vec![IpmaAssociation {
-                        property_index: 5,
-                        essential: true,
-                    }],
+                    associations: [1, 5]
+                        .into_iter()
+                        .map(|property_index| IpmaAssociation {
+                            property_index,
+                            essential: true,
+                        })
+                        .collect(),
                 },
             ],
         )
@@ -1459,7 +1398,7 @@ mod tests {
             0,
             &[
                 make_infe_box(PRIMARY_ID, HVC1, 0).unwrap(),
-                make_infe_box(GAIN_ID, GRID, 1).unwrap(),
+                make_infe_box(GAIN_ID, if direct_gain { HVC1 } else { GRID }, 1).unwrap(),
                 make_infe_box(TMAP_ID, TMAP, 0).unwrap(),
                 make_infe_box(TILE_ID, HVC1, 1).unwrap(),
             ],
@@ -1519,22 +1458,19 @@ mod tests {
             ],
         )
         .unwrap();
-        let iref = make_iref_box(
-            0,
-            &[
-                IrefEntry {
-                    kind: DIMG,
-                    from_item_id: TMAP_ID,
-                    to_item_ids: vec![PRIMARY_ID, GAIN_ID],
-                },
-                IrefEntry {
-                    kind: DIMG,
-                    from_item_id: GAIN_ID,
-                    to_item_ids: vec![TILE_ID],
-                },
-            ],
-        )
-        .unwrap();
+        let mut references = vec![IrefEntry {
+            kind: DIMG,
+            from_item_id: TMAP_ID,
+            to_item_ids: vec![PRIMARY_ID, GAIN_ID],
+        }];
+        if !direct_gain {
+            references.push(IrefEntry {
+                kind: DIMG,
+                from_item_id: GAIN_ID,
+                to_item_ids: vec![TILE_ID],
+            });
+        }
+        let iref = make_iref_box(0, &references).unwrap();
         let pitm = make_pitm_box(0, PRIMARY_ID).unwrap();
         let idat = make_box(IDAT, &idat_payload).unwrap();
         let mut altr_payload = vec![0, 0, 0, 0];
@@ -1574,6 +1510,158 @@ mod tests {
             linear_thumbnail_payload: b"linear-thumbnail",
             linear_thumbnail_width: 5,
             linear_thumbnail_height: 3,
+        }
+    }
+
+    #[test]
+    fn direct_gain_map_styles_assembly_preserves_source_resources_and_color() {
+        let source = fixture_with_gain(None, true);
+        let output =
+            assemble_photographic_styles_heif(&source, &assembly(b"bplist00test")).unwrap();
+        let before = crate::validate_gain_map_structure(&source).unwrap();
+        assert_eq!(before.tile_item_ids, vec![GAIN_ID]);
+        let after = crate::validate_gain_map_structure(&output).unwrap();
+        assert_eq!(after, before);
+        let source_top = scan_top_level_boxes(&source).unwrap();
+        let output_top = scan_top_level_boxes(&output).unwrap();
+        let source_meta = parse_meta_box(
+            &source,
+            one_top_level(&source_top.boxes, META, "source").unwrap(),
+        )
+        .unwrap();
+        let output_meta = parse_meta_box(
+            &output,
+            one_top_level(&output_top.boxes, META, "output").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            &output[output_meta.idat.as_ref().unwrap().payload_range()]
+                [..source_meta.idat.as_ref().unwrap().payload_range().len()],
+            &source[source_meta.idat.as_ref().unwrap().payload_range()]
+        );
+        for property in &source_meta.properties {
+            let actual = output_meta
+                .properties
+                .iter()
+                .find(|actual| actual.index == property.index)
+                .unwrap();
+            assert_eq!(
+                raw_property(&output, actual).unwrap(),
+                raw_property(&source, property).unwrap()
+            );
+        }
+        assert_eq!(
+            source_meta.ipma.entries,
+            output_meta.ipma.entries[..source_meta.ipma.entries.len()]
+        );
+        let source_refs = &source_meta.iref.as_ref().unwrap().entries;
+        assert_eq!(
+            source_refs,
+            &output_meta.iref.as_ref().unwrap().entries[..source_refs.len()]
+        );
+        assert!(!output_meta
+            .iref
+            .as_ref()
+            .unwrap()
+            .entries
+            .iter()
+            .any(|edge| edge.kind == DIMG && edge.from_item_id == GAIN_ID));
+    }
+
+    #[test]
+    fn direct_gain_map_styles_assembly_rejects_invalid_codec_precision_or_color() {
+        for (case, index, offset, expected) in [
+            ("missing hvcC", 5, 4, "missing hvcC"),
+            ("missing pixi", 3, 4, "missing pixi"),
+            ("bad hvcC", 5, 8, "invalid Gain Map hvcC"),
+            ("precision", 5, 25, "disagree with hvcC"),
+            ("missing color", 2, 4, "no verifiable primary color"),
+        ] {
+            let mut source = fixture_with_gain(None, true);
+            let top = scan_top_level_boxes(&source).unwrap();
+            let meta = parse_meta_box(&source, one_top_level(&top.boxes, META, "source").unwrap())
+                .unwrap();
+            let property = meta
+                .properties
+                .iter()
+                .find(|property| property.index == index)
+                .unwrap();
+            let start = property.box_range.start + offset;
+            if offset == 4 {
+                source[start..start + 4].copy_from_slice(b"free");
+            } else {
+                source[start] = if case == "bad hvcC" { 0 } else { 2 };
+            }
+            let error = assemble_photographic_styles_heif(&source, &assembly(b"bplist00test"))
+                .err()
+                .unwrap_or_else(|| panic!("accepted {case}"))
+                .to_string();
+            assert!(error.contains(expected), "{case}: {error}");
+        }
+    }
+
+    #[test]
+    fn direct_gain_map_styles_assembly_rejects_invalid_derived_relationships() {
+        for case in [
+            "derived",
+            "duplicate tmap",
+            "primary alias",
+            "unknown gain",
+            "unknown auxiliary",
+        ] {
+            let source = fixture_with_gain(None, true);
+            let top = scan_top_level_boxes(&source).unwrap();
+            let header = one_top_level(&top.boxes, META, "source").unwrap();
+            let meta = parse_meta_box(&source, header).unwrap();
+            let mut references = meta.iref.unwrap().entries;
+            match case {
+                "derived" => references.push(IrefEntry {
+                    kind: DIMG,
+                    from_item_id: GAIN_ID,
+                    to_item_ids: vec![TILE_ID],
+                }),
+                "duplicate tmap" => references.push(references[0].clone()),
+                "primary alias" => references[0].to_item_ids = vec![PRIMARY_ID, PRIMARY_ID],
+                "unknown gain" => references[0].to_item_ids = vec![PRIMARY_ID, 99],
+                "unknown auxiliary" => references.push(IrefEntry {
+                    kind: AUXL,
+                    from_item_id: TILE_ID,
+                    to_item_ids: vec![99],
+                }),
+                _ => unreachable!(),
+            }
+            let iref = make_iref_box(0, &references).unwrap();
+            // These fixture items use idat-relative extents, so changing the
+            // reference box never changes their backing resource bytes.
+            let mut meta_payload = vec![0; 4];
+            for child in parse_boxes(&source, header.data_start + 4..header.data_end).unwrap() {
+                meta_payload.extend_from_slice(if child.kind == IREF {
+                    &iref
+                } else {
+                    &source[child.box_range()]
+                });
+            }
+            let replacement = make_box(META, &meta_payload).unwrap();
+            let mut altered = Vec::new();
+            for item in &top.boxes {
+                altered.extend_from_slice(if item.kind == META {
+                    &replacement
+                } else {
+                    &source[item.box_range()]
+                });
+            }
+            let expected = match case {
+                "derived" => "must not have a dimg reference",
+                "duplicate tmap" => "exactly one dimg reference",
+                "primary alias" => "distinct item IDs",
+                "unknown gain" | "unknown auxiliary" => "targets unknown item 99",
+                _ => unreachable!(),
+            };
+            let error = assemble_photographic_styles_heif(&altered, &assembly(b"bplist00test"))
+                .err()
+                .unwrap_or_else(|| panic!("accepted {case}"))
+                .to_string();
+            assert!(error.contains(expected), "{case}: {error}");
         }
     }
 
