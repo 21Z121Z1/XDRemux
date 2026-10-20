@@ -175,7 +175,7 @@ fn find_style_graph_roots(meta: &ParsedMeta) -> Result<(u32, u32)> {
         _ => {
             return Err(invalid(
                 "Photographic Styles source has multiple tmap items",
-            ))
+            ));
         }
     };
     let Some(iref) = meta.iref.as_ref() else {
@@ -497,14 +497,25 @@ fn build_iprp(
         ],
     });
     if let Some(imir_index) = shared_imir_index {
-        ipma_entries
+        let associations = &mut ipma_entries
             .last_mut()
             .expect("style-delta ipma entry was just pushed")
-            .associations
-            .push(IpmaAssociation {
+            .associations;
+        let position = if geometry.mirror_before_rotation {
+            associations
+                .iter()
+                .position(|association| association.property_index == shared_irot_index)
+                .expect("shared irot association was just added")
+        } else {
+            associations.len()
+        };
+        associations.insert(
+            position,
+            IpmaAssociation {
                 property_index: imir_index,
                 essential: true,
-            });
+            },
+        );
     }
     ipma_entries.push(IpmaEntry {
         item_id: linear_thumbnail_id,
@@ -536,14 +547,25 @@ fn build_iprp(
         ],
     });
     if let Some(imir_index) = shared_imir_index {
-        ipma_entries
+        let associations = &mut ipma_entries
             .last_mut()
             .expect("linear-thumbnail ipma entry was just pushed")
-            .associations
-            .push(IpmaAssociation {
+            .associations;
+        let position = if geometry.mirror_before_rotation {
+            associations
+                .iter()
+                .position(|association| association.property_index == shared_irot_index)
+                .expect("shared irot association was just added")
+        } else {
+            associations.len()
+        };
+        associations.insert(
+            position,
+            IpmaAssociation {
                 property_index: imir_index,
                 essential: true,
-            });
+            },
+        );
     }
 
     let maximum_item_id = ipma_entries
@@ -1345,6 +1367,10 @@ mod tests {
     }
 
     fn fixture() -> Vec<u8> {
+        fixture_with_mirror(None)
+    }
+
+    fn fixture_with_mirror(mirror_first: Option<bool>) -> Vec<u8> {
         let primary = b"primary";
         let gain = b"gain";
         let tmap = b"tmap";
@@ -1368,30 +1394,41 @@ mod tests {
             make_box(HVCC, &[1; 19]).unwrap(),
             make_ispe_box(10, 6).unwrap(),
             make_box(IROT, &[3]).unwrap(),
+            make_box(IMIR, &[1]).unwrap(),
         ] {
             ipco_payload.extend_from_slice(&property);
         }
         let ipco = make_box(IPCO, &ipco_payload).unwrap();
+        let mut primary_associations = vec![
+            IpmaAssociation {
+                property_index: 2,
+                essential: true,
+            },
+            IpmaAssociation {
+                property_index: 6,
+                essential: false,
+            },
+            IpmaAssociation {
+                property_index: 7,
+                essential: true,
+            },
+        ];
+        if let Some(before) = mirror_first {
+            primary_associations.insert(
+                if before { 2 } else { 3 },
+                IpmaAssociation {
+                    property_index: 8,
+                    essential: true,
+                },
+            );
+        }
         let ipma = make_ipma_box(
             0,
             0,
             &[
                 IpmaEntry {
                     item_id: PRIMARY_ID,
-                    associations: vec![
-                        IpmaAssociation {
-                            property_index: 2,
-                            essential: true,
-                        },
-                        IpmaAssociation {
-                            property_index: 6,
-                            essential: false,
-                        },
-                        IpmaAssociation {
-                            property_index: 7,
-                            essential: true,
-                        },
-                    ],
+                    associations: primary_associations,
                 },
                 IpmaEntry {
                     item_id: GAIN_ID,
@@ -1646,6 +1683,51 @@ mod tests {
             associated_property_index(&meta, PRIMARY_ID, IROT),
             Some(irot_index)
         );
+    }
+
+    #[test]
+    fn style_items_preserve_primary_mirror_rotation_order() {
+        for mirror_first in [true, false] {
+            let source = fixture_with_mirror(Some(mirror_first));
+            let geometry = crate::primary_coded_geometry(&source).unwrap();
+            assert_eq!(geometry.mirror_axis, Some(1));
+            assert_eq!(geometry.mirror_before_rotation, mirror_first);
+            let output =
+                assemble_photographic_styles_heif(&source, &assembly(b"bplist00test")).unwrap();
+            let top = scan_top_level_boxes(&output).unwrap();
+            let meta =
+                parse_meta_box(&output, one_top_level(&top.boxes, META, "meta").unwrap()).unwrap();
+            let expected = if mirror_first {
+                vec![IMIR, IROT]
+            } else {
+                vec![IROT, IMIR]
+            };
+            let transformed = meta
+                .ipma
+                .entries
+                .iter()
+                .filter_map(|entry| {
+                    let kinds: Vec<_> = entry
+                        .associations
+                        .iter()
+                        .filter_map(|association| {
+                            meta.properties
+                                .iter()
+                                .find(|property| {
+                                    property.index == u32::from(association.property_index)
+                                })
+                                .map(|property| property.kind)
+                                .filter(|kind| *kind == IROT || *kind == IMIR)
+                        })
+                        .collect();
+                    (!kinds.is_empty()).then_some(kinds)
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                transformed,
+                vec![expected.clone(), expected.clone(), expected]
+            );
+        }
     }
 
     #[test]

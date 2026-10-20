@@ -549,14 +549,25 @@ fn build_iprp(
         ],
     });
     if let Some(imir) = imir {
-        ipma_entries
+        let associations = &mut ipma_entries
             .last_mut()
             .expect("gain-map ipma entry was just pushed")
-            .associations
-            .push(IpmaAssociation {
+            .associations;
+        let position = if geometry.mirror_before_rotation {
+            associations
+                .iter()
+                .position(|association| association.property_index == irot)
+                .expect("primary irot association was just added")
+        } else {
+            associations.len()
+        };
+        associations.insert(
+            position,
+            IpmaAssociation {
                 property_index: imir,
                 essential: true,
-            });
+            },
+        );
     }
     ipma_entries.push(IpmaEntry {
         item_id: graph.ids.tmap_id,

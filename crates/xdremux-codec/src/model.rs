@@ -2,6 +2,75 @@ use xdremux_engine::GainMapEncodeProfile;
 
 use crate::{CodecError, Result};
 
+/// Restore tightly packed RGB16LE display codes to HEIF coded order without
+/// reducing their precision. Mirroring and rotation follow ipma order; the
+/// inverse samples each coded pixel from its forward-mapped display position.
+pub fn undo_heif_rgb16(
+    data: &[u8],
+    width: u32,
+    height: u32,
+    quarter_turns_ccw: u8,
+    mirror_axis: Option<u8>,
+    mirror_before_rotation: bool,
+) -> Result<(u32, u32, Vec<u8>)> {
+    if width == 0
+        || height == 0
+        || quarter_turns_ccw > 3
+        || mirror_axis.is_some_and(|axis| axis > 1)
+    {
+        return Err(CodecError::invalid("invalid HEIF RGB16 transform geometry"));
+    }
+    let display_width =
+        usize::try_from(width).map_err(|_| CodecError::invalid("RGB16 width exceeds usize"))?;
+    let display_height =
+        usize::try_from(height).map_err(|_| CodecError::invalid("RGB16 height exceeds usize"))?;
+    let expected = display_width
+        .checked_mul(display_height)
+        .and_then(|pixels| pixels.checked_mul(6))
+        .ok_or_else(|| CodecError::invalid("RGB16 byte size overflows"))?;
+    if data.len() != expected {
+        return Err(CodecError::invalid(
+            "RGB16 data does not match its geometry",
+        ));
+    }
+    let (coded_width, coded_height) = if quarter_turns_ccw & 1 == 1 {
+        (display_height, display_width)
+    } else {
+        (display_width, display_height)
+    };
+    let mirror = |x: usize, y: usize, w: usize, h: usize| match mirror_axis {
+        Some(0) => (x, h - 1 - y),
+        Some(1) => (w - 1 - x, y),
+        _ => (x, y),
+    };
+    let mut coded = vec![0; expected];
+    for y in 0..coded_height {
+        for x in 0..coded_width {
+            let (px, py) = if mirror_before_rotation {
+                mirror(x, y, coded_width, coded_height)
+            } else {
+                (x, y)
+            };
+            let (px, py) = match quarter_turns_ccw {
+                0 => (px, py),
+                1 => (py, coded_width - 1 - px),
+                2 => (coded_width - 1 - px, coded_height - 1 - py),
+                3 => (coded_height - 1 - py, px),
+                _ => unreachable!("rotation was validated"),
+            };
+            let (px, py) = if mirror_before_rotation {
+                (px, py)
+            } else {
+                mirror(px, py, display_width, display_height)
+            };
+            let source = (py * display_width + px) * 6;
+            let target = (y * coded_width + x) * 6;
+            coded[target..target + 6].copy_from_slice(&data[source..source + 6]);
+        }
+    }
+    Ok((coded_width as u32, coded_height as u32, coded))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RasterPixelFormat {
     Mono8,
@@ -249,6 +318,87 @@ impl PrimaryHeifEncodeRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rgb16_inverse_preserves_channels_for_all_rotations_and_mirror_orders() {
+        // Six distinct RGB16 colors, including low bits that RGB8 cannot keep.
+        let pixels: Vec<[u16; 3]> = (0..6).map(|n| [1001 + n, 20003 + n, 50007 + n]).collect();
+        let pack = |indices: &[usize; 6]| {
+            indices
+                .iter()
+                .flat_map(|index| pixels[*index])
+                .flat_map(u16::to_le_bytes)
+                .collect::<Vec<_>>()
+        };
+        let coded = pack(&[0, 1, 2, 3, 4, 5]);
+        let cases = [
+            (
+                None,
+                false,
+                [
+                    [0, 1, 2, 3, 4, 5],
+                    [2, 5, 1, 4, 0, 3],
+                    [5, 4, 3, 2, 1, 0],
+                    [3, 0, 4, 1, 5, 2],
+                ],
+            ),
+            (
+                Some(0),
+                true,
+                [
+                    [3, 4, 5, 0, 1, 2],
+                    [5, 2, 4, 1, 3, 0],
+                    [2, 1, 0, 5, 4, 3],
+                    [0, 3, 1, 4, 2, 5],
+                ],
+            ),
+            (
+                Some(1),
+                true,
+                [
+                    [2, 1, 0, 5, 4, 3],
+                    [0, 3, 1, 4, 2, 5],
+                    [3, 4, 5, 0, 1, 2],
+                    [5, 2, 4, 1, 3, 0],
+                ],
+            ),
+            (
+                Some(0),
+                false,
+                [
+                    [3, 4, 5, 0, 1, 2],
+                    [0, 3, 1, 4, 2, 5],
+                    [2, 1, 0, 5, 4, 3],
+                    [5, 2, 4, 1, 3, 0],
+                ],
+            ),
+            (
+                Some(1),
+                false,
+                [
+                    [2, 1, 0, 5, 4, 3],
+                    [5, 2, 4, 1, 3, 0],
+                    [3, 4, 5, 0, 1, 2],
+                    [0, 3, 1, 4, 2, 5],
+                ],
+            ),
+        ];
+        for (axis, before, rotations) in cases {
+            for (turns, permutation) in rotations.iter().enumerate() {
+                let (width, height) = if turns % 2 == 0 { (3, 2) } else { (2, 3) };
+                let (w, h, actual) =
+                    undo_heif_rgb16(&pack(permutation), width, height, turns as u8, axis, before)
+                        .unwrap();
+                assert_eq!((w, h), (3, 2));
+                assert_eq!(
+                    actual, coded,
+                    "rotation={turns}, axis={axis:?}, mirror_first={before}"
+                );
+            }
+        }
+        assert!(undo_heif_rgb16(&coded[..35], 3, 2, 0, None, false).is_err());
+        assert!(undo_heif_rgb16(&coded, 3, 2, 0, Some(2), false).is_err());
+    }
 
     #[test]
     fn undo_irot_returns_coded_pixels_for_a_quarter_turn() {

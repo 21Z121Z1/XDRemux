@@ -24,8 +24,8 @@ use xdremux_engine::{
 use xdremux_hdr::ResolvedScale;
 
 use crate::apple_adapter::{AppleAdapterClient, SystemHeifAuxiliaryPlane, SystemHeifHdrFacts};
-use crate::apple_styles::scene_linear_pair;
-use crate::{PortableRuntime, Result, RuntimeError};
+use crate::apple_styles::{scene_linear_pair, SceneLinearPair};
+use crate::{AtomicFilePublisher, PortableRuntime, Result, RuntimeError};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SystemHeifHdrReport {
@@ -77,6 +77,8 @@ pub(crate) struct SystemHeifEncoded {
     pub report_path: PathBuf,
     pub reference_f32_path: PathBuf,
     pub reference_f16_path: PathBuf,
+    pub submitted_scene: Option<SceneLinearPair>,
+    pub content_headroom: f32,
 }
 
 pub(crate) fn requested() -> Result<bool> {
@@ -155,6 +157,13 @@ pub(crate) fn encode_system_base(
         report_path,
         reference_f32_path,
         reference_f16_path,
+        content_headroom: measurement.report.content_headroom,
+        submitted_scene: Some(SceneLinearPair {
+            width: dimension_usize(width)?,
+            height: dimension_usize(height)?,
+            sdr: measurement.submitted_sdr,
+            hdr: measurement.submitted_hdr,
+        }),
     })
 }
 
@@ -178,10 +187,16 @@ pub fn measure_system_heif_hdr_pair(
         height,
         staging.path(),
     )?;
-    fs::copy(&measurement.output, output)
-        .map_err(|error| RuntimeError::external("system HEIF copy", error))?;
-    ensure_round_trip(&measurement.report)?;
+    publish_measurement(&measurement, output)?;
     Ok(measurement.report)
+}
+
+fn publish_measurement(measurement: &EncodedMeasurement, output: &Path) -> Result<()> {
+    ensure_round_trip(&measurement.report)?;
+    let bytes = fs::read(&measurement.output)
+        .map_err(|error| RuntimeError::external("system HEIF staged output", error))?;
+    AtomicFilePublisher::new(output.to_path_buf()).publish_bytes(bytes)?;
+    Ok(())
 }
 
 pub(crate) fn record_carrier_error(path: &Path, detail: &str) {
@@ -239,6 +254,7 @@ struct EncodedMeasurement {
     report: SystemHeifHdrReport,
     prequantized_hdr: Vec<f32>,
     submitted_hdr: Vec<f32>,
+    submitted_sdr: Vec<f32>,
 }
 
 fn encode_linear_pair(
@@ -319,7 +335,28 @@ fn encode_linear_pair(
         report,
         prequantized_hdr: hdr,
         submitted_hdr: submitted,
+        submitted_sdr: submitted_sdr_linear(&sdr_bytes),
     })
+}
+
+// Decode the exact RGBA8 bytes submitted to Core Image, including quantization
+// and clipping. They use Display P3's IEC sRGB transfer, not a new gain map.
+fn submitted_sdr_linear(rgba8: &[u8]) -> Vec<f32> {
+    rgba8
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .flat_map(|pixel| {
+            pixel[..3].iter().map(|code| {
+                let value = f32::from(*code) / 255.0;
+                if value <= 0.04045 {
+                    value / 12.92
+                } else {
+                    ((value + 0.055) / 1.055).powf(2.4)
+                }
+            })
+        })
+        .collect()
 }
 
 fn dimension_usize(value: u32) -> Result<usize> {
@@ -547,4 +584,64 @@ fn staging_readback(heif: &Path) -> Result<PathBuf> {
     let mut path = heif.as_os_str().to_os_string();
     path.push(".readback-rgbah.bin");
     Ok(PathBuf::from(path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_readback_preserves_an_existing_measurement_output() {
+        let temporary = tempfile::tempdir().unwrap();
+        let output = temporary.path().join("existing.heic");
+        let candidate = temporary.path().join("candidate.heic");
+        fs::write(&output, b"existing published media").unwrap();
+        fs::write(&candidate, b"unvalidated candidate").unwrap();
+        let plane = || AuxiliaryPlaneReport {
+            present: false,
+            pixel_format: None,
+            width: None,
+            height: None,
+        };
+        let measurement = EncodedMeasurement {
+            output: candidate,
+            report: SystemHeifHdrReport {
+                provisional: true,
+                guided_filter: guided_filter_report(),
+                width: 2,
+                height: 2,
+                content_headroom: 1.0,
+                gain_map_as_rgb: true,
+                before_styles: SystemHeifHdrReadback {
+                    apple_hdr_gain_map: plane(),
+                    iso_gain_map: plane(),
+                    content_headroom_sent: Some(1.0),
+                    decoded_content_headroom: 1.0,
+                    decoded_width: 1,
+                    decoded_height: 2,
+                    error_vs_submitted_f16: None,
+                    error_vs_prequantized_f32: None,
+                },
+                after_styles: None,
+                styles_carrier_error: None,
+            },
+            prequantized_hdr: Vec::new(),
+            submitted_hdr: Vec::new(),
+            submitted_sdr: Vec::new(),
+        };
+        assert!(publish_measurement(&measurement, &output).is_err());
+        assert_eq!(fs::read(&output).unwrap(), b"existing published media");
+    }
+
+    #[test]
+    fn styles_sdr_reference_uses_the_quantized_submitted_codes() {
+        let original = [1.2, -0.2, 0.25];
+        let packed = encode_display_p3_rgba8(&original).unwrap();
+        let submitted = submitted_sdr_linear(&packed);
+        assert_eq!(submitted[0], 1.0);
+        assert_eq!(submitted[1], 0.0);
+        let expected = ((f32::from(packed[2]) / 255.0 + 0.055) / 1.055).powf(2.4);
+        assert_eq!(submitted[2], expected);
+        assert_ne!(submitted[2], original[2]);
+    }
 }
