@@ -1,0 +1,2 @@
+# Preserve exact Actions evidence bytes, including CR and timestamp padding.
+research/texture-style/evidence/run*/job*.log -text -whitespace

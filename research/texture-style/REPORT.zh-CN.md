@@ -176,7 +176,7 @@ ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a。
 
 已重新读回**21份完整job log**；18份有完整manifest的job恢复并核验**147份原生JSON**，逐字节SHA/size匹配runner manifest。见 [native-readback-index.json](evidence/native-readback-index.json)。源码、run、OS/SDK、输入SHA均能沿图和manifest追踪。
 
-ZIP下载引用在前容器遭HTTP tunnel403；**没有验证ZIP字节**。日志恢复是允许的文本读回，不声称完整artifact条目均已取回；上传器报告ZIP摘要也只作为报告值。所有脚本、日志和元数据是文本，没有提交生成图片或rawbuffer。原生Apple结果来自真实runner，不用自己的生成器和解析器自证整条链成功。
+ZIP下载引用在前容器遭HTTP tunnel403；**没有验证ZIP字节**。日志恢复是允许的文本读回，不声称完整artifact条目均已取回；上传器报告ZIP摘要也只作为报告值。所有脚本、日志和元数据是文本，没有提交生成图片或rawbuffer。为保留原始CR与时间戳尾随空白，.gitattributes仅对本次run目录下的job*.log设置-text与-whitespace；原始字节完整性继续由SHA回归与全量日志复核检查。[Git属性语义](https://git-scm.com/docs/gitattributes)适用于这一限定路径。原生Apple结果来自真实runner，不用自己的生成器和解析器自证整条链成功。
 
 ~~~bash
 # 输出目录必须不存在；可选--baseline-repo引用另一个干净f8fcf206 checkout。
