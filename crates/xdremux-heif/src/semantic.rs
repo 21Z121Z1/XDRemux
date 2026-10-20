@@ -528,10 +528,11 @@ fn primary_alpha_image(data: &[u8], graph: &Graph, context: &str) -> Result<Opti
         if !is_alpha_type(uri) {
             continue;
         }
-        if !subtype.is_empty() || alpha.is_some() {
-            return Err(invalid(format!(
-                "{context} has ambiguous or unsupported alpha resources"
-            )));
+        if alpha.is_some() {
+            return Err(invalid(format!("{context} has multiple alpha resources")));
+        }
+        if !subtype.is_empty() {
+            return Err(invalid(format!("{context} alpha subtype is unsupported")));
         }
         let includes_tmap = reference.to_item_ids.contains(&tmap);
         if !reference.to_item_ids.contains(&meta.primary_item_id)
@@ -701,10 +702,7 @@ fn paired_alpha_images(
 // Error reports survive the runtime's temporary scaffold cleanup. Keep this
 // observation bounded and restricted to structural IDs and fixed role labels:
 // item payloads, metadata, paths, and unknown property strings are never logged.
-fn diagnostic_auxiliary_role(data: &[u8], property: &PropertyInfo) -> &'static str {
-    let Ok((uri, _)) = auxiliary_type_bytes(data, property) else {
-        return "malformed";
-    };
+fn diagnostic_auxiliary_role(uri: &[u8]) -> &'static str {
     match uri {
         b"urn:mpeg:hevc:2015:auxid:1" => "alpha-hevc",
         b"urn:mpeg:mpegB:cicp:systems:auxiliary:alpha" => "alpha-miaf",
@@ -717,6 +715,126 @@ fn diagnostic_auxiliary_role(data: &[u8], property: &PropertyInfo) -> &'static s
         b"urn:com:apple:photo:2020:aux:semanticglassesmatte" => "semantic-glasses",
         b"urn:com:apple:photo:2020:aux:semanticskymatte" => "semantic-sky",
         _ => "unknown",
+    }
+}
+
+fn diagnostic_subtype_shape(uri: &[u8], subtype: &[u8]) -> &'static str {
+    if subtype.is_empty() {
+        return "empty";
+    }
+    if subtype.len() > 65_536 {
+        return "over-limit";
+    }
+    if subtype.iter().all(|byte| *byte == 0) {
+        return "zero-filled";
+    }
+    if uri != b"urn:mpeg:hevc:2015:auxid:1" || subtype.len() < 4 {
+        return "opaque";
+    }
+    // Recognize only the outer size/NAL-header envelope used by libheif's
+    // decode_hevc_aux_sei_messages, not alpha SEI payload semantics:
+    // https://github.com/strukturag/libheif/blob/364905fc9841bdda229e0ae2c5fda13b5fc98d1a/libheif/codecs/hevc_boxes.cc#L532
+    let size = u32::from_be_bytes([subtype[0], subtype[1], subtype[2], subtype[3]]) as usize;
+    if size != subtype.len() - 4 {
+        return "opaque";
+    }
+    let mut offset = 4;
+    let mut count = 0;
+    while offset < subtype.len() {
+        if count == 16 {
+            return "over-limit";
+        }
+        let Some(header) = subtype.get(offset..offset + 4) else {
+            return "opaque";
+        };
+        let size = u32::from_be_bytes([header[0], header[1], header[2], header[3]]) as usize;
+        let start = offset + 4;
+        let Some(end) = start.checked_add(size) else {
+            return "opaque";
+        };
+        let Some(nal) = subtype.get(start..end) else {
+            return "opaque";
+        };
+        if nal.len() < 2
+            || nal[0] & 0x80 != 0
+            || nal[1] & 7 == 0
+            || !matches!((nal[0] >> 1) & 0x3f, 39 | 40)
+        {
+            return "opaque";
+        }
+        offset = end;
+        count += 1;
+    }
+    "hevc-sei-envelope"
+}
+
+struct DiagnosticAlphaAuxc<'a> {
+    uri: &'a [u8],
+    subtype: &'a [u8],
+}
+
+fn diagnostic_alpha_auxc<'a>(
+    data: &'a [u8],
+    graph: &Graph,
+) -> std::result::Result<Option<DiagnosticAlphaAuxc<'a>>, ()> {
+    let mut alpha = None;
+    let mut count = 0;
+    for reference in graph
+        .meta
+        .iref
+        .as_ref()
+        .into_iter()
+        .flat_map(|iref| &iref.entries)
+        .filter(|reference| reference.kind == AUXL)
+    {
+        count += 1;
+        if count > 16 {
+            return Err(());
+        }
+        let associations =
+            associated_properties(&graph.meta, reference.from_item_id).map_err(|_| ())?;
+        let mut properties = associations.iter().filter_map(|association| {
+            graph.meta.properties.iter().find(|property| {
+                property.index == u32::from(association.property_index) && property.kind == AUXC
+            })
+        });
+        let Some(property) = properties.next() else {
+            continue;
+        };
+        if properties.next().is_some() {
+            return Err(());
+        }
+        let (uri, subtype) = auxiliary_type_bytes(data, property).map_err(|_| ())?;
+        if is_alpha_type(uri) {
+            if alpha.is_some() || subtype.len() > 65_536 {
+                return Err(());
+            }
+            alpha = Some(DiagnosticAlphaAuxc { uri, subtype });
+        }
+    }
+    Ok(alpha)
+}
+
+fn diagnostic_alpha_subtype_pair(
+    source_data: &[u8],
+    source: &Graph,
+    scaffold_data: &[u8],
+    scaffold: &Graph,
+) -> String {
+    match (
+        diagnostic_alpha_auxc(source_data, source),
+        diagnostic_alpha_auxc(scaffold_data, scaffold),
+    ) {
+        (Ok(Some(original)), Ok(Some(encoded))) => {
+            format!(
+                "uri_match={},bytes_match={}",
+                original.uri == encoded.uri,
+                original.subtype == encoded.subtype
+            )
+        }
+        (Ok(None), Ok(None)) => "absent".to_owned(),
+        (Ok(_), Ok(_)) => "missing".to_owned(),
+        _ => "unavailable".to_owned(),
     }
 }
 
@@ -765,6 +883,7 @@ fn diagnostic_graph(data: &[u8], graph: &Graph) -> String {
     let mut resources = Vec::new();
     for item_id in resource_ids.iter().take(MAX_RESOURCES) {
         let mut roles = Vec::new();
+        let mut subtypes = Vec::new();
         let mut role_count = 0;
         for association in meta
             .ipma
@@ -778,7 +897,20 @@ fn diagnostic_graph(data: &[u8], graph: &Graph) -> String {
             }) {
                 role_count += 1;
                 if roles.len() < MAX_ROLES {
-                    roles.push(diagnostic_auxiliary_role(data, property).to_owned());
+                    match auxiliary_type_bytes(data, property) {
+                        Ok((uri, subtype)) => {
+                            roles.push(diagnostic_auxiliary_role(uri).to_owned());
+                            subtypes.push(format!(
+                                "len={},shape={}",
+                                subtype.len(),
+                                diagnostic_subtype_shape(uri, subtype)
+                            ));
+                        }
+                        Err(_) => {
+                            roles.push("malformed".to_owned());
+                            subtypes.push("unavailable".to_owned());
+                        }
+                    }
                 }
             }
         }
@@ -788,9 +920,10 @@ fn diagnostic_graph(data: &[u8], graph: &Graph) -> String {
             roles.push("none".to_owned());
         }
         resources.push(format!(
-            "{item_id}:{}:auxC=[{}]",
+            "{item_id}:{}:auxC=[{}]:subtype=[{}]",
             diagnostic_item_type(meta, *item_id),
-            roles.join(",")
+            roles.join(","),
+            subtypes.join(";")
         ));
     }
     if resource_ids.len() > MAX_RESOURCES {
@@ -849,9 +982,10 @@ fn semantic_graph_error(
         HeifError::Format(error) => error.to_string(),
     };
     invalid(format!(
-        "{message}; resource graphs: source={{{}}}; scaffold={{{}}}",
+        "{message}; resource graphs: source={{{}}}; scaffold={{{}}}; alpha_subtype_pair={{{}}}",
         diagnostic_graph(source_data, source),
-        diagnostic_graph(scaffold_data, scaffold)
+        diagnostic_graph(scaffold_data, scaffold),
+        diagnostic_alpha_subtype_pair(source_data, source, scaffold_data, scaffold)
     ))
 }
 
@@ -3338,5 +3472,94 @@ mod tests {
             expected.meta.iref.unwrap().entries
         );
         assert_eq!(actual.meta.ipma.entries, expected.meta.ipma.entries);
+    }
+
+    fn add_alpha_subtype(fixture: &mut Fixture, id: u32, uri: &[u8], subtype: &[u8], source: bool) {
+        add_alpha(fixture, id, uri, false, source);
+        fixture
+            .auxiliary_properties
+            .iter_mut()
+            .find(|(item_id, property)| {
+                *item_id == id && property.get(4..8) == Some(AUXC.as_bytes())
+            })
+            .unwrap()
+            .1 = make_box(AUXC, &[vec![0; 4], uri.to_vec(), subtype.to_vec()].concat()).unwrap();
+    }
+
+    #[test]
+    fn alpha_subtype_diagnostic_reports_bounded_structure_and_keeps_unsupported_bytes_rejected() {
+        // Only the outer length/NAL-header envelope is recognizable here.
+        // This deliberately does not establish valid alpha SEI semantics.
+        let framed = [0, 0, 0, 8, 0, 0, 0, 4, 0x4e, 1, 165, 0];
+        for (subtype, expected) in [
+            (b"".as_slice(), "len=0,shape=empty"),
+            ([0, 0, 0, 0].as_slice(), "len=4,shape=zero-filled"),
+            (framed.as_slice(), "len=12,shape=hevc-sei-envelope"),
+            (&framed[..11], "len=11,shape=opaque"),
+            (b"SECRET_SUBTYPE".as_slice(), "len=14,shape=opaque"),
+        ] {
+            let mut source = Fixture::new(false, false, "SECRET_SOURCE_PIXELS");
+            let mut scaffold = Fixture::new(false, true, "SECRET_SCAFFOLD_PIXELS");
+            add_alpha_subtype(&mut source, 30, HEVC_ALPHA, subtype, true);
+            add_alpha_subtype(&mut scaffold, 31, HEVC_ALPHA, subtype, false);
+            scaffold
+                .references
+                .iter_mut()
+                .find(|reference| reference.from_item_id == 22)
+                .unwrap()
+                .to_item_ids = vec![11];
+            for assemble in [
+                transplant_apple_semantic_auxiliary_heif,
+                merge_apple_semantic_auxiliary_heif,
+            ] {
+                let error = assemble(&source.bytes(), &scaffold.bytes(), 3)
+                    .unwrap_err()
+                    .to_string();
+                assert!(error.contains(expected), "{error}");
+                assert!(
+                    error.contains("alpha_subtype_pair={uri_match=true,bytes_match=true}"),
+                    "{error}"
+                );
+                if !subtype.is_empty() {
+                    assert!(
+                        error.contains("source HDR alpha subtype is unsupported"),
+                        "{error}"
+                    );
+                }
+                assert!(!error.contains("SECRET"), "{error}");
+                assert!(error.len() < 32_768);
+            }
+        }
+    }
+
+    #[test]
+    fn alpha_subtype_diagnostic_distinguishes_uri_and_byte_mismatches_without_dumping_them() {
+        for (scaffold_uri, scaffold_subtype, expected) in [
+            (
+                HEVC_ALPHA,
+                b"SECRET_OTHER".as_slice(),
+                "uri_match=true,bytes_match=false",
+            ),
+            (
+                MIAF_ALPHA,
+                b"SECRET_SUBTYPE".as_slice(),
+                "uri_match=false,bytes_match=true",
+            ),
+        ] {
+            let mut source = Fixture::new(false, false, "source");
+            let mut scaffold = Fixture::new(false, true, "scaffold");
+            add_alpha_subtype(&mut source, 30, HEVC_ALPHA, b"SECRET_SUBTYPE", true);
+            add_alpha_subtype(&mut scaffold, 31, scaffold_uri, scaffold_subtype, false);
+            for assemble in [
+                transplant_apple_semantic_auxiliary_heif,
+                merge_apple_semantic_auxiliary_heif,
+            ] {
+                let error = assemble(&source.bytes(), &scaffold.bytes(), 3)
+                    .unwrap_err()
+                    .to_string();
+                assert!(error.contains(expected), "{error}");
+                assert!(!error.contains("SECRET"), "{error}");
+            }
+        }
     }
 }
