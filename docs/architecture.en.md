@@ -72,7 +72,11 @@ The still writer preserves the source Gain Map when one is present and the outpu
 
 ### Publication
 
-Live Photo output is a pair transaction. A conversion must not leave one final member as a successful result while the other member fails publication.
+Live Photo conversion succeeds only after both final members are published. It writes a validated, synced pair into its own private staging directory, then claims the MOV name before the still name using atomic no-clobber hard links. Existing final entries and unrelated files or directories are never replaced or deleted. Cooperating writers share the MOV claim, including `.heic` and `.heif` outputs with the same stem.
+
+Two filesystem names are not a system-atomic transaction. If the second link fails, conversion returns an error identifying the partial MOV and retains the complete staged pair for explicit recovery. The staged `capture.heic` can be checked with `xdremux validate`; inspect both final entries before moving either member. Reconciliation only checks destinations: unknown partial or invalid pairs are preserved and rejected. Stale-looking names do not establish ownership.
+
+Publication requires same-filesystem hard-link support. Unsupported filesystems fail closed with the original I/O error; FAT/exFAT support is not claimed. This protocol cannot prevent an external writer from actively replacing final entries. Synced staging files do not establish directory-entry durability after power loss.
 
 Batch reuse requires source provenance. A valid pair with unknown lineage is not accepted as the output of an unrelated input.
 

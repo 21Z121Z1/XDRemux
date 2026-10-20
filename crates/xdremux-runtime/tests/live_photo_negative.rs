@@ -27,6 +27,88 @@ fn disable_motion_flag(source: &mut [u8]) {
     assert!(replaced, "fixture must declare the Motion Photo flag");
 }
 
+#[test]
+fn conversion_preserves_a_source_directory_with_a_temporary_looking_name() {
+    let directory = tempfile::tempdir().unwrap();
+    let source_directory = directory.path().join(".capture.unowned.tmp.heic");
+    fs::create_dir(&source_directory).unwrap();
+    let input = source_directory.join("source.heic");
+    let source = fs::read(fixture("samsung/heif-ultrahdr-01.heic")).unwrap();
+    fs::write(&input, &source).unwrap();
+    let output = directory.path().join("capture.heic");
+    let receipt = PortableRuntime::new()
+        .convert_motion_photo_file(&source, &input, &output)
+        .unwrap();
+    assert_eq!(fs::read(&input).unwrap(), source);
+    let still = fs::read(&receipt.image).unwrap();
+    let movie = fs::read(&receipt.video).unwrap();
+    MotionPhoto::parse(
+        Input::ApplePair {
+            still: &still,
+            movie: &movie,
+        },
+        ParseOptions::strict(),
+    )
+    .unwrap();
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 3);
+}
+
+#[test]
+#[cfg(unix)]
+fn second_member_failure_retains_partial_movie_and_complete_staged_pair() {
+    use std::error::Error;
+    use xdremux_motion_photo::PairPublicationError;
+    let directory = tempfile::tempdir().unwrap();
+    let input = fixture("samsung/heif-ultrahdr-01.heic");
+    let source = fs::read(&input).unwrap();
+    // On standard Unix filesystems, MOV fits NAME_MAX while HEIC exceeds it.
+    // Check that boundary before relying on it to fail only the second link.
+    let output = directory.path().join(format!("{}.heic", "a".repeat(251)));
+    let movie = output.with_extension("mov");
+    fs::write(&movie, b"legal MOV filename probe").unwrap();
+    fs::remove_file(&movie).unwrap();
+    assert!(fs::write(&output, b"overlong still filename probe").is_err());
+    let error = PortableRuntime::new()
+        .convert_motion_photo_file(&source, &input, &output)
+        .unwrap_err();
+    assert!(movie.is_file(), "{error}");
+    let publication = error
+        .source()
+        .unwrap()
+        .downcast_ref::<PairPublicationError>()
+        .unwrap();
+    assert_eq!(publication.partial_output(), Some(movie.as_path()));
+    let directories = fs::read_dir(directory.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.is_dir())
+        .collect::<Vec<_>>();
+    assert_eq!(directories.len(), 1);
+    let staging = &directories[0];
+    let still = fs::read(staging.join("capture.heic")).unwrap();
+    let staged_movie = fs::read(staging.join("capture.mov")).unwrap();
+    assert_eq!(fs::read_dir(staging).unwrap().count(), 2);
+    MotionPhoto::parse(
+        Input::ApplePair {
+            still: &still,
+            movie: &staged_movie,
+        },
+        ParseOptions::strict(),
+    )
+    .unwrap();
+    assert_eq!(fs::read(&movie).unwrap(), staged_movie);
+    assert!(
+        error.to_string().contains(&staging.display().to_string()),
+        "{error}"
+    );
+    assert!(
+        error.to_string().contains(&movie.display().to_string()),
+        "{error}"
+    );
+    assert!(error.source().and_then(Error::source).is_some());
+    assert_eq!(fs::read(input).unwrap(), source);
+}
+
 fn video_media_boxes(movie: &[u8]) -> Vec<BoxHeader> {
     let moov = parse_boxes(movie, 0..movie.len())
         .unwrap()
