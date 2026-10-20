@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "approval": "TEMPLATE_NOT_APPROVED",
+  "repository": "21Z121Z1/XDRemux",
+  "remote": {
+    "name": "origin",
+    "url": "https://github.com/21Z121Z1/XDRemux.git"
+  },
+  "candidate_source_head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "protected_refs": [
+    "refs/heads/main"
+  ],
+  "parent_review_note": "Preparation only. Requires explicit parent deletion authorization, post-merge remaining-ref review, and newly pinned launcher. Backups are parent receipts; this task did not revalidate GitHub.",
+  "approved_deletions": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": {
+      "oid": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004"
+    },
+    "refs/heads/cursor/full-res-linear-hdr-e174": {
+      "oid": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174"
+    },
+    "refs/heads/cursor/portrait-heic-orientation-4765": {
+      "oid": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765"
+    },
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": {
+      "oid": "c6d307af662ed516f6e3994c039513359cb98610",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924"
+    },
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": {
+      "oid": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015"
+    },
+    "refs/heads/integrate/semantic-review-20261020": {
+      "oid": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/4b04fb3"
+    },
+    "refs/heads/research/texture-native-20261019": {
+      "oid": "18340989590d451f5676924feb03c70baa503e1a",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/research/texture-native-20261019"
+    },
+    "refs/heads/research/texture-style": {
+      "oid": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/research/texture-style"
+    }
+  }
+}

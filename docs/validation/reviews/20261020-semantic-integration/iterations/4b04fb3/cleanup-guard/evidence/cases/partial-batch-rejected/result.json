@@ -1,0 +1,22 @@
+{
+  "name": "partial-batch-rejected",
+  "passed": true,
+  "git_push_exit": 1,
+  "direct_chained_hook_exit": null,
+  "before": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "after": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "manifest_sha256": "65b6be41fd79048912e40b29b633028458abbcd7221c58adfef097b4beccbb22",
+  "launcher_sha256": "e2c1ed34a5d02370694646d20ba99cd93d0b31fa14538b760c5afffcac7874ea"
+}

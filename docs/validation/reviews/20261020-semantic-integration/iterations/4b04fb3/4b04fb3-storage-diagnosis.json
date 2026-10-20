@@ -1,0 +1,9 @@
+{
+  "captured_at": "2026-10-20T22:24:59.012948+00:00",
+  "source_head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "tracked_checkout_bytes": 278827277,
+  "previous_tmp_observation": "8.8G total;8.7G used;115M available;99% full",
+  "manual_reproduction": "/tmp/xdremux-worktree-diagnostic-sow8ajly/add.log: git worktree add --detach exit128, many unable-to-write errors",
+  "corrected_regression": "all source and assertions unchanged; TMPDIR=/workspace/xdremux-audit/python-tmp-4b04fb3 test_real_same_repository_worktree_is_cleaned_after_build_failure passed2.110s",
+  "cache_disposition": "task-owned contaminated /tmp/xdremux-pr58-target moved intact to /workspace/xdremux-audit/quarantined-pr58-build-cache; not discarded; prior results remain quarantined"
+}

@@ -1,0 +1,6 @@
+EXISTING_HOOK_EXECUTED
+cleanup guard rejected: named remote must have exactly the approved push URL
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/multiple-push-urls/remote.git'
+EXISTING_HOOK_EXECUTED
+cleanup guard rejected: named remote must have exactly the approved push URL
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/multiple-push-urls/remote.git'

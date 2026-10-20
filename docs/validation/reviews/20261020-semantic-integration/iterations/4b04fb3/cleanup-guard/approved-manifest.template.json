@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "approval": "TEMPLATE_NOT_APPROVED",
+  "remote": {
+    "name": "origin",
+    "url": "https://github.com/21Z121Z1/XDRemux.git"
+  },
+  "approved_deletions": {
+    "refs/heads/REPLACE_WITH_PARENT_APPROVED_BRANCH": {
+      "oid": "REPLACE_WITH_EXACT_REVIEWED_BACKED_UP_HEAD",
+      "backup_ref": "refs/tags/backup/semantic-review-20261020/REPLACE_WITH_REVIEWED_RECEIPT"
+    }
+  }
+}

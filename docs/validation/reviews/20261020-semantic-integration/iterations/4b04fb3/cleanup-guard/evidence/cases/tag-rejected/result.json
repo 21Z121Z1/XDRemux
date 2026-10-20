@@ -1,0 +1,22 @@
+{
+  "name": "tag-rejected",
+  "passed": true,
+  "git_push_exit": 1,
+  "direct_chained_hook_exit": null,
+  "before": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "after": {
+    "refs/heads/fixture/a": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/b": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/fixture/unapproved": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/tags/control": "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+  },
+  "manifest_sha256": "1249f5715610d9c3c134e10d2253e3199694dfcf39a3d66ed5e807282b005a47",
+  "launcher_sha256": "cb5f5f0f8b74b45e3af2031553085a22c736d7a67c6eaa57afbc1e66feb2a8e0"
+}

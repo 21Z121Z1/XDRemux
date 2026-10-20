@@ -1,0 +1,30 @@
+22:30:33.558821 pkt-line.c:85           packet: receive-pack> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/a\0report-status report-status-v2 delete-refs side-band-64k quiet atomic ofs-delta object-format=sha1 agent=git/2.52.0-Linux
+22:30:33.558883 pkt-line.c:85           packet: receive-pack> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/b
+22:30:33.558887 pkt-line.c:85           packet: receive-pack> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/unapproved
+22:30:33.558889 pkt-line.c:85           packet: receive-pack> 89d806c8aec961a7991eb3e6d6e2b1370aed8791 refs/heads/main
+22:30:33.558891 pkt-line.c:85           packet: receive-pack> 89d806c8aec961a7991eb3e6d6e2b1370aed8791 refs/tags/control
+22:30:33.559020 pkt-line.c:85           packet:         push< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/a\0report-status report-status-v2 delete-refs side-band-64k quiet atomic ofs-delta object-format=sha1 agent=git/2.52.0-Linux
+22:30:33.559072 pkt-line.c:85           packet:         push< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/b
+22:30:33.559075 pkt-line.c:85           packet:         push< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 refs/heads/fixture/unapproved
+22:30:33.559077 pkt-line.c:85           packet:         push< 89d806c8aec961a7991eb3e6d6e2b1370aed8791 refs/heads/main
+22:30:33.559080 pkt-line.c:85           packet:         push< 89d806c8aec961a7991eb3e6d6e2b1370aed8791 refs/tags/control
+22:30:33.564998 pkt-line.c:85           packet: receive-pack> 0000
+22:30:33.565048 pkt-line.c:85           packet:         push< 0000
+22:30:33.859609 pkt-line.c:85           packet:         push> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 0000000000000000000000000000000000000000 refs/heads/fixture/a\0 report-status-v2 side-band-64k quiet atomic object-format=sha1 agent=git/2.52.0-Linux
+22:30:33.859624 pkt-line.c:85           packet:         push> 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 0000000000000000000000000000000000000000 refs/heads/fixture/b
+22:30:33.859644 pkt-line.c:85           packet:         push> 0000
+22:30:33.859786 pkt-line.c:85           packet: receive-pack< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 0000000000000000000000000000000000000000 refs/heads/fixture/a\0 report-status-v2 side-band-64k quiet atomic object-format=sha1 agent=git/2.52.0-Linux
+22:30:33.859826 pkt-line.c:85           packet: receive-pack< 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97 0000000000000000000000000000000000000000 refs/heads/fixture/b
+22:30:33.859829 pkt-line.c:85           packet: receive-pack< 0000
+22:30:33.860573 pkt-line.c:85           packet: receive-pack> unpack ok
+22:30:33.860578 pkt-line.c:85           packet: receive-pack> ng refs/heads/fixture/a atomic transaction failed
+22:30:33.860580 pkt-line.c:85           packet: receive-pack> ng refs/heads/fixture/b atomic transaction failed
+22:30:33.860581 pkt-line.c:85           packet: receive-pack> 0000
+22:30:33.860626 pkt-line.c:85           packet:     sideband< \2error: cannot lock ref 'refs/heads/fixture/a': is at 89d806c8aec961a7991eb3e6d6e2b1370aed8791 but expected 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97
+22:30:33.860669 pkt-line.c:85           packet:     sideband< \1000eunpack ok0036ng refs/heads/fixture/a atomic transaction failed0036ng refs/heads/fixture/b atomic transaction failed0000
+22:30:33.860711 pkt-line.c:85           packet:         push< unpack ok
+22:30:33.860717 pkt-line.c:85           packet:         push< ng refs/heads/fixture/a atomic transaction failed
+22:30:33.860721 pkt-line.c:85           packet:         push< ng refs/heads/fixture/b atomic transaction failed
+22:30:33.860724 pkt-line.c:85           packet:         push< 0000
+22:30:33.864051 pkt-line.c:85           packet: receive-pack> 0000
+22:30:33.864111 pkt-line.c:85           packet:     sideband< 0000

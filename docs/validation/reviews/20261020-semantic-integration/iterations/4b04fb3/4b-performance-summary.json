@@ -1,0 +1,87 @@
+{
+  "distinct_revisions": true,
+  "diagnostic_only": true,
+  "summary": {
+    "baseline": {
+      "median_wall_seconds": 7.912647375000006,
+      "median_user_seconds": 7.88,
+      "median_sys_seconds": 0.53,
+      "max_peak_rss_bytes": 1141325824
+    },
+    "candidate": {
+      "median_wall_seconds": 9.14378150000016,
+      "median_user_seconds": 8.99,
+      "median_sys_seconds": 0.55,
+      "max_peak_rss_bytes": 1136525312
+    },
+    "candidate_over_baseline_median": 1.1555906723317304
+  },
+  "candidate_profile": {
+    "arm": "candidate",
+    "status": "validated",
+    "logs": "candidate-profile",
+    "outside_budget_and_comparison_samples": true,
+    "limits": "One candidate-only diagnostic conversion; no baseline stage comparison.",
+    "wall_seconds": 9.289624458999924,
+    "time_real_seconds": 9.27,
+    "user_seconds": 9.03,
+    "sys_seconds": 0.6,
+    "peak_rss_bytes": 1136508928,
+    "output_bytes": 2894706,
+    "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+    "stages": [
+      {
+        "stage": "source_analysis",
+        "wall_seconds": 0.005752208
+      },
+      {
+        "stage": "base_conversion",
+        "wall_seconds": 2.3268115
+      },
+      {
+        "stage": "semantic_production",
+        "wall_seconds": 2.031061833
+      },
+      {
+        "stage": "resource_decode",
+        "wall_seconds": 0.225590625
+      },
+      {
+        "stage": "scene_derivation",
+        "wall_seconds": 1.011503709
+      },
+      {
+        "stage": "thumbnail_encode",
+        "wall_seconds": 0.172149
+      },
+      {
+        "stage": "key1_fit",
+        "wall_seconds": 0.366360958
+      },
+      {
+        "stage": "style_metadata",
+        "wall_seconds": 0.200476667
+      },
+      {
+        "stage": "native_style_properties",
+        "wall_seconds": 0.001432709
+      },
+      {
+        "stage": "style_assembly",
+        "wall_seconds": 0.001085625
+      },
+      {
+        "stage": "texture_generation",
+        "wall_seconds": 2.818307083
+      },
+      {
+        "stage": "final_validation",
+        "wall_seconds": 0.010616208
+      },
+      {
+        "stage": "publication",
+        "wall_seconds": 0.003082666
+      }
+    ]
+  }
+}

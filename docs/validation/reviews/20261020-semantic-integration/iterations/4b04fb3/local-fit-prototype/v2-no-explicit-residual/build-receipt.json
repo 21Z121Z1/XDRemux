@@ -1,0 +1,95 @@
+{
+  "host": {
+    "system": "Linux",
+    "node": "eff8d845b923",
+    "release": "6.18.55",
+    "version": "#1 SMP Wed Oct 14 19:45:18 UTC 2026",
+    "machine": "x86_64",
+    "processor": ""
+  },
+  "commands": [
+    {
+      "command": [
+        "/tmp/xdremux-toolchain/rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc",
+        "--version",
+        "--verbose"
+      ],
+      "stdout": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n"
+    },
+    {
+      "command": [
+        "/tmp/xdremux-toolchain/rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+        "--version"
+      ],
+      "stdout": "cargo 1.99.1 (5f94df478 2026-08-27)\n"
+    },
+    {
+      "command": [
+        "pkg-config",
+        "--modversion",
+        "libheif"
+      ],
+      "stdout": "1.19.8\n"
+    },
+    {
+      "command": [
+        "lscpu"
+      ],
+      "stdout": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           46 bits physical, 57 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  5\nOn-line CPU(s) list:                     0-4\nVendor ID:                               GenuineIntel\nModel name:                              INTEL(R) XEON(R) PLATINUM 8573C\nCPU family:                              6\nModel:                                   207\nThread(s) per core:                      1\nCore(s) per socket:                      5\nSocket(s):                               1\nStepping:                                2\nBogoMIPS:                                4599.99\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               144 KiB (3 instances)\nL1i cache:                               96 KiB (3 instances)\nL2 cache:                                6 MiB (3 instances)\nL3 cache:                                260 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-4\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Vulnerable\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Vulnerable\nVulnerability Spec rstack overflow:      Not affected\nVulnerability Spec store bypass:         Vulnerable\nVulnerability Spectre v1:                Vulnerable: __user pointer sanitization and usercopy barriers only; no swapgs barriers\nVulnerability Spectre v2:                Vulnerable; STIBP: disabled; PBRSB-eIBRS: Not affected; BHI: Vulnerable\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n"
+    }
+  ],
+  "arms": {
+    "baseline": {
+      "command": [
+        "/tmp/xdremux-toolchain/rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--release",
+        "--manifest-path",
+        "/workspace/xdremux-audit/style-fit-accumulation-prototype/v2-no-explicit-residual/baseline-probe/Cargo.toml"
+      ],
+      "target": "/tmp/xdremux-style-fit-accumulation-v2-target/baseline",
+      "binary": "/tmp/xdremux-style-fit-accumulation-v2-target/baseline/release/xdremux-style-fit-probe",
+      "binary_sha256": "53577cae4da9e2e4a536fec8c4b3776466c697c1695913e5c192fe92ddb92b9a",
+      "manifest_sha256": "419a7aa9fdbb878081480c97b2101493c810c0b4ce6667feb1ef5b3028c214aa",
+      "lock_sha256": "63944b5dc393aa4fb532be6ee550370c7e289fdb44768361a73e38b613755288",
+      "probe_source_sha256": "272e02be3bb4a8838ffa64a6e0880742607fbd4dfa02146e7d4a6863676afef3",
+      "repo_lock_sha256": "cf9a0d6e0c7185da16045a11f2773df325242d86f6578def8fcc21e19880835c",
+      "engine_source_sha256": "a13285bfb581893e592630051402ce2abd176ab4261a1b4716d674422310931b",
+      "all_dependency_identities_in_repository_lock": true,
+      "head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "status": ""
+    },
+    "candidate": {
+      "command": [
+        "/tmp/xdremux-toolchain/rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--release",
+        "--manifest-path",
+        "/workspace/xdremux-audit/style-fit-accumulation-prototype/v2-no-explicit-residual/candidate-probe/Cargo.toml"
+      ],
+      "target": "/tmp/xdremux-style-fit-accumulation-v2-target/candidate",
+      "binary": "/tmp/xdremux-style-fit-accumulation-v2-target/candidate/release/xdremux-style-fit-probe",
+      "binary_sha256": "21791b100e7bffe657bc441e525832715a4d255e939a68a927a638857858456d",
+      "manifest_sha256": "b28a125d526f2ca760c514db8d9c4ae695b4c27fedcc6199316321c0c21530eb",
+      "lock_sha256": "63944b5dc393aa4fb532be6ee550370c7e289fdb44768361a73e38b613755288",
+      "probe_source_sha256": "272e02be3bb4a8838ffa64a6e0880742607fbd4dfa02146e7d4a6863676afef3",
+      "repo_lock_sha256": "cf9a0d6e0c7185da16045a11f2773df325242d86f6578def8fcc21e19880835c",
+      "engine_source_sha256": "b1f58170b7bc6504eb7e1957c481bb8cd6d32e91ccfbbbca5ee0213cb615cc81",
+      "all_dependency_identities_in_repository_lock": true,
+      "head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "status": " M crates/xdremux-engine/src/apple_photographic_styles.rs\n"
+    }
+  },
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_BUILD_TARGET": null,
+    "PKG_CONFIG_PATH": "/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu/pkgconfig"
+  },
+  "limits": "Linux public-primary kernel with synthetic recovery target; no native/E2E claim.",
+  "candidate_patch_sha256": "31be7f073e7ac635492d010910121789faa33e8c69f3b01b91e226b4207aa358"
+}

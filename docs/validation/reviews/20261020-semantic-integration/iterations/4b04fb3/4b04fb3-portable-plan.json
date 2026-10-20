@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "scope": "Committed-HEAD delta after1b2c07d: restrict automatic native artifact upload to named reports/logs while retaining all conversions/readbacks/assertions; preserve exact ordered local inverse-fit arithmetic using bounded cells/rows. Portable comparison retained complete-byte equality with1b2c07d; native ARM64 equality/E2E/performance remain separate obligations. No budget or source media changed.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "complete-engine-heif-runtime-regressions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-engine",
+        "-p",
+        "xdremux-heif",
+        "-p",
+        "xdremux-runtime",
+        "--all-targets"
+      ],
+      "timeout_seconds": 900,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target"
+      }
+    },
+    {
+      "name": "real-cli-pair-conversion-and-readback",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux"
+      }
+    }
+  ]
+}

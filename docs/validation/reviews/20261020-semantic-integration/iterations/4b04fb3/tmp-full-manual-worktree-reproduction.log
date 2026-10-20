@@ -1,0 +1,213 @@
+Preparing worktree (detached HEAD 4b04fb3)
+error: unable to write file fixtures/motion-photo/samsung/heif-ultrahdr-01-duplicate-r002.heic
+error: unable to write file fixtures/motion-photo/samsung/heif-ultrahdr-01.heic
+error: unable to write file fixtures/motion-photo/samsung/heif-ultrahdr-02-duplicate-r003.heic
+error: unable to write file fixtures/motion-photo/samsung/heif-ultrahdr-02.heic
+error: unable to write file fixtures/motion-photo/samsung/jpeg-ultrahdr-01.jpg
+error: unable to write file fixtures/motion-photo/samsung/jpeg-ultrahdr-02.jpg
+error: unable to write file fixtures/motion-photo/vivo/android-v1-sdr-01.jpg
+error: unable to write file fixtures/motion-photo/vivo/android-v1-sdr-02.jpg
+error: unable to write file fixtures/motion-photo/xiaomi/android-v1-ultrahdr-01.jpg
+Updating files:  64% (291/454)
+error: unable to write file fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic
+error: unable to write file fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-01.heic
+error: unable to write file fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-02.heic
+error: unable to write file fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-03.heic
+error: unable to write file fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-04.heic
+Updating files:  65% (296/454)
+error: unable to write file fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-05.heic
+error: unable to write file fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-xpan-01.heic
+error: unable to write file fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic
+error: unable to write file fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-02.heic
+Updating files:  66% (300/454)
+error: unable to write file fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v1-01.heic
+error: unable to write file fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic
+error: unable to write file fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-02.heic
+error: unable to write file fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic
+error: unable to write file fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic
+Updating files:  67% (305/454)
+error: unable to write file pyproject.toml
+error: unable to write file research/oppo_styles/CoreMLProbe.swift
+error: unable to write file research/oppo_styles/README.en.md
+error: unable to write file research/oppo_styles/README.md
+Updating files:  68% (309/454)
+error: unable to write file research/oppo_styles/__init__.py
+error: unable to write file research/oppo_styles/calibration.py
+error: unable to write file research/oppo_styles/inference.py
+error: unable to write file research/oppo_styles/methodology.en.md
+error: unable to write file research/oppo_styles/methodology.md
+Updating files:  69% (314/454)
+error: unable to write file research/oppo_styles/models/ReverseKey1Ensemble.mlpackage/Data/com.apple.CoreML/model.mlmodel
+error: unable to write file research/oppo_styles/models/ReverseKey1Ensemble.mlpackage/Data/com.apple.CoreML/weights/weight.bin
+Updating files:  69% (316/454)
+error: unable to write file research/oppo_styles/models/ReverseKey1Ensemble.mlpackage/Manifest.json
+error: unable to write file research/oppo_styles/models/ReverseKey1Ensemble.model-card.en.md
+Updating files:  70% (318/454)
+error: unable to write file research/oppo_styles/models/ReverseKey1Ensemble.model-card.md
+error: unable to write file research/oppo_styles/models/UniversalPhotographicStyleStateNet.mlpackage/Data/com.apple.CoreML/model.mlmodel
+error: unable to write file research/oppo_styles/models/UniversalPhotographicStyleStateNet.mlpackage/Data/com.apple.CoreML/weights/weight.bin
+error: unable to write file research/oppo_styles/models/UniversalPhotographicStyleStateNet.mlpackage/Manifest.json
+error: unable to write file research/oppo_styles/models/UniversalPhotographicStyleStateNet.model-card.en.md
+Updating files:  71% (323/454)
+error: unable to write file research/oppo_styles/models/UniversalPhotographicStyleStateNet.model-card.md
+error: unable to write file research/oppo_styles/predict.py
+error: unable to write file research/oppo_styles/pretrain.py
+error: unable to write file research/oppo_styles/public_pretraining.py
+Updating files:  72% (327/454)
+error: unable to write file research/oppo_styles/tools/__init__.py
+error: unable to write file research/oppo_styles/tools/build_reverse_key1_runtime_envelope.py
+error: unable to write file research/oppo_styles/tools/evaluate_reverse_key1_ensemble.py
+error: unable to write file research/oppo_styles/tools/export_reverse_key1_coreml.py
+error: unable to write file research/oppo_styles/tools/measure_style_editor_response.py
+Updating files:  73% (332/454)
+error: unable to write file research/oppo_styles/tools/predict_reverse_key1.py
+error: unable to write file research/oppo_styles/tools/predict_reverse_key1_coreml.py
+error: unable to write file research/oppo_styles/tools/probe_style_version.py
+error: unable to write file research/oppo_styles/tools/train_reverse_key1.py
+Updating files:  74% (336/454)
+error: unable to write file research/oppo_styles/train.py
+error: unable to write file research/oppo_styles/training.py
+error: unable to write file research/palette/README.en.md
+error: unable to write file research/palette/README.md
+error: unable to write file research/palette/probe.py
+Updating files:  75% (341/454)
+error: unable to write file research/texture_styles/InputTrace.m
+error: unable to write file research/texture_styles/PersonInputProbe.m
+error: unable to write file research/texture_styles/README.en.md
+error: unable to write file research/texture_styles/README.md
+error: unable to write file research/texture_styles/RuntimeInventory.m
+Updating files:  76% (346/454)
+error: unable to write file research/texture_styles/__init__.py
+error: unable to write file research/texture_styles/evidence/historical-contracts.json
+error: unable to write file research/texture_styles/evidence/native-standard-matrix.json
+error: unable to write file research/texture_styles/oracle.py
+Updating files:  77% (350/454)
+error: unable to write file research/texture_styles/probe.py
+error: unable to write file research/texture_styles/sparse.py
+error: unable to write file research/video_styles/CarrierProbe.swift
+error: unable to write file research/video_styles/README.md
+error: unable to write file research/video_styles/README.zh-CN.md
+Updating files:  78% (355/454)
+error: unable to write file research/video_styles/probe.py
+error: unable to write file research/video_styles/smoke.py
+error: unable to write file scripts/README.en.md
+error: unable to write file scripts/README.md
+Updating files:  79% (359/454)
+error: unable to write file scripts/__init__.py
+error: unable to write file scripts/apple/__init__.py
+error: unable to write file scripts/apple/build_apple_device_validation.sh
+error: unable to write file scripts/apple/build_live_photo_device_validation.sh
+error: unable to write file scripts/apple/check_apple_adapter_handshake.sh
+Updating files:  80% (364/454)
+error: unable to write file scripts/apple/check_apple_device_acceptance.py
+error: unable to write file scripts/apple/check_rust_cli_apple_portrait.sh
+error: unable to write file scripts/apple/check_rust_cli_oppo_portrait.py
+error: unable to write file scripts/apple/check_rust_style_consumer.sh
+Updating files:  81% (368/454)
+error: unable to write file scripts/apple/check_style_tone_response.py
+error: unable to write file scripts/apple/check_styles_version_hypothesis.sh
+error: unable to write file scripts/apple/check_texture_styles.py
+error: unable to write file scripts/apple/compare_cinematic_render.swift
+error: unable to write file scripts/apple/measure_system_heif_hdr.sh
+Updating files:  82% (373/454)
+error: unable to write file scripts/apple/probe_system_heif_hdr_api.sh
+error: unable to write file scripts/apple/read_oriented_heif_imageio.swift
+error: unable to write file scripts/apple/run_style_tone_sweep.sh
+error: unable to write file scripts/apple/score_system_hdr_tone.py
+Updating files:  83% (377/454)
+error: unable to write file scripts/apple/verify_cinematic_envelope.py
+error: unable to write file scripts/apple/verify_cinematic_envelope.swift
+error: unable to write file scripts/apple/vision_request_scheduler_regression.swift
+error: unable to write file scripts/ci/agent_completion_gate.py
+error: unable to write file scripts/diagnostics/compare_cinematic_alignment.py
+Updating files:  84% (382/454)
+error: unable to write file scripts/diagnostics/compare_oppo_heif_mutation.py
+error: unable to write file scripts/diagnostics/inspect_oppo_heif.py
+error: unable to write file scripts/distribution/build_native.py
+error: unable to write file scripts/distribution/macos.py
+Updating files:  85% (386/454)
+error: unable to write file scripts/distribution/native-dependencies.json
+error: unable to write file scripts/distribution/package-readme.md
+error: unable to write file scripts/distribution/smoke_macos.py
+error: unable to write file scripts/performance/benchmark_apple_videotoolbox_primitive.py
+error: unable to write file scripts/performance/benchmark_rust_product.py
+Updating files:  86% (391/454)
+error: unable to write file scripts/performance/characterize_apple_adapter_launches.py
+error: unable to write file scripts/performance/check_performance_budget.py
+error: unable to write file scripts/performance/compare_apple_styles_revisions.py
+error: unable to write file scripts/validation/check_classification_conformance.sh
+Updating files:  87% (395/454)
+error: unable to write file scripts/validation/check_container_conformance.sh
+error: unable to write file scripts/validation/check_engine_plan_vectors.sh
+error: unable to write file scripts/validation/check_format_conformance.sh
+error: unable to write file scripts/validation/check_format_constructor_conformance.sh
+error: unable to write file scripts/validation/check_hdr_edr_conformance.sh
+Updating files:  88% (400/454)
+error: unable to write file scripts/validation/check_hdr_gainmap_conformance.sh
+error: unable to write file scripts/validation/check_heif_conformance.sh
+error: unable to write file scripts/validation/check_metadata_conformance.sh
+error: unable to write file scripts/validation/check_motion_photo_rust_conformance.sh
+error: unable to write file scripts/validation/check_rust_cli_smoke.sh
+Updating files:  89% (405/454)
+error: unable to write file scripts/validation/check_rust_format_fixtures.sh
+error: unable to write file scripts/validation/check_rust_metadata_fixtures.sh
+error: unable to write file scripts/validation/check_rust_motion_photo_real_fixtures.sh
+error: unable to write file scripts/validation/verify_batch_categorize_idempotence.sh
+Updating files:  90% (409/454)
+error: unable to write file scripts/validation/verify_error_messages.sh
+error: unable to write file scripts/validation/verify_validate_only_harness.sh
+error: unable to write file tests/README.en.md
+error: unable to write file tests/README.md
+error: unable to write file tests/__init__.py
+Updating files:  91% (414/454)
+error: unable to write file tests/fixtures/hdr_edr_cases.tsv
+error: unable to write file tests/fixtures/oppo_capture_mode_cases.json
+error: unable to write file tests/fixtures/photo_classification_cases.json
+error: unable to write file tests/test_app_architecture.py
+Updating files:  92% (418/454)
+error: unable to write file tests/test_apple_device_acceptance.py
+error: unable to write file tests/test_apple_native_guards.py
+error: unable to write file tests/test_apple_reverse_key1_training.py
+error: unable to write file tests/test_categorization_documentation.py
+error: unable to write file tests/test_cinematic_alignment_report.py
+Updating files:  93% (423/454)
+error: unable to write file tests/test_frozen_style_calibration.py
+error: unable to write file tests/test_macos_distribution.py
+error: unable to write file tests/test_palette_research.py
+error: unable to write file tests/test_performance_budget.py
+Updating files:  94% (427/454)
+error: unable to write file tests/test_performance_design.py
+error: unable to write file tests/test_product_ownership.py
+error: unable to write file tests/test_public_documentation.py
+error: unable to write file tests/test_public_style_pretraining.py
+error: unable to write file tests/test_rust_apple_semantic_policy.py
+Updating files:  95% (432/454)
+error: unable to write file tests/test_rust_artifact_lifecycle.py
+error: unable to write file tests/test_rust_portrait_translation.py
+error: unable to write file tests/test_solver_candidate_archive.py
+error: unable to write file tests/test_solver_dataset_integrity.py
+Updating files:  96% (436/454)
+error: unable to write file tests/test_solver_evidence_boundaries.py
+error: unable to write file tests/test_solver_public_split.py
+error: unable to write file tests/test_solver_training_failures.py
+error: unable to write file tests/test_style_consumer_diagnostics.py
+error: unable to write file tests/test_style_version_probe.py
+Updating files:  97% (441/454)
+error: unable to write file tests/test_styles_revision_comparison.py
+error: unable to write file tests/test_texture_evidence_provenance.py
+error: unable to write file tests/test_texture_research_probe.py
+error: unable to write file tests/test_texture_sparse_lowering.py
+Updating files:  98% (445/454)
+error: unable to write file tests/test_universal_photographic_style_training.py
+error: unable to write file tests/test_video_style_diagnostics.py
+error: unable to write file tests/test_video_style_research.py
+error: unable to write file tests/validation/__init__.py
+error: unable to write file tests/validation/test_agent_completion_gate.py
+Updating files:  99% (450/454)
+error: unable to write file tests/validation/test_repository_layout.py
+error: unable to write file tests/validation/test_workflow_configuration.py
+error: unable to write file xdremux_py/__init__.py
+error: unable to write file xdremux_py/apple_reverse_key1_training.py
+Updating files: 100% (454/454)
+Updating files: 100% (454/454), done.
+fatal: Could not reset index file to revision 'HEAD'.

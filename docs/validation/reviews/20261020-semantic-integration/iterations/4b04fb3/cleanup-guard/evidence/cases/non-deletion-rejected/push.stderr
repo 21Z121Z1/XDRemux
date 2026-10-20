@@ -1,0 +1,3 @@
+EXISTING_HOOK_EXECUTED
+cleanup guard rejected: only deletion updates with all-zero local OIDs are allowed
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/non-deletion-rejected/remote.git'

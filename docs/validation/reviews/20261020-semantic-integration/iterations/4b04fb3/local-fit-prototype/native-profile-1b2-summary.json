@@ -1,0 +1,90 @@
+{
+  "source": "https://github.com/21Z121Z1/XDRemux/actions/runs/39504421273/job/118909654219",
+  "source_head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+  "scope": "Existing macOS native profile before accumulation optimization; not native evidence for the prototype.",
+  "distinct_revisions": true,
+  "diagnostic_only": true,
+  "summary": {
+    "baseline": {
+      "median_wall_seconds": 12.742538083999989,
+      "median_user_seconds": 11.6,
+      "median_sys_seconds": 1.66,
+      "max_peak_rss_bytes": 1142194176
+    },
+    "candidate": {
+      "median_wall_seconds": 15.38054329099998,
+      "median_user_seconds": 13.9,
+      "median_sys_seconds": 1.86,
+      "max_peak_rss_bytes": 1136738304
+    },
+    "candidate_over_baseline_median": 1.2070235293479226
+  },
+  "candidate_profile": {
+    "arm": "candidate",
+    "status": "validated",
+    "logs": "candidate-profile",
+    "outside_budget_and_comparison_samples": true,
+    "limits": "One candidate-only diagnostic conversion; no baseline stage comparison.",
+    "wall_seconds": 15.346095249999962,
+    "time_real_seconds": 15.32,
+    "user_seconds": 14.36,
+    "sys_seconds": 1.87,
+    "peak_rss_bytes": 1136541696,
+    "output_bytes": 2894706,
+    "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+    "stages": [
+      {
+        "stage": "source_analysis",
+        "wall_seconds": 0.00652675
+      },
+      {
+        "stage": "base_conversion",
+        "wall_seconds": 3.327722334
+      },
+      {
+        "stage": "semantic_production",
+        "wall_seconds": 4.027637917
+      },
+      {
+        "stage": "resource_decode",
+        "wall_seconds": 0.362203667
+      },
+      {
+        "stage": "scene_derivation",
+        "wall_seconds": 1.340215167
+      },
+      {
+        "stage": "thumbnail_encode",
+        "wall_seconds": 0.335857708
+      },
+      {
+        "stage": "key1_fit",
+        "wall_seconds": 1.486920042
+      },
+      {
+        "stage": "style_metadata",
+        "wall_seconds": 0.348536667
+      },
+      {
+        "stage": "native_style_properties",
+        "wall_seconds": 0.004575875
+      },
+      {
+        "stage": "style_assembly",
+        "wall_seconds": 0.005539584
+      },
+      {
+        "stage": "texture_generation",
+        "wall_seconds": 3.926049208
+      },
+      {
+        "stage": "final_validation",
+        "wall_seconds": 0.014450458
+      },
+      {
+        "stage": "publication",
+        "wall_seconds": 0.013361458
+      }
+    ]
+  }
+}

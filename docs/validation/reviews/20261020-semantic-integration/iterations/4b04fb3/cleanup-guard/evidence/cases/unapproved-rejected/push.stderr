@@ -1,0 +1,3 @@
+EXISTING_HOOK_EXECUTED
+cleanup guard rejected: unapproved or repeated remote ref
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/unapproved-rejected/remote.git'

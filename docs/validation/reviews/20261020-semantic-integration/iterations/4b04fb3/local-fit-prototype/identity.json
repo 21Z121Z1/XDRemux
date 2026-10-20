@@ -1,0 +1,9 @@
+{
+  "base_sha": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+  "arms": [
+    "baseline",
+    "candidate"
+  ],
+  "target_root": "/tmp/xdremux-style-fit-accumulation-target",
+  "scope": "Linux accumulation kernel prototype; synthetic recovery target; no native/E2E claim"
+}

@@ -1,0 +1,50 @@
+diff --git a/crates/xdremux-engine/src/apple_photographic_styles.rs b/crates/xdremux-engine/src/apple_photographic_styles.rs
+index 6c324f8..5be6b23 100644
+--- a/crates/xdremux-engine/src/apple_photographic_styles.rs
++++ b/crates/xdremux-engine/src/apple_photographic_styles.rs
+@@ -1775,6 +1775,11 @@ pub fn apple_style_revert_local_data(
+                 f64::from(request.recovered_rgb[offset + 1]),
+                 f64::from(request.recovered_rgb[offset + 2]),
+             ];
++            let residuals = [
++                recovered[0] - styled[0],
++                recovered[1] - styled[1],
++                recovered[2] - styled[2],
++            ];
+             let basis = quadratic_basis(styled);
+             let mean = (styled[0] + styled[1] + styled[2]) / 3.0;
+             let peak = styled[0].max(styled[1]).max(styled[2]);
+@@ -1809,16 +1814,24 @@ pub fn apple_style_revert_local_data(
+                             * APPLE_STYLE_PLANE_COUNT
+                             + plane)
+                             * APPLE_STYLE_BLOCK_VALUE_COUNT;
+-                        for row in 0..APPLE_STYLE_POLYNOMIAL_COUNT {
+-                            for column in row..APPLE_STYLE_POLYNOMIAL_COUNT {
+-                                normal[(cell + row) * APPLE_STYLE_POLYNOMIAL_COUNT + column] +=
+-                                    weight * basis[row] * basis[column];
+-                            }
+-                            for (channel, (&source, target)) in
+-                                styled.iter().zip(recovered).enumerate()
++                        let normal_cell = &mut normal[cell * APPLE_STYLE_POLYNOMIAL_COUNT
++                            ..(cell + APPLE_STYLE_POLYNOMIAL_COUNT) * APPLE_STYLE_POLYNOMIAL_COUNT];
++                        let rhs_cell = &mut rhs[rhs_cell..rhs_cell + APPLE_STYLE_BLOCK_VALUE_COUNT];
++                        for (row, (normal_row, rhs_row)) in normal_cell
++                            .as_chunks_mut::<APPLE_STYLE_POLYNOMIAL_COUNT>()
++                            .0
++                            .iter_mut()
++                            .zip(rhs_cell.as_chunks_mut::<APPLE_STYLE_CHANNEL_COUNT>().0)
++                            .enumerate()
++                        {
++                            let weighted_basis = weight * basis[row];
++                            for (value, &column_basis) in
++                                normal_row[row..].iter_mut().zip(&basis[row..])
+                             {
+-                                rhs[rhs_cell + row * APPLE_STYLE_CHANNEL_COUNT + channel] +=
+-                                    weight * basis[row] * (target - source);
++                                *value += weighted_basis * column_basis;
++                            }
++                            for (value, &residual) in rhs_row.iter_mut().zip(&residuals) {
++                                *value += weighted_basis * residual;
+                             }
+                         }
+                     }

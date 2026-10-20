@@ -1,0 +1,7 @@
+EXISTING_HOOK_EXECUTED
+cleanup guard approved advertised deletion batch: refs/heads/fixture/a, refs/heads/fixture/b
+remote: error: cannot lock ref 'refs/heads/fixture/a': is at 89d806c8aec961a7991eb3e6d6e2b1370aed8791 but expected 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97        
+To /workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/change-after-advertisement/remote.git
+ ! [remote rejected] fixture/a (atomic transaction failed)
+ ! [remote rejected] fixture/b (atomic transaction failed)
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/change-after-advertisement/remote.git'

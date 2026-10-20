@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "scope": "Environment recovery for unchanged4b04fb3: the earlier receipt passed metadata/format/workspace clippy, engine+HEIF+runtime tests and current-build real CLI, but the all-Python worktree checkout failed when executor /tmp was99% full. Preserve that failed receipt. All253 Python checks must rerun unchanged under a spacious owned workspace TMPDIR; this recovery receipt does not relabel skipped native/ARM64/performance gates.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300,
+      "env": {
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "real-cli-pair-conversion-and-readback",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    }
+  ]
+}

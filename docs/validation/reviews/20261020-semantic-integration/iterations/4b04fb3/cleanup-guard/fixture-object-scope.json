@@ -1,0 +1,9 @@
+{
+  "git_version": "git version 2.52.0",
+  "fixture_root": "/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv",
+  "commit_objects": 1314,
+  "closure_commit_count": 1314,
+  "all_commit_objects_in_requested_backup_closure": true,
+  "new_commit_objects_created": 0,
+  "production_executed": false
+}

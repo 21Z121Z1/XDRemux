@@ -1,0 +1,101 @@
+FFFFFFFFFFFF
+======================================================================
+FAIL: test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries) (path='artifacts/product-integration/texture/case/styles-texture.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 52, in test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries
+    self.assertFalse(self.uploaded("ci.yml", path), "media must stay on the runner")
+AssertionError: True is not false : media must stay on the runner
+
+======================================================================
+FAIL: test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries) (path='artifacts/product-integration/texture/native/context/working.png')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 52, in test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries
+    self.assertFalse(self.uploaded("ci.yml", path), "media must stay on the runner")
+AssertionError: True is not false : media must stay on the runner
+
+======================================================================
+FAIL: test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries) (path='artifacts/product-integration/texture/native/context/face.l8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 52, in test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries
+    self.assertFalse(self.uploaded("ci.yml", path), "media must stay on the runner")
+AssertionError: True is not false : media must stay on the runner
+
+======================================================================
+FAIL: test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries) (path='artifacts/product-integration/texture/native/context/stored-person-pixels.json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 52, in test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries
+    self.assertFalse(self.uploaded("ci.yml", path), "media must stay on the runner")
+AssertionError: True is not false : media must stay on the runner
+
+======================================================================
+FAIL: test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries) (path='artifacts/styles-acceptance/photo.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 52, in test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries
+    self.assertFalse(self.uploaded("ci.yml", path), "media must stay on the runner")
+AssertionError: True is not false : media must stay on the runner
+
+======================================================================
+FAIL: test_research_uploads_keep_scores_without_photos_or_render_buffers (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_uploads_keep_scores_without_photos_or_render_buffers) (path='${{ runner.temp }}/styles-photos-import/styles-v15.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 69, in test_research_uploads_keep_scores_without_photos_or_render_buffers
+    self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+AssertionError: True is not false : only scored reports may leave the runner
+
+======================================================================
+FAIL: test_research_uploads_keep_scores_without_photos_or_render_buffers (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_uploads_keep_scores_without_photos_or_render_buffers) (path='artifacts/tone-response/generated/portrait.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 69, in test_research_uploads_keep_scores_without_photos_or_render_buffers
+    self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+AssertionError: True is not false : only scored reports may leave the runner
+
+======================================================================
+FAIL: test_research_uploads_keep_scores_without_photos_or_render_buffers (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_uploads_keep_scores_without_photos_or_render_buffers) (path='artifacts/tone-response/report/comparisons/portrait.png')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 69, in test_research_uploads_keep_scores_without_photos_or_render_buffers
+    self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+AssertionError: True is not false : only scored reports may leave the runner
+
+======================================================================
+FAIL: test_research_uploads_keep_scores_without_photos_or_render_buffers (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_uploads_keep_scores_without_photos_or_render_buffers) (path='artifacts/tone-response/xdremux/photo/tone-0/renderer-0/_outputImageTexture.bin')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 69, in test_research_uploads_keep_scores_without_photos_or_render_buffers
+    self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+AssertionError: True is not false : only scored reports may leave the runner
+
+======================================================================
+FAIL: test_research_uploads_keep_scores_without_photos_or_render_buffers (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_uploads_keep_scores_without_photos_or_render_buffers) (path='artifacts/tone-response/xdremux/photo/pixels.json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 69, in test_research_uploads_keep_scores_without_photos_or_render_buffers
+    self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+AssertionError: True is not false : only scored reports may leave the runner
+
+======================================================================
+FAIL: test_research_uploads_keep_scores_without_photos_or_render_buffers (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_uploads_keep_scores_without_photos_or_render_buffers) (path='artifacts/system-heif-hdr-measurement/lhdr-v1-01.system.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 69, in test_research_uploads_keep_scores_without_photos_or_render_buffers
+    self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+AssertionError: True is not false : only scored reports may leave the runner
+
+======================================================================
+FAIL: test_research_uploads_keep_scores_without_photos_or_render_buffers (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_uploads_keep_scores_without_photos_or_render_buffers) (path='artifacts/system-heif-hdr-measurement/tone/photo/pixels.f32')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_workflow_configuration.py", line 69, in test_research_uploads_keep_scores_without_photos_or_render_buffers
+    self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
+AssertionError: True is not false : only scored reports may leave the runner
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.026s
+
+FAILED (failures=12)

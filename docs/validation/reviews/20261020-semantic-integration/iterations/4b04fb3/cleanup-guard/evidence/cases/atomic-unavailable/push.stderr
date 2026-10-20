@@ -1,0 +1,4 @@
+EXISTING_HOOK_EXECUTED
+cleanup guard approved advertised deletion batch: refs/heads/fixture/a, refs/heads/fixture/b
+fatal: the receiving end does not support --atomic push
+fatal: the remote end hung up unexpectedly

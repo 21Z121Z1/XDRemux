@@ -1,0 +1,3 @@
+EXISTING_HOOK_EXECUTED
+cleanup guard rejected: advertised deletion set differs from the complete approved batch
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/partial-batch-rejected/remote.git'

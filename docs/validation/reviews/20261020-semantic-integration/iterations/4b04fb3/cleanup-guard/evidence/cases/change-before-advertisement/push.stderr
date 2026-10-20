@@ -1,0 +1,3 @@
+EXISTING_HOOK_EXECUTED
+cleanup guard rejected: advertised head changed: refs/heads/fixture/a: 89d806c8aec961a7991eb3e6d6e2b1370aed8791
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/change-before-advertisement/remote.git'

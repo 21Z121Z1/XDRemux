@@ -1,0 +1,10 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-20T22:19:07.433063+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/4b04fb3",
+  "head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+  "tree": "a02a3e8fe5533af5aea10b7a10b56ab797b79022",
+  "restore": "remote fetched, exact commit/tree matched, full fsck exit0",
+  "restore_log": "integration-restore-4b04fb3.log",
+  "validation": "94 engine tests and40 workflow/version/device/doc tests passed; final delta gate running; new native/equality/performance checks pending"
+}

@@ -1,5 +1,7 @@
 # 后续审查证据
 
+[4b04fb3 优化与上传约束附件](4b04fb3/README.md)记录真实1b原生profile/失败、保持顺序的producer原型、当前源码portable磁盘失败/恢复、22项源恢复及待完成原生验收；不放行merge/delete。
+
 [1b2c07d 诊断/验收附件](1b2c07d/README.md)记录独立 profile、251测试干净增量回执、21个源恢复及新排队原生检查；[8dbe01d alpha 附件](8dbe01d/README.md)保留元数据与 RED/GREEN。父已选最终门禁后普通 merge #71 一次，仍须明确执行审核，未放行 merge/delete。
 
 

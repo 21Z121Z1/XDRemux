@@ -1,0 +1,2 @@
+cleanup guard rejected: original hooks changed after preparation; re-review the chain
+error: failed to push some refs to '/workspace/xdremux-audit/cleanup-guard/local-fixtures-wum6z4xv/existing-hook-changed/remote.git'
