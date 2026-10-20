@@ -1,0 +1,39 @@
+[
+  {
+    "case" : "missing-hardware",
+    "consumer_class_available" : true,
+    "consumer_encoding" : "@40@0:8@16@24o^@32",
+    "error" : {
+
+    },
+    "input" : {
+      "CaptureMode" : "Still",
+      "CaptureType" : "LF",
+      "FilmGrainSeed" : 0,
+      "PortType" : "PortTypeBack",
+      "Preset" : "Standard",
+      "TextureStylePeopleDataVersion" : 3
+    },
+    "input_sha256" : "a07f8669cb4e56efa7e6b2c5f8822b52620d69da890385082f5e0fac4c2d6643",
+    "native_consumer_called" : true,
+    "native_returned_object" : true,
+    "person_input_data" : [
+
+    ],
+    "properties" : {
+      "captureMode" : "Still",
+      "captureType" : "LF",
+      "class" : "_NUTextureStyleProperties",
+      "filmGrainSeed" : 0,
+      "numberOfPersons" : 0,
+      "personInstances" : [
+
+      ],
+      "portType" : "PortTypeBack",
+      "version" : {
+        "class" : "NUVersion"
+      }
+    },
+    "scope" : "metadata-only diagnostic, never camera provenance or Photos admission"
+  }
+]

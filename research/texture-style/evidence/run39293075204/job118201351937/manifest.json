@@ -1,0 +1,124 @@
+{
+  "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+  "xdremux_head_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+  "run_id": "39293075204",
+  "photos_used": false,
+  "synthetic_license": "CC0-1.0",
+  "files": [
+    {
+      "path": "bloom/bloom-matrix.json",
+      "size": 656,
+      "sha256": "bd12d530d0c72ef599e27e8d38ad28b41cdcc7018eaaa04cbc1d94e71e3f7d34"
+    },
+    {
+      "path": "bloom/intensity0/native.stderr.log",
+      "size": 213,
+      "sha256": "34c521cd13d94d0d4dcfb2e756414e51838cdec60212d03524919ebcfd87f981"
+    },
+    {
+      "path": "bloom/intensity0/native.stdout.log",
+      "size": 5460,
+      "sha256": "89cc07ece913a3761710e673a29809b60883de25ea2181a4c18ed604670fe865"
+    },
+    {
+      "path": "bloom/intensity0/render-bloom.json",
+      "size": 1850,
+      "sha256": "7178a1a1cc42e6af966500ed4f8b19e8bebe3466d4225899472714636ead32b8"
+    },
+    {
+      "path": "bloom/intensity0.5/native-diagnostic.json",
+      "size": 13050,
+      "sha256": "8213d633bde97c5a1f6c04223211d123a0c160f100a1709c9b2eed215e69cb06"
+    },
+    {
+      "path": "bloom/intensity0.5/native.stderr.log",
+      "size": 213,
+      "sha256": "ee3ea7aa3f24b645f4af7b35969fb607cb12e513d9d39d0dedba37bb66c7f1cd"
+    },
+    {
+      "path": "bloom/intensity0.5/native.stdout.log",
+      "size": 5478,
+      "sha256": "d0f34a506a71a155224c5347682fd0d30d8fddec3db93470780e6bf1ee3403cb"
+    },
+    {
+      "path": "bloom/intensity0.5/render-bloom.json",
+      "size": 1852,
+      "sha256": "71dc59cdf257fb1a68dafcb66e247832acf5e659cecfd597879a41c9c3ce051c"
+    },
+    {
+      "path": "bloom/intensity1/native.stderr.log",
+      "size": 213,
+      "sha256": "d54afab6ff08c92f9086e14b349c78e685f70c0c376e17a387a3f340df64ba21"
+    },
+    {
+      "path": "bloom/intensity1/native.stdout.log",
+      "size": 5460,
+      "sha256": "915e004e0e9e2f15508c28888a5c31c5723a863da7d439f4bade38607b15e0fd"
+    },
+    {
+      "path": "bloom/intensity1/render-bloom.json",
+      "size": 1850,
+      "sha256": "88c5c664c5b540ba903433d27499c8670b2e6952d6bd5a1f41cafb62075681ce"
+    },
+    {
+      "path": "bloom-driver.log",
+      "size": 20572,
+      "sha256": "3b61440d5ce6fd5fceb6a21b21abd74ea5317139e0f9757bcc983c48e348294d"
+    },
+    {
+      "path": "image-build.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "image-matrix.json",
+      "size": 14123,
+      "sha256": "86512eaadf547aed09b0ef41b3080924e586acd024c199642f329c3d128842a2"
+    },
+    {
+      "path": "image-probe.log",
+      "size": 31215,
+      "sha256": "83966e168fc727c1a70eef5d2db6b987a1650b522bf6da4a5c651f4df56494ff"
+    },
+    {
+      "path": "input-manifest.json",
+      "size": 1521,
+      "sha256": "7967cb1ea86f962b2b43cc2fa9f4a9f61cc706498598a38e7652bc57d49f50ed"
+    },
+    {
+      "path": "os.txt",
+      "size": 66,
+      "sha256": "4ef10a0fc370704ea84699cf3851e51488598c5f1ab35cb572eb6b96278a8e5c"
+    },
+    {
+      "path": "processor-build.log",
+      "size": 1585,
+      "sha256": "66020683bf5578610e7e906adaf796780bc50cc615ea17fff6c664b58f5a527a"
+    },
+    {
+      "path": "research-clients-build.log",
+      "size": 1322,
+      "sha256": "426cf1e133e06f541b60c6ff55018fe6983f955909c28824ee6d649d7028d038"
+    },
+    {
+      "path": "sdk.txt",
+      "size": 5,
+      "sha256": "7b01c549928398a045692f24bcac7803b348524cdd76f21265b02984b2ba556a"
+    },
+    {
+      "path": "semantic-control.txt",
+      "size": 319,
+      "sha256": "5a31ef89bd561feb67ed3a1301f1550db37e2e5820b245c9b371aaa53a1b9a3a"
+    },
+    {
+      "path": "xcode.txt",
+      "size": 33,
+      "sha256": "694b44731d0b415c5b11d844151e466d7f5e200a95627efda377f232f1a6ab77"
+    },
+    {
+      "path": "xdremux-head.txt",
+      "size": 41,
+      "sha256": "9cdf31714e042f8be32a28915dce73ccc696f713bcab826c24b0539666ea0808"
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+﻿2026-10-19T16:08:20.6258460Z Current runner version: '2.337.0'
+2026-10-19T16:08:20.6275480Z ##[group]Runner Image Provisioner
+2026-10-19T16:08:20.6276330Z Hosted Compute Agent
+2026-10-19T16:08:20.6276780Z Version: 20261006.597
+2026-10-19T16:08:20.6277310Z Commit: c696a59e4a9ffbc6a6203385bd1b2a10e87b1c9c
+2026-10-19T16:08:20.6277800Z Build Date: 2026-10-06T21:39:28Z
+2026-10-19T16:08:20.6278280Z Worker ID: {22f60254-f6d7-4f2e-8ed7-56fb7f8d2617}
+2026-10-19T16:08:20.6278770Z Region: westus
+2026-10-19T16:08:20.6279130Z Cloud: MacCloud
+2026-10-19T16:08:20.6279510Z ##[endgroup]
+2026-10-19T16:08:20.6280420Z ##[group]Operating System
+2026-10-19T16:08:20.6280880Z macOS
+2026-10-19T16:08:20.6281230Z 27.0.1
+2026-10-19T16:08:20.6281580Z 26A434
+2026-10-19T16:08:20.6281940Z ##[endgroup]
+2026-10-19T16:08:20.6282320Z ##[group]Runner Image
+2026-10-19T16:08:20.6282720Z Image: xcode-27-arm64
+2026-10-19T16:08:20.6283140Z Version: 20261012.0260.1
+2026-10-19T16:08:20.6284070Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261012.0260/images/macos/xcode-27-arm64-Readme.md
+2026-10-19T16:08:20.6285200Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261012.0260
+2026-10-19T16:08:20.6285890Z ##[endgroup]
+2026-10-19T16:08:20.6286820Z ##[group]GITHUB_TOKEN Permissions
+2026-10-19T16:08:20.6288340Z Contents: read
+2026-10-19T16:08:20.6288710Z Metadata: read
+2026-10-19T16:08:20.6289080Z ##[endgroup]
+2026-10-19T16:08:20.6290670Z Secret source: Actions
+2026-10-19T16:08:20.6291270Z Cache mode: write
+2026-10-19T16:08:20.6291730Z Prepare workflow directory
+2026-10-19T16:08:20.6537230Z Prepare all required actions
+2026-10-19T16:08:20.6581060Z Getting action download info
+2026-10-19T16:08:20.9151320Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-19T16:08:21.1264480Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-19T16:08:21.3168770Z Complete job name: native (xcode-27)
+2026-10-19T16:08:21.3652150Z ##[group]Run actions/checkout@v4
+2026-10-19T16:08:21.3652780Z with:
+2026-10-19T16:08:21.3653160Z   sparse-checkout: research/xdremux-texture-native
+2026-10-19T16:08:21.3653670Z   repository: 21Z121Z1/Photographic_Style_Research
+2026-10-19T16:08:21.3656410Z   token: ***
+2026-10-19T16:08:21.3656780Z   ssh-strict: true
+2026-10-19T16:08:21.3657140Z   ssh-user: git
+2026-10-19T16:08:21.3657480Z   persist-credentials: true
+2026-10-19T16:08:21.3657850Z   clean: true
+2026-10-19T16:08:21.3658230Z   sparse-checkout-cone-mode: true
+2026-10-19T16:08:21.3658660Z   fetch-depth: 1
+2026-10-19T16:08:21.3658980Z   fetch-tags: false
+2026-10-19T16:08:21.3659300Z   show-progress: true
+2026-10-19T16:08:21.3659630Z   lfs: false
+2026-10-19T16:08:21.3659940Z   submodules: false
+2026-10-19T16:08:21.3660280Z   set-safe-directory: true
+2026-10-19T16:08:21.3660660Z   allow-unsafe-pr-checkout: false
+2026-10-19T16:08:21.3661320Z ##[endgroup]
+2026-10-19T16:08:21.5390380Z Syncing repository: 21Z121Z1/Photographic_Style_Research
+2026-10-19T16:08:21.5392020Z ##[group]Getting Git version info
+2026-10-19T16:08:21.5392710Z Working directory is '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research'
+2026-10-19T16:08:21.5393890Z [command]/opt/homebrew/bin/git version
+2026-10-19T16:08:21.5683700Z git version 2.56.0
+2026-10-19T16:08:21.5694690Z ##[endgroup]
+2026-10-19T16:08:21.5701980Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/f526262c-1546-4a79-b915-b6c7a69068dd/.gitconfig'
+2026-10-19T16:08:21.5709450Z Temporarily overriding HOME='/Users/runner/work/_temp/f526262c-1546-4a79-b915-b6c7a69068dd' before making global git config changes
+2026-10-19T16:08:21.5710440Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T16:08:21.5714370Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:08:21.5835550Z Deleting the contents of '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research'
+2026-10-19T16:08:21.5837930Z ##[group]Initializing the repository
+2026-10-19T16:08:21.5841860Z [command]/opt/homebrew/bin/git init /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:08:21.6077110Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-19T16:08:21.6077950Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-19T16:08:21.6078660Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-19T16:08:21.6079310Z hint: call:
+2026-10-19T16:08:21.6079690Z hint:
+2026-10-19T16:08:21.6080180Z hint: 	git config --global init.defaultBranch <name>
+2026-10-19T16:08:21.6080770Z hint:
+2026-10-19T16:08:21.6082970Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-19T16:08:21.6083820Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-19T16:08:21.6084580Z hint:
+2026-10-19T16:08:21.6085040Z hint: 	git branch -m <name>
+2026-10-19T16:08:21.6085490Z hint:
+2026-10-19T16:08:21.6086120Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-19T16:08:21.6087500Z Initialized empty Git repository in /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/.git/
+2026-10-19T16:08:21.6091960Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-19T16:08:21.6188430Z ##[endgroup]
+2026-10-19T16:08:21.6189220Z ##[group]Disabling automatic garbage collection
+2026-10-19T16:08:21.6190010Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-19T16:08:21.6247620Z ##[endgroup]
+2026-10-19T16:08:21.6248340Z ##[group]Setting up auth
+2026-10-19T16:08:21.6251840Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T16:08:21.6323620Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T16:08:21.7260460Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T16:08:21.7325180Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T16:08:21.8140050Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T16:08:21.8206220Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T16:08:21.9092880Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-19T16:08:21.9168180Z ##[endgroup]
+2026-10-19T16:08:21.9170100Z ##[group]Fetching the repository
+2026-10-19T16:08:21.9174520Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --filter=blob:none --depth=1 origin +4e6630d50eab3626254249ec5563af5ab6db8b93:refs/remotes/origin/research/xdremux-texture-native-20261019
+2026-10-19T16:08:22.3516160Z From https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-19T16:08:22.3601690Z  * [new ref]         4e6630d50eab3626254249ec5563af5ab6db8b93 -> origin/research/xdremux-texture-native-20261019
+2026-10-19T16:08:22.3662450Z ##[endgroup]
+2026-10-19T16:08:22.3663170Z ##[group]Determining the checkout info
+2026-10-19T16:08:22.3663900Z ##[endgroup]
+2026-10-19T16:08:22.3664680Z ##[group]Setting up sparse checkout
+2026-10-19T16:08:22.3667420Z [command]/opt/homebrew/bin/git sparse-checkout set research/xdremux-texture-native
+2026-10-19T16:08:22.3669220Z ##[endgroup]
+2026-10-19T16:08:22.3682180Z ##[group]Checking out the ref
+2026-10-19T16:08:22.3683890Z [command]/opt/homebrew/bin/git checkout --progress --force -B research/xdremux-texture-native-20261019 refs/remotes/origin/research/xdremux-texture-native-20261019
+2026-10-19T16:08:22.6610960Z Switched to a new branch 'research/xdremux-texture-native-20261019'
+2026-10-19T16:08:22.6618270Z branch 'research/xdremux-texture-native-20261019' set up to track 'origin/research/xdremux-texture-native-20261019'.
+2026-10-19T16:08:22.6621470Z ##[endgroup]
+2026-10-19T16:08:22.6718410Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-19T16:08:22.6790180Z 4e6630d50eab3626254249ec5563af5ab6db8b93
+2026-10-19T16:08:22.7236520Z ##[group]Run set -euo pipefail
+2026-10-19T16:08:22.7237210Z [36;1mset -euo pipefail[0m
+2026-10-19T16:08:22.7237720Z [36;1mmkdir -p evidence[0m
+2026-10-19T16:08:22.7238370Z [36;1mtest "$(git rev-parse HEAD)" = "$GITHUB_SHA"[0m
+2026-10-19T16:08:22.7239100Z [36;1msw_vers > evidence/os.txt[0m
+2026-10-19T16:08:22.7239740Z [36;1mxcodebuild -version > evidence/xcode.txt[0m
+2026-10-19T16:08:22.7240620Z [36;1mxcrun --sdk macosx --show-sdk-version > evidence/sdk.txt[0m
+2026-10-19T16:08:22.7241580Z [36;1mxcrun swiftc --version > evidence/swift.txt[0m
+2026-10-19T16:08:22.7242330Z [36;1mgit rev-parse HEAD > evidence/head.txt[0m
+2026-10-19T16:08:22.7243440Z [36;1mxcrun swiftc -swift-version 5 research/xdremux-texture-native/native_probe.swift \[0m
+2026-10-19T16:08:22.7244940Z [36;1m  -framework Foundation -framework CoreImage -framework ImageIO -framework Metal \[0m
+2026-10-19T16:08:22.7246430Z [36;1m  -o "$RUNNER_TEMP/xdremux-texture-native-probe" 2>&1 | tee evidence/build.log[0m
+2026-10-19T16:08:22.7293690Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T16:08:22.7294420Z ##[endgroup]
+2026-10-19T16:08:30.1448550Z research/xdremux-texture-native/native_probe.swift:88:9: warning: constant 'cls' inferred to have type 'AnyClass' (aka 'any AnyObject.Type'), which may be unexpected
+2026-10-19T16:08:30.1491030Z  86 | var rows: [[String: Any]] = []
+2026-10-19T16:08:30.1534180Z  87 | for i in 0..<Int(count) {
+2026-10-19T16:08:30.1534860Z  88 |     let cls = classes[i], name = NSStringFromClass(cls)
+2026-10-19T16:08:30.1535920Z     |         |- warning: constant 'cls' inferred to have type 'AnyClass' (aka 'any AnyObject.Type'), which may be unexpected
+2026-10-19T16:08:30.1539160Z     |         `- note: add an explicit type annotation to silence this warning
+2026-10-19T16:08:30.1540260Z  89 |     if name.contains("TextureStyle") || name == "_NUSemanticStyleProperties" {
+2026-10-19T16:08:30.1541120Z  90 |         rows.append(["class": name, "instance_size": class_getInstanceSize(cls),
+2026-10-19T16:08:30.1541760Z 
+2026-10-19T16:08:30.1554830Z research/xdremux-texture-native/native_probe.swift:94:6: error: cannot convert value of type 'AutoreleasingUnsafeMutablePointer<AnyClass>' (aka 'AutoreleasingUnsafeMutablePointer<any AnyObject.Type>') to expected argument type 'UnsafeMutableRawPointer'
+2026-10-19T16:08:30.1561600Z  92 |     }
+2026-10-19T16:08:30.1565650Z swift-driver version: 1.168.6 
+2026-10-19T16:08:30.1566060Z  93 | }
+2026-10-19T16:08:30.1566480Z  94 | free(classes)
+2026-10-19T16:08:30.1567500Z     |      `- error: cannot convert value of type 'AutoreleasingUnsafeMutablePointer<AnyClass>' (aka 'AutoreleasingUnsafeMutablePointer<any AnyObject.Type>') to expected argument type 'UnsafeMutableRawPointer'
+2026-10-19T16:08:30.1568530Z  95 | let device = MTLCreateSystemDefaultDevice()
+2026-10-19T16:08:30.1569120Z  96 | try writeJSON(["schema": "xdremux-texture-runtime-v1", "os": ProcessInfo.processInfo.operatingSystemVersionString,
+2026-10-19T16:08:30.1569590Z 
+2026-10-19T16:08:30.1570310Z research/xdremux-texture-native/native_probe.swift:28:11: error: initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>')
+2026-10-19T16:08:30.1571200Z  26 |     guard let cls = object_getClass(target), let method = class_getInstanceMethod(cls, sel),
+2026-10-19T16:08:30.1571920Z  27 |           method_getNumberOfArguments(method) == UInt32(args.count + 2) else { return nil }
+2026-10-19T16:08:30.1572490Z  28 |     guard let rt = method_copyReturnType(method) else { return nil }
+2026-10-19T16:08:30.1573800Z     |           `- error: initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>')
+2026-10-19T16:08:30.1574460Z  29 |     defer { free(rt) }
+2026-10-19T16:08:30.1574790Z  30 |     guard String(cString: rt) == ret else { return nil }
+2026-10-19T16:08:30.1584670Z ##[error]Process completed with exit code 1.
+2026-10-19T16:08:30.1911480Z ##[group]Run python3 - <<'PY'
+2026-10-19T16:08:30.1911820Z [36;1mpython3 - <<'PY'[0m
+2026-10-19T16:08:30.1912060Z [36;1mimport hashlib,json,os,pathlib[0m
+2026-10-19T16:08:30.1912360Z [36;1mp=pathlib.Path('evidence');p.mkdir(exist_ok=True)[0m
+2026-10-19T16:08:30.1912660Z [36;1mrows=[][0m
+2026-10-19T16:08:30.1912910Z [36;1mfor f in sorted(p.iterdir()):[0m
+2026-10-19T16:08:30.1913310Z [36;1m    assert f.is_file() and f.suffix in {'.json','.txt','.log'}[0m
+2026-10-19T16:08:30.1913910Z [36;1m    rows.append({'path':f.name,'size':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()})[0m
+2026-10-19T16:08:30.1914880Z [36;1m(p/'manifest.json').write_text(json.dumps({'head_sha':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'photos_used':False,'files':rows},indent=2)+'\n')[0m
+2026-10-19T16:08:30.1915460Z [36;1mPY[0m
+2026-10-19T16:08:30.1953200Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T16:08:30.1953570Z ##[endgroup]
+2026-10-19T16:08:30.4078350Z ##[group]Run actions/upload-artifact@v4
+2026-10-19T16:08:30.4078660Z with:
+2026-10-19T16:08:30.4078870Z   name: xdremux-texture-native-text-xcode-27
+2026-10-19T16:08:30.4079150Z   path: evidence/
+2026-10-19T16:08:30.4079350Z   retention-days: 1
+2026-10-19T16:08:30.4079560Z   if-no-files-found: warn
+2026-10-19T16:08:30.4079780Z   compression-level: 6
+2026-10-19T16:08:30.4080000Z   overwrite: false
+2026-10-19T16:08:30.4080270Z   include-hidden-files: false
+2026-10-19T16:08:30.4080550Z ##[endgroup]
+2026-10-19T16:08:30.5608650Z (node:4440) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-19T16:08:30.5609520Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-19T16:08:30.5641410Z With the provided path, there will be 7 files uploaded
+2026-10-19T16:08:30.5643970Z Artifact name is valid!
+2026-10-19T16:08:30.5644300Z Root directory input is valid!
+2026-10-19T16:08:30.8811580Z (node:4440) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-19T16:08:30.9525550Z Beginning upload of artifact content to blob storage
+2026-10-19T16:08:31.0231950Z Uploaded bytes 2271
+2026-10-19T16:08:31.0734660Z Finished uploading artifact content to blob storage!
+2026-10-19T16:08:31.0836190Z SHA256 digest of uploaded artifact zip is e0e647f145ceb5e17abfa83d5b22ed558f1e163a01a3cdf896f11a32807c2871
+2026-10-19T16:08:31.0937590Z Finalizing artifact upload
+2026-10-19T16:08:31.3226790Z Artifact xdremux-texture-native-text-xcode-27.zip successfully finalized. Artifact ID 12201282306
+2026-10-19T16:08:31.3228570Z Artifact xdremux-texture-native-text-xcode-27 has been successfully uploaded! Final size is 2271 bytes. Artifact ID is 12201282306
+2026-10-19T16:08:31.3232160Z Artifact download URL: https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39283079303/artifacts/12201282306
+2026-10-19T16:08:31.3342460Z Post job cleanup.
+2026-10-19T16:08:31.4295130Z [command]/opt/homebrew/bin/git version
+2026-10-19T16:08:31.4352840Z git version 2.56.0
+2026-10-19T16:08:31.4437950Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/ca56cdb2-4704-4fe7-ad6a-f0e74ea25404/.gitconfig'
+2026-10-19T16:08:31.4445800Z Temporarily overriding HOME='/Users/runner/work/_temp/ca56cdb2-4704-4fe7-ad6a-f0e74ea25404' before making global git config changes
+2026-10-19T16:08:31.4452970Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T16:08:31.4459270Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:08:31.4473940Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T16:08:31.4475410Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T16:08:31.5231580Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T16:08:31.5286540Z http.https://github.com/.extraheader
+2026-10-19T16:08:31.5294030Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-19T16:08:31.5404160Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T16:08:31.6166330Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T16:08:31.6262600Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T16:08:31.7043580Z Cleaning up orphan processes
+2026-10-19T16:08:32.0887540Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

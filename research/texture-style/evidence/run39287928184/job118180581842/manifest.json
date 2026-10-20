@@ -1,0 +1,187 @@
+{
+  "head_sha": "e653f24219dd7bd152381ccfa172dd59121ac360",
+  "run_id": "39287928184",
+  "photos_used": false,
+  "files": [
+    {
+      "path": "build.log",
+      "size": 778,
+      "sha256": "f393ea14dae8b56e77a5df901249267d2ff0159d147ab1975935c158a10b3012"
+    },
+    {
+      "path": "head.txt",
+      "size": 41,
+      "sha256": "c51b7cd111e0c631fe8dded6316c24ff3ebbd78b65ebb04e3f192d63fc85fe27"
+    },
+    {
+      "path": "metadata/empty-dictionary/metadata-cases.json",
+      "size": 331,
+      "sha256": "65c4723a6953087248ff1629eedd2c44db04eecf7cdedf1ab8535ecb5012e0f2"
+    },
+    {
+      "path": "metadata/empty-dictionary.stderr.log",
+      "size": 169,
+      "sha256": "231109b4f428c02d7c101b7848bb1cd17f7a87dea3510f8743770746fcfdb559"
+    },
+    {
+      "path": "metadata/empty-dictionary.stdout.log",
+      "size": 509,
+      "sha256": "10cc9689fcf36f9762852999f0d2a5abb6d31a50a1c1182f7b9edd3b9cc65457"
+    },
+    {
+      "path": "metadata/inventory/defaults.json",
+      "size": 5,
+      "sha256": "8e1d794b49e35ea828279c6a8c95282bbb9a0787cf5c9385256c2cc9d17baeb7"
+    },
+    {
+      "path": "metadata/inventory/runtime.json",
+      "size": 6457,
+      "sha256": "16a1b553f8be6a0375545ae3a9f45decc6164fb68d91aa6a05397a9904e9089e"
+    },
+    {
+      "path": "metadata/inventory.stderr.log",
+      "size": 291,
+      "sha256": "b090c429266e7f5aa3e5b1e0ded5da234bd5c67d09ec0bc7ce79293e2cbe25ac"
+    },
+    {
+      "path": "metadata/inventory.stdout.log",
+      "size": 6628,
+      "sha256": "c8419621f4bd48a9fb5bc7d7869c16b6badc731326e15c5e110667adb1cee8d7"
+    },
+    {
+      "path": "metadata/missing-hardware/metadata-cases.json",
+      "size": 522,
+      "sha256": "3df7917c75c8536313cb129f13ce85eed0e041cdfc8c2e972468572217028f7d"
+    },
+    {
+      "path": "metadata/missing-hardware.stderr.log",
+      "size": 169,
+      "sha256": "ad2f738cfe741d9e807eb61031995a1ae70e67b273e70e9350aedcc3e5321209"
+    },
+    {
+      "path": "metadata/missing-hardware.stdout.log",
+      "size": 700,
+      "sha256": "8d15e24ed81071126566f084d235048b5ddf4a62d33ac37486b08190a0dc0b21"
+    },
+    {
+      "path": "metadata/process-results.json",
+      "size": 2086,
+      "sha256": "449df12b3efac70fd52f6662f7ed78984ed59a14de2189261f3426e0fc7b039d"
+    },
+    {
+      "path": "metadata/requirements-1/requirements.json",
+      "size": 129,
+      "sha256": "cae63e65a8ed023c4a2cb79843b935794980dd092ae3050cbd1bcbb317d463ac"
+    },
+    {
+      "path": "metadata/requirements-1.stderr.log",
+      "size": 122,
+      "sha256": "18448b5d0df67bff6fa2189744cb467489c070d457594389eceff0afb8c263de"
+    },
+    {
+      "path": "metadata/requirements-1.stdout.log",
+      "size": 231,
+      "sha256": "9ee69ae8d18bc5f3498e8d5438b6bf10426d83d51e27a614e18005397ebb1753"
+    },
+    {
+      "path": "metadata/requirements-2/requirements.json",
+      "size": 129,
+      "sha256": "f10559e57bfed0a6bef15154a7c5161ee69ce096ae2b0fda812592c58f3b3848"
+    },
+    {
+      "path": "metadata/requirements-2.stderr.log",
+      "size": 122,
+      "sha256": "18448b5d0df67bff6fa2189744cb467489c070d457594389eceff0afb8c263de"
+    },
+    {
+      "path": "metadata/requirements-2.stdout.log",
+      "size": 231,
+      "sha256": "b71fa5cb433eb8712ff18445bcf1320c6268e75bd036c09c78c949190fbdab30"
+    },
+    {
+      "path": "metadata/requirements-3/requirements.json",
+      "size": 129,
+      "sha256": "3633a6e86cd9e8c20775ef07b0776b15b8c00588eb157bfadadc47f950e5633f"
+    },
+    {
+      "path": "metadata/requirements-3.stderr.log",
+      "size": 122,
+      "sha256": "18448b5d0df67bff6fa2189744cb467489c070d457594389eceff0afb8c263de"
+    },
+    {
+      "path": "metadata/requirements-3.stdout.log",
+      "size": 231,
+      "sha256": "e947c94d19c10341bc332d66b34d0d49efc986b80efa9e1094c5b4b3a23c1a23"
+    },
+    {
+      "path": "metadata/synthetic-standard-control/metadata-cases.json",
+      "size": 570,
+      "sha256": "8bb30e3cd21c43da00e64387fb82014f0a9e85eb1522f6b7d49afd0a48291585"
+    },
+    {
+      "path": "metadata/synthetic-standard-control.stderr.log",
+      "size": 179,
+      "sha256": "86ffde9f35d03970b8fde02a8bb9914ff81e94f79c359e2df1e301e01d48a009"
+    },
+    {
+      "path": "metadata/synthetic-standard-control.stdout.log",
+      "size": 768,
+      "sha256": "747651824e839debd9a0dc573772cd27ddc160a4febba3f191112d6b1bbd7fa2"
+    },
+    {
+      "path": "metadata/synthetic-studio-control/metadata-cases.json",
+      "size": 566,
+      "sha256": "61528eb3bc95213989990edb955387d42703544f51b8d18772892aa384135afe"
+    },
+    {
+      "path": "metadata/synthetic-studio-control.stderr.log",
+      "size": 177,
+      "sha256": "98f6d5fcc37b31a1a033b2ad1269ab2391ac25b51458c6f2d2c12579171d8e86"
+    },
+    {
+      "path": "metadata/synthetic-studio-control.stdout.log",
+      "size": 760,
+      "sha256": "5b71e1d18d576316b7fd01404d4e87d651a41c9bfdadc76d91777ec8f096fed6"
+    },
+    {
+      "path": "metadata/unsupported-version/metadata-cases.json",
+      "size": 565,
+      "sha256": "150a0d6a6ccf2df17a797ba21ddec5284da1d6e85619ef09db60de5544ca56bc"
+    },
+    {
+      "path": "metadata/unsupported-version.stderr.log",
+      "size": 172,
+      "sha256": "3b04fa06d32712374a83b15ea4d6958b329e6585a4e4d8df5156146e3f7c18eb"
+    },
+    {
+      "path": "metadata/unsupported-version.stdout.log",
+      "size": 749,
+      "sha256": "dfb13f4714f46d22350bdf9c1409c07faa43f8aa6bacaffbc9a93e1211fd3aac"
+    },
+    {
+      "path": "os.txt",
+      "size": 65,
+      "sha256": "cd5d6399b3785b04ceaae75045a9ca9f80f0bbc3526eff9d0c36b170ed1ec348"
+    },
+    {
+      "path": "probe.log",
+      "size": 13120,
+      "sha256": "4151a7c086be7821de2226f76a0da6027d3f39a000737a6fddce5c5be785ab30"
+    },
+    {
+      "path": "sdk.txt",
+      "size": 5,
+      "sha256": "25205f2e2f02dc71036ee827e19c49b893b231a3d1af240e35a3ac55aa8cdcb6"
+    },
+    {
+      "path": "swift.txt",
+      "size": 98,
+      "sha256": "b674f79b747370a1c05ae7cec551fffe557816c6c807f35f39f933ecbcca80d7"
+    },
+    {
+      "path": "xcode.txt",
+      "size": 32,
+      "sha256": "18730ed2ae28a2c9cf0c2d5db549033a4f07089331391a7133b7b32187454fa9"
+    }
+  ]
+}

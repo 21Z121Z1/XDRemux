@@ -1,0 +1,41 @@
+[
+  {
+    "case" : "synthetic-studio-control",
+    "consumer_class_available" : true,
+    "consumer_encoding" : "@40@0:8@16@24o^@32",
+    "error" : {
+
+    },
+    "input" : {
+      "CaptureMode" : "Still",
+      "CaptureType" : "LF",
+      "FilmGrainSeed" : 0,
+      "HardwareModel" : "iPhone19,2",
+      "PortType" : "PortTypeBack",
+      "Preset" : "Studio",
+      "TextureStylePeopleDataVersion" : 3
+    },
+    "input_sha256" : "39c4f3296fb6ee03076f775a6c04b46b1332dab846928e6bc823455311775f8c",
+    "native_consumer_called" : true,
+    "native_returned_object" : true,
+    "person_input_data" : [
+
+    ],
+    "properties" : {
+      "captureMode" : "Still",
+      "captureType" : "LF",
+      "class" : "_NUTextureStyleProperties",
+      "filmGrainSeed" : 0,
+      "hardwareModel" : "iPhone19,2",
+      "numberOfPersons" : 0,
+      "personInstances" : [
+
+      ],
+      "portType" : "PortTypeBack",
+      "version" : {
+        "class" : "NUVersion"
+      }
+    },
+    "scope" : "metadata-only diagnostic, never camera provenance or Photos admission"
+  }
+]

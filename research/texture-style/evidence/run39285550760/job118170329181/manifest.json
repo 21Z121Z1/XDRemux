@@ -1,0 +1,124 @@
+{
+  "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+  "xdremux_head_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+  "run_id": "39285550760",
+  "photos_used": false,
+  "synthetic_license": "CC0-1.0",
+  "files": [
+    {
+      "path": "adapter-build.log",
+      "size": 578,
+      "sha256": "256bd9ef2d7b4cc5e13bb05dc405b5736b40e7fde11b6e57af64ff84d237b15e"
+    },
+    {
+      "path": "cli-build.log",
+      "size": 8637,
+      "sha256": "0ae4a482e38ca147697c88de7394a9b7911016bffd51556d48c8a0beb5b620cc"
+    },
+    {
+      "path": "heif-tests.log",
+      "size": 4157,
+      "sha256": "9d5ad48fa21939d50c5d09d4d11474cf65beb5f44f03b18dc4eee23afa1fcfaf"
+    },
+    {
+      "path": "image-build.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "image-matrix.json",
+      "size": 14123,
+      "sha256": "86512eaadf547aed09b0ef41b3080924e586acd024c199642f329c3d128842a2"
+    },
+    {
+      "path": "image-probe.log",
+      "size": 31215,
+      "sha256": "83966e168fc727c1a70eef5d2db6b987a1650b522bf6da4a5c651f4df56494ff"
+    },
+    {
+      "path": "input-manifest.json",
+      "size": 1521,
+      "sha256": "7967cb1ea86f962b2b43cc2fa9f4a9f61cc706498598a38e7652bc57d49f50ed"
+    },
+    {
+      "path": "libheif.txt",
+      "size": 7,
+      "sha256": "d69e6e2d5c968e87a605464b463fa044a5b08269a60371647475761229f55dad"
+    },
+    {
+      "path": "os.txt",
+      "size": 66,
+      "sha256": "4ef10a0fc370704ea84699cf3851e51488598c5f1ab35cb572eb6b96278a8e5c"
+    },
+    {
+      "path": "product/landscape-gradient-convert.log",
+      "size": 97,
+      "sha256": "3b222cc18107168912841b162c10a4e32720914bd3256a0056d410b5d810181f"
+    },
+    {
+      "path": "product/landscape-gradient-source.log",
+      "size": 49,
+      "sha256": "13d7839706446ed8cf7e636b0f552dcb63c8f6476b23e7daa0103e1e93ff4b46"
+    },
+    {
+      "path": "product/landscape-hdr-edge-convert.log",
+      "size": 97,
+      "sha256": "3b222cc18107168912841b162c10a4e32720914bd3256a0056d410b5d810181f"
+    },
+    {
+      "path": "product/landscape-hdr-edge-source.log",
+      "size": 49,
+      "sha256": "13d7839706446ed8cf7e636b0f552dcb63c8f6476b23e7daa0103e1e93ff4b46"
+    },
+    {
+      "path": "product/portrait-checker-convert.log",
+      "size": 92,
+      "sha256": "4d527c257cfb209881d0a3210727d1ed2d6efbd38efa25600b7cb2fa7c1ddc66"
+    },
+    {
+      "path": "product/portrait-checker-source.log",
+      "size": 49,
+      "sha256": "13d7839706446ed8cf7e636b0f552dcb63c8f6476b23e7daa0103e1e93ff4b46"
+    },
+    {
+      "path": "product/portrait-hdr-impulse-convert.log",
+      "size": 92,
+      "sha256": "4d527c257cfb209881d0a3210727d1ed2d6efbd38efa25600b7cb2fa7c1ddc66"
+    },
+    {
+      "path": "product/portrait-hdr-impulse-source.log",
+      "size": 49,
+      "sha256": "13d7839706446ed8cf7e636b0f552dcb63c8f6476b23e7daa0103e1e93ff4b46"
+    },
+    {
+      "path": "product/product-matrix.json",
+      "size": 1552,
+      "sha256": "3c0c641710e32667952a73f2349f509906924fd4e50cc1dbb5e2b23bc5ae6fe8"
+    },
+    {
+      "path": "product-driver.log",
+      "size": 2699,
+      "sha256": "a9ad07d2e7fbfc359f738d1fd900da7ad096aeae75f74b57dab098523384e51f"
+    },
+    {
+      "path": "research-clients-build.log",
+      "size": 73,
+      "sha256": "33607b8f1e656adcf40b015e6c9e035611f1be371e9bc2bbeba1018f23ab95b5"
+    },
+    {
+      "path": "sdk.txt",
+      "size": 5,
+      "sha256": "7b01c549928398a045692f24bcac7803b348524cdd76f21265b02984b2ba556a"
+    },
+    {
+      "path": "xcode.txt",
+      "size": 33,
+      "sha256": "694b44731d0b415c5b11d844151e466d7f5e200a95627efda377f232f1a6ab77"
+    },
+    {
+      "path": "xdremux-head.txt",
+      "size": 41,
+      "sha256": "9cdf31714e042f8be32a28915dce73ccc696f713bcab826c24b0539666ea0808"
+    }
+  ]
+}

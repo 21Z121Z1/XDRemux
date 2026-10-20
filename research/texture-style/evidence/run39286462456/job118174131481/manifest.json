@@ -1,0 +1,37 @@
+{
+  "head_sha": "d105a967bab6d3f1c577670751c6fce7257dd171",
+  "run_id": "39286462456",
+  "photos_used": false,
+  "files": [
+    {
+      "path": "build.log",
+      "size": 2455,
+      "sha256": "b34fcf8e1e0eac6b8e6808f9c8a5b72c4b98966568be6f42aac6167099026bea"
+    },
+    {
+      "path": "head.txt",
+      "size": 41,
+      "sha256": "b165ba4479e5f347185d05009a5e4c6d0a4247d3241119fea1433975186b308d"
+    },
+    {
+      "path": "os.txt",
+      "size": 66,
+      "sha256": "4ef10a0fc370704ea84699cf3851e51488598c5f1ab35cb572eb6b96278a8e5c"
+    },
+    {
+      "path": "sdk.txt",
+      "size": 5,
+      "sha256": "7b01c549928398a045692f24bcac7803b348524cdd76f21265b02984b2ba556a"
+    },
+    {
+      "path": "swift.txt",
+      "size": 98,
+      "sha256": "04630ab8fa201f57c63c59730e638135e32584a97e16e004a417eb8ed283dc83"
+    },
+    {
+      "path": "xcode.txt",
+      "size": 33,
+      "sha256": "694b44731d0b415c5b11d844151e466d7f5e200a95627efda377f232f1a6ab77"
+    }
+  ]
+}

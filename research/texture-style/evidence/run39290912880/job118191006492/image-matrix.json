@@ -1,0 +1,392 @@
+{
+  "license" : "CC0-1.0",
+  "no_photos_read" : true,
+  "os" : "Version 27.0.1 (Build 26A434)",
+  "rows" : [
+    {
+      "case" : "landscape-gradient-sdr-jpg",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          384,
+          256
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "landscape-gradient-sdr.jpg",
+        "file_sha256" : "0af2690b5e78e31a361088a05dab1bfbc651a1b8615cf84e232fdb52ee69db8c",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "c8bbfcdb70bb42767db98691f6974c2d6fd8c1138f421b810af1d0ade50040c1",
+        "Orientation" : 1,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 256,
+        "PixelWidth" : 384,
+        "ProfileName" : "Display P3",
+        "size" : 9627,
+        "texture_activation" : "unverified",
+        "type" : "public.jpeg"
+      },
+      "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+      "requested_orientation" : 1,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "landscape-gradient-sdr-heic",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          384,
+          256
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "landscape-gradient-sdr.heic",
+        "file_sha256" : "81b0f9b0f6a9969bfecc6efb76c047a57515cc3a01aba2e48fabd048f128bd77",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "5e590ec8b64646bee03ed544b5daa454af3e5d553dfa60f9060ef3c4ee25406e",
+        "Orientation" : 1,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 256,
+        "PixelWidth" : 384,
+        "ProfileName" : "Display P3",
+        "size" : 4564,
+        "texture_activation" : "unverified",
+        "type" : "public.heic"
+      },
+      "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+      "requested_orientation" : 1,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "portrait-checker-sdr-jpg",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          256,
+          384
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "portrait-checker-sdr.jpg",
+        "file_sha256" : "4cf9402a796f1907e8bffae369bc24040531542239bfc32fc40fdc5dd2988ac6",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "d8b429f80a0e481549e1807b6d2cb8775fc4013cd2c253f6b5fd75bf702258b7",
+        "Orientation" : 6,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 384,
+        "PixelWidth" : 256,
+        "ProfileName" : "Display P3",
+        "size" : 46991,
+        "texture_activation" : "unverified",
+        "type" : "public.jpeg"
+      },
+      "input_raw_sha256" : "40c7d19c56cfe292059b94274310121ccb2e82a1e8d2dcafeb2469d512e99b51",
+      "requested_orientation" : 6,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "portrait-checker-sdr-heic",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          256,
+          384
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "portrait-checker-sdr.heic",
+        "file_sha256" : "3a3f420c080d8f0e5673364441919b7c5ff7463d4634bd8a70592327b6b3ebfe",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "247749af11d99fff4fb7f46a5f21e18a20f24e2052d4ec502bbec7de50f7c965",
+        "Orientation" : 6,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 384,
+        "PixelWidth" : 256,
+        "ProfileName" : "Display P3",
+        "size" : 20042,
+        "texture_activation" : "unverified",
+        "type" : "public.heic"
+      },
+      "input_raw_sha256" : "40c7d19c56cfe292059b94274310121ccb2e82a1e8d2dcafeb2469d512e99b51",
+      "requested_orientation" : 6,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "landscape-hdr-edge-sdr-jpg",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          384,
+          256
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "landscape-hdr-edge-sdr.jpg",
+        "file_sha256" : "0d3c855d02f4e73917261664d75cbcea6278a078ad71bde2d0cafe183188ecc2",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "2e3cf42814e72cf28127bc7b1baba38cff7736e606a6d379a0dcefe0df41522d",
+        "Orientation" : 1,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 256,
+        "PixelWidth" : 384,
+        "ProfileName" : "Display P3",
+        "size" : 10832,
+        "texture_activation" : "unverified",
+        "type" : "public.jpeg"
+      },
+      "input_raw_sha256" : "9c0ca8a38a7ce8367410b6d15c047c44b804f64307db77a9af8823c9c7fea334",
+      "requested_orientation" : 1,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "landscape-hdr-edge-sdr-heic",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          384,
+          256
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "landscape-hdr-edge-sdr.heic",
+        "file_sha256" : "782cf6969cf92cd9ccb45c8656f1bedee9d628e64aaaac0b9cc87deaba03e4d6",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "04be4d5d49319909fe380585732184290d1e79d409dfe22ae2b5fb500152d5f0",
+        "Orientation" : 1,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 256,
+        "PixelWidth" : 384,
+        "ProfileName" : "Display P3",
+        "size" : 4125,
+        "texture_activation" : "unverified",
+        "type" : "public.heic"
+      },
+      "input_raw_sha256" : "9c0ca8a38a7ce8367410b6d15c047c44b804f64307db77a9af8823c9c7fea334",
+      "requested_orientation" : 1,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "landscape-hdr-edge-pq",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          384,
+          256
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 4.9261083602905273,
+        "decoded_bits_per_component" : 10,
+        "decoded_color_space" : "kCGColorSpaceITUR_2100_PQ",
+        "Depth" : 10,
+        "file" : "landscape-hdr-edge-pq.heic",
+        "file_sha256" : "8350df71ea28211079c83cadfcab86a2239ce1458f830438dfff8f39d8eebd99",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "bc1000d595cf0ad08e8658486701858d1f4339cd677564f107c65f06127c5494",
+        "Orientation" : 1,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 256,
+        "PixelWidth" : 384,
+        "ProfileName" : "Rec. ITU-R BT.2100 PQ",
+        "size" : 1828,
+        "texture_activation" : "unverified",
+        "type" : "public.heic"
+      },
+      "input_raw_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+      "requested_orientation" : 1,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "landscape-hdr-edge-adaptive",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          384,
+          256
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 4,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "landscape-hdr-edge-adaptive.heic",
+        "file_sha256" : "8135173a5bbabb7bb6f242a33367ccea87bec1625761e43866b3296d88ccc90a",
+        "imageio_decoded" : true,
+        "iso_gain_map" : true,
+        "native_decoded_linear_p3_rgba32f_sha256" : "4ad14fb7ad17728e643b4f353d892eb7371080ee5178a545e9eaa0c9a1f4e026",
+        "Orientation" : 1,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 256,
+        "PixelWidth" : 384,
+        "ProfileName" : "Display P3",
+        "size" : 3672,
+        "texture_activation" : "unverified",
+        "type" : "public.heic"
+      },
+      "input_raw_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+      "requested_orientation" : 1,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "portrait-hdr-impulse-sdr-jpg",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          256,
+          384
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "portrait-hdr-impulse-sdr.jpg",
+        "file_sha256" : "648423537529a26019c0e6a8337a78923b63f98b55b514a54897d5bdcd71eb07",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "810aadac09716859f864e0678b2d09582f58bed2b7650641f6d0dfe149b0c93f",
+        "Orientation" : 8,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 384,
+        "PixelWidth" : 256,
+        "ProfileName" : "Display P3",
+        "size" : 9779,
+        "texture_activation" : "unverified",
+        "type" : "public.jpeg"
+      },
+      "input_raw_sha256" : "3e6f3e992508be90017bb6b49282a798fae29356f22366b569fc7d080a8d6e79",
+      "requested_orientation" : 8,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "portrait-hdr-impulse-sdr-heic",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          256,
+          384
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "portrait-hdr-impulse-sdr.heic",
+        "file_sha256" : "8d63be9e1e316ed2a847a14c268769e9ee8017c9204c32a29c0fa48bcec8e1d1",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "93e91d367e0e81a7c357c19255b6754d5b70aa39946a5705afdb77a07c8fc69e",
+        "Orientation" : 8,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 384,
+        "PixelWidth" : 256,
+        "ProfileName" : "Display P3",
+        "size" : 4655,
+        "texture_activation" : "unverified",
+        "type" : "public.heic"
+      },
+      "input_raw_sha256" : "3e6f3e992508be90017bb6b49282a798fae29356f22366b569fc7d080a8d6e79",
+      "requested_orientation" : 8,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "portrait-hdr-impulse-pq",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          256,
+          384
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 4.9261083602905273,
+        "decoded_bits_per_component" : 10,
+        "decoded_color_space" : "kCGColorSpaceITUR_2100_PQ",
+        "Depth" : 10,
+        "file" : "portrait-hdr-impulse-pq.heic",
+        "file_sha256" : "9bb23276dae70c484bb6d9d713be0a5c7db9685cab7ddf08f28ddb77aeace2f4",
+        "imageio_decoded" : true,
+        "iso_gain_map" : false,
+        "native_decoded_linear_p3_rgba32f_sha256" : "c33234318b8b5940016aaa3025c6a621cdc1a304656f434e0f85348ef3e0b0ab",
+        "Orientation" : 1,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 384,
+        "PixelWidth" : 256,
+        "ProfileName" : "Rec. ITU-R BT.2100 PQ",
+        "size" : 1575,
+        "texture_activation" : "unverified",
+        "type" : "public.heic"
+      },
+      "input_raw_sha256" : "cc83af98983a95c5661db95f73e96a869be766800588a3dd0c2ce723473c6f81",
+      "requested_orientation" : 1,
+      "write_succeeded" : true
+    },
+    {
+      "case" : "portrait-hdr-impulse-adaptive",
+      "facts" : {
+        "apple_gain_map" : false,
+        "coded_extent" : [
+          256,
+          384
+        ],
+        "ColorModel" : "RGB",
+        "content_headroom" : 1.0361328125,
+        "decoded_bits_per_component" : 8,
+        "decoded_color_space" : "kCGColorSpaceDisplayP3",
+        "Depth" : 8,
+        "file" : "portrait-hdr-impulse-adaptive.heic",
+        "file_sha256" : "35e5b1fade8a94b2bd0b62a412239874c4ca14e8d3220f56ee03e0cdbec520cf",
+        "imageio_decoded" : true,
+        "iso_gain_map" : true,
+        "native_decoded_linear_p3_rgba32f_sha256" : "0a28941b3a2c4454821cfaa22e8435ff55bebca7a62b5c32bf2c443bcd28cb86",
+        "Orientation" : 1,
+        "original_camera_information" : false,
+        "original_raw" : false,
+        "PixelHeight" : 384,
+        "PixelWidth" : 256,
+        "ProfileName" : "Display P3",
+        "size" : 3699,
+        "texture_activation" : "unverified",
+        "type" : "public.heic"
+      },
+      "input_raw_sha256" : "cc83af98983a95c5661db95f73e96a869be766800588a3dd0c2ce723473c6f81",
+      "requested_orientation" : 1,
+      "write_succeeded" : true
+    }
+  ],
+  "schema" : "xdremux-native-synthetic-matrix-v1"
+}

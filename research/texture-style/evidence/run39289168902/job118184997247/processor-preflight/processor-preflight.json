@@ -1,0 +1,7 @@
+{
+  "APIVersion" : 20260507,
+  "apple_implementation_patched" : false,
+  "initialized" : false,
+  "input_images_supplied" : false,
+  "scope" : "default native processor initialization\/prewarm only, no image or person context supplied"
+}

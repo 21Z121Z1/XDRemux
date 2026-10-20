@@ -1,0 +1,176 @@
+{
+  "schema": "xdremux-texture-all-native-readback-v1",
+  "date": "2026-10-20",
+  "jobs": [
+    {
+      "run_id": 39282392876,
+      "job_id": 118159072406,
+      "log_sha256": "1bd82e58422399c08cb052540087056bbd81a23c2468d610d41810f9fa40dba4",
+      "status": "build-failure-no-logged-manifest",
+      "logged_native_JSON_payload_count": 0
+    },
+    {
+      "run_id": 39283079303,
+      "job_id": 118161349940,
+      "log_sha256": "3116e435aa42caa0cb028152178b23391a3201e8600ba6bd8ca04b6c374a6670",
+      "status": "build-failure-no-logged-manifest",
+      "logged_native_JSON_payload_count": 0
+    },
+    {
+      "run_id": 39283079303,
+      "job_id": 118161350462,
+      "log_sha256": "b5166a48bc86c99d7aedb20ef32e1b4df9f07cfaf293ed95aed537ccf8b2c9cc",
+      "status": "build-failure-no-logged-manifest",
+      "logged_native_JSON_payload_count": 0
+    },
+    {
+      "run_id": 39285550760,
+      "job_id": 118170329181,
+      "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+      "log_sha256": "de5d8caccd5905ec856358819eaf65905890a9509444b96d183abadbc84e9368",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 2
+    },
+    {
+      "run_id": 39285550760,
+      "job_id": 118170329556,
+      "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+      "log_sha256": "0c5829e1f5d1caf02d1acd3c0a2d5e8bf745652d0bb1ba5cff889843b9c92c07",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 0
+    },
+    {
+      "run_id": 39285550760,
+      "job_id": 118170329561,
+      "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+      "log_sha256": "69423b4d4ce417e5c79bafb62f4378f5892909410e0318e2a7511a28aec8c9be",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 0
+    },
+    {
+      "run_id": 39286462456,
+      "job_id": 118174131481,
+      "head_sha": "d105a967bab6d3f1c577670751c6fce7257dd171",
+      "log_sha256": "fa9c2f194fa13e47d0f6423b2216855cf87da031fe2f0e6b64b30159e89a51d0",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 0
+    },
+    {
+      "run_id": 39286462456,
+      "job_id": 118174132467,
+      "head_sha": "d105a967bab6d3f1c577670751c6fce7257dd171",
+      "log_sha256": "dec45f29127636d40c50d98ebeda13c1d0e48abff5b99ce988fd1bccff761b82",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 0
+    },
+    {
+      "run_id": 39287928184,
+      "job_id": 118180581842,
+      "head_sha": "e653f24219dd7bd152381ccfa172dd59121ac360",
+      "log_sha256": "e826e49cd6b2ac939f8e5f6f767d5576f6590ad50f51ba6d1fdf8591fd379264",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 10
+    },
+    {
+      "run_id": 39287928184,
+      "job_id": 118180583177,
+      "head_sha": "e653f24219dd7bd152381ccfa172dd59121ac360",
+      "log_sha256": "c050a55212f02b2f1fac86b7b1d8aa89f064da898c032b53d6806b15e36f1796",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 10
+    },
+    {
+      "run_id": 39289168902,
+      "job_id": 118184997247,
+      "head_sha": "acb572f425728963d0ee375327016c52ab069c10",
+      "log_sha256": "7256cc3d7edcdf414c7a9b444109871fe7169f43d07c6632d752bbcdb287484a",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 12
+    },
+    {
+      "run_id": 39289168902,
+      "job_id": 118184997708,
+      "head_sha": "acb572f425728963d0ee375327016c52ab069c10",
+      "log_sha256": "b3148ff760a2be3faada2ef61fef0c9e56553e04491ed8faf1cf0a14b931e9db",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 12
+    },
+    {
+      "run_id": 39290912880,
+      "job_id": 118191005710,
+      "head_sha": "00f7b5eb1d496c7b0b8b69ff3e80290aa3a29bcb",
+      "log_sha256": "aad991a6dc34a5bfb4efe0ac32739c6e9bb23b02ea060ae28f04e542493dd003",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 14
+    },
+    {
+      "run_id": 39290912880,
+      "job_id": 118191006344,
+      "head_sha": "00f7b5eb1d496c7b0b8b69ff3e80290aa3a29bcb",
+      "log_sha256": "382bac6edd712ad5146519e9955df06e04362bc4093351690fc97e042eae9760",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 14
+    },
+    {
+      "run_id": 39290912880,
+      "job_id": 118191006492,
+      "head_sha": "00f7b5eb1d496c7b0b8b69ff3e80290aa3a29bcb",
+      "log_sha256": "88a16ba288be1de76c95f569a4b297ad11618551ec1b9301af8b2ba8f4ae60ac",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 5
+    },
+    {
+      "run_id": 39292067603,
+      "job_id": 118195004044,
+      "head_sha": "098430d4f20d832b1a1a9ccda0b066bde0748490",
+      "log_sha256": "6735678dedf0b896e72cea41fc8fce96e1faea1d8aaef146bb115890fae50fce",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 6
+    },
+    {
+      "run_id": 39292067603,
+      "job_id": 118195004486,
+      "head_sha": "098430d4f20d832b1a1a9ccda0b066bde0748490",
+      "log_sha256": "54ee73dce3768c31fa5b40bb22ab205cafbf097bd4970b325318aab7587a09bb",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 14
+    },
+    {
+      "run_id": 39292067603,
+      "job_id": 118195004751,
+      "head_sha": "098430d4f20d832b1a1a9ccda0b066bde0748490",
+      "log_sha256": "6a9909b8c997c33869a8a2b56d52b823d8326213adc4d1e5961a2b47e6b88416",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 14
+    },
+    {
+      "run_id": 39293075204,
+      "job_id": 118201351937,
+      "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+      "log_sha256": "4e60ef0dd09f7b725cae3307e6aa08558cb1f6a60af59b5984c3925faedfb65d",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 6
+    },
+    {
+      "run_id": 39293075204,
+      "job_id": 118201352483,
+      "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+      "log_sha256": "dcb8432dd0bfc9909950dad6439a091d3f043777da5c2a4764bf138435dea3bc",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 14
+    },
+    {
+      "run_id": 39293075204,
+      "job_id": 118201352920,
+      "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+      "log_sha256": "a3ad7fdc4d0f72ac1cf3a102792c91f2243ead47aa6862495a2cd07fcc2ec0f9",
+      "status": "logged-JSON-manifest-verified",
+      "logged_native_JSON_payload_count": 14
+    }
+  ],
+  "complete_job_logs_read": 21,
+  "manifests_verified": 18,
+  "native_JSON_payloads_verified": 147,
+  "archive_bytes_verified": false,
+  "source": "actual connected GitHub job-log reads, not a synthetic expected-results generator"
+}

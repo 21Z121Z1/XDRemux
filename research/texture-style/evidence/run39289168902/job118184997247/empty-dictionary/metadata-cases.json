@@ -1,0 +1,20 @@
+[
+  {
+    "case" : "empty-dictionary",
+    "consumer_class_available" : true,
+    "consumer_encoding" : "@40@0:8@16@24o^@32",
+    "error" : {
+      "code" : 3,
+      "description" : "The operation couldn’t be completed. (NUError error 3.)",
+      "domain" : "NUError"
+    },
+    "input" : {
+
+    },
+    "input_sha256" : "9261ecceda608ef174256e5fdc774c1e6e3dcf533409c1bc393d490d01c713f1",
+    "native_consumer_called" : true,
+    "native_returned_object" : false,
+    "properties" : null,
+    "scope" : "metadata-only diagnostic, never camera provenance or Photos admission"
+  }
+]

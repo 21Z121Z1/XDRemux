@@ -1,0 +1,19 @@
+[
+  {
+    "case" : "synthetic-studio-control",
+    "consumer_class_available" : false,
+    "input" : {
+      "CaptureMode" : "Still",
+      "CaptureType" : "LF",
+      "FilmGrainSeed" : 0,
+      "HardwareModel" : "iPhone19,2",
+      "PortType" : "PortTypeBack",
+      "Preset" : "Studio",
+      "TextureStylePeopleDataVersion" : 3
+    },
+    "input_sha256" : "252470ff40eeab9c3aadc95d2ff2c76104f690f920a2a03eb5d712d879fcb07b",
+    "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+    "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
+    "unsupported_reason" : "class_unavailable"
+  }
+]

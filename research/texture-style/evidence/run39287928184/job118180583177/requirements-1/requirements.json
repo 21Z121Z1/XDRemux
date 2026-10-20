@@ -1,0 +1,9 @@
+{
+  "configuration" : {
+    "class" : "PITextureStyleUsageInputConfiguration",
+    "requiresPersonData" : true
+  },
+  "effect_type" : 1,
+  "is_video" : false,
+  "selector" : "inputConfigurationForEffectType:isVideo:"
+}

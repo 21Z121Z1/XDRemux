@@ -1,0 +1,107 @@
+{
+  "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+  "run_id": "39285550760",
+  "photos_used": false,
+  "files": [
+    {
+      "path": "build.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "head.txt",
+      "size": 41,
+      "sha256": "0a6c1d4a203da08210311a37422b4a6fc569e88616592f22c83ea349b033e547"
+    },
+    {
+      "path": "metadata/empty-dictionary.stderr.log",
+      "size": 412,
+      "sha256": "b51cb56026e757d2919fbb34ff876a8782f8f8dd63264fdb6627557d0a323b9a"
+    },
+    {
+      "path": "metadata/empty-dictionary.stdout.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "metadata/inventory.stderr.log",
+      "size": 412,
+      "sha256": "b1027a933b52f7487e97211ea3394719a799035cc82aab44e726f8390dc2b3fb"
+    },
+    {
+      "path": "metadata/inventory.stdout.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "metadata/missing-hardware.stderr.log",
+      "size": 412,
+      "sha256": "ee0dd55f1965cdc7efd918838b0a6bbb1413b031bb119f2b5e205e40497f55b7"
+    },
+    {
+      "path": "metadata/missing-hardware.stdout.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "metadata/process-results.json",
+      "size": 1429,
+      "sha256": "1ea2076295bc803e227443d11b63f804e7cc9605148aa4b2b19809b758282e0a"
+    },
+    {
+      "path": "metadata/synthetic-standard-control.stderr.log",
+      "size": 412,
+      "sha256": "d46c9332f0d7cb730011b60a9cc9afcb7923ab23f3d422c9da7b3160452d6120"
+    },
+    {
+      "path": "metadata/synthetic-standard-control.stdout.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "metadata/synthetic-studio-control.stderr.log",
+      "size": 412,
+      "sha256": "fb2dc72cfeb0b26da33b16f07c155a7f83482fa51a3652aef544fab7fb7b1c50"
+    },
+    {
+      "path": "metadata/synthetic-studio-control.stdout.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "metadata/unsupported-version.stderr.log",
+      "size": 412,
+      "sha256": "2283e1f113d7105fde28537223d62d13feca631442839917494808571bd72336"
+    },
+    {
+      "path": "metadata/unsupported-version.stdout.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "os.txt",
+      "size": 65,
+      "sha256": "cd5d6399b3785b04ceaae75045a9ca9f80f0bbc3526eff9d0c36b170ed1ec348"
+    },
+    {
+      "path": "probe.log",
+      "size": 3079,
+      "sha256": "4fc8080977452f77561c78747c5a1d342a4abd28f93b7a4579a63b1b94659034"
+    },
+    {
+      "path": "sdk.txt",
+      "size": 5,
+      "sha256": "25205f2e2f02dc71036ee827e19c49b893b231a3d1af240e35a3ac55aa8cdcb6"
+    },
+    {
+      "path": "swift.txt",
+      "size": 98,
+      "sha256": "b674f79b747370a1c05ae7cec551fffe557816c6c807f35f39f933ecbcca80d7"
+    },
+    {
+      "path": "xcode.txt",
+      "size": 32,
+      "sha256": "18730ed2ae28a2c9cf0c2d5db549033a4f07089331391a7133b7b32187454fa9"
+    }
+  ]
+}

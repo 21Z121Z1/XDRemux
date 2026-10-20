@@ -1,0 +1,23 @@
+{
+  "schema": "xdremux-texture-native-log-readback-v1",
+  "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+  "xdremux_head_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+  "run_id": "39285550760",
+  "log_sha256": "de5d8caccd5905ec856358819eaf65905890a9509444b96d183abadbc84e9368",
+  "verified_native_json_payloads": [
+    {
+      "path": "image-matrix.json",
+      "size": 14123,
+      "sha256": "86512eaadf547aed09b0ef41b3080924e586acd024c199642f329c3d128842a2"
+    },
+    {
+      "path": "product/product-matrix.json",
+      "size": 1552,
+      "sha256": "3c0c641710e32667952a73f2349f509906924fd4e50cc1dbb5e2b23bc5ae6fe8"
+    }
+  ],
+  "verified_payload_count": 2,
+  "archive_bytes_verified": false,
+  "github_reported_zip_sha256": "c2cfcbb2057a5bf8dfd0db882ef526a6fa968c16cfce9c2dcf87ea6afabad4a3",
+  "scope": "hash-checked actual native JSON emitted in job logs; not ZIP byte readback or Photos activation"
+}

@@ -1,0 +1,63 @@
+{
+  "schema": "xdremux-texture-native-log-readback-v1",
+  "head_sha": "e653f24219dd7bd152381ccfa172dd59121ac360",
+  "xdremux_head_sha": null,
+  "run_id": "39287928184",
+  "log_sha256": "c050a55212f02b2f1fac86b7b1d8aa89f064da898c032b53d6806b15e36f1796",
+  "verified_native_json_payloads": [
+    {
+      "path": "metadata/inventory/runtime.json",
+      "size": 165631,
+      "sha256": "7fdcf575cf36960f01577942685ddb9b5c5d09ef2a4808047f6c2a7ab6c1234e"
+    },
+    {
+      "path": "metadata/inventory/defaults.json",
+      "size": 705,
+      "sha256": "1e510c285bd9b6fb39c85b6e76b7eac39900ff793a528c291a01f006718f7578"
+    },
+    {
+      "path": "metadata/requirements-1/requirements.json",
+      "size": 219,
+      "sha256": "73ec54d65bb01803933044746a28eba2b3623c5eeecbf619cdd3bc3260c62865"
+    },
+    {
+      "path": "metadata/requirements-2/requirements.json",
+      "size": 219,
+      "sha256": "b5c45d97dabe74e8826533d6c27cbc678f322afe0940b827d23c4d55115e3d1e"
+    },
+    {
+      "path": "metadata/requirements-3/requirements.json",
+      "size": 219,
+      "sha256": "f8b7a2d41d3b2c69bd46dca52720b13da38e3946a54b2fa1dd02c84a07d67641"
+    },
+    {
+      "path": "metadata/synthetic-standard-control/metadata-cases.json",
+      "size": 570,
+      "sha256": "43a456b790d2519f685a6ff8a298bf91d8baf1267335483cbabd79c0c817b5a9"
+    },
+    {
+      "path": "metadata/synthetic-studio-control/metadata-cases.json",
+      "size": 566,
+      "sha256": "306ad184adce58d49df94e235133ae3f5c44669b29bba371cebc4fdd81c33f17"
+    },
+    {
+      "path": "metadata/missing-hardware/metadata-cases.json",
+      "size": 522,
+      "sha256": "c31e1c63f1cdd4e609196604d9510c4e1fb0a72f4df3de97be7bba75dd9080a6"
+    },
+    {
+      "path": "metadata/unsupported-version/metadata-cases.json",
+      "size": 565,
+      "sha256": "b5a7dd026d85e261afb5cc7da0b0bb2789319defd1780612fe04d9c6054d1f6e"
+    },
+    {
+      "path": "metadata/empty-dictionary/metadata-cases.json",
+      "size": 331,
+      "sha256": "65c4723a6953087248ff1629eedd2c44db04eecf7cdedf1ab8535ecb5012e0f2"
+    }
+  ],
+  "verified_payload_count": 10,
+  "archive_bytes_verified": false,
+  "github_reported_zip_sha256": "8ed437c19774dbdb71a8afe9975c7d66c57f29686df10ae3923e74cdd280155d",
+  "scope": "hash-checked actual native JSON emitted in job logs; not ZIP byte readback or Photos activation"
+}

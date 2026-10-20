@@ -1,0 +1,2235 @@
+﻿2026-10-19T17:25:24.4841810Z Current runner version: '2.337.0'
+2026-10-19T17:25:24.4877950Z ##[group]Runner Image Provisioner
+2026-10-19T17:25:24.4878640Z Hosted Compute Agent
+2026-10-19T17:25:24.4879040Z Version: 20261006.597
+2026-10-19T17:25:24.4879460Z Commit: c696a59e4a9ffbc6a6203385bd1b2a10e87b1c9c
+2026-10-19T17:25:24.4879950Z Build Date: 2026-10-06T21:39:28Z
+2026-10-19T17:25:24.4880400Z Worker ID: {1910dba0-a8de-43fc-a74e-dd4f84e6500a}
+2026-10-19T17:25:24.4880880Z Region: westus
+2026-10-19T17:25:24.4881260Z Cloud: MacCloud
+2026-10-19T17:25:24.4881630Z ##[endgroup]
+2026-10-19T17:25:24.4882670Z ##[group]Operating System
+2026-10-19T17:25:24.4883120Z macOS
+2026-10-19T17:25:24.4883470Z 27.0.1
+2026-10-19T17:25:24.4883800Z 26A434
+2026-10-19T17:25:24.4884410Z ##[endgroup]
+2026-10-19T17:25:24.4884790Z ##[group]Runner Image
+2026-10-19T17:25:24.4885190Z Image: xcode-27-arm64
+2026-10-19T17:25:24.4885580Z Version: 20261012.0260.1
+2026-10-19T17:25:24.4886480Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261012.0260/images/macos/xcode-27-arm64-Readme.md
+2026-10-19T17:25:24.4887930Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261012.0260
+2026-10-19T17:25:24.4888600Z ##[endgroup]
+2026-10-19T17:25:24.4889380Z ##[group]GITHUB_TOKEN Permissions
+2026-10-19T17:25:24.4890900Z Contents: read
+2026-10-19T17:25:24.4891280Z Metadata: read
+2026-10-19T17:25:24.4891650Z ##[endgroup]
+2026-10-19T17:25:24.4893400Z Secret source: Actions
+2026-10-19T17:25:24.4894000Z Cache mode: write
+2026-10-19T17:25:24.4895510Z Prepare workflow directory
+2026-10-19T17:25:24.5323090Z Prepare all required actions
+2026-10-19T17:25:24.5362670Z Getting action download info
+2026-10-19T17:25:24.9662310Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-19T17:25:25.3968240Z Download action repository 'actions-rust-lang/setup-rust-toolchain@v1' (SHA:166cdcfd11aee3cb47222f9ddb555ce30ddb9659)
+2026-10-19T17:25:25.7869690Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-19T17:25:26.1458520Z Getting action download info
+2026-10-19T17:25:26.2772470Z Download action repository 'Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4' (SHA:c19371144df3bb44fab255c43d04cbc2ab54d1c4)
+2026-10-19T17:25:26.9350940Z Complete job name: generated-image-and-product
+2026-10-19T17:25:27.0209330Z ##[group]Run actions/checkout@v4
+2026-10-19T17:25:27.0210440Z with:
+2026-10-19T17:25:27.0210930Z   sparse-checkout: research/xdremux-texture-native
+2026-10-19T17:25:27.0211670Z   persist-credentials: false
+2026-10-19T17:25:27.0212330Z   repository: 21Z121Z1/Photographic_Style_Research
+2026-10-19T17:25:27.0216460Z   token: ***
+2026-10-19T17:25:27.0267690Z   ssh-strict: true
+2026-10-19T17:25:27.0268810Z   ssh-user: git
+2026-10-19T17:25:27.0269890Z   clean: true
+2026-10-19T17:25:27.0271050Z   sparse-checkout-cone-mode: true
+2026-10-19T17:25:27.0272290Z   fetch-depth: 1
+2026-10-19T17:25:27.0273340Z   fetch-tags: false
+2026-10-19T17:25:27.0274510Z   show-progress: true
+2026-10-19T17:25:27.0275620Z   lfs: false
+2026-10-19T17:25:27.0276740Z   submodules: false
+2026-10-19T17:25:27.0277820Z   set-safe-directory: true
+2026-10-19T17:25:27.0279040Z   allow-unsafe-pr-checkout: false
+2026-10-19T17:25:27.0282630Z env:
+2026-10-19T17:25:27.0284060Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:27.0286570Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:27.0287760Z ##[endgroup]
+2026-10-19T17:25:27.4086450Z Syncing repository: 21Z121Z1/Photographic_Style_Research
+2026-10-19T17:25:27.4088410Z ##[group]Getting Git version info
+2026-10-19T17:25:27.4089210Z Working directory is '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research'
+2026-10-19T17:25:27.4090260Z [command]/opt/homebrew/bin/git version
+2026-10-19T17:25:27.4090740Z git version 2.56.0
+2026-10-19T17:25:27.4243930Z ##[endgroup]
+2026-10-19T17:25:27.4264950Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/d81a5b6e-38a1-4763-9094-c59c78bbf80f/.gitconfig'
+2026-10-19T17:25:27.4272500Z Temporarily overriding HOME='/Users/runner/work/_temp/d81a5b6e-38a1-4763-9094-c59c78bbf80f' before making global git config changes
+2026-10-19T17:25:27.4274360Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T17:25:27.4284020Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T17:25:27.4323640Z Deleting the contents of '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research'
+2026-10-19T17:25:27.4327840Z ##[group]Initializing the repository
+2026-10-19T17:25:27.4334820Z [command]/opt/homebrew/bin/git init /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T17:25:27.4848950Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-19T17:25:27.4850330Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-19T17:25:27.4856250Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-19T17:25:27.4858590Z hint: call:
+2026-10-19T17:25:27.4859040Z hint:
+2026-10-19T17:25:27.4859580Z hint: 	git config --global init.defaultBranch <name>
+2026-10-19T17:25:27.4860130Z hint:
+2026-10-19T17:25:27.4860700Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-19T17:25:27.4861540Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-19T17:25:27.4862260Z hint:
+2026-10-19T17:25:27.4862660Z hint: 	git branch -m <name>
+2026-10-19T17:25:27.4864610Z hint:
+2026-10-19T17:25:27.4866300Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-19T17:25:27.4869240Z Initialized empty Git repository in /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/.git/
+2026-10-19T17:25:27.4878380Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-19T17:25:27.4981580Z ##[endgroup]
+2026-10-19T17:25:27.4982410Z ##[group]Disabling automatic garbage collection
+2026-10-19T17:25:27.4986420Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-19T17:25:27.5094020Z ##[endgroup]
+2026-10-19T17:25:27.5094780Z ##[group]Setting up auth
+2026-10-19T17:25:27.5099340Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T17:25:27.5199470Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T17:25:27.7438990Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T17:25:27.7744940Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T17:25:27.9258760Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T17:25:27.9376330Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T17:25:28.1138670Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-19T17:25:28.1225910Z ##[endgroup]
+2026-10-19T17:25:28.1226600Z ##[group]Fetching the repository
+2026-10-19T17:25:28.1232130Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --filter=blob:none --depth=1 origin +84f2c8309c5d778d911148aacbeaae3aff3bdd4f:refs/remotes/origin/research/xdremux-texture-native-20261019
+2026-10-19T17:25:28.7668900Z From https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-19T17:25:28.7672970Z  * [new ref]         84f2c8309c5d778d911148aacbeaae3aff3bdd4f -> origin/research/xdremux-texture-native-20261019
+2026-10-19T17:25:28.7675860Z ##[endgroup]
+2026-10-19T17:25:28.7676700Z ##[group]Determining the checkout info
+2026-10-19T17:25:28.7677640Z ##[endgroup]
+2026-10-19T17:25:28.7678480Z ##[group]Setting up sparse checkout
+2026-10-19T17:25:28.7679240Z [command]/opt/homebrew/bin/git sparse-checkout set research/xdremux-texture-native
+2026-10-19T17:25:28.7825740Z ##[endgroup]
+2026-10-19T17:25:28.7826580Z ##[group]Checking out the ref
+2026-10-19T17:25:28.7828690Z [command]/opt/homebrew/bin/git checkout --progress --force -B research/xdremux-texture-native-20261019 refs/remotes/origin/research/xdremux-texture-native-20261019
+2026-10-19T17:25:29.2996280Z Switched to a new branch 'research/xdremux-texture-native-20261019'
+2026-10-19T17:25:29.3082620Z branch 'research/xdremux-texture-native-20261019' set up to track 'origin/research/xdremux-texture-native-20261019'.
+2026-10-19T17:25:29.3197930Z ##[endgroup]
+2026-10-19T17:25:29.3234300Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-19T17:25:29.3237360Z 84f2c8309c5d778d911148aacbeaae3aff3bdd4f
+2026-10-19T17:25:29.3277620Z ##[group]Removing auth
+2026-10-19T17:25:29.3284260Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T17:25:29.3385960Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T17:25:29.5109420Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T17:25:29.5113640Z http.https://github.com/.extraheader
+2026-10-19T17:25:29.5176240Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-19T17:25:29.5202400Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T17:25:29.7024340Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T17:25:29.7331320Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T17:25:29.9051840Z ##[endgroup]
+2026-10-19T17:25:29.9596580Z ##[group]Run actions/checkout@v4
+2026-10-19T17:25:29.9597460Z with:
+2026-10-19T17:25:29.9598090Z   repository: 21Z121Z1/XDRemux
+2026-10-19T17:25:29.9598900Z   ref: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:29.9599800Z   path: xdremux
+2026-10-19T17:25:29.9600530Z   persist-credentials: false
+2026-10-19T17:25:29.9601380Z   sparse-checkout-cone-mode: false
+2026-10-19T17:25:29.9602660Z   sparse-checkout: /Cargo.toml
+/Cargo.lock
+/Package.swift
+/crates/
+/Sources/
+/scripts/
+
+2026-10-19T17:25:29.9611250Z   token: ***
+2026-10-19T17:25:29.9611950Z   ssh-strict: true
+2026-10-19T17:25:29.9612660Z   ssh-user: git
+2026-10-19T17:25:29.9613300Z   clean: true
+2026-10-19T17:25:29.9613980Z   fetch-depth: 1
+2026-10-19T17:25:29.9614680Z   fetch-tags: false
+2026-10-19T17:25:29.9615390Z   show-progress: true
+2026-10-19T17:25:29.9616040Z   lfs: false
+2026-10-19T17:25:29.9616750Z   submodules: false
+2026-10-19T17:25:29.9617440Z   set-safe-directory: true
+2026-10-19T17:25:29.9618280Z   allow-unsafe-pr-checkout: false
+2026-10-19T17:25:29.9619100Z env:
+2026-10-19T17:25:29.9621810Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:29.9624440Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:29.9626050Z ##[endgroup]
+2026-10-19T17:25:30.2095450Z Syncing repository: 21Z121Z1/XDRemux
+2026-10-19T17:25:30.2099570Z ##[group]Getting Git version info
+2026-10-19T17:25:30.2103190Z Working directory is '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/xdremux'
+2026-10-19T17:25:30.2105470Z [command]/opt/homebrew/bin/git version
+2026-10-19T17:25:30.2106600Z git version 2.56.0
+2026-10-19T17:25:30.2109700Z ##[endgroup]
+2026-10-19T17:25:30.2116960Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/fb7254e6-9971-4726-b582-dcd3268c91b8/.gitconfig'
+2026-10-19T17:25:30.2121960Z Temporarily overriding HOME='/Users/runner/work/_temp/fb7254e6-9971-4726-b582-dcd3268c91b8' before making global git config changes
+2026-10-19T17:25:30.2127130Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T17:25:30.2129900Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/xdremux
+2026-10-19T17:25:30.2138010Z ##[group]Initializing the repository
+2026-10-19T17:25:30.2141750Z [command]/opt/homebrew/bin/git init /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/xdremux
+2026-10-19T17:25:30.2146370Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-19T17:25:30.2150060Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-19T17:25:30.2154480Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-19T17:25:30.2157480Z hint: call:
+2026-10-19T17:25:30.2158890Z hint:
+2026-10-19T17:25:30.2160530Z hint: 	git config --global init.defaultBranch <name>
+2026-10-19T17:25:30.2162650Z hint:
+2026-10-19T17:25:30.2164690Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-19T17:25:30.2168400Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-19T17:25:30.2170880Z hint:
+2026-10-19T17:25:30.2171610Z hint: 	git branch -m <name>
+2026-10-19T17:25:30.2172300Z hint:
+2026-10-19T17:25:30.2173570Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-19T17:25:30.2175550Z Initialized empty Git repository in /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/xdremux/.git/
+2026-10-19T17:25:30.2185730Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/XDRemux
+2026-10-19T17:25:30.2193220Z ##[endgroup]
+2026-10-19T17:25:30.2196350Z ##[group]Disabling automatic garbage collection
+2026-10-19T17:25:30.2199050Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-19T17:25:30.2211150Z ##[endgroup]
+2026-10-19T17:25:30.2245100Z ##[group]Setting up auth
+2026-10-19T17:25:30.2250600Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T17:25:30.2256300Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T17:25:30.3967220Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T17:25:30.4281930Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T17:25:30.6164990Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T17:25:30.6477890Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T17:25:30.8442410Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-19T17:25:30.8648810Z ##[endgroup]
+2026-10-19T17:25:30.8651590Z ##[group]Fetching the repository
+2026-10-19T17:25:30.8657560Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --filter=blob:none --depth=1 origin 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:31.2650270Z From https://github.com/21Z121Z1/XDRemux
+2026-10-19T17:25:31.2755120Z  * branch            0a462134a6082b048508cee89c85615606abfc7f -> FETCH_HEAD
+2026-10-19T17:25:31.2920890Z ##[endgroup]
+2026-10-19T17:25:31.2937910Z ##[group]Determining the checkout info
+2026-10-19T17:25:31.2958050Z ##[endgroup]
+2026-10-19T17:25:31.2965100Z ##[group]Setting up sparse checkout
+2026-10-19T17:25:31.2966380Z [command]/opt/homebrew/bin/git config core.sparseCheckout true
+2026-10-19T17:25:31.2969190Z [command]/opt/homebrew/bin/git rev-parse --git-path info/sparse-checkout
+2026-10-19T17:25:31.2970520Z .git/info/sparse-checkout
+2026-10-19T17:25:31.2972840Z ##[endgroup]
+2026-10-19T17:25:31.2974180Z ##[group]Checking out the ref
+2026-10-19T17:25:31.2975630Z [command]/opt/homebrew/bin/git checkout --progress --force 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:32.9908770Z Updating files:   0% (1/209)
+2026-10-19T17:25:32.9910080Z Updating files:   1% (3/209)
+2026-10-19T17:25:32.9917120Z Updating files:   2% (5/209)
+2026-10-19T17:25:32.9918030Z Updating files:   3% (7/209)
+2026-10-19T17:25:32.9926800Z Updating files:   4% (9/209)
+2026-10-19T17:25:32.9927360Z Updating files:   5% (11/209)
+2026-10-19T17:25:32.9928220Z Updating files:   6% (13/209)
+2026-10-19T17:25:32.9929190Z Updating files:   7% (15/209)
+2026-10-19T17:25:32.9929640Z Updating files:   8% (17/209)
+2026-10-19T17:25:32.9953470Z Updating files:   9% (19/209)
+2026-10-19T17:25:32.9954050Z Updating files:  10% (21/209)
+2026-10-19T17:25:32.9954410Z Updating files:  11% (23/209)
+2026-10-19T17:25:32.9961450Z Updating files:  12% (26/209)
+2026-10-19T17:25:32.9965610Z Updating files:  13% (28/209)
+2026-10-19T17:25:32.9966170Z Updating files:  14% (30/209)
+2026-10-19T17:25:32.9966980Z Updating files:  15% (32/209)
+2026-10-19T17:25:32.9967580Z Updating files:  16% (34/209)
+2026-10-19T17:25:32.9968950Z Updating files:  17% (36/209)
+2026-10-19T17:25:32.9970750Z Updating files:  18% (38/209)
+2026-10-19T17:25:32.9971220Z Updating files:  19% (40/209)
+2026-10-19T17:25:32.9971690Z Updating files:  20% (42/209)
+2026-10-19T17:25:32.9972130Z Updating files:  21% (44/209)
+2026-10-19T17:25:32.9974580Z Updating files:  22% (46/209)
+2026-10-19T17:25:32.9976560Z Updating files:  23% (49/209)
+2026-10-19T17:25:32.9979830Z Updating files:  24% (51/209)
+2026-10-19T17:25:32.9985290Z Updating files:  25% (53/209)
+2026-10-19T17:25:32.9992820Z Updating files:  26% (55/209)
+2026-10-19T17:25:33.0000370Z Updating files:  27% (57/209)
+2026-10-19T17:25:33.0006510Z Updating files:  28% (59/209)
+2026-10-19T17:25:33.0013220Z Updating files:  29% (61/209)
+2026-10-19T17:25:33.0017940Z Updating files:  30% (63/209)
+2026-10-19T17:25:33.0022310Z Updating files:  31% (65/209)
+2026-10-19T17:25:33.0025690Z Updating files:  32% (67/209)
+2026-10-19T17:25:33.0029350Z Updating files:  33% (69/209)
+2026-10-19T17:25:33.0031860Z Updating files:  34% (72/209)
+2026-10-19T17:25:33.0035850Z Updating files:  35% (74/209)
+2026-10-19T17:25:33.0038170Z Updating files:  36% (76/209)
+2026-10-19T17:25:33.0040270Z Updating files:  37% (78/209)
+2026-10-19T17:25:33.0041990Z Updating files:  38% (80/209)
+2026-10-19T17:25:33.0046800Z Updating files:  39% (82/209)
+2026-10-19T17:25:33.0049350Z Updating files:  40% (84/209)
+2026-10-19T17:25:33.0051620Z Updating files:  41% (86/209)
+2026-10-19T17:25:33.0053950Z Updating files:  42% (88/209)
+2026-10-19T17:25:33.0057710Z Updating files:  43% (90/209)
+2026-10-19T17:25:33.0060700Z Updating files:  44% (92/209)
+2026-10-19T17:25:33.0063720Z Updating files:  45% (95/209)
+2026-10-19T17:25:33.0067380Z Updating files:  46% (97/209)
+2026-10-19T17:25:33.0079570Z Updating files:  47% (99/209)
+2026-10-19T17:25:33.0086110Z Updating files:  48% (101/209)
+2026-10-19T17:25:33.0093440Z Updating files:  49% (103/209)
+2026-10-19T17:25:33.0101090Z Updating files:  50% (105/209)
+2026-10-19T17:25:33.0109460Z Updating files:  51% (107/209)
+2026-10-19T17:25:33.0116650Z Updating files:  52% (109/209)
+2026-10-19T17:25:33.0127530Z Updating files:  53% (111/209)
+2026-10-19T17:25:33.0129170Z Updating files:  54% (113/209)
+2026-10-19T17:25:33.0132280Z Updating files:  55% (115/209)
+2026-10-19T17:25:33.0139210Z Updating files:  56% (118/209)
+2026-10-19T17:25:33.0144560Z Updating files:  57% (120/209)
+2026-10-19T17:25:33.0148040Z Updating files:  58% (122/209)
+2026-10-19T17:25:33.0149070Z Updating files:  59% (124/209)
+2026-10-19T17:25:33.0149260Z Updating files:  60% (126/209)
+2026-10-19T17:25:33.0153080Z Updating files:  61% (128/209)
+2026-10-19T17:25:33.0159140Z Updating files:  62% (130/209)
+2026-10-19T17:25:33.0165300Z Updating files:  63% (132/209)
+2026-10-19T17:25:33.0171540Z Updating files:  64% (134/209)
+2026-10-19T17:25:33.0183450Z Updating files:  65% (136/209)
+2026-10-19T17:25:33.0196550Z Updating files:  66% (138/209)
+2026-10-19T17:25:33.0207090Z Updating files:  67% (141/209)
+2026-10-19T17:25:33.0216210Z Updating files:  68% (143/209)
+2026-10-19T17:25:33.0222730Z Updating files:  69% (145/209)
+2026-10-19T17:25:33.0230510Z Updating files:  70% (147/209)
+2026-10-19T17:25:33.0232640Z Updating files:  71% (149/209)
+2026-10-19T17:25:33.0235300Z Updating files:  72% (151/209)
+2026-10-19T17:25:33.0237540Z Updating files:  73% (153/209)
+2026-10-19T17:25:33.0240260Z Updating files:  74% (155/209)
+2026-10-19T17:25:33.0244230Z Updating files:  75% (157/209)
+2026-10-19T17:25:33.0247020Z Updating files:  76% (159/209)
+2026-10-19T17:25:33.0249990Z Updating files:  77% (161/209)
+2026-10-19T17:25:33.0251980Z Updating files:  78% (164/209)
+2026-10-19T17:25:33.0254340Z Updating files:  79% (166/209)
+2026-10-19T17:25:33.0257310Z Updating files:  80% (168/209)
+2026-10-19T17:25:33.0258750Z Updating files:  81% (170/209)
+2026-10-19T17:25:33.0264750Z Updating files:  82% (172/209)
+2026-10-19T17:25:33.0285000Z Updating files:  83% (174/209)
+2026-10-19T17:25:33.0290810Z Updating files:  84% (176/209)
+2026-10-19T17:25:33.0291570Z Updating files:  85% (178/209)
+2026-10-19T17:25:33.0291930Z Updating files:  86% (180/209)
+2026-10-19T17:25:33.0292270Z Updating files:  87% (182/209)
+2026-10-19T17:25:33.0292680Z Updating files:  88% (184/209)
+2026-10-19T17:25:33.0293160Z Updating files:  89% (187/209)
+2026-10-19T17:25:33.0296330Z Updating files:  90% (189/209)
+2026-10-19T17:25:33.0310940Z Updating files:  91% (191/209)
+2026-10-19T17:25:33.0311720Z Updating files:  92% (193/209)
+2026-10-19T17:25:33.0312750Z Updating files:  93% (195/209)
+2026-10-19T17:25:33.0313180Z Updating files:  94% (197/209)
+2026-10-19T17:25:33.0313790Z Updating files:  95% (199/209)
+2026-10-19T17:25:33.0314160Z Updating files:  96% (201/209)
+2026-10-19T17:25:33.0316070Z Updating files:  97% (203/209)
+2026-10-19T17:25:33.0317670Z Updating files:  98% (205/209)
+2026-10-19T17:25:33.0321140Z Updating files:  99% (207/209)
+2026-10-19T17:25:33.0321440Z Updating files: 100% (209/209)
+2026-10-19T17:25:33.0321640Z Updating files: 100% (209/209), done.
+2026-10-19T17:25:33.0385620Z HEAD is now at 0a46213 research(texture): retain consumer regression script executable mode
+2026-10-19T17:25:33.0428810Z ##[endgroup]
+2026-10-19T17:25:33.0595120Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-19T17:25:33.0700680Z 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:33.0714390Z ##[group]Removing auth
+2026-10-19T17:25:33.0718660Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T17:25:33.0983980Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T17:25:33.4327200Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T17:25:33.4387870Z http.https://github.com/.extraheader
+2026-10-19T17:25:33.4389420Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-19T17:25:33.4391050Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T17:25:33.5826280Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T17:25:33.6134820Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T17:25:33.8311340Z ##[endgroup]
+2026-10-19T17:25:33.8715730Z ##[group]Run actions-rust-lang/setup-rust-toolchain@v1
+2026-10-19T17:25:33.8716010Z with:
+2026-10-19T17:25:33.8716160Z   toolchain: stable
+2026-10-19T17:25:33.8716360Z   components: rustfmt, clippy
+2026-10-19T17:25:33.8716590Z   cache: true
+2026-10-19T17:25:33.8716770Z   cache-on-failure: true
+2026-10-19T17:25:33.8716980Z   cache-bin: true
+2026-10-19T17:25:33.8717150Z   cache-provider: github
+2026-10-19T17:25:33.8717320Z   cache-all-crates: false
+2026-10-19T17:25:33.8717540Z   cache-workspace-crates: false
+2026-10-19T17:25:33.8717740Z   cache-save-if: true
+2026-10-19T17:25:33.8718500Z   cache-targets: true
+2026-10-19T17:25:33.8719020Z   matcher: true
+2026-10-19T17:25:33.8719450Z   rustflags: -D warnings
+2026-10-19T17:25:33.8719910Z   override: true
+2026-10-19T17:25:33.8720320Z env:
+2026-10-19T17:25:33.8720920Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:33.8721230Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:33.8721410Z ##[endgroup]
+2026-10-19T17:25:33.8797480Z ##[start-action display=Unbork mac;id=__actions-rust-lang_setup-rust-toolchain.__run]
+2026-10-19T17:25:33.8854240Z ##[group]Run brew install bash
+2026-10-19T17:25:33.8854690Z [36;1mbrew install bash[0m
+2026-10-19T17:25:33.8929770Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:33.8930140Z env:
+2026-10-19T17:25:33.8930370Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:33.8930650Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:33.8930830Z ##[endgroup]
+2026-10-19T17:25:38.0869630Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-19T17:25:38.0969060Z ✔︎ Bottle Manifest bash (5.3.20)
+2026-10-19T17:25:38.1587590Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-19T17:25:38.1588650Z bash 5.3.20
+2026-10-19T17:25:38.1589930Z [34m==>[0m [1mWould install 1 dependency for bash:[0m
+2026-10-19T17:25:38.1590930Z ncurses
+2026-10-19T17:25:38.1691350Z [32m==>[0m [1mFetching downloads for: [32mbash[39m[0m
+2026-10-19T17:25:38.4743860Z ✔︎ Bottle Manifest ncurses (6.6)
+2026-10-19T17:25:40.6187060Z ✔︎ Bottle bash (5.3.20)
+2026-10-19T17:25:41.3444180Z ✔︎ Bottle ncurses (6.6)
+2026-10-19T17:25:41.3650520Z [32m==>[0m [1mInstalling bash dependency: [32mncurses[39m (6.6)[0m
+2026-10-19T17:25:41.3723640Z [34m==>[0m [1mPouring ncurses--6.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-19T17:25:43.6244700Z 🍺  /opt/homebrew/Cellar/ncurses/6.6: 4,086 files, 10.3MB
+2026-10-19T17:25:43.6252390Z [32m==>[0m [1mInstalling [32mbash[39m[0m
+2026-10-19T17:25:43.6303170Z [34m==>[0m [1mPouring bash--5.3.20.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-19T17:25:45.4789750Z 🍺  /opt/homebrew/Cellar/bash/5.3.20: 172 files, 13.1MB
+2026-10-19T17:25:45.4794620Z [32m==>[0m [1mCaveats[0m
+2026-10-19T17:25:45.4796320Z [34m==>[0m [1mbash[0m
+2026-10-19T17:25:45.4797260Z DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/lib/bash:/opt/local/lib/bash:/usr/pkg/lib/bash:/opt/pkg/lib/bash:.
+2026-10-19T17:25:45.5028120Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=11622]
+2026-10-19T17:25:45.5136630Z ##[start-action display=Run : construct rustup command line;id=__actions-rust-lang_setup-rust-toolchain.flags]
+2026-10-19T17:25:45.5183020Z ##[group]Run : construct rustup command line
+2026-10-19T17:25:45.5183510Z [36;1m: construct rustup command line[0m
+2026-10-19T17:25:45.5183950Z [36;1mecho "targets=$(for t in ${_srt_targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+2026-10-19T17:25:45.5184590Z [36;1mecho "components=$(for c in ${_srt_components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+2026-10-19T17:25:45.5185130Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+2026-10-19T17:25:45.5200360Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:45.5200740Z env:
+2026-10-19T17:25:45.5201610Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:45.5202510Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:45.5202860Z   _srt_targets: 
+2026-10-19T17:25:45.5203160Z   _srt_components: rustfmt, clippy
+2026-10-19T17:25:45.5203530Z ##[endgroup]
+2026-10-19T17:25:45.6723290Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.flags;outcome=success;conclusion=success;duration_ms=158]
+2026-10-19T17:25:45.6729580Z ##[start-action display=Setting Environment Variables;id=__actions-rust-lang_setup-rust-toolchain.__run_2]
+2026-10-19T17:25:45.6751450Z ##[group]Run if [[ ! -v CARGO_INCREMENTAL ]]; then
+2026-10-19T17:25:45.6751850Z [36;1mif [[ ! -v CARGO_INCREMENTAL ]]; then[0m
+2026-10-19T17:25:45.6752100Z [36;1m  echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV[0m
+2026-10-19T17:25:45.6752400Z [36;1mfi[0m
+2026-10-19T17:25:45.6752640Z [36;1mif [[ ! -v CARGO_PROFILE_DEV_DEBUG ]]; then[0m
+2026-10-19T17:25:45.6753010Z [36;1m  echo "CARGO_PROFILE_DEV_DEBUG=0" >> $GITHUB_ENV[0m
+2026-10-19T17:25:45.6753410Z [36;1mfi[0m
+2026-10-19T17:25:45.6753730Z [36;1mif [[ ! -v CARGO_TERM_COLOR ]]; then[0m
+2026-10-19T17:25:45.6754040Z [36;1m  echo "CARGO_TERM_COLOR=always" >> $GITHUB_ENV[0m
+2026-10-19T17:25:45.6754420Z [36;1mfi[0m
+2026-10-19T17:25:45.6754650Z [36;1mif [[ ! -v RUST_BACKTRACE ]]; then[0m
+2026-10-19T17:25:45.6755100Z [36;1m  echo "RUST_BACKTRACE=short" >> $GITHUB_ENV[0m
+2026-10-19T17:25:45.6755420Z [36;1mfi[0m
+2026-10-19T17:25:45.6755780Z [36;1mif [[ ( ! -v RUSTFLAGS ) && $_srt_NEW_RUSTFLAGS != "" ]]; then[0m
+2026-10-19T17:25:45.6756100Z [36;1m  echo "RUSTFLAGS=$_srt_NEW_RUSTFLAGS" >> $GITHUB_ENV[0m
+2026-10-19T17:25:45.6756490Z [36;1mfi[0m
+2026-10-19T17:25:45.6756750Z [36;1m# Enable faster sparse index on nightly[0m
+2026-10-19T17:25:45.6757150Z [36;1m# The value is ignored on stable and causes no problems[0m
+2026-10-19T17:25:45.6757750Z [36;1m# https://internals.rust-lang.org/t/call-for-testing-cargo-sparse-registry/16862[0m
+2026-10-19T17:25:45.6758310Z [36;1mif [[ ! -v CARGO_UNSTABLE_SPARSE_REGISTRY ]]; then[0m
+2026-10-19T17:25:45.6758640Z [36;1m  echo "CARGO_UNSTABLE_SPARSE_REGISTRY=true" >> $GITHUB_ENV[0m
+2026-10-19T17:25:45.6758970Z [36;1mfi[0m
+2026-10-19T17:25:45.6759220Z [36;1mif [[ ! -v CARGO_REGISTRIES_CRATES_IO_PROTOCOL ]]; then[0m
+2026-10-19T17:25:45.6759640Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse" >> $GITHUB_ENV[0m
+2026-10-19T17:25:45.6759920Z [36;1mfi[0m
+2026-10-19T17:25:45.6774700Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:45.6775000Z env:
+2026-10-19T17:25:45.6775500Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:45.6775840Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:45.6776170Z   _srt_NEW_RUSTFLAGS: -D warnings
+2026-10-19T17:25:45.6776410Z ##[endgroup]
+2026-10-19T17:25:45.7436940Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_2;outcome=success;conclusion=success;duration_ms=70]
+2026-10-19T17:25:45.7439760Z ##[start-action display=Install Rust Problem Matcher;id=__actions-rust-lang_setup-rust-toolchain.__run_3]
+2026-10-19T17:25:45.7543300Z ##[group]Run echo "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v1/rust.json"
+2026-10-19T17:25:45.7544240Z [36;1mecho "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v1/rust.json"[0m
+2026-10-19T17:25:45.7559550Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:45.7560070Z env:
+2026-10-19T17:25:45.7560330Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:45.7560770Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:45.7561000Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:25:45.7561290Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:25:45.7561510Z   CARGO_TERM_COLOR: always
+2026-10-19T17:25:45.7561710Z   RUST_BACKTRACE: short
+2026-10-19T17:25:45.7561920Z   RUSTFLAGS: -D warnings
+2026-10-19T17:25:45.7562120Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:25:45.7562400Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:25:45.7563080Z ##[endgroup]
+2026-10-19T17:25:45.8298040Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_3;outcome=success;conclusion=success;duration_ms=85]
+2026-10-19T17:25:45.8310530Z ##[start-action display=Install rustup, if needed;id=__actions-rust-lang_setup-rust-toolchain.__run_4]
+2026-10-19T17:25:45.8365150Z ##[group]Run if ! command -v rustup &> /dev/null ; then
+2026-10-19T17:25:45.8365570Z [36;1mif ! command -v rustup &> /dev/null ; then[0m
+2026-10-19T17:25:45.8366260Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" | sh -s -- --default-toolchain none -y[0m
+2026-10-19T17:25:45.8366800Z [36;1m[0m
+2026-10-19T17:25:45.8367020Z [36;1m  # Resolve the correct CARGO_HOME path depending on OS[0m
+2026-10-19T17:25:45.8367360Z [36;1m  if [[ "$RUNNER_OS" == "Windows" ]]; then[0m
+2026-10-19T17:25:45.8367810Z [36;1m    echo "${CARGO_HOME:-$USERPROFILE/.cargo}/bin" | sed 's|/|\\|g' >> $GITHUB_PATH[0m
+2026-10-19T17:25:45.8368350Z [36;1m  else[0m
+2026-10-19T17:25:45.8368620Z [36;1m    echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> $GITHUB_PATH[0m
+2026-10-19T17:25:45.8368900Z [36;1m  fi[0m
+2026-10-19T17:25:45.8369050Z [36;1mfi[0m
+2026-10-19T17:25:45.8397110Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:45.8398010Z env:
+2026-10-19T17:25:45.8398640Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:45.8399680Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:45.8400300Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:25:45.8400950Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:25:45.8401570Z   CARGO_TERM_COLOR: always
+2026-10-19T17:25:45.8402250Z   RUST_BACKTRACE: short
+2026-10-19T17:25:45.8403060Z   RUSTFLAGS: -D warnings
+2026-10-19T17:25:45.8403710Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:25:45.8404520Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:25:45.8405190Z   RUNNER_OS: macOS
+2026-10-19T17:25:45.8405870Z ##[endgroup]
+2026-10-19T17:25:45.9202230Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=88]
+2026-10-19T17:25:45.9207770Z ##[start-action display=rustup toolchain install stable;id=__actions-rust-lang_setup-rust-toolchain.__run_5]
+2026-10-19T17:25:45.9231390Z ##[group]Run # Check if value is set
+2026-10-19T17:25:45.9231810Z [36;1m# Check if value is set[0m
+2026-10-19T17:25:45.9232040Z [36;1mif [[ -n "$_srt_rust_src_dir" ]][0m
+2026-10-19T17:25:45.9232260Z [36;1mthen[0m
+2026-10-19T17:25:45.9232460Z [36;1m  # If value is set the directory must exist[0m
+2026-10-19T17:25:45.9232730Z [36;1m  if [[ -d "$_srt_rust_src_dir" ]][0m
+2026-10-19T17:25:45.9232970Z [36;1m  then[0m
+2026-10-19T17:25:45.9233150Z [36;1m    cd "$_srt_rust_src_dir"[0m
+2026-10-19T17:25:45.9233370Z [36;1m  else[0m
+2026-10-19T17:25:45.9233640Z [36;1m    echo "'rust-src-dir' does not point to an existing directory" >&2[0m
+2026-10-19T17:25:45.9234040Z [36;1m    echo "The value of 'rust-src-dir' is: ${_srt_rust_src_dir}" >&2[0m
+2026-10-19T17:25:45.9234400Z [36;1m    exit 1[0m
+2026-10-19T17:25:45.9234560Z [36;1m  fi[0m
+2026-10-19T17:25:45.9234710Z [36;1mfi[0m
+2026-10-19T17:25:45.9234990Z [36;1mif [[ -z "$_srt_toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml") ]][0m
+2026-10-19T17:25:45.9235340Z [36;1mthen[0m
+2026-10-19T17:25:45.9235560Z [36;1m  # Install the toolchain as specified in the file[0m
+2026-10-19T17:25:45.9235920Z [36;1m  # rustup show is the old way that implicitly installed a toolchain[0m
+2026-10-19T17:25:45.9236320Z [36;1m  # rustup toolchain install is the new explicit way[0m
+2026-10-19T17:25:45.9236740Z [36;1m  # https://github.com/rust-lang/rustup/issues/3635#issuecomment-2343511297[0m
+2026-10-19T17:25:45.9237170Z [36;1m  rustup show active-toolchain || rustup toolchain install[0m
+2026-10-19T17:25:45.9237480Z [36;1m  if [[ -n $_srt_components ]]; then[0m
+2026-10-19T17:25:45.9237770Z [36;1m    rustup component add ${_srt_components//,/ }[0m
+2026-10-19T17:25:45.9238410Z [36;1m  fi[0m
+2026-10-19T17:25:45.9238800Z [36;1m  if [[ -n $_srt_targets ]]; then[0m
+2026-10-19T17:25:45.9239080Z [36;1m    rustup target add ${_srt_targets//,/ }[0m
+2026-10-19T17:25:45.9239310Z [36;1m  fi[0m
+2026-10-19T17:25:45.9239480Z [36;1melse[0m
+2026-10-19T17:25:45.9239640Z [36;1m  if [[ -z "$_srt_toolchain" ]][0m
+2026-10-19T17:25:45.9239880Z [36;1m  then[0m
+2026-10-19T17:25:45.9240110Z [36;1m    _srt_toolchain=stable[0m
+2026-10-19T17:25:45.9240340Z [36;1m  fi[0m
+2026-10-19T17:25:45.9240760Z [36;1m  rustup toolchain install ${_srt_toolchain//,/ }  --component rustfmt --component clippy --profile minimal --no-self-update[0m
+2026-10-19T17:25:45.9241260Z [36;1m  # Take the last element from the list[0m
+2026-10-19T17:25:45.9241530Z [36;1m  if [[ "$_srt_override" == "true" ]][0m
+2026-10-19T17:25:45.9241760Z [36;1m  then[0m
+2026-10-19T17:25:45.9241970Z [36;1m    rustup override set ${_srt_toolchain//*,/ }[0m
+2026-10-19T17:25:45.9242220Z [36;1m  fi[0m
+2026-10-19T17:25:45.9242420Z [36;1mfi[0m
+2026-10-19T17:25:45.9255570Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:45.9255890Z env:
+2026-10-19T17:25:45.9256120Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:45.9256410Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:45.9256610Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:25:45.9256790Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:25:45.9257000Z   CARGO_TERM_COLOR: always
+2026-10-19T17:25:45.9257180Z   RUST_BACKTRACE: short
+2026-10-19T17:25:45.9257370Z   RUSTFLAGS: -D warnings
+2026-10-19T17:25:45.9257580Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:25:45.9257840Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:25:45.9258090Z   _srt_toolchain: stable
+2026-10-19T17:25:45.9258260Z   _srt_targets: 
+2026-10-19T17:25:45.9258660Z   _srt_components: rustfmt, clippy
+2026-10-19T17:25:45.9258910Z   _srt_override: true
+2026-10-19T17:25:45.9259100Z   _srt_rust_src_dir: 
+2026-10-19T17:25:45.9259300Z ##[endgroup]
+2026-10-19T17:25:46.5276510Z info: syncing channel updates for stable-aarch64-apple-darwin
+2026-10-19T17:25:46.8465270Z info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-19T17:25:46.8587560Z info: removing previous version of component clippy
+2026-10-19T17:25:46.8630950Z info: removing previous version of component rustfmt
+2026-10-19T17:25:46.8653750Z info: removing previous version of component cargo
+2026-10-19T17:25:46.8817920Z info: removing previous version of component rust-std
+2026-10-19T17:25:46.9021720Z info: removing previous version of component rustc
+2026-10-19T17:25:46.9245950Z info: downloading 5 components
+2026-10-19T17:25:55.2979100Z 
+2026-10-19T17:25:55.3769670Z info: self-update is disabled for this build of rustup
+2026-10-19T17:25:55.3771230Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))
+2026-10-19T17:25:55.3846790Z info: any updates to rustup will need to be fetched with your system package manager
+2026-10-19T17:25:55.3847680Z 
+2026-10-19T17:25:55.4231620Z info: override toolchain for /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research set to stable-aarch64-apple-darwin
+2026-10-19T17:25:55.4363640Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=9515]
+2026-10-19T17:25:55.4374360Z ##[start-action display=Print installed versions;id=__actions-rust-lang_setup-rust-toolchain.versions]
+2026-10-19T17:25:55.4426770Z ##[group]Run echo "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT
+2026-10-19T17:25:55.4427550Z [36;1mecho "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT[0m
+2026-10-19T17:25:55.4427930Z [36;1mrustc --version --verbose[0m
+2026-10-19T17:25:55.4428320Z [36;1mecho "cargo-version=$(cargo --version)" >> $GITHUB_OUTPUT[0m
+2026-10-19T17:25:55.4428680Z [36;1mcargo --version --verbose[0m
+2026-10-19T17:25:55.4429160Z [36;1mecho "rustup-version=$(rustup --version)" >> $GITHUB_OUTPUT[0m
+2026-10-19T17:25:55.4430340Z [36;1mrustup --version[0m
+2026-10-19T17:25:55.4431380Z [36;1m[0m
+2026-10-19T17:25:55.4431930Z [36;1m_srt_DATE=$(rustc --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+2026-10-19T17:25:55.4432540Z [36;1m_srt_HASH=$(rustc --version --verbose | sed -ne 's/^commit-hash: //p')[0m
+2026-10-19T17:25:55.4433110Z [36;1mecho "cachekey=$(echo $_srt_DATE$_srt_HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+2026-10-19T17:25:55.4452510Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:55.4453070Z env:
+2026-10-19T17:25:55.4453410Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:55.4453800Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:55.4454090Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:25:55.4454420Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:25:55.4454740Z   CARGO_TERM_COLOR: always
+2026-10-19T17:25:55.4455000Z   RUST_BACKTRACE: short
+2026-10-19T17:25:55.4455370Z   RUSTFLAGS: -D warnings
+2026-10-19T17:25:55.4455670Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:25:55.4456080Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:25:55.4456370Z ##[endgroup]
+2026-10-19T17:25:55.7086560Z rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-19T17:25:55.7188130Z binary: rustc
+2026-10-19T17:25:55.7290720Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-19T17:25:55.7393150Z commit-date: 2026-10-13
+2026-10-19T17:25:55.7495650Z host: aarch64-apple-darwin
+2026-10-19T17:25:55.7597490Z release: 1.99.1
+2026-10-19T17:25:55.7699520Z LLVM version: 23.1.1
+2026-10-19T17:25:55.8184230Z cargo 1.99.1 (5f94df478 2026-08-27)
+2026-10-19T17:25:55.8287300Z release: 1.99.1
+2026-10-19T17:25:55.8391800Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-19T17:25:55.8392410Z commit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e
+2026-10-19T17:25:55.8493530Z commit-date: 2026-08-27
+2026-10-19T17:25:55.8594920Z host: aarch64-apple-darwin
+2026-10-19T17:25:55.8695990Z libgit2: 1.9.6 (sys:0.21.0 vendored)
+2026-10-19T17:25:55.8798440Z libcurl: 8.7.1 (sys:0.4.90+curl-8.21.0 system ssl:(SecureTransport) LibreSSL/3.3.6)
+2026-10-19T17:25:55.8900970Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-19T17:25:55.8901980Z ssl: OpenSSL 3.6.3 9 Jun 2026
+2026-10-19T17:25:55.9003870Z os: Mac OS 27.0.1 [64-bit]
+2026-10-19T17:25:55.9135580Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-19T17:25:55.9136500Z rustup 1.29.0 (2026-03-05)
+2026-10-19T17:25:55.9652800Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-19T17:25:56.1489590Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.versions;outcome=success;conclusion=success;duration_ms=711]
+2026-10-19T17:25:56.1492630Z ##[start-action display=Downgrade registry access protocol when needed;id=__actions-rust-lang_setup-rust-toolchain.__run_6]
+2026-10-19T17:25:56.1537490Z ##[group]Run # Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-19T17:25:56.1538130Z [36;1m# Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL[0m
+2026-10-19T17:25:56.1538640Z [36;1m# On versions 1.66, 1.67, and 1.68.0-nightly the value "sparse" is still unstable.[0m
+2026-10-19T17:25:56.1539260Z [36;1m# https://github.com/dtolnay/rust-toolchain/pull/69#discussion_r1107268108[0m
+2026-10-19T17:25:56.1539920Z [36;1m# If we detect an incompatible value, set it to "git" which is always supported.[0m
+2026-10-19T17:25:56.1540610Z [36;1mif [[ "rustc 1.99.1 (58cf8f9c3 2026-10-13)" =~ ^rustc\ (1\.6[67]\.|1\.68\.0-nightly) && "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL}" == "sparse" ]]; then[0m
+2026-10-19T17:25:56.1541460Z [36;1m  echo "Downgrade cargo registry protocol to git"[0m
+2026-10-19T17:25:56.1541920Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git" >> $GITHUB_ENV[0m
+2026-10-19T17:25:56.1542320Z [36;1mfi[0m
+2026-10-19T17:25:56.1576020Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:56.1579090Z env:
+2026-10-19T17:25:56.1579930Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:56.1581000Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:56.1581870Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:25:56.1582450Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:25:56.1583210Z   CARGO_TERM_COLOR: always
+2026-10-19T17:25:56.1584320Z   RUST_BACKTRACE: short
+2026-10-19T17:25:56.1585250Z   RUSTFLAGS: -D warnings
+2026-10-19T17:25:56.1585990Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:25:56.1586850Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:25:56.1587550Z ##[endgroup]
+2026-10-19T17:25:56.2757090Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=126]
+2026-10-19T17:25:56.2765580Z ##[start-action display=Setup Rust Caching;id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache]
+2026-10-19T17:25:56.2919460Z ##[group]Run Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+2026-10-19T17:25:56.2919840Z with:
+2026-10-19T17:25:56.2920010Z   cache-on-failure: true
+2026-10-19T17:25:56.2920200Z   cache-bin: true
+2026-10-19T17:25:56.2920380Z   cache-provider: github
+2026-10-19T17:25:56.2920560Z   cache-all-crates: false
+2026-10-19T17:25:56.2920800Z   cache-workspace-crates: false
+2026-10-19T17:25:56.2921040Z   cache-targets: true
+2026-10-19T17:25:56.2921220Z   save-if: true
+2026-10-19T17:25:56.2921410Z   prefix-key: v0-rust
+2026-10-19T17:25:56.2921630Z   add-job-id-key: true
+2026-10-19T17:25:56.2921860Z   add-rust-environment-hash-key: true
+2026-10-19T17:25:56.2922110Z   lookup-only: false
+2026-10-19T17:25:56.2922760Z   cmd-format: {0}
+2026-10-19T17:25:56.2922940Z env:
+2026-10-19T17:25:56.2923200Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:56.2923470Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:56.2923670Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:25:56.2923860Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:25:56.2924040Z   CARGO_TERM_COLOR: always
+2026-10-19T17:25:56.2924220Z   RUST_BACKTRACE: short
+2026-10-19T17:25:56.2924410Z   RUSTFLAGS: -D warnings
+2026-10-19T17:25:56.2925710Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:25:56.2926370Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:25:56.2927140Z ##[endgroup]
+2026-10-19T17:25:57.2177250Z (node:8762) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-19T17:25:57.2178850Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-19T17:25:57.5639470Z Error: The process '/Users/runner/.cargo/bin/cargo' failed with exit code 101
+2026-10-19T17:25:57.5708140Z     at ExecState._setResult (/Users/runner/work/_actions/Swatinem/rust-cache/c19371144df3bb44fab255c43d04cbc2ab54d1c4/dist/restore/index.js:202817:25)
+2026-10-19T17:25:57.5709630Z ##[group]Cache Configuration
+2026-10-19T17:25:57.5775470Z     at ExecState.CheckComplete (/Users/runner/work/_actions/Swatinem/rust-cache/c19371144df3bb44fab255c43d04cbc2ab54d1c4/dist/restore/index.js:202800:18)
+2026-10-19T17:25:57.5777170Z Cache Provider:
+2026-10-19T17:25:57.5793820Z     at ChildProcess.<anonymous> (/Users/runner/work/_actions/Swatinem/rust-cache/c19371144df3bb44fab255c43d04cbc2ab54d1c4/dist/restore/index.js:202696:27)
+2026-10-19T17:25:57.5794480Z     github
+2026-10-19T17:25:57.5867620Z     at ChildProcess.emit (node:events:509:28)
+2026-10-19T17:25:57.5867890Z Workspaces:
+2026-10-19T17:25:57.5876580Z     at maybeClose (node:internal/child_process:1141:16)
+2026-10-19T17:25:57.5877670Z     /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T17:25:57.5879330Z     at ChildProcess._handle.onexit (node:internal/child_process:306:5) {
+2026-10-19T17:25:57.5880140Z Cache Paths:
+2026-10-19T17:25:57.5880800Z     /Users/runner/.cargo/bin
+2026-10-19T17:25:57.5881380Z   commandFailed: {
+2026-10-19T17:25:57.5882220Z     command: 'cargo metadata --all-features --format-version 1 --no-deps',
+2026-10-19T17:25:57.5886260Z     stderr: '\x1B[1m\x1B[91merror\x1B[0m: could not find `Cargo.toml` in `/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research` or any parent directory\n'
+2026-10-19T17:25:57.5887840Z   }
+2026-10-19T17:25:57.5888280Z     /Users/runner/.cargo/.crates.toml
+2026-10-19T17:25:57.5888910Z     /Users/runner/.cargo/.crates2.json
+2026-10-19T17:25:57.5889500Z     /Users/runner/.cargo/registry
+2026-10-19T17:25:57.5890080Z     /Users/runner/.cargo/git
+2026-10-19T17:25:57.5890920Z     /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/target
+2026-10-19T17:25:57.5891910Z Restore Key:
+2026-10-19T17:25:57.5892590Z     v0-rust-generated-image-and-product-Darwin-arm64-1950591a
+2026-10-19T17:25:57.5893330Z Cache Key:
+2026-10-19T17:25:57.5894050Z     v0-rust-generated-image-and-product-Darwin-arm64-1950591a-da39a3ee
+2026-10-19T17:25:57.5894870Z .. Prefix:
+2026-10-19T17:25:57.5895390Z   - v0-rust-generated-image-and-product-Darwin-arm64
+2026-10-19T17:25:57.5896130Z .. Environment considered:
+2026-10-19T17:25:57.5896670Z   - Rust Versions:
+2026-10-19T17:25:57.5897300Z     - 1.99.1 aarch64-apple-darwin 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-19T17:25:57.5898310Z     - 1.99.1 aarch64-apple-darwin 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-19T17:25:57.5899160Z   - CARGO_INCREMENTAL
+2026-10-19T17:25:57.5899640Z   - CARGO_PROFILE_DEV_DEBUG
+2026-10-19T17:25:57.5900840Z   - CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-19T17:25:57.5901470Z   - CARGO_TERM_COLOR
+2026-10-19T17:25:57.5901990Z   - CARGO_UNSTABLE_SPARSE_REGISTRY
+2026-10-19T17:25:57.5902540Z   - RUST_BACKTRACE
+2026-10-19T17:25:57.5903010Z   - RUSTFLAGS
+2026-10-19T17:25:57.5903450Z .. Lockfiles considered:
+2026-10-19T17:25:57.5904460Z ##[endgroup]
+2026-10-19T17:25:57.5904700Z 
+2026-10-19T17:25:57.5904910Z ... Restoring cache ...
+2026-10-19T17:25:57.5907460Z }
+2026-10-19T17:25:57.9046590Z Cache hit for: v0-rust-generated-image-and-product-Darwin-arm64-1950591a-da39a3ee
+2026-10-19T17:25:58.5113290Z Received 1322 of 1322 (100.0%), 0.0 MBs/sec
+2026-10-19T17:25:58.5233980Z Cache Size: ~0 MB (1322 B)
+2026-10-19T17:25:58.5336890Z [command]/opt/homebrew/bin/gtar -xf /Users/runner/work/_temp/f99249ee-96cc-4b00-b739-894005a3c773/cache.tzst -P -C /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research --delay-directory-restore --use-compress-program unzstd
+2026-10-19T17:25:58.6733250Z Cache restored successfully
+2026-10-19T17:25:58.6826320Z Restored from cache key "v0-rust-generated-image-and-product-Darwin-arm64-1950591a-da39a3ee" full match: true.
+2026-10-19T17:25:58.6841970Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=2407]
+2026-10-19T17:25:58.7102550Z ##[group]Run set -euo pipefail
+2026-10-19T17:25:58.7102910Z [36;1mset -euo pipefail[0m
+2026-10-19T17:25:58.7103190Z [36;1mmkdir -p evidence[0m
+2026-10-19T17:25:58.7103530Z [36;1mtest "$(git -C xdremux rev-parse HEAD)" = "$XDREMUX_SOURCE_SHA"[0m
+2026-10-19T17:25:58.7103990Z [36;1msw_vers | tee evidence/os.txt[0m
+2026-10-19T17:25:58.7104340Z [36;1mxcodebuild -version | tee evidence/xcode.txt[0m
+2026-10-19T17:25:58.7104680Z [36;1mxcrun --sdk macosx --show-sdk-version | tee evidence/sdk.txt[0m
+2026-10-19T17:25:58.7105250Z [36;1mgit -C xdremux rev-parse HEAD | tee evidence/xdremux-head.txt[0m
+2026-10-19T17:25:58.7105850Z [36;1mxcrun swiftc -swift-version 5 -target arm64-apple-macosx15.0 research/xdremux-texture-native/native_images.swift \[0m
+2026-10-19T17:25:58.7106520Z [36;1m  -framework Foundation -framework CoreImage -framework ImageIO \[0m
+2026-10-19T17:25:58.7106980Z [36;1m  -o "$RUNNER_TEMP/xdremux-native-images" 2>&1 | tee evidence/image-build.log[0m
+2026-10-19T17:25:58.7107740Z [36;1mxcrun swiftc -swift-version 5 -target arm64-apple-macosx15.0 research/xdremux-texture-native/native_probe.swift \[0m
+2026-10-19T17:25:58.7108410Z [36;1m  -framework Foundation -framework CoreImage -framework ImageIO -framework Metal \[0m
+2026-10-19T17:25:58.7109380Z [36;1m  -o "$RUNNER_TEMP/xdremux-texture-native-probe" 2>&1 | tee evidence/processor-build.log[0m
+2026-10-19T17:25:58.7110040Z [36;1mrustc --edition=2021 -O research/xdremux-texture-native/buffer_facts.rs -o "$RUNNER_TEMP/texture-buffer-facts"[0m
+2026-10-19T17:25:58.7139190Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:25:58.7140050Z env:
+2026-10-19T17:25:58.7140590Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:25:58.7141560Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:25:58.7142270Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:25:58.7142860Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:25:58.7143550Z   CARGO_TERM_COLOR: always
+2026-10-19T17:25:58.7144130Z   RUST_BACKTRACE: short
+2026-10-19T17:25:58.7144750Z   RUSTFLAGS: -D warnings
+2026-10-19T17:25:58.7145410Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:25:58.7146150Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:25:58.7147330Z   CACHE_ON_FAILURE: true
+2026-10-19T17:25:58.7148200Z ##[endgroup]
+2026-10-19T17:25:58.9438550Z ProductName:		macOS
+2026-10-19T17:25:58.9481090Z ProductVersion:		27.0.1
+2026-10-19T17:25:58.9582440Z BuildVersion:		26A434
+2026-10-19T17:25:59.1480020Z Xcode 27.0
+2026-10-19T17:25:59.1483170Z Build version 27A266a
+2026-10-19T17:26:02.9379550Z 27.0
+2026-10-19T17:26:02.9533870Z 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:26:15.3426110Z research/xdremux-texture-native/native_probe.swift:120:13: warning: constant 'cls' inferred to have type 'AnyClass' (aka 'any AnyObject.Type'), which may be unexpected
+2026-10-19T17:26:15.3429490Z 118 |     if name.contains("TextureStyle") || name == "_NUSemanticStyleProperties" {
+2026-10-19T17:26:15.3431010Z 119 |         progress("inventory \(name)")
+2026-10-19T17:26:15.3432040Z 120 |         let cls = unsafeBitCast(classes[i], to: AnyClass.self)
+2026-10-19T17:26:15.3433670Z     |             |- warning: constant 'cls' inferred to have type 'AnyClass' (aka 'any AnyObject.Type'), which may be unexpected
+2026-10-19T17:26:15.3437270Z     |             `- note: add an explicit type annotation to silence this warning
+2026-10-19T17:26:15.3438620Z 121 |         rows.append(["class": name, "instance_size": class_getInstanceSize(cls),
+2026-10-19T17:26:15.3440120Z 122 |                      "instance_methods": methodInfo(cls, false), "class_methods": methodInfo(cls, true)])
+2026-10-19T17:26:15.3441010Z 
+2026-10-19T17:26:15.3442450Z research/xdremux-texture-native/native_probe.swift:308:9: warning: constant 'consumerClass' inferred to have type 'AnyClass?' (aka 'Optional<any AnyObject.Type>'), which may be unexpected
+2026-10-19T17:26:15.3444800Z 306 |     let selector = "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:"
+2026-10-19T17:26:15.3448980Z 307 |     progress("metadata consumer \(name)")
+2026-10-19T17:26:15.3450080Z 308 |     let consumerClass = NSClassFromString("_NUTextureStyleProperties")
+2026-10-19T17:26:15.3451910Z     |         |- warning: constant 'consumerClass' inferred to have type 'AnyClass?' (aka 'Optional<any AnyObject.Type>'), which may be unexpected
+2026-10-19T17:26:15.3453700Z     |         `- note: add an explicit type annotation to silence this warning
+2026-10-19T17:26:15.3454860Z 309 |     row["consumer_class_available"] = consumerClass != nil
+2026-10-19T17:26:15.3456400Z 310 |     if let cls = consumerClass, let method = class_getClassMethod(cls, NSSelectorFromString(selector)) {
+2026-10-19T17:26:18.3859370Z ##[group]Run set -euo pipefail
+2026-10-19T17:26:18.3860150Z [36;1mset -euo pipefail[0m
+2026-10-19T17:26:18.3860850Z [36;1mcargo build --locked --manifest-path xdremux/Cargo.toml -p xdremux-heif --examples 2>&1 | tee evidence/research-clients-build.log[0m
+2026-10-19T17:26:18.3861670Z [36;1mcargo build --locked --manifest-path xdremux/Cargo.toml -p xdremux-engine[0m
+2026-10-19T17:26:18.3862300Z [36;1mrustc --edition=2021 -D warnings research/xdremux-texture-native/semantic_control.rs \[0m
+2026-10-19T17:26:18.3862860Z [36;1m  --extern xdremux_engine=xdremux/target/debug/libxdremux_engine.rlib \[0m
+2026-10-19T17:26:18.3864240Z [36;1m  -L dependency=xdremux/target/debug/deps -o "$RUNNER_TEMP/texture-semantic-control"[0m
+2026-10-19T17:26:18.3864990Z [36;1mxdremux/target/debug/examples/texture_synthetic_inputs "$RUNNER_TEMP/xdremux-analytic-inputs"[0m
+2026-10-19T17:26:18.3865780Z [36;1mcp "$RUNNER_TEMP/xdremux-analytic-inputs/manifest.json" evidence/input-manifest.json[0m
+2026-10-19T17:26:18.3866400Z [36;1m"$RUNNER_TEMP/texture-semantic-control" \[0m
+2026-10-19T17:26:18.3866830Z [36;1m  "$RUNNER_TEMP/xdremux-analytic-inputs/landscape-hdr-edge.rgba32f" \[0m
+2026-10-19T17:26:18.3867400Z [36;1m  "$RUNNER_TEMP/xdremux-analytic-inputs/landscape-hdr-edge-sdr.rgba32f" \[0m
+2026-10-19T17:26:18.3868070Z [36;1m  384 256 "$RUNNER_TEMP/texture-diagnostic-semantic.plist" | tee evidence/semantic-control.txt[0m
+2026-10-19T17:26:18.3894410Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:26:18.3895770Z env:
+2026-10-19T17:26:18.3896760Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:26:18.3897460Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:26:18.3898210Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:26:18.3898660Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:26:18.3899780Z   CARGO_TERM_COLOR: always
+2026-10-19T17:26:18.3900730Z   RUST_BACKTRACE: short
+2026-10-19T17:26:18.3901380Z   RUSTFLAGS: -D warnings
+2026-10-19T17:26:18.3902640Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:26:18.3903850Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:26:18.3905590Z   CACHE_ON_FAILURE: true
+2026-10-19T17:26:18.3906860Z ##[endgroup]
+2026-10-19T17:26:18.8010130Z [1m[92m    Updating[0m crates.io index
+2026-10-19T17:26:19.1494210Z [1m[92m Downloading[0m crates ...
+2026-10-19T17:26:19.1887410Z [1m[92m  Downloaded[0m block-buffer v0.12.1
+2026-10-19T17:26:19.2007270Z [1m[92m  Downloaded[0m cfg-if v1.0.4
+2026-10-19T17:26:19.2055870Z [1m[92m  Downloaded[0m sha2 v0.11.0
+2026-10-19T17:26:19.2211580Z [1m[92m  Downloaded[0m typenum v1.20.1
+2026-10-19T17:26:19.2324080Z [1m[92m  Downloaded[0m crypto-common v0.2.2
+2026-10-19T17:26:19.2363200Z [1m[92m  Downloaded[0m digest v0.11.3
+2026-10-19T17:26:19.2475740Z [1m[92m  Downloaded[0m cpufeatures v0.3.1
+2026-10-19T17:26:19.2533760Z [1m[92m  Downloaded[0m hybrid-array v0.4.14
+2026-10-19T17:26:19.2583980Z [1m[92m  Downloaded[0m const-oid v0.10.2
+2026-10-19T17:26:19.2636070Z [1m[92m  Downloaded[0m libc v0.2.189
+2026-10-19T17:26:19.5149180Z [1m[92m   Compiling[0m typenum v1.20.1
+2026-10-19T17:26:19.5150380Z [1m[92m   Compiling[0m libc v0.2.189
+2026-10-19T17:26:19.5150850Z [1m[92m   Compiling[0m const-oid v0.10.2
+2026-10-19T17:26:20.1389380Z [1m[92m   Compiling[0m cfg-if v1.0.4
+2026-10-19T17:26:20.2224670Z [1m[92m   Compiling[0m xdremux-format v0.1.0 (/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/xdremux/crates/xdremux-format)
+2026-10-19T17:26:21.0220470Z [1m[92m   Compiling[0m hybrid-array v0.4.14
+2026-10-19T17:26:21.4879720Z [1m[92m   Compiling[0m cpufeatures v0.3.1
+2026-10-19T17:26:21.7261870Z [1m[92m   Compiling[0m block-buffer v0.12.1
+2026-10-19T17:26:21.7265630Z [1m[92m   Compiling[0m crypto-common v0.2.2
+2026-10-19T17:26:22.5886310Z [1m[92m   Compiling[0m digest v0.11.3
+2026-10-19T17:26:22.7421900Z [1m[92m   Compiling[0m sha2 v0.11.0
+2026-10-19T17:26:23.3382890Z [1m[92m   Compiling[0m xdremux-heif v0.1.0 (/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/xdremux/crates/xdremux-heif)
+2026-10-19T17:26:26.1054860Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 7.55s
+2026-10-19T17:26:26.2849150Z [1m[92m Downloading[0m crates ...
+2026-10-19T17:26:26.3215110Z [1m[92m  Downloaded[0m itoa v1.0.18
+2026-10-19T17:26:26.3300210Z [1m[92m  Downloaded[0m serde_json v1.0.151
+2026-10-19T17:26:26.3557400Z [1m[92m  Downloaded[0m zmij v1.0.23
+2026-10-19T17:26:26.3592180Z [1m[92m  Downloaded[0m quote v1.0.47
+2026-10-19T17:26:26.3739510Z [1m[92m  Downloaded[0m serde_core v1.0.229
+2026-10-19T17:26:26.3875280Z [1m[92m  Downloaded[0m serde_derive v1.0.229
+2026-10-19T17:26:26.4037910Z [1m[92m  Downloaded[0m zerocopy-derive v0.8.56
+2026-10-19T17:26:26.4308010Z [1m[92m  Downloaded[0m half v2.7.1
+2026-10-19T17:26:26.4409150Z [1m[92m  Downloaded[0m proc-macro2 v1.0.107
+2026-10-19T17:26:26.4471700Z [1m[92m  Downloaded[0m unicode-ident v1.0.24
+2026-10-19T17:26:26.4558800Z [1m[92m  Downloaded[0m memchr v2.8.3
+2026-10-19T17:26:26.4764400Z [1m[92m  Downloaded[0m serde v1.0.229
+2026-10-19T17:26:26.4893580Z [1m[92m  Downloaded[0m zerocopy v0.8.56
+2026-10-19T17:26:26.5639790Z [1m[92m  Downloaded[0m syn v2.0.119
+2026-10-19T17:26:26.5911210Z [1m[92m  Downloaded[0m syn v3.0.4
+2026-10-19T17:26:26.6506120Z [1m[92m   Compiling[0m proc-macro2 v1.0.107
+2026-10-19T17:26:26.6637400Z [1m[92m   Compiling[0m unicode-ident v1.0.24
+2026-10-19T17:26:26.6763700Z [1m[92m   Compiling[0m quote v1.0.47
+2026-10-19T17:26:26.7521260Z [1m[92m   Compiling[0m serde_core v1.0.229
+2026-10-19T17:26:27.1396710Z [1m[92m   Compiling[0m zmij v1.0.23
+2026-10-19T17:26:27.3480920Z [1m[92m   Compiling[0m zerocopy v0.8.56
+2026-10-19T17:26:27.8515380Z [1m[92m   Compiling[0m serde v1.0.229
+2026-10-19T17:26:28.2158020Z [1m[92m   Compiling[0m serde_json v1.0.151
+2026-10-19T17:26:28.4262910Z [1m[92m   Compiling[0m syn v2.0.119
+2026-10-19T17:26:28.4439400Z [1m[92m   Compiling[0m syn v3.0.4
+2026-10-19T17:26:30.2996470Z [1m[92m   Compiling[0m memchr v2.8.3
+2026-10-19T17:26:30.7134730Z [1m[92m   Compiling[0m itoa v1.0.18
+2026-10-19T17:26:30.7784920Z [1m[92m   Compiling[0m serde_derive v1.0.229
+2026-10-19T17:26:31.7572670Z [1m[92m   Compiling[0m zerocopy-derive v0.8.56
+2026-10-19T17:26:36.2351140Z [1m[92m   Compiling[0m half v2.7.1
+2026-10-19T17:26:36.5575540Z [1m[92m   Compiling[0m xdremux-engine v0.1.0 (/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/xdremux/crates/xdremux-engine)
+2026-10-19T17:26:38.1018030Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 11.87s
+2026-10-19T17:26:38.9308220Z generated=4 copyright=CC0-1.0 camera_information=false
+2026-10-19T17:26:39.1328840Z diagnostic_semantic_plist_sha256=ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a input_hdr_sha256=0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572 input_sdr_sha256=9c0ca8a38a7ce8367410b6d15c047c44b804f64307db77a9af8823c9c7fea334 original_camera_information=false texture_producer=false
+2026-10-19T17:26:39.1678460Z ##[group]Run set -euo pipefail
+2026-10-19T17:26:39.1679140Z [36;1mset -euo pipefail[0m
+2026-10-19T17:26:39.1679710Z [36;1m"$RUNNER_TEMP/xdremux-native-images" "$RUNNER_TEMP/xdremux-analytic-inputs/manifest.json" \[0m
+2026-10-19T17:26:39.1680330Z [36;1m  "$RUNNER_TEMP/xdremux-generated-images" 2>&1 | tee evidence/image-probe.log[0m
+2026-10-19T17:26:39.1681040Z [36;1mcp "$RUNNER_TEMP/xdremux-generated-images/image-matrix.json" evidence/image-matrix.json[0m
+2026-10-19T17:26:39.1705110Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:26:39.1705490Z env:
+2026-10-19T17:26:39.1705860Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:26:39.1706220Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:26:39.1706590Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:26:39.1706960Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:26:39.1707250Z   CARGO_TERM_COLOR: always
+2026-10-19T17:26:39.1707620Z   RUST_BACKTRACE: short
+2026-10-19T17:26:39.1708110Z   RUSTFLAGS: -D warnings
+2026-10-19T17:26:39.1708380Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:26:39.1708790Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:26:39.1709520Z   CACHE_ON_FAILURE: true
+2026-10-19T17:26:39.1709890Z ##[endgroup]
+2026-10-19T17:26:39.9669520Z IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-19T17:26:41.2072660Z TEXTURE_JSON_BEGIN image-matrix.json
+2026-10-19T17:26:41.2076770Z {
+2026-10-19T17:26:41.2078270Z   "license" : "CC0-1.0",
+2026-10-19T17:26:41.2083690Z   "no_photos_read" : true,
+2026-10-19T17:26:41.2085310Z   "os" : "Version 27.0.1 (Build 26A434)",
+2026-10-19T17:26:41.2086400Z   "rows" : [
+2026-10-19T17:26:41.2087150Z     {
+2026-10-19T17:26:41.2088160Z       "case" : "landscape-gradient-sdr-jpg",
+2026-10-19T17:26:41.2090640Z       "facts" : {
+2026-10-19T17:26:41.2091430Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2092430Z         "coded_extent" : [
+2026-10-19T17:26:41.2093840Z           384,
+2026-10-19T17:26:41.2094440Z           256
+2026-10-19T17:26:41.2095910Z         ],
+2026-10-19T17:26:41.2096920Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2097300Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2097710Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2098140Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2098480Z         "Depth" : 8,
+2026-10-19T17:26:41.2098820Z         "file" : "landscape-gradient-sdr.jpg",
+2026-10-19T17:26:41.2100270Z         "file_sha256" : "0af2690b5e78e31a361088a05dab1bfbc651a1b8615cf84e232fdb52ee69db8c",
+2026-10-19T17:26:41.2101420Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2101880Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2102800Z         "native_decoded_linear_p3_rgba32f_sha256" : "c8bbfcdb70bb42767db98691f6974c2d6fd8c1138f421b810af1d0ade50040c1",
+2026-10-19T17:26:41.2104190Z         "Orientation" : 1,
+2026-10-19T17:26:41.2104720Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2105220Z         "original_raw" : false,
+2026-10-19T17:26:41.2105660Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2106000Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2106460Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2106910Z         "size" : 9627,
+2026-10-19T17:26:41.2107260Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2108000Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.2108380Z       },
+2026-10-19T17:26:41.2108900Z       "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+2026-10-19T17:26:41.2109670Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2110590Z       "write_succeeded" : true
+2026-10-19T17:26:41.2110960Z     },
+2026-10-19T17:26:41.2111500Z     {
+2026-10-19T17:26:41.2112300Z       "case" : "landscape-gradient-sdr-heic",
+2026-10-19T17:26:41.2114420Z       "facts" : {
+2026-10-19T17:26:41.2115310Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2116370Z         "coded_extent" : [
+2026-10-19T17:26:41.2118800Z           384,
+2026-10-19T17:26:41.2119220Z           256
+2026-10-19T17:26:41.2119420Z         ],
+2026-10-19T17:26:41.2119620Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2120770Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2121730Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2123130Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2124270Z         "Depth" : 8,
+2026-10-19T17:26:41.2125180Z         "file" : "landscape-gradient-sdr.heic",
+2026-10-19T17:26:41.2125930Z         "file_sha256" : "81b0f9b0f6a9969bfecc6efb76c047a57515cc3a01aba2e48fabd048f128bd77",
+2026-10-19T17:26:41.2126470Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2126910Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2127800Z         "native_decoded_linear_p3_rgba32f_sha256" : "5e590ec8b64646bee03ed544b5daa454af3e5d553dfa60f9060ef3c4ee25406e",
+2026-10-19T17:26:41.2129900Z         "Orientation" : 1,
+2026-10-19T17:26:41.2131210Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2132220Z         "original_raw" : false,
+2026-10-19T17:26:41.2132790Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2133700Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2134150Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2134870Z         "size" : 4564,
+2026-10-19T17:26:41.2136380Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2136780Z         "type" : "public.heic"
+2026-10-19T17:26:41.2137560Z       },
+2026-10-19T17:26:41.2138110Z       "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+2026-10-19T17:26:41.2139930Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2140660Z       "write_succeeded" : true
+2026-10-19T17:26:41.2141210Z     }
+2026-10-19T17:26:41.2141890Z   ],
+2026-10-19T17:26:41.2143610Z   "schema" : "xdremux-native-synthetic-matrix-v1"
+2026-10-19T17:26:41.2144670Z }
+2026-10-19T17:26:41.2145590Z TEXTURE_JSON_END image-matrix.json
+2026-10-19T17:26:41.2145970Z TEXTURE_JSON_BEGIN image-matrix.json
+2026-10-19T17:26:41.2146460Z {
+2026-10-19T17:26:41.2147060Z   "license" : "CC0-1.0",
+2026-10-19T17:26:41.2147390Z   "no_photos_read" : true,
+2026-10-19T17:26:41.2148060Z   "os" : "Version 27.0.1 (Build 26A434)",
+2026-10-19T17:26:41.2148380Z   "rows" : [
+2026-10-19T17:26:41.2148740Z     {
+2026-10-19T17:26:41.2150290Z       "case" : "landscape-gradient-sdr-jpg",
+2026-10-19T17:26:41.2150670Z       "facts" : {
+2026-10-19T17:26:41.2152750Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2153900Z         "coded_extent" : [
+2026-10-19T17:26:41.2156480Z           384,
+2026-10-19T17:26:41.2158650Z           256
+2026-10-19T17:26:41.2158980Z         ],
+2026-10-19T17:26:41.2161160Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2161560Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2162120Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2166650Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2167050Z         "Depth" : 8,
+2026-10-19T17:26:41.2167590Z         "file" : "landscape-gradient-sdr.jpg",
+2026-10-19T17:26:41.2168290Z         "file_sha256" : "0af2690b5e78e31a361088a05dab1bfbc651a1b8615cf84e232fdb52ee69db8c",
+2026-10-19T17:26:41.2168870Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2169310Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2170020Z         "native_decoded_linear_p3_rgba32f_sha256" : "c8bbfcdb70bb42767db98691f6974c2d6fd8c1138f421b810af1d0ade50040c1",
+2026-10-19T17:26:41.2170890Z         "Orientation" : 1,
+2026-10-19T17:26:41.2171390Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2171740Z         "original_raw" : false,
+2026-10-19T17:26:41.2172140Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2172490Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2173190Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2173650Z         "size" : 9627,
+2026-10-19T17:26:41.2174150Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2174680Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.2175050Z       },
+2026-10-19T17:26:41.2178490Z       "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+2026-10-19T17:26:41.2180850Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2183010Z       "write_succeeded" : true
+2026-10-19T17:26:41.2184820Z     },
+2026-10-19T17:26:41.2186020Z     {
+2026-10-19T17:26:41.2186890Z       "case" : "landscape-gradient-sdr-heic",
+2026-10-19T17:26:41.2187750Z       "facts" : {
+2026-10-19T17:26:41.2188480Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2189200Z         "coded_extent" : [
+2026-10-19T17:26:41.2190040Z           384,
+2026-10-19T17:26:41.2190910Z           256
+2026-10-19T17:26:41.2191370Z         ],
+2026-10-19T17:26:41.2192060Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2192760Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2193580Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2194620Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2195430Z         "Depth" : 8,
+2026-10-19T17:26:41.2196180Z         "file" : "landscape-gradient-sdr.heic",
+2026-10-19T17:26:41.2197370Z         "file_sha256" : "81b0f9b0f6a9969bfecc6efb76c047a57515cc3a01aba2e48fabd048f128bd77",
+2026-10-19T17:26:41.2198360Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2198930Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2200020Z         "native_decoded_linear_p3_rgba32f_sha256" : "5e590ec8b64646bee03ed544b5daa454af3e5d553dfa60f9060ef3c4ee25406e",
+2026-10-19T17:26:41.2201830Z         "Orientation" : 1,
+2026-10-19T17:26:41.2203820Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2204710Z         "original_raw" : false,
+2026-10-19T17:26:41.2205260Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2205840Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2206410Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2207220Z         "size" : 4564,
+2026-10-19T17:26:41.2207840Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2208500Z         "type" : "public.heic"
+2026-10-19T17:26:41.2209050Z       },
+2026-10-19T17:26:41.2209890Z       "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+2026-10-19T17:26:41.2210880Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2211490Z       "write_succeeded" : true
+2026-10-19T17:26:41.2212020Z     },
+2026-10-19T17:26:41.2212400Z     {
+2026-10-19T17:26:41.2212880Z       "case" : "portrait-checker-sdr-jpg",
+2026-10-19T17:26:41.2213610Z       "facts" : {
+2026-10-19T17:26:41.2214230Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2214830Z         "coded_extent" : [
+2026-10-19T17:26:41.2215310Z           256,
+2026-10-19T17:26:41.2216020Z           384
+2026-10-19T17:26:41.2216520Z         ],
+2026-10-19T17:26:41.2216950Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2217520Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2218090Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2218850Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2219580Z         "Depth" : 8,
+2026-10-19T17:26:41.2220100Z         "file" : "portrait-checker-sdr.jpg",
+2026-10-19T17:26:41.2221070Z         "file_sha256" : "4cf9402a796f1907e8bffae369bc24040531542239bfc32fc40fdc5dd2988ac6",
+2026-10-19T17:26:41.2222030Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2222650Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2223790Z         "native_decoded_linear_p3_rgba32f_sha256" : "d8b429f80a0e481549e1807b6d2cb8775fc4013cd2c253f6b5fd75bf702258b7",
+2026-10-19T17:26:41.2225040Z         "Orientation" : 6,
+2026-10-19T17:26:41.2225610Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2226380Z         "original_raw" : false,
+2026-10-19T17:26:41.2226990Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.2227560Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.2228130Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2228700Z         "size" : 46991,
+2026-10-19T17:26:41.2229260Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2231100Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.2231830Z       },
+2026-10-19T17:26:41.2232630Z       "input_raw_sha256" : "40c7d19c56cfe292059b94274310121ccb2e82a1e8d2dcafeb2469d512e99b51",
+2026-10-19T17:26:41.2233670Z       "requested_orientation" : 6,
+2026-10-19T17:26:41.2234260Z       "write_succeeded" : true
+2026-10-19T17:26:41.2234790Z     },
+2026-10-19T17:26:41.2235170Z     {
+2026-10-19T17:26:41.2235640Z       "case" : "portrait-checker-sdr-heic",
+2026-10-19T17:26:41.2236240Z       "facts" : {
+2026-10-19T17:26:41.2236750Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2237340Z         "coded_extent" : [
+2026-10-19T17:26:41.2237820Z           256,
+2026-10-19T17:26:41.2238260Z           384
+2026-10-19T17:26:41.2238700Z         ],
+2026-10-19T17:26:41.2239120Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2239680Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2240240Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2240980Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2241690Z         "Depth" : 8,
+2026-10-19T17:26:41.2242350Z         "file" : "portrait-checker-sdr.heic",
+2026-10-19T17:26:41.2243410Z         "file_sha256" : "3a3f420c080d8f0e5673364441919b7c5ff7463d4634bd8a70592327b6b3ebfe",
+2026-10-19T17:26:41.2244420Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2244980Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2246130Z         "native_decoded_linear_p3_rgba32f_sha256" : "247749af11d99fff4fb7f46a5f21e18a20f24e2052d4ec502bbec7de50f7c965",
+2026-10-19T17:26:41.2248580Z         "Orientation" : 6,
+2026-10-19T17:26:41.2249410Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2250360Z         "original_raw" : false,
+2026-10-19T17:26:41.2251020Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.2276050Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.2276320Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2277140Z         "size" : 20042,
+2026-10-19T17:26:41.2277410Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2277670Z         "type" : "public.heic"
+2026-10-19T17:26:41.2277870Z       },
+2026-10-19T17:26:41.2278250Z       "input_raw_sha256" : "40c7d19c56cfe292059b94274310121ccb2e82a1e8d2dcafeb2469d512e99b51",
+2026-10-19T17:26:41.2278630Z       "requested_orientation" : 6,
+2026-10-19T17:26:41.2280060Z       "write_succeeded" : true
+2026-10-19T17:26:41.2280660Z     }
+2026-10-19T17:26:41.2280780Z   ],
+2026-10-19T17:26:41.2280970Z   "schema" : "xdremux-native-synthetic-matrix-v1"
+2026-10-19T17:26:41.2281220Z }
+2026-10-19T17:26:41.2281370Z TEXTURE_JSON_END image-matrix.json
+2026-10-19T17:26:41.2281600Z TEXTURE_JSON_BEGIN image-matrix.json
+2026-10-19T17:26:41.2281790Z {
+2026-10-19T17:26:41.2281920Z   "license" : "CC0-1.0",
+2026-10-19T17:26:41.2283100Z   "no_photos_read" : true,
+2026-10-19T17:26:41.2283880Z   "os" : "Version 27.0.1 (Build 26A434)",
+2026-10-19T17:26:41.2284400Z   "rows" : [
+2026-10-19T17:26:41.2284550Z     {
+2026-10-19T17:26:41.2284770Z       "case" : "landscape-gradient-sdr-jpg",
+2026-10-19T17:26:41.2285060Z       "facts" : {
+2026-10-19T17:26:41.2285250Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2286050Z         "coded_extent" : [
+2026-10-19T17:26:41.2286350Z           384,
+2026-10-19T17:26:41.2286510Z           256
+2026-10-19T17:26:41.2286640Z         ],
+2026-10-19T17:26:41.2286790Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2286980Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2288490Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2288850Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2289200Z         "Depth" : 8,
+2026-10-19T17:26:41.2289420Z         "file" : "landscape-gradient-sdr.jpg",
+2026-10-19T17:26:41.2290510Z         "file_sha256" : "0af2690b5e78e31a361088a05dab1bfbc651a1b8615cf84e232fdb52ee69db8c",
+2026-10-19T17:26:41.2290960Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2291230Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2292310Z         "native_decoded_linear_p3_rgba32f_sha256" : "c8bbfcdb70bb42767db98691f6974c2d6fd8c1138f421b810af1d0ade50040c1",
+2026-10-19T17:26:41.2292780Z         "Orientation" : 1,
+2026-10-19T17:26:41.2293240Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2294120Z         "original_raw" : false,
+2026-10-19T17:26:41.2294360Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2294830Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2295080Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2296580Z         "size" : 9627,
+2026-10-19T17:26:41.2296830Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2297100Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.2297320Z       },
+2026-10-19T17:26:41.2297630Z       "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+2026-10-19T17:26:41.2299410Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2300190Z       "write_succeeded" : true
+2026-10-19T17:26:41.2300690Z     },
+2026-10-19T17:26:41.2301350Z     {
+2026-10-19T17:26:41.2301550Z       "case" : "landscape-gradient-sdr-heic",
+2026-10-19T17:26:41.2301810Z       "facts" : {
+2026-10-19T17:26:41.2302050Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2302290Z         "coded_extent" : [
+2026-10-19T17:26:41.2302520Z           384,
+2026-10-19T17:26:41.2302720Z           256
+2026-10-19T17:26:41.2303260Z         ],
+2026-10-19T17:26:41.2304150Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2304410Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2304620Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2305340Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2305660Z         "Depth" : 8,
+2026-10-19T17:26:41.2305900Z         "file" : "landscape-gradient-sdr.heic",
+2026-10-19T17:26:41.2306370Z         "file_sha256" : "81b0f9b0f6a9969bfecc6efb76c047a57515cc3a01aba2e48fabd048f128bd77",
+2026-10-19T17:26:41.2308480Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2310430Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2311970Z         "native_decoded_linear_p3_rgba32f_sha256" : "5e590ec8b64646bee03ed544b5daa454af3e5d553dfa60f9060ef3c4ee25406e",
+2026-10-19T17:26:41.2314670Z         "Orientation" : 1,
+2026-10-19T17:26:41.2316090Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2316880Z         "original_raw" : false,
+2026-10-19T17:26:41.2317100Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2317300Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2317490Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2317710Z         "size" : 4564,
+2026-10-19T17:26:41.2317990Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2318290Z         "type" : "public.heic"
+2026-10-19T17:26:41.2318510Z       },
+2026-10-19T17:26:41.2318870Z       "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+2026-10-19T17:26:41.2319230Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2320070Z       "write_succeeded" : true
+2026-10-19T17:26:41.2320820Z     },
+2026-10-19T17:26:41.2321180Z     {
+2026-10-19T17:26:41.2321960Z       "case" : "portrait-checker-sdr-jpg",
+2026-10-19T17:26:41.2322330Z       "facts" : {
+2026-10-19T17:26:41.2322570Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2322820Z         "coded_extent" : [
+2026-10-19T17:26:41.2323020Z           256,
+2026-10-19T17:26:41.2323180Z           384
+2026-10-19T17:26:41.2323330Z         ],
+2026-10-19T17:26:41.2323480Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2323670Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2323930Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2324260Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2324510Z         "Depth" : 8,
+2026-10-19T17:26:41.2324750Z         "file" : "portrait-checker-sdr.jpg",
+2026-10-19T17:26:41.2325200Z         "file_sha256" : "4cf9402a796f1907e8bffae369bc24040531542239bfc32fc40fdc5dd2988ac6",
+2026-10-19T17:26:41.2325610Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2325880Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2327340Z         "native_decoded_linear_p3_rgba32f_sha256" : "d8b429f80a0e481549e1807b6d2cb8775fc4013cd2c253f6b5fd75bf702258b7",
+2026-10-19T17:26:41.2327910Z         "Orientation" : 6,
+2026-10-19T17:26:41.2328160Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2328430Z         "original_raw" : false,
+2026-10-19T17:26:41.2328620Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.2328810Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.2329010Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2329230Z         "size" : 46991,
+2026-10-19T17:26:41.2329410Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2329690Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.2329940Z       },
+2026-10-19T17:26:41.2330240Z       "input_raw_sha256" : "40c7d19c56cfe292059b94274310121ccb2e82a1e8d2dcafeb2469d512e99b51",
+2026-10-19T17:26:41.2330610Z       "requested_orientation" : 6,
+2026-10-19T17:26:41.2330870Z       "write_succeeded" : true
+2026-10-19T17:26:41.2331080Z     },
+2026-10-19T17:26:41.2331210Z     {
+2026-10-19T17:26:41.2331360Z       "case" : "portrait-checker-sdr-heic",
+2026-10-19T17:26:41.2331590Z       "facts" : {
+2026-10-19T17:26:41.2331750Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2331950Z         "coded_extent" : [
+2026-10-19T17:26:41.2332130Z           256,
+2026-10-19T17:26:41.2336880Z           384
+2026-10-19T17:26:41.2337460Z         ],
+2026-10-19T17:26:41.2337870Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2338420Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2340350Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2340640Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2340920Z         "Depth" : 8,
+2026-10-19T17:26:41.2341160Z         "file" : "portrait-checker-sdr.heic",
+2026-10-19T17:26:41.2341630Z         "file_sha256" : "3a3f420c080d8f0e5673364441919b7c5ff7463d4634bd8a70592327b6b3ebfe",
+2026-10-19T17:26:41.2344120Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2344910Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2346080Z         "native_decoded_linear_p3_rgba32f_sha256" : "247749af11d99fff4fb7f46a5f21e18a20f24e2052d4ec502bbec7de50f7c965",
+2026-10-19T17:26:41.2347280Z         "Orientation" : 6,
+2026-10-19T17:26:41.2347840Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2348680Z         "original_raw" : false,
+2026-10-19T17:26:41.2349360Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.2350050Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.2350810Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2351630Z         "size" : 20042,
+2026-10-19T17:26:41.2352170Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2352780Z         "type" : "public.heic"
+2026-10-19T17:26:41.2353280Z       },
+2026-10-19T17:26:41.2354230Z       "input_raw_sha256" : "40c7d19c56cfe292059b94274310121ccb2e82a1e8d2dcafeb2469d512e99b51",
+2026-10-19T17:26:41.2355400Z       "requested_orientation" : 6,
+2026-10-19T17:26:41.2356050Z       "write_succeeded" : true
+2026-10-19T17:26:41.2356790Z     },
+2026-10-19T17:26:41.2357230Z     {
+2026-10-19T17:26:41.2357720Z       "case" : "landscape-hdr-edge-sdr-jpg",
+2026-10-19T17:26:41.2358470Z       "facts" : {
+2026-10-19T17:26:41.2358930Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2359500Z         "coded_extent" : [
+2026-10-19T17:26:41.2359970Z           384,
+2026-10-19T17:26:41.2360400Z           256
+2026-10-19T17:26:41.2360790Z         ],
+2026-10-19T17:26:41.2361210Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2361770Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2362310Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2363000Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2363660Z         "Depth" : 8,
+2026-10-19T17:26:41.2364170Z         "file" : "landscape-hdr-edge-sdr.jpg",
+2026-10-19T17:26:41.2365300Z         "file_sha256" : "0d3c855d02f4e73917261664d75cbcea6278a078ad71bde2d0cafe183188ecc2",
+2026-10-19T17:26:41.2365820Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2366630Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2367090Z         "native_decoded_linear_p3_rgba32f_sha256" : "2e3cf42814e72cf28127bc7b1baba38cff7736e606a6d379a0dcefe0df41522d",
+2026-10-19T17:26:41.2367590Z         "Orientation" : 1,
+2026-10-19T17:26:41.2367830Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2368140Z         "original_raw" : false,
+2026-10-19T17:26:41.2368350Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2368540Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2368740Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2368950Z         "size" : 10832,
+2026-10-19T17:26:41.2369180Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2369460Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.2369630Z       },
+2026-10-19T17:26:41.2369920Z       "input_raw_sha256" : "9c0ca8a38a7ce8367410b6d15c047c44b804f64307db77a9af8823c9c7fea334",
+2026-10-19T17:26:41.2370290Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2370490Z       "write_succeeded" : true
+2026-10-19T17:26:41.2370670Z     },
+2026-10-19T17:26:41.2370790Z     {
+2026-10-19T17:26:41.2370960Z       "case" : "landscape-hdr-edge-sdr-heic",
+2026-10-19T17:26:41.2371180Z       "facts" : {
+2026-10-19T17:26:41.2371340Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2371540Z         "coded_extent" : [
+2026-10-19T17:26:41.2371710Z           384,
+2026-10-19T17:26:41.2371840Z           256
+2026-10-19T17:26:41.2371980Z         ],
+2026-10-19T17:26:41.2372120Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2372550Z         "content_headroom" : 1,
+2026-10-19T17:26:41.2372800Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2373110Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2373410Z         "Depth" : 8,
+2026-10-19T17:26:41.2373640Z         "file" : "landscape-hdr-edge-sdr.heic",
+2026-10-19T17:26:41.2374040Z         "file_sha256" : "782cf6969cf92cd9ccb45c8656f1bedee9d628e64aaaac0b9cc87deaba03e4d6",
+2026-10-19T17:26:41.2374470Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2375120Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2375520Z         "native_decoded_linear_p3_rgba32f_sha256" : "04be4d5d49319909fe380585732184290d1e79d409dfe22ae2b5fb500152d5f0",
+2026-10-19T17:26:41.2375950Z         "Orientation" : 1,
+2026-10-19T17:26:41.2376150Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2376380Z         "original_raw" : false,
+2026-10-19T17:26:41.2376890Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2377170Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2378220Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.2378840Z         "size" : 4125,
+2026-10-19T17:26:41.2379380Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2380070Z         "type" : "public.heic"
+2026-10-19T17:26:41.2380890Z       },
+2026-10-19T17:26:41.2381210Z       "input_raw_sha256" : "9c0ca8a38a7ce8367410b6d15c047c44b804f64307db77a9af8823c9c7fea334",
+2026-10-19T17:26:41.2382860Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2383130Z       "write_succeeded" : true
+2026-10-19T17:26:41.2383320Z     },
+2026-10-19T17:26:41.2383440Z     {
+2026-10-19T17:26:41.2383640Z       "case" : "landscape-hdr-edge-pq",
+2026-10-19T17:26:41.2383930Z       "facts" : {
+2026-10-19T17:26:41.2384340Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2384570Z         "coded_extent" : [
+2026-10-19T17:26:41.2384840Z           384,
+2026-10-19T17:26:41.2385020Z           256
+2026-10-19T17:26:41.2385190Z         ],
+2026-10-19T17:26:41.2385370Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2385660Z         "content_headroom" : 4.9261083602905273,
+2026-10-19T17:26:41.2385940Z         "decoded_bits_per_component" : 10,
+2026-10-19T17:26:41.2386310Z         "decoded_color_space" : "kCGColorSpaceITUR_2100_PQ",
+2026-10-19T17:26:41.2386590Z         "Depth" : 10,
+2026-10-19T17:26:41.2386790Z         "file" : "landscape-hdr-edge-pq.heic",
+2026-10-19T17:26:41.2387920Z         "file_sha256" : "8350df71ea28211079c83cadfcab86a2239ce1458f830438dfff8f39d8eebd99",
+2026-10-19T17:26:41.2388300Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2388680Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.2389110Z         "native_decoded_linear_p3_rgba32f_sha256" : "bc1000d595cf0ad08e8658486701858d1f4339cd677564f107c65f06127c5494",
+2026-10-19T17:26:41.2389730Z         "Orientation" : 1,
+2026-10-19T17:26:41.2390000Z         "original_camera_information" : false,
+2026-10-19T17:26:41.2390690Z         "original_raw" : false,
+2026-10-19T17:26:41.2391050Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.2392990Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.2405490Z         "ProfileName" : "Rec. ITU-R BT.2100 PQ",
+2026-10-19T17:26:41.2405880Z         "size" : 1828,
+2026-10-19T17:26:41.2406200Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.2406470Z         "type" : "public.heic"
+2026-10-19T17:26:41.2406680Z       },
+2026-10-19T17:26:41.2406990Z       "input_raw_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+2026-10-19T17:26:41.2407410Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.2407640Z       "write_succeeded" : true
+2026-10-19T17:26:41.2407930Z     },
+2026-10-19T17:26:41.2408100Z     {
+2026-10-19T17:26:41.2408320Z       "case" : "landscape-hdr-edge-adaptive",
+2026-10-19T17:26:41.2408590Z       "facts" : {
+2026-10-19T17:26:41.2408810Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.2409120Z         "coded_extent" : [
+2026-10-19T17:26:41.2409300Z           384,
+2026-10-19T17:26:41.2410280Z           256
+2026-10-19T17:26:41.2410490Z         ],
+2026-10-19T17:26:41.2410730Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.2410990Z         "content_headroom" : 4,
+2026-10-19T17:26:41.2411250Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.2411540Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.2411790Z         "Depth" : 8,
+2026-10-19T17:26:41.2412010Z         "file" : "landscape-hdr-edge-adaptive.heic",
+2026-10-19T17:26:41.2412460Z         "file_sha256" : "8135173a5bbabb7bb6f242a33367ccea87bec1625761e43866b3296d88ccc90a",
+2026-10-19T17:26:41.2412890Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.2413130Z         "iso_gain_map" : true,
+2026-10-19T17:26:41.2413570Z         "native_decoded_linear_p3_rgba32f_sha256" : "4ad14fb7ad17728e643b4f353d892eb7371080ee5178a545e9eaa0c9a1f4e026",
+2026-10-19T17:26:41.2414060Z         "Orientation" : 1,
+2026-10-19T17:26:41.5906810Z         "original_camera_information" : false,
+2026-10-19T17:26:41.5919360Z         "original_raw" : false,
+2026-10-19T17:26:41.5920150Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.5920910Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.5921700Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.5922660Z         "size" : 3672,
+2026-10-19T17:26:41.5928230Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.5928720Z         "type" : "public.heic"
+2026-10-19T17:26:41.5928920Z       },
+2026-10-19T17:26:41.5929370Z       "input_raw_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+2026-10-19T17:26:41.5929870Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.5930090Z       "write_succeeded" : true
+2026-10-19T17:26:41.5930320Z     }
+2026-10-19T17:26:41.5930480Z   ],
+2026-10-19T17:26:41.5931060Z   "schema" : "xdremux-native-synthetic-matrix-v1"
+2026-10-19T17:26:41.5931530Z }
+2026-10-19T17:26:41.5931770Z TEXTURE_JSON_END image-matrix.json
+2026-10-19T17:26:41.5931990Z TEXTURE_JSON_BEGIN image-matrix.json
+2026-10-19T17:26:41.5932200Z {
+2026-10-19T17:26:41.5932330Z   "license" : "CC0-1.0",
+2026-10-19T17:26:41.5932510Z   "no_photos_read" : true,
+2026-10-19T17:26:41.5932700Z   "os" : "Version 27.0.1 (Build 26A434)",
+2026-10-19T17:26:41.5932910Z   "rows" : [
+2026-10-19T17:26:41.5933040Z     {
+2026-10-19T17:26:41.5933210Z       "case" : "landscape-gradient-sdr-jpg",
+2026-10-19T17:26:41.5933420Z       "facts" : {
+2026-10-19T17:26:41.5933580Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.5933780Z         "coded_extent" : [
+2026-10-19T17:26:41.5934740Z           384,
+2026-10-19T17:26:41.5934910Z           256
+2026-10-19T17:26:41.5935050Z         ],
+2026-10-19T17:26:41.5935190Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.5935540Z         "content_headroom" : 1,
+2026-10-19T17:26:41.5936080Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.5936510Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.5937320Z         "Depth" : 8,
+2026-10-19T17:26:41.5938530Z         "file" : "landscape-gradient-sdr.jpg",
+2026-10-19T17:26:41.5939290Z         "file_sha256" : "0af2690b5e78e31a361088a05dab1bfbc651a1b8615cf84e232fdb52ee69db8c",
+2026-10-19T17:26:41.5940210Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.5940560Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.5941150Z         "native_decoded_linear_p3_rgba32f_sha256" : "c8bbfcdb70bb42767db98691f6974c2d6fd8c1138f421b810af1d0ade50040c1",
+2026-10-19T17:26:41.5942300Z         "Orientation" : 1,
+2026-10-19T17:26:41.5943930Z         "original_camera_information" : false,
+2026-10-19T17:26:41.5944660Z         "original_raw" : false,
+2026-10-19T17:26:41.5945870Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.5946370Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.5946650Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.5946890Z         "size" : 9627,
+2026-10-19T17:26:41.5947100Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.5947400Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.5947610Z       },
+2026-10-19T17:26:41.5948430Z       "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+2026-10-19T17:26:41.5949820Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.5950510Z       "write_succeeded" : true
+2026-10-19T17:26:41.5951020Z     },
+2026-10-19T17:26:41.5951450Z     {
+2026-10-19T17:26:41.5951980Z       "case" : "landscape-gradient-sdr-heic",
+2026-10-19T17:26:41.5952900Z       "facts" : {
+2026-10-19T17:26:41.5953130Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.5953380Z         "coded_extent" : [
+2026-10-19T17:26:41.5953600Z           384,
+2026-10-19T17:26:41.5953780Z           256
+2026-10-19T17:26:41.5953960Z         ],
+2026-10-19T17:26:41.5954150Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.5954360Z         "content_headroom" : 1,
+2026-10-19T17:26:41.5956080Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.5956510Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.5956940Z         "Depth" : 8,
+2026-10-19T17:26:41.5957260Z         "file" : "landscape-gradient-sdr.heic",
+2026-10-19T17:26:41.5959480Z         "file_sha256" : "81b0f9b0f6a9969bfecc6efb76c047a57515cc3a01aba2e48fabd048f128bd77",
+2026-10-19T17:26:41.5962630Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.5963660Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.5965200Z         "native_decoded_linear_p3_rgba32f_sha256" : "5e590ec8b64646bee03ed544b5daa454af3e5d553dfa60f9060ef3c4ee25406e",
+2026-10-19T17:26:41.5967050Z         "Orientation" : 1,
+2026-10-19T17:26:41.5967280Z         "original_camera_information" : false,
+2026-10-19T17:26:41.5967780Z         "original_raw" : false,
+2026-10-19T17:26:41.5968080Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.5968850Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.5969130Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.5969410Z         "size" : 4564,
+2026-10-19T17:26:41.5969630Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.5969920Z         "type" : "public.heic"
+2026-10-19T17:26:41.5970160Z       },
+2026-10-19T17:26:41.5970570Z       "input_raw_sha256" : "9b8d50431f20be9197c4964069ef10c7ead92365e05e9411bcbe438b3092ed35",
+2026-10-19T17:26:41.5970980Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.5971190Z       "write_succeeded" : true
+2026-10-19T17:26:41.5971400Z     },
+2026-10-19T17:26:41.5971570Z     {
+2026-10-19T17:26:41.5971790Z       "case" : "portrait-checker-sdr-jpg",
+2026-10-19T17:26:41.5972030Z       "facts" : {
+2026-10-19T17:26:41.5972220Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.5973610Z         "coded_extent" : [
+2026-10-19T17:26:41.5973850Z           256,
+2026-10-19T17:26:41.5974010Z           384
+2026-10-19T17:26:41.5974190Z         ],
+2026-10-19T17:26:41.5974370Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.5974600Z         "content_headroom" : 1,
+2026-10-19T17:26:41.5974840Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.5975140Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.5975410Z         "Depth" : 8,
+2026-10-19T17:26:41.5975640Z         "file" : "portrait-checker-sdr.jpg",
+2026-10-19T17:26:41.5976150Z         "file_sha256" : "4cf9402a796f1907e8bffae369bc24040531542239bfc32fc40fdc5dd2988ac6",
+2026-10-19T17:26:41.5976540Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.5976760Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.5977220Z         "native_decoded_linear_p3_rgba32f_sha256" : "d8b429f80a0e481549e1807b6d2cb8775fc4013cd2c253f6b5fd75bf702258b7",
+2026-10-19T17:26:41.5977700Z         "Orientation" : 6,
+2026-10-19T17:26:41.5977940Z         "original_camera_information" : false,
+2026-10-19T17:26:41.5979000Z         "original_raw" : false,
+2026-10-19T17:26:41.5981320Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.5981870Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.5982620Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.5983210Z         "size" : 46991,
+2026-10-19T17:26:41.5983730Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.5984350Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.5985970Z       },
+2026-10-19T17:26:41.5986730Z       "input_raw_sha256" : "40c7d19c56cfe292059b94274310121ccb2e82a1e8d2dcafeb2469d512e99b51",
+2026-10-19T17:26:41.5987700Z       "requested_orientation" : 6,
+2026-10-19T17:26:41.5988250Z       "write_succeeded" : true
+2026-10-19T17:26:41.5988740Z     },
+2026-10-19T17:26:41.5989100Z     {
+2026-10-19T17:26:41.5989730Z       "case" : "portrait-checker-sdr-heic",
+2026-10-19T17:26:41.5990320Z       "facts" : {
+2026-10-19T17:26:41.5990890Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.5991470Z         "coded_extent" : [
+2026-10-19T17:26:41.5991940Z           256,
+2026-10-19T17:26:41.5992350Z           384
+2026-10-19T17:26:41.5992750Z         ],
+2026-10-19T17:26:41.5993160Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.5993820Z         "content_headroom" : 1,
+2026-10-19T17:26:41.5994040Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.5994350Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.5994660Z         "Depth" : 8,
+2026-10-19T17:26:41.5994850Z         "file" : "portrait-checker-sdr.heic",
+2026-10-19T17:26:41.5997850Z         "file_sha256" : "3a3f420c080d8f0e5673364441919b7c5ff7463d4634bd8a70592327b6b3ebfe",
+2026-10-19T17:26:41.5998790Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6000280Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.6000700Z         "native_decoded_linear_p3_rgba32f_sha256" : "247749af11d99fff4fb7f46a5f21e18a20f24e2052d4ec502bbec7de50f7c965",
+2026-10-19T17:26:41.6001700Z         "Orientation" : 6,
+2026-10-19T17:26:41.6002030Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6002280Z         "original_raw" : false,
+2026-10-19T17:26:41.6002480Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.6002700Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.6002910Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.6003120Z         "size" : 20042,
+2026-10-19T17:26:41.6003350Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6003630Z         "type" : "public.heic"
+2026-10-19T17:26:41.6003810Z       },
+2026-10-19T17:26:41.6004100Z       "input_raw_sha256" : "40c7d19c56cfe292059b94274310121ccb2e82a1e8d2dcafeb2469d512e99b51",
+2026-10-19T17:26:41.6004560Z       "requested_orientation" : 6,
+2026-10-19T17:26:41.6004780Z       "write_succeeded" : true
+2026-10-19T17:26:41.6004950Z     },
+2026-10-19T17:26:41.6005080Z     {
+2026-10-19T17:26:41.6005240Z       "case" : "landscape-hdr-edge-sdr-jpg",
+2026-10-19T17:26:41.6005490Z       "facts" : {
+2026-10-19T17:26:41.6006500Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.6006750Z         "coded_extent" : [
+2026-10-19T17:26:41.6006970Z           384,
+2026-10-19T17:26:41.6007140Z           256
+2026-10-19T17:26:41.6007280Z         ],
+2026-10-19T17:26:41.6007420Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.6007650Z         "content_headroom" : 1,
+2026-10-19T17:26:41.6007900Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.6008160Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.6008410Z         "Depth" : 8,
+2026-10-19T17:26:41.6008600Z         "file" : "landscape-hdr-edge-sdr.jpg",
+2026-10-19T17:26:41.6008960Z         "file_sha256" : "0d3c855d02f4e73917261664d75cbcea6278a078ad71bde2d0cafe183188ecc2",
+2026-10-19T17:26:41.6009370Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6009600Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.6010060Z         "native_decoded_linear_p3_rgba32f_sha256" : "2e3cf42814e72cf28127bc7b1baba38cff7736e606a6d379a0dcefe0df41522d",
+2026-10-19T17:26:41.6010580Z         "Orientation" : 1,
+2026-10-19T17:26:41.6010820Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6011120Z         "original_raw" : false,
+2026-10-19T17:26:41.6011380Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.6011580Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.6011830Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.6012100Z         "size" : 10832,
+2026-10-19T17:26:41.6012290Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6012730Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.6012910Z       },
+2026-10-19T17:26:41.6013250Z       "input_raw_sha256" : "9c0ca8a38a7ce8367410b6d15c047c44b804f64307db77a9af8823c9c7fea334",
+2026-10-19T17:26:41.6013650Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.6013860Z       "write_succeeded" : true
+2026-10-19T17:26:41.6014040Z     },
+2026-10-19T17:26:41.6014160Z     {
+2026-10-19T17:26:41.6014340Z       "case" : "landscape-hdr-edge-sdr-heic",
+2026-10-19T17:26:41.6014610Z       "facts" : {
+2026-10-19T17:26:41.6014800Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.6015000Z         "coded_extent" : [
+2026-10-19T17:26:41.6015210Z           384,
+2026-10-19T17:26:41.6015370Z           256
+2026-10-19T17:26:41.6015520Z         ],
+2026-10-19T17:26:41.6015670Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.6015910Z         "content_headroom" : 1,
+2026-10-19T17:26:41.6016150Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.6017570Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.6018780Z         "Depth" : 8,
+2026-10-19T17:26:41.6029440Z         "file" : "landscape-hdr-edge-sdr.heic",
+2026-10-19T17:26:41.6029970Z         "file_sha256" : "782cf6969cf92cd9ccb45c8656f1bedee9d628e64aaaac0b9cc87deaba03e4d6",
+2026-10-19T17:26:41.6030350Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6030550Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.6030980Z         "native_decoded_linear_p3_rgba32f_sha256" : "04be4d5d49319909fe380585732184290d1e79d409dfe22ae2b5fb500152d5f0",
+2026-10-19T17:26:41.6031400Z         "Orientation" : 1,
+2026-10-19T17:26:41.6031610Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6031840Z         "original_raw" : false,
+2026-10-19T17:26:41.6032040Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.6032230Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.6032430Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.6032630Z         "size" : 4125,
+2026-10-19T17:26:41.6032830Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6033060Z         "type" : "public.heic"
+2026-10-19T17:26:41.6033240Z       },
+2026-10-19T17:26:41.6033530Z       "input_raw_sha256" : "9c0ca8a38a7ce8367410b6d15c047c44b804f64307db77a9af8823c9c7fea334",
+2026-10-19T17:26:41.6033910Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.6034110Z       "write_succeeded" : true
+2026-10-19T17:26:41.6034290Z     },
+2026-10-19T17:26:41.6034410Z     {
+2026-10-19T17:26:41.6035440Z       "case" : "landscape-hdr-edge-pq",
+2026-10-19T17:26:41.6035680Z       "facts" : {
+2026-10-19T17:26:41.6035860Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.6036070Z         "coded_extent" : [
+2026-10-19T17:26:41.6036260Z           384,
+2026-10-19T17:26:41.6036430Z           256
+2026-10-19T17:26:41.6036600Z         ],
+2026-10-19T17:26:41.6036750Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.6036960Z         "content_headroom" : 4.9261083602905273,
+2026-10-19T17:26:41.6037220Z         "decoded_bits_per_component" : 10,
+2026-10-19T17:26:41.6037560Z         "decoded_color_space" : "kCGColorSpaceITUR_2100_PQ",
+2026-10-19T17:26:41.6037830Z         "Depth" : 10,
+2026-10-19T17:26:41.6038070Z         "file" : "landscape-hdr-edge-pq.heic",
+2026-10-19T17:26:41.6038490Z         "file_sha256" : "8350df71ea28211079c83cadfcab86a2239ce1458f830438dfff8f39d8eebd99",
+2026-10-19T17:26:41.6038840Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6039040Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.6039440Z         "native_decoded_linear_p3_rgba32f_sha256" : "bc1000d595cf0ad08e8658486701858d1f4339cd677564f107c65f06127c5494",
+2026-10-19T17:26:41.6039870Z         "Orientation" : 1,
+2026-10-19T17:26:41.6040080Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6040300Z         "original_raw" : false,
+2026-10-19T17:26:41.6040600Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.6040830Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.6041070Z         "ProfileName" : "Rec. ITU-R BT.2100 PQ",
+2026-10-19T17:26:41.6041580Z         "size" : 1828,
+2026-10-19T17:26:41.6041790Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6042010Z         "type" : "public.heic"
+2026-10-19T17:26:41.6042180Z       },
+2026-10-19T17:26:41.6042470Z       "input_raw_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+2026-10-19T17:26:41.6042940Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.6043150Z       "write_succeeded" : true
+2026-10-19T17:26:41.6043320Z     },
+2026-10-19T17:26:41.6043450Z     {
+2026-10-19T17:26:41.6043620Z       "case" : "landscape-hdr-edge-adaptive",
+2026-10-19T17:26:41.6043840Z       "facts" : {
+2026-10-19T17:26:41.6043990Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.6044190Z         "coded_extent" : [
+2026-10-19T17:26:41.6044350Z           384,
+2026-10-19T17:26:41.6044540Z           256
+2026-10-19T17:26:41.6044720Z         ],
+2026-10-19T17:26:41.6044890Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.6045090Z         "content_headroom" : 4,
+2026-10-19T17:26:41.6045290Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.6045560Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.6045800Z         "Depth" : 8,
+2026-10-19T17:26:41.6046010Z         "file" : "landscape-hdr-edge-adaptive.heic",
+2026-10-19T17:26:41.6046460Z         "file_sha256" : "8135173a5bbabb7bb6f242a33367ccea87bec1625761e43866b3296d88ccc90a",
+2026-10-19T17:26:41.6046900Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6047110Z         "iso_gain_map" : true,
+2026-10-19T17:26:41.6047550Z         "native_decoded_linear_p3_rgba32f_sha256" : "4ad14fb7ad17728e643b4f353d892eb7371080ee5178a545e9eaa0c9a1f4e026",
+2026-10-19T17:26:41.6049410Z         "Orientation" : 1,
+2026-10-19T17:26:41.6049670Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6049900Z         "original_raw" : false,
+2026-10-19T17:26:41.6050100Z         "PixelHeight" : 256,
+2026-10-19T17:26:41.6050290Z         "PixelWidth" : 384,
+2026-10-19T17:26:41.6050550Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.6050780Z         "size" : 3672,
+2026-10-19T17:26:41.6050980Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6051260Z         "type" : "public.heic"
+2026-10-19T17:26:41.6051470Z       },
+2026-10-19T17:26:41.6051840Z       "input_raw_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+2026-10-19T17:26:41.6052210Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.6052430Z       "write_succeeded" : true
+2026-10-19T17:26:41.6053120Z     },
+2026-10-19T17:26:41.6053250Z     {
+2026-10-19T17:26:41.6053420Z       "case" : "portrait-hdr-impulse-sdr-jpg",
+2026-10-19T17:26:41.6053640Z       "facts" : {
+2026-10-19T17:26:41.6053800Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.6053990Z         "coded_extent" : [
+2026-10-19T17:26:41.6054200Z           256,
+2026-10-19T17:26:41.6054370Z           384
+2026-10-19T17:26:41.6054530Z         ],
+2026-10-19T17:26:41.6054670Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.6054870Z         "content_headroom" : 1,
+2026-10-19T17:26:41.6055080Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.6055340Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.6055590Z         "Depth" : 8,
+2026-10-19T17:26:41.6055790Z         "file" : "portrait-hdr-impulse-sdr.jpg",
+2026-10-19T17:26:41.6056170Z         "file_sha256" : "648423537529a26019c0e6a8337a78923b63f98b55b514a54897d5bdcd71eb07",
+2026-10-19T17:26:41.6056530Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6056730Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.6057140Z         "native_decoded_linear_p3_rgba32f_sha256" : "810aadac09716859f864e0678b2d09582f58bed2b7650641f6d0dfe149b0c93f",
+2026-10-19T17:26:41.6057570Z         "Orientation" : 8,
+2026-10-19T17:26:41.6057760Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6057990Z         "original_raw" : false,
+2026-10-19T17:26:41.6058220Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.6058930Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.6059400Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.6059650Z         "size" : 9779,
+2026-10-19T17:26:41.6059880Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6060130Z         "type" : "public.jpeg"
+2026-10-19T17:26:41.6060300Z       },
+2026-10-19T17:26:41.6060590Z       "input_raw_sha256" : "3e6f3e992508be90017bb6b49282a798fae29356f22366b569fc7d080a8d6e79",
+2026-10-19T17:26:41.6060950Z       "requested_orientation" : 8,
+2026-10-19T17:26:41.6061160Z       "write_succeeded" : true
+2026-10-19T17:26:41.6061330Z     },
+2026-10-19T17:26:41.6061460Z     {
+2026-10-19T17:26:41.6061630Z       "case" : "portrait-hdr-impulse-sdr-heic",
+2026-10-19T17:26:41.6061870Z       "facts" : {
+2026-10-19T17:26:41.6062030Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.6062770Z         "coded_extent" : [
+2026-10-19T17:26:41.6062970Z           256,
+2026-10-19T17:26:41.6063110Z           384
+2026-10-19T17:26:41.6063250Z         ],
+2026-10-19T17:26:41.6063390Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.6063590Z         "content_headroom" : 1,
+2026-10-19T17:26:41.6063790Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.6064060Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.6065440Z         "Depth" : 8,
+2026-10-19T17:26:41.6066040Z         "file" : "portrait-hdr-impulse-sdr.heic",
+2026-10-19T17:26:41.6067090Z         "file_sha256" : "8d63be9e1e316ed2a847a14c268769e9ee8017c9204c32a29c0fa48bcec8e1d1",
+2026-10-19T17:26:41.6068430Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6069070Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.6069890Z         "native_decoded_linear_p3_rgba32f_sha256" : "93e91d367e0e81a7c357c19255b6754d5b70aa39946a5705afdb77a07c8fc69e",
+2026-10-19T17:26:41.6070310Z         "Orientation" : 8,
+2026-10-19T17:26:41.6070520Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6070770Z         "original_raw" : false,
+2026-10-19T17:26:41.6071250Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.6071470Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.6071680Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.6071880Z         "size" : 4655,
+2026-10-19T17:26:41.6072070Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6072300Z         "type" : "public.heic"
+2026-10-19T17:26:41.6072470Z       },
+2026-10-19T17:26:41.6072760Z       "input_raw_sha256" : "3e6f3e992508be90017bb6b49282a798fae29356f22366b569fc7d080a8d6e79",
+2026-10-19T17:26:41.6075320Z       "requested_orientation" : 8,
+2026-10-19T17:26:41.6075590Z       "write_succeeded" : true
+2026-10-19T17:26:41.6075820Z     },
+2026-10-19T17:26:41.6075970Z     {
+2026-10-19T17:26:41.6076130Z       "case" : "portrait-hdr-impulse-pq",
+2026-10-19T17:26:41.6076340Z       "facts" : {
+2026-10-19T17:26:41.6076510Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.6076710Z         "coded_extent" : [
+2026-10-19T17:26:41.6076870Z           256,
+2026-10-19T17:26:41.6077010Z           384
+2026-10-19T17:26:41.6077150Z         ],
+2026-10-19T17:26:41.6077300Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.6077500Z         "content_headroom" : 4.9261083602905273,
+2026-10-19T17:26:41.6077770Z         "decoded_bits_per_component" : 10,
+2026-10-19T17:26:41.6078140Z         "decoded_color_space" : "kCGColorSpaceITUR_2100_PQ",
+2026-10-19T17:26:41.6078390Z         "Depth" : 10,
+2026-10-19T17:26:41.6078580Z         "file" : "portrait-hdr-impulse-pq.heic",
+2026-10-19T17:26:41.6079060Z         "file_sha256" : "9bb23276dae70c484bb6d9d713be0a5c7db9685cab7ddf08f28ddb77aeace2f4",
+2026-10-19T17:26:41.6079510Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6079750Z         "iso_gain_map" : false,
+2026-10-19T17:26:41.6080240Z         "native_decoded_linear_p3_rgba32f_sha256" : "c33234318b8b5940016aaa3025c6a621cdc1a304656f434e0f85348ef3e0b0ab",
+2026-10-19T17:26:41.6080970Z         "Orientation" : 1,
+2026-10-19T17:26:41.6081200Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6081520Z         "original_raw" : false,
+2026-10-19T17:26:41.6082280Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.6082520Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.6082780Z         "ProfileName" : "Rec. ITU-R BT.2100 PQ",
+2026-10-19T17:26:41.6083050Z         "size" : 1575,
+2026-10-19T17:26:41.6083260Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6083540Z         "type" : "public.heic"
+2026-10-19T17:26:41.6083780Z       },
+2026-10-19T17:26:41.6085010Z       "input_raw_sha256" : "cc83af98983a95c5661db95f73e96a869be766800588a3dd0c2ce723473c6f81",
+2026-10-19T17:26:41.6086240Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.6087040Z       "write_succeeded" : true
+2026-10-19T17:26:41.6087570Z     },
+2026-10-19T17:26:41.6088030Z     {
+2026-10-19T17:26:41.6088550Z       "case" : "portrait-hdr-impulse-adaptive",
+2026-10-19T17:26:41.6089220Z       "facts" : {
+2026-10-19T17:26:41.6089730Z         "apple_gain_map" : false,
+2026-10-19T17:26:41.6090340Z         "coded_extent" : [
+2026-10-19T17:26:41.6090850Z           256,
+2026-10-19T17:26:41.6091330Z           384
+2026-10-19T17:26:41.6091970Z         ],
+2026-10-19T17:26:41.6092480Z         "ColorModel" : "RGB",
+2026-10-19T17:26:41.6093120Z         "content_headroom" : 1.0361328125,
+2026-10-19T17:26:41.6093800Z         "decoded_bits_per_component" : 8,
+2026-10-19T17:26:41.6094580Z         "decoded_color_space" : "kCGColorSpaceDisplayP3",
+2026-10-19T17:26:41.6095350Z         "Depth" : 8,
+2026-10-19T17:26:41.6096000Z         "file" : "portrait-hdr-impulse-adaptive.heic",
+2026-10-19T17:26:41.6108800Z         "file_sha256" : "35e5b1fade8a94b2bd0b62a412239874c4ca14e8d3220f56ee03e0cdbec520cf",
+2026-10-19T17:26:41.6109380Z         "imageio_decoded" : true,
+2026-10-19T17:26:41.6109660Z         "iso_gain_map" : true,
+2026-10-19T17:26:41.6110110Z         "native_decoded_linear_p3_rgba32f_sha256" : "0a28941b3a2c4454821cfaa22e8435ff55bebca7a62b5c32bf2c443bcd28cb86",
+2026-10-19T17:26:41.6111040Z         "Orientation" : 1,
+2026-10-19T17:26:41.6112230Z         "original_camera_information" : false,
+2026-10-19T17:26:41.6113140Z         "original_raw" : false,
+2026-10-19T17:26:41.6113410Z         "PixelHeight" : 384,
+2026-10-19T17:26:41.6113650Z         "PixelWidth" : 256,
+2026-10-19T17:26:41.6113940Z         "ProfileName" : "Display P3",
+2026-10-19T17:26:41.6114220Z         "size" : 3699,
+2026-10-19T17:26:41.6114470Z         "texture_activation" : "unverified",
+2026-10-19T17:26:41.6114720Z         "type" : "public.heic"
+2026-10-19T17:26:41.6114930Z       },
+2026-10-19T17:26:41.6115700Z       "input_raw_sha256" : "cc83af98983a95c5661db95f73e96a869be766800588a3dd0c2ce723473c6f81",
+2026-10-19T17:26:41.6116130Z       "requested_orientation" : 1,
+2026-10-19T17:26:41.6116360Z       "write_succeeded" : true
+2026-10-19T17:26:41.6116590Z     }
+2026-10-19T17:26:41.6116760Z   ],
+2026-10-19T17:26:41.6116980Z   "schema" : "xdremux-native-synthetic-matrix-v1"
+2026-10-19T17:26:41.6117280Z }
+2026-10-19T17:26:41.6117430Z TEXTURE_JSON_END image-matrix.json
+2026-10-19T17:26:41.6117700Z NATIVE_SYNTHETIC_IMAGE_MATRIX_RECORDED rows=12
+2026-10-19T17:26:41.6463450Z ##[group]Run set -euo pipefail
+2026-10-19T17:26:41.6463740Z [36;1mset -euo pipefail[0m
+2026-10-19T17:26:41.6464030Z [36;1mpython3 research/xdremux-texture-native/run_bloom_matrix.py \[0m
+2026-10-19T17:26:41.6464550Z [36;1m  "$RUNNER_TEMP/xdremux-texture-native-probe" "$RUNNER_TEMP/xdremux-analytic-inputs/manifest.json" \[0m
+2026-10-19T17:26:41.6465100Z [36;1m  "$RUNNER_TEMP/texture-buffer-facts" "$RUNNER_TEMP/xdremux-bloom-matrix" \[0m
+2026-10-19T17:26:41.6465610Z [36;1m  "$GITHUB_WORKSPACE/evidence/bloom" "$RUNNER_TEMP/texture-diagnostic-semantic.plist" \[0m
+2026-10-19T17:26:41.6466010Z [36;1m  2>&1 | tee evidence/bloom-driver.log[0m
+2026-10-19T17:26:41.6482860Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:26:41.6483210Z env:
+2026-10-19T17:26:41.6483420Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:26:41.6483720Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:26:41.6483910Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:26:41.6484310Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:26:41.6484490Z   CARGO_TERM_COLOR: always
+2026-10-19T17:26:41.6484690Z   RUST_BACKTRACE: short
+2026-10-19T17:26:41.6484890Z   RUSTFLAGS: -D warnings
+2026-10-19T17:26:41.6485070Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:26:41.6485300Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:26:41.6485540Z   CACHE_ON_FAILURE: true
+2026-10-19T17:26:41.6485730Z ##[endgroup]
+2026-10-19T17:26:42.3929830Z BLOOM_NATIVE_PROCESS intensity0 exit_code=-6
+2026-10-19T17:26:42.3930720Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T17:26:42.3931230Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T17:26:42.3932080Z PROBE_STAGE dlopen CMImaging
+2026-10-19T17:26:42.3932520Z PROBE_STAGE dlopen CMCapture
+2026-10-19T17:26:42.3932980Z PROBE_STAGE native Bloom apply intensity=0.0
+2026-10-19T17:26:42.3933460Z PROBE_STAGE native Bloom render intensity=0.0
+2026-10-19T17:26:42.4056280Z TEXTURE_JSON_BEGIN intensity0/render-bloom.json
+2026-10-19T17:26:42.4059940Z {
+2026-10-19T17:26:42.4065470Z   "apple_implementation_patched" : false,
+2026-10-19T17:26:42.4066030Z   "apply_returned_image" : true,
+2026-10-19T17:26:42.4068580Z   "before_apply" : true,
+2026-10-19T17:26:42.4069040Z   "descriptor" : {
+2026-10-19T17:26:42.4069400Z     "class" : "CMITextureStylesEffectDescriptor"
+2026-10-19T17:26:42.4069980Z   },
+2026-10-19T17:26:42.4070280Z   "diagnostic_semantic_argument" : {
+2026-10-19T17:26:42.4070630Z     "class" : "_NUSemanticStyleProperties",
+2026-10-19T17:26:42.4071050Z     "version" : {
+2026-10-19T17:26:42.4071460Z       "class" : "NUVersion"
+2026-10-19T17:26:42.4071810Z     }
+2026-10-19T17:26:42.4072050Z   },
+2026-10-19T17:26:42.4072580Z   "diagnostic_semantic_plist_sha256" : "ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a",
+2026-10-19T17:26:42.4073250Z   "input_count" : 1,
+2026-10-19T17:26:42.4073600Z   "input_domain" : "analytical extended linear Display P3",
+2026-10-19T17:26:42.4074090Z   "intensity" : 0,
+2026-10-19T17:26:42.4074450Z   "linear_thumbnail_resource_created" : false,
+2026-10-19T17:26:42.4074940Z   "metal_device" : "Apple Paravirtual device",
+2026-10-19T17:26:42.4075300Z   "native_bloom_input_configuration" : {
+2026-10-19T17:26:42.4075820Z     "class" : "PITextureStyleUsageInputConfiguration",
+2026-10-19T17:26:42.4076360Z     "optionalChannelNames" : [
+2026-10-19T17:26:42.4077810Z 
+2026-10-19T17:26:42.4078100Z     ],
+2026-10-19T17:26:42.4078940Z     "requiredChannelNames" : [
+2026-10-19T17:26:42.4080170Z 
+2026-10-19T17:26:42.4080620Z     ],
+2026-10-19T17:26:42.4080890Z     "requiresPersonData" : false
+2026-10-19T17:26:42.4081230Z   },
+2026-10-19T17:26:42.4082420Z   "native_bloom_tuning" : {
+2026-10-19T17:26:42.4083050Z     "brightness" : 0.55000000000000004,
+2026-10-19T17:26:42.4086190Z     "lightMapGamma" : 1.5,
+2026-10-19T17:26:42.4086490Z     "lightMapInvert" : 0,
+2026-10-19T17:26:42.4086840Z     "sigmaGlare" : [
+2026-10-19T17:26:42.4087150Z       200,
+2026-10-19T17:26:42.4087430Z       400,
+2026-10-19T17:26:42.4087720Z       450,
+2026-10-19T17:26:42.4089110Z       500
+2026-10-19T17:26:42.4089450Z     ],
+2026-10-19T17:26:42.4089870Z     "skinMask" : 0,
+2026-10-19T17:26:42.4090160Z     "strength" : 0.5
+2026-10-19T17:26:42.4091540Z   },
+2026-10-19T17:26:42.4092550Z   "native_tuning_keys" : [
+2026-10-19T17:26:42.4092860Z     "Bloom",
+2026-10-19T17:26:42.4093190Z     "Diffusion",
+2026-10-19T17:26:42.4093490Z     "EffectOrder",
+2026-10-19T17:26:42.4093750Z     "FilmGrain",
+2026-10-19T17:26:42.4095540Z     "Glow",
+2026-10-19T17:26:42.4095890Z     "Mattify",
+2026-10-19T17:26:42.4097190Z     "SkinSmoothingStandalone",
+2026-10-19T17:26:42.4098710Z     "UnderEyeBrightening"
+2026-10-19T17:26:42.4099780Z   ],
+2026-10-19T17:26:42.4101830Z   "scope" : "controlled native Bloom CI kernel only; no full Texture producer, no original capture or Photos activation",
+2026-10-19T17:26:42.4104420Z   "semantic_context_is_original_camera_information" : false,
+2026-10-19T17:26:42.4105620Z   "semantic_roles_synthesized" : false,
+2026-10-19T17:26:42.4106840Z   "source_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+2026-10-19T17:26:42.4108720Z   "tuning_target" : {
+2026-10-19T17:26:42.4109290Z     "CaptureMode" : "Still",
+2026-10-19T17:26:42.4109920Z     "CaptureType" : "LF",
+2026-10-19T17:26:42.4110640Z     "FilmGrainSeed" : 0,
+2026-10-19T17:26:42.4111470Z     "HardwareModel" : "iPhone19,2",
+2026-10-19T17:26:42.4112270Z     "PortType" : "PortTypeBack",
+2026-10-19T17:26:42.4113080Z     "Preset" : "Glowy",
+2026-10-19T17:26:42.4113830Z     "TextureStylePeopleDataVersion" : 3
+2026-10-19T17:26:42.4114700Z   },
+2026-10-19T17:26:42.4115360Z   "tuning_target_is_original_camera_claim" : false
+2026-10-19T17:26:42.4116210Z }
+2026-10-19T17:26:42.4116880Z TEXTURE_JSON_END intensity0/render-bloom.json
+2026-10-19T17:26:42.6502500Z BLOOM_NATIVE_PROCESS intensity0.5 exit_code=-6
+2026-10-19T17:26:42.6503280Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T17:26:42.6503880Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T17:26:42.6504280Z PROBE_STAGE dlopen CMImaging
+2026-10-19T17:26:42.6504800Z PROBE_STAGE dlopen CMCapture
+2026-10-19T17:26:42.6505280Z PROBE_STAGE native Bloom apply intensity=0.5
+2026-10-19T17:26:42.6505740Z PROBE_STAGE native Bloom render intensity=0.5
+2026-10-19T17:26:42.6647660Z TEXTURE_JSON_BEGIN intensity0.5/render-bloom.json
+2026-10-19T17:26:42.6661020Z {
+2026-10-19T17:26:42.6663110Z   "apple_implementation_patched" : false,
+2026-10-19T17:26:42.6670340Z   "apply_returned_image" : true,
+2026-10-19T17:26:42.6670770Z   "before_apply" : true,
+2026-10-19T17:26:42.6671220Z   "descriptor" : {
+2026-10-19T17:26:42.6671660Z     "class" : "CMITextureStylesEffectDescriptor"
+2026-10-19T17:26:42.6672090Z   },
+2026-10-19T17:26:42.6672490Z   "diagnostic_semantic_argument" : {
+2026-10-19T17:26:42.6672880Z     "class" : "_NUSemanticStyleProperties",
+2026-10-19T17:26:42.6673300Z     "version" : {
+2026-10-19T17:26:42.6673530Z       "class" : "NUVersion"
+2026-10-19T17:26:42.6673820Z     }
+2026-10-19T17:26:42.6674080Z   },
+2026-10-19T17:26:42.6674570Z   "diagnostic_semantic_plist_sha256" : "ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a",
+2026-10-19T17:26:42.6675120Z   "input_count" : 1,
+2026-10-19T17:26:42.6675420Z   "input_domain" : "analytical extended linear Display P3",
+2026-10-19T17:26:42.6675830Z   "intensity" : 0.5,
+2026-10-19T17:26:42.6676150Z   "linear_thumbnail_resource_created" : false,
+2026-10-19T17:26:42.6676470Z   "metal_device" : "Apple Paravirtual device",
+2026-10-19T17:26:42.6676850Z   "native_bloom_input_configuration" : {
+2026-10-19T17:26:42.6677260Z     "class" : "PITextureStyleUsageInputConfiguration",
+2026-10-19T17:26:42.6677600Z     "optionalChannelNames" : [
+2026-10-19T17:26:42.6677810Z 
+2026-10-19T17:26:42.6677930Z     ],
+2026-10-19T17:26:42.6678180Z     "requiredChannelNames" : [
+2026-10-19T17:26:42.6678380Z 
+2026-10-19T17:26:42.6678490Z     ],
+2026-10-19T17:26:42.6678780Z     "requiresPersonData" : false
+2026-10-19T17:26:42.6679030Z   },
+2026-10-19T17:26:42.6679310Z   "native_bloom_tuning" : {
+2026-10-19T17:26:42.6764620Z     "brightness" : 0.55000000000000004,
+2026-10-19T17:26:42.6765360Z     "lightMapGamma" : 1.5,
+2026-10-19T17:26:42.6765700Z     "lightMapInvert" : 0,
+2026-10-19T17:26:42.6765980Z     "sigmaGlare" : [
+2026-10-19T17:26:42.6766270Z       200,
+2026-10-19T17:26:42.6766560Z       400,
+2026-10-19T17:26:42.6766770Z       450,
+2026-10-19T17:26:42.6767060Z       500
+2026-10-19T17:26:42.6767340Z     ],
+2026-10-19T17:26:42.6767560Z     "skinMask" : 0,
+2026-10-19T17:26:42.6767860Z     "strength" : 0.5
+2026-10-19T17:26:42.6768100Z   },
+2026-10-19T17:26:42.6768390Z   "native_tuning_keys" : [
+2026-10-19T17:26:42.6768730Z     "Bloom",
+2026-10-19T17:26:42.6768970Z     "Diffusion",
+2026-10-19T17:26:42.6769300Z     "EffectOrder",
+2026-10-19T17:26:42.6769550Z     "FilmGrain",
+2026-10-19T17:26:42.6769840Z     "Glow",
+2026-10-19T17:26:42.6770110Z     "Mattify",
+2026-10-19T17:26:42.6770360Z     "SkinSmoothingStandalone",
+2026-10-19T17:26:42.6770710Z     "UnderEyeBrightening"
+2026-10-19T17:26:42.6770910Z   ],
+2026-10-19T17:26:42.6771550Z   "scope" : "controlled native Bloom CI kernel only; no full Texture producer, no original capture or Photos activation",
+2026-10-19T17:26:42.6772090Z   "semantic_context_is_original_camera_information" : false,
+2026-10-19T17:26:42.6772440Z   "semantic_roles_synthesized" : false,
+2026-10-19T17:26:42.6772920Z   "source_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+2026-10-19T17:26:42.6773300Z   "tuning_target" : {
+2026-10-19T17:26:42.6773540Z     "CaptureMode" : "Still",
+2026-10-19T17:26:42.6773770Z     "CaptureType" : "LF",
+2026-10-19T17:26:42.6773990Z     "FilmGrainSeed" : 0,
+2026-10-19T17:26:42.6774190Z     "HardwareModel" : "iPhone19,2",
+2026-10-19T17:26:42.6774730Z     "PortType" : "PortTypeBack",
+2026-10-19T17:26:42.6774960Z     "Preset" : "Glowy",
+2026-10-19T17:26:42.6809110Z     "TextureStylePeopleDataVersion" : 3
+2026-10-19T17:26:42.6809730Z   },
+2026-10-19T17:26:42.6810080Z   "tuning_target_is_original_camera_claim" : false
+2026-10-19T17:26:42.6810480Z }
+2026-10-19T17:26:42.6810780Z TEXTURE_JSON_END intensity0.5/render-bloom.json
+2026-10-19T17:27:05.9602690Z TEXTURE_JSON_BEGIN intensity0.5/native-diagnostic.json
+2026-10-19T17:27:05.9705690Z {
+2026-10-19T17:27:05.9807160Z   "command": [
+2026-10-19T17:27:05.9908750Z     "xcrun",
+2026-10-19T17:27:06.0010180Z     "lldb",
+2026-10-19T17:27:06.0111260Z     "--batch",
+2026-10-19T17:27:06.0212600Z     "-o",
+2026-10-19T17:27:06.0315080Z     "run",
+2026-10-19T17:27:06.0416620Z     "-o",
+2026-10-19T17:27:06.0545980Z     "thread backtrace all",
+2026-10-19T17:27:06.0647460Z     "--",
+2026-10-19T17:27:06.0703670Z     "/Users/runner/work/_temp/xdremux-texture-native-probe",
+2026-10-19T17:27:06.0742760Z     "/Users/runner/work/_temp/xdremux-bloom-matrix/intensity0.5",
+2026-10-19T17:27:06.0743290Z     "--render-bloom",
+2026-10-19T17:27:06.0743830Z     "/Users/runner/work/_temp/xdremux-analytic-inputs/manifest.json",
+2026-10-19T17:27:06.0744410Z     "0.5",
+2026-10-19T17:27:06.0744700Z     "--semantic-control",
+2026-10-19T17:27:06.0745590Z     "/Users/runner/work/_temp/texture-diagnostic-semantic.plist"
+2026-10-19T17:27:06.0746140Z   ],
+2026-10-19T17:27:06.0746510Z   "debugger_exit": 0,
+2026-10-19T17:27:06.0841280Z   "stdout": "(lldb) target create \"/Users/runner/work/_temp/xdremux-texture-native-probe\"\nCurrent executable set to '/Users/runner/work/_temp/xdremux-texture-native-probe' (arm64).\n(lldb) settings set -- target.run-args  \"/Users/runner/work/_temp/xdremux-bloom-matrix/intensity0.5\" \"--render-bloom\" \"/Users/runner/work/_temp/xdremux-analytic-inputs/manifest.json\" \"0.5\" \"--semantic-control\" \"/Users/runner/work/_temp/texture-diagnostic-semantic.plist\"\n(lldb) run\nPROBE_STAGE dlopen NeutrinoCore\nPROBE_STAGE dlopen PhotoImaging\nPROBE_STAGE dlopen CMImaging\nPROBE_STAGE dlopen CMCapture\nTEXTURE_JSON_BEGIN intensity0.5/render-bloom.json\n{\n  \"apple_implementation_patched\" : false,\n  \"before_apply\" : true,\n  \"descriptor\" : {\n    \"class\" : \"CMITextureStylesEffectDescriptor\"\n  },\n  \"input_count\" : 1,\n  \"input_domain\" : \"analytical extended linear Display P3\",\n  \"intensity\" : 0.5,\n  \"linear_thumbnail_resource_created\" : false,\n  \"metal_device\" : \"Apple Paravirtual device\",\n  \"native_bloom_input_configuration\" : {\n    \"class\" : \"PITextureStyleUsageInputConfiguration\",\n    \"optionalChannelNames\" : [\n\n    ],\n    \"requiredChannelNames\" : [\n\n    ],\n    \"requiresPersonData\" : false\n  },\n  \"native_bloom_tuning\" : {\n    \"brightness\" : 0.55000000000000004,\n    \"lightMapGamma\" : 1.5,\n    \"lightMapInvert\" : 0,\n    \"sigmaGlare\" : [\n      200,\n      400,\n      450,\n      500\n    ],\n    \"skinMask\" : 0,\n    \"strength\" : 0.5\n  },\n  \"native_tuning_keys\" : [\n    \"Bloom\",\n    \"Diffusion\",\n    \"EffectOrder\",\n    \"FilmGrain\",\n    \"Glow\",\n    \"Mattify\",\n    \"SkinSmoothingStandalone\",\n    \"UnderEyeBrightening\"\n  ],\n  \"scope\" : \"controlled native Bloom CI kernel only; no full Texture producer, no original capture or Photos activation\",\n  \"semantic_roles_synthesized\" : false,\n  \"source_sha256\" : \"0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572\",\n  \"tuning_target\" : {\n    \"CaptureMode\" : \"Still\",\n    \"CaptureType\" : \"LF\",\n    \"FilmGrainSeed\" : 0,\n    \"HardwareModel\" : \"iPhone19,2\",\n    \"PortType\" : \"PortTypeBack\",\n    \"Preset\" : \"Glowy\",\n    \"TextureStylePeopleDataVersion\" : 3\n  },\n  \"tuning_target_is_original_camera_claim\" : false\n}\nTEXTURE_JSON_END intensity0.5/render-bloom.json\nTEXTURE_JSON_BEGIN intensity0.5/render-bloom.json\n{\n  \"apple_implementation_patched\" : false,\n  \"before_apply\" : true,\n  \"descriptor\" : {\n    \"class\" : \"CMITextureStylesEffectDescriptor\"\n  },\n  \"diagnostic_semantic_argument\" : {\n    \"class\" : \"_NUSemanticStyleProperties\",\n    \"version\" : {\n      \"class\" : \"NUVersion\"\n    }\n  },\n  \"diagnostic_semantic_plist_sha256\" : \"ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a\",\n  \"input_count\" : 1,\n  \"input_domain\" : \"analytical extended linear Display P3\",\n  \"intensity\" : 0.5,\n  \"linear_thumbnail_resource_created\" : false,\n  \"metal_device\" : \"Apple Paravirtual device\",\n  \"native_bloom_input_configuration\" : {\n    \"class\" : \"PITextureStyleUsageInputConfiguration\",\n    \"optionalChannelNames\" : [\n\n    ],\n    \"requiredChannelNames\" : [\n\n    ],\n    \"requiresPersonData\" : false\n  },\n  \"native_bloom_tuning\" : {\n    \"brightness\" : 0.55000000000000004,\n    \"lightMapGamma\" : 1.5,\n    \"lightMapInvert\" : 0,\n    \"sigmaGlare\" : [\n      200,\n      400,\n      450,\n      500\n    ],\n    \"skinMask\" : 0,\n    \"strength\" : 0.5\n  },\n  \"native_tuning_keys\" : [\n    \"Bloom\",\n    \"Diffusion\",\n    \"EffectOrder\",\n    \"FilmGrain\",\n    \"Glow\",\n    \"Mattify\",\n    \"SkinSmoothingStandalone\",\n    \"UnderEyeBrightening\"\n  ],\n  \"scope\" : \"controlled native Bloom CI kernel only; no full Texture producer, no original capture or Photos activation\",\n  \"semantic_context_is_original_camera_information\" : false,\n  \"semantic_roles_synthesized\" : false,\n  \"source_sha256\" : \"0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572\",\n  \"tuning_target\" : {\n    \"CaptureMode\" : \"Still\",\n    \"CaptureType\" : \"LF\",\n    \"FilmGrainSeed\" : 0,\n    \"HardwareModel\" : \"iPhone19,2\",\n    \"PortType\" : \"PortTypeBack\",\n    \"Preset\" : \"Glowy\",\n    \"TextureStylePeopleDataVersion\" : 3\n  },\n  \"tuning_target_is_original_camera_claim\" : false\n}\nTEXTURE_JSON_END intensity0.5/render-bloom.json\nPROBE_STAGE native Bloom apply intensity=0.5\nTEXTURE_JSON_BEGIN intensity0.5/render-bloom.json\n{\n  \"apple_implementation_patched\" : false,\n  \"apply_returned_image\" : true,\n  \"before_apply\" : true,\n  \"descriptor\" : {\n    \"class\" : \"CMITextureStylesEffectDescriptor\"\n  },\n  \"diagnostic_semantic_argument\" : {\n    \"class\" : \"_NUSemanticStyleProperties\",\n    \"version\" : {\n      \"class\" : \"NUVersion\"\n    }\n  },\n  \"diagnostic_semantic_plist_sha256\" : \"ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a\",\n  \"input_count\" : 1,\n  \"input_domain\" : \"analytical extended linear Display P3\",\n  \"intensity\" : 0.5,\n  \"linear_thumbnail_resource_created\" : false,\n  \"metal_device\" : \"Apple Paravirtual device\",\n  \"native_bloom_input_configuration\" : {\n    \"class\" : \"PITextureStyleUsageInputConfiguration\",\n    \"optionalChannelNames\" : [\n\n    ],\n    \"requiredChannelNames\" : [\n\n    ],\n    \"requiresPersonData\" : false\n  },\n  \"native_bloom_tuning\" : {\n    \"brightness\" : 0.55000000000000004,\n    \"lightMapGamma\" : 1.5,\n    \"lightMapInvert\" : 0,\n    \"sigmaGlare\" : [\n      200,\n      400,\n      450,\n      500\n    ],\n    \"skinMask\" : 0,\n    \"strength\" : 0.5\n  },\n  \"native_tuning_keys\" : [\n    \"Bloom\",\n    \"Diffusion\",\n    \"EffectOrder\",\n    \"FilmGrain\",\n    \"Glow\",\n    \"Mattify\",\n    \"SkinSmoothingStandalone\",\n    \"UnderEyeBrightening\"\n  ],\n  \"scope\" : \"controlled native Bloom CI kernel only; no full Texture producer, no original capture or Photos activation\",\n  \"semantic_context_is_original_camera_information\" : false,\n  \"semantic_roles_synthesized\" : false,\n  \"source_sha256\" : \"0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572\",\n  \"tuning_target\" : {\n    \"CaptureMode\" : \"Still\",\n    \"CaptureType\" : \"LF\",\n    \"FilmGrainSeed\" : 0,\n    \"HardwareModel\" : \"iPhone19,2\",\n    \"PortType\" : \"PortTypeBack\",\n    \"Preset\" : \"Glowy\",\n    \"TextureStylePeopleDataVersion\" : 3\n  },\n  \"tuning_target_is_original_camera_claim\" : false\n}\nTEXTURE_JSON_END intensity0.5/render-bloom.json\nPROBE_STAGE native Bloom render intensity=0.5\n2026-10-19 17:27:05.592282+0000 xdremux-texture-native-probe[10639:32180] [] <<<< TextureStylesProcessor >>>> Fig assert: \"_textureCache\" at bail (CMITextureStylesProcessor.m:225) - (err=0)\n2026-10-19 17:27:05.592629+0000 xdremux-texture-native-probe[10639:32180] [render] [TextureStyle] roiForInput:0 - computation failed (status=0), falling back to outputRect\n2026-10-19 17:27:05.592974+0000 xdremux-texture-native-probe[10639:32180] [render] [TextureStyle] roiForInput:0 - computation failed (status=0), falling back to outputRect\n2026-10-19 17:27:05.593086+0000 xdremux-texture-native-probe[10639:32180] [render] [TextureStyle] roiForInput:0 - computation failed (status=0), falling back to outputRect\n2026-10-19 17:27:05.593157+0000 xdremux-texture-native-probe[10639:32180] [render] [TextureStyle] roiForInput:0 - computation failed (status=0), falling back to outputRect\n2026-10-19 17:27:05.594260+0000 xdremux-texture-native-probe[10639:32180] [render] [TextureStyle] roiForInput:0 - computation failed (status=0), falling back to outputRect\n2026-10-19 17:27:05.595139+0000 xdremux-texture-native-probe[10639:32180] [assert] Fail: Unexpected number of inputs\n2026-10-19 17:27:05.597211+0000 xdremux-texture-native-probe[10639:32180] [assert] Trace:\n0   PhotoImaging                        0x00000001e4b1a10c +[PITextureStyleProcessorKernel processWithInputs:arguments:output:error:] + 3124\n1   CoreImage                           0x00000001a731276c __75+[CIImageProcessorKernel applyWithExtent:inputs:arguments:tileRects:error:]_block_invoke.219 + 1544\n2   CoreImage                           0x00000001a74c9c14 _ZNK2CI13ProcessorNode6renderEPNS_8TileTaskEPNS_7ContextERKNSt3__16vectorIPKNS_14intermediate_tENS5_9allocatorIS9_EEEESE_PKNS_17RenderDestinationERK6CGRecti + 1740\n3   CoreImage                           0x00000001a747327c _ZN2CI7Context21render_processor_nodeEPKNS_17RenderDestinationEPNS_8TileTaskERKNS_9parentROIEP11__IOSurfacePU21objcproto10MTLTexture11objc_object + 2032\n4   CoreImage                           0x00000001a746c424 _ZN2CI12MetalContext11render_nodeEPKNS_17RenderDestinationEPNS_8TileTaskERKNS_9parentROIERK6CGRectPPU21objcproto10MTLTexture11objc_objectPP10__CVBufferPP11__IOSurfacem + 1456\n5   CoreImage                           0x00000001a746de58 _ZN2CI12MetalContext24render_intermediate_nodeEPNS_8TileTaskERKNS_9parentROIEPNS_14intermediate_tEbU13block_pointerFvvE + 940\n6   CoreImage                           0x00000001a7471678 _ZN2CI7Context16recursive_renderEPKNS_17RenderDestinationEPNS_8TileTaskERKNS_6roiKeyEPKNS_4NodeEb + 3268\n7   CoreImage                           0x00000001a7471804 _ZN2CI7Context16recursive_renderEPKNS_17RenderDestinationEPNS_8TileTaskERKNS_6roiKeyEPKNS_4NodeEb + 3664\n8   CoreImage                           0x00000001a7471804 _ZN2CI7Context16recursive_renderEPKNS_17RenderDestinationEPNS_8TileTaskERKNS_6roiKeyEPKNS_4NodeEb + 3664\n9   CoreImage                           0x00000001a7472838 _ZN2CI7Context6renderEPNS_11ProgramNodeERK6CGRectPKNS_17RenderDestinationE + 184\n10  CoreImage                           0x00000001a74e7040 ___ZN2CI22image_render_to_bitmapEPNS_7ContextEPNS_5ImageE6CGRectP12CGColorSpacePNS_6BitmapEPKNS_17RenderDestinationE_block_invoke + 652\n11  CoreImage                           0x00000001a74ea178 _ZN2CIL14recursive_tileEPNS_10RenderTaskEPNS_7ContextEPKNS_17RenderDestinationEPKcNS_14GraphWithDepthERK6CGRectNS_11PixelFormatERKNS_19output_swizzle_infoEU13block_pointerFPNS_8TileTaskEPNS_11ProgramNodeESA_E + 2380\n12  CoreImage                           0x00000001a74e510c _ZN2CIL15tile_node_graphEPNS_7ContextEPKNS_17RenderDestinationEPKcNS_14GraphWithDepthERK6CGRectNS_11PixelFormatERKNS_19output_swizzle_infoEU13block_pointerFPNS_8TileTaskEPNS_11ProgramNodeES8_E + 428\n13  CoreImage                           0x00000001a74e696c _ZN2CI22image_render_to_bitmapEPNS_7ContextEPNS_5ImageE6CGRectP12CGColorSpacePNS_6BitmapEPKNS_17RenderDestinationE + 1200\n14  CoreImage                           0x00000001a71dc8ac _ZNK2CI14RenderToBitmap6renderEPNS_5ImageEPNS_7ContextE + 320\n15  CoreImage                           0x00000001a71dc6dc -[CIRenderDestination _render:withContext:] + 1072\n16  CoreImage                           0x00000001a71dbdf8 -[CIContext(CIRenderDestination) _startTaskToRender:toDestination:forPrepareRender:forClear:error:] + 2524\n17  CoreImage                           0x00000001a71db22c -[CIContext(CIRenderDestination) startTaskToRender:fromRect:toDestination:atPoint:error:] + 120\n18  CoreImage                           0x00000001a71ff3a0 -[CIContext render:toBitmap:rowBytes:bounds:format:colorSpace:] + 956\n19  xdremux-texture-native-probe        0x0000000100013aa8 $s4mainySwXEfU17_ + 428\n20  xdremux-texture-native-probe        0x0000000100014840 $s4mainySwXEfU17_TA + 56\n21  xdremux-texture-native-probe        0x000000010001353c $s10Foundation4DataV22withUnsafeMutableBytesyq_q_SwxYKXExYKs5ErrorRzRi__r0_lF + 2324\n22  xdremux-texture-native-probe        0x000000010000b030 main + 40704\n23  dyld                                0x00000001991b3e80 start + 6688\nProcess 10639 launched: '/Users/runner/work/_temp/xdremux-texture-native-probe' (arm64)\nProcess 10639 stopped\n* thread #1, queue = 'com.apple.main-thread', stop reason = EXC_BREAKPOINT (code=1, subcode=0x1de9853a8)\n       frame #0: 0x00000001de9853ac NeutrinoCore`-[NUAssertionPolicyDebuggerFatal notifyAssertion:] + 60\nNeutrinoCore`-[NUAssertionPolicyDebuggerFatal notifyAssertion:]:\n->  0x1de9853ac <+60>: mov    x0, x19\n    0x1de9853b0 <+64>: ldp    x29, x30, [sp, #0x10]\n    0x1de9853b4 <+68>: ldp    x20, x19, [sp], #0x20\n    0x1de9853b8 <+72>: autibsp \nTarget 0: (xdremux-texture-native-probe) stopped.\n",
+2026-10-19T17:27:06.0900450Z   "stderr": "",
+2026-10-19T17:27:06.0987650Z   "scope": "diagnostic child launch only; debugger exit is not render success"
+2026-10-19T17:27:06.1003020Z }
+2026-10-19T17:27:06.1008160Z TEXTURE_JSON_END intensity0.5/native-diagnostic.json
+2026-10-19T17:27:06.1952940Z BLOOM_NATIVE_PROCESS intensity1 exit_code=-6
+2026-10-19T17:27:06.2055410Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T17:27:06.2164520Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T17:27:06.2317630Z PROBE_STAGE dlopen CMImaging
+2026-10-19T17:27:06.2444990Z PROBE_STAGE dlopen CMCapture
+2026-10-19T17:27:06.2558700Z PROBE_STAGE native Bloom apply intensity=1.0
+2026-10-19T17:27:06.2679420Z PROBE_STAGE native Bloom render intensity=1.0
+2026-10-19T17:27:06.2796340Z TEXTURE_JSON_BEGIN intensity1/render-bloom.json
+2026-10-19T17:27:06.2898990Z {
+2026-10-19T17:27:06.3003890Z   "apple_implementation_patched" : false,
+2026-10-19T17:27:06.3116510Z   "apply_returned_image" : true,
+2026-10-19T17:27:06.3235730Z   "before_apply" : true,
+2026-10-19T17:27:06.3376740Z   "descriptor" : {
+2026-10-19T17:27:06.3509590Z     "class" : "CMITextureStylesEffectDescriptor"
+2026-10-19T17:27:06.3662190Z   },
+2026-10-19T17:27:06.3790530Z   "diagnostic_semantic_argument" : {
+2026-10-19T17:27:06.3917190Z     "class" : "_NUSemanticStyleProperties",
+2026-10-19T17:27:06.4023720Z     "version" : {
+2026-10-19T17:27:06.4125200Z       "class" : "NUVersion"
+2026-10-19T17:27:06.4232860Z     }
+2026-10-19T17:27:06.4343940Z   },
+2026-10-19T17:27:06.4466170Z   "diagnostic_semantic_plist_sha256" : "ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a",
+2026-10-19T17:27:06.4582170Z   "input_count" : 1,
+2026-10-19T17:27:06.4711660Z   "input_domain" : "analytical extended linear Display P3",
+2026-10-19T17:27:06.4828790Z   "intensity" : 1,
+2026-10-19T17:27:06.4943410Z   "linear_thumbnail_resource_created" : false,
+2026-10-19T17:27:06.5195980Z   "metal_device" : "Apple Paravirtual device",
+2026-10-19T17:27:06.5313170Z   "native_bloom_input_configuration" : {
+2026-10-19T17:27:06.5415040Z     "class" : "PITextureStyleUsageInputConfiguration",
+2026-10-19T17:27:06.5516470Z     "optionalChannelNames" : [
+2026-10-19T17:27:06.5617360Z 
+2026-10-19T17:27:06.5721980Z     ],
+2026-10-19T17:27:06.5825890Z     "requiredChannelNames" : [
+2026-10-19T17:27:06.5859080Z 
+2026-10-19T17:27:06.5865660Z     ],
+2026-10-19T17:27:06.5866210Z     "requiresPersonData" : false
+2026-10-19T17:27:06.5866540Z   },
+2026-10-19T17:27:06.5866800Z   "native_bloom_tuning" : {
+2026-10-19T17:27:06.5867140Z     "brightness" : 0.55000000000000004,
+2026-10-19T17:27:06.5867680Z     "lightMapGamma" : 1.5,
+2026-10-19T17:27:06.5941000Z     "lightMapInvert" : 0,
+2026-10-19T17:27:06.5941920Z     "sigmaGlare" : [
+2026-10-19T17:27:06.5942170Z       200,
+2026-10-19T17:27:06.5942460Z       400,
+2026-10-19T17:27:06.5943000Z       450,
+2026-10-19T17:27:06.5943210Z       500
+2026-10-19T17:27:06.5943450Z     ],
+2026-10-19T17:27:06.5943720Z     "skinMask" : 0,
+2026-10-19T17:27:06.5943920Z     "strength" : 0.5
+2026-10-19T17:27:06.5944210Z   },
+2026-10-19T17:27:06.5944520Z   "native_tuning_keys" : [
+2026-10-19T17:27:06.5944880Z     "Bloom",
+2026-10-19T17:27:06.5945200Z     "Diffusion",
+2026-10-19T17:27:06.5945430Z     "EffectOrder",
+2026-10-19T17:27:06.5945780Z     "FilmGrain",
+2026-10-19T17:27:06.5946080Z     "Glow",
+2026-10-19T17:27:06.5946260Z     "Mattify",
+2026-10-19T17:27:06.5946580Z     "SkinSmoothingStandalone",
+2026-10-19T17:27:06.5951670Z     "UnderEyeBrightening"
+2026-10-19T17:27:06.5952100Z   ],
+2026-10-19T17:27:06.5952700Z   "scope" : "controlled native Bloom CI kernel only; no full Texture producer, no original capture or Photos activation",
+2026-10-19T17:27:06.5953380Z   "semantic_context_is_original_camera_information" : false,
+2026-10-19T17:27:06.5953870Z   "semantic_roles_synthesized" : false,
+2026-10-19T17:27:06.5954430Z   "source_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+2026-10-19T17:27:06.5955010Z   "tuning_target" : {
+2026-10-19T17:27:06.5955270Z     "CaptureMode" : "Still",
+2026-10-19T17:27:06.5955670Z     "CaptureType" : "LF",
+2026-10-19T17:27:06.5956050Z     "FilmGrainSeed" : 0,
+2026-10-19T17:27:06.5956460Z     "HardwareModel" : "iPhone19,2",
+2026-10-19T17:27:06.5957000Z     "PortType" : "PortTypeBack",
+2026-10-19T17:27:06.5957310Z     "Preset" : "Glowy",
+2026-10-19T17:27:06.5957740Z     "TextureStylePeopleDataVersion" : 3
+2026-10-19T17:27:06.5958170Z   },
+2026-10-19T17:27:06.5958480Z   "tuning_target_is_original_camera_claim" : false
+2026-10-19T17:27:06.5958880Z }
+2026-10-19T17:27:06.5959220Z TEXTURE_JSON_END intensity1/render-bloom.json
+2026-10-19T17:27:06.5959690Z TEXTURE_JSON_BEGIN bloom-matrix.json
+2026-10-19T17:27:06.5960800Z {
+2026-10-19T17:27:06.5961260Z   "scope": "single original native Bloom CI processor and controlled tuning context only; no full producer or Photos admission",
+2026-10-19T17:27:06.5962280Z   "photos_used": false,
+2026-10-19T17:27:06.5962630Z   "original_capture_information": false,
+2026-10-19T17:27:06.5963470Z   "linear_thumbnail_resource_created": false,
+2026-10-19T17:27:06.5963850Z   "semantic_auxiliary_roles_synthesized": false,
+2026-10-19T17:27:06.5964160Z   "apple_implementations_patched": false,
+2026-10-19T17:27:06.5964470Z   "rows": [
+2026-10-19T17:27:06.5964740Z     {
+2026-10-19T17:27:06.5965050Z       "intensity": 0.0,
+2026-10-19T17:27:06.5965420Z       "native_process_exit": -6,
+2026-10-19T17:27:06.5965860Z       "render_completed": false
+2026-10-19T17:27:06.5966120Z     },
+2026-10-19T17:27:06.5966360Z     {
+2026-10-19T17:27:06.5966570Z       "intensity": 0.5,
+2026-10-19T17:27:06.5966950Z       "native_process_exit": -6,
+2026-10-19T17:27:06.5967280Z       "render_completed": false
+2026-10-19T17:27:06.5967950Z     },
+2026-10-19T17:27:06.5968220Z     {
+2026-10-19T17:27:06.5968420Z       "intensity": 1.0,
+2026-10-19T17:27:06.5968700Z       "native_process_exit": -6,
+2026-10-19T17:27:06.5969020Z       "render_completed": false
+2026-10-19T17:27:06.5969360Z     }
+2026-10-19T17:27:06.5969660Z   ]
+2026-10-19T17:27:06.5969950Z }
+2026-10-19T17:27:06.5970150Z TEXTURE_JSON_END bloom-matrix.json
+2026-10-19T17:27:06.5972760Z NATIVE_BLOOM_CONTEXT_OR_RENDER_FAILURE: do not claim successful editing
+2026-10-19T17:27:06.6024300Z ##[error]Process completed with exit code 1.
+2026-10-19T17:27:06.6468300Z ##[group]Run python3 - <<'PY'
+2026-10-19T17:27:06.6468910Z [36;1mpython3 - <<'PY'[0m
+2026-10-19T17:27:06.6469200Z [36;1mimport hashlib,json,os,pathlib[0m
+2026-10-19T17:27:06.6470370Z [36;1mp=pathlib.Path('evidence');p.mkdir(exist_ok=True)[0m
+2026-10-19T17:27:06.6471040Z [36;1mrows=[][0m
+2026-10-19T17:27:06.6471800Z [36;1mfor f in sorted(p.rglob('*')):[0m
+2026-10-19T17:27:06.6472230Z [36;1m    if not f.is_file():continue[0m
+2026-10-19T17:27:06.6472930Z [36;1m    assert f.suffix in {'.json','.txt','.log'}[0m
+2026-10-19T17:27:06.6473560Z [36;1m    rows.append({'path':str(f.relative_to(p)),'size':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()})[0m
+2026-10-19T17:27:06.6474980Z [36;1mmanifest={'head_sha':os.environ['GITHUB_SHA'],'xdremux_head_sha':os.environ['XDREMUX_SOURCE_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'photos_used':False,'synthetic_license':'CC0-1.0','files':rows}[0m
+2026-10-19T17:27:06.6475960Z [36;1m(p/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')[0m
+2026-10-19T17:27:06.6476930Z [36;1mprint('TEXTURE_JSON_BEGIN manifest.json');print(json.dumps(manifest,indent=2));print('TEXTURE_JSON_END manifest.json')[0m
+2026-10-19T17:27:06.6477640Z [36;1mPY[0m
+2026-10-19T17:27:06.6534890Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T17:27:06.6535270Z env:
+2026-10-19T17:27:06.6535620Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:27:06.6535980Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:27:06.6536230Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:27:06.6536470Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:27:06.6586020Z   CARGO_TERM_COLOR: always
+2026-10-19T17:27:06.6586270Z   RUST_BACKTRACE: short
+2026-10-19T17:27:06.6586490Z   RUSTFLAGS: -D warnings
+2026-10-19T17:27:06.6586710Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:27:06.6586990Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:27:06.6587240Z   CACHE_ON_FAILURE: true
+2026-10-19T17:27:06.6587460Z ##[endgroup]
+2026-10-19T17:27:06.8797190Z TEXTURE_JSON_BEGIN manifest.json
+2026-10-19T17:27:06.8868610Z {
+2026-10-19T17:27:06.8870460Z   "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+2026-10-19T17:27:06.8871050Z   "xdremux_head_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+2026-10-19T17:27:06.8871680Z   "run_id": "39293075204",
+2026-10-19T17:27:06.8876930Z   "photos_used": false,
+2026-10-19T17:27:06.8877180Z   "synthetic_license": "CC0-1.0",
+2026-10-19T17:27:06.8877450Z   "files": [
+2026-10-19T17:27:06.8877620Z     {
+2026-10-19T17:27:06.8877780Z       "path": "bloom/bloom-matrix.json",
+2026-10-19T17:27:06.8878020Z       "size": 656,
+2026-10-19T17:27:06.8878370Z       "sha256": "bd12d530d0c72ef599e27e8d38ad28b41cdcc7018eaaa04cbc1d94e71e3f7d34"
+2026-10-19T17:27:06.8878700Z     },
+2026-10-19T17:27:06.8878850Z     {
+2026-10-19T17:27:06.8879050Z       "path": "bloom/intensity0/native.stderr.log",
+2026-10-19T17:27:06.8879320Z       "size": 213,
+2026-10-19T17:27:06.8879640Z       "sha256": "34c521cd13d94d0d4dcfb2e756414e51838cdec60212d03524919ebcfd87f981"
+2026-10-19T17:27:06.8879970Z     },
+2026-10-19T17:27:06.8880130Z     {
+2026-10-19T17:27:06.8880340Z       "path": "bloom/intensity0/native.stdout.log",
+2026-10-19T17:27:06.8880600Z       "size": 5460,
+2026-10-19T17:27:06.8880900Z       "sha256": "89cc07ece913a3761710e673a29809b60883de25ea2181a4c18ed604670fe865"
+2026-10-19T17:27:06.8881260Z     },
+2026-10-19T17:27:06.8881440Z     {
+2026-10-19T17:27:06.8881960Z       "path": "bloom/intensity0/render-bloom.json",
+2026-10-19T17:27:06.8882280Z       "size": 1850,
+2026-10-19T17:27:06.8882590Z       "sha256": "7178a1a1cc42e6af966500ed4f8b19e8bebe3466d4225899472714636ead32b8"
+2026-10-19T17:27:06.8882960Z     },
+2026-10-19T17:27:06.8883120Z     {
+2026-10-19T17:27:06.8883600Z       "path": "bloom/intensity0.5/native-diagnostic.json",
+2026-10-19T17:27:06.8884000Z       "size": 13050,
+2026-10-19T17:27:06.8884370Z       "sha256": "8213d633bde97c5a1f6c04223211d123a0c160f100a1709c9b2eed215e69cb06"
+2026-10-19T17:27:06.8885080Z     },
+2026-10-19T17:27:06.8885260Z     {
+2026-10-19T17:27:06.8885470Z       "path": "bloom/intensity0.5/native.stderr.log",
+2026-10-19T17:27:06.8885730Z       "size": 213,
+2026-10-19T17:27:06.8886010Z       "sha256": "ee3ea7aa3f24b645f4af7b35969fb607cb12e513d9d39d0dedba37bb66c7f1cd"
+2026-10-19T17:27:06.8886350Z     },
+2026-10-19T17:27:06.8886490Z     {
+2026-10-19T17:27:06.8886690Z       "path": "bloom/intensity0.5/native.stdout.log",
+2026-10-19T17:27:06.8886940Z       "size": 5478,
+2026-10-19T17:27:06.8887230Z       "sha256": "d0f34a506a71a155224c5347682fd0d30d8fddec3db93470780e6bf1ee3403cb"
+2026-10-19T17:27:06.8887540Z     },
+2026-10-19T17:27:06.8887690Z     {
+2026-10-19T17:27:06.8887920Z       "path": "bloom/intensity0.5/render-bloom.json",
+2026-10-19T17:27:06.8888160Z       "size": 1852,
+2026-10-19T17:27:06.8888450Z       "sha256": "71dc59cdf257fb1a68dafcb66e247832acf5e659cecfd597879a41c9c3ce051c"
+2026-10-19T17:27:06.8888800Z     },
+2026-10-19T17:27:06.8888930Z     {
+2026-10-19T17:27:06.8889110Z       "path": "bloom/intensity1/native.stderr.log",
+2026-10-19T17:27:06.8889360Z       "size": 213,
+2026-10-19T17:27:06.8889650Z       "sha256": "d54afab6ff08c92f9086e14b349c78e685f70c0c376e17a387a3f340df64ba21"
+2026-10-19T17:27:06.8889980Z     },
+2026-10-19T17:27:06.8890120Z     {
+2026-10-19T17:27:06.8890310Z       "path": "bloom/intensity1/native.stdout.log",
+2026-10-19T17:27:06.8893750Z       "size": 5460,
+2026-10-19T17:27:06.8895170Z       "sha256": "915e004e0e9e2f15508c28888a5c31c5723a863da7d439f4bade38607b15e0fd"
+2026-10-19T17:27:06.8895560Z     },
+2026-10-19T17:27:06.8895690Z     {
+2026-10-19T17:27:06.8895890Z       "path": "bloom/intensity1/render-bloom.json",
+2026-10-19T17:27:06.8896140Z       "size": 1850,
+2026-10-19T17:27:06.8896440Z       "sha256": "88c5c664c5b540ba903433d27499c8670b2e6952d6bd5a1f41cafb62075681ce"
+2026-10-19T17:27:06.8896830Z     },
+2026-10-19T17:27:06.8896960Z     {
+2026-10-19T17:27:06.8897130Z       "path": "bloom-driver.log",
+2026-10-19T17:27:06.8897350Z       "size": 20572,
+2026-10-19T17:27:06.8897650Z       "sha256": "3b61440d5ce6fd5fceb6a21b21abd74ea5317139e0f9757bcc983c48e348294d"
+2026-10-19T17:27:06.8898000Z     },
+2026-10-19T17:27:06.8898140Z     {
+2026-10-19T17:27:06.8898320Z       "path": "image-build.log",
+2026-10-19T17:27:06.8898570Z       "size": 0,
+2026-10-19T17:27:06.8898890Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T17:27:06.8899240Z     },
+2026-10-19T17:27:06.8899390Z     {
+2026-10-19T17:27:06.8899540Z       "path": "image-matrix.json",
+2026-10-19T17:27:06.8899770Z       "size": 14123,
+2026-10-19T17:27:06.8900070Z       "sha256": "86512eaadf547aed09b0ef41b3080924e586acd024c199642f329c3d128842a2"
+2026-10-19T17:27:06.8900500Z     },
+2026-10-19T17:27:06.8900670Z     {
+2026-10-19T17:27:06.8900850Z       "path": "image-probe.log",
+2026-10-19T17:27:06.8901070Z       "size": 31215,
+2026-10-19T17:27:06.8901360Z       "sha256": "83966e168fc727c1a70eef5d2db6b987a1650b522bf6da4a5c651f4df56494ff"
+2026-10-19T17:27:06.8901690Z     },
+2026-10-19T17:27:06.8901830Z     {
+2026-10-19T17:27:06.8902000Z       "path": "input-manifest.json",
+2026-10-19T17:27:06.8902210Z       "size": 1521,
+2026-10-19T17:27:06.8902510Z       "sha256": "7967cb1ea86f962b2b43cc2fa9f4a9f61cc706498598a38e7652bc57d49f50ed"
+2026-10-19T17:27:06.8902840Z     },
+2026-10-19T17:27:06.8902990Z     {
+2026-10-19T17:27:06.8903140Z       "path": "os.txt",
+2026-10-19T17:27:06.8903320Z       "size": 66,
+2026-10-19T17:27:06.8904190Z       "sha256": "4ef10a0fc370704ea84699cf3851e51488598c5f1ab35cb572eb6b96278a8e5c"
+2026-10-19T17:27:06.8904560Z     },
+2026-10-19T17:27:06.8904690Z     {
+2026-10-19T17:27:06.8905280Z       "path": "processor-build.log",
+2026-10-19T17:27:06.8905500Z       "size": 1585,
+2026-10-19T17:27:06.8905810Z       "sha256": "66020683bf5578610e7e906adaf796780bc50cc615ea17fff6c664b58f5a527a"
+2026-10-19T17:27:06.8906140Z     },
+2026-10-19T17:27:06.8906270Z     {
+2026-10-19T17:27:06.8906450Z       "path": "research-clients-build.log",
+2026-10-19T17:27:06.8906970Z       "size": 1322,
+2026-10-19T17:27:06.8907270Z       "sha256": "426cf1e133e06f541b60c6ff55018fe6983f955909c28824ee6d649d7028d038"
+2026-10-19T17:27:06.8907600Z     },
+2026-10-19T17:27:06.8907740Z     {
+2026-10-19T17:27:06.8907910Z       "path": "sdk.txt",
+2026-10-19T17:27:06.8908150Z       "size": 5,
+2026-10-19T17:27:06.8908470Z       "sha256": "7b01c549928398a045692f24bcac7803b348524cdd76f21265b02984b2ba556a"
+2026-10-19T17:27:06.8910050Z     },
+2026-10-19T17:27:06.8910440Z     {
+2026-10-19T17:27:06.8910930Z       "path": "semantic-control.txt",
+2026-10-19T17:27:06.8912610Z       "size": 319,
+2026-10-19T17:27:06.8913360Z       "sha256": "5a31ef89bd561feb67ed3a1301f1550db37e2e5820b245c9b371aaa53a1b9a3a"
+2026-10-19T17:27:06.8913770Z     },
+2026-10-19T17:27:06.8913930Z     {
+2026-10-19T17:27:06.8914090Z       "path": "xcode.txt",
+2026-10-19T17:27:06.8914310Z       "size": 33,
+2026-10-19T17:27:06.8914610Z       "sha256": "694b44731d0b415c5b11d844151e466d7f5e200a95627efda377f232f1a6ab77"
+2026-10-19T17:27:06.8914960Z     },
+2026-10-19T17:27:06.8915110Z     {
+2026-10-19T17:27:06.8915270Z       "path": "xdremux-head.txt",
+2026-10-19T17:27:06.8915510Z       "size": 41,
+2026-10-19T17:27:06.8915850Z       "sha256": "9cdf31714e042f8be32a28915dce73ccc696f713bcab826c24b0539666ea0808"
+2026-10-19T17:27:06.8916220Z     }
+2026-10-19T17:27:06.8916360Z   ]
+2026-10-19T17:27:06.8916500Z }
+2026-10-19T17:27:06.8916670Z TEXTURE_JSON_END manifest.json
+2026-10-19T17:27:06.9309180Z ##[group]Run actions/upload-artifact@v4
+2026-10-19T17:27:06.9309540Z with:
+2026-10-19T17:27:06.9309800Z   name: xdremux-texture-generated-image-product-text
+2026-10-19T17:27:06.9310070Z   path: evidence/
+2026-10-19T17:27:06.9310250Z   retention-days: 1
+2026-10-19T17:27:06.9310440Z   if-no-files-found: warn
+2026-10-19T17:27:06.9310630Z   compression-level: 6
+2026-10-19T17:27:06.9310820Z   overwrite: false
+2026-10-19T17:27:06.9311010Z   include-hidden-files: false
+2026-10-19T17:27:06.9311200Z env:
+2026-10-19T17:27:06.9311430Z   XDREMUX_SOURCE_SHA: 0a462134a6082b048508cee89c85615606abfc7f
+2026-10-19T17:27:06.9311720Z   HOMEBREW_NO_AUTO_UPDATE: 1
+2026-10-19T17:27:06.9311930Z   CARGO_INCREMENTAL: 0
+2026-10-19T17:27:06.9312130Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-19T17:27:06.9312310Z   CARGO_TERM_COLOR: always
+2026-10-19T17:27:06.9312510Z   RUST_BACKTRACE: short
+2026-10-19T17:27:06.9331890Z   RUSTFLAGS: -D warnings
+2026-10-19T17:27:06.9332560Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-19T17:27:06.9333400Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-19T17:27:06.9334120Z   CACHE_ON_FAILURE: true
+2026-10-19T17:27:06.9334650Z ##[endgroup]
+2026-10-19T17:27:07.5341970Z (node:10833) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-19T17:27:07.5445060Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-19T17:27:07.5859240Z With the provided path, there will be 24 files uploaded
+2026-10-19T17:27:07.5859970Z Artifact name is valid!
+2026-10-19T17:27:07.5860290Z Root directory input is valid!
+2026-10-19T17:27:08.0409390Z Beginning upload of artifact content to blob storage
+2026-10-19T17:27:08.0491340Z (node:10833) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-19T17:27:08.4339510Z Uploaded bytes 23852
+2026-10-19T17:27:08.5175090Z Finished uploading artifact content to blob storage!
+2026-10-19T17:27:08.5241010Z SHA256 digest of uploaded artifact zip is 7f7377076e2480b980d1766058812846960362d0db4babd6f78032faaef3238c
+2026-10-19T17:27:08.5306690Z Finalizing artifact upload
+2026-10-19T17:27:08.8399130Z Artifact xdremux-texture-generated-image-product-text.zip successfully finalized. Artifact ID 12206188699
+2026-10-19T17:27:08.8401340Z Artifact xdremux-texture-generated-image-product-text has been successfully uploaded! Final size is 23852 bytes. Artifact ID is 12206188699
+2026-10-19T17:27:08.8411000Z Artifact download URL: https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39293075204/artifacts/12206188699
+2026-10-19T17:27:08.8769310Z Post job cleanup.
+2026-10-19T17:27:08.8775140Z ##[start-action display=Setup Rust Caching;id=__5866b726-5bdc-4c40-b01c-e56063d174b7.__Swatinem_rust-cache]
+2026-10-19T17:27:08.8891220Z Post job cleanup.
+2026-10-19T17:27:09.3001870Z (node:11060) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-19T17:27:09.3005150Z Cache up-to-date.
+2026-10-19T17:27:09.3007920Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-19T17:27:09.3068400Z ##[end-action id=__5866b726-5bdc-4c40-b01c-e56063d174b7.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=429]
+2026-10-19T17:27:09.3153250Z Post job cleanup.
+2026-10-19T17:27:09.4673870Z [command]/opt/homebrew/bin/git version
+2026-10-19T17:27:09.5103390Z git version 2.56.0
+2026-10-19T17:27:09.5223250Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/c36aa399-b935-48e5-89ca-6ab78118c6fa/.gitconfig'
+2026-10-19T17:27:09.5224460Z Temporarily overriding HOME='/Users/runner/work/_temp/c36aa399-b935-48e5-89ca-6ab78118c6fa' before making global git config changes
+2026-10-19T17:27:09.5225240Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T17:27:09.5226280Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/xdremux
+2026-10-19T17:27:09.5411940Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T17:27:09.5545410Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T17:27:09.7854600Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T17:27:09.7970560Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T17:27:09.9519160Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T17:27:09.9605820Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T17:27:10.1722460Z Post job cleanup.
+2026-10-19T17:27:10.3730880Z [command]/opt/homebrew/bin/git version
+2026-10-19T17:27:10.3832920Z git version 2.56.0
+2026-10-19T17:27:10.3902720Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/2360e0e1-295c-40fb-9c67-1d56e8c4b626/.gitconfig'
+2026-10-19T17:27:10.3905900Z Temporarily overriding HOME='/Users/runner/work/_temp/2360e0e1-295c-40fb-9c67-1d56e8c4b626' before making global git config changes
+2026-10-19T17:27:10.3907860Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T17:27:10.3912400Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T17:27:10.3988860Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T17:27:10.4134980Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T17:27:10.6187820Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T17:27:10.6270940Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T17:27:10.8212770Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T17:27:10.8304820Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T17:27:10.9951310Z Cleaning up orphan processes
+2026-10-19T17:27:12.0307910Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

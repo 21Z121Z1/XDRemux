@@ -1,0 +1,63 @@
+{
+  "schema": "xdremux-texture-native-image-product-summary-v1",
+  "run_id": 39285550760,
+  "job_id": 118170329181,
+  "probe_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+  "XD_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+  "image_case_count": 12,
+  "image_write_decode_successes": 12,
+  "ISO_gain_map_cases": [
+    "landscape-hdr-edge-adaptive",
+    "portrait-hdr-impulse-adaptive"
+  ],
+  "product": {
+    "xdremux_head": "0a462134a6082b048508cee89c85615606abfc7f",
+    "scope": "ordinary Styles functional regression only; never Texture activation",
+    "photos_used": false,
+    "rows": [
+      {
+        "case": "landscape-gradient",
+        "source_provenance": "generated CC0 image with synthetic ProXDR metadata, no camera context",
+        "texture_activation": "unverified",
+        "source_generation_exit": 0,
+        "source_sha256": "2b8715f46ea617a3e5fffd0f304a24d711ca1acd2a4f4c0a7b2098a28e226790",
+        "convert_exit": 1
+      },
+      {
+        "case": "portrait-checker",
+        "source_provenance": "generated CC0 image with synthetic ProXDR metadata, no camera context",
+        "texture_activation": "unverified",
+        "source_generation_exit": 0,
+        "source_sha256": "76e05c105d67ebedaf9509f92390b7c8390a5207a61e89ba16da07a23ab82115",
+        "convert_exit": 1
+      },
+      {
+        "case": "landscape-hdr-edge",
+        "source_provenance": "generated CC0 image with synthetic ProXDR metadata, no camera context",
+        "texture_activation": "unverified",
+        "source_generation_exit": 0,
+        "source_sha256": "f35f8963b900e9913592720a327d9336a59c968382ba4e269d5d5324a49beb22",
+        "convert_exit": 1
+      },
+      {
+        "case": "portrait-hdr-impulse",
+        "source_provenance": "generated CC0 image with synthetic ProXDR metadata, no camera context",
+        "texture_activation": "unverified",
+        "source_generation_exit": 0,
+        "source_sha256": "1a599b660936e7980a8ef24f96043db24d6867209997e1ad6d3a43c7c8dfd083",
+        "convert_exit": 1
+      }
+    ]
+  },
+  "source_primary_dimg_failures": [
+    "landscape-gradient",
+    "landscape-hdr-edge"
+  ],
+  "scaffold_tmap_failures": [
+    "portrait-checker",
+    "portrait-hdr-impulse"
+  ],
+  "output_publication_state": null,
+  "ordinary_Styles_feature_complete": false,
+  "Texture_generation_verified": false
+}

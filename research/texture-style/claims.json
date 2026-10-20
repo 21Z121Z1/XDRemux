@@ -1,6 +1,6 @@
 {
   "schema": "xdremux-texture-claims-v1",
-  "date": "2026-10-19",
+  "date": "2026-10-20",
   "scope": "offline-provenance-and-transport-correction; general-native-generation-incomplete",
   "baseline": {
     "XDRemux": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
@@ -19,11 +19,21 @@
     "missing_producer_rejected": true,
     "metadata_recomputed_from_arbitrary_image": false,
     "original_capture_information_reconstructed": false,
-    "native_consumer_accepted_in_this_work": false,
+    "native_consumer_accepted_in_this_work": true,
     "apple_texture_api_recognition_in_this_work": false,
     "native_edit_or_render_effect_in_this_work": false,
     "real_Photos_UI_activation_in_this_work": false,
-    "production_texture_feature_complete": false
+    "production_texture_feature_complete": false,
+    "native_consumer_acceptance_scope": "metadata-only controls on macOS27; not full image eligibility",
+    "apple_texture_api_recognition_scope": "full image/composition eligibility not tested; Texture properties class alone does not establish it",
+    "native_ImageIO_CC0_encode_decode_cases": 12,
+    "native_settings_factory_objects": 30,
+    "native_Bloom_primary_intensity_controls_per_round": 3,
+    "native_Bloom_render_successes": 0,
+    "native_complete_job_logs_read": 21,
+    "native_logged_JSON_payloads_SHA_verified": 147,
+    "zip_artifact_bytes_verified": false,
+    "generic_generated_input_Styles_conversion_successes": 0
   },
   "claims": [
     {
@@ -52,11 +62,13 @@
     },
     {
       "id": "XD-TEX-03",
-      "status": "implemented-native-functional-pending",
-      "claim": "The macOS ordinary Photographic Styles path uses v15 and no longer calls the fixed 2026 Texture augmentation. Linux excludes that module; an unexecuted or zero-test filter does not validate this route.",
+      "status": "native-build-passed-functional-conversion-failed",
+      "claim": "The ordinary Photographic Styles path uses v15 without fixed2026 augmentation. Native Rust/Swift build passes, but four generated inputs fail at dimg/tmap before final assembly; batch was not reached. This path is not functionally complete.",
       "evidence": {
-        "path": "crates/xdremux-runtime/src/apple_styles.rs",
-        "native_functional_result": null
+        "XD_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+        "run_id": 39285550760,
+        "job_id": 118170329181,
+        "matrix": "evidence/run39285550760/job118170329181/product-matrix.json"
       }
     },
     {
@@ -70,36 +82,68 @@
     },
     {
       "id": "XD-TEX-05",
-      "status": "pending-runner",
-      "claim": "The PSR metadata probe is queued; no actual native OS/SDK/API result has been read back yet.",
+      "status": "native-metadata-consumer-only-verified",
+      "claim": "Native macOS27 Texture parser returns properties for Standard,Studio,missingHardware and version999 metadata controls; empty dictionary is nil NUError3. macOS26 lacks the class. No whole-image admission or original provenance is established.",
       "runs": [
         {
           "id": 39282392876,
           "head_sha": "6f420d751d0be1b2dc6f93ba7cccf62493affae9",
-          "jobs": [
-            118159072406
-          ],
-          "status": "queued"
+          "status": "failure-probe-build"
         },
         {
           "id": 39283079303,
           "head_sha": "4e6630d50eab3626254249ec5563af5ab6db8b93",
-          "jobs": [
-            118161349940,
-            118161350462
-          ],
-          "status": "queued"
+          "status": "failure-probe-build"
+        },
+        {
+          "id": 39285550760,
+          "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+          "status": "probe-SIGTRAP;12-native-image-IO-pass;4-product-conversions-fail"
+        },
+        {
+          "id": 39286462456,
+          "head_sha": "d105a967bab6d3f1c577670751c6fce7257dd171",
+          "status": "failure-probe-RTLD_DEFAULT-build"
+        },
+        {
+          "id": 39287928184,
+          "head_sha": "e653f24219dd7bd152381ccfa172dd59121ac360",
+          "status": "inventory-and-requirements-pass;consumer-guard-not-called"
+        },
+        {
+          "id": 39289168902,
+          "head_sha": "acb572f425728963d0ee375327016c52ab069c10",
+          "status": "metadata-controls-executed"
+        },
+        {
+          "id": 39290912880,
+          "head_sha": "00f7b5eb1d496c7b0b8b69ff3e80290aa3a29bcb",
+          "status": "Bloom-real-render-SIGABRT"
+        },
+        {
+          "id": 39292067603,
+          "head_sha": "098430d4f20d832b1a1a9ccda0b066bde0748490",
+          "status": "native-Missing-arguments-assertion-diagnostic"
+        },
+        {
+          "id": 39293075204,
+          "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+          "status": "semantic-argument-accepted;Unexpected-number-of-inputs-render-assertion"
         }
       ],
-      "artifact_integrity_checked": false
+      "evidence": "evidence/native-consumer-summary.json",
+      "artifact_integrity_checked": false,
+      "logged_native_JSON_hashes_match_manifest": true
     },
     {
       "id": "XD-TEX-06",
-      "status": "verified-generator-native-encoding-pending",
-      "claim": "Four CC0 analytical patterns are generated by Rust with explicit linear Display P3 float32 RGBA domain and no original camera/RAW/LinearThumbnail provenance. Planned Apple JPEG/HEIC/HDR encoding has not yet executed.",
+      "status": "verified-native-image-IO-only",
+      "claim": "Twelve CC0 chart JPEG/HEIC/SDR/PQ/AdaptiveHDR native writes and decodes succeeded. This is not Texture parsing, rendering, pixel-fidelity certification or Photos activation.",
       "evidence": {
         "manifest_sha256": "7967cb1ea86f962b2b43cc2fa9f4a9f61cc706498598a38e7652bc57d49f50ed",
-        "generator": "crates/xdremux-heif/examples/texture_synthetic_inputs.rs"
+        "run_id": 39285550760,
+        "job_id": 118170329181,
+        "matrix_sha256": "86512eaadf547aed09b0ef41b3080924e586acd024c199642f329c3d128842a2"
       }
     },
     {
@@ -109,6 +153,36 @@
       "evidence": [
         "NATIVE_TODO.md"
       ]
+    },
+    {
+      "id": "XD-TEX-08",
+      "status": "native-effect-contract-observed",
+      "claim": "Native configuration has13 input names including hairMatte. Required/optional channels vary by effect; Bloom empty requirements do not imply a single-image kernel contract. Settings factories accept no image.",
+      "evidence": "evidence/native-consumer-summary.json"
+    },
+    {
+      "id": "XD-TEX-09",
+      "status": "native-render-failed",
+      "claim": "Original Bloom apply returns delayed CIImage but all tested intensities abort during real render. Source-derived2023 semantic diagnostic is accepted, advancing the assertion from Missing arguments to Unexpected number of inputs. CMI initialization is nil and _textureCache assertion observed; hardware impossibility is not established.",
+      "evidence": "evidence/native-render-summary.json"
+    },
+    {
+      "id": "XD-TEX-10",
+      "status": "verified-logged-JSON-not-ZIP",
+      "claim": "Twenty-one actual complete job logs were read.147 native JSON payloads from18 jobs match their runner manifests in exact size/SHA. Inaccessible ZIP bytes are unverified.",
+      "evidence": "evidence/native-readback-index.json"
+    },
+    {
+      "id": "XD-TEX-11",
+      "status": "local-environment-recovery-pending",
+      "claim": "After interruption, selected environment remains starting and exec reports no usable environment. Previous local uncommitted file state was not inspected or overwritten. Remote XD0a462134 and PSR84f2c830 were verified before remote evidence recovery.",
+      "evidence": "NATIVE_TODO.md"
     }
-  ]
+  ],
+  "source_implementation_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+  "native_probe_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+  "delivery_gate_binding": {
+    "scope": "offline transport/provenance regression and evidence integrity only; excludes product native conversion and Texture/Photos",
+    "result": "refer to actual exact-HEAD PSR offline-validation receipt; no predeclared pass"
+  }
 }

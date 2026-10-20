@@ -93,6 +93,32 @@
       "url": "https://developer.apple.com/videos/play/wwdc2024/10177/",
       "observed_date": "2026-10-19",
       "level": "official-documentation"
+    },
+    {
+      "id": "native-texture-controls",
+      "repository": "21Z121Z1/Photographic_Style_Research",
+      "head_sha": "acb572f425728963d0ee375327016c52ab069c10",
+      "run_id": 39289168902,
+      "url": "https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39289168902",
+      "level": "executed-native-metadata-only",
+      "evidence": "evidence/native-consumer-summary.json"
+    },
+    {
+      "id": "native-bloom-render",
+      "repository": "21Z121Z1/Photographic_Style_Research",
+      "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+      "run_id": 39293075204,
+      "url": "https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39293075204",
+      "level": "executed-native-render-failed",
+      "evidence": "evidence/native-render-summary.json"
+    },
+    {
+      "id": "actual-image-product-run",
+      "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+      "XD_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+      "url": "https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39285550760",
+      "level": "native-IO-pass-product-conversion-fail",
+      "evidence": "evidence/native-image-product-summary.json"
     }
   ],
   "nodes": [
@@ -157,8 +183,9 @@
       "id": "thumbnail",
       "kind": "resource",
       "name": "2023 LinearThumbnail auxiliary",
-      "encoding": "Apple Log in existing XDRemux derived-thumbnail route",
-      "original_raw_or_capture_provenance": false
+      "encoding": "future derived resource must use Apple Log; no thumbnail created by current native probes",
+      "original_raw_or_capture_provenance": false,
+      "native_domain_or_fidelity_verified": false
     },
     {
       "id": "people",
@@ -180,7 +207,11 @@
       "id": "texture-consumer",
       "kind": "apple-api",
       "name": "_NUTextureStyleProperties.textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
-      "scope": "Texture metadata consumer; not an image-to-metadata producer"
+      "scope": "Texture metadata consumer; not an image-to-metadata producer",
+      "status": "metadata-only-controls-executed",
+      "sources": [
+        "native-texture-controls"
+      ]
     },
     {
       "id": "person-utilities",
@@ -192,7 +223,26 @@
       "id": "pipeline",
       "kind": "apple-api",
       "name": "PITextureStylePipelineProcessor / PITextureStyleProcessorKernel / CMITextureStylesProcessor",
-      "scope": "native input requirements and whole pipeline still to qualify"
+      "scope": "effect-specific required/optional configurations observed; kernel argument/layout contract incomplete",
+      "native_input_names": [
+        "skinMatteV2",
+        "hairMatte",
+        "glassesMatteV2",
+        "earsMatte",
+        "faceSkinMatte",
+        "noseMatte",
+        "teethMatteV2",
+        "eyebrowsMatte",
+        "nonFaceSkinMatte",
+        "lipsMatte",
+        "handsMatte",
+        "personMatte",
+        "tattooMatte"
+      ],
+      "sources": [
+        "native-texture-controls",
+        "native-bloom-render"
+      ]
     },
     {
       "id": "producer",
@@ -204,7 +254,10 @@
       "id": "render",
       "kind": "acceptance",
       "name": "actual native editing/render parameter effect",
-      "status": "unverified"
+      "status": "SIGABRT-Missing-arguments-then-Unexpected-number-of-inputs-no-pixels",
+      "sources": [
+        "native-bloom-render"
+      ]
     },
     {
       "id": "photos",
@@ -248,7 +301,10 @@
       "from": "texture",
       "to": "texture-consumer",
       "relation": "metadata-parser-input",
-      "level": "prior-source"
+      "level": "executed-native-metadata-only",
+      "sources": [
+        "native-texture-controls"
+      ]
     },
     {
       "from": "texture-consumer",
@@ -271,14 +327,14 @@
     {
       "from": "thumbnail",
       "to": "pipeline",
-      "relation": "effect-specific-dependency-to-verify",
-      "level": "unverified"
+      "relation": "Glow-configuration-requires-linearThumbnail",
+      "level": "native-configuration-observed-only"
     },
     {
       "from": "roles",
       "to": "pipeline",
-      "relation": "effect-specific-dependency-to-verify",
-      "level": "unverified"
+      "relation": "effect-dependent-requirements;13-native-input-names",
+      "level": "native-configuration-observed-only"
     },
     {
       "from": "maker84",
@@ -289,8 +345,8 @@
     {
       "from": "pipeline",
       "to": "render",
-      "relation": "requires-full-input-graph",
-      "level": "unverified"
+      "relation": "delayed-image-returned;real-render-aborts",
+      "level": "executed-native-render-failure"
     },
     {
       "from": "render",

@@ -1,0 +1,67 @@
+{
+  "apple_implementation_patched" : false,
+  "apply_returned_image" : true,
+  "before_apply" : true,
+  "descriptor" : {
+    "class" : "CMITextureStylesEffectDescriptor"
+  },
+  "diagnostic_semantic_argument" : {
+    "class" : "_NUSemanticStyleProperties",
+    "version" : {
+      "class" : "NUVersion"
+    }
+  },
+  "diagnostic_semantic_plist_sha256" : "ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a",
+  "input_count" : 1,
+  "input_domain" : "analytical extended linear Display P3",
+  "intensity" : 0.5,
+  "linear_thumbnail_resource_created" : false,
+  "metal_device" : "Apple Paravirtual device",
+  "native_bloom_input_configuration" : {
+    "class" : "PITextureStyleUsageInputConfiguration",
+    "optionalChannelNames" : [
+
+    ],
+    "requiredChannelNames" : [
+
+    ],
+    "requiresPersonData" : false
+  },
+  "native_bloom_tuning" : {
+    "brightness" : 0.55000000000000004,
+    "lightMapGamma" : 1.5,
+    "lightMapInvert" : 0,
+    "sigmaGlare" : [
+      200,
+      400,
+      450,
+      500
+    ],
+    "skinMask" : 0,
+    "strength" : 0.5
+  },
+  "native_tuning_keys" : [
+    "Bloom",
+    "Diffusion",
+    "EffectOrder",
+    "FilmGrain",
+    "Glow",
+    "Mattify",
+    "SkinSmoothingStandalone",
+    "UnderEyeBrightening"
+  ],
+  "scope" : "controlled native Bloom CI kernel only; no full Texture producer, no original capture or Photos activation",
+  "semantic_context_is_original_camera_information" : false,
+  "semantic_roles_synthesized" : false,
+  "source_sha256" : "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+  "tuning_target" : {
+    "CaptureMode" : "Still",
+    "CaptureType" : "LF",
+    "FilmGrainSeed" : 0,
+    "HardwareModel" : "iPhone19,2",
+    "PortType" : "PortTypeBack",
+    "Preset" : "Glowy",
+    "TextureStylePeopleDataVersion" : 3
+  },
+  "tuning_target_is_original_camera_claim" : false
+}

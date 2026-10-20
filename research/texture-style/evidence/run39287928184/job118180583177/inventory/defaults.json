@@ -1,0 +1,42 @@
+{
+  "Filmic" : {
+    "grain" : 1,
+    "intensity" : 1,
+    "preset" : "Filmic"
+  },
+  "Glowy" : {
+    "grain" : 1,
+    "intensity" : 1,
+    "preset" : "Glowy"
+  },
+  "inputNames" : [
+    "skinMatteV2",
+    "hairMatte",
+    "glassesMatteV2",
+    "earsMatte",
+    "faceSkinMatte",
+    "noseMatte",
+    "teethMatteV2",
+    "eyebrowsMatte",
+    "nonFaceSkinMatte",
+    "lipsMatte",
+    "handsMatte",
+    "personMatte",
+    "tattooMatte"
+  ],
+  "Soft" : {
+    "grain" : 0,
+    "intensity" : 0.5,
+    "preset" : "Soft"
+  },
+  "Standard" : {
+    "grain" : 0,
+    "intensity" : 1,
+    "preset" : "Standard"
+  },
+  "Studio" : {
+    "grain" : 0,
+    "intensity" : 0.87999999523162842,
+    "preset" : "Studio"
+  }
+}

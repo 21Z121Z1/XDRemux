@@ -1,0 +1,16 @@
+[
+  {
+    "case" : "missing-hardware",
+    "input" : {
+      "CaptureMode" : "Still",
+      "CaptureType" : "LF",
+      "FilmGrainSeed" : 0,
+      "PortType" : "PortTypeBack",
+      "Preset" : "Standard",
+      "TextureStylePeopleDataVersion" : 3
+    },
+    "input_sha256" : "da0004450bcdd0c051fb45dc05734bf85a18e2f12511d84ccbc62d61133bfd28",
+    "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+    "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:"
+  }
+]

@@ -1,0 +1,43 @@
+{
+  "schema": "xdremux-texture-native-log-readback-v1",
+  "head_sha": "098430d4f20d832b1a1a9ccda0b066bde0748490",
+  "xdremux_head_sha": "0a462134a6082b048508cee89c85615606abfc7f",
+  "run_id": "39292067603",
+  "log_sha256": "6735678dedf0b896e72cea41fc8fce96e1faea1d8aaef146bb115890fae50fce",
+  "verified_native_json_payloads": [
+    {
+      "path": "image-matrix.json",
+      "size": 14123,
+      "sha256": "86512eaadf547aed09b0ef41b3080924e586acd024c199642f329c3d128842a2"
+    },
+    {
+      "path": "bloom/intensity0/render-bloom.json",
+      "size": 1544,
+      "sha256": "c5feac7fab89df0c3c650f8b1f41c1845bd35dff411495458dd56ee46068bc3a"
+    },
+    {
+      "path": "bloom/intensity0.5/render-bloom.json",
+      "size": 1546,
+      "sha256": "2a2bd3e06b1c02e3cc642d499dc51cee1f71790653d22ce8ad2f10e07c3c4381"
+    },
+    {
+      "path": "bloom/intensity0.5/native-diagnostic.json",
+      "size": 10411,
+      "sha256": "21eb2de1cfa35e54e219ccf9be89d5f4a438425afa0522b05ad0c0a0d30b1d7e"
+    },
+    {
+      "path": "bloom/intensity1/render-bloom.json",
+      "size": 1544,
+      "sha256": "bc402839c4dc6a41beff2fcb0244d4e044663f00439b436cdadaa9ebdc70563e"
+    },
+    {
+      "path": "bloom/bloom-matrix.json",
+      "size": 656,
+      "sha256": "bd12d530d0c72ef599e27e8d38ad28b41cdcc7018eaaa04cbc1d94e71e3f7d34"
+    }
+  ],
+  "verified_payload_count": 6,
+  "archive_bytes_verified": false,
+  "github_reported_zip_sha256": "9ea6acd7582da41e9fb1c110cedf8aa59306cb9c35dfac71c04fec9ec8c2f551",
+  "scope": "hash-checked actual native JSON emitted in job logs; not ZIP byte readback or Photos activation"
+}

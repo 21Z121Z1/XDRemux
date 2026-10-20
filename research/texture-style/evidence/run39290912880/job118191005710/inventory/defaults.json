@@ -1,0 +1,108 @@
+{
+  "bloomConfiguration" : {
+    "class" : "PITextureStyleUsageInputConfiguration",
+    "optionalChannelNames" : [
+
+    ],
+    "requiredChannelNames" : [
+
+    ],
+    "requiresPersonData" : false
+  },
+  "diffusionConfiguration" : {
+    "class" : "PITextureStyleUsageInputConfiguration",
+    "optionalChannelNames" : [
+      "skinMatteV2",
+      "personMatte"
+    ],
+    "requiredChannelNames" : [
+
+    ],
+    "requiresPersonData" : false
+  },
+  "filmGrainConfiguration" : {
+    "class" : "PITextureStyleUsageInputConfiguration",
+    "optionalChannelNames" : [
+      "personMatte",
+      "skinMatteV2",
+      "skyMatte",
+      "semanticStyleCast",
+      "semanticStyleColor"
+    ],
+    "requiredChannelNames" : [
+
+    ],
+    "requiresPersonData" : false
+  },
+  "Filmic" : {
+    "grain" : 1,
+    "intensity" : 1,
+    "preset" : "Filmic"
+  },
+  "glowConfiguration" : {
+    "class" : "PITextureStyleUsageInputConfiguration",
+    "optionalChannelNames" : [
+
+    ],
+    "requiredChannelNames" : [
+      "personMatte",
+      "linearThumbnail",
+      "semanticStyleCast",
+      "semanticStyleColor"
+    ],
+    "requiresPersonData" : false
+  },
+  "Glowy" : {
+    "grain" : 1,
+    "intensity" : 1,
+    "preset" : "Glowy"
+  },
+  "halationConfiguration" : {
+    "class" : "PITextureStyleUsageInputConfiguration",
+    "optionalChannelNames" : [
+      "skinMatteV2",
+      "personMatte",
+      "semanticStyleCast",
+      "semanticStyleColor"
+    ],
+    "requiredChannelNames" : [
+
+    ],
+    "requiresPersonData" : false
+  },
+  "inputNames" : [
+    "skinMatteV2",
+    "hairMatte",
+    "glassesMatteV2",
+    "earsMatte",
+    "faceSkinMatte",
+    "noseMatte",
+    "teethMatteV2",
+    "eyebrowsMatte",
+    "nonFaceSkinMatte",
+    "lipsMatte",
+    "handsMatte",
+    "personMatte",
+    "tattooMatte"
+  ],
+  "isAvailable" : true,
+  "isAvailableForTesting" : true,
+  "personMetadataFormatVersion" : 3,
+  "processorAPIVersion" : 20260507,
+  "Soft" : {
+    "grain" : 0,
+    "intensity" : 0.5,
+    "preset" : "Soft"
+  },
+  "Standard" : {
+    "grain" : 0,
+    "intensity" : 1,
+    "preset" : "Standard"
+  },
+  "Studio" : {
+    "grain" : 0,
+    "intensity" : 0.87999999523162842,
+    "preset" : "Studio"
+  },
+  "testing_override_used" : false
+}

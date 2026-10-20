@@ -1,0 +1,25 @@
+{
+  "scope": "single original native Bloom CI processor and controlled tuning context only; no full producer or Photos admission",
+  "photos_used": false,
+  "original_capture_information": false,
+  "linear_thumbnail_resource_created": false,
+  "semantic_auxiliary_roles_synthesized": false,
+  "apple_implementations_patched": false,
+  "rows": [
+    {
+      "intensity": 0.0,
+      "native_process_exit": -6,
+      "render_completed": false
+    },
+    {
+      "intensity": 0.5,
+      "native_process_exit": -6,
+      "render_completed": false
+    },
+    {
+      "intensity": 1.0,
+      "native_process_exit": -6,
+      "render_completed": false
+    }
+  ]
+}

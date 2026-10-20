@@ -1,0 +1,512 @@
+[
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0,
+        "preset" : "Standard"
+      },
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Standard"
+    },
+    "preset_input" : "Standard"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0.5,
+        "preset" : "Standard"
+      },
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Standard"
+    },
+    "preset_input" : "Standard"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 1,
+        "preset" : "Standard"
+      },
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Standard"
+    },
+    "preset_input" : "Standard"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0,
+        "preset" : "Filmic"
+      },
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Filmic"
+    },
+    "preset_input" : "Filmic"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0.5,
+        "preset" : "Filmic"
+      },
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Filmic"
+    },
+    "preset_input" : "Filmic"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 1,
+        "preset" : "Filmic"
+      },
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Filmic"
+    },
+    "preset_input" : "Filmic"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0,
+        "preset" : "Glowy"
+      },
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Glowy"
+    },
+    "preset_input" : "Glowy"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0.5,
+        "preset" : "Glowy"
+      },
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Glowy"
+    },
+    "preset_input" : "Glowy"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 1,
+        "preset" : "Glowy"
+      },
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Glowy"
+    },
+    "preset_input" : "Glowy"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0,
+        "preset" : "Soft"
+      },
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Soft"
+    },
+    "preset_input" : "Soft"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0.5,
+        "preset" : "Soft"
+      },
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Soft"
+    },
+    "preset_input" : "Soft"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 1,
+        "preset" : "Soft"
+      },
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Soft"
+    },
+    "preset_input" : "Soft"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0,
+        "preset" : "Studio"
+      },
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Studio"
+    },
+    "preset_input" : "Studio"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 0.5,
+        "preset" : "Studio"
+      },
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Studio"
+    },
+    "preset_input" : "Studio"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "FigCaptureTextureStyle",
+      "dictionaryRepresentation" : {
+        "grain" : 0.25,
+        "intensity" : 1,
+        "preset" : "Studio"
+      },
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Studio"
+    },
+    "preset_input" : "Studio"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Standard",
+      "version" : 1
+    },
+    "preset_input" : "Standard"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Standard",
+      "version" : 1
+    },
+    "preset_input" : "Standard"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Standard",
+      "version" : 1
+    },
+    "preset_input" : "Standard"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Filmic",
+      "version" : 1
+    },
+    "preset_input" : "Filmic"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Filmic",
+      "version" : 1
+    },
+    "preset_input" : "Filmic"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Filmic",
+      "version" : 1
+    },
+    "preset_input" : "Filmic"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Glowy",
+      "version" : 1
+    },
+    "preset_input" : "Glowy"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Glowy",
+      "version" : 1
+    },
+    "preset_input" : "Glowy"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Glowy",
+      "version" : 1
+    },
+    "preset_input" : "Glowy"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Soft",
+      "version" : 1
+    },
+    "preset_input" : "Soft"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Soft",
+      "version" : 1
+    },
+    "preset_input" : "Soft"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Soft",
+      "version" : 1
+    },
+    "preset_input" : "Soft"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0,
+      "preset" : "Studio",
+      "version" : 1
+    },
+    "preset_input" : "Studio"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 0.5,
+      "preset" : "Studio",
+      "version" : 1
+    },
+    "preset_input" : "Studio"
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "native_style" : {
+      "class" : "AVCaptureTextureStyle",
+      "grain" : 0.25,
+      "intensity" : 1,
+      "preset" : "Studio",
+      "version" : 1
+    },
+    "preset_input" : "Studio"
+  }
+]

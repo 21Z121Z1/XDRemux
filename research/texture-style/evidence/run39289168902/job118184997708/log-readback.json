@@ -1,0 +1,73 @@
+{
+  "schema": "xdremux-texture-native-log-readback-v1",
+  "head_sha": "acb572f425728963d0ee375327016c52ab069c10",
+  "xdremux_head_sha": null,
+  "run_id": "39289168902",
+  "log_sha256": "b3148ff760a2be3faada2ef61fef0c9e56553e04491ed8faf1cf0a14b931e9db",
+  "verified_native_json_payloads": [
+    {
+      "path": "metadata/inventory/runtime.json",
+      "size": 6457,
+      "sha256": "16a1b553f8be6a0375545ae3a9f45decc6164fb68d91aa6a05397a9904e9089e"
+    },
+    {
+      "path": "metadata/inventory/defaults.json",
+      "size": 5,
+      "sha256": "8e1d794b49e35ea828279c6a8c95282bbb9a0787cf5c9385256c2cc9d17baeb7"
+    },
+    {
+      "path": "metadata/settings/settings.json",
+      "size": 6932,
+      "sha256": "dbe993f370d8a7b9c924dee6b5dbc732518c7275424cd2a9aa6b1533697324e2"
+    },
+    {
+      "path": "metadata/processor-preflight/processor-preflight.json",
+      "size": 251,
+      "sha256": "fde8ad194069d1e0b3788faeaf88f0304178e1a441b6178d33697095706f5321"
+    },
+    {
+      "path": "metadata/requirements-1/requirements.json",
+      "size": 129,
+      "sha256": "cae63e65a8ed023c4a2cb79843b935794980dd092ae3050cbd1bcbb317d463ac"
+    },
+    {
+      "path": "metadata/requirements-2/requirements.json",
+      "size": 129,
+      "sha256": "f10559e57bfed0a6bef15154a7c5161ee69ce096ae2b0fda812592c58f3b3848"
+    },
+    {
+      "path": "metadata/requirements-3/requirements.json",
+      "size": 129,
+      "sha256": "3633a6e86cd9e8c20775ef07b0776b15b8c00588eb157bfadadc47f950e5633f"
+    },
+    {
+      "path": "metadata/synthetic-standard-control/metadata-cases.json",
+      "size": 658,
+      "sha256": "ff4db6debf6cdfbd67f186ef1e65a4c92fcaec74fd2d343eadc25bfd82b80ec9"
+    },
+    {
+      "path": "metadata/synthetic-studio-control/metadata-cases.json",
+      "size": 654,
+      "sha256": "3a16c9ea761ac6604b93ba8ccf2817a5bc8b3617715692a4a529db5cfc03b468"
+    },
+    {
+      "path": "metadata/missing-hardware/metadata-cases.json",
+      "size": 610,
+      "sha256": "f3e13fb69c6334c72f83357a86a22fdde8e75d26aea3c34259d8e7bb4aa87056"
+    },
+    {
+      "path": "metadata/unsupported-version/metadata-cases.json",
+      "size": 653,
+      "sha256": "a772503c4b4e961b6da9797fbaac6c34bdec05f90bfba9d9ba5bb3525cfe32e6"
+    },
+    {
+      "path": "metadata/empty-dictionary/metadata-cases.json",
+      "size": 419,
+      "sha256": "0f1b23aa0bc72f91f952fe474118cfae13e2efe12f96f4b33a65fb983f5aabd7"
+    }
+  ],
+  "verified_payload_count": 12,
+  "archive_bytes_verified": false,
+  "github_reported_zip_sha256": "822e035a214cdb5cdea6a28cc783b2d64a7a99d93682ba71f7a408b173246ab6",
+  "scope": "hash-checked actual native JSON emitted in job logs; not ZIP byte readback or Photos activation"
+}

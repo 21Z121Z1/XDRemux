@@ -1,0 +1,17 @@
+[
+  {
+    "case" : "unsupported-version",
+    "input" : {
+      "CaptureMode" : "Still",
+      "CaptureType" : "LF",
+      "FilmGrainSeed" : 0,
+      "HardwareModel" : "iPhone19,2",
+      "PortType" : "PortTypeBack",
+      "Preset" : "Standard",
+      "TextureStylePeopleDataVersion" : 999
+    },
+    "input_sha256" : "e83b239f93e3ada4f91319973e0596b478cb88361015d889a96a5af0d3b9defb",
+    "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+    "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:"
+  }
+]

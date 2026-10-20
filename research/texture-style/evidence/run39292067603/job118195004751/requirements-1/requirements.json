@@ -1,0 +1,21 @@
+{
+  "configuration" : {
+    "class" : "PITextureStyleUsageInputConfiguration",
+    "optionalChannelNames" : [
+      "hairMatte",
+      "lipsMatte",
+      "earsMatte",
+      "tattooMatte",
+      "glassesMatteV2",
+      "noseMatte"
+    ],
+    "requiredChannelNames" : [
+      "faceSkinMatte",
+      "personInstances"
+    ],
+    "requiresPersonData" : true
+  },
+  "effect_type" : 1,
+  "is_video" : false,
+  "selector" : "inputConfigurationForEffectType:isVideo:"
+}

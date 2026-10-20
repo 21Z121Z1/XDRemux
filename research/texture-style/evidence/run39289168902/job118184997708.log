@@ -1,0 +1,1181 @@
+﻿2026-10-19T16:53:52.4792240Z Current runner version: '2.337.0'
+2026-10-19T16:53:52.4818750Z ##[group]Runner Image Provisioner
+2026-10-19T16:53:52.4819400Z Hosted Compute Agent
+2026-10-19T16:53:52.4819840Z Version: 20261012.601
+2026-10-19T16:53:52.4820250Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+2026-10-19T16:53:52.4820740Z Build Date: 2026-10-12T17:48:21Z
+2026-10-19T16:53:52.4822350Z Worker ID: {7a4ee0b1-1204-4689-9c9f-cf41e50c6a51}
+2026-10-19T16:53:52.4823170Z Region: westus
+2026-10-19T16:53:52.4823660Z Cloud: MacCloud
+2026-10-19T16:53:52.4824050Z ##[endgroup]
+2026-10-19T16:53:52.4825170Z ##[group]Operating System
+2026-10-19T16:53:52.4825660Z macOS
+2026-10-19T16:53:52.4826860Z 26.6.2
+2026-10-19T16:53:52.4827600Z 25G83
+2026-10-19T16:53:52.4827970Z ##[endgroup]
+2026-10-19T16:53:52.4828340Z ##[group]Runner Image
+2026-10-19T16:53:52.4828770Z Image: macos-26-arm64
+2026-10-19T16:53:52.4829280Z Version: 20261013.0424.1
+2026-10-19T16:53:52.4830230Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20261013.0424/images/macos/macos-26-arm64-Readme.md
+2026-10-19T16:53:52.4831370Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20261013.0424
+2026-10-19T16:53:52.4833060Z ##[endgroup]
+2026-10-19T16:53:52.4835090Z ##[group]GITHUB_TOKEN Permissions
+2026-10-19T16:53:52.4838910Z Contents: read
+2026-10-19T16:53:52.4839400Z Metadata: read
+2026-10-19T16:53:52.4839850Z ##[endgroup]
+2026-10-19T16:53:52.4842030Z Secret source: Actions
+2026-10-19T16:53:52.4842630Z Cache mode: write
+2026-10-19T16:53:52.4843180Z Prepare workflow directory
+2026-10-19T16:53:52.5363100Z Prepare all required actions
+2026-10-19T16:53:52.5404080Z Getting action download info
+2026-10-19T16:53:52.9870640Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-19T16:53:53.3133740Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-19T16:53:53.6405070Z Complete job name: native (macos-26)
+2026-10-19T16:53:53.7123090Z ##[group]Run actions/checkout@v4
+2026-10-19T16:53:53.7125030Z with:
+2026-10-19T16:53:53.7126460Z   sparse-checkout: research/xdremux-texture-native
+2026-10-19T16:53:53.7127960Z   persist-credentials: false
+2026-10-19T16:53:53.7129390Z   repository: 21Z121Z1/Photographic_Style_Research
+2026-10-19T16:53:53.7133430Z   token: ***
+2026-10-19T16:53:53.7133790Z   ssh-strict: true
+2026-10-19T16:53:53.7134160Z   ssh-user: git
+2026-10-19T16:53:53.7134570Z   clean: true
+2026-10-19T16:53:53.7134960Z   sparse-checkout-cone-mode: true
+2026-10-19T16:53:53.7135390Z   fetch-depth: 1
+2026-10-19T16:53:53.7135810Z   fetch-tags: false
+2026-10-19T16:53:53.7136220Z   show-progress: true
+2026-10-19T16:53:53.7137560Z   lfs: false
+2026-10-19T16:53:53.7138650Z   submodules: false
+2026-10-19T16:53:53.7140030Z   set-safe-directory: true
+2026-10-19T16:53:53.7141230Z   allow-unsafe-pr-checkout: false
+2026-10-19T16:53:53.7143850Z ##[endgroup]
+2026-10-19T16:53:54.1934410Z Syncing repository: 21Z121Z1/Photographic_Style_Research
+2026-10-19T16:53:54.1939490Z ##[group]Getting Git version info
+2026-10-19T16:53:54.1942610Z Working directory is '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research'
+2026-10-19T16:53:54.1946650Z [command]/opt/homebrew/bin/git version
+2026-10-19T16:53:54.2243490Z git version 2.56.0
+2026-10-19T16:53:54.2268700Z ##[endgroup]
+2026-10-19T16:53:54.2277750Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/273c00a6-20ff-4936-a66f-e7fe0d38bf78/.gitconfig'
+2026-10-19T16:53:54.2285710Z Temporarily overriding HOME='/Users/runner/work/_temp/273c00a6-20ff-4936-a66f-e7fe0d38bf78' before making global git config changes
+2026-10-19T16:53:54.2288370Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T16:53:54.2290760Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:53:54.2419510Z Deleting the contents of '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research'
+2026-10-19T16:53:54.2423080Z ##[group]Initializing the repository
+2026-10-19T16:53:54.2428760Z [command]/opt/homebrew/bin/git init /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:53:54.2722290Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-19T16:53:54.2726420Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-19T16:53:54.2732010Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-19T16:53:54.2736590Z hint: call:
+2026-10-19T16:53:54.2738410Z hint:
+2026-10-19T16:53:54.2740980Z hint: 	git config --global init.defaultBranch <name>
+2026-10-19T16:53:54.2743550Z hint:
+2026-10-19T16:53:54.2745970Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-19T16:53:54.2750530Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-19T16:53:54.2754220Z hint:
+2026-10-19T16:53:54.2756080Z hint: 	git branch -m <name>
+2026-10-19T16:53:54.2758270Z hint:
+2026-10-19T16:53:54.2761300Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-19T16:53:54.2767040Z Initialized empty Git repository in /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/.git/
+2026-10-19T16:53:54.2771600Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-19T16:53:54.2889210Z ##[endgroup]
+2026-10-19T16:53:54.2891020Z ##[group]Disabling automatic garbage collection
+2026-10-19T16:53:54.2893220Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-19T16:53:54.3040300Z ##[endgroup]
+2026-10-19T16:53:54.3041440Z ##[group]Setting up auth
+2026-10-19T16:53:54.3051510Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T16:53:54.3187810Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T16:53:54.4980760Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T16:53:54.5043770Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T16:53:54.6673340Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T16:53:54.6810740Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T16:53:54.8302130Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-19T16:53:54.8452410Z ##[endgroup]
+2026-10-19T16:53:54.8455220Z ##[group]Fetching the repository
+2026-10-19T16:53:54.8467140Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --filter=blob:none --depth=1 origin +acb572f425728963d0ee375327016c52ab069c10:refs/remotes/origin/research/xdremux-texture-native-20261019
+2026-10-19T16:53:55.3492710Z From https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-19T16:53:55.3495030Z  * [new ref]         acb572f425728963d0ee375327016c52ab069c10 -> origin/research/xdremux-texture-native-20261019
+2026-10-19T16:53:55.3498450Z ##[endgroup]
+2026-10-19T16:53:55.3499560Z ##[group]Determining the checkout info
+2026-10-19T16:53:55.3501050Z ##[endgroup]
+2026-10-19T16:53:55.3502330Z ##[group]Setting up sparse checkout
+2026-10-19T16:53:55.3503510Z [command]/opt/homebrew/bin/git sparse-checkout set research/xdremux-texture-native
+2026-10-19T16:53:55.3583260Z ##[endgroup]
+2026-10-19T16:53:55.3584360Z ##[group]Checking out the ref
+2026-10-19T16:53:55.3586660Z [command]/opt/homebrew/bin/git checkout --progress --force -B research/xdremux-texture-native-20261019 refs/remotes/origin/research/xdremux-texture-native-20261019
+2026-10-19T16:53:55.7035210Z Switched to a new branch 'research/xdremux-texture-native-20261019'
+2026-10-19T16:53:55.7134510Z branch 'research/xdremux-texture-native-20261019' set up to track 'origin/research/xdremux-texture-native-20261019'.
+2026-10-19T16:53:55.7190340Z ##[endgroup]
+2026-10-19T16:53:55.7268070Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-19T16:53:55.7365400Z acb572f425728963d0ee375327016c52ab069c10
+2026-10-19T16:53:55.7376700Z ##[group]Removing auth
+2026-10-19T16:53:55.7379680Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T16:53:55.7516150Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T16:53:55.9746720Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T16:53:55.9846520Z http.https://github.com/.extraheader
+2026-10-19T16:53:56.0156020Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-19T16:53:56.0467080Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T16:53:56.2842810Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T16:53:56.2964330Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T16:53:56.4861470Z ##[endgroup]
+2026-10-19T16:53:56.5064920Z ##[group]Run set -euo pipefail
+2026-10-19T16:53:56.5065570Z [36;1mset -euo pipefail[0m
+2026-10-19T16:53:56.5065960Z [36;1mmkdir -p evidence[0m
+2026-10-19T16:53:56.5066410Z [36;1mtest "$(git rev-parse HEAD)" = "$GITHUB_SHA"[0m
+2026-10-19T16:53:56.5066910Z [36;1msw_vers | tee evidence/os.txt[0m
+2026-10-19T16:53:56.5067350Z [36;1mxcodebuild -version | tee evidence/xcode.txt[0m
+2026-10-19T16:53:56.5067860Z [36;1mxcrun --sdk macosx --show-sdk-version | tee evidence/sdk.txt[0m
+2026-10-19T16:53:56.5068320Z [36;1mxcrun swiftc --version | tee evidence/swift.txt[0m
+2026-10-19T16:53:56.5068730Z [36;1mgit rev-parse HEAD | tee evidence/head.txt[0m
+2026-10-19T16:53:56.5069270Z [36;1mxcrun swiftc -swift-version 5 research/xdremux-texture-native/native_probe.swift \[0m
+2026-10-19T16:53:56.5069990Z [36;1m  -framework Foundation -framework CoreImage -framework ImageIO -framework Metal \[0m
+2026-10-19T16:53:56.5070720Z [36;1m  -o "$RUNNER_TEMP/xdremux-texture-native-probe" 2>&1 | tee evidence/build.log[0m
+2026-10-19T16:53:56.5133710Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T16:53:56.5134910Z ##[endgroup]
+2026-10-19T16:53:56.6110840Z ProductName:		macOS
+2026-10-19T16:53:56.6112520Z ProductVersion:		26.6.2
+2026-10-19T16:53:56.6112960Z BuildVersion:		25G83
+2026-10-19T16:53:56.7739190Z Xcode 26.6
+2026-10-19T16:53:56.7744340Z Build version 17F113
+2026-10-19T16:53:59.3467880Z 26.5
+2026-10-19T16:54:01.0747320Z Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)
+2026-10-19T16:54:01.0748360Z Target: arm64-apple-macosx26.0
+2026-10-19T16:54:01.1179330Z acb572f425728963d0ee375327016c52ab069c10
+2026-10-19T16:54:06.9466810Z research/xdremux-texture-native/native_probe.swift:119:13: warning: constant 'cls' inferred to have type 'AnyClass' (aka 'any AnyObject.Type'), which may be unexpected
+2026-10-19T16:54:06.9469880Z 117 |     if name.contains("TextureStyle") || name == "_NUSemanticStyleProperties" {
+2026-10-19T16:54:06.9473650Z 118 |         progress("inventory \(name)")
+2026-10-19T16:54:06.9474630Z 119 |         let cls = unsafeBitCast(classes[i], to: AnyClass.self)
+2026-10-19T16:54:06.9479590Z     |             |- warning: constant 'cls' inferred to have type 'AnyClass' (aka 'any AnyObject.Type'), which may be unexpected
+2026-10-19T16:54:06.9494140Z     |             `- note: add an explicit type annotation to silence this warning
+2026-10-19T16:54:06.9495560Z 120 |         rows.append(["class": name, "instance_size": class_getInstanceSize(cls),
+2026-10-19T16:54:06.9497010Z 121 |                      "instance_methods": methodInfo(cls, false), "class_methods": methodInfo(cls, true)])
+2026-10-19T16:54:06.9497940Z 
+2026-10-19T16:54:06.9503760Z research/xdremux-texture-native/native_probe.swift:216:9: warning: constant 'consumerClass' inferred to have type 'AnyClass?' (aka 'Optional<any AnyObject.Type>'), which may be unexpected
+2026-10-19T16:54:06.9505150Z 214 |     let selector = "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:"
+2026-10-19T16:54:06.9505740Z 215 |     progress("metadata consumer \(name)")
+2026-10-19T16:54:06.9506210Z 216 |     let consumerClass = NSClassFromString("_NUTextureStyleProperties")
+2026-10-19T16:54:06.9506970Z     |         |- warning: constant 'consumerClass' inferred to have type 'AnyClass?' (aka 'Optional<any AnyObject.Type>'), which may be unexpected
+2026-10-19T16:54:06.9507720Z     |         `- note: add an explicit type annotation to silence this warning
+2026-10-19T16:54:06.9508220Z 217 |     row["consumer_class_available"] = consumerClass != nil
+2026-10-19T16:54:06.9509070Z 218 |     if let cls = consumerClass, let method = class_getClassMethod(cls, NSSelectorFromString(selector)) {
+2026-10-19T16:54:07.6523280Z swift-driver version: 1.148.6 
+2026-10-19T16:54:07.6855320Z ##[group]Run set -euo pipefail
+2026-10-19T16:54:07.6855790Z [36;1mset -euo pipefail[0m
+2026-10-19T16:54:07.6856100Z [36;1mpython3 research/xdremux-texture-native/run_metadata_matrix.py \[0m
+2026-10-19T16:54:07.6856720Z [36;1m  "$RUNNER_TEMP/xdremux-texture-native-probe" evidence/metadata 2>&1 | tee evidence/probe.log[0m
+2026-10-19T16:54:07.6900760Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T16:54:07.6901120Z ##[endgroup]
+2026-10-19T16:54:07.9558400Z NATIVE_PROCESS_BEGIN inventory
+2026-10-19T16:54:08.2973280Z TEXTURE_JSON_BEGIN inventory/runtime.json
+2026-10-19T16:54:08.2974450Z {
+2026-10-19T16:54:08.2981490Z   "classes" : [
+2026-10-19T16:54:08.2982650Z     {
+2026-10-19T16:54:08.2983380Z       "class" : "_NUSemanticStyleProperties",
+2026-10-19T16:54:08.2984340Z       "class_methods" : [
+2026-10-19T16:54:08.2985150Z         {
+2026-10-19T16:54:08.2986240Z           "encoding" : "@32@0:8@16o^@24",
+2026-10-19T16:54:08.2987370Z           "selector" : "baselineExposureFromLegacyMetadata:error:"
+2026-10-19T16:54:08.2988420Z         },
+2026-10-19T16:54:08.2988970Z         {
+2026-10-19T16:54:08.2989730Z           "encoding" : "@32@0:8@16o^@24",
+2026-10-19T16:54:08.2990730Z           "selector" : "globalToneCurveDataFromCaptureMetadata:error:"
+2026-10-19T16:54:08.2991820Z         },
+2026-10-19T16:54:08.2992370Z         {
+2026-10-19T16:54:08.2993090Z           "encoding" : "@60@0:8@16B24{?=qiIq}28o^@52",
+2026-10-19T16:54:08.2994150Z           "selector" : "legacySemanticStylePropertiesFromData:fromVideo:keyTime:error:"
+2026-10-19T16:54:08.2995190Z         },
+2026-10-19T16:54:08.2995670Z         {
+2026-10-19T16:54:08.2996340Z           "encoding" : "@60@0:8@16B24{?=qiIq}28o^@52",
+2026-10-19T16:54:08.2997450Z           "selector" : "semanticStylePropertiesFromData:fromVideo:keyTime:error:"
+2026-10-19T16:54:08.2998440Z         },
+2026-10-19T16:54:08.2999000Z         {
+2026-10-19T16:54:08.2999490Z           "encoding" : "@32@0:8@16o^@24",
+2026-10-19T16:54:08.3000350Z           "selector" : "semanticStylePropertiesFromImageMetadata:error:"
+2026-10-19T16:54:08.3001330Z         },
+2026-10-19T16:54:08.3002080Z         {
+2026-10-19T16:54:08.3002570Z           "encoding" : "@56@0:8@16{?=qiIq}24o^@48",
+2026-10-19T16:54:08.3003490Z           "selector" : "semanticStylePropertiesFromVideoMetadata:keyTime:error:"
+2026-10-19T16:54:08.3004350Z         }
+2026-10-19T16:54:08.3004780Z       ],
+2026-10-19T16:54:08.3005260Z       "instance_methods" : [
+2026-10-19T16:54:08.3006770Z         {
+2026-10-19T16:54:08.3007370Z           "encoding" : "v16@0:8",
+2026-10-19T16:54:08.3008320Z           "selector" : ".cxx_destruct"
+2026-10-19T16:54:08.3008980Z         },
+2026-10-19T16:54:08.3009660Z         {
+2026-10-19T16:54:08.3010120Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3010870Z           "selector" : "baseGain"
+2026-10-19T16:54:08.3011490Z         },
+2026-10-19T16:54:08.3011920Z         {
+2026-10-19T16:54:08.3012450Z           "encoding" : "d16@0:8",
+2026-10-19T16:54:08.3013270Z           "selector" : "baselineExposure"
+2026-10-19T16:54:08.3013920Z         },
+2026-10-19T16:54:08.3014450Z         {
+2026-10-19T16:54:08.3014890Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3015640Z           "selector" : "brightness"
+2026-10-19T16:54:08.3016440Z         },
+2026-10-19T16:54:08.3016970Z         {
+2026-10-19T16:54:08.3017700Z           "encoding" : "@24@0:8^{_NSZone=}16",
+2026-10-19T16:54:08.3018580Z           "selector" : "copyWithZone:"
+2026-10-19T16:54:08.3019210Z         },
+2026-10-19T16:54:08.3019700Z         {
+2026-10-19T16:54:08.3020340Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3020910Z           "selector" : "description"
+2026-10-19T16:54:08.3021480Z         },
+2026-10-19T16:54:08.3021880Z         {
+2026-10-19T16:54:08.3022540Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3023120Z           "selector" : "extendedStats"
+2026-10-19T16:54:08.3023690Z         },
+2026-10-19T16:54:08.3024340Z         {
+2026-10-19T16:54:08.3026460Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3027790Z           "selector" : "faceBasedGlobalExposureBoostRatio"
+2026-10-19T16:54:08.3028600Z         },
+2026-10-19T16:54:08.3029190Z         {
+2026-10-19T16:54:08.3029710Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3030700Z           "selector" : "globalToneCurveData"
+2026-10-19T16:54:08.3031500Z         },
+2026-10-19T16:54:08.3031960Z         {
+2026-10-19T16:54:08.3032650Z           "encoding" : "B16@0:8",
+2026-10-19T16:54:08.3033380Z           "selector" : "isVideo"
+2026-10-19T16:54:08.3034160Z         },
+2026-10-19T16:54:08.3034720Z         {
+2026-10-19T16:54:08.3035360Z           "encoding" : "{?=qiIq}16@0:8",
+2026-10-19T16:54:08.3036110Z           "selector" : "keyTime"
+2026-10-19T16:54:08.3036850Z         },
+2026-10-19T16:54:08.3037390Z         {
+2026-10-19T16:54:08.3038000Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3038710Z           "selector" : "lightMapData"
+2026-10-19T16:54:08.3039380Z         },
+2026-10-19T16:54:08.3041070Z         {
+2026-10-19T16:54:08.3041460Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3042300Z           "selector" : "lightMapHeight"
+2026-10-19T16:54:08.3042740Z         },
+2026-10-19T16:54:08.3042980Z         {
+2026-10-19T16:54:08.3043270Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3043560Z           "selector" : "lightMapWidth"
+2026-10-19T16:54:08.3043790Z         },
+2026-10-19T16:54:08.3043940Z         {
+2026-10-19T16:54:08.3044230Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3044470Z           "selector" : "linearGain"
+2026-10-19T16:54:08.3044690Z         },
+2026-10-19T16:54:08.3044990Z         {
+2026-10-19T16:54:08.3045260Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3045690Z           "selector" : "linearLightMapData"
+2026-10-19T16:54:08.3046000Z         },
+2026-10-19T16:54:08.3046330Z         {
+2026-10-19T16:54:08.3046540Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3046810Z           "selector" : "linearRangeMax"
+2026-10-19T16:54:08.3047030Z         },
+2026-10-19T16:54:08.3047210Z         {
+2026-10-19T16:54:08.3047490Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3047780Z           "selector" : "linearRangeMin"
+2026-10-19T16:54:08.3048020Z         },
+2026-10-19T16:54:08.3048220Z         {
+2026-10-19T16:54:08.3048430Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3048740Z           "selector" : "sceneType"
+2026-10-19T16:54:08.3049000Z         },
+2026-10-19T16:54:08.3049240Z         {
+2026-10-19T16:54:08.3049520Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3050560Z           "selector" : "setBaseGain:"
+2026-10-19T16:54:08.3050950Z         },
+2026-10-19T16:54:08.3051260Z         {
+2026-10-19T16:54:08.3051490Z           "encoding" : "v24@0:8d16",
+2026-10-19T16:54:08.3051740Z           "selector" : "setBaselineExposure:"
+2026-10-19T16:54:08.3051970Z         },
+2026-10-19T16:54:08.3052270Z         {
+2026-10-19T16:54:08.3052520Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3052750Z           "selector" : "setBrightness:"
+2026-10-19T16:54:08.3053020Z         },
+2026-10-19T16:54:08.3053280Z         {
+2026-10-19T16:54:08.3053500Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3053870Z           "selector" : "setExtendedStats:"
+2026-10-19T16:54:08.3054230Z         },
+2026-10-19T16:54:08.3054440Z         {
+2026-10-19T16:54:08.3054630Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3054910Z           "selector" : "setFaceBasedGlobalExposureBoostRatio:"
+2026-10-19T16:54:08.3055190Z         },
+2026-10-19T16:54:08.3055350Z         {
+2026-10-19T16:54:08.3055520Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3055760Z           "selector" : "setGlobalToneCurveData:"
+2026-10-19T16:54:08.3056010Z         },
+2026-10-19T16:54:08.3056150Z         {
+2026-10-19T16:54:08.3056320Z           "encoding" : "v20@0:8B16",
+2026-10-19T16:54:08.3056570Z           "selector" : "setIsVideo:"
+2026-10-19T16:54:08.3056770Z         },
+2026-10-19T16:54:08.3056930Z         {
+2026-10-19T16:54:08.3057090Z           "encoding" : "v40@0:8{?=qiIq}16",
+2026-10-19T16:54:08.3057600Z           "selector" : "setKeyTime:"
+2026-10-19T16:54:08.3057870Z         },
+2026-10-19T16:54:08.3058040Z         {
+2026-10-19T16:54:08.3058200Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3058440Z           "selector" : "setLightMapData:"
+2026-10-19T16:54:08.3058660Z         },
+2026-10-19T16:54:08.3058840Z         {
+2026-10-19T16:54:08.3058990Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3059250Z           "selector" : "setLightMapHeight:"
+2026-10-19T16:54:08.3059490Z         },
+2026-10-19T16:54:08.3059640Z         {
+2026-10-19T16:54:08.3059810Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3060040Z           "selector" : "setLightMapWidth:"
+2026-10-19T16:54:08.3060270Z         },
+2026-10-19T16:54:08.3060410Z         {
+2026-10-19T16:54:08.3060580Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3060800Z           "selector" : "setLinearGain:"
+2026-10-19T16:54:08.3061040Z         },
+2026-10-19T16:54:08.3061190Z         {
+2026-10-19T16:54:08.3061370Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3061650Z           "selector" : "setLinearLightMapData:"
+2026-10-19T16:54:08.3061940Z         },
+2026-10-19T16:54:08.3062120Z         {
+2026-10-19T16:54:08.3062280Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3062530Z           "selector" : "setLinearRangeMax:"
+2026-10-19T16:54:08.3062760Z         },
+2026-10-19T16:54:08.3062920Z         {
+2026-10-19T16:54:08.3063110Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3063340Z           "selector" : "setLinearRangeMin:"
+2026-10-19T16:54:08.3063630Z         },
+2026-10-19T16:54:08.3063830Z         {
+2026-10-19T16:54:08.3064070Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3064320Z           "selector" : "setSceneType:"
+2026-10-19T16:54:08.3064530Z         },
+2026-10-19T16:54:08.3064700Z         {
+2026-10-19T16:54:08.3064860Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3065150Z           "selector" : "setStats:"
+2026-10-19T16:54:08.3065430Z         },
+2026-10-19T16:54:08.3065590Z         {
+2026-10-19T16:54:08.3065750Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3066010Z           "selector" : "setStyleData:"
+2026-10-19T16:54:08.3066280Z         },
+2026-10-19T16:54:08.3066420Z         {
+2026-10-19T16:54:08.3076630Z           "encoding" : "v20@0:8B16",
+2026-10-19T16:54:08.3077040Z           "selector" : "setStyleDataIsFloat16:"
+2026-10-19T16:54:08.3077290Z         },
+2026-10-19T16:54:08.3077440Z         {
+2026-10-19T16:54:08.3078160Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3078410Z           "selector" : "setSubjectRelightingValue:"
+2026-10-19T16:54:08.3078670Z         },
+2026-10-19T16:54:08.3078820Z         {
+2026-10-19T16:54:08.3079000Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3079200Z           "selector" : "setTuningType:"
+2026-10-19T16:54:08.3079440Z         },
+2026-10-19T16:54:08.3079600Z         {
+2026-10-19T16:54:08.3079760Z           "encoding" : "v24@0:8@16",
+2026-10-19T16:54:08.3079970Z           "selector" : "setVersion:"
+2026-10-19T16:54:08.3080220Z         },
+2026-10-19T16:54:08.3080420Z         {
+2026-10-19T16:54:08.3080600Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3080910Z           "selector" : "stats"
+2026-10-19T16:54:08.3081220Z         },
+2026-10-19T16:54:08.3081410Z         {
+2026-10-19T16:54:08.3081590Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3081800Z           "selector" : "styleData"
+2026-10-19T16:54:08.3081990Z         },
+2026-10-19T16:54:08.3082130Z         {
+2026-10-19T16:54:08.3082310Z           "encoding" : "B16@0:8",
+2026-10-19T16:54:08.3082540Z           "selector" : "styleDataIsFloat16"
+2026-10-19T16:54:08.3082770Z         },
+2026-10-19T16:54:08.3082920Z         {
+2026-10-19T16:54:08.3083150Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3083370Z           "selector" : "subjectRelightingValue"
+2026-10-19T16:54:08.3083580Z         },
+2026-10-19T16:54:08.3083710Z         {
+2026-10-19T16:54:08.3083850Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3084280Z           "selector" : "tuningType"
+2026-10-19T16:54:08.3084530Z         },
+2026-10-19T16:54:08.3084700Z         {
+2026-10-19T16:54:08.3084840Z           "encoding" : "@16@0:8",
+2026-10-19T16:54:08.3085050Z           "selector" : "version"
+2026-10-19T16:54:08.3085250Z         }
+2026-10-19T16:54:08.3085400Z       ],
+2026-10-19T16:54:08.3085580Z       "instance_size" : 192
+2026-10-19T16:54:08.3085770Z     }
+2026-10-19T16:54:08.3085890Z   ],
+2026-10-19T16:54:08.3086050Z   "device" : "Apple Paravirtual device",
+2026-10-19T16:54:08.3086300Z   "frameworks" : [
+2026-10-19T16:54:08.3086450Z     {
+2026-10-19T16:54:08.3086630Z       "error" : "",
+2026-10-19T16:54:08.3086840Z       "loaded" : true,
+2026-10-19T16:54:08.3088400Z       "path" : "\/System\/Library\/PrivateFrameworks\/NeutrinoCore.framework\/NeutrinoCore"
+2026-10-19T16:54:08.3089370Z     },
+2026-10-19T16:54:08.3089800Z     {
+2026-10-19T16:54:08.3090190Z       "error" : "",
+2026-10-19T16:54:08.3090820Z       "loaded" : true,
+2026-10-19T16:54:08.3091680Z       "path" : "\/System\/Library\/PrivateFrameworks\/PhotoImaging.framework\/PhotoImaging"
+2026-10-19T16:54:08.3092610Z     },
+2026-10-19T16:54:08.3092990Z     {
+2026-10-19T16:54:08.3093370Z       "error" : "",
+2026-10-19T16:54:08.3093820Z       "loaded" : true,
+2026-10-19T16:54:08.3094560Z       "path" : "\/System\/Library\/PrivateFrameworks\/CMImaging.framework\/CMImaging"
+2026-10-19T16:54:08.3095400Z     },
+2026-10-19T16:54:08.3095780Z     {
+2026-10-19T16:54:08.3096160Z       "error" : "",
+2026-10-19T16:54:08.3096630Z       "loaded" : true,
+2026-10-19T16:54:08.3097390Z       "path" : "\/System\/Library\/PrivateFrameworks\/CMCapture.framework\/CMCapture"
+2026-10-19T16:54:08.3098240Z     }
+2026-10-19T16:54:08.3098610Z   ],
+2026-10-19T16:54:08.3099020Z   "os" : "Version 26.6.2 (Build 25G83)",
+2026-10-19T16:54:08.3099670Z   "patches_to_apple_implementations" : false,
+2026-10-19T16:54:08.3100300Z   "photos_used" : false,
+2026-10-19T16:54:08.3100960Z   "schema" : "xdremux-texture-runtime-v1"
+2026-10-19T16:54:08.3101650Z }
+2026-10-19T16:54:08.3102090Z TEXTURE_JSON_END inventory/runtime.json
+2026-10-19T16:54:08.3102720Z TEXTURE_JSON_BEGIN inventory/defaults.json
+2026-10-19T16:54:08.3103300Z {
+2026-10-19T16:54:08.3103500Z 
+2026-10-19T16:54:08.3103720Z }
+2026-10-19T16:54:08.3104600Z TEXTURE_JSON_END inventory/defaults.json
+2026-10-19T16:54:08.3105270Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.3105830Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.3106380Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.3108340Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.3108950Z PROBE_STAGE copy raw Objective-C class list
+2026-10-19T16:54:08.3109660Z PROBE_STAGE inventory _NUSemanticStyleProperties
+2026-10-19T16:54:08.3110390Z PROBE_STAGE write runtime inventory
+2026-10-19T16:54:08.3111010Z PROBE_STAGE native default dictionaries
+2026-10-19T16:54:08.3111640Z NATIVE_PROCESS_END inventory exit_code=0
+2026-10-19T16:54:08.3112240Z NATIVE_PROCESS_BEGIN settings
+2026-10-19T16:54:08.3180950Z TEXTURE_JSON_BEGIN settings/settings.json
+2026-10-19T16:54:08.3181370Z [
+2026-10-19T16:54:08.3181510Z   {
+2026-10-19T16:54:08.3181720Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3182020Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3182280Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3182520Z     "image_input" : false,
+2026-10-19T16:54:08.3182740Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3182960Z     "preset_input" : "Standard",
+2026-10-19T16:54:08.3183220Z     "unsupported" : true
+2026-10-19T16:54:08.3183410Z   },
+2026-10-19T16:54:08.3183550Z   {
+2026-10-19T16:54:08.3183700Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3188590Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3189280Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3189810Z     "image_input" : false,
+2026-10-19T16:54:08.3190370Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3190950Z     "preset_input" : "Standard",
+2026-10-19T16:54:08.3191500Z     "unsupported" : true
+2026-10-19T16:54:08.3192810Z   },
+2026-10-19T16:54:08.3193310Z   {
+2026-10-19T16:54:08.3193800Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3194480Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3195080Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3195580Z     "image_input" : false,
+2026-10-19T16:54:08.3196080Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3196590Z     "preset_input" : "Standard",
+2026-10-19T16:54:08.3197170Z     "unsupported" : true
+2026-10-19T16:54:08.3197660Z   },
+2026-10-19T16:54:08.3198060Z   {
+2026-10-19T16:54:08.3198490Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3199150Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3199760Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3200270Z     "image_input" : false,
+2026-10-19T16:54:08.3200770Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3201280Z     "preset_input" : "Filmic",
+2026-10-19T16:54:08.3201850Z     "unsupported" : true
+2026-10-19T16:54:08.3203370Z   },
+2026-10-19T16:54:08.3203800Z   {
+2026-10-19T16:54:08.3204230Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3204900Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3205530Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3206020Z     "image_input" : false,
+2026-10-19T16:54:08.3206530Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3207040Z     "preset_input" : "Filmic",
+2026-10-19T16:54:08.3207560Z     "unsupported" : true
+2026-10-19T16:54:08.3208020Z   },
+2026-10-19T16:54:08.3208390Z   {
+2026-10-19T16:54:08.3208820Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3209450Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3210040Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3210550Z     "image_input" : false,
+2026-10-19T16:54:08.3211070Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3211580Z     "preset_input" : "Filmic",
+2026-10-19T16:54:08.3212090Z     "unsupported" : true
+2026-10-19T16:54:08.3212550Z   },
+2026-10-19T16:54:08.3212910Z   {
+2026-10-19T16:54:08.3213350Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3213980Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3214560Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3215330Z     "image_input" : false,
+2026-10-19T16:54:08.3215830Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3216330Z     "preset_input" : "Glowy",
+2026-10-19T16:54:08.3216840Z     "unsupported" : true
+2026-10-19T16:54:08.3217300Z   },
+2026-10-19T16:54:08.3217660Z   {
+2026-10-19T16:54:08.3218090Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3219770Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3220390Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3220900Z     "image_input" : false,
+2026-10-19T16:54:08.3221410Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3221940Z     "preset_input" : "Glowy",
+2026-10-19T16:54:08.3222800Z     "unsupported" : true
+2026-10-19T16:54:08.3223300Z   },
+2026-10-19T16:54:08.3223680Z   {
+2026-10-19T16:54:08.3224160Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3224800Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3225400Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3225900Z     "image_input" : false,
+2026-10-19T16:54:08.3226410Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3226920Z     "preset_input" : "Glowy",
+2026-10-19T16:54:08.3227430Z     "unsupported" : true
+2026-10-19T16:54:08.3227900Z   },
+2026-10-19T16:54:08.3228280Z   {
+2026-10-19T16:54:08.3228850Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3229540Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3230120Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3230600Z     "image_input" : false,
+2026-10-19T16:54:08.3231100Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3231600Z     "preset_input" : "Soft",
+2026-10-19T16:54:08.3232110Z     "unsupported" : true
+2026-10-19T16:54:08.3232570Z   },
+2026-10-19T16:54:08.3232940Z   {
+2026-10-19T16:54:08.3233380Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3235120Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3236220Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3236590Z     "image_input" : false,
+2026-10-19T16:54:08.3236790Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3236980Z     "preset_input" : "Soft",
+2026-10-19T16:54:08.3237190Z     "unsupported" : true
+2026-10-19T16:54:08.3237350Z   },
+2026-10-19T16:54:08.3237470Z   {
+2026-10-19T16:54:08.3237630Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3237870Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3238120Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3238290Z     "image_input" : false,
+2026-10-19T16:54:08.3238470Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3238650Z     "preset_input" : "Soft",
+2026-10-19T16:54:08.3238830Z     "unsupported" : true
+2026-10-19T16:54:08.3238990Z   },
+2026-10-19T16:54:08.3239110Z   {
+2026-10-19T16:54:08.3239260Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3239500Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3239720Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3239900Z     "image_input" : false,
+2026-10-19T16:54:08.3240070Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3240250Z     "preset_input" : "Studio",
+2026-10-19T16:54:08.3240460Z     "unsupported" : true
+2026-10-19T16:54:08.3240630Z   },
+2026-10-19T16:54:08.3240750Z   {
+2026-10-19T16:54:08.3240910Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3241140Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3241360Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3241530Z     "image_input" : false,
+2026-10-19T16:54:08.3241710Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3241930Z     "preset_input" : "Studio",
+2026-10-19T16:54:08.3242160Z     "unsupported" : true
+2026-10-19T16:54:08.3242330Z   },
+2026-10-19T16:54:08.3242460Z   {
+2026-10-19T16:54:08.3242620Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3242850Z     "factory" : "FigCaptureTextureStyle",
+2026-10-19T16:54:08.3243070Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3243280Z     "image_input" : false,
+2026-10-19T16:54:08.3243500Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3243690Z     "preset_input" : "Studio",
+2026-10-19T16:54:08.3243860Z     "unsupported" : true
+2026-10-19T16:54:08.3244030Z   },
+2026-10-19T16:54:08.3244150Z   {
+2026-10-19T16:54:08.3244300Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3244530Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3244770Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3245350Z     "image_input" : false,
+2026-10-19T16:54:08.3245530Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3245710Z     "preset_input" : "Standard",
+2026-10-19T16:54:08.3245910Z     "unsupported" : true
+2026-10-19T16:54:08.3246060Z   },
+2026-10-19T16:54:08.3246180Z   {
+2026-10-19T16:54:08.3246340Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3246570Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3246780Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3247000Z     "image_input" : false,
+2026-10-19T16:54:08.3247230Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3247490Z     "preset_input" : "Standard",
+2026-10-19T16:54:08.3247730Z     "unsupported" : true
+2026-10-19T16:54:08.3247960Z   },
+2026-10-19T16:54:08.3248090Z   {
+2026-10-19T16:54:08.3248350Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3248660Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3248880Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3305970Z     "image_input" : false,
+2026-10-19T16:54:08.3306460Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3306680Z     "preset_input" : "Standard",
+2026-10-19T16:54:08.3306880Z     "unsupported" : true
+2026-10-19T16:54:08.3307060Z   },
+2026-10-19T16:54:08.3307180Z   {
+2026-10-19T16:54:08.3307340Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3307570Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3307800Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3307970Z     "image_input" : false,
+2026-10-19T16:54:08.3308570Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3308760Z     "preset_input" : "Filmic",
+2026-10-19T16:54:08.3308940Z     "unsupported" : true
+2026-10-19T16:54:08.3309100Z   },
+2026-10-19T16:54:08.3309220Z   {
+2026-10-19T16:54:08.3309370Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3309600Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3309810Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3310020Z     "image_input" : false,
+2026-10-19T16:54:08.3310250Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3310450Z     "preset_input" : "Filmic",
+2026-10-19T16:54:08.3310620Z     "unsupported" : true
+2026-10-19T16:54:08.3310790Z   },
+2026-10-19T16:54:08.3310920Z   {
+2026-10-19T16:54:08.3311070Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3311330Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3311590Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3311780Z     "image_input" : false,
+2026-10-19T16:54:08.3311950Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3312130Z     "preset_input" : "Filmic",
+2026-10-19T16:54:08.3312320Z     "unsupported" : true
+2026-10-19T16:54:08.3312480Z   },
+2026-10-19T16:54:08.3312610Z   {
+2026-10-19T16:54:08.3312770Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3313060Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3313320Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3313500Z     "image_input" : false,
+2026-10-19T16:54:08.3313670Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3313860Z     "preset_input" : "Glowy",
+2026-10-19T16:54:08.3314050Z     "unsupported" : true
+2026-10-19T16:54:08.3314210Z   },
+2026-10-19T16:54:08.3314340Z   {
+2026-10-19T16:54:08.3314480Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3314720Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3314960Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3315170Z     "image_input" : false,
+2026-10-19T16:54:08.3315370Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3315550Z     "preset_input" : "Glowy",
+2026-10-19T16:54:08.3315750Z     "unsupported" : true
+2026-10-19T16:54:08.3315910Z   },
+2026-10-19T16:54:08.3316030Z   {
+2026-10-19T16:54:08.3316180Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3316410Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3316620Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3316800Z     "image_input" : false,
+2026-10-19T16:54:08.3317010Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3317190Z     "preset_input" : "Glowy",
+2026-10-19T16:54:08.3317610Z     "unsupported" : true
+2026-10-19T16:54:08.3317810Z   },
+2026-10-19T16:54:08.3317960Z   {
+2026-10-19T16:54:08.3318130Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3318820Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3319040Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3319210Z     "image_input" : false,
+2026-10-19T16:54:08.3319390Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3319580Z     "preset_input" : "Soft",
+2026-10-19T16:54:08.3319760Z     "unsupported" : true
+2026-10-19T16:54:08.3319920Z   },
+2026-10-19T16:54:08.3320050Z   {
+2026-10-19T16:54:08.3320200Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3320430Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3320630Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3320800Z     "image_input" : false,
+2026-10-19T16:54:08.3320980Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3321170Z     "preset_input" : "Soft",
+2026-10-19T16:54:08.3321360Z     "unsupported" : true
+2026-10-19T16:54:08.3321520Z   },
+2026-10-19T16:54:08.3321660Z   {
+2026-10-19T16:54:08.3321840Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3322120Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3322320Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3322480Z     "image_input" : false,
+2026-10-19T16:54:08.3322650Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3322830Z     "preset_input" : "Soft",
+2026-10-19T16:54:08.3323020Z     "unsupported" : true
+2026-10-19T16:54:08.3323430Z   },
+2026-10-19T16:54:08.3323570Z   {
+2026-10-19T16:54:08.3323740Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3324030Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3324250Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3324420Z     "image_input" : false,
+2026-10-19T16:54:08.3324590Z     "intensity_input" : 0,
+2026-10-19T16:54:08.3324760Z     "preset_input" : "Studio",
+2026-10-19T16:54:08.3324940Z     "unsupported" : true
+2026-10-19T16:54:08.3325100Z   },
+2026-10-19T16:54:08.3325220Z   {
+2026-10-19T16:54:08.3325370Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3325600Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3325800Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3325970Z     "image_input" : false,
+2026-10-19T16:54:08.3326150Z     "intensity_input" : 0.5,
+2026-10-19T16:54:08.3326370Z     "preset_input" : "Studio",
+2026-10-19T16:54:08.3326810Z     "unsupported" : true
+2026-10-19T16:54:08.3327920Z   },
+2026-10-19T16:54:08.3328140Z   {
+2026-10-19T16:54:08.3328310Z     "capture_metadata_computation" : false,
+2026-10-19T16:54:08.3328590Z     "factory" : "AVCaptureTextureStyle",
+2026-10-19T16:54:08.3328810Z     "grain_input" : 0.25,
+2026-10-19T16:54:08.3328990Z     "image_input" : false,
+2026-10-19T16:54:08.3329170Z     "intensity_input" : 1,
+2026-10-19T16:54:08.3329350Z     "preset_input" : "Studio",
+2026-10-19T16:54:08.3329540Z     "unsupported" : true
+2026-10-19T16:54:08.3329700Z   }
+2026-10-19T16:54:08.3329830Z ]
+2026-10-19T16:54:08.3330000Z TEXTURE_JSON_END settings/settings.json
+2026-10-19T16:54:08.3330300Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.3330520Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.3330710Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.3330910Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.3331100Z NATIVE_PROCESS_END settings exit_code=0
+2026-10-19T16:54:08.3331330Z NATIVE_PROCESS_BEGIN processor-preflight
+2026-10-19T16:54:08.3338100Z TEXTURE_JSON_BEGIN processor-preflight/processor-preflight.json
+2026-10-19T16:54:08.3338990Z {
+2026-10-19T16:54:08.3339460Z   "apple_implementation_patched" : false,
+2026-10-19T16:54:08.3340780Z   "input_images_supplied" : false,
+2026-10-19T16:54:08.3341270Z   "scope" : "default native processor initialization\/prewarm only, no image or person context supplied",
+2026-10-19T16:54:08.3342120Z   "unsupported" : "CMITextureStylesProcessor class unavailable"
+2026-10-19T16:54:08.3342460Z }
+2026-10-19T16:54:08.3342720Z TEXTURE_JSON_END processor-preflight/processor-preflight.json
+2026-10-19T16:54:08.3343340Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.3343590Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.3343820Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.3344050Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.3344450Z NATIVE_PROCESS_END processor-preflight exit_code=0
+2026-10-19T16:54:08.3344770Z NATIVE_PROCESS_BEGIN requirements-1
+2026-10-19T16:54:08.3458290Z TEXTURE_JSON_BEGIN requirements-1/requirements.json
+2026-10-19T16:54:08.3458640Z {
+2026-10-19T16:54:08.3458780Z   "effect_type" : 1,
+2026-10-19T16:54:08.3458950Z   "is_video" : false,
+2026-10-19T16:54:08.3459170Z   "selector" : "inputConfigurationForEffectType:isVideo:",
+2026-10-19T16:54:08.3459500Z   "unsupported" : true
+2026-10-19T16:54:08.3459700Z }
+2026-10-19T16:54:08.3459870Z TEXTURE_JSON_END requirements-1/requirements.json
+2026-10-19T16:54:08.3460120Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.3460320Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.3460550Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.3461120Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.3461780Z NATIVE_PROCESS_END requirements-1 exit_code=0
+2026-10-19T16:54:08.3462060Z NATIVE_PROCESS_BEGIN requirements-2
+2026-10-19T16:54:08.3578290Z TEXTURE_JSON_BEGIN requirements-2/requirements.json
+2026-10-19T16:54:08.3578590Z {
+2026-10-19T16:54:08.3578720Z   "effect_type" : 2,
+2026-10-19T16:54:08.3578880Z   "is_video" : false,
+2026-10-19T16:54:08.3580180Z   "selector" : "inputConfigurationForEffectType:isVideo:",
+2026-10-19T16:54:08.3580470Z   "unsupported" : true
+2026-10-19T16:54:08.3580630Z }
+2026-10-19T16:54:08.3580810Z TEXTURE_JSON_END requirements-2/requirements.json
+2026-10-19T16:54:08.3581590Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.3582470Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.3582730Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.3582920Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.3583170Z NATIVE_PROCESS_END requirements-2 exit_code=0
+2026-10-19T16:54:08.3583500Z NATIVE_PROCESS_BEGIN requirements-3
+2026-10-19T16:54:08.3690270Z TEXTURE_JSON_BEGIN requirements-3/requirements.json
+2026-10-19T16:54:08.3690680Z {
+2026-10-19T16:54:08.3690860Z   "effect_type" : 3,
+2026-10-19T16:54:08.3691080Z   "is_video" : false,
+2026-10-19T16:54:08.3691300Z   "selector" : "inputConfigurationForEffectType:isVideo:",
+2026-10-19T16:54:08.3691570Z   "unsupported" : true
+2026-10-19T16:54:08.3691740Z }
+2026-10-19T16:54:08.3691960Z TEXTURE_JSON_END requirements-3/requirements.json
+2026-10-19T16:54:08.3692280Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.3692480Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.3692670Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.3692850Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.3693070Z NATIVE_PROCESS_END requirements-3 exit_code=0
+2026-10-19T16:54:08.3704670Z NATIVE_PROCESS_BEGIN synthetic-standard-control
+2026-10-19T16:54:08.3847410Z TEXTURE_JSON_BEGIN synthetic-standard-control/metadata-cases.json
+2026-10-19T16:54:08.3847810Z [
+2026-10-19T16:54:08.3847940Z   {
+2026-10-19T16:54:08.3848100Z     "case" : "synthetic-standard-control",
+2026-10-19T16:54:08.3848330Z     "consumer_class_available" : false,
+2026-10-19T16:54:08.3848530Z     "input" : {
+2026-10-19T16:54:08.3848680Z       "CaptureMode" : "Still",
+2026-10-19T16:54:08.3848870Z       "CaptureType" : "LF",
+2026-10-19T16:54:08.3849070Z       "FilmGrainSeed" : 0,
+2026-10-19T16:54:08.3849270Z       "HardwareModel" : "iPhone19,2",
+2026-10-19T16:54:08.3849550Z       "PortType" : "PortTypeBack",
+2026-10-19T16:54:08.3849790Z       "Preset" : "Standard",
+2026-10-19T16:54:08.3849990Z       "TextureStylePeopleDataVersion" : 3
+2026-10-19T16:54:08.3850200Z     },
+2026-10-19T16:54:08.3850470Z     "input_sha256" : "0ebc40424f0a9ce77cb9fd71ceddc1bbff6f8541095b3f5e715fd204952ca4fc",
+2026-10-19T16:54:08.3850950Z     "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+2026-10-19T16:54:08.3851490Z     "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
+2026-10-19T16:54:08.3852440Z     "unsupported_reason" : "class_unavailable"
+2026-10-19T16:54:08.3852760Z   }
+2026-10-19T16:54:08.3852930Z ]
+2026-10-19T16:54:08.3853180Z TEXTURE_JSON_END synthetic-standard-control/metadata-cases.json
+2026-10-19T16:54:08.3853600Z NATIVE_METADATA_PROBE_RECORDED cases=1; full_image_activation=false
+2026-10-19T16:54:08.3853950Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.3854170Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.3854400Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.3854600Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.3854860Z PROBE_STAGE metadata consumer synthetic-standard-control
+2026-10-19T16:54:08.3855230Z NATIVE_PROCESS_END synthetic-standard-control exit_code=0
+2026-10-19T16:54:08.3855550Z NATIVE_PROCESS_BEGIN synthetic-studio-control
+2026-10-19T16:54:08.3961060Z TEXTURE_JSON_BEGIN synthetic-studio-control/metadata-cases.json
+2026-10-19T16:54:08.3961390Z [
+2026-10-19T16:54:08.3961520Z   {
+2026-10-19T16:54:08.3961700Z     "case" : "synthetic-studio-control",
+2026-10-19T16:54:08.3961930Z     "consumer_class_available" : false,
+2026-10-19T16:54:08.3962130Z     "input" : {
+2026-10-19T16:54:08.3962290Z       "CaptureMode" : "Still",
+2026-10-19T16:54:08.3962480Z       "CaptureType" : "LF",
+2026-10-19T16:54:08.3962660Z       "FilmGrainSeed" : 0,
+2026-10-19T16:54:08.3962910Z       "HardwareModel" : "iPhone19,2",
+2026-10-19T16:54:08.3963170Z       "PortType" : "PortTypeBack",
+2026-10-19T16:54:08.3963360Z       "Preset" : "Studio",
+2026-10-19T16:54:08.3964230Z       "TextureStylePeopleDataVersion" : 3
+2026-10-19T16:54:08.3964540Z     },
+2026-10-19T16:54:08.3964900Z     "input_sha256" : "252470ff40eeab9c3aadc95d2ff2c76104f690f920a2a03eb5d712d879fcb07b",
+2026-10-19T16:54:08.3965620Z     "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+2026-10-19T16:54:08.3966240Z     "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
+2026-10-19T16:54:08.3966610Z     "unsupported_reason" : "class_unavailable"
+2026-10-19T16:54:08.3966860Z   }
+2026-10-19T16:54:08.3967000Z ]
+2026-10-19T16:54:08.3967220Z TEXTURE_JSON_END synthetic-studio-control/metadata-cases.json
+2026-10-19T16:54:08.3967590Z NATIVE_METADATA_PROBE_RECORDED cases=1; full_image_activation=false
+2026-10-19T16:54:08.3967900Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.3968120Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.3968320Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.3968540Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.3968780Z PROBE_STAGE metadata consumer synthetic-studio-control
+2026-10-19T16:54:08.3969150Z NATIVE_PROCESS_END synthetic-studio-control exit_code=0
+2026-10-19T16:54:08.3969420Z NATIVE_PROCESS_BEGIN missing-hardware
+2026-10-19T16:54:08.4075980Z TEXTURE_JSON_BEGIN missing-hardware/metadata-cases.json
+2026-10-19T16:54:08.4076310Z [
+2026-10-19T16:54:08.4076460Z   {
+2026-10-19T16:54:08.4076640Z     "case" : "missing-hardware",
+2026-10-19T16:54:08.4076870Z     "consumer_class_available" : false,
+2026-10-19T16:54:08.4077100Z     "input" : {
+2026-10-19T16:54:08.4077260Z       "CaptureMode" : "Still",
+2026-10-19T16:54:08.4077450Z       "CaptureType" : "LF",
+2026-10-19T16:54:08.4087320Z       "FilmGrainSeed" : 0,
+2026-10-19T16:54:08.4087590Z       "PortType" : "PortTypeBack",
+2026-10-19T16:54:08.4087850Z       "Preset" : "Standard",
+2026-10-19T16:54:08.4088100Z       "TextureStylePeopleDataVersion" : 3
+2026-10-19T16:54:08.4088320Z     },
+2026-10-19T16:54:08.4088620Z     "input_sha256" : "f4f3cc8285edd15f193352af42d067bd8fed895fff7b1b862c98b0c56663d755",
+2026-10-19T16:54:08.4089150Z     "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+2026-10-19T16:54:08.4089640Z     "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
+2026-10-19T16:54:08.4090030Z     "unsupported_reason" : "class_unavailable"
+2026-10-19T16:54:08.4090250Z   }
+2026-10-19T16:54:08.4090380Z ]
+2026-10-19T16:54:08.4090570Z TEXTURE_JSON_END missing-hardware/metadata-cases.json
+2026-10-19T16:54:08.4091320Z NATIVE_METADATA_PROBE_RECORDED cases=1; full_image_activation=false
+2026-10-19T16:54:08.4091620Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.4091810Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.4092010Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.4092220Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.4092440Z PROBE_STAGE metadata consumer missing-hardware
+2026-10-19T16:54:08.4092740Z NATIVE_PROCESS_END missing-hardware exit_code=0
+2026-10-19T16:54:08.4093000Z NATIVE_PROCESS_BEGIN unsupported-version
+2026-10-19T16:54:08.4191890Z TEXTURE_JSON_BEGIN unsupported-version/metadata-cases.json
+2026-10-19T16:54:08.4192230Z [
+2026-10-19T16:54:08.4192350Z   {
+2026-10-19T16:54:08.4192500Z     "case" : "unsupported-version",
+2026-10-19T16:54:08.4192720Z     "consumer_class_available" : false,
+2026-10-19T16:54:08.4192920Z     "input" : {
+2026-10-19T16:54:08.4193100Z       "CaptureMode" : "Still",
+2026-10-19T16:54:08.4193290Z       "CaptureType" : "LF",
+2026-10-19T16:54:08.4193530Z       "FilmGrainSeed" : 0,
+2026-10-19T16:54:08.4193760Z       "HardwareModel" : "iPhone19,2",
+2026-10-19T16:54:08.4194010Z       "PortType" : "PortTypeBack",
+2026-10-19T16:54:08.4194260Z       "Preset" : "Standard",
+2026-10-19T16:54:08.4194510Z       "TextureStylePeopleDataVersion" : 999
+2026-10-19T16:54:08.4194720Z     },
+2026-10-19T16:54:08.4195120Z     "input_sha256" : "5fba13ea0451aff30f886907428dd030beff046abb319c7d721943cd67419f78",
+2026-10-19T16:54:08.4195960Z     "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+2026-10-19T16:54:08.4196480Z     "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
+2026-10-19T16:54:08.4196860Z     "unsupported_reason" : "class_unavailable"
+2026-10-19T16:54:08.4197120Z   }
+2026-10-19T16:54:08.4197250Z ]
+2026-10-19T16:54:08.4197480Z TEXTURE_JSON_END unsupported-version/metadata-cases.json
+2026-10-19T16:54:08.4197860Z NATIVE_METADATA_PROBE_RECORDED cases=1; full_image_activation=false
+2026-10-19T16:54:08.4198200Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.4198680Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.4198960Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.4199260Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.4199510Z PROBE_STAGE metadata consumer unsupported-version
+2026-10-19T16:54:08.4199860Z NATIVE_PROCESS_END unsupported-version exit_code=0
+2026-10-19T16:54:08.4200160Z NATIVE_PROCESS_BEGIN empty-dictionary
+2026-10-19T16:54:08.4306860Z TEXTURE_JSON_BEGIN empty-dictionary/metadata-cases.json
+2026-10-19T16:54:08.4307330Z [
+2026-10-19T16:54:08.4307480Z   {
+2026-10-19T16:54:08.4307620Z     "case" : "empty-dictionary",
+2026-10-19T16:54:08.4307830Z     "consumer_class_available" : false,
+2026-10-19T16:54:08.4308040Z     "input" : {
+2026-10-19T16:54:08.4308130Z 
+2026-10-19T16:54:08.4308180Z     },
+2026-10-19T16:54:08.4308650Z     "input_sha256" : "9261ecceda608ef174256e5fdc774c1e6e3dcf533409c1bc393d490d01c713f1",
+2026-10-19T16:54:08.4309160Z     "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+2026-10-19T16:54:08.4309640Z     "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
+2026-10-19T16:54:08.4310100Z     "unsupported_reason" : "class_unavailable"
+2026-10-19T16:54:08.4310380Z   }
+2026-10-19T16:54:08.4310530Z ]
+2026-10-19T16:54:08.4311070Z TEXTURE_JSON_END empty-dictionary/metadata-cases.json
+2026-10-19T16:54:08.4311460Z NATIVE_METADATA_PROBE_RECORDED cases=1; full_image_activation=false
+2026-10-19T16:54:08.4311840Z PROBE_STAGE dlopen NeutrinoCore
+2026-10-19T16:54:08.4312060Z PROBE_STAGE dlopen PhotoImaging
+2026-10-19T16:54:08.4312260Z PROBE_STAGE dlopen CMImaging
+2026-10-19T16:54:08.4312460Z PROBE_STAGE dlopen CMCapture
+2026-10-19T16:54:08.4312670Z PROBE_STAGE metadata consumer empty-dictionary
+2026-10-19T16:54:08.4312950Z NATIVE_PROCESS_END empty-dictionary exit_code=0
+2026-10-19T16:54:08.4641190Z ##[group]Run python3 - <<'PY'
+2026-10-19T16:54:08.4641470Z [36;1mpython3 - <<'PY'[0m
+2026-10-19T16:54:08.4642030Z [36;1mimport hashlib,json,os,pathlib[0m
+2026-10-19T16:54:08.4642360Z [36;1mp=pathlib.Path('evidence');p.mkdir(exist_ok=True)[0m
+2026-10-19T16:54:08.4642800Z [36;1mrows=[][0m
+2026-10-19T16:54:08.4643000Z [36;1mfor f in sorted(p.rglob('*')):[0m
+2026-10-19T16:54:08.4643430Z [36;1m    if not f.is_file():continue[0m
+2026-10-19T16:54:08.4643730Z [36;1m    assert f.suffix in {'.json','.txt','.log'}[0m
+2026-10-19T16:54:08.4644360Z [36;1m    rows.append({'path':str(f.relative_to(p)),'size':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()})[0m
+2026-10-19T16:54:08.4645300Z [36;1mmanifest={'head_sha':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'photos_used':False,'files':rows}[0m
+2026-10-19T16:54:08.4646040Z [36;1m(p/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')[0m
+2026-10-19T16:54:08.4647140Z [36;1mprint('TEXTURE_JSON_BEGIN manifest.json');print(json.dumps(manifest,indent=2));print('TEXTURE_JSON_END manifest.json')[0m
+2026-10-19T16:54:08.4647830Z [36;1mPY[0m
+2026-10-19T16:54:08.4681520Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T16:54:08.4681780Z ##[endgroup]
+2026-10-19T16:54:08.5667590Z TEXTURE_JSON_BEGIN manifest.json
+2026-10-19T16:54:08.5667940Z {
+2026-10-19T16:54:08.5668150Z   "head_sha": "acb572f425728963d0ee375327016c52ab069c10",
+2026-10-19T16:54:08.5668490Z   "run_id": "39289168902",
+2026-10-19T16:54:08.5668700Z   "photos_used": false,
+2026-10-19T16:54:08.5668910Z   "files": [
+2026-10-19T16:54:08.5669060Z     {
+2026-10-19T16:54:08.5669220Z       "path": "build.log",
+2026-10-19T16:54:08.5669410Z       "size": 1585,
+2026-10-19T16:54:08.5669790Z       "sha256": "ce12d26609fb92893d87d465cd80c4b504959d3a62c58ca3020e3f11b69b630d"
+2026-10-19T16:54:08.5670110Z     },
+2026-10-19T16:54:08.5670260Z     {
+2026-10-19T16:54:08.5670420Z       "path": "head.txt",
+2026-10-19T16:54:08.5670650Z       "size": 41,
+2026-10-19T16:54:08.5670930Z       "sha256": "46aa9cbfc69eecaa9ee3510bab002e0e6ca581c5eda77310a30e9531c2cbd773"
+2026-10-19T16:54:08.5671270Z     },
+2026-10-19T16:54:08.5671410Z     {
+2026-10-19T16:54:08.5671620Z       "path": "metadata/empty-dictionary/metadata-cases.json",
+2026-10-19T16:54:08.5671900Z       "size": 419,
+2026-10-19T16:54:08.5672170Z       "sha256": "0f1b23aa0bc72f91f952fe474118cfae13e2efe12f96f4b33a65fb983f5aabd7"
+2026-10-19T16:54:08.5672500Z     },
+2026-10-19T16:54:08.5672640Z     {
+2026-10-19T16:54:08.5672840Z       "path": "metadata/empty-dictionary.stderr.log",
+2026-10-19T16:54:08.5673090Z       "size": 169,
+2026-10-19T16:54:08.5673350Z       "sha256": "231109b4f428c02d7c101b7848bb1cd17f7a87dea3510f8743770746fcfdb559"
+2026-10-19T16:54:08.5673660Z     },
+2026-10-19T16:54:08.5673800Z     {
+2026-10-19T16:54:08.5673990Z       "path": "metadata/empty-dictionary.stdout.log",
+2026-10-19T16:54:08.5674230Z       "size": 597,
+2026-10-19T16:54:08.5674510Z       "sha256": "584a40c17986322115d3dca69a325369169f8eba3f66b1490202fe14f6273da0"
+2026-10-19T16:54:08.5674820Z     },
+2026-10-19T16:54:08.5674970Z     {
+2026-10-19T16:54:08.5675200Z       "path": "metadata/inventory/defaults.json",
+2026-10-19T16:54:08.5675470Z       "size": 5,
+2026-10-19T16:54:08.5675750Z       "sha256": "8e1d794b49e35ea828279c6a8c95282bbb9a0787cf5c9385256c2cc9d17baeb7"
+2026-10-19T16:54:08.5676050Z     },
+2026-10-19T16:54:08.5676190Z     {
+2026-10-19T16:54:08.5676360Z       "path": "metadata/inventory/runtime.json",
+2026-10-19T16:54:08.5676610Z       "size": 6457,
+2026-10-19T16:54:08.5676880Z       "sha256": "16a1b553f8be6a0375545ae3a9f45decc6164fb68d91aa6a05397a9904e9089e"
+2026-10-19T16:54:08.5677200Z     },
+2026-10-19T16:54:08.5677340Z     {
+2026-10-19T16:54:08.5677510Z       "path": "metadata/inventory.stderr.log",
+2026-10-19T16:54:08.5677750Z       "size": 291,
+2026-10-19T16:54:08.5678070Z       "sha256": "b090c429266e7f5aa3e5b1e0ded5da234bd5c67d09ec0bc7ce79293e2cbe25ac"
+2026-10-19T16:54:08.5678440Z     },
+2026-10-19T16:54:08.5679040Z     {
+2026-10-19T16:54:08.5679260Z       "path": "metadata/inventory.stdout.log",
+2026-10-19T16:54:08.5679490Z       "size": 6628,
+2026-10-19T16:54:08.5680240Z       "sha256": "c8419621f4bd48a9fb5bc7d7869c16b6badc731326e15c5e110667adb1cee8d7"
+2026-10-19T16:54:08.5680610Z     },
+2026-10-19T16:54:08.5680800Z     {
+2026-10-19T16:54:08.5681010Z       "path": "metadata/missing-hardware/metadata-cases.json",
+2026-10-19T16:54:08.5681290Z       "size": 610,
+2026-10-19T16:54:08.5681570Z       "sha256": "f3e13fb69c6334c72f83357a86a22fdde8e75d26aea3c34259d8e7bb4aa87056"
+2026-10-19T16:54:08.5681870Z     },
+2026-10-19T16:54:08.5682020Z     {
+2026-10-19T16:54:08.5682210Z       "path": "metadata/missing-hardware.stderr.log",
+2026-10-19T16:54:08.5682450Z       "size": 169,
+2026-10-19T16:54:08.5682730Z       "sha256": "ad2f738cfe741d9e807eb61031995a1ae70e67b273e70e9350aedcc3e5321209"
+2026-10-19T16:54:08.5683030Z     },
+2026-10-19T16:54:08.5683180Z     {
+2026-10-19T16:54:08.5683370Z       "path": "metadata/missing-hardware.stdout.log",
+2026-10-19T16:54:08.5683620Z       "size": 788,
+2026-10-19T16:54:08.5683890Z       "sha256": "dc26d998021b136078dce58eb3331dc4d73dc7948ab4c5ba61d66fa0bd5fa144"
+2026-10-19T16:54:08.5684220Z     },
+2026-10-19T16:54:08.5684410Z     {
+2026-10-19T16:54:08.5684630Z       "path": "metadata/process-results.json",
+2026-10-19T16:54:08.5684920Z       "size": 2507,
+2026-10-19T16:54:08.5685250Z       "sha256": "105f3c7426665a539e1d262fc31b2e8b0fef7e0b8612fb74332174d437a0ab76"
+2026-10-19T16:54:08.5685600Z     },
+2026-10-19T16:54:08.5685750Z     {
+2026-10-19T16:54:08.5685990Z       "path": "metadata/processor-preflight/processor-preflight.json",
+2026-10-19T16:54:08.5686270Z       "size": 251,
+2026-10-19T16:54:08.5686560Z       "sha256": "fde8ad194069d1e0b3788faeaf88f0304178e1a441b6178d33697095706f5321"
+2026-10-19T16:54:08.5686870Z     },
+2026-10-19T16:54:08.5687020Z     {
+2026-10-19T16:54:08.5687220Z       "path": "metadata/processor-preflight.stderr.log",
+2026-10-19T16:54:08.5687470Z       "size": 122,
+2026-10-19T16:54:08.5687750Z       "sha256": "18448b5d0df67bff6fa2189744cb467489c070d457594389eceff0afb8c263de"
+2026-10-19T16:54:08.5688060Z     },
+2026-10-19T16:54:08.5688220Z     {
+2026-10-19T16:54:08.5688410Z       "path": "metadata/processor-preflight.stdout.log",
+2026-10-19T16:54:08.5688670Z       "size": 377,
+2026-10-19T16:54:08.5688940Z       "sha256": "5cf63819d1749f83c7abc2ddfeee8baa9623417ae8dfb1eeb6e23760e0279bde"
+2026-10-19T16:54:08.5689260Z     },
+2026-10-19T16:54:08.5689420Z     {
+2026-10-19T16:54:08.5689610Z       "path": "metadata/requirements-1/requirements.json",
+2026-10-19T16:54:08.5689870Z       "size": 129,
+2026-10-19T16:54:08.5690140Z       "sha256": "cae63e65a8ed023c4a2cb79843b935794980dd092ae3050cbd1bcbb317d463ac"
+2026-10-19T16:54:08.5690450Z     },
+2026-10-19T16:54:08.5690580Z     {
+2026-10-19T16:54:08.5701980Z       "path": "metadata/requirements-1.stderr.log",
+2026-10-19T16:54:08.5702260Z       "size": 122,
+2026-10-19T16:54:08.5702560Z       "sha256": "18448b5d0df67bff6fa2189744cb467489c070d457594389eceff0afb8c263de"
+2026-10-19T16:54:08.5702940Z     },
+2026-10-19T16:54:08.5703060Z     {
+2026-10-19T16:54:08.5703260Z       "path": "metadata/requirements-1.stdout.log",
+2026-10-19T16:54:08.5703550Z       "size": 231,
+2026-10-19T16:54:08.5703850Z       "sha256": "9ee69ae8d18bc5f3498e8d5438b6bf10426d83d51e27a614e18005397ebb1753"
+2026-10-19T16:54:08.5704230Z     },
+2026-10-19T16:54:08.5704370Z     {
+2026-10-19T16:54:08.5704600Z       "path": "metadata/requirements-2/requirements.json",
+2026-10-19T16:54:08.5704900Z       "size": 129,
+2026-10-19T16:54:08.5705180Z       "sha256": "f10559e57bfed0a6bef15154a7c5161ee69ce096ae2b0fda812592c58f3b3848"
+2026-10-19T16:54:08.5705470Z     },
+2026-10-19T16:54:08.5705610Z     {
+2026-10-19T16:54:08.5705770Z       "path": "metadata/requirements-2.stderr.log",
+2026-10-19T16:54:08.5706010Z       "size": 122,
+2026-10-19T16:54:08.5706360Z       "sha256": "18448b5d0df67bff6fa2189744cb467489c070d457594389eceff0afb8c263de"
+2026-10-19T16:54:08.5706970Z     },
+2026-10-19T16:54:08.5707120Z     {
+2026-10-19T16:54:08.5707290Z       "path": "metadata/requirements-2.stdout.log",
+2026-10-19T16:54:08.5707670Z       "size": 231,
+2026-10-19T16:54:08.5707930Z       "sha256": "b71fa5cb433eb8712ff18445bcf1320c6268e75bd036c09c78c949190fbdab30"
+2026-10-19T16:54:08.5708240Z     },
+2026-10-19T16:54:08.5708360Z     {
+2026-10-19T16:54:08.5708550Z       "path": "metadata/requirements-3/requirements.json",
+2026-10-19T16:54:08.5708780Z       "size": 129,
+2026-10-19T16:54:08.5709050Z       "sha256": "3633a6e86cd9e8c20775ef07b0776b15b8c00588eb157bfadadc47f950e5633f"
+2026-10-19T16:54:08.5709360Z     },
+2026-10-19T16:54:08.5709480Z     {
+2026-10-19T16:54:08.5709650Z       "path": "metadata/requirements-3.stderr.log",
+2026-10-19T16:54:08.5709880Z       "size": 122,
+2026-10-19T16:54:08.5710150Z       "sha256": "18448b5d0df67bff6fa2189744cb467489c070d457594389eceff0afb8c263de"
+2026-10-19T16:54:08.5710460Z     },
+2026-10-19T16:54:08.5710620Z     {
+2026-10-19T16:54:08.5710830Z       "path": "metadata/requirements-3.stdout.log",
+2026-10-19T16:54:08.5711060Z       "size": 231,
+2026-10-19T16:54:08.5711320Z       "sha256": "e947c94d19c10341bc332d66b34d0d49efc986b80efa9e1094c5b4b3a23c1a23"
+2026-10-19T16:54:08.5711640Z     },
+2026-10-19T16:54:08.5711760Z     {
+2026-10-19T16:54:08.5711910Z       "path": "metadata/settings/settings.json",
+2026-10-19T16:54:08.5712140Z       "size": 6932,
+2026-10-19T16:54:08.5712400Z       "sha256": "dbe993f370d8a7b9c924dee6b5dbc732518c7275424cd2a9aa6b1533697324e2"
+2026-10-19T16:54:08.5712710Z     },
+2026-10-19T16:54:08.5712830Z     {
+2026-10-19T16:54:08.5713000Z       "path": "metadata/settings.stderr.log",
+2026-10-19T16:54:08.5713220Z       "size": 122,
+2026-10-19T16:54:08.5713480Z       "sha256": "18448b5d0df67bff6fa2189744cb467489c070d457594389eceff0afb8c263de"
+2026-10-19T16:54:08.5713770Z     },
+2026-10-19T16:54:08.5713900Z     {
+2026-10-19T16:54:08.5714060Z       "path": "metadata/settings.stdout.log",
+2026-10-19T16:54:08.5714270Z       "size": 7014,
+2026-10-19T16:54:08.5714550Z       "sha256": "4435da149e09cf221bace8259afb75ef2f43ea6b68a9542fb2684d48c83da261"
+2026-10-19T16:54:08.5714860Z     },
+2026-10-19T16:54:08.5714980Z     {
+2026-10-19T16:54:08.5715220Z       "path": "metadata/synthetic-standard-control/metadata-cases.json",
+2026-10-19T16:54:08.5715500Z       "size": 658,
+2026-10-19T16:54:08.5715780Z       "sha256": "ff4db6debf6cdfbd67f186ef1e65a4c92fcaec74fd2d343eadc25bfd82b80ec9"
+2026-10-19T16:54:08.5716100Z     },
+2026-10-19T16:54:08.5716230Z     {
+2026-10-19T16:54:08.5716430Z       "path": "metadata/synthetic-standard-control.stderr.log",
+2026-10-19T16:54:08.5716680Z       "size": 179,
+2026-10-19T16:54:08.5716940Z       "sha256": "86ffde9f35d03970b8fde02a8bb9914ff81e94f79c359e2df1e301e01d48a009"
+2026-10-19T16:54:08.5717240Z     },
+2026-10-19T16:54:08.5717360Z     {
+2026-10-19T16:54:08.5717570Z       "path": "metadata/synthetic-standard-control.stdout.log",
+2026-10-19T16:54:08.5717850Z       "size": 856,
+2026-10-19T16:54:08.5718100Z       "sha256": "42d42ff8263ee49f694676ddb36121a7e7ce662081f23053b907a6d133bffa57"
+2026-10-19T16:54:08.5718390Z     },
+2026-10-19T16:54:08.5718510Z     {
+2026-10-19T16:54:08.5718750Z       "path": "metadata/synthetic-studio-control/metadata-cases.json",
+2026-10-19T16:54:08.5719030Z       "size": 654,
+2026-10-19T16:54:08.5719280Z       "sha256": "3a16c9ea761ac6604b93ba8ccf2817a5bc8b3617715692a4a529db5cfc03b468"
+2026-10-19T16:54:08.5719600Z     },
+2026-10-19T16:54:08.5719730Z     {
+2026-10-19T16:54:08.5719950Z       "path": "metadata/synthetic-studio-control.stderr.log",
+2026-10-19T16:54:08.5720210Z       "size": 177,
+2026-10-19T16:54:08.5720490Z       "sha256": "98f6d5fcc37b31a1a033b2ad1269ab2391ac25b51458c6f2d2c12579171d8e86"
+2026-10-19T16:54:08.5720780Z     },
+2026-10-19T16:54:08.5720930Z     {
+2026-10-19T16:54:08.5721130Z       "path": "metadata/synthetic-studio-control.stdout.log",
+2026-10-19T16:54:08.5721400Z       "size": 848,
+2026-10-19T16:54:08.5721800Z       "sha256": "b93e99bb692b2ae8ad5442220f71720281aee74f9a49eed76b30ae2f8e194b48"
+2026-10-19T16:54:08.5722120Z     },
+2026-10-19T16:54:08.5722250Z     {
+2026-10-19T16:54:08.5722450Z       "path": "metadata/unsupported-version/metadata-cases.json",
+2026-10-19T16:54:08.5722860Z       "size": 653,
+2026-10-19T16:54:08.5723130Z       "sha256": "a772503c4b4e961b6da9797fbaac6c34bdec05f90bfba9d9ba5bb3525cfe32e6"
+2026-10-19T16:54:08.5723450Z     },
+2026-10-19T16:54:08.5723570Z     {
+2026-10-19T16:54:08.5723750Z       "path": "metadata/unsupported-version.stderr.log",
+2026-10-19T16:54:08.5724000Z       "size": 172,
+2026-10-19T16:54:08.5724290Z       "sha256": "3b04fa06d32712374a83b15ea4d6958b329e6585a4e4d8df5156146e3f7c18eb"
+2026-10-19T16:54:08.5724610Z     },
+2026-10-19T16:54:08.5724730Z     {
+2026-10-19T16:54:08.5724930Z       "path": "metadata/unsupported-version.stdout.log",
+2026-10-19T16:54:08.5725170Z       "size": 837,
+2026-10-19T16:54:08.5725450Z       "sha256": "af0a6491c0227e3509a423857b0b7374322f017e4fc4faf319b3c747728259db"
+2026-10-19T16:54:08.5725750Z     },
+2026-10-19T16:54:08.5725880Z     {
+2026-10-19T16:54:08.5726040Z       "path": "os.txt",
+2026-10-19T16:54:08.5726210Z       "size": 65,
+2026-10-19T16:54:08.5726470Z       "sha256": "cd5d6399b3785b04ceaae75045a9ca9f80f0bbc3526eff9d0c36b170ed1ec348"
+2026-10-19T16:54:08.5726760Z     },
+2026-10-19T16:54:08.5726900Z     {
+2026-10-19T16:54:08.5727030Z       "path": "probe.log",
+2026-10-19T16:54:08.5727190Z       "size": 21357,
+2026-10-19T16:54:08.5727460Z       "sha256": "a383c91a860c22bc3ab65a2199b72b0ff048c5fbf47589903216c82fd2ce447c"
+2026-10-19T16:54:08.5727750Z     },
+2026-10-19T16:54:08.5727880Z     {
+2026-10-19T16:54:08.5728040Z       "path": "sdk.txt",
+2026-10-19T16:54:08.5728200Z       "size": 5,
+2026-10-19T16:54:08.5728470Z       "sha256": "25205f2e2f02dc71036ee827e19c49b893b231a3d1af240e35a3ac55aa8cdcb6"
+2026-10-19T16:54:08.5728770Z     },
+2026-10-19T16:54:08.5728900Z     {
+2026-10-19T16:54:08.5729040Z       "path": "swift.txt",
+2026-10-19T16:54:08.5729220Z       "size": 98,
+2026-10-19T16:54:08.5729480Z       "sha256": "b674f79b747370a1c05ae7cec551fffe557816c6c807f35f39f933ecbcca80d7"
+2026-10-19T16:54:08.5729780Z     },
+2026-10-19T16:54:08.5729920Z     {
+2026-10-19T16:54:08.5730070Z       "path": "xcode.txt",
+2026-10-19T16:54:08.5730230Z       "size": 32,
+2026-10-19T16:54:08.5730490Z       "sha256": "18730ed2ae28a2c9cf0c2d5db549033a4f07089331391a7133b7b32187454fa9"
+2026-10-19T16:54:08.5730790Z     }
+2026-10-19T16:54:08.5730920Z   ]
+2026-10-19T16:54:08.5731040Z }
+2026-10-19T16:54:08.5731180Z TEXTURE_JSON_END manifest.json
+2026-10-19T16:54:08.5802890Z ##[group]Run actions/upload-artifact@v4
+2026-10-19T16:54:08.5803130Z with:
+2026-10-19T16:54:08.5803300Z   name: xdremux-texture-native-text-macos-26
+2026-10-19T16:54:08.5803530Z   path: evidence/
+2026-10-19T16:54:08.5803680Z   retention-days: 1
+2026-10-19T16:54:08.5803850Z   if-no-files-found: warn
+2026-10-19T16:54:08.5804040Z   compression-level: 6
+2026-10-19T16:54:08.5804200Z   overwrite: false
+2026-10-19T16:54:08.5804370Z   include-hidden-files: false
+2026-10-19T16:54:08.5804550Z ##[endgroup]
+2026-10-19T16:54:09.1885100Z (node:1391) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-19T16:54:09.1886120Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-19T16:54:09.2114960Z With the provided path, there will be 43 files uploaded
+2026-10-19T16:54:09.2115730Z Artifact name is valid!
+2026-10-19T16:54:09.2115990Z Root directory input is valid!
+2026-10-19T16:54:09.6629030Z Beginning upload of artifact content to blob storage
+2026-10-19T16:54:09.7315510Z (node:1391) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-19T16:54:10.0998860Z Uploaded bytes 21012
+2026-10-19T16:54:10.1850690Z Finished uploading artifact content to blob storage!
+2026-10-19T16:54:10.1953530Z SHA256 digest of uploaded artifact zip is 822e035a214cdb5cdea6a28cc783b2d64a7a99d93682ba71f7a408b173246ab6
+2026-10-19T16:54:10.2055730Z Finalizing artifact upload
+2026-10-19T16:54:10.5006790Z Artifact xdremux-texture-native-text-macos-26.zip successfully finalized. Artifact ID 12205510329
+2026-10-19T16:54:10.5010640Z Artifact xdremux-texture-native-text-macos-26 has been successfully uploaded! Final size is 21012 bytes. Artifact ID is 12205510329
+2026-10-19T16:54:10.5012910Z Artifact download URL: https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39289168902/artifacts/12205510329
+2026-10-19T16:54:10.5201140Z Post job cleanup.
+2026-10-19T16:54:10.6617110Z [command]/opt/homebrew/bin/git version
+2026-10-19T16:54:10.6708690Z git version 2.56.0
+2026-10-19T16:54:10.6727920Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/affe19c2-ab61-4ef4-b627-cbc15b43aae5/.gitconfig'
+2026-10-19T16:54:10.6739260Z Temporarily overriding HOME='/Users/runner/work/_temp/affe19c2-ab61-4ef4-b627-cbc15b43aae5' before making global git config changes
+2026-10-19T16:54:10.6742410Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T16:54:10.6743290Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:54:10.6856330Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T16:54:10.6972710Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T16:54:10.8156010Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T16:54:10.8244070Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T16:54:10.9595170Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T16:54:10.9899620Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T16:54:11.0801020Z Cleaning up orphan processes
+2026-10-19T16:54:11.3168560Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

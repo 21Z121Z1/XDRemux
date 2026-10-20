@@ -1,0 +1,6 @@
+{
+  "effect_type" : 2,
+  "is_video" : false,
+  "selector" : "inputConfigurationForEffectType:isVideo:",
+  "unsupported" : true
+}

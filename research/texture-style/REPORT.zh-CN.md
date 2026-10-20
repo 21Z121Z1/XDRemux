@@ -1,112 +1,202 @@
-# XDRemux Texture Styles 原生适配调查 — 2026-10-19
+# XDRemux Texture Styles 原生适配调查（2026-10-19—20）
 
-## 当前可交付结果
+## 交付结论
 
-**已实现并验证的是：拒绝伪造新纹理元数据，以及逐字节保留已有不透明载体。任意图像的 Apple 原生 Texture 元数据重计算、纹理风格识别、编辑渲染和 iPhone Photos 激活仍未证明。** 不把普通 Photographic Styles 的成功算作 Texture 成功。
+已实现的最小方案是：**拒绝凭空生成拍摄私有信息，逐字节保留已有不透明 Texture 载体**。实现提交为 XDRemux **0a462134a6082b048508cee89c85615606abfc7f**，专用分支 research/texture-native-20261019。
 
-本轮从 `XDRemux@f8fcf2067c506e87665e9ea113324db1a57d4cf7` 的 `research/texture-style` 出发，在独立目录和 `research/texture-native-20261019` 分支工作。只读审计 PSR `research/gpt-styles-20261019@5fef06eddaff8a8d2fd42c59e33612a5d576b088`；原生探针另放 PSR `research/xdremux-texture-native-20261019`，不修改该并行分支或 master。没有修改预加载 libheif 仓库、环境配置、secret、release；没有合并、发布、force push、向外部仓库发 PR 或评论。
+已实际执行 Apple Texture 专用元数据解析、设置工厂、依赖查询和 Bloom 渲染入口。macOS27 接受部分元数据控制，但三个强度值均未完成真实渲染。**任意图像的完整原生 Texture producer、完整图像的编辑资格和 iPhone Photos 纹理激活仍未证明。** 普通 Photographic Styles 的构建成功、ImageIO解码、非空properties、非空CI计算图都不算纹理激活。
 
-`#65` 读取结果仍为 open，head `bc4d54753f18905dbe73f595a06a6eaf21aaa014`，未合并。`#85` 的 pull 和 issue API 均返回 404，不能把无法读取解释为已合并。本轮未引入 #65 的 HDR-first 修改。
+原生研究仅在自有 PSR 分支 research/xdremux-texture-native-20261019 的 macOS Actions 执行，最后探针源码为 **84f2c8309c5d778d911148aacbeaae3aff3bdd4f**。没有修改 master 或其并行 research/gpt-styles-20261019，没有合并 XDRemux #65/#85，没有发布、force push、外部PR或评论。原生工作流 sparse checkout 自己的探针与固定XD源码，不读仓库相机照片、secret或其他任务的样本运输。
 
-## 先审计得到的证据图
+2026-10-20恢复会话时，新选容器一直 starting；执行工具实际返回 No usable execution environment is available。此前本地待提交证据的远端写入未发生，远端仍为0a462134。**未把断连等同于文件丢失，也未声称这些本地未提交文件已核对。** 本次从已连接GitHub读取真实历史job日志，在同一研究分支保存独立证据；后续本地恢复时应保留原索引与文件，再逐项比较。
 
-完整节点、边、证据来源见 [evidence-graph.json](evidence-graph.json)。原仓库的 AGENTS 要求对 exact HEAD 做 completion gate，且不能以容器证明 Photos 交互编辑；本报告沿用该边界。
+## 审计起点与证据图
 
-```mermaid
+XD baseline：research/texture-style@f8fcf2067c506e87665e9ea113324db1a57d4cf7。PSR只读起点：research/gpt-styles-20261019@5fef06eddaff8a8d2fd42c59e33612a5d576b088。先读了AGENTS及既有Texture/semantic研究，没有从类名重新猜一套算法。另只读参考PSR consumer-model与macOS Photos probe分支的源文本，没有执行其修改Apple断言/residency策略的探针。
+
+完整可检索图见 [evidence-graph.json](evidence-graph.json)。
+
+~~~mermaid
 flowchart LR
-  Pixels[输入像素、编码色彩空间、方向] --> Derived[新推导图像事实与派生数据]
-  Capture[原始拍摄上下文与逐人数据] --> Native[Apple 原生生产链：尚未闭合]
-  Derived -. 输入契约待验证 .-> Native
-  Native -. 原生输出待验证 .-> Texture[2026 Texture URI / MakerNote84 / 语义资源]
-  Styles[2023 Photographic Styles v15或v16] --> SemanticConsumer[_NUSemanticStyleProperties]
-  Texture --> TextureConsumer[_NUTextureStyleProperties]
-  TextureConsumer --> Processor[PITextureStylePipelineProcessor / CMITextureStylesProcessor]
-  Processor -. 真实输出待验证 .-> Render[编辑与渲染]
-  Render -. 需要实机 .-> Photos[iPhone Photos Texture UI]
-  Existing[已有载体完整字节] --> Preserve[Rust 只读检查与原样传输：已验证离线行为]
-```
+  Pixels[图像像素 / 颜色域 / 方向] --> Derived[新推导的图像事实]
+  Capture[原始拍摄与逐人上下文] --> Producer[完整原生生产链：未闭合]
+  Derived -. 输入契约待验证 .-> Producer
+  Producer -. 输出尚未取得 .-> Texture[2026 Texture元数据 / MakerNote84 / 关联资源]
+  Styles[2023 Photographic Styles v15或v16] --> Semantic[_NUSemanticStyleProperties]
+  Texture --> Parser[_NUTextureStyleProperties：仅控制plist解析已执行]
+  Parser --> Pipeline[PITextureStyle / CMITextureStylesProcessor]
+  Pipeline --> Abort[真实Bloom render：断言终止]
+  Pipeline -. 未验证 .-> Photos[iPhone Photos Texture编辑]
+  Existing[已有完整载体] --> Transport[Rust不透明检查 / 原样传输]
+~~~
 
-|对象|已有证据|不能推出的结论|
+|对象|已有证据|不能推出什么|
 |---|---|---|
-|`tag:apple.com,2023:photo:metadata:styles`|Rust 已有 v15 与诊断 v16 序列化，字段包含 key1、GTC、统计、光照图等。v16 的 `l=false` 仍在这一个 URI 内。|它不是独立的 2026 Texture 元数据，也不是纹理风格已激活。|
-|`tag:apple.com,2026:photo:metadata:texture_styles`|旧探针的二进制 plist 有 Preset、CaptureType、CaptureMode、PortType、HardwareModel、TextureStylePeopleDataVersion、FilmGrainSeed。PSR 旧研究记录的 native 样本是 214B、Studio、seed65；XD 探针的 Standard/seed0 常量是 216B。|不能把常量长度、可解析或字段存在当作图像相关重计算。|
-|Apple MakerNote tag84 (`0x0054`)|旧公开控制契约包含字符串键0–12，包含 Float32、整数和 Bool；旧 writer 对缺失 MakerNote 的输入生成 `Apple iOS`、PhotoIdentifier 与 tag84。|槽位的物理/算法含义、任意图像的计算方式尚未闭合；UUID 的确定性不提供 Apple 拍摄来源。|
-|2026 `auxC` 语义资源|旧载体有 nose、skin v2、non-face skin、lips、teeth v2、person、glasses v2、eyebrows、tattoo、hands、ears、face skin 十二个声明。|一个 2019 skin matte 不能证明十二种语义；角色数量不是通用准入充分条件。|
-|逐人上下文|已有 `_NUTextureStyleProperties` 消费入口、`personInputDataFromStillProperties:`、`personInputDataArrayFromDetectedFaces:` 等线索。PSR 旧记录在空 aux 字典下解析 persons0。|persons0 不证明图像没有人，也不能代替相机原始 face/instance ROI、pose、landmarks、instance mask、imageStats、眼部统计。|
-|预设和调校表|PSR 静态清单记录5预设、285机型/port/模式组合，及 FilmGrain、Diffusion、Mattify 等符号和 EffectOrder。|不证明运行次序相对 GTM/LTM 的位置、内部 Linear/Log 域、真实滤波系数或可逆性。|
+|2023 styles URI|v15与诊断v16均属于Photographic Styles；v16的l=false仍在这一URI内。|不是独立2026 Texture元数据，不是纹理激活。|
+|2026 texture_styles URI|公开控制含Preset、CaptureType、CaptureMode、PortType、HardwareModel、people version、seed。|固定字典不是随图像重新计算；不能给任意成片冒填iPhone拍摄来源。|
+|Apple MakerNote84 / 0x0054|已有typed bplist槽位0—12的静态契约；旧writer会补Apple iOS、UUID与84。|没有闭合每个槽位的物理含义、计算入口或Photos必要性。|
+|2026 auxC资源|旧writer给一个2019 skin matte分配十二个新角色。原生输入清单实际包含十三项，含hairMatte。|角色标签不认证像素语义，十二项也不是通用充分条件。|
+|逐人数据|原生properties在空aux控制下persons0；部分效果配置确实requiresPersonData。|persons0不是画面无人判断，不能还原instance mask、ROI、pose、landmarks、眼部/图像统计。|
+|原生生产候选|PITextureStyleAutoCalculator、CMI处理器input/outputPersonImageStats、BW相机metadata节点等可观察。|名字或selector不是已验证的任意图像生产API；捕获节点可能依赖sampleBuffer与完整会话。|
 
-官方使用说明把 Texture 控件和 Photographic Styles 的调色控件区分，并对拍摄设备与编辑设备给出条件：[相机 Styles](https://support.apple.com/guide/iphone/use-photographic-styles-iph629d2cd37/ios)、[Photos 编辑](https://support.apple.com/en-lb/guide/iphone/iphb08064d57/ios)。这只能支持功能与设备范围，不公开底层生产算法。
+Apple官方说明把Texture控制与Styles调色区分，并给出设备/拍摄条件：[相机指南](https://support.apple.com/guide/iphone/use-photographic-styles-iph629d2cd37/ios)、[Photos编辑](https://support.apple.com/en-lb/guide/iphone/iphb08064d57/ios)。这些资料不公开私有元数据生产算法。
 
-## 正负对照与本轮实现
+## 已复现的旧缺陷与最小实现
 
-### 原缺陷确实复现
+在独立原base checkout上，用纯程序构造的HEIF item graph复现旧probe。primary/gain/matte是测试哨兵，**不是可解码照片或Apple正样**。输入不具备相机来源，但满足旧probe的style/skin/Exif/tmap前提。
 
-在独立的原始 base checkout 上运行同一反例：输入是纯程序构造的 HEIF item graph，primary/gain/matte 都是可识别的测试哨兵字节，**不是可解码照片，也不是 Apple 正样**。它满足旧 probe 的 style/skin/Exif/tmap 输入契约，但没有 Apple 拍摄信息。
+旧augment仍输出3655B，新增Texture URI、HardwareModel=iPhone19,2、Apple iOS MakerNote、十二个角色别名。输入SHA256：
+42cb3c77691fb6985a7ff9af71ce0dc3f7958a311ccd3ce1ae290e96085cfa43。
+旧输出：
+0ad11ab02be096811550113cbb40b4c74c57e5119bcbfb651211a442fd7c7ea4。
+拒绝伪造回归在原base故意exit101，失败于 OLD_PROBE_FABRICATED_UNBACKED_TEXTURE_CARRIER。这是旧缺陷证据，不是新实现失败。
 
-旧 `augment_texture_style_heif` 仍生成 3655B 载体，新增 Texture URI、`HardwareModel=iPhone19,2`、`Apple iOS` MakerNote 和十二个别名。输入 SHA256 `42cb3c77691fb6985a7ff9af71ce0dc3f7958a311ccd3ce1ae290e96085cfa43`，旧输出 SHA256 `0ad11ab02be096811550113cbb40b4c74c57e5119bcbfb651211a442fd7c7ea4`。要求拒绝伪造的测试在原 base 上 exit101，明确失败于 `OLD_PROBE_FABRICATED_UNBACKED_TEXTURE_CARRIER`；这是有意的旧缺陷复现，不是新实现测试失败。
+Rust最小方案：
 
-已知实机正样的历史结论保留为历史来源；本轮没有获准使用相机人像原件，未访问并行任务的临时 secret/加密运输。**没有复现真实相机纹理正样的 Photos 激活。** 新原生探针只重放已公开的元数据形状作为合成控制，不能替代真实原厂正样。
+1. inspect_texture_style_heif精确读取infe URI字段，检查唯一item ID、本地iloc、mdat/idat范围、主图cdsc关联和引用。返回的是不透明本地graph事实与字节SHA，不认证plist、HEVC或蒙版语义。
+2. preserve_texture_style_heif返回**完整原字节**。compressed media、Gain Map、ICC、irot/imir、Exif、未知box与尾部因而相同。没有Texture载体时明确generation unsupported；越界、错误引用或不支持的位置失败。兼容augment入口遵循同一规则。
+3. --apple-styles改用实际提交到semantic consumer的v15数据，停止自动追加固定2026 plist、MakerNote与十二个别名。它仍是普通Photographic Styles路径；本轮没有提供“任意图像纹理成功”标志。
+4. 示例客户端采用create_new，不覆盖已有输出。引擎的v16序列化保留为2023 schema诊断工具，不称完整Texture producer。
 
-### 最小 Rust 方案
+离线功能样本输入与输出SHA均为
+4f823272e3778e5b44605e20194f1e112e04f8c6ed875ec84ed4fd0713a263a3。
+六项针对回归覆盖缺producer、URI名称混淆、越界idat、错误/悬空引用、JPEG/截断与原样传输。完整HEIF crate共27项测试。这里的哨兵不可解码，只支持传输/拒绝结论，不能自证Apple接受。
 
-1. `inspect_texture_style_heif` 精确读取 `infe` 的 URI 字段，检查已有 Texture item 的本地位置、主图关联和引用。它记录元数据哈希与 `auxC` 类型声明，不解释 opaque plist 或认证蒙版含义。把 URI 文本放在 item name 中不会触发识别。
-2. `preserve_texture_style_heif` 对已有本地载体返回完整原字节。因此压缩媒体、Gain Map、ICC、irot/imir、Exif、未知 box 与尾部都保持相同。越界 idat、悬空/错误引用、外部或未支持的位置失败；没有 Texture 数据时返回明确 generation unsupported。现有同名 `augment_...` 兼容入口遵循同一规则。
-3. `--apple-styles` 使用实际提交到 semantic consumer 的 v15 数据，停止自动追加固定 Texture plist、MakerNote 与十二个角色别名。它继续是 Photographic Styles 路径；没有新增“纹理成功”的 CLI 标志。没有改动 LinearThumbnail 算法或 Apple Log 常数。
-4. 研究用 example client 不覆盖已有输出。它不会把旧输入中已经存在的错误事实认证成真，也不会把 byte-identical 传输叫作新的原生生成。
+## 原生运行与精确绑定
 
-现有引擎的 v16 序列化保留为诊断工具，并纠正注释：它只是2023 URI 的 v16 schema，不是完整2026 Texture producer。
+所有原生job都在PSR；artifact retention-days为1，只上传json/txt/log。四个Rust CC0解析图案的清单SHA：
+7967cb1ea86f962b2b43cc2fa9f4a9f61cc706498598a38e7652bc57d49f50ed。
+尺寸384×256或256×384，orientation1/6/8，SDR与HDR阶跃/亮点。原始raw、原始LinearThumbnail、真实相机信息均明确为false。
 
-离线验证覆盖27个 HEIF crate 测试（19单元、2已有失败关闭、6新增回归）、clippy，以及独立 Python 生成输入 → Rust example 写出 → Python 全字节比较。反例检查缺少 producer、idat 越界、错误/悬空引用、URI 名称混淆、JPEG/截断输入和输出保护。**这些样本没有可解码的图像，所以该轮只能证明传输和拒绝行为。** 不以自己的生成器和解析器证明 Apple 接受。
+|lane|实际OS / build|Xcode / build|SDK|
+|---|---|---|---|
+|xcode-27|27.0.1 / 26A434|27.0 / 27A266a|27.0|
+|macos-26|26.6.2 / 25G83|26.6 / 17F113|26.5|
 
-## 任意图像能重新计算什么
+|run与源码|真实结果|
+|---|---|
+|[39282392876](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39282392876) / 6f420d751d0be1b2dc6f93ba7cccf62493affae9|Swift ObjC runtime类型编译失败，未调用消费者。|
+|[39283079303](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39283079303) / 4e6630d50eab3626254249ec5563af5ab6db8b93|两lane相同编译缺陷，未调用消费者。|
+|[39285550760](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39285550760) / 4857d1a3fc4871297b29a1313468fd677fb278a7|元数据probe在非NSObject根类桥接SIGTRAP。产品job编译成功；12个原生I/O用例成功；4个普通Styles转换失败。|
+|[39286462456](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39286462456) / d105a967bab6d3f1c577670751c6fce7257dd171|Swift不能导入RTLD_DEFAULT宏，未消费Texture。|
+|[39287928184](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39287928184) / e653f24219dd7bd152381ccfa172dd59121ac360|C ABI过滤类名成功，27发现60个相关类；消费者被探针NSError-out ABI guard拦住，该轮未调用。|
+|[39289168902](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39289168902) / acb572f425728963d0ee375327016c52ab069c10|修正o^@ ABI，真实元数据控制、设置工厂与输入配置执行。|
+|[39290912880](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39290912880) / 00f7b5eb1d496c7b0b8b69ff3e80290aa3a29bcb|Bloom三个强度实际render均SIGABRT；CMI三种初始化均nil。|
+|[39292067603](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39292067603) / 098430d4f20d832b1a1a9ccda0b066bde0748490|原生诊断定位_textureCache与Missing arguments断言；调试器exit0不是渲染成功。|
+|[39293075204](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39293075204) / 84f2c8309c5d778d911148aacbeaae3aff3bdd4f|补入同图像推导的2023语义诊断参数后，断言推进为Unexpected number of inputs；仍无像素输出。|
 
-|类别|可行范围|本轮处理|
+前五轮探针编译/桥接/ABI缺陷已区别记录，不能倒写成Apple拒绝数据或平台不支持。
+
+### 文件编码与实际产品路径
+
+run39285550760/job118170329181固定XD源码0a462134。12个原生I/O用例全部成功：4JPEG、4SDR HEIC、2PQ HEIF10、2Adaptive HDR HEIC。SDR方向1/6/8与请求一致；PQ报告10bit和ITUR2100PQ；两份Adaptive HDR的ImageIO ISO Gain Map为true。image-matrix SHA：
+86512eaadf547aed09b0ef41b3080924e586acd024c199642f329c3d128842a2。
+这支持原生编解码及所读字段，不认证HDR像素保真或Texture。
+
+实际Rust/Swift产品编译成功，但四个程序生成的ProXDR输入在convert --apple-styles均exit1：两个横向输入为 source HDR item 1 has no dimg reference；两个竖向输入为 semantic scaffold has no tmap item。图案、尺寸、方向同时变化，不能单独归因于方向。均未到最终Styles组装，batch未运行，输出发布状态未独立检查。product-matrix SHA：
+3c0c641710e32667952a73f2349f509906924fd4e50cc1dbb5e2b23bc5ae6fe8。
+因此runtime路径只证明编译，**功能仍有阻塞**，不能由离线green gate抹除。
+
+### Texture元数据消费者
+
+真实selector为 _NUTextureStyleProperties.textureStylePropertiesFromImageMetadata:auxImageMetadata:error:，运行时编码 @40@0:8@16@24o^@32。输入为公开形状的合成二进制plist，aux字典为空，未写回照片。
+
+run39289168902/job118184997247的结果：
+
+|控制|27结果|该次二进制plist SHA256|
 |---|---|---|
-|像素尺寸、编码域、ICC、方向、是否有 Gain Map、文件与资源哈希|能从输入容器和正确配置的原生 decoder 观察。|Rust 传输保留；Apple ImageIO/CI 探针负责独立读回，结果待实际 runner。|
-|新图像统计、新语义/人脸几何|原则上可以对正确方向和颜色域的解码图像重新检测，但属于新的分析上下文。|尚未证明满足完整 Texture producer 的统计/语义契约；不声称还原拍摄统计或标注。|
-|Preset、强度、Grain 和新 seed|可作为明确的新编辑选择；seed 可新生成。|不能冒称原拍摄选择。当前安全 API 不生成这套数据。|
-|HardwareModel、PortType、CaptureMode/Type|像素不携带可靠的相机机型、镜头 port 或具体捕获链事实。|缺失时保持缺失或 unsupported；若将来用作“调校目标”，必须与“原始来源”分开且验证原生契约。|
-|TextureStylePeopleDataVersion、序列化版本|受具体原生 API、OS 及生产者版本控制。|公开 v3 控制和版本999负例只是诊断，不盲目把3或16当通用版本。|
-|原始 RAW、原始预处理图、原始 LinearThumbnail、逐人 imageStats/眼部统计/instance masks|仅凭普通成片不能认证这些历史拍摄信息。|没有原始资源时不生成“原始信息”声明；已有派生 LinearThumbnail 只保留 Apple Log 路线。|
+|Standard / version3 / seed0|Texture properties非空，NSError空，已读capture/hardware/port/seed，persons0。|f28bac185f7c081964905aac70e219e20cb1354ee855b86628c47ea6ae444d4e|
+|Studio|同样非空；未取得用于核验Preset的getter。|39c4f3296fb6ee03076f775a6c04b46b1332dab846928e6bc823455311775f8c|
+|缺HardwareModel|仍非空，未返回hardwareModel。|a07f8669cb4e56efa7e6b2c5f8822b52620d69da890385082f5e0fac4c2d6643|
+|people version999|仍非空；version只读到NUVersion对象，未读数值。|a22168ec7e314a25f80a1bc8e81b916e89e1f2eb3af863135fe53b60e84c2563|
+|空字典|nil，NUError code3。|9261ecceda608ef174256e5fdc774c1e6e3dcf533409c1bc393d490d01c713f1|
 
-Apple 官方 HDR 文档区分 SDR、HDR 和 Gain Map，并要求编辑保持关联；保存可由正确的 SDR/HDR 对计算新的 Gain Map：[HDR API 说明](https://developer.apple.com/videos/play/wwdc2024/10177/)、[HEIF10 API](https://developer.apple.com/documentation/coreimage/cicontext/writeheif10representation%28of%3Ato%3Acolorspace%3Aoptions%3A%29)。这些 API 不负责 Texture 相机上下文的生成。本探针的 extended linear Display P3 是明确的**合成输入域**，不据此推断 Texture 内核内部域。
+26的Texture类不可用，未调用。后续各run有同字段控制，但二进制plist每进程的实际SHA以各自JSON为准，不假设Apple序列化字节稳定。
 
-## 原生 Actions 与证据状态
+非空仅证明这次元数据反序列化；version999非空不说明保留999或版本校验成功，persons0不说明画面无人，缺HardwareModel仍非空说明其不是完整性判据。没有执行完整HEIF/composition的canRenderTextureStyles资格判断。
 
-仅 PSR 专用分支执行 Apple 调用。工作流限制到该分支和自己的两个路径，`contents:read`，artifact `retention-days:1`，不读取任何 secret 或仓库照片；不修改 Apple 方法、residency 策略、SIP 或权限。
+FigCaptureTextureStyle和AVCaptureTextureStyle原生 styleWithPreset:intensity:grain: 共30个控制对象可构造：5预设×强度0/0.5/1，grain0.25。它们没有图像输入，是编辑设置工厂。不要混淆AV设置版本1、Photographic v15/v16、person metadata3与CMI APIVersion20260507。
 
-首轮 probe source `6f420d751d0be1b2dc6f93ba7cccf62493affae9`：[run39282392876](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39282392876)，job118159072406，xcode-27。加入 macOS26 对照后的 source `4e6630d50eab3626254249ec5563af5ab6db8b93`：[run39283079303](https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39283079303)，job118161349940（macos-26）、118161350462（xcode-27）。本记录创建时均为 queued，无真实 OS/SDK/build log 或 artifact；不能借用旧研究的27.0.1/26A434充当本轮环境。后续状态以 `evidence/` 和 `claims.json` 的实际读回为准。
+### 效果依赖与原生渲染
 
-原生探针执行 `_NUTextureStyleProperties.textureStylePropertiesFromImageMetadata:auxImageMetadata:error:`，记录标准/Studio合成控制、缺少 HardwareModel、版本999、空字典，保留原生 error 与类型。另记录 `PITextureStylePipelineProcessor` 默认字典与输入名、运行时方法/ABI，下一轮必须基于真实 inventory 追踪生产/渲染入口。
+27实测pipeline.isAvailable和isAvailableForTesting均true，没有使用override。inputNames为十三项，含hairMatte。依赖按效果变化：
 
-Rust 的 `texture_synthetic_inputs` 生成4个CC0图案，覆盖384×256、256×384、orientation1/6/8、SDR和HDR阶跃/亮点；清单 SHA256 `7967cb1ea86f962b2b43cc2fa9f4a9f61cc706498598a38e7652bc57d49f50ed`。Swift 仅负责 ImageIO JPEG/HEIC、PQ HEIF10、SDR/HDR 配对生成 Adaptive HDR 及原生读回。真实编码器不支持或输出缺少 Gain Map 时必须报告相应状态，不能把计划矩阵写成已通过。图案数学值不等于相机传感器线性数据。
+|配置|required|optional|requiresPersonData|
+|---|---|---|---|
+|Bloom|空|空|false|
+|Diffusion|空|skinMatteV2、personMatte|false|
+|FilmGrain|空|personMatte、skinMatteV2、skyMatte、semanticStyleCast、semanticStyleColor|false|
+|Glow|personMatte、linearThumbnail、semanticStyleCast、semanticStyleColor|空|false|
+|Halation|空|skinMatteV2、personMatte、semanticStyleCast、semanticStyleColor|false|
+|numeric1|faceSkinMatte、personInstances|hair、lips、ears、tattoo、glassesV2、nose|true|
+|numeric2|skinMatteV2、personInstances|完整11项见JSON|true|
+|numeric3|skinMatteV2、faceSkinMatte、personInstances|glassesV2、ears、nose、lips、tattoo|true|
 
-|验证层|本轮能证明的内容|当前限制|
+numeric1/2/3的原生名称映射未取得，不猜。配置required为空不代表底层kernel接受一份图像。
+
+Bloom输入是Rust HDR-edge raw，SHA：
+0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572。
+输入和CIContext明确为analytical extended linear Display P3；内部域、相对GTM/LTM顺序仍未证明。使用Apple自己的Glowy调校查询和Bloom descriptor，iPhone19,2/LF/Still/Back只作为明确的调校目标控制，未写回输入或冒称相机来源。每例一份图像，没有语义角色填充或LinearThumbnail资源。
+
+原生CIImageProcessorKernel.apply返回延迟计算图，但强度0/0.5/1全部在真实render SIGABRT(-6)。[官方apply API](https://developer.apple.com/documentation/coreimage/ciimageprocessorkernel/apply%28withextent%3Ainputs%3Aarguments%3A%29?language=objc)的计算图返回不能代替像素输出。default、nil queue、真实Apple Paravirtual device queue三种CMI初始化均nil。
+
+未修改Apple方法或residency策略的子进程诊断先看到 CMITextureStylesProcessor.m:225 的_textureCache断言，再看到PhotoImaging Missing arguments。随后Rust以同图案的新统计、GTC、light maps和显式identity协议控制构造2023诊断plist，SHA：
+ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a。
+它被原生_NUSemanticStyleProperties接受；加入semanticStyleProperties参数后，内核变为Unexpected number of inputs。该控制不是2026生产结果或相机原始统计，也没有赋予任意输入一个固定正样。
+
+这定位了未闭合的参数/输入布局契约，**不能仅归因于GPU或硬件不支持**。没有用零图、重复蒙版、断言补丁或空输出将失败变绿；没有成功执行像素差异统计。
+
+## 任意图像适用边界
+
+|信息|可行范围与本轮结论|
+|---|---|
+|尺寸、编码色彩空间、方向、Gain Map、资源哈希|可观察。本轮12例原生I/O读回，transport保留原字节。|
+|新图像统计、语义与脸部几何|可对正确方向/域重新分析，属于新上下文；尚未证明满足完整Texture producer。合成图案诊断不能推广到人像或任意场景。|
+|Preset、强度、grain、新seed|可作为明确的新编辑选择，不是恢复拍摄选择。本轮只测设置工厂与控制参数。|
+|HardwareModel、PortType、CaptureMode/Type|不能仅凭像素认证历史来源；缺失时unsupported或保持缺失。调校目标必须另作标注。|
+|原始RAW、原始LinearThumbnail、逐人原始统计|普通成片不能认证这些历史信息。没有资源就不称已恢复。|
+|LinearThumbnail|本轮未改原产品路径，也未在新native试验中生成该资源。后续新派生资源须沿Apple Log并明确derived，不改成PQ或冒称RAW。原路径的颜色域/保真仍需独立核验。|
+
+[Apple HDR说明](https://developer.apple.com/videos/play/wwdc2024/10177/)与[HEIF10 API](https://developer.apple.com/documentation/coreimage/cicontext/writeheif10representation%28of%3Ato%3Acolorspace%3Aoptions%3A%29)支持HDR/Gain Map编解码路径，不提供Texture相机上下文生产算法。PQ测试是独立HDR输入测试，不是LinearThumbnail替代。
+
+真实相机Texture正样的历史记录仅作既有研究来源，本轮没有使用或上传人像原件、私有媒体、密钥、厂商二进制，没有读取别的任务secret。没有真实正样或iPhone UI能力，就不宣称完成激活对照。
+
+## 验证层级
+
+|层|已证明|尚未证明|
 |---|---|---|
-|字段可读|公开合成 plist 形状、旧结构字段的静态审计。|Apple 解析读回待 runner。|
-|结构完整|限定的本地 opaque item graph 与全字节传输/拒绝已验证。|不是完整 HEVC 解码或所有 ISO 配置的认证。|
-|原生消费者接受|尚未获得本轮真实结果。|queued；字段存在不算接受。|
-|Apple API 明确识别 Texture|尚未获得本轮真实结果。|返回非空也只可证明该次消费，必须检查实际 Texture 类型与字段。|
-|真实编辑/渲染参数有效|未验证。|需要同输入正负对照、非零参数变化和完整所需上下文。|
-|iPhone Photos 纹理控件与持久编辑|未验证。|无已授权设备/UI/真实正样；macOS runner 的 shader 或 parser 不能替代。|
+|字段可读|静态字段、27的原生properties getter。|Preset getter、NUVersion数值、原始相机事实。|
+|结构完整|限定本地opaque graph检查与全字节传输/拒绝。|通用ISO/HEVC认证和蒙版语义。|
+|原生消费者接受|Texture专用解析器4接受/空字典拒绝；26类不可用。|完整文件准入；ImageIO通用解码另列。|
+|Apple API认定完整图像为Texture可编辑|未验证。|composition资格与完整资源图。|
+|实际参数/渲染有效|真实尝试已执行，全部断言失败。|有效输出、强度/grain差异。|
+|真机Photos纹理控件及持久编辑|未执行。|已授权正样、设备/UI与重新打开后的持久性。|
 
-## 复现与交付
+## 证据完整性与复现
 
-```bash
-# 普通 Linux/macOS 离线回归；输出目录必须不存在。
+已重新读回**21份完整job log**；18份有完整manifest的job恢复并核验**147份原生JSON**，逐字节SHA/size匹配runner manifest。见 [native-readback-index.json](evidence/native-readback-index.json)。源码、run、OS/SDK、输入SHA均能沿图和manifest追踪。
+
+ZIP下载引用在前容器遭HTTP tunnel403；**没有验证ZIP字节**。日志恢复是允许的文本读回，不声称完整artifact条目均已取回；上传器报告ZIP摘要也只作为报告值。所有脚本、日志和元数据是文本，没有提交生成图片或rawbuffer。原生Apple结果来自真实runner，不用自己的生成器和解析器自证整条链成功。
+
+~~~bash
+# 输出目录必须不存在；可选--baseline-repo引用另一个干净f8fcf206 checkout。
 python3 scripts/research/verify_texture_transport.py --out /tmp/texture-offline-new
 
-# 可选：在另一个干净的 exact-base checkout 复现旧缺陷。
-python3 scripts/research/verify_texture_transport.py --out /tmp/texture-baseline-new \
-  --baseline-repo /path/to/clean-f8fcf206-checkout
+# 原生日志恢复与manifest核验；仅重验文本完整性，不重新执行Apple。
+python3 scripts/research/read_texture_native_log.py JOB.log --out /tmp/native-log-new
+python3 scripts/research/verify_texture_native_evidence.py
 
-# 研究样本只生成解析图案，不读用户照片。
-cargo run --locked -p xdremux-heif --example texture_synthetic_inputs -- /tmp/new-analytic-inputs
+# 拒绝、传输与证据读回器的负例。
+cargo test --locked -p xdremux-heif --test texture_transport
+python3 -m unittest Tests.test_texture_native_evidence Tests.test_public_documentation Tests.test_rust_apple_semantic_policy
 
-# 仅保留已有 Texture carrier；NEW_OUTPUT 已存在会拒绝。
-cargo run --locked -p xdremux-heif --example texture_transport -- INPUT.heic NEW_OUTPUT.heic
-```
+# 提交后按AGENTS运行，并verify其exact-HEAD receipt。
+python3 scripts/agent_completion_gate.py run --base f8fcf2067c506e87665e9ea113324db1a57d4cf7 --plan research/texture-style/offline-verification-plan.json
+python3 scripts/agent_completion_gate.py verify .codex/verification-receipts/$(git rev-parse HEAD).json
+~~~
 
-本容器通过官方 Rustup 在任务目录安装 Rust1.99.1，未修改 PATH profile。系统已有 libheif1.19.8，缺 pkg-config 开发元数据；本轮根据实际 `heif_get_version()` 在任务目录建立本地 `.pc` 与指向现有库的 symlink，未改系统或预加载 libheif。该动作只用于普通 Rust 构建。Linux 的 `apple_styles::tests` 过滤运行实际是0项，因为模块限macOS；**不把它写成 macOS 路径通过**。macOS 编译和功能验证单列。
+Swift只承载Apple API与探针；图案、统计、协议结构、像素差异统计都在Rust。PSR的native_images.swift、native_probe.swift、semantic_control.rs、run_metadata_matrix.py、run_bloom_matrix.py、run_product_matrix.py及隔离workflow提供真实命令。
 
-机器可读结论见 [claims.json](claims.json)，直接执行项和硬阻塞见 [NATIVE_TODO.md](NATIVE_TODO.md)。验收只覆盖已有证据的离线行为，通用原生生成与真机激活不标完成。
+前一容器在任务目录用官方Rustup安装Rust1.99.1，未改profile；使用已有libheif1.19.8及任务内匹配实际版本的pkg-config文件，未修改预加载libheif或环境配置。Linux运行macOS模块过滤实际0项，不算原生通过。后续exact-HEAD gate的范围仅为已测试的离线传输和证据校验；四个普通Styles功能失败与完整Texture/Photos阻塞不会被gate覆盖。最终交付SHA的收据由PSR隔离offline-validation job输出并读回，不把源码中的预期状态当作收据。
+
+机器可读结论见 [claims.json](claims.json)，具体下一步和阻塞见 [NATIVE_TODO.md](NATIVE_TODO.md)。

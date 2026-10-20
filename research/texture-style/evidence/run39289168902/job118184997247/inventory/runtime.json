@@ -1,0 +1,6392 @@
+{
+  "classes" : [
+    {
+      "class" : "AVCaptureTextureStyle",
+      "class_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "identityStyle"
+        },
+        {
+          "encoding" : "@28@0:8@16f24",
+          "selector" : "styleWithPreset:intensity:"
+        },
+        {
+          "encoding" : "@32@0:8@16f24f28",
+          "selector" : "styleWithPreset:intensity:grain:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "@32@0:8@16f24f28",
+          "selector" : "_initWithPreset:intensity:grain:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "debugDescription"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "grain"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "intensity"
+        },
+        {
+          "encoding" : "B24@0:8@16",
+          "selector" : "isEqual:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "preset"
+        },
+        {
+          "encoding" : "q16@0:8",
+          "selector" : "version"
+        }
+      ],
+      "instance_size" : 40
+    },
+    {
+      "class" : "BWBaselineTextureStyleRenderer",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "Q20@0:8i16",
+          "selector" : "requiredSharedMetalAllocatorBackendSizeWithProcessorVersion:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v24@0:8^{opaqueCMSampleBuffer=}16",
+          "selector" : "adjustMetadataOfSampleBuffer:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "adjustsMetadata"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "displayName"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithConfiguration:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isMetalRenderer"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isPassThroughRenderer"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "prepareForRenderingWithParameters:inputVideoFormat:inputMediaPropertiesByAttachedMediaKey:"
+        },
+        {
+          "encoding" : "v56@0:8@16^{__CVBuffer=}24^{opaqueCMSampleBuffer=}32^{__CVBuffer=}40@?48",
+          "selector" : "renderUsingParameters:inputPixelBuffer:inputSampleBuffer:processedPixelBuffer:completionHandler:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsAnimation"
+        },
+        {
+          "encoding" : "s16@0:8",
+          "selector" : "type"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "waitForMetalCompletion"
+        }
+      ],
+      "instance_size" : 24
+    },
+    {
+      "class" : "BWGlobalTextureStyleRenderer",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "Q20@0:8i16",
+          "selector" : "requiredSharedMetalAllocatorBackendSizeWithProcessorVersion:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v24@0:8^{opaqueCMSampleBuffer=}16",
+          "selector" : "adjustMetadataOfSampleBuffer:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "adjustsMetadata"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "displayName"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithConfiguration:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isMetalRenderer"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isPassThroughRenderer"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "prepareForRenderingWithParameters:inputVideoFormat:inputMediaPropertiesByAttachedMediaKey:"
+        },
+        {
+          "encoding" : "v56@0:8@16^{__CVBuffer=}24^{opaqueCMSampleBuffer=}32^{__CVBuffer=}40@?48",
+          "selector" : "renderUsingParameters:inputPixelBuffer:inputSampleBuffer:processedPixelBuffer:completionHandler:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsAnimation"
+        },
+        {
+          "encoding" : "s16@0:8",
+          "selector" : "type"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "waitForMetalCompletion"
+        }
+      ],
+      "instance_size" : 24
+    },
+    {
+      "class" : "BWGlowTextureStyleRenderer",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "Q20@0:8i16",
+          "selector" : "requiredSharedMetalAllocatorBackendSizeWithProcessorVersion:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v24@0:8^{opaqueCMSampleBuffer=}16",
+          "selector" : "adjustMetadataOfSampleBuffer:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "adjustsMetadata"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "displayName"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithConfiguration:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isMetalRenderer"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isPassThroughRenderer"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "prepareForRenderingWithParameters:inputVideoFormat:inputMediaPropertiesByAttachedMediaKey:"
+        },
+        {
+          "encoding" : "v56@0:8@16^{__CVBuffer=}24^{opaqueCMSampleBuffer=}32^{__CVBuffer=}40@?48",
+          "selector" : "renderUsingParameters:inputPixelBuffer:inputSampleBuffer:processedPixelBuffer:completionHandler:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsAnimation"
+        },
+        {
+          "encoding" : "s16@0:8",
+          "selector" : "type"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "waitForMetalCompletion"
+        }
+      ],
+      "instance_size" : 40
+    },
+    {
+      "class" : "BWSkinTextureStyleRenderer",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "Q20@0:8i16",
+          "selector" : "requiredSharedMetalAllocatorBackendSizeWithProcessorVersion:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v24@0:8^{opaqueCMSampleBuffer=}16",
+          "selector" : "adjustMetadataOfSampleBuffer:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "adjustsMetadata"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "displayName"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithConfiguration:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isMetalRenderer"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isPassThroughRenderer"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "prepareForRenderingWithParameters:inputVideoFormat:inputMediaPropertiesByAttachedMediaKey:"
+        },
+        {
+          "encoding" : "v56@0:8@16^{__CVBuffer=}24^{opaqueCMSampleBuffer=}32^{__CVBuffer=}40@?48",
+          "selector" : "renderUsingParameters:inputPixelBuffer:inputSampleBuffer:processedPixelBuffer:completionHandler:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsAnimation"
+        },
+        {
+          "encoding" : "s16@0:8",
+          "selector" : "type"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "waitForMetalCompletion"
+        }
+      ],
+      "instance_size" : 32
+    },
+    {
+      "class" : "BWTextureStyleInfoMetadataNode",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "boxedMetadataOutput"
+        },
+        {
+          "encoding" : "v40@0:8q16@24@32",
+          "selector" : "configurationWithID:updatedFormat:didBecomeLiveForInput:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "v32@0:8@16@24",
+          "selector" : "didReachEndOfDataForConfigurationID:input:"
+        },
+        {
+          "encoding" : "v32@0:8@16@24",
+          "selector" : "didSelectFormat:forInput:"
+        },
+        {
+          "encoding" : "v32@0:8@16@24",
+          "selector" : "handleDroppedSample:forInput:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "hasNonLiveConfigurationChanges"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "nodeSubType"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "nodeType"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "passthruOutput"
+        },
+        {
+          "encoding" : "v32@0:8^{opaqueCMSampleBuffer=}16@24",
+          "selector" : "renderSampleBuffer:forInput:"
+        }
+      ],
+      "instance_size" : 176
+    },
+    {
+      "class" : "BWTextureStyleTuning",
+      "class_methods" : [
+        {
+          "encoding" : "@20@0:8i16",
+          "selector" : "captureTypeToString:"
+        },
+        {
+          "encoding" : "S24@0:8@16",
+          "selector" : "filmGrainSeedForCaptureRequestIdentifier:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "@44@0:8@16@24i32@36",
+          "selector" : "parametersForPortType:captureMode:captureType:preset:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B24@0:8^{opaqueCMSampleBuffer=}16",
+          "selector" : "unstyledImageRequiredForReversibility:"
+        }
+      ],
+      "instance_methods" : [
+
+      ],
+      "instance_size" : 8
+    },
+    {
+      "class" : "CMITextureStyle",
+      "class_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "initStandardTextureStyle"
+        },
+        {
+          "encoding" : "@32@0:8@16f24f28",
+          "selector" : "initWithPresetName:intensity:grain:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "debugDescription"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "grain"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "hash"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "intensity"
+        },
+        {
+          "encoding" : "B24@0:8@16",
+          "selector" : "isEqual:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "preset"
+        }
+      ],
+      "instance_size" : 24
+    },
+    {
+      "class" : "CMITextureStyleTuningLookup",
+      "class_methods" : [
+        {
+          "encoding" : "@56@0:8@16@24@32@40@48",
+          "selector" : "_cacheKeyForHardwareModel:portType:captureMode:preset:captureType:"
+        },
+        {
+          "encoding" : "@36@0:8@16@24f32",
+          "selector" : "_interpolateFrom:to:t:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "_loadTuningPlist"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "_loadTuningPlistIfNeeded"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "_mergeTuningDictionary:forCaptureType:"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "_normalizedCaptureTypeForPresetDict:requestedCaptureType:"
+        },
+        {
+          "encoding" : "@48@0:8@16@24f32f36^f40",
+          "selector" : "blendedTuningFrom:to:intensity:blendThreshold:effectiveIntensityOut:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "defaultTextureStyleForPresetName:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "defaultTextureStyleForSmartStyleCastType:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "reloadTuningPlist"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "tuningDictionary:withFilmGrainFromTuning:"
+        },
+        {
+          "encoding" : "@56@0:8@16@24@32@40@48",
+          "selector" : "tuningDictionaryForHardwareModel:portType:captureMode:preset:captureType:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "tuningDictionaryForMetadata:"
+        }
+      ],
+      "instance_methods" : [
+
+      ],
+      "instance_size" : 8
+    },
+    {
+      "class" : "CMITextureStylesBloom",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_compileShaders"
+        },
+        {
+          "encoding" : "v36@0:8^{?=i{?=[3]}B}16@24B32",
+          "selector" : "_configureColorConversion:forTexture:isOutput:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "_updateColorManagementForInputOutput:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_validateInputsAndParameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allocator"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "calculateStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalContext:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputOutput"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "instanceID"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personData"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "scaleParametersWithIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllocator:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputOutput:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setInstanceID:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setParameters:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonData:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsInPlaceRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        }
+      ],
+      "instance_size" : 448
+    },
+    {
+      "class" : "CMITextureStylesBloomIO",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputSkinMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputSkinMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        }
+      ],
+      "instance_size" : 32
+    },
+    {
+      "class" : "CMITextureStylesBloomParameters",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "f36@0:8@16@24f32",
+          "selector" : "_floatFromDict:key:default:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightness"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithTuningDictionary:"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "inputTextureROI"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lightMapGamma"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lightMapInvert"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightness:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "setDefaults"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setInputTextureROI:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLightMapGamma:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLightMapInvert:"
+        },
+        {
+          "encoding" : "v32@0:816",
+          "selector" : "setSigmaGlare:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSkinMask:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setStrength:"
+        },
+        {
+          "encoding" : "16@0:8",
+          "selector" : "sigmaGlare"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "skinMask"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "strength"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "validate"
+        }
+      ],
+      "instance_size" : 80
+    },
+    {
+      "class" : "CMITextureStylesDiffusion",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i56@0:8@16@24f32f36@40@48",
+          "selector" : "_applyMeteorToInput:gainMap:gain:mixFactor:outputMixed:commandBuffer:"
+        },
+        {
+          "encoding" : "f24@0:8@16",
+          "selector" : "_calculateBlurSigma:"
+        },
+        {
+          "encoding" : "I24@0:8@16",
+          "selector" : "_calculateFullScaleBlurRadius:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_compileShaders"
+        },
+        {
+          "encoding" : "v36@0:8^{?=i{?=[3]}B}16@24B32",
+          "selector" : "_configureColorConversion:forTexture:isOutput:"
+        },
+        {
+          "encoding" : "i72@0:8@16{CGRect={CGPoint=dd}{CGSize=dd}}24{CGSize=dd}56",
+          "selector" : "_createIntermediateTextures:inputRegion:blurredSize:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_releaseIntermediateTextures"
+        },
+        {
+          "encoding" : "i72@0:8@16@24@32@40@48@56@64",
+          "selector" : "_renderDiffusionWithInput:blurred:skinMask:personMask:output:diffusionParameters:commandBuffer:"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "_rescale:toLinearRGB:commandBuffer:"
+        },
+        {
+          "encoding" : "v32@0:8@16@24",
+          "selector" : "_updateColorManagementForInputTexture:outputTexture:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_validateInputsAndParameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allocator"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "calculateStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalContext:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputOutput"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "instanceID"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personData"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "scaleParametersWithIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllocator:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputOutput:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setInstanceID:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setParameters:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonData:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsInPlaceRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        }
+      ],
+      "instance_size" : 496
+    },
+    {
+      "class" : "CMITextureStylesDiffusionIO",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputGainMap"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputPersonMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputSkinMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputGainMap:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputPersonMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputSkinMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        }
+      ],
+      "instance_size" : 48
+    },
+    {
+      "class" : "CMITextureStylesDiffusionParameters",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "f36@0:8@16@24f32",
+          "selector" : "_floatFromDict:key:default:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bg"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bw3Gamma"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "difSat"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "diffuseColor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "faceTempering"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "fogStrength"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "gaussianBlurSigma"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "grading"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "highlight"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hueRotate"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithTuningDictionary:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lift"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maxRGB"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "meteorHeadroom"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "meteorHeadroomMixFactor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "naturalResolution"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "person"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "saturation"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBg:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBw3Gamma:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "setDefaults"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDifSat:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDiffuseColor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFaceTempering:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFogStrength:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setGaussianBlurSigma:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setGrading:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHighlight:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHueRotate:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLift:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaxRGB:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMeteorHeadroom:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMeteorHeadroomMixFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setNaturalResolution:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setPerson:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSaturation:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setShDarken:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSlBG:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSlBright:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSlDark:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSlPerson:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSlSkin:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSoftLight:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSpbHL:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setStrength:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "shDarken"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "slBG"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "slBright"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "slDark"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "slPerson"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "slSkin"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "softLight"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "spbHL"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "strength"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "validate"
+        }
+      ],
+      "instance_size" : 112
+    },
+    {
+      "class" : "CMITextureStylesDownSampler",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "downSampleInput:output:commandBuffer:"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "downSampleInput:output:encoder:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "rescaleInput:output:commandBuffer:"
+        },
+        {
+          "encoding" : "i40@0:8@16@24@32",
+          "selector" : "rescaleInput:output:encoder:"
+        }
+      ],
+      "instance_size" : 40
+    },
+    {
+      "class" : "CMITextureStylesEffectDescriptor",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "hash"
+        },
+        {
+          "encoding" : "@32@0:8Q16@24",
+          "selector" : "initWithtype:parameters:"
+        },
+        {
+          "encoding" : "B24@0:8@16",
+          "selector" : "isEqual:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setSkipRendering:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "skipRendering"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "type"
+        }
+      ],
+      "instance_size" : 32
+    },
+    {
+      "class" : "CMITextureStylesFaceLandmark",
+      "class_methods" : [
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "landmarkFromDictionary:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "dictionaryRepresentation"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "error"
+        },
+        {
+          "encoding" : "@36@0:8{CGPoint=dd}16f32",
+          "selector" : "initWithPoint:error:"
+        },
+        {
+          "encoding" : "{CGPoint=dd}16@0:8",
+          "selector" : "point"
+        }
+      ],
+      "instance_size" : 32
+    },
+    {
+      "class" : "CMITextureStylesFastGaussian",
+      "class_methods" : [
+        {
+          "encoding" : "B68@0:8I16I20f24i28f32^I36^I44^f52^i60",
+          "selector" : "calculateGaussianDimsWithWidth:height:radius:nSamples:targetBlurRadius:pWorkWidth:pWorkHeight:pFinalSigma:pKernelRadius:"
+        },
+        {
+          "encoding" : "B72@0:8I16I20f24i28f32^I36^I44^f52^i60B68",
+          "selector" : "calculateGaussianDimsWithWidth:height:sigma:nSamples:targetBlurRadius:pWorkWidth:pWorkHeight:pFinalSigma:pKernelRadius:fastMode:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        },
+        {
+          "encoding" : "i44@0:8@16@24f32@36",
+          "selector" : "processTexture:outputTexture:radius:commandBuffer:"
+        },
+        {
+          "encoding" : "i48@0:8@16@24f32@36B44",
+          "selector" : "processTexture:outputTexture:sigma:commandBuffer:fastMode:"
+        }
+      ],
+      "instance_size" : 48
+    },
+    {
+      "class" : "CMITextureStylesFilmGrainIO",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightnessValue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputPersonImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputSkinImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputSkyImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightnessValue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputPersonImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputSkinImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputSkyImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        }
+      ],
+      "instance_size" : 56
+    },
+    {
+      "class" : "CMITextureStylesFilmGrainParameters",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "f36@0:8@16@24f32",
+          "selector" : "_floatFromDict:key:default:"
+        },
+        {
+          "encoding" : "f40@0:8@16@24f32f36",
+          "selector" : "_gainBasedFloatFromDict:key:totalGain:default:"
+        },
+        {
+          "encoding" : "Q40@0:8@16@24Q32",
+          "selector" : "_unsignedIntegerFromDict:key:default:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "amplitude"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "amplitudeDecay"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "backgroundStrength"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bvHigh"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bvLow"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bvLowScale"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "contrastBoost"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "darkScale"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "frequencyGap"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "grainBlurRadius"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "grainSelectivity"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hueMix"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "imageGuidedFilterEpsilon"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "imageGuidedFilterRadius"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithTuningDictionary:"
+        },
+        {
+          "encoding" : "@28@0:8@16f24",
+          "selector" : "initWithTuningDictionary:totalGain:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "naturalResolution"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "octaves"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "personStrength"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "saturation"
+        },
+        {
+          "encoding" : "S16@0:8",
+          "selector" : "seed"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setAmplitude:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setAmplitudeDecay:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBackgroundStrength:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBvHigh:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBvLow:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBvLowScale:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setContrastBoost:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDarkScale:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "setDefaults"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFrequencyGap:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setGrainBlurRadius:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setGrainSelectivity:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHueMix:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setImageGuidedFilterEpsilon:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setImageGuidedFilterRadius:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setNaturalResolution:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setOctaves:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setPersonStrength:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSaturation:"
+        },
+        {
+          "encoding" : "v20@0:8S16",
+          "selector" : "setSeed:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setShadowLift:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSkinStrength:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSkyStrength:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setStrength:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setTileSize:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setZoom:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "shadowLift"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "skinStrength"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "skyStrength"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "strength"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "tileSize"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "validate"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "zoom"
+        }
+      ],
+      "instance_size" : 112
+    },
+    {
+      "class" : "CMITextureStylesFilmGrainProcessorV1",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_compileShaders"
+        },
+        {
+          "encoding" : "v36@0:8^{?=i{?=[3]}}16@24B32",
+          "selector" : "_configureColorConversion:forTexture:isOutput:"
+        },
+        {
+          "encoding" : "i152@0:8{?=ffIfffffffffffffffffIf[5f]}16@136@144",
+          "selector" : "_encodeGrainBlendWithInputImageUsingParams:commandBuffer:inputOutput:"
+        },
+        {
+          "encoding" : "@20@0:8I16",
+          "selector" : "_shaderForFilterRadius:"
+        },
+        {
+          "encoding" : "v32@0:8@16@24",
+          "selector" : "_updateColorManagementForInputTexture:outputImageTexture:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allocator"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "calculateStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalContext:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputOutput"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "instanceID"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "{?=ffIfffffffffffffffffIf[5f]}28@0:8@16f24",
+          "selector" : "metalShaderParamsFromDynamicParameters:brightnessValue:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personData"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "scaleParametersWithIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllocator:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputOutput:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setInstanceID:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setParameters:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonData:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsInPlaceRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        }
+      ],
+      "instance_size" : 400
+    },
+    {
+      "class" : "CMITextureStylesFilter",
+      "class_methods" : [
+        {
+          "encoding" : "i52@0:8^I16^f24{CGSize=dd}32f48",
+          "selector" : "calculateIdealRadius:andDownSamplingScale:forImageSize:andTargetFullScaleRadius:"
+        },
+        {
+          "encoding" : "I20@0:8f16",
+          "selector" : "calculateRadiusForSigma:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i52@0:8^I16^f24{CGSize=dd}32f48",
+          "selector" : "calculateIdealRadius:andDownSamplingScale:forImageSize:andTargetFullScaleRadius:"
+        },
+        {
+          "encoding" : "I20@0:8f16",
+          "selector" : "calculateRadiusForSigma:"
+        },
+        {
+          "encoding" : "i48@0:8@16@24I32f36@40",
+          "selector" : "gaussianFilterInput:output:radius:sigma:commandBuffer:"
+        },
+        {
+          "encoding" : "i48@0:8@16@24I32f36@40",
+          "selector" : "gaussianFilterInput:output:radius:sigma:encoder:"
+        },
+        {
+          "encoding" : "i68@0:8@16@24@32@40I48f52f56@60",
+          "selector" : "guidedFilterInput:guide:outputA:outputB:radius:sigma:epsilon:commandBuffer:"
+        },
+        {
+          "encoding" : "i68@0:8@16@24@32@40I48f52f56@60",
+          "selector" : "guidedFilterInput:guide:outputA:outputB:radius:sigma:epsilon:encoder:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        },
+        {
+          "encoding" : "i68@0:8@16@24@32@40I48f52f56@60",
+          "selector" : "weightedGuidedFilterInput:guide:outputA:outputB:radius:sigma:epsilon:commandBuffer:"
+        },
+        {
+          "encoding" : "i68@0:8@16@24@32@40I48f52f56@60",
+          "selector" : "weightedGuidedFilterInput:guide:outputA:outputB:radius:sigma:epsilon:encoder:"
+        }
+      ],
+      "instance_size" : 368
+    },
+    {
+      "class" : "CMITextureStylesGaussianFilter",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i44@0:8@16@24@32f40",
+          "selector" : "encodeGaussianBlur2DWithCommandBuffer:input:output:radius:"
+        },
+        {
+          "encoding" : "i52@0:8@16@24@32r^f40i48",
+          "selector" : "encodeGaussianBlurWithCommandBuffer:input:output:kernel:kernelSize:"
+        },
+        {
+          "encoding" : "i44@0:8@16@24@32f40",
+          "selector" : "encodeGaussianBlurWithCommandBuffer:input:output:radius:"
+        },
+        {
+          "encoding" : "i44@0:8@16@24@32f40",
+          "selector" : "encodeSIMDGaussianBlurWithCommandBuffer:input:output:radius:"
+        },
+        {
+          "encoding" : "i52@0:8@16@24@32@40f48",
+          "selector" : "encodeSIMDMaskedDownsampledGaussianBlurWithCommandBuffer:input:output:skinMask:radius:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        }
+      ],
+      "instance_size" : 56
+    },
+    {
+      "class" : "CMITextureStylesGaussianGuidedFilterV3",
+      "class_methods" : [
+        {
+          "encoding" : "B88@0:8I16I20f24f28^I32^I40^I48^I56^I64^I72^f80",
+          "selector" : "calculateGuidedFilterDimsWithFullImageWidth:fullImageHeight:sigma:blurRadius:pMediumResWidth:pMediumResHeight:pLowResWidth:pLowResHeight:pMediumToLow:pMediumSampling:pOutputBlurRadius:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        },
+        {
+          "encoding" : "i96@0:8@16@24@32f40f44f48f52{CGSize=dd}5672@80@88",
+          "selector" : "runWithInput:skinMask:instanceMask:highlightRetention:sigma:eps:blurRadius:fullImageSize:fullImageOffset:outputTexture:commandBuffer:"
+        }
+      ],
+      "instance_size" : 40
+    },
+    {
+      "class" : "CMITextureStylesGlow",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_compileShaders"
+        },
+        {
+          "encoding" : "v36@0:8^{?=i{?=[3]}B}16@24B32",
+          "selector" : "_configureColorConversion:forTexture:isOutput:"
+        },
+        {
+          "encoding" : "i40@0:8@16@24^@32",
+          "selector" : "_createGlobalToneCurveTextureFromGTCData:encoder:toneCurveTextureOut:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_releaseIntermediateTextures"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "_updateColorManagementForInputOutput:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_validateInputsAndParameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allocator"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "calculateStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalContext:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputOutput"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "instanceID"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personData"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "scaleParametersWithIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllocator:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputOutput:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setInstanceID:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setParameters:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonData:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setStreamingMode:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "streamingMode"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsInPlaceRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        }
+      ],
+      "instance_size" : 464
+    },
+    {
+      "class" : "CMITextureStylesGlowIO",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputLinearImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputLinearMetadata"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputLinearImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputLinearMetadata:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        }
+      ],
+      "instance_size" : 48
+    },
+    {
+      "class" : "CMITextureStylesGlowParameters",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "B36@0:8@16@24B32",
+          "selector" : "_boolFromDict:key:default:"
+        },
+        {
+          "encoding" : "f36@0:8@16@24f32",
+          "selector" : "_floatFromDict:key:default:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "baselineExposure"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightness"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightnessMask"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "contrast"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "contrastMask"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "gamma"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "gammaMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithTuningDictionary:"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "inputTextureROI"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lightMapGamma"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lightMapMax"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "linearImageHighKey"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "linearMixForBG"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "linearMixForSkin"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "preserveColorfulness"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "preserveColorfulnessMask"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "saturation"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "saturationFromSmartStyle"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "saturationMask"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBaselineExposure:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightness:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightnessMask:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setContrast:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setContrastMask:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "setDefaults"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setGamma:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setGammaMask:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setInputTextureROI:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLightMapGamma:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLightMapMax:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLinearImageHighKey:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLinearMixForBG:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLinearMixForSkin:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setPreserveColorfulness:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setPreserveColorfulnessMask:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSaturation:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSaturationFromSmartStyle:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSaturationMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setStatistics:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setStrength:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setStrengthMask:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setUseStatistics:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "statistics"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "strength"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "strengthMask"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "useStatistics"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "validate"
+        }
+      ],
+      "instance_size" : 120
+    },
+    {
+      "class" : "CMITextureStylesGuidedFilter",
+      "class_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "supportedRadii"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i56@0:8@16@24@32@40I48f52",
+          "selector" : "encodeRunWithCommandBuffer:guide:input:output:radius:epsilon:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        }
+      ],
+      "instance_size" : 80
+    },
+    {
+      "class" : "CMITextureStylesHalation",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "{?=ff}24@0:8@16",
+          "selector" : "_calculateBlurSigma:"
+        },
+        {
+          "encoding" : "I24@0:8@16",
+          "selector" : "_calculateFullScaleBlurRadius:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_compileShaders"
+        },
+        {
+          "encoding" : "i60@0:8@16@24@32@40f48@52",
+          "selector" : "_computeAsymLumMaskWithInput:personMask:outputMask:halationParameters:brightnessValue:commandBuffer:"
+        },
+        {
+          "encoding" : "v36@0:8^{?=i{?=[3]}B}16@24B32",
+          "selector" : "_configureColorConversion:forTexture:isOutput:"
+        },
+        {
+          "encoding" : "i80@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16{CGSize=dd}48{CGSize=dd}64",
+          "selector" : "_createIntermediateTexturesWithInputRegion:firstBlurSize:secondBlurSize:"
+        },
+        {
+          "encoding" : "i72@0:8@16@24@32@40@48@56@64",
+          "selector" : "_halationFinalRendererWithInput:halationMask:skinMask:personMask:output:parameters:commandBuffer:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_releaseIntermediateTextures"
+        },
+        {
+          "encoding" : "i48@0:8@16@24@32@40",
+          "selector" : "_substractFg:bg:output:commandBuffer:"
+        },
+        {
+          "encoding" : "v32@0:8@16@24",
+          "selector" : "_updateColorManagementForInputTexture:outputTexture:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "_validateInputsAndParameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allocator"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "calculateStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalContext:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputOutput"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "instanceID"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personData"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "scaleParametersWithIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllocator:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputOutput:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setInstanceID:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setParameters:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonData:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsInPlaceRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        }
+      ],
+      "instance_size" : 496
+    },
+    {
+      "class" : "CMITextureStylesHalationIO",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightnessValue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputGainMap"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputHDRImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputLightMap"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputPersonMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputSkinMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightnessValue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputGainMap:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputHDRImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputLightMap:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputPersonMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputSkinMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        }
+      ],
+      "instance_size" : 72
+    },
+    {
+      "class" : "CMITextureStylesHalationParameters",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "f36@0:8@16@24f32",
+          "selector" : "_floatFromDict:key:default:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bg"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bvHigh"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bvLow"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bvThresholdDeltaLowScale"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "faceTempering"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "halationChroma"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "halationHue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithTuningDictionary:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputInnerKnot0"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputInnerKnot1"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputLowerBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputLowerCoeffA"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputLowerCoeffB"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputOuterKnot0"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputOuterKnot1"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputSpread"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "inputTextureROI"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputThresholdDelta"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputUpperCoeffA"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "inputUpperCoeffB"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maskBlurSigma"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maxRGB"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "meteorHeadroom"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "meteorHeadroomMixFactor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "naturalResolution"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "person"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBg:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBvHigh:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBvLow:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBvThresholdDeltaLowScale:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "setDefaults"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFaceTempering:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHalationChroma:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHalationHue:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputInnerKnot0:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputInnerKnot1:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputLowerBound:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputLowerCoeffA:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputLowerCoeffB:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputOuterKnot0:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputOuterKnot1:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputSpread:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setInputTextureROI:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputThresholdDelta:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputUpperCoeffA:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setInputUpperCoeffB:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaskBlurSigma:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaxRGB:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMeteorHeadroom:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMeteorHeadroomMixFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setNaturalResolution:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setPerson:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setStrength:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "strength"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "validate"
+        }
+      ],
+      "instance_size" : 144
+    },
+    {
+      "class" : "CMITextureStylesMattify",
+      "class_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "dictOfZeroInitializedStats"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allocator"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "calculateStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalContext:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputOutput"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "instanceID"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personData"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "scaleParametersWithIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllocator:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputOutput:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setInstanceID:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setParameters:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonData:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setSkipRendering:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setStreamingMode:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "skipRendering"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "streamingMode"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsInPlaceRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        }
+      ],
+      "instance_size" : 320
+    },
+    {
+      "class" : "CMITextureStylesMattifyIO",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputEarMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputFaceMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputGlassesMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputInstanceMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputLipsMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputNoseMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputSkinMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputTattoosMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputPersonStats"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputEarMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputFaceMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputGlassesMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputInstanceMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputLipsMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputNoseMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputSkinMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputTattoosMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputPersonStats:"
+        }
+      ],
+      "instance_size" : 96
+    },
+    {
+      "class" : "CMITextureStylesMattifyParameters",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "blendColorImageAverageColorMixFactor"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "darknessDiffSmoothstepLowerBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "darknessDiffSmoothstepUpperBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "editingStrength"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "fracMaskHighlightsHeadroom"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "fracMaskHighlightsNormFactor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hueDiffMeanTermSmoothstepLowerBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hueDiffMeanTermSmoothstepUpperBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hueDiffSmoothstepLowerBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hueDiffSmoothstepUpperBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "imageTextureFactor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "imageTextureThreshold"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithTuningDictionary:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "largeBlurRadiusFaceDiagonalFactor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lightnessEditFactor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lightnessEditHeadroom"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBlendColorImageAverageColorMixFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDarknessDiffSmoothstepLowerBound:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDarknessDiffSmoothstepUpperBound:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "setDefaults"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setEditingStrength:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFracMaskHighlightsHeadroom:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFracMaskHighlightsNormFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHueDiffMeanTermSmoothstepLowerBound:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHueDiffMeanTermSmoothstepUpperBound:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHueDiffSmoothstepLowerBound:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHueDiffSmoothstepUpperBound:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setImageTextureFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setImageTextureThreshold:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLargeBlurRadiusFaceDiagonalFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLightnessEditFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLightnessEditHeadroom:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setSmallBlurRadiusFaceDiagonalFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureRestoreScalingFactor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureRestoreSmoothstepLowerBound:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureRestoreSmoothstepUpperBound:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureRestoreStrengthFactor:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "smallBlurRadiusFaceDiagonalFactor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureRestoreScalingFactor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureRestoreSmoothstepLowerBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureRestoreSmoothstepUpperBound"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureRestoreStrengthFactor"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "validate"
+        }
+      ],
+      "instance_size" : 88
+    },
+    {
+      "class" : "CMITextureStylesPersonInputData",
+      "class_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "metadataFormatVersion"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "personDataFromDictionary:"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "personDataFromDictionary:forKeys:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "convertDegreesToRadians"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "convertRadiansToDegrees"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "dictionaryRepresentation"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "dictionaryRepresentationForKeys:"
+        },
+        {
+          "encoding" : "q16@0:8",
+          "selector" : "faceID"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "faceLandmarkType"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "faceLandmarks"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "facePitch"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "faceROI"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "faceROIAndLandmarksROIRelativeScalingROI"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "faceRoll"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "faceSkinROI"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "faceYaw"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "imageStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "instanceMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "instanceMaskReferenceKey"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "instanceROI"
+        },
+        {
+          "encoding" : "@48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "normalizeRelativeToCropRect:"
+        },
+        {
+          "encoding" : "v24@0:8q16",
+          "selector" : "setFaceID:"
+        },
+        {
+          "encoding" : "v24@0:8Q16",
+          "selector" : "setFaceLandmarkType:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setFaceLandmarks:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFacePitch:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setFaceROI:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFaceRoll:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setFaceSkinROI:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setFaceYaw:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setImageStats:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInstanceMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInstanceMaskReferenceKey:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setInstanceROI:"
+        },
+        {
+          "encoding" : "v24@0:8Q16",
+          "selector" : "setUnitOfAngle:"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "unitOfAngle"
+        }
+      ],
+      "instance_size" : 208
+    },
+    {
+      "class" : "CMITextureStylesPersonInputDataUtilities",
+      "class_methods" : [
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "convertUnitOfAngleInPersonInputDataArrayToDegrees:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "convertUnitOfAngleInPersonInputDataArrayToRadians:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "dictionaryRepresentationsFromFigLivePhotoMetadata:"
+        },
+        {
+          "encoding" : "f48@0:8{CGSize=dd}16{CGSize=dd}32",
+          "selector" : "faceDiagonalRatioForFaceSize:imageSize:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "@56@0:8@16{CGRect={CGPoint=dd}{CGSize=dd}}24",
+          "selector" : "normalizePersonInputDataArray:toCropRect:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "personInputDataArrayFromDetectedFaces:"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "personInputDataArrayFromDictionaryRepresentations:keys:"
+        },
+        {
+          "encoding" : "@48@0:8@16@24@32@40",
+          "selector" : "personInputDataArrayFromLivePhotoMetadataAndStatsTracks:faceAttitudesMetadataTrack:effectsStatsTrack:effectsToRender:"
+        },
+        {
+          "encoding" : "f56@0:8{CGSize=dd}16{CGSize=dd}32f48f52",
+          "selector" : "softFadeGatingForFaceSize:imageSize:lowerBound:upperBound:"
+        },
+        {
+          "encoding" : "@28@0:8@16i24",
+          "selector" : "sortPersonInputDataArrayByFaceSize:maxCount:"
+        }
+      ],
+      "instance_methods" : [
+
+      ],
+      "instance_size" : 8
+    },
+    {
+      "class" : "CMITextureStylesProcessor",
+      "class_methods" : [
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "APIVersion"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}80@0:8{CGSize=dd}16{CGRect={CGPoint=dd}{CGSize=dd}}32{CGSize=dd}64",
+          "selector" : "computeAuxTextureRegionInCropSpaceWithAuxTextureSize:auxCropRect:fullImageSize:"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}48@0:8{CGSize=dd}16{CGSize=dd}32",
+          "selector" : "computeAuxTextureRegionInCropSpaceWithAuxTextureSize:fullImageSize:"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}72@0:8^{__CVBuffer=}16{CGRect={CGPoint=dd}{CGSize=dd}}24{CGSize=dd}56",
+          "selector" : "computeAuxTextureRegionInCropSpaceWithPixelBuffer:auxCropRect:fullImageSize:"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}40@0:8^{__CVBuffer=}16{CGSize=dd}24",
+          "selector" : "computeAuxTextureRegionInCropSpaceWithPixelBuffer:fullImageSize:"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}72@0:8@16{CGRect={CGPoint=dd}{CGSize=dd}}24{CGSize=dd}56",
+          "selector" : "computeAuxTextureRegionInCropSpaceWithTexture:auxCropRect:fullImageSize:"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}40@0:8@16{CGSize=dd}24",
+          "selector" : "computeAuxTextureRegionInCropSpaceWithTexture:fullImageSize:"
+        },
+        {
+          "encoding" : "@24@0:8Q16",
+          "selector" : "effectTypeToEffectName:"
+        },
+        {
+          "encoding" : "@24@0:8Q16",
+          "selector" : "effectTypeToZeroInitializedStats:"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "getRequiredMemorySize"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        },
+        {
+          "encoding" : "Q24@0:8@16",
+          "selector" : "presetNameToPresetValue:"
+        },
+        {
+          "encoding" : "@24@0:8Q16",
+          "selector" : "presetValueToPresetName:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightnessValue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "effectsToRender"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "enableSkinSmoothingMultiPersonBlending"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "externalMemoryResource"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalCommandQueue:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputLinearImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputLinearImageMetadata"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputMasks"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputMeteorGainMap"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputPersonData"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputPingPongImageForRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputSkinSmoothingFaceDetections"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "label"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "memoryResource"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "needsIntermediateRenderingBuffer"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputPersonImageStats"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "outputSkinSmoothingLargeBlurGuidedFilterA"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "outputSkinSmoothingLargeBlurGuidedFilterB"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "outputSkinSmoothingProcessedMask"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "outputSkinSmoothingSmallBlur"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "outputSkinSmoothingStats"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "outputSkinSmoothingTextureAddback"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightnessValue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setEffectsToRender:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setEnableSkinSmoothingMultiPersonBlending:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setExternalMemoryResource:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputLinearImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputLinearImageMetadata:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputMasks:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputMeteorGainMap:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputPersonData:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputPingPongImageForRendering:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputSkinSmoothingFaceDetections:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLabel:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMemoryResource:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputPersonImageStats:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setOutputSkinSmoothingLargeBlurGuidedFilterA:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setOutputSkinSmoothingLargeBlurGuidedFilterB:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setOutputSkinSmoothingProcessedMask:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setOutputSkinSmoothingSmallBlur:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setOutputSkinSmoothingStats:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setOutputSkinSmoothingTextureAddback:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setShouldFlushCVMTLCachesOnResetState:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setStreamingMode:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureStyleIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "shouldFlushCVMTLCachesOnResetState"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "streamingMode"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureStyleIntensity"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "waitForSchedule"
+        }
+      ],
+      "instance_size" : 344
+    },
+    {
+      "class" : "CMITextureStylesPyramid",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dereference"
+        },
+        {
+          "encoding" : "@52@0:8@16I24@28@36@44",
+          "selector" : "initWithImage:maxLevels:allocator:encoder:shader:"
+        },
+        {
+          "encoding" : "@60@0:8@16I24Q28@36@44@52",
+          "selector" : "initWithImage:maxLevels:pixelFormat:allocator:encoder:shader:"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "nLevels"
+        },
+        {
+          "encoding" : "@20@0:8i16",
+          "selector" : "objectAtIndexedSubscript:"
+        }
+      ],
+      "instance_size" : 16
+    },
+    {
+      "class" : "CMITextureStylesPyramidFactory",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@36@0:8@16I24@28",
+          "selector" : "createPyramidWithImage:maxLevels:encoder:"
+        },
+        {
+          "encoding" : "@44@0:8@16I24Q28@36",
+          "selector" : "createPyramidWithImage:maxLevels:pixelFormat:encoder:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        }
+      ],
+      "instance_size" : 24
+    },
+    {
+      "class" : "CMITextureStylesSkinSmoothIO",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allPersonDataForBlending"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "bodyMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightnessValue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "earsMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "externalFaceRoughnessStatsOutput"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "externalLargeBlurGuidedFilterAOutput"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "externalLargeBlurGuidedFilterBOutput"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "externalSmallBlurOutput"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "externalTextureAddbackOutput"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "eyebrowsMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "faceSkinMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "glassesMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "hairMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "handsMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "inputFaceRect"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputSkinMaskAndFullImageRegion"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "instanceMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "lipsMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputPersonStats"
+        },
+        {
+          "encoding" : "^@16@0:8",
+          "selector" : "outputProcessedSkinMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllPersonDataForBlending:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setBodyMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightnessValue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setEarsMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setExternalFaceRoughnessStatsOutput:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setExternalLargeBlurGuidedFilterAOutput:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setExternalLargeBlurGuidedFilterBOutput:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setExternalSmallBlurOutput:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setExternalTextureAddbackOutput:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setEyebrowsMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setFaceSkinMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setGlassesMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setHairMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setHandsMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setInputFaceRect:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputSkinMaskAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInstanceMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLipsMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputPersonStats:"
+        },
+        {
+          "encoding" : "v24@0:8^@16",
+          "selector" : "setOutputProcessedSkinMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTattoosMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTeethMaskTextureAndFullImageRegion:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tattoosMaskTextureAndFullImageRegion"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "teethMaskTextureAndFullImageRegion"
+        }
+      ],
+      "instance_size" : 232
+    },
+    {
+      "class" : "CMITextureStylesSkinSmoothParameters",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "degrunge"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "degrungeBody"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "detailSize"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "enableTextureAddback"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "eyeProtection"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "eyebrows"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "fastMode"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "gFContrast"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "gFRadius"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hairClothes"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hairTxFloor"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "handsAndEars"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "highlightRetention"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hlBlurStrength"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hlTextureRestore"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithTuningDictionary:"
+        },
+        {
+          "encoding" : "@28@0:8@16f24",
+          "selector" : "initWithTuningDictionary:totalGain:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lipContrast"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lipCrease"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lipHighlights"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "lipNegClar"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maxDarknessTrigger"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "minDarknessTrigger"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "minTexture"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "nightMode"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "nightModeSharpness"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "plusGreenGuide"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "pores"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "poresBody"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "roughSamples"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "setDefaults"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDegrunge:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDegrungeBody:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDetailSize:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setEnableTextureAddback:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setEyeProtection:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setEyebrows:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setFastMode:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setGFContrast:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setGFRadius:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHairClothes:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHairTxFloor:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHandsAndEars:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHighlightRetention:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHlBlurStrength:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHlTextureRestore:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLipContrast:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLipCrease:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLipHighlights:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setLipNegClar:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaxDarknessTrigger:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMinDarknessTrigger:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMinTexture:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setNightMode:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setNightModeSharpness:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setPlusGreenGuide:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setPores:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setPoresBody:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setRoughSamples:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setStrongTextureProtect:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTattooSmoothing:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTattooWeight:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTeeth:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureClamp:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureDetectScale:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureRestore:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setVarTexture:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "strongTextureProtect"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "tattooSmoothing"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "tattooWeight"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "teeth"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureClamp"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureDetectScale"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureRestore"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "validate"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "varTexture"
+        }
+      ],
+      "instance_size" : 144
+    },
+    {
+      "class" : "CMITextureStylesSkinSmoothStandalone",
+      "class_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "dictOfZeroInitializedStats"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allocator"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "calculateStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalContext:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputOutput"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "instanceID"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personData"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "scaleParametersWithIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllocator:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputOutput:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setInstanceID:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setParameters:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonData:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setStreamingMode:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "streamingMode"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsInPlaceRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        }
+      ],
+      "instance_size" : 288
+    },
+    {
+      "class" : "CMITextureStylesTextureCopy",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "i104@0:8@16{CGRect={CGPoint=dd}{CGSize=dd}}24@56{CGRect={CGPoint=dd}{CGSize=dd}}64@96",
+          "selector" : "copyFromInputTexture:withInputROI:toOutputTexture:withOutputROI:encodedTo:"
+        },
+        {
+          "encoding" : "i104@0:8@16{CGRect={CGPoint=dd}{CGSize=dd}}24@56{CGRect={CGPoint=dd}{CGSize=dd}}64@96",
+          "selector" : "copyFromInputTexture:withInputROI:toOutputTexture:withOutputROI:enqueuedTo:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        }
+      ],
+      "instance_size" : 24
+    },
+    {
+      "class" : "CMITextureStylesTextureWarping",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithMetalContext:"
+        },
+        {
+          "encoding" : "i56@0:8@16@24@32@40@48",
+          "selector" : "processInput:output:triangleVertices:textureCoords:commandBuffer:"
+        }
+      ],
+      "instance_size" : 24
+    },
+    {
+      "class" : "CMITextureStylesUnderEyeBrighten",
+      "class_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "dictOfZeroInitializedStats"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "initialize"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allocator"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "calculateStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "cameraInfoByPortType"
+        },
+        {
+          "encoding" : "i24@0:8^{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "computeMinimumInputRegionInFullImageCoords:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "finishProcessing"
+        },
+        {
+          "encoding" : "{CGSize=dd}16@0:8",
+          "selector" : "fullImageSize"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithOptionalMetalContext:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputOutput"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "instanceID"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "parameters"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personData"
+        },
+        {
+          "encoding" : "i20@0:8I16",
+          "selector" : "prepareToProcess:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "prewarm"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "process"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "purgeResources"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}16@0:8",
+          "selector" : "regionToRender"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "resetState"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "scaleParametersWithIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setAllocator:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCameraInfoByPortType:"
+        },
+        {
+          "encoding" : "v32@0:8{CGSize=dd}16",
+          "selector" : "setFullImageSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputOutput:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setInstanceID:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setMetalCommandQueue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setParameters:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonData:"
+        },
+        {
+          "encoding" : "v48@0:8{CGRect={CGPoint=dd}{CGSize=dd}}16",
+          "selector" : "setRegionToRender:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setSkipRendering:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningParameters:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "setup"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "skipRendering"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsExternalMemoryResource"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsInPlaceRendering"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningParameters"
+        }
+      ],
+      "instance_size" : 232
+    },
+    {
+      "class" : "CMITextureStylesUnderEyeBrightenIO",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightnessValue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputEarMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputFaceMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputGlassesMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputHairMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputInstanceMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputLipMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputNoseMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputTattooMask"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputImage"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputPersonStats"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightnessValue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputEarMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputFaceMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputGlassesMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputHairMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputInstanceMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputLipMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputNoseMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInputTattooMask:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputImage:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOutputPersonStats:"
+        }
+      ],
+      "instance_size" : 104
+    },
+    {
+      "class" : "CMITextureStylesUnderEyeBrightenParameters",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "averageColorMix"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "bimodalVarianceFalloff"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "blendConditionFilterScale"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "brightnessMix"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "colorBlendFilterScale"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "dominantYawTapering"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "hueMaskFilterScale"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithTuningDictionary:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maskThreshold"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maxDarknessTrigger"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maxFaceFrac"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maxHueTolerance"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maximumBimodalVariance"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "maximumUnimodalVariance"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "minDarknessTrigger"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "minFaceFrac"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "minHueTolerance"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "minTextureAddBack"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "nightMode"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "nightModeSharpness"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "regionMaskThreshold"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setAverageColorMix:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBimodalVarianceFalloff:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBlendConditionFilterScale:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setBrightnessMix:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setColorBlendFilterScale:"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "setDefaults"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setDominantYawTapering:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setHueMaskFilterScale:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaskThreshold:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaxDarknessTrigger:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaxFaceFrac:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaxHueTolerance:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaximumBimodalVariance:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMaximumUnimodalVariance:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMinDarknessTrigger:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMinFaceFrac:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMinHueTolerance:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setMinTextureAddBack:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setNightMode:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setNightModeSharpness:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setRegionMaskThreshold:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureAddBackFilterScale:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setTextureAddBackScale:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setUnimodalVarianceFalloff:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setYawFallOff:"
+        },
+        {
+          "encoding" : "v20@0:8f16",
+          "selector" : "setYawOffset:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureAddBackFilterScale"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "textureAddBackScale"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "unimodalVarianceFalloff"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "validate"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "yawFallOff"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "yawOffset"
+        }
+      ],
+      "instance_size" : 112
+    },
+    {
+      "class" : "FigCaptureTextureStyle",
+      "class_methods" : [
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "createFromDictionary:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "identityStyle"
+        },
+        {
+          "encoding" : "@32@0:8@16f24f28",
+          "selector" : "styleWithPreset:intensity:grain:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "supportsSecureCoding"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "copyXPCEncoding"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "debugDescription"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "dictionaryRepresentation"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "encodeWithCoder:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "grain"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "hash"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithCoder:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "initWithXPCEncoding:"
+        },
+        {
+          "encoding" : "f16@0:8",
+          "selector" : "intensity"
+        },
+        {
+          "encoding" : "B24@0:8@16",
+          "selector" : "isEqual:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isIdentity"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isStandardPreset"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "preset"
+        }
+      ],
+      "instance_size" : 32
+    },
+    {
+      "class" : "PITextureStyle",
+      "class_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "adjustmentDescriptor"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "adjustmentFormat"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "availableOptions"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "identifier"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "@40@0:8@16@24o^@32",
+          "selector" : "_buildTextureStylesPipeline:input:error:"
+        },
+        {
+          "encoding" : "B32@0:8@16o^@24",
+          "selector" : "buildPipeline:error:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "identifier"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputChannels"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isVideo"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "outputChannels"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "processorUsage"
+        }
+      ],
+      "instance_size" : 16
+    },
+    {
+      "class" : "PITextureStyleAdjustmentController",
+      "class_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "allPresets"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "grainIntensityKey"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "intensityKey"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "presetKey"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "B40@0:8@16@24@32",
+          "selector" : "_areValuesEquivalentBetween:and:nilEquivalentDefaultValue:"
+        },
+        {
+          "encoding" : "d16@0:8",
+          "selector" : "grainIntensity"
+        },
+        {
+          "encoding" : "d16@0:8",
+          "selector" : "intensity"
+        },
+        {
+          "encoding" : "B32@0:8@16@24",
+          "selector" : "isSettingEqual:forKey:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "preset"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "resetToUnstyledOriginal"
+        },
+        {
+          "encoding" : "v24@0:8d16",
+          "selector" : "setGrainIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8d16",
+          "selector" : "setIntensity:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPreset:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "updateWithTextureStyleInfo:"
+        }
+      ],
+      "instance_size" : 40
+    },
+    {
+      "class" : "PITextureStyleAutoCalculator",
+      "class_methods" : [
+        {
+          "encoding" : "B24@0:8@16",
+          "selector" : "canRenderTextureStylesOnComposition:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "pipelineOutput"
+        },
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "processComputedData:error:"
+        },
+        {
+          "encoding" : "v24@0:8@?16",
+          "selector" : "submit:"
+        }
+      ],
+      "instance_size" : 144
+    },
+    {
+      "class" : "PITextureStylePipelineProcessor",
+      "class_methods" : [
+        {
+          "encoding" : "@24@0:8Q16",
+          "selector" : "allowedEffectTypesForUsage:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "bloomConfiguration"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "defaultTextureStyleDictionaryForCast:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "defaultTextureStyleDictionaryForPreset:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "diffusionConfiguration"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "filmGrainConfiguration"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "glowConfiguration"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "halationConfiguration"
+        },
+        {
+          "encoding" : "@28@0:8Q16B24",
+          "selector" : "inputConfigurationForEffectType:isVideo:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputNames"
+        },
+        {
+          "encoding" : "@24@0:8Q16",
+          "selector" : "inputRequirementsForUsage:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isAvailable"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isAvailableForTesting"
+        },
+        {
+          "encoding" : "B24@0:8Q16",
+          "selector" : "isUsageVideo:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearThumbnailChannel"
+        },
+        {
+          "encoding" : "@24@0:8Q16",
+          "selector" : "maskTypeFromIndex:"
+        },
+        {
+          "encoding" : "@20@0:8B16",
+          "selector" : "mattifyConfiguration:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personInstancesChannel"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "semanticStyleCastChannel"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "semanticStyleColorChannel"
+        },
+        {
+          "encoding" : "@20@0:8B16",
+          "selector" : "skinSmoothingConfiguration:"
+        },
+        {
+          "encoding" : "@20@0:8B16",
+          "selector" : "underEyeBrighteningConfiguration:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "init"
+        },
+        {
+          "encoding" : "@24@0:8Q16",
+          "selector" : "initWithUsage:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "inputChannels"
+        },
+        {
+          "encoding" : "B24@0:8@16",
+          "selector" : "isInputChannelRequired:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isVideo"
+        },
+        {
+          "encoding" : "@40@0:8@16@24o^@32",
+          "selector" : "outputImageWithSamples:controlData:error:"
+        },
+        {
+          "encoding" : "{?=qq}48@0:8@16@24{?=qq}32",
+          "selector" : "renderScaleForInput:geometry:outputScale:"
+        }
+      ],
+      "instance_size" : 24
+    },
+    {
+      "class" : "PITextureStyleProcessorKernel",
+      "class_methods" : [
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "allowPartialOutputRegion"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "defaultEffectOrderForPreset:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "descriptorForBloomWithTuningDictionary:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "descriptorForDiffusionWithTuningDictionary:"
+        },
+        {
+          "encoding" : "@48@0:8@16@24@32@40",
+          "selector" : "descriptorForEffectName:tuningDictionary:semanticStyleProperties:semanticStyleInfo:"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "descriptorForFilmGrainWithTuningDictionary:semanticStyleInfo:"
+        },
+        {
+          "encoding" : "@40@0:8@16@24@32",
+          "selector" : "descriptorForGlowWithTuningDictionary:semanticStyleProperties:semanticStyleInfo:"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "descriptorForHalationWithTuningDictionary:semanticStyleInfo:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "descriptorForMattifyWithTuningDictionary:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "descriptorForSkinSmoothingWithTuningDictionary:"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "descriptorForUnderEyeBrighteningWithTuningDictionary:"
+        },
+        {
+          "encoding" : "@60@0:8@16f24@28Q36@44@52",
+          "selector" : "effectDescriptorsForPreset:grainIntensity:tuningDictionary:usage:semanticStyleProperties:semanticStyleInfo:"
+        },
+        {
+          "encoding" : "i28@0:8i16@20",
+          "selector" : "formatForInputAtIndex:arguments:"
+        },
+        {
+          "encoding" : "i16@0:8",
+          "selector" : "outputFormat"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "outputIsOpaque"
+        },
+        {
+          "encoding" : "@24@0:8@16",
+          "selector" : "personInputDataFromStillProperties:"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "personInputDataFromVideoProperties:effectDescriptors:"
+        },
+        {
+          "encoding" : "B48@0:8@16@24@32^@40",
+          "selector" : "processWithInputs:arguments:output:error:"
+        },
+        {
+          "encoding" : "{CGRect={CGPoint=dd}{CGSize=dd}}60@0:8i16@20{CGRect={CGPoint=dd}{CGSize=dd}}28",
+          "selector" : "roiForInput:arguments:outputRect:"
+        },
+        {
+          "encoding" : "@60@0:8i16@20{CGRect={CGPoint=dd}{CGSize=dd}}28",
+          "selector" : "roiTileArrayForInput:arguments:outputRect:"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "synchronizeInputs"
+        }
+      ],
+      "instance_methods" : [
+
+      ],
+      "instance_size" : 8
+    },
+    {
+      "class" : "PITextureStyleProcessorResource",
+      "class_methods" : [
+        {
+          "encoding" : "B44@0:8@16B24@28@?36",
+          "selector" : "usingSharedProcessorWithUsage:isVideo:commandQueue:perform:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "createMemoryResource"
+        },
+        {
+          "encoding" : "v16@0:8",
+          "selector" : "dealloc"
+        },
+        {
+          "encoding" : "@32@0:8@16@24",
+          "selector" : "initWithUsage:metalCommandQueue:"
+        },
+        {
+          "encoding" : "B32@0:8@16@24",
+          "selector" : "matchesUsage:metalCommandQueue:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "metalCommandQueue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "processor"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "setupProcessor"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "usage"
+        }
+      ],
+      "instance_size" : 32
+    },
+    {
+      "class" : "PITextureStyleUsageInputConfiguration",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "debugDescription"
+        },
+        {
+          "encoding" : "@36@0:8@16@24B32",
+          "selector" : "initWithRequiredChannels:optionalChannels:personData:"
+        },
+        {
+          "encoding" : "B24@0:8@16",
+          "selector" : "isChannelRequired:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "optionalChannelNames"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "optionalChannels"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "requiredChannelNames"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "requiredChannels"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "requiresPersonData"
+        }
+      ],
+      "instance_size" : 48
+    },
+    {
+      "class" : "_NUSemanticStyleProperties",
+      "class_methods" : [
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "baselineExposureFromLegacyMetadata:error:"
+        },
+        {
+          "encoding" : "@60@0:8@16B24{?=qiIq}28o^@52",
+          "selector" : "legacySemanticStylePropertiesFromData:fromVideo:keyTime:error:"
+        },
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "linearGlobalToneCurveDataFromCaptureMetadata:error:"
+        },
+        {
+          "encoding" : "@60@0:8@16B24{?=qiIq}28o^@52",
+          "selector" : "semanticStylePropertiesFromData:fromVideo:keyTime:error:"
+        },
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "semanticStylePropertiesFromImageMetadata:error:"
+        },
+        {
+          "encoding" : "@56@0:8@16{?=qiIq}24o^@48",
+          "selector" : "semanticStylePropertiesFromVideoMetadata:keyTime:error:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "baseGain"
+        },
+        {
+          "encoding" : "d16@0:8",
+          "selector" : "baselineExposure"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "brightness"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "extendedStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "faceBasedGlobalExposureBoostRatio"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "globalToneCurveData"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "globalToneCurveUInt16Data"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isVideo"
+        },
+        {
+          "encoding" : "{?=qiIq}16@0:8",
+          "selector" : "keyTime"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "lightMapData"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "lightMapHeight"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "lightMapWidth"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearGain"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearHighKey"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearLightMapData"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearRangeMax"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearRangeMin"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "nu_updateDigest:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "revertUsingOriginal"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "sceneType"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setBaseGain:"
+        },
+        {
+          "encoding" : "v24@0:8d16",
+          "selector" : "setBaselineExposure:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setBrightness:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setExtendedStats:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setFaceBasedGlobalExposureBoostRatio:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setGlobalToneCurveData:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setGlobalToneCurveUInt16Data:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setIsVideo:"
+        },
+        {
+          "encoding" : "v40@0:8{?=qiIq}16",
+          "selector" : "setKeyTime:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLightMapData:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLightMapHeight:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLightMapWidth:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearGain:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearHighKey:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearLightMapData:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearRangeMax:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearRangeMin:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setRevertUsingOriginal:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setSceneType:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setStats:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setStyleData:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setStyleDataIsFloat16:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setSubjectRelightingValue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningType:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setVersion:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "stats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "styleData"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "styleDataIsFloat16"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "subjectRelightingValue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningType"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "version"
+        }
+      ],
+      "instance_size" : 216
+    },
+    {
+      "class" : "_NUTextureStylePersonInstanceProperties",
+      "class_methods" : [
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "personInstancePropertiesFromDictionary:error:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "instanceMaskReferenceKey"
+        },
+        {
+          "encoding" : "{?=qq}16@0:8",
+          "selector" : "maskSize"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "nu_updateDigest:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "opaquePersonInfo"
+        },
+        {
+          "encoding" : "I16@0:8",
+          "selector" : "pixelFormat"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setInstanceMaskReferenceKey:"
+        },
+        {
+          "encoding" : "v32@0:8{?=qq}16",
+          "selector" : "setMaskSize:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setOpaquePersonInfo:"
+        },
+        {
+          "encoding" : "v20@0:8I16",
+          "selector" : "setPixelFormat:"
+        }
+      ],
+      "instance_size" : 48
+    },
+    {
+      "class" : "_NUTextureStyleProperties",
+      "class_methods" : [
+        {
+          "encoding" : "@40@0:8@16@24o^@32",
+          "selector" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:"
+        },
+        {
+          "encoding" : "@40@0:8@16@24o^@32",
+          "selector" : "textureStyleVideoPropertiesFromTextureStyleData:faceInfoData:error:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "captureMode"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "captureType"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "filmGrainSeed"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "hardwareModel"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isVideo"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "nu_updateDigest:"
+        },
+        {
+          "encoding" : "Q16@0:8",
+          "selector" : "numberOfPersons"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "personInstances"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "portType"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCaptureMode:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setCaptureType:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setFilmGrainSeed:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setHardwareModel:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setIsVideo:"
+        },
+        {
+          "encoding" : "v24@0:8Q16",
+          "selector" : "setNumberOfPersons:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPersonInstances:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setPortType:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setVersion:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setVideoFacesInfoData:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setVideoOpaquePersonsInfo:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "version"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "videoFacesInfoData"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "videoOpaquePersonsInfo"
+        }
+      ],
+      "instance_size" : 96
+    },
+    {
+      "class" : "_PITextureStyleSettingsExpressionFunction",
+      "class_methods" : [
+
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "evaluateWithArguments:error:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "format"
+        }
+      ],
+      "instance_size" : 8
+    }
+  ],
+  "device" : "Apple Paravirtual device",
+  "frameworks" : [
+    {
+      "error" : "",
+      "loaded" : true,
+      "path" : "\/System\/Library\/PrivateFrameworks\/NeutrinoCore.framework\/NeutrinoCore"
+    },
+    {
+      "error" : "",
+      "loaded" : true,
+      "path" : "\/System\/Library\/PrivateFrameworks\/PhotoImaging.framework\/PhotoImaging"
+    },
+    {
+      "error" : "",
+      "loaded" : true,
+      "path" : "\/System\/Library\/PrivateFrameworks\/CMImaging.framework\/CMImaging"
+    },
+    {
+      "error" : "",
+      "loaded" : true,
+      "path" : "\/System\/Library\/PrivateFrameworks\/CMCapture.framework\/CMCapture"
+    }
+  ],
+  "os" : "Version 27.0.1 (Build 26A434)",
+  "patches_to_apple_implementations" : false,
+  "photos_used" : false,
+  "schema" : "xdremux-texture-runtime-v1"
+}

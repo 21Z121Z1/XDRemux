@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "scope": "Offline opaque Texture carrier transport/provenance refusal and persisted native text integrity only. Native ordinary Styles conversions fail; complete Texture generation, image eligibility, rendering and Photos activation are excluded.",
+  "checks": [
+    {
+      "name": "texture-provenance-and-transport-regression",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "xdremux-heif",
+        "--test",
+        "texture_transport"
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "name": "opaque-transport-functional",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "scripts/research/verify_texture_transport.py",
+        "--out",
+        "artifacts/texture-final-offline"
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "name": "native-evidence-tamper-path-truncation-and-raw-log-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "Tests.test_texture_native_evidence"
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "name": "persisted-actual-native-evidence-integrity",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "scripts/research/verify_texture_native_evidence.py"
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "name": "public-documentation-and-rust-apple-ownership",
+      "kind": "static",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "Tests.test_public_documentation",
+        "Tests.test_rust_apple_semantic_policy"
+      ],
+      "timeout_seconds": 120
+    }
+  ]
+}

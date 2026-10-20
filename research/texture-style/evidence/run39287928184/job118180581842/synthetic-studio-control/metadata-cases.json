@@ -1,0 +1,17 @@
+[
+  {
+    "case" : "synthetic-studio-control",
+    "input" : {
+      "CaptureMode" : "Still",
+      "CaptureType" : "LF",
+      "FilmGrainSeed" : 0,
+      "HardwareModel" : "iPhone19,2",
+      "PortType" : "PortTypeBack",
+      "Preset" : "Studio",
+      "TextureStylePeopleDataVersion" : 3
+    },
+    "input_sha256" : "0bd97948a22f84fe0556dd4909b0e666620599f568abb1fd67d262dd5f8fb096",
+    "scope" : "metadata-only diagnostic, never camera provenance or Photos admission",
+    "unsupported" : "textureStylePropertiesFromImageMetadata:auxImageMetadata:error:"
+  }
+]

@@ -1,0 +1,345 @@
+{
+  "schema": "xdremux-texture-native-consumer-summary-v1",
+  "run_id": 39289168902,
+  "head_sha": "acb572f425728963d0ee375327016c52ab069c10",
+  "job_ids": {
+    "macOS27": 118184997247,
+    "macOS26": 118184997708
+  },
+  "environment": {
+    "OS": "27.0.1",
+    "OS_build": "26A434",
+    "Xcode": "27.0",
+    "Xcode_build": "27A266a",
+    "SDK": "27.0",
+    "GPU": "Apple Paravirtual device"
+  },
+  "selector": "_NUTextureStyleProperties.textureStylePropertiesFromImageMetadata:auxImageMetadata:error:",
+  "encoding": "@40@0:8@16@24o^@32",
+  "cases": [
+    {
+      "case": "synthetic-standard-control",
+      "consumer_class_available": true,
+      "consumer_encoding": "@40@0:8@16@24o^@32",
+      "error": {},
+      "input": {
+        "CaptureMode": "Still",
+        "CaptureType": "LF",
+        "FilmGrainSeed": 0,
+        "HardwareModel": "iPhone19,2",
+        "PortType": "PortTypeBack",
+        "Preset": "Standard",
+        "TextureStylePeopleDataVersion": 3
+      },
+      "input_sha256": "f28bac185f7c081964905aac70e219e20cb1354ee855b86628c47ea6ae444d4e",
+      "native_consumer_called": true,
+      "native_returned_object": true,
+      "person_input_data": [],
+      "properties": {
+        "captureMode": "Still",
+        "captureType": "LF",
+        "class": "_NUTextureStyleProperties",
+        "filmGrainSeed": 0,
+        "hardwareModel": "iPhone19,2",
+        "numberOfPersons": 0,
+        "personInstances": [],
+        "portType": "PortTypeBack",
+        "version": {
+          "class": "NUVersion"
+        }
+      },
+      "scope": "metadata-only diagnostic, never camera provenance or Photos admission"
+    },
+    {
+      "case": "synthetic-studio-control",
+      "consumer_class_available": true,
+      "consumer_encoding": "@40@0:8@16@24o^@32",
+      "error": {},
+      "input": {
+        "CaptureMode": "Still",
+        "CaptureType": "LF",
+        "FilmGrainSeed": 0,
+        "HardwareModel": "iPhone19,2",
+        "PortType": "PortTypeBack",
+        "Preset": "Studio",
+        "TextureStylePeopleDataVersion": 3
+      },
+      "input_sha256": "39c4f3296fb6ee03076f775a6c04b46b1332dab846928e6bc823455311775f8c",
+      "native_consumer_called": true,
+      "native_returned_object": true,
+      "person_input_data": [],
+      "properties": {
+        "captureMode": "Still",
+        "captureType": "LF",
+        "class": "_NUTextureStyleProperties",
+        "filmGrainSeed": 0,
+        "hardwareModel": "iPhone19,2",
+        "numberOfPersons": 0,
+        "personInstances": [],
+        "portType": "PortTypeBack",
+        "version": {
+          "class": "NUVersion"
+        }
+      },
+      "scope": "metadata-only diagnostic, never camera provenance or Photos admission"
+    },
+    {
+      "case": "missing-hardware",
+      "consumer_class_available": true,
+      "consumer_encoding": "@40@0:8@16@24o^@32",
+      "error": {},
+      "input": {
+        "CaptureMode": "Still",
+        "CaptureType": "LF",
+        "FilmGrainSeed": 0,
+        "PortType": "PortTypeBack",
+        "Preset": "Standard",
+        "TextureStylePeopleDataVersion": 3
+      },
+      "input_sha256": "a07f8669cb4e56efa7e6b2c5f8822b52620d69da890385082f5e0fac4c2d6643",
+      "native_consumer_called": true,
+      "native_returned_object": true,
+      "person_input_data": [],
+      "properties": {
+        "captureMode": "Still",
+        "captureType": "LF",
+        "class": "_NUTextureStyleProperties",
+        "filmGrainSeed": 0,
+        "numberOfPersons": 0,
+        "personInstances": [],
+        "portType": "PortTypeBack",
+        "version": {
+          "class": "NUVersion"
+        }
+      },
+      "scope": "metadata-only diagnostic, never camera provenance or Photos admission"
+    },
+    {
+      "case": "unsupported-version",
+      "consumer_class_available": true,
+      "consumer_encoding": "@40@0:8@16@24o^@32",
+      "error": {},
+      "input": {
+        "CaptureMode": "Still",
+        "CaptureType": "LF",
+        "FilmGrainSeed": 0,
+        "HardwareModel": "iPhone19,2",
+        "PortType": "PortTypeBack",
+        "Preset": "Standard",
+        "TextureStylePeopleDataVersion": 999
+      },
+      "input_sha256": "a22168ec7e314a25f80a1bc8e81b916e89e1f2eb3af863135fe53b60e84c2563",
+      "native_consumer_called": true,
+      "native_returned_object": true,
+      "person_input_data": [],
+      "properties": {
+        "captureMode": "Still",
+        "captureType": "LF",
+        "class": "_NUTextureStyleProperties",
+        "filmGrainSeed": 0,
+        "hardwareModel": "iPhone19,2",
+        "numberOfPersons": 0,
+        "personInstances": [],
+        "portType": "PortTypeBack",
+        "version": {
+          "class": "NUVersion"
+        }
+      },
+      "scope": "metadata-only diagnostic, never camera provenance or Photos admission"
+    },
+    {
+      "case": "empty-dictionary",
+      "consumer_class_available": true,
+      "consumer_encoding": "@40@0:8@16@24o^@32",
+      "error": {
+        "code": 3,
+        "description": "The operation couldn’t be completed. (NUError error 3.)",
+        "domain": "NUError"
+      },
+      "input": {},
+      "input_sha256": "9261ecceda608ef174256e5fdc774c1e6e3dcf533409c1bc393d490d01c713f1",
+      "native_consumer_called": true,
+      "native_returned_object": false,
+      "properties": null,
+      "scope": "metadata-only diagnostic, never camera provenance or Photos admission"
+    }
+  ],
+  "native_settings_factory_objects": 30,
+  "settings_have_no_image_input": true,
+  "native_effect_configuration": {
+    "bloomConfiguration": {
+      "class": "PITextureStyleUsageInputConfiguration",
+      "optionalChannelNames": [],
+      "requiredChannelNames": [],
+      "requiresPersonData": false
+    },
+    "diffusionConfiguration": {
+      "class": "PITextureStyleUsageInputConfiguration",
+      "optionalChannelNames": [
+        "skinMatteV2",
+        "personMatte"
+      ],
+      "requiredChannelNames": [],
+      "requiresPersonData": false
+    },
+    "filmGrainConfiguration": {
+      "class": "PITextureStyleUsageInputConfiguration",
+      "optionalChannelNames": [
+        "personMatte",
+        "skinMatteV2",
+        "skyMatte",
+        "semanticStyleCast",
+        "semanticStyleColor"
+      ],
+      "requiredChannelNames": [],
+      "requiresPersonData": false
+    },
+    "Filmic": {
+      "grain": 1,
+      "intensity": 1,
+      "preset": "Filmic"
+    },
+    "glowConfiguration": {
+      "class": "PITextureStyleUsageInputConfiguration",
+      "optionalChannelNames": [],
+      "requiredChannelNames": [
+        "personMatte",
+        "linearThumbnail",
+        "semanticStyleCast",
+        "semanticStyleColor"
+      ],
+      "requiresPersonData": false
+    },
+    "Glowy": {
+      "grain": 1,
+      "intensity": 1,
+      "preset": "Glowy"
+    },
+    "halationConfiguration": {
+      "class": "PITextureStyleUsageInputConfiguration",
+      "optionalChannelNames": [
+        "skinMatteV2",
+        "personMatte",
+        "semanticStyleCast",
+        "semanticStyleColor"
+      ],
+      "requiredChannelNames": [],
+      "requiresPersonData": false
+    },
+    "inputNames": [
+      "skinMatteV2",
+      "hairMatte",
+      "glassesMatteV2",
+      "earsMatte",
+      "faceSkinMatte",
+      "noseMatte",
+      "teethMatteV2",
+      "eyebrowsMatte",
+      "nonFaceSkinMatte",
+      "lipsMatte",
+      "handsMatte",
+      "personMatte",
+      "tattooMatte"
+    ],
+    "isAvailable": true,
+    "isAvailableForTesting": true,
+    "personMetadataFormatVersion": 3,
+    "processorAPIVersion": 20260507,
+    "Soft": {
+      "grain": 0,
+      "intensity": 0.5,
+      "preset": "Soft"
+    },
+    "Standard": {
+      "grain": 0,
+      "intensity": 1,
+      "preset": "Standard"
+    },
+    "Studio": {
+      "grain": 0,
+      "intensity": 0.8799999952316284,
+      "preset": "Studio"
+    },
+    "testing_override_used": false
+  },
+  "numeric_effect_configurations": [
+    {
+      "configuration": {
+        "class": "PITextureStyleUsageInputConfiguration",
+        "optionalChannelNames": [
+          "hairMatte",
+          "lipsMatte",
+          "earsMatte",
+          "tattooMatte",
+          "glassesMatteV2",
+          "noseMatte"
+        ],
+        "requiredChannelNames": [
+          "faceSkinMatte",
+          "personInstances"
+        ],
+        "requiresPersonData": true
+      },
+      "effect_type": 1,
+      "is_video": false,
+      "selector": "inputConfigurationForEffectType:isVideo:"
+    },
+    {
+      "configuration": {
+        "class": "PITextureStyleUsageInputConfiguration",
+        "optionalChannelNames": [
+          "nonFaceSkinMatte",
+          "lipsMatte",
+          "hairMatte",
+          "handsMatte",
+          "tattooMatte",
+          "earsMatte",
+          "faceSkinMatte",
+          "teethMatteV2",
+          "eyebrowsMatte",
+          "glassesMatteV2",
+          "personMatte"
+        ],
+        "requiredChannelNames": [
+          "skinMatteV2",
+          "personInstances"
+        ],
+        "requiresPersonData": true
+      },
+      "effect_type": 2,
+      "is_video": false,
+      "selector": "inputConfigurationForEffectType:isVideo:"
+    },
+    {
+      "configuration": {
+        "class": "PITextureStyleUsageInputConfiguration",
+        "optionalChannelNames": [
+          "glassesMatteV2",
+          "earsMatte",
+          "noseMatte",
+          "lipsMatte",
+          "tattooMatte"
+        ],
+        "requiredChannelNames": [
+          "skinMatteV2",
+          "faceSkinMatte",
+          "personInstances"
+        ],
+        "requiresPersonData": true
+      },
+      "effect_type": 3,
+      "is_video": false,
+      "selector": "inputConfigurationForEffectType:isVideo:"
+    }
+  ],
+  "later_metadata_field_controls": {
+    "run_id": 39293075204,
+    "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+    "job_id": 118201352920,
+    "note": "same field controls; per-process binary plist hashes are separately recorded, not assumed deterministic"
+  },
+  "full_image_eligibility": false,
+  "original_capture_information_recomputed": false,
+  "Photos_activation": false,
+  "ZIP_bytes_verified": false
+}

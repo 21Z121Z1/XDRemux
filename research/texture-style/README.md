@@ -8,6 +8,10 @@ This is the canonical research line for iOS 27 Texture Style work.
 - This directory and `scripts/research/` keep reusable contracts, validators, and probes for unresolved questions.
 - Historical experiment branches can provide provenance, but one-off workflows do not belong in the canonical working tree.
 
+## Native observations (2026-10-20)
+
+The dedicated PSR branch executed the real Texture metadata parser, settings factories, effect input queries and native Bloom render attempts. Metadata controls parse on macOS27, but all tested renders abort. Whole-image Texture eligibility and iPhone Photos editing remain unverified. Twelve native generated-image codec cases pass; four ordinary Styles product conversions fail before assembly. The current report separates these outcomes. Run `python3 scripts/research/verify_texture_native_evidence.py` to recheck147 native JSON payloads against persisted real runner logs and manifests; it does not reexecute Apple or verify ZIP bytes.
+
 ## Audited baseline blockers (2026-10-19)
 
 The audited baseline `f8fcf2067c506e87665e9ea113324db1a57d4cf7` contained three admission probes that were not valid product facts.

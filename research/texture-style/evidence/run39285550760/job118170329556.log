@@ -1,0 +1,326 @@
+﻿2026-10-19T16:27:25.4645070Z Current runner version: '2.337.0'
+2026-10-19T16:27:25.4659890Z ##[group]Runner Image Provisioner
+2026-10-19T16:27:25.4660410Z Hosted Compute Agent
+2026-10-19T16:27:25.4660840Z Version: 20261006.597
+2026-10-19T16:27:25.4661340Z Commit: c696a59e4a9ffbc6a6203385bd1b2a10e87b1c9c
+2026-10-19T16:27:25.4661890Z Build Date: 2026-10-06T21:39:28Z
+2026-10-19T16:27:25.4662440Z Worker ID: {50a39bac-63cb-4c4f-936d-45486212d40f}
+2026-10-19T16:27:25.4662910Z Region: westus
+2026-10-19T16:27:25.4663320Z Cloud: MacCloud
+2026-10-19T16:27:25.4663690Z ##[endgroup]
+2026-10-19T16:27:25.4664600Z ##[group]Operating System
+2026-10-19T16:27:25.4665000Z macOS
+2026-10-19T16:27:25.4665370Z 27.0.1
+2026-10-19T16:27:25.4665750Z 26A434
+2026-10-19T16:27:25.4666090Z ##[endgroup]
+2026-10-19T16:27:25.4666600Z ##[group]Runner Image
+2026-10-19T16:27:25.4667030Z Image: xcode-27-arm64
+2026-10-19T16:27:25.4667400Z Version: 20261012.0260.1
+2026-10-19T16:27:25.4668290Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261012.0260/images/macos/xcode-27-arm64-Readme.md
+2026-10-19T16:27:25.4669400Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261012.0260
+2026-10-19T16:27:25.4670270Z ##[endgroup]
+2026-10-19T16:27:25.4671040Z ##[group]GITHUB_TOKEN Permissions
+2026-10-19T16:27:25.4672260Z Contents: read
+2026-10-19T16:27:25.4672630Z Metadata: read
+2026-10-19T16:27:25.4673050Z ##[endgroup]
+2026-10-19T16:27:25.4674730Z Secret source: Actions
+2026-10-19T16:27:25.4675420Z Cache mode: write
+2026-10-19T16:27:25.4676010Z Prepare workflow directory
+2026-10-19T16:27:25.4907970Z Prepare all required actions
+2026-10-19T16:27:25.4948030Z Getting action download info
+2026-10-19T16:27:25.6224700Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-19T16:27:25.9170390Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-10-19T16:27:26.1641240Z Complete job name: native (xcode-27)
+2026-10-19T16:27:26.2166360Z ##[group]Run actions/checkout@v4
+2026-10-19T16:27:26.2166980Z with:
+2026-10-19T16:27:26.2167360Z   sparse-checkout: research/xdremux-texture-native
+2026-10-19T16:27:26.2167820Z   persist-credentials: false
+2026-10-19T16:27:26.2168240Z   repository: 21Z121Z1/Photographic_Style_Research
+2026-10-19T16:27:26.2170920Z   token: ***
+2026-10-19T16:27:26.2171230Z   ssh-strict: true
+2026-10-19T16:27:26.2171560Z   ssh-user: git
+2026-10-19T16:27:26.2171880Z   clean: true
+2026-10-19T16:27:26.2172210Z   sparse-checkout-cone-mode: true
+2026-10-19T16:27:26.2172590Z   fetch-depth: 1
+2026-10-19T16:27:26.2172920Z   fetch-tags: false
+2026-10-19T16:27:26.2173240Z   show-progress: true
+2026-10-19T16:27:26.2173570Z   lfs: false
+2026-10-19T16:27:26.2173880Z   submodules: false
+2026-10-19T16:27:26.2174400Z   set-safe-directory: true
+2026-10-19T16:27:26.2174810Z   allow-unsafe-pr-checkout: false
+2026-10-19T16:27:26.2175330Z ##[endgroup]
+2026-10-19T16:27:26.4173880Z Syncing repository: 21Z121Z1/Photographic_Style_Research
+2026-10-19T16:27:26.4175510Z ##[group]Getting Git version info
+2026-10-19T16:27:26.4176290Z Working directory is '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research'
+2026-10-19T16:27:26.4177370Z [command]/opt/homebrew/bin/git version
+2026-10-19T16:27:26.5038870Z git version 2.56.0
+2026-10-19T16:27:26.5056360Z ##[endgroup]
+2026-10-19T16:27:26.5066040Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/d805e602-a5bf-473f-9577-b231a792518c/.gitconfig'
+2026-10-19T16:27:26.5071260Z Temporarily overriding HOME='/Users/runner/work/_temp/d805e602-a5bf-473f-9577-b231a792518c' before making global git config changes
+2026-10-19T16:27:26.5072410Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T16:27:26.5077470Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:27:26.5299590Z Deleting the contents of '/Users/runner/work/Photographic_Style_Research/Photographic_Style_Research'
+2026-10-19T16:27:26.5308970Z ##[group]Initializing the repository
+2026-10-19T16:27:26.5318030Z [command]/opt/homebrew/bin/git init /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:27:26.6460570Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-19T16:27:26.6562470Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-19T16:27:26.6664400Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-19T16:27:26.6766060Z hint: call:
+2026-10-19T16:27:26.6914510Z hint:
+2026-10-19T16:27:26.7013780Z hint: 	git config --global init.defaultBranch <name>
+2026-10-19T16:27:26.7141900Z hint:
+2026-10-19T16:27:26.7183390Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-19T16:27:26.7190560Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-19T16:27:26.7201560Z hint:
+2026-10-19T16:27:26.7202120Z hint: 	git branch -m <name>
+2026-10-19T16:27:26.7203510Z hint:
+2026-10-19T16:27:26.7204200Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-19T16:27:26.7205560Z Initialized empty Git repository in /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research/.git/
+2026-10-19T16:27:26.7207770Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-19T16:27:26.7209540Z ##[endgroup]
+2026-10-19T16:27:26.7210190Z ##[group]Disabling automatic garbage collection
+2026-10-19T16:27:26.7210770Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-19T16:27:26.7212260Z ##[endgroup]
+2026-10-19T16:27:26.7212930Z ##[group]Setting up auth
+2026-10-19T16:27:26.7220980Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T16:27:26.7224800Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T16:27:26.8951000Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T16:27:26.9021430Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T16:27:26.9974190Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T16:27:27.0111730Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T16:27:27.2731120Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-19T16:27:27.2855750Z ##[endgroup]
+2026-10-19T16:27:27.2857130Z ##[group]Fetching the repository
+2026-10-19T16:27:27.2876340Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --filter=blob:none --depth=1 origin +4857d1a3fc4871297b29a1313468fd677fb278a7:refs/remotes/origin/research/xdremux-texture-native-20261019
+2026-10-19T16:27:27.8949550Z From https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-19T16:27:27.8952320Z  * [new ref]         4857d1a3fc4871297b29a1313468fd677fb278a7 -> origin/research/xdremux-texture-native-20261019
+2026-10-19T16:27:27.8958970Z ##[endgroup]
+2026-10-19T16:27:27.8959710Z ##[group]Determining the checkout info
+2026-10-19T16:27:27.8962670Z ##[endgroup]
+2026-10-19T16:27:27.8963340Z ##[group]Setting up sparse checkout
+2026-10-19T16:27:27.8964080Z [command]/opt/homebrew/bin/git sparse-checkout set research/xdremux-texture-native
+2026-10-19T16:27:27.9041760Z ##[endgroup]
+2026-10-19T16:27:27.9042390Z ##[group]Checking out the ref
+2026-10-19T16:27:27.9044520Z [command]/opt/homebrew/bin/git checkout --progress --force -B research/xdremux-texture-native-20261019 refs/remotes/origin/research/xdremux-texture-native-20261019
+2026-10-19T16:27:28.3600630Z Switched to a new branch 'research/xdremux-texture-native-20261019'
+2026-10-19T16:27:28.3604690Z branch 'research/xdremux-texture-native-20261019' set up to track 'origin/research/xdremux-texture-native-20261019'.
+2026-10-19T16:27:28.3610580Z ##[endgroup]
+2026-10-19T16:27:28.3785630Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-19T16:27:28.3856490Z 4857d1a3fc4871297b29a1313468fd677fb278a7
+2026-10-19T16:27:28.4006490Z ##[group]Removing auth
+2026-10-19T16:27:28.4025110Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T16:27:28.4060130Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T16:27:28.4922210Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T16:27:28.4990950Z http.https://github.com/.extraheader
+2026-10-19T16:27:28.4997690Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-19T16:27:28.5121360Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T16:27:28.6532180Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T16:27:28.6624230Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T16:27:28.7690410Z ##[endgroup]
+2026-10-19T16:27:28.7848830Z ##[group]Run set -euo pipefail
+2026-10-19T16:27:28.7849380Z [36;1mset -euo pipefail[0m
+2026-10-19T16:27:28.7849660Z [36;1mmkdir -p evidence[0m
+2026-10-19T16:27:28.7849960Z [36;1mtest "$(git rev-parse HEAD)" = "$GITHUB_SHA"[0m
+2026-10-19T16:27:28.7850300Z [36;1msw_vers | tee evidence/os.txt[0m
+2026-10-19T16:27:28.7850570Z [36;1mxcodebuild -version | tee evidence/xcode.txt[0m
+2026-10-19T16:27:28.7850970Z [36;1mxcrun --sdk macosx --show-sdk-version | tee evidence/sdk.txt[0m
+2026-10-19T16:27:28.7851330Z [36;1mxcrun swiftc --version | tee evidence/swift.txt[0m
+2026-10-19T16:27:28.7851640Z [36;1mgit rev-parse HEAD | tee evidence/head.txt[0m
+2026-10-19T16:27:28.7852040Z [36;1mxcrun swiftc -swift-version 5 research/xdremux-texture-native/native_probe.swift \[0m
+2026-10-19T16:27:28.7852600Z [36;1m  -framework Foundation -framework CoreImage -framework ImageIO -framework Metal \[0m
+2026-10-19T16:27:28.7853220Z [36;1m  -o "$RUNNER_TEMP/xdremux-texture-native-probe" 2>&1 | tee evidence/build.log[0m
+2026-10-19T16:27:28.7912490Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T16:27:28.7912820Z ##[endgroup]
+2026-10-19T16:27:28.8534550Z ProductName:		macOS
+2026-10-19T16:27:28.8542980Z ProductVersion:		27.0.1
+2026-10-19T16:27:28.8543450Z BuildVersion:		26A434
+2026-10-19T16:27:29.3215020Z Xcode 27.0
+2026-10-19T16:27:29.3224970Z Build version 27A266a
+2026-10-19T16:27:31.8036960Z 27.0
+2026-10-19T16:27:33.0784440Z Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+2026-10-19T16:27:33.0784920Z Target: arm64-apple-macosx27.0.0
+2026-10-19T16:27:33.1123360Z 4857d1a3fc4871297b29a1313468fd677fb278a7
+2026-10-19T16:27:37.2892630Z swift-driver version: 1.168.6 
+2026-10-19T16:27:37.2968460Z ##[group]Run set -euo pipefail
+2026-10-19T16:27:37.2968820Z [36;1mset -euo pipefail[0m
+2026-10-19T16:27:37.2969380Z [36;1mpython3 research/xdremux-texture-native/run_metadata_matrix.py \[0m
+2026-10-19T16:27:37.2969930Z [36;1m  "$RUNNER_TEMP/xdremux-texture-native-probe" evidence/metadata 2>&1 | tee evidence/probe.log[0m
+2026-10-19T16:27:37.3010510Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T16:27:37.3010740Z ##[endgroup]
+2026-10-19T16:27:37.4840630Z NATIVE_PROCESS_BEGIN inventory
+2026-10-19T16:27:37.8563710Z NATIVE_PROCESS_END inventory exit_code=-5
+2026-10-19T16:27:37.8564510Z NATIVE_PROCESS_BEGIN synthetic-standard-control
+2026-10-19T16:27:37.8878420Z NATIVE_PROCESS_END synthetic-standard-control exit_code=-5
+2026-10-19T16:27:37.8951330Z NATIVE_PROCESS_BEGIN synthetic-studio-control
+2026-10-19T16:27:38.0435440Z NATIVE_PROCESS_END synthetic-studio-control exit_code=-5
+2026-10-19T16:27:38.1096720Z NATIVE_PROCESS_BEGIN missing-hardware
+2026-10-19T16:27:39.0620060Z NATIVE_PROCESS_END missing-hardware exit_code=-5
+2026-10-19T16:27:39.2735360Z NATIVE_PROCESS_BEGIN unsupported-version
+2026-10-19T16:27:40.0940780Z NATIVE_PROCESS_END unsupported-version exit_code=-5
+2026-10-19T16:27:40.1142610Z NATIVE_PROCESS_BEGIN empty-dictionary
+2026-10-19T16:27:40.2446810Z NATIVE_PROCESS_END empty-dictionary exit_code=-5
+2026-10-19T16:27:40.2556700Z NATIVE_PROBE_PROCESS_FAILED: see explicit per-case exits
+2026-10-19T16:27:40.2646620Z ##[error]Process completed with exit code 1.
+2026-10-19T16:27:40.3267850Z ##[group]Run python3 - <<'PY'
+2026-10-19T16:27:40.3268200Z [36;1mpython3 - <<'PY'[0m
+2026-10-19T16:27:40.3268540Z [36;1mimport hashlib,json,os,pathlib[0m
+2026-10-19T16:27:40.3268930Z [36;1mp=pathlib.Path('evidence');p.mkdir(exist_ok=True)[0m
+2026-10-19T16:27:40.3269400Z [36;1mrows=[][0m
+2026-10-19T16:27:40.3269680Z [36;1mfor f in sorted(p.rglob('*')):[0m
+2026-10-19T16:27:40.3270050Z [36;1m    if not f.is_file():continue[0m
+2026-10-19T16:27:40.3270400Z [36;1m    assert f.suffix in {'.json','.txt','.log'}[0m
+2026-10-19T16:27:40.3271200Z [36;1m    rows.append({'path':str(f.relative_to(p)),'size':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()})[0m
+2026-10-19T16:27:40.3272020Z [36;1mmanifest={'head_sha':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'photos_used':False,'files':rows}[0m
+2026-10-19T16:27:40.3272600Z [36;1m(p/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')[0m
+2026-10-19T16:27:40.3274010Z [36;1mprint('TEXTURE_JSON_BEGIN manifest.json');print(json.dumps(manifest,indent=2));print('TEXTURE_JSON_END manifest.json')[0m
+2026-10-19T16:27:40.3274790Z [36;1mPY[0m
+2026-10-19T16:27:40.3361590Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-19T16:27:40.3362060Z ##[endgroup]
+2026-10-19T16:27:44.6970120Z TEXTURE_JSON_BEGIN manifest.json
+2026-10-19T16:27:44.7077060Z {
+2026-10-19T16:27:44.7187600Z   "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+2026-10-19T16:27:44.7743640Z   "run_id": "39285550760",
+2026-10-19T16:27:44.7851300Z   "photos_used": false,
+2026-10-19T16:27:44.8209900Z   "files": [
+2026-10-19T16:27:44.8362150Z     {
+2026-10-19T16:27:44.8465240Z       "path": "build.log",
+2026-10-19T16:27:44.8913840Z       "size": 0,
+2026-10-19T16:27:44.8915360Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:44.9273150Z     },
+2026-10-19T16:27:44.9399650Z     {
+2026-10-19T16:27:44.9559450Z       "path": "head.txt",
+2026-10-19T16:27:44.9748920Z       "size": 41,
+2026-10-19T16:27:44.9873000Z       "sha256": "0a6c1d4a203da08210311a37422b4a6fc569e88616592f22c83ea349b033e547"
+2026-10-19T16:27:45.0043260Z     },
+2026-10-19T16:27:45.0212040Z     {
+2026-10-19T16:27:45.0313780Z       "path": "metadata/empty-dictionary.stderr.log",
+2026-10-19T16:27:45.0415160Z       "size": 0,
+2026-10-19T16:27:45.0696170Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.0800950Z     },
+2026-10-19T16:27:45.0927940Z     {
+2026-10-19T16:27:45.1093530Z       "path": "metadata/empty-dictionary.stdout.log",
+2026-10-19T16:27:45.1224080Z       "size": 0,
+2026-10-19T16:27:45.1340870Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.1396420Z     },
+2026-10-19T16:27:45.1397190Z     {
+2026-10-19T16:27:45.1398010Z       "path": "metadata/inventory.stderr.log",
+2026-10-19T16:27:45.1398770Z       "size": 0,
+2026-10-19T16:27:45.1399640Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.1401440Z     },
+2026-10-19T16:27:45.1401970Z     {
+2026-10-19T16:27:45.1402630Z       "path": "metadata/inventory.stdout.log",
+2026-10-19T16:27:45.1403460Z       "size": 0,
+2026-10-19T16:27:45.1404210Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.1404950Z     },
+2026-10-19T16:27:45.1405360Z     {
+2026-10-19T16:27:45.1405800Z       "path": "metadata/missing-hardware.stderr.log",
+2026-10-19T16:27:45.1406250Z       "size": 0,
+2026-10-19T16:27:45.1407340Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.1408180Z     },
+2026-10-19T16:27:45.1408730Z     {
+2026-10-19T16:27:45.1409450Z       "path": "metadata/missing-hardware.stdout.log",
+2026-10-19T16:27:45.1410150Z       "size": 0,
+2026-10-19T16:27:45.1410600Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.1411170Z     },
+2026-10-19T16:27:45.1412300Z     {
+2026-10-19T16:27:45.1412830Z       "path": "metadata/process-results.json",
+2026-10-19T16:27:45.1413310Z       "size": 1429,
+2026-10-19T16:27:45.1413870Z       "sha256": "1ea2076295bc803e227443d11b63f804e7cc9605148aa4b2b19809b758282e0a"
+2026-10-19T16:27:45.1414480Z     },
+2026-10-19T16:27:45.1415230Z     {
+2026-10-19T16:27:45.1537050Z       "path": "metadata/synthetic-standard-control.stderr.log",
+2026-10-19T16:27:45.1824130Z       "size": 0,
+2026-10-19T16:27:45.1931480Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.2157020Z     },
+2026-10-19T16:27:45.2288040Z     {
+2026-10-19T16:27:45.2591890Z       "path": "metadata/synthetic-standard-control.stdout.log",
+2026-10-19T16:27:45.2830060Z       "size": 0,
+2026-10-19T16:27:45.2952010Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.3174540Z     },
+2026-10-19T16:27:45.3287700Z     {
+2026-10-19T16:27:45.3512700Z       "path": "metadata/synthetic-studio-control.stderr.log",
+2026-10-19T16:27:45.3634200Z       "size": 0,
+2026-10-19T16:27:45.3867730Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.3987810Z     },
+2026-10-19T16:27:45.3993860Z     {
+2026-10-19T16:27:45.3994350Z       "path": "metadata/synthetic-studio-control.stdout.log",
+2026-10-19T16:27:45.3994940Z       "size": 0,
+2026-10-19T16:27:45.3995340Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.3995880Z     },
+2026-10-19T16:27:45.3996240Z     {
+2026-10-19T16:27:45.3996620Z       "path": "metadata/unsupported-version.stderr.log",
+2026-10-19T16:27:45.3997030Z       "size": 0,
+2026-10-19T16:27:45.4001620Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.4003020Z     },
+2026-10-19T16:27:45.4003790Z     {
+2026-10-19T16:27:45.4004510Z       "path": "metadata/unsupported-version.stdout.log",
+2026-10-19T16:27:45.4005340Z       "size": 0,
+2026-10-19T16:27:45.4162910Z       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+2026-10-19T16:27:45.4163380Z     },
+2026-10-19T16:27:45.4163510Z     {
+2026-10-19T16:27:45.4163710Z       "path": "os.txt",
+2026-10-19T16:27:45.4164650Z       "size": 66,
+2026-10-19T16:27:45.4164980Z       "sha256": "4ef10a0fc370704ea84699cf3851e51488598c5f1ab35cb572eb6b96278a8e5c"
+2026-10-19T16:27:45.4240450Z     },
+2026-10-19T16:27:45.4345580Z     {
+2026-10-19T16:27:45.4451240Z       "path": "probe.log",
+2026-10-19T16:27:45.4615870Z       "size": 607,
+2026-10-19T16:27:45.4722070Z       "sha256": "f8a50cedc6b1167646be18095cb9aeb81a31a6610ae119481411afde59603043"
+2026-10-19T16:27:45.4829440Z     },
+2026-10-19T16:27:45.4930810Z     {
+2026-10-19T16:27:45.5034680Z       "path": "sdk.txt",
+2026-10-19T16:27:45.5158930Z       "size": 5,
+2026-10-19T16:27:45.5260260Z       "sha256": "7b01c549928398a045692f24bcac7803b348524cdd76f21265b02984b2ba556a"
+2026-10-19T16:27:45.5361770Z     },
+2026-10-19T16:27:45.5473780Z     {
+2026-10-19T16:27:45.5574960Z       "path": "swift.txt",
+2026-10-19T16:27:45.5676460Z       "size": 98,
+2026-10-19T16:27:45.6467520Z       "sha256": "04630ab8fa201f57c63c59730e638135e32584a97e16e004a417eb8ed283dc83"
+2026-10-19T16:27:45.7237500Z     },
+2026-10-19T16:27:45.7340720Z     {
+2026-10-19T16:27:45.7442050Z       "path": "xcode.txt",
+2026-10-19T16:27:45.7544130Z       "size": 33,
+2026-10-19T16:27:45.7735410Z       "sha256": "694b44731d0b415c5b11d844151e466d7f5e200a95627efda377f232f1a6ab77"
+2026-10-19T16:27:45.8643720Z     }
+2026-10-19T16:27:45.9557250Z   ]
+2026-10-19T16:27:46.0503570Z }
+2026-10-19T16:27:46.1416040Z TEXTURE_JSON_END manifest.json
+2026-10-19T16:27:46.3539250Z ##[group]Run actions/upload-artifact@v4
+2026-10-19T16:27:46.3539540Z with:
+2026-10-19T16:27:46.3539770Z   name: xdremux-texture-native-text-xcode-27
+2026-10-19T16:27:46.3540100Z   path: evidence/
+2026-10-19T16:27:46.3541560Z   retention-days: 1
+2026-10-19T16:27:46.3541760Z   if-no-files-found: warn
+2026-10-19T16:27:46.3542100Z   compression-level: 6
+2026-10-19T16:27:46.3758900Z   overwrite: false
+2026-10-19T16:27:46.3792330Z   include-hidden-files: false
+2026-10-19T16:27:46.3792680Z ##[endgroup]
+2026-10-19T16:27:54.4663910Z (node:19274) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-10-19T16:27:54.4675730Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-10-19T16:27:54.4796010Z With the provided path, there will be 21 files uploaded
+2026-10-19T16:27:54.4796940Z Artifact name is valid!
+2026-10-19T16:27:54.4797530Z Root directory input is valid!
+2026-10-19T16:27:54.7577450Z Beginning upload of artifact content to blob storage
+2026-10-19T16:27:54.7638490Z (node:19274) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-10-19T16:27:54.7974620Z Uploaded bytes 4463
+2026-10-19T16:27:54.8184050Z Finished uploading artifact content to blob storage!
+2026-10-19T16:27:54.8184940Z SHA256 digest of uploaded artifact zip is a1c477036e7ef204869b7df03c14095ec3cddd6692401ed11589d6241b90f435
+2026-10-19T16:27:54.8185750Z Finalizing artifact upload
+2026-10-19T16:27:55.0807540Z Artifact xdremux-texture-native-text-xcode-27.zip successfully finalized. Artifact ID 12201239658
+2026-10-19T16:27:55.0823340Z Artifact xdremux-texture-native-text-xcode-27 has been successfully uploaded! Final size is 4463 bytes. Artifact ID is 12201239658
+2026-10-19T16:27:55.0828830Z Artifact download URL: https://github.com/21Z121Z1/Photographic_Style_Research/actions/runs/39285550760/artifacts/12201239658
+2026-10-19T16:27:55.1078290Z Post job cleanup.
+2026-10-19T16:27:55.2652140Z [command]/opt/homebrew/bin/git version
+2026-10-19T16:27:55.2879320Z git version 2.56.0
+2026-10-19T16:27:55.2901210Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/714f598f-3667-4513-aeba-253ccaac4a24/.gitconfig'
+2026-10-19T16:27:55.2908510Z Temporarily overriding HOME='/Users/runner/work/_temp/714f598f-3667-4513-aeba-253ccaac4a24' before making global git config changes
+2026-10-19T16:27:55.2909450Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-19T16:27:55.2912560Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/Photographic_Style_Research/Photographic_Style_Research
+2026-10-19T16:27:55.3040720Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-19T16:27:55.3121890Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-19T16:27:55.4498190Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-19T16:27:55.4578970Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-19T16:27:55.5849760Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-19T16:27:55.6152140Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-19T16:27:55.7928520Z Cleaning up orphan processes
+2026-10-19T16:27:56.6672730Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

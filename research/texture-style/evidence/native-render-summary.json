@@ -1,0 +1,115 @@
+{
+  "schema": "xdremux-texture-native-render-summary-v1",
+  "raw_input_sha256": "0df50938ed0aade93fcc56d138cd6ba310677d8bb9564072dfc5280821ae9572",
+  "input_domain": "analytical extended linear Display P3; private internal domain not established",
+  "rounds": [
+    {
+      "run_id": 39290912880,
+      "job_id": 118191006492,
+      "head_sha": "00f7b5eb1d496c7b0b8b69ff3e80290aa3a29bcb",
+      "matrix": {
+        "scope": "single original native Bloom CI processor and controlled tuning context only; no full producer or Photos admission",
+        "photos_used": false,
+        "original_capture_information": false,
+        "linear_thumbnail_resource_created": false,
+        "semantic_auxiliary_roles_synthesized": false,
+        "apple_implementations_patched": false,
+        "rows": [
+          {
+            "intensity": 0,
+            "native_process_exit": -6,
+            "render_completed": false
+          },
+          {
+            "intensity": 0.5,
+            "native_process_exit": -6,
+            "render_completed": false
+          },
+          {
+            "intensity": 1,
+            "native_process_exit": -6,
+            "render_completed": false
+          }
+        ]
+      }
+    },
+    {
+      "run_id": 39292067603,
+      "job_id": 118195004044,
+      "head_sha": "098430d4f20d832b1a1a9ccda0b066bde0748490",
+      "matrix": {
+        "scope": "single original native Bloom CI processor and controlled tuning context only; no full producer or Photos admission",
+        "photos_used": false,
+        "original_capture_information": false,
+        "linear_thumbnail_resource_created": false,
+        "semantic_auxiliary_roles_synthesized": false,
+        "apple_implementations_patched": false,
+        "rows": [
+          {
+            "intensity": 0,
+            "native_process_exit": -6,
+            "render_completed": false
+          },
+          {
+            "intensity": 0.5,
+            "native_process_exit": -6,
+            "render_completed": false
+          },
+          {
+            "intensity": 1,
+            "native_process_exit": -6,
+            "render_completed": false
+          }
+        ]
+      }
+    },
+    {
+      "run_id": 39293075204,
+      "job_id": 118201351937,
+      "head_sha": "84f2c8309c5d778d911148aacbeaae3aff3bdd4f",
+      "matrix": {
+        "scope": "single original native Bloom CI processor and controlled tuning context only; no full producer or Photos admission",
+        "photos_used": false,
+        "original_capture_information": false,
+        "linear_thumbnail_resource_created": false,
+        "semantic_auxiliary_roles_synthesized": false,
+        "apple_implementations_patched": false,
+        "rows": [
+          {
+            "intensity": 0,
+            "native_process_exit": -6,
+            "render_completed": false
+          },
+          {
+            "intensity": 0.5,
+            "native_process_exit": -6,
+            "render_completed": false
+          },
+          {
+            "intensity": 1,
+            "native_process_exit": -6,
+            "render_completed": false
+          }
+        ]
+      }
+    }
+  ],
+  "diagnostic_semantic_plist_sha256": "ab2be255437bdd26285119966f796316a3fda576563a3b3279cd649355b0e00a",
+  "semantic_argument_scope": "new Rust2023 protocol/scene diagnostic, not camera capture or2026 producer",
+  "CMI_initialization": {
+    "default_non_nil": false,
+    "nil_queue_non_nil": false,
+    "real_queue_non_nil": false
+  },
+  "native_assertions": [
+    "CMITextureStylesProcessor.m:225 _textureCache",
+    "Missing arguments before semanticStyleProperties diagnostic",
+    "Unexpected number of inputs after native parser accepts source-derived semantic argument"
+  ],
+  "primary_render_successes": 0,
+  "parameter_effect_pixels_verified": false,
+  "Photos_activation": false,
+  "Apple_implementation_patched": false,
+  "hardware_impossibility_established": false,
+  "ZIP_bytes_verified": false
+}

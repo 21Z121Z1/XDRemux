@@ -1,0 +1,251 @@
+{
+  "classes" : [
+    {
+      "class" : "_NUSemanticStyleProperties",
+      "class_methods" : [
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "baselineExposureFromLegacyMetadata:error:"
+        },
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "globalToneCurveDataFromCaptureMetadata:error:"
+        },
+        {
+          "encoding" : "@60@0:8@16B24{?=qiIq}28o^@52",
+          "selector" : "legacySemanticStylePropertiesFromData:fromVideo:keyTime:error:"
+        },
+        {
+          "encoding" : "@60@0:8@16B24{?=qiIq}28o^@52",
+          "selector" : "semanticStylePropertiesFromData:fromVideo:keyTime:error:"
+        },
+        {
+          "encoding" : "@32@0:8@16o^@24",
+          "selector" : "semanticStylePropertiesFromImageMetadata:error:"
+        },
+        {
+          "encoding" : "@56@0:8@16{?=qiIq}24o^@48",
+          "selector" : "semanticStylePropertiesFromVideoMetadata:keyTime:error:"
+        }
+      ],
+      "instance_methods" : [
+        {
+          "encoding" : "v16@0:8",
+          "selector" : ".cxx_destruct"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "baseGain"
+        },
+        {
+          "encoding" : "d16@0:8",
+          "selector" : "baselineExposure"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "brightness"
+        },
+        {
+          "encoding" : "@24@0:8^{_NSZone=}16",
+          "selector" : "copyWithZone:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "description"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "extendedStats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "faceBasedGlobalExposureBoostRatio"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "globalToneCurveData"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "isVideo"
+        },
+        {
+          "encoding" : "{?=qiIq}16@0:8",
+          "selector" : "keyTime"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "lightMapData"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "lightMapHeight"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "lightMapWidth"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearGain"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearLightMapData"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearRangeMax"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "linearRangeMin"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "sceneType"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setBaseGain:"
+        },
+        {
+          "encoding" : "v24@0:8d16",
+          "selector" : "setBaselineExposure:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setBrightness:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setExtendedStats:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setFaceBasedGlobalExposureBoostRatio:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setGlobalToneCurveData:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setIsVideo:"
+        },
+        {
+          "encoding" : "v40@0:8{?=qiIq}16",
+          "selector" : "setKeyTime:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLightMapData:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLightMapHeight:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLightMapWidth:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearGain:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearLightMapData:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearRangeMax:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setLinearRangeMin:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setSceneType:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setStats:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setStyleData:"
+        },
+        {
+          "encoding" : "v20@0:8B16",
+          "selector" : "setStyleDataIsFloat16:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setSubjectRelightingValue:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setTuningType:"
+        },
+        {
+          "encoding" : "v24@0:8@16",
+          "selector" : "setVersion:"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "stats"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "styleData"
+        },
+        {
+          "encoding" : "B16@0:8",
+          "selector" : "styleDataIsFloat16"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "subjectRelightingValue"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "tuningType"
+        },
+        {
+          "encoding" : "@16@0:8",
+          "selector" : "version"
+        }
+      ],
+      "instance_size" : 192
+    }
+  ],
+  "device" : "Apple Paravirtual device",
+  "frameworks" : [
+    {
+      "error" : "",
+      "loaded" : true,
+      "path" : "\/System\/Library\/PrivateFrameworks\/NeutrinoCore.framework\/NeutrinoCore"
+    },
+    {
+      "error" : "",
+      "loaded" : true,
+      "path" : "\/System\/Library\/PrivateFrameworks\/PhotoImaging.framework\/PhotoImaging"
+    },
+    {
+      "error" : "",
+      "loaded" : true,
+      "path" : "\/System\/Library\/PrivateFrameworks\/CMImaging.framework\/CMImaging"
+    },
+    {
+      "error" : "",
+      "loaded" : true,
+      "path" : "\/System\/Library\/PrivateFrameworks\/CMCapture.framework\/CMCapture"
+    }
+  ],
+  "os" : "Version 26.6.2 (Build 25G83)",
+  "patches_to_apple_implementations" : false,
+  "photos_used" : false,
+  "schema" : "xdremux-texture-runtime-v1"
+}

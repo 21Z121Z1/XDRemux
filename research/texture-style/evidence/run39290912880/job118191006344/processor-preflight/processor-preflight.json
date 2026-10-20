@@ -1,0 +1,6 @@
+{
+  "apple_implementation_patched" : false,
+  "input_images_supplied" : false,
+  "scope" : "default native processor initialization\/prewarm only, no image or person context supplied",
+  "unsupported" : "CMITextureStylesProcessor class unavailable"
+}

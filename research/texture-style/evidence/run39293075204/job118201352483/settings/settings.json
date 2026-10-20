@@ -1,0 +1,272 @@
+[
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Standard",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Standard",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Standard",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Filmic",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Filmic",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Filmic",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Glowy",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Glowy",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Glowy",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Soft",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Soft",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Soft",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Studio",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Studio",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "FigCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Studio",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Standard",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Standard",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Standard",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Filmic",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Filmic",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Filmic",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Glowy",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Glowy",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Glowy",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Soft",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Soft",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Soft",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0,
+    "preset_input" : "Studio",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 0.5,
+    "preset_input" : "Studio",
+    "unsupported" : true
+  },
+  {
+    "capture_metadata_computation" : false,
+    "factory" : "AVCaptureTextureStyle",
+    "grain_input" : 0.25,
+    "image_input" : false,
+    "intensity_input" : 1,
+    "preset_input" : "Studio",
+    "unsupported" : true
+  }
+]

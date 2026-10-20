@@ -1,0 +1,12 @@
+{
+  "schema": "xdremux-texture-native-log-readback-v1",
+  "head_sha": "4857d1a3fc4871297b29a1313468fd677fb278a7",
+  "xdremux_head_sha": null,
+  "run_id": "39285550760",
+  "log_sha256": "69423b4d4ce417e5c79bafb62f4378f5892909410e0318e2a7511a28aec8c9be",
+  "verified_native_json_payloads": [],
+  "verified_payload_count": 0,
+  "archive_bytes_verified": false,
+  "github_reported_zip_sha256": "4f6bc8e84ed683b519e72733619515f66af4f475fc03e712652df5f1837012bf",
+  "scope": "hash-checked actual native JSON emitted in job logs; not ZIP byte readback or Photos activation"
+}
