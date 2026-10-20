@@ -12,6 +12,11 @@ import json
 from pathlib import Path
 import plistlib
 import struct
+import sys
+
+# Keep the original file entry point as well as `python -m` usable.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from scripts.diagnostics.inspect_oppo_heif import box_header
 

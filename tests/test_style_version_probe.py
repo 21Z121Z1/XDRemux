@@ -89,26 +89,29 @@ class StyleVersionProbeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 style_metadata_payload(source, report)
 
-    def test_research_module_cli_preserves_its_single_byte_contract(self):
+    def test_research_cli_entrypoints_preserve_the_single_byte_contract(self):
         raw = plistlib.dumps({"0": 15, "1": b"actual-existing-style"}, fmt=plistlib.FMT_BINARY)
-        with tempfile.TemporaryDirectory(prefix="xdremux-version-cli-") as tmp:
-            root = Path(tmp)
-            source = root / "input.heic"
-            source.write_bytes(raw)
-            inspection = root / "inspect.json"
-            inspection.write_text(json.dumps({"items": [{"type": "uri ", "name": "styleMetadata",
-                "location": {"construction_method": 0,
-                             "extents": [{"offset": 0, "length": len(raw)}]}}], "meta_children": []}))
-            command = [sys.executable, "-m", "research.oppo_styles.tools.probe_style_version",
-                       "--input", str(source), "--inspect", str(inspection),
-                       "--output", str(root / "output.heic"), "--report", str(root / "report.json")]
-            result = subprocess.run(command, cwd=Path(__file__).resolve().parents[1],
-                                    capture_output=True, text=True, check=False)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(source.read_bytes(), raw)
-            edited = (root / "output.heic").read_bytes()
-            self.assertEqual(sum(a != b for a, b in zip(raw, edited)), 1)
-            self.assertEqual(plistlib.loads(edited), {"0": 16, "1": b"actual-existing-style"})
+        repository = Path(__file__).resolve().parents[1]
+        for entry in (["-m", "research.oppo_styles.tools.probe_style_version"],
+                      [str(repository / "research/oppo_styles/tools/probe_style_version.py")]):
+            with self.subTest(entry=entry), tempfile.TemporaryDirectory(prefix="xdremux-version-cli-") as tmp:
+                root = Path(tmp)
+                source = root / "input.heic"
+                source.write_bytes(raw)
+                inspection = root / "inspect.json"
+                inspection.write_text(json.dumps({"items": [{"type": "uri ", "name": "styleMetadata",
+                    "location": {"construction_method": 0,
+                                 "extents": [{"offset": 0, "length": len(raw)}]}}], "meta_children": []}))
+                command = [sys.executable, *entry,
+                           "--input", str(source), "--inspect", str(inspection),
+                           "--output", str(root / "output.heic"), "--report", str(root / "report.json")]
+                result = subprocess.run(command, cwd=repository,
+                                        capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(source.read_bytes(), raw)
+                edited = (root / "output.heic").read_bytes()
+                self.assertEqual(sum(a != b for a, b in zip(raw, edited)), 1)
+                self.assertEqual(plistlib.loads(edited), {"0": 16, "1": b"actual-existing-style"})
 
 
 if __name__ == "__main__":
