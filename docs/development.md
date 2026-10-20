@@ -44,9 +44,11 @@ portable providers + platform adapters
 | `xdremux-runtime` | 文件系统执行、publication、批处理可靠性、恢复以及平台能力协调。 |
 | `xdremux-engine` | 产品意图、转换规划、能力要求、平台无关事实和 orchestration。 |
 | `xdremux-source` / `xdremux-classification` | 输入探测、资产身份和分类。 |
-| `xdremux-motion-photo` | Motion Photo 解析和 Live Photo 媒体语义。 |
+| `xdremux-motion-photo` | LibLivePhoto consumer facade、产品几何和 pair 发布。 |
 | `xdremux-hdr` / `xdremux-metadata` | HDR / Gain Map 数学和 metadata primitive。 |
-| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Container、HEIF、codec、JPEG/EXIF/TIFF/ISOBMFF primitive。 |
+| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | 产品 container 和 codec 操作；共享二进制基础类型来自 `liblivephoto-format`。 |
+
+独立库边界见 [LibLivePhoto 接入契约](liblivephoto-integration.md)。
 
 下层 crate 可以提供格式 primitive，但这不意味着它成为一个产品模式。是否使用该 primitive 由 runtime 和 engine 决定。
 

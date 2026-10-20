@@ -44,9 +44,11 @@ Keep product intent at the top of this stack. Do not expose codec, camera-tail, 
 | `xdremux-runtime` | Filesystem execution, publication, batch reliability, recovery, and platform capability coordination. |
 | `xdremux-engine` | Product intent, conversion planning, capability requirements, platform-independent facts, and orchestration. |
 | `xdremux-source` / `xdremux-classification` | Source probing, asset identity, and classification. |
-| `xdremux-motion-photo` | Motion Photo parsing and Live Photo media semantics. |
+| `xdremux-motion-photo` | LibLivePhoto consumer facade, product geometry and pair publication. |
 | `xdremux-hdr` / `xdremux-metadata` | HDR/Gain Map math and metadata primitives. |
-| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Container, HEIF, codec, JPEG/EXIF/TIFF/ISOBMFF primitives. |
+| `xdremux-container` / `xdremux-heif` / `xdremux-codec` / `xdremux-format` | Product container and codec operations; shared binary primitives come from `liblivephoto-format`. |
+
+See [LibLivePhoto integration](liblivephoto-integration.en.md) for the independent library boundary.
 
 A lower crate may provide a format primitive without making it a product mode. Runtime and engine own the decision to use that primitive.
 

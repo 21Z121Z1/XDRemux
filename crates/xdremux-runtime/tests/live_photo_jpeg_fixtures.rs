@@ -63,6 +63,28 @@ fn exercise(relative: &str, expect_gain_map: bool) {
     validate_live_photo_movie(&movie, &movie_id, receipt.still_time_seconds)
         .expect("published movie must satisfy Live Photo contract");
 
+    let parsed_source = xdremux_motion_photo::MotionPhoto::parse(
+        xdremux_motion_photo::Input::SingleFile(&source),
+        xdremux_motion_photo::ParseOptions::compatible(),
+    )
+    .unwrap();
+    assert!(xdremux_motion_photo::apple::read_presentation(&movie)
+        .unwrap()
+        .unwrap()
+        .equivalent(receipt.presentation));
+    if let Some(time) = parsed_source.presentation_time() {
+        assert!(receipt.presentation.equivalent(time));
+    }
+    assert!(receipt
+        .conversion_report
+        .resources
+        .iter()
+        .any(|r| r.disposition == xdremux_motion_photo::Disposition::TranscodeRequired));
+    assert!(receipt
+        .conversion_report
+        .resources
+        .iter()
+        .any(|r| r.disposition == xdremux_motion_photo::Disposition::Dropped));
     if expect_gain_map {
         validate_gain_map_structure(&still).unwrap_or_else(|error| {
             panic!("{relative}: final HEIF Gain Map graph invalid: {error}")
