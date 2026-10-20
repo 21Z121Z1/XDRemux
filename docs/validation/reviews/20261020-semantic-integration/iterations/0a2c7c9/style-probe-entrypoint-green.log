@@ -1,0 +1,16 @@
+test_file_backed_styles_keep_existing_texture_bytes (tests.test_style_version_probe.StyleVersionProbeTests.test_file_backed_styles_keep_existing_texture_bytes) ... ok
+test_heif_scope_and_refusal (tests.test_style_version_probe.StyleVersionProbeTests.test_heif_scope_and_refusal) ... ok
+test_idat_extent_uses_real_header_and_cannot_escape_its_box (tests.test_style_version_probe.StyleVersionProbeTests.test_idat_extent_uses_real_header_and_cannot_escape_its_box) ... ok
+test_only_version_changes (tests.test_style_version_probe.StyleVersionProbeTests.test_only_version_changes) ... ok
+test_rejects_shared_version_object_instead_of_mutating_other_fields (tests.test_style_version_probe.StyleVersionProbeTests.test_rejects_shared_version_object_instead_of_mutating_other_fields) ... ok
+test_research_cli_entrypoints_preserve_the_single_byte_contract (tests.test_style_version_probe.StyleVersionProbeTests.test_research_cli_entrypoints_preserve_the_single_byte_contract) ... ok
+test_reverse_v16_to_v15_changes_only_one_byte (tests.test_style_version_probe.StyleVersionProbeTests.test_reverse_v16_to_v15_changes_only_one_byte) ... ok
+test_current_native_file_backed_v15_is_read_without_an_idat (tests.test_style_consumer_diagnostics.StyleConsumerDiagnosticTests.test_current_native_file_backed_v15_is_read_without_an_idat) ... ok
+test_external_and_truncated_extents_are_rejected (tests.test_style_consumer_diagnostics.StyleConsumerDiagnosticTests.test_external_and_truncated_extents_are_rejected) ... ok
+test_idat_backed_v15_remains_supported (tests.test_style_consumer_diagnostics.StyleConsumerDiagnosticTests.test_idat_backed_v15_remains_supported) ... ok
+test_wrong_version_does_not_pass_the_product_diagnostic (tests.test_style_consumer_diagnostics.StyleConsumerDiagnosticTests.test_wrong_version_does_not_pass_the_product_diagnostic) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.451s
+
+OK

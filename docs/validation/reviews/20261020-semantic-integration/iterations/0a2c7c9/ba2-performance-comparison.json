@@ -1,0 +1,142 @@
+{
+  "f9": {
+    "sha": "f9a419aa4eeb33214e2dfac2205719e6cb97d598",
+    "run": "https://github.com/21Z121Z1/XDRemux/actions/runs/39481011670",
+    "conclusion": "success"
+  },
+  "ba2": {
+    "sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7",
+    "run": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770093",
+    "conclusion": "failure"
+  },
+  "rows": [
+    {
+      "name": "hdr-lhdr-mono400",
+      "f9": {
+        "median_seconds": 1.564,
+        "p95_seconds": 1.774,
+        "max_rss_mib": 49.7
+      },
+      "ba2": {
+        "median_seconds": 2.009,
+        "p95_seconds": 2.246,
+        "max_rss_mib": 49.7
+      },
+      "median_ratio_ba2_over_f9": 1.2845
+    },
+    {
+      "name": "hdr-uhdr-rgb444",
+      "f9": {
+        "median_seconds": 6.823,
+        "p95_seconds": 6.88,
+        "max_rss_mib": 115.6
+      },
+      "ba2": {
+        "median_seconds": 9.871,
+        "p95_seconds": 10.629,
+        "max_rss_mib": 115.6
+      },
+      "median_ratio_ba2_over_f9": 1.4467
+    },
+    {
+      "name": "oppo-compatible-lhdr-rgb420",
+      "f9": {
+        "median_seconds": 1.513,
+        "p95_seconds": 1.686,
+        "max_rss_mib": 64.7
+      },
+      "ba2": {
+        "median_seconds": 2.206,
+        "p95_seconds": 3.075,
+        "max_rss_mib": 64.8
+      },
+      "median_ratio_ba2_over_f9": 1.458
+    },
+    {
+      "name": "oppo-compatible-uhdr-rgb420",
+      "f9": {
+        "median_seconds": 5.766,
+        "p95_seconds": 6.337,
+        "max_rss_mib": 111.6
+      },
+      "ba2": {
+        "median_seconds": 8.812,
+        "p95_seconds": 9.185,
+        "max_rss_mib": 111.6
+      },
+      "median_ratio_ba2_over_f9": 1.5283
+    },
+    {
+      "name": "motion-jpeg",
+      "f9": {
+        "median_seconds": 6.051,
+        "p95_seconds": 6.292,
+        "max_rss_mib": 314.3
+      },
+      "ba2": {
+        "median_seconds": 9.21,
+        "p95_seconds": 10.22,
+        "max_rss_mib": 314.1
+      },
+      "median_ratio_ba2_over_f9": 1.5221
+    },
+    {
+      "name": "motion-heif",
+      "f9": {
+        "median_seconds": 0.076,
+        "p95_seconds": 0.079,
+        "max_rss_mib": 25.6
+      },
+      "ba2": {
+        "median_seconds": 0.116,
+        "p95_seconds": 0.129,
+        "max_rss_mib": 25.6
+      },
+      "median_ratio_ba2_over_f9": 1.5263
+    },
+    {
+      "name": "batch-3",
+      "f9": {
+        "median_seconds": 16.021,
+        "p95_seconds": 16.926,
+        "max_rss_mib": 247
+      },
+      "ba2": {
+        "median_seconds": 23.125,
+        "p95_seconds": 25.056,
+        "max_rss_mib": 249
+      },
+      "median_ratio_ba2_over_f9": 1.4434
+    },
+    {
+      "name": "apple-portrait",
+      "f9": {
+        "median_seconds": 3.22,
+        "p95_seconds": 3.524,
+        "max_rss_mib": 896.5
+      },
+      "ba2": {
+        "median_seconds": 4.309,
+        "p95_seconds": 5.132,
+        "max_rss_mib": 896.5
+      },
+      "median_ratio_ba2_over_f9": 1.3382
+    },
+    {
+      "name": "apple-styles",
+      "f9": {
+        "median_seconds": 10.323,
+        "p95_seconds": 10.856,
+        "max_rss_mib": 1084.4
+      },
+      "ba2": {
+        "median_seconds": 15.14,
+        "p95_seconds": 15.859,
+        "max_rss_mib": 1083.3
+      },
+      "median_ratio_ba2_over_f9": 1.4666
+    }
+  ],
+  "interpretation": "Multiple independent workloads slowed proportionally on the same nominal image. Host throughput difference is a hypothesis, not a proven root cause or waiver. Retain failure; do not change baseline/tolerances. Next necessary source revision will use existing exact-head CI and include CPU/load observation.",
+  "changed_since_f9": "34aa186 changes the external Styles diagnostic/research Python storage resolver and diagnostic tests/docs. ba2b169 adds semantic error formatting and regression tests; successful semantic assembly path unchanged."
+}

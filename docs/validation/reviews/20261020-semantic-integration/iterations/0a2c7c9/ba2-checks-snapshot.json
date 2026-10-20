@@ -1,0 +1,132 @@
+{
+  "source_head": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7",
+  "captured_at": "2026-10-20 20:16:17 UTC",
+  "checks": [
+    {
+      "name": "CodeQL",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/runs/118849481668",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "style-tone-response",
+      "status": "in_progress",
+      "conclusion": null,
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770233/job/118849107735",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "coreml-candidate",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770233/job/118849107414",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "video-carrier",
+      "status": "queued",
+      "conclusion": null,
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770233/job/118849107400",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "styles-version-control",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770233/job/118849107211",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "texture-probe-build",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770233/job/118849107178",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "portable-evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770233/job/118849107137",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "exact-head",
+      "status": "in_progress",
+      "conclusion": null,
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770306/job/118849107023",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "macos-product",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770103/job/118849106878",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "real-proxdr",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770118/job/118849106835",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "portable-cli (macos-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770130/job/118849106798",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "portable-cli (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770130/job/118849106796",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "system-heif-hdr-api",
+      "status": "completed",
+      "conclusion": "failure",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770233/job/118849106752",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "portable-cli (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770130/job/118849106503",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "rust-performance",
+      "status": "completed",
+      "conclusion": "failure",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486770093/job/118849106059",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "Analyze (actions)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486765672/job/118849097447",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "Analyze (python)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486765672/job/118849097340",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    },
+    {
+      "name": "Analyze (rust)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39486765672/job/118849096929",
+      "head_sha": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7"
+    }
+  ]
+}

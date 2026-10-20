@@ -1,0 +1,16 @@
+{
+  "command": "validate",
+  "details": {
+    "kind": "live-photo",
+    "value": {
+      "content_identifier": "5DDB1263-945D-4E8E-90FC-9740BCAD69DE",
+      "image": "/tmp/xdremux-verify-work-avr923sx/converted.heic",
+      "input": "/tmp/xdremux-verify-work-avr923sx/converted.heic",
+      "still_time_seconds": 1.540401,
+      "video": "/tmp/xdremux-verify-work-avr923sx/converted.mov"
+    }
+  },
+  "kind": "live-photo",
+  "schema_version": 1,
+  "valid": true
+}

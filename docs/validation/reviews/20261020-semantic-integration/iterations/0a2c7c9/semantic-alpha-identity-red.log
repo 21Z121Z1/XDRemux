@@ -1,0 +1,29 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.41s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 3 tests
+
+thread 'semantic::tests::auxiliary_identity_rejects_unhandled_alpha_tile_outgoing_references' (59787) panicked at crates/xdremux-heif/src/semantic.rs:3193:17:
+assertion failed: assemble(&source.bytes(), &scaffold.bytes(), 3).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test semantic::tests::auxiliary_identity_rejects_unhandled_alpha_tile_outgoing_references ... FAILED
+
+thread 'semantic::tests::auxiliary_identity_rejects_duplicate_alpha_item_records' (59786) panicked at crates/xdremux-heif/src/semantic.rs:3168:13:
+assertion failed: assemble(&source.bytes(), &scaffold.bytes(), 3).is_err()
+test semantic::tests::auxiliary_identity_rejects_duplicate_alpha_item_records ... FAILED
+
+thread 'semantic::tests::auxiliary_identity_rejects_unknown_semantic_role_even_with_matching_descriptors' (59788) panicked at crates/xdremux-heif/src/semantic.rs:3178:13:
+assertion failed: assemble(&source, &scaffold.bytes(), 3).is_err()
+test semantic::tests::auxiliary_identity_rejects_unknown_semantic_role_even_with_matching_descriptors ... FAILED
+
+failures:
+
+failures:
+    semantic::tests::auxiliary_identity_rejects_duplicate_alpha_item_records
+    semantic::tests::auxiliary_identity_rejects_unhandled_alpha_tile_outgoing_references
+    semantic::tests::auxiliary_identity_rejects_unknown_semantic_role_even_with_matching_descriptors
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 41 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p xdremux-heif --lib`

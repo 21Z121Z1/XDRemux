@@ -1,0 +1,20 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.04s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 1 test
+
+thread 'semantic::tests::auxiliary_identity_transplant_rejects_unpaired_unknown_source_auxiliary' (63300) panicked at crates/xdremux-heif/src/semantic.rs:3278:9:
+assertion failed: transplant_apple_semantic_auxiliary_heif(&source.bytes(), &scaffold,
+        3).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test semantic::tests::auxiliary_identity_transplant_rejects_unpaired_unknown_source_auxiliary ... FAILED
+
+failures:
+
+failures:
+    semantic::tests::auxiliary_identity_transplant_rejects_unpaired_unknown_source_auxiliary
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p xdremux-heif --lib`

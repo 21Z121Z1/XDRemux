@@ -1,0 +1,29 @@
+{
+  "head": "45d7bac93bdc9bb7c0f15527e7466c5a23412b47",
+  "dirty": " M .github/workflows/rust-cli-core.yml\n M crates/xdremux-cli/src/categorize.rs\n M crates/xdremux-cli/src/lib.rs\n M crates/xdremux-cli/src/validate.rs\n M docs/cli.en.md\n M docs/cli.md\n M docs/development.en.md\n M docs/development.md\n M scripts/README.en.md\n M scripts/README.md\n M tests/validation/test_repository_layout.py\n M tests/validation/test_workflow_configuration.py\n?? crates/xdremux-cli/src/i18n.rs\n?? crates/xdremux-cli/tests/i18n.rs\n?? scripts/distribution/\n?? tests/test_macos_distribution.py\n",
+  "files": {
+    ".github/workflows/rust-cli-core.yml": "958bbca199d1d8ffc53c4d073b587925d0b51703bcc906c19e49e8c3d5099c86",
+    "crates/xdremux-cli/src/lib.rs": "5fc526474319ec004fc3326f99e7c3c8d0f9b7b6d0969489586f232f67266d61",
+    "crates/xdremux-cli/src/categorize.rs": "284b025e234fad91225fdff199d7257251a93bcc73a8189c73b23fa896b3a274",
+    "crates/xdremux-cli/src/validate.rs": "d9980498d4ba241288d98ce9714ac616d25151cee94f2ffcf9df64da5e5c3909",
+    "crates/xdremux-cli/src/i18n.rs": "a7891d903829b1c70a4a2d138279d5a76262f4ea60e1e6968e7285e172df2982",
+    "crates/xdremux-cli/tests/i18n.rs": "28c675268d2de2057eafed0ee25693c73b110b5fb9c24bd6205b049ae943f8bc",
+    "docs/cli.en.md": "51c9150f12670ecd8757fa470cd9e5801e186b82d6580d278a487141c9ec1c15",
+    "docs/cli.md": "362ed78647bb7a60fb38bfcea1d1587729e52fcc4a5a049834726afedd7c5498",
+    "docs/development.en.md": "062d6b82f708090e65477d055b211518a405323cdf73d07d93c15aa46936655d",
+    "docs/development.md": "416a175b1796c0db1a32c0767eccdad45f6eb25353d9d8326ad7ceb6b6a47ed0",
+    "scripts/README.en.md": "553198f47118da441d1b1415eb1cf9ff491d8c1da73391808639c60100edb877",
+    "scripts/README.md": "3220e316fbafa5350b8c41bb3ef3c009e70aa86e00c40d077be1404aa916edec",
+    "tests/validation/test_repository_layout.py": "3eca54dd674f8362d46487b9b60e0632cd88d9c11a5f3037e446c20e9e6aab3b",
+    "tests/validation/test_workflow_configuration.py": "d025647b893610070b04964168064cd7354b8c716d2050f8f2befc0f6bd06fc1",
+    "tests/test_macos_distribution.py": "ae846d20db6e80263d308a642680336045ff1550b206da2e36de2f214a4144a3",
+    "scripts/distribution/build_native.py": "885a06443af6f4ba1de2b4c32870bdc33f305ba209edcf6248c076a5b4d9e92f",
+    "scripts/distribution/macos.py": "4a0c8a01bc07af107ae35db5dcb2e45c2e80c196242c3dedfc4a29b67a3dc7ac",
+    "scripts/distribution/native-dependencies.json": "bb1787ee101975cf0b54d75a4faf4bdfe053328d7279767cadb6e44fad5812b2",
+    "scripts/distribution/package-readme.md": "67afe10b593f154de202e0bf7e4c9b2a1af9a4f0abe78787f394ea9061d8e65b",
+    "scripts/distribution/smoke_macos.py": "f4c2ea44b42d4ce5ffde7856841b21852dbbbebbb6763cf2130380150fbd2653"
+  },
+  "parent_commit": "0a2c7c94765a6fd52a83331d66b74f26259d1141",
+  "parent_commit_dirty": "",
+  "unchanged_since_freeze": true
+}

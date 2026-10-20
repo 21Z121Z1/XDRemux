@@ -1,0 +1,11 @@
+2026-10-20T20:03:21.1409730Z styles-main10-observed-color_primaries=ITU_R_709_2
+2026-10-20T20:03:21.1410170Z styles-main10-observed-transfer_function=ITU_R_709_2
+2026-10-20T20:03:21.1410510Z styles-main10-observed-ycbcr_matrix=ITU_R_601_4
+2026-10-20T20:05:22.2304820Z rust-styles-consumer-pass: output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.SPPL5r/rust-styles.heic maker_apple_84={'1': 0, '12': 1, '2': 0, '11': 0, '5': 1, '0': 1, '4': 1, '9': 1, '3': 1, '7': 0, '6': 4, '10': 0, '8': 1} iso_gain_map=True portrait_effects_matte=True skin_matte=True gain_map=1532x2040
+2026-10-20T20:05:22.2359450Z rust-styles-consumer-pass: output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.SPPL5r/batch/uhdr-portrait-01.xdremux.heic maker_apple_84={'9': 1, '1': 0, '11': 0, '8': 1, '10': 0, '7': 0, '4': 1, '6': 4, '3': 1, '0': 1, '12': 1, '2': 0, '5': 1} iso_gain_map=True portrait_effects_matte=True skin_matte=True gain_map=1532x2040
+2026-10-20T20:05:22.4483810Z rust-styles-graph-pass: inspect=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.SPPL5r/inspect.json items=131 references=42
+2026-10-20T20:05:22.4485230Z rust-styles-graph-pass: inspect=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.SPPL5r/batch-inspect.json items=131 references=42
+2026-10-20T20:05:22.5095750Z rust-styles-policy-pass: output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.SPPL5r/rust-styles.heic style_sha256=0231b91cd5dfb909f280d94721fda603778639d3132fffd11e11ab70138ba434 baseline_exposure=7.0923075675964355 base_gain=2.2938013076782227 scene_type=0
+2026-10-20T20:05:22.5097920Z rust-styles-policy-pass: output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.SPPL5r/batch/uhdr-portrait-01.xdremux.heic style_sha256=0231b91cd5dfb909f280d94721fda603778639d3132fffd11e11ab70138ba434 baseline_exposure=7.0923075675964355 base_gain=2.2938013076782227 scene_type=0
+2026-10-20T20:14:23.0076860Z   "native_transaction_count": 5
+2026-10-20T20:14:56.7687740Z XDRemuxAppModelTests passed

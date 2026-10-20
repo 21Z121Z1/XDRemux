@@ -1,0 +1,11 @@
+PASS [static] locked-workspace (0.044s)
+PASS [static] rust-format (1.756s)
+PASS [static] rust-workspace-clippy (0.377s)
+PASS [regression] complete-heif-regressions (0.814s)
+PASS [regression] cli-unit-and-process-regressions (12.102s)
+PASS [regression] all-portable-python-regressions (28.741s)
+PASS [functional] build-current-cli (0.158s)
+PASS [functional] real-cli-pair-conversion-and-readback (4.292s)
+PASS completion gate for 0a2c7c94765a6fd52a83331d66b74f26259d1141
+receipt: /workspace/XDRemux-integration/.codex/verification-receipts/0a2c7c94765a6fd52a83331d66b74f26259d1141.json
+PASS verified completion receipt for 0a2c7c94765a6fd52a83331d66b74f26259d1141

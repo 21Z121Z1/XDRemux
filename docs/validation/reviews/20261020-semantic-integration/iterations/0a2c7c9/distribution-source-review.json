@@ -1,0 +1,30 @@
+{
+  "libde265": {
+    "status": "downloaded and checksum matched",
+    "bytes": 319593,
+    "sha256": "eaacd1943ab0c452c19f6136a36ca227e6b761b39a81eaca8454d48c147e1f67",
+    "notice_paths": [
+      "libde265-1.1.2/COPYING"
+    ]
+  },
+  "x265": {
+    "status": "downloaded and checksum matched",
+    "bytes": 2052112,
+    "sha256": "83c53e4c8bbb8f1e33ed59e10a7d621d1d7801ca853910c3eb41f038b8ffb121",
+    "notice_paths": [
+      "x265_4.3/COPYING"
+    ]
+  },
+  "libwebp": {
+    "status": "not downloaded; original HTTPS host denied HTTP CONNECT tunnel with 403",
+    "expected_sha256": "e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564"
+  },
+  "libheif": {
+    "status": "downloaded and checksum matched",
+    "bytes": 2217221,
+    "sha256": "d0c02b4b0e978f34a1974b6f3eea7975a537bf7a9195ffeea38e7242ff316fdd",
+    "notice_paths": [
+      "libheif-1.23.4/COPYING"
+    ]
+  }
+}

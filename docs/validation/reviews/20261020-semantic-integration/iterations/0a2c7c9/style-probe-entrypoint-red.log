@@ -1,0 +1,19 @@
+test_research_cli_entrypoints_preserve_the_single_byte_contract (tests.test_style_version_probe.StyleVersionProbeTests.test_research_cli_entrypoints_preserve_the_single_byte_contract) ... 
+  test_research_cli_entrypoints_preserve_the_single_byte_contract (tests.test_style_version_probe.StyleVersionProbeTests.test_research_cli_entrypoints_preserve_the_single_byte_contract) (entry=['/workspace/XDRemux-integration/research/oppo_styles/tools/probe_style_version.py']) ... FAIL
+
+======================================================================
+FAIL: test_research_cli_entrypoints_preserve_the_single_byte_contract (tests.test_style_version_probe.StyleVersionProbeTests.test_research_cli_entrypoints_preserve_the_single_byte_contract) (entry=['/workspace/XDRemux-integration/research/oppo_styles/tools/probe_style_version.py'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_version_probe.py", line 110, in test_research_cli_entrypoints_preserve_the_single_byte_contract
+    self.assertEqual(result.returncode, 0, result.stderr)
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/research/oppo_styles/tools/probe_style_version.py", line 16, in <module>
+    from scripts.diagnostics.inspect_oppo_heif import box_header
+ModuleNotFoundError: No module named 'scripts'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.129s
+
+FAILED (failures=1)

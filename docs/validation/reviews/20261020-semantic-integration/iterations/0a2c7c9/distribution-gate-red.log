@@ -1,0 +1,38 @@
+FFF
+======================================================================
+FAIL: test_build_inputs_require_regression_and_functional_evidence (tests.validation.test_agent_completion_gate.CompletionGateTests.test_build_inputs_require_regression_and_functional_evidence) (path='scripts/distribution/build_native.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_agent_completion_gate.py", line 125, in test_build_inputs_require_regression_and_functional_evidence
+    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+AssertionError: 0 != 2 : PASS [regression] regression (0.021s)
+PASS completion gate for 47f76c1d508d7f2966af122b12466422dacd5af7
+receipt: /tmp/tmpsgpceir0/receipt.json
+
+
+======================================================================
+FAIL: test_build_inputs_require_regression_and_functional_evidence (tests.validation.test_agent_completion_gate.CompletionGateTests.test_build_inputs_require_regression_and_functional_evidence) (path='scripts/distribution/macos.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_agent_completion_gate.py", line 125, in test_build_inputs_require_regression_and_functional_evidence
+    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+AssertionError: 0 != 2 : PASS [regression] regression (0.067s)
+PASS completion gate for 9c7045edaf97061b06c60e4bb060ea32e1fadc51
+receipt: /tmp/tmpsgpceir0/receipt.json
+
+
+======================================================================
+FAIL: test_build_inputs_require_regression_and_functional_evidence (tests.validation.test_agent_completion_gate.CompletionGateTests.test_build_inputs_require_regression_and_functional_evidence) (path='scripts/distribution/native-dependencies.json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/validation/test_agent_completion_gate.py", line 122, in test_build_inputs_require_regression_and_functional_evidence
+    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+AssertionError: 1 != 2 : PASS [static] static (0.019s)
+FAIL completion gate for e825b6b39b2e0f8133687bf761a09f5a15a72db2
+receipt: /tmp/tmpsgpceir0/receipt.json
+
+
+----------------------------------------------------------------------
+Ran 1 test in 4.357s
+
+FAILED (failures=3)

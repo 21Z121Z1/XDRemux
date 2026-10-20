@@ -1,0 +1,29 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.60s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 3 tests
+
+thread 'semantic::tests::alpha_assembly_rejects_unknown_missing_ambiguous_or_conflicting_pairs' (57300) panicked at crates/xdremux-heif/src/semantic.rs:2756:17:
+accepted source only
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'semantic::tests::alpha_merge_preserves_source_auxiliary_instead_of_importing_reencoded_alpha' (57301) panicked at crates/xdremux-heif/src/semantic.rs:2706:97:
+called `Result::unwrap()` on an `Err` value: Invalid("semantic scaffold has 4 semantic images but 3 metadata descriptors; resource graphs: source={primary=1,items=5,resources=[1:hvc1:auxC=[none],2:hvc1:auxC=[none],30:hvc1:auxC=[unknown]],dimg=[3->[1,2]],auxl=[2->[1,3],30->[1,3]],cdsc=[4->[1,3]]}; scaffold={primary=1,items=11,resources=[1:hvc1:auxC=[none],2:hvc1:auxC=[none],10:hvc1:auxC=[none],11:hvc1:auxC=[none],12:hvc1:auxC=[none],31:hvc1:auxC=[unknown]],dimg=[3->[1,2]],auxl=[2->[1,3],10->[1,3],11->[1,3],12->[1,3],31->[1,3]],cdsc=[4->[1,3],20->[10],21->[11],22->[12]]}")
+test semantic::tests::alpha_assembly_rejects_unknown_missing_ambiguous_or_conflicting_pairs ... FAILED
+test semantic::tests::alpha_merge_preserves_source_auxiliary_instead_of_importing_reencoded_alpha ... FAILED
+
+thread 'semantic::tests::alpha_transplant_preserves_source_payload_codec_and_tile_order' (57302) panicked at crates/xdremux-heif/src/semantic.rs:2678:108:
+called `Result::unwrap()` on an `Err` value: Invalid("semantic scaffold has 4 semantic images but 3 metadata descriptors; resource graphs: source={primary=1,items=5,resources=[1:hvc1:auxC=[none],2:hvc1:auxC=[none],30:hvc1:auxC=[unknown]],dimg=[3->[1,2]],auxl=[2->[1,3],30->[1,3]],cdsc=[4->[1,3]]}; scaffold={primary=1,items=11,resources=[1:hvc1:auxC=[none],2:hvc1:auxC=[none],10:hvc1:auxC=[none],11:hvc1:auxC=[none],12:hvc1:auxC=[none],31:hvc1:auxC=[unknown]],dimg=[3->[1,2]],auxl=[2->[1,3],10->[1,3],11->[1,3],12->[1,3],31->[1,3]],cdsc=[4->[1,3],20->[10],21->[11],22->[12]]}")
+test semantic::tests::alpha_transplant_preserves_source_payload_codec_and_tile_order ... FAILED
+
+failures:
+
+failures:
+    semantic::tests::alpha_assembly_rejects_unknown_missing_ambiguous_or_conflicting_pairs
+    semantic::tests::alpha_merge_preserves_source_auxiliary_instead_of_importing_reencoded_alpha
+    semantic::tests::alpha_transplant_preserves_source_payload_codec_and_tile_order
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 38 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p xdremux-heif --lib`

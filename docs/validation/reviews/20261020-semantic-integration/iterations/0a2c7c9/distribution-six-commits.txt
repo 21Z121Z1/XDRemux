@@ -1,0 +1,98 @@
+commit 8be9f554e5916fdfd7f0248481c723707f901891
+Author:     21Z121Z1 <89170834+21Z121Z1@users.noreply.github.com>
+AuthorDate: Thu Sep 24 10:58:20 2026 +0800
+Commit:     21Z121Z1 <89170834+21Z121Z1@users.noreply.github.com>
+CommitDate: Thu Sep 24 10:58:20 2026 +0800
+
+    ci: establish exact-head macOS distribution inspection harness
+
+ .github/workflows/macos-distribution.yml | 85 ++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
+
+commit a97ba55d9dd7db49b290c0ed5983ef1431e2d8b3
+Author:     21Z121Z1 <89170834+21Z121Z1@users.noreply.github.com>
+AuthorDate: Thu Sep 24 11:13:12 2026 +0800
+Commit:     21Z121Z1 <89170834+21Z121Z1@users.noreply.github.com>
+CommitDate: Thu Sep 24 11:13:12 2026 +0800
+
+    ci: execute reviewed platform migration on isolated development branch
+
+ .github/workflows/macos-distribution.yml | 85 +++++++++++++++-----------------
+ 1 file changed, 41 insertions(+), 44 deletions(-)
+
+commit 055143cb68294b4b97b51e7d11e20fdc6109f78c
+Author:     github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+AuthorDate: Thu Sep 24 03:13:25 2026 +0000
+Commit:     github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+CommitDate: Thu Sep 24 03:13:25 2026 +0000
+
+    refactor: give the Apple adapter one platform-owned package boundary
+
+ .../XDRemuxApp/XDRemuxApp.xcodeproj/project.pbxproj  |  2 +-
+ apps/macos/XDRemuxApp/project.yml                    |  4 ++--
+ apps/macos/XDRemuxApp/scripts/build_and_run.sh       |  2 +-
+ docs/architecture.en.md                              |  4 ++--
+ docs/architecture.md                                 |  4 ++--
+ docs/development.en.md                               |  4 ++--
+ docs/development.md                                  |  4 ++--
+ Package.swift => platforms/apple/Package.swift       |  2 +-
+ .../Sources}/XDRemuxAppleAdapter/CoreImageL8.swift   |  0
+ .../XDRemuxAppleAdapter/VideoToolboxMain10.swift     |  0
+ .../VisionRequestScheduling.swift                    |  0
+ .../VisionSceneClassification.swift                  |  0
+ .../XDRemuxAppleAdapter/VisionSemanticMattes.swift   |  0
+ .../apple/Sources}/XDRemuxAppleAdapter/main.swift    |  0
+ scripts/apple/build_apple_device_validation.sh       |  4 ++--
+ scripts/apple/check_apple_adapter_handshake.sh       |  6 +++---
+ scripts/apple/check_rust_cli_apple_portrait.sh       |  4 ++--
+ scripts/apple/check_rust_style_consumer.sh           |  4 ++--
+ scripts/ci/agent_completion_gate.py                  |  5 +++--
+ tests/README.en.md                                   |  2 +-
+ tests/README.md                                      |  2 +-
+ tests/test_performance_design.py                     |  8 ++++----
+ tests/test_product_ownership.py                      |  4 ++--
+ tests/test_rust_apple_semantic_policy.py             |  8 ++++----
+ tests/validation/test_agent_completion_gate.py       |  2 +-
+ tests/validation/test_repository_layout.py           | 20 +++++++++++++++++++-
+ 26 files changed, 57 insertions(+), 38 deletions(-)
+
+commit 5f350a545015c20a00f0fc80d5bea1e0ac1bad39
+Author:     21Z121Z1 <89170834+21Z121Z1@users.noreply.github.com>
+AuthorDate: Thu Sep 24 11:20:28 2026 +0800
+Commit:     21Z121Z1 <89170834+21Z121Z1@users.noreply.github.com>
+CommitDate: Thu Sep 24 11:20:28 2026 +0800
+
+    ci: apply and exercise CLI-only bilingual presentation changes
+
+ .github/workflows/macos-distribution.yml | 49 ++++++++++++++++++--------------
+ 1 file changed, 28 insertions(+), 21 deletions(-)
+
+commit 3bfc2c04fec1c8fec9da381286308d32db706278
+Author:     github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+AuthorDate: Thu Sep 24 03:20:45 2026 +0000
+Commit:     github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+CommitDate: Thu Sep 24 03:20:45 2026 +0000
+
+    feat(cli): localize terminal presentation without changing machine contracts
+
+ crates/xdremux-cli/src/categorize.rs |  52 +++-
+ crates/xdremux-cli/src/i18n.rs       | 250 ++++++++++++++++++
+ crates/xdremux-cli/src/lib.rs        | 479 +++++++++++++++++++++++++++--------
+ crates/xdremux-cli/src/validate.rs   | 157 ++++++++++--
+ crates/xdremux-cli/tests/i18n.rs     | 230 +++++++++++++++++
+ 5 files changed, 1032 insertions(+), 136 deletions(-)
+
+commit c6d307af662ed516f6e3994c039513359cb98610
+Author:     21Z121Z1 <89170834+21Z121Z1@users.noreply.github.com>
+AuthorDate: Thu Sep 24 11:35:29 2026 +0800
+Commit:     21Z121Z1 <89170834+21Z121Z1@users.noreply.github.com>
+CommitDate: Thu Sep 24 11:35:29 2026 +0800
+
+    build: package pinned macOS Rust binaries with relocatable native dependencies
+
+ .github/workflows/macos-distribution.yml      | 120 ++++++++-------
+ scripts/distribution/build_native.py          | 122 +++++++++++++++
+ scripts/distribution/macos.py                 | 204 ++++++++++++++++++++++++++
+ scripts/distribution/native-dependencies.json |  29 ++++
+ scripts/distribution/package-readme.md        |  61 ++++++++
+ 5 files changed, 475 insertions(+), 61 deletions(-)

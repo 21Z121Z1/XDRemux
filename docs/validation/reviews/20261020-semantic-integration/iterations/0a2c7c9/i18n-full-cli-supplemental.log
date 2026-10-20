@@ -1,0 +1,177 @@
+Targeted CLI tests; integration worktree deliberately dirty; not final committed-HEAD evidence.
+
+COMMAND ['git', 'rev-parse', 'HEAD']
+0facc0a5d22b630ab88474c62e4a4b14fb3e2323
+EXIT 0
+
+COMMAND ['git', 'status', '--short']
+ M .github/workflows/rust-cli-core.yml
+ M crates/xdremux-cli/src/categorize.rs
+ M crates/xdremux-cli/src/lib.rs
+ M crates/xdremux-cli/src/validate.rs
+ M crates/xdremux-heif/src/semantic.rs
+ M docs/cli.en.md
+ M docs/cli.md
+ M docs/development.en.md
+ M docs/development.md
+ M scripts/README.en.md
+ M scripts/README.md
+ M scripts/ci/agent_completion_gate.py
+ M tests/validation/test_agent_completion_gate.py
+ M tests/validation/test_repository_layout.py
+ M tests/validation/test_workflow_configuration.py
+?? crates/xdremux-cli/src/i18n.rs
+?? crates/xdremux-cli/tests/i18n.rs
+?? scripts/distribution/
+?? tests/test_macos_distribution.py
+EXIT 0
+
+COMMAND ['cargo', 'test', '--locked', '-p', 'xdremux-cli']
+   Compiling xdremux-runtime v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-runtime)
+   Compiling xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.71s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_cli-e2dd1d90af1b738f)
+
+running 28 tests
+test i18n::tests::precedence_and_empty_values_are_deterministic ... ok
+test i18n::tests::normalizes_supported_locales ... ok
+test categorize::tests::in_place_discovery_skips_existing_category_roots ... ok
+test tests::batch_accepts_repeatable_inputs ... ok
+test tests::apple_portrait_and_oppo_compatibility_are_incompatible_usage ... ok
+test tests::batch_failure_human_name_does_not_leak_workspace_paths ... ok
+test tests::batch_discovery_is_non_recursive_by_default_and_recursive_on_request ... ok
+test tests::batch_output_planning_is_source_safe_and_reserves_live_photo_companions ... ok
+test tests::batch_rejects_zero_jobs_as_usage_error ... ok
+test tests::batch_requires_a_source ... ok
+test tests::cinematic_requests_and_video_discovery_follow_the_selected_intent ... ok
+test i18n::tests::every_public_description_has_a_translation ... ok
+test tests::clap_command_definition_is_internally_consistent ... ok
+test tests::batch_accepts_oppo_gallery_product_intent ... ok
+test tests::conversion_accepts_apple_portrait_product_intent ... ok
+test tests::convert_accepts_oppo_native_portrait_profile ... ok
+test tests::convert_accepts_explicit_output ... ok
+test tests::convert_defaults_to_in_place_publication ... ok
+test tests::convert_accepts_oppo_gallery_product_intent ... ok
+test tests::conversion_help_exposes_intent_not_internal_policy ... ok
+test tests::convert_requires_named_input ... ok
+test tests::convert_rejects_combining_complete_and_oppo_native_portrait ... ok
+test tests::help_and_version_are_successful_control_flow ... ok
+test tests::double_dash_allows_paths_that_start_with_dash ... ok
+test tests::no_arguments_prints_help ... ok
+test tests::inspect_requires_exactly_one_input ... ok
+test validate::tests::feature_validation_uses_the_same_styles_intent ... ok
+test tests::unknown_command_is_a_usage_error ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (target/debug/deps/xdremux-b70d1384a234c168)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/batch.rs (target/debug/deps/batch-7dd7f0d1ffaf4cf9)
+
+running 2 tests
+test batch_command_is_deterministic_machine_readable_and_failure_isolating ... ok
+test live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media has been running for over 60 seconds
+test live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 346.43s
+
+     Running tests/batch_categorize.rs (target/debug/deps/batch_categorize-6a2a9419e1bb2b11)
+
+running 1 test
+test batch_categorize_projects_final_outputs_before_conversion ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.70s
+
+     Running tests/batch_jobs.rs (target/debug/deps/batch_jobs-e431255b567593d4)
+
+running 1 test
+test bounded_parallel_batch_keeps_receipts_ordered_and_checkpoint_reusable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.25s
+
+     Running tests/batch_resume.rs (target/debug/deps/batch_resume-5f3bd91e0ac95413)
+
+running 1 test
+test resume_reuses_only_the_checkpoint_proven_live_photo_pair ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.07s
+
+     Running tests/categorize.rs (target/debug/deps/categorize-8c3574f0b9808d1d)
+
+running 1 test
+test categorize_command_copies_then_reports_duplicate_on_rerun ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/cinematic_envelope.rs (target/debug/deps/cinematic_envelope-0d4a56db3944d2dd)
+
+running 3 tests
+test cinematic_command_rejects_unsupported_platform_before_opening_input ... ok
+test cinematic_is_a_conversion_flag_on_both_entry_points ... ok
+test cinematic_configuration_requires_the_feature_and_rejects_image_intents ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/convert.rs (target/debug/deps/convert-fcb22524134a8127)
+
+running 1 test
+test convert_command_executes_full_rust_proxdr_pipeline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.61s
+
+     Running tests/i18n.rs (target/debug/deps/i18n-3d89a939565cdff7)
+
+running 8 tests
+test environment_precedence_and_global_option_are_observable ... ok
+test current_feature_conflicts_remain_usage_errors_in_both_languages ... ok
+test every_help_page_supports_both_languages ... ok
+test parse_errors_keep_stdout_empty_and_exit_code_two ... ok
+test human_output_translates_labels_but_not_user_paths ... ok
+test json_inspection_and_validation_failure_are_byte_identical ... ok
+test non_unicode_input_arguments_remain_opaque_and_locale_independent ... ok
+test successful_batch_validation_and_categorization_json_are_locale_independent ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.64s
+
+     Running tests/live_photo.rs (target/debug/deps/live_photo-07932ee10dd23f76)
+
+running 2 tests
+test convert_command_executes_full_rust_heif_live_photo_pipeline ... ok
+test convert_command_executes_full_rust_jpeg_ultrahdr_live_photo_pipeline ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.41s
+
+     Running tests/validate.rs (target/debug/deps/validate-5dd6a809654363a1)
+
+running 1 test
+test validate_reports_iso_hdr_live_photo_and_failures_as_stable_json ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.76s
+
+   Doc-tests xdremux_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+EXIT 0
+
+COMMAND ['cargo', 'clippy', '--locked', '-p', 'xdremux-cli', '--all-targets', '--', '-D', 'warnings']
+    Checking xdremux-format v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-format)
+    Checking xdremux-motion-photo v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-motion-photo)
+    Checking xdremux-container v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-container)
+    Checking xdremux-classification v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-classification)
+    Checking xdremux-engine v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-engine)
+    Checking xdremux-metadata v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-metadata)
+    Checking xdremux-source v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-source)
+    Checking xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Checking xdremux-hdr v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-hdr)
+    Checking xdremux-codec v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-codec)
+    Checking xdremux-runtime v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-runtime)
+    Checking xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.95s
+EXIT 0
