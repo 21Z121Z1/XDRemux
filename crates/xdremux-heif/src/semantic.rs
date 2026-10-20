@@ -16,6 +16,7 @@ const GRID: FourCC = FourCC::new(*b"grid");
 const MIME: FourCC = FourCC::new(*b"mime");
 const EXIF: FourCC = FourCC::new(*b"Exif");
 const TMAP: FourCC = FourCC::new(*b"tmap");
+const AUXC: FourCC = FourCC::new(*b"auxC");
 const AUXL: FourCC = FourCC::new(*b"auxl");
 const CDSC: FourCC = FourCC::new(*b"cdsc");
 const DIMG: FourCC = FourCC::new(*b"dimg");
@@ -412,6 +413,174 @@ fn semantic_items(scaffold: &Graph) -> Result<(u32, Vec<u32>, Vec<u32>)> {
         )));
     }
     Ok((scaffold_tmap, images, metadata))
+}
+
+// Error reports survive the runtime's temporary scaffold cleanup. Keep this
+// observation bounded and restricted to structural IDs and fixed role labels:
+// item payloads, metadata, paths, and unknown property strings are never logged.
+fn diagnostic_auxiliary_role(data: &[u8], property: &PropertyInfo) -> &'static str {
+    let Ok(boxes) = parse_boxes(data, property.box_range.clone()) else {
+        return "malformed";
+    };
+    let [header] = boxes.as_slice() else {
+        return "malformed";
+    };
+    let Some(payload) = data.get(header.payload_range()) else {
+        return "malformed";
+    };
+    if payload.get(..4) != Some(&[0, 0, 0, 0]) {
+        return "malformed";
+    }
+    let uri = &payload[4..];
+    let Some(end) = uri.iter().position(|byte| *byte == 0) else {
+        return "malformed";
+    };
+    match &uri[..end] {
+        b"urn:iso:std:iso:ts:21496:-1" => "iso-gain-map",
+        b"urn:com:apple:photo:2020:aux:hdrgainmap" => "apple-hdr-gain-map",
+        b"urn:com:apple:photo:2018:aux:portraiteffectsmatte" => "portrait-effects-matte",
+        b"urn:com:apple:photo:2019:aux:semanticskinmatte" => "semantic-skin",
+        b"urn:com:apple:photo:2019:aux:semantichairmatte" => "semantic-hair",
+        b"urn:com:apple:photo:2019:aux:semanticteethmatte" => "semantic-teeth",
+        b"urn:com:apple:photo:2020:aux:semanticglassesmatte" => "semantic-glasses",
+        b"urn:com:apple:photo:2020:aux:semanticskymatte" => "semantic-sky",
+        _ => "unknown",
+    }
+}
+
+fn diagnostic_item_type(meta: &ParsedMeta, item_id: u32) -> &'static str {
+    let mut infos = meta
+        .iinf
+        .entries
+        .iter()
+        .filter(|item| item.item_id == item_id);
+    let Some(info) = infos.next() else {
+        return "missing";
+    };
+    if infos.next().is_some() {
+        return "ambiguous";
+    }
+    match info.item_type {
+        Some(HVC1) => "hvc1",
+        Some(GRID) => "grid",
+        Some(TMAP) => "tmap",
+        Some(MIME) => "mime",
+        Some(EXIF) => "Exif",
+        _ => "other",
+    }
+}
+
+fn diagnostic_graph(data: &[u8], graph: &Graph) -> String {
+    const MAX_RESOURCES: usize = 16;
+    const MAX_ROLES: usize = 4;
+    const MAX_REFERENCES: usize = 12;
+    const MAX_TARGETS: usize = 8;
+    let meta = &graph.meta;
+    let references = meta
+        .iref
+        .as_ref()
+        .map_or(&[][..], |iref| iref.entries.as_slice());
+    let mut resource_ids = BTreeSet::from([meta.primary_item_id]);
+    for reference in references {
+        if reference.kind == AUXL {
+            resource_ids.insert(reference.from_item_id);
+        } else if reference.kind == DIMG
+            && diagnostic_item_type(meta, reference.from_item_id) == "tmap"
+        {
+            resource_ids.extend(&reference.to_item_ids);
+        }
+    }
+    let mut resources = Vec::new();
+    for item_id in resource_ids.iter().take(MAX_RESOURCES) {
+        let mut roles = Vec::new();
+        let mut role_count = 0;
+        for association in meta
+            .ipma
+            .entries
+            .iter()
+            .filter(|entry| entry.item_id == *item_id)
+            .flat_map(|entry| &entry.associations)
+        {
+            if let Some(property) = meta.properties.iter().find(|property| {
+                property.index == u32::from(association.property_index) && property.kind == AUXC
+            }) {
+                role_count += 1;
+                if roles.len() < MAX_ROLES {
+                    roles.push(diagnostic_auxiliary_role(data, property).to_owned());
+                }
+            }
+        }
+        if role_count > MAX_ROLES {
+            roles.push(format!("omitted={}", role_count - MAX_ROLES));
+        } else if roles.is_empty() {
+            roles.push("none".to_owned());
+        }
+        resources.push(format!(
+            "{item_id}:{}:auxC=[{}]",
+            diagnostic_item_type(meta, *item_id),
+            roles.join(",")
+        ));
+    }
+    if resource_ids.len() > MAX_RESOURCES {
+        resources.push(format!("omitted={}", resource_ids.len() - MAX_RESOURCES));
+    }
+    let mut groups = Vec::new();
+    for (kind, name) in [(DIMG, "dimg"), (AUXL, "auxl"), (CDSC, "cdsc")] {
+        let mut edges = Vec::new();
+        let mut count = 0;
+        for reference in references.iter().filter(|reference| reference.kind == kind) {
+            count += 1;
+            if edges.len() >= MAX_REFERENCES {
+                continue;
+            }
+            let mut targets = reference
+                .to_item_ids
+                .iter()
+                .take(MAX_TARGETS)
+                .map(u32::to_string)
+                .collect::<Vec<_>>();
+            if reference.to_item_ids.len() > MAX_TARGETS {
+                targets.push(format!(
+                    "omitted={}",
+                    reference.to_item_ids.len() - MAX_TARGETS
+                ));
+            }
+            edges.push(format!(
+                "{}->[{}]",
+                reference.from_item_id,
+                targets.join(",")
+            ));
+        }
+        if count > MAX_REFERENCES {
+            edges.push(format!("omitted={}", count - MAX_REFERENCES));
+        }
+        groups.push(format!("{name}=[{}]", edges.join(",")));
+    }
+    format!(
+        "primary={},items={},resources=[{}],{}",
+        meta.primary_item_id,
+        meta.iinf.entries.len(),
+        resources.join(","),
+        groups.join(",")
+    )
+}
+
+fn semantic_graph_error(
+    error: HeifError,
+    source_data: &[u8],
+    source: &Graph,
+    scaffold_data: &[u8],
+    scaffold: &Graph,
+) -> HeifError {
+    let message = match error {
+        HeifError::Invalid(message) => message,
+        HeifError::Format(error) => error.to_string(),
+    };
+    invalid(format!(
+        "{message}; resource graphs: source={{{}}}; scaffold={{{}}}",
+        diagnostic_graph(source_data, source),
+        diagnostic_graph(scaffold_data, scaffold)
+    ))
 }
 
 fn associated_properties(meta: &ParsedMeta, item_id: u32) -> Result<Vec<IpmaAssociation>> {
@@ -832,7 +1001,10 @@ pub fn merge_apple_semantic_auxiliary_heif(
     let scaffold = parse_graph(scaffold_data, "semantic scaffold")?;
     let source_tmap = find_tmap(&source.meta, "source HDR")?;
     let _ = hdr_image_items(&source.meta, "source HDR")?;
-    let (scaffold_tmap, semantic_images, semantic_metadata) = semantic_items(&scaffold)?;
+    let (scaffold_tmap, semantic_images, semantic_metadata) =
+        semantic_items(&scaffold).map_err(|error| {
+            semantic_graph_error(error, source_data, &source, scaffold_data, &scaffold)
+        })?;
     if semantic_images.len() != expected_semantic_roles {
         return Err(invalid(format!(
             "semantic scaffold contains {} roles; expected {expected_semantic_roles}",
@@ -1659,7 +1831,9 @@ pub fn transplant_apple_semantic_auxiliary_heif(
     }
     let source = parse_graph(source_data, "source HDR")?;
     let scaffold = parse_graph(scaffold_data, "semantic scaffold")?;
-    let (_, semantic_images, semantic_metadata) = semantic_items(&scaffold)?;
+    let (_, semantic_images, semantic_metadata) = semantic_items(&scaffold).map_err(|error| {
+        semantic_graph_error(error, source_data, &source, scaffold_data, &scaffold)
+    })?;
     if semantic_images.len() != expected_semantic_roles {
         return Err(invalid(format!(
             "semantic scaffold contains {} roles; expected {expected_semantic_roles}",
@@ -1864,6 +2038,7 @@ mod tests {
         items: Vec<(u32, FourCC, Vec<u8>)>,
         references: Vec<IrefEntry>,
         codec_marker: u8,
+        auxiliary_properties: Vec<(u32, Vec<u8>)>,
     }
 
     impl Fixture {
@@ -1939,6 +2114,7 @@ mod tests {
                 items,
                 references,
                 codec_marker: if semantic { 7 } else { 9 },
+                auxiliary_properties: Vec::new(),
             }
         }
 
@@ -1949,13 +2125,16 @@ mod tests {
                 .map(|(id, kind, _)| make_infe_box(*id, *kind, 0).unwrap())
                 .collect::<Vec<_>>();
             let iinf = make_iinf_box(0, &infos).unwrap();
-            let properties = [
+            let mut properties = [
                 make_box(HVCC, &[self.codec_marker; 19]).unwrap(),
                 make_box(HVCC, &[self.codec_marker + 1; 21]).unwrap(),
                 make_box(HVCC, &[5; 19]).unwrap(),
             ]
             .concat();
-            let associations = self
+            for (_, property) in &self.auxiliary_properties {
+                properties.extend_from_slice(property);
+            }
+            let mut associations = self
                 .items
                 .iter()
                 .map(|(id, kind, _)| IpmaEntry {
@@ -1976,6 +2155,17 @@ mod tests {
                     },
                 })
                 .collect::<Vec<_>>();
+            for (index, (item_id, _)) in self.auxiliary_properties.iter().enumerate() {
+                associations
+                    .iter_mut()
+                    .find(|entry| entry.item_id == *item_id)
+                    .unwrap()
+                    .associations
+                    .push(IpmaAssociation {
+                        property_index: u16::try_from(index + 4).unwrap(),
+                        essential: true,
+                    });
+            }
             let iprp = make_box(
                 IPRP,
                 &[
@@ -2347,5 +2537,109 @@ mod tests {
         assert_payload(&output, PRIMARY, b"rust-primary");
         assert_payload(&output, GAIN, b"rust-gain");
         assert_payload(&output, 10, b"scaffold-semantic-0");
+    }
+
+    fn auxiliary_property(uri: &[u8]) -> Vec<u8> {
+        make_box(FourCC::new(*b"auxC"), &[vec![0; 4], uri.to_vec()].concat()).unwrap()
+    }
+
+    #[test]
+    fn unclassified_auxiliary_failure_diagnostic_reports_roles_and_edges_without_media() {
+        let mut source = Fixture::new(false, false, "DO_NOT_REPORT_SOURCE_PIXELS");
+        let mut scaffold = Fixture::new(false, true, "DO_NOT_REPORT_SCAFFOLD_PIXELS");
+        for (fixture, extra_id) in [(&mut source, 30), (&mut scaffold, 31)] {
+            fixture
+                .items
+                .push((extra_id, HVC1, b"DO_NOT_REPORT_AUXILIARY_PIXELS".to_vec()));
+            fixture.references.push(IrefEntry {
+                kind: AUXL,
+                from_item_id: extra_id,
+                to_item_ids: vec![PRIMARY, TONE_MAP],
+            });
+            fixture.auxiliary_properties.extend([
+                (GAIN, auxiliary_property(b"urn:iso:std:iso:ts:21496:-1\0")),
+                (
+                    extra_id,
+                    auxiliary_property(b"urn:com:apple:photo:2020:aux:hdrgainmap\0"),
+                ),
+            ]);
+        }
+        scaffold.auxiliary_properties.extend([
+            (
+                10,
+                auxiliary_property(b"urn:com:apple:photo:2018:aux:portraiteffectsmatte\0"),
+            ),
+            (
+                11,
+                auxiliary_property(b"urn:com:apple:photo:2019:aux:semanticskinmatte\0"),
+            ),
+            (
+                12,
+                auxiliary_property(b"urn:com:apple:photo:2020:aux:semanticskymatte\0"),
+            ),
+        ]);
+        for assemble in [
+            transplant_apple_semantic_auxiliary_heif,
+            merge_apple_semantic_auxiliary_heif,
+        ] {
+            let error = assemble(&source.bytes(), &scaffold.bytes(), 3)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("4 semantic images but 3 metadata descriptors"));
+            assert!(error.contains("source={primary=1"), "{error}");
+            assert!(error.contains("scaffold={primary=1"), "{error}");
+            for expected in [
+                "2:hvc1:auxC=[iso-gain-map]",
+                "30:hvc1:auxC=[apple-hdr-gain-map]",
+                "31:hvc1:auxC=[apple-hdr-gain-map]",
+                "10:hvc1:auxC=[portrait-effects-matte]",
+                "11:hvc1:auxC=[semantic-skin]",
+                "12:hvc1:auxC=[semantic-sky]",
+                "dimg=[3->[1,2]]",
+                "31->[1,3]",
+                "20->[10]",
+            ] {
+                assert!(error.contains(expected), "missing {expected} in {error}");
+            }
+            assert!(!error.contains("DO_NOT_REPORT"), "{error}");
+        }
+    }
+
+    #[test]
+    fn auxiliary_graph_diagnostic_bounds_unknown_and_malformed_properties() {
+        let source = Fixture::new(false, false, "DO_NOT_REPORT_SOURCE_PIXELS").bytes();
+        let mut scaffold = Fixture::new(false, true, "DO_NOT_REPORT_SCAFFOLD_PIXELS");
+        scaffold.auxiliary_properties.extend([
+            (
+                10,
+                auxiliary_property(b"DO_NOT_REPORT_UNKNOWN_AUXILIARY_URI\0"),
+            ),
+            (11, auxiliary_property(b"DO_NOT_REPORT_UNTERMINATED_URI")),
+            (12, make_box(FourCC::new(*b"auxC"), b"\0\0").unwrap()),
+        ]);
+        for item_id in 1000..2000 {
+            scaffold
+                .items
+                .push((item_id, HVC1, b"DO_NOT_REPORT_PIXELS".to_vec()));
+            scaffold.references.push(IrefEntry {
+                kind: AUXL,
+                from_item_id: item_id,
+                to_item_ids: (1..100).collect(),
+            });
+        }
+        for assemble in [
+            transplant_apple_semantic_auxiliary_heif,
+            merge_apple_semantic_auxiliary_heif,
+        ] {
+            let error = assemble(&source, &scaffold.bytes(), 3)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("10:hvc1:auxC=[unknown]"), "{error}");
+            assert!(error.contains("11:hvc1:auxC=[malformed]"), "{error}");
+            assert!(error.contains("12:hvc1:auxC=[malformed]"), "{error}");
+            assert!(error.contains("omitted="), "{error}");
+            assert!(error.len() < 32_768, "diagnostic has {} bytes", error.len());
+            assert!(!error.contains("DO_NOT_REPORT"), "{error}");
+        }
     }
 }
