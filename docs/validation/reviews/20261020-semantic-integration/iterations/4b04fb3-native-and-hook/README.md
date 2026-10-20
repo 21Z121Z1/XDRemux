@@ -14,7 +14,7 @@
 | [严格exact-head job](https://github.com/21Z121Z1/XDRemux/actions/runs/39507239977/job/118919303603)、[日志](4b-exact-job118919303603.log)、[14项摘要](4b-exact-summary.json) | PASS全部14项及runner内clean-head receipt verify，包含component conformance与明确实物Motion Photo gate。ZIP artifact12305292396存在，执行器未下载，不冒称独立复核其字节。 |
 | [性能](../4b04fb3/4b-performance-summary.json) | PASS原绝对门限，Styles median9.142/p959.334秒；同机候选/main比值1.155591保留，不混为跨run因果证明。 |
 | [System HEIF job](https://github.com/21Z121Z1/XDRemux/actions/runs/39507240004/job/118919132084)、[完整日志](4b-system-job118919132084.log) | **FAIL**。合成原生System HDR测试1/1通过，真实measurement越过旧alpha拒绝后在`gain-map item10 is hvc1, expected grid`失败。公共validator与Styles根识别仍假定GRID，是直接HVC1消费缺口；不能跳过验证或伪造GRID。本项仍阻止收敛。 |
-| [检查状态快照](4b-checks-after-native.json) | 三portable hosts、arm64解包转换、CodeQL/Analyze、realProXDR、portable/CoreML/version/video/probe research通过；arm64及Intel固定依赖打包/checkout外解包转换均通过，[Intel原始日志](4b-intel-job118919419346.log)已保留；采集时仅tone sweep仍运行，不计通过。 |
+| [检查状态快照](4b-checks-after-native.json) | 三portable hosts、arm64解包转换、CodeQL/Analyze、realProXDR、portable/CoreML/version/video/probe research通过；arm64及Intel固定依赖打包/checkout外解包转换均通过，[Intel原始日志](4b-intel-job118919419346.log)已保留；快照采集时tone仍运行；后来虽机械绿灯，[原始tone日志](4b-tone-job118919132030.log)显示三个产品extractor全return1、指标/原生render缺失，不能算产品Tone验收。此为新增阻塞，正定位首错及修复缺测绿报；Apple参考数据不能替代产品响应。 |
 
 父已接受v7的22源ref/9分支恢复、fresh fsck、同clean4b磁盘失败/环境修复receipt及43字节比较来源。[v7远端恢复日志](evidence-v7-restore.log)补固定附件commit/tree/fsck。[规则/review/预合并树映射](4b04fb3-merge-rules-and-reviews.json)保留strict exact-head、never bypass、thread解决、自动删分支与相同源码tree；未改保护。
 

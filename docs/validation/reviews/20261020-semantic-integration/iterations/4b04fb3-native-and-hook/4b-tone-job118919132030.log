@@ -1,0 +1,1219 @@
+﻿2026-10-20T22:50:12.1752270Z Current runner version: '2.338.0'
+2026-10-20T22:50:12.1769920Z ##[group]Runner Image Provisioner
+2026-10-20T22:50:12.1770520Z Hosted Compute Agent
+2026-10-20T22:50:12.1771080Z Version: 20261006.597
+2026-10-20T22:50:12.1771570Z Commit: c696a59e4a9ffbc6a6203385bd1b2a10e87b1c9c
+2026-10-20T22:50:12.1772150Z Build Date: 2026-10-06T21:39:28Z
+2026-10-20T22:50:12.1772730Z Worker ID: {af915726-23b8-4065-8c86-39a5fc23a9c4}
+2026-10-20T22:50:12.1773340Z Region: westus
+2026-10-20T22:50:12.1773830Z Cloud: MacCloud
+2026-10-20T22:50:12.1774250Z ##[endgroup]
+2026-10-20T22:50:12.1775470Z ##[group]Operating System
+2026-10-20T22:50:12.1775930Z macOS
+2026-10-20T22:50:12.1776390Z 27.0.1
+2026-10-20T22:50:12.1776740Z 26A434
+2026-10-20T22:50:12.1777190Z ##[endgroup]
+2026-10-20T22:50:12.1777660Z ##[group]Runner Image
+2026-10-20T22:50:12.1778160Z Image: xcode-27-arm64
+2026-10-20T22:50:12.1778670Z Version: 20261012.0260.1
+2026-10-20T22:50:12.1779610Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261012.0260/images/macos/xcode-27-arm64-Readme.md
+2026-10-20T22:50:12.1780800Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261012.0260
+2026-10-20T22:50:12.1781650Z ##[endgroup]
+2026-10-20T22:50:12.1782550Z ##[group]GITHUB_TOKEN Permissions
+2026-10-20T22:50:12.1784710Z Contents: read
+2026-10-20T22:50:12.1785080Z Metadata: read
+2026-10-20T22:50:12.1785590Z ##[endgroup]
+2026-10-20T22:50:12.1787240Z Secret source: Actions
+2026-10-20T22:50:12.1787880Z Cache mode: write
+2026-10-20T22:50:12.1788500Z Prepare workflow directory
+2026-10-20T22:50:12.2034130Z Prepare all required actions
+2026-10-20T22:50:12.2071340Z Getting action download info
+2026-10-20T22:50:12.4841310Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-10-20T22:50:12.8627750Z Download action repository 'actions-rust-lang/setup-rust-toolchain@v2' (SHA:ecabd13d1c56bd1345c230e542e9144811ad706f)
+2026-10-20T22:50:13.3252990Z Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+2026-10-20T22:50:14.3015310Z Getting action download info
+2026-10-20T22:50:14.4065090Z Download action repository 'Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6' (SHA:6323deb102c322ba6fcbdcafc7e3dddab59af2b6)
+2026-10-20T22:50:15.2341300Z Complete job name: style-tone-response
+2026-10-20T22:50:15.2907340Z ##[group]Run actions/checkout@v7
+2026-10-20T22:50:15.2907970Z with:
+2026-10-20T22:50:15.2908240Z   ref: 4b04fb3168cdc9bf8f54d7755db94fd3677eebb6
+2026-10-20T22:50:15.2908580Z   persist-credentials: false
+2026-10-20T22:50:15.2908800Z   repository: 21Z121Z1/XDRemux
+2026-10-20T22:50:15.2914310Z   token: ***
+2026-10-20T22:50:15.2914970Z   ssh-strict: true
+2026-10-20T22:50:15.2915530Z   ssh-user: git
+2026-10-20T22:50:15.2916040Z   clean: true
+2026-10-20T22:50:15.2916600Z   sparse-checkout-cone-mode: true
+2026-10-20T22:50:15.2917280Z   fetch-depth: 1
+2026-10-20T22:50:15.2917810Z   fetch-tags: false
+2026-10-20T22:50:15.2918350Z   show-progress: true
+2026-10-20T22:50:15.2918950Z   lfs: false
+2026-10-20T22:50:15.2919440Z   submodules: false
+2026-10-20T22:50:15.2919980Z   set-safe-directory: true
+2026-10-20T22:50:15.2920650Z   allow-unsafe-pr-checkout: false
+2026-10-20T22:50:15.2922820Z ##[endgroup]
+2026-10-20T22:50:15.8544070Z Syncing repository: 21Z121Z1/XDRemux
+2026-10-20T22:50:15.8545510Z ##[group]Getting Git version info
+2026-10-20T22:50:15.8545950Z Working directory is '/Users/runner/work/XDRemux/XDRemux'
+2026-10-20T22:50:15.8546590Z [command]/opt/homebrew/bin/git version
+2026-10-20T22:50:15.8847350Z git version 2.56.0
+2026-10-20T22:50:15.8860350Z ##[endgroup]
+2026-10-20T22:50:15.8867120Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/87044e3b-21b8-4441-8eaf-fa6782804c51/.gitconfig'
+2026-10-20T22:50:15.8872990Z Temporarily overriding HOME='/Users/runner/work/_temp/87044e3b-21b8-4441-8eaf-fa6782804c51' before making global git config changes
+2026-10-20T22:50:15.8873830Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-20T22:50:15.8876640Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-20T22:50:15.8982060Z Deleting the contents of '/Users/runner/work/XDRemux/XDRemux'
+2026-10-20T22:50:15.8984800Z ##[group]Determining repository object format
+2026-10-20T22:50:15.8986070Z ##[endgroup]
+2026-10-20T22:50:15.8986990Z ##[group]Initializing the repository
+2026-10-20T22:50:15.8987920Z [command]/opt/homebrew/bin/git init /Users/runner/work/XDRemux/XDRemux
+2026-10-20T22:50:15.9201220Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-20T22:50:15.9201790Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-20T22:50:15.9202360Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-20T22:50:15.9202740Z hint: call:
+2026-10-20T22:50:15.9202960Z hint:
+2026-10-20T22:50:15.9203260Z hint: 	git config --global init.defaultBranch <name>
+2026-10-20T22:50:15.9203630Z hint:
+2026-10-20T22:50:15.9203970Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-20T22:50:15.9204630Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-20T22:50:15.9205020Z hint:
+2026-10-20T22:50:15.9205320Z hint: 	git branch -m <name>
+2026-10-20T22:50:15.9205550Z hint:
+2026-10-20T22:50:15.9205890Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-20T22:50:15.9207030Z Initialized empty Git repository in /Users/runner/work/XDRemux/XDRemux/.git/
+2026-10-20T22:50:15.9215280Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/XDRemux
+2026-10-20T22:50:15.9305110Z ##[endgroup]
+2026-10-20T22:50:15.9306210Z ##[group]Disabling automatic garbage collection
+2026-10-20T22:50:15.9307250Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-20T22:50:15.9379500Z ##[endgroup]
+2026-10-20T22:50:15.9379910Z ##[group]Setting up auth
+2026-10-20T22:50:15.9380230Z Removing SSH command configuration
+2026-10-20T22:50:15.9382490Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T22:50:15.9466270Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T22:50:16.0569200Z Removing HTTP extra header
+2026-10-20T22:50:16.0572590Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T22:50:16.0647310Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T22:50:16.2235270Z Removing includeIf entries pointing to credentials config files
+2026-10-20T22:50:16.2339960Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T22:50:16.2525570Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T22:50:16.4052160Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-20T22:50:16.4055420Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path /Users/runner/work/_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config
+2026-10-20T22:50:16.4059920Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config
+2026-10-20T22:50:16.4105630Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config
+2026-10-20T22:50:16.4191640Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config
+2026-10-20T22:50:16.4281580Z ##[endgroup]
+2026-10-20T22:50:16.4282000Z ##[group]Fetching the repository
+2026-10-20T22:50:16.4282970Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 4b04fb3168cdc9bf8f54d7755db94fd3677eebb6
+2026-10-20T22:50:31.3474950Z From https://github.com/21Z121Z1/XDRemux
+2026-10-20T22:50:31.3477770Z  * branch            4b04fb3168cdc9bf8f54d7755db94fd3677eebb6 -> FETCH_HEAD
+2026-10-20T22:50:31.3553800Z [command]/opt/homebrew/bin/git rev-parse --verify --quiet 4b04fb3168cdc9bf8f54d7755db94fd3677eebb6^{object}
+2026-10-20T22:50:31.3718040Z 4b04fb3168cdc9bf8f54d7755db94fd3677eebb6
+2026-10-20T22:50:31.3724270Z ##[endgroup]
+2026-10-20T22:50:31.3724940Z ##[group]Determining the checkout info
+2026-10-20T22:50:31.3726250Z ##[endgroup]
+2026-10-20T22:50:31.3728430Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-20T22:50:31.3851470Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-20T22:50:31.3940720Z ##[group]Checking out the ref
+2026-10-20T22:50:31.3943010Z [command]/opt/homebrew/bin/git checkout --progress --force 4b04fb3168cdc9bf8f54d7755db94fd3677eebb6
+2026-10-20T22:50:32.6017310Z Updating files:  69% (316/454)
+2026-10-20T22:50:32.7283670Z Updating files:  70% (318/454)
+2026-10-20T22:50:32.7386590Z Updating files:  71% (323/454)
+2026-10-20T22:50:32.7493360Z Updating files:  72% (327/454)
+2026-10-20T22:50:32.7596670Z Updating files:  73% (332/454)
+2026-10-20T22:50:32.7698010Z Updating files:  74% (336/454)
+2026-10-20T22:50:32.7799540Z Updating files:  75% (341/454)
+2026-10-20T22:50:32.7899800Z Updating files:  76% (346/454)
+2026-10-20T22:50:32.8001220Z Updating files:  77% (350/454)
+2026-10-20T22:50:32.8102910Z Updating files:  78% (355/454)
+2026-10-20T22:50:32.8204300Z Updating files:  79% (359/454)
+2026-10-20T22:50:32.8305920Z Updating files:  80% (364/454)
+2026-10-20T22:50:32.8410370Z Updating files:  81% (368/454)
+2026-10-20T22:50:32.8513200Z Updating files:  82% (373/454)
+2026-10-20T22:50:32.8613540Z Updating files:  83% (377/454)
+2026-10-20T22:50:32.8723100Z Updating files:  84% (382/454)
+2026-10-20T22:50:32.8827760Z Updating files:  85% (386/454)
+2026-10-20T22:50:32.8931130Z Updating files:  86% (391/454)
+2026-10-20T22:50:32.9032490Z Updating files:  87% (395/454)
+2026-10-20T22:50:32.9134840Z Updating files:  88% (400/454)
+2026-10-20T22:50:32.9236660Z Updating files:  89% (405/454)
+2026-10-20T22:50:32.9339140Z Updating files:  90% (409/454)
+2026-10-20T22:50:32.9424380Z Updating files:  91% (414/454)
+2026-10-20T22:50:32.9475450Z Updating files:  92% (418/454)
+2026-10-20T22:50:32.9491950Z Updating files:  93% (423/454)
+2026-10-20T22:50:32.9519100Z Updating files:  94% (427/454)
+2026-10-20T22:50:32.9534180Z Updating files:  95% (432/454)
+2026-10-20T22:50:32.9556040Z Updating files:  96% (436/454)
+2026-10-20T22:50:32.9556840Z Updating files:  97% (441/454)
+2026-10-20T22:50:32.9557280Z Updating files:  98% (445/454)
+2026-10-20T22:50:32.9557750Z Updating files:  99% (450/454)
+2026-10-20T22:50:32.9558290Z Updating files: 100% (454/454)
+2026-10-20T22:50:32.9558730Z Updating files: 100% (454/454), done.
+2026-10-20T22:50:32.9559600Z HEAD is now at 4b04fb3 perf(styles): bound local-fit cells and reuse ordered row products
+2026-10-20T22:50:32.9561500Z ##[endgroup]
+2026-10-20T22:50:32.9565600Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-20T22:50:32.9566130Z 4b04fb3168cdc9bf8f54d7755db94fd3677eebb6
+2026-10-20T22:50:32.9567230Z ##[group]Removing auth
+2026-10-20T22:50:32.9567650Z Removing SSH command configuration
+2026-10-20T22:50:32.9568110Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T22:50:32.9569570Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T22:50:33.0520850Z Removing HTTP extra header
+2026-10-20T22:50:33.0521650Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T22:50:33.0722050Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T22:50:33.1994690Z Removing includeIf entries pointing to credentials config files
+2026-10-20T22:50:33.1996280Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T22:50:33.2108950Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-20T22:50:33.2110350Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-20T22:50:33.2111630Z includeif.gitdir:/github/workspace/.git.path
+2026-10-20T22:50:33.2112420Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-20T22:50:33.2116880Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-20T22:50:33.2199230Z /Users/runner/work/_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config
+2026-10-20T22:50:33.2236170Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path \/Users\/runner\/work\/_temp\/git\-credentials\-b41578b1\-3ee9\-43c9\-9819\-fd6775e9e3d6\.config
+2026-10-20T22:50:33.2313900Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-20T22:50:33.2382170Z /Users/runner/work/_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config
+2026-10-20T22:50:33.2400970Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path \/Users\/runner\/work\/_temp\/git\-credentials\-b41578b1\-3ee9\-43c9\-9819\-fd6775e9e3d6\.config
+2026-10-20T22:50:33.2481120Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-10-20T22:50:33.2556140Z /github/runner_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config
+2026-10-20T22:50:33.2561300Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-b41578b1\-3ee9\-43c9\-9819\-fd6775e9e3d6\.config
+2026-10-20T22:50:33.2648410Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-20T22:50:33.2721950Z /github/runner_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config
+2026-10-20T22:50:33.2735110Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-b41578b1\-3ee9\-43c9\-9819\-fd6775e9e3d6\.config
+2026-10-20T22:50:33.2867410Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T22:50:33.4082080Z Removing credentials config '/Users/runner/work/_temp/git-credentials-b41578b1-3ee9-43c9-9819-fd6775e9e3d6.config'
+2026-10-20T22:50:33.4111430Z ##[endgroup]
+2026-10-20T22:50:33.4526000Z ##[group]Run actions/checkout@v7
+2026-10-20T22:50:33.4526230Z with:
+2026-10-20T22:50:33.4526450Z   repository: 21Z121Z1/Photographic_Style_Research
+2026-10-20T22:50:33.4526760Z   ref: 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-20T22:50:33.4527070Z   path: consumer-research
+2026-10-20T22:50:33.4527300Z   persist-credentials: false
+2026-10-20T22:50:33.4529410Z   token: ***
+2026-10-20T22:50:33.4529680Z   ssh-strict: true
+2026-10-20T22:50:33.4529830Z   ssh-user: git
+2026-10-20T22:50:33.4529970Z   clean: true
+2026-10-20T22:50:33.4530130Z   sparse-checkout-cone-mode: true
+2026-10-20T22:50:33.4530690Z   fetch-depth: 1
+2026-10-20T22:50:33.4530820Z   fetch-tags: false
+2026-10-20T22:50:33.4530970Z   show-progress: true
+2026-10-20T22:50:33.4531120Z   lfs: false
+2026-10-20T22:50:33.4531260Z   submodules: false
+2026-10-20T22:50:33.4531410Z   set-safe-directory: true
+2026-10-20T22:50:33.4531600Z   allow-unsafe-pr-checkout: false
+2026-10-20T22:50:33.4531790Z ##[endgroup]
+2026-10-20T22:50:33.7575570Z Syncing repository: 21Z121Z1/Photographic_Style_Research
+2026-10-20T22:50:33.7576410Z ##[group]Getting Git version info
+2026-10-20T22:50:33.7577150Z Working directory is '/Users/runner/work/XDRemux/XDRemux/consumer-research'
+2026-10-20T22:50:33.7578290Z [command]/opt/homebrew/bin/git version
+2026-10-20T22:50:33.7579860Z git version 2.56.0
+2026-10-20T22:50:33.7593930Z ##[endgroup]
+2026-10-20T22:50:33.7595720Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/3546c356-227a-4610-ab6a-084c394d0370/.gitconfig'
+2026-10-20T22:50:33.7596560Z Temporarily overriding HOME='/Users/runner/work/_temp/3546c356-227a-4610-ab6a-084c394d0370' before making global git config changes
+2026-10-20T22:50:33.7597370Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-20T22:50:33.7598190Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-20T22:50:33.7599540Z ##[group]Determining repository object format
+2026-10-20T22:50:33.7600030Z ##[endgroup]
+2026-10-20T22:50:33.7600500Z ##[group]Initializing the repository
+2026-10-20T22:50:33.7601010Z [command]/opt/homebrew/bin/git init /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-20T22:50:33.7601660Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-20T22:50:33.7602200Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-20T22:50:33.7602750Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-20T22:50:33.7603170Z hint: call:
+2026-10-20T22:50:33.7603480Z hint:
+2026-10-20T22:50:33.7603830Z hint: 	git config --global init.defaultBranch <name>
+2026-10-20T22:50:33.7604340Z hint:
+2026-10-20T22:50:33.7604680Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-20T22:50:33.7605200Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-20T22:50:33.7605670Z hint:
+2026-10-20T22:50:33.7605860Z hint: 	git branch -m <name>
+2026-10-20T22:50:33.7606210Z hint:
+2026-10-20T22:50:33.7606570Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-20T22:50:33.7607200Z Initialized empty Git repository in /Users/runner/work/XDRemux/XDRemux/consumer-research/.git/
+2026-10-20T22:50:33.7612710Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-20T22:50:33.7614020Z ##[endgroup]
+2026-10-20T22:50:33.7614330Z ##[group]Disabling automatic garbage collection
+2026-10-20T22:50:33.7614660Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-20T22:50:33.7658850Z ##[endgroup]
+2026-10-20T22:50:33.7659200Z ##[group]Setting up auth
+2026-10-20T22:50:33.7659430Z Removing SSH command configuration
+2026-10-20T22:50:33.7664820Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T22:50:33.7752700Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T22:50:33.8754240Z Removing HTTP extra header
+2026-10-20T22:50:33.8760270Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T22:50:33.8878290Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T22:50:34.0350610Z Removing includeIf entries pointing to credentials config files
+2026-10-20T22:50:34.0358500Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T22:50:34.0494540Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T22:50:34.1731470Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-20T22:50:34.1817570Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path /Users/runner/work/_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config
+2026-10-20T22:50:34.1908050Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config
+2026-10-20T22:50:34.1987070Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/consumer-research/.git.path /github/runner_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config
+2026-10-20T22:50:34.2097360Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path /github/runner_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config
+2026-10-20T22:50:34.2188470Z ##[endgroup]
+2026-10-20T22:50:34.2189300Z ##[group]Fetching the repository
+2026-10-20T22:50:34.2193680Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-20T22:50:35.6232410Z From https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-20T22:50:35.6232880Z  * branch            37dd551a949047ed14580efa0c0a2556922791b5 -> FETCH_HEAD
+2026-10-20T22:50:35.6254630Z [command]/opt/homebrew/bin/git rev-parse --verify --quiet 37dd551a949047ed14580efa0c0a2556922791b5^{object}
+2026-10-20T22:50:35.6326270Z 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-20T22:50:35.6337750Z ##[endgroup]
+2026-10-20T22:50:35.6354860Z ##[group]Determining the checkout info
+2026-10-20T22:50:35.6355490Z ##[endgroup]
+2026-10-20T22:50:35.6355930Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-20T22:50:35.6414920Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-20T22:50:35.6474500Z ##[group]Checking out the ref
+2026-10-20T22:50:35.6477580Z [command]/opt/homebrew/bin/git checkout --progress --force 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-20T22:50:35.7345140Z HEAD is now at 37dd551 consumer-model README: cite C35 line
+2026-10-20T22:50:35.7401900Z ##[endgroup]
+2026-10-20T22:50:35.7402720Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-20T22:50:35.7459850Z 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-20T22:50:35.7468180Z ##[group]Removing auth
+2026-10-20T22:50:35.7468430Z Removing SSH command configuration
+2026-10-20T22:50:35.7471110Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T22:50:35.7529230Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T22:50:35.8199900Z Removing HTTP extra header
+2026-10-20T22:50:35.8200970Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T22:50:35.8256050Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T22:50:36.0476240Z Removing includeIf entries pointing to credentials config files
+2026-10-20T22:50:36.0576610Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T22:50:36.0678960Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path
+2026-10-20T22:50:36.0779170Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path
+2026-10-20T22:50:36.0877300Z includeif.gitdir:/github/workspace/consumer-research/.git.path
+2026-10-20T22:50:36.0973500Z includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path
+2026-10-20T22:50:36.1298820Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path
+2026-10-20T22:50:36.1400490Z /Users/runner/work/_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config
+2026-10-20T22:50:36.1704040Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path \/Users\/runner\/work\/_temp\/git\-credentials\-8b6bf7eb\-c07b\-4440\-b448\-a7a4422ad094\.config
+2026-10-20T22:50:36.1873940Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path
+2026-10-20T22:50:36.1975360Z /Users/runner/work/_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config
+2026-10-20T22:50:36.2275240Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path \/Users\/runner\/work\/_temp\/git\-credentials\-8b6bf7eb\-c07b\-4440\-b448\-a7a4422ad094\.config
+2026-10-20T22:50:36.2486660Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/consumer-research/.git.path
+2026-10-20T22:50:36.2508260Z /github/runner_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config
+2026-10-20T22:50:36.2530330Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/consumer-research/.git.path \/github\/runner_temp\/git\-credentials\-8b6bf7eb\-c07b\-4440\-b448\-a7a4422ad094\.config
+2026-10-20T22:50:36.2531590Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path
+2026-10-20T22:50:36.2532190Z /github/runner_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config
+2026-10-20T22:50:36.2533440Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-8b6bf7eb\-c07b\-4440\-b448\-a7a4422ad094\.config
+2026-10-20T22:50:36.2534710Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T22:50:36.2535680Z Removing credentials config '/Users/runner/work/_temp/git-credentials-8b6bf7eb-c07b-4440-b448-a7a4422ad094.config'
+2026-10-20T22:50:36.2536380Z ##[endgroup]
+2026-10-20T22:50:36.2605520Z ##[group]Run brew install libheif
+2026-10-20T22:50:36.2605840Z [36;1mbrew install libheif[0m
+2026-10-20T22:50:36.2606220Z [36;1mecho "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"[0m
+2026-10-20T22:50:36.2606710Z [36;1m# xcode-27 Python is externally managed, so the harness packages stay in a job venv.[0m
+2026-10-20T22:50:36.2607130Z [36;1mpython3 -m venv "$RUNNER_TEMP/tone-venv"[0m
+2026-10-20T22:50:36.2607470Z [36;1m"$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow[0m
+2026-10-20T22:50:36.2607840Z [36;1mecho "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"[0m
+2026-10-20T22:50:36.2675550Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:50:36.2675950Z ##[endgroup]
+2026-10-20T22:50:38.9568570Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-20T22:50:38.9631610Z ✔︎ Bottle Manifest libheif (1.23.6)
+2026-10-20T22:50:39.0662000Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-20T22:50:39.0662950Z libheif 1.23.6
+2026-10-20T22:50:39.0666840Z [34m==>[0m [1mWould install 4 dependencies for libheif:[0m
+2026-10-20T22:50:39.0668400Z libvmaf
+2026-10-20T22:50:39.0670190Z aom
+2026-10-20T22:50:39.0671160Z libde265
+2026-10-20T22:50:39.0672550Z x265
+2026-10-20T22:50:39.1235080Z [32m==>[0m [1mFetching downloads for: [32mlibheif[39m[0m
+2026-10-20T22:50:39.4527940Z ✔︎ Bottle Manifest libvmaf (3.2.1)
+2026-10-20T22:50:39.4528380Z ✔︎ Bottle Manifest aom (3.15.2)
+2026-10-20T22:50:39.4529060Z ✔︎ Bottle Manifest libde265 (1.1.3)
+2026-10-20T22:50:39.6470110Z ✔︎ Bottle Manifest x265 (4.3)
+2026-10-20T22:50:41.1443610Z ✔︎ Bottle libvmaf (3.2.1)
+2026-10-20T22:50:41.1945110Z ✔︎ Bottle libheif (1.23.6)
+2026-10-20T22:50:41.2046680Z ✔︎ Bottle aom (3.15.2)
+2026-10-20T22:50:41.3008240Z ✔︎ Bottle libde265 (1.1.3)
+2026-10-20T22:50:41.3677130Z ✔︎ Bottle x265 (4.3)
+2026-10-20T22:50:41.4018850Z [32m==>[0m [1mInstalling dependencies for libheif:[0m [32mlibvmaf[39m, [32maom[39m, [32mlibde265[39m and [32mx265[39m[0m
+2026-10-20T22:50:41.4020070Z [32m==>[0m [1mInstalling libheif dependency: [32mlibvmaf[39m (3.2.1)[0m
+2026-10-20T22:50:41.4099240Z [34m==>[0m [1mPouring libvmaf--3.2.1.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-20T22:50:42.4021280Z 🍺  /opt/homebrew/Cellar/libvmaf/3.2.1: 243 files, 8.2MB
+2026-10-20T22:50:42.4023100Z [32m==>[0m [1mInstalling libheif dependency: [32maom[39m (3.15.2)[0m
+2026-10-20T22:50:42.4134990Z [34m==>[0m [1mPouring aom--3.15.2.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-20T22:50:43.6119020Z 🍺  /opt/homebrew/Cellar/aom/3.15.2: 30 files, 11.3MB
+2026-10-20T22:50:43.6126500Z [32m==>[0m [1mInstalling libheif dependency: [32mlibde265[39m (1.1.3)[0m
+2026-10-20T22:50:43.6174890Z [34m==>[0m [1mPouring libde265--1.1.3.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-20T22:50:44.7363030Z 🍺  /opt/homebrew/Cellar/libde265/1.1.3: 18 files, 436.6KB
+2026-10-20T22:50:44.7365020Z [32m==>[0m [1mInstalling libheif dependency: [32mx265[39m (4.3)[0m
+2026-10-20T22:50:44.7392010Z [34m==>[0m [1mPouring x265--4.3.arm64_golden_gate.bottle.1.tar.gz[0m
+2026-10-20T22:50:45.6295470Z 🍺  /opt/homebrew/Cellar/x265/4.3: 12 files, 17.3MB
+2026-10-20T22:50:45.6299110Z [32m==>[0m [1mInstalling [32mlibheif[39m[0m
+2026-10-20T22:50:45.6300340Z [34m==>[0m [1mPouring libheif--1.23.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-20T22:50:46.5731480Z 🍺  /opt/homebrew/Cellar/libheif/1.23.6: 53 files, 9.1MB
+2026-10-20T22:50:46.5743010Z [32m==>[0m [1mCaveats[0m
+2026-10-20T22:50:46.5750750Z [34m==>[0m [1mlibheif[0m
+2026-10-20T22:50:46.5752200Z Additional codecs can be enabled by `brew install libheif-plugins`
+2026-10-20T22:50:50.8425860Z Collecting numpy
+2026-10-20T22:50:50.9328550Z   Downloading numpy-2.5.4-cp315-cp315-macosx_14_0_arm64.whl.metadata (6.6 kB)
+2026-10-20T22:50:51.1312100Z Collecting pillow
+2026-10-20T22:50:51.1514930Z   Downloading pillow-13.0.0-cp315-cp315-macosx_11_0_arm64.whl.metadata (9.1 kB)
+2026-10-20T22:50:51.2220450Z Downloading numpy-2.5.4-cp315-cp315-macosx_14_0_arm64.whl (5.5 MB)
+2026-10-20T22:50:51.3312380Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.5/5.5 MB 63.9 MB/s  0:00:00
+2026-10-20T22:50:51.3467120Z Downloading pillow-13.0.0-cp315-cp315-macosx_11_0_arm64.whl (4.9 MB)
+2026-10-20T22:50:51.3955750Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.9/4.9 MB 106.6 MB/s  0:00:00
+2026-10-20T22:50:51.4317580Z Installing collected packages: pillow, numpy
+2026-10-20T22:50:54.1103860Z 
+2026-10-20T22:50:54.1139630Z 
+2026-10-20T22:50:54.1205230Z Successfully installed numpy-2.5.4 pillow-13.0.0
+2026-10-20T22:50:54.1240390Z [notice] A new release of pip is available: 26.2.1 -> 26.2.2
+2026-10-20T22:50:54.1341690Z [notice] To update, run: /Users/runner/work/_temp/tone-venv/bin/python -m pip install --upgrade pip
+2026-10-20T22:50:54.3240210Z ##[group]Run actions-rust-lang/setup-rust-toolchain@v2
+2026-10-20T22:50:54.3242780Z with:
+2026-10-20T22:50:54.3242960Z   toolchain: stable
+2026-10-20T22:50:54.3243160Z   build-warnings: deny
+2026-10-20T22:50:54.3243350Z   cache: true
+2026-10-20T22:50:54.3243480Z   cache-on-failure: true
+2026-10-20T22:50:54.3244210Z   cache-bin: true
+2026-10-20T22:50:54.3245440Z   cache-provider: github
+2026-10-20T22:50:54.3250040Z   cache-all-crates: false
+2026-10-20T22:50:54.3250350Z   cache-workspace-crates: false
+2026-10-20T22:50:54.3253390Z   cache-save-if: true
+2026-10-20T22:50:54.3253610Z   cache-targets: true
+2026-10-20T22:50:54.3253900Z   matcher: true
+2026-10-20T22:50:54.3254120Z   override: true
+2026-10-20T22:50:54.3255860Z env:
+2026-10-20T22:50:54.3256650Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:50:54.3257320Z ##[endgroup]
+2026-10-20T22:50:54.3418370Z ##[start-action display=Unbork mac;id=__actions-rust-lang_setup-rust-toolchain.__run]
+2026-10-20T22:50:54.4062020Z ##[group]Run brew install bash
+2026-10-20T22:50:54.4062260Z [36;1mbrew install bash[0m
+2026-10-20T22:50:54.4138910Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:50:54.4139180Z env:
+2026-10-20T22:50:54.4139400Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:50:54.4139640Z ##[endgroup]
+2026-10-20T22:50:56.3142510Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-20T22:50:56.3246430Z ✔︎ Bottle Manifest bash (5.3.20)
+2026-10-20T22:50:56.3887670Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-20T22:50:56.3996660Z bash 5.3.20
+2026-10-20T22:50:56.4108060Z [32m==>[0m [1mFetching downloads for: [32mbash[39m[0m
+2026-10-20T22:50:56.4109040Z [34m==>[0m [1mWould install 1 dependency for bash:[0m
+2026-10-20T22:50:56.4210540Z ncurses
+2026-10-20T22:50:56.6613570Z ✔︎ Bottle Manifest ncurses (6.6)
+2026-10-20T22:50:58.3238120Z ✔︎ Bottle bash (5.3.20)
+2026-10-20T22:50:58.9119790Z ✔︎ Bottle ncurses (6.6)
+2026-10-20T22:50:58.9246280Z [32m==>[0m [1mInstalling bash dependency: [32mncurses[39m (6.6)[0m
+2026-10-20T22:50:58.9303610Z [34m==>[0m [1mPouring ncurses--6.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-20T22:51:01.0216540Z 🍺  /opt/homebrew/Cellar/ncurses/6.6: 4,086 files, 10.3MB
+2026-10-20T22:51:01.0218090Z [32m==>[0m [1mInstalling [32mbash[39m[0m
+2026-10-20T22:51:01.0220790Z [34m==>[0m [1mPouring bash--5.3.20.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-20T22:51:02.6063690Z 🍺  /opt/homebrew/Cellar/bash/5.3.20: 172 files, 13.1MB
+2026-10-20T22:51:02.6068810Z [32m==>[0m [1mCaveats[0m
+2026-10-20T22:51:02.6069960Z [34m==>[0m [1mbash[0m
+2026-10-20T22:51:02.6071600Z DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/lib/bash:/opt/local/lib/bash:/usr/pkg/lib/bash:/opt/pkg/lib/bash:.
+2026-10-20T22:51:02.6278390Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=8285]
+2026-10-20T22:51:02.6338460Z ##[start-action display=Run : construct rustup command line;id=__actions-rust-lang_setup-rust-toolchain.flags]
+2026-10-20T22:51:02.6381860Z ##[group]Run : construct rustup command line
+2026-10-20T22:51:02.6382330Z [36;1m: construct rustup command line[0m
+2026-10-20T22:51:02.6383060Z [36;1mecho "targets=$(for t in ${_srt_targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+2026-10-20T22:51:02.6383850Z [36;1mecho "components=$(for c in ${_srt_components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+2026-10-20T22:51:02.6385060Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+2026-10-20T22:51:02.6408050Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:51:02.6408440Z env:
+2026-10-20T22:51:02.6408760Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:02.6409140Z   _srt_targets: 
+2026-10-20T22:51:02.6409430Z   _srt_components: 
+2026-10-20T22:51:02.6409660Z ##[endgroup]
+2026-10-20T22:51:02.7567030Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.flags;outcome=success;conclusion=success;duration_ms=122]
+2026-10-20T22:51:02.7573480Z ##[start-action display=Setting Environment Variables;id=__actions-rust-lang_setup-rust-toolchain.__run_2]
+2026-10-20T22:51:02.7604550Z ##[group]Run if [[ ! -v CARGO_INCREMENTAL ]]; then
+2026-10-20T22:51:02.7605020Z [36;1mif [[ ! -v CARGO_INCREMENTAL ]]; then[0m
+2026-10-20T22:51:02.7605330Z [36;1m  echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV[0m
+2026-10-20T22:51:02.7606330Z [36;1mfi[0m
+2026-10-20T22:51:02.7606580Z [36;1mif [[ ! -v CARGO_PROFILE_DEV_DEBUG ]]; then[0m
+2026-10-20T22:51:02.7606970Z [36;1m  echo "CARGO_PROFILE_DEV_DEBUG=0" >> $GITHUB_ENV[0m
+2026-10-20T22:51:02.7607270Z [36;1mfi[0m
+2026-10-20T22:51:02.7607560Z [36;1mif [[ ! -v CARGO_TERM_COLOR ]]; then[0m
+2026-10-20T22:51:02.7607880Z [36;1m  echo "CARGO_TERM_COLOR=always" >> $GITHUB_ENV[0m
+2026-10-20T22:51:02.7608250Z [36;1mfi[0m
+2026-10-20T22:51:02.7608540Z [36;1mif [[ ! -v RUST_BACKTRACE ]]; then[0m
+2026-10-20T22:51:02.7608790Z [36;1m  echo "RUST_BACKTRACE=short" >> $GITHUB_ENV[0m
+2026-10-20T22:51:02.7609140Z [36;1mfi[0m
+2026-10-20T22:51:02.7609400Z [36;1mif [[ ( ! -v RUSTFLAGS ) && $_srt_NEW_RUSTFLAGS != "" ]]; then[0m
+2026-10-20T22:51:02.7609770Z [36;1m  echo "RUSTFLAGS=$_srt_NEW_RUSTFLAGS" >> $GITHUB_ENV[0m
+2026-10-20T22:51:02.7610010Z [36;1mfi[0m
+2026-10-20T22:51:02.7610320Z [36;1mif [[ ( ! -v CARGO_BUILD_WARNINGS ) && $_srt_CARGO_BUILD_WARNINGS != "" ]]; then[0m
+2026-10-20T22:51:02.7610900Z [36;1m  echo "CARGO_BUILD_WARNINGS=$_srt_CARGO_BUILD_WARNINGS" >> $GITHUB_ENV[0m
+2026-10-20T22:51:02.7611310Z [36;1mfi[0m
+2026-10-20T22:51:02.7611630Z [36;1m# Enable faster sparse index on nightly[0m
+2026-10-20T22:51:02.7612010Z [36;1m# The value is ignored on stable and causes no problems[0m
+2026-10-20T22:51:02.7612570Z [36;1m# https://internals.rust-lang.org/t/call-for-testing-cargo-sparse-registry/16862[0m
+2026-10-20T22:51:02.7613020Z [36;1mif [[ ! -v CARGO_UNSTABLE_SPARSE_REGISTRY ]]; then[0m
+2026-10-20T22:51:02.7613460Z [36;1m  echo "CARGO_UNSTABLE_SPARSE_REGISTRY=true" >> $GITHUB_ENV[0m
+2026-10-20T22:51:02.7613780Z [36;1mfi[0m
+2026-10-20T22:51:02.7614130Z [36;1mif [[ ! -v CARGO_REGISTRIES_CRATES_IO_PROTOCOL ]]; then[0m
+2026-10-20T22:51:02.7614590Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse" >> $GITHUB_ENV[0m
+2026-10-20T22:51:02.7614910Z [36;1mfi[0m
+2026-10-20T22:51:02.7628420Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:51:02.7628710Z env:
+2026-10-20T22:51:02.7629040Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:02.7629470Z   _srt_NEW_RUSTFLAGS: 
+2026-10-20T22:51:02.7629720Z   _srt_CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:51:02.7630110Z ##[endgroup]
+2026-10-20T22:51:02.8120520Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_2;outcome=success;conclusion=success;duration_ms=54]
+2026-10-20T22:51:02.8123130Z ##[start-action display=Install Rust Problem Matcher;id=__actions-rust-lang_setup-rust-toolchain.__run_3]
+2026-10-20T22:51:02.8154730Z ##[group]Run echo "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"
+2026-10-20T22:51:02.8155370Z [36;1mecho "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"[0m
+2026-10-20T22:51:02.8168010Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:51:02.8168310Z env:
+2026-10-20T22:51:02.8168510Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:02.8168820Z   CARGO_INCREMENTAL: 0
+2026-10-20T22:51:02.8169000Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T22:51:02.8169230Z   CARGO_TERM_COLOR: always
+2026-10-20T22:51:02.8169410Z   RUST_BACKTRACE: short
+2026-10-20T22:51:02.8169590Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:51:02.8169790Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T22:51:02.8170030Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T22:51:02.8170280Z ##[endgroup]
+2026-10-20T22:51:02.8639720Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_3;outcome=success;conclusion=success;duration_ms=51]
+2026-10-20T22:51:02.8647660Z ##[start-action display=Install rustup, if needed;id=__actions-rust-lang_setup-rust-toolchain.__run_4]
+2026-10-20T22:51:02.8689280Z ##[group]Run if ! command -v rustup &> /dev/null ; then
+2026-10-20T22:51:02.8690110Z [36;1mif ! command -v rustup &> /dev/null ; then[0m
+2026-10-20T22:51:02.8691600Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" | sh -s -- --default-toolchain none -y[0m
+2026-10-20T22:51:02.8705140Z [36;1m[0m
+2026-10-20T22:51:02.8705450Z [36;1m  # Resolve the correct CARGO_HOME path depending on OS[0m
+2026-10-20T22:51:02.8705760Z [36;1m  if [[ "$RUNNER_OS" == "Windows" ]]; then[0m
+2026-10-20T22:51:02.8706210Z [36;1m    echo "${CARGO_HOME:-$USERPROFILE/.cargo}/bin" | sed 's|/|\\|g' >> $GITHUB_PATH[0m
+2026-10-20T22:51:02.8706540Z [36;1m  else[0m
+2026-10-20T22:51:02.8706770Z [36;1m    echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> $GITHUB_PATH[0m
+2026-10-20T22:51:02.8707040Z [36;1m  fi[0m
+2026-10-20T22:51:02.8707190Z [36;1mfi[0m
+2026-10-20T22:51:02.8721060Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:51:02.8721620Z env:
+2026-10-20T22:51:02.8721840Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:02.8722090Z   CARGO_INCREMENTAL: 0
+2026-10-20T22:51:02.8722300Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T22:51:02.8722510Z   CARGO_TERM_COLOR: always
+2026-10-20T22:51:02.8722690Z   RUST_BACKTRACE: short
+2026-10-20T22:51:02.8722900Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:51:02.8723100Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T22:51:02.8723380Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T22:51:02.8723660Z   RUNNER_OS: macOS
+2026-10-20T22:51:02.8723840Z ##[endgroup]
+2026-10-20T22:51:02.9231160Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=58]
+2026-10-20T22:51:02.9235130Z ##[start-action display=rustup toolchain install stable;id=__actions-rust-lang_setup-rust-toolchain.__run_5]
+2026-10-20T22:51:02.9270370Z ##[group]Run # Check if value is set
+2026-10-20T22:51:02.9271120Z [36;1m# Check if value is set[0m
+2026-10-20T22:51:02.9271720Z [36;1mif [[ -n "$_srt_rust_src_dir" ]][0m
+2026-10-20T22:51:02.9272470Z [36;1mthen[0m
+2026-10-20T22:51:02.9273050Z [36;1m  # If value is set the directory must exist[0m
+2026-10-20T22:51:02.9273890Z [36;1m  if [[ -d "$_srt_rust_src_dir" ]][0m
+2026-10-20T22:51:02.9274540Z [36;1m  then[0m
+2026-10-20T22:51:02.9275090Z [36;1m    cd "$_srt_rust_src_dir"[0m
+2026-10-20T22:51:02.9275700Z [36;1m  else[0m
+2026-10-20T22:51:02.9276380Z [36;1m    echo "'rust-src-dir' does not point to an existing directory" >&2[0m
+2026-10-20T22:51:02.9277540Z [36;1m    echo "The value of 'rust-src-dir' is: ${_srt_rust_src_dir}" >&2[0m
+2026-10-20T22:51:02.9278500Z [36;1m    exit 1[0m
+2026-10-20T22:51:02.9279020Z [36;1m  fi[0m
+2026-10-20T22:51:02.9279420Z [36;1mfi[0m
+2026-10-20T22:51:02.9280240Z [36;1mif [[ -z "$_srt_toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml") ]][0m
+2026-10-20T22:51:02.9281210Z [36;1mthen[0m
+2026-10-20T22:51:02.9281750Z [36;1m  # Install the toolchain as specified in the file[0m
+2026-10-20T22:51:02.9282780Z [36;1m  # rustup show is the old way that implicitly installed a toolchain[0m
+2026-10-20T22:51:02.9283730Z [36;1m  # rustup toolchain install is the new explicit way[0m
+2026-10-20T22:51:02.9284900Z [36;1m  # https://github.com/rust-lang/rustup/issues/3635#issuecomment-2343511297[0m
+2026-10-20T22:51:02.9285980Z [36;1m  rustup show active-toolchain || rustup toolchain install[0m
+2026-10-20T22:51:02.9286900Z [36;1m  if [[ -n $_srt_components ]]; then[0m
+2026-10-20T22:51:02.9287690Z [36;1m    rustup component add ${_srt_components//,/ }[0m
+2026-10-20T22:51:02.9288660Z [36;1m  fi[0m
+2026-10-20T22:51:02.9289180Z [36;1m  if [[ -n $_srt_targets ]]; then[0m
+2026-10-20T22:51:02.9290910Z [36;1m    rustup target add ${_srt_targets//,/ }[0m
+2026-10-20T22:51:02.9291690Z [36;1m  fi[0m
+2026-10-20T22:51:02.9292100Z [36;1melse[0m
+2026-10-20T22:51:02.9292580Z [36;1m  if [[ -z "$_srt_toolchain" ]][0m
+2026-10-20T22:51:02.9293170Z [36;1m  then[0m
+2026-10-20T22:51:02.9293640Z [36;1m    _srt_toolchain=stable[0m
+2026-10-20T22:51:02.9294210Z [36;1m  fi[0m
+2026-10-20T22:51:02.9295000Z [36;1m  rustup toolchain install ${_srt_toolchain//,/ }  --profile minimal --no-self-update[0m
+2026-10-20T22:51:02.9296750Z [36;1m  # Take the last element from the list[0m
+2026-10-20T22:51:02.9297470Z [36;1m  if [[ "$_srt_override" == "true" ]][0m
+2026-10-20T22:51:02.9298140Z [36;1m  then[0m
+2026-10-20T22:51:02.9298690Z [36;1m    rustup override set ${_srt_toolchain//*,/ }[0m
+2026-10-20T22:51:02.9299360Z [36;1m  fi[0m
+2026-10-20T22:51:02.9299760Z [36;1mfi[0m
+2026-10-20T22:51:02.9330170Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:51:02.9331080Z env:
+2026-10-20T22:51:02.9331670Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:02.9332380Z   CARGO_INCREMENTAL: 0
+2026-10-20T22:51:02.9332880Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T22:51:02.9333390Z   CARGO_TERM_COLOR: always
+2026-10-20T22:51:02.9333900Z   RUST_BACKTRACE: short
+2026-10-20T22:51:02.9334370Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:51:02.9334950Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T22:51:02.9335570Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T22:51:02.9336220Z   _srt_toolchain: stable
+2026-10-20T22:51:02.9336750Z   _srt_targets: 
+2026-10-20T22:51:02.9337170Z   _srt_components: 
+2026-10-20T22:51:02.9337630Z   _srt_override: true
+2026-10-20T22:51:02.9338090Z   _srt_rust_src_dir: 
+2026-10-20T22:51:02.9338550Z ##[endgroup]
+2026-10-20T22:51:03.1224430Z info: syncing channel updates for stable-aarch64-apple-darwin
+2026-10-20T22:51:03.3739430Z info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-20T22:51:03.3858440Z info: removing previous version of component clippy
+2026-10-20T22:51:03.3925850Z info: removing previous version of component rustfmt
+2026-10-20T22:51:03.3950240Z info: removing previous version of component cargo
+2026-10-20T22:51:03.4044190Z info: removing previous version of component rust-std
+2026-10-20T22:51:03.4200650Z info: removing previous version of component rustc
+2026-10-20T22:51:03.4340710Z info: downloading 5 components
+2026-10-20T22:51:10.0564970Z 
+2026-10-20T22:51:10.1142950Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))
+2026-10-20T22:51:10.1151220Z info: self-update is disabled for this build of rustup
+2026-10-20T22:51:10.1151770Z info: any updates to rustup will need to be fetched with your system package manager
+2026-10-20T22:51:10.1152160Z 
+2026-10-20T22:51:10.1433140Z info: override toolchain for /Users/runner/work/XDRemux/XDRemux set to stable-aarch64-apple-darwin
+2026-10-20T22:51:10.1481570Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=7224]
+2026-10-20T22:51:10.1489430Z ##[start-action display=Print installed versions;id=__actions-rust-lang_setup-rust-toolchain.versions]
+2026-10-20T22:51:10.1524310Z ##[group]Run echo "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT
+2026-10-20T22:51:10.1524980Z [36;1mecho "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT[0m
+2026-10-20T22:51:10.1525490Z [36;1m_srt_VERBOSE=$(rustc --version --verbose)[0m
+2026-10-20T22:51:10.1525860Z [36;1mecho "$_srt_VERBOSE"[0m
+2026-10-20T22:51:10.1526200Z [36;1mecho "cargo-version=$(cargo --version)" >> $GITHUB_OUTPUT[0m
+2026-10-20T22:51:10.1547410Z [36;1mcargo --version --verbose[0m
+2026-10-20T22:51:10.1547830Z [36;1mecho "rustup-version=$(rustup --version)" >> $GITHUB_OUTPUT[0m
+2026-10-20T22:51:10.1548340Z [36;1mrustup --version[0m
+2026-10-20T22:51:10.1548630Z [36;1m[0m
+2026-10-20T22:51:10.1550270Z [36;1m_srt_DATE=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+2026-10-20T22:51:10.1550830Z [36;1m_srt_HASH=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-hash: //p')[0m
+2026-10-20T22:51:10.1551230Z [36;1mecho "cachekey=$(echo $_srt_DATE$_srt_HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+2026-10-20T22:51:10.1571210Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:51:10.1571620Z env:
+2026-10-20T22:51:10.1571930Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:10.1573130Z   CARGO_INCREMENTAL: 0
+2026-10-20T22:51:10.1573470Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T22:51:10.1573770Z   CARGO_TERM_COLOR: always
+2026-10-20T22:51:10.1574070Z   RUST_BACKTRACE: short
+2026-10-20T22:51:10.1574340Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:51:10.1574700Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T22:51:10.1574960Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T22:51:10.1575330Z ##[endgroup]
+2026-10-20T22:51:10.3573020Z rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-20T22:51:10.3573550Z binary: rustc
+2026-10-20T22:51:10.3574040Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-20T22:51:10.3574450Z commit-date: 2026-10-13
+2026-10-20T22:51:10.3574800Z host: aarch64-apple-darwin
+2026-10-20T22:51:10.3575020Z release: 1.99.1
+2026-10-20T22:51:10.3575230Z LLVM version: 23.1.1
+2026-10-20T22:51:10.4120110Z cargo 1.99.1 (5f94df478 2026-08-27)
+2026-10-20T22:51:10.4122920Z release: 1.99.1
+2026-10-20T22:51:10.4123610Z commit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e
+2026-10-20T22:51:10.4124250Z commit-date: 2026-08-27
+2026-10-20T22:51:10.4124640Z host: aarch64-apple-darwin
+2026-10-20T22:51:10.4125040Z libgit2: 1.9.6 (sys:0.21.0 vendored)
+2026-10-20T22:51:10.4125540Z libcurl: 8.7.1 (sys:0.4.90+curl-8.21.0 system ssl:(SecureTransport) LibreSSL/3.3.6)
+2026-10-20T22:51:10.4126120Z ssl: OpenSSL 3.6.3 9 Jun 2026
+2026-10-20T22:51:10.4126490Z os: Mac OS 27.0.1 [64-bit]
+2026-10-20T22:51:10.4261850Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-20T22:51:10.4635870Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-20T22:51:10.4892010Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-20T22:51:10.4892480Z rustup 1.29.0 (2026-03-05)
+2026-10-20T22:51:10.5258440Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-20T22:51:10.5443950Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.versions;outcome=success;conclusion=success;duration_ms=395]
+2026-10-20T22:51:10.5447010Z ##[start-action display=Downgrade registry access protocol when needed;id=__actions-rust-lang_setup-rust-toolchain.__run_6]
+2026-10-20T22:51:10.5479420Z ##[group]Run # Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-20T22:51:10.5480030Z [36;1m# Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL[0m
+2026-10-20T22:51:10.5480560Z [36;1m# On versions 1.66, 1.67, and 1.68.0-nightly the value "sparse" is still unstable.[0m
+2026-10-20T22:51:10.5481190Z [36;1m# https://github.com/dtolnay/rust-toolchain/pull/69#discussion_r1107268108[0m
+2026-10-20T22:51:10.5481730Z [36;1m# If we detect an incompatible value, set it to "git" which is always supported.[0m
+2026-10-20T22:51:10.5482500Z [36;1mif [[ "rustc 1.99.1 (58cf8f9c3 2026-10-13)" =~ ^rustc\ (1\.6[67]\.|1\.68\.0-nightly) && "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL}" == "sparse" ]]; then[0m
+2026-10-20T22:51:10.5483200Z [36;1m  echo "Downgrade cargo registry protocol to git"[0m
+2026-10-20T22:51:10.5483660Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git" >> $GITHUB_ENV[0m
+2026-10-20T22:51:10.5484090Z [36;1mfi[0m
+2026-10-20T22:51:10.5497660Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:51:10.5498100Z env:
+2026-10-20T22:51:10.5498380Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:10.5499030Z   CARGO_INCREMENTAL: 0
+2026-10-20T22:51:10.5499260Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T22:51:10.5500040Z   CARGO_TERM_COLOR: always
+2026-10-20T22:51:10.5500370Z   RUST_BACKTRACE: short
+2026-10-20T22:51:10.5500630Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:51:10.5500940Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T22:51:10.5501290Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T22:51:10.5501580Z ##[endgroup]
+2026-10-20T22:51:10.6141190Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=69]
+2026-10-20T22:51:10.6144510Z ##[start-action display=Setup Rust Caching;id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache]
+2026-10-20T22:51:10.6222700Z ##[group]Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+2026-10-20T22:51:10.6223010Z with:
+2026-10-20T22:51:10.6223170Z   cache-on-failure: true
+2026-10-20T22:51:10.6223330Z   cache-bin: true
+2026-10-20T22:51:10.6223490Z   cache-provider: github
+2026-10-20T22:51:10.6223660Z   cache-all-crates: false
+2026-10-20T22:51:10.6223860Z   cache-workspace-crates: false
+2026-10-20T22:51:10.6224080Z   cache-targets: true
+2026-10-20T22:51:10.6224270Z   save-if: true
+2026-10-20T22:51:10.6224450Z   prefix-key: v0-rust
+2026-10-20T22:51:10.6224650Z   add-job-id-key: true
+2026-10-20T22:51:10.6224860Z   add-rust-environment-hash-key: true
+2026-10-20T22:51:10.6225080Z   lookup-only: false
+2026-10-20T22:51:10.6225230Z   cmd-format: {0}
+2026-10-20T22:51:10.6225360Z env:
+2026-10-20T22:51:10.6225540Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:10.6225800Z   CARGO_INCREMENTAL: 0
+2026-10-20T22:51:10.6225990Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T22:51:10.6226170Z   CARGO_TERM_COLOR: always
+2026-10-20T22:51:10.6226370Z   RUST_BACKTRACE: short
+2026-10-20T22:51:10.6226550Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:51:10.6226870Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T22:51:10.6227270Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T22:51:10.6227600Z ##[endgroup]
+2026-10-20T22:51:11.4516460Z ##[group]Cache Configuration
+2026-10-20T22:51:11.4543270Z Cache Provider:
+2026-10-20T22:51:11.4548980Z     github
+2026-10-20T22:51:11.4549590Z Workspaces:
+2026-10-20T22:51:11.4550180Z     /Users/runner/work/XDRemux/XDRemux
+2026-10-20T22:51:11.4554890Z Cache Paths:
+2026-10-20T22:51:11.4557570Z     /Users/runner/.cargo/bin
+2026-10-20T22:51:11.4558940Z     /Users/runner/.cargo/.crates.toml
+2026-10-20T22:51:11.4559880Z     /Users/runner/.cargo/.crates2.json
+2026-10-20T22:51:11.4560870Z     /Users/runner/.cargo/registry
+2026-10-20T22:51:11.4562890Z     /Users/runner/.cargo/git
+2026-10-20T22:51:11.4565850Z     /Users/runner/work/XDRemux/XDRemux/target
+2026-10-20T22:51:11.4566310Z Restore Key:
+2026-10-20T22:51:11.4566560Z     v0-rust-style-tone-response-Darwin-arm64-e85a7fdf
+2026-10-20T22:51:11.4569460Z Cache Key:
+2026-10-20T22:51:11.4569830Z     v0-rust-style-tone-response-Darwin-arm64-e85a7fdf-acff7af5
+2026-10-20T22:51:11.4570130Z .. Prefix:
+2026-10-20T22:51:11.4570370Z   - v0-rust-style-tone-response-Darwin-arm64
+2026-10-20T22:51:11.4572020Z .. Environment considered:
+2026-10-20T22:51:11.4573790Z   - Rust Versions:
+2026-10-20T22:51:11.4574120Z     - 1.99.1 aarch64-apple-darwin 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-20T22:51:11.4574460Z   - CARGO_BUILD_WARNINGS
+2026-10-20T22:51:11.4574730Z   - CARGO_INCREMENTAL
+2026-10-20T22:51:11.4575380Z   - CARGO_PROFILE_DEV_DEBUG
+2026-10-20T22:51:11.4575680Z   - CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-20T22:51:11.4575960Z   - CARGO_TERM_COLOR
+2026-10-20T22:51:11.4576200Z   - CARGO_UNSTABLE_SPARSE_REGISTRY
+2026-10-20T22:51:11.4576810Z   - RUST_BACKTRACE
+2026-10-20T22:51:11.4577080Z .. Lockfiles considered:
+2026-10-20T22:51:11.4577450Z   - /Users/runner/work/XDRemux/XDRemux/Cargo.lock
+2026-10-20T22:51:11.4578810Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification/Cargo.toml
+2026-10-20T22:51:11.4580700Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli/Cargo.toml
+2026-10-20T22:51:11.4581660Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec/Cargo.toml
+2026-10-20T22:51:11.4583180Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-container/Cargo.toml
+2026-10-20T22:51:11.4583870Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine/Cargo.toml
+2026-10-20T22:51:11.4584650Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-format/Cargo.toml
+2026-10-20T22:51:11.4585250Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr/Cargo.toml
+2026-10-20T22:51:11.4588500Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif/Cargo.toml
+2026-10-20T22:51:11.4589430Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata/Cargo.toml
+2026-10-20T22:51:11.4589920Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo/Cargo.toml
+2026-10-20T22:51:11.4590370Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime/Cargo.toml
+2026-10-20T22:51:11.4590800Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-source/Cargo.toml
+2026-10-20T22:51:11.4591420Z ##[endgroup]
+2026-10-20T22:51:11.4591510Z 
+2026-10-20T22:51:11.4591600Z ... Restoring cache ...
+2026-10-20T22:51:11.6440680Z Cache hit for: v0-rust-style-tone-response-Darwin-arm64-e85a7fdf-acff7af5
+2026-10-20T22:51:12.8197340Z Received 33554432 of 69891373 (48.0%), 32.0 MBs/sec
+2026-10-20T22:51:13.1100810Z Received 69891373 of 69891373 (100.0%), 51.7 MBs/sec
+2026-10-20T22:51:13.1205790Z Cache Size: ~67 MB (69891373 B)
+2026-10-20T22:51:13.1247210Z [command]/opt/homebrew/bin/gtar -xf /Users/runner/work/_temp/b5707ce0-e3d6-42ea-9b42-8906aea894d0/cache.tzst -P -C /Users/runner/work/XDRemux/XDRemux --delay-directory-restore --use-compress-program unzstd
+2026-10-20T22:51:14.1603080Z Cache restored successfully
+2026-10-20T22:51:14.1703250Z Restored from cache key "v0-rust-style-tone-response-Darwin-arm64-e85a7fdf-acff7af5" full match: true.
+2026-10-20T22:51:14.1764860Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=3561]
+2026-10-20T22:51:14.1858790Z ##[group]Run cargo build --locked -p xdremux-cli
+2026-10-20T22:51:14.1859150Z [36;1mcargo build --locked -p xdremux-cli[0m
+2026-10-20T22:51:14.1859440Z [36;1mswift build --product xdremux-apple-adapter[0m
+2026-10-20T22:51:14.1859730Z [36;1mtest -x target/debug/xdremux[0m
+2026-10-20T22:51:14.1860080Z [36;1mtest -x "$(swift build --show-bin-path)/xdremux-apple-adapter"[0m
+2026-10-20T22:51:14.1875240Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:51:14.1875570Z env:
+2026-10-20T22:51:14.1875820Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:51:14.1876160Z   CARGO_INCREMENTAL: 0
+2026-10-20T22:51:14.1876360Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T22:51:14.1876590Z   CARGO_TERM_COLOR: always
+2026-10-20T22:51:14.1876830Z   RUST_BACKTRACE: short
+2026-10-20T22:51:14.1877030Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:51:14.1877260Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T22:51:14.1877630Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T22:51:14.1877880Z   CACHE_ON_FAILURE: true
+2026-10-20T22:51:14.1878090Z ##[endgroup]
+2026-10-20T22:51:14.4721420Z [1m[92m    Updating[0m crates.io index
+2026-10-20T22:51:15.5258430Z [1m[92m   Compiling[0m xdremux-format v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-format)
+2026-10-20T22:51:15.5302630Z [1m[92m   Compiling[0m xdremux-motion-photo v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo)
+2026-10-20T22:51:15.5404220Z [1m[92m   Compiling[0m xdremux-container v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-container)
+2026-10-20T22:51:15.7425820Z [1m[92m   Compiling[0m xdremux-engine v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine)
+2026-10-20T22:51:15.7676400Z [1m[92m   Compiling[0m xdremux-metadata v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata)
+2026-10-20T22:51:16.3342150Z [1m[92m   Compiling[0m xdremux-source v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-source)
+2026-10-20T22:51:16.3770100Z [1m[92m   Compiling[0m xdremux-heif v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif)
+2026-10-20T22:51:16.4569380Z [1m[92m   Compiling[0m xdremux-classification v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification)
+2026-10-20T22:51:17.0933740Z [1m[92m   Compiling[0m xdremux-codec v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec)
+2026-10-20T22:51:17.1260120Z [1m[92m   Compiling[0m xdremux-hdr v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr)
+2026-10-20T22:51:17.8368350Z [1m[92m   Compiling[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-20T22:51:19.2928910Z [1m[92m   Compiling[0m xdremux-cli v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli)
+2026-10-20T22:51:23.6671760Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 9.36s
+2026-10-20T22:51:32.6186760Z Building for debugging...
+2026-10-20T22:51:32.6190590Z [Pre-planning 1 / 96]
+2026-10-20T22:51:32.8584950Z [Planning deferred tasks]
+2026-10-20T22:51:32.9623910Z [25 / 44] XDTextureNative
+2026-10-20T22:51:43.0440840Z [27 / 44]
+2026-10-20T22:51:45.4148050Z [31 / 45] XDTextureNative
+2026-10-20T22:51:45.6203210Z [32 / 95]
+2026-10-20T22:51:45.7370810Z [36 / 95]
+2026-10-20T22:51:46.0001010Z [41 / 104]
+2026-10-20T22:51:46.2180630Z [45 / 177]
+2026-10-20T22:51:46.3129620Z [46 / 177]
+2026-10-20T22:51:46.4762060Z [50 / 177]
+2026-10-20T22:51:46.5788690Z [52 / 177]
+2026-10-20T22:51:46.6876620Z [55 / 177]
+2026-10-20T22:51:46.8448120Z [59 / 186]
+2026-10-20T22:51:46.9451870Z [62 / 186]
+2026-10-20T22:51:47.0799870Z [66 / 186]
+2026-10-20T22:51:47.2220800Z [71 / 186]
+2026-10-20T22:51:47.4237590Z [73 / 186]
+2026-10-20T22:51:47.5953840Z [76 / 186]
+2026-10-20T22:51:47.9918040Z [80 / 186]
+2026-10-20T22:51:48.1201070Z [82 / 186]
+2026-10-20T22:51:48.2524640Z [85 / 186]
+2026-10-20T22:51:48.3620170Z [89 / 186]
+2026-10-20T22:51:48.4783410Z [94 / 186]
+2026-10-20T22:51:48.5996870Z [100 / 186]
+2026-10-20T22:51:48.7660820Z [104 / 186]
+2026-10-20T22:51:48.9091470Z [109 / 186]
+2026-10-20T22:51:49.0435740Z [112 / 186]
+2026-10-20T22:51:49.1478390Z [116 / 186]
+2026-10-20T22:51:49.3067120Z [119 / 186]
+2026-10-20T22:51:49.4159670Z [120 / 186]
+2026-10-20T22:51:49.7154680Z [122 / 186]
+2026-10-20T22:51:49.8237740Z [128 / 186]
+2026-10-20T22:51:49.9666170Z [131 / 186]
+2026-10-20T22:51:50.1263250Z [135 / 186]
+2026-10-20T22:51:50.2632540Z [139 / 186]
+2026-10-20T22:51:50.4231000Z [142 / 186]
+2026-10-20T22:51:50.5591950Z [145 / 186]
+2026-10-20T22:51:50.6827490Z [148 / 186]
+2026-10-20T22:51:50.8056130Z [151 / 186]
+2026-10-20T22:51:50.9516580Z [153 / 186]
+2026-10-20T22:51:51.0727070Z [155 / 186]
+2026-10-20T22:51:51.2028200Z [158 / 186]
+2026-10-20T22:51:51.4589020Z [161 / 186]
+2026-10-20T22:51:51.6060350Z [163 / 186]
+2026-10-20T22:51:51.7126060Z [167 / 186] xdremux-apple-adapter-product
+2026-10-20T22:51:52.1031090Z [169 / 186]
+2026-10-20T22:51:52.2600000Z [171 / 186] xdremux-apple-adapter-product
+2026-10-20T22:51:52.3829630Z [174 / 186] XDTextureNative
+2026-10-20T22:51:52.5747960Z [176 / 186] xdremux-apple-adapter-product
+2026-10-20T22:51:52.8238890Z [1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:581:40: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-20T22:51:52.8243000Z [179 / 186] XDTextureNative
+2026-10-20T22:51:52.8345620Z   581 |     for (AVAssetTrack *track in [asset tracksWithMediaType:AVMediaTypeVideo]) {[0m
+2026-10-20T22:51:52.8448110Z       | [0;1;32m                                       ^
+2026-10-20T22:51:52.8551250Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-20T22:51:52.8658040Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-20T22:51:52.8758030Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-20T22:51:52.8860950Z       | [0;1;32m^
+2026-10-20T22:51:52.8966050Z [0m[1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:601:40: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-20T22:51:52.9070840Z   601 |     for (AVAssetTrack *track in [asset tracksWithMediaType:AVMediaTypeAudio]) {[0m
+2026-10-20T22:51:52.9174220Z       | [0;1;32m                                       ^
+2026-10-20T22:51:52.9276530Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-20T22:51:52.9381990Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-20T22:51:52.9487850Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-20T22:51:52.9590920Z       | [0;1;32m^
+2026-10-20T22:51:52.9704600Z [0m[1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:844:43: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-20T22:51:52.9705860Z [180 / 186] XDCinematicNative
+2026-10-20T22:51:52.9808580Z   844 |         AVAssetTrack *videoTrack = [asset tracksWithMediaType:AVMediaTypeVideo].firstObject;[0m
+2026-10-20T22:51:52.9910060Z       | [0;1;32m                                          ^
+2026-10-20T22:51:53.0013030Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-20T22:51:53.0219860Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-20T22:51:53.0319600Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-20T22:51:53.0427040Z       | [0;1;32m^
+2026-10-20T22:51:53.0523830Z [0m3 warnings generated.
+2026-10-20T22:51:56.3337520Z [182 / 186] XDTextureNative
+2026-10-20T22:51:57.3519210Z [182 / 186] xdremux-apple-adapter-product
+2026-10-20T22:52:00.7228300Z [184 / 186] xdremux-apple-adapter-product
+2026-10-20T22:52:00.8957260Z Build complete! (28.59 sec)
+2026-10-20T22:52:02.4749600Z ##[group]Run adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+2026-10-20T22:52:02.4750760Z [36;1madapter="$(swift build --show-bin-path)/xdremux-apple-adapter"[0m
+2026-10-20T22:52:02.4751860Z [36;1mXDREMUX_APPLE_ADAPTER="$adapter" \[0m
+2026-10-20T22:52:02.4752800Z [36;1m  bash scripts/apple/run_style_tone_sweep.sh[0m
+2026-10-20T22:52:02.4892380Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-20T22:52:02.4893030Z env:
+2026-10-20T22:52:02.4893390Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T22:52:02.4893760Z   CARGO_INCREMENTAL: 0
+2026-10-20T22:52:02.4893980Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T22:52:02.4894450Z   CARGO_TERM_COLOR: always
+2026-10-20T22:52:02.4894730Z   RUST_BACKTRACE: short
+2026-10-20T22:52:02.4894990Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T22:52:02.4895360Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T22:52:02.4895770Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T22:52:02.4896220Z   CACHE_ON_FAILURE: true
+2026-10-20T22:52:02.4896590Z   RESEARCH_ROOT: /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-20T22:52:02.4897030Z   TONE_OUT: /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response
+2026-10-20T22:52:02.4897490Z   XDREMUX_CLI: /Users/runner/work/XDRemux/XDRemux/target/debug/xdremux
+2026-10-20T22:52:02.4897880Z ##[endgroup]
+2026-10-20T22:52:04.5262300Z style tone response self-test passed
+2026-10-20T22:55:40.4600830Z {"photo": "IMG_0032", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 167861, "max_abs": 0.00732421875, "psnr_peak1_db": 64.54207105722539}
+2026-10-20T22:55:40.4610770Z {"photo": "IMG_0032", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 175383, "max_abs": 0.0068359375, "psnr_peak1_db": 64.52031152428866}
+2026-10-20T22:55:40.4635630Z {"photo": "IMG_0032", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 173151, "max_abs": 0.00732421875, "psnr_peak1_db": 64.85290959643916}
+2026-10-20T22:55:40.4640390Z {"photo": "IMG_0032", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 165196, "max_abs": 0.0068359375, "psnr_peak1_db": 65.18715632026536}
+2026-10-20T22:55:40.4647740Z {"photo": "IMG_0032", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 165135, "max_abs": 0.00439453125, "psnr_peak1_db": 66.32288109743273}
+2026-10-20T22:55:40.4652090Z {"photo": "IMG_0032", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-20T22:55:40.4655910Z {"photo": "IMG_0032", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 160697, "max_abs": 0.00634765625, "psnr_peak1_db": 65.00370777734304}
+2026-10-20T22:55:40.4657350Z {"photo": "IMG_0032", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 286415, "max_abs": 0.005859375, "psnr_peak1_db": 63.94329113804058}
+2026-10-20T22:55:40.4660510Z {"photo": "IMG_0032", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 242725, "max_abs": 0.00732421875, "psnr_peak1_db": 63.36224257006552}
+2026-10-20T22:55:40.4661690Z {"photo": "IMG_0032", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 260594, "max_abs": 0.0068359375, "psnr_peak1_db": 62.69079933474488}
+2026-10-20T22:55:40.4662720Z {"photo": "IMG_0032", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 239004, "max_abs": 0.00732421875, "psnr_peak1_db": 62.3321480575676}
+2026-10-20T22:55:40.4663710Z {"photo": "IMG_0033", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 163553, "max_abs": 0.0068359375, "psnr_peak1_db": 64.70882755786745}
+2026-10-20T22:55:40.4667330Z {"photo": "IMG_0033", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 168203, "max_abs": 0.00732421875, "psnr_peak1_db": 64.69835562894536}
+2026-10-20T22:55:40.4669610Z {"photo": "IMG_0033", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 166586, "max_abs": 0.00732421875, "psnr_peak1_db": 65.06894983102141}
+2026-10-20T22:55:40.4670870Z {"photo": "IMG_0033", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 164843, "max_abs": 0.0068359375, "psnr_peak1_db": 65.36978933992727}
+2026-10-20T22:55:40.4673000Z {"photo": "IMG_0033", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 170127, "max_abs": 0.0048828125, "psnr_peak1_db": 66.2495703800525}
+2026-10-20T22:55:40.4674410Z {"photo": "IMG_0033", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-20T22:55:40.4677090Z {"photo": "IMG_0033", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 157585, "max_abs": 0.00634765625, "psnr_peak1_db": 65.27737112949416}
+2026-10-20T22:55:40.4679090Z {"photo": "IMG_0033", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 260910, "max_abs": 0.00634765625, "psnr_peak1_db": 64.28026138678402}
+2026-10-20T22:55:40.4680150Z {"photo": "IMG_0033", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 234223, "max_abs": 0.00732421875, "psnr_peak1_db": 63.63855586780087}
+2026-10-20T22:55:40.4681170Z {"photo": "IMG_0033", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 252171, "max_abs": 0.0068359375, "psnr_peak1_db": 62.87827263268638}
+2026-10-20T22:55:40.4682260Z {"photo": "IMG_0033", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 231542, "max_abs": 0.00830078125, "psnr_peak1_db": 62.664642452280646}
+2026-10-20T22:55:40.4683250Z {"photo": "IMG_2600", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 128262, "max_abs": 0.0068359375, "psnr_peak1_db": 65.22188638536029}
+2026-10-20T22:55:40.4684830Z {"photo": "IMG_2600", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 156815, "max_abs": 0.00830078125, "psnr_peak1_db": 63.59877195372679}
+2026-10-20T22:55:40.4685910Z {"photo": "IMG_2600", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 163326, "max_abs": 0.0068359375, "psnr_peak1_db": 63.89976978632588}
+2026-10-20T22:55:40.4686920Z {"photo": "IMG_2600", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 171513, "max_abs": 0.00732421875, "psnr_peak1_db": 63.1990150173096}
+2026-10-20T22:55:40.4688090Z {"photo": "IMG_2600", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 175413, "max_abs": 0.0048828125, "psnr_peak1_db": 65.13641419089639}
+2026-10-20T22:55:40.4689240Z {"photo": "IMG_2600", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-20T22:55:40.4690180Z {"photo": "IMG_2600", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 196828, "max_abs": 0.00732421875, "psnr_peak1_db": 63.668260419314954}
+2026-10-20T22:55:40.4696330Z {"photo": "IMG_2600", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 272530, "max_abs": 0.0068359375, "psnr_peak1_db": 63.34035447934687}
+2026-10-20T22:55:40.4697940Z {"photo": "IMG_2600", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 257305, "max_abs": 0.00732421875, "psnr_peak1_db": 62.541587796096884}
+2026-10-20T22:55:40.4699060Z {"photo": "IMG_2600", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 259127, "max_abs": 0.00830078125, "psnr_peak1_db": 62.412650167994215}
+2026-10-20T22:55:40.4700090Z {"photo": "IMG_2600", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 254160, "max_abs": 0.00732421875, "psnr_peak1_db": 62.29788850489654}
+2026-10-20T22:55:40.4707940Z {"photo": "IMG_2604", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 214067, "max_abs": 0.00634765625, "psnr_peak1_db": 62.643567258358274}
+2026-10-20T22:55:40.4710790Z {"photo": "IMG_2604", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 225760, "max_abs": 0.00732421875, "psnr_peak1_db": 62.11388027032622}
+2026-10-20T22:55:40.4717320Z {"photo": "IMG_2604", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 230140, "max_abs": 0.00634765625, "psnr_peak1_db": 62.06432904749374}
+2026-10-20T22:55:40.4718430Z {"photo": "IMG_2604", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 242106, "max_abs": 0.0068359375, "psnr_peak1_db": 61.21442704850996}
+2026-10-20T22:55:40.4719410Z {"photo": "IMG_2604", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 218638, "max_abs": 0.0048828125, "psnr_peak1_db": 63.854799009344205}
+2026-10-20T22:55:40.4720460Z {"photo": "IMG_2604", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-20T22:55:40.4721550Z {"photo": "IMG_2604", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 259909, "max_abs": 0.005859375, "psnr_peak1_db": 62.17333385727251}
+2026-10-20T22:55:40.4722540Z {"photo": "IMG_2604", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 286067, "max_abs": 0.005859375, "psnr_peak1_db": 62.47286880197932}
+2026-10-20T22:55:40.4723590Z {"photo": "IMG_2604", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 268449, "max_abs": 0.00634765625, "psnr_peak1_db": 62.15328474508092}
+2026-10-20T22:55:40.4724750Z {"photo": "IMG_2604", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 270123, "max_abs": 0.0068359375, "psnr_peak1_db": 61.70988065370105}
+2026-10-20T22:55:40.4725730Z {"photo": "IMG_2604", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 273646, "max_abs": 0.0068359375, "psnr_peak1_db": 61.402947030676884}
+2026-10-20T22:55:40.4727280Z {"photo": "IMG_2608", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 166222, "max_abs": 0.0068359375, "psnr_peak1_db": 64.21462939767858}
+2026-10-20T22:55:40.4728440Z {"photo": "IMG_2608", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 173575, "max_abs": 0.0078125, "psnr_peak1_db": 63.35936239848361}
+2026-10-20T22:55:40.4729530Z {"photo": "IMG_2608", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 178145, "max_abs": 0.00634765625, "psnr_peak1_db": 63.73235682642323}
+2026-10-20T22:55:40.4730490Z {"photo": "IMG_2608", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 191663, "max_abs": 0.00732421875, "psnr_peak1_db": 62.2953162667778}
+2026-10-20T22:55:40.4732000Z {"photo": "IMG_2608", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 174754, "max_abs": 0.004150390625, "psnr_peak1_db": 64.9274539946277}
+2026-10-20T22:55:40.4732930Z {"photo": "IMG_2608", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-20T22:55:40.4734090Z {"photo": "IMG_2608", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 215656, "max_abs": 0.00634765625, "psnr_peak1_db": 63.165438750589445}
+2026-10-20T22:55:40.4735240Z {"photo": "IMG_2608", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 275705, "max_abs": 0.0068359375, "psnr_peak1_db": 63.61971012170339}
+2026-10-20T22:55:40.4736240Z {"photo": "IMG_2608", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 264901, "max_abs": 0.00732421875, "psnr_peak1_db": 62.88255895261793}
+2026-10-20T22:55:40.4737190Z {"photo": "IMG_2608", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 266677, "max_abs": 0.00830078125, "psnr_peak1_db": 62.54733173583061}
+2026-10-20T22:55:40.4738220Z {"photo": "IMG_2608", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 262449, "max_abs": 0.00732421875, "psnr_peak1_db": 62.357552897752385}
+2026-10-20T22:55:47.5847240Z # Photographic Styles tone response
+2026-10-20T22:55:47.5870040Z 
+2026-10-20T22:55:47.5870790Z Host gate trusted: True. Tone 0 differing components: 0.
+2026-10-20T22:55:47.5871150Z 
+2026-10-20T22:55:47.5871410Z The harness sets inputToneBias only. It has no color-bias argument.
+2026-10-20T22:55:47.5872030Z 
+2026-10-20T22:55:47.5872260Z ## IMG_0032
+2026-10-20T22:55:47.5872380Z 
+2026-10-20T22:55:47.5872810Z Monotonic mean luminance: False. L(-1)-L(0) = 0.057729021815844495. L(+1)-L(0) = 0.20257831554460742. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2850.
+2026-10-20T22:55:47.5873310Z 
+2026-10-20T22:55:47.5873460Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-20T22:55:47.5873810Z |---:|---:|---:|---:|---:|
+2026-10-20T22:55:47.5874090Z | -1 | 0.37224 | 0.37166 | 0.37348 | 0.36281 |
+2026-10-20T22:55:47.5874730Z | -0.75 | 0.35873 | 0.35816 | 0.36001 | 0.34931 |
+2026-10-20T22:55:47.5881600Z | -0.5 | 0.34271 | 0.34211 | 0.34399 | 0.33335 |
+2026-10-20T22:55:47.5882070Z | -0.35 | 0.33280 | 0.33222 | 0.33405 | 0.32353 |
+2026-10-20T22:55:47.5882540Z | -0.15 | 0.32077 | 0.32028 | 0.32197 | 0.31165 |
+2026-10-20T22:55:47.5882980Z | 0 | 0.31451 | 0.31434 | 0.31564 | 0.30505 |
+2026-10-20T22:55:47.5883330Z | 0.15 | 0.33674 | 0.33611 | 0.33801 | 0.32755 |
+2026-10-20T22:55:47.5883700Z | 0.35 | 0.38563 | 0.38469 | 0.38701 | 0.37634 |
+2026-10-20T22:55:47.5886650Z | 0.5 | 0.42924 | 0.42791 | 0.43073 | 0.42008 |
+2026-10-20T22:55:47.5887070Z | 0.75 | 0.47058 | 0.46872 | 0.47224 | 0.46149 |
+2026-10-20T22:55:47.5887400Z | 1 | 0.51709 | 0.51487 | 0.51886 | 0.50822 |
+2026-10-20T22:55:47.5887610Z 
+2026-10-20T22:55:47.5887820Z - mean luminance is not monotonic across the tone sweep
+2026-10-20T22:55:47.5888110Z 
+2026-10-20T22:55:47.5888250Z ## IMG_0033
+2026-10-20T22:55:47.5888420Z 
+2026-10-20T22:55:47.5894280Z Monotonic mean luminance: False. L(-1)-L(0) = 0.04149877334289698. L(+1)-L(0) = 0.1854766197901785. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2237.
+2026-10-20T22:55:47.5894820Z 
+2026-10-20T22:55:47.5895070Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-20T22:55:47.5895470Z |---:|---:|---:|---:|---:|
+2026-10-20T22:55:47.5895830Z | -1 | 0.35822 | 0.36010 | 0.35884 | 0.34713 |
+2026-10-20T22:55:47.5896690Z | -0.75 | 0.34859 | 0.35079 | 0.34915 | 0.33732 |
+2026-10-20T22:55:47.5897140Z | -0.5 | 0.33652 | 0.33891 | 0.33701 | 0.32529 |
+2026-10-20T22:55:47.5897490Z | -0.35 | 0.32912 | 0.33161 | 0.32958 | 0.31796 |
+2026-10-20T22:55:47.5897940Z | -0.15 | 0.32051 | 0.32314 | 0.32091 | 0.30948 |
+2026-10-20T22:55:47.5898310Z | 0 | 0.31672 | 0.31982 | 0.31701 | 0.30530 |
+2026-10-20T22:55:47.5898710Z | 0.15 | 0.33403 | 0.33665 | 0.33445 | 0.32288 |
+2026-10-20T22:55:47.5899200Z | 0.35 | 0.37548 | 0.37791 | 0.37597 | 0.36404 |
+2026-10-20T22:55:47.5899530Z | 0.5 | 0.41346 | 0.41559 | 0.41406 | 0.40200 |
+2026-10-20T22:55:47.5900040Z | 0.75 | 0.45566 | 0.45765 | 0.45634 | 0.44398 |
+2026-10-20T22:55:47.5900490Z | 1 | 0.50220 | 0.50420 | 0.50289 | 0.49037 |
+2026-10-20T22:55:47.5900640Z 
+2026-10-20T22:55:47.5900880Z - mean luminance is not monotonic across the tone sweep
+2026-10-20T22:55:47.5901230Z 
+2026-10-20T22:55:47.5901420Z ## IMG_2600
+2026-10-20T22:55:47.5901610Z 
+2026-10-20T22:55:47.5906140Z Monotonic mean luminance: True. L(-1)-L(0) = -0.03209235885581674. L(+1)-L(0) = 0.1255848728249826. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2555.
+2026-10-20T22:55:47.5906610Z 
+2026-10-20T22:55:47.5906800Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-20T22:55:47.5907230Z |---:|---:|---:|---:|---:|
+2026-10-20T22:55:47.5907600Z | -1 | 0.28784 | 0.28381 | 0.28793 | 0.29766 |
+2026-10-20T22:55:47.5907920Z | -0.75 | 0.30028 | 0.29518 | 0.30075 | 0.31057 |
+2026-10-20T22:55:47.5908290Z | -0.5 | 0.30878 | 0.30315 | 0.30948 | 0.31856 |
+2026-10-20T22:55:47.5908740Z | -0.35 | 0.31245 | 0.30662 | 0.31329 | 0.32190 |
+2026-10-20T22:55:47.5909130Z | -0.15 | 0.31643 | 0.31048 | 0.31737 | 0.32546 |
+2026-10-20T22:55:47.5909540Z | 0 | 0.31993 | 0.31402 | 0.32085 | 0.32888 |
+2026-10-20T22:55:47.5909980Z | 0.15 | 0.32858 | 0.32199 | 0.32975 | 0.33718 |
+2026-10-20T22:55:47.5910340Z | 0.35 | 0.35395 | 0.34603 | 0.35571 | 0.36164 |
+2026-10-20T22:55:47.5911510Z | 0.5 | 0.37972 | 0.37067 | 0.38202 | 0.38591 |
+2026-10-20T22:55:47.5912000Z | 0.75 | 0.41252 | 0.40177 | 0.41565 | 0.41623 |
+2026-10-20T22:55:47.5912340Z | 1 | 0.44551 | 0.43325 | 0.44946 | 0.44657 |
+2026-10-20T22:55:47.5912600Z 
+2026-10-20T22:55:47.5912720Z ## IMG_2604
+2026-10-20T22:55:47.5913760Z 
+2026-10-20T22:55:47.5914910Z Monotonic mean luminance: True. L(-1)-L(0) = -0.01267440686857546. L(+1)-L(0) = 0.13764351841457284. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.0921.
+2026-10-20T22:55:47.5915930Z 
+2026-10-20T22:55:47.5916370Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-20T22:55:47.5917170Z |---:|---:|---:|---:|---:|
+2026-10-20T22:55:47.5917900Z | -1 | 0.39804 | 0.39061 | 0.39975 | 0.40440 |
+2026-10-20T22:55:47.5918820Z | -0.75 | 0.39866 | 0.39164 | 0.40096 | 0.39864 |
+2026-10-20T22:55:47.5919660Z | -0.5 | 0.39962 | 0.39327 | 0.40233 | 0.39421 |
+2026-10-20T22:55:47.5920420Z | -0.35 | 0.40092 | 0.39507 | 0.40377 | 0.39305 |
+2026-10-20T22:55:47.5921300Z | -0.15 | 0.40461 | 0.39930 | 0.40755 | 0.39437 |
+2026-10-20T22:55:47.5922270Z | 0 | 0.41071 | 0.40600 | 0.41363 | 0.39875 |
+2026-10-20T22:55:47.5923110Z | 0.15 | 0.41548 | 0.41015 | 0.41878 | 0.40207 |
+2026-10-20T22:55:47.5924140Z | 0.35 | 0.44004 | 0.43391 | 0.44417 | 0.42138 |
+2026-10-20T22:55:47.5925080Z | 0.5 | 0.46811 | 0.46092 | 0.47329 | 0.44354 |
+2026-10-20T22:55:47.5925820Z | 0.75 | 0.50789 | 0.49974 | 0.51456 | 0.47323 |
+2026-10-20T22:55:47.5926750Z | 1 | 0.54836 | 0.53971 | 0.55631 | 0.50372 |
+2026-10-20T22:55:47.5927240Z 
+2026-10-20T22:55:47.5927410Z ## IMG_2608
+2026-10-20T22:55:47.5927770Z 
+2026-10-20T22:55:47.5928790Z Monotonic mean luminance: True. L(-1)-L(0) = -0.02897905198195888. L(+1)-L(0) = 0.12075375209710937. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2400.
+2026-10-20T22:55:47.5930990Z 
+2026-10-20T22:55:47.5931250Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-20T22:55:47.5931540Z |---:|---:|---:|---:|---:|
+2026-10-20T22:55:47.5931960Z | -1 | 0.30086 | 0.29704 | 0.30236 | 0.29784 |
+2026-10-20T22:55:47.5932610Z | -0.75 | 0.31072 | 0.30778 | 0.31273 | 0.30156 |
+2026-10-20T22:55:47.5933120Z | -0.5 | 0.31836 | 0.31647 | 0.32063 | 0.30393 |
+2026-10-20T22:55:47.5933550Z | -0.35 | 0.32179 | 0.32054 | 0.32414 | 0.30487 |
+2026-10-20T22:55:47.5934480Z | -0.15 | 0.32566 | 0.32517 | 0.32806 | 0.30616 |
+2026-10-20T22:55:47.5934790Z | 0 | 0.32984 | 0.33026 | 0.33217 | 0.30822 |
+2026-10-20T22:55:47.5935160Z | 0.15 | 0.33636 | 0.33602 | 0.33903 | 0.31402 |
+2026-10-20T22:55:47.5935460Z | 0.35 | 0.35851 | 0.35750 | 0.36184 | 0.33229 |
+2026-10-20T22:55:47.5935830Z | 0.5 | 0.38184 | 0.38013 | 0.38589 | 0.35138 |
+2026-10-20T22:55:47.5936230Z | 0.75 | 0.41559 | 0.41386 | 0.42060 | 0.37682 |
+2026-10-20T22:55:47.5936520Z | 1 | 0.45059 | 0.44926 | 0.45644 | 0.40347 |
+2026-10-20T22:55:47.5936780Z 
+2026-10-20T22:55:47.5936890Z ## Model versus native
+2026-10-20T22:55:47.5937060Z 
+2026-10-20T22:55:47.5937210Z | photo | tone | differing | max abs | PSNR |
+2026-10-20T22:55:47.5937500Z |---|---:|---:|---:|---:|
+2026-10-20T22:55:47.5937840Z | IMG_0032 | -1.0 | 167861 | 0.00732421875 | 64.54207105722539 |
+2026-10-20T22:55:47.5938290Z | IMG_0032 | -0.75 | 175383 | 0.0068359375 | 64.52031152428866 |
+2026-10-20T22:55:47.5938730Z | IMG_0032 | -0.5 | 173151 | 0.00732421875 | 64.85290959643916 |
+2026-10-20T22:55:47.5939210Z | IMG_0032 | -0.35 | 165196 | 0.0068359375 | 65.18715632026536 |
+2026-10-20T22:55:47.5939590Z | IMG_0032 | -0.15 | 165135 | 0.00439453125 | 66.32288109743273 |
+2026-10-20T22:55:47.5939980Z | IMG_0032 | 0.0 | 0 | 0.0 | inf |
+2026-10-20T22:55:47.5940350Z | IMG_0032 | 0.15 | 160697 | 0.00634765625 | 65.00370777734304 |
+2026-10-20T22:55:47.5940740Z | IMG_0032 | 0.35 | 286415 | 0.005859375 | 63.94329113804058 |
+2026-10-20T22:55:47.5941170Z | IMG_0032 | 0.5 | 242725 | 0.00732421875 | 63.36224257006552 |
+2026-10-20T22:55:47.5941640Z | IMG_0032 | 0.75 | 260594 | 0.0068359375 | 62.69079933474488 |
+2026-10-20T22:55:47.5942100Z | IMG_0032 | 1.0 | 239004 | 0.00732421875 | 62.3321480575676 |
+2026-10-20T22:55:47.5942460Z | IMG_0033 | -1.0 | 163553 | 0.0068359375 | 64.70882755786745 |
+2026-10-20T22:55:47.5943720Z | IMG_0033 | -0.75 | 168203 | 0.00732421875 | 64.69835562894536 |
+2026-10-20T22:55:47.5944110Z | IMG_0033 | -0.5 | 166586 | 0.00732421875 | 65.06894983102141 |
+2026-10-20T22:55:47.6021540Z | IMG_0033 | -0.35 | 164843 | 0.0068359375 | 65.36978933992727 |
+2026-10-20T22:55:47.6022190Z | IMG_0033 | -0.15 | 170127 | 0.0048828125 | 66.2495703800525 |
+2026-10-20T22:55:47.6022560Z | IMG_0033 | 0.0 | 0 | 0.0 | inf |
+2026-10-20T22:55:47.6022970Z | IMG_0033 | 0.15 | 157585 | 0.00634765625 | 65.27737112949416 |
+2026-10-20T22:55:47.6023470Z | IMG_0033 | 0.35 | 260910 | 0.00634765625 | 64.28026138678402 |
+2026-10-20T22:55:47.6028660Z | IMG_0033 | 0.5 | 234223 | 0.00732421875 | 63.63855586780087 |
+2026-10-20T22:55:47.6029150Z | IMG_0033 | 0.75 | 252171 | 0.0068359375 | 62.87827263268638 |
+2026-10-20T22:55:47.6029530Z | IMG_0033 | 1.0 | 231542 | 0.00830078125 | 62.664642452280646 |
+2026-10-20T22:55:47.6030010Z | IMG_2600 | -1.0 | 128262 | 0.0068359375 | 65.22188638536029 |
+2026-10-20T22:55:47.6030800Z | IMG_2600 | -0.75 | 156815 | 0.00830078125 | 63.59877195372679 |
+2026-10-20T22:55:47.6031220Z | IMG_2600 | -0.5 | 163326 | 0.0068359375 | 63.89976978632588 |
+2026-10-20T22:55:47.6031660Z | IMG_2600 | -0.35 | 171513 | 0.00732421875 | 63.1990150173096 |
+2026-10-20T22:55:47.6031970Z | IMG_2600 | -0.15 | 175413 | 0.0048828125 | 65.13641419089639 |
+2026-10-20T22:55:47.6032310Z | IMG_2600 | 0.0 | 0 | 0.0 | inf |
+2026-10-20T22:55:47.6035430Z | IMG_2600 | 0.15 | 196828 | 0.00732421875 | 63.668260419314954 |
+2026-10-20T22:55:47.6035790Z | IMG_2600 | 0.35 | 272530 | 0.0068359375 | 63.34035447934687 |
+2026-10-20T22:55:47.6036150Z | IMG_2600 | 0.5 | 257305 | 0.00732421875 | 62.541587796096884 |
+2026-10-20T22:55:47.6037240Z | IMG_2600 | 0.75 | 259127 | 0.00830078125 | 62.412650167994215 |
+2026-10-20T22:55:47.6037720Z | IMG_2600 | 1.0 | 254160 | 0.00732421875 | 62.29788850489654 |
+2026-10-20T22:55:47.6038170Z | IMG_2604 | -1.0 | 214067 | 0.00634765625 | 62.643567258358274 |
+2026-10-20T22:55:47.6039700Z | IMG_2604 | -0.75 | 225760 | 0.00732421875 | 62.11388027032622 |
+2026-10-20T22:55:47.6041030Z | IMG_2604 | -0.5 | 230140 | 0.00634765625 | 62.06432904749374 |
+2026-10-20T22:55:47.6041950Z | IMG_2604 | -0.35 | 242106 | 0.0068359375 | 61.21442704850996 |
+2026-10-20T22:55:47.6042380Z | IMG_2604 | -0.15 | 218638 | 0.0048828125 | 63.854799009344205 |
+2026-10-20T22:55:47.6042760Z | IMG_2604 | 0.0 | 0 | 0.0 | inf |
+2026-10-20T22:55:47.6043130Z | IMG_2604 | 0.15 | 259909 | 0.005859375 | 62.17333385727251 |
+2026-10-20T22:55:47.6043550Z | IMG_2604 | 0.35 | 286067 | 0.005859375 | 62.47286880197932 |
+2026-10-20T22:55:47.6043860Z | IMG_2604 | 0.5 | 268449 | 0.00634765625 | 62.15328474508092 |
+2026-10-20T22:55:47.6047360Z | IMG_2604 | 0.75 | 270123 | 0.0068359375 | 61.70988065370105 |
+2026-10-20T22:55:47.6047880Z | IMG_2604 | 1.0 | 273646 | 0.0068359375 | 61.402947030676884 |
+2026-10-20T22:55:47.6048260Z | IMG_2608 | -1.0 | 166222 | 0.0068359375 | 64.21462939767858 |
+2026-10-20T22:55:47.6048680Z | IMG_2608 | -0.75 | 173575 | 0.0078125 | 63.35936239848361 |
+2026-10-20T22:55:47.6049160Z | IMG_2608 | -0.5 | 178145 | 0.00634765625 | 63.73235682642323 |
+2026-10-20T22:55:47.6055700Z | IMG_2608 | -0.35 | 191663 | 0.00732421875 | 62.2953162667778 |
+2026-10-20T22:55:47.6056090Z | IMG_2608 | -0.15 | 174754 | 0.004150390625 | 64.9274539946277 |
+2026-10-20T22:55:47.6056350Z | IMG_2608 | 0.0 | 0 | 0.0 | inf |
+2026-10-20T22:55:47.6056750Z | IMG_2608 | 0.15 | 215656 | 0.00634765625 | 63.165438750589445 |
+2026-10-20T22:55:47.6057210Z | IMG_2608 | 0.35 | 275705 | 0.0068359375 | 63.61971012170339 |
+2026-10-20T22:55:47.6057610Z | IMG_2608 | 0.5 | 264901 | 0.00732421875 | 62.88255895261793 |
+2026-10-20T22:55:47.6058080Z | IMG_2608 | 0.75 | 266677 | 0.00830078125 | 62.54733173583061 |
+2026-10-20T22:55:47.6058520Z | IMG_2608 | 1.0 | 262449 | 0.00732421875 | 62.357552897752385 |
+2026-10-20T22:55:47.6061930Z 
+2026-10-20T22:57:05.4211990Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic -> /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/uhdr-portrait-01.xdremux.heic
+2026-10-20T22:59:15.2301860Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic -> /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/uhdr-hr-01.xdremux.heic
+2026-10-20T23:00:41.8041800Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic -> /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/lhdr-v1-01.xdremux.heic
+2026-10-20T23:00:44.1708060Z # Photographic Styles tone response
+2026-10-20T23:00:44.1712480Z 
+2026-10-20T23:00:44.1713210Z Host gate trusted: True. Tone 0 differing components: 0.
+2026-10-20T23:00:44.1714570Z 
+2026-10-20T23:00:44.1715100Z The harness sets inputToneBias only. It has no color-bias argument.
+2026-10-20T23:00:44.1715490Z 
+2026-10-20T23:00:44.1715850Z ## lhdr-v1-01.xdremux
+2026-10-20T23:00:44.1716230Z 
+2026-10-20T23:00:44.1716940Z Monotonic mean luminance: None. L(-1)-L(0) = None. L(+1)-L(0) = None. |L(-1)-L(0)| / |L(+1)-L(0)| = n/a.
+2026-10-20T23:00:44.1717730Z 
+2026-10-20T23:00:44.1718070Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-20T23:00:44.1718650Z |---:|---:|---:|---:|---:|
+2026-10-20T23:00:44.1719460Z 
+2026-10-20T23:00:44.1719860Z - native render missing for tone 0 or for a comparison tone
+2026-10-20T23:00:44.1720400Z 
+2026-10-20T23:00:44.1720740Z ## uhdr-hr-01.xdremux
+2026-10-20T23:00:44.1720950Z 
+2026-10-20T23:00:44.1721550Z Monotonic mean luminance: None. L(-1)-L(0) = None. L(+1)-L(0) = None. |L(-1)-L(0)| / |L(+1)-L(0)| = n/a.
+2026-10-20T23:00:44.1722160Z 
+2026-10-20T23:00:44.1722470Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-20T23:00:44.1723430Z |---:|---:|---:|---:|---:|
+2026-10-20T23:00:44.1737040Z 
+2026-10-20T23:00:44.1737250Z - native render missing for tone 0 or for a comparison tone
+2026-10-20T23:00:44.1737600Z 
+2026-10-20T23:00:44.1737810Z ## uhdr-portrait-01.xdremux
+2026-10-20T23:00:44.1738090Z 
+2026-10-20T23:00:44.1738530Z Monotonic mean luminance: None. L(-1)-L(0) = None. L(+1)-L(0) = None. |L(-1)-L(0)| / |L(+1)-L(0)| = n/a.
+2026-10-20T23:00:44.1739000Z 
+2026-10-20T23:00:44.1739110Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-20T23:00:44.1739610Z |---:|---:|---:|---:|---:|
+2026-10-20T23:00:44.1740230Z 
+2026-10-20T23:00:44.1740550Z - native render missing for tone 0 or for a comparison tone
+2026-10-20T23:00:44.1740770Z 
+2026-10-20T23:00:44.1740980Z ## Model versus native
+2026-10-20T23:00:44.1741270Z 
+2026-10-20T23:00:44.1741490Z | photo | tone | differing | max abs | PSNR |
+2026-10-20T23:00:44.1742020Z |---|---:|---:|---:|---:|
+2026-10-20T23:00:44.1742500Z | uhdr-portrait-01.xdremux | None | extract_inputs returncode 1 |  |  |
+2026-10-20T23:00:44.1743230Z | uhdr-hr-01.xdremux | None | extract_inputs returncode 1 |  |  |
+2026-10-20T23:00:44.1743770Z | lhdr-v1-01.xdremux | None | extract_inputs returncode 1 |  |  |
+2026-10-20T23:00:44.1744140Z 
+2026-10-20T23:00:44.3011410Z # Tone asymmetry
+2026-10-20T23:00:44.3012860Z 
+2026-10-20T23:00:44.3013750Z Apple |L(-1)-L(0)| / |L(+1)-L(0)| ranges from 0.0921 to 0.2850.
+2026-10-20T23:00:44.3015000Z 
+2026-10-20T23:00:44.3016430Z | photo | group | monotonic | L(-1)-L(0) | L(+1)-L(0) | ratio | inside Apple range |
+2026-10-20T23:00:44.3017540Z |---|---|---|---:|---:|---:|---|
+2026-10-20T23:00:44.3018860Z | IMG_0032 | apple | False | 0.057729021815844495 | 0.20257831554460742 | 0.2850 |  |
+2026-10-20T23:00:44.3020190Z | IMG_0033 | apple | False | 0.04149877334289698 | 0.1854766197901785 | 0.2237 |  |
+2026-10-20T23:00:44.3021850Z | IMG_2600 | apple | True | -0.03209235885581674 | 0.1255848728249826 | 0.2555 |  |
+2026-10-20T23:00:44.3024840Z | IMG_2604 | apple | True | -0.01267440686857546 | 0.13764351841457284 | 0.0921 |  |
+2026-10-20T23:00:44.3026200Z | IMG_2608 | apple | True | -0.02897905198195888 | 0.12075375209710937 | 0.2400 |  |
+2026-10-20T23:00:44.3027530Z | lhdr-v1-01.xdremux | xdremux | None | None | None | n/a | None |
+2026-10-20T23:00:44.3043560Z | uhdr-hr-01.xdremux | xdremux | None | None | None | n/a | None |
+2026-10-20T23:00:44.3046400Z | uhdr-portrait-01.xdremux | xdremux | None | None | None | n/a | None |
+2026-10-20T23:00:44.3046940Z 
+2026-10-20T23:00:44.3047260Z ## Plist fields outside the Apple numeric range
+2026-10-20T23:00:44.3047740Z 
+2026-10-20T23:00:44.3048150Z No numeric plist field on an XDRemux output falls outside the Apple captures.
+2026-10-20T23:00:44.3048410Z 
+2026-10-20T23:00:44.3048620Z ## Tone-related plist values
+2026-10-20T23:00:44.3048980Z 
+2026-10-20T23:00:44.3049340Z | field | IMG_0032 | IMG_0033 | IMG_2600 | IMG_2604 | IMG_2608 |
+2026-10-20T23:00:44.3049860Z |---|---:|---:|---:|---:|---:|
+2026-10-20T23:00:44.3051170Z | 0 | 15 | 15 | 16 | 16 | 16 |
+2026-10-20T23:00:44.3051730Z | 4 | 4.01538 | 4.01538 | 4.89231 | 5.69231 | 4 |
+2026-10-20T23:00:44.3053300Z | 5 | 0 | 0 | 2 | 2 | 2 |
+2026-10-20T23:00:44.3055650Z | h | 0.542969 | 0.540955 | 2.59024 | 2.55383 | 2.08905 |
+2026-10-20T23:00:44.3056270Z | j | 1 | 1 | 1 | 1 | 1 |
+2026-10-20T23:00:44.3057150Z | k | False | False | False | False | False |
+2026-10-20T23:00:44.3058630Z | 7.PeopleRatio | 0 | 0 | 0 | 0 | 0 |
+2026-10-20T23:00:44.3061690Z | 7.PersonMasksValidHint | -1 | -1 | 0 | 0 | 0 |
+2026-10-20T23:00:44.3062200Z | 7.SkinRatio | 0 | 0 | 0 | 0 | 0 |
+2026-10-20T23:00:44.3063860Z | i.Gain | 2.17188 | 2.16382 | 10.361 | 10.2153 | 8.35619 |
+2026-10-20T23:00:44.3065450Z | i.OriginalRangeMin | 0.00888062 | 0.00682449 | -0.0203247 | -0.00189209 | -0.00197029 |
+2026-10-20T23:00:44.3068820Z | i.OriginalRangeMax | 0.887695 | 0.653809 | 0.343262 | 0.0508423 | 0.108948 |
+2026-10-20T23:00:44.3071450Z | gtc.node0 | 0 | 0 | 0 | 0 | 0 |
+2026-10-20T23:00:44.3071930Z | gtc.node64 | 0.541978 | 0.539262 | 0.463927 | 0.460524 | 0.466231 |
+2026-10-20T23:00:44.3073190Z | gtc.node128 | 0.798441 | 0.797678 | 0.718055 | 0.71662 | 0.719016 |
+2026-10-20T23:00:44.3073800Z | gtc.node192 | 0.931547 | 0.931318 | 0.89491 | 0.894543 | 0.895154 |
+2026-10-20T23:00:44.3075140Z | gtc.node255 | 0.999344 | 0.999344 | 0.998657 | 0.998657 | 0.998657 |
+2026-10-20T23:00:44.3076420Z | gtc.mean | 0.706758 | 0.704879 | 0.652658 | 0.650358 | 0.654252 |
+2026-10-20T23:00:44.3078900Z | gtc.monotonic_nodes | True | True | True | True | True |
+2026-10-20T23:00:44.3079440Z | light_c.mean | 0.260814 | 0.260946 | 0.258403 | 0.31838 | 0.262473 |
+2026-10-20T23:00:44.3080140Z | light_d.mean | 0.262124 | 0.263067 | 0.221838 | 0.215099 | 0.199097 |
+2026-10-20T23:00:44.3080540Z 
+2026-10-20T23:00:44.4317950Z ##[group]Run actions/upload-artifact@v7
+2026-10-20T23:00:44.4318270Z with:
+2026-10-20T23:00:44.4318660Z   name: style-tone-response
+2026-10-20T23:00:44.4319050Z   if-no-files-found: warn
+2026-10-20T23:00:44.4319510Z   retention-days: 1
+2026-10-20T23:00:44.4320530Z   path: artifacts/tone-response/host.txt
+artifacts/tone-response/apple-report/tone-response.json
+artifacts/tone-response/apple-report/tone-response.md
+artifacts/tone-response/report/tone-response.json
+artifacts/tone-response/report/tone-response.md
+artifacts/tone-response/asymmetry/asymmetry.json
+
+2026-10-20T23:00:44.4321650Z   compression-level: 6
+2026-10-20T23:00:44.4321900Z   overwrite: false
+2026-10-20T23:00:44.4322270Z   include-hidden-files: false
+2026-10-20T23:00:44.4322600Z   archive: true
+2026-10-20T23:00:44.4322770Z env:
+2026-10-20T23:00:44.4322970Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-20T23:00:44.4323320Z   CARGO_INCREMENTAL: 0
+2026-10-20T23:00:44.4324300Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-20T23:00:44.4324810Z   CARGO_TERM_COLOR: always
+2026-10-20T23:00:44.4325060Z   RUST_BACKTRACE: short
+2026-10-20T23:00:44.4325330Z   CARGO_BUILD_WARNINGS: deny
+2026-10-20T23:00:44.4325700Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-20T23:00:44.4326010Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-20T23:00:44.4326480Z   CACHE_ON_FAILURE: true
+2026-10-20T23:00:44.4326730Z ##[endgroup]
+2026-10-20T23:00:45.2866650Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-10-20T23:00:45.2871230Z The least common ancestor is /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response. This will be the root directory of the artifact
+2026-10-20T23:00:45.2872970Z With the provided path, there will be 6 files uploaded
+2026-10-20T23:00:45.2874180Z Artifact name is valid!
+2026-10-20T23:00:45.2874880Z Root directory input is valid!
+2026-10-20T23:00:45.5872500Z Uploading artifact: style-tone-response.zip
+2026-10-20T23:00:45.5902900Z Beginning upload of artifact content to blob storage
+2026-10-20T23:00:45.8315750Z Uploaded bytes 20906
+2026-10-20T23:00:45.8770330Z Finished uploading artifact content to blob storage!
+2026-10-20T23:00:45.8772040Z SHA256 digest of uploaded artifact is bf20b9164cd8821da14a72aa1a5b31bd0e6017c9a156671335cdfff8af6da43f
+2026-10-20T23:00:45.8773250Z Finalizing artifact upload
+2026-10-20T23:00:46.1869780Z Artifact style-tone-response successfully finalized. Artifact ID 12306033470
+2026-10-20T23:00:46.1873320Z Artifact style-tone-response has been successfully uploaded! Final size is 20906 bytes. Artifact ID is 12306033470
+2026-10-20T23:00:46.1892270Z Artifact download URL: https://github.com/21Z121Z1/XDRemux/actions/runs/39507240004/artifacts/12306033470
+2026-10-20T23:00:46.2300600Z Post job cleanup.
+2026-10-20T23:00:46.2304930Z ##[start-action display=Setup Rust Caching;id=__9b83e473-1042-4af3-8ef1-a67e131089dc.__Swatinem_rust-cache]
+2026-10-20T23:00:46.2363190Z Post job cleanup.
+2026-10-20T23:00:46.4279440Z Cache up-to-date.
+2026-10-20T23:00:46.4322680Z ##[end-action id=__9b83e473-1042-4af3-8ef1-a67e131089dc.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=201]
+2026-10-20T23:00:46.4439300Z Post job cleanup.
+2026-10-20T23:00:46.6226560Z [command]/opt/homebrew/bin/git version
+2026-10-20T23:00:46.6602150Z git version 2.56.0
+2026-10-20T23:00:46.6627270Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/efade493-fd91-4b5e-a674-a196518c7dfd/.gitconfig'
+2026-10-20T23:00:46.6643830Z Temporarily overriding HOME='/Users/runner/work/_temp/efade493-fd91-4b5e-a674-a196518c7dfd' before making global git config changes
+2026-10-20T23:00:46.6646090Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-20T23:00:46.6653190Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-20T23:00:46.6895570Z Removing SSH command configuration
+2026-10-20T23:00:46.6901390Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T23:00:46.7012950Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T23:00:46.9331100Z Removing HTTP extra header
+2026-10-20T23:00:46.9335930Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T23:00:46.9437330Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T23:00:47.0832400Z Removing includeIf entries pointing to credentials config files
+2026-10-20T23:00:47.0839110Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T23:00:47.0988900Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T23:00:47.2333450Z Post job cleanup.
+2026-10-20T23:00:47.3812640Z [command]/opt/homebrew/bin/git version
+2026-10-20T23:00:47.3911610Z git version 2.56.0
+2026-10-20T23:00:47.3932750Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/9e4d9f9f-e018-4771-9e37-ca918d3a3619/.gitconfig'
+2026-10-20T23:00:47.3945420Z Temporarily overriding HOME='/Users/runner/work/_temp/9e4d9f9f-e018-4771-9e37-ca918d3a3619' before making global git config changes
+2026-10-20T23:00:47.3947410Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-20T23:00:47.3950400Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-20T23:00:47.4062930Z Removing SSH command configuration
+2026-10-20T23:00:47.4068200Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-20T23:00:47.4173020Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-20T23:00:47.5272950Z Removing HTTP extra header
+2026-10-20T23:00:47.5276850Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-20T23:00:47.5355860Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-20T23:00:47.6516600Z Removing includeIf entries pointing to credentials config files
+2026-10-20T23:00:47.6520530Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-20T23:00:47.6697830Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-20T23:00:47.8136380Z Cleaning up orphan processes
