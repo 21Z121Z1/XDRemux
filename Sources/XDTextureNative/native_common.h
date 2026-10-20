@@ -108,4 +108,3 @@ static NSArray *FaceFacts(NSArray<VNFaceObservation *> *observations) {
     }
     return result;
 }
-

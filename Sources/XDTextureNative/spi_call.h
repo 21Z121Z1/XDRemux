@@ -74,4 +74,3 @@ static id PersonFromVisionFace(VNFaceObservation *face, size_t width, size_t hei
     }
     Call(person,@"setFaceLandmarks:",@[landmarks]); return person;
 }
-
