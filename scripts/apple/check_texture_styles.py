@@ -101,7 +101,7 @@ child=subprocess.Popen([adapter,'--persistent-json-lines'],stdin=subprocess.PIPE
 try:
  for line in sys.stdin.buffer:
   request=json.loads(line); operation=request['operation']
-  if os.environ.get('XDREMUX_TEXTURE_INJECT_FAILURE') and operation=='texture-statistics':
+  if os.environ.get('XDREMUX_TEXTURE_INJECT_FAILURE') == operation:
    sys.stderr.write('injected native statistics failure for publication regression\n');sys.exit(73)
   child.stdin.write(line);child.stdin.flush();response=child.stdout.readline()
   if not response: sys.exit(child.wait())
@@ -124,6 +124,7 @@ def main():
     parser.add_argument('--output',type=Path)
     parser.add_argument('--all-fixtures',action='store_true')
     parser.add_argument('--skip-build',action='store_true')
+    parser.add_argument('--release',action='store_true',help='exercise the shipping build')
     args=parser.parse_args()
     if sys.platform!='darwin':parser.error('requires macOS with Texture SPI')
     out=(args.output or Path(tempfile.mkdtemp(prefix='xdremux-texture-'))).resolve()
@@ -131,11 +132,14 @@ def main():
     summary={'schema':'xdremux-product-texture-v1','head':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
              'cases':[],'passed':False,'photos_device_result':'new HDR product outputs require device import; earlier SDR research activation was user-reported'}
     try:
+        swift_profile=['-c','release'] if args.release else []
+        rust_profile=['--release'] if args.release else []
         if not args.skip_build:
-            run(['swift','build','--product','xdremux-apple-adapter'],out/'swift-build.log')
-            run(['cargo','build','--locked','-p','xdremux-cli'],out/'rust-build.log')
-        adapter=Path(subprocess.check_output(['swift','build','--show-bin-path'],cwd=ROOT,text=True).strip())/'xdremux-apple-adapter'
-        cli=ROOT/'target/debug/xdremux'
+            run(['swift','build',*swift_profile,'--product','xdremux-apple-adapter'],out/'swift-build.log')
+            run(['cargo','build',*rust_profile,'--locked','-p','xdremux-cli'],out/'rust-build.log')
+        adapter=Path(subprocess.check_output(['swift','build',*swift_profile,'--show-bin-path'],cwd=ROOT,text=True).strip())/'xdremux-apple-adapter'
+        cli=ROOT/('target/release/xdremux' if args.release else 'target/debug/xdremux')
+        summary['build_configuration']='release' if args.release else 'debug'
         observer=out/'observe-adapter.py';observer.write_text(WRAPPER);observer.chmod(0o755)
         observations=out/'native';observations.mkdir(exist_ok=True)
         env={**os.environ,'XDREMUX_APPLE_ADAPTER':str(observer),'XDREMUX_REAL_TEXTURE_ADAPTER':str(adapter),'XDREMUX_TEXTURE_OBSERVATIONS':str(observations)}
@@ -165,10 +169,11 @@ def main():
                 run([app_smoke,fixture,baseline,app_output],case/'app-bridge.log',{**env,'XDREMUX_CLI':str(cli)})
                 facts=check(app_output,baseline,adapter,case);facts['entry_point']='app';summary['cases'].append(facts)
                 sentinel=case/'existing.heic';sentinel.write_bytes(b'previous published output')
-                failing={**env,'XDREMUX_TEXTURE_INJECT_FAILURE':'1'}
+                failing={**env,'XDREMUX_TEXTURE_INJECT_FAILURE':'texture-infer'}
                 run([cli,'convert','--input',fixture,'--output',sentinel,'--apple-styles'],case/'expected-failure.log',failing,success=False)
                 assert sentinel.read_bytes()==b'previous published output','native failure damaged published output'
                 summary['atomic_failure_preserves_existing_output']=True
+        assert any(c['people']>0 for c in summary['cases']), 'fixture run did not exercise measured person statistics'
         summary['native_transaction_count']=len(list(observations.glob('*/final-native-readback.json')))
         assert summary['native_transaction_count']==len(summary['cases'])
         summary['passed']=True
