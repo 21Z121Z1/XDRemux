@@ -12,11 +12,12 @@ Read [AGENTS.md](../../../AGENTS.md), [testing policy](../../../docs/quality/tes
 The primary product is a short-lived Rust CLI. From the repository root, use the existing documented build:
 
 ```bash
+export CARGO_TARGET_DIR="$PWD/target"
 cargo build --locked -p xdremux-cli
-export XDREMUX_VERIFY_CLI="$PWD/target/debug/xdremux"
+export XDREMUX_VERIFY_CLI="$CARGO_TARGET_DIR/debug/xdremux"
 ```
 
-Use the session's already configured Rust/libheif environment. Do not install or upgrade dependencies without existing task authority. If the user or lead supplies an existing binary, set `XDREMUX_VERIFY_CLI` to its absolute path and record its hash and unverified build binding. That binary can prove the exercised behavior of those bytes; it cannot prove that the latest source or final committed HEAD produced them.
+Use a separate Cargo target for each worktree; the launch command overrides an inherited shared target. Completion plans that set a custom target must bind every Cargo check and CLI path to that worktree's own directory. Use the session's already configured Rust/libheif environment. Do not install or upgrade dependencies without existing task authority. If the user or lead supplies an existing binary, set `XDREMUX_VERIFY_CLI` to its absolute path and record its hash and unverified build binding. That binary can prove the exercised behavior of those bytes; it cannot prove that the latest source or final committed HEAD produced them.
 
 No server or interactive session must remain running. Give each run its own temporary output directory. Never reuse the input path for a verification conversion, even when ordinary ProXDR supports intentional in-place conversion. Do not drive a shared app/helper instance that the run does not own.
 
