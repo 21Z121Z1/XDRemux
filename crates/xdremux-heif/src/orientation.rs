@@ -8,6 +8,7 @@ use crate::error::{HeifError, Result};
 
 const ISPE: FourCC = FourCC::new(*b"ispe");
 const IROT: FourCC = FourCC::new(*b"irot");
+const IMIR: FourCC = FourCC::new(*b"imir");
 
 /// Relative aspect tolerance. A one-pixel rounding error on a half-resolution
 /// map stays inside this bound. A display-oriented transpose of a 4:3 primary
@@ -21,6 +22,10 @@ pub struct PrimaryCodedGeometry {
     pub height: u32,
     /// HEIF `irot` quarter turns counter-clockwise. Absent `irot` is 0.
     pub quarter_turns_ccw: u8,
+    /// HEIF imir axis: 0 flips rows, 1 flips columns. Absent imir is None.
+    pub mirror_axis: Option<u8>,
+    /// Transformative properties apply in their ipma association order.
+    pub mirror_before_rotation: bool,
 }
 
 fn invalid(message: impl Into<String>) -> HeifError {
@@ -84,10 +89,30 @@ pub(crate) fn coded_geometry(source: &[u8], meta: &ParsedMeta) -> Result<Primary
         Some(irot) => read_irot(source, irot)?,
         None => 0,
     };
+    let mirror_axis = associated_property(meta, meta.primary_item_id, IMIR)
+        .map(|property| read_imir(source, property))
+        .transpose()?;
+    let associations = &meta
+        .ipma
+        .entries
+        .iter()
+        .find(|entry| entry.item_id == meta.primary_item_id)
+        .ok_or_else(|| invalid("primary item has no property associations"))?
+        .associations;
+    let position = |kind| {
+        associations.iter().position(|association| {
+            meta.properties.iter().any(|property| {
+                property.index == u32::from(association.property_index) && property.kind == kind
+            })
+        })
+    };
+    let mirror_before_rotation = matches!((position(IMIR), position(IROT)), (Some(mirror), Some(rotation)) if mirror < rotation);
     Ok(PrimaryCodedGeometry {
         width,
         height,
         quarter_turns_ccw,
+        mirror_axis,
+        mirror_before_rotation,
     })
 }
 
@@ -150,6 +175,17 @@ fn read_irot(source: &[u8], property: &PropertyInfo) -> Result<u8> {
         )));
     }
     Ok(parse_irot_quarter_turns(raw, &headers[0])?)
+}
+
+fn read_imir(source: &[u8], property: &PropertyInfo) -> Result<u8> {
+    let raw = source
+        .get(property.box_range.clone())
+        .ok_or_else(|| invalid("imir property is outside the HEIF"))?;
+    let headers = parse_boxes(raw, 0..raw.len())?;
+    if headers.len() != 1 || headers[0].payload_range().len() != 1 {
+        return Err(invalid("imir property must contain exactly one axis byte"));
+    }
+    Ok(raw[headers[0].data_start] & 1)
 }
 
 #[cfg(test)]

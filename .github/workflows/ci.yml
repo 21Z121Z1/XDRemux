@@ -63,6 +63,8 @@ jobs:
 
       - name: Test canonical Rust product stack
         shell: bash
+        env:
+          XDREMUX_ORIENTATION_OUTPUT: ${{ github.workspace }}/artifacts/product-integration/orientation
         run: |
           cargo test --locked --workspace --all-targets \
             2>&1 | tee artifacts/product-integration/rust-tests.log
@@ -120,6 +122,14 @@ jobs:
         run: |
           python3 scripts/apple/check_rust_cli_oppo_portrait.py \
             2>&1 | tee artifacts/product-integration/oppo-native-portrait.log
+
+      - name: Verify oriented HEIF with ImageIO
+        shell: bash
+        run: |
+          swift scripts/apple/read_oriented_heif_imageio.swift \
+            artifacts/product-integration/orientation/oriented-gain-map.heic \
+            artifacts/product-integration/orientation/expected.json \
+            | tee artifacts/product-integration/orientation/imageio.json
 
       - name: Verify Rust-driven Photographic Styles path
         shell: bash
