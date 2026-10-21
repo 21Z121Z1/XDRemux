@@ -1,0 +1,47 @@
+{
+  "source": "392009ad9d6e1974ff154fe1705536da3c6265c3",
+  "tree": "df25fbb2d193d9828ae1d6a4ec7a3a9d831fe1b9",
+  "base": "af223f00856b31756559a70ad59abb5af0bdb462",
+  "review_kind": "author review; portable simulator model is not Apple native evidence",
+  "files": {
+    ".agents/skills/xdremux-verify/features/motion-photo.md": "fec8520938bdce33e7628db6615d34a7b5c83518979b7e0cc00f96b4225a7d32",
+    "scripts/apple/pvt_native_import/check_native_import.py": "86941932c7c776585f79451d935b9f44af187260be208d17f12132b0dfb561fd",
+    "tests/test_pvt_simulator_install.py": "891b265f0b3220a11a504a254501b92562d133a74e910461df071a88b9582ef8"
+  },
+  "product_and_workflow_diff": [],
+  "finding": {
+    "priority": "P1 native probe setup/outcome integrity",
+    "actual_trigger": "af223 install-owned-reader client timed out60s/observed63.052 with empty stdout/stderr; cold SDK/reader/sign/boot succeeded. Device was cleaned before installed-state readback, so old actual state is irrecoverably unknown, not Photos rejection.",
+    "fix": "Read-only app inventory service preparation, at most one120s install, post-command registration + three bounded app/data-container observations, owned UDID/path/bundle/executable SHA checks. Continue after a client timeout only if the actual expected signed binary and both containers are verified. No repeat install; explicit native errors and unresolved state remain blocked. Existing matching installation is verified before skipping mutation; mismatches preserved."
+  },
+  "behavior_checks": [
+    "late-completing timeout and already-completed timeout both reconcile with exactly1install",
+    "unresolved timeout stays not-verified, no reinstall",
+    "unready or malformed inventory prevents mutation; read polls bounded",
+    "existing correct app verified with0installs; changed binary/wrong metadata/foreign container rejected and preserved",
+    "owned path aliases resolve by actual identity",
+    "explicit installer error retained, not assumed Photos rejection",
+    "SIGTERM client exit with uncertain timeout remains distinct from explicit native error"
+  ],
+  "validation": {
+    "focused": 45,
+    "all_python": 307,
+    "clean_completion_gate": "4/4 at current committed source, baseaf223; format, allPython, current CLI build and actual pair/PVT conversion/validation/no-clobber",
+    "not_repeated": "unchanged full Rust/clippy suite; exact product/workflow path equality verified",
+    "native": "current-head actual installer reconciliation/UI/PhotoKit/full CI pending; oldaf223 release/production/App/System/Tone/performance receipts separate"
+  },
+  "invariants_unchanged": [
+    "original media/package bytes",
+    "whole-package representation and phase binding",
+    "one added Live asset and no removed assets",
+    "original still/video identity, cover timestamp and resource hash checks",
+    "owned simulator cleanup and no host Photos/global-security changes",
+    "pair remains default; no decomposed PhotoKit import fallback"
+  ],
+  "review_notes": [
+    "No new framework, daemon mutation, permission workaround or service restart. Readiness/result polls are read-only and name exact owned UUID/bundle.",
+    "Installer process-group telemetry reuses existing narrow helper; backend log query remains within the disposable simulator.",
+    "Temporary exec-server transport failure occurred beforegitadd process creation; after reconnection HEAD/index checked unchanged before one real commit. Not an approval-review denial."
+  ],
+  "captured_at": "2026-10-21T05:24:24.502487+00:00"
+}

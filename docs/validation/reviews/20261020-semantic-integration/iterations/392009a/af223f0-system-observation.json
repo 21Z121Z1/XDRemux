@@ -1,0 +1,41 @@
+{
+  "source": "af223f00856b31756559a70ad59abb5af0bdb462",
+  "run": 39544499135,
+  "job": 119039642356,
+  "conclusion": "success",
+  "native_rows": [
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 40094,
+      "max_abs": 0.005859375,
+      "psnr_peak1_db": 67.31545344735109
+    },
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 66931,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 63.98242993496426
+    }
+  ],
+  "all_metrics": [],
+  "product_metrics": [],
+  "log_sha256": "789ff6e0c722f483f10af3c3056edc90c4c43686c7293eed9e6a9575fa13b274",
+  "limits": [
+    "Native rendered data only; Photos PVT whole-package import/readback and wallpaper remain separate."
+  ]
+}

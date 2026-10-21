@@ -1,0 +1,216 @@
+{
+  "source": "af223f00856b31756559a70ad59abb5af0bdb462",
+  "run": 39544499116,
+  "job": 119039473014,
+  "attempt": 1,
+  "conclusion": "success",
+  "native_release_consumer": {
+    "actual_test": "test apple_styles::tests::style_scene_preserves_every_rgb8_code_and_row_stride ... ok",
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0
+  },
+  "absolute_styles_budget_lines": [
+    "  apple-styles median_wall_seconds: observed=9.749s reference=8.691s budget=11.732s",
+    "  apple-styles p95_wall_seconds: observed=10.079s reference=11.412s budget=15.406s",
+    "  apple-styles max_peak_rss_mib: observed=1084.391MiB reference=1089.094MiB budget=1361.367MiB"
+  ],
+  "interleaved_result": {
+    "distinct_revisions": true,
+    "diagnostic_only": true,
+    "summary": {
+      "baseline": {
+        "median_wall_seconds": 8.277483416999985,
+        "median_user_seconds": 8.03,
+        "median_sys_seconds": 0.77,
+        "max_peak_rss_bytes": 1142161408
+      },
+      "candidate": {
+        "median_wall_seconds": 9.755783166000128,
+        "median_user_seconds": 9.21,
+        "median_sys_seconds": 0.8,
+        "max_peak_rss_bytes": 1137033216
+      },
+      "candidate_over_baseline_median": 1.1785928976872448
+    },
+    "candidate_profile": {
+      "arm": "candidate",
+      "status": "validated",
+      "logs": "candidate-profile",
+      "outside_budget_and_comparison_samples": true,
+      "limits": "One candidate-only diagnostic conversion; no baseline stage comparison. The two scene detail spans overlap scene_derivation; do not add them to stage totals.",
+      "wall_seconds": 9.55380220799998,
+      "time_real_seconds": 9.53,
+      "user_seconds": 9.03,
+      "sys_seconds": 0.77,
+      "peak_rss_bytes": 1137033216,
+      "output_bytes": 2894706,
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.005754875
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.138359584
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 2.15130925
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.255362959
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.729593542
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.1077175
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 0.967726375
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.216778625
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.361159791
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.257531583
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.001947208
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001636209
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 3.048054458
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.0154605
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.010232542
+        }
+      ]
+    }
+  },
+  "arms": {
+    "arms": {
+      "baseline": {
+        "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "tracked_status": "",
+        "cli": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-k1qvcmco/reference-cargo-target/release/xdremux",
+          "sha256": "4f774a7262f35fcb1c55d2672ff81f33caf5dc1fdc7cb675199a5aef74e9a1c7",
+          "bytes": 4944448
+        },
+        "adapter": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-k1qvcmco/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "26f1625e3b178b7f595d9f4559ed31bcf146269ee14550cbc7336831a7f45175",
+          "bytes": 805352
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "--package-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-k1qvcmco/reference-source",
+            "--scratch-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-k1qvcmco/reference-swift-scratch",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "reference-cargo-features.log",
+          "sha256": "ec6d4a980fe2ab3cc7b47522a20d92c3d64cfa9c67751414db63414c7c46ed56",
+          "source_path_normalized_sha256": "dfd23f0509793a5a6d2531f09545bb2e5ce29fa6915180da8ef4f520023f6e87"
+        }
+      },
+      "candidate": {
+        "sha": "af223f00856b31756559a70ad59abb5af0bdb462",
+        "tracked_status": "",
+        "cli": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/target/release/xdremux",
+          "sha256": "4377fb942bbcc93f2e8518caff20b0e8b03a6d8568fbd1e80ee26c7c829ab3fc",
+          "bytes": 4917584
+        },
+        "adapter": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/.build/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "d78ee2d5ed7ece698e1b0497edbcf31d787da6d740e1689cd98f2989ecabe4da",
+          "bytes": 884216
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "build_owner": "performance.yml existing candidate release build",
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "candidate-cargo-features.log",
+          "sha256": "14613cdb763acd78878f2f6499b0f4221309b7029efc52dffda84b5f390e9931",
+          "source_path_normalized_sha256": "f1e4c9d6dc0064d69aeae23a62d1ed0dc3e4910a8a908fb67546097b76541753"
+        }
+      }
+    }
+  },
+  "log_sha256": "17050194987b07c5ebc829690fad1a3272e2142bc2a5eabef2f7dd38baab6a20",
+  "interpretation": "Native release bit equivalence and unchanged absolute gate passed, but candidate/main+17.8593% relative cost persists. Linux kernel speedup is not a demonstrated ARM64/E2E speedup or whole-gap repair. No rerun requested."
+}

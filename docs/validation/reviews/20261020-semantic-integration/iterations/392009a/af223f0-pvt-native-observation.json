@@ -1,0 +1,57 @@
+{
+  "source": "af223f00856b31756559a70ad59abb5af0bdb462",
+  "run": 39544499135,
+  "job": 119039642433,
+  "conclusion": "failure",
+  "category": "owned simulator install setup; command outcome uncertain, not Photos rejection",
+  "commands": [
+    {
+      "name": "compile-sdk-canary",
+      "duration_seconds": 5.050711999999976,
+      "exit_code": 0
+    },
+    {
+      "name": "compile-reader",
+      "duration_seconds": 1.161893833000022,
+      "exit_code": 0
+    },
+    {
+      "name": "sign-owned-reader",
+      "duration_seconds": 0.06247224999992795,
+      "exit_code": 0
+    },
+    {
+      "name": "boot-owned-simulator",
+      "duration_seconds": 16.599821957999893,
+      "exit_code": 0
+    },
+    {
+      "name": "boot-owned-status",
+      "duration_seconds": 73.22432616699984,
+      "exit_code": 0
+    },
+    {
+      "name": "install-owned-reader",
+      "duration_seconds": 63.05239849999998,
+      "outcome": "uncertain-after-timeout",
+      "error": "Command '['xcrun', 'simctl', 'install', '4BB77860-DE5F-49A7-B499-EBAB8BB61315', '/Users/runner/work/_temp/pvt-native-import/pvt-native-grk2a0cu/PVTReadback.app']' timed out after 60 seconds"
+    }
+  ],
+  "missing": [
+    "post-timeout installed bundle/container state",
+    "Photos authorization",
+    "baseline",
+    "three whole-package UI representations",
+    "PhotoKit Live asset readback"
+  ],
+  "input_unchanged": true,
+  "package_unchanged": true,
+  "cleanup": "completed",
+  "log_sha256": "7109b7f65c549d81929cb2382693b6e537d08b92aecb01098f57d9a0c174fbb6",
+  "artifact": {
+    "id": 12321573686,
+    "sha256": "40b58959aa3315814acec1112a8dec3fac5302bb74bf7c47ec4066bd1211bb5a",
+    "attribution": "parent independently checked; this executor parsed native console receipt"
+  },
+  "past_state_limit": "Owned simulator already deleted; its actual old installation state cannot now be reconciled or claimed absent/present."
+}

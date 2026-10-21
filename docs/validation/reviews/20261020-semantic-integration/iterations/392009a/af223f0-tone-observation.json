@@ -1,0 +1,819 @@
+{
+  "source": "af223f00856b31756559a70ad59abb5af0bdb462",
+  "run": 39544499135,
+  "job": 119039642480,
+  "conclusion": "success",
+  "native_rows": [
+    {
+      "photo": "IMG_0032",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 167861,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 64.54207105722539
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": -0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 175383,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 64.52031152428866
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": -0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 173151,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 64.85290959643916
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": -0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 165196,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 65.18715632026536
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": -0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 165135,
+      "max_abs": 0.00439453125,
+      "psnr_peak1_db": 66.32288109743273
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": 0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 160697,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 65.00370777734304
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": 0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 286415,
+      "max_abs": 0.005859375,
+      "psnr_peak1_db": 63.94329113804058
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": 0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 242725,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 63.36224257006552
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": 0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 260594,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 62.69079933474488
+    },
+    {
+      "photo": "IMG_0032",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 239004,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 62.3321480575676
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 163553,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 64.70882755786745
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": -0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 168203,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 64.69835562894536
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": -0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 166586,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 65.06894983102141
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": -0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 164843,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 65.36978933992727
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": -0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 170127,
+      "max_abs": 0.0048828125,
+      "psnr_peak1_db": 66.2495703800525
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": 0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 157585,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 65.27737112949416
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": 0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 260910,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 64.28026138678402
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": 0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 234223,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 63.63855586780087
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": 0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 252171,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 62.87827263268638
+    },
+    {
+      "photo": "IMG_0033",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 231542,
+      "max_abs": 0.00830078125,
+      "psnr_peak1_db": 62.664642452280646
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 128262,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 65.22188638536029
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": -0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 156815,
+      "max_abs": 0.00830078125,
+      "psnr_peak1_db": 63.59877195372679
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": -0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 163326,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 63.89976978632588
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": -0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 171513,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 63.1990150173096
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": -0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 175413,
+      "max_abs": 0.0048828125,
+      "psnr_peak1_db": 65.13641419089639
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": 0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 196828,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 63.668260419314954
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": 0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 272530,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 63.34035447934687
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": 0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 257305,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 62.541587796096884
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": 0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 259127,
+      "max_abs": 0.00830078125,
+      "psnr_peak1_db": 62.412650167994215
+    },
+    {
+      "photo": "IMG_2600",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 254160,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 62.29788850489654
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 214067,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 62.643567258358274
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": -0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 225760,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 62.11388027032622
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": -0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 230140,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 62.06432904749374
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": -0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 242106,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 61.21442704850996
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": -0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 218638,
+      "max_abs": 0.0048828125,
+      "psnr_peak1_db": 63.854799009344205
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": 0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 259909,
+      "max_abs": 0.005859375,
+      "psnr_peak1_db": 62.17333385727251
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": 0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 286067,
+      "max_abs": 0.005859375,
+      "psnr_peak1_db": 62.47286880197932
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": 0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 268449,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 62.15328474508092
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": 0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 270123,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 61.70988065370105
+    },
+    {
+      "photo": "IMG_2604",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 273646,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 61.402947030676884
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 166222,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 64.21462939767858
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": -0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 173575,
+      "max_abs": 0.0078125,
+      "psnr_peak1_db": 63.35936239848361
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": -0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 178145,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 63.73235682642323
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": -0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 191663,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 62.2953162667778
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": -0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 174754,
+      "max_abs": 0.004150390625,
+      "psnr_peak1_db": 64.9274539946277
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": 0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 215656,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 63.165438750589445
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": 0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 275705,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 63.61971012170339
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": 0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 264901,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 62.88255895261793
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": 0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 266677,
+      "max_abs": 0.00830078125,
+      "psnr_peak1_db": 62.54733173583061
+    },
+    {
+      "photo": "IMG_2608",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 262449,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 62.357552897752385
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 71919,
+      "max_abs": 0.00439453125,
+      "psnr_peak1_db": 73.5711539180053
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": -0.75,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 68910,
+      "max_abs": 0.00439453125,
+      "psnr_peak1_db": 73.74205599138843
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": -0.5,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 66116,
+      "max_abs": 0.00439453125,
+      "psnr_peak1_db": 73.74300569349123
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": -0.35,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 57625,
+      "max_abs": 0.00439453125,
+      "psnr_peak1_db": 75.83603963527426
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": -0.15,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 46637,
+      "max_abs": 0.00390625,
+      "psnr_peak1_db": 79.79150975639331
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": 0.15,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 190809,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 68.07030169272713
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": 0.35,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 289456,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 65.41455576889825
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": 0.5,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 291422,
+      "max_abs": 0.0087890625,
+      "psnr_peak1_db": 64.25775681585047
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": 0.75,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 286034,
+      "max_abs": 0.00830078125,
+      "psnr_peak1_db": 63.975108711938766
+    },
+    {
+      "photo": "uhdr-portrait-01.xdremux",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 591360,
+      "differing_components": 273046,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 63.678372893975
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 92285,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 69.97377091405829
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": -0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 93016,
+      "max_abs": 0.0078125,
+      "psnr_peak1_db": 69.8333708337183
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": -0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 93697,
+      "max_abs": 0.0078125,
+      "psnr_peak1_db": 70.19786311504782
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": -0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 91783,
+      "max_abs": 0.0078125,
+      "psnr_peak1_db": 70.60179194679951
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": -0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 89335,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 71.805866594668
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": 0.15,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 195962,
+      "max_abs": 0.005859375,
+      "psnr_peak1_db": 70.35807427426758
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": 0.35,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 222123,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 69.52000146830264
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": 0.5,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 211025,
+      "max_abs": 0.00732421875,
+      "psnr_peak1_db": 68.3783663692414
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": 0.75,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 213945,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 67.67521660880861
+    },
+    {
+      "photo": "uhdr-hr-01.xdremux",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 589824,
+      "differing_components": 208273,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 66.9790533480427
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 152803,
+      "max_abs": 0.00830078125,
+      "psnr_peak1_db": 66.73110898862923
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": -0.75,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 179508,
+      "max_abs": 0.0078125,
+      "psnr_peak1_db": 66.16688325360438
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": -0.5,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 156745,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 66.36539817638975
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": -0.35,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 142316,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 68.19993360596133
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": -0.15,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 206586,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 65.30522238604833
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": 0.15,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 210630,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 65.93481372516348
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": 0.35,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 239614,
+      "max_abs": 0.0078125,
+      "psnr_peak1_db": 67.76284283052514
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": 0.5,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 315889,
+      "max_abs": 0.0078125,
+      "psnr_peak1_db": 65.39440345094107
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": 0.75,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 268705,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 64.94039066783935
+    },
+    {
+      "photo": "lhdr-v1-01.xdremux",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 674304,
+      "differing_components": 320778,
+      "max_abs": 0.0068359375,
+      "psnr_peak1_db": 60.51021762853341
+    }
+  ],
+  "all_metrics": [
+    "Monotonic mean luminance: False. L(-1)-L(0) = 0.057729021815844495. L(+1)-L(0) = 0.20257831554460742. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2850.",
+    "Monotonic mean luminance: False. L(-1)-L(0) = 0.04149877334289698. L(+1)-L(0) = 0.1854766197901785. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2237.",
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.03209235885581674. L(+1)-L(0) = 0.1255848728249826. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2555.",
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.01267440686857546. L(+1)-L(0) = 0.13764351841457284. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.0921.",
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.02897905198195888. L(+1)-L(0) = 0.12075375209710937. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2400.",
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.018543799571739683. L(+1)-L(0) = 0.17465695537734177. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.1062.",
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.012467508732202481. L(+1)-L(0) = 0.13275180479762536. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.0939.",
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.028352684637093284. L(+1)-L(0) = 0.11109930831798409. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2552."
+  ],
+  "product_metrics": [
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.018543799571739683. L(+1)-L(0) = 0.17465695537734177. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.1062.",
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.012467508732202481. L(+1)-L(0) = 0.13275180479762536. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.0939.",
+    "Monotonic mean luminance: True. L(-1)-L(0) = -0.028352684637093284. L(+1)-L(0) = 0.11109930831798409. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2552."
+  ],
+  "log_sha256": "094045bad0a3b66f592a6b98a2c72c1952818d9fad616e7efc0c72ace7702566",
+  "limits": [
+    "Native rendered data only; Photos PVT whole-package import/readback and wallpaper remain separate."
+  ]
+}

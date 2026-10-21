@@ -1,0 +1,110 @@
+test_changed_existing_binary_is_preserved_and_not_replaced (tests.test_pvt_simulator_install.SimulatorInstallTests.test_changed_existing_binary_is_preserved_and_not_replaced) ... ERROR
+test_existing_correct_install_is_verified_before_any_new_mutation (tests.test_pvt_simulator_install.SimulatorInstallTests.test_existing_correct_install_is_verified_before_any_new_mutation) ... ERROR
+test_explicit_native_install_error_is_retained_without_retry (tests.test_pvt_simulator_install.SimulatorInstallTests.test_explicit_native_install_error_is_retained_without_retry) ... ERROR
+test_service_readiness_is_bounded_and_never_starts_an_install_when_unknown (tests.test_pvt_simulator_install.SimulatorInstallTests.test_service_readiness_is_bounded_and_never_starts_an_install_when_unknown) ... ERROR
+test_success_requires_actual_matching_bundle_and_both_containers (tests.test_pvt_simulator_install.SimulatorInstallTests.test_success_requires_actual_matching_bundle_and_both_containers) ... ERROR
+test_timeout_is_reconciled_without_repeating_the_install (tests.test_pvt_simulator_install.SimulatorInstallTests.test_timeout_is_reconciled_without_repeating_the_install) ... 
+  test_timeout_is_reconciled_without_repeating_the_install (tests.test_pvt_simulator_install.SimulatorInstallTests.test_timeout_is_reconciled_without_repeating_the_install) (behavior='timeout-installed') ... ERROR
+  test_timeout_is_reconciled_without_repeating_the_install (tests.test_pvt_simulator_install.SimulatorInstallTests.test_timeout_is_reconciled_without_repeating_the_install) (behavior='timeout-late') ... ERROR
+test_unverified_timeout_stays_unknown_and_never_reinstalls (tests.test_pvt_simulator_install.SimulatorInstallTests.test_unverified_timeout_stays_unknown_and_never_reinstalls) ... ERROR
+
+======================================================================
+ERROR: test_changed_existing_binary_is_preserved_and_not_replaced (tests.test_pvt_simulator_install.SimulatorInstallTests.test_changed_existing_binary_is_preserved_and_not_replaced)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 119, in test_changed_existing_binary_is_preserved_and_not_replaced
+    with self.assertRaises(probe.Blocked): model.install()
+                                           ^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 71, in install
+    return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'install_owned_reader'
+
+======================================================================
+ERROR: test_existing_correct_install_is_verified_before_any_new_mutation (tests.test_pvt_simulator_install.SimulatorInstallTests.test_existing_correct_install_is_verified_before_any_new_mutation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 111, in test_existing_correct_install_is_verified_before_any_new_mutation
+    facts = model.install()
+            ^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 71, in install
+    return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'install_owned_reader'
+
+======================================================================
+ERROR: test_explicit_native_install_error_is_retained_without_retry (tests.test_pvt_simulator_install.SimulatorInstallTests.test_explicit_native_install_error_is_retained_without_retry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 126, in test_explicit_native_install_error_is_retained_without_retry
+    with self.assertRaises(probe.Blocked): model.install()
+                                           ^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 71, in install
+    return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'install_owned_reader'
+
+======================================================================
+ERROR: test_service_readiness_is_bounded_and_never_starts_an_install_when_unknown (tests.test_pvt_simulator_install.SimulatorInstallTests.test_service_readiness_is_bounded_and_never_starts_an_install_when_unknown)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 104, in test_service_readiness_is_bounded_and_never_starts_an_install_when_unknown
+    with self.assertRaises(probe.Blocked): model.install()
+                                           ^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 71, in install
+    return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'install_owned_reader'
+
+======================================================================
+ERROR: test_success_requires_actual_matching_bundle_and_both_containers (tests.test_pvt_simulator_install.SimulatorInstallTests.test_success_requires_actual_matching_bundle_and_both_containers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 79, in test_success_requires_actual_matching_bundle_and_both_containers
+    facts = model.install()
+            ^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 71, in install
+    return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'install_owned_reader'
+
+======================================================================
+ERROR: test_timeout_is_reconciled_without_repeating_the_install (tests.test_pvt_simulator_install.SimulatorInstallTests.test_timeout_is_reconciled_without_repeating_the_install) (behavior='timeout-installed')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 88, in test_timeout_is_reconciled_without_repeating_the_install
+    facts = model.install()
+            ^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 71, in install
+    return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'install_owned_reader'
+
+======================================================================
+ERROR: test_timeout_is_reconciled_without_repeating_the_install (tests.test_pvt_simulator_install.SimulatorInstallTests.test_timeout_is_reconciled_without_repeating_the_install) (behavior='timeout-late')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 88, in test_timeout_is_reconciled_without_repeating_the_install
+    facts = model.install()
+            ^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 71, in install
+    return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'install_owned_reader'
+
+======================================================================
+ERROR: test_unverified_timeout_stays_unknown_and_never_reinstalls (tests.test_pvt_simulator_install.SimulatorInstallTests.test_unverified_timeout_stays_unknown_and_never_reinstalls)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 96, in test_unverified_timeout_stays_unknown_and_never_reinstalls
+    with self.assertRaises(probe.Blocked): model.install()
+                                           ^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 71, in install
+    return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'install_owned_reader'
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.010s
+
+FAILED (errors=8)

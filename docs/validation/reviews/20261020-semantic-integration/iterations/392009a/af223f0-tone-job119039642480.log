@@ -1,0 +1,2091 @@
+﻿2026-10-21T04:58:13.1847950Z Current runner version: '2.338.0'
+2026-10-21T04:58:13.1886430Z ##[group]Runner Image Provisioner
+2026-10-21T04:58:13.1887000Z Hosted Compute Agent
+2026-10-21T04:58:13.1887380Z Version: 20261006.597
+2026-10-21T04:58:13.1887840Z Commit: c696a59e4a9ffbc6a6203385bd1b2a10e87b1c9c
+2026-10-21T04:58:13.1888330Z Build Date: 2026-10-06T21:39:28Z
+2026-10-21T04:58:13.1888790Z Worker ID: {e152800d-7605-4de2-881c-c34e813024b0}
+2026-10-21T04:58:13.1889340Z Region: westus
+2026-10-21T04:58:13.1889720Z Cloud: MacCloud
+2026-10-21T04:58:13.1890070Z ##[endgroup]
+2026-10-21T04:58:13.1891830Z ##[group]Operating System
+2026-10-21T04:58:13.1892250Z macOS
+2026-10-21T04:58:13.1892610Z 27.0.1
+2026-10-21T04:58:13.1892940Z 26A434
+2026-10-21T04:58:13.1893300Z ##[endgroup]
+2026-10-21T04:58:13.1893810Z ##[group]Runner Image
+2026-10-21T04:58:13.1894200Z Image: xcode-27-arm64
+2026-10-21T04:58:13.1894720Z Version: 20261012.0260.1
+2026-10-21T04:58:13.1895600Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261012.0260/images/macos/xcode-27-arm64-Readme.md
+2026-10-21T04:58:13.1896640Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261012.0260
+2026-10-21T04:58:13.1897300Z ##[endgroup]
+2026-10-21T04:58:13.1898080Z ##[group]GITHUB_TOKEN Permissions
+2026-10-21T04:58:13.1899380Z Contents: read
+2026-10-21T04:58:13.1899880Z Metadata: read
+2026-10-21T04:58:13.1900270Z ##[endgroup]
+2026-10-21T04:58:13.1902120Z Secret source: Actions
+2026-10-21T04:58:13.1902700Z Cache mode: write
+2026-10-21T04:58:13.1903160Z Prepare workflow directory
+2026-10-21T04:58:13.2212080Z Prepare all required actions
+2026-10-21T04:58:13.2250940Z Getting action download info
+2026-10-21T04:58:13.3948810Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-10-21T04:58:13.6350250Z Download action repository 'actions-rust-lang/setup-rust-toolchain@v2' (SHA:ecabd13d1c56bd1345c230e542e9144811ad706f)
+2026-10-21T04:58:14.1588220Z Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+2026-10-21T04:58:15.4251410Z Getting action download info
+2026-10-21T04:58:15.4990620Z Download action repository 'Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6' (SHA:6323deb102c322ba6fcbdcafc7e3dddab59af2b6)
+2026-10-21T04:58:16.4599180Z Complete job name: style-tone-response
+2026-10-21T04:58:16.5206740Z ##[group]Run actions/checkout@v7
+2026-10-21T04:58:16.5207610Z with:
+2026-10-21T04:58:16.5210240Z   ref: af223f00856b31756559a70ad59abb5af0bdb462
+2026-10-21T04:58:16.5211060Z   persist-credentials: false
+2026-10-21T04:58:16.5213860Z   repository: 21Z121Z1/XDRemux
+2026-10-21T04:58:16.5225380Z   token: ***
+2026-10-21T04:58:16.5225930Z   ssh-strict: true
+2026-10-21T04:58:16.5226470Z   ssh-user: git
+2026-10-21T04:58:16.5227610Z   clean: true
+2026-10-21T04:58:16.5228290Z   sparse-checkout-cone-mode: true
+2026-10-21T04:58:16.5231090Z   fetch-depth: 1
+2026-10-21T04:58:16.5231640Z   fetch-tags: false
+2026-10-21T04:58:16.5232810Z   show-progress: true
+2026-10-21T04:58:16.5233490Z   lfs: false
+2026-10-21T04:58:16.5234000Z   submodules: false
+2026-10-21T04:58:16.5234540Z   set-safe-directory: true
+2026-10-21T04:58:16.5235300Z   allow-unsafe-pr-checkout: false
+2026-10-21T04:58:16.5236720Z ##[endgroup]
+2026-10-21T04:58:16.9232270Z Syncing repository: 21Z121Z1/XDRemux
+2026-10-21T04:58:16.9234090Z ##[group]Getting Git version info
+2026-10-21T04:58:16.9235030Z Working directory is '/Users/runner/work/XDRemux/XDRemux'
+2026-10-21T04:58:16.9236300Z [command]/opt/homebrew/bin/git version
+2026-10-21T04:58:16.9456390Z git version 2.56.0
+2026-10-21T04:58:16.9471420Z ##[endgroup]
+2026-10-21T04:58:16.9477340Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/fedcdb19-11cf-4332-a664-01cb06657a86/.gitconfig'
+2026-10-21T04:58:16.9481320Z Temporarily overriding HOME='/Users/runner/work/_temp/fedcdb19-11cf-4332-a664-01cb06657a86' before making global git config changes
+2026-10-21T04:58:16.9483110Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T04:58:16.9485270Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-21T04:58:16.9572950Z Deleting the contents of '/Users/runner/work/XDRemux/XDRemux'
+2026-10-21T04:58:16.9575210Z ##[group]Determining repository object format
+2026-10-21T04:58:16.9576480Z ##[endgroup]
+2026-10-21T04:58:16.9577360Z ##[group]Initializing the repository
+2026-10-21T04:58:16.9578850Z [command]/opt/homebrew/bin/git init /Users/runner/work/XDRemux/XDRemux
+2026-10-21T04:58:16.9768560Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-21T04:58:16.9770480Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-21T04:58:16.9771740Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-21T04:58:16.9772810Z hint: call:
+2026-10-21T04:58:16.9773340Z hint:
+2026-10-21T04:58:16.9774030Z hint: 	git config --global init.defaultBranch <name>
+2026-10-21T04:58:16.9774950Z hint:
+2026-10-21T04:58:16.9775660Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-21T04:58:16.9777050Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-21T04:58:16.9777950Z hint:
+2026-10-21T04:58:16.9778470Z hint: 	git branch -m <name>
+2026-10-21T04:58:16.9779040Z hint:
+2026-10-21T04:58:16.9780010Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-21T04:58:16.9781350Z Initialized empty Git repository in /Users/runner/work/XDRemux/XDRemux/.git/
+2026-10-21T04:58:16.9783520Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/XDRemux
+2026-10-21T04:58:16.9851230Z ##[endgroup]
+2026-10-21T04:58:16.9852620Z ##[group]Disabling automatic garbage collection
+2026-10-21T04:58:16.9853970Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-21T04:58:16.9911240Z ##[endgroup]
+2026-10-21T04:58:16.9912120Z ##[group]Setting up auth
+2026-10-21T04:58:16.9912770Z Removing SSH command configuration
+2026-10-21T04:58:16.9914830Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T04:58:16.9968680Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T04:58:17.0877570Z Removing HTTP extra header
+2026-10-21T04:58:17.0881120Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T04:58:17.0938960Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T04:58:17.2383700Z Removing includeIf entries pointing to credentials config files
+2026-10-21T04:58:17.2484250Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T04:58:17.2793100Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T04:58:17.4101850Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-21T04:58:17.4106480Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path /Users/runner/work/_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config
+2026-10-21T04:58:17.4135730Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config
+2026-10-21T04:58:17.4208490Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config
+2026-10-21T04:58:17.4280190Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config
+2026-10-21T04:58:17.4343080Z ##[endgroup]
+2026-10-21T04:58:17.4344140Z ##[group]Fetching the repository
+2026-10-21T04:58:17.4347170Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin af223f00856b31756559a70ad59abb5af0bdb462
+2026-10-21T04:58:22.6008860Z From https://github.com/21Z121Z1/XDRemux
+2026-10-21T04:58:22.6009640Z  * branch            af223f00856b31756559a70ad59abb5af0bdb462 -> FETCH_HEAD
+2026-10-21T04:58:22.6018250Z [command]/opt/homebrew/bin/git rev-parse --verify --quiet af223f00856b31756559a70ad59abb5af0bdb462^{object}
+2026-10-21T04:58:22.6136140Z af223f00856b31756559a70ad59abb5af0bdb462
+2026-10-21T04:58:22.6138660Z ##[endgroup]
+2026-10-21T04:58:22.6138960Z ##[group]Determining the checkout info
+2026-10-21T04:58:22.6139770Z ##[endgroup]
+2026-10-21T04:58:22.6143430Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-21T04:58:22.6240060Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-21T04:58:22.6311890Z ##[group]Checking out the ref
+2026-10-21T04:58:22.6315090Z [command]/opt/homebrew/bin/git checkout --progress --force af223f00856b31756559a70ad59abb5af0bdb462
+2026-10-21T04:58:23.2438880Z HEAD is now at af223f0 Reuse exact RGB8 linearization values and require native release equivalence
+2026-10-21T04:58:23.2470890Z ##[endgroup]
+2026-10-21T04:58:23.2611970Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-21T04:58:23.2706920Z af223f00856b31756559a70ad59abb5af0bdb462
+2026-10-21T04:58:23.2714590Z ##[group]Removing auth
+2026-10-21T04:58:23.2714950Z Removing SSH command configuration
+2026-10-21T04:58:23.2718090Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T04:58:23.2788760Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T04:58:23.4237450Z Removing HTTP extra header
+2026-10-21T04:58:23.4269270Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T04:58:23.4307550Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T04:58:23.5869410Z Removing includeIf entries pointing to credentials config files
+2026-10-21T04:58:23.5914550Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T04:58:23.5931230Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-21T04:58:23.5963810Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-21T04:58:23.5991530Z includeif.gitdir:/github/workspace/.git.path
+2026-10-21T04:58:23.6047650Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-21T04:58:23.6115340Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-21T04:58:23.6137110Z /Users/runner/work/_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config
+2026-10-21T04:58:23.6162980Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path \/Users\/runner\/work\/_temp\/git\-credentials\-4a5496fc\-f731\-47bd\-a513\-a372110b5fc4\.config
+2026-10-21T04:58:23.6184780Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-21T04:58:23.6185830Z /Users/runner/work/_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config
+2026-10-21T04:58:23.6187430Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path \/Users\/runner\/work\/_temp\/git\-credentials\-4a5496fc\-f731\-47bd\-a513\-a372110b5fc4\.config
+2026-10-21T04:58:23.6191430Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-10-21T04:58:23.6228420Z /github/runner_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config
+2026-10-21T04:58:23.6233330Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-4a5496fc\-f731\-47bd\-a513\-a372110b5fc4\.config
+2026-10-21T04:58:23.6299800Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-21T04:58:23.6361510Z /github/runner_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config
+2026-10-21T04:58:23.6374130Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-4a5496fc\-f731\-47bd\-a513\-a372110b5fc4\.config
+2026-10-21T04:58:23.6441240Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T04:58:23.7307400Z Removing credentials config '/Users/runner/work/_temp/git-credentials-4a5496fc-f731-47bd-a513-a372110b5fc4.config'
+2026-10-21T04:58:23.7324390Z ##[endgroup]
+2026-10-21T04:58:23.7650090Z ##[group]Run actions/checkout@v7
+2026-10-21T04:58:23.7650310Z with:
+2026-10-21T04:58:23.7650480Z   repository: 21Z121Z1/Photographic_Style_Research
+2026-10-21T04:58:23.7650740Z   ref: 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T04:58:23.7650970Z   path: consumer-research
+2026-10-21T04:58:23.7651160Z   persist-credentials: false
+2026-10-21T04:58:23.7653480Z   token: ***
+2026-10-21T04:58:23.7653640Z   ssh-strict: true
+2026-10-21T04:58:23.7653780Z   ssh-user: git
+2026-10-21T04:58:23.7653920Z   clean: true
+2026-10-21T04:58:23.7654130Z   sparse-checkout-cone-mode: true
+2026-10-21T04:58:23.7654320Z   fetch-depth: 1
+2026-10-21T04:58:23.7654470Z   fetch-tags: false
+2026-10-21T04:58:23.7654620Z   show-progress: true
+2026-10-21T04:58:23.7654780Z   lfs: false
+2026-10-21T04:58:23.7654910Z   submodules: false
+2026-10-21T04:58:23.7655170Z   set-safe-directory: true
+2026-10-21T04:58:23.7655360Z   allow-unsafe-pr-checkout: false
+2026-10-21T04:58:23.7655540Z ##[endgroup]
+2026-10-21T04:58:23.9023510Z Syncing repository: 21Z121Z1/Photographic_Style_Research
+2026-10-21T04:58:23.9025960Z ##[group]Getting Git version info
+2026-10-21T04:58:23.9026730Z Working directory is '/Users/runner/work/XDRemux/XDRemux/consumer-research'
+2026-10-21T04:58:23.9027850Z [command]/opt/homebrew/bin/git version
+2026-10-21T04:58:23.9099460Z git version 2.56.0
+2026-10-21T04:58:23.9191860Z ##[endgroup]
+2026-10-21T04:58:23.9193330Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/b5288e11-bb24-47a5-88ce-bf002fe560f0/.gitconfig'
+2026-10-21T04:58:23.9194210Z Temporarily overriding HOME='/Users/runner/work/_temp/b5288e11-bb24-47a5-88ce-bf002fe560f0' before making global git config changes
+2026-10-21T04:58:23.9194930Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T04:58:23.9195630Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T04:58:23.9196890Z ##[group]Determining repository object format
+2026-10-21T04:58:23.9197380Z ##[endgroup]
+2026-10-21T04:58:23.9197790Z ##[group]Initializing the repository
+2026-10-21T04:58:23.9198270Z [command]/opt/homebrew/bin/git init /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T04:58:23.9291180Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-21T04:58:23.9346840Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-21T04:58:23.9347790Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-21T04:58:23.9349390Z hint: call:
+2026-10-21T04:58:23.9349680Z hint:
+2026-10-21T04:58:23.9350040Z hint: 	git config --global init.defaultBranch <name>
+2026-10-21T04:58:23.9350440Z hint:
+2026-10-21T04:58:23.9350780Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-21T04:58:23.9351380Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-21T04:58:23.9352480Z hint:
+2026-10-21T04:58:23.9352760Z hint: 	git branch -m <name>
+2026-10-21T04:58:23.9353090Z hint:
+2026-10-21T04:58:23.9353510Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-21T04:58:23.9354670Z Initialized empty Git repository in /Users/runner/work/XDRemux/XDRemux/consumer-research/.git/
+2026-10-21T04:58:23.9356020Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-21T04:58:23.9376780Z ##[endgroup]
+2026-10-21T04:58:23.9377230Z ##[group]Disabling automatic garbage collection
+2026-10-21T04:58:23.9380020Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-21T04:58:23.9448010Z ##[endgroup]
+2026-10-21T04:58:23.9448420Z ##[group]Setting up auth
+2026-10-21T04:58:23.9448740Z Removing SSH command configuration
+2026-10-21T04:58:23.9452810Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T04:58:23.9523290Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T04:58:24.0701500Z Removing HTTP extra header
+2026-10-21T04:58:24.0757400Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T04:58:24.0822950Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T04:58:24.2808180Z Removing includeIf entries pointing to credentials config files
+2026-10-21T04:58:24.2909790Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T04:58:24.3213590Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T04:58:24.4539290Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-21T04:58:24.4843300Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path /Users/runner/work/_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config
+2026-10-21T04:58:24.4983710Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config
+2026-10-21T04:58:24.5012660Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/consumer-research/.git.path /github/runner_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config
+2026-10-21T04:58:24.5014710Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path /github/runner_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config
+2026-10-21T04:58:24.5016530Z ##[endgroup]
+2026-10-21T04:58:24.5016940Z ##[group]Fetching the repository
+2026-10-21T04:58:24.5017650Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T04:58:26.1104260Z From https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-21T04:58:26.1205040Z  * branch            37dd551a949047ed14580efa0c0a2556922791b5 -> FETCH_HEAD
+2026-10-21T04:58:26.1451730Z [command]/opt/homebrew/bin/git rev-parse --verify --quiet 37dd551a949047ed14580efa0c0a2556922791b5^{object}
+2026-10-21T04:58:26.1552730Z 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T04:58:26.1857780Z ##[endgroup]
+2026-10-21T04:58:26.1960680Z ##[group]Determining the checkout info
+2026-10-21T04:58:26.2061870Z ##[endgroup]
+2026-10-21T04:58:26.2163500Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-21T04:58:26.2467690Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-21T04:58:26.2774310Z ##[group]Checking out the ref
+2026-10-21T04:58:26.2874690Z [command]/opt/homebrew/bin/git checkout --progress --force 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T04:58:26.2976700Z HEAD is now at 37dd551 consumer-model README: cite C35 line
+2026-10-21T04:58:26.3279290Z ##[endgroup]
+2026-10-21T04:58:26.3581460Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-21T04:58:26.3681740Z 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T04:58:26.3984100Z ##[group]Removing auth
+2026-10-21T04:58:26.4084280Z Removing SSH command configuration
+2026-10-21T04:58:26.4185360Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T04:58:26.4488120Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T04:58:26.4791310Z Removing HTTP extra header
+2026-10-21T04:58:26.4819180Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T04:58:26.4953160Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T04:58:26.5373050Z Removing includeIf entries pointing to credentials config files
+2026-10-21T04:58:26.5375400Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T04:58:26.5438510Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path
+2026-10-21T04:58:26.5439110Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path
+2026-10-21T04:58:26.5439670Z includeif.gitdir:/github/workspace/consumer-research/.git.path
+2026-10-21T04:58:26.5440170Z includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path
+2026-10-21T04:58:26.5444420Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path
+2026-10-21T04:58:26.5503830Z /Users/runner/work/_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config
+2026-10-21T04:58:26.5511600Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path \/Users\/runner\/work\/_temp\/git\-credentials\-3604ecd7\-2c42\-4f5b\-84b4\-306f85ff74aa\.config
+2026-10-21T04:58:26.5573010Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path
+2026-10-21T04:58:26.5623430Z /Users/runner/work/_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config
+2026-10-21T04:58:26.5629880Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path \/Users\/runner\/work\/_temp\/git\-credentials\-3604ecd7\-2c42\-4f5b\-84b4\-306f85ff74aa\.config
+2026-10-21T04:58:26.5686570Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/consumer-research/.git.path
+2026-10-21T04:58:26.5810690Z /github/runner_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config
+2026-10-21T04:58:26.5899490Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/consumer-research/.git.path \/github\/runner_temp\/git\-credentials\-3604ecd7\-2c42\-4f5b\-84b4\-306f85ff74aa\.config
+2026-10-21T04:58:26.5901480Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path
+2026-10-21T04:58:26.5908440Z /github/runner_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config
+2026-10-21T04:58:26.5914540Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-3604ecd7\-2c42\-4f5b\-84b4\-306f85ff74aa\.config
+2026-10-21T04:58:26.5973920Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T04:58:26.6672080Z Removing credentials config '/Users/runner/work/_temp/git-credentials-3604ecd7-2c42-4f5b-84b4-306f85ff74aa.config'
+2026-10-21T04:58:26.6677540Z ##[endgroup]
+2026-10-21T04:58:26.6748360Z ##[group]Run brew install libheif
+2026-10-21T04:58:26.6748640Z [36;1mbrew install libheif[0m
+2026-10-21T04:58:26.6748970Z [36;1mecho "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"[0m
+2026-10-21T04:58:26.6749430Z [36;1m# xcode-27 Python is externally managed, so the harness packages stay in a job venv.[0m
+2026-10-21T04:58:26.6749800Z [36;1mpython3 -m venv "$RUNNER_TEMP/tone-venv"[0m
+2026-10-21T04:58:26.6750130Z [36;1m"$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow[0m
+2026-10-21T04:58:26.6750460Z [36;1mecho "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"[0m
+2026-10-21T04:58:26.6795450Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:26.6795750Z ##[endgroup]
+2026-10-21T04:58:29.0774220Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-21T04:58:29.0815880Z ✔︎ Bottle Manifest libheif (1.23.6)
+2026-10-21T04:58:29.1489610Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-21T04:58:29.1489970Z libheif 1.23.6
+2026-10-21T04:58:29.1492800Z [34m==>[0m [1mWould install 4 dependencies for libheif:[0m
+2026-10-21T04:58:29.1493130Z libvmaf
+2026-10-21T04:58:29.1493270Z aom
+2026-10-21T04:58:29.1493410Z libde265
+2026-10-21T04:58:29.1493540Z x265
+2026-10-21T04:58:29.1932830Z [32m==>[0m [1mFetching downloads for: [32mlibheif[39m[0m
+2026-10-21T04:58:29.7691760Z ✔︎ Bottle Manifest libvmaf (3.2.1)
+2026-10-21T04:58:29.7724170Z ✔︎ Bottle Manifest aom (3.15.2)
+2026-10-21T04:58:29.7729490Z ✔︎ Bottle Manifest libde265 (1.1.3)
+2026-10-21T04:58:29.8536460Z ✔︎ Bottle Manifest x265 (4.3)
+2026-10-21T04:58:30.9895330Z ✔︎ Bottle libheif (1.23.6)
+2026-10-21T04:58:31.0592260Z ✔︎ Bottle libvmaf (3.2.1)
+2026-10-21T04:58:31.0592840Z ✔︎ Bottle aom (3.15.2)
+2026-10-21T04:58:31.2219170Z ✔︎ Bottle libde265 (1.1.3)
+2026-10-21T04:58:31.2587740Z ✔︎ Bottle x265 (4.3)
+2026-10-21T04:58:31.2960350Z [32m==>[0m [1mInstalling dependencies for libheif:[0m [32mlibvmaf[39m, [32maom[39m, [32mlibde265[39m and [32mx265[39m[0m
+2026-10-21T04:58:31.2961200Z [32m==>[0m [1mInstalling libheif dependency: [32mlibvmaf[39m (3.2.1)[0m
+2026-10-21T04:58:31.3024070Z [34m==>[0m [1mPouring libvmaf--3.2.1.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T04:58:32.1392180Z 🍺  /opt/homebrew/Cellar/libvmaf/3.2.1: 243 files, 8.2MB
+2026-10-21T04:58:32.1396020Z [32m==>[0m [1mInstalling libheif dependency: [32maom[39m (3.15.2)[0m
+2026-10-21T04:58:32.1501540Z [34m==>[0m [1mPouring aom--3.15.2.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T04:58:32.8835200Z 🍺  /opt/homebrew/Cellar/aom/3.15.2: 30 files, 11.3MB
+2026-10-21T04:58:32.8837090Z [32m==>[0m [1mInstalling libheif dependency: [32mlibde265[39m (1.1.3)[0m
+2026-10-21T04:58:32.8860430Z [34m==>[0m [1mPouring libde265--1.1.3.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T04:58:33.6137200Z 🍺  /opt/homebrew/Cellar/libde265/1.1.3: 18 files, 436.6KB
+2026-10-21T04:58:33.6139370Z [32m==>[0m [1mInstalling libheif dependency: [32mx265[39m (4.3)[0m
+2026-10-21T04:58:33.6167290Z [34m==>[0m [1mPouring x265--4.3.arm64_golden_gate.bottle.1.tar.gz[0m
+2026-10-21T04:58:34.3612940Z 🍺  /opt/homebrew/Cellar/x265/4.3: 12 files, 17.3MB
+2026-10-21T04:58:34.3615070Z [32m==>[0m [1mInstalling [32mlibheif[39m[0m
+2026-10-21T04:58:34.3616790Z [34m==>[0m [1mPouring libheif--1.23.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T04:58:35.1167160Z 🍺  /opt/homebrew/Cellar/libheif/1.23.6: 53 files, 9.1MB
+2026-10-21T04:58:35.1170450Z [32m==>[0m [1mCaveats[0m
+2026-10-21T04:58:35.1170880Z [34m==>[0m [1mlibheif[0m
+2026-10-21T04:58:35.1171880Z Additional codecs can be enabled by `brew install libheif-plugins`
+2026-10-21T04:58:38.0215670Z Collecting numpy
+2026-10-21T04:58:38.0487200Z   Downloading numpy-2.5.4-cp315-cp315-macosx_14_0_arm64.whl.metadata (6.6 kB)
+2026-10-21T04:58:38.1626240Z Collecting pillow
+2026-10-21T04:58:38.1727800Z   Downloading pillow-13.0.0-cp315-cp315-macosx_11_0_arm64.whl.metadata (9.1 kB)
+2026-10-21T04:58:38.1838160Z Downloading numpy-2.5.4-cp315-cp315-macosx_14_0_arm64.whl (5.5 MB)
+2026-10-21T04:58:38.2239650Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.5/5.5 MB 147.4 MB/s  0:00:00
+2026-10-21T04:58:38.2319550Z Downloading pillow-13.0.0-cp315-cp315-macosx_11_0_arm64.whl (4.9 MB)
+2026-10-21T04:58:38.2564140Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.9/4.9 MB 199.9 MB/s  0:00:00
+2026-10-21T04:58:38.2822340Z Installing collected packages: pillow, numpy
+2026-10-21T04:58:40.1294980Z 
+2026-10-21T04:58:40.1294990Z 
+2026-10-21T04:58:40.1396150Z [notice] A new release of pip is available: 26.2.1 -> 26.2.2
+2026-10-21T04:58:40.1396610Z Successfully installed numpy-2.5.4 pillow-13.0.0
+2026-10-21T04:58:40.1497050Z [notice] To update, run: /Users/runner/work/_temp/tone-venv/bin/python -m pip install --upgrade pip
+2026-10-21T04:58:40.2173850Z ##[group]Run python3 -m unittest tests.test_style_tone_response -v
+2026-10-21T04:58:40.2174400Z [36;1mpython3 -m unittest tests.test_style_tone_response -v[0m
+2026-10-21T04:58:40.2221450Z shell: /bin/bash -e {0}
+2026-10-21T04:58:40.2221660Z env:
+2026-10-21T04:58:40.2221950Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:40.2222380Z   RESEARCH_ROOT: /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T04:58:40.2222670Z ##[endgroup]
+2026-10-21T04:58:40.7721750Z test_real_extractor_preserves_sibling_helper_import_and_direct_search_order (tests.test_style_tone_response.PinnedExtractorIntegrationTests.test_real_extractor_preserves_sibling_helper_import_and_direct_search_order) ... ok
+2026-10-21T04:58:41.0383650Z test_real_extractor_recovers_v1_and_keeps_missing_role_failure (tests.test_style_tone_response.PinnedExtractorIntegrationTests.test_real_extractor_recovers_v1_and_keeps_missing_role_failure) ... ok
+2026-10-21T04:58:41.0808240Z test_all_requested_tones_and_photos_are_required (tests.test_style_tone_response.StyleToneResponseTests.test_all_requested_tones_and_photos_are_required) ... ok
+2026-10-21T04:58:41.0814950Z test_comparison_rejects_missing_product_measurements_and_metadata (tests.test_style_tone_response.StyleToneResponseTests.test_comparison_rejects_missing_product_measurements_and_metadata) ... ok
+2026-10-21T04:58:41.1210980Z test_complete_comparison_requires_both_groups_and_real_metadata_arrays (tests.test_style_tone_response.StyleToneResponseTests.test_complete_comparison_requires_both_groups_and_real_metadata_arrays) ... ok
+2026-10-21T04:58:41.4398290Z test_complete_data_still_produces_real_tone_statistics (tests.test_style_tone_response.StyleToneResponseTests.test_complete_data_still_produces_real_tone_statistics) ... ok
+2026-10-21T04:58:42.3220470Z test_consumer_case_names_preserve_namespace_across_stem_versions (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_case_names_preserve_namespace_across_stem_versions) ... ok
+2026-10-21T04:58:42.3461910Z test_consumer_process_failure_retains_both_streams (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_process_failure_retains_both_streams) ... ok
+2026-10-21T04:58:42.3465480Z test_consumer_rejects_invalid_requested_tone_subsets_before_execution (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_invalid_requested_tone_subsets_before_execution) ... ok
+2026-10-21T04:58:42.4631250Z test_consumer_routes_extraction_through_the_owned_adapter (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_routes_extraction_through_the_owned_adapter) ... ok
+2026-10-21T04:58:42.5216180Z test_consumer_timeout_is_a_failure_with_a_reaped_process (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_timeout_is_a_failure_with_a_reaped_process) ... ok
+2026-10-21T04:58:42.5504130Z test_consumer_zero_exit_with_extractor_failure_retains_stderr_and_fails (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_zero_exit_with_extractor_failure_retains_stderr_and_fails) ... ok
+2026-10-21T04:58:42.9185680Z test_corrupt_or_nonfinite_render_leaves_a_failure_report (tests.test_style_tone_response.StyleToneResponseTests.test_corrupt_or_nonfinite_render_leaves_a_failure_report) ... ok
+2026-10-21T04:58:42.9375790Z test_failed_process_or_model_comparison_cannot_reuse_present_renders (tests.test_style_tone_response.StyleToneResponseTests.test_failed_process_or_model_comparison_cannot_reuse_present_renders) ... ok
+2026-10-21T04:58:42.9464840Z test_finish_status_is_observed_without_guessing_its_success_value (tests.test_style_tone_response.StyleToneResponseTests.test_finish_status_is_observed_without_guessing_its_success_value) ... ok
+2026-10-21T04:58:42.9465930Z test_host_gate_requires_a_successful_nonempty_native_comparison (tests.test_style_tone_response.StyleToneResponseTests.test_host_gate_requires_a_successful_nonempty_native_comparison) ... ok
+2026-10-21T04:58:42.9479620Z test_iinf_adapter_accepts_v0_and_v1_counts_and_rejects_incomplete_data (tests.test_style_tone_response.StyleToneResponseTests.test_iinf_adapter_accepts_v0_and_v1_counts_and_rejects_incomplete_data) ... ok
+2026-10-21T04:58:42.9498860Z test_iinf_adapter_rejects_an_unexpected_source_hash (tests.test_style_tone_response.StyleToneResponseTests.test_iinf_adapter_rejects_an_unexpected_source_hash) ... ok
+2026-10-21T04:58:42.9783590Z test_malformed_sweep_and_duplicate_rows_leave_untrusted_reports (tests.test_style_tone_response.StyleToneResponseTests.test_malformed_sweep_and_duplicate_rows_leave_untrusted_reports) ... ok
+2026-10-21T04:58:43.0103070Z test_native_facts_dictionary_stays_local_while_stderr_and_exception_survive (tests.test_style_tone_response.StyleToneResponseTests.test_native_facts_dictionary_stays_local_while_stderr_and_exception_survive) ... ok
+2026-10-21T04:58:43.0104320Z test_nonzero_tone_keeps_signed_zero_bit_difference_and_infinite_psnr (tests.test_style_tone_response.StyleToneResponseTests.test_nonzero_tone_keeps_signed_zero_bit_difference_and_infinite_psnr) ... ok
+2026-10-21T04:58:43.0172540Z test_reference_pass_cannot_admit_an_empty_product_sweep (tests.test_style_tone_response.StyleToneResponseTests.test_reference_pass_cannot_admit_an_empty_product_sweep) ... ok
+2026-10-21T04:58:43.1708830Z test_system_shell_retains_the_consumer_first_fault_before_scoring (tests.test_style_tone_response.StyleToneResponseTests.test_system_shell_retains_the_consumer_first_fault_before_scoring) ... ok
+2026-10-21T04:58:43.7252850Z test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) ... ok
+2026-10-21T04:58:43.7253530Z 
+2026-10-21T04:58:43.7253660Z ----------------------------------------------------------------------
+2026-10-21T04:58:43.7253960Z Ran 24 tests in 3.200s
+2026-10-21T04:58:43.7254100Z 
+2026-10-21T04:58:43.7254160Z OK
+2026-10-21T04:58:43.7580980Z ##[group]Run actions-rust-lang/setup-rust-toolchain@v2
+2026-10-21T04:58:43.7581270Z with:
+2026-10-21T04:58:43.7581440Z   toolchain: stable
+2026-10-21T04:58:43.7581630Z   build-warnings: deny
+2026-10-21T04:58:43.7581790Z   cache: true
+2026-10-21T04:58:43.7581940Z   cache-on-failure: true
+2026-10-21T04:58:43.7582100Z   cache-bin: true
+2026-10-21T04:58:43.7582260Z   cache-provider: github
+2026-10-21T04:58:43.7582430Z   cache-all-crates: false
+2026-10-21T04:58:43.7582850Z   cache-workspace-crates: false
+2026-10-21T04:58:43.7583070Z   cache-save-if: true
+2026-10-21T04:58:43.7583250Z   cache-targets: true
+2026-10-21T04:58:43.7583420Z   matcher: true
+2026-10-21T04:58:43.7583550Z   override: true
+2026-10-21T04:58:43.7583680Z env:
+2026-10-21T04:58:43.7583990Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:43.7584270Z ##[endgroup]
+2026-10-21T04:58:43.7627450Z ##[start-action display=Unbork mac;id=__actions-rust-lang_setup-rust-toolchain.__run]
+2026-10-21T04:58:43.7656820Z ##[group]Run brew install bash
+2026-10-21T04:58:43.7657030Z [36;1mbrew install bash[0m
+2026-10-21T04:58:43.7689260Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:43.7689500Z env:
+2026-10-21T04:58:43.7689690Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:43.7689930Z ##[endgroup]
+2026-10-21T04:58:44.4784340Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-21T04:58:44.5185970Z ✔︎ Bottle Manifest bash (5.3.20)
+2026-10-21T04:58:44.5487530Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-21T04:58:44.5588710Z [32m==>[0m [1mFetching downloads for: [32mbash[39m[0m
+2026-10-21T04:58:44.5589000Z bash 5.3.20
+2026-10-21T04:58:44.5689080Z [34m==>[0m [1mWould install 1 dependency for bash:[0m
+2026-10-21T04:58:44.5789660Z ncurses
+2026-10-21T04:58:44.9054320Z ✔︎ Bottle Manifest ncurses (6.6)
+2026-10-21T04:58:45.8971980Z ✔︎ Bottle bash (5.3.20)
+2026-10-21T04:58:46.3344150Z ✔︎ Bottle ncurses (6.6)
+2026-10-21T04:58:46.3450110Z [32m==>[0m [1mInstalling bash dependency: [32mncurses[39m (6.6)[0m
+2026-10-21T04:58:46.3466750Z [34m==>[0m [1mPouring ncurses--6.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T04:58:47.5502870Z 🍺  /opt/homebrew/Cellar/ncurses/6.6: 4,086 files, 10.3MB
+2026-10-21T04:58:47.5505670Z [32m==>[0m [1mInstalling [32mbash[39m[0m
+2026-10-21T04:58:47.5508910Z [34m==>[0m [1mPouring bash--5.3.20.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T04:58:48.4054430Z 🍺  /opt/homebrew/Cellar/bash/5.3.20: 172 files, 13.1MB
+2026-10-21T04:58:48.4056960Z [32m==>[0m [1mCaveats[0m
+2026-10-21T04:58:48.4057210Z [34m==>[0m [1mbash[0m
+2026-10-21T04:58:48.4057910Z DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/lib/bash:/opt/local/lib/bash:/usr/pkg/lib/bash:/opt/pkg/lib/bash:.
+2026-10-21T04:58:48.4137170Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=4650]
+2026-10-21T04:58:48.4147650Z ##[start-action display=Run : construct rustup command line;id=__actions-rust-lang_setup-rust-toolchain.flags]
+2026-10-21T04:58:48.4165350Z ##[group]Run : construct rustup command line
+2026-10-21T04:58:48.4165600Z [36;1m: construct rustup command line[0m
+2026-10-21T04:58:48.4165970Z [36;1mecho "targets=$(for t in ${_srt_targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+2026-10-21T04:58:48.4166480Z [36;1mecho "components=$(for c in ${_srt_components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+2026-10-21T04:58:48.4166890Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+2026-10-21T04:58:48.4177620Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:48.4177900Z env:
+2026-10-21T04:58:48.4178080Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:48.4178320Z   _srt_targets: 
+2026-10-21T04:58:48.4178460Z   _srt_components: 
+2026-10-21T04:58:48.4178610Z ##[endgroup]
+2026-10-21T04:58:48.4526790Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.flags;outcome=success;conclusion=success;duration_ms=37]
+2026-10-21T04:58:48.4530640Z ##[start-action display=Setting Environment Variables;id=__actions-rust-lang_setup-rust-toolchain.__run_2]
+2026-10-21T04:58:48.4546320Z ##[group]Run if [[ ! -v CARGO_INCREMENTAL ]]; then
+2026-10-21T04:58:48.4546610Z [36;1mif [[ ! -v CARGO_INCREMENTAL ]]; then[0m
+2026-10-21T04:58:48.4546870Z [36;1m  echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV[0m
+2026-10-21T04:58:48.4547090Z [36;1mfi[0m
+2026-10-21T04:58:48.4547490Z [36;1mif [[ ! -v CARGO_PROFILE_DEV_DEBUG ]]; then[0m
+2026-10-21T04:58:48.4547780Z [36;1m  echo "CARGO_PROFILE_DEV_DEBUG=0" >> $GITHUB_ENV[0m
+2026-10-21T04:58:48.4548010Z [36;1mfi[0m
+2026-10-21T04:58:48.4548170Z [36;1mif [[ ! -v CARGO_TERM_COLOR ]]; then[0m
+2026-10-21T04:58:48.4548420Z [36;1m  echo "CARGO_TERM_COLOR=always" >> $GITHUB_ENV[0m
+2026-10-21T04:58:48.4548650Z [36;1mfi[0m
+2026-10-21T04:58:48.4548800Z [36;1mif [[ ! -v RUST_BACKTRACE ]]; then[0m
+2026-10-21T04:58:48.4549050Z [36;1m  echo "RUST_BACKTRACE=short" >> $GITHUB_ENV[0m
+2026-10-21T04:58:48.4549280Z [36;1mfi[0m
+2026-10-21T04:58:48.4549570Z [36;1mif [[ ( ! -v RUSTFLAGS ) && $_srt_NEW_RUSTFLAGS != "" ]]; then[0m
+2026-10-21T04:58:48.4549910Z [36;1m  echo "RUSTFLAGS=$_srt_NEW_RUSTFLAGS" >> $GITHUB_ENV[0m
+2026-10-21T04:58:48.4550140Z [36;1mfi[0m
+2026-10-21T04:58:48.4550390Z [36;1mif [[ ( ! -v CARGO_BUILD_WARNINGS ) && $_srt_CARGO_BUILD_WARNINGS != "" ]]; then[0m
+2026-10-21T04:58:48.4550790Z [36;1m  echo "CARGO_BUILD_WARNINGS=$_srt_CARGO_BUILD_WARNINGS" >> $GITHUB_ENV[0m
+2026-10-21T04:58:48.4551070Z [36;1mfi[0m
+2026-10-21T04:58:48.4551240Z [36;1m# Enable faster sparse index on nightly[0m
+2026-10-21T04:58:48.4551530Z [36;1m# The value is ignored on stable and causes no problems[0m
+2026-10-21T04:58:48.4551940Z [36;1m# https://internals.rust-lang.org/t/call-for-testing-cargo-sparse-registry/16862[0m
+2026-10-21T04:58:48.4552320Z [36;1mif [[ ! -v CARGO_UNSTABLE_SPARSE_REGISTRY ]]; then[0m
+2026-10-21T04:58:48.4552640Z [36;1m  echo "CARGO_UNSTABLE_SPARSE_REGISTRY=true" >> $GITHUB_ENV[0m
+2026-10-21T04:58:48.4552890Z [36;1mfi[0m
+2026-10-21T04:58:48.4553090Z [36;1mif [[ ! -v CARGO_REGISTRIES_CRATES_IO_PROTOCOL ]]; then[0m
+2026-10-21T04:58:48.4553420Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse" >> $GITHUB_ENV[0m
+2026-10-21T04:58:48.4553710Z [36;1mfi[0m
+2026-10-21T04:58:48.4563970Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:48.4564240Z env:
+2026-10-21T04:58:48.4564440Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:48.4564680Z   _srt_NEW_RUSTFLAGS: 
+2026-10-21T04:58:48.4564850Z   _srt_CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:58:48.4565020Z ##[endgroup]
+2026-10-21T04:58:48.4833080Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_2;outcome=success;conclusion=success;duration_ms=30]
+2026-10-21T04:58:48.4835230Z ##[start-action display=Install Rust Problem Matcher;id=__actions-rust-lang_setup-rust-toolchain.__run_3]
+2026-10-21T04:58:48.4864050Z ##[group]Run echo "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"
+2026-10-21T04:58:48.4864770Z [36;1mecho "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"[0m
+2026-10-21T04:58:48.4876520Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:48.4876790Z env:
+2026-10-21T04:58:48.4877000Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:48.4877310Z   CARGO_INCREMENTAL: 0
+2026-10-21T04:58:48.4877530Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T04:58:48.4877720Z   CARGO_TERM_COLOR: always
+2026-10-21T04:58:48.4877920Z   RUST_BACKTRACE: short
+2026-10-21T04:58:48.4878130Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:58:48.4878450Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T04:58:48.4878710Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T04:58:48.4878930Z ##[endgroup]
+2026-10-21T04:58:48.5170910Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_3;outcome=success;conclusion=success;duration_ms=33]
+2026-10-21T04:58:48.5173430Z ##[start-action display=Install rustup, if needed;id=__actions-rust-lang_setup-rust-toolchain.__run_4]
+2026-10-21T04:58:48.5189310Z ##[group]Run if ! command -v rustup &> /dev/null ; then
+2026-10-21T04:58:48.5189650Z [36;1mif ! command -v rustup &> /dev/null ; then[0m
+2026-10-21T04:58:48.5190270Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" | sh -s -- --default-toolchain none -y[0m
+2026-10-21T04:58:48.5191040Z [36;1m[0m
+2026-10-21T04:58:48.5191290Z [36;1m  # Resolve the correct CARGO_HOME path depending on OS[0m
+2026-10-21T04:58:48.5191630Z [36;1m  if [[ "$RUNNER_OS" == "Windows" ]]; then[0m
+2026-10-21T04:58:48.5192000Z [36;1m    echo "${CARGO_HOME:-$USERPROFILE/.cargo}/bin" | sed 's|/|\\|g' >> $GITHUB_PATH[0m
+2026-10-21T04:58:48.5192320Z [36;1m  else[0m
+2026-10-21T04:58:48.5192550Z [36;1m    echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> $GITHUB_PATH[0m
+2026-10-21T04:58:48.5192860Z [36;1m  fi[0m
+2026-10-21T04:58:48.5193020Z [36;1mfi[0m
+2026-10-21T04:58:48.5204310Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:48.5204590Z env:
+2026-10-21T04:58:48.5204820Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:48.5205100Z   CARGO_INCREMENTAL: 0
+2026-10-21T04:58:48.5205270Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T04:58:48.5205470Z   CARGO_TERM_COLOR: always
+2026-10-21T04:58:48.5205680Z   RUST_BACKTRACE: short
+2026-10-21T04:58:48.5205890Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:58:48.5206110Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T04:58:48.5206400Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T04:58:48.5206620Z   RUNNER_OS: macOS
+2026-10-21T04:58:48.5206780Z ##[endgroup]
+2026-10-21T04:58:48.5488970Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=31]
+2026-10-21T04:58:48.5492410Z ##[start-action display=rustup toolchain install stable;id=__actions-rust-lang_setup-rust-toolchain.__run_5]
+2026-10-21T04:58:48.5509590Z ##[group]Run # Check if value is set
+2026-10-21T04:58:48.5509900Z [36;1m# Check if value is set[0m
+2026-10-21T04:58:48.5510140Z [36;1mif [[ -n "$_srt_rust_src_dir" ]][0m
+2026-10-21T04:58:48.5510380Z [36;1mthen[0m
+2026-10-21T04:58:48.5510580Z [36;1m  # If value is set the directory must exist[0m
+2026-10-21T04:58:48.5510840Z [36;1m  if [[ -d "$_srt_rust_src_dir" ]][0m
+2026-10-21T04:58:48.5511120Z [36;1m  then[0m
+2026-10-21T04:58:48.5511280Z [36;1m    cd "$_srt_rust_src_dir"[0m
+2026-10-21T04:58:48.5511480Z [36;1m  else[0m
+2026-10-21T04:58:48.5511730Z [36;1m    echo "'rust-src-dir' does not point to an existing directory" >&2[0m
+2026-10-21T04:58:48.5512130Z [36;1m    echo "The value of 'rust-src-dir' is: ${_srt_rust_src_dir}" >&2[0m
+2026-10-21T04:58:48.5512420Z [36;1m    exit 1[0m
+2026-10-21T04:58:48.5512580Z [36;1m  fi[0m
+2026-10-21T04:58:48.5512770Z [36;1mfi[0m
+2026-10-21T04:58:48.5513120Z [36;1mif [[ -z "$_srt_toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml") ]][0m
+2026-10-21T04:58:48.5513480Z [36;1mthen[0m
+2026-10-21T04:58:48.5513730Z [36;1m  # Install the toolchain as specified in the file[0m
+2026-10-21T04:58:48.5514100Z [36;1m  # rustup show is the old way that implicitly installed a toolchain[0m
+2026-10-21T04:58:48.5514450Z [36;1m  # rustup toolchain install is the new explicit way[0m
+2026-10-21T04:58:48.5514870Z [36;1m  # https://github.com/rust-lang/rustup/issues/3635#issuecomment-2343511297[0m
+2026-10-21T04:58:48.5515300Z [36;1m  rustup show active-toolchain || rustup toolchain install[0m
+2026-10-21T04:58:48.5515610Z [36;1m  if [[ -n $_srt_components ]]; then[0m
+2026-10-21T04:58:48.5515960Z [36;1m    rustup component add ${_srt_components//,/ }[0m
+2026-10-21T04:58:48.5516210Z [36;1m  fi[0m
+2026-10-21T04:58:48.5528000Z [36;1m  if [[ -n $_srt_targets ]]; then[0m
+2026-10-21T04:58:48.5528670Z [36;1m    rustup target add ${_srt_targets//,/ }[0m
+2026-10-21T04:58:48.5528930Z [36;1m  fi[0m
+2026-10-21T04:58:48.5529120Z [36;1melse[0m
+2026-10-21T04:58:48.5529300Z [36;1m  if [[ -z "$_srt_toolchain" ]][0m
+2026-10-21T04:58:48.5529580Z [36;1m  then[0m
+2026-10-21T04:58:48.5529750Z [36;1m    _srt_toolchain=stable[0m
+2026-10-21T04:58:48.5529950Z [36;1m  fi[0m
+2026-10-21T04:58:48.5530250Z [36;1m  rustup toolchain install ${_srt_toolchain//,/ }  --profile minimal --no-self-update[0m
+2026-10-21T04:58:48.5530850Z [36;1m  # Take the last element from the list[0m
+2026-10-21T04:58:48.5531120Z [36;1m  if [[ "$_srt_override" == "true" ]][0m
+2026-10-21T04:58:48.5531330Z [36;1m  then[0m
+2026-10-21T04:58:48.5531550Z [36;1m    rustup override set ${_srt_toolchain//*,/ }[0m
+2026-10-21T04:58:48.5531800Z [36;1m  fi[0m
+2026-10-21T04:58:48.5531970Z [36;1mfi[0m
+2026-10-21T04:58:48.5543360Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:48.5543630Z env:
+2026-10-21T04:58:48.5543830Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:48.5544070Z   CARGO_INCREMENTAL: 0
+2026-10-21T04:58:48.5544220Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T04:58:48.5544390Z   CARGO_TERM_COLOR: always
+2026-10-21T04:58:48.5544670Z   RUST_BACKTRACE: short
+2026-10-21T04:58:48.5544850Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:58:48.5545040Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T04:58:48.5545250Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T04:58:48.5545480Z   _srt_toolchain: stable
+2026-10-21T04:58:48.5545640Z   _srt_targets: 
+2026-10-21T04:58:48.5545780Z   _srt_components: 
+2026-10-21T04:58:48.5545930Z   _srt_override: true
+2026-10-21T04:58:48.5546090Z   _srt_rust_src_dir: 
+2026-10-21T04:58:48.5546250Z ##[endgroup]
+2026-10-21T04:58:48.6496890Z info: syncing channel updates for stable-aarch64-apple-darwin
+2026-10-21T04:58:48.7651220Z info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-21T04:58:48.7739320Z info: removing previous version of component clippy
+2026-10-21T04:58:48.7763400Z info: removing previous version of component rustfmt
+2026-10-21T04:58:48.7779960Z info: removing previous version of component cargo
+2026-10-21T04:58:48.7845510Z info: removing previous version of component rust-std
+2026-10-21T04:58:48.7927780Z info: removing previous version of component rustc
+2026-10-21T04:58:48.7995520Z info: downloading 5 components
+2026-10-21T04:58:54.5831200Z 
+2026-10-21T04:58:54.6258820Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))
+2026-10-21T04:58:54.6259590Z 
+2026-10-21T04:58:54.6259860Z info: self-update is disabled for this build of rustup
+2026-10-21T04:58:54.6260380Z info: any updates to rustup will need to be fetched with your system package manager
+2026-10-21T04:58:54.6487710Z info: override toolchain for /Users/runner/work/XDRemux/XDRemux set to stable-aarch64-apple-darwin
+2026-10-21T04:58:54.6543650Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=6104]
+2026-10-21T04:58:54.6547850Z ##[start-action display=Print installed versions;id=__actions-rust-lang_setup-rust-toolchain.versions]
+2026-10-21T04:58:54.6574870Z ##[group]Run echo "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT
+2026-10-21T04:58:54.6575390Z [36;1mecho "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T04:58:54.6575720Z [36;1m_srt_VERBOSE=$(rustc --version --verbose)[0m
+2026-10-21T04:58:54.6576040Z [36;1mecho "$_srt_VERBOSE"[0m
+2026-10-21T04:58:54.6576310Z [36;1mecho "cargo-version=$(cargo --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T04:58:54.6576660Z [36;1mcargo --version --verbose[0m
+2026-10-21T04:58:54.6576920Z [36;1mecho "rustup-version=$(rustup --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T04:58:54.6577220Z [36;1mrustup --version[0m
+2026-10-21T04:58:54.6577420Z [36;1m[0m
+2026-10-21T04:58:54.6578330Z [36;1m_srt_DATE=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+2026-10-21T04:58:54.6578930Z [36;1m_srt_HASH=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-hash: //p')[0m
+2026-10-21T04:58:54.6579380Z [36;1mecho "cachekey=$(echo $_srt_DATE$_srt_HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+2026-10-21T04:58:54.6595180Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:54.6595550Z env:
+2026-10-21T04:58:54.6595840Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:54.6596720Z   CARGO_INCREMENTAL: 0
+2026-10-21T04:58:54.6597040Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T04:58:54.6597260Z   CARGO_TERM_COLOR: always
+2026-10-21T04:58:54.6597510Z   RUST_BACKTRACE: short
+2026-10-21T04:58:54.6597710Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:58:54.6597960Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T04:58:54.6598280Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T04:58:54.6598650Z ##[endgroup]
+2026-10-21T04:58:54.7665020Z rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-21T04:58:54.7665460Z binary: rustc
+2026-10-21T04:58:54.7665800Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T04:58:54.7666230Z commit-date: 2026-10-13
+2026-10-21T04:58:54.7666500Z host: aarch64-apple-darwin
+2026-10-21T04:58:54.7666820Z release: 1.99.1
+2026-10-21T04:58:54.7667060Z LLVM version: 23.1.1
+2026-10-21T04:58:54.8062000Z cargo 1.99.1 (5f94df478 2026-08-27)
+2026-10-21T04:58:54.8062600Z release: 1.99.1
+2026-10-21T04:58:54.8063030Z commit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e
+2026-10-21T04:58:54.8063440Z commit-date: 2026-08-27
+2026-10-21T04:58:54.8063680Z host: aarch64-apple-darwin
+2026-10-21T04:58:54.8064370Z libgit2: 1.9.6 (sys:0.21.0 vendored)
+2026-10-21T04:58:54.8064760Z libcurl: 8.7.1 (sys:0.4.90+curl-8.21.0 system ssl:(SecureTransport) LibreSSL/3.3.6)
+2026-10-21T04:58:54.8065120Z ssl: OpenSSL 3.6.3 9 Jun 2026
+2026-10-21T04:58:54.8065340Z os: Mac OS 27.0.1 [64-bit]
+2026-10-21T04:58:54.8160300Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-21T04:58:54.8429810Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-21T04:58:54.8526520Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-21T04:58:54.8526910Z rustup 1.29.0 (2026-03-05)
+2026-10-21T04:58:54.8781830Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-21T04:58:54.8892780Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.versions;outcome=success;conclusion=success;duration_ms=234]
+2026-10-21T04:58:54.8895220Z ##[start-action display=Downgrade registry access protocol when needed;id=__actions-rust-lang_setup-rust-toolchain.__run_6]
+2026-10-21T04:58:54.8914220Z ##[group]Run # Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T04:58:54.8914640Z [36;1m# Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL[0m
+2026-10-21T04:58:54.8915060Z [36;1m# On versions 1.66, 1.67, and 1.68.0-nightly the value "sparse" is still unstable.[0m
+2026-10-21T04:58:54.8915500Z [36;1m# https://github.com/dtolnay/rust-toolchain/pull/69#discussion_r1107268108[0m
+2026-10-21T04:58:54.8915930Z [36;1m# If we detect an incompatible value, set it to "git" which is always supported.[0m
+2026-10-21T04:58:54.8916500Z [36;1mif [[ "rustc 1.99.1 (58cf8f9c3 2026-10-13)" =~ ^rustc\ (1\.6[67]\.|1\.68\.0-nightly) && "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL}" == "sparse" ]]; then[0m
+2026-10-21T04:58:54.8917000Z [36;1m  echo "Downgrade cargo registry protocol to git"[0m
+2026-10-21T04:58:54.8917320Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git" >> $GITHUB_ENV[0m
+2026-10-21T04:58:54.8917590Z [36;1mfi[0m
+2026-10-21T04:58:54.8927870Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:54.8928270Z env:
+2026-10-21T04:58:54.8928540Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:54.8928860Z   CARGO_INCREMENTAL: 0
+2026-10-21T04:58:54.8929050Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T04:58:54.8929480Z   CARGO_TERM_COLOR: always
+2026-10-21T04:58:54.8940050Z   RUST_BACKTRACE: short
+2026-10-21T04:58:54.8940310Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:58:54.8940610Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T04:58:54.8940880Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T04:58:54.8941180Z ##[endgroup]
+2026-10-21T04:58:54.9226780Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=33]
+2026-10-21T04:58:54.9229500Z ##[start-action display=Setup Rust Caching;id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache]
+2026-10-21T04:58:54.9281620Z ##[group]Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+2026-10-21T04:58:54.9281950Z with:
+2026-10-21T04:58:54.9282140Z   cache-on-failure: true
+2026-10-21T04:58:54.9282350Z   cache-bin: true
+2026-10-21T04:58:54.9282540Z   cache-provider: github
+2026-10-21T04:58:54.9282720Z   cache-all-crates: false
+2026-10-21T04:58:54.9282930Z   cache-workspace-crates: false
+2026-10-21T04:58:54.9283160Z   cache-targets: true
+2026-10-21T04:58:54.9283640Z   save-if: true
+2026-10-21T04:58:54.9283810Z   prefix-key: v0-rust
+2026-10-21T04:58:54.9284770Z   add-job-id-key: true
+2026-10-21T04:58:54.9285040Z   add-rust-environment-hash-key: true
+2026-10-21T04:58:54.9285960Z   lookup-only: false
+2026-10-21T04:58:54.9286220Z   cmd-format: {0}
+2026-10-21T04:58:54.9286400Z env:
+2026-10-21T04:58:54.9286660Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:54.9286960Z   CARGO_INCREMENTAL: 0
+2026-10-21T04:58:54.9287150Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T04:58:54.9287380Z   CARGO_TERM_COLOR: always
+2026-10-21T04:58:54.9287600Z   RUST_BACKTRACE: short
+2026-10-21T04:58:54.9287810Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:58:54.9288090Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T04:58:54.9288350Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T04:58:54.9288610Z ##[endgroup]
+2026-10-21T04:58:55.4027250Z ##[group]Cache Configuration
+2026-10-21T04:58:55.4027910Z Cache Provider:
+2026-10-21T04:58:55.4028250Z     github
+2026-10-21T04:58:55.4030560Z Workspaces:
+2026-10-21T04:58:55.4030840Z     /Users/runner/work/XDRemux/XDRemux
+2026-10-21T04:58:55.4031180Z Cache Paths:
+2026-10-21T04:58:55.4031470Z     /Users/runner/.cargo/bin
+2026-10-21T04:58:55.4032370Z     /Users/runner/.cargo/.crates.toml
+2026-10-21T04:58:55.4033570Z     /Users/runner/.cargo/.crates2.json
+2026-10-21T04:58:55.4033900Z     /Users/runner/.cargo/registry
+2026-10-21T04:58:55.4034250Z     /Users/runner/.cargo/git
+2026-10-21T04:58:55.4034570Z     /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T04:58:55.4034910Z Restore Key:
+2026-10-21T04:58:55.4035240Z     v0-rust-style-tone-response-Darwin-arm64-e85a7fdf
+2026-10-21T04:58:55.4035680Z Cache Key:
+2026-10-21T04:58:55.4036540Z     v0-rust-style-tone-response-Darwin-arm64-e85a7fdf-1d3ccc71
+2026-10-21T04:58:55.4036960Z .. Prefix:
+2026-10-21T04:58:55.4037220Z   - v0-rust-style-tone-response-Darwin-arm64
+2026-10-21T04:58:55.4037550Z .. Environment considered:
+2026-10-21T04:58:55.4037790Z   - Rust Versions:
+2026-10-21T04:58:55.4038150Z     - 1.99.1 aarch64-apple-darwin 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T04:58:55.4038480Z   - CARGO_BUILD_WARNINGS
+2026-10-21T04:58:55.4038710Z   - CARGO_INCREMENTAL
+2026-10-21T04:58:55.4038960Z   - CARGO_PROFILE_DEV_DEBUG
+2026-10-21T04:58:55.4039200Z   - CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T04:58:55.4039470Z   - CARGO_TERM_COLOR
+2026-10-21T04:58:55.4039670Z   - CARGO_UNSTABLE_SPARSE_REGISTRY
+2026-10-21T04:58:55.4039920Z   - RUST_BACKTRACE
+2026-10-21T04:58:55.4040120Z .. Lockfiles considered:
+2026-10-21T04:58:55.4040420Z   - /Users/runner/work/XDRemux/XDRemux/Cargo.lock
+2026-10-21T04:58:55.4040870Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification/Cargo.toml
+2026-10-21T04:58:55.4041390Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli/Cargo.toml
+2026-10-21T04:58:55.4041880Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec/Cargo.toml
+2026-10-21T04:58:55.4042970Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-container/Cargo.toml
+2026-10-21T04:58:55.4043500Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine/Cargo.toml
+2026-10-21T04:58:55.4044110Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-format/Cargo.toml
+2026-10-21T04:58:55.4044570Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr/Cargo.toml
+2026-10-21T04:58:55.4045110Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif/Cargo.toml
+2026-10-21T04:58:55.4045940Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata/Cargo.toml
+2026-10-21T04:58:55.4046400Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo/Cargo.toml
+2026-10-21T04:58:55.4046840Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime/Cargo.toml
+2026-10-21T04:58:55.4047260Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-source/Cargo.toml
+2026-10-21T04:58:55.4047760Z ##[endgroup]
+2026-10-21T04:58:55.4047860Z 
+2026-10-21T04:58:55.4047950Z ... Restoring cache ...
+2026-10-21T04:58:55.4923740Z Cache hit for: v0-rust-style-tone-response-Darwin-arm64-e85a7fdf-1d3ccc71
+2026-10-21T04:58:55.8616170Z Received 69913016 of 69913016 (100.0%), 200.8 MBs/sec
+2026-10-21T04:58:55.8619450Z Cache Size: ~67 MB (69913016 B)
+2026-10-21T04:58:55.8645520Z [command]/opt/homebrew/bin/gtar -xf /Users/runner/work/_temp/ac6a7002-d770-4622-9e8a-327ac49d2800/cache.tzst -P -C /Users/runner/work/XDRemux/XDRemux --delay-directory-restore --use-compress-program unzstd
+2026-10-21T04:58:56.4425390Z Cache restored successfully
+2026-10-21T04:58:56.4527630Z Restored from cache key "v0-rust-style-tone-response-Darwin-arm64-e85a7fdf-1d3ccc71" full match: true.
+2026-10-21T04:58:56.4579350Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=1534]
+2026-10-21T04:58:56.4654580Z ##[group]Run cargo build --locked -p xdremux-cli
+2026-10-21T04:58:56.4655010Z [36;1mcargo build --locked -p xdremux-cli[0m
+2026-10-21T04:58:56.4655470Z [36;1mswift build --product xdremux-apple-adapter[0m
+2026-10-21T04:58:56.4655920Z [36;1mtest -x target/debug/xdremux[0m
+2026-10-21T04:58:56.4656300Z [36;1mtest -x "$(swift build --show-bin-path)/xdremux-apple-adapter"[0m
+2026-10-21T04:58:56.4671610Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:58:56.4672020Z env:
+2026-10-21T04:58:56.4672290Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:58:56.4672570Z   CARGO_INCREMENTAL: 0
+2026-10-21T04:58:56.4672860Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T04:58:56.4673150Z   CARGO_TERM_COLOR: always
+2026-10-21T04:58:56.4673360Z   RUST_BACKTRACE: short
+2026-10-21T04:58:56.4673640Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:58:56.4673920Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T04:58:56.4674410Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T04:58:56.4674720Z   CACHE_ON_FAILURE: true
+2026-10-21T04:58:56.4674990Z ##[endgroup]
+2026-10-21T04:58:56.6412520Z [1m[92m    Updating[0m crates.io index
+2026-10-21T04:58:57.4375860Z [1m[92m   Compiling[0m xdremux-format v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-format)
+2026-10-21T04:58:57.4384300Z [1m[92m   Compiling[0m xdremux-motion-photo v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo)
+2026-10-21T04:58:57.4390540Z [1m[92m   Compiling[0m xdremux-container v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-container)
+2026-10-21T04:58:57.5805130Z [1m[92m   Compiling[0m xdremux-engine v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine)
+2026-10-21T04:58:57.5908900Z [1m[92m   Compiling[0m xdremux-heif v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif)
+2026-10-21T04:58:58.1123160Z [1m[92m   Compiling[0m xdremux-source v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-source)
+2026-10-21T04:58:58.2047550Z [1m[92m   Compiling[0m xdremux-metadata v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata)
+2026-10-21T04:58:58.6578270Z [1m[92m   Compiling[0m xdremux-codec v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec)
+2026-10-21T04:58:58.8899290Z [1m[92m   Compiling[0m xdremux-classification v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification)
+2026-10-21T04:58:59.1643720Z [1m[92m   Compiling[0m xdremux-hdr v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr)
+2026-10-21T04:58:59.3221010Z [1m[92m   Compiling[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-21T04:59:00.5003890Z [1m[92m   Compiling[0m xdremux-cli v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli)
+2026-10-21T04:59:03.3486610Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 6.81s
+2026-10-21T04:59:10.0342170Z Building for debugging...
+2026-10-21T04:59:10.0352270Z [Planning 7 / 96]
+2026-10-21T04:59:10.2058530Z [Planning deferred tasks]
+2026-10-21T04:59:16.4877060Z [27 / 44]
+2026-10-21T04:59:17.8516650Z [31 / 45] XDTextureNative
+2026-10-21T04:59:18.0212340Z [33 / 95]
+2026-10-21T04:59:18.1258090Z [38 / 95]
+2026-10-21T04:59:18.2459320Z [44 / 177]
+2026-10-21T04:59:18.3563320Z [48 / 177]
+2026-10-21T04:59:18.4502300Z [52 / 177]
+2026-10-21T04:59:18.5695880Z [56 / 177]
+2026-10-21T04:59:18.6872090Z [62 / 186]
+2026-10-21T04:59:18.7912080Z [67 / 186]
+2026-10-21T04:59:18.9935430Z [73 / 186]
+2026-10-21T04:59:19.1587520Z [76 / 186]
+2026-10-21T04:59:19.2976390Z [80 / 186]
+2026-10-21T04:59:19.4310960Z [83 / 186]
+2026-10-21T04:59:19.5493210Z [87 / 186]
+2026-10-21T04:59:19.6572770Z [91 / 186]
+2026-10-21T04:59:19.7853040Z [97 / 186]
+2026-10-21T04:59:19.8973790Z [103 / 186]
+2026-10-21T04:59:20.0056660Z [106 / 186]
+2026-10-21T04:59:20.1317020Z [109 / 186]
+2026-10-21T04:59:20.2519520Z [113 / 186]
+2026-10-21T04:59:20.4236860Z [118 / 186]
+2026-10-21T04:59:20.5697800Z [120 / 186]
+2026-10-21T04:59:20.6912590Z [122 / 186]
+2026-10-21T04:59:21.0257120Z [128 / 186]
+2026-10-21T04:59:21.1292660Z [132 / 186]
+2026-10-21T04:59:21.2420490Z [135 / 186]
+2026-10-21T04:59:21.3609600Z [138 / 186]
+2026-10-21T04:59:21.5114790Z [141 / 186]
+2026-10-21T04:59:21.6519770Z [144 / 186]
+2026-10-21T04:59:21.7722880Z [148 / 186]
+2026-10-21T04:59:21.9157940Z [151 / 186]
+2026-10-21T04:59:22.0833830Z [154 / 186]
+2026-10-21T04:59:22.2204710Z [157 / 186]
+2026-10-21T04:59:22.3392050Z [161 / 186]
+2026-10-21T04:59:22.4821370Z [162 / 186]
+2026-10-21T04:59:22.5986590Z [163 / 186]
+2026-10-21T04:59:22.7129340Z [166 / 186] xdremux-apple-adapter-product
+2026-10-21T04:59:22.8688630Z [168 / 186]
+2026-10-21T04:59:22.9933810Z [171 / 186] XDTextureNative
+2026-10-21T04:59:23.1138340Z [172 / 186] XDTextureNative
+2026-10-21T04:59:23.2313330Z [177 / 186]
+2026-10-21T04:59:23.4661090Z [1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:581:40: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T04:59:23.4662320Z [180 / 186] XDTextureNative
+2026-10-21T04:59:23.4765780Z   581 |     for (AVAssetTrack *track in [asset tracksWithMediaType:AVMediaTypeVideo]) {[0m
+2026-10-21T04:59:23.4789400Z       | [0;1;32m                                       ^
+2026-10-21T04:59:23.4791520Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T04:59:23.4793260Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T04:59:23.4795370Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T04:59:23.4796530Z       | [0;1;32m^
+2026-10-21T04:59:23.4799790Z [0m[1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:601:40: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T04:59:23.4801070Z   601 |     for (AVAssetTrack *track in [asset tracksWithMediaType:AVMediaTypeAudio]) {[0m
+2026-10-21T04:59:23.4803790Z       | [0;1;32m                                       ^
+2026-10-21T04:59:23.4806470Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T04:59:23.4807940Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T04:59:23.4814360Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T04:59:23.4824820Z       | [0;1;32m^
+2026-10-21T04:59:23.4827400Z [0m[1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:844:43: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T04:59:23.4832660Z   844 |         AVAssetTrack *videoTrack = [asset tracksWithMediaType:AVMediaTypeVideo].firstObject;[0m
+2026-10-21T04:59:23.4833430Z       | [0;1;32m                                          ^
+2026-10-21T04:59:23.4834510Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T04:59:23.4840760Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T04:59:23.4842150Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T04:59:23.4843100Z       | [0;1;32m^
+2026-10-21T04:59:23.4843400Z [0m3 warnings generated.
+2026-10-21T04:59:25.3426500Z [182 / 186] XDTextureNative
+2026-10-21T04:59:25.8473440Z [182 / 186] xdremux-apple-adapter-product
+2026-10-21T04:59:27.5653560Z [184 / 186] xdremux-apple-adapter-product
+2026-10-21T04:59:27.6561000Z Build complete! (17.90 sec)
+2026-10-21T04:59:28.4599210Z ##[group]Run adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+2026-10-21T04:59:28.4599830Z [36;1madapter="$(swift build --show-bin-path)/xdremux-apple-adapter"[0m
+2026-10-21T04:59:28.4600180Z [36;1mXDREMUX_APPLE_ADAPTER="$adapter" \[0m
+2026-10-21T04:59:28.4600450Z [36;1m  bash scripts/apple/run_style_tone_sweep.sh[0m
+2026-10-21T04:59:28.4656780Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T04:59:28.4657100Z env:
+2026-10-21T04:59:28.4657470Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T04:59:28.4657770Z   CARGO_INCREMENTAL: 0
+2026-10-21T04:59:28.4657980Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T04:59:28.4658180Z   CARGO_TERM_COLOR: always
+2026-10-21T04:59:28.4658380Z   RUST_BACKTRACE: short
+2026-10-21T04:59:28.4658630Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T04:59:28.4658840Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T04:59:28.4659140Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T04:59:28.4659440Z   CACHE_ON_FAILURE: true
+2026-10-21T04:59:28.4659720Z   RESEARCH_ROOT: /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T04:59:28.4660190Z   TONE_OUT: /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response
+2026-10-21T04:59:28.4660580Z   XDREMUX_CLI: /Users/runner/work/XDRemux/XDRemux/target/debug/xdremux
+2026-10-21T04:59:28.4661050Z ##[endgroup]
+2026-10-21T04:59:29.5152920Z style tone response self-test passed
+2026-10-21T05:01:55.6641240Z {"photo": "IMG_0032", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 167861, "max_abs": 0.00732421875, "psnr_peak1_db": 64.54207105722539}
+2026-10-21T05:01:55.6664270Z {"photo": "IMG_0032", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 175383, "max_abs": 0.0068359375, "psnr_peak1_db": 64.52031152428866}
+2026-10-21T05:01:55.6665990Z {"photo": "IMG_0032", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 173151, "max_abs": 0.00732421875, "psnr_peak1_db": 64.85290959643916}
+2026-10-21T05:01:55.6667110Z {"photo": "IMG_0032", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 165196, "max_abs": 0.0068359375, "psnr_peak1_db": 65.18715632026536}
+2026-10-21T05:01:55.6672500Z {"photo": "IMG_0032", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 165135, "max_abs": 0.00439453125, "psnr_peak1_db": 66.32288109743273}
+2026-10-21T05:01:55.6673460Z {"photo": "IMG_0032", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-21T05:01:55.6674470Z {"photo": "IMG_0032", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 160697, "max_abs": 0.00634765625, "psnr_peak1_db": 65.00370777734304}
+2026-10-21T05:01:55.6675460Z {"photo": "IMG_0032", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 286415, "max_abs": 0.005859375, "psnr_peak1_db": 63.94329113804058}
+2026-10-21T05:01:55.6676420Z {"photo": "IMG_0032", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 242725, "max_abs": 0.00732421875, "psnr_peak1_db": 63.36224257006552}
+2026-10-21T05:01:55.6677420Z {"photo": "IMG_0032", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 260594, "max_abs": 0.0068359375, "psnr_peak1_db": 62.69079933474488}
+2026-10-21T05:01:55.6678610Z {"photo": "IMG_0032", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 239004, "max_abs": 0.00732421875, "psnr_peak1_db": 62.3321480575676}
+2026-10-21T05:01:55.6679540Z {"photo": "IMG_0033", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 163553, "max_abs": 0.0068359375, "psnr_peak1_db": 64.70882755786745}
+2026-10-21T05:01:55.6680600Z {"photo": "IMG_0033", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 168203, "max_abs": 0.00732421875, "psnr_peak1_db": 64.69835562894536}
+2026-10-21T05:01:55.6685070Z {"photo": "IMG_0033", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 166586, "max_abs": 0.00732421875, "psnr_peak1_db": 65.06894983102141}
+2026-10-21T05:01:55.6686240Z {"photo": "IMG_0033", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 164843, "max_abs": 0.0068359375, "psnr_peak1_db": 65.36978933992727}
+2026-10-21T05:01:55.6687250Z {"photo": "IMG_0033", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 170127, "max_abs": 0.0048828125, "psnr_peak1_db": 66.2495703800525}
+2026-10-21T05:01:55.6688150Z {"photo": "IMG_0033", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-21T05:01:55.6688970Z {"photo": "IMG_0033", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 157585, "max_abs": 0.00634765625, "psnr_peak1_db": 65.27737112949416}
+2026-10-21T05:01:55.6689910Z {"photo": "IMG_0033", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 260910, "max_abs": 0.00634765625, "psnr_peak1_db": 64.28026138678402}
+2026-10-21T05:01:55.6690840Z {"photo": "IMG_0033", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 234223, "max_abs": 0.00732421875, "psnr_peak1_db": 63.63855586780087}
+2026-10-21T05:01:55.6691700Z {"photo": "IMG_0033", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 252171, "max_abs": 0.0068359375, "psnr_peak1_db": 62.87827263268638}
+2026-10-21T05:01:55.6692670Z {"photo": "IMG_0033", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 231542, "max_abs": 0.00830078125, "psnr_peak1_db": 62.664642452280646}
+2026-10-21T05:01:55.6693700Z {"photo": "IMG_2600", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 128262, "max_abs": 0.0068359375, "psnr_peak1_db": 65.22188638536029}
+2026-10-21T05:01:55.6694660Z {"photo": "IMG_2600", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 156815, "max_abs": 0.00830078125, "psnr_peak1_db": 63.59877195372679}
+2026-10-21T05:01:55.6695900Z {"photo": "IMG_2600", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 163326, "max_abs": 0.0068359375, "psnr_peak1_db": 63.89976978632588}
+2026-10-21T05:01:55.6697070Z {"photo": "IMG_2600", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 171513, "max_abs": 0.00732421875, "psnr_peak1_db": 63.1990150173096}
+2026-10-21T05:01:55.6697980Z {"photo": "IMG_2600", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 175413, "max_abs": 0.0048828125, "psnr_peak1_db": 65.13641419089639}
+2026-10-21T05:01:55.6698850Z {"photo": "IMG_2600", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-21T05:01:55.6699670Z {"photo": "IMG_2600", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 196828, "max_abs": 0.00732421875, "psnr_peak1_db": 63.668260419314954}
+2026-10-21T05:01:55.6700610Z {"photo": "IMG_2600", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 272530, "max_abs": 0.0068359375, "psnr_peak1_db": 63.34035447934687}
+2026-10-21T05:01:55.6701540Z {"photo": "IMG_2600", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 257305, "max_abs": 0.00732421875, "psnr_peak1_db": 62.541587796096884}
+2026-10-21T05:01:55.6702380Z {"photo": "IMG_2600", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 259127, "max_abs": 0.00830078125, "psnr_peak1_db": 62.412650167994215}
+2026-10-21T05:01:55.6703290Z {"photo": "IMG_2600", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 254160, "max_abs": 0.00732421875, "psnr_peak1_db": 62.29788850489654}
+2026-10-21T05:01:55.6704230Z {"photo": "IMG_2604", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 214067, "max_abs": 0.00634765625, "psnr_peak1_db": 62.643567258358274}
+2026-10-21T05:01:55.6705310Z {"photo": "IMG_2604", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 225760, "max_abs": 0.00732421875, "psnr_peak1_db": 62.11388027032622}
+2026-10-21T05:01:55.6706260Z {"photo": "IMG_2604", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 230140, "max_abs": 0.00634765625, "psnr_peak1_db": 62.06432904749374}
+2026-10-21T05:01:55.6707200Z {"photo": "IMG_2604", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 242106, "max_abs": 0.0068359375, "psnr_peak1_db": 61.21442704850996}
+2026-10-21T05:01:55.6708060Z {"photo": "IMG_2604", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 218638, "max_abs": 0.0048828125, "psnr_peak1_db": 63.854799009344205}
+2026-10-21T05:01:55.6708950Z {"photo": "IMG_2604", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-21T05:01:55.6709810Z {"photo": "IMG_2604", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 259909, "max_abs": 0.005859375, "psnr_peak1_db": 62.17333385727251}
+2026-10-21T05:01:55.6710700Z {"photo": "IMG_2604", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 286067, "max_abs": 0.005859375, "psnr_peak1_db": 62.47286880197932}
+2026-10-21T05:01:55.6711800Z {"photo": "IMG_2604", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 268449, "max_abs": 0.00634765625, "psnr_peak1_db": 62.15328474508092}
+2026-10-21T05:01:55.6712870Z {"photo": "IMG_2604", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 270123, "max_abs": 0.0068359375, "psnr_peak1_db": 61.70988065370105}
+2026-10-21T05:01:55.6713850Z {"photo": "IMG_2604", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 273646, "max_abs": 0.0068359375, "psnr_peak1_db": 61.402947030676884}
+2026-10-21T05:01:55.6714860Z {"photo": "IMG_2608", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 166222, "max_abs": 0.0068359375, "psnr_peak1_db": 64.21462939767858}
+2026-10-21T05:01:55.6715900Z {"photo": "IMG_2608", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 173575, "max_abs": 0.0078125, "psnr_peak1_db": 63.35936239848361}
+2026-10-21T05:01:55.6717050Z {"photo": "IMG_2608", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 178145, "max_abs": 0.00634765625, "psnr_peak1_db": 63.73235682642323}
+2026-10-21T05:01:55.6718100Z {"photo": "IMG_2608", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 191663, "max_abs": 0.00732421875, "psnr_peak1_db": 62.2953162667778}
+2026-10-21T05:01:55.6719130Z {"photo": "IMG_2608", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 174754, "max_abs": 0.004150390625, "psnr_peak1_db": 64.9274539946277}
+2026-10-21T05:01:55.6720050Z {"photo": "IMG_2608", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-21T05:01:55.6720990Z {"photo": "IMG_2608", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 215656, "max_abs": 0.00634765625, "psnr_peak1_db": 63.165438750589445}
+2026-10-21T05:01:55.6722060Z {"photo": "IMG_2608", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 275705, "max_abs": 0.0068359375, "psnr_peak1_db": 63.61971012170339}
+2026-10-21T05:01:55.6723000Z {"photo": "IMG_2608", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 264901, "max_abs": 0.00732421875, "psnr_peak1_db": 62.88255895261793}
+2026-10-21T05:01:55.6724070Z {"photo": "IMG_2608", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 266677, "max_abs": 0.00830078125, "psnr_peak1_db": 62.54733173583061}
+2026-10-21T05:01:55.6725160Z {"photo": "IMG_2608", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 262449, "max_abs": 0.00732421875, "psnr_peak1_db": 62.357552897752385}
+2026-10-21T05:01:55.6725750Z {
+2026-10-21T05:01:55.6726080Z   "status": "completed",
+2026-10-21T05:01:55.6726690Z   "photos": [
+2026-10-21T05:01:55.6726970Z     "IMG_0032",
+2026-10-21T05:01:55.6727250Z     "IMG_0033",
+2026-10-21T05:01:55.6727470Z     "IMG_2600",
+2026-10-21T05:01:55.6727780Z     "IMG_2604",
+2026-10-21T05:01:55.6728060Z     "IMG_2608"
+2026-10-21T05:01:55.6728300Z   ],
+2026-10-21T05:01:55.6728640Z   "tones": [
+2026-10-21T05:01:55.6728880Z     -1.0,
+2026-10-21T05:01:55.6729170Z     -0.75,
+2026-10-21T05:01:55.6729460Z     -0.5,
+2026-10-21T05:01:55.6729790Z     -0.35,
+2026-10-21T05:01:55.6729980Z     -0.15,
+2026-10-21T05:01:55.6730120Z     0.0,
+2026-10-21T05:01:55.6730320Z     0.15,
+2026-10-21T05:01:55.6761610Z     0.35,
+2026-10-21T05:01:55.6762030Z     0.5,
+2026-10-21T05:01:55.6762270Z     0.75,
+2026-10-21T05:01:55.6762510Z     1.0
+2026-10-21T05:01:55.6762690Z   ],
+2026-10-21T05:01:55.6762890Z   "command": [
+2026-10-21T05:01:55.6763260Z     "/Users/runner/work/_temp/tone-venv/bin/python3",
+2026-10-21T05:01:55.6763920Z     "/Users/runner/work/XDRemux/XDRemux/consumer-research/consumer-model/harness/run_tone_sweep.py",
+2026-10-21T05:01:55.6764550Z     "/Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/apple",
+2026-10-21T05:01:55.6765080Z     "/Users/runner/work/XDRemux/XDRemux/consumer-research/Apple_Native_Samples/IMG_0032.HEIC",
+2026-10-21T05:01:55.6765630Z     "/Users/runner/work/XDRemux/XDRemux/consumer-research/Apple_Native_Samples/IMG_0033.HEIC",
+2026-10-21T05:01:55.6766200Z     "/Users/runner/work/XDRemux/XDRemux/consumer-research/research/vm-native/samples/IMG_2600.HEIC",
+2026-10-21T05:01:55.6766850Z     "/Users/runner/work/XDRemux/XDRemux/consumer-research/research/vm-native/samples/IMG_2604.HEIC",
+2026-10-21T05:01:55.6767490Z     "/Users/runner/work/XDRemux/XDRemux/consumer-research/research/vm-native/samples/IMG_2608.HEIC",
+2026-10-21T05:01:55.6768060Z     "--tones",
+2026-10-21T05:01:55.6768300Z     "-1.0",
+2026-10-21T05:01:55.6768520Z     "-0.75",
+2026-10-21T05:01:55.6768790Z     "-0.5",
+2026-10-21T05:01:55.6769000Z     "-0.35",
+2026-10-21T05:01:55.6769220Z     "-0.15",
+2026-10-21T05:01:55.6769360Z     "0.0",
+2026-10-21T05:01:55.6769630Z     "0.15",
+2026-10-21T05:01:55.6769770Z     "0.35",
+2026-10-21T05:01:55.6769900Z     "0.5",
+2026-10-21T05:01:55.6770760Z     "0.75",
+2026-10-21T05:01:55.6771080Z     "1.0"
+2026-10-21T05:01:55.6771260Z   ],
+2026-10-21T05:01:55.6771640Z   "python_executable": "/Users/runner/work/_temp/tone-venv/bin/python3",
+2026-10-21T05:01:55.6772150Z   "python_version": "3.15.0 (main, Oct  9 2026, 11:16:41) [Clang 21.0.0 (clang-2100.3.34.2)]",
+2026-10-21T05:01:55.6772620Z   "returncode": 0,
+2026-10-21T05:01:55.6772900Z   "errors": [],
+2026-10-21T05:01:55.6773170Z   "diagnostics": [
+2026-10-21T05:01:55.6773420Z     {
+2026-10-21T05:01:55.6773670Z       "log": "build.log",
+2026-10-21T05:01:55.6774220Z       "source_log_sha256": "7ef61894c5a69833e16230e37014c80349791fa870ced57a23494613c9c63b8d",
+2026-10-21T05:01:55.6774740Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6775140Z       "omitted_native_facts_lines": 0
+2026-10-21T05:01:55.6775390Z     },
+2026-10-21T05:01:55.6775620Z     {
+2026-10-21T05:01:55.6776020Z       "log": "IMG_0032-extract.log",
+2026-10-21T05:01:55.6776520Z       "source_log_sha256": "25fb8b6dd011494e4399d829ed6fb12b6798cc130e6b65daf9259436e9ed6651",
+2026-10-21T05:01:55.6777040Z       "omitted_inventory_lines": 1,
+2026-10-21T05:01:55.6777380Z       "omitted_native_facts_lines": 0
+2026-10-21T05:01:55.6777600Z     },
+2026-10-21T05:01:55.6777850Z     {
+2026-10-21T05:01:55.6778070Z       "log": "IMG_0032-tone--1.log",
+2026-10-21T05:01:55.6778440Z       "source_log_sha256": "645adcb70aa82d5a3c7c27de70f8f1573e062d2100ff2afdfb933bf61f5399f1",
+2026-10-21T05:01:55.6778800Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6779110Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6779360Z     },
+2026-10-21T05:01:55.6779490Z     {
+2026-10-21T05:01:55.6779730Z       "log": "IMG_0032-tone--0.75.log",
+2026-10-21T05:01:55.6780300Z       "source_log_sha256": "fd192f92b54680bdac392551954e5cea5a1d8122c49e65d7ce40f36e5219eb99",
+2026-10-21T05:01:55.6781030Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6781390Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6781650Z     },
+2026-10-21T05:01:55.6781830Z     {
+2026-10-21T05:01:55.6782140Z       "log": "IMG_0032-tone--0.5.log",
+2026-10-21T05:01:55.6782710Z       "source_log_sha256": "19e4ab4233b8883221efe63d5f381723274dfaa24f5d7c0e34640d6cd701f0f6",
+2026-10-21T05:01:55.6783080Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6783410Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6783810Z     },
+2026-10-21T05:01:55.6784040Z     {
+2026-10-21T05:01:55.6784290Z       "log": "IMG_0032-tone--0.35.log",
+2026-10-21T05:01:55.6784890Z       "source_log_sha256": "8485d87d9e21b7da9c3cca8765e0589122f3161d67b84b2747aa8f89c9bc5639",
+2026-10-21T05:01:55.6785330Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6785650Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6785890Z     },
+2026-10-21T05:01:55.6786170Z     {
+2026-10-21T05:01:55.6786430Z       "log": "IMG_0032-tone--0.15.log",
+2026-10-21T05:01:55.6786880Z       "source_log_sha256": "1b4e0d4902a8551d892b07dbe023316fd7106d2cb8412a91fbd7a2451d07beca",
+2026-10-21T05:01:55.6787410Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6787740Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6788010Z     },
+2026-10-21T05:01:55.6788230Z     {
+2026-10-21T05:01:55.6788380Z       "log": "IMG_0032-tone-0.log",
+2026-10-21T05:01:55.6788830Z       "source_log_sha256": "6d22854d347b9301f180c6700853cdec4f6717c5384f9ac10c6f0f20c68b0812",
+2026-10-21T05:01:55.6789780Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6790260Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6790760Z     },
+2026-10-21T05:01:55.6791060Z     {
+2026-10-21T05:01:55.6791390Z       "log": "IMG_0032-tone-0.15.log",
+2026-10-21T05:01:55.6791980Z       "source_log_sha256": "ac9bc7ee5ce7e5837b7fc759ae88fbe14eb69bb544847168b3b8dd9a71827a19",
+2026-10-21T05:01:55.6792500Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6792760Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6793060Z     },
+2026-10-21T05:01:55.6793210Z     {
+2026-10-21T05:01:55.6793490Z       "log": "IMG_0032-tone-0.35.log",
+2026-10-21T05:01:55.6794280Z       "source_log_sha256": "fcd0d35356307e6988023b43533ceb0d7fd9994d6baf7dd6c00020e6dcab27f3",
+2026-10-21T05:01:55.6794670Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6794890Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6795150Z     },
+2026-10-21T05:01:55.6795380Z     {
+2026-10-21T05:01:55.6795660Z       "log": "IMG_0032-tone-0.5.log",
+2026-10-21T05:01:55.6796100Z       "source_log_sha256": "56b942fb357f2717d8acd1f2aa0ccb8a28c21da6bb350a0849150dae27c9f30c",
+2026-10-21T05:01:55.6796600Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6796830Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6797030Z     },
+2026-10-21T05:01:55.6797280Z     {
+2026-10-21T05:01:55.6797480Z       "log": "IMG_0032-tone-0.75.log",
+2026-10-21T05:01:55.6797940Z       "source_log_sha256": "1ff88ce33de95999fd941fe2074fa31083a649bb3f224f4add23e12ea02f7312",
+2026-10-21T05:01:55.6798400Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6798640Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6798890Z     },
+2026-10-21T05:01:55.6799090Z     {
+2026-10-21T05:01:55.6799410Z       "log": "IMG_0032-tone-1.log",
+2026-10-21T05:01:55.6799860Z       "source_log_sha256": "3a5ea657b252827cbe5c16c8836063ac9333f40898a44236831096d0421a2b6c",
+2026-10-21T05:01:55.6800260Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6800560Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6800760Z     },
+2026-10-21T05:01:55.6800970Z     {
+2026-10-21T05:01:55.6801250Z       "log": "IMG_0033-extract.log",
+2026-10-21T05:01:55.6801800Z       "source_log_sha256": "70182ddd1eac6b6c04e66b3e627faff5a93c156a3592591c5d8a4e0265af8a8e",
+2026-10-21T05:01:55.6802300Z       "omitted_inventory_lines": 1,
+2026-10-21T05:01:55.6802520Z       "omitted_native_facts_lines": 0
+2026-10-21T05:01:55.6803010Z     },
+2026-10-21T05:01:55.6803220Z     {
+2026-10-21T05:01:55.6803460Z       "log": "IMG_0033-tone--1.log",
+2026-10-21T05:01:55.6803890Z       "source_log_sha256": "12e65718a2c02d58aeed74559f3277e6fb2a437262df9657f6c272ecaeb9e5d4",
+2026-10-21T05:01:55.6804300Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6804560Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6804800Z     },
+2026-10-21T05:01:55.6805040Z     {
+2026-10-21T05:01:55.6805240Z       "log": "IMG_0033-tone--0.75.log",
+2026-10-21T05:01:55.6805710Z       "source_log_sha256": "aef6f58ee227bf35ec17313069f1457cd98559cd4017c5a23b6c61cc2309cb14",
+2026-10-21T05:01:55.6806150Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6806420Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6806660Z     },
+2026-10-21T05:01:55.6806860Z     {
+2026-10-21T05:01:55.6807020Z       "log": "IMG_0033-tone--0.5.log",
+2026-10-21T05:01:55.6807410Z       "source_log_sha256": "a74fc243064db637c804aab21ff0f3bb9a6356cd5f1231fa19174f16a96ddaff",
+2026-10-21T05:01:55.6807830Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6808050Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6808250Z     },
+2026-10-21T05:01:55.6808370Z     {
+2026-10-21T05:01:55.6808530Z       "log": "IMG_0033-tone--0.35.log",
+2026-10-21T05:01:55.6808900Z       "source_log_sha256": "ec1d03345ad16abd61aa1b664869c5a3e0a4ef79004181ac62bbb9118c134394",
+2026-10-21T05:01:55.6809270Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6809500Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6809700Z     },
+2026-10-21T05:01:55.6809850Z     {
+2026-10-21T05:01:55.6810040Z       "log": "IMG_0033-tone--0.15.log",
+2026-10-21T05:01:55.6810510Z       "source_log_sha256": "c24801f4f8b2c9b8bdc214e6eeddccfe6c1c132320e755f1e73d120aede870de",
+2026-10-21T05:01:55.6810920Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6811140Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6811340Z     },
+2026-10-21T05:01:55.6811470Z     {
+2026-10-21T05:01:55.6811630Z       "log": "IMG_0033-tone-0.log",
+2026-10-21T05:01:55.6812000Z       "source_log_sha256": "c7c0a782122446930cebb6e1c32e138ede8dd7912439e33327b8e4b5f174be0a",
+2026-10-21T05:01:55.6812610Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6812840Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6813030Z     },
+2026-10-21T05:01:55.6813160Z     {
+2026-10-21T05:01:55.6813310Z       "log": "IMG_0033-tone-0.15.log",
+2026-10-21T05:01:55.6813680Z       "source_log_sha256": "0d90c9e7028a4df26f906ee1a73d39eb47b4fa5709e15e428e24654f42f58cf3",
+2026-10-21T05:01:55.6814050Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6814270Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6814460Z     },
+2026-10-21T05:01:55.6814580Z     {
+2026-10-21T05:01:55.6814770Z       "log": "IMG_0033-tone-0.35.log",
+2026-10-21T05:01:55.6815210Z       "source_log_sha256": "c35644187cd6de74b6323d43a6fb7973b37c7298fc3244b2f9f9b1af66f8092c",
+2026-10-21T05:01:55.6815580Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6815800Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6815990Z     },
+2026-10-21T05:01:55.6816110Z     {
+2026-10-21T05:01:55.6816280Z       "log": "IMG_0033-tone-0.5.log",
+2026-10-21T05:01:55.6816650Z       "source_log_sha256": "24d59b55ff7dd2197971956531a579bd69ffdd9b01e5d1c425043cba08cb72f4",
+2026-10-21T05:01:55.6817010Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6817240Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6817430Z     },
+2026-10-21T05:01:55.6817550Z     {
+2026-10-21T05:01:55.6817710Z       "log": "IMG_0033-tone-0.75.log",
+2026-10-21T05:01:55.6818190Z       "source_log_sha256": "33de2a3ada9b2590b15fdb31a5a1fbdba5b291e4644fdacfa8cbe8ef4ab65a59",
+2026-10-21T05:01:55.6818570Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6818850Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6819090Z     },
+2026-10-21T05:01:55.6819210Z     {
+2026-10-21T05:01:55.6819500Z       "log": "IMG_0033-tone-1.log",
+2026-10-21T05:01:55.6819880Z       "source_log_sha256": "3b08ccbae31d3b1c748d7aabb023e6f3f07916774d956c9a022db56c543349d1",
+2026-10-21T05:01:55.6820280Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6820560Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6820770Z     },
+2026-10-21T05:01:55.6820910Z     {
+2026-10-21T05:01:55.6821090Z       "log": "IMG_2600-extract.log",
+2026-10-21T05:01:55.6821540Z       "source_log_sha256": "79fd312ae1eb007ff3506fc2039eccee705bd90ed41ac3f894d29433ea362660",
+2026-10-21T05:01:55.6822080Z       "omitted_inventory_lines": 1,
+2026-10-21T05:01:55.6822340Z       "omitted_native_facts_lines": 0
+2026-10-21T05:01:55.6822560Z     },
+2026-10-21T05:01:55.6822720Z     {
+2026-10-21T05:01:55.6822920Z       "log": "IMG_2600-tone--1.log",
+2026-10-21T05:01:55.6823370Z       "source_log_sha256": "021f34835ee9cd54f405934a7c7544ddfc0c6fb9f5fda850cc4df285e7d5a2f7",
+2026-10-21T05:01:55.6823780Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6824010Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6824240Z     },
+2026-10-21T05:01:55.6824390Z     {
+2026-10-21T05:01:55.6824620Z       "log": "IMG_2600-tone--0.75.log",
+2026-10-21T05:01:55.6825100Z       "source_log_sha256": "f70299f0c46c5822626a507659decde2a4e70c52b9ae95561d650d18ada8e659",
+2026-10-21T05:01:55.6825550Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6825830Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6826090Z     },
+2026-10-21T05:01:55.6826250Z     {
+2026-10-21T05:01:55.6826440Z       "log": "IMG_2600-tone--0.5.log",
+2026-10-21T05:01:55.6826840Z       "source_log_sha256": "6a673737430fb9afaa0978fa07467ad8a48d636835ebe2504f558f7e89156f01",
+2026-10-21T05:01:55.6827290Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6827540Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6827760Z     },
+2026-10-21T05:01:55.6827940Z     {
+2026-10-21T05:01:55.6828160Z       "log": "IMG_2600-tone--0.35.log",
+2026-10-21T05:01:55.6828580Z       "source_log_sha256": "c03586f806f0ac3fcfc2ede43de8dee82a0782138a0975f7d3ebe3a1fcb4cf94",
+2026-10-21T05:01:55.6828960Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6829190Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6829530Z     },
+2026-10-21T05:01:55.6829670Z     {
+2026-10-21T05:01:55.6829870Z       "log": "IMG_2600-tone--0.15.log",
+2026-10-21T05:01:55.6830380Z       "source_log_sha256": "d4ab95590b839bdbc35d3c53afcc01fdfeb6eda07899e34bead9e12ec9386d94",
+2026-10-21T05:01:55.6830790Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6831030Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6831250Z     },
+2026-10-21T05:01:55.6831400Z     {
+2026-10-21T05:01:55.6831610Z       "log": "IMG_2600-tone-0.log",
+2026-10-21T05:01:55.6831970Z       "source_log_sha256": "2ba0a40a4a6157bc5b7214e841fd037743ebcbe143570b2151852feb351a3091",
+2026-10-21T05:01:55.6832350Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6832570Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6832770Z     },
+2026-10-21T05:01:55.6832910Z     {
+2026-10-21T05:01:55.6833070Z       "log": "IMG_2600-tone-0.15.log",
+2026-10-21T05:01:55.6833520Z       "source_log_sha256": "5e7b60f73c91253fdbfb7277134ebc28a65be4c1a842c895e307a02da40af59b",
+2026-10-21T05:01:55.6833960Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6834240Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6834450Z     },
+2026-10-21T05:01:55.6834570Z     {
+2026-10-21T05:01:55.6834730Z       "log": "IMG_2600-tone-0.35.log",
+2026-10-21T05:01:55.6835100Z       "source_log_sha256": "1906dfa261c6e4129af3e59cbbb7a27479c93a35965af0dd8ac45359f56a2c26",
+2026-10-21T05:01:55.6835470Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6835730Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6844550Z     },
+2026-10-21T05:01:55.6844800Z     {
+2026-10-21T05:01:55.6844990Z       "log": "IMG_2600-tone-0.5.log",
+2026-10-21T05:01:55.6845510Z       "source_log_sha256": "8afb2a13d818a86e5d33ba5eecae1805e0f3cc79e2e33bacaf75c3fd086eccb3",
+2026-10-21T05:01:55.6846240Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6846520Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6846720Z     },
+2026-10-21T05:01:55.6846870Z     {
+2026-10-21T05:01:55.6847050Z       "log": "IMG_2600-tone-0.75.log",
+2026-10-21T05:01:55.6847440Z       "source_log_sha256": "ff805bf0f76136dce6fc6d65e13d85e84b46b600b943aacf93cdc65299718dfb",
+2026-10-21T05:01:55.6847870Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6848100Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6848300Z     },
+2026-10-21T05:01:55.6848420Z     {
+2026-10-21T05:01:55.6848580Z       "log": "IMG_2600-tone-1.log",
+2026-10-21T05:01:55.6848950Z       "source_log_sha256": "e8be6d1a2ac7980c9e5007cefd26501c6351027ad290bddf024f2f403e7f089e",
+2026-10-21T05:01:55.6849310Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6849520Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6849710Z     },
+2026-10-21T05:01:55.6849830Z     {
+2026-10-21T05:01:55.6849990Z       "log": "IMG_2604-extract.log",
+2026-10-21T05:01:55.6850350Z       "source_log_sha256": "d49acb89020c9a78a688ecaa5bc13ef80e0114798fc32dd072219003389f40f1",
+2026-10-21T05:01:55.6850740Z       "omitted_inventory_lines": 1,
+2026-10-21T05:01:55.6850950Z       "omitted_native_facts_lines": 0
+2026-10-21T05:01:55.6851140Z     },
+2026-10-21T05:01:55.6851250Z     {
+2026-10-21T05:01:55.6851410Z       "log": "IMG_2604-tone--1.log",
+2026-10-21T05:01:55.6851770Z       "source_log_sha256": "14d727ed17971cbb282b7a5c5ca3398baa4bec2074100f252ae4d1a67c554ef5",
+2026-10-21T05:01:55.6852150Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6852370Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6852560Z     },
+2026-10-21T05:01:55.6852680Z     {
+2026-10-21T05:01:55.6852830Z       "log": "IMG_2604-tone--0.75.log",
+2026-10-21T05:01:55.6853180Z       "source_log_sha256": "ac1c2804f34b0a7a16546e340040821305e98b0ff79d016bf133216a40926721",
+2026-10-21T05:01:55.6853550Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6853810Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6854040Z     },
+2026-10-21T05:01:55.6854160Z     {
+2026-10-21T05:01:55.6854330Z       "log": "IMG_2604-tone--0.5.log",
+2026-10-21T05:01:55.6854990Z       "source_log_sha256": "8ca38b85f809fb6feb4fd800daf8a79b01afb75c78d1da1c01e7797b8e3f257f",
+2026-10-21T05:01:55.6855350Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6855600Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6855820Z     },
+2026-10-21T05:01:55.6855940Z     {
+2026-10-21T05:01:55.6856120Z       "log": "IMG_2604-tone--0.35.log",
+2026-10-21T05:01:55.6856500Z       "source_log_sha256": "ce6ff6770c4de1041a8777e424843a4fdcaa1d4274d7db0b683e68314811aec9",
+2026-10-21T05:01:55.6856910Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6857170Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6857360Z     },
+2026-10-21T05:01:55.6857480Z     {
+2026-10-21T05:01:55.6857630Z       "log": "IMG_2604-tone--0.15.log",
+2026-10-21T05:01:55.6858000Z       "source_log_sha256": "f2197f9a3aaae5b0bd55ffc9268429e1d42b645d29585f0a7b74eef7c2d658a3",
+2026-10-21T05:01:55.6858380Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6858620Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6858830Z     },
+2026-10-21T05:01:55.6858960Z     {
+2026-10-21T05:01:55.6859120Z       "log": "IMG_2604-tone-0.log",
+2026-10-21T05:01:55.6859510Z       "source_log_sha256": "05de129033a55b55bca60b316e3b6e2c9e745da6eac6328ebb5cb8c9d45b6aa9",
+2026-10-21T05:01:55.6859880Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6860110Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6860300Z     },
+2026-10-21T05:01:55.6860420Z     {
+2026-10-21T05:01:55.6860570Z       "log": "IMG_2604-tone-0.15.log",
+2026-10-21T05:01:55.6860930Z       "source_log_sha256": "351e8107016fa95bd5ecbf6cf42d4928affb11ceee1c74d5e4e0da36e4bd42b7",
+2026-10-21T05:01:55.6861300Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6861510Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6861850Z     },
+2026-10-21T05:01:55.6861980Z     {
+2026-10-21T05:01:55.6862130Z       "log": "IMG_2604-tone-0.35.log",
+2026-10-21T05:01:55.6862490Z       "source_log_sha256": "202fcb433e37945b3984d67a8f988b83cff0afc14412d45ca53c37ec678c2250",
+2026-10-21T05:01:55.6862850Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6863070Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6863260Z     },
+2026-10-21T05:01:55.6863380Z     {
+2026-10-21T05:01:55.6863530Z       "log": "IMG_2604-tone-0.5.log",
+2026-10-21T05:01:55.6863900Z       "source_log_sha256": "8e86ed017cde20f163c55b58c2577783d68e1cb3a85b49b99ed0e4111adb0d3a",
+2026-10-21T05:01:55.6864260Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6864470Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6864690Z     },
+2026-10-21T05:01:55.6864810Z     {
+2026-10-21T05:01:55.6864960Z       "log": "IMG_2604-tone-0.75.log",
+2026-10-21T05:01:55.6865310Z       "source_log_sha256": "72e6400034291356be5306fba6ef787fa58b47ad6d16f9c1a030f19e1c122216",
+2026-10-21T05:01:55.6865670Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6865920Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6866150Z     },
+2026-10-21T05:01:55.6866290Z     {
+2026-10-21T05:01:55.6866440Z       "log": "IMG_2604-tone-1.log",
+2026-10-21T05:01:55.6866810Z       "source_log_sha256": "e4476b3e570b95b00f9de0015dca5335bcf344dc52d3818c119a46c2aa8a6606",
+2026-10-21T05:01:55.6867160Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6867370Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6867560Z     },
+2026-10-21T05:01:55.6867680Z     {
+2026-10-21T05:01:55.6867840Z       "log": "IMG_2608-extract.log",
+2026-10-21T05:01:55.6868180Z       "source_log_sha256": "1785e54a9431c41b154f598370a54c13a397dbd26889ff3e2a248ca1535c799f",
+2026-10-21T05:01:55.6868540Z       "omitted_inventory_lines": 1,
+2026-10-21T05:01:55.6868760Z       "omitted_native_facts_lines": 0
+2026-10-21T05:01:55.6868950Z     },
+2026-10-21T05:01:55.6869080Z     {
+2026-10-21T05:01:55.6869230Z       "log": "IMG_2608-tone--1.log",
+2026-10-21T05:01:55.6869590Z       "source_log_sha256": "37ec3fee6b71a2403e94517576719d8af8a46c5b2be87329b1a2a428e77d3e36",
+2026-10-21T05:01:55.6870110Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6870330Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6870530Z     },
+2026-10-21T05:01:55.6870650Z     {
+2026-10-21T05:01:55.6870810Z       "log": "IMG_2608-tone--0.75.log",
+2026-10-21T05:01:55.6871190Z       "source_log_sha256": "0751efe33d466df0282eea993d9d80440ea502d360d793f61855ac2ab5c5e699",
+2026-10-21T05:01:55.6871550Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6871770Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6871970Z     },
+2026-10-21T05:01:55.6872090Z     {
+2026-10-21T05:01:55.6872240Z       "log": "IMG_2608-tone--0.5.log",
+2026-10-21T05:01:55.6872610Z       "source_log_sha256": "7470050eafccc1d4cc397369fe17da94066abe337a6b4a900db8c728339aef83",
+2026-10-21T05:01:55.6873020Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6873260Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6873450Z     },
+2026-10-21T05:01:55.6873580Z     {
+2026-10-21T05:01:55.6873730Z       "log": "IMG_2608-tone--0.35.log",
+2026-10-21T05:01:55.6874110Z       "source_log_sha256": "eccf4990aedf1b87a104bf7352e65aa92d99fd66283d648df60548b6af316ae8",
+2026-10-21T05:01:55.6874480Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6874700Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6874930Z     },
+2026-10-21T05:01:55.6875070Z     {
+2026-10-21T05:01:55.6875230Z       "log": "IMG_2608-tone--0.15.log",
+2026-10-21T05:01:55.6875600Z       "source_log_sha256": "6fd85222c5fe7a95c4596eafeb36a801a75548d97439c243fa943b6028bf681a",
+2026-10-21T05:01:55.6875970Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6876230Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6876440Z     },
+2026-10-21T05:01:55.6876560Z     {
+2026-10-21T05:01:55.6876710Z       "log": "IMG_2608-tone-0.log",
+2026-10-21T05:01:55.6877270Z       "source_log_sha256": "5e9be731946f0a68ebb8155bf290be277d0e984f92dce1c2803fdd00bbaf8856",
+2026-10-21T05:01:55.6877650Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6877910Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6878120Z     },
+2026-10-21T05:01:55.6878240Z     {
+2026-10-21T05:01:55.6878400Z       "log": "IMG_2608-tone-0.15.log",
+2026-10-21T05:01:55.6878780Z       "source_log_sha256": "f16245533e5ad3351426efeff4aaaea313026eb4a5f5fe89de4060fec784e854",
+2026-10-21T05:01:55.6879180Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6879440Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6879630Z     },
+2026-10-21T05:01:55.6879760Z     {
+2026-10-21T05:01:55.6879910Z       "log": "IMG_2608-tone-0.35.log",
+2026-10-21T05:01:55.6880280Z       "source_log_sha256": "53884a0ede06071645558ad0e13dc080fef2d3dd90335827c0c3787b5d17a842",
+2026-10-21T05:01:55.6880650Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6880890Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6881120Z     },
+2026-10-21T05:01:55.6881250Z     {
+2026-10-21T05:01:55.6881400Z       "log": "IMG_2608-tone-0.5.log",
+2026-10-21T05:01:55.6881950Z       "source_log_sha256": "f1f5326369d741d12bab5b05a44ecce38f37e59c8ee2e229e5eb23c372064c31",
+2026-10-21T05:01:55.6882360Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6882590Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6882780Z     },
+2026-10-21T05:01:55.6882900Z     {
+2026-10-21T05:01:55.6883060Z       "log": "IMG_2608-tone-0.75.log",
+2026-10-21T05:01:55.6883490Z       "source_log_sha256": "28a9642491e1ea452473f74f309637598c29424cc5a90d21fcfa3832c279bfe5",
+2026-10-21T05:01:55.6883850Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6884070Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6884270Z     },
+2026-10-21T05:01:55.6884420Z     {
+2026-10-21T05:01:55.6884590Z       "log": "IMG_2608-tone-1.log",
+2026-10-21T05:01:55.6884970Z       "source_log_sha256": "100bfb1fe067472e76623d1ff15b6c80caaa4cd1796db77761dd48e5e8c7a8ee",
+2026-10-21T05:01:55.6885340Z       "omitted_inventory_lines": 0,
+2026-10-21T05:01:55.6885570Z       "omitted_native_facts_lines": 105
+2026-10-21T05:01:55.6885880Z     }
+2026-10-21T05:01:55.6886020Z   ],
+2026-10-21T05:01:55.6886370Z   "consumer_script_sha256": "ac6c5d93a78ada33b95980ecb7f862559446dc20952129116f2bf08a9af7ec72",
+2026-10-21T05:01:55.6886760Z   "parser_compatibility": {
+2026-10-21T05:01:55.6886960Z     "name": "iinf-v1-u32-count",
+2026-10-21T05:01:55.6887270Z     "upstream_revision": "37dd551a949047ed14580efa0c0a2556922791b5",
+2026-10-21T05:01:55.6887730Z     "original_source_sha256": "24ef91b177d6346fb3952036e8e2b770c4491c7aad5bea85244a768794336e10",
+2026-10-21T05:01:55.6888200Z     "original_git_blob_sha1": "d65da02fb2ffadc334d4d00199d063d26bf7eb94",
+2026-10-21T05:01:55.6888660Z     "patch_sha256": "c530cb377a50b1d7553e5633ec1f9a6eb148af2f1e366148814556de82a5c633",
+2026-10-21T05:01:55.6889220Z     "patched_source_sha256": "72a70eeed36098b6acd72677129db190839c4216c35a0f992202bfc1345a099c",
+2026-10-21T05:01:55.6889810Z     "scope": "Owned extraction launcher; fixed upstream files and media bytes remain unchanged.",
+2026-10-21T05:01:55.6890380Z     "launcher_sha256": "e1613aed39af5f9bd995fbb251ff1b6396b9f21af28d3950de8ffbeafdc3104f"
+2026-10-21T05:01:55.6890770Z   },
+2026-10-21T05:01:55.6891130Z   "working_directory": "/Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/apple/consumer-compat",
+2026-10-21T05:01:55.6891550Z   "wall_seconds": 145.89945391700007,
+2026-10-21T05:01:55.6891760Z   "native_failures": []
+2026-10-21T05:01:55.6891920Z }
+2026-10-21T05:02:00.7408100Z # Photographic Styles tone response
+2026-10-21T05:02:00.7408380Z 
+2026-10-21T05:02:00.7408560Z Host gate trusted: True. Tone 0 differing components: 0.
+2026-10-21T05:02:00.7408940Z Measurement status: completed. Product measurements complete: True.
+2026-10-21T05:02:00.7409170Z 
+2026-10-21T05:02:00.7409350Z The harness sets inputToneBias only. It has no color-bias argument.
+2026-10-21T05:02:00.7410220Z Complete native Tone measurements do not establish Photos Tone/Color editing admission or private status-code domains.
+2026-10-21T05:02:00.7410610Z 
+2026-10-21T05:02:00.7410680Z ## IMG_0032
+2026-10-21T05:02:00.7410760Z 
+2026-10-21T05:02:00.7411110Z Monotonic mean luminance: False. L(-1)-L(0) = 0.057729021815844495. L(+1)-L(0) = 0.20257831554460742. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2850.
+2026-10-21T05:02:00.7411480Z 
+2026-10-21T05:02:00.7411590Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-21T05:02:00.7411820Z |---:|---:|---:|---:|---:|
+2026-10-21T05:02:00.7412030Z | -1 | 0.37224 | 0.37166 | 0.37348 | 0.36281 |
+2026-10-21T05:02:00.7412290Z | -0.75 | 0.35873 | 0.35816 | 0.36001 | 0.34931 |
+2026-10-21T05:02:00.7412540Z | -0.5 | 0.34271 | 0.34211 | 0.34399 | 0.33335 |
+2026-10-21T05:02:00.7412790Z | -0.35 | 0.33280 | 0.33222 | 0.33405 | 0.32353 |
+2026-10-21T05:02:00.7413040Z | -0.15 | 0.32077 | 0.32028 | 0.32197 | 0.31165 |
+2026-10-21T05:02:00.7413290Z | 0 | 0.31451 | 0.31434 | 0.31564 | 0.30505 |
+2026-10-21T05:02:00.7413520Z | 0.15 | 0.33674 | 0.33611 | 0.33801 | 0.32755 |
+2026-10-21T05:02:00.7413770Z | 0.35 | 0.38563 | 0.38469 | 0.38701 | 0.37634 |
+2026-10-21T05:02:00.7414020Z | 0.5 | 0.42924 | 0.42791 | 0.43073 | 0.42008 |
+2026-10-21T05:02:00.7414260Z | 0.75 | 0.47058 | 0.46872 | 0.47224 | 0.46149 |
+2026-10-21T05:02:00.7414500Z | 1 | 0.51709 | 0.51487 | 0.51886 | 0.50822 |
+2026-10-21T05:02:00.7414650Z 
+2026-10-21T05:02:00.7414780Z - mean luminance is not monotonic across the tone sweep
+2026-10-21T05:02:00.7414970Z 
+2026-10-21T05:02:00.7415030Z ## IMG_0033
+2026-10-21T05:02:00.7415110Z 
+2026-10-21T05:02:00.7415450Z Monotonic mean luminance: False. L(-1)-L(0) = 0.04149877334289698. L(+1)-L(0) = 0.1854766197901785. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2237.
+2026-10-21T05:02:00.7415810Z 
+2026-10-21T05:02:00.7415910Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-21T05:02:00.7416150Z |---:|---:|---:|---:|---:|
+2026-10-21T05:02:00.7416390Z | -1 | 0.35822 | 0.36010 | 0.35884 | 0.34713 |
+2026-10-21T05:02:00.7416640Z | -0.75 | 0.34859 | 0.35079 | 0.34915 | 0.33732 |
+2026-10-21T05:02:00.7416880Z | -0.5 | 0.33652 | 0.33891 | 0.33701 | 0.32529 |
+2026-10-21T05:02:00.7417310Z | -0.35 | 0.32912 | 0.33161 | 0.32958 | 0.31796 |
+2026-10-21T05:02:00.7417550Z | -0.15 | 0.32051 | 0.32314 | 0.32091 | 0.30948 |
+2026-10-21T05:02:00.7417780Z | 0 | 0.31672 | 0.31982 | 0.31701 | 0.30530 |
+2026-10-21T05:02:00.7418010Z | 0.15 | 0.33403 | 0.33665 | 0.33445 | 0.32288 |
+2026-10-21T05:02:00.7418270Z | 0.35 | 0.37548 | 0.37791 | 0.37597 | 0.36404 |
+2026-10-21T05:02:00.7418500Z | 0.5 | 0.41346 | 0.41559 | 0.41406 | 0.40200 |
+2026-10-21T05:02:00.7418740Z | 0.75 | 0.45566 | 0.45765 | 0.45634 | 0.44398 |
+2026-10-21T05:02:00.7418970Z | 1 | 0.50220 | 0.50420 | 0.50289 | 0.49037 |
+2026-10-21T05:02:00.7419110Z 
+2026-10-21T05:02:00.7419240Z - mean luminance is not monotonic across the tone sweep
+2026-10-21T05:02:00.7419420Z 
+2026-10-21T05:02:00.7419490Z ## IMG_2600
+2026-10-21T05:02:00.7419580Z 
+2026-10-21T05:02:00.7420790Z Monotonic mean luminance: True. L(-1)-L(0) = -0.03209235885581674. L(+1)-L(0) = 0.1255848728249826. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2555.
+2026-10-21T05:02:00.7421170Z 
+2026-10-21T05:02:00.7421280Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-21T05:02:00.7421520Z |---:|---:|---:|---:|---:|
+2026-10-21T05:02:00.7421780Z | -1 | 0.28784 | 0.28381 | 0.28793 | 0.29766 |
+2026-10-21T05:02:00.7429280Z | -0.75 | 0.30028 | 0.29518 | 0.30075 | 0.31057 |
+2026-10-21T05:02:00.7429540Z | -0.5 | 0.30878 | 0.30315 | 0.30948 | 0.31856 |
+2026-10-21T05:02:00.7429770Z | -0.35 | 0.31245 | 0.30662 | 0.31329 | 0.32190 |
+2026-10-21T05:02:00.7430010Z | -0.15 | 0.31643 | 0.31048 | 0.31737 | 0.32546 |
+2026-10-21T05:02:00.7430240Z | 0 | 0.31993 | 0.31402 | 0.32085 | 0.32888 |
+2026-10-21T05:02:00.7430470Z | 0.15 | 0.32858 | 0.32199 | 0.32975 | 0.33718 |
+2026-10-21T05:02:00.7430700Z | 0.35 | 0.35395 | 0.34603 | 0.35571 | 0.36164 |
+2026-10-21T05:02:00.7430930Z | 0.5 | 0.37972 | 0.37067 | 0.38202 | 0.38591 |
+2026-10-21T05:02:00.7431550Z | 0.75 | 0.41252 | 0.40177 | 0.41565 | 0.41623 |
+2026-10-21T05:02:00.7431800Z | 1 | 0.44551 | 0.43325 | 0.44946 | 0.44657 |
+2026-10-21T05:02:00.7431940Z 
+2026-10-21T05:02:00.7432000Z ## IMG_2604
+2026-10-21T05:02:00.7432080Z 
+2026-10-21T05:02:00.7432400Z Monotonic mean luminance: True. L(-1)-L(0) = -0.01267440686857546. L(+1)-L(0) = 0.13764351841457284. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.0921.
+2026-10-21T05:02:00.7432760Z 
+2026-10-21T05:02:00.7432860Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-21T05:02:00.7433070Z |---:|---:|---:|---:|---:|
+2026-10-21T05:02:00.7433270Z | -1 | 0.39804 | 0.39061 | 0.39975 | 0.40440 |
+2026-10-21T05:02:00.7433500Z | -0.75 | 0.39866 | 0.39164 | 0.40096 | 0.39864 |
+2026-10-21T05:02:00.7433740Z | -0.5 | 0.39962 | 0.39327 | 0.40233 | 0.39421 |
+2026-10-21T05:02:00.7433970Z | -0.35 | 0.40092 | 0.39507 | 0.40377 | 0.39305 |
+2026-10-21T05:02:00.7434210Z | -0.15 | 0.40461 | 0.39930 | 0.40755 | 0.39437 |
+2026-10-21T05:02:00.7434440Z | 0 | 0.41071 | 0.40600 | 0.41363 | 0.39875 |
+2026-10-21T05:02:00.7434670Z | 0.15 | 0.41548 | 0.41015 | 0.41878 | 0.40207 |
+2026-10-21T05:02:00.7434900Z | 0.35 | 0.44004 | 0.43391 | 0.44417 | 0.42138 |
+2026-10-21T05:02:00.7435130Z | 0.5 | 0.46811 | 0.46092 | 0.47329 | 0.44354 |
+2026-10-21T05:02:00.7435370Z | 0.75 | 0.50789 | 0.49974 | 0.51456 | 0.47323 |
+2026-10-21T05:02:00.7435590Z | 1 | 0.54836 | 0.53971 | 0.55631 | 0.50372 |
+2026-10-21T05:02:00.7435730Z 
+2026-10-21T05:02:00.7435780Z ## IMG_2608
+2026-10-21T05:02:00.7435860Z 
+2026-10-21T05:02:00.7436180Z Monotonic mean luminance: True. L(-1)-L(0) = -0.02897905198195888. L(+1)-L(0) = 0.12075375209710937. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2400.
+2026-10-21T05:02:00.7436530Z 
+2026-10-21T05:02:00.7436620Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-21T05:02:00.7436830Z |---:|---:|---:|---:|---:|
+2026-10-21T05:02:00.7437030Z | -1 | 0.30086 | 0.29704 | 0.30236 | 0.29784 |
+2026-10-21T05:02:00.7437260Z | -0.75 | 0.31072 | 0.30778 | 0.31273 | 0.30156 |
+2026-10-21T05:02:00.7437510Z | -0.5 | 0.31836 | 0.31647 | 0.32063 | 0.30393 |
+2026-10-21T05:02:00.7437750Z | -0.35 | 0.32179 | 0.32054 | 0.32414 | 0.30487 |
+2026-10-21T05:02:00.7437980Z | -0.15 | 0.32566 | 0.32517 | 0.32806 | 0.30616 |
+2026-10-21T05:02:00.7438390Z | 0 | 0.32984 | 0.33026 | 0.33217 | 0.30822 |
+2026-10-21T05:02:00.7438620Z | 0.15 | 0.33636 | 0.33602 | 0.33903 | 0.31402 |
+2026-10-21T05:02:00.7438860Z | 0.35 | 0.35851 | 0.35750 | 0.36184 | 0.33229 |
+2026-10-21T05:02:00.7439090Z | 0.5 | 0.38184 | 0.38013 | 0.38589 | 0.35138 |
+2026-10-21T05:02:00.7439320Z | 0.75 | 0.41559 | 0.41386 | 0.42060 | 0.37682 |
+2026-10-21T05:02:00.7439560Z | 1 | 0.45059 | 0.44926 | 0.45644 | 0.40347 |
+2026-10-21T05:02:00.7439700Z 
+2026-10-21T05:02:00.7439770Z ## Model versus native
+2026-10-21T05:02:00.7439870Z 
+2026-10-21T05:02:00.7439980Z | photo | tone | differing | max abs | PSNR |
+2026-10-21T05:02:00.7440200Z |---|---:|---:|---:|---:|
+2026-10-21T05:02:00.7440440Z | IMG_0032 | -1.0 | 167861 | 0.00732421875 | 64.54207105722539 |
+2026-10-21T05:02:00.7440750Z | IMG_0032 | -0.75 | 175383 | 0.0068359375 | 64.52031152428866 |
+2026-10-21T05:02:00.7441060Z | IMG_0032 | -0.5 | 173151 | 0.00732421875 | 64.85290959643916 |
+2026-10-21T05:02:00.7441360Z | IMG_0032 | -0.35 | 165196 | 0.0068359375 | 65.18715632026536 |
+2026-10-21T05:02:00.7441660Z | IMG_0032 | -0.15 | 165135 | 0.00439453125 | 66.32288109743273 |
+2026-10-21T05:02:00.7441920Z | IMG_0032 | 0.0 | 0 | 0.0 | inf |
+2026-10-21T05:02:00.7442160Z | IMG_0032 | 0.15 | 160697 | 0.00634765625 | 65.00370777734304 |
+2026-10-21T05:02:00.7442470Z | IMG_0032 | 0.35 | 286415 | 0.005859375 | 63.94329113804058 |
+2026-10-21T05:02:00.7442760Z | IMG_0032 | 0.5 | 242725 | 0.00732421875 | 63.36224257006552 |
+2026-10-21T05:02:00.7443050Z | IMG_0032 | 0.75 | 260594 | 0.0068359375 | 62.69079933474488 |
+2026-10-21T05:02:00.7443340Z | IMG_0032 | 1.0 | 239004 | 0.00732421875 | 62.3321480575676 |
+2026-10-21T05:02:00.7443640Z | IMG_0033 | -1.0 | 163553 | 0.0068359375 | 64.70882755786745 |
+2026-10-21T05:02:00.7444100Z | IMG_0033 | -0.75 | 168203 | 0.00732421875 | 64.69835562894536 |
+2026-10-21T05:02:00.7444420Z | IMG_0033 | -0.5 | 166586 | 0.00732421875 | 65.06894983102141 |
+2026-10-21T05:02:00.7444720Z | IMG_0033 | -0.35 | 164843 | 0.0068359375 | 65.36978933992727 |
+2026-10-21T05:02:00.7445020Z | IMG_0033 | -0.15 | 170127 | 0.0048828125 | 66.2495703800525 |
+2026-10-21T05:02:00.7445270Z | IMG_0033 | 0.0 | 0 | 0.0 | inf |
+2026-10-21T05:02:00.7445530Z | IMG_0033 | 0.15 | 157585 | 0.00634765625 | 65.27737112949416 |
+2026-10-21T05:02:00.7445830Z | IMG_0033 | 0.35 | 260910 | 0.00634765625 | 64.28026138678402 |
+2026-10-21T05:02:00.7446120Z | IMG_0033 | 0.5 | 234223 | 0.00732421875 | 63.63855586780087 |
+2026-10-21T05:02:00.7446420Z | IMG_0033 | 0.75 | 252171 | 0.0068359375 | 62.87827263268638 |
+2026-10-21T05:02:00.7446710Z | IMG_0033 | 1.0 | 231542 | 0.00830078125 | 62.664642452280646 |
+2026-10-21T05:02:00.7447010Z | IMG_2600 | -1.0 | 128262 | 0.0068359375 | 65.22188638536029 |
+2026-10-21T05:02:00.7447310Z | IMG_2600 | -0.75 | 156815 | 0.00830078125 | 63.59877195372679 |
+2026-10-21T05:02:00.7447860Z | IMG_2600 | -0.5 | 163326 | 0.0068359375 | 63.89976978632588 |
+2026-10-21T05:02:00.7448180Z | IMG_2600 | -0.35 | 171513 | 0.00732421875 | 63.1990150173096 |
+2026-10-21T05:02:00.7448480Z | IMG_2600 | -0.15 | 175413 | 0.0048828125 | 65.13641419089639 |
+2026-10-21T05:02:00.7448730Z | IMG_2600 | 0.0 | 0 | 0.0 | inf |
+2026-10-21T05:02:00.7448970Z | IMG_2600 | 0.15 | 196828 | 0.00732421875 | 63.668260419314954 |
+2026-10-21T05:02:00.7449270Z | IMG_2600 | 0.35 | 272530 | 0.0068359375 | 63.34035447934687 |
+2026-10-21T05:02:00.7449570Z | IMG_2600 | 0.5 | 257305 | 0.00732421875 | 62.541587796096884 |
+2026-10-21T05:02:00.7449870Z | IMG_2600 | 0.75 | 259127 | 0.00830078125 | 62.412650167994215 |
+2026-10-21T05:02:00.7450170Z | IMG_2600 | 1.0 | 254160 | 0.00732421875 | 62.29788850489654 |
+2026-10-21T05:02:00.7450480Z | IMG_2604 | -1.0 | 214067 | 0.00634765625 | 62.643567258358274 |
+2026-10-21T05:02:00.7450780Z | IMG_2604 | -0.75 | 225760 | 0.00732421875 | 62.11388027032622 |
+2026-10-21T05:02:00.7451080Z | IMG_2604 | -0.5 | 230140 | 0.00634765625 | 62.06432904749374 |
+2026-10-21T05:02:00.7451380Z | IMG_2604 | -0.35 | 242106 | 0.0068359375 | 61.21442704850996 |
+2026-10-21T05:02:00.7451850Z | IMG_2604 | -0.15 | 218638 | 0.0048828125 | 63.854799009344205 |
+2026-10-21T05:02:00.7452100Z | IMG_2604 | 0.0 | 0 | 0.0 | inf |
+2026-10-21T05:02:00.7452350Z | IMG_2604 | 0.15 | 259909 | 0.005859375 | 62.17333385727251 |
+2026-10-21T05:02:00.7452630Z | IMG_2604 | 0.35 | 286067 | 0.005859375 | 62.47286880197932 |
+2026-10-21T05:02:00.7452930Z | IMG_2604 | 0.5 | 268449 | 0.00634765625 | 62.15328474508092 |
+2026-10-21T05:02:00.7453220Z | IMG_2604 | 0.75 | 270123 | 0.0068359375 | 61.70988065370105 |
+2026-10-21T05:02:00.7453520Z | IMG_2604 | 1.0 | 273646 | 0.0068359375 | 61.402947030676884 |
+2026-10-21T05:02:00.7453820Z | IMG_2608 | -1.0 | 166222 | 0.0068359375 | 64.21462939767858 |
+2026-10-21T05:02:00.7454110Z | IMG_2608 | -0.75 | 173575 | 0.0078125 | 63.35936239848361 |
+2026-10-21T05:02:00.7454410Z | IMG_2608 | -0.5 | 178145 | 0.00634765625 | 63.73235682642323 |
+2026-10-21T05:02:00.7454710Z | IMG_2608 | -0.35 | 191663 | 0.00732421875 | 62.2953162667778 |
+2026-10-21T05:02:00.7455020Z | IMG_2608 | -0.15 | 174754 | 0.004150390625 | 64.9274539946277 |
+2026-10-21T05:02:00.7455270Z | IMG_2608 | 0.0 | 0 | 0.0 | inf |
+2026-10-21T05:02:00.7455520Z | IMG_2608 | 0.15 | 215656 | 0.00634765625 | 63.165438750589445 |
+2026-10-21T05:02:00.7455820Z | IMG_2608 | 0.35 | 275705 | 0.0068359375 | 63.61971012170339 |
+2026-10-21T05:02:00.7456120Z | IMG_2608 | 0.5 | 264901 | 0.00732421875 | 62.88255895261793 |
+2026-10-21T05:02:00.7456420Z | IMG_2608 | 0.75 | 266677 | 0.00830078125 | 62.54733173583061 |
+2026-10-21T05:02:00.7456720Z | IMG_2608 | 1.0 | 262449 | 0.00732421875 | 62.357552897752385 |
+2026-10-21T05:02:00.7456890Z 
+2026-10-21T05:03:06.0699350Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic -> /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/uhdr-portrait-01.xdremux.heic
+2026-10-21T05:04:49.5891630Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic -> /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/uhdr-hr-01.xdremux.heic
+2026-10-21T05:05:57.8469280Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic -> /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/lhdr-v1-01.xdremux.heic
+2026-10-21T05:07:55.5939870Z {"photo": "uhdr-portrait-01.xdremux", "tone": -1.0, "returncode": 0, "components": 591360, "differing_components": 71919, "max_abs": 0.00439453125, "psnr_peak1_db": 73.5711539180053}
+2026-10-21T05:07:55.6037870Z {"photo": "uhdr-portrait-01.xdremux", "tone": -0.75, "returncode": 0, "components": 591360, "differing_components": 68910, "max_abs": 0.00439453125, "psnr_peak1_db": 73.74205599138843}
+2026-10-21T05:07:55.6141880Z {"photo": "uhdr-portrait-01.xdremux", "tone": -0.5, "returncode": 0, "components": 591360, "differing_components": 66116, "max_abs": 0.00439453125, "psnr_peak1_db": 73.74300569349123}
+2026-10-21T05:07:55.6245050Z {"photo": "uhdr-portrait-01.xdremux", "tone": -0.35, "returncode": 0, "components": 591360, "differing_components": 57625, "max_abs": 0.00439453125, "psnr_peak1_db": 75.83603963527426}
+2026-10-21T05:07:55.6347650Z {"photo": "uhdr-portrait-01.xdremux", "tone": -0.15, "returncode": 0, "components": 591360, "differing_components": 46637, "max_abs": 0.00390625, "psnr_peak1_db": 79.79150975639331}
+2026-10-21T05:07:55.6450650Z {"photo": "uhdr-portrait-01.xdremux", "tone": 0.0, "returncode": 0, "components": 591360, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-21T05:07:55.6553240Z {"photo": "uhdr-portrait-01.xdremux", "tone": 0.15, "returncode": 0, "components": 591360, "differing_components": 190809, "max_abs": 0.00732421875, "psnr_peak1_db": 68.07030169272713}
+2026-10-21T05:07:55.6655730Z {"photo": "uhdr-portrait-01.xdremux", "tone": 0.35, "returncode": 0, "components": 591360, "differing_components": 289456, "max_abs": 0.00732421875, "psnr_peak1_db": 65.41455576889825}
+2026-10-21T05:07:55.6757580Z {"photo": "uhdr-portrait-01.xdremux", "tone": 0.5, "returncode": 0, "components": 591360, "differing_components": 291422, "max_abs": 0.0087890625, "psnr_peak1_db": 64.25775681585047}
+2026-10-21T05:07:55.6789630Z {"photo": "uhdr-portrait-01.xdremux", "tone": 0.75, "returncode": 0, "components": 591360, "differing_components": 286034, "max_abs": 0.00830078125, "psnr_peak1_db": 63.975108711938766}
+2026-10-21T05:07:55.6791200Z {"photo": "uhdr-portrait-01.xdremux", "tone": 1.0, "returncode": 0, "components": 591360, "differing_components": 273046, "max_abs": 0.00732421875, "psnr_peak1_db": 63.678372893975}
+2026-10-21T05:07:55.6792520Z {"photo": "uhdr-hr-01.xdremux", "tone": -1.0, "returncode": 0, "components": 589824, "differing_components": 92285, "max_abs": 0.00732421875, "psnr_peak1_db": 69.97377091405829}
+2026-10-21T05:07:55.6793680Z {"photo": "uhdr-hr-01.xdremux", "tone": -0.75, "returncode": 0, "components": 589824, "differing_components": 93016, "max_abs": 0.0078125, "psnr_peak1_db": 69.8333708337183}
+2026-10-21T05:07:55.6794900Z {"photo": "uhdr-hr-01.xdremux", "tone": -0.5, "returncode": 0, "components": 589824, "differing_components": 93697, "max_abs": 0.0078125, "psnr_peak1_db": 70.19786311504782}
+2026-10-21T05:07:55.6809650Z {"photo": "uhdr-hr-01.xdremux", "tone": -0.35, "returncode": 0, "components": 589824, "differing_components": 91783, "max_abs": 0.0078125, "psnr_peak1_db": 70.60179194679951}
+2026-10-21T05:07:55.6811070Z {"photo": "uhdr-hr-01.xdremux", "tone": -0.15, "returncode": 0, "components": 589824, "differing_components": 89335, "max_abs": 0.0068359375, "psnr_peak1_db": 71.805866594668}
+2026-10-21T05:07:55.6812870Z {"photo": "uhdr-hr-01.xdremux", "tone": 0.0, "returncode": 0, "components": 589824, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-21T05:07:55.6817190Z {"photo": "uhdr-hr-01.xdremux", "tone": 0.15, "returncode": 0, "components": 589824, "differing_components": 195962, "max_abs": 0.005859375, "psnr_peak1_db": 70.35807427426758}
+2026-10-21T05:07:55.6818920Z {"photo": "uhdr-hr-01.xdremux", "tone": 0.35, "returncode": 0, "components": 589824, "differing_components": 222123, "max_abs": 0.00634765625, "psnr_peak1_db": 69.52000146830264}
+2026-10-21T05:07:55.6820180Z {"photo": "uhdr-hr-01.xdremux", "tone": 0.5, "returncode": 0, "components": 589824, "differing_components": 211025, "max_abs": 0.00732421875, "psnr_peak1_db": 68.3783663692414}
+2026-10-21T05:07:55.6821410Z {"photo": "uhdr-hr-01.xdremux", "tone": 0.75, "returncode": 0, "components": 589824, "differing_components": 213945, "max_abs": 0.0068359375, "psnr_peak1_db": 67.67521660880861}
+2026-10-21T05:07:55.6824660Z {"photo": "uhdr-hr-01.xdremux", "tone": 1.0, "returncode": 0, "components": 589824, "differing_components": 208273, "max_abs": 0.0068359375, "psnr_peak1_db": 66.9790533480427}
+2026-10-21T05:07:55.6826160Z {"photo": "lhdr-v1-01.xdremux", "tone": -1.0, "returncode": 0, "components": 674304, "differing_components": 152803, "max_abs": 0.00830078125, "psnr_peak1_db": 66.73110898862923}
+2026-10-21T05:07:55.6827690Z {"photo": "lhdr-v1-01.xdremux", "tone": -0.75, "returncode": 0, "components": 674304, "differing_components": 179508, "max_abs": 0.0078125, "psnr_peak1_db": 66.16688325360438}
+2026-10-21T05:07:55.6829020Z {"photo": "lhdr-v1-01.xdremux", "tone": -0.5, "returncode": 0, "components": 674304, "differing_components": 156745, "max_abs": 0.0068359375, "psnr_peak1_db": 66.36539817638975}
+2026-10-21T05:07:55.6831650Z {"photo": "lhdr-v1-01.xdremux", "tone": -0.35, "returncode": 0, "components": 674304, "differing_components": 142316, "max_abs": 0.0068359375, "psnr_peak1_db": 68.19993360596133}
+2026-10-21T05:07:55.6832720Z {"photo": "lhdr-v1-01.xdremux", "tone": -0.15, "returncode": 0, "components": 674304, "differing_components": 206586, "max_abs": 0.0068359375, "psnr_peak1_db": 65.30522238604833}
+2026-10-21T05:07:55.6833920Z {"photo": "lhdr-v1-01.xdremux", "tone": 0.0, "returncode": 0, "components": 674304, "differing_components": 0, "max_abs": 0.0, "psnr_peak1_db": "inf"}
+2026-10-21T05:07:55.6834980Z {"photo": "lhdr-v1-01.xdremux", "tone": 0.15, "returncode": 0, "components": 674304, "differing_components": 210630, "max_abs": 0.00634765625, "psnr_peak1_db": 65.93481372516348}
+2026-10-21T05:07:55.6836350Z {"photo": "lhdr-v1-01.xdremux", "tone": 0.35, "returncode": 0, "components": 674304, "differing_components": 239614, "max_abs": 0.0078125, "psnr_peak1_db": 67.76284283052514}
+2026-10-21T05:07:55.6837430Z {"photo": "lhdr-v1-01.xdremux", "tone": 0.5, "returncode": 0, "components": 674304, "differing_components": 315889, "max_abs": 0.0078125, "psnr_peak1_db": 65.39440345094107}
+2026-10-21T05:07:55.6839420Z {"photo": "lhdr-v1-01.xdremux", "tone": 0.75, "returncode": 0, "components": 674304, "differing_components": 268705, "max_abs": 0.00634765625, "psnr_peak1_db": 64.94039066783935}
+2026-10-21T05:07:55.6840420Z {"photo": "lhdr-v1-01.xdremux", "tone": 1.0, "returncode": 0, "components": 674304, "differing_components": 320778, "max_abs": 0.0068359375, "psnr_peak1_db": 60.51021762853341}
+2026-10-21T05:07:55.6841070Z {
+2026-10-21T05:07:55.6912330Z   "status": "completed",
+2026-10-21T05:07:55.6912910Z   "photos": [
+2026-10-21T05:07:55.6913400Z     "uhdr-portrait-01.xdremux",
+2026-10-21T05:07:55.6913850Z     "uhdr-hr-01.xdremux",
+2026-10-21T05:07:55.6914400Z     "lhdr-v1-01.xdremux"
+2026-10-21T05:07:55.6914780Z   ],
+2026-10-21T05:07:55.6915200Z   "tones": [
+2026-10-21T05:07:55.6915520Z     -1.0,
+2026-10-21T05:07:55.6916050Z     -0.75,
+2026-10-21T05:07:55.6916320Z     -0.5,
+2026-10-21T05:07:55.6916650Z     -0.35,
+2026-10-21T05:07:55.6917100Z     -0.15,
+2026-10-21T05:07:55.6917350Z     0.0,
+2026-10-21T05:07:55.6917820Z     0.15,
+2026-10-21T05:07:55.6918140Z     0.35,
+2026-10-21T05:07:55.6918510Z     0.5,
+2026-10-21T05:07:55.6918940Z     0.75,
+2026-10-21T05:07:55.6919180Z     1.0
+2026-10-21T05:07:55.6919630Z   ],
+2026-10-21T05:07:55.6920420Z   "command": [
+2026-10-21T05:07:55.6921230Z     "/Users/runner/work/_temp/tone-venv/bin/python3",
+2026-10-21T05:07:55.6922010Z     "/Users/runner/work/XDRemux/XDRemux/consumer-research/consumer-model/harness/run_tone_sweep.py",
+2026-10-21T05:07:55.6922650Z     "/Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/xdremux",
+2026-10-21T05:07:55.6923520Z     "/Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/uhdr-portrait-01.xdremux.heic",
+2026-10-21T05:07:55.6925090Z     "/Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/uhdr-hr-01.xdremux.heic",
+2026-10-21T05:07:55.6925790Z     "/Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/generated/lhdr-v1-01.xdremux.heic",
+2026-10-21T05:07:55.6927810Z     "--tones",
+2026-10-21T05:07:55.6928220Z     "-1.0",
+2026-10-21T05:07:55.6928540Z     "-0.75",
+2026-10-21T05:07:55.6928920Z     "-0.5",
+2026-10-21T05:07:55.6929260Z     "-0.35",
+2026-10-21T05:07:55.6929970Z     "-0.15",
+2026-10-21T05:07:55.6930370Z     "0.0",
+2026-10-21T05:07:55.6930630Z     "0.15",
+2026-10-21T05:07:55.6930970Z     "0.35",
+2026-10-21T05:07:55.6931390Z     "0.5",
+2026-10-21T05:07:55.6931940Z     "0.75",
+2026-10-21T05:07:55.6932290Z     "1.0"
+2026-10-21T05:07:55.6932610Z   ],
+2026-10-21T05:07:55.6933180Z   "python_executable": "/Users/runner/work/_temp/tone-venv/bin/python3",
+2026-10-21T05:07:55.6934040Z   "python_version": "3.15.0 (main, Oct  9 2026, 11:16:41) [Clang 21.0.0 (clang-2100.3.34.2)]",
+2026-10-21T05:07:55.6934520Z   "returncode": 0,
+2026-10-21T05:07:55.6935040Z   "errors": [],
+2026-10-21T05:07:55.6935710Z   "diagnostics": [
+2026-10-21T05:07:55.6936010Z     {
+2026-10-21T05:07:55.6936430Z       "log": "build.log",
+2026-10-21T05:07:55.6937030Z       "source_log_sha256": "7ef61894c5a69833e16230e37014c80349791fa870ced57a23494613c9c63b8d",
+2026-10-21T05:07:55.6937670Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6938350Z       "omitted_native_facts_lines": 0
+2026-10-21T05:07:55.6938990Z     },
+2026-10-21T05:07:55.6939590Z     {
+2026-10-21T05:07:55.6939920Z       "log": "uhdr-portrait-01.xdremux-extract.log",
+2026-10-21T05:07:55.6940610Z       "source_log_sha256": "849415450fcdeca712e477e145e600e1736b3c1e6d899d985f874a40561c4454",
+2026-10-21T05:07:55.6941300Z       "omitted_inventory_lines": 1,
+2026-10-21T05:07:55.6942250Z       "omitted_native_facts_lines": 0
+2026-10-21T05:07:55.6943050Z     },
+2026-10-21T05:07:55.6943490Z     {
+2026-10-21T05:07:55.6943830Z       "log": "uhdr-portrait-01.xdremux-tone--1.log",
+2026-10-21T05:07:55.6944740Z       "source_log_sha256": "2040974904641511af485c99c2c57baa3defbd776d06278ce9b003095d342ccd",
+2026-10-21T05:07:55.6945790Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6946390Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6946810Z     },
+2026-10-21T05:07:55.6947230Z     {
+2026-10-21T05:07:55.6947560Z       "log": "uhdr-portrait-01.xdremux-tone--0.75.log",
+2026-10-21T05:07:55.6948260Z       "source_log_sha256": "407b4d359e5e1372103a14cc25e898359fdf2731c23ab4c77746fcd66fb4a244",
+2026-10-21T05:07:55.6949960Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6950270Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6950800Z     },
+2026-10-21T05:07:55.6951500Z     {
+2026-10-21T05:07:55.6951870Z       "log": "uhdr-portrait-01.xdremux-tone--0.5.log",
+2026-10-21T05:07:55.6952590Z       "source_log_sha256": "60c9bc607d6bdc403273681e1868328cd68bc25489dc4f2739b6725ff07c9497",
+2026-10-21T05:07:55.6953230Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6953630Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6954140Z     },
+2026-10-21T05:07:55.6954460Z     {
+2026-10-21T05:07:55.6955060Z       "log": "uhdr-portrait-01.xdremux-tone--0.35.log",
+2026-10-21T05:07:55.6956460Z       "source_log_sha256": "81f46530c0b1b5f62cb6d06f0db7b9e24c96dc8b310253f90446e7750ee54ca0",
+2026-10-21T05:07:55.6957020Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6957550Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6958120Z     },
+2026-10-21T05:07:55.6958400Z     {
+2026-10-21T05:07:55.6958950Z       "log": "uhdr-portrait-01.xdremux-tone--0.15.log",
+2026-10-21T05:07:55.6959860Z       "source_log_sha256": "e923c0d3485d231525be93f35d1df19de939b4067a5aeaf84f5d8885885b7be9",
+2026-10-21T05:07:55.6960520Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6961060Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6961460Z     },
+2026-10-21T05:07:55.6961850Z     {
+2026-10-21T05:07:55.6963020Z       "log": "uhdr-portrait-01.xdremux-tone-0.log",
+2026-10-21T05:07:55.6963660Z       "source_log_sha256": "b5eb07f0d01e66e693fa53bc3e52e7576ac6dbfe62f9a343bc346c27e166e081",
+2026-10-21T05:07:55.6964400Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6964780Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6965230Z     },
+2026-10-21T05:07:55.6965630Z     {
+2026-10-21T05:07:55.6965960Z       "log": "uhdr-portrait-01.xdremux-tone-0.15.log",
+2026-10-21T05:07:55.6966960Z       "source_log_sha256": "1497e571c944df53be4e8819e872445545b6e260b77ab3d4a31f277ec19858a2",
+2026-10-21T05:07:55.6967580Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6967970Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6968410Z     },
+2026-10-21T05:07:55.6968570Z     {
+2026-10-21T05:07:55.6968890Z       "log": "uhdr-portrait-01.xdremux-tone-0.35.log",
+2026-10-21T05:07:55.6969480Z       "source_log_sha256": "6500a7188262810eb496510e50c23f69925f3df5fe22d81398da02ac72d3f462",
+2026-10-21T05:07:55.6970880Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6971260Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6971760Z     },
+2026-10-21T05:07:55.6972130Z     {
+2026-10-21T05:07:55.6972510Z       "log": "uhdr-portrait-01.xdremux-tone-0.5.log",
+2026-10-21T05:07:55.6973200Z       "source_log_sha256": "5ee82c38e6802c6e006434ae802f622b2d877b7e6b9613607219d7832178816a",
+2026-10-21T05:07:55.6974130Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6974430Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6974800Z     },
+2026-10-21T05:07:55.6975150Z     {
+2026-10-21T05:07:55.6975960Z       "log": "uhdr-portrait-01.xdremux-tone-0.75.log",
+2026-10-21T05:07:55.6976560Z       "source_log_sha256": "9b81d5a086192e5f5824b26b278f2cb5c046c7f494d8157b1916f735f7afcc8a",
+2026-10-21T05:07:55.6977080Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6977840Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6978170Z     },
+2026-10-21T05:07:55.6978400Z     {
+2026-10-21T05:07:55.6978930Z       "log": "uhdr-portrait-01.xdremux-tone-1.log",
+2026-10-21T05:07:55.6979630Z       "source_log_sha256": "eabedb1d6f1a3bd5367b5a4882f216e7821ff5de7ee65ae8331141a548e4fae0",
+2026-10-21T05:07:55.6980210Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6980610Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6980960Z     },
+2026-10-21T05:07:55.6981210Z     {
+2026-10-21T05:07:55.6981490Z       "log": "uhdr-hr-01.xdremux-extract.log",
+2026-10-21T05:07:55.6982020Z       "source_log_sha256": "eb15850419294434055261a00bbdc7ae0ff06b36bb53c4d405c84dc31b709b56",
+2026-10-21T05:07:55.6982540Z       "omitted_inventory_lines": 1,
+2026-10-21T05:07:55.6983850Z       "omitted_native_facts_lines": 0
+2026-10-21T05:07:55.6984160Z     },
+2026-10-21T05:07:55.6984370Z     {
+2026-10-21T05:07:55.6984600Z       "log": "uhdr-hr-01.xdremux-tone--1.log",
+2026-10-21T05:07:55.6985130Z       "source_log_sha256": "4158ad629ba60cf9facc37a4cec9965e945892072e3be9d6e6cc4a67c87e1541",
+2026-10-21T05:07:55.6985610Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6985880Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6986280Z     },
+2026-10-21T05:07:55.6986470Z     {
+2026-10-21T05:07:55.6986790Z       "log": "uhdr-hr-01.xdremux-tone--0.75.log",
+2026-10-21T05:07:55.6987320Z       "source_log_sha256": "20b3cade6702a2b50bde7298140c87f080662699c64c701c8c5199bc4f16456a",
+2026-10-21T05:07:55.6987750Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6988070Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6988400Z     },
+2026-10-21T05:07:55.6988580Z     {
+2026-10-21T05:07:55.6988890Z       "log": "uhdr-hr-01.xdremux-tone--0.5.log",
+2026-10-21T05:07:55.6990690Z       "source_log_sha256": "5da152b08c09e93bdc6146d867aee2912d9d1e3cc626e11b8833382877f72f0f",
+2026-10-21T05:07:55.6991250Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6991610Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6991970Z     },
+2026-10-21T05:07:55.6992110Z     {
+2026-10-21T05:07:55.6992380Z       "log": "uhdr-hr-01.xdremux-tone--0.35.log",
+2026-10-21T05:07:55.6992880Z       "source_log_sha256": "1f6ab150b618d9bdaddab014cf4d93a885866300ff7c68a4fba63708a81e48cc",
+2026-10-21T05:07:55.6993290Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6993610Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6993870Z     },
+2026-10-21T05:07:55.6994040Z     {
+2026-10-21T05:07:55.6994350Z       "log": "uhdr-hr-01.xdremux-tone--0.15.log",
+2026-10-21T05:07:55.6994800Z       "source_log_sha256": "dcd00bf91ca65837d37d96476eb4972672a44ba3141e692d8c1c27e2aca79b14",
+2026-10-21T05:07:55.6995290Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6995630Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6995900Z     },
+2026-10-21T05:07:55.6996130Z     {
+2026-10-21T05:07:55.6996510Z       "log": "uhdr-hr-01.xdremux-tone-0.log",
+2026-10-21T05:07:55.6997000Z       "source_log_sha256": "4d1235a03c6a5c7cd05eb9c5296c4f0664afb3a7f1b2578f2c28d392015ebcd3",
+2026-10-21T05:07:55.6998190Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.6998520Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.6998810Z     },
+2026-10-21T05:07:55.6999050Z     {
+2026-10-21T05:07:55.6999280Z       "log": "uhdr-hr-01.xdremux-tone-0.15.log",
+2026-10-21T05:07:55.6999750Z       "source_log_sha256": "f7713a3ca0b5c7e46695714f0800102a09de9036529204f8480114988d069880",
+2026-10-21T05:07:55.7000270Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7000630Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7000920Z     },
+2026-10-21T05:07:55.7001100Z     {
+2026-10-21T05:07:55.7001350Z       "log": "uhdr-hr-01.xdremux-tone-0.35.log",
+2026-10-21T05:07:55.7001850Z       "source_log_sha256": "bb5b76fbfabc59d3fc5e6c5f058eb69076f9f515d94ea0a9837e075deba8f623",
+2026-10-21T05:07:55.7002280Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7002760Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7002960Z     },
+2026-10-21T05:07:55.7003080Z     {
+2026-10-21T05:07:55.7003260Z       "log": "uhdr-hr-01.xdremux-tone-0.5.log",
+2026-10-21T05:07:55.7003670Z       "source_log_sha256": "2c409e76686d2572e6ae533ca631b77a57a1bb1fbece0362940abb9fcc5d7328",
+2026-10-21T05:07:55.7004100Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7004330Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7004520Z     },
+2026-10-21T05:07:55.7004640Z     {
+2026-10-21T05:07:55.7004830Z       "log": "uhdr-hr-01.xdremux-tone-0.75.log",
+2026-10-21T05:07:55.7005250Z       "source_log_sha256": "1a68f371f47b28fe7b0790029c610b086f802d497824f45d49e3201de924aa83",
+2026-10-21T05:07:55.7005620Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7005840Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7006040Z     },
+2026-10-21T05:07:55.7006170Z     {
+2026-10-21T05:07:55.7006380Z       "log": "uhdr-hr-01.xdremux-tone-1.log",
+2026-10-21T05:07:55.7006780Z       "source_log_sha256": "c1bcb5ab9af5ced8246893a3688b75ee9b15d6d1548a983c1f7fab2e27a8e8e0",
+2026-10-21T05:07:55.7007200Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7007420Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7007620Z     },
+2026-10-21T05:07:55.7007770Z     {
+2026-10-21T05:07:55.7007950Z       "log": "lhdr-v1-01.xdremux-extract.log",
+2026-10-21T05:07:55.7008380Z       "source_log_sha256": "e66157a9f64795909d3417fff1d86de6f183f2a99f35a3b90de9a0828e117ffb",
+2026-10-21T05:07:55.7008740Z       "omitted_inventory_lines": 1,
+2026-10-21T05:07:55.7008960Z       "omitted_native_facts_lines": 0
+2026-10-21T05:07:55.7009170Z     },
+2026-10-21T05:07:55.7009290Z     {
+2026-10-21T05:07:55.7009460Z       "log": "lhdr-v1-01.xdremux-tone--1.log",
+2026-10-21T05:07:55.7009970Z       "source_log_sha256": "314e5fe741a0f7a452c9a781ca236984046d4197b2071335137cd70d34ee7918",
+2026-10-21T05:07:55.7010390Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7010620Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7010810Z     },
+2026-10-21T05:07:55.7010940Z     {
+2026-10-21T05:07:55.7011130Z       "log": "lhdr-v1-01.xdremux-tone--0.75.log",
+2026-10-21T05:07:55.7011530Z       "source_log_sha256": "b0360512695a1cf93703f909966caa0f5c48d7bfb8a2ce1fb853adac94238d6e",
+2026-10-21T05:07:55.7011900Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7012120Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7013260Z     },
+2026-10-21T05:07:55.7013390Z     {
+2026-10-21T05:07:55.7013570Z       "log": "lhdr-v1-01.xdremux-tone--0.5.log",
+2026-10-21T05:07:55.7013970Z       "source_log_sha256": "356c30a8a0b0d2ffb06d7f3b466e52eb9a88d86b60fa10635bda8d5f3d68e52f",
+2026-10-21T05:07:55.7014340Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7014570Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7014760Z     },
+2026-10-21T05:07:55.7014880Z     {
+2026-10-21T05:07:55.7015060Z       "log": "lhdr-v1-01.xdremux-tone--0.35.log",
+2026-10-21T05:07:55.7015460Z       "source_log_sha256": "c89c33e9a5dfa7106074dc944fe26954182291f5d5b4f73a59dcf2ff0d0e4b9d",
+2026-10-21T05:07:55.7015830Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7016050Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7016290Z     },
+2026-10-21T05:07:55.7016420Z     {
+2026-10-21T05:07:55.7016610Z       "log": "lhdr-v1-01.xdremux-tone--0.15.log",
+2026-10-21T05:07:55.7017010Z       "source_log_sha256": "c9a20c5f8647de9caaae8a7e2da5b2008ebe0912d034e8b30ecc030648e8dc0a",
+2026-10-21T05:07:55.7017390Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7017610Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7017810Z     },
+2026-10-21T05:07:55.7017920Z     {
+2026-10-21T05:07:55.7018120Z       "log": "lhdr-v1-01.xdremux-tone-0.log",
+2026-10-21T05:07:55.7018530Z       "source_log_sha256": "24bccb0c0b4217c600b11d853eb0be1811d99b6f08bbba50d3a8ed0bf47d8739",
+2026-10-21T05:07:55.7018970Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7020690Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7021050Z     },
+2026-10-21T05:07:55.7041380Z     {
+2026-10-21T05:07:55.7041650Z       "log": "lhdr-v1-01.xdremux-tone-0.15.log",
+2026-10-21T05:07:55.7042080Z       "source_log_sha256": "93507526896fb79cff4625d1a443417bfec6ffdf624b998ce03a3f96353eea7e",
+2026-10-21T05:07:55.7043140Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7043370Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7043570Z     },
+2026-10-21T05:07:55.7043690Z     {
+2026-10-21T05:07:55.7043880Z       "log": "lhdr-v1-01.xdremux-tone-0.35.log",
+2026-10-21T05:07:55.7044450Z       "source_log_sha256": "f51d305389fb5963c2d94b093b1d850785279be6de1624d183b73d8c251a537c",
+2026-10-21T05:07:55.7046220Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7046490Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7046730Z     },
+2026-10-21T05:07:55.7046920Z     {
+2026-10-21T05:07:55.7047110Z       "log": "lhdr-v1-01.xdremux-tone-0.5.log",
+2026-10-21T05:07:55.7047510Z       "source_log_sha256": "92bb7a13df319bf5f2cfe4377e576a73f16c3083465e743891a9b99e55c69896",
+2026-10-21T05:07:55.7048540Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7048770Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7048960Z     },
+2026-10-21T05:07:55.7049080Z     {
+2026-10-21T05:07:55.7049250Z       "log": "lhdr-v1-01.xdremux-tone-0.75.log",
+2026-10-21T05:07:55.7049650Z       "source_log_sha256": "b700dfd7ec0b4cf4454118d89bb0f1a6ac59bdf8aaba1f94e89b3090964bafc2",
+2026-10-21T05:07:55.7050020Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7050240Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7050430Z     },
+2026-10-21T05:07:55.7050580Z     {
+2026-10-21T05:07:55.7051660Z       "log": "lhdr-v1-01.xdremux-tone-1.log",
+2026-10-21T05:07:55.7052340Z       "source_log_sha256": "1d5825f58fe01b53367520bf205a6b94234d08ad5dc89a19bfaa701c1e0029a9",
+2026-10-21T05:07:55.7052730Z       "omitted_inventory_lines": 0,
+2026-10-21T05:07:55.7054270Z       "omitted_native_facts_lines": 105
+2026-10-21T05:07:55.7054510Z     }
+2026-10-21T05:07:55.7054630Z   ],
+2026-10-21T05:07:55.7054950Z   "consumer_script_sha256": "ac6c5d93a78ada33b95980ecb7f862559446dc20952129116f2bf08a9af7ec72",
+2026-10-21T05:07:55.7055330Z   "parser_compatibility": {
+2026-10-21T05:07:55.7055770Z     "name": "iinf-v1-u32-count",
+2026-10-21T05:07:55.7056810Z     "upstream_revision": "37dd551a949047ed14580efa0c0a2556922791b5",
+2026-10-21T05:07:55.7057320Z     "original_source_sha256": "24ef91b177d6346fb3952036e8e2b770c4491c7aad5bea85244a768794336e10",
+2026-10-21T05:07:55.7057850Z     "original_git_blob_sha1": "d65da02fb2ffadc334d4d00199d063d26bf7eb94",
+2026-10-21T05:07:55.7058360Z     "patch_sha256": "c530cb377a50b1d7553e5633ec1f9a6eb148af2f1e366148814556de82a5c633",
+2026-10-21T05:07:55.7058940Z     "patched_source_sha256": "72a70eeed36098b6acd72677129db190839c4216c35a0f992202bfc1345a099c",
+2026-10-21T05:07:55.7060480Z     "scope": "Owned extraction launcher; fixed upstream files and media bytes remain unchanged.",
+2026-10-21T05:07:55.7061070Z     "launcher_sha256": "695deca881c72483a2d57881c1d6c108f40bb3a6f0d3bafdc024cea63e6365a0"
+2026-10-21T05:07:55.7061440Z   },
+2026-10-21T05:07:55.7061860Z   "working_directory": "/Users/runner/work/XDRemux/XDRemux/artifacts/tone-response/xdremux/consumer-compat",
+2026-10-21T05:07:55.7062350Z   "wall_seconds": 117.50048387499987,
+2026-10-21T05:07:55.7062630Z   "native_failures": []
+2026-10-21T05:07:55.7062810Z }
+2026-10-21T05:07:58.9413660Z # Photographic Styles tone response
+2026-10-21T05:07:58.9413910Z 
+2026-10-21T05:07:58.9414070Z Host gate trusted: True. Tone 0 differing components: 0.
+2026-10-21T05:07:58.9414450Z Measurement status: completed. Product measurements complete: True.
+2026-10-21T05:07:58.9414680Z 
+2026-10-21T05:07:58.9414860Z The harness sets inputToneBias only. It has no color-bias argument.
+2026-10-21T05:07:58.9415440Z Complete native Tone measurements do not establish Photos Tone/Color editing admission or private status-code domains.
+2026-10-21T05:07:58.9415810Z 
+2026-10-21T05:07:58.9416240Z ## uhdr-portrait-01.xdremux
+2026-10-21T05:07:58.9416370Z 
+2026-10-21T05:07:58.9416730Z Monotonic mean luminance: True. L(-1)-L(0) = -0.018543799571739683. L(+1)-L(0) = 0.17465695537734177. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.1062.
+2026-10-21T05:07:58.9417100Z 
+2026-10-21T05:07:58.9417200Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-21T05:07:58.9417430Z |---:|---:|---:|---:|---:|
+2026-10-21T05:07:58.9417640Z | -1 | 0.22393 | 0.31012 | 0.20758 | 0.11767 |
+2026-10-21T05:07:58.9417890Z | -0.75 | 0.22669 | 0.31717 | 0.20922 | 0.11778 |
+2026-10-21T05:07:58.9418140Z | -0.5 | 0.23019 | 0.32519 | 0.21156 | 0.11829 |
+2026-10-21T05:07:58.9418390Z | -0.35 | 0.23290 | 0.33073 | 0.21355 | 0.11910 |
+2026-10-21T05:07:58.9418630Z | -0.15 | 0.23743 | 0.33927 | 0.21710 | 0.12081 |
+2026-10-21T05:07:58.9418880Z | 0 | 0.24248 | 0.34950 | 0.22089 | 0.12175 |
+2026-10-21T05:07:58.9419120Z | 0.15 | 0.26917 | 0.38616 | 0.24571 | 0.13595 |
+2026-10-21T05:07:58.9419370Z | 0.35 | 0.31674 | 0.44720 | 0.29110 | 0.16369 |
+2026-10-21T05:07:58.9419610Z | 0.5 | 0.35215 | 0.48776 | 0.32615 | 0.18735 |
+2026-10-21T05:07:58.9419860Z | 0.75 | 0.37968 | 0.52118 | 0.35284 | 0.20525 |
+2026-10-21T05:07:58.9420090Z | 1 | 0.41714 | 0.56587 | 0.38955 | 0.22826 |
+2026-10-21T05:07:58.9420240Z 
+2026-10-21T05:07:58.9420320Z ## uhdr-hr-01.xdremux
+2026-10-21T05:07:58.9420430Z 
+2026-10-21T05:07:58.9420770Z Monotonic mean luminance: True. L(-1)-L(0) = -0.012467508732202481. L(+1)-L(0) = 0.13275180479762536. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.0939.
+2026-10-21T05:07:58.9421130Z 
+2026-10-21T05:07:58.9421230Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-21T05:07:58.9421460Z |---:|---:|---:|---:|---:|
+2026-10-21T05:07:58.9421670Z | -1 | 0.12897 | 0.14190 | 0.12596 | 0.11772 |
+2026-10-21T05:07:58.9421930Z | -0.75 | 0.13568 | 0.14958 | 0.13234 | 0.12460 |
+2026-10-21T05:07:58.9422350Z | -0.5 | 0.13938 | 0.15402 | 0.13580 | 0.12833 |
+2026-10-21T05:07:58.9422600Z | -0.35 | 0.14025 | 0.15521 | 0.13657 | 0.12923 |
+2026-10-21T05:07:58.9422850Z | -0.15 | 0.14068 | 0.15599 | 0.13687 | 0.12965 |
+2026-10-21T05:07:58.9423080Z | 0 | 0.14143 | 0.15760 | 0.13739 | 0.13002 |
+2026-10-21T05:07:58.9423310Z | 0.15 | 0.15409 | 0.17007 | 0.15008 | 0.14295 |
+2026-10-21T05:07:58.9423550Z | 0.35 | 0.18342 | 0.20028 | 0.17913 | 0.17213 |
+2026-10-21T05:07:58.9423780Z | 0.5 | 0.21122 | 0.22875 | 0.20674 | 0.19969 |
+2026-10-21T05:07:58.9424020Z | 0.75 | 0.23941 | 0.25842 | 0.23449 | 0.22748 |
+2026-10-21T05:07:58.9424240Z | 1 | 0.27419 | 0.29450 | 0.26886 | 0.26193 |
+2026-10-21T05:07:58.9424380Z 
+2026-10-21T05:07:58.9424460Z ## lhdr-v1-01.xdremux
+2026-10-21T05:07:58.9424550Z 
+2026-10-21T05:07:58.9424880Z Monotonic mean luminance: True. L(-1)-L(0) = -0.028352684637093284. L(+1)-L(0) = 0.11109930831798409. |L(-1)-L(0)| / |L(+1)-L(0)| = 0.2552.
+2026-10-21T05:07:58.9425230Z 
+2026-10-21T05:07:58.9425330Z | tone | mean Y | mean R | mean G | mean B |
+2026-10-21T05:07:58.9425550Z |---:|---:|---:|---:|---:|
+2026-10-21T05:07:58.9425750Z | -1 | 0.25907 | 0.22848 | 0.26480 | 0.29648 |
+2026-10-21T05:07:58.9425990Z | -0.75 | 0.26874 | 0.23530 | 0.27475 | 0.31302 |
+2026-10-21T05:07:58.9426230Z | -0.5 | 0.27480 | 0.23973 | 0.28075 | 0.32352 |
+2026-10-21T05:07:58.9426460Z | -0.35 | 0.27762 | 0.24203 | 0.28348 | 0.32804 |
+2026-10-21T05:07:58.9426700Z | -0.15 | 0.28227 | 0.24629 | 0.28819 | 0.33409 |
+2026-10-21T05:07:58.9426930Z | 0 | 0.28742 | 0.25048 | 0.29362 | 0.34177 |
+2026-10-21T05:07:58.9427150Z | 0.15 | 0.29503 | 0.25580 | 0.30153 | 0.35242 |
+2026-10-21T05:07:58.9427390Z | 0.35 | 0.31762 | 0.27206 | 0.32498 | 0.38369 |
+2026-10-21T05:07:58.9427620Z | 0.5 | 0.33949 | 0.28872 | 0.34792 | 0.41292 |
+2026-10-21T05:07:58.9427850Z | 0.75 | 0.36370 | 0.30564 | 0.37331 | 0.44805 |
+2026-10-21T05:07:58.9428070Z | 1 | 0.39852 | 0.33171 | 0.40959 | 0.49474 |
+2026-10-21T05:07:58.9428210Z 
+2026-10-21T05:07:58.9428290Z ## Model versus native
+2026-10-21T05:07:58.9428390Z 
+2026-10-21T05:07:58.9428490Z | photo | tone | differing | max abs | PSNR |
+2026-10-21T05:07:58.9428720Z |---|---:|---:|---:|---:|
+2026-10-21T05:07:58.9429150Z | uhdr-portrait-01.xdremux | -1.0 | 71919 | 0.00439453125 | 73.5711539180053 |
+2026-10-21T05:07:58.9429580Z | uhdr-portrait-01.xdremux | -0.75 | 68910 | 0.00439453125 | 73.74205599138843 |
+2026-10-21T05:07:58.9430010Z | uhdr-portrait-01.xdremux | -0.5 | 66116 | 0.00439453125 | 73.74300569349123 |
+2026-10-21T05:07:58.9430420Z | uhdr-portrait-01.xdremux | -0.35 | 57625 | 0.00439453125 | 75.83603963527426 |
+2026-10-21T05:07:58.9430840Z | uhdr-portrait-01.xdremux | -0.15 | 46637 | 0.00390625 | 79.79150975639331 |
+2026-10-21T05:07:58.9431190Z | uhdr-portrait-01.xdremux | 0.0 | 0 | 0.0 | inf |
+2026-10-21T05:07:58.9431540Z | uhdr-portrait-01.xdremux | 0.15 | 190809 | 0.00732421875 | 68.07030169272713 |
+2026-10-21T05:07:58.9431950Z | uhdr-portrait-01.xdremux | 0.35 | 289456 | 0.00732421875 | 65.41455576889825 |
+2026-10-21T05:07:58.9432370Z | uhdr-portrait-01.xdremux | 0.5 | 291422 | 0.0087890625 | 64.25775681585047 |
+2026-10-21T05:07:58.9432790Z | uhdr-portrait-01.xdremux | 0.75 | 286034 | 0.00830078125 | 63.975108711938766 |
+2026-10-21T05:07:58.9433200Z | uhdr-portrait-01.xdremux | 1.0 | 273046 | 0.00732421875 | 63.678372893975 |
+2026-10-21T05:07:58.9433600Z | uhdr-hr-01.xdremux | -1.0 | 92285 | 0.00732421875 | 69.97377091405829 |
+2026-10-21T05:07:58.9433970Z | uhdr-hr-01.xdremux | -0.75 | 93016 | 0.0078125 | 69.8333708337183 |
+2026-10-21T05:07:58.9434320Z | uhdr-hr-01.xdremux | -0.5 | 93697 | 0.0078125 | 70.19786311504782 |
+2026-10-21T05:07:58.9434680Z | uhdr-hr-01.xdremux | -0.35 | 91783 | 0.0078125 | 70.60179194679951 |
+2026-10-21T05:07:58.9435040Z | uhdr-hr-01.xdremux | -0.15 | 89335 | 0.0068359375 | 71.805866594668 |
+2026-10-21T05:07:58.9435350Z | uhdr-hr-01.xdremux | 0.0 | 0 | 0.0 | inf |
+2026-10-21T05:07:58.9435660Z | uhdr-hr-01.xdremux | 0.15 | 195962 | 0.005859375 | 70.35807427426758 |
+2026-10-21T05:07:58.9436170Z | uhdr-hr-01.xdremux | 0.35 | 222123 | 0.00634765625 | 69.52000146830264 |
+2026-10-21T05:07:58.9436560Z | uhdr-hr-01.xdremux | 0.5 | 211025 | 0.00732421875 | 68.3783663692414 |
+2026-10-21T05:07:58.9436930Z | uhdr-hr-01.xdremux | 0.75 | 213945 | 0.0068359375 | 67.67521660880861 |
+2026-10-21T05:07:58.9437290Z | uhdr-hr-01.xdremux | 1.0 | 208273 | 0.0068359375 | 66.9790533480427 |
+2026-10-21T05:07:58.9437660Z | lhdr-v1-01.xdremux | -1.0 | 152803 | 0.00830078125 | 66.73110898862923 |
+2026-10-21T05:07:58.9438030Z | lhdr-v1-01.xdremux | -0.75 | 179508 | 0.0078125 | 66.16688325360438 |
+2026-10-21T05:07:58.9438400Z | lhdr-v1-01.xdremux | -0.5 | 156745 | 0.0068359375 | 66.36539817638975 |
+2026-10-21T05:07:58.9438770Z | lhdr-v1-01.xdremux | -0.35 | 142316 | 0.0068359375 | 68.19993360596133 |
+2026-10-21T05:07:58.9439140Z | lhdr-v1-01.xdremux | -0.15 | 206586 | 0.0068359375 | 65.30522238604833 |
+2026-10-21T05:07:58.9439450Z | lhdr-v1-01.xdremux | 0.0 | 0 | 0.0 | inf |
+2026-10-21T05:07:58.9439760Z | lhdr-v1-01.xdremux | 0.15 | 210630 | 0.00634765625 | 65.93481372516348 |
+2026-10-21T05:07:58.9440120Z | lhdr-v1-01.xdremux | 0.35 | 239614 | 0.0078125 | 67.76284283052514 |
+2026-10-21T05:07:58.9440470Z | lhdr-v1-01.xdremux | 0.5 | 315889 | 0.0078125 | 65.39440345094107 |
+2026-10-21T05:07:58.9440840Z | lhdr-v1-01.xdremux | 0.75 | 268705 | 0.00634765625 | 64.94039066783935 |
+2026-10-21T05:07:58.9441210Z | lhdr-v1-01.xdremux | 1.0 | 320778 | 0.0068359375 | 60.51021762853341 |
+2026-10-21T05:07:58.9441410Z 
+2026-10-21T05:07:59.0488150Z # Tone asymmetry
+2026-10-21T05:07:59.0488360Z 
+2026-10-21T05:07:59.0488480Z Comparison status: completed.
+2026-10-21T05:07:59.0488640Z 
+2026-10-21T05:07:59.0488810Z Apple |L(-1)-L(0)| / |L(+1)-L(0)| ranges from 0.0921 to 0.2850.
+2026-10-21T05:07:59.0489020Z 
+2026-10-21T05:07:59.0489230Z | photo | group | monotonic | L(-1)-L(0) | L(+1)-L(0) | ratio | inside Apple range |
+2026-10-21T05:07:59.0489570Z |---|---|---|---:|---:|---:|---|
+2026-10-21T05:07:59.0489910Z | IMG_0032 | apple | False | 0.057729021815844495 | 0.20257831554460742 | 0.2850 |  |
+2026-10-21T05:07:59.0490340Z | IMG_0033 | apple | False | 0.04149877334289698 | 0.1854766197901785 | 0.2237 |  |
+2026-10-21T05:07:59.0490970Z | IMG_2600 | apple | True | -0.03209235885581674 | 0.1255848728249826 | 0.2555 |  |
+2026-10-21T05:07:59.0491380Z | IMG_2604 | apple | True | -0.01267440686857546 | 0.13764351841457284 | 0.0921 |  |
+2026-10-21T05:07:59.0491790Z | IMG_2608 | apple | True | -0.02897905198195888 | 0.12075375209710937 | 0.2400 |  |
+2026-10-21T05:07:59.0492290Z | uhdr-portrait-01.xdremux | xdremux | True | -0.018543799571739683 | 0.17465695537734177 | 0.1062 | True |
+2026-10-21T05:07:59.0492840Z | uhdr-hr-01.xdremux | xdremux | True | -0.012467508732202481 | 0.13275180479762536 | 0.0939 | True |
+2026-10-21T05:07:59.0493360Z | lhdr-v1-01.xdremux | xdremux | True | -0.028352684637093284 | 0.11109930831798409 | 0.2552 | True |
+2026-10-21T05:07:59.0493640Z 
+2026-10-21T05:07:59.0493760Z ## Plist fields outside the Apple numeric range
+2026-10-21T05:07:59.0493940Z 
+2026-10-21T05:07:59.0494060Z | field | Apple min | Apple max | XDRemux outside |
+2026-10-21T05:07:59.0494290Z |---|---:|---:|---|
+2026-10-21T05:07:59.0494580Z | 4 | 4 | 5.69231 | uhdr-hr-01.xdremux=5.78462, uhdr-portrait-01.xdremux=7.09231 |
+2026-10-21T05:07:59.0495200Z | 6.LinearGTCImage.blackPoint | 0 | 0 | lhdr-v1-01.xdremux=0.00404188, uhdr-hr-01.xdremux=0.00560276, uhdr-portrait-01.xdremux=0.00269554 |
+2026-10-21T05:07:59.0495950Z | 6.LinearGTCImage.highKey | 0 | 0 | lhdr-v1-01.xdremux=0.995772, uhdr-hr-01.xdremux=0.508672, uhdr-portrait-01.xdremux=0.578972 |
+2026-10-21T05:07:59.0496900Z | 6.LinearGTCImage.p02 | 0 | 0 | lhdr-v1-01.xdremux=0.00500317, uhdr-hr-01.xdremux=0.00601526, uhdr-portrait-01.xdremux=0.00516535 |
+2026-10-21T05:07:59.0497610Z | 6.LinearGTCImage.p10 | 0 | 0 | lhdr-v1-01.xdremux=0.0168845, uhdr-hr-01.xdremux=0.00996406, uhdr-portrait-01.xdremux=0.0416663 |
+2026-10-21T05:07:59.0498450Z | 6.LinearGTCImage.p25 | 0 | 0 | lhdr-v1-01.xdremux=0.0554576, uhdr-hr-01.xdremux=0.0251194, uhdr-portrait-01.xdremux=0.118603 |
+2026-10-21T05:07:59.0499160Z | 6.LinearGTCImage.p50 | 0 | 0 | lhdr-v1-01.xdremux=0.152152, uhdr-hr-01.xdremux=0.0643766, uhdr-portrait-01.xdremux=0.218212 |
+2026-10-21T05:07:59.0499840Z | 6.LinearGTCImage.p75 | 0 | 0 | lhdr-v1-01.xdremux=0.364238, uhdr-hr-01.xdremux=0.178228, uhdr-portrait-01.xdremux=0.33897 |
+2026-10-21T05:07:59.0500520Z | 6.LinearGTCImage.p98 | 0 | 0 | lhdr-v1-01.xdremux=0.995772, uhdr-hr-01.xdremux=0.687113, uhdr-portrait-01.xdremux=0.716678 |
+2026-10-21T05:07:59.0501220Z | 6.LinearGTCImage.whitePoint | 0 | 0 | lhdr-v1-01.xdremux=0.995772, uhdr-hr-01.xdremux=0.844156, uhdr-portrait-01.xdremux=0.840177 |
+2026-10-21T05:07:59.0501950Z | 6.LinearImage.highKey | 0.920015 | 0.950872 | lhdr-v1-01.xdremux=0.0357473, uhdr-hr-01.xdremux=0.0204809, uhdr-portrait-01.xdremux=0.0233547 |
+2026-10-21T05:07:59.0502720Z | 6.LinearImage.p02 | 0.00178607 | 0.00995244 | lhdr-v1-01.xdremux=0.000124506, uhdr-hr-01.xdremux=7.72059e-05, uhdr-portrait-01.xdremux=0.000130679 |
+2026-10-21T05:07:59.0503490Z | 6.LinearImage.p10 | 0.00357215 | 0.0170555 | lhdr-v1-01.xdremux=0.000605964, uhdr-hr-01.xdremux=0.000213805, uhdr-portrait-01.xdremux=0.00133763 |
+2026-10-21T05:07:59.0504250Z | 6.LinearImage.p25 | 0.00535822 | 0.0303209 | lhdr-v1-01.xdremux=0.0019857, uhdr-hr-01.xdremux=0.00060758, uhdr-portrait-01.xdremux=0.00408649 |
+2026-10-21T05:07:59.0505000Z | 6.LinearImage.p50 | 0.00982341 | 0.0577242 | lhdr-v1-01.xdremux=0.00544274, uhdr-hr-01.xdremux=0.00177478, uhdr-portrait-01.xdremux=0.0080552 |
+2026-10-21T05:07:59.0505730Z | 6.LinearImage.p75 | 0.065262 | 0.141993 | lhdr-v1-01.xdremux=0.0130576, uhdr-hr-01.xdremux=0.0057595, uhdr-portrait-01.xdremux=0.0130473 |
+2026-10-21T05:07:59.0506450Z | 6.LinearImage.p98 | 0.115352 | 0.303276 | lhdr-v1-01.xdremux=0.0357473, uhdr-hr-01.xdremux=0.0303576, uhdr-portrait-01.xdremux=0.0300979 |
+2026-10-21T05:07:59.0507200Z | 6.LinearImage.whitePoint | 0.12454 | 0.372221 | lhdr-v1-01.xdremux=0.0370312, uhdr-hr-01.xdremux=0.0457835, uhdr-portrait-01.xdremux=0.0419566 |
+2026-10-21T05:07:59.0507920Z | 6.LinearImagePersonSegmentBased.blackPoint | 0 | 0 | uhdr-hr-01.xdremux=4.97895e-05, uhdr-portrait-01.xdremux=0.00102439 |
+2026-10-21T05:07:59.0508700Z | 6.LinearImagePersonSegmentBased.highKey | 1 | 1 | uhdr-hr-01.xdremux=0.0293451, uhdr-portrait-01.xdremux=0.0176677 |
+2026-10-21T05:07:59.0509340Z | 6.LinearImagePersonSegmentBased.p02 | 0 | 0 | uhdr-hr-01.xdremux=5.30934e-05, uhdr-portrait-01.xdremux=0.00285832 |
+2026-10-21T05:07:59.0509980Z | 6.LinearImagePersonSegmentBased.p10 | 0 | 0 | uhdr-hr-01.xdremux=6.40631e-05, uhdr-portrait-01.xdremux=0.00572444 |
+2026-10-21T05:07:59.0510600Z | 6.LinearImagePersonSegmentBased.p25 | 0 | 0 | uhdr-hr-01.xdremux=7.94645e-05, uhdr-portrait-01.xdremux=0.00776949 |
+2026-10-21T05:07:59.0511230Z | 6.LinearImagePersonSegmentBased.p50 | 0 | 0 | uhdr-hr-01.xdremux=0.000112598, uhdr-portrait-01.xdremux=0.010609 |
+2026-10-21T05:07:59.0511860Z | 6.LinearImagePersonSegmentBased.p75 | 0 | 0 | uhdr-hr-01.xdremux=0.000619809, uhdr-portrait-01.xdremux=0.0148227 |
+2026-10-21T05:07:59.0512480Z | 6.LinearImagePersonSegmentBased.p98 | 0 | 0 | uhdr-hr-01.xdremux=0.0326022, uhdr-portrait-01.xdremux=0.0187094 |
+2026-10-21T05:07:59.0513130Z | 6.LinearImagePersonSegmentBased.whitePoint | 0 | 0 | uhdr-hr-01.xdremux=0.0342308, uhdr-portrait-01.xdremux=0.0205459 |
+2026-10-21T05:07:59.0513660Z | 6.ToneMappedImage.highKey | 0.507486 | 0.633745 | lhdr-v1-01.xdremux=1 |
+2026-10-21T05:07:59.0514080Z | 6.ToneMappedImage.p02 | 0.00384306 | 0.0185643 | lhdr-v1-01.xdremux=0.00348294 |
+2026-10-21T05:07:59.0514600Z | 6.ToneMappedImage.p10 | 0.0118566 | 0.0445542 | uhdr-hr-01.xdremux=0.0101721, uhdr-portrait-01.xdremux=0.0462493 |
+2026-10-21T05:07:59.0515200Z | 6.ToneMappedImage.p25 | 0.0355699 | 0.105844 | uhdr-hr-01.xdremux=0.0256464, uhdr-portrait-01.xdremux=0.121545 |
+2026-10-21T05:07:59.0515700Z | 6.ToneMappedImage.p50 | 0.122518 | 0.254059 | uhdr-hr-01.xdremux=0.0642911 |
+2026-10-21T05:07:59.0516380Z | 6.ToneMappedImage.p75 | 0.450751 | 0.749996 | lhdr-v1-01.xdremux=0.364969, uhdr-hr-01.xdremux=0.176146, uhdr-portrait-01.xdremux=0.336129 |
+2026-10-21T05:07:59.0517100Z | 6.ToneMappedImage.p98 | 0.835392 | 0.91296 | lhdr-v1-01.xdremux=1, uhdr-hr-01.xdremux=0.67, uhdr-portrait-01.xdremux=0.68765 |
+2026-10-21T05:07:59.0517810Z | 6.ToneMappedImage.whitePoint | 0.87252 | 0.964338 | lhdr-v1-01.xdremux=1, uhdr-hr-01.xdremux=0.828892, uhdr-portrait-01.xdremux=0.804212 |
+2026-10-21T05:07:59.0518540Z | 6.ToneMappedImagePersonSegmentBased.blackPoint | 0 | 0 | uhdr-hr-01.xdremux=0.00240369, uhdr-portrait-01.xdremux=0.0357125 |
+2026-10-21T05:07:59.0519230Z | 6.ToneMappedImagePersonSegmentBased.highKey | 1 | 1 | uhdr-hr-01.xdremux=0.511683, uhdr-portrait-01.xdremux=0.440443 |
+2026-10-21T05:07:59.0519890Z | 6.ToneMappedImagePersonSegmentBased.p02 | 0 | 0 | uhdr-hr-01.xdremux=0.00255641, uhdr-portrait-01.xdremux=0.0862698 |
+2026-10-21T05:07:59.0520540Z | 6.ToneMappedImagePersonSegmentBased.p10 | 0 | 0 | uhdr-hr-01.xdremux=0.00306604, uhdr-portrait-01.xdremux=0.159451 |
+2026-10-21T05:07:59.0521190Z | 6.ToneMappedImagePersonSegmentBased.p25 | 0 | 0 | uhdr-hr-01.xdremux=0.00389394, uhdr-portrait-01.xdremux=0.210524 |
+2026-10-21T05:07:59.0521830Z | 6.ToneMappedImagePersonSegmentBased.p50 | 0 | 0 | uhdr-hr-01.xdremux=0.00507503, uhdr-portrait-01.xdremux=0.279815 |
+2026-10-21T05:07:59.0522480Z | 6.ToneMappedImagePersonSegmentBased.p75 | 0 | 0 | uhdr-hr-01.xdremux=0.0242408, uhdr-portrait-01.xdremux=0.375674 |
+2026-10-21T05:07:59.0523110Z | 6.ToneMappedImagePersonSegmentBased.p98 | 0 | 0 | uhdr-hr-01.xdremux=0.535935, uhdr-portrait-01.xdremux=0.46367 |
+2026-10-21T05:07:59.0523780Z | 6.ToneMappedImagePersonSegmentBased.whitePoint | 0 | 0 | uhdr-hr-01.xdremux=0.548061, uhdr-portrait-01.xdremux=0.498348 |
+2026-10-21T05:07:59.0524450Z | 7.PeopleRatio | 0 | 0 | lhdr-v1-01.xdremux=4.15161e-06, uhdr-hr-01.xdremux=0.000326491, uhdr-portrait-01.xdremux=0.267918 |
+2026-10-21T05:07:59.0525000Z | 7.PersonMasksValidHint | -1 | 0 | uhdr-hr-01.xdremux=1, uhdr-portrait-01.xdremux=1 |
+2026-10-21T05:07:59.0525480Z | 7.SkinRatio | 0 | 0 | lhdr-v1-01.xdremux=4.08918e-08, uhdr-portrait-01.xdremux=0.00750875 |
+2026-10-21T05:07:59.0526070Z | gtc.maximum | 0.998657 | 0.999344 | lhdr-v1-01.xdremux=0.999893, uhdr-hr-01.xdremux=0.980041, uhdr-portrait-01.xdremux=0.987594 |
+2026-10-21T05:07:59.0527000Z | gtc.mean | 0.650358 | 0.706758 | lhdr-v1-01.xdremux=0.858281, uhdr-hr-01.xdremux=0.733033, uhdr-portrait-01.xdremux=0.727267 |
+2026-10-21T05:07:59.0527760Z | gtc.minimum | 0 | 0 | lhdr-v1-01.xdremux=0.0355693, uhdr-hr-01.xdremux=0.0498825, uhdr-portrait-01.xdremux=0.0213477 |
+2026-10-21T05:07:59.0528420Z | gtc.node0 | 0 | 0 | lhdr-v1-01.xdremux=0.0355693, uhdr-hr-01.xdremux=0.0498825, uhdr-portrait-01.xdremux=0.0213477 |
+2026-10-21T05:07:59.0528890Z | gtc.node128 | 0.71662 | 0.798441 | lhdr-v1-01.xdremux=0.998138 |
+2026-10-21T05:07:59.0529290Z | gtc.node192 | 0.894543 | 0.931547 | lhdr-v1-01.xdremux=0.999893, uhdr-hr-01.xdremux=0.873684 |
+2026-10-21T05:07:59.0529880Z | gtc.node255 | 0.998657 | 0.999344 | lhdr-v1-01.xdremux=0.999893, uhdr-hr-01.xdremux=0.980041, uhdr-portrait-01.xdremux=0.987594 |
+2026-10-21T05:07:59.0530540Z | gtc.node64 | 0.460524 | 0.541978 | lhdr-v1-01.xdremux=0.77015, uhdr-hr-01.xdremux=0.62363, uhdr-portrait-01.xdremux=0.596805 |
+2026-10-21T05:07:59.0530970Z | j | 1 | 1 | uhdr-hr-01.xdremux=2.5 |
+2026-10-21T05:07:59.0531420Z | light_c.maximum | 0.672363 | 0.71875 | lhdr-v1-01.xdremux=1, uhdr-hr-01.xdremux=0.753906, uhdr-portrait-01.xdremux=0.830078 |
+2026-10-21T05:07:59.0532010Z | light_c.mean | 0.258403 | 0.31838 | uhdr-hr-01.xdremux=0.142664, uhdr-portrait-01.xdremux=0.242521 |
+2026-10-21T05:07:59.0532640Z | light_c.minimum | 0.0433044 | 0.0539551 | lhdr-v1-01.xdremux=0.004879, uhdr-hr-01.xdremux=0.00542068, uhdr-portrait-01.xdremux=0.00283432 |
+2026-10-21T05:07:59.0533350Z | light_d.maximum | 0.571777 | 0.758301 | lhdr-v1-01.xdremux=0.437012, uhdr-hr-01.xdremux=0.777832, uhdr-portrait-01.xdremux=0.921387 |
+2026-10-21T05:07:59.0534160Z | light_d.mean | 0.199097 | 0.263067 | lhdr-v1-01.xdremux=0.128254, uhdr-hr-01.xdremux=0.103218, uhdr-portrait-01.xdremux=0.197473 |
+2026-10-21T05:07:59.0534870Z | light_d.minimum | 0.040741 | 0.0461731 | lhdr-v1-01.xdremux=0.00213242, uhdr-hr-01.xdremux=0.00216484, uhdr-portrait-01.xdremux=0.00095129 |
+2026-10-21T05:07:59.0535260Z 
+2026-10-21T05:07:59.0535350Z ## Tone-related plist values
+2026-10-21T05:07:59.0535470Z 
+2026-10-21T05:07:59.0535790Z | field | IMG_0032 | IMG_0033 | IMG_2600 | IMG_2604 | IMG_2608 | lhdr-v1-01.xdremux | uhdr-hr-01.xdremux | uhdr-portrait-01.xdremux |
+2026-10-21T05:07:59.0536240Z |---|---:|---:|---:|---:|---:|---:|---:|---:|
+2026-10-21T05:07:59.0536470Z | 0 | 15 | 15 | 16 | 16 | 16 | 15 | 15 | 15 |
+2026-10-21T05:07:59.0536760Z | 4 | 4.01538 | 4.01538 | 4.89231 | 5.69231 | 4 | 4 | 5.78462 | 7.09231 |
+2026-10-21T05:07:59.0537030Z | 5 | 0 | 0 | 2 | 2 | 2 | 2 | 2 | 0 |
+2026-10-21T05:07:59.0537330Z | h | 0.542969 | 0.540955 | 2.59024 | 2.55383 | 2.08905 | 1.74838 | 2.21633 | 2.2938 |
+2026-10-21T05:07:59.0537620Z | j | 1 | 1 | 1 | 1 | 1 | 1 | 2.5 | 1 |
+2026-10-21T05:07:59.0537910Z | k | False | False | False | False | False | False | False | False |
+2026-10-21T05:07:59.0538270Z | 7.PeopleRatio | 0 | 0 | 0 | 0 | 0 | 4.15161e-06 | 0.000326491 | 0.267918 |
+2026-10-21T05:07:59.0538620Z | 7.PersonMasksValidHint | -1 | -1 | 0 | 0 | 0 | -1 | 1 | 1 |
+2026-10-21T05:07:59.0538940Z | 7.SkinRatio | 0 | 0 | 0 | 0 | 0 | 4.08918e-08 | 0 | 0.00750875 |
+2026-10-21T05:07:59.0545490Z | i.Gain | 2.17188 | 2.16382 | 10.361 | 10.2153 | 8.35619 | 6.99353 | 8.86533 | 9.17521 |
+2026-10-21T05:07:59.0546050Z | i.OriginalRangeMin | 0.00888062 | 0.00682449 | -0.0203247 | -0.00189209 | -0.00197029 | 0 | 3.6403e-06 | 0 |
+2026-10-21T05:07:59.0546600Z | i.OriginalRangeMax | 0.887695 | 0.653809 | 0.343262 | 0.0508423 | 0.108948 | 0.0526551 | 0.0852905 | 0.0560983 |
+2026-10-21T05:07:59.0547020Z | gtc.node0 | 0 | 0 | 0 | 0 | 0 | 0.0355693 | 0.0498825 | 0.0213477 |
+2026-10-21T05:07:59.0547420Z | gtc.node64 | 0.541978 | 0.539262 | 0.463927 | 0.460524 | 0.466231 | 0.77015 | 0.62363 | 0.596805 |
+2026-10-21T05:07:59.0547900Z | gtc.node128 | 0.798441 | 0.797678 | 0.718055 | 0.71662 | 0.719016 | 0.998138 | 0.798151 | 0.791528 |
+2026-10-21T05:07:59.0548370Z | gtc.node192 | 0.931547 | 0.931318 | 0.89491 | 0.894543 | 0.895154 | 0.999893 | 0.873684 | 0.916959 |
+2026-10-21T05:07:59.0549180Z | gtc.node255 | 0.999344 | 0.999344 | 0.998657 | 0.998657 | 0.998657 | 0.999893 | 0.980041 | 0.987594 |
+2026-10-21T05:07:59.0549640Z | gtc.mean | 0.706758 | 0.704879 | 0.652658 | 0.650358 | 0.654252 | 0.858281 | 0.733033 | 0.727267 |
+2026-10-21T05:07:59.0550070Z | gtc.monotonic_nodes | True | True | True | True | True | True | True | True |
+2026-10-21T05:07:59.0550520Z | light_c.mean | 0.260814 | 0.260946 | 0.258403 | 0.31838 | 0.262473 | 0.28894 | 0.142664 | 0.242521 |
+2026-10-21T05:07:59.0551000Z | light_d.mean | 0.262124 | 0.263067 | 0.221838 | 0.215099 | 0.199097 | 0.128254 | 0.103218 | 0.197473 |
+2026-10-21T05:07:59.0551260Z 
+2026-10-21T05:07:59.1277940Z ##[group]Run actions/upload-artifact@v7
+2026-10-21T05:07:59.1278150Z with:
+2026-10-21T05:07:59.1278290Z   name: style-tone-response
+2026-10-21T05:07:59.1278460Z   if-no-files-found: warn
+2026-10-21T05:07:59.1278620Z   retention-days: 1
+2026-10-21T05:07:59.1280000Z   path: artifacts/tone-response/host.txt
+artifacts/tone-response/apple-report/tone-response.json
+artifacts/tone-response/apple-report/tone-response.md
+artifacts/tone-response/report/tone-response.json
+artifacts/tone-response/report/tone-response.md
+artifacts/tone-response/asymmetry/asymmetry.json
+artifacts/tone-response/apple/consumer-run.json
+artifacts/tone-response/apple/diagnostics/*.log
+artifacts/tone-response/xdremux/consumer-run.json
+artifacts/tone-response/xdremux/diagnostics/*.log
+
+2026-10-21T05:07:59.1281410Z   compression-level: 6
+2026-10-21T05:07:59.1281560Z   overwrite: false
+2026-10-21T05:07:59.1281710Z   include-hidden-files: false
+2026-10-21T05:07:59.1281880Z   archive: true
+2026-10-21T05:07:59.1282020Z env:
+2026-10-21T05:07:59.1282200Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T05:07:59.1282440Z   CARGO_INCREMENTAL: 0
+2026-10-21T05:07:59.1282590Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T05:07:59.1282760Z   CARGO_TERM_COLOR: always
+2026-10-21T05:07:59.1282920Z   RUST_BACKTRACE: short
+2026-10-21T05:07:59.1283080Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T05:07:59.1283250Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T05:07:59.1283460Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T05:07:59.1283660Z   CACHE_ON_FAILURE: true
+2026-10-21T05:07:59.1283810Z ##[endgroup]
+2026-10-21T05:07:59.5839050Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-10-21T05:07:59.5845210Z The least common ancestor is /Users/runner/work/XDRemux/XDRemux/artifacts/tone-response. This will be the root directory of the artifact
+2026-10-21T05:07:59.5845900Z With the provided path, there will be 110 files uploaded
+2026-10-21T05:07:59.5846610Z Artifact name is valid!
+2026-10-21T05:07:59.5846890Z Root directory input is valid!
+2026-10-21T05:07:59.7748980Z Uploading artifact: style-tone-response.zip
+2026-10-21T05:07:59.7806400Z Beginning upload of artifact content to blob storage
+2026-10-21T05:07:59.9139000Z Uploaded bytes 63804
+2026-10-21T05:07:59.9280500Z Finished uploading artifact content to blob storage!
+2026-10-21T05:07:59.9281450Z SHA256 digest of uploaded artifact is 029e210e0cd87eb1642b2b79604158db547f84f9c66c035678123b3334d0fc55
+2026-10-21T05:07:59.9282040Z Finalizing artifact upload
+2026-10-21T05:08:00.1540250Z Artifact style-tone-response successfully finalized. Artifact ID 12321873048
+2026-10-21T05:08:00.1541470Z Artifact style-tone-response has been successfully uploaded! Final size is 63804 bytes. Artifact ID is 12321873048
+2026-10-21T05:08:00.1552200Z Artifact download URL: https://github.com/21Z121Z1/XDRemux/actions/runs/39544499135/artifacts/12321873048
+2026-10-21T05:08:00.1869270Z Post job cleanup.
+2026-10-21T05:08:00.1872660Z ##[start-action display=Setup Rust Caching;id=__c1d3deed-bcc4-417e-924a-69421ee962a0.__Swatinem_rust-cache]
+2026-10-21T05:08:00.1929300Z Post job cleanup.
+2026-10-21T05:08:00.3018040Z Cache up-to-date.
+2026-10-21T05:08:00.3044890Z ##[end-action id=__c1d3deed-bcc4-417e-924a-69421ee962a0.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=117]
+2026-10-21T05:08:00.3116690Z Post job cleanup.
+2026-10-21T05:08:00.3961160Z [command]/opt/homebrew/bin/git version
+2026-10-21T05:08:00.4163770Z git version 2.56.0
+2026-10-21T05:08:00.4180010Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/d5a48384-1f3d-477a-a341-07de4d7c5f31/.gitconfig'
+2026-10-21T05:08:00.4186830Z Temporarily overriding HOME='/Users/runner/work/_temp/d5a48384-1f3d-477a-a341-07de4d7c5f31' before making global git config changes
+2026-10-21T05:08:00.4187630Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T05:08:00.4190480Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T05:08:00.4287360Z Removing SSH command configuration
+2026-10-21T05:08:00.4292620Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T05:08:00.4363640Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T05:08:00.5608790Z Removing HTTP extra header
+2026-10-21T05:08:00.5613900Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T05:08:00.5953480Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T05:08:00.7519550Z Removing includeIf entries pointing to credentials config files
+2026-10-21T05:08:00.7520130Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T05:08:00.7591560Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T05:08:00.8707010Z Post job cleanup.
+2026-10-21T05:08:00.9684700Z [command]/opt/homebrew/bin/git version
+2026-10-21T05:08:00.9740840Z git version 2.56.0
+2026-10-21T05:08:00.9756000Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/94d856db-e40c-4694-9e1a-f8b824541ebb/.gitconfig'
+2026-10-21T05:08:00.9762230Z Temporarily overriding HOME='/Users/runner/work/_temp/94d856db-e40c-4694-9e1a-f8b824541ebb' before making global git config changes
+2026-10-21T05:08:00.9763120Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T05:08:00.9765970Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-21T05:08:00.9834960Z Removing SSH command configuration
+2026-10-21T05:08:00.9839630Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T05:08:00.9893990Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T05:08:01.0574260Z Removing HTTP extra header
+2026-10-21T05:08:01.0577900Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T05:08:01.0633150Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T05:08:01.1272550Z Removing includeIf entries pointing to credentials config files
+2026-10-21T05:08:01.1276490Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T05:08:01.1328290Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T05:08:01.2051070Z Cleaning up orphan processes
