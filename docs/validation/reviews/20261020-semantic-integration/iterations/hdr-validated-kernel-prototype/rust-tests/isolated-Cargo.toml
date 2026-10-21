@@ -1,0 +1,16 @@
+[package]
+name = "xdremux-hdr"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lib]
+path = "/workspace/XDRemux-hdr-validated-prototype/crates/xdremux-hdr/src/lib.rs"
+
+[[test]]
+name = "scene_linear_equivalence"
+path = "/workspace/XDRemux-hdr-validated-prototype/crates/xdremux-hdr/tests/scene_linear_equivalence.rs"

@@ -1,0 +1,4 @@
+crates/xdremux-hdr/src/scene_linear.rs
+crates/xdremux-hdr/tests/oracles/provenance.json
+crates/xdremux-hdr/tests/oracles/scene_linear_e1072a9.rs
+crates/xdremux-hdr/tests/scene_linear_equivalence.rs

@@ -1,0 +1,12 @@
+--- candidate/scene_linear.rs
++++ owned-negative-control/scene_linear.rs
+@@ -138,8 +138,8 @@
+     weight: f64,
+ ) -> Result<f64> {
+     // The public scalar entry keeps its sample -> channel -> weight error order.
++    validate_channel(channel)?;
+     validate_gain_sample(sdr_linear, gain_code)?;
+-    validate_channel(channel)?;
+     if !weight.is_finite() || !(0.0..=1.0).contains(&weight) {
+         return Err(HdrError::invalid(
+             "gain map application",

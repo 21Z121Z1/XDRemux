@@ -1,0 +1,24 @@
+   Compiling xdremux-hdr-negative-control-public-order v0.1.0 (/workspace/xdremux-audit/hdr-kernel-tests/negative-control-final-public-order)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.28s
+     Running /workspace/XDRemux-hdr-validated-prototype/crates/xdremux-hdr/tests/scene_linear_equivalence.rs (/workspace/xdremux-audit/hdr-kernel-tests/negative-control-final-public-order/target/debug/deps/scene_linear_equivalence-69a4a89222ba9d2e)
+
+running 1 test
+test public_scalar_preserves_validation_order_and_exact_errors ... FAILED
+
+failures:
+
+---- public_scalar_preserves_validation_order_and_exact_errors stdout ----
+
+thread 'public_scalar_preserves_validation_order_and_exact_errors' (5910) panicked at /workspace/XDRemux-hdr-validated-prototype/crates/xdremux-hdr/tests/scene_linear_equivalence.rs:39:29:
+assertion `left == right` failed: scalar error mismatch
+  left: HdrError { context: "gain map application", detail: "channel minimum, maximum, positive gamma, and offsets must be finite" }
+ right: HdrError { context: "gain map application", detail: "SDR sample and gain code must be finite" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    public_scalar_preserves_validation_order_and_exact_errors
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test scene_linear_equivalence`

@@ -1,0 +1,10 @@
+{
+  "action": "Read official Rust stable release manifest for a workspace-local toolchain",
+  "url": "https://static.rust-lang.org/dist/channel-rust-stable.toml",
+  "started_at": "2026-10-21T17:54:08.735634+00:00",
+  "timeout_seconds": 30,
+  "status": "downloaded",
+  "http_status": 200,
+  "bytes": 943486,
+  "duration_seconds": 2.1783346960000927
+}

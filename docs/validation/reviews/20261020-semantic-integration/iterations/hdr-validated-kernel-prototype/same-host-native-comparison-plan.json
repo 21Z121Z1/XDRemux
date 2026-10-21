@@ -1,0 +1,43 @@
+{
+  "status": "proposed-not-implemented-or-dispatched",
+  "operation_enabled": false,
+  "control": {
+    "product_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "role": "Unchanged e107 as direct baseline, not main89"
+  },
+  "candidate": {
+    "product_sha": "baa763e4cea14ee79953912b50c90d877ab9d352",
+    "ref": "review/hdr-validated-kernel-20261021-v1"
+  },
+  "harness": {
+    "future_fixed_sha": null,
+    "future_control_ref": null,
+    "parent_review_required": true,
+    "existing_entrypoint": "33bbe860ad6b1777839753a738ec17d3f9229b61",
+    "existing_harness": "1a1698e47e008b688cf5c3fc492dfc307b04ae1a",
+    "compatible_as_is": false,
+    "reason": "Existing entry/harness hard-pin e107 versus main89. Do not dispatch them as a prototype comparison or dispatch the prototype tag legacy job. A new guarded control/harness must be implemented, fixed and reviewed first; no new workflow code is added this round."
+  },
+  "environment": "One existing free standard public xcode-27 arm64 allocation; verify actual macOS27/Xcode27/SDK27 and resource class. contents: read, independent non-cancelling concurrency, no PVT.",
+  "budgets": "Retain reviewed 15min preparation, 90min diagnostic and 110/120min step/job bounds. On timeout/failure keep partial receipts and stop for diagnosis, no blind rerun or budget relaxation.",
+  "preparation": [
+    "Separate pinned clean/object-independent checkouts; verify complete working bytes before loading reviewed code.",
+    "Fresh isolated release Cargo targets per CLI and fresh shared adapter scratch; do not reuse old binaries. Adapter source is unchanged: build once from e107 and use its exact single hash for both arms.",
+    "Record actual CLI/adapter hashes, commands/environment/toolchain, feature graphs with only checkout paths normalized, CPU/load/memory and source checks. Refuse graph/architecture drift.",
+    "Run the frozen-oracle HDR tests on arm64 in debug/release before measuring; Linux evidence does not prove Mac float behavior."
+  ],
+  "fixture": {
+    "path": "fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+    "sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+    "policy": "Use the existing versioned benchmark in runner-local paths; do not upload source/output media or portraits. Check original hash before/after."
+  },
+  "measurements": [
+    "One warmup per arm plus five measured conversions per arm in the accepted ABBA order (12 total). XDREMUX_STYLES_PROFILE unset for primary E2E/CPU/RSS samples; no system-gain-map override.",
+    "Use the same fixed adapter, input bytes, working/path policy and CLI options. Independently validate every output outside timing and verify its recorded hash did not change.",
+    "After primary timing, at most one separate XDREMUX_STYLES_PROFILE=1 conversion per arm with the same validation. These two locator profiles are not timing medians or a formal budget.",
+    "Report all per-sample rows, variance and E2E/user/sys/RSS medians. Compare source-equivalent runtime stages, never add nested spans or sum stage medians as E2E attribution."
+  ],
+  "decision": "No speed claim from source shape or Linux tests. If new same-host measurements do not demonstrate gain, discard as a performance fix; no approximation, lower precision, weaker validation, reduced local key1 semantics or larger unrelated rewrite.",
+  "formal_gates": "e107 stays18green/2red with all past budget/ABBA failures preserved. A diagnostic never replaces final exact-head/native/App/Tone/SystemHEIF/absolute-performance acceptance.",
+  "artifacts": "Owned explicit UTF-8 text whitelist only; receipts, hashes, logs, feature graph. No clones, binaries, image/video/raw pixels, full environment or secrets. Preserve failed/partial attempts."
+}

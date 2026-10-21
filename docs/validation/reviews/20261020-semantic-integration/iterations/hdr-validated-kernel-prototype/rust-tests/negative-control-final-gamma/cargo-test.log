@@ -1,0 +1,22 @@
+   Compiling xdremux-hdr-negative-control-gamma v0.1.0 (/workspace/xdremux-audit/hdr-kernel-tests/negative-control-final-gamma)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running /workspace/XDRemux-hdr-validated-prototype/crates/xdremux-hdr/tests/scene_linear_equivalence.rs (/workspace/xdremux-audit/hdr-kernel-tests/negative-control-final-gamma/target/debug/deps/scene_linear_equivalence-b102e711b05b2bec)
+
+running 1 test
+test scalar_boundary_values_match_e107_bits_or_errors ... FAILED
+
+failures:
+
+---- scalar_boundary_values_match_e107_bits_or_errors stdout ----
+
+thread 'scalar_boundary_values_match_e107_bits_or_errors' (5843) panicked at /workspace/XDRemux-hdr-validated-prototype/crates/xdremux-hdr/tests/scene_linear_equivalence.rs:40:14:
+scalar result mismatch: actual=Err(HdrError { context: "gain map application", detail: "reconstructed HDR sample is non-finite" }), expected=Ok(-1.6484918731100238e308)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    scalar_boundary_values_match_e107_bits_or_errors
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test scene_linear_equivalence`

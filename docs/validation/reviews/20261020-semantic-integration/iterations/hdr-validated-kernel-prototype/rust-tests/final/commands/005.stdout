@@ -1,0 +1,9 @@
+cargo 1.99.1 (5f94df478 2026-08-27)
+release: 1.99.1
+commit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e
+commit-date: 2026-08-27
+host: x86_64-unknown-linux-gnu
+libgit2: 1.9.6 (sys:0.21.0 vendored)
+libcurl: 8.21.0-DEV (sys:0.4.90+curl-8.21.0 vendored ssl:OpenSSL/3.6.3)
+ssl: OpenSSL 3.6.3 9 Jun 2026
+os: Debian 13.0.0 (trixie) [64-bit]

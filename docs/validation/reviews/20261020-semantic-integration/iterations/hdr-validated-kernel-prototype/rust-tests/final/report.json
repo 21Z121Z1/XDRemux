@@ -1,0 +1,289 @@
+{
+  "expected_head": "baa763e4cea14ee79953912b50c90d877ab9d352",
+  "expected_tree": "c0f0b24f3cd77336049da50a499a0867f46153fa",
+  "scope": "Real HDR crate source through equivalent dependency-free manifest; debug and release Rust tests, not workspace/native/performance acceptance",
+  "status": "passed",
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/000.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/000.stderr",
+      "owned_process_group": 5601,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015383019999717362
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/001.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/001.stderr",
+      "owned_process_group": 5602,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014307500005088514
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/002.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/002.stderr",
+      "owned_process_group": 5603,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.003422026000407641
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "diff-tree",
+        "--no-commit-id",
+        "--name-only",
+        "-r",
+        "HEAD"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/003.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/003.stderr",
+      "owned_process_group": 5604,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0034394419999443926
+    },
+    {
+      "argv": [
+        "/workspace/xdremux-audit/hdr-kernel-toolchain/install/bin/rustc",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/004.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/004.stderr",
+      "owned_process_group": 5605,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.007748265999907744
+    },
+    {
+      "argv": [
+        "/workspace/xdremux-audit/hdr-kernel-toolchain/install/bin/cargo",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/005.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/005.stderr",
+      "owned_process_group": 5607,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0075413940012367675
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "/workspace/xdremux-audit/hdr-kernel-tests/isolated/Cargo.toml"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/debug.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 5610,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.3671152160004567
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "/workspace/xdremux-audit/hdr-kernel-tests/isolated/Cargo.toml",
+        "--release"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/release.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 5683,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.6731072389993642
+    },
+    {
+      "argv": [
+        "/workspace/xdremux-audit/hdr-kernel-toolchain/install/bin/rustfmt",
+        "--check",
+        "--edition",
+        "2021",
+        "crates/xdremux-hdr/src/scene_linear.rs",
+        "crates/xdremux-hdr/tests/scene_linear_equivalence.rs"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/008.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/008.stderr",
+      "owned_process_group": 5764,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.015821093000340625
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/009.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/009.stderr",
+      "owned_process_group": 5765,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.007806904999597464
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/010.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/010.stderr",
+      "owned_process_group": 5766,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0035878460003004875
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "e1072a90e31b12861dfe8b9cf25e07ce75c17c44:crates/xdremux-hdr/src/scene_linear.rs"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/011.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-tests/final/commands/011.stderr",
+      "owned_process_group": 5767,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001495567001256859
+    }
+  ],
+  "changed_files": [
+    {
+      "path": "crates/xdremux-hdr/src/scene_linear.rs",
+      "sha256": "9d6f4f0883a7b5d67c9897bdac05286204910f74e8c658988762c057becf04fe"
+    },
+    {
+      "path": "crates/xdremux-hdr/tests/oracles/provenance.json",
+      "sha256": "b582fc540b1a1f46b3a85b90d2c6fbe0cd1867995644c6a450853680759397f3"
+    },
+    {
+      "path": "crates/xdremux-hdr/tests/oracles/scene_linear_e1072a9.rs",
+      "sha256": "a795cd6d0f9f85ce9d8bff9f3911926d455fa4b316cc361d28f16edfb1843053"
+    },
+    {
+      "path": "crates/xdremux-hdr/tests/scene_linear_equivalence.rs",
+      "sha256": "f4d3ab473c67068061638f00f16f0de447c3f14124214d176bd23f6fa24bedec"
+    }
+  ],
+  "environment": {
+    "PATH": "/workspace/xdremux-audit/hdr-kernel-toolchain/install/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+    "CARGO_HOME": "/workspace/xdremux-audit/hdr-kernel-tests/cargo-home",
+    "CARGO_TARGET_DIR": "/workspace/xdremux-audit/hdr-kernel-tests/isolated-target",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTC": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null
+  },
+  "profiles": {
+    "debug": {
+      "exit_code": 0,
+      "unit_tests": 17,
+      "differential_integration_tests": 6,
+      "doc_tests": 0,
+      "log_sha256": "fecdf087edfac9ecf810f6cf34e4932a9a695f6a9634e91bb43f6af593e27cf0"
+    },
+    "release": {
+      "exit_code": 0,
+      "unit_tests": 17,
+      "differential_integration_tests": 6,
+      "doc_tests": 0,
+      "log_sha256": "fa37184949c2a9607144d3dd9c87b9b89b3d497a7026414cab6a2ed9a807781c"
+    }
+  },
+  "frozen_oracle_exact": true,
+  "scalar_matrix_cases": 1600,
+  "image_matrix_cases": 720,
+  "native_runs": 0,
+  "performance_claim": false
+}

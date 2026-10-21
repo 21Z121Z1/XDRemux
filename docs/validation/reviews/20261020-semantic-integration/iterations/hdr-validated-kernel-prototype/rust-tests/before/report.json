@@ -1,0 +1,28 @@
+{
+  "phase": "before",
+  "production_source_sha256": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2",
+  "status": "workspace-command-failed",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "xdremux-hdr"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/before/cargo-test.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 5186,
+      "exit_code": 101,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.03254018100051326
+    }
+  ],
+  "exit_code": 101
+}

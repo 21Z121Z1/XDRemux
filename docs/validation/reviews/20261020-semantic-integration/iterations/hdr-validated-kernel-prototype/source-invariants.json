@@ -1,0 +1,13 @@
+{
+  "candidate": "baa763e4cea14ee79953912b50c90d877ab9d352",
+  "baseline": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "source_path": "crates/xdremux-hdr/src/scene_linear.rs",
+  "original_source_sha256": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2",
+  "candidate_source_sha256": "9d6f4f0883a7b5d67c9897bdac05286204910f74e8c658988762c057becf04fe",
+  "gain_math_and_f64_result_guard_byte_identical": true,
+  "gain_math_block_sha256": "cfe8e777af4593c8a2501e57365bf375fa61433f1cb3e8f0fbe98dbd061bb0ea",
+  "whole_image_body_restores_exact_e107_after_removing_two_comments_and_renaming_only_callee": true,
+  "whole_image_validation_iteration_sampling_f32_checks_unchanged": true,
+  "public_order_checked_by_frozen_oracle_and_mutation": "sample -> channel -> weight",
+  "runtime_or_hardware_speed_evidence": false
+}

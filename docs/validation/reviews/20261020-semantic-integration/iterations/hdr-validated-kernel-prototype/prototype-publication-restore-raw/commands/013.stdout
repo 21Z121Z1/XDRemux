@@ -1,0 +1,101 @@
+name: Rust CLI portability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-classification/**"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-source/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-metadata/**"
+      - "crates/xdremux-format/**"
+      - "crates/xdremux-container/**"
+      - "crates/xdremux-motion-photo/**"
+      - ".github/workflows/rust-cli-core.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/xdremux-classification/**"
+      - "crates/xdremux-cli/**"
+      - "crates/xdremux-runtime/**"
+      - "crates/xdremux-source/**"
+      - "crates/xdremux-engine/**"
+      - "crates/xdremux-codec/**"
+      - "crates/xdremux-heif/**"
+      - "crates/xdremux-hdr/**"
+      - "crates/xdremux-metadata/**"
+      - "crates/xdremux-format/**"
+      - "crates/xdremux-container/**"
+      - "crates/xdremux-motion-photo/**"
+      - ".github/workflows/rust-cli-core.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-cli:
+    name: portable-cli (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact checked-out head
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Install libheif + HEVC on Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libheif-dev libheif-plugin-x265 libheif-plugin-libde265
+
+      - name: Install libheif + HEVC on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - name: Install libheif + HEVC on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $triplet = "x64-windows-static-md"
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "libheif[hevc]:$triplet"
+          "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "VCPKG_DEFAULT_TRIPLET=$triplet" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "$env:VCPKG_INSTALLATION_ROOT\installed\$triplet\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+
+      - name: Build canonical Rust CLI
+        run: cargo build --locked -p xdremux-cli
+
+      - name: Test portable Rust CLI semantics
+        run: cargo test --locked -p xdremux-classification -p xdremux-engine -p xdremux-source -p xdremux-runtime -p xdremux-cli

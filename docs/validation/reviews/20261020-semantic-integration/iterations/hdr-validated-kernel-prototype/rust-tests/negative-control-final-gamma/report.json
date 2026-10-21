@@ -1,0 +1,34 @@
+{
+  "status": "intentional-mutation-rejected",
+  "purpose": "Intentional wrong kernel or public validation order must be rejected by independent frozen e107 tests",
+  "live_source_modified": false,
+  "original_source_sha256": "9d6f4f0883a7b5d67c9897bdac05286204910f74e8c658988762c057becf04fe",
+  "mutant_source_sha256": "20c684125c439d9225aed73fe226aa074fd8d446867c5533e610aa1eccd286bd",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "/workspace/xdremux-audit/hdr-kernel-tests/negative-control-final-gamma/Cargo.toml",
+        "--test",
+        "scene_linear_equivalence",
+        "scalar_boundary_values_match_e107_bits_or_errors",
+        "--",
+        "--exact"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/negative-control-final-gamma/cargo-test.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 5777,
+      "exit_code": 101,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.31586914299987257
+    }
+  ],
+  "exit_code": 101
+}

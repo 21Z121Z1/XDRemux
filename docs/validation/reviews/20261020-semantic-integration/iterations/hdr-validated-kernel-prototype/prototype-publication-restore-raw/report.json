@@ -1,0 +1,857 @@
+{
+  "expected_commit": "baa763e4cea14ee79953912b50c90d877ab9d352",
+  "expected_tree": "c0f0b24f3cd77336049da50a499a0867f46153fa",
+  "ref": "refs/tags/review/hdr-validated-kernel-20261021-v1",
+  "product_parent": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "native_experiments": 0,
+  "operation_enabled": false,
+  "status": "published-and-restored",
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "remote",
+        "get-url",
+        "--push",
+        "origin"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/000.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/000.stderr",
+      "owned_process_group": 5928,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0016358939992642263
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/001.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/001.stderr",
+      "owned_process_group": 5929,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0013766939991910476
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/002.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/002.stderr",
+      "owned_process_group": 5930,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014781460013182368
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "rev-parse",
+        "HEAD^"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/003.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/003.stderr",
+      "owned_process_group": 5931,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001326208001046325
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-hdr-validated-prototype",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/004.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/004.stderr",
+      "owned_process_group": 5932,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0034980790005647577
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "diff",
+        "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+        "baa763e4cea14ee79953912b50c90d877ab9d352",
+        "--",
+        ".github/workflows"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/005.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/005.stderr",
+      "owned_process_group": 5933,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0013696330006496282
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "diff",
+        "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+        "baa763e4cea14ee79953912b50c90d877ab9d352",
+        "--name-only"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/006.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/006.stderr",
+      "owned_process_group": 5934,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015624240004399326
+    },
+    {
+      "argv": [
+        "git",
+        "ls-remote",
+        "origin",
+        "refs/heads/*",
+        "refs/tags/review/hdr-validated-kernel-20261021-v1"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/007.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/007.stderr",
+      "owned_process_group": 5935,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 2.1178756819990667
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "ls-tree",
+        "-r",
+        "--name-only",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        ".github/workflows"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/008.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/008.stderr",
+      "owned_process_group": 5939,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0036519719997158973
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791:.github/workflows/ci.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/009.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/009.stderr",
+      "owned_process_group": 5940,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.003507102999719791
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791:.github/workflows/completion-gate.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/010.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/010.stderr",
+      "owned_process_group": 5941,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015844460012885975
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791:.github/workflows/performance.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/011.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/011.stderr",
+      "owned_process_group": 5942,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014999089999037096
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791:.github/workflows/research.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/012.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/012.stderr",
+      "owned_process_group": 5943,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014835040001344169
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791:.github/workflows/rust-cli-core.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/013.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/013.stderr",
+      "owned_process_group": 5944,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014117959999566665
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791:.github/workflows/rust-proxdr-real-fixtures.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/014.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/014.stderr",
+      "owned_process_group": 5945,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014075199997023446
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "ls-tree",
+        "-r",
+        "--name-only",
+        "baa763e4cea14ee79953912b50c90d877ab9d352",
+        ".github/workflows"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/015.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/015.stderr",
+      "owned_process_group": 5946,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014953820009395713
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "baa763e4cea14ee79953912b50c90d877ab9d352:.github/workflows/ci.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/016.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/016.stderr",
+      "owned_process_group": 5947,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001469924000048195
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "baa763e4cea14ee79953912b50c90d877ab9d352:.github/workflows/completion-gate.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/017.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/017.stderr",
+      "owned_process_group": 5948,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001467901000069105
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "baa763e4cea14ee79953912b50c90d877ab9d352:.github/workflows/performance.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/018.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/018.stderr",
+      "owned_process_group": 5949,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014721169991389615
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "baa763e4cea14ee79953912b50c90d877ab9d352:.github/workflows/research.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/019.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/019.stderr",
+      "owned_process_group": 5950,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015133790002437308
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "baa763e4cea14ee79953912b50c90d877ab9d352:.github/workflows/rust-cli-core.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/020.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/020.stderr",
+      "owned_process_group": 5951,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015322780000133207
+    },
+    {
+      "argv": [
+        "git",
+        "show",
+        "baa763e4cea14ee79953912b50c90d877ab9d352:.github/workflows/rust-proxdr-real-fixtures.yml"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/021.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/021.stderr",
+      "owned_process_group": 5952,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015290730007109232
+    },
+    {
+      "argv": [
+        "git",
+        "push",
+        "origin",
+        "baa763e4cea14ee79953912b50c90d877ab9d352:refs/tags/review/hdr-validated-kernel-20261021-v1"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 60,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/022.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/022.stderr",
+      "owned_process_group": 5953,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 3.671230268999352
+    },
+    {
+      "argv": [
+        "git",
+        "ls-remote",
+        "https://github.com/21Z121Z1/XDRemux.git",
+        "refs/tags/review/hdr-validated-kernel-20261021-v1"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/023.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/023.stderr",
+      "owned_process_group": 5961,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 1.0165540439993492
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/workspace/xdremux-audit/restore-test.git",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/024.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/024.stderr",
+      "owned_process_group": 5965,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0019142629989801208
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "fetch",
+        "https://github.com/21Z121Z1/XDRemux.git",
+        "refs/tags/review/hdr-validated-kernel-20261021-v1:refs/tags/review/hdr-validated-kernel-20261021-v1"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 60,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/025.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/025.stderr",
+      "owned_process_group": 5966,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 1.768216393998955
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "refs/tags/review/hdr-validated-kernel-20261021-v1^{commit}"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/026.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/026.stderr",
+      "owned_process_group": 5975,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001885710000351537
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "refs/tags/review/hdr-validated-kernel-20261021-v1^{tree}"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/027.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/027.stderr",
+      "owned_process_group": 5976,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001626351000595605
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "--is-shallow-repository"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/028.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/028.stderr",
+      "owned_process_group": 5977,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015475019990844885
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "fsck",
+        "--full",
+        "--strict",
+        "--no-dangling"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/029.stdout",
+      "stderr_path": "/workspace/xdremux-audit/hdr-kernel-publication-raw/commands/029.stderr",
+      "owned_process_group": 5978,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 1.5183063419990503
+    }
+  ],
+  "changed_paths": [
+    "crates/xdremux-hdr/src/scene_linear.rs",
+    "crates/xdremux-hdr/tests/oracles/provenance.json",
+    "crates/xdremux-hdr/tests/oracles/scene_linear_e1072a9.rs",
+    "crates/xdremux-hdr/tests/scene_linear_equivalence.rs"
+  ],
+  "heads_before": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "trigger_inventory": [
+    {
+      "role": "default-main",
+      "commit": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "eligible_tag_push_workflows": [],
+      "workflows": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "sha256": "3418ece2f6cb4a1a7f19bb848dcde6917c67ef8ef35295ac093ec73604c1ce2b",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths-ignore": [
+              "**/*.md"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/completion-gate.yml",
+          "sha256": "950cc1a06b6117c57a0582da4c2b891bd40588a5219264ba78a2657f5b12c458",
+          "push": {
+            "branches": [
+              "main"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/performance.yml",
+          "sha256": "35c822cd13f9323279ef25a00c7765810f93087a57feb8ecf267ebf0f7f8f304",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths": [
+              "Cargo.toml",
+              "Cargo.lock",
+              "crates/**",
+              "Sources/XDRemuxAppleAdapter/**",
+              "Sources/XDTextureNative/**",
+              "Package.swift",
+              "benchmarks/macos26-arm64-product-baseline.json",
+              "benchmarks/macos27-arm64-product-baseline.json",
+              "tests/test_performance_design.py",
+              "tests/test_performance_budget.py",
+              "scripts/performance/benchmark_rust_product.py",
+              "scripts/performance/benchmark_apple_videotoolbox_primitive.py",
+              "scripts/performance/characterize_apple_adapter_launches.py",
+              "scripts/performance/check_performance_budget.py",
+              ".github/workflows/performance.yml"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/research.yml",
+          "sha256": "93f4c3fd83a00d4c2d5ac2914a4f4eaa1ed530f931c0e9a01d9d04705cfffc01",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths": [
+              "research/**",
+              "xdremux_py/**",
+              "tests/**",
+              "scripts/**",
+              ".gitignore",
+              "pyproject.toml",
+              ".github/workflows/research.yml"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/rust-cli-core.yml",
+          "sha256": "64b324c1f9d6f24e2cd872556f27fcae24cb7b28d3227b832d44aef094be5130",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths": [
+              "Cargo.toml",
+              "Cargo.lock",
+              "crates/xdremux-classification/**",
+              "crates/xdremux-cli/**",
+              "crates/xdremux-runtime/**",
+              "crates/xdremux-source/**",
+              "crates/xdremux-engine/**",
+              "crates/xdremux-codec/**",
+              "crates/xdremux-heif/**",
+              "crates/xdremux-hdr/**",
+              "crates/xdremux-metadata/**",
+              "crates/xdremux-format/**",
+              "crates/xdremux-container/**",
+              "crates/xdremux-motion-photo/**",
+              ".github/workflows/rust-cli-core.yml"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/rust-proxdr-real-fixtures.yml",
+          "sha256": "1e64a7533dba7a703e5fad3331bdbdd22e0f76f89c3eeae818905ec8b6f58353",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths": [
+              "Cargo.toml",
+              "Cargo.lock",
+              "crates/xdremux-cli/**",
+              "crates/xdremux-runtime/**",
+              "crates/xdremux-source/**",
+              "crates/xdremux-engine/**",
+              "crates/xdremux-codec/**",
+              "crates/xdremux-heif/**",
+              "crates/xdremux-hdr/**",
+              "crates/xdremux-metadata/**",
+              "crates/xdremux-format/**",
+              "crates/xdremux-container/**",
+              "fixtures/SHA256SUMS",
+              "fixtures/proxdr/**",
+              ".github/workflows/rust-proxdr-real-fixtures.yml"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "prototype",
+      "commit": "baa763e4cea14ee79953912b50c90d877ab9d352",
+      "eligible_tag_push_workflows": [],
+      "workflows": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "sha256": "10aede687263806d24db82bf3e320b293d828f299c5e732d58dc049e650feead",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths-ignore": [
+              "**/*.md"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/completion-gate.yml",
+          "sha256": "950cc1a06b6117c57a0582da4c2b891bd40588a5219264ba78a2657f5b12c458",
+          "push": {
+            "branches": [
+              "main"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/performance.yml",
+          "sha256": "1685ccc53a64b88fc4194542a84d58ada113a71ec226a3dec59198093322f3e4",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths": [
+              "Cargo.toml",
+              "Cargo.lock",
+              "crates/**",
+              "Sources/XDRemuxAppleAdapter/**",
+              "Sources/XDTextureNative/**",
+              "Package.swift",
+              "benchmarks/macos26-arm64-product-baseline.json",
+              "benchmarks/macos27-arm64-product-baseline.json",
+              "tests/test_performance_design.py",
+              "tests/test_performance_budget.py",
+              "scripts/performance/benchmark_rust_product.py",
+              "scripts/performance/compare_apple_styles_revisions.py",
+              "tests/test_styles_revision_comparison.py",
+              "scripts/performance/benchmark_apple_videotoolbox_primitive.py",
+              "scripts/performance/characterize_apple_adapter_launches.py",
+              "scripts/performance/check_performance_budget.py",
+              ".github/workflows/performance.yml"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/research.yml",
+          "sha256": "c47c17e67dbe0d17d4ac9841dcb6fc04719d76521bc6f3bac879ab746ca88485",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths": [
+              "research/**",
+              "fixtures/proxdr/**",
+              "Sources/XDRemuxAppleAdapter/**",
+              "crates/**",
+              "xdremux_py/**",
+              "tests/**",
+              "scripts/**",
+              ".gitignore",
+              "pyproject.toml",
+              ".github/workflows/research.yml"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/rust-cli-core.yml",
+          "sha256": "9d924df281996c904b197170c9ef3d302f8fbb270b4b297d291d3e9c4944c38e",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths": [
+              "Cargo.toml",
+              "Cargo.lock",
+              "Package.swift",
+              "Sources/**",
+              "scripts/distribution/**",
+              "tests/test_macos_distribution.py",
+              "crates/xdremux-classification/**",
+              "crates/xdremux-cli/**",
+              "crates/xdremux-runtime/**",
+              "crates/xdremux-source/**",
+              "crates/xdremux-engine/**",
+              "crates/xdremux-codec/**",
+              "crates/xdremux-heif/**",
+              "crates/xdremux-hdr/**",
+              "crates/xdremux-metadata/**",
+              "crates/xdremux-format/**",
+              "crates/xdremux-container/**",
+              "crates/xdremux-motion-photo/**",
+              ".github/workflows/rust-cli-core.yml"
+            ]
+          }
+        },
+        {
+          "path": ".github/workflows/rust-proxdr-real-fixtures.yml",
+          "sha256": "1e64a7533dba7a703e5fad3331bdbdd22e0f76f89c3eeae818905ec8b6f58353",
+          "push": {
+            "branches": [
+              "main"
+            ],
+            "paths": [
+              "Cargo.toml",
+              "Cargo.lock",
+              "crates/xdremux-cli/**",
+              "crates/xdremux-runtime/**",
+              "crates/xdremux-source/**",
+              "crates/xdremux-engine/**",
+              "crates/xdremux-codec/**",
+              "crates/xdremux-heif/**",
+              "crates/xdremux-hdr/**",
+              "crates/xdremux-metadata/**",
+              "crates/xdremux-format/**",
+              "crates/xdremux-container/**",
+              "fixtures/SHA256SUMS",
+              "fixtures/proxdr/**",
+              ".github/workflows/rust-proxdr-real-fixtures.yml"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "object_store_checks": [
+    {
+      "role": "independent-prototype-recovery",
+      "source": "/workspace/xdremux-audit/restore-test.git",
+      "status": "no borrowing metadata",
+      "object_directory": "/workspace/xdremux-audit/restore-test.git/objects",
+      "alternate_metadata": []
+    }
+  ],
+  "observed_commit": "baa763e4cea14ee79953912b50c90d877ab9d352",
+  "observed_tree": "c0f0b24f3cd77336049da50a499a0867f46153fa",
+  "fsck_exit_code": 0
+}

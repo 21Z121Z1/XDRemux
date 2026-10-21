@@ -1,0 +1,50 @@
+{
+  "manifest_sha256": "fb152be80975c194aa5fc684b2aec3a6e14e2b855efe2faa4e5f8ae6e590f463",
+  "target": "x86_64-unknown-linux-gnu",
+  "prefix": "/workspace/xdremux-audit/hdr-kernel-toolchain/install",
+  "status": "ready",
+  "components": [
+    {
+      "component": "rustc",
+      "version": "1.99.1 (58cf8f9c3 2026-10-13)",
+      "url": "https://static.rust-lang.org/dist/2026-10-15/rustc-1.99.1-x86_64-unknown-linux-gnu.tar.xz",
+      "expected_sha256": "2ff05ff9c08a90861e7f6e4065b40a8b87463b4576186fd613871c3e37f2091f",
+      "status": "verified-and-locally-materialized",
+      "http_status": 200,
+      "actual_sha256": "2ff05ff9c08a90861e7f6e4065b40a8b87463b4576186fd613871c3e37f2091f",
+      "archive_bytes": 84098960,
+      "duration_seconds": 22.497605941000074
+    },
+    {
+      "component": "rust-std",
+      "version": "1.99.1 (58cf8f9c3 2026-10-13)",
+      "url": "https://static.rust-lang.org/dist/2026-10-15/rust-std-1.99.1-x86_64-unknown-linux-gnu.tar.xz",
+      "expected_sha256": "109b074225bf5b9ea3820890876bfdf4ed161adbfaf94b2b4b5984c85ee5d958",
+      "status": "verified-and-locally-materialized",
+      "http_status": 200,
+      "actual_sha256": "109b074225bf5b9ea3820890876bfdf4ed161adbfaf94b2b4b5984c85ee5d958",
+      "archive_bytes": 31563228,
+      "duration_seconds": 9.730696943001021
+    },
+    {
+      "component": "cargo",
+      "version": "0.100.0 (5f94df478 2026-08-27)",
+      "url": "https://static.rust-lang.org/dist/2026-10-15/cargo-1.99.1-x86_64-unknown-linux-gnu.tar.xz",
+      "expected_sha256": "53f3521949404d595efb06a55c12c5658d4ed1c75566f33d3d514eaebe70bd8a",
+      "status": "verified-and-locally-materialized",
+      "http_status": 200,
+      "actual_sha256": "53f3521949404d595efb06a55c12c5658d4ed1c75566f33d3d514eaebe70bd8a",
+      "archive_bytes": 10954816,
+      "duration_seconds": 3.2996868879999965
+    }
+  ],
+  "installer_scripts_executed": false,
+  "tool_versions": {
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)\nrelease: 1.99.1\ncommit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e\ncommit-date: 2026-08-27\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.6 (sys:0.21.0 vendored)\nlibcurl: 8.21.0-DEV (sys:0.4.90+curl-8.21.0 vendored ssl:OpenSSL/3.6.3)\nssl: OpenSSL 3.6.3 9 Jun 2026\nos: Debian 13.0.0 (trixie) [64-bit]\n"
+  },
+  "binary_sha256": {
+    "rustc": "b53b780f77f952062f8ca8a3b70aef2390b1e45ad91939be94afdc9543026853",
+    "cargo": "a670e02cfa39ac2e53f77a2d911ca1fc9e2c479b0603ec956625be1daf24e3af"
+  }
+}

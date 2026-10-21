@@ -1,0 +1,62 @@
+{
+  "candidate": "baa763e4cea14ee79953912b50c90d877ab9d352",
+  "tree": "c0f0b24f3cd77336049da50a499a0867f46153fa",
+  "ref": "refs/tags/review/hdr-validated-kernel-20261021-v1",
+  "parent": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "changed_files": [
+    {
+      "path": "crates/xdremux-hdr/src/scene_linear.rs",
+      "sha256": "9d6f4f0883a7b5d67c9897bdac05286204910f74e8c658988762c057becf04fe"
+    },
+    {
+      "path": "crates/xdremux-hdr/tests/oracles/provenance.json",
+      "sha256": "b582fc540b1a1f46b3a85b90d2c6fbe0cd1867995644c6a450853680759397f3"
+    },
+    {
+      "path": "crates/xdremux-hdr/tests/oracles/scene_linear_e1072a9.rs",
+      "sha256": "a795cd6d0f9f85ce9d8bff9f3911926d455fa4b316cc361d28f16edfb1843053"
+    },
+    {
+      "path": "crates/xdremux-hdr/tests/scene_linear_equivalence.rs",
+      "sha256": "f4d3ab473c67068061638f00f16f0de447c3f14124214d176bd23f6fa24bedec"
+    }
+  ],
+  "scope": "One private validated-parameter kernel plus its per-sample guard test and frozen-e107 differential tests; no runtime/Swift/media/workflow/threshold edits",
+  "frozen_oracle": {
+    "source_commit": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "source_path": "crates/xdremux-hdr/src/scene_linear.rs",
+    "source_git_blob": "85fd50705e7d3675e012b9dc637194872c067067",
+    "source_sha256": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2",
+    "oracle_file": "scene_linear_e1072a9.rs",
+    "transformation": "Exact source byte prefix before the first #[cfg(test)]\\nmod tests marker; no edits or new kernel imports",
+    "prefix_bytes": 16424,
+    "oracle_sha256": "a795cd6d0f9f85ce9d8bff9f3911926d455fa4b316cc361d28f16edfb1843053"
+  },
+  "rust_checks": {
+    "debug": {
+      "exit_code": 0,
+      "unit_tests": 17,
+      "differential_integration_tests": 6,
+      "doc_tests": 0,
+      "log_sha256": "fecdf087edfac9ecf810f6cf34e4932a9a695f6a9634e91bb43f6af593e27cf0"
+    },
+    "release": {
+      "exit_code": 0,
+      "unit_tests": 17,
+      "differential_integration_tests": 6,
+      "doc_tests": 0,
+      "log_sha256": "fa37184949c2a9607144d3dd9c87b9b89b3d497a7026414cab6a2ed9a807781c"
+    },
+    "scalar_matrix_cases": 1600,
+    "whole_image_matrix_cases": 720,
+    "intentional_negative_controls": 2,
+    "full_workspace_test": "Offline resolution blocked on unrelated LibLivePhoto Git dependency; not reported as a full-workspace pass"
+  },
+  "native_execution": false,
+  "performance_gain": "unknown",
+  "parent_execution_review_required": true,
+  "operation_enabled": false,
+  "main_unchanged": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "pr71_unchanged": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "native192_artifact_gap": "Artifact12367047255 bytes/feature graph/whole checkout/export manifests still not independently read; original URLError reason not retained, no 403 assertion and no retry this round"
+}

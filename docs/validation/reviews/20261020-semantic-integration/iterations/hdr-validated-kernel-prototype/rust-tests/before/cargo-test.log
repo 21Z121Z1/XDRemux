@@ -1,0 +1,10 @@
+error: failed to get `liblivephoto-format` as a dependency of package `xdremux-format v0.1.0 (/workspace/XDRemux-hdr-validated-prototype/crates/xdremux-format)`
+
+Caused by:
+  failed to load source for dependency `liblivephoto-format`
+
+Caused by:
+  unable to update https://github.com/21Z121Z1/LibLivePhoto?rev=794ab552596db0f66095600d23cf7937a631b9ec#794ab552
+
+Caused by:
+  can't checkout from 'https://github.com/21Z121Z1/LibLivePhoto': you are in the offline mode (--offline)

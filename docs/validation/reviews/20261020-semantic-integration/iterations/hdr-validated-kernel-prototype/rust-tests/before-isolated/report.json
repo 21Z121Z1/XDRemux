@@ -1,0 +1,28 @@
+{
+  "phase": "before-isolated",
+  "production_source_sha256": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2",
+  "scope": "Real xdremux-hdr source and all its unit/doc/integration tests, equivalent dependency-free isolated manifest. Full workspace resolution is blocked offline by unrelated LibLivePhoto dependency. No Mac or speed claim.",
+  "status": "passed",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "/workspace/xdremux-audit/hdr-kernel-tests/isolated/Cargo.toml"
+      ],
+      "cwd": "/workspace/XDRemux-hdr-validated-prototype",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/hdr-kernel-tests/before-isolated/cargo-test.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 5202,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.4649489680014085
+    }
+  ],
+  "exit_code": 0
+}

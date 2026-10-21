@@ -1,0 +1,246 @@
+{
+  "ref": "refs/tags/review/semantic-integration-20261020-evidence-v29",
+  "expected_commit": "6e8e77d0db1b318726007447460da619cf3551ee",
+  "expected_tree": "2f364eb0831a9fd2c9675099099d4fbfe925bfd9",
+  "status": "passed",
+  "native_run": 39644162258,
+  "additional_native_experiments": 0,
+  "operation_enabled": false,
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "remote",
+        "get-url",
+        "--push",
+        "origin"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/000.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/000.stderr",
+      "owned_process_group": 4892,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014651729998149676
+    },
+    {
+      "argv": [
+        "git",
+        "ls-remote",
+        "origin",
+        "refs/heads/*",
+        "refs/tags/review/styles-stage-diagnostic-20261021-v1"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/001.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/001.stderr",
+      "owned_process_group": 4893,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 2.117903775999366
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "diff",
+        "aeffd22a6d2651b84be03bc56791a3aa67acef89",
+        "6e8e77d0db1b318726007447460da619cf3551ee",
+        "--",
+        ".github/workflows"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/002.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/002.stderr",
+      "owned_process_group": 4897,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0037242179987515556
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "rev-parse",
+        "6e8e77d0db1b318726007447460da619cf3551ee^{tree}"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/003.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/003.stderr",
+      "owned_process_group": 4898,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014246219998312881
+    },
+    {
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/workspace/xdremux-audit/publish-evidence-source.py",
+        "--version",
+        "v29",
+        "--source",
+        "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+        "--head",
+        "6e8e77d0db1b318726007447460da619cf3551ee",
+        "--tree",
+        "2f364eb0831a9fd2c9675099099d4fbfe925bfd9",
+        "--files",
+        "2189",
+        "--index-sha256",
+        "c919c2d1cfb2d68fd41dc98b459057bcb7f275cd6c88ba389c25cecb925a56a3"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 60,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/004.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/004.stderr",
+      "owned_process_group": 4899,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 8.731364894001672
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/workspace/xdremux-audit/restore-test.git",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/005.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/005.stderr",
+      "owned_process_group": 4935,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014799550008319784
+    },
+    {
+      "argv": [
+        "git",
+        "ls-remote",
+        "https://github.com/21Z121Z1/XDRemux.git",
+        "refs/tags/review/semantic-integration-20261020-evidence-v29"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/006.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/006.stderr",
+      "owned_process_group": 4936,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.9656583239993779
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "refs/tags/review/semantic-integration-20261020-evidence-v29^{commit}"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/007.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/007.stderr",
+      "owned_process_group": 4940,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0036118759999226313
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "refs/tags/review/semantic-integration-20261020-evidence-v29^{tree}"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/008.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/008.stderr",
+      "owned_process_group": 4941,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014323010000225622
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "--is-shallow-repository"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/009.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/009.stderr",
+      "owned_process_group": 4942,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015040199996292358
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "fsck",
+        "--full",
+        "--strict",
+        "--no-dangling"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/v29-publication-raw/commands/010.stdout",
+      "stderr_path": "/workspace/xdremux-audit/v29-publication-raw/commands/010.stderr",
+      "owned_process_group": 4943,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 1.4670571120004752
+    }
+  ],
+  "object_store_checks": [
+    {
+      "role": "independent-v29-recovery",
+      "source": "/workspace/xdremux-audit/restore-test.git",
+      "status": "no borrowing metadata",
+      "object_directory": "/workspace/xdremux-audit/restore-test.git/objects",
+      "alternate_metadata": []
+    }
+  ],
+  "observed_commit": "6e8e77d0db1b318726007447460da619cf3551ee",
+  "observed_tree": "2f364eb0831a9fd2c9675099099d4fbfe925bfd9",
+  "fsck_exit_code": 0,
+  "remote_heads_unchanged": true
+}

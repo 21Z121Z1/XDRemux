@@ -1,0 +1,8 @@
+{
+  "component": "rustfmt-preview",
+  "url": "https://static.rust-lang.org/dist/2026-10-15/rustfmt-1.99.1-x86_64-unknown-linux-gnu.tar.xz",
+  "expected_sha256": "e3b36c4c7ec3486c059d8067ff48787676612007123aad7a4e8ec12c48ee9ba2",
+  "status": "verified-and-locally-materialized",
+  "actual_sha256": "e3b36c4c7ec3486c059d8067ff48787676612007123aad7a4e8ec12c48ee9ba2",
+  "bytes": 2488800
+}

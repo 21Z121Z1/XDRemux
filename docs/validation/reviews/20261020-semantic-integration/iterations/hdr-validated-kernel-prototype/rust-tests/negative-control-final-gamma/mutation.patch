@@ -1,0 +1,11 @@
+--- candidate/scene_linear.rs
++++ owned-negative-control/scene_linear.rs
+@@ -172,7 +172,7 @@
+     let shaped = if channel.gamma == 1.0 {
+         code
+     } else {
+-        code.powf(1.0 / channel.gamma)
++        code.powf(channel.gamma)
+     };
+     let log_gain = channel.minimum_log2 + shaped * (channel.maximum_log2 - channel.minimum_log2);
+     let hdr =
