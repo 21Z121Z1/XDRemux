@@ -1,0 +1,32 @@
+{
+  "captured_at": "2026-10-21T08:08:39.114947+00:00",
+  "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "before": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "after": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "push_exit": 0,
+  "target_observed_at_requested_head": true,
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/e1072a9",
+  "portable_gate": "5/5 scoped PASS; positional verify exit0; unchanged product paths, prior native receipts retained",
+  "native_ci": "Harness e1072a9; unchanged product/probe8d6. One same-job owned control; one20s parsed inventory query and verified own cleanup before at most one original fullprobe. Warming recorded. Original8d6actual19green/1PVTservicefailure remains separate; new source applicableCI pending, no old run replay.",
+  "merge_delete": "not executed"
+}

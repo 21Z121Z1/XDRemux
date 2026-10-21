@@ -1,0 +1,19 @@
+test_pvt_readiness_control (unittest.loader._FailedTest.test_pvt_readiness_control) ... ERROR
+
+======================================================================
+ERROR: test_pvt_readiness_control (unittest.loader._FailedTest.test_pvt_readiness_control)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_pvt_readiness_control
+Traceback (most recent call last):
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_pvt_readiness_control.py", line 10, in <module>
+    from scripts.apple.pvt_native_import import readiness_control as control
+ImportError: cannot import name 'readiness_control' from 'scripts.apple.pvt_native_import' (unknown location)
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)

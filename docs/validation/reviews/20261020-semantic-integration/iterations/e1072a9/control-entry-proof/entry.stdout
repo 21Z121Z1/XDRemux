@@ -1,0 +1,55 @@
+Same-host readiness receipt:
+{
+  "status": "experiment-blocked",
+  "commands": [],
+  "product_source_sha": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "control_stdout_path": "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-control-entry-proof-3dqcyv5f/control/control-j0no8byv/control-listapps.stdout",
+  "work": "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-control-entry-proof-3dqcyv5f/control/control-j0no8byv",
+  "host": {
+    "node": "eff8d845b923",
+    "os": "Linux",
+    "arch": "x86_64",
+    "pid": 233763
+  },
+  "job": {
+    "GITHUB_RUN_ID": null,
+    "GITHUB_RUN_ATTEMPT": null,
+    "GITHUB_JOB": null,
+    "RUNNER_NAME": null
+  },
+  "media_uploaded": false,
+  "product_probe_invocations": 0,
+  "harness_source": {
+    "head": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "tree": "209f1b5abc6faed76b65ebf8fcd093f9973465fa",
+    "status": ""
+  },
+  "product_source": {
+    "head": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+    "tree": "24128c312feb507a95672c168c43bb1b0c07c805",
+    "status": ""
+  },
+  "equivalence": {
+    "product_trees": {
+      "Cargo.toml": "47b8121d52ab330004ba82ca6a6bc1a3dd0b67c7",
+      "Cargo.lock": "982aff086bd018952258749517cc8be3753d5dcb",
+      "Package.swift": "97ad11db6df5bc4c3d7e3f56096144e02cc5b92e",
+      "crates": "901bbcc855acd03499670df921545c6a0e76a4c8",
+      "Sources": "5f14c2663c1c50833f200de0385078b4fc35967c",
+      "apps": "2832008540d9396185cfdfc32a7954d33abdbd55",
+      "fixtures": "37fd4dc2963e9d268f7e55bf2bb8169f112411de"
+    },
+    "unchanged_original_probe_files": {
+      "scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift": "cbe70fa1c368ac68ca7fad627c7e5fa90999256453d9b341bcd7898119f6aab7",
+      "scripts/apple/pvt_native_import/PVTReadback.swift": "448015deca5a48ac875150c27c6ecfae57cb089a4c85930ba51ffb970687e9c3",
+      "scripts/apple/pvt_native_import/PVTShareTests.xcodeproj/project.pbxproj": "4896e4aad65e8253d713f325ee9ab865cff06b7324fc094cf0e12456c5b55d51",
+      "scripts/apple/pvt_native_import/PVTShareTests.xcodeproj/xcshareddata/xcschemes/PVTShareUITests.xcscheme": "d892eccefe9e4897f0e0f29e8ab600e8a7004ea2fccb9b0bc93894e973a6bd54",
+      "scripts/apple/pvt_native_import/PVTShareUITests.swift.in": "8723fce01a0e0aeb5c34ceb5caa22cea425bfe4e31ddd06e14298606185a3ffc",
+      "scripts/apple/pvt_native_import/ReadbackCore.swift": "89a53303f9697de32563f530ad332e2fdd6b3e90e2b2ab4f65523bdcfa9aa3f2",
+      "scripts/apple/pvt_native_import/SDKCompileProbe.swift": "fc53b5705a0f30b538e3092f833a130616a8b0e939fd88a3fc0d9c138f71f6ed",
+      "scripts/apple/pvt_native_import/check_native_import.py": "a549744429ac698c0fa8e42bc9cee83677bc054c282315add984615bb6ff83bb"
+    }
+  },
+  "product_probe_sha256": "a549744429ac698c0fa8e42bc9cee83677bc054c282315add984615bb6ff83bb",
+  "reason": "owned execution requires the authorized arm64/macOS host"
+}

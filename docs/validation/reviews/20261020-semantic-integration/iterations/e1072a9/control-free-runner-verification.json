@@ -1,0 +1,21 @@
+{
+  "observed_at": "2026-10-21 08:04:18 UTC",
+  "repository": "21Z121Z1/XDRemux",
+  "private": false,
+  "visibility": "public",
+  "owner_type": "User",
+  "official_source": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+  "classification": {
+    "label": "xcode-27",
+    "kind": "standard GitHub-hosted public-repository runner",
+    "arch": "arm64",
+    "cpu": "3 M1",
+    "memory_gb": 7,
+    "compute_charge": "free for public repositories per official standard-runner reference"
+  },
+  "limits": [
+    "This is a resource classification, not proof that any allocation is fresh/cold.",
+    "No larger/self-hosted resource, budget, billing, payment or permission configuration is introduced.",
+    "Job stays25minutes; public visibility/private guards fail closed; one same-job preflight/probe experiment."
+  ]
+}

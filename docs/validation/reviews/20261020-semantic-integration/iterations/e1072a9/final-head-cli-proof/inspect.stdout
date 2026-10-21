@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "input": "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+  "kind": "motion-photo",
+  "source_kind": "androidHeifMotionPhotoV1",
+  "still": {
+    "offset": 0,
+    "length": 1232154
+  },
+  "video": {
+    "offset": 1232162,
+    "length": 3949505
+  },
+  "presentation_timestamp_us": 1540401,
+  "presentation_source": "androidXMP",
+  "stream_count": 2
+}

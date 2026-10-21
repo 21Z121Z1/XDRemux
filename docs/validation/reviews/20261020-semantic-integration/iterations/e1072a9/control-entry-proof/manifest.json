@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "harness_source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "product_source": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "/workspace/XDRemux-integration/scripts/apple/pvt_native_import/readiness_control.py",
+    "--harness-repo",
+    "/workspace/XDRemux-integration",
+    "--expected-harness-head",
+    "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "--product-repo",
+    "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-control-entry-source-ushi_y0c/product-source",
+    "--expected-product-head",
+    "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+    "--output-root",
+    "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-control-entry-proof-3dqcyv5f/control",
+    "--product-output-root",
+    "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-control-entry-proof-3dqcyv5f/product"
+  ],
+  "exit_code": 2,
+  "meaning": "Actual CLI validated two separate exact clean checkouts and original probe/product equivalence, then refused native execution without its explicit flag. No Apple/CoreSimulator/Photos operation executed.",
+  "receipt": "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-control-entry-proof-3dqcyv5f/control/control-j0no8byv/result.json",
+  "probe_sha256": "a549744429ac698c0fa8e42bc9cee83677bc054c282315add984615bb6ff83bb"
+}

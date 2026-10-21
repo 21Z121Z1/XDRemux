@@ -1,0 +1,28 @@
+{
+  "harness_source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "product_source": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "tree": "209f1b5abc6faed76b65ebf8fcd093f9973465fa",
+  "review": "author review; not independent/native acceptance",
+  "changed_files": {
+    ".agents/skills/xdremux-verify/features/motion-photo.md": "de6633bd836591f223de220ea2ed7ed81d50c00954246cfea5f11b7ec3d0390a",
+    ".github/workflows/research.yml": "c47c17e67dbe0d17d4ac9841dcb6fc04719d76521bc6f3bac879ab746ca88485",
+    "scripts/apple/pvt_native_import/readiness_control.py": "8b2b10dcf9f0e56ba54839a1e8f693fa610dd1e8a8287cc26728e0aa27b8a475",
+    "tests/test_pvt_readiness_control.py": "afa7b14ac5c7f040f0d6e0f5abe14c4681fb9c134fa35c455d0a0d55fe3a5bca",
+    "tests/validation/test_workflow_configuration.py": "b9d82309bc0744a8533e7df9b7a60f473a6004434ad09f6ef13a87bd309bca12"
+  },
+  "unchanged_product_trees": {
+    "Cargo.toml": "47b8121d52ab330004ba82ca6a6bc1a3dd0b67c7",
+    "Cargo.lock": "982aff086bd018952258749517cc8be3753d5dcb",
+    "Package.swift": "97ad11db6df5bc4c3d7e3f56096144e02cc5b92e",
+    "crates": "901bbcc855acd03499670df921545c6a0e76a4c8",
+    "Sources": "5f14c2663c1c50833f200de0385078b4fc35967c",
+    "apps": "2832008540d9396185cfdfc32a7954d33abdbd55",
+    "fixtures": "37fd4dc2963e9d268f7e55bf2bb8169f112411de"
+  },
+  "unchanged_probe_sha256": "a549744429ac698c0fa8e42bc9cee83677bc054c282315add984615bb6ff83bb",
+  "decision": "One sequential same-job control with original selector and supported-type table; bootstatus180s; one parsed20s app query; exact ownUUID shutdown/delete and one structured absence/directory verification. Unknown create/cleanup stops. Only passed+cleaned control permits one synchronous unchanged8d6fullprobe. NativePVT result/exit/head/selection/hash/cleanup remain required; warming explicitly recorded, no cold/newVM/root-cause assertion.",
+  "resources": "Public-repo standardxcode27 confirmed by official GitHub reference and API; same25m job/class, explicit public-event guard. No paid/budget/payment/permission/config change.",
+  "local_evidence": "58focused;320Python plus clean5check gate including actual two-checkout no-execute CLI boundary. Not native control/import proof.",
+  "native": "New harness source needs its own applicableCI; prior8d6all20terminal19green/1servicefailure retained, not relabeled.",
+  "recorded_at": "2026-10-21T08:07:17.497673+00:00"
+}

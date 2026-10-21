@@ -1,0 +1,53 @@
+{
+  "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "captured_at": "2026-10-21T08:11:58.343153+00:00",
+  "worktrees": [
+    {
+      "path": "/workspace/XDRemux",
+      "head": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "branch": "refs/heads/work",
+      "status": ""
+    },
+    {
+      "path": "/workspace/XDRemux-integration",
+      "head": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+      "branch": "refs/heads/integrate/semantic-review-20261020",
+      "status": ""
+    },
+    {
+      "path": "/workspace/XDRemux-pr58-candidate",
+      "head": "6ae70b2b2ffcdc258808cceb5ae8263b2150073c",
+      "branch": null,
+      "status": ""
+    },
+    {
+      "path": "/workspace/XDRemux-pr69-candidate",
+      "head": "6458e3d2c7a6da3ae378b867377047bd8a59595e",
+      "branch": null,
+      "status": ""
+    },
+    {
+      "path": "/workspace/XDRemux-review-evidence",
+      "head": "69606d1333723c6f66544b902d3b5863f48b4b20",
+      "branch": null,
+      "status": ""
+    },
+    {
+      "path": "/workspace/xdremux-audit/style-fit-accumulation-prototype/baseline-source",
+      "head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "branch": null,
+      "status": ""
+    },
+    {
+      "path": "/workspace/xdremux-audit/style-fit-accumulation-prototype/candidate-source",
+      "head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "branch": null,
+      "status": " M crates/xdremux-engine/src/apple_photographic_styles.rs\n",
+      "tracked_patch_sha256": "31be7f073e7ac635492d010910121789faa33e8c69f3b01b91e226b4207aa358",
+      "tracked_files": {
+        "crates/xdremux-engine/src/apple_photographic_styles.rs": "b1f58170b7bc6504eb7e1957c481bb8cd6d32e91ccfbbbca5ee0213cb615cc81"
+      }
+    }
+  ],
+  "mutations": "none"
+}

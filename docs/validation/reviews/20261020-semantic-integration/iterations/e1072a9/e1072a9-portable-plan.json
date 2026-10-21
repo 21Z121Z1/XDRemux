@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "scope": "New same-job readiness orchestration, compared with8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a. Harness e1072a90e31b12861dfe8b9cf25e07ce75c17c44 pins unchanged8d6product/probe. One control bootstatus180s and one20s parsed inventory query; only verified control cleanup enables one full unchanged original probe. Source/selection/hash/readback assertions unchanged; control warming recorded. All320Python, format/currentCLI/real pairPVT and actual no-execute two-checkout CLI boundary evidence required. Models are not native acceptance; all applicable new-head CI is separate.",
+  "checks": [
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300,
+      "env": {
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3",
+        "RESEARCH_ROOT": "/workspace/xdremux-audit/tone-pinned-checkout"
+      }
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "real-cli-pair-and-pvt-conversion-roundtrip-and-no-clobber",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "same-job-control-cli-exact-source-binding-without-native-execution",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-control-entry.py"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "XDREMUX_HARNESS_EXPECTED_SOURCE_SHA": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    }
+  ]
+}
