@@ -1,0 +1,9 @@
+{
+  "baseline": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "candidate": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "native_executed": false,
+  "started_at": "2026-10-21T15:06:57.837943+00:00",
+  "status": "blocked",
+  "reason": "This restored Linux environment has no cargo executable; apple_styles is also macOS-cfg-only. Linux cargo check would not compile these timers. Native compilation remains unverified.",
+  "command_attempted": false
+}

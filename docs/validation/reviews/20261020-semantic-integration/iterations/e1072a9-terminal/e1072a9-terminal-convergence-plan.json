@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "operation_enabled": false,
+  "approval": "Direction approved; final merge/delete execution NOT approved.",
+  "captured_at": "2026-10-21T15:00:30.731280+00:00",
+  "repository": "21Z121Z1/XDRemux",
+  "candidate": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "tree": "209f1b5abc6faed76b65ebf8fcd093f9973465fa",
+  "main_before": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "exact_heads_before": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "backup_manifest": "e1072a9-terminal-39-ref-manifest.json",
+  "source_reviewed": [
+    {
+      "pr": 58,
+      "branch": "codex/liblivephoto-consumer-20261004",
+      "exact_head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "ancestor_of_candidate": true,
+      "planned_handling": "Preserve in ordinary merge71 ancestry, inspect GitHub indirect merged state; do not claim this old head CI passed."
+    },
+    {
+      "pr": 69,
+      "branch": "cursor/portrait-heic-orientation-4765",
+      "exact_head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "ancestor_of_candidate": true,
+      "planned_handling": "Preserve in ordinary merge71 ancestry, inspect GitHub indirect merged state; do not claim this old head CI passed."
+    },
+    {
+      "pr": 65,
+      "branch": "feat/styles-hdr-first-linear-thumbnail-20261015",
+      "exact_head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "ancestor_of_candidate": true,
+      "planned_handling": "Preserve in ordinary merge71 ancestry, inspect GitHub indirect merged state; do not claim this old head CI passed."
+    },
+    {
+      "pr": 68,
+      "branch": "cursor/full-res-linear-hdr-e174",
+      "exact_head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "ancestor_of_candidate": true,
+      "planned_handling": "Preserve in ordinary merge71 ancestry, inspect GitHub indirect merged state; do not claim this old head CI passed."
+    }
+  ],
+  "ordered_steps": [
+    {
+      "step": 1,
+      "action": "Refresh all heads/current writers, candidate clean status, default rules21932863, required strict status checks, CodeQL errors/high and review threads; require every final candidate gate complete.",
+      "blocking_now": "All20 exact e107checks terminal18success/2failure. PVT control environment blocked, cleanup uncertain, product calls0; absolute Styles median/p95 failed. No merge/delete approval."
+    },
+    {
+      "step": 2,
+      "action": "Refresh exact persistent-tag restore receipt, validate9heads and original4tip ancestry, submit concrete final batch to parent for execution review.",
+      "blocking_now": "Parent has not approved final merge/delete."
+    },
+    {
+      "step": 3,
+      "action": "After explicit execution approval mark only71 ready, ordinary merge71 using expected-head SHA. No squash/rebase/bypass/protection edits.",
+      "expected_head": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+    },
+    {
+      "step": 4,
+      "action": "Observe actual merge commit M, parents [oldMain,H], tree==H tree, original4head ancestry; fetch resulting M and persist/restoration-validate M backup before any manual cleanup. Inspect71/original4 actual merged states and automatic deletion; stop if any unexpected head movement or contradictory PR status.",
+      "blocking_now": "M does not exist yet."
+    },
+    {
+      "step": 5,
+      "action": "Form exact observed remaining non-main ref deletion set. Require each actual OID equal the reviewed inventory or stop; every deleting tip must have exact durable restored backup. Submit fresh M+remaining-set+guard hashes/hooksPath/permissions to parent.",
+      "blocking_now": "Remaining set and post-merge rule state cannot be known before step4."
+    },
+    {
+      "step": 6,
+      "action": "After cleanup approval execute one atomic remote deletion push of only the exact remaining approved set with disabled-template guard properly pinned and no active preexisting hook. Keep tags and main. Fail closed if hook state/config/advertised OIDs differ. Never force or alter global safety/protection."
+    },
+    {
+      "step": 7,
+      "action": "Verify remote heads contains onlymain atM and all originalheads still recoverable. Refresh local worktree inventory and dirty-file recovery, retain physical worktrees/media, detach owned integration worktree, create/check localmain tracking origin/main then normally delete only merged localwork/integrate refs after review; reverify onlymain localhead."
+    }
+  ],
+  "local_inventory": "e1072a9-terminal-local-inventory.json",
+  "local_dirty_recovery": "e1072a9-terminal-local-dirty-recovery.json",
+  "guard_state": "v8template100644/NOTAPPROVED; not activated; hooksPath/permissions require fresh review.",
+  "forbidden": "No merge/delete now; no upstream/releases/force push/paid resources/protection/global security changes.",
+  "outcome": "Plan only; no cleanup or merge operation executed.",
+  "native_source": "Exact e107harness terminal. Pinned8d6product/probe unchanged; control stopped before product compilation/media generation, product calls0. No whole-PVT Photos admission or refusal observed.",
+  "evidence_binding": "New persistent source/evidence revision binds exact harness/product identities and39ref restoration; no operation enabled or parent execution approval.",
+  "latest_evidence_note": "Terminal exacte10718success/2failure, not running. PVTcontrol listapps20.157s timeout and uncertain cleanup; product0. Styles14.458/16.156 above11.732/15.406; same-hostABBA12.434200333/14.704374375 +18.2575%. Existing39refs/9heads/WIP freshly restored; no branch mutation.",
+  "harness_source_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "product_source_sha": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "controlled_preflight": {
+    "protocol": "one same-job control; only parsed20s bundle dictionary AND verified control cleanup permit one full original probe",
+    "bootstatus_budget_seconds": 180,
+    "listapps_attempts_max": 1,
+    "listapps_budget_seconds": 20,
+    "warming": "explicit experimental condition, not cold-start/root-cause/freshVM evidence",
+    "product_source": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+    "status": "control-environment-blocked",
+    "runner_evidence": "control-free-runner-verification.json",
+    "cleanup_status": "uncertain",
+    "product_probe_invocations": 0,
+    "receipt": "e1072a9-pvt-log-receipt.json",
+    "next_experiment": "Blocked until new healthy isolated environment/service recovery evidence; no identical control rerun."
+  },
+  "performance": {
+    "status": "failed",
+    "receipt": "e1072a9-performance-terminal.json",
+    "next_step": "Same-host comparable two-arm stage attribution; current candidate-only profile cannot explain relative cost. Preserve all historical attempts and original limits."
+  },
+  "current_ci": "e1072a9-ci-terminal.json"
+}

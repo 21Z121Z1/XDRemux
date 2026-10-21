@@ -1,0 +1,11 @@
+{
+  "review": "Author review, not independent or native acceptance",
+  "lifecycle": "ARCHIVE a reproducible diagnostic prototype; not promoted into product/CI",
+  "problem": "Current candidate-only stage profile cannot attribute same-host +18.2575% relative cost.",
+  "scope": "Timer-only main89 disposable worktree, exact e107 candidate and direct real adapters; formal budget and prior ABBA unchanged.",
+  "checks": "5 portable checks pass: actual fixed-source insertion reversibility, changed/double-source rejection, per-arm stage requirements, no nested-detail aggregation and required readbacks, actual Linux entry refusal.",
+  "first_attempt": "Local cargo setup failed before execution; owned worktree removed. No failing-before product reproduction claimed.",
+  "native": "Uncompiled/unexecuted on macOS. No timing result or optimization claimed.",
+  "execution_boundary": "No new source push to avoid repeating PVT control. No workflow-dispatch connector; harmless gh API read returned Forbidden. No dispatch POST or retry/bypass attempted.",
+  "remaining_review": "Compile timer-patched main on arm64/macOS27 before trusting receipts. Stage boundaries are comparable operations, not identical algorithms; scene change deliberately measures full HDR-before-reduction versus legacy downsample-first."
+}

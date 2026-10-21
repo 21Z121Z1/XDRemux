@@ -1,0 +1,10 @@
+test_common_summary_excludes_nested_details_and_requires_all_readbacks (test_e107_stage_prototype.PrototypeTests.test_common_summary_excludes_nested_details_and_requires_all_readbacks) ... ok
+test_native_receipts_require_each_arms_real_stage_sequence (test_e107_stage_prototype.PrototypeTests.test_native_receipts_require_each_arms_real_stage_sequence) ... ok
+test_real_fixed_baseline_only_adds_timers_at_all_thirteen_boundaries (test_e107_stage_prototype.PrototypeTests.test_real_fixed_baseline_only_adds_timers_at_all_thirteen_boundaries) ... ok
+test_real_linux_entry_blocks_before_loading_or_building_native_owners (test_e107_stage_prototype.PrototypeTests.test_real_linux_entry_blocks_before_loading_or_building_native_owners) ... ok
+test_wrong_or_already_instrumented_source_fails_before_a_build (test_e107_stage_prototype.PrototypeTests.test_wrong_or_already_instrumented_source_fails_before_a_build) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.035s
+
+OK

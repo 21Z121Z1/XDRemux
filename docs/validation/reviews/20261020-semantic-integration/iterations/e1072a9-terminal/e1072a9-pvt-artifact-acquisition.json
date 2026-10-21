@@ -1,0 +1,7 @@
+{
+  "artifact_id": 12330064787,
+  "expected_sha256": "557147ca06b688a9a331bfed6b07a122e282754abaad2dbd2d0cf47fce98f2e1",
+  "status": "blocked",
+  "error_type": "URLError",
+  "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+}

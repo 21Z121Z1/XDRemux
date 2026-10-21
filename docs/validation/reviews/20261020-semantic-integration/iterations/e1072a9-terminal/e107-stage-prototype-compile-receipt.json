@@ -1,0 +1,38 @@
+{
+  "baseline": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "candidate": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "native_executed": false,
+  "started_at": "2026-10-21T15:06:02.722040+00:00",
+  "instrumentation": {
+    "original_sha256": "6129f27b69334cdbafa040e1ef98c974fc5bd02025bb2b63e4f98489e19d1908",
+    "instrumented_sha256": "065c95ac4560dcc54b4e95db502b7f4f2646148b82770bc4f69958125f2af448",
+    "removed_insertions_restore_exact_original": true,
+    "common_stages": [
+      "source_analysis",
+      "base_conversion",
+      "semantic_production",
+      "resource_decode",
+      "scene_derivation",
+      "thumbnail_encode",
+      "key1_fit",
+      "style_metadata",
+      "native_style_properties",
+      "style_assembly",
+      "texture_generation",
+      "final_validation",
+      "publication"
+    ],
+    "baseline_scene_boundary": "legacy downsample plus scene derivation",
+    "candidate_scene_boundary": "full-resolution HDR reconstruction plus linear area reduction; nested details excluded from totals"
+  },
+  "cleanup": {
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "",
+    "path": "/workspace/xdremux-audit/e107-stage-source-h73kb2rg/baseline-source"
+  },
+  "status": "blocked",
+  "command_executed": false,
+  "error": "FileNotFoundError: cargo executable absent after environment restoration",
+  "scope": "Attempted local setup only. No compilation occurred; owned temporary worktree cleanup confirmed. Changed source is macOS cfg only, so Linux cargo check would not prove it compiled."
+}

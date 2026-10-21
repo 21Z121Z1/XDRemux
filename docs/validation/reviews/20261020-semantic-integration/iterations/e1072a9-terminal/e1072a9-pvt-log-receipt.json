@@ -1,0 +1,201 @@
+{
+  "status": "control-environment-blocked",
+  "commands": [
+    {
+      "name": "control-runtimes",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "list",
+        "runtimes",
+        "--json"
+      ],
+      "timeout_seconds": 60,
+      "owned_process_group": 5782,
+      "exit_code": 0,
+      "duration_seconds": 3.73244245799998
+    },
+    {
+      "name": "control-device-types",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "list",
+        "devicetypes",
+        "--json"
+      ],
+      "timeout_seconds": 60,
+      "owned_process_group": 5821,
+      "exit_code": 0,
+      "duration_seconds": 0.3883476249999944
+    },
+    {
+      "name": "control-create",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "create",
+        "pvt-readiness-control-52b5385c440647369707c2fce65d2e63",
+        "com.apple.CoreSimulator.SimDeviceType.iPhone-11",
+        "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
+      ],
+      "timeout_seconds": 60,
+      "owned_process_group": 5830,
+      "exit_code": 0,
+      "duration_seconds": 0.6925565000000233
+    },
+    {
+      "name": "control-boot",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "boot",
+        "9DB401FC-137A-412D-A5FC-3A37600AFD58"
+      ],
+      "timeout_seconds": 60,
+      "owned_process_group": 5841,
+      "exit_code": 0,
+      "duration_seconds": 4.590363708000041
+    },
+    {
+      "name": "control-bootstatus",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "bootstatus",
+        "9DB401FC-137A-412D-A5FC-3A37600AFD58",
+        "-b"
+      ],
+      "timeout_seconds": 180,
+      "owned_process_group": 6094,
+      "exit_code": 0,
+      "duration_seconds": 152.20239520799998
+    },
+    {
+      "name": "control-listapps",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "listapps",
+        "9DB401FC-137A-412D-A5FC-3A37600AFD58"
+      ],
+      "timeout_seconds": 20,
+      "owned_process_group": 6585,
+      "outcome": "uncertain-after-timeout",
+      "owned_process_group_stopped": true,
+      "exit_code": -15,
+      "duration_seconds": 20.157384167000032
+    },
+    {
+      "name": "control-shutdown",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "shutdown",
+        "9DB401FC-137A-412D-A5FC-3A37600AFD58"
+      ],
+      "timeout_seconds": 60,
+      "owned_process_group": 6676,
+      "outcome": "uncertain-after-timeout",
+      "owned_process_group_stopped": true,
+      "exit_code": -15,
+      "duration_seconds": 60.21514112500006
+    },
+    {
+      "name": "control-delete",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "delete",
+        "9DB401FC-137A-412D-A5FC-3A37600AFD58"
+      ],
+      "timeout_seconds": 60,
+      "owned_process_group": 6889,
+      "outcome": "uncertain-after-timeout",
+      "owned_process_group_stopped": true,
+      "exit_code": -15,
+      "duration_seconds": 60.50730562499996
+    },
+    {
+      "name": "control-cleanup-verification",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "list",
+        "devices",
+        "--json"
+      ],
+      "timeout_seconds": 20,
+      "owned_process_group": 7090,
+      "outcome": "uncertain-after-timeout",
+      "owned_process_group_stopped": true,
+      "exit_code": -15,
+      "duration_seconds": 21.285609249999993
+    }
+  ],
+  "product_source_sha": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "control_stdout_path": "/Users/runner/work/_temp/pvt-readiness-control/control-nks6p0ot/control-listapps.stdout",
+  "work": "/Users/runner/work/_temp/pvt-readiness-control/control-nks6p0ot",
+  "host": {
+    "node": "sjc22-be111-93dcb29f-e592-449f-8fed-7d839491f748-3A2F961B4BE2.local",
+    "os": "Darwin",
+    "arch": "arm64",
+    "pid": 5754
+  },
+  "job": {
+    "GITHUB_RUN_ID": "39567065919",
+    "GITHUB_RUN_ATTEMPT": "1",
+    "GITHUB_JOB": "pvt-native-import",
+    "RUNNER_NAME": "GitHub Actions 1000026387"
+  },
+  "media_uploaded": false,
+  "product_probe_invocations": 0,
+  "harness_source": {
+    "head": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "tree": "209f1b5abc6faed76b65ebf8fcd093f9973465fa",
+    "status": ""
+  },
+  "product_source": {
+    "head": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+    "tree": "24128c312feb507a95672c168c43bb1b0c07c805",
+    "status": ""
+  },
+  "equivalence": {
+    "product_trees": {
+      "Cargo.toml": "47b8121d52ab330004ba82ca6a6bc1a3dd0b67c7",
+      "Cargo.lock": "982aff086bd018952258749517cc8be3753d5dcb",
+      "Package.swift": "97ad11db6df5bc4c3d7e3f56096144e02cc5b92e",
+      "crates": "901bbcc855acd03499670df921545c6a0e76a4c8",
+      "Sources": "5f14c2663c1c50833f200de0385078b4fc35967c",
+      "apps": "2832008540d9396185cfdfc32a7954d33abdbd55",
+      "fixtures": "37fd4dc2963e9d268f7e55bf2bb8169f112411de"
+    },
+    "unchanged_original_probe_files": {
+      "scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift": "cbe70fa1c368ac68ca7fad627c7e5fa90999256453d9b341bcd7898119f6aab7",
+      "scripts/apple/pvt_native_import/PVTReadback.swift": "448015deca5a48ac875150c27c6ecfae57cb089a4c85930ba51ffb970687e9c3",
+      "scripts/apple/pvt_native_import/PVTShareTests.xcodeproj/project.pbxproj": "4896e4aad65e8253d713f325ee9ab865cff06b7324fc094cf0e12456c5b55d51",
+      "scripts/apple/pvt_native_import/PVTShareTests.xcodeproj/xcshareddata/xcschemes/PVTShareUITests.xcscheme": "d892eccefe9e4897f0e0f29e8ab600e8a7004ea2fccb9b0bc93894e973a6bd54",
+      "scripts/apple/pvt_native_import/PVTShareUITests.swift.in": "8723fce01a0e0aeb5c34ceb5caa22cea425bfe4e31ddd06e14298606185a3ffc",
+      "scripts/apple/pvt_native_import/ReadbackCore.swift": "89a53303f9697de32563f530ad332e2fdd6b3e90e2b2ab4f65523bdcfa9aa3f2",
+      "scripts/apple/pvt_native_import/SDKCompileProbe.swift": "fc53b5705a0f30b538e3092f833a130616a8b0e939fd88a3fc0d9c138f71f6ed",
+      "scripts/apple/pvt_native_import/check_native_import.py": "a549744429ac698c0fa8e42bc9cee83677bc054c282315add984615bb6ff83bb"
+    }
+  },
+  "product_probe_sha256": "a549744429ac698c0fa8e42bc9cee83677bc054c282315add984615bb6ff83bb",
+  "control_prewarms_core_simulator": true,
+  "experimental_condition": "control may warm CoreSimulator/runtime; not a cold-start fix or fresh-VM claim",
+  "control": {
+    "name": "pvt-readiness-control-52b5385c440647369707c2fce65d2e63",
+    "status": "blocked",
+    "listapps_attempts": 1,
+    "cleanup_status": "uncertain",
+    "selected_runtime": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+    "selected_device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-11",
+    "owned_udid": "9DB401FC-137A-412D-A5FC-3A37600AFD58",
+    "reason": "control-listapps: uncertain-after-timeout",
+    "control-shutdown_error": "control-shutdown: uncertain-after-timeout",
+    "control-delete_error": "control-delete: uncertain-after-timeout",
+    "cleanup_verification_error": "control-cleanup-verification: uncertain-after-timeout"
+  },
+  "reason": "control-listapps: uncertain-after-timeout"
+}

@@ -1,0 +1,242 @@
+{
+  "distinct_revisions": true,
+  "diagnostic_only": true,
+  "summary": {
+    "baseline": {
+      "median_wall_seconds": 12.434200333000035,
+      "median_user_seconds": 11.7,
+      "median_sys_seconds": 1.83,
+      "max_peak_rss_bytes": 1141653504
+    },
+    "candidate": {
+      "median_wall_seconds": 14.704374375000043,
+      "median_user_seconds": 13.29,
+      "median_sys_seconds": 1.99,
+      "max_peak_rss_bytes": 1136820224
+    },
+    "candidate_over_baseline_median": 1.1825749932607268
+  },
+  "candidate_profile": {
+    "arm": "candidate",
+    "status": "validated",
+    "logs": "candidate-profile",
+    "outside_budget_and_comparison_samples": true,
+    "limits": "One candidate-only diagnostic conversion; no baseline stage comparison. The two scene detail spans overlap scene_derivation; do not add them to stage totals.",
+    "wall_seconds": 13.94644370800006,
+    "time_real_seconds": 13.93,
+    "user_seconds": 12.78,
+    "sys_seconds": 1.68,
+    "peak_rss_bytes": 1136705536,
+    "output_bytes": 2894706,
+    "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+    "stages": [
+      {
+        "stage": "source_analysis",
+        "wall_seconds": 0.008769542
+      },
+      {
+        "stage": "base_conversion",
+        "wall_seconds": 3.628007
+      },
+      {
+        "stage": "semantic_production",
+        "wall_seconds": 3.225670667
+      },
+      {
+        "stage": "resource_decode",
+        "wall_seconds": 0.352613208
+      },
+      {
+        "stage": "scene_hdr_reconstruction",
+        "wall_seconds": 0.961166541
+      },
+      {
+        "stage": "scene_linear_area_reduction",
+        "wall_seconds": 0.175610709
+      },
+      {
+        "stage": "scene_derivation",
+        "wall_seconds": 1.337145667
+      },
+      {
+        "stage": "thumbnail_encode",
+        "wall_seconds": 0.367785583
+      },
+      {
+        "stage": "key1_fit",
+        "wall_seconds": 0.464531125
+      },
+      {
+        "stage": "style_metadata",
+        "wall_seconds": 0.316989167
+      },
+      {
+        "stage": "native_style_properties",
+        "wall_seconds": 0.003252208
+      },
+      {
+        "stage": "style_assembly",
+        "wall_seconds": 0.003236625
+      },
+      {
+        "stage": "texture_generation",
+        "wall_seconds": 4.002656083
+      },
+      {
+        "stage": "final_validation",
+        "wall_seconds": 0.024824167
+      },
+      {
+        "stage": "publication",
+        "wall_seconds": 0.004868167
+      }
+    ]
+  },
+  "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "captured_at": "2026-10-21T15:00:30.731280+00:00",
+  "absolute_gate": {
+    "status": "failure",
+    "median_seconds": 14.458,
+    "median_limit_seconds": 11.732,
+    "p95_seconds": 16.156,
+    "p95_limit_seconds": 15.406,
+    "max_rss_mib": 1084.3,
+    "run_id": 39567065898,
+    "job_id": 119111773150,
+    "attempt": 1
+  },
+  "samples": [
+    {
+      "arm": "baseline",
+      "iteration": 0,
+      "ordinal": 0,
+      "peak_rss_bytes": 1141096448,
+      "sys_seconds": 1.99,
+      "time_real_seconds": 14.51,
+      "user_seconds": 11.93,
+      "wall_seconds": 14.52573591600003,
+      "warmup": true
+    },
+    {
+      "arm": "candidate",
+      "iteration": 0,
+      "ordinal": 1,
+      "peak_rss_bytes": 1136754688,
+      "sys_seconds": 1.95,
+      "time_real_seconds": 13.86,
+      "user_seconds": 12.69,
+      "wall_seconds": 13.8751014999998,
+      "warmup": true
+    },
+    {
+      "arm": "baseline",
+      "iteration": 0,
+      "ordinal": 2,
+      "peak_rss_bytes": 1140965376,
+      "sys_seconds": 1.92,
+      "time_real_seconds": 12.42,
+      "user_seconds": 11.49,
+      "wall_seconds": 12.434200333000035,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 0,
+      "ordinal": 3,
+      "peak_rss_bytes": 1136705536,
+      "sys_seconds": 1.96,
+      "time_real_seconds": 13.77,
+      "user_seconds": 12.65,
+      "wall_seconds": 13.78456366699993,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 1,
+      "ordinal": 4,
+      "peak_rss_bytes": 1136820224,
+      "sys_seconds": 1.85,
+      "time_real_seconds": 14.21,
+      "user_seconds": 13.29,
+      "wall_seconds": 14.220549165999955,
+      "warmup": false
+    },
+    {
+      "arm": "baseline",
+      "iteration": 1,
+      "ordinal": 5,
+      "peak_rss_bytes": 1141653504,
+      "sys_seconds": 1.83,
+      "time_real_seconds": 13.09,
+      "user_seconds": 12.03,
+      "wall_seconds": 13.11372854199999,
+      "warmup": false
+    },
+    {
+      "arm": "baseline",
+      "iteration": 2,
+      "ordinal": 6,
+      "peak_rss_bytes": 1141063680,
+      "sys_seconds": 1.63,
+      "time_real_seconds": 12.33,
+      "user_seconds": 11.7,
+      "wall_seconds": 12.359975207999923,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 2,
+      "ordinal": 7,
+      "peak_rss_bytes": 1136803840,
+      "sys_seconds": 1.99,
+      "time_real_seconds": 14.68,
+      "user_seconds": 13.35,
+      "wall_seconds": 14.704374375000043,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 3,
+      "ordinal": 8,
+      "peak_rss_bytes": 1136656384,
+      "sys_seconds": 2.07,
+      "time_real_seconds": 14.83,
+      "user_seconds": 13.41,
+      "wall_seconds": 14.852904957999954,
+      "warmup": false
+    },
+    {
+      "arm": "baseline",
+      "iteration": 3,
+      "ordinal": 9,
+      "peak_rss_bytes": 1140965376,
+      "sys_seconds": 1.63,
+      "time_real_seconds": 12.32,
+      "user_seconds": 11.67,
+      "wall_seconds": 12.348521541000082,
+      "warmup": false
+    },
+    {
+      "arm": "baseline",
+      "iteration": 4,
+      "ordinal": 10,
+      "peak_rss_bytes": 1140981760,
+      "sys_seconds": 1.86,
+      "time_real_seconds": 13.28,
+      "user_seconds": 11.73,
+      "wall_seconds": 13.302855459000057,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 4,
+      "ordinal": 11,
+      "peak_rss_bytes": 1136738304,
+      "sys_seconds": 2.6,
+      "time_real_seconds": 17.07,
+      "user_seconds": 13.19,
+      "wall_seconds": 17.08778908399995,
+      "warmup": false
+    }
+  ]
+}

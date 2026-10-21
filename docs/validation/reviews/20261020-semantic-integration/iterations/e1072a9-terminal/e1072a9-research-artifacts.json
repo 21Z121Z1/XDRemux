@@ -1,0 +1,156 @@
+{
+  "artifacts": [
+    {
+      "id": 12331411492,
+      "name": "texture-probe-build-e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+      "size_in_bytes": 2271,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12331411492",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12331411492/zip",
+      "expired": false,
+      "created_at": "2026-10-21T08:26:31Z",
+      "expires_at": "2026-10-28T08:26:30Z",
+      "updated_at": "2026-10-21T08:26:31Z",
+      "digest": "sha256:32574909a29ee90353f5f6eeb58d5fcb100ca4bae014f3bc9442275f05a4fbd4",
+      "workflow_run": {
+        "id": 39567065919,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "integrate/semantic-review-20261020",
+        "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+      }
+    },
+    {
+      "id": 12331273332,
+      "name": "style-tone-response",
+      "size_in_bytes": 63803,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12331273332",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12331273332/zip",
+      "expired": false,
+      "created_at": "2026-10-21T08:35:27Z",
+      "expires_at": "2026-10-22T08:35:25Z",
+      "updated_at": "2026-10-21T08:35:27Z",
+      "digest": "sha256:eef2598b85488edb5276a5748e6b378064d3cc5a7f580c1121618e4e746149af",
+      "workflow_run": {
+        "id": 39567065919,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "integrate/semantic-review-20261020",
+        "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+      }
+    },
+    {
+      "id": 12331122673,
+      "name": "coreml-candidate-evidence-e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+      "size_in_bytes": 1633,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12331122673",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12331122673/zip",
+      "expired": false,
+      "created_at": "2026-10-21T08:27:25Z",
+      "expires_at": "2026-10-28T08:27:24Z",
+      "updated_at": "2026-10-21T08:27:25Z",
+      "digest": "sha256:724955fd26d9a5055a07e9e3eaf297facacdaf333e8b2892953ca5096a842108",
+      "workflow_run": {
+        "id": 39567065919,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "integrate/semantic-review-20261020",
+        "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+      }
+    },
+    {
+      "id": 12330932210,
+      "name": "video-style-evidence-e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+      "size_in_bytes": 1407,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12330932210",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12330932210/zip",
+      "expired": false,
+      "created_at": "2026-10-21T08:19:55Z",
+      "expires_at": "2026-10-28T08:19:53Z",
+      "updated_at": "2026-10-21T08:19:55Z",
+      "digest": "sha256:3e5c4397bed29bcf3bf3393cefeaeaeed62f74b0181b743c5c9289c0d0c0219b",
+      "workflow_run": {
+        "id": 39567065919,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "integrate/semantic-review-20261020",
+        "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+      }
+    },
+    {
+      "id": 12330912594,
+      "name": "styles-version-only-e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+      "size_in_bytes": 883,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12330912594",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12330912594/zip",
+      "expired": false,
+      "created_at": "2026-10-21T08:22:22Z",
+      "expires_at": "2026-10-28T08:22:21Z",
+      "updated_at": "2026-10-21T08:22:22Z",
+      "digest": "sha256:b097d064342115ed598a467136116f288d4bd184f90e08709b72502c86d5c50c",
+      "workflow_run": {
+        "id": 39567065919,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "integrate/semantic-review-20261020",
+        "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+      }
+    },
+    {
+      "id": 12330168817,
+      "name": "system-heif-hdr-measurement",
+      "size_in_bytes": 4697,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12330168817",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12330168817/zip",
+      "expired": false,
+      "created_at": "2026-10-21T08:19:56Z",
+      "expires_at": "2026-10-22T08:19:54Z",
+      "updated_at": "2026-10-21T08:19:56Z",
+      "digest": "sha256:4b8d4e5875f947a14fcd755fc9f02bdb05d32164cad2dd49ffe6ba3b2ea05b16",
+      "workflow_run": {
+        "id": 39567065919,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "integrate/semantic-review-20261020",
+        "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+      }
+    },
+    {
+      "id": 12330064787,
+      "name": "pvt-native-import-e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+      "size_in_bytes": 11302,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12330064787",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12330064787/zip",
+      "expired": false,
+      "created_at": "2026-10-21T08:26:49Z",
+      "expires_at": "2026-10-22T08:26:46Z",
+      "updated_at": "2026-10-21T08:26:49Z",
+      "digest": "sha256:557147ca06b688a9a331bfed6b07a122e282754abaad2dbd2d0cf47fce98f2e1",
+      "workflow_run": {
+        "id": 39567065919,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "integrate/semantic-review-20261020",
+        "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+      }
+    },
+    {
+      "id": 12329864059,
+      "name": "system-heif-hdr-api",
+      "size_in_bytes": 107053,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12329864059",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12329864059/zip",
+      "expired": false,
+      "created_at": "2026-10-21T08:19:55Z",
+      "expires_at": "2026-10-22T08:19:52Z",
+      "updated_at": "2026-10-21T08:19:55Z",
+      "digest": "sha256:1228283d6572552a65b199093f5ac4e565187821757bb8947f57b6b1a8c4ebf7",
+      "workflow_run": {
+        "id": 39567065919,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "integrate/semantic-review-20261020",
+        "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+      }
+    }
+  ]
+}
