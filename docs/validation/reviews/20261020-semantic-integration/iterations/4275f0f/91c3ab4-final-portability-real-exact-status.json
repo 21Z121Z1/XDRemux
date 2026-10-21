@@ -1,0 +1,520 @@
+{
+  "source": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+  "runs": [
+    {
+      "run_id": 39523528322,
+      "jobs": [
+        {
+          "id": 118972764422,
+          "name": "macos-package (arm64)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 39523528322,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Verify exact checked-out head",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Run actions/setup-python@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Install build tools and check portable packaging contracts",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Build checksum-pinned native dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7
+            },
+            {
+              "name": "Build and archive the current Rust CLI and complete Apple adapter",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8
+            },
+            {
+              "name": "Run the extracted package outside the checkout with only system environment",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9
+            },
+            {
+              "name": "Run actions/upload-artifact@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10
+            },
+            {
+              "name": "Post Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18
+            },
+            {
+              "name": "Post Run actions/setup-python@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19
+            },
+            {
+              "name": "Post Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21
+            }
+          ]
+        },
+        {
+          "id": 118972764724,
+          "name": "portable-cli (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 39523528322,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Verify exact checked-out head",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Install libheif + HEVC on Linux",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 4
+            },
+            {
+              "name": "Install libheif + HEVC on macOS",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5
+            },
+            {
+              "name": "Install libheif + HEVC on Windows",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7
+            },
+            {
+              "name": "Build canonical Rust CLI",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8
+            },
+            {
+              "name": "Test portable Rust CLI semantics",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9
+            },
+            {
+              "name": "Post Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17
+            },
+            {
+              "name": "Post Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19
+            }
+          ]
+        },
+        {
+          "id": 118972764800,
+          "name": "portable-cli (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 39523528322,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Verify exact checked-out head",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Install libheif + HEVC on Linux",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Install libheif + HEVC on macOS",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5
+            },
+            {
+              "name": "Install libheif + HEVC on Windows",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6
+            },
+            {
+              "name": "Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7
+            },
+            {
+              "name": "Build canonical Rust CLI",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8
+            },
+            {
+              "name": "Test portable Rust CLI semantics",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9
+            },
+            {
+              "name": "Post Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17
+            },
+            {
+              "name": "Post Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19
+            }
+          ]
+        },
+        {
+          "id": 118972764879,
+          "name": "portable-cli (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 39523528322,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Verify exact checked-out head",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Install libheif + HEVC on Linux",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 4
+            },
+            {
+              "name": "Install libheif + HEVC on macOS",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Install libheif + HEVC on Windows",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6
+            },
+            {
+              "name": "Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7
+            },
+            {
+              "name": "Build canonical Rust CLI",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8
+            },
+            {
+              "name": "Test portable Rust CLI semantics",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9
+            },
+            {
+              "name": "Post Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17
+            },
+            {
+              "name": "Post Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 39523528366,
+      "jobs": [
+        {
+          "id": 118972764207,
+          "name": "real-proxdr",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 39523528366,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Verify exact checked-out head",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Install portable HEVC provider",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Verify canonical fixture identities",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Build canonical Rust CLI",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7
+            },
+            {
+              "name": "Inspect every ProXDR fixture through Rust",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8
+            },
+            {
+              "name": "Convert representative real fixtures through Rust CLI",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9
+            },
+            {
+              "name": "Run Rust CLI/runtime regressions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10
+            },
+            {
+              "name": "Post Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19
+            },
+            {
+              "name": "Post Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 39523528353,
+      "jobs": [
+        {
+          "id": 118973308807,
+          "name": "exact-head",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 39523528353,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Install portable HEVC provider",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Write exact-HEAD verification plan",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Run exact-HEAD completion gate",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Upload completion receipt",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7
+            },
+            {
+              "name": "Post Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13
+            },
+            {
+              "name": "Post Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Source91 only: product/App fails; other passes are not final4275 validation. Native PVT probe was not in source91.",
+  "persisted_at": "2026-10-21T01:37:15.477143+00:00"
+}

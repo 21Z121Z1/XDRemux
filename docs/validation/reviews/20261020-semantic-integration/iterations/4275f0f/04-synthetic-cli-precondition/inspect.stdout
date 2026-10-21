@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "input": "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/source.jpg",
+  "kind": "motion-photo",
+  "source_kind": "legacyMicroVideoV1b",
+  "still": {
+    "offset": 0,
+    "length": 2632
+  },
+  "video": {
+    "offset": 2632,
+    "length": 3315
+  },
+  "presentation_timestamp_us": 1000000,
+  "presentation_source": "legacyMicroVideoXMP",
+  "stream_count": 1
+}

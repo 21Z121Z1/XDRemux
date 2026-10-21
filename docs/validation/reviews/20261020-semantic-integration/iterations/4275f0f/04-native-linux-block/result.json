@@ -1,0 +1,47 @@
+{
+  "status": "blocked",
+  "work": "/workspace/xdremux-audit/pvt-native-import-current-head/pvt-native-j94syzd4",
+  "host_system": "Linux",
+  "commands": [
+    {
+      "name": "head",
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "source-status",
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "simctl-addmedia-help",
+      "argv": [
+        "xcrun",
+        "simctl",
+        "help",
+        "addmedia"
+      ],
+      "error": "[Errno 2] No such file or directory: 'xcrun'",
+      "outcome": "not-started"
+    }
+  ],
+  "direct_package_import_only": true,
+  "media_uploaded": false,
+  "probe_source_sha256": {
+    "GenerateSyntheticMotion.swift": "cbe70fa1c368ac68ca7fad627c7e5fa90999256453d9b341bcd7898119f6aab7",
+    "PVTReadback.swift": "668e43776ea2901ff6d2dcd8e432b3647d2d6b4a69b1db2a05e485b2ac37a2c1"
+  },
+  "head": "04c09aac1b0cabdbd412ab10d071f74120b7bff6",
+  "reason": "simctl-addmedia-help: [Errno 2] No such file or directory: 'xcrun'",
+  "native_validation_status_before_cleanup": "blocked",
+  "cleanup_status": "not-created",
+  "probe_driver_sha256": "788207a627c6b29311ff8a1f7af876338a0f6b6a0be3e1e6559a2054ba4953a9"
+}

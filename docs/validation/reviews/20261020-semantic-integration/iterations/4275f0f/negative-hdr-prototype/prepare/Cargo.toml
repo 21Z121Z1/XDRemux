@@ -1,0 +1,9 @@
+[package]
+name = "hdr-input-prepare"
+version = "0.0.0"
+edition = "2021"
+[dependencies]
+xdremux-codec = { path = "../source0c/crates/xdremux-codec" }
+xdremux-container = { path = "../source0c/crates/xdremux-container" }
+xdremux-engine = { path = "../source0c/crates/xdremux-engine" }
+xdremux-hdr = { path = "../source0c/crates/xdremux-hdr" }

@@ -1,0 +1,313 @@
+{
+  "receipt_source": "/workspace/xdremux-audit/000e74b-performance-review.json",
+  "raw_log": "/workspace/xdremux-audit/000e74b-performance-job118965588781.log",
+  "raw_log_sha256": "a875cbbff01a996b4c211b87265927fea5a5fc232154407f2352b80f4d1267df",
+  "revisions": {
+    "main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "measured": "000e74b329d7f4f37a60da3523ccec1887e29469",
+    "reviewed": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06"
+  },
+  "arms": {
+    "baseline": {
+      "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "tracked_status": "",
+      "cli": {
+        "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-uh91t70j/reference-cargo-target/release/xdremux",
+        "sha256": "4f774a7262f35fcb1c55d2672ff81f33caf5dc1fdc7cb675199a5aef74e9a1c7",
+        "bytes": 4944448
+      },
+      "adapter": {
+        "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-uh91t70j/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+        "sha256": "5a87519889d7958c04eeb7733e785ac4922438e369e97104c22b63b86b10d1ef",
+        "bytes": 805352
+      },
+      "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+      "build_commands": [
+        [
+          "cargo",
+          "build",
+          "--locked",
+          "--workspace",
+          "--all-targets",
+          "--release"
+        ],
+        [
+          "swift",
+          "build",
+          "--package-path",
+          "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-uh91t70j/reference-source",
+          "--scratch-path",
+          "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-uh91t70j/reference-swift-scratch",
+          "-c",
+          "release",
+          "--product",
+          "xdremux-apple-adapter"
+        ]
+      ],
+      "feature_graph": {
+        "command": [
+          "cargo",
+          "tree",
+          "--locked",
+          "--workspace",
+          "--edges",
+          "features"
+        ],
+        "log": "reference-cargo-features.log",
+        "sha256": "cc32a55007730c873ba11754a0c3d48eff8a815b042a87b128058ad154850367",
+        "source_path_normalized_sha256": "dfd23f0509793a5a6d2531f09545bb2e5ce29fa6915180da8ef4f520023f6e87"
+      }
+    },
+    "candidate": {
+      "sha": "000e74b329d7f4f37a60da3523ccec1887e29469",
+      "tracked_status": "",
+      "cli": {
+        "path": "/Users/runner/work/XDRemux/XDRemux/target/release/xdremux",
+        "sha256": "d9bc92d92c1070789b581f8f649def35d170e9da70ad7fec4196e98dd70cd579",
+        "bytes": 4919136
+      },
+      "adapter": {
+        "path": "/Users/runner/work/XDRemux/XDRemux/.build/out/Products/Release/xdremux-apple-adapter",
+        "sha256": "d78ee2d5ed7ece698e1b0497edbcf31d787da6d740e1689cd98f2989ecabe4da",
+        "bytes": 884216
+      },
+      "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+      "build_commands": [
+        [
+          "cargo",
+          "build",
+          "--locked",
+          "--workspace",
+          "--all-targets",
+          "--release"
+        ],
+        [
+          "swift",
+          "build",
+          "-c",
+          "release",
+          "--product",
+          "xdremux-apple-adapter"
+        ]
+      ],
+      "build_owner": "performance.yml existing candidate release build",
+      "feature_graph": {
+        "command": [
+          "cargo",
+          "tree",
+          "--locked",
+          "--workspace",
+          "--edges",
+          "features"
+        ],
+        "log": "candidate-cargo-features.log",
+        "sha256": "14613cdb763acd78878f2f6499b0f4221309b7029efc52dffda84b5f390e9931",
+        "source_path_normalized_sha256": "f1e4c9d6dc0064d69aeae23a62d1ed0dc3e4910a8a908fb67546097b76541753"
+      }
+    }
+  },
+  "samples": [
+    {
+      "arm": "baseline",
+      "iteration": 0,
+      "ordinal": 0,
+      "peak_rss_bytes": 1141407744,
+      "sys_seconds": 1.77,
+      "time_real_seconds": 12.61,
+      "user_seconds": 10.79,
+      "wall_seconds": 12.624952915999984,
+      "warmup": true
+    },
+    {
+      "arm": "candidate",
+      "iteration": 0,
+      "ordinal": 1,
+      "peak_rss_bytes": 1136607232,
+      "sys_seconds": 1.37,
+      "time_real_seconds": 11.95,
+      "user_seconds": 10.71,
+      "wall_seconds": 11.968685499999992,
+      "warmup": true
+    },
+    {
+      "arm": "baseline",
+      "iteration": 0,
+      "ordinal": 2,
+      "peak_rss_bytes": 1141178368,
+      "sys_seconds": 1.2,
+      "time_real_seconds": 11.32,
+      "user_seconds": 10.64,
+      "wall_seconds": 11.353105290999792,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 0,
+      "ordinal": 3,
+      "peak_rss_bytes": 1136443392,
+      "sys_seconds": 0.95,
+      "time_real_seconds": 12.0,
+      "user_seconds": 11.5,
+      "wall_seconds": 12.009046625000337,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 1,
+      "ordinal": 4,
+      "peak_rss_bytes": 1136492544,
+      "sys_seconds": 0.96,
+      "time_real_seconds": 12.44,
+      "user_seconds": 11.86,
+      "wall_seconds": 12.455959291999989,
+      "warmup": false
+    },
+    {
+      "arm": "baseline",
+      "iteration": 1,
+      "ordinal": 5,
+      "peak_rss_bytes": 1141260288,
+      "sys_seconds": 0.92,
+      "time_real_seconds": 10.77,
+      "user_seconds": 10.34,
+      "wall_seconds": 10.813840750000054,
+      "warmup": false
+    },
+    {
+      "arm": "baseline",
+      "iteration": 2,
+      "ordinal": 6,
+      "peak_rss_bytes": 1141260288,
+      "sys_seconds": 1.01,
+      "time_real_seconds": 11.36,
+      "user_seconds": 10.69,
+      "wall_seconds": 11.378475583000181,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 2,
+      "ordinal": 7,
+      "peak_rss_bytes": 1136394240,
+      "sys_seconds": 2.06,
+      "time_real_seconds": 14.94,
+      "user_seconds": 12.94,
+      "wall_seconds": 14.961006874999839,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 3,
+      "ordinal": 8,
+      "peak_rss_bytes": 1136377856,
+      "sys_seconds": 3.39,
+      "time_real_seconds": 16.76,
+      "user_seconds": 13.11,
+      "wall_seconds": 16.782474000000093,
+      "warmup": false
+    },
+    {
+      "arm": "baseline",
+      "iteration": 3,
+      "ordinal": 9,
+      "peak_rss_bytes": 1141194752,
+      "sys_seconds": 2.11,
+      "time_real_seconds": 11.77,
+      "user_seconds": 10.58,
+      "wall_seconds": 11.796584583000367,
+      "warmup": false
+    },
+    {
+      "arm": "baseline",
+      "iteration": 4,
+      "ordinal": 10,
+      "peak_rss_bytes": 1141440512,
+      "sys_seconds": 1.58,
+      "time_real_seconds": 11.14,
+      "user_seconds": 9.94,
+      "wall_seconds": 11.156138374999955,
+      "warmup": false
+    },
+    {
+      "arm": "candidate",
+      "iteration": 4,
+      "ordinal": 11,
+      "peak_rss_bytes": 1136590848,
+      "sys_seconds": 2.05,
+      "time_real_seconds": 12.84,
+      "user_seconds": 11.45,
+      "wall_seconds": 12.86168083299981,
+      "warmup": false
+    }
+  ],
+  "source_sha256": {
+    "crates/xdremux-runtime/src/apple_styles.rs": {
+      "main": "6129f27b69334cdbafa040e1ef98c974fc5bd02025bb2b63e4f98489e19d1908",
+      "measured": "19ae41e8060d871d81fff9759192cdb1bfffb8164a52616177e0687eb9082eac",
+      "reviewed": "19ae41e8060d871d81fff9759192cdb1bfffb8164a52616177e0687eb9082eac"
+    },
+    "crates/xdremux-runtime/src/apple_texture.rs": {
+      "main": "10bc2f8413395c20a0a53c09cc28764597da0be265611749ea75f78830c024be",
+      "measured": "c14b57a67fc78595f7c2614810501d5718b4d7376647327934c2a009ec21c707",
+      "reviewed": "c14b57a67fc78595f7c2614810501d5718b4d7376647327934c2a009ec21c707"
+    },
+    "crates/xdremux-engine/src/apple_photographic_styles.rs": {
+      "main": "f217c50060976b2c177bacd3d254f632cddeea5f472d79591e3a73c3632fceb1",
+      "measured": "b1f58170b7bc6504eb7e1957c481bb8cd6d32e91ccfbbbca5ee0213cb615cc81",
+      "reviewed": "b1f58170b7bc6504eb7e1957c481bb8cd6d32e91ccfbbbca5ee0213cb615cc81"
+    },
+    "crates/xdremux-hdr/src/scene_linear.rs": {
+      "main": null,
+      "measured": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2",
+      "reviewed": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2"
+    },
+    "crates/xdremux-heif/src/semantic.rs": {
+      "main": "5034d684cdc7414fec9d4627bb0ab5dffe4c6aa65fd4e3ac9fbe503f1335a2e0",
+      "measured": "e035e1239f52f389572cb4de935c5af74403416c223d9c6e31c291ec641cad7b",
+      "reviewed": "e035e1239f52f389572cb4de935c5af74403416c223d9c6e31c291ec641cad7b"
+    },
+    "crates/xdremux-heif/src/texture.rs": {
+      "main": "93cd14c4d2c12ef4d2605cc6732a65e6a1932adad414d28db3c0e75e025a04a6",
+      "measured": "32fc7756a246ef03c7efcc39a944bc603c9a7f3cd421442869822408300fb939",
+      "reviewed": "32fc7756a246ef03c7efcc39a944bc603c9a7f3cd421442869822408300fb939"
+    },
+    "crates/xdremux-heif/src/styles.rs": {
+      "main": "83e5c220559277a8b40a7e31ea78177e9b4b5c13b6436b183a286be71c249433",
+      "measured": "cfd48b23510d07fb5985f1e3ce4ee9613dcf7c8ee3a670cf2736e5bc7ddfbbe0",
+      "reviewed": "cfd48b23510d07fb5985f1e3ce4ee9613dcf7c8ee3a670cf2736e5bc7ddfbbe0"
+    },
+    "crates/xdremux-heif/src/validation.rs": {
+      "main": "4901bee8880790eb67555de93aaa0b64c569fa97a7f75de019120944d5b5edff",
+      "measured": "5375b4e209ad920ee63d73979e70c70649b8f1eb2b7a3b8f9da026c09b868da9",
+      "reviewed": "5375b4e209ad920ee63d73979e70c70649b8f1eb2b7a3b8f9da026c09b868da9"
+    },
+    "Sources/XDRemuxAppleAdapter/VideoToolboxMain10.swift": {
+      "main": "e307d9536ba123637c8ee484f36af0e13ebdb7c760396c70cf75c06dcffca395",
+      "measured": "4681b52ea292a142fe869617722c2dc776e1466a849153d97c05f37d9bdc285a",
+      "reviewed": "4681b52ea292a142fe869617722c2dc776e1466a849153d97c05f37d9bdc285a"
+    },
+    "Sources/XDRemuxAppleAdapter/VisionSemanticMattes.swift": {
+      "main": "e924b7ee4e365cd8ce45c904c63f88b351eed01dfa35efb43a2b3b3c8e29df2c",
+      "measured": "e924b7ee4e365cd8ce45c904c63f88b351eed01dfa35efb43a2b3b3c8e29df2c",
+      "reviewed": "e924b7ee4e365cd8ce45c904c63f88b351eed01dfa35efb43a2b3b3c8e29df2c"
+    },
+    "Sources/XDTextureNative/infer.m": {
+      "main": "40d3c0f784f0586bcec3515ae572e76440aef18bf4f6cdb658bbdc3459a8a441",
+      "measured": "e501144ec036e460de4b161666521bc249ba7ac901d97626b9062a022cdbe868",
+      "reviewed": "e501144ec036e460de4b161666521bc249ba7ac901d97626b9062a022cdbe868"
+    },
+    "Sources/XDTextureNative/statistics.m": {
+      "main": "5fc9e4bc713a1edc4c97e7205f087dfb4bd6463d86cc26e4d3fc0c50efed571e",
+      "measured": "206efbf3a324f93f32f4d083d10d964aa85e2384b382fd7f0788eb0e38310892",
+      "reviewed": "206efbf3a324f93f32f4d083d10d964aa85e2384b382fd7f0788eb0e38310892"
+    }
+  },
+  "arithmetic": {
+    "wall_median_gap_seconds": 1.5085755420000169,
+    "user_median_gap_seconds": 1.2799999999999994,
+    "sys_median_gap_seconds": 0.8499999999999999,
+    "scene_remaining_wall_seconds": 0.301710416,
+    "three_candidate_wall_spans_seconds": 1.2827853340000002
+  },
+  "limit": "Candidate-only stage wall durations are not increments versus main or per-stage CPU measurements; measured 000 receipt is not a reviewed-91 native pass."
+}

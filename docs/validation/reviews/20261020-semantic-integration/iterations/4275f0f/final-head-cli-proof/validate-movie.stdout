@@ -1,0 +1,16 @@
+{
+  "command": "validate",
+  "details": {
+    "kind": "live-photo",
+    "value": {
+      "content_identifier": "65829695-33FE-4C8D-B646-6AB45A096451",
+      "image": "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-wd29wisc/converted.heic",
+      "input": "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-wd29wisc/converted.mov",
+      "still_time_seconds": 1.540401,
+      "video": "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-wd29wisc/converted.mov"
+    }
+  },
+  "kind": "live-photo",
+  "schema_version": 1,
+  "valid": true
+}

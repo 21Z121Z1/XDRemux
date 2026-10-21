@@ -1,0 +1,25 @@
+$ git --git-dir=<restore> fetch https://github.com/21Z121Z1/XDRemux.git refs/tags/backup/semantic-review-20261020/integration/04c09aa:refs/tags/backup/semantic-review-20261020/integration/04c09aa
+From https://github.com/21Z121Z1/XDRemux
+ * [new tag]         backup/semantic-review-20261020/integration/04c09aa -> backup/semantic-review-20261020/integration/04c09aa
+
+exit=0
+
+$ git --git-dir=<restore> rev-parse refs/tags/backup/semantic-review-20261020/integration/04c09aa^{commit}
+04c09aac1b0cabdbd412ab10d071f74120b7bff6
+
+exit=0
+
+$ git --git-dir=<restore> rev-parse refs/tags/backup/semantic-review-20261020/integration/04c09aa^{tree}
+5322b3668d626ef6704091993948b548338db49e
+
+exit=0
+
+$ git --git-dir=<restore> rev-parse --is-shallow-repository
+false
+
+exit=0
+
+$ git --git-dir=<restore> fsck --full --strict --no-dangling
+notice: HEAD points to an unborn branch (master)
+
+exit=0

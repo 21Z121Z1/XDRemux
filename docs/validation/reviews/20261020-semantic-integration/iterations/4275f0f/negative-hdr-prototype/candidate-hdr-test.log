@@ -1,0 +1,42 @@
+   Compiling xdremux-hdr v0.1.0 (/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate/hdr)
+    Finished `release` profile [optimized] target(s) in 0.90s
+     Running unittests src/lib.rs (xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/deps/xdremux_hdr-7db698ea9e6b6bfb)
+
+running 16 tests
+test edr::tests::modern_cfg_is_numeric_interval_and_precomputed_remains_f64 ... ok
+test edr::tests::early_cfg_uses_float32_subnormal_sentinel_not_numeric_one ... ok
+test edr::tests::uhdr_keeps_distinct_channels ... ok
+test edr::tests::rejects_wrong_metadata_lengths ... ok
+test info::tests::invalid_positive_per_channel_max_falls_back_to_scalar ... ok
+test info::tests::repeats_first_channel_and_preserves_float32_boundary ... ok
+test gainmap::tests::output_stride_is_256_aligned_and_padding_stays_zero ... ok
+test gainmap::tests::rejects_malformed_masks_fail_closed ... ok
+test scene_linear::tests::alternate_application_uses_resolved_channel_metadata_and_full_weight ... ok
+test scene_linear::tests::area_resize_follows_full_resolution_reconstruction ... ok
+test scene_linear::tests::edge_and_near_black_samples_stay_on_the_gain_formula ... ok
+test scene_linear::tests::headroom_weight_selects_the_alternate_image_or_a_fraction ... ok
+test scene_linear::tests::gain_application_matches_known_hdr_for_gamma_offsets_and_weight ... ok
+test scene_linear::tests::invalid_gain_metadata_and_rasters_fail_closed ... ok
+test scene_linear::tests::reconstruction_upsamples_gain_codes_before_application ... ok
+test gainmap::tests::quantization_truncates_instead_of_rounding ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xdremux-gainmap-vectors.rs (xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/deps/xdremux_gainmap_vectors-a4269001055b4e81)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xdremux-hdr-vectors.rs (xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/deps/xdremux_hdr_vectors-f4a9673b801b8f99)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xdremux_hdr
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

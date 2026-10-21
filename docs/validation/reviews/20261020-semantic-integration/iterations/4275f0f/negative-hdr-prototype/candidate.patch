@@ -1,0 +1,35 @@
+--- a/crates/xdremux-hdr/src/scene_linear.rs
++++ b/crates/xdremux-hdr/src/scene_linear.rs
+@@ -150,6 +150,23 @@
+             "application weight must be finite and within 0 through 1",
+         ));
+     }
++    apply_iso_gain_sample_validated(sdr_linear, gain_code, channel, weight)
++}
++
++// The caller has already validated the immutable channel and weight.
++// Keep sample/result validation and the application arithmetic unchanged.
++fn apply_iso_gain_sample_validated(
++    sdr_linear: f64,
++    gain_code: f64,
++    channel: &IsoGainChannel,
++    weight: f64,
++) -> Result<f64> {
++    if !sdr_linear.is_finite() || !gain_code.is_finite() {
++        return Err(HdrError::invalid(
++            "gain map application",
++            "SDR sample and gain code must be finite",
++        ));
++    }
+     let code = gain_code.clamp(0.0, 1.0);
+     let shaped = if channel.gamma == 1.0 {
+         code
+@@ -199,7 +216,7 @@
+             let source = (y * sdr.width + x) * 3;
+             for (component, sample) in sdr.samples[source..source + 3].iter().enumerate() {
+                 let code = sample_gain_code(gain_map, x, y, sdr.width, sdr.height, component);
+-                let hdr = apply_iso_gain_sample(
++                let hdr = apply_iso_gain_sample_validated(
+                     f64::from(*sample),
+                     code,
+                     &application.channels[component],

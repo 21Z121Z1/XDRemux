@@ -1,0 +1,59 @@
+{
+  "source": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+  "tree": "236dc69996b39c5aee08044b154c269aaf7ea68d",
+  "base": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+  "captured_at": "2026-10-21T01:37:15.380910+00:00",
+  "review_kind": "Author review; independently frozen App boundary review and negative HDR prototype are separately attributed. No local Swift or native import execution.",
+  "files": {
+    ".agents/skills/xdremux-verify/features/motion-photo.md": "7e903372542aaa47d29638a2d3ea1b2e0b7861af8d38bd91cd513ae2d731d02e",
+    ".github/workflows/research.yml": "0e0f8a7a81ef0b023f29c5d259bab88758458f1e8a2ad520efa9b95a427e4124",
+    "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift": "ee5c464091057f2d23de1394975f419419af8f4a06f04a38e8688483d20c0aca",
+    "apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift": "91081e08ee5c415a48f6a561ddcd9cb6109a0b19ed2ce616b24ed9b5e7bca18f",
+    "scripts/apple/check_style_tone_response.py": "8d3c7482dc41995da2bb477199bccb52a6208b88f78d3f04c1a34164ab281fdb",
+    "scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift": "cbe70fa1c368ac68ca7fad627c7e5fa90999256453d9b341bcd7898119f6aab7",
+    "scripts/apple/pvt_native_import/PVTReadback.swift": "800ee5baa98e1ad19a4743734f5274f00d3e18603e26d1bbeb9033c878105b16",
+    "scripts/apple/pvt_native_import/check_native_import.py": "788207a627c6b29311ff8a1f7af876338a0f6b6a0be3e1e6559a2054ba4953a9",
+    "tests/test_pvt_native_import.py": "2b65f239e9b26b25b78b133af10e6239f361214d760704863cfd004f44745e48",
+    "tests/test_style_tone_response.py": "5489ce9411c73dd4f470f1eba323ea85d6ccb8bbe183f3d368d185079eff62df",
+    "tests/validation/test_workflow_configuration.py": "94b63543691d81a03014f6eff86715bc51e8095666b2874c62964830b5c3f968"
+  },
+  "findings": [
+    {
+      "severity": "P1",
+      "trigger": "Missing output leaf under an existing directory alias to a PVT or its interior.",
+      "repair": "Shared planning/preparation package helper resolves existing nodes and ancestors independently. Both lexical and resolved package components reject. Source-alias identity precedence unchanged.",
+      "evidence": "App source91 actual native assertion failure, original subcase unknown. 32 named native cases include pair/PVT, both skip settings, aliases and missing multilevel descendants; source bytes, complete membership, symlink targets and no CLI convert/validate are checked. Linux six architecture checks and filesystem model are not Darwin execution."
+    },
+    {
+      "severity": "P1",
+      "trigger": "Tone filename escapes to parent or collides with owned diagnostic/compatibility output.",
+      "repair": "Reject reserved or duplicate source stems before any external process; keep finite explicit tone subset and exact consumer data completeness.",
+      "evidence": "New real child-stub negative tests RED, focused43 GREEN with actual pinned extractor integration. No upstream mutation or native parameter changes."
+    },
+    {
+      "severity": "P1",
+      "trigger": "PVT structural validation could be mistaken for actual Photos package admission.",
+      "repair": "Dedicated existing Research workflow job, synthetic real video/JPEG generation, current CLI build, one exact owned simulator and one whole-directory simctl import. Baseline/delta read-only PhotoKit and original resources/ID/cover readback; all failure logs and cleanup required; no pair import fallback.",
+      "evidence": "Local portable/protocol tests and synthetic CLI precondition pass; actual Linux xcrun ENOENT produces blocked exit2. Swift compilation and actual native import remain pending."
+    },
+    {
+      "severity": "P2",
+      "trigger": "UIKit app readback does long synchronous PhotoKit/AVFoundation work off main queue.",
+      "repair": "Mark only the three stateless worker methods nonisolated; window and delegate launch remain isolated.",
+      "evidence": "Source inspection only; actual Swift SDK compile required in new native probe."
+    },
+    {
+      "severity": "P2",
+      "trigger": "Same-runner source91 candidate/main median9.240143625/7.932123333 ratio1.164901658.",
+      "repair": "No unproven numerical/threshold change. Review maps actual extra work; immutable-validation hoisting prototype has byte-exact errors/outputs but no wall-time speedup, so not adopted.",
+      "evidence": "Raw91 performance and frozen audit-only prototype results; no single-commit causal attribution or host-only dismissal."
+    }
+  ],
+  "checks": {
+    "focused": "Six App architecture checks and diff check PASS; prior04 clean7/289 are distinct.",
+    "final_head": "Clean committed-head7/7 PASS and positional verify exit0; all289 Python tests executed, including real original pinned extractor integration. Native gates are separate.",
+    "required_native": "Both App builds/full30 model harness including32 matrix, PVT direct import/readback, System/Tone, performance, package and other configured gates.",
+    "scope": "Complete product arm64/macOS27; Rust core cross-platform. No Photos device/wallpaper claim; no merge/delete/protection change."
+  },
+  "portable_receipt_sha256": "b712526229cd39114fa92ae90b770496307a0a6ac9f52b2ac2b9ff244b42befd"
+}

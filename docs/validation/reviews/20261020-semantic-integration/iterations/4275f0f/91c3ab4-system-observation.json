@@ -1,0 +1,60 @@
+{
+  "source": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+  "run": 39523528232,
+  "job": 118972765014,
+  "conclusion": "success",
+  "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39523528232/job/118972765014",
+  "small_hdr_roundtrip": "1PASS/0failed, actual log",
+  "actual_fixture_conversion": "completed through source/scaffold alpha and typed Texture graph",
+  "actual_native_consumer": {
+    "status": "completed",
+    "returncode": 0,
+    "native_failures": [],
+    "rows": [
+      {
+        "photo": "lhdr-v1-01.system",
+        "tone": -1.0,
+        "returncode": 0,
+        "components": 168960,
+        "differing_components": 40094,
+        "max_abs": 0.005859375,
+        "psnr_peak1_db": 67.31545344735109
+      },
+      {
+        "photo": "lhdr-v1-01.system",
+        "tone": 0.0,
+        "returncode": 0,
+        "components": 168960,
+        "differing_components": 0,
+        "max_abs": 0.0,
+        "psnr_peak1_db": "inf"
+      },
+      {
+        "photo": "lhdr-v1-01.system",
+        "tone": 1.0,
+        "returncode": 0,
+        "components": 168960,
+        "differing_components": 66931,
+        "max_abs": 0.00634765625,
+        "psnr_peak1_db": 63.98242993496426
+      }
+    ]
+  },
+  "score": {
+    "mean_luminance": {
+      "-1": 0.20243671579677794,
+      "0": 0.2879219098961844,
+      "1": 0.4011222002391386
+    },
+    "signed_luminance_at_minus_1": -0.08548519409940644,
+    "signed_luminance_at_plus_1": 0.1132002903429542,
+    "tone_changes_render": true,
+    "matches_earlier_asymmetric_shape": true
+  },
+  "log_sha256": "df88fab2928c93a86181ba68d344e474750da1aa9354b1b7a36e13cc8cd0a135",
+  "limits": [
+    "This is source91 native System evidence; later source revisions require their own gate.",
+    "Three requested native textures are validated; this does not establish the independent eleven-tone product journey, Photos editing UI, PVT import or device wallpaper."
+  ],
+  "captured_at": "2026-10-21T00:59:25.371373+00:00"
+}

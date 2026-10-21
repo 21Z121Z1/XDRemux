@@ -1,0 +1,122 @@
+{
+  "host": "POSIX Linux",
+  "darwin_foundation_execution": false,
+  "limits": "Both whole-path behaviors are hypotheses. Only the next native App run can identify actual Darwin behavior and the original failed subcase.",
+  "scenarios": [
+    {
+      "case": "direct-package",
+      "extension": "heic",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": true,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "direct-package",
+      "extension": "pvt",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": true,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "direct-missing-child",
+      "extension": "heic",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": true,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "direct-missing-child",
+      "extension": "pvt",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": true,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-package",
+      "extension": "heic",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-package",
+      "extension": "pvt",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-missing-child",
+      "extension": "heic",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-missing-child",
+      "extension": "pvt",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-missing-multilevel",
+      "extension": "heic",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-missing-multilevel",
+      "extension": "pvt",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-interior",
+      "extension": "heic",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-interior",
+      "extension": "pvt",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-interior-missing-multilevel",
+      "extension": "heic",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-interior-missing-multilevel",
+      "extension": "pvt",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-chain-missing-multilevel",
+      "extension": "heic",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    },
+    {
+      "case": "alias-chain-missing-multilevel",
+      "extension": "pvt",
+      "new_guard": true,
+      "old_whole_path_requires_existing_leaf": false,
+      "old_whole_path_resolves_existing_prefix": true
+    }
+  ],
+  "positive_controls": 4,
+  "existing_current_alias_to_interior_member_blocked": true,
+  "package_bytes_and_member_sets_unchanged": true
+}

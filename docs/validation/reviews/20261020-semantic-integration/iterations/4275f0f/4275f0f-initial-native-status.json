@@ -1,0 +1,295 @@
+{
+  "source": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+  "runs": [
+    {
+      "id": 39528720307,
+      "name": "Research evidence",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 96,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720307/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720307/logs",
+      "workflow_id": 364655225
+    },
+    {
+      "id": 39528720286,
+      "name": "Rust CLI portability",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 407,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720286/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720286/logs",
+      "workflow_id": 347223704
+    },
+    {
+      "id": 39528720300,
+      "name": "XDRemux Rust Product Integration",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 532,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720300/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720300/logs",
+      "workflow_id": 315568847
+    },
+    {
+      "id": 39528720315,
+      "name": "XDRemux Completion Gate",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 457,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720315/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720315/logs",
+      "workflow_id": 337441246
+    },
+    {
+      "id": 39528720351,
+      "name": "XDRemux Rust Performance and Design",
+      "status": "queued",
+      "conclusion": null,
+      "run_number": 184,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720351/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720351/logs",
+      "workflow_id": 337168196
+    },
+    {
+      "id": 39528720329,
+      "name": "Rust ProXDR real fixtures",
+      "status": "in_progress",
+      "conclusion": null,
+      "run_number": 354,
+      "jobs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720329/jobs",
+      "logs_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39528720329/logs",
+      "workflow_id": 347463427
+    }
+  ],
+  "jobs": [
+    {
+      "run_id": 39528720307,
+      "jobs": [
+        {
+          "id": 118989380107,
+          "name": "texture-probe-build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 39528720307,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 118989380289,
+          "name": "video-carrier",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 39528720307,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 118989380303,
+          "name": "coreml-candidate",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 39528720307,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 118989380307,
+          "name": "styles-version-control",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 39528720307,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 118989380311,
+          "name": "system-heif-hdr-api",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 39528720307,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v7",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 2
+            },
+            {
+              "name": "Read the SDK HEIF HDR surface",
+              "status": "pending",
+              "conclusion": null,
+              "number": 3
+            },
+            {
+              "name": "Install the HEVC provider",
+              "status": "pending",
+              "conclusion": null,
+              "number": 4
+            },
+            {
+              "name": "Run actions-rust-lang/setup-rust-toolchain@v2",
+              "status": "pending",
+              "conclusion": null,
+              "number": 5
+            },
+            {
+              "name": "Build the CLI and the Apple adapter",
+              "status": "pending",
+              "conclusion": null,
+              "number": 6
+            },
+            {
+              "name": "Round-trip a synthetic SDR and linear HDR pair",
+              "status": "pending",
+              "conclusion": null,
+              "number": 7
+            },
+            {
+              "name": "Check out the published consumer model",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8
+            },
+            {
+              "name": "Test System tone measurement failure handling",
+              "status": "pending",
+              "conclusion": null,
+              "number": 9
+            },
+            {
+              "name": "Encode one fixture and score the three-tone sweep",
+              "status": "pending",
+              "conclusion": null,
+              "number": 10
+            },
+            {
+              "name": "Upload SDK HEIF HDR surface",
+              "status": "pending",
+              "conclusion": null,
+              "number": 11
+            },
+            {
+              "name": "Upload system gain-map measurement",
+              "status": "pending",
+              "conclusion": null,
+              "number": 12
+            },
+            {
+              "name": "Post Run actions/checkout@v7",
+              "status": "pending",
+              "conclusion": null,
+              "number": 24
+            }
+          ]
+        },
+        {
+          "id": 118989380334,
+          "name": "portable-evidence",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 39528720307,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Run actions/setup-python@v7",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Install research test dependencies",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 4
+            },
+            {
+              "name": "Run all portable regression tests",
+              "status": "pending",
+              "conclusion": null,
+              "number": 5
+            },
+            {
+              "name": "Post Run actions/setup-python@v7",
+              "status": "pending",
+              "conclusion": null,
+              "number": 9
+            },
+            {
+              "name": "Post Run actions/checkout@v7",
+              "status": "pending",
+              "conclusion": null,
+              "number": 10
+            }
+          ]
+        },
+        {
+          "id": 118989380338,
+          "name": "style-tone-response",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 39528720307,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 118989380411,
+          "name": "pvt-native-import",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 39528720307,
+          "logs_url": null,
+          "steps": null
+        }
+      ]
+    },
+    {
+      "run_id": 39528720300,
+      "jobs": [
+        {
+          "id": 118989380416,
+          "name": "macos-product",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 39528720300,
+          "logs_url": null,
+          "steps": null
+        }
+      ]
+    },
+    {
+      "run_id": 39528720351,
+      "jobs": [
+        {
+          "id": 118989380709,
+          "name": "rust-performance",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 39528720351,
+          "logs_url": null,
+          "steps": null
+        }
+      ]
+    }
+  ],
+  "note": "First observed new-source automatic runs; jobs queued or in progress; no native pass claim."
+}

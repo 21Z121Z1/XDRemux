@@ -1,0 +1,65 @@
+{
+  "baseline": {
+    "path": "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-target/release/deps/xdremux_hdr-a828ae64709073ff.s",
+    "sha256": "4e3ee1a35822dd9046b841d0628becce5cb3226276e03882f7e7e9282911508e",
+    "evidence_lines": [
+      {
+        "line": 620,
+        "text": "_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear21apply_iso_gain_sample:"
+      },
+      {
+        "line": 3581,
+        "text": "callq\t*_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear21apply_iso_gain_sample@GOTPCREL(%rip)"
+      },
+      {
+        "line": 3666,
+        "text": "callq\t*_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear21apply_iso_gain_sample@GOTPCREL(%rip)"
+      },
+      {
+        "line": 3748,
+        "text": "callq\t*_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear21apply_iso_gain_sample@GOTPCREL(%rip)"
+      }
+    ]
+  },
+  "candidate": {
+    "path": "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/deps/xdremux_hdr-a828ae64709073ff.s",
+    "sha256": "0c82e44921f0ad5eaf565c846995ef244bcf7d0c5ba3bee65c0954350931e9bf",
+    "evidence_lines": [
+      {
+        "line": 620,
+        "text": "_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear21apply_iso_gain_sample:"
+      },
+      {
+        "line": 763,
+        "text": "callq\t_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear31apply_iso_gain_sample_validated"
+      },
+      {
+        "line": 3514,
+        "text": "callq\t_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear31apply_iso_gain_sample_validated"
+      },
+      {
+        "line": 3599,
+        "text": "callq\t_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear31apply_iso_gain_sample_validated"
+      },
+      {
+        "line": 3681,
+        "text": "callq\t_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear31apply_iso_gain_sample_validated"
+      },
+      {
+        "line": 3904,
+        "text": "_RNvNtCs4THzpZyXVAX_11xdremux_hdr12scene_linear31apply_iso_gain_sample_validated:"
+      }
+    ]
+  },
+  "root_original": {
+    "path": "/workspace/xdremux-audit/hdr-codegen-target/release/deps/xdremux_hdr-132085bf64093420.s",
+    "sha256": "d94bd446746d2666056d14eac63bfeac918eb79bedc5b0d2c8fa1c552d978710",
+    "immutable_scalar_checks": "620-779",
+    "public_scalar_math": "780-849",
+    "outer_calls": [
+      3581,
+      3666,
+      3748
+    ]
+  }
+}

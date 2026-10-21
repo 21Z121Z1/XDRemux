@@ -1,0 +1,98 @@
+{
+  "operation": "Update existing PR71 title/body for current tested source and fixed v11 evidence",
+  "write_result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "number": 71,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "draft": true,
+      "body": "This draft integrates the four feature PRs while retaining real native Texture/Styles production and original media facts. It adds optional true-directory PVT output and narrows the complete product to arm64/macOS27; three-platform Rust core checks remain. Main and the four original PR tips are unchanged. **Merge and branch deletion remain blocked pending final native gates and parent review.**\n\nChanges:\n- Preserve HDR/gain-map relationships, coded/display transforms, RGB16/Main10 values and original primary/video samples. Use typed native skin-carrier selection while rejecting unknown or ambiguous auxiliary graphs.\n- Require completed native GPU/edit-state receipts and real source-derived Styles data. Reconstruct HDR before linear-light reduction and preserve the inverse fit.\n- Publish pairs/PVT without replacing existing output; retain recoverable complete stages after partial failure. Protect source aliases and opaque packages in CLI, batch checkpoints and App.\n- Keep photo+video as the default. The optional PVT directory contains a validated HEIC/MOV pair and metadata.plist with string version1; wrapping adds no encoding. CLI and App share the Rust option.\n- Port CLI localization without changing JSON, exit codes or user paths. Pin package dependencies and audit complete native/dylib closure; test relocated arm64 conversion outside the checkout.\n- Use one owned consumer boundary for System's three tones and the full eleven-tone sweep. Preserve the fixed upstream extractor/helper import behavior; derive only the pinned iinf parser repair locally. Missing native textures, invalid geometry, incomplete metrics or tool failures cannot yield completed acceptance.\n- Adapt scoped pinned pstack instruction skills to existing owners and machine checks. No Cursor bootstrap, new framework or weakened performance threshold.\n\nCurrent source **91c3ab45310adb05d5e9e3a3d1c23e1345542b06**, tree **56d4dcfd50b29defb99d9d6f3afe0e50c144116b**.\n\nValidation:\n- Clean committed-head Linux gate:7/7 pass, including all280 Python tests, workspace all-target clippy/regressions, current CLI build and actual pair/PVT conversion, byte-exact unwrap and duplicate preservation. The Rust command explicitly excludes two repeated JPEG CLI encodes; native product CI retains the full suite.\n- Real original pinned extractor/helper/parser integration:42 focused checks pass without skips, including direct-script versus owned-launcher behavior, v1 compatibility and negative import/data cases. These structural tests are not native rendering.\n- Previous000 performance job passed unchanged absolute limits: Styles median9.582s/p9512.168s versus11.732/15.406s. Its separate same-runner candidate/main ratio remains1.13288, user11.86/10.58s; the relative cost remains unresolved. Candidate-only nested stages do not prove baseline attribution.\n- Current-head native App builds/all30 model calls, System HEIF, complete Tone data, performance, relocated arm64 package and exact-head checks are pending. Old000 product/PVT-path, System-consumer and Tone-import failures remain failed evidence.\n- Direct PVT package import is being prepared on an isolated runner-owned environment with synthetic media. No current Photos import, single-Live-Photo pairing or wallpaper success is claimed. Unpacking and creating a PhotoKit pair will not count as package import.\n\n[Fixed v11 evidence, exact-head receipt and26-ref recovery](https://github.com/21Z121Z1/XDRemux/blob/85f3fe05e01e7e0f233e3cea42394f131b585657/docs/validation/reviews/20261020-semantic-integration/iterations/91c3ab4/README.en.md) includes complete first-fault histories and source-bound limits. All26 persistent source refs were independently fetched with exact commit/tree matches, non-shallow full strict fsck0, covering all9 current remote heads. [PVT/App/Texture review and original failures](https://github.com/21Z121Z1/XDRemux/blob/8ebb9c684b0afcd82c7869700ab5745a8dae9359/docs/validation/reviews/20261020-semantic-integration/iterations/000e74b/README.en.md) retain the prior implementation details and earlier dirty-build proofs separately.\n\nAfter all final gates and recovery review, the proposed convergence is one ordinary merge commit of#71, retaining the original #58/#69/#65/#68 heads as ancestors. Inspect GitHub's actual indirect merged states and automatic source deletion before approving the exact remaining cleanup set. No squash/rebase, merge/delete execution, force push, release, upstream write, paid resource, billing or protection change occurred. No private portrait media are uploaded; native media remain runner-local.\n",
+      "title": "Complete HDR/Live Photo semantics, optional PVT output and arm64 macOS packaging",
+      "base": "main",
+      "base_sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "head": "integrate/semantic-review-20261020",
+      "head_sha": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+      "head_repo_id": 1221397436,
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "merge_commit_sha": "c8e3f1e27875a31434b3aecc25405edc5dbff12b",
+      "user": {
+        "login": "21Z121Z1",
+        "name": "21Z121Z1",
+        "email": null,
+        "avatar_url": "https://avatars.githubusercontent.com/u/89170834?v=4",
+        "id": 89170834
+      },
+      "requested_reviewers": null,
+      "requested_team_reviewers": null,
+      "diff": null,
+      "comments": null,
+      "created_at": "2026-10-20T19:09:18Z",
+      "updated_at": "2026-10-21T00:50:51Z",
+      "closed_at": null,
+      "merged_at": null,
+      "commits": 74,
+      "changed_files": 177,
+      "additions": 20130,
+      "deletions": 8623,
+      "display_url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "display_title": "Complete HDR/Live Photo semantics, optional PVT output and arm64 macOS packaging"
+    },
+    "isError": false
+  },
+  "readback": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "number": 71,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "draft": true,
+      "body": "This draft integrates the four feature PRs while retaining real native Texture/Styles production and original media facts. It adds optional true-directory PVT output and narrows the complete product to arm64/macOS27; three-platform Rust core checks remain. Main and the four original PR tips are unchanged. **Merge and branch deletion remain blocked pending final native gates and parent review.**\n\nChanges:\n- Preserve HDR/gain-map relationships, coded/display transforms, RGB16/Main10 values and original primary/video samples. Use typed native skin-carrier selection while rejecting unknown or ambiguous auxiliary graphs.\n- Require completed native GPU/edit-state receipts and real source-derived Styles data. Reconstruct HDR before linear-light reduction and preserve the inverse fit.\n- Publish pairs/PVT without replacing existing output; retain recoverable complete stages after partial failure. Protect source aliases and opaque packages in CLI, batch checkpoints and App.\n- Keep photo+video as the default. The optional PVT directory contains a validated HEIC/MOV pair and metadata.plist with string version1; wrapping adds no encoding. CLI and App share the Rust option.\n- Port CLI localization without changing JSON, exit codes or user paths. Pin package dependencies and audit complete native/dylib closure; test relocated arm64 conversion outside the checkout.\n- Use one owned consumer boundary for System's three tones and the full eleven-tone sweep. Preserve the fixed upstream extractor/helper import behavior; derive only the pinned iinf parser repair locally. Missing native textures, invalid geometry, incomplete metrics or tool failures cannot yield completed acceptance.\n- Adapt scoped pinned pstack instruction skills to existing owners and machine checks. No Cursor bootstrap, new framework or weakened performance threshold.\n\nCurrent source **91c3ab45310adb05d5e9e3a3d1c23e1345542b06**, tree **56d4dcfd50b29defb99d9d6f3afe0e50c144116b**.\n\nValidation:\n- Clean committed-head Linux gate:7/7 pass, including all280 Python tests, workspace all-target clippy/regressions, current CLI build and actual pair/PVT conversion, byte-exact unwrap and duplicate preservation. The Rust command explicitly excludes two repeated JPEG CLI encodes; native product CI retains the full suite.\n- Real original pinned extractor/helper/parser integration:42 focused checks pass without skips, including direct-script versus owned-launcher behavior, v1 compatibility and negative import/data cases. These structural tests are not native rendering.\n- Previous000 performance job passed unchanged absolute limits: Styles median9.582s/p9512.168s versus11.732/15.406s. Its separate same-runner candidate/main ratio remains1.13288, user11.86/10.58s; the relative cost remains unresolved. Candidate-only nested stages do not prove baseline attribution.\n- Current-head native App builds/all30 model calls, System HEIF, complete Tone data, performance, relocated arm64 package and exact-head checks are pending. Old000 product/PVT-path, System-consumer and Tone-import failures remain failed evidence.\n- Direct PVT package import is being prepared on an isolated runner-owned environment with synthetic media. No current Photos import, single-Live-Photo pairing or wallpaper success is claimed. Unpacking and creating a PhotoKit pair will not count as package import.\n\n[Fixed v11 evidence, exact-head receipt and26-ref recovery](https://github.com/21Z121Z1/XDRemux/blob/85f3fe05e01e7e0f233e3cea42394f131b585657/docs/validation/reviews/20261020-semantic-integration/iterations/91c3ab4/README.en.md) includes complete first-fault histories and source-bound limits. All26 persistent source refs were independently fetched with exact commit/tree matches, non-shallow full strict fsck0, covering all9 current remote heads. [PVT/App/Texture review and original failures](https://github.com/21Z121Z1/XDRemux/blob/8ebb9c684b0afcd82c7869700ab5745a8dae9359/docs/validation/reviews/20261020-semantic-integration/iterations/000e74b/README.en.md) retain the prior implementation details and earlier dirty-build proofs separately.\n\nAfter all final gates and recovery review, the proposed convergence is one ordinary merge commit of#71, retaining the original #58/#69/#65/#68 heads as ancestors. Inspect GitHub's actual indirect merged states and automatic source deletion before approving the exact remaining cleanup set. No squash/rebase, merge/delete execution, force push, release, upstream write, paid resource, billing or protection change occurred. No private portrait media are uploaded; native media remain runner-local.\n",
+      "title": "Complete HDR/Live Photo semantics, optional PVT output and arm64 macOS packaging",
+      "base": "main",
+      "base_sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "head": "integrate/semantic-review-20261020",
+      "head_sha": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+      "head_repo_id": 1221397436,
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "merge_commit_sha": "c8e3f1e27875a31434b3aecc25405edc5dbff12b",
+      "user": {
+        "login": "21Z121Z1",
+        "name": "21Z121Z1",
+        "email": null,
+        "avatar_url": "https://avatars.githubusercontent.com/u/89170834?v=4",
+        "id": 89170834
+      },
+      "requested_reviewers": null,
+      "requested_team_reviewers": null,
+      "diff": null,
+      "comments": null,
+      "created_at": "2026-10-20T19:09:18Z",
+      "updated_at": "2026-10-21T00:50:51Z",
+      "closed_at": null,
+      "merged_at": null,
+      "commits": 74,
+      "changed_files": 177,
+      "additions": 20130,
+      "deletions": 8623,
+      "display_url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "display_title": "Complete HDR/Live Photo semantics, optional PVT output and arm64 macOS packaging"
+    },
+    "isError": false
+  },
+  "verified": true
+}

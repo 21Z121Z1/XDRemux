@@ -1,0 +1,4 @@
+   Compiling hdr-input-prepare v0.0.0 (/workspace/xdremux-audit/perf-hdr-validation-prototype/prepare)
+    Finished `release` profile [optimized] target(s) in 0.47s
+     Running `xdremux-audit/perf-hdr-validation-prototype/prepare-target/release/source-metadata-evidence /workspace/XDRemux-integration/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic`
+source_info_bytes_equal_extracted=true source_gain_bytes_equal_extracted=true metadata_bytes=80 float_count=20 fallback_conditions_false=true

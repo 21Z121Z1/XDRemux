@@ -1,0 +1,11 @@
+{
+  "source_head": "04c09aac1b0cabdbd412ab10d071f74120b7bff6",
+  "helper_unchanged_from_native_red_head": true,
+  "viewmodel_before_sha256": "7de21ea86929dfcc4173fd234b15e11e42d5ab296c80514dee933c01cac390cc",
+  "native_red_job": 118972766877,
+  "native_red_log": "/workspace/xdremux-audit/91c3ab4-product-job118972766877.log",
+  "native_red_log_sha256": "851315145c7ed5f823726a6345c89c725027610d3dfd06bca3a1422804732d41",
+  "native_red_assertion": "both pair and PVT outputs must not add members inside an existing package",
+  "native_red_subcase": "not recorded by original test",
+  "local_swift_available": false
+}

@@ -1,0 +1,36 @@
+All paths below are under /workspace/xdremux-audit/perf-hdr-validation-prototype (ROOT).
+
+Snapshot (read-only product): git archive 0c5789ac3891f5bbfaad629d2500abd417231ff7 Cargo.toml Cargo.lock crates > ROOT/source0c.tar; archive extracted to ROOT/source0c.
+Both external HDR workspaces inherit edition=2021, unsafe_code=forbid, resolver=2; only members hdr/probe. Their src is exact exported HDR src except candidate.patch. No profile overrides.
+
+Common environment used for cargo:
+PATH=/tmp/xdremux-toolchain/cargo/bin:$PATH
+CARGO_HOME=/tmp/xdremux-toolchain/cargo
+RUSTUP_HOME=/tmp/xdremux-toolchain/rustup
+PKG_CONFIG_PATH=/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu/pkgconfig (prepare only)
+CARGO_TARGET_DIR=ROOT/prepare-target or ROOT/baseline-target or ROOT/candidate-target respectively.
+
+Actual initial build commands:
+cargo build --release --offline --manifest-path ROOT/prepare/Cargo.toml
+cargo build --release --offline --manifest-path ROOT/baseline/Cargo.toml
+cargo build --release --offline --manifest-path ROOT/candidate/Cargo.toml
+
+Input preparation (outside timer):
+ROOT/prepare-target/release/hdr-input-prepare /workspace/XDRemux-integration/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic ROOT/public-request.bin
+
+Behavior (each ARM=baseline,candidate):
+ROOT/ARM-target/release/hdr-validation-probe matrix ROOT/ARM-matrix.bin
+cargo test --release --offline --locked -p xdremux-hdr --manifest-path ROOT/ARM/Cargo.toml
+Python bytes equality over the two complete matrix files.
+
+Measured (bounded warmup1 + 5 samples per arm with rotating order; complete actual argv for each invocation in results.json):
+python3 ROOT/measure.py > ROOT/measure.log 2>&1
+ROOT/ARM-target/release/hdr-validation-probe real ROOT/public-request.bin ROOT/ARM-public-output.bin
+
+Codegen collected after all timing, separately for each arm:
+cargo rustc --release --offline --locked -p xdremux-hdr --lib --manifest-path ROOT/ARM/Cargo.toml -- --emit=asm
+
+Original build logs, stderr/stdout per invocation, test logs, provenance.json, verification.json, codegen.json and results.json persist here. To replay now, cargo initial builds may add --locked because generated locks are present. Real buffers and binaries are local-only; do not upload them.
+
+Additional source-fact check after timing (same prepare environment):
+cargo run --release --offline --locked --manifest-path ROOT/prepare/Cargo.toml --bin source-metadata-evidence -- /workspace/XDRemux-integration/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic

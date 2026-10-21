@@ -1,0 +1,297 @@
+{
+  "scope": "Linux x86_64 pure Rust HDR kernel. Source primary HEIF and private JPEG gain codes; no Apple native or full product claim.",
+  "input": {
+    "sha256": "38a8eafc02ddd8c603f722c063bd45a41a14f73b0eeea65d07b2fab6c89106fe",
+    "bytes": 159389472,
+    "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+    "unchanged_after": true
+  },
+  "host": {
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           46 bits physical, 57 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  5\nOn-line CPU(s) list:                     0-4\nVendor ID:                               GenuineIntel\nModel name:                              INTEL(R) XEON(R) PLATINUM 8573C\nCPU family:                              6\nModel:                                   207\nThread(s) per core:                      1\nCore(s) per socket:                      5\nSocket(s):                               1\nStepping:                                2\nBogoMIPS:                                4599.99\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               144 KiB (3 instances)\nL1i cache:                               96 KiB (3 instances)\nL2 cache:                                6 MiB (3 instances)\nL3 cache:                                260 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-4\nVulnerability Gather data sampling:      Not affected",
+    "load_before": [
+      0.2080078125,
+      0.30908203125,
+      0.373046875
+    ],
+    "load_after": [
+      0.5830078125,
+      0.392578125,
+      0.39892578125
+    ]
+  },
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_PROFILE_RELEASE_LTO": null,
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": null,
+    "LD_PRELOAD": null
+  },
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1",
+  "binaries": {
+    "baseline": {
+      "path": "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-target/release/hdr-validation-probe",
+      "sha256": "ffb8049d64b1c42d6de57af9ba12ec93b2a75ae7ee54431281b13444132f04ca",
+      "bytes": 535992
+    },
+    "candidate": {
+      "path": "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/hdr-validation-probe",
+      "sha256": "63b043ddda331e44d58f3b21795ff88e40ff438f08bf3ae60da58bdd15b878be",
+      "bytes": 536288
+    }
+  },
+  "samples": [
+    {
+      "index": 0,
+      "warmup": true,
+      "arm": "baseline",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 4.595967062999989,
+      "process_user_seconds": 2.410369,
+      "process_system_seconds": 2.145298,
+      "kernel_wall_seconds": 2.676743441,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa"
+    },
+    {
+      "index": 0,
+      "warmup": true,
+      "arm": "candidate",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 2.2891897129993595,
+      "process_user_seconds": 1.2740959999999997,
+      "process_system_seconds": 1.0115540000000003,
+      "kernel_wall_seconds": 1.174875958,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 1,
+      "warmup": false,
+      "arm": "candidate",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.988992092999979,
+      "process_user_seconds": 1.2409790000000003,
+      "process_system_seconds": 0.7396149999999997,
+      "kernel_wall_seconds": 1.518363945,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 1,
+      "warmup": false,
+      "arm": "baseline",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 2.633067442002357,
+      "process_user_seconds": 1.6874799999999999,
+      "process_system_seconds": 0.9047030000000005,
+      "kernel_wall_seconds": 2.078117477,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 2,
+      "warmup": false,
+      "arm": "baseline",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.8410691520002729,
+      "process_user_seconds": 1.308243,
+      "process_system_seconds": 0.524464,
+      "kernel_wall_seconds": 1.341398556,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 2,
+      "warmup": false,
+      "arm": "candidate",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.4813879700013786,
+      "process_user_seconds": 1.0958559999999995,
+      "process_system_seconds": 0.3604889999999994,
+      "kernel_wall_seconds": 1.046846333,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 3,
+      "warmup": false,
+      "arm": "candidate",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.8540119859972037,
+      "process_user_seconds": 1.4422510000000006,
+      "process_system_seconds": 0.4073190000000002,
+      "kernel_wall_seconds": 1.386091103,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 3,
+      "warmup": false,
+      "arm": "baseline",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.6580597560023307,
+      "process_user_seconds": 1.2401429999999998,
+      "process_system_seconds": 0.3696869999999999,
+      "kernel_wall_seconds": 1.191034613,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 4,
+      "warmup": false,
+      "arm": "baseline",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.699503937998088,
+      "process_user_seconds": 1.3066899999999997,
+      "process_system_seconds": 0.38629599999999975,
+      "kernel_wall_seconds": 1.21945283,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 4,
+      "warmup": false,
+      "arm": "candidate",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.9089865099995222,
+      "process_user_seconds": 1.4099140000000006,
+      "process_system_seconds": 0.4052290000000003,
+      "kernel_wall_seconds": 1.467680364,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 5,
+      "warmup": false,
+      "arm": "candidate",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/candidate-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.4689289039997675,
+      "process_user_seconds": 1.1024379999999994,
+      "process_system_seconds": 0.36407100000000003,
+      "kernel_wall_seconds": 1.038568333,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    },
+    {
+      "index": 5,
+      "warmup": false,
+      "arm": "baseline",
+      "command": [
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-target/release/hdr-validation-probe",
+        "real",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/public-request.bin",
+        "/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline-public-output.bin"
+      ],
+      "returncode": 0,
+      "process_wall_seconds": 1.704575935000321,
+      "process_user_seconds": 1.3625320000000016,
+      "process_system_seconds": 0.32740100000000094,
+      "kernel_wall_seconds": 1.236143002,
+      "output_bytes": 150013493,
+      "output_sha256": "d22c1b504da3965bbe1be8ca8cdb47d4fcc018baee614feda9744f002f51a9fa",
+      "full_bytes_equal_other_arm": true
+    }
+  ],
+  "complete": true,
+  "matrix": {
+    "full_bytes_equal": true,
+    "bytes": 10885558,
+    "sha256": "d7a9ba30061c9420d1bada08b3e1979e69af1212bbe747071cfa7a48adabccb7",
+    "counts": "reconstruction_cases=607 ok=198 error=409 scalar_cases=66096 scalar_ok=9716 scalar_error=56380"
+  },
+  "privacy": "Input/output pixel buffers are local-only. Do not upload public-request.bin, *-public-output.bin, binaries, or rendered media.",
+  "summary": {
+    "baseline": {
+      "kernel_median_seconds": 1.236143002,
+      "kernel_min_seconds": 1.191034613,
+      "kernel_max_seconds": 2.078117477,
+      "process_user_median_seconds": 1.308243,
+      "process_system_median_seconds": 0.38629599999999975
+    },
+    "candidate": {
+      "kernel_median_seconds": 1.386091103,
+      "kernel_min_seconds": 1.038568333,
+      "kernel_max_seconds": 1.518363945,
+      "process_user_median_seconds": 1.2409790000000003,
+      "process_system_median_seconds": 0.4052290000000003
+    },
+    "candidate_baseline_kernel_ratio": 1.1213031993526588
+  }
+}

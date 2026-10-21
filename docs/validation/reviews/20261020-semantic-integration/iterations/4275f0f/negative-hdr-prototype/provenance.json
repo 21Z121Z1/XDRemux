@@ -1,0 +1,9 @@
+{
+  "source_sha": "0c5789ac3891f5bbfaad629d2500abd417231ff7",
+  "source_status": "?? scripts/apple/pvt_native_import/\n",
+  "snapshot_archive_sha256": "4c8c17bae96f570b0c0a46b9506a757f93a967fe83976923e38e4a880e132a6b",
+  "original_scene_sha256": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2",
+  "candidate_scene_sha256": "a24e48888b3c40e4a37e4890e2d61acaa14145b828478bcc497302b0777d54fc",
+  "candidate_patch_sha256": "bc88e81683d28baa77b6755b2e51cec7b29f0ca4cdeb4d6bb92e08c2ab4b4b08",
+  "scope": "audit-only Linux/x86_64 prototype; no product source edits"
+}

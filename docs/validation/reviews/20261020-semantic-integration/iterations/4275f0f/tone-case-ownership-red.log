@@ -1,0 +1,78 @@
+test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) ... 
+  test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='') ... FAIL
+  test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='..heic') ... FAIL
+  test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='...heic') ... FAIL
+  test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='diagnostics.heic') ... FAIL
+  test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='consumer-compat.heic') ... FAIL
+  test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='build.log.heic') ... FAIL
+  test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='tone-sweep.json.heic') ... FAIL
+  test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='consumer-run.json.heic') ... FAIL
+
+======================================================================
+FAIL: test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 176, in test_consumer_rejects_unsafe_or_owned_case_names_before_launch
+    self.assertFalse((root / "upstream-launched").exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='..heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 176, in test_consumer_rejects_unsafe_or_owned_case_names_before_launch
+    self.assertFalse((root / "upstream-launched").exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='...heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 176, in test_consumer_rejects_unsafe_or_owned_case_names_before_launch
+    self.assertFalse((root / "upstream-launched").exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='diagnostics.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 176, in test_consumer_rejects_unsafe_or_owned_case_names_before_launch
+    self.assertFalse((root / "upstream-launched").exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='consumer-compat.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 176, in test_consumer_rejects_unsafe_or_owned_case_names_before_launch
+    self.assertFalse((root / "upstream-launched").exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='build.log.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 176, in test_consumer_rejects_unsafe_or_owned_case_names_before_launch
+    self.assertFalse((root / "upstream-launched").exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='tone-sweep.json.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 176, in test_consumer_rejects_unsafe_or_owned_case_names_before_launch
+    self.assertFalse((root / "upstream-launched").exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_consumer_rejects_unsafe_or_owned_case_names_before_launch (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_rejects_unsafe_or_owned_case_names_before_launch) (name='consumer-run.json.heic')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 176, in test_consumer_rejects_unsafe_or_owned_case_names_before_launch
+    self.assertFalse((root / "upstream-launched").exists())
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 1 test in 0.453s
+
+FAILED (failures=8)

@@ -1,0 +1,21 @@
+{
+  "status": "audit-prototype-frozen-native-blocked",
+  "head_observed": "0c5789ac3891f5bbfaad629d2500abd417231ff7",
+  "repo_status": "",
+  "files_sha256": {
+    "native_probe.py": "c9002ae3855f92ca7b23717d56e7c6cef73a93c0c3a4ad9ad1a5c5347f658a73",
+    "GenerateSyntheticMotion.swift": "cbe70fa1c368ac68ca7fad627c7e5fa90999256453d9b341bcd7898119f6aab7",
+    "PVTReadback.swift": "668e43776ea2901ff6d2dcd8e432b3647d2d6b4a69b1db2a05e485b2ac37a2c1",
+    "README.md": "a31c9276b6616969898a4af6067949e0571262604ce3bbfed141823c294eb866"
+  },
+  "local_receipt": "/workspace/xdremux-audit/pvt-native-import-probe/local-results/pvt-native-z_2w1v1b/result.json",
+  "local_receipt_sha256": "f80169ca0dba28c1bc465ab0a66f8ca936527d902618dab6db9bd2b544062606",
+  "pure_and_local_fs_checks": 14,
+  "checks_sha256": "d018e944a0d10cff0de4f08ef1f1a8ac57398c1ed99eeed0478b921cb3ee7e55",
+  "python_syntax": "PASS",
+  "native_swift_compile": "NOT_EXECUTED",
+  "simulator_import": "NOT_EXECUTED",
+  "photokit_readback": "NOT_EXECUTED",
+  "blocker": "simctl-addmedia-help: [Errno 2] No such file or directory: 'xcrun'",
+  "remote_actions": []
+}

@@ -1,0 +1,2259 @@
+﻿2026-10-21T00:54:43.0711510Z Current runner version: '2.338.0'
+2026-10-21T00:54:43.0730270Z ##[group]Runner Image Provisioner
+2026-10-21T00:54:43.0730940Z Hosted Compute Agent
+2026-10-21T00:54:43.0731510Z Version: 20261006.597
+2026-10-21T00:54:43.0732010Z Commit: c696a59e4a9ffbc6a6203385bd1b2a10e87b1c9c
+2026-10-21T00:54:43.0732630Z Build Date: 2026-10-06T21:39:28Z
+2026-10-21T00:54:43.0733150Z Worker ID: {c008bcfe-f84f-46c1-a1c4-28dbfb4406b9}
+2026-10-21T00:54:43.0733790Z Region: westus
+2026-10-21T00:54:43.0734220Z Cloud: MacCloud
+2026-10-21T00:54:43.0734590Z ##[endgroup]
+2026-10-21T00:54:43.0735620Z ##[group]Operating System
+2026-10-21T00:54:43.0736090Z macOS
+2026-10-21T00:54:43.0736750Z 27.0.1
+2026-10-21T00:54:43.0737200Z 26A434
+2026-10-21T00:54:43.0737640Z ##[endgroup]
+2026-10-21T00:54:43.0738050Z ##[group]Runner Image
+2026-10-21T00:54:43.0738580Z Image: xcode-27-arm64
+2026-10-21T00:54:43.0738970Z Version: 20261012.0260.1
+2026-10-21T00:54:43.0740090Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261012.0260/images/macos/xcode-27-arm64-Readme.md
+2026-10-21T00:54:43.0741200Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261012.0260
+2026-10-21T00:54:43.0741940Z ##[endgroup]
+2026-10-21T00:54:43.0742990Z ##[group]GITHUB_TOKEN Permissions
+2026-10-21T00:54:43.0744460Z Contents: read
+2026-10-21T00:54:43.0744850Z Metadata: read
+2026-10-21T00:54:43.0745350Z ##[endgroup]
+2026-10-21T00:54:43.0746960Z Secret source: Actions
+2026-10-21T00:54:43.0747860Z Cache mode: write
+2026-10-21T00:54:43.0748410Z Prepare workflow directory
+2026-10-21T00:54:43.1338240Z Prepare all required actions
+2026-10-21T00:54:43.1383480Z Getting action download info
+2026-10-21T00:54:43.4172130Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-10-21T00:54:43.8235460Z Download action repository 'actions-rust-lang/setup-rust-toolchain@v2' (SHA:ecabd13d1c56bd1345c230e542e9144811ad706f)
+2026-10-21T00:54:44.2267770Z Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+2026-10-21T00:54:44.8726160Z Getting action download info
+2026-10-21T00:54:44.9793400Z Download action repository 'Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6' (SHA:6323deb102c322ba6fcbdcafc7e3dddab59af2b6)
+2026-10-21T00:54:45.5603270Z Complete job name: macos-product
+2026-10-21T00:54:45.7044290Z ##[group]Run actions/checkout@v7
+2026-10-21T00:54:45.7045300Z with:
+2026-10-21T00:54:45.7045670Z   ref: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:54:45.7046100Z   fetch-depth: 0
+2026-10-21T00:54:45.7046430Z   repository: 21Z121Z1/XDRemux
+2026-10-21T00:54:45.7049190Z   token: ***
+2026-10-21T00:54:45.7049520Z   ssh-strict: true
+2026-10-21T00:54:45.7049860Z   ssh-user: git
+2026-10-21T00:54:45.7050200Z   persist-credentials: true
+2026-10-21T00:54:45.7050560Z   clean: true
+2026-10-21T00:54:45.7050910Z   sparse-checkout-cone-mode: true
+2026-10-21T00:54:45.7051300Z   fetch-tags: false
+2026-10-21T00:54:45.7051630Z   show-progress: true
+2026-10-21T00:54:45.7052090Z   lfs: false
+2026-10-21T00:54:45.7052390Z   submodules: false
+2026-10-21T00:54:45.7054100Z   set-safe-directory: true
+2026-10-21T00:54:45.7055480Z   allow-unsafe-pr-checkout: false
+2026-10-21T00:54:45.7059030Z env:
+2026-10-21T00:54:45.7060130Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:54:45.7061160Z ##[endgroup]
+2026-10-21T00:54:46.3519790Z Syncing repository: 21Z121Z1/XDRemux
+2026-10-21T00:54:46.3521490Z ##[group]Getting Git version info
+2026-10-21T00:54:46.3522050Z Working directory is '/Users/runner/work/XDRemux/XDRemux'
+2026-10-21T00:54:46.3522930Z [command]/opt/homebrew/bin/git version
+2026-10-21T00:54:46.3898330Z git version 2.56.0
+2026-10-21T00:54:46.3929450Z ##[endgroup]
+2026-10-21T00:54:46.4177750Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/af43937e-6842-4b19-be6b-1aa80d09cdc4/.gitconfig'
+2026-10-21T00:54:46.4428920Z Temporarily overriding HOME='/Users/runner/work/_temp/af43937e-6842-4b19-be6b-1aa80d09cdc4' before making global git config changes
+2026-10-21T00:54:46.4539810Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T00:54:46.4597460Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-21T00:54:46.4604600Z Deleting the contents of '/Users/runner/work/XDRemux/XDRemux'
+2026-10-21T00:54:46.4606960Z ##[group]Determining repository object format
+2026-10-21T00:54:46.4613220Z ##[endgroup]
+2026-10-21T00:54:46.4615150Z ##[group]Initializing the repository
+2026-10-21T00:54:46.4617700Z [command]/opt/homebrew/bin/git init /Users/runner/work/XDRemux/XDRemux
+2026-10-21T00:54:46.4853520Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-21T00:54:46.4854560Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-21T00:54:46.4855670Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-21T00:54:46.4856340Z hint: call:
+2026-10-21T00:54:46.4856730Z hint:
+2026-10-21T00:54:46.4857190Z hint: 	git config --global init.defaultBranch <name>
+2026-10-21T00:54:46.4857800Z hint:
+2026-10-21T00:54:46.4858270Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-21T00:54:46.4859020Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-21T00:54:46.4859620Z hint:
+2026-10-21T00:54:46.4860110Z hint: 	git branch -m <name>
+2026-10-21T00:54:46.4860530Z hint:
+2026-10-21T00:54:46.4861060Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-21T00:54:46.4862050Z Initialized empty Git repository in /Users/runner/work/XDRemux/XDRemux/.git/
+2026-10-21T00:54:46.4868510Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/XDRemux
+2026-10-21T00:54:46.4987200Z ##[endgroup]
+2026-10-21T00:54:46.4988060Z ##[group]Disabling automatic garbage collection
+2026-10-21T00:54:46.4988810Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-21T00:54:46.5152620Z ##[endgroup]
+2026-10-21T00:54:46.5153430Z ##[group]Setting up auth
+2026-10-21T00:54:46.5154210Z Removing SSH command configuration
+2026-10-21T00:54:46.5154990Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T00:54:46.5227670Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T00:54:46.7166900Z Removing HTTP extra header
+2026-10-21T00:54:46.7175610Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T00:54:46.7286340Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T00:54:46.8718260Z Removing includeIf entries pointing to credentials config files
+2026-10-21T00:54:46.8817440Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T00:54:46.9125370Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T00:54:47.1153500Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-21T00:54:47.1460030Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path /Users/runner/work/_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config
+2026-10-21T00:54:47.1704930Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config
+2026-10-21T00:54:47.1791020Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config
+2026-10-21T00:54:47.1893130Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config
+2026-10-21T00:54:47.1980090Z ##[endgroup]
+2026-10-21T00:54:47.1988640Z ##[group]Fetching the repository
+2026-10-21T00:54:47.1990030Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2026-10-21T00:54:53.5243310Z From https://github.com/21Z121Z1/XDRemux
+2026-10-21T00:54:53.5248440Z  * [new branch]      codex/liblivephoto-consumer-20261004 -> origin/codex/liblivephoto-consumer-20261004
+2026-10-21T00:54:53.5250490Z  * [new branch]      cursor/full-res-linear-hdr-e174 -> origin/cursor/full-res-linear-hdr-e174
+2026-10-21T00:54:53.5252790Z  * [new branch]      cursor/portrait-heic-orientation-4765 -> origin/cursor/portrait-heic-orientation-4765
+2026-10-21T00:54:53.5256010Z  * [new branch]      feat/rust-cli-distribution-i18n-20260924 -> origin/feat/rust-cli-distribution-i18n-20260924
+2026-10-21T00:54:53.5258310Z  * [new branch]      feat/styles-hdr-first-linear-thumbnail-20261015 -> origin/feat/styles-hdr-first-linear-thumbnail-20261015
+2026-10-21T00:54:53.5260700Z  * [new branch]      integrate/semantic-review-20261020 -> origin/integrate/semantic-review-20261020
+2026-10-21T00:54:53.5262300Z  * [new branch]      main                   -> origin/main
+2026-10-21T00:54:53.5263890Z  * [new branch]      research/texture-native-20261019 -> origin/research/texture-native-20261019
+2026-10-21T00:54:53.5265770Z  * [new branch]      research/texture-style -> origin/research/texture-style
+2026-10-21T00:54:53.5267790Z  * [new tag]         backup/semantic-review-20261020/candidate/pr58-6ae70b2 -> backup/semantic-review-20261020/candidate/pr58-6ae70b2
+2026-10-21T00:54:53.5270480Z  * [new tag]         backup/semantic-review-20261020/candidate/pr58-8263637 -> backup/semantic-review-20261020/candidate/pr58-8263637
+2026-10-21T00:54:53.5272970Z  * [new tag]         backup/semantic-review-20261020/candidate/pr69-01ccece -> backup/semantic-review-20261020/candidate/pr69-01ccece
+2026-10-21T00:54:53.5278880Z  * [new tag]         backup/semantic-review-20261020/candidate/pr69-6458e3d -> backup/semantic-review-20261020/candidate/pr69-6458e3d
+2026-10-21T00:54:53.5282210Z  * [new tag]         backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004 -> backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004
+2026-10-21T00:54:53.5284930Z  * [new tag]         backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174 -> backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174
+2026-10-21T00:54:53.5286270Z  * [new tag]         backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765 -> backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765
+2026-10-21T00:54:53.5287560Z  * [new tag]         backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924 -> backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924
+2026-10-21T00:54:53.5288910Z  * [new tag]         backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015 -> backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015
+2026-10-21T00:54:53.5290030Z  * [new tag]         backup/semantic-review-20261020/integration/000e74b -> backup/semantic-review-20261020/integration/000e74b
+2026-10-21T00:54:53.5290960Z  * [new tag]         backup/semantic-review-20261020/integration/0a2c7c9 -> backup/semantic-review-20261020/integration/0a2c7c9
+2026-10-21T00:54:53.5292260Z  * [new tag]         backup/semantic-review-20261020/integration/1b2c07d -> backup/semantic-review-20261020/integration/1b2c07d
+2026-10-21T00:54:53.5293320Z  * [new tag]         backup/semantic-review-20261020/integration/4b04fb3 -> backup/semantic-review-20261020/integration/4b04fb3
+2026-10-21T00:54:53.5295390Z  * [new tag]         backup/semantic-review-20261020/integration/711213c -> backup/semantic-review-20261020/integration/711213c
+2026-10-21T00:54:53.5296270Z  * [new tag]         backup/semantic-review-20261020/integration/8dbe01d -> backup/semantic-review-20261020/integration/8dbe01d
+2026-10-21T00:54:53.5297220Z  * [new tag]         backup/semantic-review-20261020/integration/91c3ab4 -> backup/semantic-review-20261020/integration/91c3ab4
+2026-10-21T00:54:53.5298380Z  * [new tag]         backup/semantic-review-20261020/integration/ab37567 -> backup/semantic-review-20261020/integration/ab37567
+2026-10-21T00:54:53.5299650Z  * [new tag]         backup/semantic-review-20261020/integration/b049b7a -> backup/semantic-review-20261020/integration/b049b7a
+2026-10-21T00:54:53.5300660Z  * [new tag]         backup/semantic-review-20261020/integration/ba2b169 -> backup/semantic-review-20261020/integration/ba2b169
+2026-10-21T00:54:53.5301680Z  * [new tag]         backup/semantic-review-20261020/integration/c379aa7 -> backup/semantic-review-20261020/integration/c379aa7
+2026-10-21T00:54:53.5303300Z  * [new tag]         backup/semantic-review-20261020/integration/c484046 -> backup/semantic-review-20261020/integration/c484046
+2026-10-21T00:54:53.5304430Z  * [new tag]         backup/semantic-review-20261020/integration/f9a419a -> backup/semantic-review-20261020/integration/f9a419a
+2026-10-21T00:54:53.5305460Z  * [new tag]         backup/semantic-review-20261020/integration/fc3f04d -> backup/semantic-review-20261020/integration/fc3f04d
+2026-10-21T00:54:53.5306310Z  * [new tag]         backup/semantic-review-20261020/main -> backup/semantic-review-20261020/main
+2026-10-21T00:54:53.5307280Z  * [new tag]         backup/semantic-review-20261020/research/texture-native-20261019 -> backup/semantic-review-20261020/research/texture-native-20261019
+2026-10-21T00:54:53.5309050Z  * [new tag]         backup/semantic-review-20261020/research/texture-style -> backup/semantic-review-20261020/research/texture-style
+2026-10-21T00:54:53.5310020Z  * [new tag]         review/semantic-integration-20261020-evidence-v1 -> review/semantic-integration-20261020-evidence-v1
+2026-10-21T00:54:53.5310980Z  * [new tag]         review/semantic-integration-20261020-evidence-v10 -> review/semantic-integration-20261020-evidence-v10
+2026-10-21T00:54:53.5312520Z  * [new tag]         review/semantic-integration-20261020-evidence-v11 -> review/semantic-integration-20261020-evidence-v11
+2026-10-21T00:54:53.5313500Z  * [new tag]         review/semantic-integration-20261020-evidence-v2 -> review/semantic-integration-20261020-evidence-v2
+2026-10-21T00:54:53.5314460Z  * [new tag]         review/semantic-integration-20261020-evidence-v3 -> review/semantic-integration-20261020-evidence-v3
+2026-10-21T00:54:53.5315420Z  * [new tag]         review/semantic-integration-20261020-evidence-v4 -> review/semantic-integration-20261020-evidence-v4
+2026-10-21T00:54:53.5316350Z  * [new tag]         review/semantic-integration-20261020-evidence-v5 -> review/semantic-integration-20261020-evidence-v5
+2026-10-21T00:54:53.5317260Z  * [new tag]         review/semantic-integration-20261020-evidence-v6 -> review/semantic-integration-20261020-evidence-v6
+2026-10-21T00:54:53.5318180Z  * [new tag]         review/semantic-integration-20261020-evidence-v7 -> review/semantic-integration-20261020-evidence-v7
+2026-10-21T00:54:53.5319030Z  * [new tag]         review/semantic-integration-20261020-evidence-v8 -> review/semantic-integration-20261020-evidence-v8
+2026-10-21T00:54:53.5319980Z  * [new tag]         review/semantic-integration-20261020-evidence-v9 -> review/semantic-integration-20261020-evidence-v9
+2026-10-21T00:54:53.5320720Z  * [new tag]         v1.0                   -> v1.0
+2026-10-21T00:54:53.5321140Z  * [new tag]         v1.1                   -> v1.1
+2026-10-21T00:54:53.5321590Z  * [new tag]         v1.2                   -> v1.2
+2026-10-21T00:54:53.5321990Z  * [new tag]         v1.3                   -> v1.3
+2026-10-21T00:54:53.5323020Z  * [new tag]         v1.3.1                 -> v1.3.1
+2026-10-21T00:54:53.5323410Z  * [new tag]         v1.4                   -> v1.4
+2026-10-21T00:54:53.5326850Z [command]/opt/homebrew/bin/git rev-parse --verify --quiet 91c3ab45310adb05d5e9e3a3d1c23e1345542b06^{object}
+2026-10-21T00:54:53.5409660Z 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:54:53.5419290Z ##[endgroup]
+2026-10-21T00:54:53.5420820Z ##[group]Determining the checkout info
+2026-10-21T00:54:53.5422180Z ##[endgroup]
+2026-10-21T00:54:53.5429410Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-21T00:54:53.5584790Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-21T00:54:53.5684560Z ##[group]Checking out the ref
+2026-10-21T00:54:53.5687270Z [command]/opt/homebrew/bin/git checkout --progress --force 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:54:54.5514190Z HEAD is now at 91c3ab4 Route System and Tone checks through the complete pinned native consumer
+2026-10-21T00:54:54.5586710Z ##[endgroup]
+2026-10-21T00:54:54.5880670Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-21T00:54:54.6001930Z 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:54:54.6724500Z ##[group]Run actual="$(git rev-parse HEAD)"
+2026-10-21T00:54:54.6724880Z [36;1mactual="$(git rev-parse HEAD)"[0m
+2026-10-21T00:54:54.6725290Z [36;1mtest "$actual" = "$EXPECTED_HEAD"[0m
+2026-10-21T00:54:54.6725730Z [36;1mmkdir -p artifacts/product-integration[0m
+2026-10-21T00:54:54.6750660Z [36;1mprintf 'head=%s\n' "$actual" | tee artifacts/product-integration/head.txt[0m
+2026-10-21T00:54:54.6839060Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:54:54.6839750Z env:
+2026-10-21T00:54:54.6840320Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:54:54.6841120Z ##[endgroup]
+2026-10-21T00:54:54.8432700Z head=91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:54:54.8735640Z ##[group]Run brew install libheif
+2026-10-21T00:54:54.8736620Z [36;1mbrew install libheif[0m
+2026-10-21T00:54:54.8737720Z [36;1mecho "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"[0m
+2026-10-21T00:54:54.8803240Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:54:54.8803630Z env:
+2026-10-21T00:54:54.8803990Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:54:54.8804350Z ##[endgroup]
+2026-10-21T00:55:00.3139320Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-21T00:55:00.3235770Z ✔︎ Bottle Manifest libheif (1.23.6)
+2026-10-21T00:55:00.5501810Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-21T00:55:00.5502640Z libheif 1.23.6
+2026-10-21T00:55:00.5505720Z [34m==>[0m [1mWould install 4 dependencies for libheif:[0m
+2026-10-21T00:55:00.5506730Z libvmaf
+2026-10-21T00:55:00.5507670Z aom
+2026-10-21T00:55:00.5508360Z libde265
+2026-10-21T00:55:00.5509170Z x265
+2026-10-21T00:55:00.6105700Z [32m==>[0m [1mFetching downloads for: [32mlibheif[39m[0m
+2026-10-21T00:55:01.0883050Z ✔︎ Bottle Manifest libvmaf (3.2.1)
+2026-10-21T00:55:01.1000160Z ✔︎ Bottle Manifest aom (3.15.2)
+2026-10-21T00:55:01.1102390Z ✔︎ Bottle Manifest libde265 (1.1.3)
+2026-10-21T00:55:01.4622840Z ✔︎ Bottle Manifest x265 (4.3)
+2026-10-21T00:55:03.8029110Z ✔︎ Bottle libheif (1.23.6)
+2026-10-21T00:55:03.8629920Z ✔︎ Bottle libvmaf (3.2.1)
+2026-10-21T00:55:03.9182760Z ✔︎ Bottle libde265 (1.1.3)
+2026-10-21T00:55:03.9285460Z ✔︎ Bottle aom (3.15.2)
+2026-10-21T00:55:04.0937610Z ✔︎ Bottle x265 (4.3)
+2026-10-21T00:55:04.1517810Z [32m==>[0m [1mInstalling dependencies for libheif:[0m [32mlibvmaf[39m, [32maom[39m, [32mlibde265[39m and [32mx265[39m[0m
+2026-10-21T00:55:04.1519830Z [32m==>[0m [1mInstalling libheif dependency: [32mlibvmaf[39m (3.2.1)[0m
+2026-10-21T00:55:04.1615210Z [34m==>[0m [1mPouring libvmaf--3.2.1.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:55:05.6331660Z 🍺  /opt/homebrew/Cellar/libvmaf/3.2.1: 243 files, 8.2MB
+2026-10-21T00:55:05.6334130Z [32m==>[0m [1mInstalling libheif dependency: [32maom[39m (3.15.2)[0m
+2026-10-21T00:55:05.6529630Z [34m==>[0m [1mPouring aom--3.15.2.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:55:06.8910240Z 🍺  /opt/homebrew/Cellar/aom/3.15.2: 30 files, 11.3MB
+2026-10-21T00:55:06.8913210Z [32m==>[0m [1mInstalling libheif dependency: [32mlibde265[39m (1.1.3)[0m
+2026-10-21T00:55:06.8942810Z [34m==>[0m [1mPouring libde265--1.1.3.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:55:08.0178360Z 🍺  /opt/homebrew/Cellar/libde265/1.1.3: 18 files, 436.6KB
+2026-10-21T00:55:08.0181250Z [32m==>[0m [1mInstalling libheif dependency: [32mx265[39m (4.3)[0m
+2026-10-21T00:55:08.0242950Z [34m==>[0m [1mPouring x265--4.3.arm64_golden_gate.bottle.1.tar.gz[0m
+2026-10-21T00:55:09.2632420Z 🍺  /opt/homebrew/Cellar/x265/4.3: 12 files, 17.3MB
+2026-10-21T00:55:09.2640090Z [32m==>[0m [1mInstalling [32mlibheif[39m[0m
+2026-10-21T00:55:09.2645940Z [34m==>[0m [1mPouring libheif--1.23.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:55:10.3406920Z 🍺  /opt/homebrew/Cellar/libheif/1.23.6: 53 files, 9.1MB
+2026-10-21T00:55:10.3409980Z [32m==>[0m [1mCaveats[0m
+2026-10-21T00:55:10.3413440Z [34m==>[0m [1mlibheif[0m
+2026-10-21T00:55:10.3414010Z Additional codecs can be enabled by `brew install libheif-plugins`
+2026-10-21T00:55:10.4205000Z ##[group]Run actions-rust-lang/setup-rust-toolchain@v2
+2026-10-21T00:55:10.4205680Z with:
+2026-10-21T00:55:10.4206180Z   toolchain: stable
+2026-10-21T00:55:10.4206630Z   components: rustfmt, clippy
+2026-10-21T00:55:10.4207490Z   build-warnings: deny
+2026-10-21T00:55:10.4208210Z   cache: true
+2026-10-21T00:55:10.4208730Z   cache-on-failure: true
+2026-10-21T00:55:10.4209480Z   cache-bin: true
+2026-10-21T00:55:10.4209710Z   cache-provider: github
+2026-10-21T00:55:10.4209890Z   cache-all-crates: false
+2026-10-21T00:55:10.4210080Z   cache-workspace-crates: false
+2026-10-21T00:55:10.4210350Z   cache-save-if: true
+2026-10-21T00:55:10.4210540Z   cache-targets: true
+2026-10-21T00:55:10.4210800Z   matcher: true
+2026-10-21T00:55:10.4210990Z   override: true
+2026-10-21T00:55:10.4211250Z env:
+2026-10-21T00:55:10.4211550Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:10.4211920Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:10.4212250Z ##[endgroup]
+2026-10-21T00:55:10.4287630Z ##[start-action display=Unbork mac;id=__actions-rust-lang_setup-rust-toolchain.__run]
+2026-10-21T00:55:10.4351180Z ##[group]Run brew install bash
+2026-10-21T00:55:10.4351440Z [36;1mbrew install bash[0m
+2026-10-21T00:55:10.4419800Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:10.4420110Z env:
+2026-10-21T00:55:10.4420340Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:10.4420650Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:10.4420920Z ##[endgroup]
+2026-10-21T00:55:11.5841040Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-21T00:55:11.5945900Z ✔︎ Bottle Manifest bash (5.3.20)
+2026-10-21T00:55:11.6470490Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-21T00:55:11.6471420Z bash 5.3.20
+2026-10-21T00:55:11.6474350Z [34m==>[0m [1mWould install 1 dependency for bash:[0m
+2026-10-21T00:55:11.6474750Z ncurses
+2026-10-21T00:55:11.6576400Z [32m==>[0m [1mFetching downloads for: [32mbash[39m[0m
+2026-10-21T00:55:12.0219980Z ✔︎ Bottle Manifest ncurses (6.6)
+2026-10-21T00:55:13.6883180Z ✔︎ Bottle bash (5.3.20)
+2026-10-21T00:55:14.1980650Z ✔︎ Bottle ncurses (6.6)
+2026-10-21T00:55:14.2156400Z [32m==>[0m [1mInstalling bash dependency: [32mncurses[39m (6.6)[0m
+2026-10-21T00:55:14.2188130Z [34m==>[0m [1mPouring ncurses--6.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:55:15.7791980Z 🍺  /opt/homebrew/Cellar/ncurses/6.6: 4,086 files, 10.3MB
+2026-10-21T00:55:15.7795010Z [32m==>[0m [1mInstalling [32mbash[39m[0m
+2026-10-21T00:55:15.7797660Z [34m==>[0m [1mPouring bash--5.3.20.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:55:17.1593110Z 🍺  /opt/homebrew/Cellar/bash/5.3.20: 172 files, 13.1MB
+2026-10-21T00:55:17.1600750Z [32m==>[0m [1mCaveats[0m
+2026-10-21T00:55:17.1602730Z [34m==>[0m [1mbash[0m
+2026-10-21T00:55:17.1603560Z DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/lib/bash:/opt/local/lib/bash:/usr/pkg/lib/bash:/opt/pkg/lib/bash:.
+2026-10-21T00:55:17.1868390Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=6757]
+2026-10-21T00:55:17.1935110Z ##[start-action display=Run : construct rustup command line;id=__actions-rust-lang_setup-rust-toolchain.flags]
+2026-10-21T00:55:17.1980520Z ##[group]Run : construct rustup command line
+2026-10-21T00:55:17.1981040Z [36;1m: construct rustup command line[0m
+2026-10-21T00:55:17.1981490Z [36;1mecho "targets=$(for t in ${_srt_targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:55:17.1982220Z [36;1mecho "components=$(for c in ${_srt_components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:55:17.1982800Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:55:17.2004690Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:17.2005100Z env:
+2026-10-21T00:55:17.2006300Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:17.2006810Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:17.2007160Z   _srt_targets: 
+2026-10-21T00:55:17.2007400Z   _srt_components: rustfmt, clippy
+2026-10-21T00:55:17.2007700Z ##[endgroup]
+2026-10-21T00:55:17.2870260Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.flags;outcome=success;conclusion=success;duration_ms=93]
+2026-10-21T00:55:17.2875960Z ##[start-action display=Setting Environment Variables;id=__actions-rust-lang_setup-rust-toolchain.__run_2]
+2026-10-21T00:55:17.2907160Z ##[group]Run if [[ ! -v CARGO_INCREMENTAL ]]; then
+2026-10-21T00:55:17.2907670Z [36;1mif [[ ! -v CARGO_INCREMENTAL ]]; then[0m
+2026-10-21T00:55:17.2907980Z [36;1m  echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV[0m
+2026-10-21T00:55:17.2908410Z [36;1mfi[0m
+2026-10-21T00:55:17.2908720Z [36;1mif [[ ! -v CARGO_PROFILE_DEV_DEBUG ]]; then[0m
+2026-10-21T00:55:17.2909070Z [36;1m  echo "CARGO_PROFILE_DEV_DEBUG=0" >> $GITHUB_ENV[0m
+2026-10-21T00:55:17.2909450Z [36;1mfi[0m
+2026-10-21T00:55:17.2909670Z [36;1mif [[ ! -v CARGO_TERM_COLOR ]]; then[0m
+2026-10-21T00:55:17.2910060Z [36;1m  echo "CARGO_TERM_COLOR=always" >> $GITHUB_ENV[0m
+2026-10-21T00:55:17.2910380Z [36;1mfi[0m
+2026-10-21T00:55:17.2910650Z [36;1mif [[ ! -v RUST_BACKTRACE ]]; then[0m
+2026-10-21T00:55:17.2911020Z [36;1m  echo "RUST_BACKTRACE=short" >> $GITHUB_ENV[0m
+2026-10-21T00:55:17.2911370Z [36;1mfi[0m
+2026-10-21T00:55:17.2911690Z [36;1mif [[ ( ! -v RUSTFLAGS ) && $_srt_NEW_RUSTFLAGS != "" ]]; then[0m
+2026-10-21T00:55:17.2912090Z [36;1m  echo "RUSTFLAGS=$_srt_NEW_RUSTFLAGS" >> $GITHUB_ENV[0m
+2026-10-21T00:55:17.2912530Z [36;1mfi[0m
+2026-10-21T00:55:17.2912880Z [36;1mif [[ ( ! -v CARGO_BUILD_WARNINGS ) && $_srt_CARGO_BUILD_WARNINGS != "" ]]; then[0m
+2026-10-21T00:55:17.2913500Z [36;1m  echo "CARGO_BUILD_WARNINGS=$_srt_CARGO_BUILD_WARNINGS" >> $GITHUB_ENV[0m
+2026-10-21T00:55:17.2913890Z [36;1mfi[0m
+2026-10-21T00:55:17.2914190Z [36;1m# Enable faster sparse index on nightly[0m
+2026-10-21T00:55:17.2914520Z [36;1m# The value is ignored on stable and causes no problems[0m
+2026-10-21T00:55:17.2915190Z [36;1m# https://internals.rust-lang.org/t/call-for-testing-cargo-sparse-registry/16862[0m
+2026-10-21T00:55:17.2915630Z [36;1mif [[ ! -v CARGO_UNSTABLE_SPARSE_REGISTRY ]]; then[0m
+2026-10-21T00:55:17.2916030Z [36;1m  echo "CARGO_UNSTABLE_SPARSE_REGISTRY=true" >> $GITHUB_ENV[0m
+2026-10-21T00:55:17.2916370Z [36;1mfi[0m
+2026-10-21T00:55:17.2916630Z [36;1mif [[ ! -v CARGO_REGISTRIES_CRATES_IO_PROTOCOL ]]; then[0m
+2026-10-21T00:55:17.2916990Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse" >> $GITHUB_ENV[0m
+2026-10-21T00:55:17.2917280Z [36;1mfi[0m
+2026-10-21T00:55:17.2931260Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:17.2931900Z env:
+2026-10-21T00:55:17.2932210Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:17.2932760Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:17.2933120Z   _srt_NEW_RUSTFLAGS: 
+2026-10-21T00:55:17.2933430Z   _srt_CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:17.2933700Z ##[endgroup]
+2026-10-21T00:55:17.3583650Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_2;outcome=success;conclusion=success;duration_ms=70]
+2026-10-21T00:55:17.3586710Z ##[start-action display=Install Rust Problem Matcher;id=__actions-rust-lang_setup-rust-toolchain.__run_3]
+2026-10-21T00:55:17.3618280Z ##[group]Run echo "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"
+2026-10-21T00:55:17.3619750Z [36;1mecho "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"[0m
+2026-10-21T00:55:17.3812170Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:17.3813350Z env:
+2026-10-21T00:55:17.3813970Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:17.3815080Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:17.3818440Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:17.3819050Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:17.3819660Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:17.3820320Z   RUST_BACKTRACE: short
+2026-10-21T00:55:17.3821030Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:17.3821600Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:17.3822240Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:17.3822910Z ##[endgroup]
+2026-10-21T00:55:17.4363220Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_3;outcome=success;conclusion=success;duration_ms=77]
+2026-10-21T00:55:17.4366930Z ##[start-action display=Install rustup, if needed;id=__actions-rust-lang_setup-rust-toolchain.__run_4]
+2026-10-21T00:55:17.4390440Z ##[group]Run if ! command -v rustup &> /dev/null ; then
+2026-10-21T00:55:17.4390880Z [36;1mif ! command -v rustup &> /dev/null ; then[0m
+2026-10-21T00:55:17.4391530Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" | sh -s -- --default-toolchain none -y[0m
+2026-10-21T00:55:17.4392100Z [36;1m[0m
+2026-10-21T00:55:17.4392380Z [36;1m  # Resolve the correct CARGO_HOME path depending on OS[0m
+2026-10-21T00:55:17.4392760Z [36;1m  if [[ "$RUNNER_OS" == "Windows" ]]; then[0m
+2026-10-21T00:55:17.4393700Z [36;1m    echo "${CARGO_HOME:-$USERPROFILE/.cargo}/bin" | sed 's|/|\\|g' >> $GITHUB_PATH[0m
+2026-10-21T00:55:17.4394050Z [36;1m  else[0m
+2026-10-21T00:55:17.4394260Z [36;1m    echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> $GITHUB_PATH[0m
+2026-10-21T00:55:17.4394530Z [36;1m  fi[0m
+2026-10-21T00:55:17.4394670Z [36;1mfi[0m
+2026-10-21T00:55:17.4410170Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:17.4410510Z env:
+2026-10-21T00:55:17.4410820Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:17.4411190Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:17.4411520Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:17.4411820Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:17.4412060Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:17.4412250Z   RUST_BACKTRACE: short
+2026-10-21T00:55:17.4412450Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:17.4412700Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:17.4413010Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:17.4413340Z   RUNNER_OS: macOS
+2026-10-21T00:55:17.4413570Z ##[endgroup]
+2026-10-21T00:55:17.4917590Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=54]
+2026-10-21T00:55:17.4922500Z ##[start-action display=rustup toolchain install stable;id=__actions-rust-lang_setup-rust-toolchain.__run_5]
+2026-10-21T00:55:17.4959530Z ##[group]Run # Check if value is set
+2026-10-21T00:55:17.4959920Z [36;1m# Check if value is set[0m
+2026-10-21T00:55:17.4960480Z [36;1mif [[ -n "$_srt_rust_src_dir" ]][0m
+2026-10-21T00:55:17.4960700Z [36;1mthen[0m
+2026-10-21T00:55:17.4960920Z [36;1m  # If value is set the directory must exist[0m
+2026-10-21T00:55:17.4961250Z [36;1m  if [[ -d "$_srt_rust_src_dir" ]][0m
+2026-10-21T00:55:17.4961510Z [36;1m  then[0m
+2026-10-21T00:55:17.4961690Z [36;1m    cd "$_srt_rust_src_dir"[0m
+2026-10-21T00:55:17.4961920Z [36;1m  else[0m
+2026-10-21T00:55:17.4962240Z [36;1m    echo "'rust-src-dir' does not point to an existing directory" >&2[0m
+2026-10-21T00:55:17.4962690Z [36;1m    echo "The value of 'rust-src-dir' is: ${_srt_rust_src_dir}" >&2[0m
+2026-10-21T00:55:17.4963050Z [36;1m    exit 1[0m
+2026-10-21T00:55:17.4963220Z [36;1m  fi[0m
+2026-10-21T00:55:17.4963420Z [36;1mfi[0m
+2026-10-21T00:55:17.4963770Z [36;1mif [[ -z "$_srt_toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml") ]][0m
+2026-10-21T00:55:17.4964160Z [36;1mthen[0m
+2026-10-21T00:55:17.4964420Z [36;1m  # Install the toolchain as specified in the file[0m
+2026-10-21T00:55:17.4964890Z [36;1m  # rustup show is the old way that implicitly installed a toolchain[0m
+2026-10-21T00:55:17.4966460Z [36;1m  # rustup toolchain install is the new explicit way[0m
+2026-10-21T00:55:17.4967790Z [36;1m  # https://github.com/rust-lang/rustup/issues/3635#issuecomment-2343511297[0m
+2026-10-21T00:55:17.4968880Z [36;1m  rustup show active-toolchain || rustup toolchain install[0m
+2026-10-21T00:55:17.4969720Z [36;1m  if [[ -n $_srt_components ]]; then[0m
+2026-10-21T00:55:17.4970510Z [36;1m    rustup component add ${_srt_components//,/ }[0m
+2026-10-21T00:55:17.4971210Z [36;1m  fi[0m
+2026-10-21T00:55:17.4971660Z [36;1m  if [[ -n $_srt_targets ]]; then[0m
+2026-10-21T00:55:17.4972340Z [36;1m    rustup target add ${_srt_targets//,/ }[0m
+2026-10-21T00:55:17.4973550Z [36;1m  fi[0m
+2026-10-21T00:55:17.4973810Z [36;1melse[0m
+2026-10-21T00:55:17.4973990Z [36;1m  if [[ -z "$_srt_toolchain" ]][0m
+2026-10-21T00:55:17.4974230Z [36;1m  then[0m
+2026-10-21T00:55:17.4974400Z [36;1m    _srt_toolchain=stable[0m
+2026-10-21T00:55:17.4975280Z [36;1m  fi[0m
+2026-10-21T00:55:17.4976430Z [36;1m  rustup toolchain install ${_srt_toolchain//,/ }  --component rustfmt --component clippy --profile minimal --no-self-update[0m
+2026-10-21T00:55:17.4977760Z [36;1m  # Take the last element from the list[0m
+2026-10-21T00:55:17.4978580Z [36;1m  if [[ "$_srt_override" == "true" ]][0m
+2026-10-21T00:55:17.4979190Z [36;1m  then[0m
+2026-10-21T00:55:17.4979730Z [36;1m    rustup override set ${_srt_toolchain//*,/ }[0m
+2026-10-21T00:55:17.4980510Z [36;1m  fi[0m
+2026-10-21T00:55:17.4981010Z [36;1mfi[0m
+2026-10-21T00:55:17.5006010Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:17.5006390Z env:
+2026-10-21T00:55:17.5006700Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:17.5007070Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:17.5007370Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:17.5007650Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:17.5007850Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:17.5008040Z   RUST_BACKTRACE: short
+2026-10-21T00:55:17.5008240Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:17.5008480Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:17.5008780Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:17.5009070Z   _srt_toolchain: stable
+2026-10-21T00:55:17.5009310Z   _srt_targets: 
+2026-10-21T00:55:17.5009490Z   _srt_components: rustfmt, clippy
+2026-10-21T00:55:17.5009740Z   _srt_override: true
+2026-10-21T00:55:17.5009980Z   _srt_rust_src_dir: 
+2026-10-21T00:55:17.5029610Z ##[endgroup]
+2026-10-21T00:55:17.9438500Z info: syncing channel updates for stable-aarch64-apple-darwin
+2026-10-21T00:55:18.1548010Z info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-21T00:55:18.1655420Z info: removing previous version of component clippy
+2026-10-21T00:55:18.1694830Z info: removing previous version of component rustfmt
+2026-10-21T00:55:18.1720560Z info: removing previous version of component cargo
+2026-10-21T00:55:18.1804630Z info: removing previous version of component rust-std
+2026-10-21T00:55:18.1986660Z info: removing previous version of component rustc
+2026-10-21T00:55:18.2128430Z info: downloading 5 components
+2026-10-21T00:55:25.4996500Z 
+2026-10-21T00:55:25.5592000Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))
+2026-10-21T00:55:25.5594300Z info: self-update is disabled for this build of rustup
+2026-10-21T00:55:25.5595590Z info: any updates to rustup will need to be fetched with your system package manager
+2026-10-21T00:55:25.5597160Z 
+2026-10-21T00:55:25.6024170Z info: override toolchain for /Users/runner/work/XDRemux/XDRemux set to stable-aarch64-apple-darwin
+2026-10-21T00:55:25.6086950Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=8115]
+2026-10-21T00:55:25.6098250Z ##[start-action display=Print installed versions;id=__actions-rust-lang_setup-rust-toolchain.versions]
+2026-10-21T00:55:25.6144470Z ##[group]Run echo "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT
+2026-10-21T00:55:25.6145780Z [36;1mecho "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:55:25.6146260Z [36;1m_srt_VERBOSE=$(rustc --version --verbose)[0m
+2026-10-21T00:55:25.6146540Z [36;1mecho "$_srt_VERBOSE"[0m
+2026-10-21T00:55:25.6147100Z [36;1mecho "cargo-version=$(cargo --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:55:25.6147450Z [36;1mcargo --version --verbose[0m
+2026-10-21T00:55:25.6147880Z [36;1mecho "rustup-version=$(rustup --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:55:25.6148210Z [36;1mrustup --version[0m
+2026-10-21T00:55:25.6148510Z [36;1m[0m
+2026-10-21T00:55:25.6149010Z [36;1m_srt_DATE=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+2026-10-21T00:55:25.6149540Z [36;1m_srt_HASH=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-hash: //p')[0m
+2026-10-21T00:55:25.6150050Z [36;1mecho "cachekey=$(echo $_srt_DATE$_srt_HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:55:25.6169880Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:25.6170360Z env:
+2026-10-21T00:55:25.6170640Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:25.6171110Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:25.6171490Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:25.6171820Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:25.6172150Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:25.6172410Z   RUST_BACKTRACE: short
+2026-10-21T00:55:25.6173040Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:25.6173300Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:25.6173700Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:25.6173990Z ##[endgroup]
+2026-10-21T00:55:25.8329640Z rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-21T00:55:25.8330600Z binary: rustc
+2026-10-21T00:55:25.8336870Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T00:55:25.8343540Z commit-date: 2026-10-13
+2026-10-21T00:55:25.8343960Z host: aarch64-apple-darwin
+2026-10-21T00:55:25.8344430Z release: 1.99.1
+2026-10-21T00:55:25.8344770Z LLVM version: 23.1.1
+2026-10-21T00:55:25.9097990Z cargo 1.99.1 (5f94df478 2026-08-27)
+2026-10-21T00:55:25.9100170Z release: 1.99.1
+2026-10-21T00:55:25.9101090Z commit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e
+2026-10-21T00:55:25.9102180Z commit-date: 2026-08-27
+2026-10-21T00:55:25.9102930Z host: aarch64-apple-darwin
+2026-10-21T00:55:25.9103880Z libgit2: 1.9.6 (sys:0.21.0 vendored)
+2026-10-21T00:55:25.9104880Z libcurl: 8.7.1 (sys:0.4.90+curl-8.21.0 system ssl:(SecureTransport) LibreSSL/3.3.6)
+2026-10-21T00:55:25.9106010Z ssl: OpenSSL 3.6.3 9 Jun 2026
+2026-10-21T00:55:25.9106730Z os: Mac OS 27.0.1 [64-bit]
+2026-10-21T00:55:25.9223260Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-21T00:55:25.9643810Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-21T00:55:25.9870180Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-21T00:55:25.9871470Z rustup 1.29.0 (2026-03-05)
+2026-10-21T00:55:26.0236530Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-21T00:55:26.0473690Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.versions;outcome=success;conclusion=success;duration_ms=437]
+2026-10-21T00:55:26.0480450Z ##[start-action display=Downgrade registry access protocol when needed;id=__actions-rust-lang_setup-rust-toolchain.__run_6]
+2026-10-21T00:55:26.0557320Z ##[group]Run # Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T00:55:26.0558810Z [36;1m# Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL[0m
+2026-10-21T00:55:26.0560330Z [36;1m# On versions 1.66, 1.67, and 1.68.0-nightly the value "sparse" is still unstable.[0m
+2026-10-21T00:55:26.0561650Z [36;1m# https://github.com/dtolnay/rust-toolchain/pull/69#discussion_r1107268108[0m
+2026-10-21T00:55:26.0564140Z [36;1m# If we detect an incompatible value, set it to "git" which is always supported.[0m
+2026-10-21T00:55:26.0565870Z [36;1mif [[ "rustc 1.99.1 (58cf8f9c3 2026-10-13)" =~ ^rustc\ (1\.6[67]\.|1\.68\.0-nightly) && "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL}" == "sparse" ]]; then[0m
+2026-10-21T00:55:26.0567690Z [36;1m  echo "Downgrade cargo registry protocol to git"[0m
+2026-10-21T00:55:26.0568680Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git" >> $GITHUB_ENV[0m
+2026-10-21T00:55:26.0569710Z [36;1mfi[0m
+2026-10-21T00:55:26.0588980Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:26.0589820Z env:
+2026-10-21T00:55:26.0590110Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:26.0590590Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:26.0591220Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:26.0591590Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:26.0591870Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:26.0592210Z   RUST_BACKTRACE: short
+2026-10-21T00:55:26.0592470Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:26.0592800Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:26.0593200Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:26.0593500Z ##[endgroup]
+2026-10-21T00:55:26.1227660Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=74]
+2026-10-21T00:55:26.1230710Z ##[start-action display=Setup Rust Caching;id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache]
+2026-10-21T00:55:26.1337470Z ##[group]Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+2026-10-21T00:55:26.1337800Z with:
+2026-10-21T00:55:26.1337970Z   cache-on-failure: true
+2026-10-21T00:55:26.1338170Z   cache-bin: true
+2026-10-21T00:55:26.1338330Z   cache-provider: github
+2026-10-21T00:55:26.1338560Z   cache-all-crates: false
+2026-10-21T00:55:26.1338750Z   cache-workspace-crates: false
+2026-10-21T00:55:26.1338970Z   cache-targets: true
+2026-10-21T00:55:26.1339160Z   save-if: true
+2026-10-21T00:55:26.1339640Z   prefix-key: v0-rust
+2026-10-21T00:55:26.1339850Z   add-job-id-key: true
+2026-10-21T00:55:26.1340080Z   add-rust-environment-hash-key: true
+2026-10-21T00:55:26.1340320Z   lookup-only: false
+2026-10-21T00:55:26.1340490Z   cmd-format: {0}
+2026-10-21T00:55:26.1340630Z env:
+2026-10-21T00:55:26.1340850Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:26.1341180Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:26.1341450Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:26.1341640Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:26.1341830Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:26.1342200Z   RUST_BACKTRACE: short
+2026-10-21T00:55:26.1342430Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:26.1342630Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:26.1343250Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:26.1343480Z ##[endgroup]
+2026-10-21T00:55:27.2946420Z ##[group]Cache Configuration
+2026-10-21T00:55:27.2947030Z Cache Provider:
+2026-10-21T00:55:27.2947860Z     github
+2026-10-21T00:55:27.2959280Z Workspaces:
+2026-10-21T00:55:27.2986100Z     /Users/runner/work/XDRemux/XDRemux
+2026-10-21T00:55:27.2991000Z Cache Paths:
+2026-10-21T00:55:27.2991400Z     /Users/runner/.cargo/bin
+2026-10-21T00:55:27.2991840Z     /Users/runner/.cargo/.crates.toml
+2026-10-21T00:55:27.2992200Z     /Users/runner/.cargo/.crates2.json
+2026-10-21T00:55:27.2993410Z     /Users/runner/.cargo/registry
+2026-10-21T00:55:27.2993650Z     /Users/runner/.cargo/git
+2026-10-21T00:55:27.2993960Z     /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T00:55:27.2994360Z Restore Key:
+2026-10-21T00:55:27.2994610Z     v0-rust-macos-product-Darwin-arm64-e85a7fdf
+2026-10-21T00:55:27.2994870Z Cache Key:
+2026-10-21T00:55:27.2995110Z     v0-rust-macos-product-Darwin-arm64-e85a7fdf-1d3ccc71
+2026-10-21T00:55:27.2995530Z .. Prefix:
+2026-10-21T00:55:27.2995760Z   - v0-rust-macos-product-Darwin-arm64
+2026-10-21T00:55:27.2996040Z .. Environment considered:
+2026-10-21T00:55:27.2996220Z   - Rust Versions:
+2026-10-21T00:55:27.2998280Z     - 1.99.1 aarch64-apple-darwin 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T00:55:27.2998850Z   - CARGO_BUILD_WARNINGS
+2026-10-21T00:55:27.2999080Z   - CARGO_INCREMENTAL
+2026-10-21T00:55:27.2999270Z   - CARGO_PROFILE_DEV_DEBUG
+2026-10-21T00:55:27.2999500Z   - CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T00:55:27.3000530Z   - CARGO_TERM_COLOR
+2026-10-21T00:55:27.3001220Z   - CARGO_UNSTABLE_SPARSE_REGISTRY
+2026-10-21T00:55:27.3001590Z   - RUST_BACKTRACE
+2026-10-21T00:55:27.3001820Z .. Lockfiles considered:
+2026-10-21T00:55:27.3002070Z   - /Users/runner/work/XDRemux/XDRemux/Cargo.lock
+2026-10-21T00:55:27.3002500Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification/Cargo.toml
+2026-10-21T00:55:27.3003040Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli/Cargo.toml
+2026-10-21T00:55:27.3003550Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec/Cargo.toml
+2026-10-21T00:55:27.3003990Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-container/Cargo.toml
+2026-10-21T00:55:27.3004530Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine/Cargo.toml
+2026-10-21T00:55:27.3004970Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-format/Cargo.toml
+2026-10-21T00:55:27.3005890Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr/Cargo.toml
+2026-10-21T00:55:27.3006930Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif/Cargo.toml
+2026-10-21T00:55:27.3007420Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata/Cargo.toml
+2026-10-21T00:55:27.3007920Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo/Cargo.toml
+2026-10-21T00:55:27.3008380Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime/Cargo.toml
+2026-10-21T00:55:27.3008790Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-source/Cargo.toml
+2026-10-21T00:55:27.3009570Z ##[endgroup]
+2026-10-21T00:55:27.3009720Z 
+2026-10-21T00:55:27.3009830Z ... Restoring cache ...
+2026-10-21T00:55:27.4989010Z Cache hit for: v0-rust-macos-product-Darwin-arm64-e85a7fdf-1d3ccc71
+2026-10-21T00:55:28.6559250Z Received 71303168 of 90933840 (78.4%), 67.9 MBs/sec
+2026-10-21T00:55:28.7736730Z Received 90933840 of 90933840 (100.0%), 77.5 MBs/sec
+2026-10-21T00:55:28.7737750Z Cache Size: ~87 MB (90933840 B)
+2026-10-21T00:55:28.7781270Z [command]/opt/homebrew/bin/gtar -xf /Users/runner/work/_temp/ed40aa6d-b521-45cb-a464-d1b8f5f02f6c/cache.tzst -P -C /Users/runner/work/XDRemux/XDRemux --delay-directory-restore --use-compress-program unzstd
+2026-10-21T00:55:30.3715330Z Cache restored successfully
+2026-10-21T00:55:30.3758280Z Restored from cache key "v0-rust-macos-product-Darwin-arm64-e85a7fdf-1d3ccc71" full match: true.
+2026-10-21T00:55:30.4046580Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=4281]
+2026-10-21T00:55:30.4320010Z ##[group]Run cargo metadata --locked --no-deps --format-version 1 >/dev/null
+2026-10-21T00:55:30.4320700Z [36;1mcargo metadata --locked --no-deps --format-version 1 >/dev/null[0m
+2026-10-21T00:55:30.4321100Z [36;1mcargo fmt --all -- --check[0m
+2026-10-21T00:55:30.4355010Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:30.4356030Z env:
+2026-10-21T00:55:30.4356760Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:30.4357700Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:30.4358590Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:30.4359270Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:30.4359890Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:30.4360560Z   RUST_BACKTRACE: short
+2026-10-21T00:55:30.4361140Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:30.4361940Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:30.4362770Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:30.4363780Z   CACHE_ON_FAILURE: true
+2026-10-21T00:55:30.4364680Z ##[endgroup]
+2026-10-21T00:55:31.6952510Z ##[group]Run cargo clippy --locked --workspace --all-targets -- --deny warnings \
+2026-10-21T00:55:31.6953230Z [36;1mcargo clippy --locked --workspace --all-targets -- --deny warnings \[0m
+2026-10-21T00:55:31.6953720Z [36;1m  2>&1 | tee artifacts/product-integration/clippy.log[0m
+2026-10-21T00:55:31.6968650Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:31.6969020Z env:
+2026-10-21T00:55:31.6969320Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:31.6969790Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:31.6970100Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:31.6971340Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:31.6972360Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:31.6973130Z   RUST_BACKTRACE: short
+2026-10-21T00:55:31.6973700Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:31.6974490Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:31.6975750Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:31.6976570Z   CACHE_ON_FAILURE: true
+2026-10-21T00:55:31.6977410Z ##[endgroup]
+2026-10-21T00:55:32.0711270Z [1m[92m    Updating[0m crates.io index
+2026-10-21T00:55:33.4541940Z [1m[92m    Checking[0m xdremux-format v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-format)
+2026-10-21T00:55:33.4668680Z [1m[92m    Checking[0m xdremux-motion-photo v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo)
+2026-10-21T00:55:33.4673360Z [1m[92m    Checking[0m xdremux-container v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-container)
+2026-10-21T00:55:33.7260460Z [1m[92m    Checking[0m xdremux-engine v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine)
+2026-10-21T00:55:33.7477820Z [1m[92m    Checking[0m xdremux-heif v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif)
+2026-10-21T00:55:33.9092150Z [1m[92m    Checking[0m xdremux-metadata v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata)
+2026-10-21T00:55:34.2426840Z [1m[92m    Checking[0m xdremux-hdr v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr)
+2026-10-21T00:55:34.5027850Z [1m[92m    Checking[0m xdremux-source v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-source)
+2026-10-21T00:55:34.5734280Z [1m[92m    Checking[0m xdremux-codec v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec)
+2026-10-21T00:55:34.6452540Z [1m[92m    Checking[0m xdremux-classification v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification)
+2026-10-21T00:55:35.1356460Z [1m[92m    Checking[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-21T00:55:36.4658650Z [1m[92m    Checking[0m xdremux-cli v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli)
+2026-10-21T00:55:38.9959810Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 7.10s
+2026-10-21T00:55:39.0657050Z ##[group]Run cargo test --locked --workspace --all-targets \
+2026-10-21T00:55:39.0658350Z [36;1mcargo test --locked --workspace --all-targets \[0m
+2026-10-21T00:55:39.0660020Z [36;1m  2>&1 | tee artifacts/product-integration/rust-tests.log[0m
+2026-10-21T00:55:39.0699180Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:55:39.0699650Z env:
+2026-10-21T00:55:39.0699950Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:55:39.0700390Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:55:39.0700790Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:55:39.0701350Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:55:39.0701670Z   CARGO_TERM_COLOR: always
+2026-10-21T00:55:39.0702010Z   RUST_BACKTRACE: short
+2026-10-21T00:55:39.0702270Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:55:39.0702610Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:55:39.0703000Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:55:39.0703530Z   CACHE_ON_FAILURE: true
+2026-10-21T00:55:39.0704080Z   XDREMUX_ORIENTATION_OUTPUT: /Users/runner/work/XDRemux/XDRemux/artifacts/product-integration/orientation
+2026-10-21T00:55:39.0704610Z ##[endgroup]
+2026-10-21T00:55:39.4269100Z [1m[92m   Compiling[0m xdremux-format v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-format)
+2026-10-21T00:55:39.4379880Z [1m[92m   Compiling[0m xdremux-motion-photo v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo)
+2026-10-21T00:55:39.4482270Z [1m[92m   Compiling[0m xdremux-container v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-container)
+2026-10-21T00:55:39.6062040Z [1m[92m   Compiling[0m xdremux-engine v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine)
+2026-10-21T00:55:39.6470420Z [1m[92m   Compiling[0m xdremux-heif v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif)
+2026-10-21T00:55:40.1801360Z [1m[92m   Compiling[0m xdremux-metadata v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata)
+2026-10-21T00:55:40.7167410Z [1m[92m   Compiling[0m xdremux-codec v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec)
+2026-10-21T00:55:40.9219800Z [1m[92m   Compiling[0m xdremux-hdr v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr)
+2026-10-21T00:55:41.2563490Z [1m[92m   Compiling[0m xdremux-source v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-source)
+2026-10-21T00:55:41.4384760Z [1m[92m   Compiling[0m xdremux-classification v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification)
+2026-10-21T00:55:42.2552880Z [1m[92m   Compiling[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-21T00:55:46.3612330Z [1m[92m   Compiling[0m xdremux-cli v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli)
+2026-10-21T00:56:03.2643900Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 24.08s
+2026-10-21T00:56:03.2887550Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_classification-5dc6a30ba88ea12e)
+2026-10-21T00:56:03.2925530Z 
+2026-10-21T00:56:03.2927270Z running 12 tests
+2026-10-21T00:56:03.2946590Z test oppo::tests::parses_json_and_embedded_prefix_forms ... ok
+2026-10-21T00:56:03.2948070Z test oppo::tests::keeps_all_activated_modes_but_projects_one_folder ... ok
+2026-10-21T00:56:03.2949440Z test capabilities::tests::requires_complete_depth_manifest_evidence ... ok
+2026-10-21T00:56:03.2950660Z test oppo::tests::separates_known_unmapped_and_unknown_flags ... ok
+2026-10-21T00:56:03.2952190Z test planning::tests::asset_planning_contract_keeps_validated_live_pair_on_shared_collision_sequence ... ok
+2026-10-21T00:56:03.2954620Z test planning::tests::planner_rejects_asset_classification_type_drift ... ok
+2026-10-21T00:56:03.2955400Z test planning::tests::reservations_keep_cross_asset_collisions_deterministic ... ok
+2026-10-21T00:56:03.2956100Z test planning::tests::identical_existing_resources_are_duplicates_without_renaming ... ok
+2026-10-21T00:56:03.2957790Z test planning::tests::resolve_asset_preserves_inferred_embedded_live_photo_without_companion ... ok
+2026-10-21T00:56:03.2959300Z test planning::tests::resolve_asset_claims_only_validated_same_stem_sibling_mov ... ok
+2026-10-21T00:56:03.2959880Z test tests::photo_asset_keeps_live_photo_resources_together ... ok
+2026-10-21T00:56:03.2960400Z test tests::matches_shared_swift_python_golden_contract ... ok
+2026-10-21T00:56:03.2960640Z 
+2026-10-21T00:56:03.2960960Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:56:03.2961320Z 
+2026-10-21T00:56:03.2961810Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_cli-401a1578bac1311c)
+2026-10-21T00:56:03.3343170Z 
+2026-10-21T00:56:03.3345900Z running 28 tests
+2026-10-21T00:56:03.3364630Z test i18n::tests::normalizes_supported_locales ... ok
+2026-10-21T00:56:03.3371100Z test i18n::tests::precedence_and_empty_values_are_deterministic ... ok
+2026-10-21T00:56:03.3446430Z test i18n::tests::every_public_description_has_a_translation ... ok
+2026-10-21T00:56:03.3447140Z test tests::apple_portrait_and_oppo_compatibility_are_incompatible_usage ... ok
+2026-10-21T00:56:03.3447790Z test categorize::tests::in_place_discovery_skips_existing_category_roots ... ok
+2026-10-21T00:56:03.3448350Z test tests::batch_accepts_oppo_gallery_product_intent ... ok
+2026-10-21T00:56:03.3448960Z test tests::batch_failure_human_name_does_not_leak_workspace_paths ... ok
+2026-10-21T00:56:03.3449560Z test tests::batch_accepts_repeatable_inputs ... ok
+2026-10-21T00:56:03.3449990Z test tests::batch_rejects_zero_jobs_as_usage_error ... ok
+2026-10-21T00:56:03.3450450Z test tests::batch_requires_a_source ... ok
+2026-10-21T00:56:03.3451100Z test tests::batch_output_planning_is_source_safe_and_reserves_live_photo_companions ... ok
+2026-10-21T00:56:03.3452690Z test tests::cinematic_requests_and_video_discovery_follow_the_selected_intent ... ok
+2026-10-21T00:56:03.3454470Z test tests::clap_command_definition_is_internally_consistent ... ok
+2026-10-21T00:56:03.3455910Z test tests::batch_discovery_is_non_recursive_by_default_and_recursive_on_request ... ok
+2026-10-21T00:56:03.3457200Z test tests::conversion_accepts_apple_portrait_product_intent ... ok
+2026-10-21T00:56:03.3458640Z test tests::convert_accepts_explicit_output ... ok
+2026-10-21T00:56:03.3459760Z test tests::convert_accepts_oppo_gallery_product_intent ... ok
+2026-10-21T00:56:03.3461140Z test tests::conversion_help_exposes_intent_not_internal_policy ... ok
+2026-10-21T00:56:03.3462320Z test tests::convert_accepts_oppo_native_portrait_profile ... ok
+2026-10-21T00:56:03.3463450Z test tests::convert_defaults_to_in_place_publication ... ok
+2026-10-21T00:56:03.3464690Z test tests::convert_rejects_combining_complete_and_oppo_native_portrait ... ok
+2026-10-21T00:56:03.3466000Z test tests::double_dash_allows_paths_that_start_with_dash ... ok
+2026-10-21T00:56:03.3467060Z test tests::convert_requires_named_input ... ok
+2026-10-21T00:56:03.3468000Z test tests::help_and_version_are_successful_control_flow ... ok
+2026-10-21T00:56:03.3469120Z test tests::inspect_requires_exactly_one_input ... ok
+2026-10-21T00:56:03.3470080Z test tests::unknown_command_is_a_usage_error ... ok
+2026-10-21T00:56:03.3470910Z test tests::no_arguments_prints_help ... ok
+2026-10-21T00:56:03.3472030Z test validate::tests::feature_validation_uses_the_same_styles_intent ... ok
+2026-10-21T00:56:03.3472780Z 
+2026-10-21T00:56:03.3473480Z test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-10-21T00:56:03.3474220Z 
+2026-10-21T00:56:03.3475260Z [1m[92m     Running[0m unittests src/main.rs (target/debug/deps/xdremux-12eb3f0f76ed5821)
+2026-10-21T00:56:03.3566870Z 
+2026-10-21T00:56:03.3567870Z running 0 tests
+2026-10-21T00:56:03.3568400Z 
+2026-10-21T00:56:03.3569100Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:56:03.3569610Z 
+2026-10-21T00:56:03.3570680Z [1m[92m     Running[0m tests/batch.rs (target/debug/deps/batch-312d3b5c72e1ca86)
+2026-10-21T00:56:03.3692850Z 
+2026-10-21T00:56:03.3693110Z running 2 tests
+2026-10-21T00:56:05.6775920Z test batch_command_is_deterministic_machine_readable_and_failure_isolating ... ok
+2026-10-21T00:57:03.4433130Z test live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media has been running for over 60 seconds
+2026-10-21T00:57:54.4609130Z test live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media ... ok
+2026-10-21T00:57:54.4610090Z 
+2026-10-21T00:57:54.4610830Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 111.09s
+2026-10-21T00:57:54.4611300Z 
+2026-10-21T00:57:54.4882530Z [1m[92m     Running[0m tests/batch_categorize.rs (target/debug/deps/batch_categorize-e584c8dfd1e344e1)
+2026-10-21T00:57:54.5242730Z 
+2026-10-21T00:57:54.5244060Z running 1 test
+2026-10-21T00:58:07.2339700Z test batch_categorize_projects_final_outputs_before_conversion ... ok
+2026-10-21T00:58:07.2340630Z 
+2026-10-21T00:58:07.2342000Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.71s
+2026-10-21T00:58:07.2343590Z 
+2026-10-21T00:58:07.2383560Z [1m[92m     Running[0m tests/batch_jobs.rs (target/debug/deps/batch_jobs-a7984a5bad7bbd65)
+2026-10-21T00:58:07.2635310Z 
+2026-10-21T00:58:07.2635620Z running 1 test
+2026-10-21T00:58:25.4634740Z test bounded_parallel_batch_keeps_receipts_ordered_and_checkpoint_reusable ... ok
+2026-10-21T00:58:25.4635830Z 
+2026-10-21T00:58:25.4636560Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.20s
+2026-10-21T00:58:25.4637460Z 
+2026-10-21T00:58:25.4711620Z [1m[92m     Running[0m tests/batch_resume.rs (target/debug/deps/batch_resume-0caa28e39e60f560)
+2026-10-21T00:58:25.4935890Z 
+2026-10-21T00:58:25.4936310Z running 1 test
+2026-10-21T00:58:36.1614340Z test resume_reuses_only_the_checkpoint_proven_live_photo_pair ... ok
+2026-10-21T00:58:36.1615330Z 
+2026-10-21T00:58:36.1616430Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.67s
+2026-10-21T00:58:36.1617610Z 
+2026-10-21T00:58:36.1726510Z [1m[92m     Running[0m tests/categorize.rs (target/debug/deps/categorize-b32a6cad6e42a77f)
+2026-10-21T00:58:36.1902530Z 
+2026-10-21T00:58:36.1902960Z running 1 test
+2026-10-21T00:58:36.2260880Z test categorize_command_copies_then_reports_duplicate_on_rerun ... ok
+2026-10-21T00:58:36.2261940Z 
+2026-10-21T00:58:36.2262700Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+2026-10-21T00:58:36.2263590Z 
+2026-10-21T00:58:36.2264810Z [1m[92m     Running[0m tests/cinematic_envelope.rs (target/debug/deps/cinematic_envelope-b60c9d6ff897e668)
+2026-10-21T00:58:36.2471290Z 
+2026-10-21T00:58:36.2472050Z running 2 tests
+2026-10-21T00:58:36.2624580Z test cinematic_is_a_conversion_flag_on_both_entry_points ... ok
+2026-10-21T00:58:36.2635410Z test cinematic_configuration_requires_the_feature_and_rejects_image_intents ... ok
+2026-10-21T00:58:36.2636300Z 
+2026-10-21T00:58:36.2637070Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+2026-10-21T00:58:36.2637810Z 
+2026-10-21T00:58:36.2638900Z [1m[92m     Running[0m tests/convert.rs (target/debug/deps/convert-b532efdafacd5498)
+2026-10-21T00:58:36.2857380Z 
+2026-10-21T00:58:36.2857720Z running 1 test
+2026-10-21T00:58:38.0778630Z test convert_command_executes_full_rust_proxdr_pipeline ... ok
+2026-10-21T00:58:38.0779530Z 
+2026-10-21T00:58:38.0780330Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.79s
+2026-10-21T00:58:38.0781300Z 
+2026-10-21T00:58:38.0786170Z [1m[92m     Running[0m tests/i18n.rs (target/debug/deps/i18n-71e8996a70185af6)
+2026-10-21T00:58:38.0908640Z 
+2026-10-21T00:58:38.0909000Z running 8 tests
+2026-10-21T00:58:38.2213040Z test environment_precedence_and_global_option_are_observable ... ok
+2026-10-21T00:58:38.2566700Z test current_feature_conflicts_remain_usage_errors_in_both_languages ... ok
+2026-10-21T00:58:38.2735840Z test every_help_page_supports_both_languages ... ok
+2026-10-21T00:58:38.3679800Z test parse_errors_keep_stdout_empty_and_exit_code_two ... ok
+2026-10-21T00:58:38.8881980Z test json_inspection_and_validation_failure_are_byte_identical ... ok
+2026-10-21T00:58:39.0027600Z test pvt_validation_json_preserves_package_and_member_paths_in_both_languages ... ok
+2026-10-21T00:58:39.4085930Z test human_output_translates_labels_but_not_user_paths ... ok
+2026-10-21T00:58:40.8824880Z test successful_batch_validation_and_categorization_json_are_locale_independent ... ok
+2026-10-21T00:58:40.8826000Z 
+2026-10-21T00:58:40.8826610Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.79s
+2026-10-21T00:58:40.8827480Z 
+2026-10-21T00:58:40.8828570Z [1m[92m     Running[0m tests/live_photo.rs (target/debug/deps/live_photo-32cf77ffe53fde7c)
+2026-10-21T00:58:40.9062970Z 
+2026-10-21T00:58:40.9063580Z running 2 tests
+2026-10-21T00:58:41.4821780Z test convert_command_executes_full_rust_heif_live_photo_pipeline ... ok
+2026-10-21T00:58:51.1655390Z test convert_command_executes_full_rust_jpeg_ultrahdr_live_photo_pipeline ... ok
+2026-10-21T00:58:51.1655990Z 
+2026-10-21T00:58:51.1656250Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.26s
+2026-10-21T00:58:51.1656670Z 
+2026-10-21T00:58:51.1714400Z [1m[92m     Running[0m tests/live_photo_pvt.rs (target/debug/deps/live_photo_pvt-484ecd581e3b7141)
+2026-10-21T00:58:51.1980980Z 
+2026-10-21T00:58:51.1981880Z running 8 tests
+2026-10-21T00:58:52.4394150Z test a_pvt_destination_cannot_disguise_pair_output_or_replace_unknown_entries ... ok
+2026-10-21T00:58:53.1059580Z test input_scanning_prunes_packages_and_output_planning_preserves_unknown_package_members ... ok
+2026-10-21T00:58:53.5716770Z test categorization_keeps_packages_opaque_and_cannot_publish_inside_one ... ok
+2026-10-21T00:58:54.2271520Z test pvt_conversion_and_validation_publish_a_real_directory_and_preserve_source ... ok
+2026-10-21T00:58:54.9718650Z test relative_output_from_a_package_working_directory_cannot_mutate_it ... ok
+2026-10-21T00:58:56.0119260Z test mixed_batch_pvt_keeps_ordinary_hdr_semantics_and_publishes_motion_as_a_package ... ok
+2026-10-21T00:58:56.7504050Z test pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs ... ok
+2026-10-21T00:58:56.9990250Z test unknown_valid_packages_are_never_adopted_and_same_stems_get_distinct_outputs ... ok
+2026-10-21T00:58:56.9991770Z 
+2026-10-21T00:58:56.9992870Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.80s
+2026-10-21T00:58:56.9993840Z 
+2026-10-21T00:58:57.0009800Z [1m[92m     Running[0m tests/validate.rs (target/debug/deps/validate-7a644fda0497f8c6)
+2026-10-21T00:58:57.0233880Z 
+2026-10-21T00:58:57.0234320Z running 1 test
+2026-10-21T00:59:08.2854780Z test validate_reports_iso_hdr_live_photo_and_failures_as_stable_json ... ok
+2026-10-21T00:59:08.2855870Z 
+2026-10-21T00:59:08.2856810Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.26s
+2026-10-21T00:59:08.2857720Z 
+2026-10-21T00:59:08.2913740Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_codec-2f8452218a1f719b)
+2026-10-21T00:59:08.3114760Z 
+2026-10-21T00:59:08.3115770Z running 11 tests
+2026-10-21T00:59:08.3140390Z test portable::jpeg::tests::advertises_only_jpeg_raster_decode ... ok
+2026-10-21T00:59:08.3256870Z test model::tests::undo_irot_returns_coded_pixels_for_a_quarter_turn ... ok
+2026-10-21T00:59:08.3359150Z test portable::libheif::tests::advertises_only_reference_verified_operations ... ok
+2026-10-21T00:59:08.3496040Z test model::tests::rgb16_inverse_preserves_channels_for_all_rotations_and_mirror_orders ... ok
+2026-10-21T00:59:08.4766780Z test portable::libheif::tests::libheif_rgb444_tile_roundtrips_through_raster_decoder ... ok
+2026-10-21T00:59:08.4822600Z test portable::libheif::tests::reference_compatible_request_pins_512_and_quality_90 ... ok
+2026-10-21T00:59:08.4823950Z test portable::libheif::tests::rejects_native_422_instead_of_silently_falling_back ... ok
+2026-10-21T00:59:08.4825260Z test portable::primary_heif::tests::encodes_primary_heif_that_libheif_can_decode ... ok
+2026-10-21T00:59:08.4825900Z test portable::primary_heif::tests::rejects_non_tiff_exif_before_calling_libheif ... ok
+2026-10-21T00:59:08.5563320Z test portable::libheif::tests::edge_tiles_report_padded_coded_geometry ... ok
+2026-10-21T00:59:10.3666520Z test portable::jpeg::tests::decodes_real_jpeg_with_trailing_motion_data_as_mono_and_rgb ... ok
+2026-10-21T00:59:10.3668200Z 
+2026-10-21T00:59:10.3669330Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.06s
+2026-10-21T00:59:10.3670260Z 
+2026-10-21T00:59:10.3702230Z [1m[92m     Running[0m unittests src/bin/xdremux-codec-gainmap-bench.rs (target/debug/deps/xdremux_codec_gainmap_bench-05154589c0b53932)
+2026-10-21T00:59:10.3902490Z 
+2026-10-21T00:59:10.3903410Z running 0 tests
+2026-10-21T00:59:10.3904250Z 
+2026-10-21T00:59:10.3904810Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:10.3905270Z 
+2026-10-21T00:59:10.3913540Z [1m[92m     Running[0m tests/orientation_roundtrip.rs (target/debug/deps/orientation_roundtrip-be37c23219aec5c0)
+2026-10-21T00:59:10.4131240Z 
+2026-10-21T00:59:10.4132390Z running 1 test
+2026-10-21T00:59:12.6111460Z test rotated_gain_map_matches_primary_coded_orientation_after_libheif_transform ... ok
+2026-10-21T00:59:12.6113470Z 
+2026-10-21T00:59:12.6114370Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.20s
+2026-10-21T00:59:12.6115260Z 
+2026-10-21T00:59:12.6138660Z [1m[92m     Running[0m tests/portable_final_file.rs (target/debug/deps/portable_final_file-f2c24e28c7f6210c)
+2026-10-21T00:59:12.6307960Z 
+2026-10-21T00:59:12.6310520Z running 1 test
+2026-10-21T00:59:14.2506730Z test portable_libheif_profiles_produce_valid_final_gain_map_files_without_swift_intermediate ... ok
+2026-10-21T00:59:14.2507720Z 
+2026-10-21T00:59:14.2508480Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.62s
+2026-10-21T00:59:14.2509410Z 
+2026-10-21T00:59:14.2517760Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_container-bd1f62d6e304ceee)
+2026-10-21T00:59:14.2614260Z 
+2026-10-21T00:59:14.2614770Z running 23 tests
+2026-10-21T00:59:14.2625930Z test extractor::tests::negative_manifest_lengths_never_form_slices ... ok
+2026-10-21T00:59:14.2630650Z test extractor::tests::uhdr_non_finite_metadata_uses_canonical_fallback ... ok
+2026-10-21T00:59:14.2638640Z test extractor::tests::valid_jxrs_footer_allows_manifest_without_qti_marker ... ok
+2026-10-21T00:59:14.2642090Z test extractor::tests::manifest_without_qti_or_valid_jxrs_fails_closed ... ok
+2026-10-21T00:59:14.2643720Z test extractor::tests::coincidental_qti_text_with_invalid_box_size_is_rejected ... ok
+2026-10-21T00:59:14.2645240Z test oppo_portrait::tests::depth_rank_mapping_matches_producer_round_trip ... ok
+2026-10-21T00:59:14.2646730Z test oppo_portrait::tests::parses_depth_header_and_flagged_planes ... ok
+2026-10-21T00:59:14.2647960Z test oppo_portrait::tests::parses_version_four_face_table_into_fixed_shape_records ... ok
+2026-10-21T00:59:14.2649430Z test oppo_portrait::tests::parses_version_one_without_inventing_newer_fields ... ok
+2026-10-21T00:59:14.2650890Z test oppo_portrait::tests::rejects_invalid_depth_quantization_and_missing_flagged_plane ... ok
+2026-10-21T00:59:14.2655760Z test oppo_portrait::tests::rejects_non_finite_or_truncated_config_records ... ok
+2026-10-21T00:59:14.2656560Z test oppo_portrait_focus::tests::blur_response_uses_source_curve_and_zoom_region ... ok
+2026-10-21T00:59:14.2657220Z test oppo_portrait_focus::tests::center_focus_averages_native_depth_not_rank ... ok
+2026-10-21T00:59:14.2657950Z test oppo_portrait_focus::tests::focus_dispatch_matches_recovered_swift_regression_vectors ... ok
+2026-10-21T00:59:14.2659040Z test oppo_portrait_focus::tests::no_rectangle_focus_fallback_centers_roi_on_focus_point ... ok
+2026-10-21T00:59:14.2660660Z test oppo_portrait_focus::tests::pet_no_rectangle_histogram_keeps_recovered_two_percent_behavior ... ok
+2026-10-21T00:59:14.2661720Z test oppo_tail::tests::default_private_hdr_filter_keeps_unrelated_vendor_payloads ... ok
+2026-10-21T00:59:14.2662380Z test oppo_tail::tests::filtered_repack_preserves_physical_payload_and_manifest_order ... ok
+2026-10-21T00:59:14.2663310Z test oppo_tail::tests::neutralization_changes_only_quoted_manifest_name_byte ... ok
+2026-10-21T00:59:14.2663990Z test oppo_tail::tests::preserve_returns_exact_post_extension_bytes ... ok
+2026-10-21T00:59:14.2665990Z test oppo_tail::tests::private_hdr_name_policy_matches_product_contract ... ok
+2026-10-21T00:59:14.4074870Z test oppo_portrait::tests::rejects_committed_non_portrait_fixture_as_portrait_source ... ok
+2026-10-21T00:59:14.5039510Z test oppo_portrait::tests::extracts_typed_source_from_committed_portrait_fixture ... ok
+2026-10-21T00:59:14.5040520Z 
+2026-10-21T00:59:14.5041160Z test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+2026-10-21T00:59:14.5042060Z 
+2026-10-21T00:59:14.5043580Z [1m[92m     Running[0m unittests src/bin/xdremux-container-extract.rs (target/debug/deps/xdremux_container_extract-65d07b7ae7c83754)
+2026-10-21T00:59:14.5119400Z 
+2026-10-21T00:59:14.5120180Z running 0 tests
+2026-10-21T00:59:14.5120600Z 
+2026-10-21T00:59:14.5121750Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.5122560Z 
+2026-10-21T00:59:14.5125640Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_engine-0b8b53459441b227)
+2026-10-21T00:59:14.5227960Z 
+2026-10-21T00:59:14.5228450Z running 94 tests
+2026-10-21T00:59:14.5248560Z test apple::tests::l8_mask_rejects_invalid_shape ... ok
+2026-10-21T00:59:14.5250970Z test apple::tests::credible_foreground_requires_sixteen_high_confidence_pixels ... ok
+2026-10-21T00:59:14.5253590Z test apple::tests::oppo_native_portrait_contract_accepts_only_producer_backed_resources ... ok
+2026-10-21T00:59:14.5254900Z test apple::tests::oppo_native_portrait_contract_binds_every_optional_resource ... ok
+2026-10-21T00:59:14.5256620Z test apple::tests::portrait_hair_preserves_low_confidence_prior_without_claiming_acceptance ... ok
+2026-10-21T00:59:14.5258340Z test apple::tests::portrait_hair_prior_is_gated_by_fused_person_matte ... ok
+2026-10-21T00:59:14.5259860Z test apple::tests::portrait_hair_requires_shared_geometry ... ok
+2026-10-21T00:59:14.5261190Z test apple::tests::morphology_support_uses_a_disk_not_a_square ... ok
+2026-10-21T00:59:14.5262330Z test apple::tests::portrait_hair_without_prior_is_vision_only ... ok
+2026-10-21T00:59:14.5263580Z test apple::tests::portrait_person_prior_is_ignored_without_legacy_overlap_threshold ... ok
+2026-10-21T00:59:14.5265100Z test apple::tests::portrait_person_prior_is_clipped_to_dilated_vision_support ... ok
+2026-10-21T00:59:14.5266540Z test apple::tests::portrait_policy_requires_the_complete_auxiliary_resource_set ... ok
+2026-10-21T00:59:14.5267840Z test apple::tests::portrait_semantic_contract_is_explicit_and_stable ... ok
+2026-10-21T00:59:14.5269280Z test apple::tests::portrait_source_gain_map_policy_accepts_only_observed_apple_formats ... ok
+2026-10-21T00:59:14.5270770Z test apple_auxiliary::tests::l8_matte_payloads_encode_only_rust_owned_role_policy ... ok
+2026-10-21T00:59:14.5272950Z test apple_auxiliary::tests::standard_base64_matches_rfc_4648_vectors ... ok
+2026-10-21T00:59:14.5276810Z test apple_auxiliary::tests::disparity_payload_matches_the_legacy_imageio_contract ... ok
+2026-10-21T00:59:14.5278980Z test apple_auxiliary::tests::payload_builders_reject_invalid_shape_and_product_values ... ok
+2026-10-21T00:59:14.5282330Z test apple_photographic_styles::tests::coefficient_bounds_and_malformed_payloads_fail_closed ... ok
+2026-10-21T00:59:14.5345300Z test apple_photographic_styles::tests::distribution_matches_swift_percentiles_and_empty_contract ... ok
+2026-10-21T00:59:14.5346880Z test apple_photographic_styles::tests::face_exposure_boost_matches_swift_formula_and_neutral_fallback ... ok
+2026-10-21T00:59:14.5347950Z test apple_photographic_styles::tests::direct_parameters_change_only_the_six_owned_coefficients ... ok
+2026-10-21T00:59:14.5348940Z test apple_photographic_styles::tests::identity_global_tone_curve_matches_257_sample_wire_contract ... ok
+2026-10-21T00:59:14.5349850Z test apple_photographic_styles::tests::existing_payload_deltas_are_applied_per_repeated_block ... ok
+2026-10-21T00:59:14.5444220Z test apple_photographic_styles::tests::light_map_rejects_invalid_geometry_orientation_and_samples ... ok
+2026-10-21T00:59:14.5455370Z test apple_photographic_styles::tests::identity_layout_matches_verified_dimensions_and_values ... ok
+2026-10-21T00:59:14.5460720Z test apple_photographic_styles::tests::linear_metadata_changes_with_photo_distribution_and_gain_range ... ok
+2026-10-21T00:59:14.5465520Z test apple_photographic_styles::tests::light_map_storage_orientation_matches_all_eight_exif_mappings ... ok
+2026-10-21T00:59:14.5466340Z test apple_photographic_styles::tests::linear_thumbnail_rejects_invalid_reference_before_quantization ... ok
+2026-10-21T00:59:14.5467210Z test apple_photographic_styles::tests::polynomial_basis_matches_swift_contract ... ok
+2026-10-21T00:59:14.5467890Z test apple_photographic_styles::tests::linear_thumbnail_log_round_trips_the_exponential_decoder ... ok
+2026-10-21T00:59:14.5468960Z test apple_photographic_styles::tests::property_list_rejects_incomplete_resources_and_nonfinite_statistics ... ok
+2026-10-21T00:59:14.5469870Z test apple_photographic_styles::tests::refinement_inputs_fail_closed ... ok
+2026-10-21T00:59:14.5470630Z test apple_photographic_styles::tests::refinement_scalar_rows_are_typed_and_updates_are_clamped ... ok
+2026-10-21T00:59:14.5471600Z test apple_photographic_styles::tests::property_list_serialization_emits_complete_deterministic_contract ... ok
+2026-10-21T00:59:14.5472480Z test apple_photographic_styles::tests::sampled_jacobian_recovers_bounded_refinement_update ... ok
+2026-10-21T00:59:14.5473230Z test apple_photographic_styles::tests::scene_policy_preserves_priority_and_native_default ... ok
+2026-10-21T00:59:14.5474130Z test apple_photographic_styles::tests::semantic_tone_at_neutral_ltm_ignores_thumbnail_and_curve ... ok
+2026-10-21T00:59:14.5475120Z test apple_photographic_styles::tests::source_derived_global_tone_curve_follows_channel_codes_without_percentile_scaling ... ok
+2026-10-21T00:59:14.5476080Z test apple_photographic_styles::tests::global_polynomial_fit_recovers_a_bounded_known_transform ... ok
+2026-10-21T00:59:14.5476880Z test apple_portrait::tests::rend_rejects_duplicate_identifiers_and_unknown_types ... ok
+2026-10-21T00:59:14.5477490Z test apple_portrait::tests::rend_round_trips_byte_identically ... ok
+2026-10-21T00:59:14.5478170Z test apple_portrait::tests::rendering_parameters_add_dynamic_records_for_every_lens_profile ... ok
+2026-10-21T00:59:14.5478910Z test apple_portrait::tests::scene_activation_matches_the_swift_oracle_formula ... ok
+2026-10-21T00:59:14.5479590Z test apple_portrait::tests::committed_static_profiles_are_byte_stable_and_exclude_dynamic_records ... ok
+2026-10-21T00:59:14.5480360Z test apple_portrait::tests::scene_activation_rejects_non_finite_inputs ... ok
+2026-10-21T00:59:14.5481000Z test apple_portrait::tests::signed_identifier_sort_matches_swift_int16_order ... ok
+2026-10-21T00:59:14.5481640Z test apple_portrait::tests::xhlrb_clamps_finite_inputs_and_rejects_non_finite_inputs ... ok
+2026-10-21T00:59:14.5482390Z test apple_portrait::tests::xhlrb_dynamic_records_match_recovered_swift_formulas ... ok
+2026-10-21T00:59:14.5483080Z test apple_portrait::tests::xhlrb_records_replace_static_profile_without_duplicate_scene_ids ... ok
+2026-10-21T00:59:14.5483990Z test apple_portrait_geometry::tests::calibration_saturates_tele_profile_without_fabricating_new_profile ... ok
+2026-10-21T00:59:14.5484790Z test apple_portrait_geometry::tests::calibration_uses_lens_anchor_and_repairs_inconsistent_exif_zoom ... ok
+2026-10-21T00:59:14.5486200Z test apple_portrait_geometry::tests::disparity_pixels_match_swift_endpoint_semantics ... ok
+2026-10-21T00:59:14.5487160Z test apple_portrait_geometry::tests::focus_disparity_uses_source_exponent_without_extra_focal_scaling ... ok
+2026-10-21T00:59:14.5487880Z test apple_portrait_geometry::tests::focus_orientation_transform_matches_all_eight_producer_mappings ... ok
+2026-10-21T00:59:14.5488570Z test apple_portrait_geometry::tests::focus_orientation_transform_rejects_invalid_input ... ok
+2026-10-21T00:59:14.5489200Z test apple_portrait_geometry::tests::lens_model_parser_matches_swift_camera_number_contract ... ok
+2026-10-21T00:59:14.5489860Z test apple_portrait_geometry::tests::lens_profile_dispatch_matches_swift_thresholds ... ok
+2026-10-21T00:59:14.5490450Z test apple_portrait_geometry::tests::orientation_resolution_matches_swift_fallback_policy ... ok
+2026-10-21T00:59:14.5491060Z test apple_scene::tests::aliases_are_rust_policy_and_max_confidence_wins ... ok
+2026-10-21T00:59:14.5491590Z test apple_scene::tests::invalid_known_confidence_fails_closed ... ok
+2026-10-21T00:59:14.5492100Z test apple_scene::tests::unknown_vision_identifiers_do_not_change_product_scores ... ok
+2026-10-21T00:59:14.5492750Z test apple_texture::tests::duplicate_instances_empty_statistics_and_corrupt_angles_fail ... ok
+2026-10-21T00:59:14.5493410Z test capabilities::tests::concrete_codec_ports_remain_individually_dyn_compatible ... ok
+2026-10-21T00:59:14.5494010Z test apple_texture::tests::texture_contains_measured_people_signed_angles_and_empty_context ... ok
+2026-10-21T00:59:14.5494660Z test capabilities::tests::inventory_is_only_a_set_of_composed_operation_facts ... ok
+2026-10-21T00:59:14.5495220Z test execution::tests::lifecycle_is_plan_build_validate_publish ... ok
+2026-10-21T00:59:14.5495700Z test execution::tests::planning_failure_prevents_all_side_effect_ports ... ok
+2026-10-21T00:59:14.5496350Z test execution::tests::validation_failure_prevents_publication ... ok
+2026-10-21T00:59:14.5496910Z test product_policy::tests::oppo_gallery_output_requires_rgb420_even_for_lhdr_mono ... ok
+2026-10-21T00:59:14.5497500Z test product_policy::tests::product_policy_fails_closed_when_required_layout_is_unavailable ... ok
+2026-10-21T00:59:14.5498100Z test product_policy::tests::standard_mono_output_stays_mono400 ... ok
+2026-10-21T00:59:14.5498660Z test product_policy::tests::standard_rgb_output_is_444_even_when_private_jpeg_is_420 ... ok
+2026-10-21T00:59:14.5499300Z test provisional_guided_filter::tests::constant_image_stays_constant_without_local_detail ... ok
+2026-10-21T00:59:14.5499960Z test provisional_guided_filter::tests::checkerboard_changes_when_local_detail_is_removed ... ok
+2026-10-21T00:59:14.5500590Z test provisional_guided_filter::tests::exact_buffers_have_no_finite_psnr ... ok
+2026-10-21T00:59:14.5501150Z test provisional_guided_filter::tests::half_packing_round_trips_exact_values_and_sets_alpha ... ok
+2026-10-21T00:59:14.5501790Z test provisional_guided_filter::tests::headroom_is_at_least_sdr_white ... ok
+2026-10-21T00:59:14.5502340Z test provisional_guided_filter::tests::unit_local_weight_is_the_primary ... ok
+2026-10-21T00:59:14.5502910Z test source_profile::tests::hvcc_probe_keeps_semantic_channels_separate_from_storage_sampling ... ok
+2026-10-21T00:59:14.5503560Z test source_profile::tests::jpeg_probe_flows_into_source_profile_without_decoding ... ok
+2026-10-21T00:59:14.5504180Z test source_profile::tests::source_profile_boundary_rejects_non_gain_map_channel_counts ... ok
+2026-10-21T00:59:14.5504790Z test source_profile::tests::source_profile_boundary_rejects_semantic_storage_mismatch ... ok
+2026-10-21T00:59:14.5505330Z test tests::adaptive_policy_preserves_known_mono_420_and_444_layouts ... ok
+2026-10-21T00:59:14.5505780Z test tests::cinematic_intent_is_not_silently_ignored_by_the_still_planner ... ok
+2026-10-21T00:59:14.5506270Z test tests::plan_contains_only_execution_relevant_decisions ... ok
+2026-10-21T00:59:14.5506900Z test tests::planner_never_silently_downconverts_bit_depth_or_444_chroma ... ok
+2026-10-21T00:59:14.5507850Z test tests::planner_rejects_apple_features_with_oppo_gallery_compatibility ... ok
+2026-10-21T00:59:14.5508670Z test tests::planner_rejects_requested_apple_feature_without_its_adapter ... ok
+2026-10-21T00:59:14.5509190Z test tests::planner_requires_decoder_for_the_probed_source_codec ... ok
+2026-10-21T00:59:14.5509680Z test tests::request_exposes_product_intent_only ... ok
+2026-10-21T00:59:14.5510100Z test tests::rgb_422_may_promote_losslessly_to_444_when_backend_lacks_422 ... ok
+2026-10-21T00:59:14.5510670Z test tests::unknown_rgb_sampling_uses_444_as_information_safe_target ... ok
+2026-10-21T00:59:14.5951260Z test apple_photographic_styles::tests::revert_key1_is_local_and_points_from_styled_primary_to_recovered_scene ... ok
+2026-10-21T00:59:14.5952670Z 
+2026-10-21T00:59:14.5953390Z test result: ok. 94 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+2026-10-21T00:59:14.5954540Z 
+2026-10-21T00:59:14.5955290Z [1m[92m     Running[0m unittests src/bin/xdremux-engine-vectors.rs (target/debug/deps/xdremux_engine_vectors-fa96b4a04d5727d4)
+2026-10-21T00:59:14.6030330Z 
+2026-10-21T00:59:14.6030640Z running 0 tests
+2026-10-21T00:59:14.6030770Z 
+2026-10-21T00:59:14.6031060Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.6031500Z 
+2026-10-21T00:59:14.6037990Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_format-41c04c12685b1157)
+2026-10-21T00:59:14.6110520Z 
+2026-10-21T00:59:14.6111350Z running 8 tests
+2026-10-21T00:59:14.6137030Z test hevc::tests::rejects_truncated_or_wrong_version_records ... ok
+2026-10-21T00:59:14.6137760Z test hevc::tests::preserves_declared_bit_depth ... ok
+2026-10-21T00:59:14.6138560Z test hevc::tests::parses_all_hevc_chroma_classes ... ok
+2026-10-21T00:59:14.6139740Z test jpeg::tests::distinguishes_three_channel_sampling_classes ... ok
+2026-10-21T00:59:14.6141280Z test jpeg::tests::preserves_unusual_component_layout_without_guessing_sampling ... ok
+2026-10-21T00:59:14.6142630Z test jpeg::tests::probes_monochrome_sampling ... ok
+2026-10-21T00:59:14.6143540Z test jpeg::tests::rejects_scan_before_frame_header ... ok
+2026-10-21T00:59:14.6144460Z test jpeg::tests::rejects_truncated_segment ... ok
+2026-10-21T00:59:14.6144940Z 
+2026-10-21T00:59:14.6145580Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.6146320Z 
+2026-10-21T00:59:14.6147590Z [1m[92m     Running[0m unittests src/bin/xdremux-format-inspect.rs (target/debug/deps/xdremux_format_inspect-e745ab4edbef1a82)
+2026-10-21T00:59:14.6202730Z 
+2026-10-21T00:59:14.6202980Z running 0 tests
+2026-10-21T00:59:14.6203250Z 
+2026-10-21T00:59:14.6204560Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.6205390Z 
+2026-10-21T00:59:14.6211000Z [1m[92m     Running[0m unittests src/bin/xdremux-format-vectors.rs (target/debug/deps/xdremux_format_vectors-b354045ea2a7e6e8)
+2026-10-21T00:59:14.6281040Z 
+2026-10-21T00:59:14.6281270Z running 0 tests
+2026-10-21T00:59:14.6281430Z 
+2026-10-21T00:59:14.6281820Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.6282290Z 
+2026-10-21T00:59:14.6287200Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_hdr-218b6e607c0920df)
+2026-10-21T00:59:14.6367850Z 
+2026-10-21T00:59:14.6368260Z running 16 tests
+2026-10-21T00:59:14.6375240Z test edr::tests::early_cfg_uses_float32_subnormal_sentinel_not_numeric_one ... ok
+2026-10-21T00:59:14.6379690Z test edr::tests::rejects_wrong_metadata_lengths ... ok
+2026-10-21T00:59:14.6380770Z test edr::tests::modern_cfg_is_numeric_interval_and_precomputed_remains_f64 ... ok
+2026-10-21T00:59:14.6381310Z test edr::tests::uhdr_keeps_distinct_channels ... ok
+2026-10-21T00:59:14.6382890Z test gainmap::tests::rejects_malformed_masks_fail_closed ... ok
+2026-10-21T00:59:14.6383680Z test info::tests::invalid_positive_per_channel_max_falls_back_to_scalar ... ok
+2026-10-21T00:59:14.6384590Z test gainmap::tests::output_stride_is_256_aligned_and_padding_stays_zero ... ok
+2026-10-21T00:59:14.6385300Z test info::tests::repeats_first_channel_and_preserves_float32_boundary ... ok
+2026-10-21T00:59:14.6385870Z test scene_linear::tests::alternate_application_uses_resolved_channel_metadata_and_full_weight ... ok
+2026-10-21T00:59:14.6387800Z test scene_linear::tests::edge_and_near_black_samples_stay_on_the_gain_formula ... ok
+2026-10-21T00:59:14.6389520Z test scene_linear::tests::area_resize_follows_full_resolution_reconstruction ... ok
+2026-10-21T00:59:14.6391140Z test scene_linear::tests::gain_application_matches_known_hdr_for_gamma_offsets_and_weight ... ok
+2026-10-21T00:59:14.6391810Z test scene_linear::tests::headroom_weight_selects_the_alternate_image_or_a_fraction ... ok
+2026-10-21T00:59:14.6392680Z test scene_linear::tests::invalid_gain_metadata_and_rasters_fail_closed ... ok
+2026-10-21T00:59:14.6393290Z test scene_linear::tests::reconstruction_upsamples_gain_codes_before_application ... ok
+2026-10-21T00:59:14.6393880Z test gainmap::tests::quantization_truncates_instead_of_rounding ... ok
+2026-10-21T00:59:14.6394270Z 
+2026-10-21T00:59:14.6395360Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.6395740Z 
+2026-10-21T00:59:14.6396600Z [1m[92m     Running[0m unittests src/bin/xdremux-gainmap-vectors.rs (target/debug/deps/xdremux_gainmap_vectors-9c7fe9d7584d1c08)
+2026-10-21T00:59:14.6478370Z 
+2026-10-21T00:59:14.6478840Z running 0 tests
+2026-10-21T00:59:14.6479100Z 
+2026-10-21T00:59:14.6479450Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.6479880Z 
+2026-10-21T00:59:14.6489540Z [1m[92m     Running[0m unittests src/bin/xdremux-hdr-vectors.rs (target/debug/deps/xdremux_hdr_vectors-f4652be4f4180c10)
+2026-10-21T00:59:14.6554850Z 
+2026-10-21T00:59:14.6555180Z running 0 tests
+2026-10-21T00:59:14.6555420Z 
+2026-10-21T00:59:14.6555810Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.6556200Z 
+2026-10-21T00:59:14.6561510Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_heif-f09cb8f408c892ac)
+2026-10-21T00:59:14.6690420Z 
+2026-10-21T00:59:14.6690910Z running 61 tests
+2026-10-21T00:59:14.6725560Z test canonical::tests::altr_group_encodes_tmap_before_primary ... ok
+2026-10-21T00:59:14.6731790Z test canonical::tests::consumer_iref_replaces_gain_auxl_with_primary_and_tmap_targets ... ok
+2026-10-21T00:59:14.6738120Z test data_information::tests::dinf_contains_one_self_contained_url_reference ... ok
+2026-10-21T00:59:14.6741600Z test direct::tests::accepts_explicit_chroma_and_bit_depth_profiles ... ok
+2026-10-21T00:59:14.6743440Z test direct::tests::grid_payload_uses_large_dimension_form_only_when_required ... ok
+2026-10-21T00:59:14.6748240Z test direct::tests::rejects_bad_tile_geometry_before_parsing_source ... ok
+2026-10-21T00:59:14.6750090Z test direct::tests::rejects_codec_channel_mismatch_before_parsing_source ... ok
+2026-10-21T00:59:14.6755850Z test native::tests::assembly_rejects_empty_metadata_before_parsing_source ... ok
+2026-10-21T00:59:14.6756490Z test orientation::tests::coded_aspect_accepts_an_integer_scale_and_rejects_a_transpose ... ok
+2026-10-21T00:59:14.6757060Z test orientation::tests::odd_irot_swaps_display_dimensions ... ok
+2026-10-21T00:59:14.6757590Z test canonical::tests::essential_normalization_changes_only_requested_associations ... ok
+2026-10-21T00:59:14.6770070Z test semantic::tests::alpha_merge_preserves_source_auxiliary_instead_of_importing_reencoded_alpha ... ok
+2026-10-21T00:59:14.6872180Z test direct::tests::both_gain_map_assemblers_preserve_mirror_rotation_order ... ok
+2026-10-21T00:59:14.6909740Z test semantic::tests::alpha_primary_only_and_premultiplied_relationships_preserve_transform_order ... ok
+2026-10-21T00:59:14.6910490Z test semantic::tests::alpha_subtype_diagnostic_distinguishes_uri_and_byte_mismatches_without_dumping_them ... ok
+2026-10-21T00:59:14.6911990Z test semantic::tests::alpha_subtype_diagnostic_reports_bounded_structure_for_invalid_resource_graph ... ok
+2026-10-21T00:59:14.7014060Z test semantic::tests::alpha_subtype_passthrough_readback_rejects_changed_returned_auxiliary_bytes ... ok
+2026-10-21T00:59:14.7027090Z test semantic::tests::alpha_subtype_passthrough_rejects_changed_metadata_or_unknown_identity ... ok
+2026-10-21T00:59:14.7027760Z test semantic::tests::alpha_subtype_passthrough_rejects_property_changes_on_other_resources ... ok
+2026-10-21T00:59:14.7028450Z test semantic::tests::alpha_transplant_preserves_source_payload_codec_and_tile_order ... ok
+2026-10-21T00:59:14.7029040Z test semantic::tests::alpha_subtype_passthrough_preserves_complete_source_metadata_and_coded_resources ... ok
+2026-10-21T00:59:14.7029600Z test semantic::tests::auxiliary_identity_rejects_duplicate_alpha_item_records ... ok
+2026-10-21T00:59:14.7030130Z test semantic::tests::alpha_assembly_rejects_unknown_missing_ambiguous_or_conflicting_pairs ... ok
+2026-10-21T00:59:14.7030740Z test semantic::tests::auxiliary_identity_rejects_unknown_semantic_role_even_with_matching_descriptors ... ok
+2026-10-21T00:59:14.7031380Z test semantic::tests::auxiliary_identity_rejects_unhandled_alpha_tile_outgoing_references ... ok
+2026-10-21T00:59:14.7032500Z test semantic::tests::auxiliary_identity_transplant_rejects_unpaired_unknown_source_auxiliary ... ok
+2026-10-21T00:59:14.7034600Z test semantic::tests::merge_direct_hdr_imports_three_described_semantics_without_importing_gain ... ok
+2026-10-21T00:59:14.7036100Z test semantic::tests::semantic_assembly_rejects_ambiguous_auxiliary_and_descriptor_edges ... ok
+2026-10-21T00:59:14.7037650Z test semantic::tests::semantic_assembly_rejects_unknown_auxiliary_instead_of_dropping_it ... ok
+2026-10-21T00:59:14.7039100Z test semantic::tests::semantic_descriptors_must_cover_each_image_once_even_when_counts_match ... ok
+2026-10-21T00:59:14.7040440Z test semantic::tests::semantic_merge_rejects_ambiguous_source_gain_map_graph ... ok
+2026-10-21T00:59:14.7041900Z test semantic::tests::transplant_direct_hdr_keeps_gain_out_of_three_semantic_roles ... ok
+2026-10-21T00:59:14.7043410Z test semantic::tests::transplant_identifies_gain_map_by_relationship_with_reversed_tmap_targets ... ok
+2026-10-21T00:59:14.7044890Z test semantic::tests::transplant_preserves_multi_tile_grid_payload_order_and_semantics ... ok
+2026-10-21T00:59:14.7046520Z test semantic::tests::unclassified_auxiliary_failure_diagnostic_reports_roles_and_edges_without_media ... ok
+2026-10-21T00:59:14.7049200Z test semantic::tests::semantic_assembly_rejects_ambiguous_or_incomplete_hdr_graphs ... ok
+2026-10-21T00:59:14.7050720Z test styles::tests::derives_primary_color_from_grid_components_when_grid_has_geometry_only ... ok
+2026-10-21T00:59:14.7052230Z test styles::tests::appends_rust_resources_and_preserves_source_mdat_prefix ... ok
+2026-10-21T00:59:14.7061530Z test styles::tests::direct_gain_map_styles_assembly_preserves_source_resources_and_color ... ok
+2026-10-21T00:59:14.7062180Z test styles::tests::direct_gain_map_styles_assembly_rejects_invalid_codec_precision_or_color ... ok
+2026-10-21T00:59:14.7062800Z test styles::tests::direct_gain_map_styles_assembly_rejects_invalid_derived_relationships ... ok
+2026-10-21T00:59:14.7063320Z test styles::tests::display_oriented_style_item_is_rejected ... ok
+2026-10-21T00:59:14.7063800Z test styles::tests::rejects_non_binary_style_metadata_before_parsing_source ... ok
+2026-10-21T00:59:14.7064270Z test styles::tests::rejects_a_second_style_metadata_item ... ok
+2026-10-21T00:59:14.7064860Z test styles::tests::rotated_primary_reuses_its_irot_on_coded_style_items ... ok
+2026-10-21T00:59:14.7065430Z test texture::tests::a_role_label_cannot_replace_a_missing_native_codec_or_distinct_instance ... ok
+2026-10-21T00:59:14.7065930Z test styles::tests::style_items_preserve_primary_mirror_rotation_order ... ok
+2026-10-21T00:59:14.7066390Z test texture::tests::appends_measured_masks_without_changing_original_payloads ... ok
+2026-10-21T00:59:14.7105470Z test texture::tests::native_skin_carrier_is_selected_among_alpha_without_changing_source_hdr_resources ... ok
+2026-10-21T00:59:14.7106450Z test texture::tests::native_skin_carrier_rejects_malformed_or_ambiguous_auxc_properties ... ok
+2026-10-21T00:59:14.7107040Z test texture::tests::native_skin_carrier_rejects_unknown_ambiguous_or_overlapping_auxiliary_graphs ... ok
+2026-10-21T00:59:14.7107680Z test texture::tests::native_skin_carrier_failure_reports_bounded_roles_and_references_without_opaque_bytes ... ok
+2026-10-21T00:59:14.7108360Z test validation::tests::accepts_mono_420_422_444_and_ten_bit_profiles ... ok
+2026-10-21T00:59:14.7108770Z test validation::tests::accepts_valid_tiled_gain_map_graph ... ok
+2026-10-21T00:59:14.7109270Z test validation::tests::direct_gain_map_rejects_incomplete_ambiguous_or_conflicting_resources ... ok
+2026-10-21T00:59:14.7109750Z test validation::tests::rejects_grid_tile_count_mismatch ... ok
+2026-10-21T00:59:14.7110260Z test validation::tests::direct_gain_map_reports_its_actual_coded_resource_and_precision ... ok
+2026-10-21T00:59:14.7110740Z test validation::tests::rejects_idat_extent_past_storage ... ok
+2026-10-21T00:59:14.7111140Z test validation::tests::rejects_tmap_reference_to_unknown_gain_map ... ok
+2026-10-21T00:59:14.7111590Z test validation::tests::rejects_pixi_hvcc_channel_mismatch ... ok
+2026-10-21T00:59:14.7153430Z test semantic::tests::auxiliary_graph_diagnostic_bounds_unknown_and_malformed_properties ... ok
+2026-10-21T00:59:14.7154370Z 
+2026-10-21T00:59:14.7154980Z test result: ok. 61 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+2026-10-21T00:59:14.7155850Z 
+2026-10-21T00:59:14.7156790Z [1m[92m     Running[0m tests/fail_closed.rs (target/debug/deps/fail_closed-a06ce8d093de86c9)
+2026-10-21T00:59:14.7242220Z 
+2026-10-21T00:59:14.7242580Z running 2 tests
+2026-10-21T00:59:14.7259910Z test malformed_source_fails_closed_after_validating_spec ... ok
+2026-10-21T00:59:14.7260510Z test structurally_incomplete_source_is_rejected ... ok
+2026-10-21T00:59:14.7260720Z 
+2026-10-21T00:59:14.7260980Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.7261290Z 
+2026-10-21T00:59:14.7266170Z [1m[92m     Running[0m unittests examples/heif_conformance.rs (target/debug/examples/heif_conformance-063563f0fcac99be)
+2026-10-21T00:59:14.7385670Z 
+2026-10-21T00:59:14.7385920Z running 0 tests
+2026-10-21T00:59:14.7386100Z 
+2026-10-21T00:59:14.7386380Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.7386760Z 
+2026-10-21T00:59:14.7394100Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_metadata-9c1554d5417b9cc0)
+2026-10-21T00:59:14.7477890Z 
+2026-10-21T00:59:14.7478100Z running 16 tests
+2026-10-21T00:59:14.7486480Z test apple_portrait::tests::focus_xmp_rejects_invalid_geometry_and_coordinates ... ok
+2026-10-21T00:59:14.7487670Z test iso21496::tests::apple_tmap_matches_current_swift_golden_bytes ... ok
+2026-10-21T00:59:14.7489120Z test apple_portrait::tests::focus_xmp_contains_consumer_region_and_type ... ok
+2026-10-21T00:59:14.7490530Z test iso21496::tests::distinct_channels_are_preserved_in_xmp_and_tmap ... ok
+2026-10-21T00:59:14.7491290Z test iso21496::tests::hdrgm_xmp_preserves_current_swift_indentation_contract ... ok
+2026-10-21T00:59:14.7491880Z test iso21496::tests::malformed_lengths_and_strict_payloads_fail_closed ... ok
+2026-10-21T00:59:14.7492320Z test iso21496::tests::native_and_strict_lengths_match_swift_contract ... ok
+2026-10-21T00:59:14.7492900Z test iso21496::tests::reversed_per_channel_gain_ranges_are_rejected_by_both_tmap_writers ... ok
+2026-10-21T00:59:14.7493530Z test oppo::tests::extent_adjustment_matches_swift_overlap_policy ... ok
+2026-10-21T00:59:14.7493950Z test oppo::tests::malformed_decimal_overflow_is_not_misparsed ... ok
+2026-10-21T00:59:14.7494400Z test oppo::tests::adjustment_preserves_digit_width_and_expands_when_required ... ok
+2026-10-21T00:59:14.7494830Z test oppo::tests::routing_matches_current_swift_contract ... ok
+2026-10-21T00:59:14.7495540Z test ultrahdr_jpeg::tests::decodes_iso_multichannel_metadata ... ok
+2026-10-21T00:59:14.7496200Z test oppo::tests::usercomment_patch_repoints_tiff_value_and_tracks_extent_delta ... ok
+2026-10-21T00:59:14.7496690Z test ultrahdr_jpeg::tests::rejects_nonzero_iso_reserved_bits ... ok
+2026-10-21T00:59:14.7497120Z test ultrahdr_jpeg::tests::parses_hdrgm_scalar_values ... ok
+2026-10-21T00:59:14.7497880Z 
+2026-10-21T00:59:14.7498190Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.7498510Z 
+2026-10-21T00:59:14.7499090Z [1m[92m     Running[0m unittests src/bin/xdremux-metadata-fixture.rs (target/debug/deps/xdremux_metadata_fixture-9259961518eb3b68)
+2026-10-21T00:59:14.7567960Z 
+2026-10-21T00:59:14.7568220Z running 0 tests
+2026-10-21T00:59:14.7568370Z 
+2026-10-21T00:59:14.7568680Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.7569010Z 
+2026-10-21T00:59:14.7575580Z [1m[92m     Running[0m unittests src/bin/xdremux-metadata-vectors.rs (target/debug/deps/xdremux_metadata_vectors-d6e1e20c70494f5b)
+2026-10-21T00:59:14.7642210Z 
+2026-10-21T00:59:14.7642430Z running 0 tests
+2026-10-21T00:59:14.7642570Z 
+2026-10-21T00:59:14.7642810Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:14.7643160Z 
+2026-10-21T00:59:14.7649570Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_motion_photo-082052dcfd188bdb)
+2026-10-21T00:59:14.7728100Z 
+2026-10-21T00:59:14.7729040Z running 16 tests
+2026-10-21T00:59:14.7741300Z test geometry::tests::coloros16_transform_matches_existing_product_policy ... ok
+2026-10-21T00:59:14.7744110Z test geometry::tests::coloros15_uses_closest_cover_frame_and_inverts_matrix ... ok
+2026-10-21T00:59:14.7752830Z test payload::tests::payload_limit_failure_leaves_existing_destination_untouched ... ok
+2026-10-21T00:59:14.7756930Z test payload::tests::out_of_file_range_leaves_existing_destination_untouched ... ok
+2026-10-21T00:59:14.7770170Z test payload::tests::same_path_misuse_fails_closed_and_removes_partial_destination ... ok
+2026-10-21T00:59:14.7774390Z test publication::tests::companion_movie_uses_same_stem ... ok
+2026-10-21T00:59:14.7778680Z test payload::tests::zero_buffer_failure_leaves_existing_destination_untouched ... ok
+2026-10-21T00:59:14.7798450Z test payload::tests::copies_exact_range_replaces_destination_and_creates_parent ... ok
+2026-10-21T00:59:14.7832660Z test publication::tests::publication_accepts_owned_staging_under_destination_directory ... ok
+2026-10-21T00:59:14.7833320Z test publication::tests::publication_preserves_a_dangling_competitor_symlink ... ok
+2026-10-21T00:59:14.7834180Z test publication::tests::publication_claims_shared_movie_before_either_still_extension ... ok
+2026-10-21T00:59:14.7834840Z test publication::tests::publication_refuses_existing_resources_and_preserves_staging ... ok
+2026-10-21T00:59:14.7835440Z test publication::tests::publication_rejects_identical_final_paths_without_effects ... ok
+2026-10-21T00:59:14.7836050Z test publication::tests::publication_retains_a_recoverable_partial_pair_after_second_link_failure ... ok
+2026-10-21T00:59:14.7838990Z test publication::tests::reconcile_preserves_partial_invalid_and_valid_pairs ... ok
+2026-10-21T00:59:14.7842680Z test publication::tests::reconcile_preserves_unowned_artifacts_and_directories ... ok
+2026-10-21T00:59:14.7843130Z 
+2026-10-21T00:59:14.7843470Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-10-21T00:59:14.7844420Z 
+2026-10-21T00:59:14.7846470Z [1m[92m     Running[0m tests/liblivephoto_interop.rs (target/debug/deps/liblivephoto_interop-44cf32e2762e83e4)
+2026-10-21T00:59:14.7986510Z 
+2026-10-21T00:59:14.7987190Z running 1 test
+2026-10-21T00:59:15.5351450Z test coloros16_public_writer_retains_unmapped_resources_as_explicit_sidecars ... ok
+2026-10-21T00:59:15.5352260Z 
+2026-10-21T00:59:15.5352870Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+2026-10-21T00:59:15.5355750Z 
+2026-10-21T00:59:15.5368660Z [1m[92m     Running[0m tests/live_photo_heif_still_fixture.rs (target/debug/deps/live_photo_heif_still_fixture-4eb53978b7454d32)
+2026-10-21T00:59:15.5473880Z 
+2026-10-21T00:59:15.5474610Z running 1 test
+2026-10-21T00:59:15.8591080Z test samsung_heif_motion_photo_becomes_portable_apple_live_photo_still ... ok
+2026-10-21T00:59:15.8591850Z 
+2026-10-21T00:59:15.8592580Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+2026-10-21T00:59:15.8593360Z 
+2026-10-21T00:59:15.8594560Z [1m[92m     Running[0m tests/live_photo_mov_fixture.rs (target/debug/deps/live_photo_mov_fixture-54a4e9a7d71f75e8)
+2026-10-21T00:59:15.8704710Z 
+2026-10-21T00:59:15.8704930Z running 1 test
+2026-10-21T00:59:16.6084160Z test real_coloros_motion_video_rewrap_preserves_compressed_media ... ok
+2026-10-21T00:59:16.6084850Z 
+2026-10-21T00:59:16.6085460Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+2026-10-21T00:59:16.6086250Z 
+2026-10-21T00:59:16.6094510Z [1m[92m     Running[0m unittests examples/motion_photo_conformance.rs (target/debug/examples/motion_photo_conformance-13b9243a0eafde3c)
+2026-10-21T00:59:16.6168470Z 
+2026-10-21T00:59:16.6168650Z running 0 tests
+2026-10-21T00:59:16.6168770Z 
+2026-10-21T00:59:16.6169060Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:16.6169420Z 
+2026-10-21T00:59:16.6175650Z [1m[92m     Running[0m unittests examples/payload_conformance.rs (target/debug/examples/payload_conformance-14abdb386addf29a)
+2026-10-21T00:59:16.6246570Z 
+2026-10-21T00:59:16.6247160Z running 0 tests
+2026-10-21T00:59:16.6247480Z 
+2026-10-21T00:59:16.6248110Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:16.6248850Z 
+2026-10-21T00:59:16.6254000Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_runtime-aac582d53dfb235b)
+2026-10-21T00:59:16.6482230Z 
+2026-10-21T00:59:16.6482510Z running 59 tests
+2026-10-21T00:59:16.6573140Z test apple_adapter::tests::image_properties_wire_is_platform_facts_only ... ok
+2026-10-21T00:59:16.6587070Z test apple_adapter::tests::scene_classification_wire_is_raw_and_rust_owns_bucketing ... ok
+2026-10-21T00:59:16.6598130Z test apple_adapter::tests::scene_classification_wire_rejects_invalid_platform_confidence ... ok
+2026-10-21T00:59:16.6614100Z test apple_styles::tests::identity_statistics_match_percentile_contract ... ok
+2026-10-21T00:59:16.6651720Z test apple_styles::tests::linear_thumbnail_reconstructs_rgb_gain_and_keeps_storage_geometry ... ok
+2026-10-21T00:59:16.6691860Z test apple_styles::tests::missing_or_changed_smartstyle_state_is_rejected_before_publication ... ok
+2026-10-21T00:59:16.6696940Z test apple_styles::tests::neutral_style_delta_uses_verified_main10_protocol_resource ... ok
+2026-10-21T00:59:16.6698420Z test apple_styles::tests::real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox ... ok
+2026-10-21T00:59:16.6722450Z test apple_styles::tests::semantic_matte_dimensions_match_scaffold_fit_for_all_orientation_classes ... ok
+2026-10-21T00:59:16.6723300Z test apple_styles::tests::semantic_matte_resize_is_deterministic_and_preserves_corners ... ok
+2026-10-21T00:59:16.6724050Z test apple_styles::tests::single_idr_payload_converts_annex_b_to_length_prefixed_item_data ... ok
+2026-10-21T00:59:16.6724740Z test apple_styles::tests::style_grid_size_stays_inside_the_fixed_thirty_tile_layout ... ok
+2026-10-21T00:59:16.6725410Z test apple_styles::tests::style_scene_applies_gain_at_full_resolution_before_area_resize ... ok
+2026-10-21T00:59:16.6726090Z test apple_styles::tests::submitted_system_pair_drives_styles_without_original_gain_parameters ... ok
+2026-10-21T00:59:16.6727830Z test apple_texture::tests::empty_people_context_admits_but_a_dropped_instance_fails ... ok
+2026-10-21T00:59:16.6770160Z test apple_adapter::tests::persistent_session_reuses_process_and_recovers_after_crash ... ok
+2026-10-21T00:59:16.6784040Z test apple_texture::tests::internal_gpu_failure_rejects_even_when_explicit_commands_completed ... ok
+2026-10-21T00:59:16.6787520Z test apple_texture::tests::missing_or_malformed_gpu_receipts_cannot_admit_optional_empty_statistics ... ok
+2026-10-21T00:59:16.6789760Z test apple_texture::tests::missing_texture_and_partial_gpu_work_fail_before_publication ... ok
+2026-10-21T00:59:16.6792140Z test batch::tests::failed_batch_conversion_never_publishes_and_cleans_private_paths ... ok
+2026-10-21T00:59:16.6853650Z test batch::tests::new_batch_publication_preserves_a_destination_created_during_conversion ... ok
+2026-10-21T00:59:16.6890930Z test apple_adapter::tests::persistent_response_reader_rejects_oversized_frame ... ok
+2026-10-21T00:59:16.6894160Z test batch::tests::receipt_counts_are_derived_from_outcomes ... ok
+2026-10-21T00:59:16.6946930Z test batch::tests::new_batch_publication_uses_the_converted_file_and_cleans_private_paths ... ok
+2026-10-21T00:59:16.7186480Z test batch_checkpoint::tests::streamed_signature_matches_in_memory_signature_for_large_input ... ok
+2026-10-21T00:59:16.7494220Z test batch_checkpoint::tests::changed_source_digest_invalidates_reuse_even_when_mtime_is_irrelevant ... ok
+2026-10-21T00:59:16.7557590Z test batch_checkpoint::tests::truncated_tail_record_never_grants_reuse ... ok
+2026-10-21T00:59:16.7575550Z test categorize::tests::dry_run_plans_without_creating_output ... ok
+2026-10-21T00:59:16.7650000Z test live_photo::tests::candidate_scanner_ignores_unvalidated_jpeg_blobs ... ok
+2026-10-21T00:59:16.7657850Z test live_photo::tests::generated_pair_identifier_is_uuid_v4 ... ok
+2026-10-21T00:59:16.7943910Z test categorize::tests::categorization_is_idempotent_and_never_clobbers_conflicts ... ok
+2026-10-21T00:59:16.7984570Z test live_photo_package::tests::concurrent_package_claims_publish_one_whole_directory_and_preserve_loser_staging ... ok
+2026-10-21T00:59:16.7991330Z test live_photo_package::tests::direct_batch_and_checkpoint_writers_cannot_create_members_in_an_existing_package ... ok
+2026-10-21T00:59:16.8009270Z test live_photo_package::tests::failed_publication_keeps_staging_and_original_error_without_replacing_destination ... ok
+2026-10-21T00:59:17.0853050Z test apple_texture::tests::existing_styles_require_edit_state_even_when_texture_parser_would_admit ... ok
+2026-10-21T00:59:17.0953340Z test live_photo_package::tests::metadata_requires_the_observed_string_version_and_one_complete_document ... ok
+2026-10-21T00:59:17.1054450Z test live_photo_package::tests::package_reader_and_output_parent_checks_reject_symlink_and_nested_package_mutation ... ok
+2026-10-21T00:59:17.2463290Z test live_photo_package::tests::jpeg_package_reader_uses_real_pair_metadata_without_filename_pairing ... ok
+2026-10-21T00:59:17.3131940Z test live_photo::tests::sef_hdr_without_a_mapped_gain_map_cannot_be_classified_as_sdr ... ok
+2026-10-21T00:59:17.5584460Z test live_photo_package::tests::packaging_keeps_every_validated_heif_pair_byte_identity_time_and_auxiliary_resource ... ok
+2026-10-21T00:59:17.7438770Z test oppo_portrait::tests::committed_portrait_fixture_has_depth_without_subject_matte ... ok
+2026-10-21T00:59:17.7540890Z test oppo_portrait::tests::private_gain_map_headroom_matches_the_swift_stop_mapping ... ok
+2026-10-21T00:59:17.8949270Z test live_photo_package::tests::package_reader_rejects_mismatched_truncated_missing_and_ambiguous_members ... ok
+2026-10-21T00:59:17.9763860Z test oppo_portrait::tests::decodes_committed_portrait_depth_without_external_zstd ... ok
+2026-10-21T00:59:17.9865830Z test oppo_portrait::tests::rejects_empty_compressed_depth ... ok
+2026-10-21T00:59:18.0268270Z test oppo_portrait::tests::producer_focus_region_uses_the_stored_oppo_focus_point ... ok
+2026-10-21T00:59:18.0370690Z test oppo_portrait::tests::simulated_aperture_matches_the_swift_oracle_precedence ... ok
+2026-10-21T00:59:18.1756430Z test oppo_portrait::tests::producer_focus_region_uses_valid_focus_rectangle_dimensions ... ok
+2026-10-21T00:59:18.1764980Z test system_heif_hdr::tests::invalid_readback_preserves_an_existing_measurement_output ... ok
+2026-10-21T00:59:18.1768210Z test system_heif_hdr::tests::styles_sdr_reference_uses_the_quantized_submitted_codes ... ok
+2026-10-21T00:59:18.1828140Z test tests::atomic_publisher_replaces_destination_only_on_commit ... ok
+2026-10-21T00:59:18.1832120Z test tests::diagnostic_only_error_has_no_invented_source ... ok
+2026-10-21T00:59:18.1832670Z test tests::mono_replication_preserves_logical_pixels_not_padding ... ok
+2026-10-21T00:59:18.1833270Z test tests::relative_publication_uses_current_directory_parent ... ok
+2026-10-21T00:59:18.1833820Z test tests::runtime_error_retains_typed_sources_through_context_and_clone ... ok
+2026-10-21T00:59:18.1834340Z test tests::standard_heif_body_drops_post_mdat_vendor_tail ... ok
+2026-10-21T00:59:18.1834820Z test validation::tests::chroma_names_are_stable_machine_values ... ok
+2026-10-21T00:59:18.2421690Z test oppo_portrait::tests::rejects_one_jpeg_from_the_portrait_pair_as_a_complete_source_image ... ok
+2026-10-21T00:59:18.2837230Z test oppo_portrait::tests::splits_committed_portrait_source_with_hardened_jpeg_boundaries ... ok
+2026-10-21T00:59:18.2837590Z 
+2026-10-21T00:59:18.2837850Z test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
+2026-10-21T00:59:18.2838160Z 
+2026-10-21T00:59:18.2868080Z [1m[92m     Running[0m tests/apple_adapter.rs (target/debug/deps/apple_adapter-26c126be02c4872c)
+2026-10-21T00:59:18.3077520Z 
+2026-10-21T00:59:18.3080640Z running 5 tests
+2026-10-21T00:59:18.3092430Z test rust_owned_auxiliary_manifest_round_trips_through_imageio ... ok
+2026-10-21T00:59:18.3092920Z test rust_client_round_trips_styles_metadata_through_apple_consumer ... ok
+2026-10-21T00:59:18.3094120Z test oppo_native_portrait_preserves_only_available_source_resources ... ok
+2026-10-21T00:59:18.3095440Z test rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives ... ok
+2026-10-21T00:59:18.3096610Z test swift_adapter_advertises_only_apple_operation_facts ... ok
+2026-10-21T00:59:18.3097170Z 
+2026-10-21T00:59:18.3097800Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:18.3098580Z 
+2026-10-21T00:59:18.3100060Z [1m[92m     Running[0m tests/apple_portrait_rend.rs (target/debug/deps/apple_portrait_rend-00349aa0cf1345ec)
+2026-10-21T00:59:18.3282370Z 
+2026-10-21T00:59:18.3282810Z running 2 tests
+2026-10-21T00:59:18.3299770Z test canonical_portrait_file_transaction_publishes_only_after_rust_and_imageio_validation ... ok
+2026-10-21T00:59:18.3301200Z test source_derived_rend_round_trips_through_the_rust_owned_portrait_manifest ... ok
+2026-10-21T00:59:18.3301930Z 
+2026-10-21T00:59:18.3302550Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:18.3303290Z 
+2026-10-21T00:59:18.3304410Z [1m[92m     Running[0m tests/cinematic_envelope.rs (target/debug/deps/cinematic_envelope-1341ee1ae62fc13a)
+2026-10-21T00:59:18.3503580Z 
+2026-10-21T00:59:18.3503950Z running 4 tests
+2026-10-21T00:59:18.3620780Z test cinematic_preflight_preserves_existing_files_and_rejects_invalid_parameters ... ok
+2026-10-21T00:59:18.3630090Z test cinematic_rejects_misnamed_output_before_adapter_execution ... ok
+2026-10-21T00:59:19.5236270Z test cinematic_rejects_incomplete_adapter_output_and_removes_staging ... ok
+2026-10-21T00:59:19.5313690Z test cinematic_batch_routes_video_intent_and_rejects_incomplete_output ... ok
+2026-10-21T00:59:19.5314200Z 
+2026-10-21T00:59:19.5318430Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s
+2026-10-21T00:59:19.5319320Z 
+2026-10-21T00:59:19.5322160Z [1m[92m     Running[0m tests/live_photo_fixture.rs (target/debug/deps/live_photo_fixture-3d5477c38dbbdb7f)
+2026-10-21T00:59:19.5510530Z 
+2026-10-21T00:59:19.5511290Z running 1 test
+2026-10-21T00:59:20.0192120Z test real_samsung_heif_motion_photo_becomes_valid_live_photo_pair ... ok
+2026-10-21T00:59:20.0192890Z 
+2026-10-21T00:59:20.0193550Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+2026-10-21T00:59:20.0196190Z 
+2026-10-21T00:59:20.0197690Z [1m[92m     Running[0m tests/live_photo_jpeg_fixtures.rs (target/debug/deps/live_photo_jpeg_fixtures-bc21915a4a9b365f)
+2026-10-21T00:59:20.0389260Z 
+2026-10-21T00:59:20.0389550Z running 2 tests
+2026-10-21T00:59:20.0392000Z test real_jpeg_motion_photo_vendor_matrix ... ignored, real-device vendor matrix; invoked explicitly by the Rust CLI gate
+2026-10-21T00:59:30.0303070Z test samsung_ultrahdr_jpeg_becomes_valid_hdr_live_photo ... ok
+2026-10-21T00:59:30.0303910Z 
+2026-10-21T00:59:30.0304530Z test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 9.99s
+2026-10-21T00:59:30.0305340Z 
+2026-10-21T00:59:30.0339970Z [1m[92m     Running[0m tests/live_photo_negative.rs (target/debug/deps/live_photo_negative-84941fc5d6b4dd34)
+2026-10-21T00:59:30.0561640Z 
+2026-10-21T00:59:30.0561940Z running 6 tests
+2026-10-21T00:59:30.3931850Z test conversion_preserves_a_source_directory_with_a_temporary_looking_name ... ok
+2026-10-21T00:59:30.7140900Z test second_member_failure_retains_partial_movie_and_complete_staged_pair ... ok
+2026-10-21T00:59:30.9477870Z test known_timestamp_without_video_track_is_rejected_before_publication ... ok
+2026-10-21T00:59:30.9748760Z test known_timestamp_without_video_samples_is_rejected_before_publication ... ok
+2026-10-21T00:59:31.7599960Z test sef_fallback_hdr_without_mapped_gain_map_is_rejected_before_publication ... ok
+2026-10-21T00:59:42.3390850Z test sef_fallback_with_real_sdr_still_and_movie_remains_supported ... ok
+2026-10-21T00:59:42.3391650Z 
+2026-10-21T00:59:42.3392350Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.28s
+2026-10-21T00:59:42.3393220Z 
+2026-10-21T00:59:42.3432160Z [1m[92m     Running[0m tests/oppo_compat_fixture.rs (target/debug/deps/oppo_compat_fixture-5c89fa9f0832064e)
+2026-10-21T00:59:42.3633560Z 
+2026-10-21T00:59:42.3634390Z running 2 tests
+2026-10-21T00:59:44.1591660Z test standard_output_keeps_x6_gain_map_monochrome ... ok
+2026-10-21T00:59:44.4422770Z test oppo_gallery_output_expands_x6_mono_to_rgb420_and_preserves_vendor_routing ... ok
+2026-10-21T00:59:44.4423710Z 
+2026-10-21T00:59:44.4424510Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.08s
+2026-10-21T00:59:44.4425460Z 
+2026-10-21T00:59:44.4435340Z [1m[92m     Running[0m tests/oppo_tail_fixture.rs (target/debug/deps/oppo_tail_fixture-b6c14758150658f9)
+2026-10-21T00:59:44.4654310Z 
+2026-10-21T00:59:44.4654640Z running 2 tests
+2026-10-21T00:59:46.7158850Z test standard_output_removes_private_hdr_tail_resources ... ok
+2026-10-21T00:59:47.1341080Z test oppo_gallery_output_appends_exact_source_tail_bytes ... ok
+2026-10-21T00:59:47.1341800Z 
+2026-10-21T00:59:47.1342430Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.67s
+2026-10-21T00:59:47.1343270Z 
+2026-10-21T00:59:47.1355270Z [1m[92m     Running[0m tests/private_fixture.rs (target/debug/deps/private_fixture-21cc75177af439b4)
+2026-10-21T00:59:47.1544310Z 
+2026-10-21T00:59:47.1544650Z running 1 test
+2026-10-21T00:59:47.1560490Z test standard_private_proxdr_fixture_reaches_portable_final_file ... ok
+2026-10-21T00:59:47.1561250Z 
+2026-10-21T00:59:47.1561920Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:47.1562730Z 
+2026-10-21T00:59:47.1564690Z [1m[92m     Running[0m tests/source_detection_fixtures.rs (target/debug/deps/source_detection_fixtures-71ef96f98b0e4c1f)
+2026-10-21T00:59:47.1750360Z 
+2026-10-21T00:59:47.1751240Z running 3 tests
+2026-10-21T00:59:47.2274380Z test find_x7_lhdr_source_is_monochrome_jpeg8 ... ok
+2026-10-21T00:59:47.3167930Z test find_x9_uhdr_source_is_rgb_jpeg8 ... ok
+2026-10-21T00:59:47.3226110Z test find_x6_lhdr_source_is_monochrome_jpeg8 ... ok
+2026-10-21T00:59:47.3226740Z 
+2026-10-21T00:59:47.3227380Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+2026-10-21T00:59:47.3228120Z 
+2026-10-21T00:59:47.3231530Z [1m[92m     Running[0m tests/synthetic_uhdr.rs (target/debug/deps/synthetic_uhdr-c9d4d33a095a6d9d)
+2026-10-21T00:59:47.3422090Z 
+2026-10-21T00:59:47.3422410Z running 1 test
+2026-10-21T00:59:47.7432520Z test portable_runtime_converts_synthetic_uhdr_end_to_end ... ok
+2026-10-21T00:59:47.7433170Z 
+2026-10-21T00:59:47.7433820Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+2026-10-21T00:59:47.7434680Z 
+2026-10-21T00:59:47.7439590Z [1m[92m     Running[0m tests/system_heif_hdr.rs (target/debug/deps/system_heif_hdr-fc25af46f00ce3fe)
+2026-10-21T00:59:47.7656080Z 
+2026-10-21T00:59:47.7656450Z running 1 test
+2026-10-21T00:59:47.7672470Z test system_encoder_round_trips_a_small_linear_hdr_pair ... ok
+2026-10-21T00:59:47.7673230Z 
+2026-10-21T00:59:47.7674120Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-21T00:59:47.7674940Z 
+2026-10-21T00:59:47.7675950Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_source-eaa2493b73d9da02)
+2026-10-21T00:59:47.7786510Z 
+2026-10-21T00:59:47.7787180Z running 3 tests
+2026-10-21T00:59:47.7827770Z test tests::malformed_motion_metadata_is_not_silently_treated_as_hdr ... ok
+2026-10-21T00:59:47.7829370Z test tests::unsupported_bytes_do_not_claim_a_product_route ... ok
+2026-10-21T00:59:47.7831930Z test tests::routes_android_motion_photo_before_hdr_probe ... ok
+2026-10-21T00:59:47.7832260Z 
+2026-10-21T00:59:47.7832580Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-10-21T00:59:47.7832920Z 
+2026-10-21T00:59:47.8205580Z ##[group]Run cargo build --locked -p xdremux-cli \
+2026-10-21T00:59:47.8206210Z [36;1mcargo build --locked -p xdremux-cli \[0m
+2026-10-21T00:59:47.8206580Z [36;1m  2>&1 | tee artifacts/product-integration/rust-cli-build.log[0m
+2026-10-21T00:59:47.8207120Z [36;1mswift build --product xdremux-apple-adapter \[0m
+2026-10-21T00:59:47.8207620Z [36;1m  2>&1 | tee artifacts/product-integration/apple-adapter-build.log[0m
+2026-10-21T00:59:47.8208070Z [36;1madapter="$(swift build --show-bin-path)/xdremux-apple-adapter"[0m
+2026-10-21T00:59:47.8208440Z [36;1mtest -x "$adapter"[0m
+2026-10-21T00:59:47.8208770Z [36;1mecho "XDREMUX_CI_APPLE_ADAPTER=$adapter" >> "$GITHUB_ENV"[0m
+2026-10-21T00:59:47.8232180Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:59:47.8232530Z env:
+2026-10-21T00:59:47.8232780Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T00:59:47.8233160Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:59:47.8233640Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:59:47.8233870Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:59:47.8234130Z   CARGO_TERM_COLOR: always
+2026-10-21T00:59:47.8234350Z   RUST_BACKTRACE: short
+2026-10-21T00:59:47.8234640Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:59:47.8234930Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:59:47.8235200Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:59:47.8235490Z   CACHE_ON_FAILURE: true
+2026-10-21T00:59:47.8235740Z ##[endgroup]
+2026-10-21T00:59:48.4543180Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 0.48s
+2026-10-21T00:59:55.9589290Z Building for debugging...
+2026-10-21T00:59:55.9597180Z [Pre-planning 1 / 96]
+2026-10-21T00:59:56.1991330Z [Planning deferred tasks]
+2026-10-21T00:59:56.3009920Z [21 / 44] XDTextureNative
+2026-10-21T01:00:05.4241990Z [27 / 44]
+2026-10-21T01:00:07.7295490Z [31 / 45] XDTextureNative
+2026-10-21T01:00:07.9151610Z [33 / 95]
+2026-10-21T01:00:08.0402140Z [36 / 95]
+2026-10-21T01:00:08.1453590Z [39 / 95]
+2026-10-21T01:00:08.3707840Z [44 / 177]
+2026-10-21T01:00:08.5189070Z [47 / 177]
+2026-10-21T01:00:08.6238180Z [50 / 177]
+2026-10-21T01:00:08.7490920Z [53 / 177]
+2026-10-21T01:00:09.1242710Z [58 / 177]
+2026-10-21T01:00:09.2570600Z [62 / 186]
+2026-10-21T01:00:09.3683540Z [64 / 186]
+2026-10-21T01:00:09.4739500Z [67 / 186]
+2026-10-21T01:00:09.6286080Z [69 / 186]
+2026-10-21T01:00:09.8061720Z [72 / 186]
+2026-10-21T01:00:09.9735110Z [74 / 186]
+2026-10-21T01:00:10.1664300Z [77 / 186]
+2026-10-21T01:00:10.5312540Z [79 / 186]
+2026-10-21T01:00:10.6626990Z [81 / 186]
+2026-10-21T01:00:10.8071020Z [84 / 186]
+2026-10-21T01:00:10.9716470Z [88 / 186]
+2026-10-21T01:00:11.0883070Z [92 / 186]
+2026-10-21T01:00:11.2087270Z [94 / 186]
+2026-10-21T01:00:11.3187520Z [96 / 186]
+2026-10-21T01:00:11.5511170Z [101 / 186]
+2026-10-21T01:00:11.7714960Z [103 / 186]
+2026-10-21T01:00:11.9830270Z [105 / 186]
+2026-10-21T01:00:12.1522170Z [108 / 186]
+2026-10-21T01:00:12.3131310Z [109 / 186]
+2026-10-21T01:00:12.4375580Z [110 / 186]
+2026-10-21T01:00:12.5927770Z [113 / 186]
+2026-10-21T01:00:12.7393340Z [117 / 186]
+2026-10-21T01:00:12.9843020Z [119 / 186]
+2026-10-21T01:00:13.1381950Z [120 / 186]
+2026-10-21T01:00:13.2505020Z [121 / 186]
+2026-10-21T01:00:13.3586570Z [122 / 186]
+2026-10-21T01:00:13.9025430Z [127 / 186]
+2026-10-21T01:00:14.0498680Z [130 / 186]
+2026-10-21T01:00:14.1794780Z [131 / 186]
+2026-10-21T01:00:14.3103370Z [133 / 186]
+2026-10-21T01:00:14.4167480Z [136 / 186]
+2026-10-21T01:00:14.5398350Z [138 / 186]
+2026-10-21T01:00:14.6825930Z [142 / 186]
+2026-10-21T01:00:14.8236810Z [144 / 186]
+2026-10-21T01:00:14.9761250Z [146 / 186]
+2026-10-21T01:00:15.1304710Z [148 / 186]
+2026-10-21T01:00:15.2511890Z [150 / 186]
+2026-10-21T01:00:15.3899450Z [152 / 186]
+2026-10-21T01:00:15.4980530Z [157 / 186]
+2026-10-21T01:00:15.6437810Z [160 / 186]
+2026-10-21T01:00:15.7644210Z [162 / 186]
+2026-10-21T01:00:15.8638320Z [163 / 186]
+2026-10-21T01:00:15.9713910Z [167 / 186]
+2026-10-21T01:00:16.2317720Z [169 / 186]
+2026-10-21T01:00:16.5203490Z [170 / 186] XDTextureNative
+2026-10-21T01:00:16.6522750Z [171 / 186] xdremux-apple-adapter-product
+2026-10-21T01:00:16.7749590Z [174 / 186]
+2026-10-21T01:00:16.9881940Z [179 / 186] xdremux-apple-adapter-product
+2026-10-21T01:00:17.1062210Z [180 / 186] XDTextureNative
+2026-10-21T01:00:17.1065110Z [1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:581:40: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T01:00:17.1071000Z   581 |     for (AVAssetTrack *track in [asset tracksWithMediaType:AVMediaTypeVideo]) {[0m
+2026-10-21T01:00:17.1071840Z       | [0;1;32m                                       ^
+2026-10-21T01:00:17.1074530Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T01:00:17.1076220Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T01:00:17.1082950Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T01:00:17.1083730Z       | [0;1;32m^
+2026-10-21T01:00:17.1104380Z [0m[1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:601:40: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T01:00:17.1110820Z   601 |     for (AVAssetTrack *track in [asset tracksWithMediaType:AVMediaTypeAudio]) {[0m
+2026-10-21T01:00:17.1112740Z       | [0;1;32m                                       ^
+2026-10-21T01:00:17.1115050Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T01:00:17.1233460Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T01:00:17.1254950Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T01:00:17.1256100Z       | [0;1;32m^
+2026-10-21T01:00:17.1258450Z [0m[1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:844:43: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T01:00:17.1284330Z   844 |         AVAssetTrack *videoTrack = [asset tracksWithMediaType:AVMediaTypeVideo].firstObject;[0m
+2026-10-21T01:00:17.1285050Z       | [0;1;32m                                          ^
+2026-10-21T01:00:17.1293010Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T01:00:17.1333140Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T01:00:17.1448640Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T01:00:17.1572740Z       | [0;1;32m^
+2026-10-21T01:00:17.1691350Z [0m3 warnings generated.
+2026-10-21T01:00:19.8567970Z [182 / 186] xdremux-apple-adapter-product
+2026-10-21T01:00:23.3897970Z [184 / 186] xdremux-apple-adapter-product
+2026-10-21T01:00:23.5462160Z Build complete! (27.88 sec)
+2026-10-21T01:00:24.6169260Z ##[group]Run python3 -m unittest \
+2026-10-21T01:00:24.6169790Z [36;1mpython3 -m unittest \[0m
+2026-10-21T01:00:24.6170500Z [36;1m  tests.validation.test_agent_completion_gate \[0m
+2026-10-21T01:00:24.6171310Z [36;1m  tests.validation.test_repository_layout \[0m
+2026-10-21T01:00:24.6171760Z [36;1m  tests.test_app_architecture \[0m
+2026-10-21T01:00:24.6172570Z [36;1m  tests.test_product_ownership \[0m
+2026-10-21T01:00:24.6173170Z [36;1m  tests.test_public_documentation \[0m
+2026-10-21T01:00:24.6173760Z [36;1m  tests.test_categorization_documentation \[0m
+2026-10-21T01:00:24.6174800Z [36;1m  tests.test_performance_design \[0m
+2026-10-21T01:00:24.6175230Z [36;1m  tests.test_rust_artifact_lifecycle \[0m
+2026-10-21T01:00:24.6175790Z [36;1m  tests.test_rust_apple_semantic_policy \[0m
+2026-10-21T01:00:24.6176530Z [36;1m  tests.test_rust_portrait_translation \[0m
+2026-10-21T01:00:24.6177340Z [36;1m  2>&1 | tee artifacts/product-integration/policy-tests.log[0m
+2026-10-21T01:00:24.7203060Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:00:24.7203440Z env:
+2026-10-21T01:00:24.7203800Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:00:24.7204250Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:00:24.7204610Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:00:24.7205000Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:00:24.7205250Z   CARGO_TERM_COLOR: always
+2026-10-21T01:00:24.7205550Z   RUST_BACKTRACE: short
+2026-10-21T01:00:24.7205880Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:00:24.7206130Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:00:24.7206460Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:00:24.7206840Z   CACHE_ON_FAILURE: true
+2026-10-21T01:00:24.7207290Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:00:24.7207920Z ##[endgroup]
+2026-10-21T01:00:34.3357950Z ........................................................................
+2026-10-21T01:00:34.3359540Z ----------------------------------------------------------------------
+2026-10-21T01:00:34.3360430Z Ran 72 tests in 9.156s
+2026-10-21T01:00:34.3360880Z 
+2026-10-21T01:00:34.3361080Z OK
+2026-10-21T01:00:34.3787460Z ##[group]Run bash scripts/validation/check_rust_cli_smoke.sh \
+2026-10-21T01:00:34.3787910Z [36;1mbash scripts/validation/check_rust_cli_smoke.sh \[0m
+2026-10-21T01:00:34.3788440Z [36;1m  2>&1 | tee artifacts/product-integration/rust-cli-smoke.log[0m
+2026-10-21T01:00:34.3815640Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:00:34.3816720Z env:
+2026-10-21T01:00:34.3817030Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:00:34.3817480Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:00:34.3817800Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:00:34.3818140Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:00:34.3818440Z   CARGO_TERM_COLOR: always
+2026-10-21T01:00:34.3818680Z   RUST_BACKTRACE: short
+2026-10-21T01:00:34.3818960Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:00:34.3819270Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:00:34.3819570Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:00:34.3820290Z   CACHE_ON_FAILURE: true
+2026-10-21T01:00:34.3820790Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:00:34.3821420Z ##[endgroup]
+2026-10-21T01:00:39.9862470Z converted: fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic -> /Users/runner/work/_temp/xdremux-rust-cli.kQDx5H/oppo-compatible.heic
+2026-10-21T01:00:40.1532130Z ##[group]Run bash scripts/apple/check_apple_adapter_handshake.sh \
+2026-10-21T01:00:40.1532690Z [36;1mbash scripts/apple/check_apple_adapter_handshake.sh \[0m
+2026-10-21T01:00:40.1533110Z [36;1m  2>&1 | tee artifacts/product-integration/apple-handshake.log[0m
+2026-10-21T01:00:40.1547600Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:00:40.1548010Z env:
+2026-10-21T01:00:40.1548320Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:00:40.1548690Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:00:40.1549050Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:00:40.1549370Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:00:40.1549620Z   CARGO_TERM_COLOR: always
+2026-10-21T01:00:40.1549910Z   RUST_BACKTRACE: short
+2026-10-21T01:00:40.1550140Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:00:40.1550450Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:00:40.1550810Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:00:40.1551260Z   CACHE_ON_FAILURE: true
+2026-10-21T01:00:40.1551740Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:00:40.1552200Z ##[endgroup]
+2026-10-21T01:00:41.9157770Z Building for debugging...
+2026-10-21T01:00:41.9160030Z [1 / 1]
+2026-10-21T01:00:41.9874020Z Build complete! (0.42 sec)
+2026-10-21T01:00:44.2860150Z PASS Vision request scheduler: singleton batches, ordered, fail-fast
+2026-10-21T01:00:44.9260750Z [1m[92m   Compiling[0m proc-macro2 v1.0.107
+2026-10-21T01:00:44.9262180Z [1m[92m   Compiling[0m libc v0.2.189
+2026-10-21T01:00:44.9265170Z [1m[92m   Compiling[0m quote v1.0.47
+2026-10-21T01:00:45.7519290Z [1m[92m   Compiling[0m unicode-ident v1.0.24
+2026-10-21T01:00:45.9003670Z [1m[92m   Compiling[0m cfg-if v1.0.4
+2026-10-21T01:00:45.9517500Z [1m[92m   Compiling[0m serde_core v1.0.229
+2026-10-21T01:00:46.2304970Z [1m[92m   Compiling[0m memchr v2.8.3
+2026-10-21T01:00:46.5681760Z [1m[92m   Compiling[0m zmij v1.0.23
+2026-10-21T01:00:46.7549910Z [1m[92m   Compiling[0m target-lexicon v0.13.5
+2026-10-21T01:00:46.8482900Z [1m[92m   Compiling[0m serde_json v1.0.154
+2026-10-21T01:00:47.1638700Z [1m[92m   Compiling[0m itoa v1.0.18
+2026-10-21T01:00:47.2673760Z [1m[92m   Compiling[0m liblivephoto-format v0.1.0 (https://github.com/21Z121Z1/LibLivePhoto?rev=794ab552596db0f66095600d23cf7937a631b9ec#794ab552)
+2026-10-21T01:00:47.3303620Z [1m[92m   Compiling[0m winnow v1.0.4
+2026-10-21T01:00:47.5875490Z [1m[92m   Compiling[0m toml_parser v1.1.3+spec-1.1.0
+2026-10-21T01:00:47.9845760Z [1m[92m   Compiling[0m syn v2.0.119
+2026-10-21T01:00:48.0206840Z [1m[92m   Compiling[0m typenum v1.20.1
+2026-10-21T01:00:48.7078700Z [1m[92m   Compiling[0m serde_spanned v1.1.1
+2026-10-21T01:00:48.7833820Z [1m[92m   Compiling[0m system-deps v8.0.0
+2026-10-21T01:00:48.9606430Z [1m[92m   Compiling[0m toml_datetime v1.1.1+spec-1.1.0
+2026-10-21T01:00:49.1147490Z [1m[92m   Compiling[0m smallvec v1.16.0
+2026-10-21T01:00:49.1905430Z [1m[92m   Compiling[0m toml v1.1.4+spec-1.1.0
+2026-10-21T01:00:49.2731690Z [1m[92m   Compiling[0m cfg-expr v0.20.9
+2026-10-21T01:00:49.6148600Z [1m[92m   Compiling[0m hybrid-array v0.4.14
+2026-10-21T01:00:49.7019830Z [1m[92m   Compiling[0m syn v3.0.4
+2026-10-21T01:00:50.0360440Z [1m[92m   Compiling[0m getrandom v0.4.3
+2026-10-21T01:00:50.2449940Z [1m[92m   Compiling[0m rand_core v0.10.1
+2026-10-21T01:00:50.3833200Z [1m[92m   Compiling[0m version-compare v0.2.1
+2026-10-21T01:00:50.5594060Z [1m[92m   Compiling[0m pkg-config v0.3.34
+2026-10-21T01:00:50.7101130Z [1m[92m   Compiling[0m heck v0.5.0
+2026-10-21T01:00:50.8614600Z [1m[92m   Compiling[0m serde v1.0.229
+2026-10-21T01:00:51.1790980Z [1m[92m   Compiling[0m zerocopy v0.8.56
+2026-10-21T01:00:51.6224270Z [1m[92m   Compiling[0m serde_derive v1.0.229
+2026-10-21T01:00:51.6645530Z [1m[92m   Compiling[0m zerocopy-derive v0.8.56
+2026-10-21T01:00:51.7080030Z [1m[92m   Compiling[0m libheif-sys v5.3.1+1.23.1
+2026-10-21T01:00:51.9433970Z [1m[92m   Compiling[0m crypto-common v0.2.2
+2026-10-21T01:00:52.6331160Z [1m[92m   Compiling[0m block-buffer v0.12.1
+2026-10-21T01:00:52.7434680Z [1m[92m   Compiling[0m xdremux-format v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-format)
+2026-10-21T01:00:52.7620580Z [1m[92m   Compiling[0m quick-xml v0.42.0
+2026-10-21T01:00:52.8455540Z [1m[92m   Compiling[0m const-oid v0.10.2
+2026-10-21T01:00:52.9839020Z [1m[92m   Compiling[0m cfg_aliases v0.2.2
+2026-10-21T01:00:53.0401520Z [1m[92m   Compiling[0m bitflags v2.13.1
+2026-10-21T01:00:53.1812670Z [1m[92m   Compiling[0m nix v0.31.3
+2026-10-21T01:00:53.4610880Z [1m[92m   Compiling[0m digest v0.11.3
+2026-10-21T01:00:53.6712880Z [1m[92m   Compiling[0m cpufeatures v0.3.1
+2026-10-21T01:00:53.7572470Z [1m[92m   Compiling[0m rustix v1.1.4
+2026-10-21T01:00:54.1637560Z [1m[92m   Compiling[0m sha2 v0.11.1
+2026-10-21T01:00:54.3538520Z [1m[92m   Compiling[0m liblivephoto v0.1.0 (https://github.com/21Z121Z1/LibLivePhoto?rev=794ab552596db0f66095600d23cf7937a631b9ec#794ab552)
+2026-10-21T01:00:54.7396540Z [1m[92m   Compiling[0m enumn v0.1.14
+2026-10-21T01:00:55.1099140Z [1m[92m   Compiling[0m chacha20 v0.10.2
+2026-10-21T01:00:55.3473540Z [1m[92m   Compiling[0m errno v0.3.14
+2026-10-21T01:00:55.4782360Z [1m[92m   Compiling[0m four-cc v0.4.0
+2026-10-21T01:00:55.5742020Z [1m[92m   Compiling[0m zune-core v0.5.3
+2026-10-21T01:00:55.8956490Z [1m[92m   Compiling[0m zune-jpeg v0.5.15
+2026-10-21T01:00:56.2871940Z [1m[92m   Compiling[0m libheif-rs v3.0.0
+2026-10-21T01:00:56.7438640Z [1m[92m   Compiling[0m xdremux-motion-photo v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo)
+2026-10-21T01:00:56.9357000Z [1m[92m   Compiling[0m rand v0.10.2
+2026-10-21T01:00:57.7662350Z [1m[92m   Compiling[0m half v2.7.1
+2026-10-21T01:00:58.2946020Z [1m[92m   Compiling[0m xdremux-engine v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine)
+2026-10-21T01:00:58.4593480Z [1m[92m   Compiling[0m xdremux-container v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-container)
+2026-10-21T01:00:58.7571960Z [1m[92m   Compiling[0m twox-hash v2.1.4
+2026-10-21T01:00:58.8723180Z [1m[92m   Compiling[0m once_cell v1.21.4
+2026-10-21T01:00:59.0294910Z [1m[92m   Compiling[0m fastrand v2.5.0
+2026-10-21T01:00:59.1322420Z [1m[92m   Compiling[0m xdremux-codec v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec)
+2026-10-21T01:00:59.2033700Z [1m[92m   Compiling[0m tempfile v3.27.0
+2026-10-21T01:00:59.4274690Z [1m[92m   Compiling[0m ruzstd v0.9.1
+2026-10-21T01:00:59.6062480Z [1m[92m   Compiling[0m xdremux-source v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-source)
+2026-10-21T01:00:59.7103980Z [1m[92m   Compiling[0m atomic-write-file v0.3.1
+2026-10-21T01:00:59.7389730Z [1m[92m   Compiling[0m xdremux-classification v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification)
+2026-10-21T01:00:59.8655240Z [1m[92m   Compiling[0m xdremux-metadata v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata)
+2026-10-21T01:01:00.3314620Z [1m[92m   Compiling[0m xdremux-heif v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif)
+2026-10-21T01:01:00.3359670Z [1m[92m   Compiling[0m uuid v1.28.0
+2026-10-21T01:01:00.3665470Z [1m[92m   Compiling[0m xdremux-hdr v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr)
+2026-10-21T01:01:00.5870630Z [1m[92m   Compiling[0m jpeg-encoder v0.7.1
+2026-10-21T01:01:01.4939080Z [1m[92m   Compiling[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-21T01:01:03.9853980Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 19.67s
+2026-10-21T01:01:03.9975810Z [1m[92m     Running[0m tests/apple_adapter.rs (/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-apple-adapter.9xAnt5/debug/deps/apple_adapter-8a010074dc2685e0)
+2026-10-21T01:01:04.0119620Z 
+2026-10-21T01:01:04.0123360Z running 5 tests
+2026-10-21T01:01:04.0125430Z test rust_client_round_trips_styles_metadata_through_apple_consumer ... ok
+2026-10-21T01:01:04.5826010Z test rust_owned_auxiliary_manifest_round_trips_through_imageio ... ok
+2026-10-21T01:01:04.6357120Z test swift_adapter_advertises_only_apple_operation_facts ... ok
+2026-10-21T01:01:12.2887750Z test oppo_native_portrait_preserves_only_available_source_resources ... ok
+2026-10-21T01:01:14.8471830Z test rust_owns_oppo_portrait_source_preflight_around_apple_framework_primitives ... ok
+2026-10-21T01:01:14.8474230Z 
+2026-10-21T01:01:14.8475470Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.84s
+2026-10-21T01:01:14.8479370Z 
+2026-10-21T01:01:14.8517760Z [1m[92m     Running[0m tests/apple_portrait_rend.rs (/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-apple-adapter.9xAnt5/debug/deps/apple_portrait_rend-d3af9806f28a433f)
+2026-10-21T01:01:14.8731860Z 
+2026-10-21T01:01:14.8732770Z running 2 tests
+2026-10-21T01:01:22.8929600Z test canonical_portrait_file_transaction_publishes_only_after_rust_and_imageio_validation ... ok
+2026-10-21T01:01:27.2366800Z test source_derived_rend_round_trips_through_the_rust_owned_portrait_manifest ... ok
+2026-10-21T01:01:27.2367960Z 
+2026-10-21T01:01:27.2368650Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.36s
+2026-10-21T01:01:27.2369490Z 
+2026-10-21T01:01:27.3997570Z ##[group]Run bash scripts/apple/check_rust_cli_apple_portrait.sh \
+2026-10-21T01:01:27.3999280Z [36;1mbash scripts/apple/check_rust_cli_apple_portrait.sh \[0m
+2026-10-21T01:01:27.4000690Z [36;1m  2>&1 | tee artifacts/product-integration/apple-portrait.log[0m
+2026-10-21T01:01:27.4077930Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:01:27.4078440Z env:
+2026-10-21T01:01:27.4078810Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:01:27.4079280Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:01:27.4079820Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:01:27.4080150Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:01:27.4080910Z   CARGO_TERM_COLOR: always
+2026-10-21T01:01:27.4081470Z   RUST_BACKTRACE: short
+2026-10-21T01:01:27.4081860Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:01:27.4082340Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:01:27.4082990Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:01:27.4083550Z   CACHE_ON_FAILURE: true
+2026-10-21T01:01:27.4084000Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:01:27.4084800Z ##[endgroup]
+2026-10-21T01:01:29.4140080Z Building for debugging...
+2026-10-21T01:01:29.4141700Z [1 / 1]
+2026-10-21T01:01:29.4976560Z Build complete! (0.35 sec)
+2026-10-21T01:01:30.5301360Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 0.22s
+2026-10-21T01:01:36.1239280Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic -> /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-portrait-cli.LSn9Hg/convert.heic
+2026-10-21T01:01:36.1407840Z valid: iso-hdr-heif
+2026-10-21T01:01:36.1409530Z input: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-portrait-cli.LSn9Hg/convert.heic
+2026-10-21T01:01:36.1410470Z gain-map: 2040x1532
+2026-10-21T01:01:36.1411480Z grid: 3x4
+2026-10-21T01:01:36.1412140Z tiles: 12
+2026-10-21T01:01:36.1412590Z channels: 3
+2026-10-21T01:01:36.1413100Z chroma: 4:4:4
+2026-10-21T01:01:36.1413700Z bit-depth: luma=8 chroma=8
+2026-10-21T01:01:41.1389530Z {
+2026-10-21T01:01:41.1389930Z   "command": "batch",
+2026-10-21T01:01:41.1390290Z   "failed": 0,
+2026-10-21T01:01:41.1390710Z   "failures": [],
+2026-10-21T01:01:41.1391030Z   "processed": 1,
+2026-10-21T01:01:41.1391410Z   "schema_version": 1,
+2026-10-21T01:01:41.1391760Z   "skipped_existing": 0,
+2026-10-21T01:01:41.1392020Z   "succeeded": 1,
+2026-10-21T01:01:41.1392410Z   "successes": [
+2026-10-21T01:01:41.1392680Z     {
+2026-10-21T01:01:41.1393360Z       "input": "/Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+2026-10-21T01:01:41.1394150Z       "kind": "pro-xdr",
+2026-10-21T01:01:41.1394640Z       "omitted_resource_count": null,
+2026-10-21T01:01:41.1394950Z       "outputs": [
+2026-10-21T01:01:41.1396160Z         "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-portrait-cli.LSn9Hg/batch/uhdr-portrait-01.xdremux.heic"
+2026-10-21T01:01:41.1396850Z       ],
+2026-10-21T01:01:41.1397180Z       "status": "converted"
+2026-10-21T01:01:41.1397490Z     }
+2026-10-21T01:01:41.1397800Z   ]
+2026-10-21T01:01:41.1398060Z }
+2026-10-21T01:01:41.1538700Z valid: iso-hdr-heif
+2026-10-21T01:01:41.1539540Z input: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-portrait-cli.LSn9Hg/batch/uhdr-portrait-01.xdremux.heic
+2026-10-21T01:01:41.1540210Z gain-map: 2040x1532
+2026-10-21T01:01:41.1540540Z grid: 3x4
+2026-10-21T01:01:41.1540750Z tiles: 12
+2026-10-21T01:01:41.1541130Z channels: 3
+2026-10-21T01:01:41.1541490Z chroma: 4:4:4
+2026-10-21T01:01:41.1541740Z bit-depth: luma=8 chroma=8
+2026-10-21T01:01:41.8704740Z rust-portrait-consumer-pass: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-portrait-cli.LSn9Hg/convert.heic
+2026-10-21T01:01:41.8725750Z rust-portrait-consumer-pass: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-portrait-cli.LSn9Hg/batch/uhdr-portrait-01.xdremux.heic
+2026-10-21T01:01:41.9266350Z ##[group]Run python3 scripts/apple/check_rust_cli_oppo_portrait.py \
+2026-10-21T01:01:41.9267240Z [36;1mpython3 scripts/apple/check_rust_cli_oppo_portrait.py \[0m
+2026-10-21T01:01:41.9267740Z [36;1m  2>&1 | tee artifacts/product-integration/oppo-native-portrait.log[0m
+2026-10-21T01:01:41.9286180Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:01:41.9286640Z env:
+2026-10-21T01:01:41.9286900Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:01:41.9287340Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:01:41.9287680Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:01:41.9288000Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:01:41.9288350Z   CARGO_TERM_COLOR: always
+2026-10-21T01:01:41.9288600Z   RUST_BACKTRACE: short
+2026-10-21T01:01:41.9288900Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:01:41.9289190Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:01:41.9289520Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:01:41.9289880Z   CACHE_ON_FAILURE: true
+2026-10-21T01:01:41.9290320Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:01:41.9290860Z ##[endgroup]
+2026-10-21T01:01:43.5076910Z Building for debugging...
+2026-10-21T01:01:43.5079860Z [1 / 8] xdremux-apple-adapter-product
+2026-10-21T01:01:43.5370380Z Build complete! (0.29 sec)
+2026-10-21T01:01:44.4286970Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 0.07s
+2026-10-21T01:01:44.5304110Z [1m[92m   Compiling[0m xdremux-engine v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine)
+2026-10-21T01:01:44.5314710Z [1m[92m   Compiling[0m xdremux-source v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-source)
+2026-10-21T01:01:44.5315860Z [1m[92m   Compiling[0m xdremux-classification v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification)
+2026-10-21T01:01:45.8520640Z [1m[92m   Compiling[0m xdremux-codec v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec)
+2026-10-21T01:01:46.2335630Z [1m[92m   Compiling[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-21T01:01:49.5835030Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 5.12s
+2026-10-21T01:01:49.5882870Z [1m[92m     Running[0m tests/apple_adapter.rs (target/debug/deps/apple_adapter-8a010074dc2685e0)
+2026-10-21T01:01:49.6042190Z 
+2026-10-21T01:01:49.6042820Z running 1 test
+2026-10-21T01:01:54.7972860Z test oppo_native_portrait_preserves_only_available_source_resources ... ok
+2026-10-21T01:01:54.7973820Z 
+2026-10-21T01:01:54.7974680Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 5.19s
+2026-10-21T01:01:54.7975660Z 
+2026-10-21T01:01:57.2160530Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic -> /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/single-0.heic
+2026-10-21T01:01:57.2322250Z valid: iso-hdr-heif
+2026-10-21T01:01:57.2322880Z input: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/single-0.heic
+2026-10-21T01:01:57.2323450Z gain-map: 2040x1532
+2026-10-21T01:01:57.2323760Z grid: 3x4
+2026-10-21T01:01:57.2323980Z tiles: 12
+2026-10-21T01:01:57.2324280Z channels: 3
+2026-10-21T01:01:57.2324540Z chroma: 4:4:4
+2026-10-21T01:01:57.2324860Z bit-depth: luma=8 chroma=8
+2026-10-21T01:02:00.2221010Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic -> /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/single-1.heic
+2026-10-21T01:02:00.2405750Z valid: iso-hdr-heif
+2026-10-21T01:02:00.2406940Z input: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/single-1.heic
+2026-10-21T01:02:00.2407950Z gain-map: 2048x1536
+2026-10-21T01:02:00.2408460Z grid: 3x4
+2026-10-21T01:02:00.2408850Z tiles: 12
+2026-10-21T01:02:00.2409250Z channels: 3
+2026-10-21T01:02:00.2410750Z chroma: 4:4:4
+2026-10-21T01:02:00.2411380Z bit-depth: luma=8 chroma=8
+2026-10-21T01:02:05.9774760Z {
+2026-10-21T01:02:05.9775550Z   "command": "batch",
+2026-10-21T01:02:05.9776270Z   "failed": 0,
+2026-10-21T01:02:05.9776970Z   "failures": [],
+2026-10-21T01:02:05.9777530Z   "processed": 2,
+2026-10-21T01:02:05.9778300Z   "schema_version": 1,
+2026-10-21T01:02:05.9778930Z   "skipped_existing": 0,
+2026-10-21T01:02:05.9779640Z   "succeeded": 2,
+2026-10-21T01:02:05.9780270Z   "successes": [
+2026-10-21T01:02:05.9780780Z     {
+2026-10-21T01:02:05.9782190Z       "input": "/Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+2026-10-21T01:02:05.9783980Z       "kind": "pro-xdr",
+2026-10-21T01:02:05.9785700Z       "omitted_resource_count": null,
+2026-10-21T01:02:05.9786870Z       "outputs": [
+2026-10-21T01:02:05.9787530Z         "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/batch-1/uhdr-portrait-01.xdremux.heic"
+2026-10-21T01:02:05.9788380Z       ],
+2026-10-21T01:02:05.9788630Z       "status": "converted"
+2026-10-21T01:02:05.9789030Z     },
+2026-10-21T01:02:05.9789330Z     {
+2026-10-21T01:02:05.9789920Z       "input": "/Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic",
+2026-10-21T01:02:05.9790460Z       "kind": "pro-xdr",
+2026-10-21T01:02:05.9790870Z       "omitted_resource_count": null,
+2026-10-21T01:02:05.9791160Z       "outputs": [
+2026-10-21T01:02:05.9791840Z         "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/batch-1/uhdr-portrait-02.xdremux.heic"
+2026-10-21T01:02:05.9793400Z       ],
+2026-10-21T01:02:05.9793720Z       "status": "converted"
+2026-10-21T01:02:05.9794050Z     }
+2026-10-21T01:02:05.9794350Z   ]
+2026-10-21T01:02:05.9794580Z }
+2026-10-21T01:02:05.9976750Z valid: iso-hdr-heif
+2026-10-21T01:02:05.9979590Z input: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/batch-1/uhdr-portrait-01.xdremux.heic
+2026-10-21T01:02:05.9981980Z gain-map: 2040x1532
+2026-10-21T01:02:05.9983170Z grid: 3x4
+2026-10-21T01:02:05.9984090Z tiles: 12
+2026-10-21T01:02:05.9986210Z channels: 3
+2026-10-21T01:02:05.9987260Z chroma: 4:4:4
+2026-10-21T01:02:05.9987860Z bit-depth: luma=8 chroma=8
+2026-10-21T01:02:06.2762390Z valid: iso-hdr-heif
+2026-10-21T01:02:06.2763200Z input: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/batch-1/uhdr-portrait-02.xdremux.heic
+2026-10-21T01:02:06.2763860Z gain-map: 2048x1536
+2026-10-21T01:02:06.2764170Z grid: 3x4
+2026-10-21T01:02:06.2764400Z tiles: 12
+2026-10-21T01:02:06.2764700Z channels: 3
+2026-10-21T01:02:06.2765100Z chroma: 4:4:4
+2026-10-21T01:02:06.2765350Z bit-depth: luma=8 chroma=8
+2026-10-21T01:02:09.8124310Z {
+2026-10-21T01:02:09.8125460Z   "command": "batch",
+2026-10-21T01:02:09.8125990Z   "failed": 0,
+2026-10-21T01:02:09.8126450Z   "failures": [],
+2026-10-21T01:02:09.8126940Z   "processed": 2,
+2026-10-21T01:02:09.8127460Z   "schema_version": 1,
+2026-10-21T01:02:09.8183150Z   "skipped_existing": 0,
+2026-10-21T01:02:09.8183780Z   "succeeded": 2,
+2026-10-21T01:02:09.8184210Z   "successes": [
+2026-10-21T01:02:09.8184590Z     {
+2026-10-21T01:02:09.8185130Z       "input": "/Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+2026-10-21T01:02:09.8185770Z       "kind": "pro-xdr",
+2026-10-21T01:02:09.8186120Z       "omitted_resource_count": null,
+2026-10-21T01:02:09.8186510Z       "outputs": [
+2026-10-21T01:02:09.8187160Z         "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/batch-2/uhdr-portrait-01.xdremux.heic"
+2026-10-21T01:02:09.8187830Z       ],
+2026-10-21T01:02:09.8188160Z       "status": "converted"
+2026-10-21T01:02:09.8188490Z     },
+2026-10-21T01:02:09.8188930Z     {
+2026-10-21T01:02:09.8189720Z       "input": "/Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic",
+2026-10-21T01:02:09.8190480Z       "kind": "pro-xdr",
+2026-10-21T01:02:09.8191510Z       "omitted_resource_count": null,
+2026-10-21T01:02:09.8192000Z       "outputs": [
+2026-10-21T01:02:09.8192660Z         "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/batch-2/uhdr-portrait-02.xdremux.heic"
+2026-10-21T01:02:09.8193320Z       ],
+2026-10-21T01:02:09.8193730Z       "status": "converted"
+2026-10-21T01:02:09.8194070Z     }
+2026-10-21T01:02:09.8194320Z   ]
+2026-10-21T01:02:09.8194880Z }
+2026-10-21T01:02:09.8323470Z valid: iso-hdr-heif
+2026-10-21T01:02:09.8324460Z input: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/batch-2/uhdr-portrait-01.xdremux.heic
+2026-10-21T01:02:09.8325360Z gain-map: 2040x1532
+2026-10-21T01:02:09.8325780Z grid: 3x4
+2026-10-21T01:02:09.8326060Z tiles: 12
+2026-10-21T01:02:09.8326400Z channels: 3
+2026-10-21T01:02:09.8326770Z chroma: 4:4:4
+2026-10-21T01:02:09.8327090Z bit-depth: luma=8 chroma=8
+2026-10-21T01:02:10.1794030Z valid: iso-hdr-heif
+2026-10-21T01:02:10.1795620Z input: /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-native-portrait-rlsenvcu/batch-2/uhdr-portrait-02.xdremux.heic
+2026-10-21T01:02:10.1796490Z gain-map: 2048x1536
+2026-10-21T01:02:10.1797620Z grid: 3x4
+2026-10-21T01:02:10.1797940Z tiles: 12
+2026-10-21T01:02:10.1802720Z channels: 3
+2026-10-21T01:02:10.1814760Z chroma: 4:4:4
+2026-10-21T01:02:10.1815020Z bit-depth: luma=8 chroma=8
+2026-10-21T01:02:11.0787220Z PASS OPPO-native Portrait: runtime, single, serial/parallel batch, atomic failure, no Vision calls
+2026-10-21T01:02:11.0791290Z [{"disparity": true, "focus_metadata": true, "glasses_matte": false, "hair_matte": false, "iso_gain_map": true, "portrait_effects_matte": false, "skin_matte": false, "teeth_matte": false}, {"disparity": true, "focus_metadata": true, "glasses_matte": false, "hair_matte": true, "iso_gain_map": true, "portrait_effects_matte": true, "skin_matte": false, "teeth_matte": false}]
+2026-10-21T01:02:11.1174840Z ##[group]Run swift scripts/apple/read_oriented_heif_imageio.swift \
+2026-10-21T01:02:11.1175450Z [36;1mswift scripts/apple/read_oriented_heif_imageio.swift \[0m
+2026-10-21T01:02:11.1175910Z [36;1m  artifacts/product-integration/orientation/oriented-gain-map.heic \[0m
+2026-10-21T01:02:11.1176490Z [36;1m  artifacts/product-integration/orientation/expected.json \[0m
+2026-10-21T01:02:11.1176920Z [36;1m  | tee artifacts/product-integration/orientation/imageio.json[0m
+2026-10-21T01:02:11.1237900Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:02:11.1238270Z env:
+2026-10-21T01:02:11.1238650Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:02:11.1239150Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:02:11.1239400Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:02:11.1239700Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:02:11.1240050Z   CARGO_TERM_COLOR: always
+2026-10-21T01:02:11.1240340Z   RUST_BACKTRACE: short
+2026-10-21T01:02:11.1240700Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:02:11.1240970Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:02:11.1241390Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:02:11.1241730Z   CACHE_ON_FAILURE: true
+2026-10-21T01:02:11.1242200Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:02:11.1242760Z ##[endgroup]
+2026-10-21T01:02:15.5720250Z IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-21T01:02:15.5751870Z {
+2026-10-21T01:02:15.5752710Z   "gain_height" : 60,
+2026-10-21T01:02:15.5753470Z   "gain_space" : "coded",
+2026-10-21T01:02:15.5754070Z   "gain_width" : 80,
+2026-10-21T01:02:15.5754960Z   "orientation" : 6,
+2026-10-21T01:02:15.5755590Z   "primary_height" : 3000,
+2026-10-21T01:02:15.5756560Z   "primary_space" : "coded",
+2026-10-21T01:02:15.5757370Z   "primary_width" : 4000
+2026-10-21T01:02:15.5758060Z }
+2026-10-21T01:02:15.6320740Z ##[group]Run bash scripts/apple/check_rust_style_consumer.sh \
+2026-10-21T01:02:15.6322260Z [36;1mbash scripts/apple/check_rust_style_consumer.sh \[0m
+2026-10-21T01:02:15.6323350Z [36;1m  2>&1 | tee artifacts/product-integration/apple-styles.log[0m
+2026-10-21T01:02:15.6361680Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:02:15.6362710Z env:
+2026-10-21T01:02:15.6363520Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:02:15.6364450Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:02:15.6365360Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:02:15.6366300Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:02:15.6366670Z   CARGO_TERM_COLOR: always
+2026-10-21T01:02:15.6367120Z   RUST_BACKTRACE: short
+2026-10-21T01:02:15.6367430Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:02:15.6367780Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:02:15.6368180Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:02:15.6368620Z   CACHE_ON_FAILURE: true
+2026-10-21T01:02:15.6369260Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:02:15.6370000Z   XDREMUX_STYLES_ACCEPTANCE_DIR: /Users/runner/work/XDRemux/XDRemux/artifacts/styles-acceptance
+2026-10-21T01:02:15.6370570Z ##[endgroup]
+2026-10-21T01:02:17.3891840Z Building for debugging...
+2026-10-21T01:02:17.3894410Z [1 / 1]
+2026-10-21T01:02:17.4732340Z Build complete! (0.36 sec)
+2026-10-21T01:02:18.4117540Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 0.10s
+2026-10-21T01:02:18.5214310Z [1m[92m   Compiling[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-21T01:02:21.2766000Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 2.82s
+2026-10-21T01:02:21.2803040Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/xdremux_runtime-7857ada639257d02)
+2026-10-21T01:02:21.2955020Z 
+2026-10-21T01:02:21.2955790Z running 1 test
+2026-10-21T01:03:21.4468240Z test apple_styles::tests::real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox has been running for over 60 seconds
+2026-10-21T01:03:52.7690400Z hdr-log-thumbnail: fixture=oppo/find-x9-ultra/uhdr-portrait-01.heic dimensions=770x1024 log_mae=1.0281/255 sdr_mae=32.2194/255 output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/.tmpAwnw7D/uhdr-portrait-01.heic
+2026-10-21T01:05:35.3503850Z hdr-log-thumbnail: fixture=oppo/find-x7-ultra/lhdr-v2-01.heic dimensions=1024x878 log_mae=0.8332/255 sdr_mae=42.6761/255 output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/.tmpAwnw7D/lhdr-v2-01.heic
+2026-10-21T01:05:35.3588350Z test apple_styles::tests::real_styles_thumbnail_round_trips_hdr_log_through_videotoolbox ... ok
+2026-10-21T01:05:35.3597110Z 
+2026-10-21T01:05:35.3597680Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 194.06s
+2026-10-21T01:05:35.3598140Z 
+2026-10-21T01:05:36.0259010Z styles-main10-observed-color_primaries=ITU_R_709_2
+2026-10-21T01:05:36.0259730Z styles-main10-observed-transfer_function=ITU_R_709_2
+2026-10-21T01:05:36.0260170Z styles-main10-observed-ycbcr_matrix=ITU_R_601_4
+2026-10-21T01:06:50.1593370Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic -> /var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.vFUvma/rust-styles.heic
+2026-10-21T01:07:58.1170670Z rust-styles-consumer-pass: output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.vFUvma/rust-styles.heic maker_apple_84={'11': 0, '9': 1, '6': 4, '8': 1, '1': 0, '0': 1, '3': 1, '10': 0, '4': 1, '7': 0, '12': 1, '2': 0, '5': 1} iso_gain_map=True portrait_effects_matte=True skin_matte=True gain_map=1532x2040
+2026-10-21T01:07:58.1173890Z rust-styles-consumer-pass: output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.vFUvma/batch/uhdr-portrait-01.xdremux.heic maker_apple_84={'12': 1, '4': 1, '9': 1, '8': 1, '0': 1, '7': 0, '2': 0, '11': 0, '6': 4, '3': 1, '1': 0, '5': 1, '10': 0} iso_gain_map=True portrait_effects_matte=True skin_matte=True gain_map=1532x2040
+2026-10-21T01:07:58.2976700Z rust-styles-graph-pass: inspect=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.vFUvma/inspect.json items=131 references=42
+2026-10-21T01:07:58.2977770Z rust-styles-graph-pass: inspect=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.vFUvma/batch-inspect.json items=131 references=42
+2026-10-21T01:07:58.3621930Z rust-styles-policy-pass: output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.vFUvma/rust-styles.heic style_sha256=0231b91cd5dfb909f280d94721fda603778639d3132fffd11e11ab70138ba434 baseline_exposure=7.0923075675964355 base_gain=2.2938013076782227 scene_type=0
+2026-10-21T01:07:58.3624000Z rust-styles-policy-pass: output=/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T//xdremux-rust-style-consumer.vFUvma/batch/uhdr-portrait-01.xdremux.heic style_sha256=0231b91cd5dfb909f280d94721fda603778639d3132fffd11e11ab70138ba434 baseline_exposure=7.0923075675964355 base_gain=2.2938013076782227 scene_type=0
+2026-10-21T01:10:11.4686830Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x9-ultra/uhdr-master-v2-01.heic -> /Users/runner/work/XDRemux/XDRemux/artifacts/styles-acceptance/uhdr-master-v2-01-apple-styles-v15.heic
+2026-10-21T01:10:13.5073050Z v15-product-diagnostic: file=uhdr-master-v2-01-apple-styles-v15.heic bytes=6792225 sha256=b94a0df375a58050b5deabd5118f977104bbe09c176312f6cdab4c4b4983b88a Photos Tone/Color admission remains UNVERIFIED
+2026-10-21T01:10:13.5762900Z ##[group]Run python3 scripts/apple/check_texture_styles.py --skip-build \
+2026-10-21T01:10:13.5763830Z [36;1mpython3 scripts/apple/check_texture_styles.py --skip-build \[0m
+2026-10-21T01:10:13.5765030Z [36;1m  --output artifacts/product-integration/texture \[0m
+2026-10-21T01:10:13.5765540Z [36;1m  2>&1 | tee artifacts/product-integration/texture.log[0m
+2026-10-21T01:10:13.5823460Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:10:13.5823780Z env:
+2026-10-21T01:10:13.5824000Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:10:13.5824320Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:10:13.5824740Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:10:13.5824940Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:10:13.5825300Z   CARGO_TERM_COLOR: always
+2026-10-21T01:10:13.5825780Z   RUST_BACKTRACE: short
+2026-10-21T01:10:13.5826050Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:10:13.5826670Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:10:13.5827150Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:10:13.5827390Z   CACHE_ON_FAILURE: true
+2026-10-21T01:10:13.5827890Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:10:13.5828400Z ##[endgroup]
+2026-10-21T01:19:11.5715150Z {
+2026-10-21T01:19:11.5716120Z   "schema": "xdremux-product-texture-v1",
+2026-10-21T01:19:11.5716690Z   "head": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+2026-10-21T01:19:11.5717160Z   "cases": [
+2026-10-21T01:19:11.5717440Z     {
+2026-10-21T01:19:11.5717930Z       "output": "find-x9-ultra__uhdr-portrait-02/styles-texture.heic",
+2026-10-21T01:19:11.5718480Z       "bytes": 2027240,
+2026-10-21T01:19:11.5718910Z       "sha256": "74636f8c35ee0a3361f991ac2f7a172907dfe6650bb3a32d8e36747eb529e705",
+2026-10-21T01:19:11.5719520Z       "people": 1,
+2026-10-21T01:19:11.5719850Z       "texture_version": 3,
+2026-10-21T01:19:11.5720520Z       "primary_and_gain_map_hevc_preserved": true,
+2026-10-21T01:19:11.5721020Z       "decoded_dimensions": [
+2026-10-21T01:19:11.5721350Z         3072,
+2026-10-21T01:19:11.5721750Z         4096
+2026-10-21T01:19:11.5722230Z       ],
+2026-10-21T01:19:11.5722470Z       "native_groups": [
+2026-10-21T01:19:11.5722940Z         [
+2026-10-21T01:19:11.5723150Z           "Mattify",
+2026-10-21T01:19:11.5723520Z           "SkinSmoothingStandalone",
+2026-10-21T01:19:11.5723920Z           "UnderEyeBrightening"
+2026-10-21T01:19:11.5724160Z         ]
+2026-10-21T01:19:11.5724430Z       ],
+2026-10-21T01:19:11.5724750Z       "fixture": "fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-02.heic"
+2026-10-21T01:19:11.5725270Z     },
+2026-10-21T01:19:11.5725510Z     {
+2026-10-21T01:19:11.5725860Z       "output": "find-x9-ultra__uhdr-portrait-02/batch/uhdr-portrait-02.xdremux.heic",
+2026-10-21T01:19:11.5726470Z       "bytes": 2027240,
+2026-10-21T01:19:11.5726900Z       "sha256": "74636f8c35ee0a3361f991ac2f7a172907dfe6650bb3a32d8e36747eb529e705",
+2026-10-21T01:19:11.5727350Z       "people": 1,
+2026-10-21T01:19:11.5728080Z       "texture_version": 3,
+2026-10-21T01:19:11.5728820Z       "primary_and_gain_map_hevc_preserved": true,
+2026-10-21T01:19:11.5729470Z       "decoded_dimensions": [
+2026-10-21T01:19:11.5771490Z         3072,
+2026-10-21T01:19:11.5771920Z         4096
+2026-10-21T01:19:11.5772380Z       ],
+2026-10-21T01:19:11.5772690Z       "native_groups": [
+2026-10-21T01:19:11.5773100Z         [
+2026-10-21T01:19:11.5773420Z           "Mattify",
+2026-10-21T01:19:11.5773870Z           "SkinSmoothingStandalone",
+2026-10-21T01:19:11.5774450Z           "UnderEyeBrightening"
+2026-10-21T01:19:11.5774820Z         ]
+2026-10-21T01:19:11.5775070Z       ],
+2026-10-21T01:19:11.5775510Z       "entry_point": "batch"
+2026-10-21T01:19:11.5775930Z     },
+2026-10-21T01:19:11.5776280Z     {
+2026-10-21T01:19:11.5776650Z       "output": "find-x9-ultra__uhdr-portrait-02/app-styles-texture.heic",
+2026-10-21T01:19:11.5777180Z       "bytes": 2027240,
+2026-10-21T01:19:11.5778860Z       "sha256": "74636f8c35ee0a3361f991ac2f7a172907dfe6650bb3a32d8e36747eb529e705",
+2026-10-21T01:19:11.5779340Z       "people": 1,
+2026-10-21T01:19:11.5779520Z       "texture_version": 3,
+2026-10-21T01:19:11.5795220Z       "primary_and_gain_map_hevc_preserved": true,
+2026-10-21T01:19:11.5795590Z       "decoded_dimensions": [
+2026-10-21T01:19:11.5797520Z         3072,
+2026-10-21T01:19:11.5797710Z         4096
+2026-10-21T01:19:11.5797870Z       ],
+2026-10-21T01:19:11.5798220Z       "native_groups": [
+2026-10-21T01:19:11.5798530Z         [
+2026-10-21T01:19:11.5798920Z           "Mattify",
+2026-10-21T01:19:11.5799240Z           "SkinSmoothingStandalone",
+2026-10-21T01:19:11.5799780Z           "UnderEyeBrightening"
+2026-10-21T01:19:11.5800020Z         ]
+2026-10-21T01:19:11.5800180Z       ],
+2026-10-21T01:19:11.5800330Z       "entry_point": "app"
+2026-10-21T01:19:11.5800610Z     },
+2026-10-21T01:19:11.5800860Z     {
+2026-10-21T01:19:11.5801180Z       "output": "find-x9-ultra__uhdr-hr-01/styles-texture.heic",
+2026-10-21T01:19:11.5801690Z       "bytes": 5882134,
+2026-10-21T01:19:11.5802110Z       "sha256": "805da6994b9bf594f19fdbafe98802fe5b85594ab781bfebce67e2442f92e43f",
+2026-10-21T01:19:11.5802460Z       "people": 0,
+2026-10-21T01:19:11.5802670Z       "texture_version": 3,
+2026-10-21T01:19:11.5802900Z       "primary_and_gain_map_hevc_preserved": true,
+2026-10-21T01:19:11.5803180Z       "decoded_dimensions": [
+2026-10-21T01:19:11.5803380Z         8192,
+2026-10-21T01:19:11.5803600Z         6144
+2026-10-21T01:19:11.5803890Z       ],
+2026-10-21T01:19:11.5808530Z       "native_groups": [],
+2026-10-21T01:19:11.5808870Z       "fixture": "fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic"
+2026-10-21T01:19:11.5809420Z     },
+2026-10-21T01:19:11.5809580Z     {
+2026-10-21T01:19:11.5809830Z       "output": "find-x7-ultra__lhdr-v2-01/styles-texture.heic",
+2026-10-21T01:19:11.5810220Z       "bytes": 2528772,
+2026-10-21T01:19:11.5810610Z       "sha256": "087bdf206cbdf29eda6cf906dd658108bffb126a1da5fee5f3df62ff72812ba9",
+2026-10-21T01:19:11.5811040Z       "people": 0,
+2026-10-21T01:19:11.5811290Z       "texture_version": 3,
+2026-10-21T01:19:11.5811530Z       "primary_and_gain_map_hevc_preserved": true,
+2026-10-21T01:19:11.5812000Z       "decoded_dimensions": [
+2026-10-21T01:19:11.5812240Z         4096,
+2026-10-21T01:19:11.5812400Z         3512
+2026-10-21T01:19:11.5812550Z       ],
+2026-10-21T01:19:11.5812770Z       "native_groups": [],
+2026-10-21T01:19:11.5813200Z       "fixture": "fixtures/proxdr/oppo/find-x7-ultra/lhdr-v2-01.heic"
+2026-10-21T01:19:11.5813590Z     }
+2026-10-21T01:19:11.5813770Z   ],
+2026-10-21T01:19:11.5814060Z   "passed": true,
+2026-10-21T01:19:11.5814580Z   "photos_device_result": "new HDR product outputs require device import; earlier SDR research activation was user-reported",
+2026-10-21T01:19:11.5823070Z   "build_configuration": "debug",
+2026-10-21T01:19:11.5823500Z   "atomic_failure_preserves_existing_output": true,
+2026-10-21T01:19:11.5823880Z   "native_transaction_count": 5
+2026-10-21T01:19:11.5824400Z }
+2026-10-21T01:19:11.6354170Z ##[group]Run xcodebuild \
+2026-10-21T01:19:11.6355100Z [36;1mxcodebuild \[0m
+2026-10-21T01:19:11.6355430Z [36;1m  -quiet \[0m
+2026-10-21T01:19:11.6355850Z [36;1m  -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \[0m
+2026-10-21T01:19:11.6356310Z [36;1m  -scheme XDRemuxApp \[0m
+2026-10-21T01:19:11.6356610Z [36;1m  -configuration Debug \[0m
+2026-10-21T01:19:11.6357000Z [36;1m  -derivedDataPath "$RUNNER_TEMP/xdremux-app" \[0m
+2026-10-21T01:19:11.6357440Z [36;1m  CODE_SIGNING_ALLOWED=NO \[0m
+2026-10-21T01:19:11.6357700Z [36;1m  build[0m
+2026-10-21T01:19:11.6358030Z [36;1mxcodebuild \[0m
+2026-10-21T01:19:11.6358360Z [36;1m  -quiet \[0m
+2026-10-21T01:19:11.6358800Z [36;1m  -project apps/macos/XDRemuxApp/XDRemuxApp.xcodeproj \[0m
+2026-10-21T01:19:11.6359380Z [36;1m  -scheme XDRemuxAppModelTests \[0m
+2026-10-21T01:19:11.6359750Z [36;1m  -configuration Debug \[0m
+2026-10-21T01:19:11.6360160Z [36;1m  -derivedDataPath "$XDREMUX_DERIVED_DATA" \[0m
+2026-10-21T01:19:11.6360600Z [36;1m  CODE_SIGNING_ALLOWED=NO \[0m
+2026-10-21T01:19:11.6360890Z [36;1m  build[0m
+2026-10-21T01:19:11.6361260Z [36;1mXDREMUX_CLI="$GITHUB_WORKSPACE/target/debug/xdremux" \[0m
+2026-10-21T01:19:11.6362130Z [36;1m  "$XDREMUX_DERIVED_DATA/Build/Products/Debug/XDRemuxAppModelTests" \[0m
+2026-10-21T01:19:11.6362670Z [36;1m  2>&1 | tee artifacts/product-integration/app-model.log[0m
+2026-10-21T01:19:11.6500510Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:19:11.6500930Z env:
+2026-10-21T01:19:11.6501310Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:19:11.6501790Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:19:11.6502150Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:19:11.6502500Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:19:11.6502780Z   CARGO_TERM_COLOR: always
+2026-10-21T01:19:11.6503130Z   RUST_BACKTRACE: short
+2026-10-21T01:19:11.6503460Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:19:11.6503750Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:19:11.6504220Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:19:11.6504650Z   CACHE_ON_FAILURE: true
+2026-10-21T01:19:11.6505130Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:19:11.6505890Z   XDREMUX_DERIVED_DATA: /Users/runner/work/_temp/xdremux-app-model-tests
+2026-10-21T01:19:11.6506310Z ##[endgroup]
+2026-10-21T01:19:15.2869480Z 2026-10-21 01:19:15.286 xcodebuild[56735:143111] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-10-21T01:19:15.3026600Z --- xcodebuild: WARNING: Using the first of multiple matching destinations:
+2026-10-21T01:19:15.3027350Z { platform:macOS, arch:arm64, id:d265e17279960619effadf01fff9e7068cabc77f, name:My Mac }
+2026-10-21T01:19:15.3027760Z { platform:macOS, name:Any Mac }
+2026-10-21T01:19:35.8229200Z 2026-10-21 01:19:35.822 xcodebuild[57695:145719] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-10-21T01:19:35.8285380Z --- xcodebuild: WARNING: Using the first of multiple matching destinations:
+2026-10-21T01:19:35.8286140Z { platform:macOS, arch:arm64, id:d265e17279960619effadf01fff9e7068cabc77f, name:My Mac }
+2026-10-21T01:19:35.8286910Z { platform:macOS, name:Any Mac }
+2026-10-21T01:19:50.6248890Z Swift/ErrorType.swift:254: Fatal error: Error raised at top level: both pair and PVT outputs must not add members inside an existing package
+2026-10-21T01:19:50.6284260Z /Users/runner/work/_temp/38a775ed-ae78-4aa4-aeb9-6a313cb30fb4.sh: line 19: 58177 Trace/BPT trap: 5          XDREMUX_CLI="$GITHUB_WORKSPACE/target/debug/xdremux" "$XDREMUX_DERIVED_DATA/Build/Products/Debug/XDRemuxAppModelTests" 2>&1
+2026-10-21T01:19:50.6290990Z      58178 Done                       | tee artifacts/product-integration/app-model.log
+2026-10-21T01:19:50.6397420Z ##[error]Process completed with exit code 133.
+2026-10-21T01:19:50.7290420Z ##[group]Run {
+2026-10-21T01:19:50.7291080Z [36;1m{[0m
+2026-10-21T01:19:50.7291490Z [36;1m  echo "## XDRemux canonical Rust product integration"[0m
+2026-10-21T01:19:50.7291900Z [36;1m  echo[0m
+2026-10-21T01:19:50.7292280Z [36;1m  echo "The checked-out commit is the exact pull-request head or push SHA."[0m
+2026-10-21T01:19:50.7293410Z [36;1m  echo "The public CLI, product policy, media runtime, Apple primitive adapter, Portrait, Styles, and macOS app bridge are exercised without a second Swift/Python product implementation."[0m
+2026-10-21T01:19:50.7294330Z [36;1m  echo[0m
+2026-10-21T01:19:50.7294990Z [36;1m  echo "Windows portability, real fixture suites, performance measurements, completion receipts, and device-only Apple Photos acceptance remain separate evidence classes."[0m
+2026-10-21T01:19:50.7295780Z [36;1m} >> "$GITHUB_STEP_SUMMARY"[0m
+2026-10-21T01:19:50.8021740Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T01:19:50.8022360Z env:
+2026-10-21T01:19:50.8022620Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:19:50.8022950Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:19:50.8023230Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:19:50.8023430Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:19:50.8076330Z   CARGO_TERM_COLOR: always
+2026-10-21T01:19:50.8077060Z   RUST_BACKTRACE: short
+2026-10-21T01:19:50.8077330Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:19:50.8077620Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:19:50.8077920Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:19:50.8078240Z   CACHE_ON_FAILURE: true
+2026-10-21T01:19:50.8078750Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:19:50.8079270Z ##[endgroup]
+2026-10-21T01:19:51.0190580Z ##[group]Run actions/upload-artifact@v7
+2026-10-21T01:19:51.0191010Z with:
+2026-10-21T01:19:51.0191210Z   name: xdremux-rust-product-integration
+2026-10-21T01:19:51.0191500Z   if-no-files-found: warn
+2026-10-21T01:19:51.0191730Z   retention-days: 14
+2026-10-21T01:19:51.0192330Z   path: artifacts/product-integration/*.log
+artifacts/product-integration/**/*.log
+artifacts/product-integration/orientation/*.json
+artifacts/product-integration/texture/result.json
+
+2026-10-21T01:19:51.0193010Z   compression-level: 6
+2026-10-21T01:19:51.0193190Z   overwrite: false
+2026-10-21T01:19:51.0193440Z   include-hidden-files: false
+2026-10-21T01:19:51.0193740Z   archive: true
+2026-10-21T01:19:51.0193890Z env:
+2026-10-21T01:19:51.0194120Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:19:51.0194580Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:19:51.0194940Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:19:51.0195580Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:19:51.0196070Z   CARGO_TERM_COLOR: always
+2026-10-21T01:19:51.0196330Z   RUST_BACKTRACE: short
+2026-10-21T01:19:51.0196560Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:19:51.0196920Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:19:51.0197160Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:19:51.0197530Z   CACHE_ON_FAILURE: true
+2026-10-21T01:19:51.0197980Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:19:51.0198480Z ##[endgroup]
+2026-10-21T01:19:52.0639250Z With the provided path, there will be 31 files uploaded
+2026-10-21T01:19:52.0639740Z Artifact name is valid!
+2026-10-21T01:19:52.0639970Z Root directory input is valid!
+2026-10-21T01:19:52.4002500Z Uploading artifact: xdremux-rust-product-integration.zip
+2026-10-21T01:19:52.4023820Z Beginning upload of artifact content to blob storage
+2026-10-21T01:19:52.7200800Z Uploaded bytes 25890
+2026-10-21T01:19:52.7566450Z Finished uploading artifact content to blob storage!
+2026-10-21T01:19:52.7567030Z SHA256 digest of uploaded artifact is d20fd1dfd9fd9870b4241c277742905fca8c1fee12eac6f9c5a084c02d8a9ba3
+2026-10-21T01:19:52.7567670Z Finalizing artifact upload
+2026-10-21T01:19:53.1560360Z Artifact xdremux-rust-product-integration successfully finalized. Artifact ID 12313692157
+2026-10-21T01:19:53.1561140Z Artifact xdremux-rust-product-integration has been successfully uploaded! Final size is 25890 bytes. Artifact ID is 12313692157
+2026-10-21T01:19:53.1707460Z Artifact download URL: https://github.com/21Z121Z1/XDRemux/actions/runs/39523528376/artifacts/12313692157
+2026-10-21T01:19:53.2568140Z ##[group]Run actions/upload-artifact@v7
+2026-10-21T01:19:53.2568390Z with:
+2026-10-21T01:19:53.2568580Z   name: xdremux-hdr-first-styles-diagnostics
+2026-10-21T01:19:53.2568840Z   retention-days: 14
+2026-10-21T01:19:53.2569060Z   if-no-files-found: warn
+2026-10-21T01:19:53.2569370Z   path: artifacts/styles-acceptance/linear-thumbnail-roundtrip.json
+2026-10-21T01:19:53.2569720Z   compression-level: 6
+2026-10-21T01:19:53.2569890Z   overwrite: false
+2026-10-21T01:19:53.2570070Z   include-hidden-files: false
+2026-10-21T01:19:53.2570270Z   archive: true
+2026-10-21T01:19:53.2570430Z env:
+2026-10-21T01:19:53.2570700Z   EXPECTED_HEAD: 91c3ab45310adb05d5e9e3a3d1c23e1345542b06
+2026-10-21T01:19:53.2571100Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T01:19:53.2571350Z   CARGO_INCREMENTAL: 0
+2026-10-21T01:19:53.2571930Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T01:19:53.2572220Z   CARGO_TERM_COLOR: always
+2026-10-21T01:19:53.2572400Z   RUST_BACKTRACE: short
+2026-10-21T01:19:53.2572620Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T01:19:53.2572840Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T01:19:53.2573120Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T01:19:53.2573380Z   CACHE_ON_FAILURE: true
+2026-10-21T01:19:53.2573830Z   XDREMUX_CI_APPLE_ADAPTER: /Users/runner/work/XDRemux/XDRemux/.build/out/Products/Debug/xdremux-apple-adapter
+2026-10-21T01:19:53.2574270Z ##[endgroup]
+2026-10-21T01:19:53.3900800Z With the provided path, there will be 1 file uploaded
+2026-10-21T01:19:53.3903590Z Artifact name is valid!
+2026-10-21T01:19:53.3903920Z Root directory input is valid!
+2026-10-21T01:19:53.6535420Z Uploading artifact: xdremux-hdr-first-styles-diagnostics.zip
+2026-10-21T01:19:53.6556920Z Beginning upload of artifact content to blob storage
+2026-10-21T01:19:53.8097600Z Uploaded bytes 544
+2026-10-21T01:19:53.8447230Z Finished uploading artifact content to blob storage!
+2026-10-21T01:19:53.8449450Z SHA256 digest of uploaded artifact is 2d18412ae9e57850b0d0f8ce9439a0938905bf26a29b90725255ee2072421eff
+2026-10-21T01:19:53.8449980Z Finalizing artifact upload
+2026-10-21T01:19:54.1558450Z Artifact xdremux-hdr-first-styles-diagnostics successfully finalized. Artifact ID 12312847484
+2026-10-21T01:19:54.1559310Z Artifact xdremux-hdr-first-styles-diagnostics has been successfully uploaded! Final size is 544 bytes. Artifact ID is 12312847484
+2026-10-21T01:19:54.1668890Z Artifact download URL: https://github.com/21Z121Z1/XDRemux/actions/runs/39523528376/artifacts/12312847484
+2026-10-21T01:19:54.2509810Z Post job cleanup.
+2026-10-21T01:19:54.2515920Z ##[start-action display=Setup Rust Caching;id=__4e2b0af4-9702-40ed-bb79-900addabe48d.__Swatinem_rust-cache]
+2026-10-21T01:19:54.2604200Z Post job cleanup.
+2026-10-21T01:19:54.4228070Z Cache up-to-date.
+2026-10-21T01:19:54.4258580Z ##[end-action id=__4e2b0af4-9702-40ed-bb79-900addabe48d.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=174]
+2026-10-21T01:19:54.4337550Z Post job cleanup.
+2026-10-21T01:19:54.6621990Z [command]/opt/homebrew/bin/git version
+2026-10-21T01:19:54.7870070Z git version 2.56.0
+2026-10-21T01:19:54.7955680Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/c6bf24a5-97b5-48b4-8e7c-e19087583ff7/.gitconfig'
+2026-10-21T01:19:54.7956560Z Temporarily overriding HOME='/Users/runner/work/_temp/c6bf24a5-97b5-48b4-8e7c-e19087583ff7' before making global git config changes
+2026-10-21T01:19:54.7957340Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T01:19:54.7959160Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-21T01:19:54.8224750Z Removing SSH command configuration
+2026-10-21T01:19:54.8280620Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T01:19:54.8329690Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T01:19:55.0150730Z Removing HTTP extra header
+2026-10-21T01:19:55.0152650Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T01:19:55.0280340Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T01:19:55.2878410Z Removing includeIf entries pointing to credentials config files
+2026-10-21T01:19:55.2886420Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T01:19:55.2964300Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-21T01:19:55.2965590Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-21T01:19:55.2966910Z includeif.gitdir:/github/workspace/.git.path
+2026-10-21T01:19:55.2967510Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-21T01:19:55.3011150Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-21T01:19:55.3052160Z /Users/runner/work/_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config
+2026-10-21T01:19:55.3059520Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path \/Users\/runner\/work\/_temp\/git\-credentials\-b5938898\-41d4\-41d3\-bbc3\-aedba3e24be7\.config
+2026-10-21T01:19:55.3390410Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-21T01:19:55.3454900Z /Users/runner/work/_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config
+2026-10-21T01:19:55.3462420Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path \/Users\/runner\/work\/_temp\/git\-credentials\-b5938898\-41d4\-41d3\-bbc3\-aedba3e24be7\.config
+2026-10-21T01:19:55.3605130Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-10-21T01:19:55.3665190Z /github/runner_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config
+2026-10-21T01:19:55.3724800Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-b5938898\-41d4\-41d3\-bbc3\-aedba3e24be7\.config
+2026-10-21T01:19:55.3804520Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-21T01:19:55.3866070Z /github/runner_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config
+2026-10-21T01:19:55.3880150Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-b5938898\-41d4\-41d3\-bbc3\-aedba3e24be7\.config
+2026-10-21T01:19:55.4012570Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T01:19:55.5466760Z Removing credentials config '/Users/runner/work/_temp/git-credentials-b5938898-41d4-41d3-bbc3-aedba3e24be7.config'
+2026-10-21T01:19:55.5934250Z Cleaning up orphan processes
+2026-10-21T01:19:56.1818200Z Terminate orphan process: pid (57222) (ibtoold)
+2026-10-21T01:19:56.2615450Z Terminate orphan process: pid (56949) (ibtoold)

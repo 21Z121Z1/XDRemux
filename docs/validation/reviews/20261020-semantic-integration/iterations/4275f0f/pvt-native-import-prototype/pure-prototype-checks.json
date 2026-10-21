@@ -1,0 +1,19 @@
+{
+  "native_execution": false,
+  "checks": {
+    "stock_baseline_then_one_added": true,
+    "no_new_asset": true,
+    "two_new_assets": true,
+    "removed_baseline_asset": true,
+    "wrong_asset_selected": true,
+    "not_live": true,
+    "different_pair_id": true,
+    "missing_cover": true,
+    "media_mutation_separate_from_admission": true,
+    "source_wrapper_preserves_inputs_and_declares_actual_offset": true,
+    "installed_compatible_runtime_selection": true,
+    "failure_still_observes_source_and_package_without_hiding_native_error": true,
+    "failed_import_package_mutation_is_recorded": true,
+    "failed_import_missing_package_and_changed_source_are_recorded": true
+  }
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "photos-authorization",
+    "url": "https://developer.apple.com/documentation/photos/phphotolibrary/requestauthorization(for:handler:).md",
+    "error": "<urlopen error Tunnel connection failed: 403 Forbidden>",
+    "ok": false
+  },
+  {
+    "name": "photos-resource",
+    "url": "https://developer.apple.com/documentation/photos/phassetresource/assetresources(for:)-27o4l.md",
+    "error": "<urlopen error Tunnel connection failed: 403 Forbidden>",
+    "ok": false
+  },
+  {
+    "name": "photos-live",
+    "url": "https://developer.apple.com/documentation/photos/phassetmediasubtype/photolive.md",
+    "error": "<urlopen error Tunnel connection failed: 403 Forbidden>",
+    "ok": false
+  },
+  {
+    "name": "photos-data",
+    "url": "https://developer.apple.com/documentation/photos/phassetresourcemanager/requestdata(for:options:datareceivedhandler:completionhandler:).md",
+    "error": "<urlopen error Tunnel connection failed: 403 Forbidden>",
+    "ok": false
+  },
+  {
+    "name": "ui-interruption",
+    "url": "https://developer.apple.com/documentation/xctest/xctestcase/adduiinterruptionmonitor(withdescription:handler:).md",
+    "error": "<urlopen error Tunnel connection failed: 403 Forbidden>",
+    "ok": false
+  }
+]

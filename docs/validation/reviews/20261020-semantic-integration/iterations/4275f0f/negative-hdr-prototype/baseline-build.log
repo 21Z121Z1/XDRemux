@@ -1,0 +1,3 @@
+   Compiling xdremux-hdr v0.1.0 (/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline/hdr)
+   Compiling hdr-validation-probe v0.0.0 (/workspace/xdremux-audit/perf-hdr-validation-prototype/baseline/probe)
+    Finished `release` profile [optimized] target(s) in 1.29s

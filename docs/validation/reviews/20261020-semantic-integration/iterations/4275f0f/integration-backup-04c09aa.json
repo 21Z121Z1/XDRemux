@@ -1,0 +1,10 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-21T01:11:16.421996+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/04c09aa",
+  "head": "04c09aac1b0cabdbd412ab10d071f74120b7bff6",
+  "tree": "5322b3668d626ef6704091993948b548338db49e",
+  "restore": "remote fetched; exact commit/tree matched; non-shallow and full strict fsck exit0",
+  "restore_log": "integration-restore-04c09aa.log",
+  "validation": "clean-head focused checks pass; final portable gate pending; final native gates pending; no merge/delete approval"
+}

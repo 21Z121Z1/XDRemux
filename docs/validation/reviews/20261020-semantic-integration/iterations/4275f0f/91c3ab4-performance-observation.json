@@ -1,0 +1,114 @@
+{
+  "source": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+  "run": 39523528320,
+  "job": 118972764411,
+  "conclusion": "success",
+  "absolute_styles": {
+    "median_seconds": 9.786,
+    "median_budget_seconds": 11.732,
+    "p95_seconds": 10.045,
+    "p95_budget_seconds": 15.406
+  },
+  "same_runner_comparison": {
+    "distinct_revisions": true,
+    "diagnostic_only": true,
+    "summary": {
+      "baseline": {
+        "median_wall_seconds": 7.932123333000163,
+        "median_user_seconds": 7.91,
+        "median_sys_seconds": 0.53,
+        "max_peak_rss_bytes": 1141309440
+      },
+      "candidate": {
+        "median_wall_seconds": 9.240143624999746,
+        "median_user_seconds": 9.12,
+        "median_sys_seconds": 0.57,
+        "max_peak_rss_bytes": 1136820224
+      },
+      "candidate_over_baseline_median": 1.1649016583690526
+    },
+    "candidate_profile": {
+      "arm": "candidate",
+      "status": "validated",
+      "logs": "candidate-profile",
+      "outside_budget_and_comparison_samples": true,
+      "limits": "One candidate-only diagnostic conversion; no baseline stage comparison. The two scene detail spans overlap scene_derivation; do not add them to stage totals.",
+      "wall_seconds": 9.372503000000052,
+      "time_real_seconds": 9.35,
+      "user_seconds": 9.08,
+      "sys_seconds": 0.62,
+      "peak_rss_bytes": 1136607232,
+      "output_bytes": 2894706,
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.005748584
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.150142708
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 2.161607875
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.226233042
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.651640875
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.106874125
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.025965584
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.175928458
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.38380075
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.221370708
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.002141417
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001285958
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 2.886818333
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.010983625
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.007244417
+        }
+      ]
+    }
+  },
+  "log_sha256": "b6aae3e770ae1bfb69999efd0b20000445291a4e0cd6805449c97282411f2433",
+  "limits": [
+    "Relative wall ratio1.1649016583690526 remains; no host-only or single-change attribution.",
+    "Candidate-only profile wall cannot be equated to median CPU delta.",
+    "Future source04 must pass its own unchanged gate."
+  ],
+  "captured_at": "2026-10-21T01:13:23.291955+00:00"
+}

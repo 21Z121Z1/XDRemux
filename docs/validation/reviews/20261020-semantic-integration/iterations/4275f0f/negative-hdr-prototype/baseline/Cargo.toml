@@ -1,0 +1,7 @@
+[workspace]
+members = ["hdr", "probe"]
+resolver = "2"
+[workspace.package]
+edition = "2021"
+[workspace.lints.rust]
+unsafe_code = "forbid"

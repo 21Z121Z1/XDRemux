@@ -1,0 +1,27 @@
+{
+  "base_head": "04c09aac1b0cabdbd412ab10d071f74120b7bff6",
+  "frozen_files_sha256": {
+    "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift": "ee5c464091057f2d23de1394975f419419af8f4a06f04a38e8688483d20c0aca",
+    "apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift": "91081e08ee5c415a48f6a561ddcd9cb6109a0b19ed2ce616b24ed9b5e7bca18f"
+  },
+  "native_red_job": 118972766877,
+  "native_red_subcase": "unknown in original log",
+  "native_green": "NOT_EXECUTED",
+  "local_architecture_tests": 6,
+  "modeled_negative_paths": 16,
+  "modeled_positive_controls": 4,
+  "new_native_matrix": {
+    "named_cases": 8,
+    "formats": 2,
+    "skip_settings": 2,
+    "checks": 32
+  },
+  "source_alias_priority": "unchanged fileKeys/markDuplicateOutputPlans",
+  "local_diff_check": "PASS",
+  "evidence": {
+    "baseline.json": "5777f3c20cbb141bea8ff996dff457366dfeee3e2e68fcf5cbf670ac503e2804",
+    "ancestor-semantics-result.json": "d6ade1985901c77fe50fc846454a6f66f80be5eca41eb543bcdad9f42375abfb",
+    "architecture-tests.log": "62cfbeb2911bb226088bfb0918eb4b05008ea70b20bce854ee2ca8a564bd37a5",
+    "README.md": "06c05ec3e3314b5c1a45ecd45839a20f34f2ded3914bdbc57b425572a4c1ab3e"
+  }
+}

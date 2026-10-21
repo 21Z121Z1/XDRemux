@@ -1,0 +1,89 @@
+{
+  "scope": "Linux synthetic Motion Photo to current CLI PVT; not AVFoundation, native import or device evidence",
+  "head": "04c09aac1b0cabdbd412ab10d071f74120b7bff6",
+  "source_status": "",
+  "binary_sha256": "b943bc8e7b26c96d023084e8cda2e7dcb476db65a286a418318f9e642669508d",
+  "commands": [
+    {
+      "name": "generate-movie",
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=0x142e52:s=256x256:r=30:d=2",
+        "-c:v",
+        "libx264",
+        "-profile:v",
+        "main",
+        "-pix_fmt",
+        "yuv420p",
+        "-g",
+        "30",
+        "-an",
+        "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/motion.mp4"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "inspect",
+      "argv": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "inspect",
+        "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/source.jpg",
+        "--json"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "convert",
+      "argv": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/source.jpg",
+        "--output",
+        "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/capture.pvt",
+        "--live-photo-output",
+        "pvt"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "validate",
+      "argv": [
+        "/workspace/XDRemux-integration/target/debug/xdremux",
+        "validate",
+        "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/capture.pvt",
+        "--json"
+      ],
+      "exit": 0
+    }
+  ],
+  "passed": true,
+  "source_sha256": "7bf6e791ba710ded094c95e6fa5c0e345dad42d4eecbe21b940f70eed872fe6f",
+  "source_unchanged": true,
+  "validation": {
+    "command": "validate",
+    "details": {
+      "kind": "live-photo",
+      "value": {
+        "content_identifier": "641F548C-89C1-4458-B06C-652F036F3844",
+        "image": "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/capture.pvt/capture.heic",
+        "input": "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/capture.pvt",
+        "still_time_seconds": 1.0,
+        "video": "/workspace/xdremux-audit/pvt-synthetic-cli-24o6yfp3/capture.pvt/capture.mov"
+      }
+    },
+    "kind": "live-photo",
+    "schema_version": 1,
+    "valid": true
+  },
+  "package_hashes": {
+    "metadata.plist": "32c70976fd8a5f305a573568b9d7dae31cf6f7c1817d9ee7ebe70ada5b5c3f01",
+    "capture.heic": "f96744575139b08ec5a533901bdaf705d16d5d5842c4a7d7ef057864344eb1ce",
+    "capture.mov": "bae904d0834d621d7c104670c391731586963ef5810a5266627fd392a8e57a7a"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "prepare_registry_packages": 55,
+  "all_used_registry_versions_checksums_in_source_lock": true,
+  "original_source_still_equal_baseline": true,
+  "current_repo_head": "04c09aac1b0cabdbd412ab10d071f74120b7bff6",
+  "current_repo_status": "",
+  "artifacts": {
+    "baseline/hdr/src/scene_linear.rs": {
+      "bytes": 25885,
+      "sha256": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2"
+    },
+    "candidate/hdr/src/scene_linear.rs": {
+      "bytes": 26468,
+      "sha256": "a24e48888b3c40e4a37e4890e2d61acaa14145b828478bcc497302b0777d54fc"
+    },
+    "probe.rs": {
+      "bytes": 9579,
+      "sha256": "fa0a3b828da66645a23f0de5d9dc942942dfd3b7e2c8eef6f8d05baf40db8a90"
+    },
+    "prepare/src/main.rs": {
+      "bytes": 2455,
+      "sha256": "ae859dbe13b4c333e52dea26c02379985bcbc3c09bdc3abf4fe15230ad80d9a4"
+    },
+    "prepare/Cargo.lock": {
+      "bytes": 13103,
+      "sha256": "0bd56de1bfece3d0ad81b8f24ad2b4af501905a54d7cff8c969190cfc45154da"
+    },
+    "source0c/Cargo.lock": {
+      "bytes": 24932,
+      "sha256": "056160dda971be254be247896d1aec466f99dda646e88ba44cd0bc163a34f242"
+    },
+    "candidate.patch": {
+      "bytes": 1388,
+      "sha256": "bc88e81683d28baa77b6755b2e51cec7b29f0ca4cdeb4d6bb92e08c2ab4b4b08"
+    },
+    "measure.py": {
+      "bytes": 5716,
+      "sha256": "b17a795eea589131f0967ccecb5a4842841fad43a69a8a10a6621094e633a564"
+    },
+    "baseline-target/release/hdr-validation-probe": {
+      "sha256": "ffb8049d64b1c42d6de57af9ba12ec93b2a75ae7ee54431281b13444132f04ca"
+    },
+    "candidate-target/release/hdr-validation-probe": {
+      "sha256": "63b043ddda331e44d58f3b21795ff88e40ff438f08bf3ae60da58bdd15b878be"
+    }
+  }
+}
