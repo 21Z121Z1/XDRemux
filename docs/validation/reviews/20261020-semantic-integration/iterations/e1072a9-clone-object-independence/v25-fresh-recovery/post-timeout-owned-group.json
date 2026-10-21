@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "ps",
+    "-eo",
+    "pid=,ppid=,pgid=,stat=,comm="
+  ],
+  "exit_code": 0,
+  "filter": "PGID3130 only; no other process metadata archived",
+  "matching_rows": [
+    "   3131       1    3130 Z    git",
+    "   3132       1    3130 Z    git-remote-http",
+    "   3135       1    3130 Z    git"
+  ],
+  "cleanup_receipt_remains_uncertain": true,
+  "no_extra_signal_sent": true
+}

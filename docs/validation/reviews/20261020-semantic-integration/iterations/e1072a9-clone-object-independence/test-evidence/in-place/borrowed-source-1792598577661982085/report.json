@@ -1,0 +1,146 @@
+{
+  "native_executed": false,
+  "fixture": {
+    "root": "/tmp/stage-real-borrowed-source-ug1fpjl9",
+    "lender": "/tmp/stage-real-borrowed-source-ug1fpjl9/source",
+    "borrower": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+    "head": "3cc09717cddc797458415ee1d4bd41008722960e",
+    "retained": true,
+    "alternates": "/tmp/stage-real-borrowed-source-ug1fpjl9/source/.git/objects\n",
+    "borrowed_commit_available": true,
+    "commit_loose_object_local": false,
+    "lender_and_borrower_preserved": true
+  },
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "clone",
+        "--shared",
+        "--",
+        "/tmp/stage-real-borrowed-source-ug1fpjl9/source",
+        "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower"
+      ],
+      "cwd": "/tmp/stage-real-borrowed-source-ug1fpjl9",
+      "budget_seconds": 10,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/000.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/000.stderr",
+      "owned_process_group": 2935,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.007783981000102358
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/001.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/001.stderr",
+      "owned_process_group": 2938,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015245610002239118
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+        "cat-file",
+        "-e",
+        "3cc09717cddc797458415ee1d4bd41008722960e"
+      ],
+      "cwd": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+      "budget_seconds": 5,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/002.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/002.stderr",
+      "owned_process_group": 2939,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001633075999961875
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/003.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/003.stderr",
+      "owned_process_group": 2940,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0016215579998970497
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/004.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test-evidence/in-place/borrowed-source-1792598577661982085/commands/004.stderr",
+      "owned_process_group": 2941,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0015649120000489347
+    }
+  ],
+  "owned_workspace": {
+    "path": "/tmp/xdremux-stage-retained-p0c81v2n",
+    "retained": true,
+    "deletion_attempted": false,
+    "shared_worktree_registry_touched": false,
+    "reason": "retained by design on success, failure or interrupt; manual review required"
+  },
+  "object_store_checks": [
+    {
+      "role": "source-before-clone",
+      "source": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+      "status": "rejected",
+      "object_directory": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower/.git/objects",
+      "alternate_metadata": [
+        "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower/.git/objects/info/alternates"
+      ]
+    },
+    {
+      "role": "candidate-before-owner",
+      "source": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower",
+      "status": "rejected",
+      "object_directory": "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower/.git/objects",
+      "alternate_metadata": [
+        "/tmp/stage-real-borrowed-source-ug1fpjl9/borrower/.git/objects/info/alternates"
+      ]
+    }
+  ],
+  "owner_execution_attempted": false,
+  "owner_execution_completed": false
+}

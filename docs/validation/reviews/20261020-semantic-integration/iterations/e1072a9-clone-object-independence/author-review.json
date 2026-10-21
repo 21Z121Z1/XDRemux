@@ -1,0 +1,25 @@
+{
+  "scope": "One object-store invariant, one real borrowing fixture, public raw recovery evidence; author review",
+  "chosen_policy": "Refuse borrowed/redirection sources, recheck retained clone; do not rewrite/dissociate/delete source",
+  "failing_before": "exit1 against v25 helper; actual retained clone inherited alternates and reached stubbed build boundary",
+  "passing_after": "22/22 here plus22/22 relocated; no Rust/Swift/Apple execution",
+  "original_recovery": {
+    "ref": "refs/tags/review/semantic-integration-20261020-evidence-v25",
+    "commit": "64fb7e5c5193698e88e8ba035be3c809f7c38763",
+    "tree": "9f5214d0e7ba50a4d939b4658133be79194cf5f8",
+    "original_log": "v25-original-restore.log",
+    "current_raw_verification": "v25-existing-independent-verification/commands.log",
+    "fsck_exit_code": 0
+  },
+  "incomplete_attempt": {
+    "target": "/workspace/xdremux-audit/v25-fresh-independent-proof.git",
+    "action": "fetch v25 into new empty bare",
+    "result": "120.002s timeout; process-group cleanup uncertain; ref absent128; no fsck",
+    "receipt": "v25-fresh-recovery/report.json",
+    "retried": false
+  },
+  "product_head": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "native_experiments": 0,
+  "workflow_changed": false,
+  "operation_enabled": false
+}

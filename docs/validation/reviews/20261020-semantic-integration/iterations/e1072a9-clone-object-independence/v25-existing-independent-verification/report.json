@@ -1,0 +1,136 @@
+{
+  "scope": "Read-only current verification of the existing independent restore; original successful fetch log is archived separately",
+  "ref": "refs/tags/review/semantic-integration-20261020-evidence-v25",
+  "expected_commit": "64fb7e5c5193698e88e8ba035be3c809f7c38763",
+  "expected_tree": "9f5214d0e7ba50a4d939b4658133be79194cf5f8",
+  "status": "passed",
+  "remote_fetch_attempted": false,
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/workspace/xdremux-audit/restore-test.git",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/000.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/000.stderr",
+      "owned_process_group": 3174,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001566566999827046
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "refs/tags/review/semantic-integration-20261020-evidence-v25^{commit}"
+      ],
+      "cwd": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/001.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/001.stderr",
+      "owned_process_group": 3175,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0013674980000359938
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "refs/tags/review/semantic-integration-20261020-evidence-v25^{tree}"
+      ],
+      "cwd": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/002.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/002.stderr",
+      "owned_process_group": 3176,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0013728049998462666
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "--is-shallow-repository"
+      ],
+      "cwd": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/003.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/003.stderr",
+      "owned_process_group": 3177,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014355200000863988
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "rev-parse",
+        "--is-bare-repository"
+      ],
+      "cwd": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/004.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/004.stderr",
+      "owned_process_group": 3178,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014414689994737273
+    },
+    {
+      "argv": [
+        "git",
+        "--git-dir=/workspace/xdremux-audit/restore-test.git",
+        "fsck",
+        "--full",
+        "--strict",
+        "--no-dangling"
+      ],
+      "cwd": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/005.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification/commands/005.stderr",
+      "owned_process_group": 3179,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 1.4670787750001182
+    }
+  ],
+  "object_store_checks": [
+    {
+      "role": "existing-independent-restore",
+      "source": "/workspace/xdremux-audit/restore-test.git",
+      "status": "no borrowing metadata",
+      "object_directory": "/workspace/xdremux-audit/restore-test.git/objects",
+      "alternate_metadata": []
+    }
+  ],
+  "observed_commit": "64fb7e5c5193698e88e8ba035be3c809f7c38763",
+  "observed_tree": "9f5214d0e7ba50a4d939b4658133be79194cf5f8",
+  "fsck_exit_code": 0,
+  "is_shallow": false
+}

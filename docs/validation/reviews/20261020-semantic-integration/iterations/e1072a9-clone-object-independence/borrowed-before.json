@@ -1,0 +1,12 @@
+{
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "test_e107_stage_prototype.IdentityTests.test_rejects_real_borrowing_source_before_clone_or_owner",
+    "-v"
+  ],
+  "exit_code": 1,
+  "helper_sha256": "00abc59a689176c3e1607bd2d6c9e60b8e1d6d1f6bc466a3e914462c305ea6b6",
+  "scope": "Real local borrowed Git fixture; build boundary is a stub and no native code ran."
+}

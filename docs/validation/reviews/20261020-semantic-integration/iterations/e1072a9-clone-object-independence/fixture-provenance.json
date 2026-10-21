@@ -1,0 +1,9 @@
+{
+  "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "baseline": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "fixtures": {
+    "fixtures/baseline-apple-styles.rs": "6129f27b69334cdbafa040e1ef98c974fc5bd02025bb2b63e4f98489e19d1908",
+    "fixtures/candidate-apple-styles.rs": "7549f71c5baa63dcffc1f255f2747e0e122a9cf603b2745fce1fad3d65e42d5d"
+  },
+  "scope": "Exact Rust source snapshots only; no media. Tests require no original workspace or checkout."
+}

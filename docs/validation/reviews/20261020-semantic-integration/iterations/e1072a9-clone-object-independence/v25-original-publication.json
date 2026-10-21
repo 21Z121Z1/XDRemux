@@ -1,0 +1,10 @@
+{
+  "evidence": "64fb7e5c5193698e88e8ba035be3c809f7c38763",
+  "tree": "9f5214d0e7ba50a4d939b4658133be79194cf5f8",
+  "tag": "refs/tags/review/semantic-integration-20261020-evidence-v25",
+  "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "files": 1861,
+  "index_sha256": "3c942269121db8330ac16fb13b39637e20158ad33d0f05e6cc4ff90376ce1bc7",
+  "restore": "remote commit/tree exact; non-shallow full strict fsck exit0",
+  "captured_at": "2026-10-21T15:48:32.930549+00:00"
+}

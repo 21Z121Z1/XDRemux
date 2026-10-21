@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "git",
+    "--git-dir=/workspace/xdremux-audit/v25-fresh-independent-proof.git",
+    "show-ref",
+    "--verify",
+    "refs/tags/review/semantic-integration-20261020-evidence-v25"
+  ],
+  "exit_code": 128,
+  "stdout": "",
+  "stderr": "fatal: 'refs/tags/review/semantic-integration-20261020-evidence-v25' - not a valid ref\n",
+  "fetch_retried": false
+}

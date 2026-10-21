@@ -1,0 +1,53 @@
+$ git -C /workspace/xdremux-audit/restore-test.git rev-parse --path-format=absolute --git-path objects
+cwd=/workspace/xdremux-audit/restore-test.git
+stdout:
+/workspace/xdremux-audit/restore-test.git/objects
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git rev-parse 'refs/tags/review/semantic-integration-20261020-evidence-v25^{commit}'
+cwd=/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification
+stdout:
+64fb7e5c5193698e88e8ba035be3c809f7c38763
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git rev-parse 'refs/tags/review/semantic-integration-20261020-evidence-v25^{tree}'
+cwd=/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification
+stdout:
+9f5214d0e7ba50a4d939b4658133be79194cf5f8
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git rev-parse --is-shallow-repository
+cwd=/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification
+stdout:
+false
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git rev-parse --is-bare-repository
+cwd=/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification
+stdout:
+true
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git fsck --full --strict --no-dangling
+cwd=/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/v25-existing-independent-verification
+stdout:
+
+stderr:
+notice: HEAD points to an unborn branch (master)
+
+exit=0

@@ -1,0 +1,42 @@
+{
+  "scope": "Read-only entrypoint inventory; no execution/configuration change",
+  "product_commit": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "current_workflow": ".github/workflows/performance.yml",
+  "workflow_name": "XDRemux Rust Performance and Design",
+  "existing_ref": "integrate/semantic-review-20261020",
+  "workflow_sha256": "1685ccc53a64b88fc4194542a84d58ada113a71ec226a3dec59198093322f3e4",
+  "dispatch_inputs": {},
+  "runs_existing_candidate_only_comparison": true,
+  "corrected_prototype_is_wired": false,
+  "dispatch_tool_exposed": false,
+  "dispatch_request_attempted": false,
+  "server_rejection_observed": false,
+  "historical_gh_receipt_incomplete": true,
+  "selected_environment": "Linux; xcodebuild and swift commands absent",
+  "usable_current_native_execution_path": null,
+  "proposed_requirements_not_implemented": {
+    "workflow_owner": ".github/workflows/performance.yml",
+    "mode": "explicit styles-stage-attribution diagnostic only",
+    "product_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "harness_ref": "refs/tags/review/semantic-integration-20261020-evidence-v26",
+    "harness_commit": "to be resolved in publication recovery attachment",
+    "host": "free standard arm64 macOS27/Xcode27, actual host facts required",
+    "checkout": "separate exact product/harness checkouts; full product history; clean identity before code",
+    "inputs": [
+      "product SHA",
+      "reviewed harness SHA",
+      "explicit diagnostic-only mode"
+    ],
+    "cli_inputs": [
+      "--source exact product checkout",
+      "--cli fresh release CLI",
+      "--apple-adapter fresh release adapter",
+      "--cli-sha256 from that build",
+      "--adapter-sha256 from that build",
+      "--output-dir fresh text-only evidence path"
+    ],
+    "artifact_policy": "text allowlist only; retained clone/media outside artifacts",
+    "constraints": "No PVT, no old-run rerun, no product-head push, no budget weakening; prior failures remain"
+  },
+  "this_round_executed_native_experiments": 0
+}

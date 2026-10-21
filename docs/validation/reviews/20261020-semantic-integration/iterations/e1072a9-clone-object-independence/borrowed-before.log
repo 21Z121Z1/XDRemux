@@ -1,0 +1,18 @@
+test_rejects_real_borrowing_source_before_clone_or_owner (test_e107_stage_prototype.IdentityTests.test_rejects_real_borrowing_source_before_clone_or_owner) ... ERROR
+
+======================================================================
+ERROR: test_rejects_real_borrowing_source_before_clone_or_owner (test_e107_stage_prototype.IdentityTests.test_rejects_real_borrowing_source_before_clone_or_owner)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test_e107_stage_prototype.py", line 414, in test_rejects_real_borrowing_source_before_clone_or_owner
+    reference_clone(owner, head, owned, out, report, commands)
+  File "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/bounded_stage_lifecycle.py", line 291, in reference_clone
+    c.run_logged(c.CARGO_RELEASE_COMMAND, source, env, output / 'reference-rust-build.log', 1800)
+  File "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/test_e107_stage_prototype.py", line 409, in forbid_build
+    raise RuntimeError('test sentinel: missing borrowed-object guard reached build boundary')
+RuntimeError: test sentinel: missing borrowed-object guard reached build boundary
+
+----------------------------------------------------------------------
+Ran 1 test in 0.037s
+
+FAILED (errors=1)
