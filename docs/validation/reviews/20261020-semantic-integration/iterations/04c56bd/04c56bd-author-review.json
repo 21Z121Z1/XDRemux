@@ -1,0 +1,49 @@
+{
+  "review_kind": "author review; no independent Swift execution claim",
+  "head": "04c56bda6740212861b4c24907f15bb870e2e997",
+  "tree": "d41d1649a1afd1db45b3b1c81d39337d9ab9b0c2",
+  "base": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+  "changed_files": {
+    ".agents/skills/xdremux-verify/features/motion-photo.md": "6b27d3765a9c1fd9f3df3bd9b6f19d10e344e8d590cbd91dc51913da000ccd04",
+    ".github/workflows/research.yml": "461efc103245bb4c9092d6f2d032b9236966eb4079ef11c484cc3f8128e41b6e",
+    "scripts/apple/pvt_native_import/PVTReadback.swift": "448015deca5a48ac875150c27c6ecfae57cb089a4c85930ba51ffb970687e9c3",
+    "scripts/apple/pvt_native_import/PVTShareUITests.swift.in": "8723fce01a0e0aeb5c34ceb5caa22cea425bfe4e31ddd06e14298606185a3ffc",
+    "scripts/apple/pvt_native_import/check_native_import.py": "77c634fba6c357ca63fbbe725455472b714ccaa25d98b6fed2875ab0640976e7",
+    "tests/test_pvt_native_import.py": "99d51eeae65422fd0719e7e0036633c76874f8e93bd7f9aca2f015bd9dddb2c6"
+  },
+  "accepted_findings": [
+    {
+      "priority": "P1 evidence correctness",
+      "trigger": "share sheet has no Photos Save, original XCTest failed29.747s but xcodebuild timed out180s",
+      "fix": "native no-Save marker stops only private XCTest process group; still non-PASS; own simulator cleanup remains required"
+    },
+    {
+      "priority": "P1 evidence attribution",
+      "trigger": "automatic URL control record could survive into unrequested provider phase",
+      "fix": "remove previous transfer receipt, phase-bind input and callback, require identical complete-member hashes and independent PhotoKit admission"
+    },
+    {
+      "priority": "P2 native diagnosis",
+      "trigger": "explicit UTI may not be understood as PVT package by current simulator; activity accessibility may use cells",
+      "fix": "record real SDK types/automatic provider registrations, compare UIImage-only availability, whole-directory URL and explicit file provider. Only1 actual unambiguous Photos save; no unrelated activity or pair fallback."
+    }
+  ],
+  "checks": [
+    "13focused native-boundary tests PASS",
+    "33native-boundary+workflow tests PASS",
+    "295portable Python tests PASS; no native execution claim",
+    "git diff --check PASS"
+  ],
+  "native_gaps": [
+    "actual new Swift compilation/control availability/direct import pending native CI",
+    "macOS Photos library selection, physical-device Photos and wallpaper not exercised"
+  ],
+  "unchanged_product_paths": [],
+  "process_scope": "POSIX private session created by this invocation; SIGTERM then bounded SIGKILL only own process group. No executable-name kill or global security setting change.",
+  "failed_attempts": [
+    "new helper missing API RED; URL route prior contract RED",
+    "pvt-route-controls-focused.log used wrong workflow module name; corrected33PASS",
+    "04c56bd-portable-gate-cli-argument-error.log wrong --output; corrected --receipt actual full gate separately"
+  ],
+  "captured_at": "2026-10-21T03:54:18.477972+00:00"
+}

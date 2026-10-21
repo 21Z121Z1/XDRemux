@@ -1,0 +1,1458 @@
+﻿2026-10-21T03:29:25.8572710Z Current runner version: '2.338.0'
+2026-10-21T03:29:25.8589840Z ##[group]Runner Image Provisioner
+2026-10-21T03:29:25.8590400Z Hosted Compute Agent
+2026-10-21T03:29:25.8590810Z Version: 20261006.597
+2026-10-21T03:29:25.8591250Z Commit: c696a59e4a9ffbc6a6203385bd1b2a10e87b1c9c
+2026-10-21T03:29:25.8591760Z Build Date: 2026-10-06T21:39:28Z
+2026-10-21T03:29:25.8592240Z Worker ID: {da9370e4-fc41-4acf-8845-a036d6b8b88b}
+2026-10-21T03:29:25.8592720Z Region: westus
+2026-10-21T03:29:25.8593070Z Cloud: MacCloud
+2026-10-21T03:29:25.8593430Z ##[endgroup]
+2026-10-21T03:29:25.8594550Z ##[group]Operating System
+2026-10-21T03:29:25.8594980Z macOS
+2026-10-21T03:29:25.8595340Z 27.0.1
+2026-10-21T03:29:25.8595670Z 26A434
+2026-10-21T03:29:25.8596010Z ##[endgroup]
+2026-10-21T03:29:25.8596370Z ##[group]Runner Image
+2026-10-21T03:29:25.8596760Z Image: xcode-27-arm64
+2026-10-21T03:29:25.8597130Z Version: 20261012.0260.1
+2026-10-21T03:29:25.8598250Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261012.0260/images/macos/xcode-27-arm64-Readme.md
+2026-10-21T03:29:25.8599250Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261012.0260
+2026-10-21T03:29:25.8599920Z ##[endgroup]
+2026-10-21T03:29:25.8600620Z ##[group]GITHUB_TOKEN Permissions
+2026-10-21T03:29:25.8601700Z Contents: read
+2026-10-21T03:29:25.8602050Z Metadata: read
+2026-10-21T03:29:25.8602460Z ##[endgroup]
+2026-10-21T03:29:25.8604090Z Secret source: Actions
+2026-10-21T03:29:25.8604660Z Cache mode: write
+2026-10-21T03:29:25.8605130Z Prepare workflow directory
+2026-10-21T03:29:25.9076710Z Prepare all required actions
+2026-10-21T03:29:25.9107650Z Getting action download info
+2026-10-21T03:29:26.0573110Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-10-21T03:29:26.2387320Z Download action repository 'actions-rust-lang/setup-rust-toolchain@v2' (SHA:ecabd13d1c56bd1345c230e542e9144811ad706f)
+2026-10-21T03:29:26.6847990Z Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+2026-10-21T03:29:27.6901330Z Getting action download info
+2026-10-21T03:29:27.7627580Z Download action repository 'Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6' (SHA:6323deb102c322ba6fcbdcafc7e3dddab59af2b6)
+2026-10-21T03:29:28.7155000Z Complete job name: pvt-native-import
+2026-10-21T03:29:28.7630280Z ##[group]Run actions/checkout@v7
+2026-10-21T03:29:28.7631210Z with:
+2026-10-21T03:29:28.7631780Z   ref: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:28.7632520Z   persist-credentials: false
+2026-10-21T03:29:28.7633130Z   repository: 21Z121Z1/XDRemux
+2026-10-21T03:29:28.7638370Z   token: ***
+2026-10-21T03:29:28.7638910Z   ssh-strict: true
+2026-10-21T03:29:28.7639430Z   ssh-user: git
+2026-10-21T03:29:28.7639930Z   clean: true
+2026-10-21T03:29:28.7640460Z   sparse-checkout-cone-mode: true
+2026-10-21T03:29:28.7641080Z   fetch-depth: 1
+2026-10-21T03:29:28.7641600Z   fetch-tags: false
+2026-10-21T03:29:28.7642130Z   show-progress: true
+2026-10-21T03:29:28.7642720Z   lfs: false
+2026-10-21T03:29:28.7643230Z   submodules: false
+2026-10-21T03:29:28.7643760Z   set-safe-directory: true
+2026-10-21T03:29:28.7644360Z   allow-unsafe-pr-checkout: false
+2026-10-21T03:29:28.7645080Z env:
+2026-10-21T03:29:28.7645690Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:28.7646620Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:28.7647390Z ##[endgroup]
+2026-10-21T03:29:29.1074600Z Syncing repository: 21Z121Z1/XDRemux
+2026-10-21T03:29:29.1076440Z ##[group]Getting Git version info
+2026-10-21T03:29:29.1077320Z Working directory is '/Users/runner/work/XDRemux/XDRemux'
+2026-10-21T03:29:29.1078750Z [command]/opt/homebrew/bin/git version
+2026-10-21T03:29:29.1317780Z git version 2.56.0
+2026-10-21T03:29:29.1329210Z ##[endgroup]
+2026-10-21T03:29:29.1335330Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/cf7aac88-9e93-4fe8-b94f-702e251abace/.gitconfig'
+2026-10-21T03:29:29.1339940Z Temporarily overriding HOME='/Users/runner/work/_temp/cf7aac88-9e93-4fe8-b94f-702e251abace' before making global git config changes
+2026-10-21T03:29:29.1342620Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T03:29:29.1344410Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-21T03:29:29.1446250Z Deleting the contents of '/Users/runner/work/XDRemux/XDRemux'
+2026-10-21T03:29:29.1448780Z ##[group]Determining repository object format
+2026-10-21T03:29:29.1450090Z ##[endgroup]
+2026-10-21T03:29:29.1451290Z ##[group]Initializing the repository
+2026-10-21T03:29:29.1453300Z [command]/opt/homebrew/bin/git init /Users/runner/work/XDRemux/XDRemux
+2026-10-21T03:29:29.1651690Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-21T03:29:29.1653280Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-21T03:29:29.1654600Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-21T03:29:29.1655760Z hint: call:
+2026-10-21T03:29:29.1656390Z hint:
+2026-10-21T03:29:29.1657110Z hint: 	git config --global init.defaultBranch <name>
+2026-10-21T03:29:29.1657980Z hint:
+2026-10-21T03:29:29.1658930Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-21T03:29:29.1660260Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-21T03:29:29.1661340Z hint:
+2026-10-21T03:29:29.1661890Z hint: 	git branch -m <name>
+2026-10-21T03:29:29.1662500Z hint:
+2026-10-21T03:29:29.1663330Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-21T03:29:29.1664880Z Initialized empty Git repository in /Users/runner/work/XDRemux/XDRemux/.git/
+2026-10-21T03:29:29.1667280Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/XDRemux
+2026-10-21T03:29:29.1738890Z ##[endgroup]
+2026-10-21T03:29:29.1740330Z ##[group]Disabling automatic garbage collection
+2026-10-21T03:29:29.1741530Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-21T03:29:29.1810030Z ##[endgroup]
+2026-10-21T03:29:29.1811020Z ##[group]Setting up auth
+2026-10-21T03:29:29.1811760Z Removing SSH command configuration
+2026-10-21T03:29:29.1814310Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T03:29:29.1876270Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T03:29:29.2768410Z Removing HTTP extra header
+2026-10-21T03:29:29.2774720Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T03:29:29.2841370Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T03:29:29.3660130Z Removing includeIf entries pointing to credentials config files
+2026-10-21T03:29:29.3663270Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T03:29:29.3722050Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T03:29:29.5421970Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-21T03:29:29.5425810Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path /Users/runner/work/_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config
+2026-10-21T03:29:29.5429310Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config
+2026-10-21T03:29:29.5499620Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config
+2026-10-21T03:29:29.5577270Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config
+2026-10-21T03:29:29.5647490Z ##[endgroup]
+2026-10-21T03:29:29.5648050Z ##[group]Fetching the repository
+2026-10-21T03:29:29.5652470Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:34.6346820Z From https://github.com/21Z121Z1/XDRemux
+2026-10-21T03:29:34.6347610Z  * branch            7a561de9b2c6573caabae80642ba01d99e07e05f -> FETCH_HEAD
+2026-10-21T03:29:34.6364300Z [command]/opt/homebrew/bin/git rev-parse --verify --quiet 7a561de9b2c6573caabae80642ba01d99e07e05f^{object}
+2026-10-21T03:29:34.6465810Z 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:34.6472060Z ##[endgroup]
+2026-10-21T03:29:34.6473440Z ##[group]Determining the checkout info
+2026-10-21T03:29:34.6474140Z ##[endgroup]
+2026-10-21T03:29:34.6476560Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-21T03:29:34.6580780Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-21T03:29:34.6657590Z ##[group]Checking out the ref
+2026-10-21T03:29:34.6660600Z [command]/opt/homebrew/bin/git checkout --progress --force 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:35.3652970Z HEAD is now at 7a561de Declare scene lifecycle for the current SDK PVT probe app
+2026-10-21T03:29:35.3687380Z ##[endgroup]
+2026-10-21T03:29:35.3835620Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-21T03:29:35.3930600Z 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:35.3941080Z ##[group]Removing auth
+2026-10-21T03:29:35.3941530Z Removing SSH command configuration
+2026-10-21T03:29:35.3944630Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T03:29:35.4023950Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T03:29:35.5369800Z Removing HTTP extra header
+2026-10-21T03:29:35.5470780Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T03:29:35.5664780Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T03:29:35.6823050Z Removing includeIf entries pointing to credentials config files
+2026-10-21T03:29:35.6869610Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T03:29:35.6913170Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-21T03:29:35.6929600Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-21T03:29:35.6930370Z includeif.gitdir:/github/workspace/.git.path
+2026-10-21T03:29:35.6968060Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-21T03:29:35.7269360Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-21T03:29:35.7377780Z /Users/runner/work/_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config
+2026-10-21T03:29:35.7634660Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path \/Users\/runner\/work\/_temp\/git\-credentials\-374b251b\-6a9a\-4e73\-a055\-9bb6760e4301\.config
+2026-10-21T03:29:35.7656870Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-21T03:29:35.7658440Z /Users/runner/work/_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config
+2026-10-21T03:29:35.7660350Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path \/Users\/runner\/work\/_temp\/git\-credentials\-374b251b\-6a9a\-4e73\-a055\-9bb6760e4301\.config
+2026-10-21T03:29:35.7664240Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-10-21T03:29:35.7665100Z /github/runner_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config
+2026-10-21T03:29:35.7667690Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-374b251b\-6a9a\-4e73\-a055\-9bb6760e4301\.config
+2026-10-21T03:29:35.7669270Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-21T03:29:35.7693140Z /github/runner_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config
+2026-10-21T03:29:35.7702080Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-374b251b\-6a9a\-4e73\-a055\-9bb6760e4301\.config
+2026-10-21T03:29:35.7769690Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T03:29:35.8462780Z Removing credentials config '/Users/runner/work/_temp/git-credentials-374b251b-6a9a-4e73-a055-9bb6760e4301.config'
+2026-10-21T03:29:35.8476280Z ##[endgroup]
+2026-10-21T03:29:35.8848790Z ##[group]Run actions-rust-lang/setup-rust-toolchain@v2
+2026-10-21T03:29:35.8849080Z with:
+2026-10-21T03:29:35.8849290Z   toolchain: stable
+2026-10-21T03:29:35.8849440Z   build-warnings: deny
+2026-10-21T03:29:35.8849630Z   cache: true
+2026-10-21T03:29:35.8849760Z   cache-on-failure: true
+2026-10-21T03:29:35.8849960Z   cache-bin: true
+2026-10-21T03:29:35.8850160Z   cache-provider: github
+2026-10-21T03:29:35.8850320Z   cache-all-crates: false
+2026-10-21T03:29:35.8850490Z   cache-workspace-crates: false
+2026-10-21T03:29:35.8850650Z   cache-save-if: true
+2026-10-21T03:29:35.8850790Z   cache-targets: true
+2026-10-21T03:29:35.8850930Z   matcher: true
+2026-10-21T03:29:35.8851050Z   override: true
+2026-10-21T03:29:35.8851180Z env:
+2026-10-21T03:29:35.8851350Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:35.8851670Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:35.8851950Z ##[endgroup]
+2026-10-21T03:29:35.8897570Z ##[start-action display=Unbork mac;id=__actions-rust-lang_setup-rust-toolchain.__run]
+2026-10-21T03:29:35.8936260Z ##[group]Run brew install bash
+2026-10-21T03:29:35.8936470Z [36;1mbrew install bash[0m
+2026-10-21T03:29:35.8977450Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T03:29:35.8977680Z env:
+2026-10-21T03:29:35.8977860Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:35.8978180Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:35.8978410Z ##[endgroup]
+2026-10-21T03:29:38.2488580Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-21T03:29:38.2562250Z ✔︎ Bottle Manifest bash (5.3.20)
+2026-10-21T03:29:38.2967950Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-21T03:29:38.2968220Z bash 5.3.20
+2026-10-21T03:29:38.2969130Z [34m==>[0m [1mWould install 1 dependency for bash:[0m
+2026-10-21T03:29:38.2969430Z ncurses
+2026-10-21T03:29:38.3046450Z [32m==>[0m [1mFetching downloads for: [32mbash[39m[0m
+2026-10-21T03:29:38.6613710Z ✔︎ Bottle Manifest ncurses (6.6)
+2026-10-21T03:29:39.7844610Z ✔︎ Bottle bash (5.3.20)
+2026-10-21T03:29:40.0481620Z ✔︎ Bottle ncurses (6.6)
+2026-10-21T03:29:40.0566620Z [32m==>[0m [1mInstalling bash dependency: [32mncurses[39m (6.6)[0m
+2026-10-21T03:29:40.0586060Z [34m==>[0m [1mPouring ncurses--6.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T03:29:41.1860950Z 🍺  /opt/homebrew/Cellar/ncurses/6.6: 4,086 files, 10.3MB
+2026-10-21T03:29:41.1863680Z [32m==>[0m [1mInstalling [32mbash[39m[0m
+2026-10-21T03:29:41.1866240Z [34m==>[0m [1mPouring bash--5.3.20.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T03:29:42.1090720Z 🍺  /opt/homebrew/Cellar/bash/5.3.20: 172 files, 13.1MB
+2026-10-21T03:29:42.1094280Z [32m==>[0m [1mCaveats[0m
+2026-10-21T03:29:42.1095320Z [34m==>[0m [1mbash[0m
+2026-10-21T03:29:42.1096200Z DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/lib/bash:/opt/local/lib/bash:/usr/pkg/lib/bash:/opt/pkg/lib/bash:.
+2026-10-21T03:29:42.1183790Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=6228]
+2026-10-21T03:29:42.1196340Z ##[start-action display=Run : construct rustup command line;id=__actions-rust-lang_setup-rust-toolchain.flags]
+2026-10-21T03:29:42.1217550Z ##[group]Run : construct rustup command line
+2026-10-21T03:29:42.1217820Z [36;1m: construct rustup command line[0m
+2026-10-21T03:29:42.1218260Z [36;1mecho "targets=$(for t in ${_srt_targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+2026-10-21T03:29:42.1218790Z [36;1mecho "components=$(for c in ${_srt_components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+2026-10-21T03:29:42.1219250Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+2026-10-21T03:29:42.1229790Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T03:29:42.1230070Z env:
+2026-10-21T03:29:42.1230250Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:42.1230950Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:42.1231200Z   _srt_targets: 
+2026-10-21T03:29:42.1231360Z   _srt_components: 
+2026-10-21T03:29:42.1231500Z ##[endgroup]
+2026-10-21T03:29:42.1575040Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.flags;outcome=success;conclusion=success;duration_ms=37]
+2026-10-21T03:29:42.1579640Z ##[start-action display=Setting Environment Variables;id=__actions-rust-lang_setup-rust-toolchain.__run_2]
+2026-10-21T03:29:42.1600720Z ##[group]Run if [[ ! -v CARGO_INCREMENTAL ]]; then
+2026-10-21T03:29:42.1601130Z [36;1mif [[ ! -v CARGO_INCREMENTAL ]]; then[0m
+2026-10-21T03:29:42.1601430Z [36;1m  echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV[0m
+2026-10-21T03:29:42.1601730Z [36;1mfi[0m
+2026-10-21T03:29:42.1601940Z [36;1mif [[ ! -v CARGO_PROFILE_DEV_DEBUG ]]; then[0m
+2026-10-21T03:29:42.1602310Z [36;1m  echo "CARGO_PROFILE_DEV_DEBUG=0" >> $GITHUB_ENV[0m
+2026-10-21T03:29:42.1602580Z [36;1mfi[0m
+2026-10-21T03:29:42.1602820Z [36;1mif [[ ! -v CARGO_TERM_COLOR ]]; then[0m
+2026-10-21T03:29:42.1603130Z [36;1m  echo "CARGO_TERM_COLOR=always" >> $GITHUB_ENV[0m
+2026-10-21T03:29:42.1603390Z [36;1mfi[0m
+2026-10-21T03:29:42.1603580Z [36;1mif [[ ! -v RUST_BACKTRACE ]]; then[0m
+2026-10-21T03:29:42.1603860Z [36;1m  echo "RUST_BACKTRACE=short" >> $GITHUB_ENV[0m
+2026-10-21T03:29:42.1604100Z [36;1mfi[0m
+2026-10-21T03:29:42.1604360Z [36;1mif [[ ( ! -v RUSTFLAGS ) && $_srt_NEW_RUSTFLAGS != "" ]]; then[0m
+2026-10-21T03:29:42.1604720Z [36;1m  echo "RUSTFLAGS=$_srt_NEW_RUSTFLAGS" >> $GITHUB_ENV[0m
+2026-10-21T03:29:42.1604980Z [36;1mfi[0m
+2026-10-21T03:29:42.1605260Z [36;1mif [[ ( ! -v CARGO_BUILD_WARNINGS ) && $_srt_CARGO_BUILD_WARNINGS != "" ]]; then[0m
+2026-10-21T03:29:42.1605700Z [36;1m  echo "CARGO_BUILD_WARNINGS=$_srt_CARGO_BUILD_WARNINGS" >> $GITHUB_ENV[0m
+2026-10-21T03:29:42.1606040Z [36;1mfi[0m
+2026-10-21T03:29:42.1606230Z [36;1m# Enable faster sparse index on nightly[0m
+2026-10-21T03:29:42.1606550Z [36;1m# The value is ignored on stable and causes no problems[0m
+2026-10-21T03:29:42.1606990Z [36;1m# https://internals.rust-lang.org/t/call-for-testing-cargo-sparse-registry/16862[0m
+2026-10-21T03:29:42.1607440Z [36;1mif [[ ! -v CARGO_UNSTABLE_SPARSE_REGISTRY ]]; then[0m
+2026-10-21T03:29:42.1607780Z [36;1m  echo "CARGO_UNSTABLE_SPARSE_REGISTRY=true" >> $GITHUB_ENV[0m
+2026-10-21T03:29:42.1608080Z [36;1mfi[0m
+2026-10-21T03:29:42.1608670Z [36;1mif [[ ! -v CARGO_REGISTRIES_CRATES_IO_PROTOCOL ]]; then[0m
+2026-10-21T03:29:42.1609040Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse" >> $GITHUB_ENV[0m
+2026-10-21T03:29:42.1609360Z [36;1mfi[0m
+2026-10-21T03:29:42.1621210Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T03:29:42.1621530Z env:
+2026-10-21T03:29:42.1621840Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:42.1622200Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:42.1622490Z   _srt_NEW_RUSTFLAGS: 
+2026-10-21T03:29:42.1622690Z   _srt_CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:42.1622900Z ##[endgroup]
+2026-10-21T03:29:42.1849590Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_2;outcome=success;conclusion=success;duration_ms=26]
+2026-10-21T03:29:42.1851860Z ##[start-action display=Install Rust Problem Matcher;id=__actions-rust-lang_setup-rust-toolchain.__run_3]
+2026-10-21T03:29:42.1919720Z ##[group]Run echo "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"
+2026-10-21T03:29:42.1920520Z [36;1mecho "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"[0m
+2026-10-21T03:29:42.1941140Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T03:29:42.1943710Z env:
+2026-10-21T03:29:42.1944080Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:42.1944650Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:42.1945090Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:29:42.1945820Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:29:42.1946080Z   CARGO_TERM_COLOR: always
+2026-10-21T03:29:42.1946380Z   RUST_BACKTRACE: short
+2026-10-21T03:29:42.1946580Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:42.1946780Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:29:42.1947030Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:29:42.1947290Z ##[endgroup]
+2026-10-21T03:29:42.2188060Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_3;outcome=success;conclusion=success;duration_ms=33]
+2026-10-21T03:29:42.2190770Z ##[start-action display=Install rustup, if needed;id=__actions-rust-lang_setup-rust-toolchain.__run_4]
+2026-10-21T03:29:42.2209130Z ##[group]Run if ! command -v rustup &> /dev/null ; then
+2026-10-21T03:29:42.2209530Z [36;1mif ! command -v rustup &> /dev/null ; then[0m
+2026-10-21T03:29:42.2210130Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" | sh -s -- --default-toolchain none -y[0m
+2026-10-21T03:29:42.2210720Z [36;1m[0m
+2026-10-21T03:29:42.2210960Z [36;1m  # Resolve the correct CARGO_HOME path depending on OS[0m
+2026-10-21T03:29:42.2211320Z [36;1m  if [[ "$RUNNER_OS" == "Windows" ]]; then[0m
+2026-10-21T03:29:42.2211740Z [36;1m    echo "${CARGO_HOME:-$USERPROFILE/.cargo}/bin" | sed 's|/|\\|g' >> $GITHUB_PATH[0m
+2026-10-21T03:29:42.2212120Z [36;1m  else[0m
+2026-10-21T03:29:42.2212390Z [36;1m    echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> $GITHUB_PATH[0m
+2026-10-21T03:29:42.2212650Z [36;1m  fi[0m
+2026-10-21T03:29:42.2212810Z [36;1mfi[0m
+2026-10-21T03:29:42.2232770Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T03:29:42.2233230Z env:
+2026-10-21T03:29:42.2233470Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:42.2233810Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:42.2234090Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:29:42.2234280Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:29:42.2234480Z   CARGO_TERM_COLOR: always
+2026-10-21T03:29:42.2234680Z   RUST_BACKTRACE: short
+2026-10-21T03:29:42.2234880Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:42.2235080Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:29:42.2235370Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:29:42.2235650Z   RUNNER_OS: macOS
+2026-10-21T03:29:42.2236320Z ##[endgroup]
+2026-10-21T03:29:42.2465270Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=27]
+2026-10-21T03:29:42.2469010Z ##[start-action display=rustup toolchain install stable;id=__actions-rust-lang_setup-rust-toolchain.__run_5]
+2026-10-21T03:29:42.2487690Z ##[group]Run # Check if value is set
+2026-10-21T03:29:42.2488020Z [36;1m# Check if value is set[0m
+2026-10-21T03:29:42.2488310Z [36;1mif [[ -n "$_srt_rust_src_dir" ]][0m
+2026-10-21T03:29:42.2488560Z [36;1mthen[0m
+2026-10-21T03:29:42.2488820Z [36;1m  # If value is set the directory must exist[0m
+2026-10-21T03:29:42.2489170Z [36;1m  if [[ -d "$_srt_rust_src_dir" ]][0m
+2026-10-21T03:29:42.2489460Z [36;1m  then[0m
+2026-10-21T03:29:42.2489680Z [36;1m    cd "$_srt_rust_src_dir"[0m
+2026-10-21T03:29:42.2489920Z [36;1m  else[0m
+2026-10-21T03:29:42.2490250Z [36;1m    echo "'rust-src-dir' does not point to an existing directory" >&2[0m
+2026-10-21T03:29:42.2490740Z [36;1m    echo "The value of 'rust-src-dir' is: ${_srt_rust_src_dir}" >&2[0m
+2026-10-21T03:29:42.2491160Z [36;1m    exit 1[0m
+2026-10-21T03:29:42.2491360Z [36;1m  fi[0m
+2026-10-21T03:29:42.2491530Z [36;1mfi[0m
+2026-10-21T03:29:42.2491810Z [36;1mif [[ -z "$_srt_toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml") ]][0m
+2026-10-21T03:29:42.2492170Z [36;1mthen[0m
+2026-10-21T03:29:42.2492380Z [36;1m  # Install the toolchain as specified in the file[0m
+2026-10-21T03:29:42.2492750Z [36;1m  # rustup show is the old way that implicitly installed a toolchain[0m
+2026-10-21T03:29:42.2493110Z [36;1m  # rustup toolchain install is the new explicit way[0m
+2026-10-21T03:29:42.2493730Z [36;1m  # https://github.com/rust-lang/rustup/issues/3635#issuecomment-2343511297[0m
+2026-10-21T03:29:42.2494220Z [36;1m  rustup show active-toolchain || rustup toolchain install[0m
+2026-10-21T03:29:42.2494600Z [36;1m  if [[ -n $_srt_components ]]; then[0m
+2026-10-21T03:29:42.2494970Z [36;1m    rustup component add ${_srt_components//,/ }[0m
+2026-10-21T03:29:42.2495260Z [36;1m  fi[0m
+2026-10-21T03:29:42.2495450Z [36;1m  if [[ -n $_srt_targets ]]; then[0m
+2026-10-21T03:29:42.2495700Z [36;1m    rustup target add ${_srt_targets//,/ }[0m
+2026-10-21T03:29:42.2495950Z [36;1m  fi[0m
+2026-10-21T03:29:42.2496100Z [36;1melse[0m
+2026-10-21T03:29:42.2496300Z [36;1m  if [[ -z "$_srt_toolchain" ]][0m
+2026-10-21T03:29:42.2496550Z [36;1m  then[0m
+2026-10-21T03:29:42.2496800Z [36;1m    _srt_toolchain=stable[0m
+2026-10-21T03:29:42.2497010Z [36;1m  fi[0m
+2026-10-21T03:29:42.2497340Z [36;1m  rustup toolchain install ${_srt_toolchain//,/ }  --profile minimal --no-self-update[0m
+2026-10-21T03:29:42.2497810Z [36;1m  # Take the last element from the list[0m
+2026-10-21T03:29:42.2498070Z [36;1m  if [[ "$_srt_override" == "true" ]][0m
+2026-10-21T03:29:42.2498300Z [36;1m  then[0m
+2026-10-21T03:29:42.2498520Z [36;1m    rustup override set ${_srt_toolchain//*,/ }[0m
+2026-10-21T03:29:42.2511920Z [36;1m  fi[0m
+2026-10-21T03:29:42.2512150Z [36;1mfi[0m
+2026-10-21T03:29:42.2523270Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T03:29:42.2523570Z env:
+2026-10-21T03:29:42.2523780Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:42.2524100Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:42.2524370Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:29:42.2524550Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:29:42.2524740Z   CARGO_TERM_COLOR: always
+2026-10-21T03:29:42.2524940Z   RUST_BACKTRACE: short
+2026-10-21T03:29:42.2525110Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:42.2525310Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:29:42.2525550Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:29:42.2525790Z   _srt_toolchain: stable
+2026-10-21T03:29:42.2525950Z   _srt_targets: 
+2026-10-21T03:29:42.2526100Z   _srt_components: 
+2026-10-21T03:29:42.2526270Z   _srt_override: true
+2026-10-21T03:29:42.2526410Z   _srt_rust_src_dir: 
+2026-10-21T03:29:42.2526580Z ##[endgroup]
+2026-10-21T03:29:42.5654210Z info: syncing channel updates for stable-aarch64-apple-darwin
+2026-10-21T03:29:42.6639000Z info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-21T03:29:42.6726590Z info: removing previous version of component clippy
+2026-10-21T03:29:42.6747750Z info: removing previous version of component rustfmt
+2026-10-21T03:29:42.6761920Z info: removing previous version of component cargo
+2026-10-21T03:29:42.6815940Z info: removing previous version of component rust-std
+2026-10-21T03:29:42.6898570Z info: removing previous version of component rustc
+2026-10-21T03:29:42.6974580Z info: downloading 5 components
+2026-10-21T03:29:48.3342340Z 
+2026-10-21T03:29:48.3810340Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))
+2026-10-21T03:29:48.3811100Z info: self-update is disabled for this build of rustup
+2026-10-21T03:29:48.3826090Z 
+2026-10-21T03:29:48.3879560Z info: any updates to rustup will need to be fetched with your system package manager
+2026-10-21T03:29:48.4045740Z info: override toolchain for /Users/runner/work/XDRemux/XDRemux set to stable-aarch64-apple-darwin
+2026-10-21T03:29:48.4118610Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=6164]
+2026-10-21T03:29:48.4121810Z ##[start-action display=Print installed versions;id=__actions-rust-lang_setup-rust-toolchain.versions]
+2026-10-21T03:29:48.4368160Z ##[group]Run echo "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT
+2026-10-21T03:29:48.4368590Z [36;1mecho "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T03:29:48.4369130Z [36;1m_srt_VERBOSE=$(rustc --version --verbose)[0m
+2026-10-21T03:29:48.4369390Z [36;1mecho "$_srt_VERBOSE"[0m
+2026-10-21T03:29:48.4369640Z [36;1mecho "cargo-version=$(cargo --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T03:29:48.4369930Z [36;1mcargo --version --verbose[0m
+2026-10-21T03:29:48.4370200Z [36;1mecho "rustup-version=$(rustup --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T03:29:48.4370540Z [36;1mrustup --version[0m
+2026-10-21T03:29:48.4370720Z [36;1m[0m
+2026-10-21T03:29:48.4371070Z [36;1m_srt_DATE=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+2026-10-21T03:29:48.4371560Z [36;1m_srt_HASH=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-hash: //p')[0m
+2026-10-21T03:29:48.4371960Z [36;1mecho "cachekey=$(echo $_srt_DATE$_srt_HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+2026-10-21T03:29:48.4383170Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T03:29:48.4383450Z env:
+2026-10-21T03:29:48.4383640Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:48.4383950Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:48.4384210Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:29:48.4384390Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:29:48.4384570Z   CARGO_TERM_COLOR: always
+2026-10-21T03:29:48.4384750Z   RUST_BACKTRACE: short
+2026-10-21T03:29:48.4384990Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:48.4385180Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:29:48.4385420Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:29:48.4385630Z ##[endgroup]
+2026-10-21T03:29:48.5421550Z rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-21T03:29:48.5421830Z binary: rustc
+2026-10-21T03:29:48.5422080Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T03:29:48.5422380Z commit-date: 2026-10-13
+2026-10-21T03:29:48.5422570Z host: aarch64-apple-darwin
+2026-10-21T03:29:48.5422770Z release: 1.99.1
+2026-10-21T03:29:48.5422980Z LLVM version: 23.1.1
+2026-10-21T03:29:48.5815490Z cargo 1.99.1 (5f94df478 2026-08-27)
+2026-10-21T03:29:48.5816190Z release: 1.99.1
+2026-10-21T03:29:48.5816570Z commit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e
+2026-10-21T03:29:48.5816870Z commit-date: 2026-08-27
+2026-10-21T03:29:48.5817490Z host: aarch64-apple-darwin
+2026-10-21T03:29:48.5817730Z libgit2: 1.9.6 (sys:0.21.0 vendored)
+2026-10-21T03:29:48.5818570Z libcurl: 8.7.1 (sys:0.4.90+curl-8.21.0 system ssl:(SecureTransport) LibreSSL/3.3.6)
+2026-10-21T03:29:48.5818960Z ssl: OpenSSL 3.6.3 9 Jun 2026
+2026-10-21T03:29:48.5819180Z os: Mac OS 27.0.1 [64-bit]
+2026-10-21T03:29:48.5905660Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-21T03:29:48.6159220Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-21T03:29:48.6250530Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-21T03:29:48.6250920Z rustup 1.29.0 (2026-03-05)
+2026-10-21T03:29:48.6506530Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-21T03:29:48.6612060Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.versions;outcome=success;conclusion=success;duration_ms=248]
+2026-10-21T03:29:48.6614340Z ##[start-action display=Downgrade registry access protocol when needed;id=__actions-rust-lang_setup-rust-toolchain.__run_6]
+2026-10-21T03:29:48.6635420Z ##[group]Run # Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T03:29:48.6635960Z [36;1m# Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL[0m
+2026-10-21T03:29:48.6636500Z [36;1m# On versions 1.66, 1.67, and 1.68.0-nightly the value "sparse" is still unstable.[0m
+2026-10-21T03:29:48.6636990Z [36;1m# https://github.com/dtolnay/rust-toolchain/pull/69#discussion_r1107268108[0m
+2026-10-21T03:29:48.6637510Z [36;1m# If we detect an incompatible value, set it to "git" which is always supported.[0m
+2026-10-21T03:29:48.6638610Z [36;1mif [[ "rustc 1.99.1 (58cf8f9c3 2026-10-13)" =~ ^rustc\ (1\.6[67]\.|1\.68\.0-nightly) && "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL}" == "sparse" ]]; then[0m
+2026-10-21T03:29:48.6639280Z [36;1m  echo "Downgrade cargo registry protocol to git"[0m
+2026-10-21T03:29:48.6639780Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git" >> $GITHUB_ENV[0m
+2026-10-21T03:29:48.6640110Z [36;1mfi[0m
+2026-10-21T03:29:48.6651280Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T03:29:48.6651620Z env:
+2026-10-21T03:29:48.6651830Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:48.6652160Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:48.6652430Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:29:48.6652740Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:29:48.6652980Z   CARGO_TERM_COLOR: always
+2026-10-21T03:29:48.6653300Z   RUST_BACKTRACE: short
+2026-10-21T03:29:48.6653660Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:48.6653970Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:29:48.6654470Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:29:48.6654790Z ##[endgroup]
+2026-10-21T03:29:48.6873690Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=25]
+2026-10-21T03:29:48.6875790Z ##[start-action display=Setup Rust Caching;id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache]
+2026-10-21T03:29:48.6922190Z ##[group]Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+2026-10-21T03:29:48.6922530Z with:
+2026-10-21T03:29:48.6922700Z   cache-on-failure: true
+2026-10-21T03:29:48.6922900Z   cache-bin: true
+2026-10-21T03:29:48.6923070Z   cache-provider: github
+2026-10-21T03:29:48.6923270Z   cache-all-crates: false
+2026-10-21T03:29:48.6923460Z   cache-workspace-crates: false
+2026-10-21T03:29:48.6923660Z   cache-targets: true
+2026-10-21T03:29:48.6923840Z   save-if: true
+2026-10-21T03:29:48.6924010Z   prefix-key: v0-rust
+2026-10-21T03:29:48.6924240Z   add-job-id-key: true
+2026-10-21T03:29:48.6924490Z   add-rust-environment-hash-key: true
+2026-10-21T03:29:48.6924770Z   lookup-only: false
+2026-10-21T03:29:48.6924960Z   cmd-format: {0}
+2026-10-21T03:29:48.6925150Z env:
+2026-10-21T03:29:48.6925360Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:48.6925690Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:48.6925950Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:29:48.6926530Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:29:48.6926760Z   CARGO_TERM_COLOR: always
+2026-10-21T03:29:48.6926960Z   RUST_BACKTRACE: short
+2026-10-21T03:29:48.6927170Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:48.6927380Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:29:48.6927690Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:29:48.6927960Z ##[endgroup]
+2026-10-21T03:29:49.1393390Z ##[group]Cache Configuration
+2026-10-21T03:29:49.1397350Z Cache Provider:
+2026-10-21T03:29:49.1397700Z     github
+2026-10-21T03:29:49.1398000Z Workspaces:
+2026-10-21T03:29:49.1398790Z     /Users/runner/work/XDRemux/XDRemux
+2026-10-21T03:29:49.1399200Z Cache Paths:
+2026-10-21T03:29:49.1399590Z     /Users/runner/.cargo/bin
+2026-10-21T03:29:49.1402940Z     /Users/runner/.cargo/.crates.toml
+2026-10-21T03:29:49.1403620Z     /Users/runner/.cargo/.crates2.json
+2026-10-21T03:29:49.1404330Z     /Users/runner/.cargo/registry
+2026-10-21T03:29:49.1404870Z     /Users/runner/.cargo/git
+2026-10-21T03:29:49.1405510Z     /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:49.1405820Z Restore Key:
+2026-10-21T03:29:49.1406130Z     v0-rust-pvt-native-import-Darwin-arm64-06417ce0
+2026-10-21T03:29:49.1406430Z Cache Key:
+2026-10-21T03:29:49.1406690Z     v0-rust-pvt-native-import-Darwin-arm64-06417ce0-1d3ccc71
+2026-10-21T03:29:49.1406980Z .. Prefix:
+2026-10-21T03:29:49.1407280Z   - v0-rust-pvt-native-import-Darwin-arm64
+2026-10-21T03:29:49.1407550Z .. Environment considered:
+2026-10-21T03:29:49.1407770Z   - Rust Versions:
+2026-10-21T03:29:49.1408590Z     - 1.99.1 aarch64-apple-darwin 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T03:29:49.1409010Z   - CARGO_BUILD_WARNINGS
+2026-10-21T03:29:49.1409240Z   - CARGO_INCREMENTAL
+2026-10-21T03:29:49.1409460Z   - CARGO_PROFILE_DEV_DEBUG
+2026-10-21T03:29:49.1409730Z   - CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T03:29:49.1409990Z   - CARGO_TARGET_DIR
+2026-10-21T03:29:49.1410210Z   - CARGO_TERM_COLOR
+2026-10-21T03:29:49.1410440Z   - CARGO_UNSTABLE_SPARSE_REGISTRY
+2026-10-21T03:29:49.1410680Z   - RUST_BACKTRACE
+2026-10-21T03:29:49.1410890Z .. Lockfiles considered:
+2026-10-21T03:29:49.1411160Z   - /Users/runner/work/XDRemux/XDRemux/Cargo.lock
+2026-10-21T03:29:49.1411590Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification/Cargo.toml
+2026-10-21T03:29:49.1412030Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli/Cargo.toml
+2026-10-21T03:29:49.1412440Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec/Cargo.toml
+2026-10-21T03:29:49.1412850Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-container/Cargo.toml
+2026-10-21T03:29:49.1413300Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine/Cargo.toml
+2026-10-21T03:29:49.1413830Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-format/Cargo.toml
+2026-10-21T03:29:49.1414250Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr/Cargo.toml
+2026-10-21T03:29:49.1414650Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif/Cargo.toml
+2026-10-21T03:29:49.1415070Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata/Cargo.toml
+2026-10-21T03:29:49.1415520Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo/Cargo.toml
+2026-10-21T03:29:49.1415940Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime/Cargo.toml
+2026-10-21T03:29:49.1416380Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-source/Cargo.toml
+2026-10-21T03:29:49.1416840Z ##[endgroup]
+2026-10-21T03:29:49.1416950Z 
+2026-10-21T03:29:49.1417040Z ... Restoring cache ...
+2026-10-21T03:29:49.2107940Z Cache hit for: v0-rust-pvt-native-import-Darwin-arm64-06417ce0-1d3ccc71
+2026-10-21T03:29:49.7652500Z Received 69890897 of 69890897 (100.0%), 133.0 MBs/sec
+2026-10-21T03:29:49.7664830Z Cache Size: ~67 MB (69890897 B)
+2026-10-21T03:29:49.7761270Z [command]/opt/homebrew/bin/gtar -xf /Users/runner/work/_temp/06bf28c7-b107-434f-9ff3-39e74bf571cf/cache.tzst -P -C /Users/runner/work/XDRemux/XDRemux --delay-directory-restore --use-compress-program unzstd
+2026-10-21T03:29:50.4440840Z Cache restored successfully
+2026-10-21T03:29:50.4542450Z Restored from cache key "v0-rust-pvt-native-import-Darwin-arm64-06417ce0-1d3ccc71" full match: true.
+2026-10-21T03:29:50.4652130Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=1777]
+2026-10-21T03:29:50.4710610Z ##[group]Run brew install libheif
+2026-10-21T03:29:50.4710980Z [36;1mbrew install libheif[0m
+2026-10-21T03:29:50.4711320Z [36;1mecho "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"[0m
+2026-10-21T03:29:50.4724170Z shell: /opt/homebrew/bin/bash -e {0}
+2026-10-21T03:29:50.4724390Z env:
+2026-10-21T03:29:50.4724620Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:50.4724970Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:50.4725250Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:29:50.4725440Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:29:50.4725650Z   CARGO_TERM_COLOR: always
+2026-10-21T03:29:50.4725860Z   RUST_BACKTRACE: short
+2026-10-21T03:29:50.4726060Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:50.4726260Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:29:50.4726520Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:29:50.4726810Z   CACHE_ON_FAILURE: true
+2026-10-21T03:29:50.4727060Z ##[endgroup]
+2026-10-21T03:29:51.4385900Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-21T03:29:51.4451980Z ✔︎ Bottle Manifest libheif (1.23.6)
+2026-10-21T03:29:51.5132850Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-21T03:29:51.5133130Z libheif 1.23.6
+2026-10-21T03:29:51.5137000Z [34m==>[0m [1mWould install 4 dependencies for libheif:[0m
+2026-10-21T03:29:51.5137350Z libvmaf
+2026-10-21T03:29:51.5137500Z aom
+2026-10-21T03:29:51.5137640Z libde265
+2026-10-21T03:29:51.5137790Z x265
+2026-10-21T03:29:51.5505210Z [32m==>[0m [1mFetching downloads for: [32mlibheif[39m[0m
+2026-10-21T03:29:51.9416210Z ✔︎ Bottle Manifest libvmaf (3.2.1)
+2026-10-21T03:29:52.1521410Z ✔︎ Bottle Manifest aom (3.15.2)
+2026-10-21T03:29:52.1622270Z ✔︎ Bottle Manifest libde265 (1.1.3)
+2026-10-21T03:29:52.2326660Z ✔︎ Bottle Manifest x265 (4.3)
+2026-10-21T03:29:53.4380330Z ✔︎ Bottle libheif (1.23.6)
+2026-10-21T03:29:53.4481490Z ✔︎ Bottle libvmaf (3.2.1)
+2026-10-21T03:29:53.4583330Z ✔︎ Bottle aom (3.15.2)
+2026-10-21T03:29:53.5831190Z ✔︎ Bottle libde265 (1.1.3)
+2026-10-21T03:29:53.6345110Z ✔︎ Bottle x265 (4.3)
+2026-10-21T03:29:53.6630760Z [32m==>[0m [1mInstalling dependencies for libheif:[0m [32mlibvmaf[39m, [32maom[39m, [32mlibde265[39m and [32mx265[39m[0m
+2026-10-21T03:29:53.6631580Z [32m==>[0m [1mInstalling libheif dependency: [32mlibvmaf[39m (3.2.1)[0m
+2026-10-21T03:29:53.6695570Z [34m==>[0m [1mPouring libvmaf--3.2.1.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T03:29:54.5745640Z 🍺  /opt/homebrew/Cellar/libvmaf/3.2.1: 243 files, 8.2MB
+2026-10-21T03:29:54.5748060Z [32m==>[0m [1mInstalling libheif dependency: [32maom[39m (3.15.2)[0m
+2026-10-21T03:29:54.5871490Z [34m==>[0m [1mPouring aom--3.15.2.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T03:29:55.4040090Z 🍺  /opt/homebrew/Cellar/aom/3.15.2: 30 files, 11.3MB
+2026-10-21T03:29:55.4041860Z [32m==>[0m [1mInstalling libheif dependency: [32mlibde265[39m (1.1.3)[0m
+2026-10-21T03:29:55.4065510Z [34m==>[0m [1mPouring libde265--1.1.3.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T03:29:56.1720560Z 🍺  /opt/homebrew/Cellar/libde265/1.1.3: 18 files, 436.6KB
+2026-10-21T03:29:56.1722140Z [32m==>[0m [1mInstalling libheif dependency: [32mx265[39m (4.3)[0m
+2026-10-21T03:29:56.1749420Z [34m==>[0m [1mPouring x265--4.3.arm64_golden_gate.bottle.1.tar.gz[0m
+2026-10-21T03:29:56.9867780Z 🍺  /opt/homebrew/Cellar/x265/4.3: 12 files, 17.3MB
+2026-10-21T03:29:56.9869260Z [32m==>[0m [1mInstalling [32mlibheif[39m[0m
+2026-10-21T03:29:56.9871070Z [34m==>[0m [1mPouring libheif--1.23.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T03:29:57.7891760Z 🍺  /opt/homebrew/Cellar/libheif/1.23.6: 53 files, 9.1MB
+2026-10-21T03:29:57.7894480Z [32m==>[0m [1mCaveats[0m
+2026-10-21T03:29:57.7894850Z [34m==>[0m [1mlibheif[0m
+2026-10-21T03:29:57.7895380Z Additional codecs can be enabled by `brew install libheif-plugins`
+2026-10-21T03:29:57.8215000Z ##[group]Run python3 scripts/apple/pvt_native_import/check_native_import.py \
+2026-10-21T03:29:57.8215530Z [36;1mpython3 scripts/apple/pvt_native_import/check_native_import.py \[0m
+2026-10-21T03:29:57.8215870Z [36;1m  --repo "$GITHUB_WORKSPACE" \[0m
+2026-10-21T03:29:57.8216130Z [36;1m  --cli "$CARGO_TARGET_DIR/debug/xdremux" \[0m
+2026-10-21T03:29:57.8216400Z [36;1m  --expected-head "$EXPECTED_HEAD" \[0m
+2026-10-21T03:29:57.8216700Z [36;1m  --output-root "$RUNNER_TEMP/pvt-native-import" \[0m
+2026-10-21T03:29:57.8216980Z [36;1m  --execute-owned-simulator[0m
+2026-10-21T03:29:57.8227160Z shell: /opt/homebrew/bin/bash -e {0}
+2026-10-21T03:29:57.8227410Z env:
+2026-10-21T03:29:57.8227630Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:29:57.8227940Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:29:57.8228210Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:29:57.8228430Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:29:57.8228770Z   CARGO_TERM_COLOR: always
+2026-10-21T03:29:57.8228970Z   RUST_BACKTRACE: short
+2026-10-21T03:29:57.8229140Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:29:57.8229450Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:29:57.8229690Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:29:57.8229910Z   CACHE_ON_FAILURE: true
+2026-10-21T03:29:57.8230230Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T03:29:57.8230490Z ##[endgroup]
+2026-10-21T03:38:45.0095850Z PVT native receipt:
+2026-10-21T03:38:45.0106920Z {
+2026-10-21T03:38:45.0116310Z   "binary_sha256": "8ed33a6dd93a453162a8fa680c232ab625613e7a6c78ee90d6727f4964534a8d",
+2026-10-21T03:38:45.0118670Z   "cleanup_status": "completed",
+2026-10-21T03:38:45.0143650Z   "commands": [
+2026-10-21T03:38:45.0147640Z     {
+2026-10-21T03:38:45.0149900Z       "argv": [
+2026-10-21T03:38:45.0150390Z         "git",
+2026-10-21T03:38:45.0150850Z         "rev-parse",
+2026-10-21T03:38:45.0151410Z         "HEAD"
+2026-10-21T03:38:45.0151850Z       ],
+2026-10-21T03:38:45.0152340Z       "duration_seconds": 0.006878166999996438,
+2026-10-21T03:38:45.0153280Z       "exit_code": 0,
+2026-10-21T03:38:45.0153750Z       "name": "head"
+2026-10-21T03:38:45.0154210Z     },
+2026-10-21T03:38:45.0155400Z     {
+2026-10-21T03:38:45.0156040Z       "argv": [
+2026-10-21T03:38:45.0156640Z         "git",
+2026-10-21T03:38:45.0157030Z         "status",
+2026-10-21T03:38:45.0157730Z         "--porcelain"
+2026-10-21T03:38:45.0158320Z       ],
+2026-10-21T03:38:45.0159270Z       "duration_seconds": 0.4700045419999981,
+2026-10-21T03:38:45.0159640Z       "exit_code": 0,
+2026-10-21T03:38:45.0160180Z       "name": "source-status"
+2026-10-21T03:38:45.0160590Z     },
+2026-10-21T03:38:45.0161030Z     {
+2026-10-21T03:38:45.0161490Z       "argv": [
+2026-10-21T03:38:45.0161840Z         "xcodebuild",
+2026-10-21T03:38:45.0162870Z         "-version"
+2026-10-21T03:38:45.0163550Z       ],
+2026-10-21T03:38:45.0163960Z       "duration_seconds": 0.12374633400000334,
+2026-10-21T03:38:45.0164570Z       "exit_code": 0,
+2026-10-21T03:38:45.0164830Z       "name": "xcode-version"
+2026-10-21T03:38:45.0165470Z     },
+2026-10-21T03:38:45.0165830Z     {
+2026-10-21T03:38:45.0166080Z       "argv": [
+2026-10-21T03:38:45.0166460Z         "sw_vers"
+2026-10-21T03:38:45.0166790Z       ],
+2026-10-21T03:38:45.0167310Z       "duration_seconds": 0.011013708000007227,
+2026-10-21T03:38:45.0168900Z       "exit_code": 0,
+2026-10-21T03:38:45.0169430Z       "name": "macos-version"
+2026-10-21T03:38:45.0169960Z     },
+2026-10-21T03:38:45.0170330Z     {
+2026-10-21T03:38:45.0170630Z       "argv": [
+2026-10-21T03:38:45.0171050Z         "xcrun",
+2026-10-21T03:38:45.0171820Z         "simctl",
+2026-10-21T03:38:45.0172460Z         "help",
+2026-10-21T03:38:45.0172890Z         "privacy"
+2026-10-21T03:38:45.0173310Z       ],
+2026-10-21T03:38:45.0187300Z       "duration_seconds": 1.7950718749999908,
+2026-10-21T03:38:45.0187910Z       "exit_code": 0,
+2026-10-21T03:38:45.0188250Z       "name": "simctl-privacy-help"
+2026-10-21T03:38:45.0188910Z     },
+2026-10-21T03:38:45.0190020Z     {
+2026-10-21T03:38:45.0190420Z       "argv": [
+2026-10-21T03:38:45.0190900Z         "xcrun",
+2026-10-21T03:38:45.0191170Z         "simctl",
+2026-10-21T03:38:45.0191680Z         "list",
+2026-10-21T03:38:45.0192430Z         "runtimes",
+2026-10-21T03:38:45.0194170Z         "--json"
+2026-10-21T03:38:45.0194850Z       ],
+2026-10-21T03:38:45.0195150Z       "duration_seconds": 0.14537395899998273,
+2026-10-21T03:38:45.0195720Z       "exit_code": 0,
+2026-10-21T03:38:45.0196130Z       "name": "simctl-runtimes"
+2026-10-21T03:38:45.0429200Z     },
+2026-10-21T03:38:45.0429760Z     {
+2026-10-21T03:38:45.0429940Z       "argv": [
+2026-10-21T03:38:45.0430120Z         "xcrun",
+2026-10-21T03:38:45.0430280Z         "simctl",
+2026-10-21T03:38:45.0430580Z         "list",
+2026-10-21T03:38:45.0430950Z         "devicetypes",
+2026-10-21T03:38:45.0431220Z         "--json"
+2026-10-21T03:38:45.0431490Z       ],
+2026-10-21T03:38:45.0431680Z       "duration_seconds": 0.13350833299998044,
+2026-10-21T03:38:45.0432120Z       "exit_code": 0,
+2026-10-21T03:38:45.0433080Z       "name": "simctl-device-types"
+2026-10-21T03:38:45.0433490Z     },
+2026-10-21T03:38:45.0433700Z     {
+2026-10-21T03:38:45.0433990Z       "argv": [
+2026-10-21T03:38:45.0434150Z         "xcrun",
+2026-10-21T03:38:45.0434380Z         "--sdk",
+2026-10-21T03:38:45.0434600Z         "iphonesimulator",
+2026-10-21T03:38:45.0434990Z         "--show-sdk-path"
+2026-10-21T03:38:45.0435780Z       ],
+2026-10-21T03:38:45.0436030Z       "duration_seconds": 0.9904449170000191,
+2026-10-21T03:38:45.0436510Z       "exit_code": 0,
+2026-10-21T03:38:45.0437040Z       "name": "simulator-sdk-path"
+2026-10-21T03:38:45.0437340Z     },
+2026-10-21T03:38:45.0438040Z     {
+2026-10-21T03:38:45.0438190Z       "argv": [
+2026-10-21T03:38:45.0438910Z         "xcrun",
+2026-10-21T03:38:45.0439120Z         "--sdk",
+2026-10-21T03:38:45.0440370Z         "iphonesimulator",
+2026-10-21T03:38:45.0440730Z         "--show-sdk-version"
+2026-10-21T03:38:45.0441000Z       ],
+2026-10-21T03:38:45.0441380Z       "duration_seconds": 0.480450750000017,
+2026-10-21T03:38:45.0441890Z       "exit_code": 0,
+2026-10-21T03:38:45.0442570Z       "name": "simulator-sdk-version"
+2026-10-21T03:38:45.0442970Z     },
+2026-10-21T03:38:45.0443130Z     {
+2026-10-21T03:38:45.0443450Z       "argv": [
+2026-10-21T03:38:45.0443720Z         "cargo",
+2026-10-21T03:38:45.0444660Z         "build",
+2026-10-21T03:38:45.0445470Z         "--locked",
+2026-10-21T03:38:45.0452590Z         "-p",
+2026-10-21T03:38:45.0452930Z         "xdremux-cli",
+2026-10-21T03:38:45.0453320Z         "--message-format=json-render-diagnostics"
+2026-10-21T03:38:45.0453870Z       ],
+2026-10-21T03:38:45.0455170Z       "duration_seconds": 7.281917542000002,
+2026-10-21T03:38:45.0455760Z       "exit_code": 0,
+2026-10-21T03:38:45.0456230Z       "name": "build-current-cli"
+2026-10-21T03:38:45.0457250Z     },
+2026-10-21T03:38:45.0457570Z     {
+2026-10-21T03:38:45.0458180Z       "argv": [
+2026-10-21T03:38:45.0458600Z         "git",
+2026-10-21T03:38:45.0459330Z         "status",
+2026-10-21T03:38:45.0459580Z         "--porcelain"
+2026-10-21T03:38:45.0460080Z       ],
+2026-10-21T03:38:45.0460700Z       "duration_seconds": 0.030831124999991744,
+2026-10-21T03:38:45.0461230Z       "exit_code": 0,
+2026-10-21T03:38:45.0461880Z       "name": "built-source-status"
+2026-10-21T03:38:45.0462260Z     },
+2026-10-21T03:38:45.0462680Z     {
+2026-10-21T03:38:45.0464120Z       "argv": [
+2026-10-21T03:38:45.0464660Z         "git",
+2026-10-21T03:38:45.0465060Z         "rev-parse",
+2026-10-21T03:38:45.0465510Z         "HEAD"
+2026-10-21T03:38:45.0466070Z       ],
+2026-10-21T03:38:45.0466400Z       "duration_seconds": 0.007292750000004844,
+2026-10-21T03:38:45.0467940Z       "exit_code": 0,
+2026-10-21T03:38:45.0469320Z       "name": "built-head"
+2026-10-21T03:38:45.0469810Z     },
+2026-10-21T03:38:45.0470770Z     {
+2026-10-21T03:38:45.0471390Z       "argv": [
+2026-10-21T03:38:45.0472040Z         "/Users/runner/work/XDRemux/XDRemux/target/debug/xdremux",
+2026-10-21T03:38:45.0472880Z         "--version"
+2026-10-21T03:38:45.0473530Z       ],
+2026-10-21T03:38:45.0474000Z       "duration_seconds": 0.03726541700001462,
+2026-10-21T03:38:45.0474490Z       "exit_code": 0,
+2026-10-21T03:38:45.0475170Z       "name": "cli-version"
+2026-10-21T03:38:45.0475450Z     },
+2026-10-21T03:38:45.0475980Z     {
+2026-10-21T03:38:45.0476580Z       "argv": [
+2026-10-21T03:38:45.0476950Z         "xcrun",
+2026-10-21T03:38:45.0477480Z         "--sdk",
+2026-10-21T03:38:45.0477660Z         "macosx",
+2026-10-21T03:38:45.0478220Z         "swiftc",
+2026-10-21T03:38:45.0478760Z         "-swift-version",
+2026-10-21T03:38:45.0479020Z         "5",
+2026-10-21T03:38:45.0479510Z         "-parse-as-library",
+2026-10-21T03:38:45.0480830Z         "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift",
+2026-10-21T03:38:45.0481810Z         "-o",
+2026-10-21T03:38:45.0482650Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/generate-synthetic"
+2026-10-21T03:38:45.0483240Z       ],
+2026-10-21T03:38:45.0483600Z       "duration_seconds": 6.294831333000019,
+2026-10-21T03:38:45.0484160Z       "exit_code": 0,
+2026-10-21T03:38:45.0484620Z       "name": "compile-generator"
+2026-10-21T03:38:45.0485180Z     },
+2026-10-21T03:38:45.0485450Z     {
+2026-10-21T03:38:45.0485900Z       "argv": [
+2026-10-21T03:38:45.0486650Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/generate-synthetic",
+2026-10-21T03:38:45.0487180Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve"
+2026-10-21T03:38:45.0487700Z       ],
+2026-10-21T03:38:45.0488540Z       "duration_seconds": 0.5202904579999768,
+2026-10-21T03:38:45.0488950Z       "exit_code": 0,
+2026-10-21T03:38:45.0490060Z       "name": "generate-synthetic"
+2026-10-21T03:38:45.0490450Z     },
+2026-10-21T03:38:45.0491020Z     {
+2026-10-21T03:38:45.0491230Z       "argv": [
+2026-10-21T03:38:45.0491850Z         "/Users/runner/work/XDRemux/XDRemux/target/debug/xdremux",
+2026-10-21T03:38:45.0492400Z         "inspect",
+2026-10-21T03:38:45.0493050Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/synthetic-motion.jpg",
+2026-10-21T03:38:45.0493420Z         "--json"
+2026-10-21T03:38:45.0493900Z       ],
+2026-10-21T03:38:45.0494330Z       "duration_seconds": 0.01801037500001712,
+2026-10-21T03:38:45.0494970Z       "exit_code": 0,
+2026-10-21T03:38:45.0495350Z       "name": "cli-inspect"
+2026-10-21T03:38:45.0496030Z     },
+2026-10-21T03:38:45.0496370Z     {
+2026-10-21T03:38:45.0496790Z       "argv": [
+2026-10-21T03:38:45.0497800Z         "/Users/runner/work/XDRemux/XDRemux/target/debug/xdremux",
+2026-10-21T03:38:45.0498120Z         "convert",
+2026-10-21T03:38:45.0498500Z         "--input",
+2026-10-21T03:38:45.0499120Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/synthetic-motion.jpg",
+2026-10-21T03:38:45.0499750Z         "--output",
+2026-10-21T03:38:45.0500460Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/capture.pvt",
+2026-10-21T03:38:45.0500970Z         "--live-photo-output",
+2026-10-21T03:38:45.0501360Z         "pvt"
+2026-10-21T03:38:45.0501720Z       ],
+2026-10-21T03:38:45.0501970Z       "duration_seconds": 0.062043582999990576,
+2026-10-21T03:38:45.0502330Z       "exit_code": 0,
+2026-10-21T03:38:45.0502650Z       "name": "cli-convert-pvt"
+2026-10-21T03:38:45.0503010Z     },
+2026-10-21T03:38:45.0503300Z     {
+2026-10-21T03:38:45.0503510Z       "argv": [
+2026-10-21T03:38:45.0504040Z         "/Users/runner/work/XDRemux/XDRemux/target/debug/xdremux",
+2026-10-21T03:38:45.0504630Z         "validate",
+2026-10-21T03:38:45.0505040Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/capture.pvt",
+2026-10-21T03:38:45.0505520Z         "--json"
+2026-10-21T03:38:45.0505830Z       ],
+2026-10-21T03:38:45.0506080Z       "duration_seconds": 0.011045832999997174,
+2026-10-21T03:38:45.0507150Z       "exit_code": 0,
+2026-10-21T03:38:45.0507410Z       "name": "cli-validate-pvt"
+2026-10-21T03:38:45.0507750Z     },
+2026-10-21T03:38:45.0508000Z     {
+2026-10-21T03:38:45.0508500Z       "argv": [
+2026-10-21T03:38:45.0508770Z         "xcrun",
+2026-10-21T03:38:45.0508920Z         "simctl",
+2026-10-21T03:38:45.0509160Z         "create",
+2026-10-21T03:38:45.0509440Z         "pvt-audit-1dd928c6841c47978d7979a5dc3869bb",
+2026-10-21T03:38:45.0509800Z         "com.apple.CoreSimulator.SimDeviceType.iPhone-11",
+2026-10-21T03:38:45.0510360Z         "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
+2026-10-21T03:38:45.0510680Z       ],
+2026-10-21T03:38:45.0510860Z       "duration_seconds": 0.4140414999999962,
+2026-10-21T03:38:45.0511100Z       "exit_code": 0,
+2026-10-21T03:38:45.0511300Z       "name": "create-owned-simulator"
+2026-10-21T03:38:45.0511520Z     },
+2026-10-21T03:38:45.0511660Z     {
+2026-10-21T03:38:45.0511790Z       "argv": [
+2026-10-21T03:38:45.0511960Z         "xcrun",
+2026-10-21T03:38:45.0512160Z         "simctl",
+2026-10-21T03:38:45.0512350Z         "boot",
+2026-10-21T03:38:45.0512560Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9"
+2026-10-21T03:38:45.0512820Z       ],
+2026-10-21T03:38:45.0513010Z       "duration_seconds": 7.119109000000009,
+2026-10-21T03:38:45.0513230Z       "exit_code": 0,
+2026-10-21T03:38:45.0513430Z       "name": "boot-owned-simulator"
+2026-10-21T03:38:45.0513750Z     },
+2026-10-21T03:38:45.0513940Z     {
+2026-10-21T03:38:45.0514110Z       "argv": [
+2026-10-21T03:38:45.0514270Z         "xcrun",
+2026-10-21T03:38:45.0514420Z         "simctl",
+2026-10-21T03:38:45.0514630Z         "bootstatus",
+2026-10-21T03:38:45.0514870Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0515090Z         "-b"
+2026-10-21T03:38:45.0515240Z       ],
+2026-10-21T03:38:45.0515450Z       "duration_seconds": 82.339213333,
+2026-10-21T03:38:45.0515760Z       "exit_code": 0,
+2026-10-21T03:38:45.0516000Z       "name": "boot-owned-status"
+2026-10-21T03:38:45.0516290Z     },
+2026-10-21T03:38:45.0516430Z     {
+2026-10-21T03:38:45.0516590Z       "argv": [
+2026-10-21T03:38:45.0516740Z         "xcrun",
+2026-10-21T03:38:45.0516900Z         "--sdk",
+2026-10-21T03:38:45.0517090Z         "iphonesimulator",
+2026-10-21T03:38:45.0517280Z         "swiftc",
+2026-10-21T03:38:45.0517460Z         "-swift-version",
+2026-10-21T03:38:45.0518350Z         "5",
+2026-10-21T03:38:45.0518630Z         "-parse-as-library",
+2026-10-21T03:38:45.0518860Z         "-target",
+2026-10-21T03:38:45.0519090Z         "arm64-apple-ios17.0-simulator",
+2026-10-21T03:38:45.0519320Z         "-sdk",
+2026-10-21T03:38:45.0519940Z         "/Applications/Xcode_27.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator27.0.sdk",
+2026-10-21T03:38:45.0520620Z         "-module-cache-path",
+2026-10-21T03:38:45.0521040Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/sdk-module-cache",
+2026-10-21T03:38:45.0521440Z         "-Xfrontend",
+2026-10-21T03:38:45.0521670Z         "-debug-time-function-bodies",
+2026-10-21T03:38:45.0521930Z         "-Xfrontend",
+2026-10-21T03:38:45.0522170Z         "-warn-long-function-bodies=500",
+2026-10-21T03:38:45.0522630Z         "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/SDKCompileProbe.swift",
+2026-10-21T03:38:45.0523040Z         "-o",
+2026-10-21T03:38:45.0523350Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/sdk-canary"
+2026-10-21T03:38:45.0523710Z       ],
+2026-10-21T03:38:45.0523900Z       "duration_seconds": 90.61745829099999,
+2026-10-21T03:38:45.0524130Z       "exit_code": 0,
+2026-10-21T03:38:45.0524370Z       "name": "compile-sdk-canary"
+2026-10-21T03:38:45.0524600Z     },
+2026-10-21T03:38:45.0524760Z     {
+2026-10-21T03:38:45.0524890Z       "argv": [
+2026-10-21T03:38:45.0525040Z         "xcrun",
+2026-10-21T03:38:45.0525200Z         "--sdk",
+2026-10-21T03:38:45.0525370Z         "iphonesimulator",
+2026-10-21T03:38:45.0525550Z         "swiftc",
+2026-10-21T03:38:45.0525730Z         "-swift-version",
+2026-10-21T03:38:45.0526640Z         "5",
+2026-10-21T03:38:45.0526800Z         "-parse-as-library",
+2026-10-21T03:38:45.0526990Z         "-target",
+2026-10-21T03:38:45.0527410Z         "arm64-apple-ios17.0-simulator",
+2026-10-21T03:38:45.0527650Z         "-sdk",
+2026-10-21T03:38:45.0528140Z         "/Applications/Xcode_27.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator27.0.sdk",
+2026-10-21T03:38:45.0528660Z         "-module-cache-path",
+2026-10-21T03:38:45.0529030Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/sdk-module-cache",
+2026-10-21T03:38:45.0529410Z         "-Xfrontend",
+2026-10-21T03:38:45.0529610Z         "-debug-time-function-bodies",
+2026-10-21T03:38:45.0529830Z         "-Xfrontend",
+2026-10-21T03:38:45.0530020Z         "-warn-long-function-bodies=500",
+2026-10-21T03:38:45.0530460Z         "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift",
+2026-10-21T03:38:45.0531100Z         "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift",
+2026-10-21T03:38:45.0531570Z         "-o",
+2026-10-21T03:38:45.0532100Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/PVTReadback.app/PVTReadback"
+2026-10-21T03:38:45.0532560Z       ],
+2026-10-21T03:38:45.0532770Z       "duration_seconds": 3.473404541999969,
+2026-10-21T03:38:45.0533120Z       "exit_code": 0,
+2026-10-21T03:38:45.0533380Z       "name": "compile-reader"
+2026-10-21T03:38:45.0533580Z     },
+2026-10-21T03:38:45.0533730Z     {
+2026-10-21T03:38:45.0533890Z       "argv": [
+2026-10-21T03:38:45.0542740Z         "codesign",
+2026-10-21T03:38:45.0542990Z         "--force",
+2026-10-21T03:38:45.0543160Z         "--sign",
+2026-10-21T03:38:45.0543300Z         "-",
+2026-10-21T03:38:45.0543680Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/PVTReadback.app"
+2026-10-21T03:38:45.0544070Z       ],
+2026-10-21T03:38:45.0544280Z       "duration_seconds": 0.15814870900004507,
+2026-10-21T03:38:45.0544590Z       "exit_code": 0,
+2026-10-21T03:38:45.0544830Z       "name": "sign-owned-reader"
+2026-10-21T03:38:45.0545060Z     },
+2026-10-21T03:38:45.0545210Z     {
+2026-10-21T03:38:45.0545370Z       "argv": [
+2026-10-21T03:38:45.0545520Z         "xcrun",
+2026-10-21T03:38:45.0545680Z         "simctl",
+2026-10-21T03:38:45.0545840Z         "install",
+2026-10-21T03:38:45.0546060Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0546480Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/PVTReadback.app"
+2026-10-21T03:38:45.0546830Z       ],
+2026-10-21T03:38:45.0547000Z       "duration_seconds": 12.00883916700002,
+2026-10-21T03:38:45.0547450Z       "exit_code": 0,
+2026-10-21T03:38:45.0547680Z       "name": "install-owned-reader"
+2026-10-21T03:38:45.0547880Z     },
+2026-10-21T03:38:45.0548010Z     {
+2026-10-21T03:38:45.0548140Z       "argv": [
+2026-10-21T03:38:45.0548290Z         "xcrun",
+2026-10-21T03:38:45.0548430Z         "simctl",
+2026-10-21T03:38:45.0548620Z         "privacy",
+2026-10-21T03:38:45.0548830Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0549050Z         "grant",
+2026-10-21T03:38:45.0549210Z         "photos",
+2026-10-21T03:38:45.0549490Z         "org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb"
+2026-10-21T03:38:45.0549840Z       ],
+2026-10-21T03:38:45.0550030Z       "duration_seconds": 2.269817250000017,
+2026-10-21T03:38:45.0550250Z       "exit_code": 0,
+2026-10-21T03:38:45.0550440Z       "name": "grant-owned-photos"
+2026-10-21T03:38:45.0550630Z     },
+2026-10-21T03:38:45.0550760Z     {
+2026-10-21T03:38:45.0550890Z       "argv": [
+2026-10-21T03:38:45.0551040Z         "xcrun",
+2026-10-21T03:38:45.0551180Z         "simctl",
+2026-10-21T03:38:45.0551330Z         "launch",
+2026-10-21T03:38:45.0551520Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0551870Z         "org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb",
+2026-10-21T03:38:45.0552180Z         "--phase",
+2026-10-21T03:38:45.0552880Z         "baseline"
+2026-10-21T03:38:45.0553030Z       ],
+2026-10-21T03:38:45.0553200Z       "duration_seconds": 1.4639345840000146,
+2026-10-21T03:38:45.0553420Z       "exit_code": 0,
+2026-10-21T03:38:45.0554310Z       "name": "launch-baseline"
+2026-10-21T03:38:45.0554530Z     },
+2026-10-21T03:38:45.0554660Z     {
+2026-10-21T03:38:45.0554780Z       "argv": [
+2026-10-21T03:38:45.0554940Z         "xcrun",
+2026-10-21T03:38:45.0555080Z         "simctl",
+2026-10-21T03:38:45.0555280Z         "get_app_container",
+2026-10-21T03:38:45.0555550Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0555950Z         "org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb",
+2026-10-21T03:38:45.0556390Z         "data"
+2026-10-21T03:38:45.0556560Z       ],
+2026-10-21T03:38:45.0556770Z       "duration_seconds": 0.8901205830000549,
+2026-10-21T03:38:45.0557000Z       "exit_code": 0,
+2026-10-21T03:38:45.0557230Z       "name": "container-baseline"
+2026-10-21T03:38:45.0557480Z     },
+2026-10-21T03:38:45.0557630Z     {
+2026-10-21T03:38:45.0557770Z       "argv": [
+2026-10-21T03:38:45.0557940Z         "xcrun",
+2026-10-21T03:38:45.0558130Z         "simctl",
+2026-10-21T03:38:45.0558330Z         "terminate",
+2026-10-21T03:38:45.0558550Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0558910Z         "org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb"
+2026-10-21T03:38:45.0559260Z       ],
+2026-10-21T03:38:45.0559480Z       "duration_seconds": 0.21237404200002175,
+2026-10-21T03:38:45.0559710Z       "exit_code": 0,
+2026-10-21T03:38:45.0559920Z       "name": "terminate-baseline"
+2026-10-21T03:38:45.0560110Z     },
+2026-10-21T03:38:45.0560240Z     {
+2026-10-21T03:38:45.0560470Z       "argv": [
+2026-10-21T03:38:45.0560660Z         "xcrun",
+2026-10-21T03:38:45.0560850Z         "simctl",
+2026-10-21T03:38:45.0561010Z         "get_app_container",
+2026-10-21T03:38:45.0561240Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0561610Z         "org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb",
+2026-10-21T03:38:45.0561920Z         "data"
+2026-10-21T03:38:45.0562070Z       ],
+2026-10-21T03:38:45.0562240Z       "duration_seconds": 0.3447633339999925,
+2026-10-21T03:38:45.0562480Z       "exit_code": 0,
+2026-10-21T03:38:45.0562670Z       "name": "container-share"
+2026-10-21T03:38:45.0562870Z     },
+2026-10-21T03:38:45.0563110Z     {
+2026-10-21T03:38:45.0563250Z       "argv": [
+2026-10-21T03:38:45.0563420Z         "xcodebuild",
+2026-10-21T03:38:45.0563590Z         "-project",
+2026-10-21T03:38:45.0564030Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-tests/PVTShareTests.xcodeproj",
+2026-10-21T03:38:45.0564460Z         "-scheme",
+2026-10-21T03:38:45.0564640Z         "PVTShareUITests",
+2026-10-21T03:38:45.0564890Z         "-destination",
+2026-10-21T03:38:45.0565230Z         "id=1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0565560Z         "-derivedDataPath",
+2026-10-21T03:38:45.0566050Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/ui-build",
+2026-10-21T03:38:45.0566510Z         "CODE_SIGNING_ALLOWED=NO",
+2026-10-21T03:38:45.0568690Z         "PRODUCT_BUNDLE_IDENTIFIER=org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb.uitests",
+2026-10-21T03:38:45.0569760Z         "build-for-testing"
+2026-10-21T03:38:45.0570060Z       ],
+2026-10-21T03:38:45.0570290Z       "duration_seconds": 124.13433933300001,
+2026-10-21T03:38:45.0570660Z       "exit_code": 0,
+2026-10-21T03:38:45.0571150Z       "name": "build-share-ui"
+2026-10-21T03:38:45.0571950Z     },
+2026-10-21T03:38:45.0572160Z     {
+2026-10-21T03:38:45.0572360Z       "argv": [
+2026-10-21T03:38:45.0572580Z         "xcodebuild",
+2026-10-21T03:38:45.0572840Z         "-project",
+2026-10-21T03:38:45.0573770Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-tests/PVTShareTests.xcodeproj",
+2026-10-21T03:38:45.0574320Z         "-scheme",
+2026-10-21T03:38:45.0575020Z         "PVTShareUITests",
+2026-10-21T03:38:45.0575410Z         "-destination",
+2026-10-21T03:38:45.0577370Z         "id=1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0578090Z         "-derivedDataPath",
+2026-10-21T03:38:45.0579530Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/ui-build",
+2026-10-21T03:38:45.0581330Z         "CODE_SIGNING_ALLOWED=NO",
+2026-10-21T03:38:45.0582800Z         "PRODUCT_BUNDLE_IDENTIFIER=org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb.uitests",
+2026-10-21T03:38:45.0583460Z         "-resultBundlePath",
+2026-10-21T03:38:45.0584320Z         "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-results.xcresult",
+2026-10-21T03:38:45.0585580Z         "-only-testing:PVTShareUITests/PVTShareUITests/testWholePackageSystemShare",
+2026-10-21T03:38:45.0586050Z         "test-without-building"
+2026-10-21T03:38:45.0586350Z       ],
+2026-10-21T03:38:45.0587150Z       "duration_seconds": 180.17800408300002,
+2026-10-21T03:38:45.0590200Z       "error": "Command '['xcodebuild', '-project', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-tests/PVTShareTests.xcodeproj', '-scheme', 'PVTShareUITests', '-destination', 'id=1736CABF-89E1-413B-9BF5-7B4C010DECA9', '-derivedDataPath', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/ui-build', 'CODE_SIGNING_ALLOWED=NO', 'PRODUCT_BUNDLE_IDENTIFIER=org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb.uitests', '-resultBundlePath', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-results.xcresult', '-only-testing:PVTShareUITests/PVTShareUITests/testWholePackageSystemShare', 'test-without-building']' timed out after 180 seconds",
+2026-10-21T03:38:45.0593630Z       "name": "test-share-ui",
+2026-10-21T03:38:45.0594620Z       "outcome": "uncertain-after-timeout"
+2026-10-21T03:38:45.0596480Z     },
+2026-10-21T03:38:45.0596740Z     {
+2026-10-21T03:38:45.0596900Z       "argv": [
+2026-10-21T03:38:45.0597160Z         "xcrun",
+2026-10-21T03:38:45.0597420Z         "simctl",
+2026-10-21T03:38:45.0597620Z         "shutdown",
+2026-10-21T03:38:45.0597980Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9"
+2026-10-21T03:38:45.0598990Z       ],
+2026-10-21T03:38:45.0599500Z       "duration_seconds": 2.5599849169999516,
+2026-10-21T03:38:45.0600060Z       "exit_code": 0,
+2026-10-21T03:38:45.0600360Z       "name": "shutdown-owned"
+2026-10-21T03:38:45.0600770Z     },
+2026-10-21T03:38:45.0600990Z     {
+2026-10-21T03:38:45.0601240Z       "argv": [
+2026-10-21T03:38:45.0601470Z         "xcrun",
+2026-10-21T03:38:45.0601650Z         "simctl",
+2026-10-21T03:38:45.0601930Z         "delete",
+2026-10-21T03:38:45.0602260Z         "1736CABF-89E1-413B-9BF5-7B4C010DECA9"
+2026-10-21T03:38:45.0603010Z       ],
+2026-10-21T03:38:45.0603300Z       "duration_seconds": 0.18904941699997835,
+2026-10-21T03:38:45.0603600Z       "exit_code": 0,
+2026-10-21T03:38:45.0603840Z       "name": "delete-owned"
+2026-10-21T03:38:45.0604090Z     }
+2026-10-21T03:38:45.0604650Z   ],
+2026-10-21T03:38:45.0604880Z   "delete-owned-exit": 0,
+2026-10-21T03:38:45.0605210Z   "direct_package_import_only": true,
+2026-10-21T03:38:45.0605660Z   "expected_identifier": "220B61F6-0D9E-447E-BD47-FAAED2CFAB22",
+2026-10-21T03:38:45.0607240Z   "head": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+2026-10-21T03:38:45.0608590Z   "host_architecture": "arm64",
+2026-10-21T03:38:45.0608890Z   "host_system": "Darwin",
+2026-10-21T03:38:45.0609170Z   "host_version": "27.0.1",
+2026-10-21T03:38:45.0609720Z   "known_unsupported_route_not_repeated": "simctl addmedia rejects PVT directories (NSPOSIXErrorDomain22)",
+2026-10-21T03:38:45.0611320Z   "media_uploaded": false,
+2026-10-21T03:38:45.0612060Z   "native_route": "iOS Simulator system Photos save activity; whole live-photo file representation",
+2026-10-21T03:38:45.0612930Z   "native_share_ui_test_invoked": true,
+2026-10-21T03:38:45.0614230Z   "native_validation_status_before_cleanup": "blocked",
+2026-10-21T03:38:45.0614610Z   "not_exercised": [
+2026-10-21T03:38:45.0615780Z     "macOS Photos library import",
+2026-10-21T03:38:45.0616190Z     "physical-device Photos or wallpaper"
+2026-10-21T03:38:45.0617020Z   ],
+2026-10-21T03:38:45.0617300Z   "official_owned_photos_grant_available": true,
+2026-10-21T03:38:45.0618270Z   "owned_device_name": "pvt-audit-1dd928c6841c47978d7979a5dc3869bb",
+2026-10-21T03:38:45.0618910Z   "owned_udid": "1736CABF-89E1-413B-9BF5-7B4C010DECA9",
+2026-10-21T03:38:45.0619270Z   "package_bytes_unchanged": true,
+2026-10-21T03:38:45.0619620Z   "package_sha256_after_import": {
+2026-10-21T03:38:45.0620260Z     "capture.heic": "4d930d0a2f81d23b050a27046219785dcc15ebbe82592e787a4f37efc9abd1b2",
+2026-10-21T03:38:45.0621000Z     "capture.mov": "c5a9053f5177d359989f50c7a879061f5872ad294d84113830564ffe8a3767fc",
+2026-10-21T03:38:45.0622040Z     "metadata.plist": "32c70976fd8a5f305a573568b9d7dae31cf6f7c1817d9ee7ebe70ada5b5c3f01"
+2026-10-21T03:38:45.0622510Z   },
+2026-10-21T03:38:45.0622680Z   "package_sha256_before_import": {
+2026-10-21T03:38:45.0623530Z     "capture.heic": "4d930d0a2f81d23b050a27046219785dcc15ebbe82592e787a4f37efc9abd1b2",
+2026-10-21T03:38:45.0625620Z     "capture.mov": "c5a9053f5177d359989f50c7a879061f5872ad294d84113830564ffe8a3767fc",
+2026-10-21T03:38:45.0626360Z     "metadata.plist": "32c70976fd8a5f305a573568b9d7dae31cf6f7c1817d9ee7ebe70ada5b5c3f01"
+2026-10-21T03:38:45.0627260Z   },
+2026-10-21T03:38:45.0628640Z   "probe_bundle_id": "org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb",
+2026-10-21T03:38:45.0629370Z   "probe_driver_sha256": "11fcff35630b9e3e57c1b735314603471f98403587ad2a29bdd6a396545af008",
+2026-10-21T03:38:45.0630960Z   "probe_source_sha256": {
+2026-10-21T03:38:45.0631530Z     "GenerateSyntheticMotion.swift": "cbe70fa1c368ac68ca7fad627c7e5fa90999256453d9b341bcd7898119f6aab7",
+2026-10-21T03:38:45.0632310Z     "PVTReadback.swift": "41df51c40ed8d126403d45ef1d550f9415258929360b3c6efbf61b26ffafecd1",
+2026-10-21T03:38:45.0633650Z     "PVTShareTests.xcodeproj/project.pbxproj": "4896e4aad65e8253d713f325ee9ab865cff06b7324fc094cf0e12456c5b55d51",
+2026-10-21T03:38:45.0634930Z     "PVTShareTests.xcodeproj/xcshareddata/xcschemes/PVTShareUITests.xcscheme": "d892eccefe9e4897f0e0f29e8ab600e8a7004ea2fccb9b0bc93894e973a6bd54",
+2026-10-21T03:38:45.0635710Z     "PVTShareUITests.swift.in": "52b1c88cb9f0851cd1436d5b1642b195c53754e5821a27a571860c534000e33e",
+2026-10-21T03:38:45.0636290Z     "ReadbackCore.swift": "89a53303f9697de32563f530ad332e2fdd6b3e90e2b2ab4f65523bdcfa9aa3f2",
+2026-10-21T03:38:45.0636890Z     "SDKCompileProbe.swift": "fc53b5705a0f30b538e3092f833a130616a8b0e939fd88a3fc0d9c138f71f6ed"
+2026-10-21T03:38:45.0637340Z   },
+2026-10-21T03:38:45.0637690Z   "reader_binary_sha256": "a6b42d531b390fff4241b57e2aa69f298779d119ed202eb0054a04a6a662f3b6",
+2026-10-21T03:38:45.0638220Z   "reader_info_sha256": "e58d1449271681d911e3a67e4c75d224e6f2c771ce138e57d57ad472ca200df7",
+2026-10-21T03:38:45.0641500Z   "reason": "test-share-ui: Command '['xcodebuild', '-project', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-tests/PVTShareTests.xcodeproj', '-scheme', 'PVTShareUITests', '-destination', 'id=1736CABF-89E1-413B-9BF5-7B4C010DECA9', '-derivedDataPath', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/ui-build', 'CODE_SIGNING_ALLOWED=NO', 'PRODUCT_BUNDLE_IDENTIFIER=org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb.uitests', '-resultBundlePath', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-results.xcresult', '-only-testing:PVTShareUITests/PVTShareUITests/testWholePackageSystemShare', 'test-without-building']' timed out after 180 seconds",
+2026-10-21T03:38:45.0644060Z   "selected_device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-11",
+2026-10-21T03:38:45.0644560Z   "selected_runtime": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+2026-10-21T03:38:45.0644890Z   "shutdown-owned-exit": 0,
+2026-10-21T03:38:45.0645090Z   "status": "blocked",
+2026-10-21T03:38:45.0645460Z   "synthetic_input_sha256": "8c3f2c6fbb79a10b44c63727751fb5adfdc2bfa3aba708edc599a8ef5b00328e",
+2026-10-21T03:38:45.0646060Z   "synthetic_input_sha256_after": "8c3f2c6fbb79a10b44c63727751fb5adfdc2bfa3aba708edc599a8ef5b00328e",
+2026-10-21T03:38:45.0646890Z   "synthetic_input_unchanged": true,
+2026-10-21T03:38:45.0647140Z   "transported_package_sha256_after_share": {
+2026-10-21T03:38:45.0647780Z     "capture.heic": "4d930d0a2f81d23b050a27046219785dcc15ebbe82592e787a4f37efc9abd1b2",
+2026-10-21T03:38:45.0648300Z     "capture.mov": "c5a9053f5177d359989f50c7a879061f5872ad294d84113830564ffe8a3767fc",
+2026-10-21T03:38:45.0648820Z     "metadata.plist": "32c70976fd8a5f305a573568b9d7dae31cf6f7c1817d9ee7ebe70ada5b5c3f01"
+2026-10-21T03:38:45.0649200Z   },
+2026-10-21T03:38:45.0649400Z   "transported_package_sha256_before_share": {
+2026-10-21T03:38:45.0649840Z     "capture.heic": "4d930d0a2f81d23b050a27046219785dcc15ebbe82592e787a4f37efc9abd1b2",
+2026-10-21T03:38:45.0650360Z     "capture.mov": "c5a9053f5177d359989f50c7a879061f5872ad294d84113830564ffe8a3767fc",
+2026-10-21T03:38:45.0650980Z     "metadata.plist": "32c70976fd8a5f305a573568b9d7dae31cf6f7c1817d9ee7ebe70ada5b5c3f01"
+2026-10-21T03:38:45.0651360Z   },
+2026-10-21T03:38:45.0651740Z   "ui_test_source_sha256": "888ec73577a513f378394a72096e3cce3da14291cb9adc233f0dd3e095f8f710",
+2026-10-21T03:38:45.0652320Z   "work": "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve"
+2026-10-21T03:38:45.0652640Z }
+2026-10-21T03:38:45.0652830Z PVT diagnostic compile-generator.stderr:
+2026-10-21T03:38:45.0653920Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift:29:15: warning: 'expectsMediaDataInRealTime' was deprecated in macOS 27.0: Use the input receiver's appendImmediately(...) method instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0654810Z 27 |             ],
+2026-10-21T03:38:45.0655010Z 28 |         ])
+2026-10-21T03:38:45.0655260Z 29 |         input.expectsMediaDataInRealTime = false
+2026-10-21T03:38:45.0655980Z    |               `- warning: 'expectsMediaDataInRealTime' was deprecated in macOS 27.0: Use the input receiver's appendImmediately(...) method instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0656770Z 30 |         guard writer.canAdd(input) else { throw failure("H264 writer input unavailable") }
+2026-10-21T03:38:45.0657230Z 31 |         writer.add(input)
+2026-10-21T03:38:45.0657430Z 
+2026-10-21T03:38:45.0658380Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift:31:16: warning: 'add' was deprecated in macOS 27.0: Use the appropriate AVAssetWriter.inputReceiver(for:...) overload for your input and optional adaptor instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0659440Z 29 |         input.expectsMediaDataInRealTime = false
+2026-10-21T03:38:45.0659910Z 30 |         guard writer.canAdd(input) else { throw failure("H264 writer input unavailable") }
+2026-10-21T03:38:45.0660300Z 31 |         writer.add(input)
+2026-10-21T03:38:45.0661050Z    |                `- warning: 'add' was deprecated in macOS 27.0: Use the appropriate AVAssetWriter.inputReceiver(for:...) overload for your input and optional adaptor instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0662070Z 32 |         let adapter = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+2026-10-21T03:38:45.0662760Z 33 |             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+2026-10-21T03:38:45.0663070Z 
+2026-10-21T03:38:45.0664070Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift:32:23: warning: 'AVAssetWriterInputPixelBufferAdaptor' was deprecated in macOS 27.0: Use AVAssetWriter.inputPixelBufferReceiver(for:pixelBufferAttributes:) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0665310Z 30 |         guard writer.canAdd(input) else { throw failure("H264 writer input unavailable") }
+2026-10-21T03:38:45.0665880Z 31 |         writer.add(input)
+2026-10-21T03:38:45.0674060Z 32 |         let adapter = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+2026-10-21T03:38:45.0675100Z    |                       `- warning: 'AVAssetWriterInputPixelBufferAdaptor' was deprecated in macOS 27.0: Use AVAssetWriter.inputPixelBufferReceiver(for:pixelBufferAttributes:) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0676880Z 33 |             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+2026-10-21T03:38:45.0677360Z 34 |             kCVPixelBufferWidthKey as String: width,
+2026-10-21T03:38:45.0677550Z 
+2026-10-21T03:38:45.0678180Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift:37:22: warning: 'startWriting()' was deprecated in macOS 27.0: Use start() instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0678960Z 35 |             kCVPixelBufferHeightKey as String: height,
+2026-10-21T03:38:45.0679210Z 36 |         ])
+2026-10-21T03:38:45.0679560Z 37 |         guard writer.startWriting() else { throw writer.error ?? failure("startWriting failed") }
+2026-10-21T03:38:45.0680190Z    |                      `- warning: 'startWriting()' was deprecated in macOS 27.0: Use start() instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0680700Z 38 |         writer.startSession(atSourceTime: .zero)
+2026-10-21T03:38:45.0681170Z 39 |         let deadline = Date().addingTimeInterval(60)
+2026-10-21T03:38:45.0681380Z 
+2026-10-21T03:38:45.0682150Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift:41:26: warning: 'isReadyForMoreMediaData' was deprecated in macOS 27.0: Use the input receiver's async append(...) method instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0683180Z 39 |         let deadline = Date().addingTimeInterval(60)
+2026-10-21T03:38:45.0683450Z 40 |         for frame in 0..<frames {
+2026-10-21T03:38:45.0683720Z 41 |             while !input.isReadyForMoreMediaData {
+2026-10-21T03:38:45.0684380Z    |                          `- warning: 'isReadyForMoreMediaData' was deprecated in macOS 27.0: Use the input receiver's async append(...) method instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0685040Z 42 |                 guard Date() < deadline, writer.status == .writing else {
+2026-10-21T03:38:45.0685440Z 43 |                     throw writer.error ?? failure("writer readiness timeout")
+2026-10-21T03:38:45.0685670Z 
+2026-10-21T03:38:45.0686430Z [#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+2026-10-21T03:38:45.0686800Z 
+2026-10-21T03:38:45.0686910Z PVT diagnostic generate-synthetic.stderr:
+2026-10-21T03:38:45.0687260Z IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-21T03:38:45.0687490Z 
+2026-10-21T03:38:45.0687620Z PVT diagnostic compile-sdk-canary.stderr:
+2026-10-21T03:38:45.0688640Z 19.36ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/SDKCompileProbe.swift:13:17	static method main.(file).SDKCompileProbe.main()@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/SDKCompileProbe.swift:13:17
+2026-10-21T03:38:45.0690230Z 0.02ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/SDKCompileProbe.swift:12:8	initializer main.(file).SDKCompileProbe.init()@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/SDKCompileProbe.swift:12:8
+2026-10-21T03:38:45.0691320Z 0.53ms	<invalid loc>	static method main.(file).SDKCompileProbe.$main()
+2026-10-21T03:38:45.0691610Z 
+2026-10-21T03:38:45.0691730Z PVT diagnostic compile-reader.stderr:
+2026-10-21T03:38:45.0692680Z 10.74ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:10:31	getter PVTReadback.(file).ReadbackCore.documents.getter@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:10:31
+2026-10-21T03:38:45.0694240Z 24.44ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:14:17	static method PVTReadback.(file).ReadbackCore.write(_:phase:)@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:14:17
+2026-10-21T03:38:45.0695810Z 50.02ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:19:17	static method PVTReadback.(file).ReadbackCore.packageHashes@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:19:17
+2026-10-21T03:38:45.0698250Z 28.79ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:34:17	static method PVTReadback.(file).ReadbackCore.collect(phase:)@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:34:17
+2026-10-21T03:38:45.0700050Z 8.88ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:78:25	static method PVTReadback.(file).ReadbackCore.addingResourceFacts(_:to:)@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:78:25
+2026-10-21T03:38:45.0701530Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:124:34: warning: 'metadata(forFormat:)' was deprecated in iOS 16.0: Use loadMetadata(for:) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0702370Z 122 |         if resource.type == .pairedVideo {
+2026-10-21T03:38:45.0702680Z 123 |             let video = AVURLAsset(url: url)
+2026-10-21T03:38:45.0703160Z 124 |             let metadata = video.metadata(forFormat: .quickTimeMetadata)
+2026-10-21T03:38:45.0703780Z     |                                  `- warning: 'metadata(forFormat:)' was deprecated in iOS 16.0: Use loadMetadata(for:) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0704670Z 125 |             facts["content_identifiers"] = metadata.filter { $0.identifier == .quickTimeMetadataContentIdentifier }.compactMap { $0.stringValue }
+2026-10-21T03:38:45.0705290Z 126 |             facts["still_image_time_samples"] = try stillTimeSamples(video)
+2026-10-21T03:38:45.0705540Z 
+2026-10-21T03:38:45.0706380Z 48.47ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:102:25	static method PVTReadback.(file).ReadbackCore.resourceFacts(_:index:directory:)@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:102:25
+2026-10-21T03:38:45.0708370Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:125:133: warning: 'stringValue' was deprecated in iOS 16.0: Use load(.stringValue) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0709100Z 123 |             let video = AVURLAsset(url: url)
+2026-10-21T03:38:45.0709560Z 124 |             let metadata = video.metadata(forFormat: .quickTimeMetadata)
+2026-10-21T03:38:45.0710270Z 125 |             facts["content_identifiers"] = metadata.filter { $0.identifier == .quickTimeMetadataContentIdentifier }.compactMap { $0.stringValue }
+2026-10-21T03:38:45.0711200Z     |                                                                                                                                     `- warning: 'stringValue' was deprecated in iOS 16.0: Use load(.stringValue) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0711860Z 126 |             facts["still_image_time_samples"] = try stillTimeSamples(video)
+2026-10-21T03:38:45.0712160Z 127 |         }
+2026-10-21T03:38:45.0712260Z 
+2026-10-21T03:38:45.0712910Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:133:28: warning: 'tracks(withMediaType:)' was deprecated in iOS 16.0: Use loadTracks(withMediaType:) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0713780Z 131 |     private static func stillTimeSamples(_ video: AVAsset) throws -> [[String: Any]] {
+2026-10-21T03:38:45.0714170Z 132 |         var samples: [[String: Any]] = []
+2026-10-21T03:38:45.0714480Z 133 |         for track in video.tracks(withMediaType: .metadata) {
+2026-10-21T03:38:45.0715090Z     |                            `- warning: 'tracks(withMediaType:)' was deprecated in iOS 16.0: Use loadTracks(withMediaType:) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0715640Z 134 |             let reader = try AVAssetReader(asset: video)
+2026-10-21T03:38:45.0716050Z 135 |             let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+2026-10-21T03:38:45.0716330Z 
+2026-10-21T03:38:45.0717590Z 16.81ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:131:25	static method PVTReadback.(file).ReadbackCore.stillTimeSamples@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:131:25
+2026-10-21T03:38:45.0719200Z 0.32ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:159:9	local function PVTReadback.(file).ReadbackCore.export(_:to:).$defer()@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:159:9
+2026-10-21T03:38:45.0721180Z 0.08ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:166:26	local function PVTReadback.(file).ReadbackCore.export(_:to:).explicit closure discriminator=65535.$defer()@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:166:26
+2026-10-21T03:38:45.0722950Z 11.74ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:156:25	static method PVTReadback.(file).ReadbackCore.export(_:to:)@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:156:25
+2026-10-21T03:38:45.0724480Z 2.20ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:180:17	static method PVTReadback.(file).ReadbackCore.errorFacts@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:180:17
+2026-10-21T03:38:45.0726110Z 0.85ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:185:17	static method PVTReadback.(file).ReadbackCore.failure@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:185:17
+2026-10-21T03:38:45.0727150Z 0.02ms	<invalid loc>	getter Foundation.(file).FileManager extension.SearchPathDomainMask.userDomainMask.getter
+2026-10-21T03:38:45.0727850Z 0.02ms	<invalid loc>	getter Foundation.(file).JSONSerialization extension.WritingOptions.prettyPrinted.getter
+2026-10-21T03:38:45.0728580Z 0.01ms	<invalid loc>	getter Foundation.(file).JSONSerialization extension.WritingOptions.sortedKeys.getter
+2026-10-21T03:38:45.0729180Z 0.02ms	<invalid loc>	getter Foundation.(file).NSData extension.WritingOptions.atomic.getter
+2026-10-21T03:38:45.0729680Z 0.28ms	<invalid loc>	getter Photos.(file).PHAuthorizationStatus.rawValue.getter
+2026-10-21T03:38:45.0730170Z 0.02ms	<invalid loc>	getter Photos.(file).PHAssetMediaSubtype.photoLive.getter
+2026-10-21T03:38:45.0730650Z 0.02ms	<invalid loc>	getter Photos.(file).PHAssetMediaType.rawValue.getter
+2026-10-21T03:38:45.0731220Z 0.01ms	<invalid loc>	getter Photos.(file).PHAssetResourceType.rawValue.getter
+2026-10-21T03:38:45.0731770Z 0.01ms	<invalid loc>	getter AVFoundation.(file).AVMetadataIdentifier.rawValue.getter
+2026-10-21T03:38:45.0732270Z 0.12ms	<invalid loc>	getter Photos.(file).PHAssetMediaSubtype.rawValue.getter
+2026-10-21T03:38:45.0732860Z 0.01ms	<invalid loc>	getter AVFoundation.(file).AVAssetReader extension.Status.rawValue.getter
+2026-10-21T03:38:45.0733570Z 0.01ms	<invalid loc>	getter Foundation.(file).JSONSerialization extension.WritingOptions.rawValue.getter
+2026-10-21T03:38:45.0734160Z 0.01ms	<invalid loc>	getter Foundation.(file).URLResourceKey.rawValue.getter
+2026-10-21T03:38:45.0734740Z 0.01ms	<invalid loc>	getter Foundation.(file).FileManager extension.DirectoryEnumerationOptions.rawValue.getter
+2026-10-21T03:38:45.0735420Z 0.01ms	<invalid loc>	getter Foundation.(file).JSONSerialization extension.ReadingOptions.rawValue.getter
+2026-10-21T03:38:45.0736070Z 0.00ms	<invalid loc>	getter AVFoundation.(file).AVMetadataFormat.rawValue.getter
+2026-10-21T03:38:45.0736530Z 0.01ms	<invalid loc>	getter AVFoundation.(file).AVMediaType.rawValue.getter
+2026-10-21T03:38:45.0737380Z /Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift:146:41: warning: 'numberValue' was deprecated in iOS 16.0: Use load(.numberValue) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0738210Z 144 |                     sample["timescale"] = group.timeRange.start.timescale
+2026-10-21T03:38:45.0738970Z 145 |                     sample["epoch"] = group.timeRange.start.epoch
+2026-10-21T03:38:45.0739720Z 146 |                     if let value = item.numberValue { sample["sample_value"] = value }
+2026-10-21T03:38:45.0740470Z     |                                         `- warning: 'numberValue' was deprecated in iOS 16.0: Use load(.numberValue) instead [#DeprecatedDeclaration]
+2026-10-21T03:38:45.0741090Z 147 |                     else { sample["sample_value"] = NSNull() }
+2026-10-21T03:38:45.0741510Z 148 |                     samples.append(sample)
+2026-10-21T03:38:45.0741750Z 
+2026-10-21T03:38:45.0742130Z [#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+2026-10-21T03:38:45.0743480Z 1.71ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:9:10	instance method PVTReadback.(file).AppDelegate.application(_:configurationForConnecting:options:)@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:9:10
+2026-10-21T03:38:45.0745200Z 0.01ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:8:61	initializer PVTReadback.(file).AppDelegate.init()@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:8:61
+2026-10-21T03:38:45.0746170Z 0.08ms	<invalid loc>	static method PVTReadback.(file).AppDelegate.$main()
+2026-10-21T03:38:45.0747200Z 0.01ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:8:13	deinitializer PVTReadback.(file).AppDelegate.deinit@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:8:13
+2026-10-21T03:38:45.0748860Z 0.01ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:18:9	getter PVTReadback.(file).PVTSceneDelegate.window.getter@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:18:9
+2026-10-21T03:38:45.0750430Z 0.01ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:18:9	setter PVTReadback.(file).PVTSceneDelegate.window.setter@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:18:9
+2026-10-21T03:38:45.0752190Z 0.01ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:18:9	_modify accessor PVTReadback.(file).PVTSceneDelegate.window._modify accessor@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:18:9
+2026-10-21T03:38:45.0753820Z 0.01ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:19:17	getter PVTReadback.(file).PVTSceneDelegate.statusLabel.getter@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:19:17
+2026-10-21T03:38:45.0755520Z 58.93ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:21:10	instance method PVTReadback.(file).PVTSceneDelegate.scene(_:willConnectTo:options:)@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:21:10
+2026-10-21T03:38:45.0757090Z 10.42ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:53:24	instance method PVTReadback.(file).PVTSceneDelegate.sharePackage()@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:53:24
+2026-10-21T03:38:45.0758830Z 4.64ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:82:18	instance method PVTReadback.(file).PVTSceneDelegate.finishShare(activity:completed:error:)@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:82:18
+2026-10-21T03:38:45.0760410Z 0.01ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:17:66	initializer PVTReadback.(file).PVTSceneDelegate.init()@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:17:66
+2026-10-21T03:38:45.0761990Z 0.01ms	/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:17:13	deinitializer PVTReadback.(file).PVTSceneDelegate.deinit@/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift:17:13
+2026-10-21T03:38:45.0763960Z 0.02ms	<invalid loc>	getter UIKit.(file).UIControl extension.State.normal.getter
+2026-10-21T03:38:45.0764520Z 0.01ms	<invalid loc>	getter UIKit.(file).UIControl extension.Event.touchUpInside.getter
+2026-10-21T03:38:45.0765030Z 0.01ms	<invalid loc>	getter UIKit.(file).UIActivity extension.ActivityType.rawValue.getter
+2026-10-21T03:38:45.0765560Z 0.01ms	<invalid loc>	getter UIKit.(file).UISceneSession extension.Role.rawValue.getter
+2026-10-21T03:38:45.0766110Z 0.01ms	<invalid loc>	getter Foundation.(file).NSItemProviderFileOptions.rawValue.getter
+2026-10-21T03:38:45.0766500Z 
+2026-10-21T03:38:45.0766620Z PVT diagnostic grant-owned-photos.stderr:
+2026-10-21T03:38:45.0766790Z 
+2026-10-21T03:38:45.0766880Z PVT diagnostic baseline.json:
+2026-10-21T03:38:45.0767060Z {
+2026-10-21T03:38:45.0767200Z   "asset_count" : 6,
+2026-10-21T03:38:45.0767390Z   "asset_identifiers" : [
+2026-10-21T03:38:45.0767630Z     "106E99A1-4F6A-45A2-B320-B0AD4A8E8473\/L0\/001",
+2026-10-21T03:38:45.0767930Z     "99D53A1F-FEEF-40E1-8BB3-7DD55A43C8B7\/L0\/001",
+2026-10-21T03:38:45.0768220Z     "9F983DBA-EC35-42B8-8773-B597CF782EDD\/L0\/001",
+2026-10-21T03:38:45.0768510Z     "B84E8479-475C-4727-A4A4-B77AA9980897\/L0\/001",
+2026-10-21T03:38:45.0768780Z     "CC95F08C-88C3-4012-9D6D-64A413D254B3\/L0\/001",
+2026-10-21T03:38:45.0769100Z     "ED7AC36B-A150-4C38-BB8C-B6D696F4F2ED\/L0\/001"
+2026-10-21T03:38:45.0769380Z   ],
+2026-10-21T03:38:45.0769540Z   "authorization" : 3,
+2026-10-21T03:38:45.0769720Z   "phase" : "baseline",
+2026-10-21T03:38:45.0769910Z   "read_only_photokit" : true,
+2026-10-21T03:38:45.0770110Z   "status" : "baseline"
+2026-10-21T03:38:45.0770280Z }
+2026-10-21T03:38:45.0770460Z PVT diagnostic build-share-ui.stderr:
+2026-10-21T03:38:45.0770610Z 
+2026-10-21T03:38:45.0770710Z PVT diagnostic test-share-ui.stdout:
+2026-10-21T03:38:45.0770930Z Command line invocation:
+2026-10-21T03:38:45.0773430Z     /Applications/Xcode_27.app/Contents/Developer/usr/bin/xcodebuild -project /Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-tests/PVTShareTests.xcodeproj -scheme PVTShareUITests -destination id=1736CABF-89E1-413B-9BF5-7B4C010DECA9 -derivedDataPath /Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/ui-build CODE_SIGNING_ALLOWED=NO PRODUCT_BUNDLE_IDENTIFIER=org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb.uitests -resultBundlePath /Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-results.xcresult "-only-testing:PVTShareUITests/PVTShareUITests/testWholePackageSystemShare" test-without-building
+2026-10-21T03:38:45.0775640Z 
+2026-10-21T03:38:45.0775750Z Build settings from command line:
+2026-10-21T03:38:45.0776000Z     CODE_SIGNING_ALLOWED = NO
+2026-10-21T03:38:45.0776510Z     PRODUCT_BUNDLE_IDENTIFIER = org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb.uitests
+2026-10-21T03:38:45.0776950Z 
+2026-10-21T03:38:45.0777070Z Writing result bundle at path:
+2026-10-21T03:38:45.0777450Z 	/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-results.xcresult
+2026-10-21T03:38:45.0777740Z 
+2026-10-21T03:38:45.0777980Z 2026-10-21 03:35:55.356716+0000 PVTShareUITests-Runner[10697:37041] [Default] Running tests...
+2026-10-21T03:38:45.0778450Z     t =      nans Interface orientation changed to Portrait
+2026-10-21T03:38:45.0778860Z Test Suite 'Selected tests' started at 2026-10-21 03:36:07.256.
+2026-10-21T03:38:45.0779290Z Test Suite 'PVTShareUITests.xctest' started at 2026-10-21 03:36:07.261.
+2026-10-21T03:38:45.0779680Z Test Suite 'PVTShareUITests' started at 2026-10-21 03:36:07.261.
+2026-10-21T03:38:45.0780140Z Test Case '-[PVTShareUITests.PVTShareUITests testWholePackageSystemShare]' started.
+2026-10-21T03:38:45.0780580Z     t =     0.00s Start Test at 2026-10-21 03:36:07.265
+2026-10-21T03:38:45.0780850Z     t =     0.85s Set Up
+2026-10-21T03:38:45.0781210Z     t =     0.88s Open org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb
+2026-10-21T03:38:45.0782530Z     t =     0.88s     Launch org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb
+2026-10-21T03:38:45.0783350Z     t =     2.19s         Setting up automation session
+2026-10-21T03:38:45.0786200Z objc[10697]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.zaq6GS/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x10334c398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.zaq6GS/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x106828310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+2026-10-21T03:38:45.0788940Z     t =     4.98s         Wait for org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb to idle
+2026-10-21T03:38:45.0789400Z     t =     6.47s Waiting 20.0s for "share-pvt" Button to exist
+2026-10-21T03:38:45.0789870Z     t =     7.54s     Checking `Expect predicate `existsNoRetry == 1` for object "share-pvt" Button`
+2026-10-21T03:38:45.0790380Z     t =     7.54s         Checking existence of `"share-pvt" Button`
+2026-10-21T03:38:45.0790680Z     t =     7.59s Tap "share-pvt" Button
+2026-10-21T03:38:45.0791100Z     t =     7.59s     Wait for org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb to idle
+2026-10-21T03:38:45.0791530Z     t =     7.59s     Find the "share-pvt" Button
+2026-10-21T03:38:45.0791890Z     t =     7.60s     Check for interrupting elements affecting "share-pvt" Button
+2026-10-21T03:38:45.0792200Z     t =     7.66s     Synthesize event
+2026-10-21T03:38:45.0792620Z     t =     8.17s     Wait for org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb to idle
+2026-10-21T03:38:45.0793190Z     t =     8.76s Waiting 20.0s for Button (First Match) to exist
+2026-10-21T03:38:45.0793760Z     t =     9.83s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0794400Z     t =     9.83s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0794910Z     t =     9.84s         Capturing element debug description
+2026-10-21T03:38:45.0795440Z     t =    10.79s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0795870Z     t =    10.79s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0796200Z     t =    10.80s         Capturing element debug description
+2026-10-21T03:38:45.0796650Z     t =    11.85s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0797100Z     t =    11.85s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0797420Z     t =    12.04s         Capturing element debug description
+2026-10-21T03:38:45.0797910Z     t =    12.82s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0798400Z     t =    12.83s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0798720Z     t =    15.04s         Capturing element debug description
+2026-10-21T03:38:45.0799150Z     t =    15.78s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0799580Z     t =    15.78s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0799910Z     t =    15.85s         Capturing element debug description
+2026-10-21T03:38:45.0800370Z     t =    16.79s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0800910Z     t =    16.79s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0801300Z     t =    16.85s         Capturing element debug description
+2026-10-21T03:38:45.0801930Z     t =    17.77s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0802580Z     t =    17.77s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0802960Z     t =    17.83s         Capturing element debug description
+2026-10-21T03:38:45.0803460Z     t =    18.82s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0803990Z     t =    18.82s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0804330Z     t =    18.85s         Capturing element debug description
+2026-10-21T03:38:45.0804750Z     t =    19.83s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0805210Z     t =    19.83s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0805560Z     t =    19.86s         Capturing element debug description
+2026-10-21T03:38:45.0806020Z     t =    20.83s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0806560Z     t =    20.83s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0806940Z     t =    20.89s         Capturing element debug description
+2026-10-21T03:38:45.0807380Z     t =    21.84s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+2026-10-21T03:38:45.0807810Z     t =    21.84s         Checking existence of `Button (First Match)`
+2026-10-21T03:38:45.0808190Z     t =    21.86s         Capturing element debug description
+2026-10-21T03:38:45.0808570Z     t =    22.80s     Checking `Expect predicate `existsNoRetry == 1` for object Button (
+2026-10-21T03:38:45.0808990Z [console excerpt; complete text retained in artifact]
+2026-10-21T03:38:45.0809310Z 0.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0809610Z                   Other, 0x107682f80, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0809930Z                     Other, 0x1076830c0, {{9.0, 520.5}, {0.0, 0.0}}
+2026-10-21T03:38:45.0810250Z                       Other, 0x107683200, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0810570Z                         Other, 0x107683340, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0810890Z                           Other, 0x107683480, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0811220Z                             Other, 0x1076835c0, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0811650Z                               Other, 0x107683700, {{9.0, 520.5}, {396.0, 366.5}}, identifier: 'ActivityListView'
+2026-10-21T03:38:45.0812280Z                                 Other, 0x107683840, {{9.0, 520.5}, {396.0, 366.5}}, identifier: 'ShareSheet.RemoteContainerView'
+2026-10-21T03:38:45.0812750Z                                   Other, 0x107683980, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0813140Z                                     Other, 0x107683ac0, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0813530Z                                       Other, 0x107683c00, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0813890Z                                         Other, 0x107683d40, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0814250Z                                           Other, 0x107683e80, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0814630Z                                             Other, 0x103657ac0, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0815070Z                                               Other, 0x103657700, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0815600Z                                                 NavigationBar, 0x103657840, {{9.0, 520.5}, {396.0, 110.0}}, identifier: 'UIActivityContentView'
+2026-10-21T03:38:45.0816120Z                                                   Image, 0x1075a6580, {{39.0, 550.5}, {64.0, 64.0}}
+2026-10-21T03:38:45.0816570Z                                                 Other, 0x1075a70c0, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0817200Z                                                   Other, 0x1075a7980, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0818010Z                                                     Other, 0x1075a57c0, {{9.0, 520.5}, {396.0, 366.5}}, identifier: 'shareSheet.activity.contentView'
+2026-10-21T03:38:45.0818760Z                                                       CollectionView, 0x1075a5540, {{9.0, 520.5}, {396.0, 366.5}}, identifier: 'activityCollectionView'
+2026-10-21T03:38:45.0819430Z                                                         Other, 0x1075a4140, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0819850Z                                                           Other, 0x1075a6f80, {{9.0, 520.5}, {396.0, 150.0}}
+2026-10-21T03:38:45.0820260Z                                                         Other, 0x1075a4a00, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0820690Z                                                         ScrollView, 0x1075a4000, {{31.0, 630.5}, {352.0, 121.0}}
+2026-10-21T03:38:45.0821260Z                                                           Cell, 0x1075a4b40, {{31.0, 630.5}, {82.0, 120.5}}, identifier: 'shareCell', label: 'More'
+2026-10-21T03:38:45.0821870Z                                                             Other, 0x1075a4f00, {{31.0, 630.5}, {82.0, 120.5}}
+2026-10-21T03:38:45.0822480Z                                                               Other, 0x1075a4c80, {{31.0, 720.5}, {82.0, 14.5}}
+2026-10-21T03:38:45.0823130Z                                                                 StaticText, 0x1075a6a80, {{31.0, 720.5}, {82.0, 14.5}}, identifier: 'cellTitleLabel', label: 'More'
+2026-10-21T03:38:45.0823900Z                                                                 StaticText, 0x1075a7480, {{31.0, 720.5}, {33.0, 30.5}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+2026-10-21T03:38:45.0824520Z                                                                 Other, 0x1075a6800, {{31.0, 720.5}, {82.0, 14.5}}
+2026-10-21T03:38:45.0825090Z                                                               Image, 0x1075a4dc0, {{39.0, 646.5}, {66.0, 66.0}}, identifier: 'activityImageView'
+2026-10-21T03:38:45.0825660Z                                                         ScrollView, 0x1075a6440, {{31.0, 752.5}, {352.0, 134.5}}
+2026-10-21T03:38:45.0826300Z                                                           Cell, 0x1075a5180, {{31.0, 752.5}, {82.0, 134.5}}, identifier: 'actionGroupCell', label: 'Copy'
+2026-10-21T03:38:45.0826870Z                                                             Other, 0x1075a6940, {{31.0, 752.5}, {82.0, 134.5}}
+2026-10-21T03:38:45.0827330Z                                                               Other, 0x1075a5900, {{31.0, 840.5}, {82.0, 14.5}}
+2026-10-21T03:38:45.0828020Z                                                                 StaticText, 0x1075a5a40, {{31.0, 840.5}, {82.0, 14.5}}, identifier: 'cellTitleLabel', label: 'Copy'
+2026-10-21T03:38:45.0828760Z                                                                 StaticText, 0x1075a5b80, {{31.0, 840.5}, {33.0, 30.5}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+2026-10-21T03:38:45.0829380Z                                                                 Other, 0x1075a5cc0, {{31.0, 840.5}, {82.0, 14.5}}
+2026-10-21T03:38:45.0829880Z                                                               Other, 0x1075a5e00, {{39.0, 768.5}, {66.0, 66.0}}
+2026-10-21T03:38:45.0830540Z                                                               Image, 0x1075a7700, {{56.0, 783.0}, {32.0, 37.0}}, identifier: 'activityImageView', label: 'copy'
+2026-10-21T03:38:45.0831290Z                                                         Other, 0x1075a6d00, {{39.0, 751.5}, {336.0, 1.0}}, identifier: 'collectionView.footerView'
+2026-10-21T03:38:45.0831800Z                                                       Other, 0x1075a7d40, {{39.0, 630.5}, {336.0, 1.0}}
+2026-10-21T03:38:45.0832420Z                                                 Toolbar, 0x1075a66c0, {{9.0, 520.5}, {396.0, 366.5}}, identifier: 'Toolbar', label: 'Toolbar'
+2026-10-21T03:38:45.0841660Z                                                   Other, 0x1075a7340, {{9.0, 520.5}, {396.0, 366.5}}
+2026-10-21T03:38:45.0847530Z Path to element:
+2026-10-21T03:38:45.0870190Z  →Application, 0x107681b80, pid: 10866, label: 'PVTReadback'
+2026-10-21T03:38:45.0870510Z Query chain:
+2026-10-21T03:38:45.0871290Z  →Find: Application 'org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb'
+2026-10-21T03:38:45.0871910Z   Output: {
+2026-10-21T03:38:45.0872170Z     Application, 0x1075a7c00, pid: 10866, label: 'PVTReadback'
+2026-10-21T03:38:45.0872450Z   }
+2026-10-21T03:38:45.0872530Z 
+2026-10-21T03:38:45.0872640Z     t =    29.41s Tear Down
+2026-10-21T03:38:45.0873120Z Test Case '-[PVTShareUITests.PVTShareUITests testWholePackageSystemShare]' failed (29.747 seconds).
+2026-10-21T03:38:45.0873640Z Test Suite 'PVTShareUITests' failed at 2026-10-21 03:36:37.012.
+2026-10-21T03:38:45.0874030Z 	 Executed 1 test, with 1 failure (0 unexpected) in 29.747 (29.750) seconds
+2026-10-21T03:38:45.0874470Z Test Suite 'PVTShareUITests.xctest' failed at 2026-10-21 03:36:37.012.
+2026-10-21T03:38:45.0874890Z 	 Executed 1 test, with 1 failure (0 unexpected) in 29.747 (29.752) seconds
+2026-10-21T03:38:45.0875300Z Test Suite 'Selected tests' failed at 2026-10-21 03:36:37.013.
+2026-10-21T03:38:45.0875820Z 	 Executed 1 test, with 1 failure (0 unexpected) in 29.747 (29.757) seconds
+2026-10-21T03:38:45.0876060Z 
+2026-10-21T03:38:45.0876160Z PVT diagnostic test-share-ui.stderr:
+2026-10-21T03:38:45.0876310Z 
+2026-10-21T03:38:45.0876410Z PVT diagnostic shutdown-owned.stderr:
+2026-10-21T03:38:45.0876580Z 
+2026-10-21T03:38:45.0876680Z PVT diagnostic delete-owned.stderr:
+2026-10-21T03:38:45.0876860Z 
+2026-10-21T03:38:45.0879600Z {"status": "blocked", "report": "/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/result.json", "reason": "test-share-ui: Command '['xcodebuild', '-project', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-tests/PVTShareTests.xcodeproj', '-scheme', 'PVTShareUITests', '-destination', 'id=1736CABF-89E1-413B-9BF5-7B4C010DECA9', '-derivedDataPath', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/ui-build', 'CODE_SIGNING_ALLOWED=NO', 'PRODUCT_BUNDLE_IDENTIFIER=org.xdremux.audit.PVTReadback.u1dd928c6841c47978d7979a5dc3869bb.uitests', '-resultBundlePath', '/Users/runner/work/_temp/pvt-native-import/pvt-native-uhzocdve/share-results.xcresult', '-only-testing:PVTShareUITests/PVTShareUITests/testWholePackageSystemShare', 'test-without-building']' timed out after 180 seconds"}
+2026-10-21T03:38:45.0983710Z ##[error]Process completed with exit code 2.
+2026-10-21T03:38:45.1252010Z ##[group]Run actions/upload-artifact@v7
+2026-10-21T03:38:45.1252590Z with:
+2026-10-21T03:38:45.1252860Z   name: pvt-native-import-7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:38:45.1254500Z   path: /Users/runner/work/_temp/pvt-native-import/pvt-native-*/result.json
+/Users/runner/work/_temp/pvt-native-import/pvt-native-*/baseline.json
+/Users/runner/work/_temp/pvt-native-import/pvt-native-*/after.json
+/Users/runner/work/_temp/pvt-native-import/pvt-native-*/share.json
+/Users/runner/work/_temp/pvt-native-import/pvt-native-*/share-transfer.json
+/Users/runner/work/_temp/pvt-native-import/pvt-native-*/*.stdout
+/Users/runner/work/_temp/pvt-native-import/pvt-native-*/*.stderr
+
+2026-10-21T03:38:45.1256150Z   if-no-files-found: warn
+2026-10-21T03:38:45.1256360Z   retention-days: 1
+2026-10-21T03:38:45.1256560Z   compression-level: 6
+2026-10-21T03:38:45.1256760Z   overwrite: false
+2026-10-21T03:38:45.1256950Z   include-hidden-files: false
+2026-10-21T03:38:45.1257150Z   archive: true
+2026-10-21T03:38:45.1257350Z env:
+2026-10-21T03:38:45.1257560Z   EXPECTED_HEAD: 7a561de9b2c6573caabae80642ba01d99e07e05f
+2026-10-21T03:38:45.1257920Z   CARGO_TARGET_DIR: /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T03:38:45.1258200Z   CARGO_INCREMENTAL: 0
+2026-10-21T03:38:45.1258400Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T03:38:45.1258610Z   CARGO_TERM_COLOR: always
+2026-10-21T03:38:45.1259230Z   RUST_BACKTRACE: short
+2026-10-21T03:38:45.1259440Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T03:38:45.1259650Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T03:38:45.1259900Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T03:38:45.1260170Z   CACHE_ON_FAILURE: true
+2026-10-21T03:38:45.1260430Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T03:38:45.1260710Z ##[endgroup]
+2026-10-21T03:38:45.9714030Z With the provided path, there will be 70 files uploaded
+2026-10-21T03:38:45.9714490Z Artifact name is valid!
+2026-10-21T03:38:45.9714710Z Root directory input is valid!
+2026-10-21T03:38:46.1822610Z Uploading artifact: pvt-native-import-7a561de9b2c6573caabae80642ba01d99e07e05f.zip
+2026-10-21T03:38:46.1823430Z Beginning upload of artifact content to blob storage
+2026-10-21T03:38:46.3323450Z Uploaded bytes 44496
+2026-10-21T03:38:46.3488280Z Finished uploading artifact content to blob storage!
+2026-10-21T03:38:46.3489090Z SHA256 digest of uploaded artifact is e6a9bd13a00a3d4405ac24cf655cc9c3ed5d8cc30b4e7d2005871d9cef7a3012
+2026-10-21T03:38:46.3489590Z Finalizing artifact upload
+2026-10-21T03:38:46.5772800Z Artifact pvt-native-import-7a561de9b2c6573caabae80642ba01d99e07e05f successfully finalized. Artifact ID 12319360743
+2026-10-21T03:38:46.5775490Z Artifact pvt-native-import-7a561de9b2c6573caabae80642ba01d99e07e05f has been successfully uploaded! Final size is 44496 bytes. Artifact ID is 12319360743
+2026-10-21T03:38:46.5786190Z Artifact download URL: https://github.com/21Z121Z1/XDRemux/actions/runs/39536719321/artifacts/12319360743
+2026-10-21T03:38:46.6239210Z Post job cleanup.
+2026-10-21T03:38:46.6245540Z ##[start-action display=Setup Rust Caching;id=__3e7007a5-4662-41b8-9cf4-92ff15eaa340.__Swatinem_rust-cache]
+2026-10-21T03:38:46.6304390Z Post job cleanup.
+2026-10-21T03:38:46.7436130Z Cache up-to-date.
+2026-10-21T03:38:46.7465500Z ##[end-action id=__3e7007a5-4662-41b8-9cf4-92ff15eaa340.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=121]
+2026-10-21T03:38:46.7555990Z Post job cleanup.
+2026-10-21T03:38:46.8597120Z [command]/opt/homebrew/bin/git version
+2026-10-21T03:38:46.8915350Z git version 2.56.0
+2026-10-21T03:38:46.8932870Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/bff3ae95-8d88-44ea-ae30-eff2d987c7e0/.gitconfig'
+2026-10-21T03:38:46.8939700Z Temporarily overriding HOME='/Users/runner/work/_temp/bff3ae95-8d88-44ea-ae30-eff2d987c7e0' before making global git config changes
+2026-10-21T03:38:46.8940710Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T03:38:46.8944170Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-21T03:38:46.9062920Z Removing SSH command configuration
+2026-10-21T03:38:46.9068610Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T03:38:46.9162950Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T03:38:47.0476070Z Removing HTTP extra header
+2026-10-21T03:38:47.0476730Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T03:38:47.0541810Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T03:38:47.1379360Z Removing includeIf entries pointing to credentials config files
+2026-10-21T03:38:47.1384050Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T03:38:47.1444510Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T03:38:47.2478780Z Cleaning up orphan processes

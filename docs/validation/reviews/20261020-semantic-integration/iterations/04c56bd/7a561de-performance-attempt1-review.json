@@ -1,0 +1,340 @@
+{
+  "source": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+  "job": 119014935484,
+  "run": 39536719296,
+  "conclusion": "failure",
+  "absolute_styles": {
+    "median_seconds": 13.616,
+    "median_limit": 11.732,
+    "p95_seconds": 16.015,
+    "p95_limit": 15.406
+  },
+  "binary_and_fixture_identity": {
+    "candidate_cli_sha256_equal": true,
+    "candidate_cli_sha256": "d9bc92d92c1070789b581f8f649def35d170e9da70ad7fec4196e98dd70cd579",
+    "candidate_adapter_sha256_equal": true,
+    "candidate_adapter_sha256": "d78ee2d5ed7ece698e1b0497edbcf31d787da6d740e1689cd98f2989ecabe4da",
+    "fixture_equal": true,
+    "candidate_profile_output_equal": true,
+    "baseline_cli_sha256_equal": true,
+    "baseline_adapter_sha256_equal": false
+  },
+  "previous_pass_summary": {
+    "baseline": {
+      "median_wall_seconds": 7.9021091249999245,
+      "median_user_seconds": 7.9,
+      "median_sys_seconds": 0.55,
+      "max_peak_rss_bytes": 1141555200
+    },
+    "candidate": {
+      "median_wall_seconds": 9.323697875000107,
+      "median_user_seconds": 9.1,
+      "median_sys_seconds": 0.7,
+      "max_peak_rss_bytes": 1137213440
+    },
+    "candidate_over_baseline_median": 1.1798999137461539
+  },
+  "current_failed_job_interleaved_summary": {
+    "baseline": {
+      "median_wall_seconds": 9.895716666999988,
+      "median_user_seconds": 9.89,
+      "median_sys_seconds": 1.11,
+      "max_peak_rss_bytes": 1141899264
+    },
+    "candidate": {
+      "median_wall_seconds": 11.538215750000063,
+      "median_user_seconds": 11.39,
+      "median_sys_seconds": 1.09,
+      "max_peak_rss_bytes": 1136705536
+    },
+    "candidate_over_baseline_median": 1.1659808115239843
+  },
+  "candidate_profile": {
+    "arm": "candidate",
+    "status": "validated",
+    "logs": "candidate-profile",
+    "outside_budget_and_comparison_samples": true,
+    "limits": "One candidate-only diagnostic conversion; no baseline stage comparison. The two scene detail spans overlap scene_derivation; do not add them to stage totals.",
+    "wall_seconds": 9.736490791999813,
+    "time_real_seconds": 9.72,
+    "user_seconds": 9.33,
+    "sys_seconds": 0.83,
+    "peak_rss_bytes": 1136754688,
+    "output_bytes": 2894706,
+    "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+    "stages": [
+      {
+        "stage": "source_analysis",
+        "wall_seconds": 0.006109125
+      },
+      {
+        "stage": "base_conversion",
+        "wall_seconds": 2.22301275
+      },
+      {
+        "stage": "semantic_production",
+        "wall_seconds": 2.276222042
+      },
+      {
+        "stage": "resource_decode",
+        "wall_seconds": 0.249197125
+      },
+      {
+        "stage": "scene_hdr_reconstruction",
+        "wall_seconds": 0.70450975
+      },
+      {
+        "stage": "scene_linear_area_reduction",
+        "wall_seconds": 0.1130865
+      },
+      {
+        "stage": "scene_derivation",
+        "wall_seconds": 1.12285725
+      },
+      {
+        "stage": "thumbnail_encode",
+        "wall_seconds": 0.208190959
+      },
+      {
+        "stage": "key1_fit",
+        "wall_seconds": 0.376963458
+      },
+      {
+        "stage": "style_metadata",
+        "wall_seconds": 0.2198075
+      },
+      {
+        "stage": "native_style_properties",
+        "wall_seconds": 0.002097209
+      },
+      {
+        "stage": "style_assembly",
+        "wall_seconds": 0.001479417
+      },
+      {
+        "stage": "texture_generation",
+        "wall_seconds": 2.906233292
+      },
+      {
+        "stage": "final_validation",
+        "wall_seconds": 0.012914125
+      },
+      {
+        "stage": "publication",
+        "wall_seconds": 0.008289125
+      }
+    ]
+  },
+  "arms_and_build_evidence": {
+    "previous": {
+      "baseline": {
+        "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "tracked_status": "",
+        "cli": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-cedfmp7s/reference-cargo-target/release/xdremux",
+          "sha256": "4f774a7262f35fcb1c55d2672ff81f33caf5dc1fdc7cb675199a5aef74e9a1c7",
+          "bytes": 4944448
+        },
+        "adapter": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-cedfmp7s/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "81ca1ab7bebdaf26e7ce2cd319dff406747a55b6955a54fbd8c03ad5bf6a8ddc",
+          "bytes": 805352
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "--package-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-cedfmp7s/reference-source",
+            "--scratch-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-cedfmp7s/reference-swift-scratch",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "reference-cargo-features.log",
+          "sha256": "d4a34f505326f542ad29d7f2e39ea21c600b4501b159f96a211bac5ca451b1ef",
+          "source_path_normalized_sha256": "dfd23f0509793a5a6d2531f09545bb2e5ce29fa6915180da8ef4f520023f6e87"
+        }
+      },
+      "candidate": {
+        "sha": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+        "tracked_status": "",
+        "cli": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/target/release/xdremux",
+          "sha256": "d9bc92d92c1070789b581f8f649def35d170e9da70ad7fec4196e98dd70cd579",
+          "bytes": 4919136
+        },
+        "adapter": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/.build/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "d78ee2d5ed7ece698e1b0497edbcf31d787da6d740e1689cd98f2989ecabe4da",
+          "bytes": 884216
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "build_owner": "performance.yml existing candidate release build",
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "candidate-cargo-features.log",
+          "sha256": "14613cdb763acd78878f2f6499b0f4221309b7029efc52dffda84b5f390e9931",
+          "source_path_normalized_sha256": "f1e4c9d6dc0064d69aeae23a62d1ed0dc3e4910a8a908fb67546097b76541753"
+        }
+      }
+    },
+    "current": {
+      "baseline": {
+        "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "tracked_status": "",
+        "cli": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-9satgvw8/reference-cargo-target/release/xdremux",
+          "sha256": "4f774a7262f35fcb1c55d2672ff81f33caf5dc1fdc7cb675199a5aef74e9a1c7",
+          "bytes": 4944448
+        },
+        "adapter": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-9satgvw8/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "000ea15ce33304d6e4e5bd2358824116a91a9697a279f836e29e1659ea4aa1a8",
+          "bytes": 805352
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "--package-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-9satgvw8/reference-source",
+            "--scratch-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-9satgvw8/reference-swift-scratch",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "reference-cargo-features.log",
+          "sha256": "66ae5c1571a0471bd2e2d0d0030da76edac126e5292f4dc50f123f80b89e9441",
+          "source_path_normalized_sha256": "dfd23f0509793a5a6d2531f09545bb2e5ce29fa6915180da8ef4f520023f6e87"
+        }
+      },
+      "candidate": {
+        "sha": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+        "tracked_status": "",
+        "cli": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/target/release/xdremux",
+          "sha256": "d9bc92d92c1070789b581f8f649def35d170e9da70ad7fec4196e98dd70cd579",
+          "bytes": 4919136
+        },
+        "adapter": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/.build/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "d78ee2d5ed7ece698e1b0497edbcf31d787da6d740e1689cd98f2989ecabe4da",
+          "bytes": 884216
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "build_owner": "performance.yml existing candidate release build",
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "candidate-cargo-features.log",
+          "sha256": "14613cdb763acd78878f2f6499b0f4221309b7029efc52dffda84b5f390e9931",
+          "source_path_normalized_sha256": "f1e4c9d6dc0064d69aeae23a62d1ed0dc3e4910a8a908fb67546097b76541753"
+        }
+      }
+    }
+  },
+  "log_sha256": {
+    "previous": "651fcd74e02c8e8ef20aa9c20fce15b0a44ac617ca674eaa604c9ec959e9bc9a",
+    "current": "0d492d41f9050569793c877f0d88d9fa13fc0828cee2ccd2d58ac2f0231404da"
+  },
+  "same_host_spec": "macOS27.0.1/26A434; Xcode27.0/27A266a; Swift6.4; VirtualMac2,1 AppleM1Virtual3cores7GiB in both logs",
+  "context_only_load": {
+    "previous": "3.26/2.40/4.33",
+    "current": "8.22/32.23/19.00"
+  },
+  "assessment": "Candidate CLI, native adapter, fixture and validated profile output are byte-identical across last passing and current failed jobs. Both main and candidate comparisons slow similarly across hosts, while relative candidate cost1.16598 persists. This is materially stronger evidence than load alone, but not a sole causal proof. The absolute failure remains failed.",
+  "bounded_followup": "Request exactly one rerun of only the failed performance job at the same immutable source and unchanged budgets; no code, gate, fixture or resource-tier changes. Retain both results and stop blind retries.",
+  "captured_at": "2026-10-21T03:25:49.642687+00:00"
+}

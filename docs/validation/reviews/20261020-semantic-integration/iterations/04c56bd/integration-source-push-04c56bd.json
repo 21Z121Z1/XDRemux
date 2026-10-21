@@ -1,0 +1,32 @@
+{
+  "captured_at": "2026-10-21T03:57:53.251140+00:00",
+  "source": "04c56bda6740212861b4c24907f15bb870e2e997",
+  "before": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "after": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "04c56bda6740212861b4c24907f15bb870e2e997",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "push_exit": 0,
+  "target_observed_at_requested_head": true,
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/04c56bd",
+  "portable_gate": "7/7 PASS; positional verify exit0",
+  "native_ci": "new-head automatic contexts pending;7a native App30/32matrix, System three-tone, Tone88real rows, three-platform core, arm64 package and exact-head pass;7a performance first attempt failed, single bounded second passed with12.93% relative cost.7a PVT native share lacks Save activity and remains failed. New source adds explicit controls/type facts and bounded failure exit; no earlier result substitutes for final-head native gates",
+  "merge_delete": "not executed"
+}

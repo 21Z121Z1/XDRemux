@@ -1,0 +1,56 @@
+{
+  "source": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+  "run": 39536719321,
+  "job": 119014935934,
+  "conclusion": "failure",
+  "native_setup": [
+    {
+      "name": "compile-sdk-canary",
+      "duration_seconds": 90.61745829099999,
+      "exit_code": 0
+    },
+    {
+      "name": "compile-reader",
+      "duration_seconds": 3.473404541999969,
+      "exit_code": 0
+    },
+    {
+      "name": "install-owned-reader",
+      "duration_seconds": 12.00883916700002,
+      "exit_code": 0
+    },
+    {
+      "name": "grant-owned-photos",
+      "duration_seconds": 2.269817250000017,
+      "exit_code": 0
+    },
+    {
+      "name": "launch-baseline",
+      "duration_seconds": 1.4639345840000146,
+      "exit_code": 0
+    },
+    {
+      "name": "build-share-ui",
+      "duration_seconds": 124.13433933300001,
+      "exit_code": 0
+    },
+    {
+      "name": "test-share-ui",
+      "duration_seconds": 180.17800408300002
+    }
+  ],
+  "first_actual_failure": "PVTShareUITests.swift:17 no matching Photos Save activity after opening system share sheet. Native tree has More/Copy only. XCTest case failed at29.747s; xcodebuild then timed out180s. No save, transfer or after receipt.",
+  "native_test_outcome": "Test started and failed; xcodebuild outcome uncertain after timeout. No Photos import/readback success or rejection conclusion.",
+  "source_unchanged": true,
+  "package_unchanged": true,
+  "transported_package_unchanged": true,
+  "cleanup": "completed",
+  "baseline_assets": 6,
+  "baseline_count_evidence": "actual baseline.json console diagnostic",
+  "log_sha256": "4de2c4e459d25b4dfcec55bd065f118a944a8237b544096f3d267e86c6d349cd",
+  "limits": [
+    "iOS27/iPhone11 owned simulator only; not macOS Photos or device.",
+    "UTI registration is an unvalidated representation hypothesis, not a package acceptance contract.",
+    "Parent independently read artifact12319360743; this receipt was parsed from original console log, not claimed ZIP materialization."
+  ]
+}
