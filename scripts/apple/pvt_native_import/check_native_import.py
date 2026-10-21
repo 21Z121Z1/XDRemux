@@ -98,6 +98,148 @@ def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout):
     return facts
 
 
+def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=time.sleep):
+    """Install at most once; reconcile registered bytes after a client timeout.
+
+    Booted, installer exit0 and a readable installed app are separate facts.
+    Read-only readiness/result polls never repeat an uncertain installation.
+    """
+    if (str(uuid.UUID(owned_udid)).upper() != owned_udid or report.get('owned_udid') != owned_udid
+            or report.get('probe_bundle_id') != bundle
+            or not re.fullmatch(r'org\.xdremux\.audit\.PVTReadback\.u[0-9a-f]{32}', bundle)):
+        raise Blocked('installation target is not the simulator/bundle created by this invocation')
+    staged_info = plistlib.loads((app / 'Info.plist').read_bytes())
+    if staged_info.get('CFBundleIdentifier') != bundle or staged_info.get('CFBundleExecutable') != 'PVTReadback':
+        raise Blocked('staged reader identity does not match this invocation')
+    expected_binary = sha(app / 'PVTReadback')
+    facts = {'status': 'preparing', 'install_attempts': 0, 'observations': [],
+             'readiness_attempt_limit': 3, 'reconcile_attempt_limit': 3, 'install_timeout_seconds': 120}
+    report['reader_installation'] = facts
+
+    def fail(status, reason):
+        facts['status'] = status
+        # Read only this disposable simulator's installation-service log.
+        try:
+            run('install-service-log', ['xcrun', 'simctl', 'spawn', owned_udid, 'log', 'show',
+                '--last', '2m', '--style', 'compact', '--predicate',
+                'process == "installd" OR process == "installcoordinationd" OR process == "mobile_installation_proxy"'],
+                timeout=15, required=False)
+        except Blocked as error:
+            facts['service_log_error'] = str(error)
+        raise Blocked(reason)
+
+    def inventory(attempt):
+        name = f'install-readiness-{attempt}'
+        result = run(name, ['xcrun', 'simctl', 'listapps', owned_udid], timeout=20, required=False)
+        if result.returncode:
+            raise Blocked('installed-app inventory service returned nonzero; readiness not established')
+        try:
+            value = json.loads(result.stdout)
+        except (ValueError, UnicodeDecodeError):
+            try:
+                value = plistlib.loads(result.stdout)
+            except (ValueError, plistlib.InvalidFileException):
+                # simctl also emits OpenStep plists. Preserve the raw reply and
+                # use the platform plist reader; never infer readiness from text.
+                raw = work / (name + '.stdout')
+                raw.write_bytes(result.stdout)
+                normalized = run(name + '-plist', ['plutil', '-convert', 'json', '-o', '-', raw], timeout=10)
+                value = json.loads(normalized.stdout)
+        if not isinstance(value, dict) or any(not isinstance(k, str) or not isinstance(v, dict) for k, v in value.items()):
+            raise Blocked('installed-app inventory is not a bundle dictionary')
+        return value
+
+    def installed_state(attempt):
+        observation = {'phase': 'container-readback', 'attempt': attempt, 'state': 'not-verified'}
+        facts['observations'].append(observation)
+        try:
+            paths = {}
+            for kind in ('app', 'data'):
+                result = run(f'install-state-{attempt}-{kind}',
+                             ['xcrun', 'simctl', 'get_app_container', owned_udid, bundle, kind], timeout=10, required=False)
+                observation[kind + '_query_exit_code'] = result.returncode
+                if result.returncode:
+                    continue
+                path = Path(result.stdout.decode().strip())
+                if not path.is_absolute() or owned_udid.lower() not in {p.lower() for p in path.parts}:
+                    raise Blocked('installed container query points outside the owned simulator')
+                path = path.resolve(strict=True)
+                if owned_udid.lower() not in {p.lower() for p in path.parts} or not path.is_dir():
+                    raise Blocked('resolved installed container is outside the owned simulator')
+                paths[kind] = path
+            if set(paths) != {'app', 'data'} or paths['app'] == paths['data']:
+                return None
+            info_path, binary = paths['app'] / 'Info.plist', paths['app'] / 'PVTReadback'
+            if info_path.is_symlink() or binary.is_symlink() or not binary.is_file():
+                raise Blocked('installed reader metadata or binary is not a regular owned file')
+            info = plistlib.loads(info_path.read_bytes())
+            if info.get('CFBundleIdentifier') != bundle or info.get('CFBundleExecutable') != 'PVTReadback':
+                raise Blocked('installed reader bundle identity differs from the staged app')
+            actual_binary = sha(binary)
+            if actual_binary != expected_binary:
+                raise Blocked('installed reader binary differs from the signed staged binary')
+            observation['state'] = 'installed-verified'
+            return {'app_container': str(paths['app']), 'data_container': str(paths['data']),
+                    'installed_binary_sha256': actual_binary, 'installed_info_sha256': sha(info_path)}
+        except (Blocked, OSError, ValueError) as error:
+            observation['error'] = str(error)
+            return None
+
+    ready = None
+    for attempt in range(1, 4):
+        try:
+            ready = inventory(attempt)
+            facts['observations'].append({'phase': 'inventory', 'attempt': attempt, 'state': 'service-answered',
+                'registered_app_count': len(ready), 'reader_registered': bundle in ready,
+                'inventory_contains_com_apple_mobileslideshow': 'com.apple.mobileslideshow' in ready})
+            break
+        except (Blocked, ValueError) as error:
+            facts['observations'].append({'phase': 'inventory', 'attempt': attempt, 'state': 'unknown', 'error': str(error)})
+            if attempt < 3:
+                pause(1)
+    if ready is None:
+        fail('installation-service-not-ready', 'owned simulator app-inventory service did not become readable; no installation attempted')
+    if bundle not in ready:
+        facts['install_attempts'] = 1
+        try:
+            result = run('install-owned-reader', ['xcrun', 'simctl', 'install', owned_udid, app], timeout=120, required=False)
+            facts['install_exit_code'] = result.returncode
+        except Blocked as error:
+            record = next(c for c in reversed(report['commands']) if c['name'] == 'install-owned-reader')
+            facts['install_exit_code'] = record.get('exit_code')
+            facts['install_client_outcome'] = record.get('outcome', 'failed-without-known-result')
+            facts['install_client_error'] = str(error)
+    if facts['install_attempts']:
+        try:
+            after_command = inventory('after-command')
+            facts['observations'].append({'phase': 'registration-after-command', 'state': 'service-answered',
+                                          'reader_registered': bundle in after_command})
+        except (Blocked, ValueError) as error:
+            facts['observations'].append({'phase': 'registration-after-command', 'state': 'unknown', 'error': str(error)})
+    for attempt in range(1, 4):
+        verified = installed_state(attempt)
+        explicit_error = (facts['install_attempts'] and facts.get('install_exit_code') is not None and facts['install_exit_code'] != 0
+                          and facts.get('install_client_outcome') != 'uncertain-after-timeout')
+        if explicit_error:
+            fail('native-install-error', 'native installer failed; actual command and installed-state observations retained')
+        if facts['install_attempts'] and facts.get('install_exit_code') is None and facts.get('install_client_outcome') != 'uncertain-after-timeout':
+            fail('unknown-install-client-result', 'installer client result is unknown; actual installed-state observations retained')
+        if verified:
+            facts.update(verified)
+            if not facts['install_attempts']:
+                facts['status'] = 'already-installed-verified'
+            elif facts.get('install_client_outcome') == 'uncertain-after-timeout':
+                facts['status'] = 'installed-verified-after-client-timeout'
+            else:
+                facts['status'] = 'installed-verified'
+            return facts
+        if attempt < 3:
+            pause(1)
+    status = ('not-verified-after-client-timeout' if facts.get('install_client_outcome') == 'uncertain-after-timeout'
+              else 'registered-reader-not-verified')
+    fail(status, 'owned reader installation could not be verified; no second install or Photos admission assumed')
+
+
 def print_console_receipt(work, report):
     # Keep the first native failure inspectable when artifact transfer is not
     # available. Only this owned probe's fixed text outputs are eligible.
@@ -105,6 +247,9 @@ def print_console_receipt(work, report):
     for name in ('compile-generator.stderr', 'generate-synthetic.stderr',
                  'compile-sdk-canary.stderr', 'compile-reader.stderr',
                  'compile-sdk-canary.processes.json', 'compile-reader.processes.json',
+                 'boot-owned-simulator.stdout', 'boot-owned-status.stdout',
+                 'install-owned-reader.stdout', 'install-owned-reader.stderr', 'install-owned-reader.processes.json',
+                 'install-service-log.stdout', 'install-service-log.stderr',
                  'grant-owned-photos.stderr', 'baseline.json',
                  'build-share-ui.stderr', 'test-share-ui.stdout', 'test-share-ui.stderr',
                  'share.json', 'share-transfer.json', 'share-types.json',
@@ -269,14 +414,14 @@ def main():
         report['commands'].append(record)
         started = time.monotonic()
         try:
-            if name in ('compile-sdk-canary', 'compile-reader'):
+            if name in ('compile-sdk-canary', 'compile-reader', 'install-owned-reader'):
                 progress = work / (name + '.processes.json')
                 record['progress_file'] = progress.name
                 record['timeout_seconds'] = timeout
                 record.update(run_owned_process(record['argv'], args.repo, work / (name + '.stdout'),
                                                 work / (name + '.stderr'), timeout=timeout, diagnostic_path=progress))
                 if record.get('outcome'):
-                    raise Blocked(f'{name}: {record["outcome"]}; compiler process stages and stdout/stderr retained')
+                    raise Blocked(f'{name}: {record["outcome"]}; owned process stages and stdout/stderr retained')
                 result = subprocess.CompletedProcess(record['argv'], record['exit_code'],
                     (work / (name + '.stdout')).read_bytes(), (work / (name + '.stderr')).read_bytes())
             else:
@@ -407,7 +552,9 @@ def main():
         (work / 'owned-simulator.json').write_text(json.dumps({'udid': owned_udid, 'name': 'pvt-audit-' + token, 'bundle': bundle}))
         run('boot-owned-simulator', ['xcrun', 'simctl', 'boot', owned_udid])
         run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
-        run('install-owned-reader', ['xcrun', 'simctl', 'install', owned_udid, app])
+        run('simctl-install-help', ['xcrun', 'simctl', 'help', 'install'], timeout=15)
+        run('simctl-listapps-help', ['xcrun', 'simctl', 'help', 'listapps'], timeout=15)
+        install_owned_reader(run, owned_udid, bundle, app, work, report)
         # Only the exact created UDID and installed bundle; no host TCC/SQLite.
         run('grant-owned-photos', ['xcrun', 'simctl', 'privacy', owned_udid, 'grant', 'photos', bundle])
         baseline = read_report('baseline', bundle)

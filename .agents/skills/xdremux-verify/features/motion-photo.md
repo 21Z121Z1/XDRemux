@@ -150,8 +150,14 @@ runner. It builds the exact source CLI and generates geometric media. It first
 compiles a cold SDK canary (240 seconds) and the actual reader (120 seconds)
 before creating or booting a simulator. Cold module setup retains toolchain/SDK
 identity and ten-second snapshots of only its owned compiler process group;
-timeout stops that group and remains non-PASS. It then installs only its
-own app and establishes a read-only PhotoKit baseline. It transports the whole
+timeout stops that group and remains non-PASS. After boot, bounded read-only
+app-inventory queries establish that the installation service answers. The
+probe submits at most one 120-second install and checks registration, app/data
+containers, bundle identity and the installed executable hash. A client timeout
+stays recorded; only independently verified matching installed bytes allow
+continuation. Unknown state is observed with bounded reads, never a second
+install. Installation-service logs remain scoped to the owned simulator. It
+then establishes a read-only PhotoKit baseline. It transports the whole
 validated directory unchanged into that app. A synthetic `UIImage` control
 checks save-action availability without saving it. The probe then offers the
 whole directory URL and, if no save action exists, an explicit
