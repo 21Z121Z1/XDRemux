@@ -329,36 +329,50 @@ jobs:
             artifacts/system-heif-hdr-measurement/tone/diagnostics/*.log
 
   pvt-native-import:
+    if: ${{ github.event.repository.visibility == 'public' && github.event.repository.private == false }}
     runs-on: xcode-27
     timeout-minutes: 25
     env:
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      PRODUCT_SOURCE_SHA: 8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a
+      CARGO_TARGET_DIR: ${{ github.workspace }}/product-source/target
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.EXPECTED_HEAD }}
+          path: harness-source
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.PRODUCT_SOURCE_SHA }}
+          path: product-source
           persist-credentials: false
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
+          rust-src-dir: product-source
       - name: Install the portable HEVC provider
         run: |
           brew install libheif
           echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
-      - name: Share the complete synthetic PVT through the owned simulator Photos activity
+      - name: One same-job readiness control then the unchanged pinned whole-PVT probe
         run: |
-          python3 scripts/apple/pvt_native_import/check_native_import.py \
-            --repo "$GITHUB_WORKSPACE" \
-            --cli "$CARGO_TARGET_DIR/debug/xdremux" \
-            --expected-head "$EXPECTED_HEAD" \
-            --output-root "$RUNNER_TEMP/pvt-native-import" \
+          python3 "$GITHUB_WORKSPACE/harness-source/scripts/apple/pvt_native_import/readiness_control.py" \
+            --harness-repo "$GITHUB_WORKSPACE/harness-source" \
+            --expected-harness-head "$EXPECTED_HEAD" \
+            --product-repo "$GITHUB_WORKSPACE/product-source" \
+            --expected-product-head "$PRODUCT_SOURCE_SHA" \
+            --output-root "$RUNNER_TEMP/pvt-readiness-control" \
+            --product-output-root "$RUNNER_TEMP/pvt-native-import" \
             --execute-owned-simulator
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
           name: pvt-native-import-${{ env.EXPECTED_HEAD }}
           path: |
+            ${{ runner.temp }}/pvt-readiness-control/control-*/result.json
+            ${{ runner.temp }}/pvt-readiness-control/control-*/*.stdout
+            ${{ runner.temp }}/pvt-readiness-control/control-*/*.stderr
             ${{ runner.temp }}/pvt-native-import/pvt-native-*/result.json
             ${{ runner.temp }}/pvt-native-import/pvt-native-*/baseline.json
             ${{ runner.temp }}/pvt-native-import/pvt-native-*/after.json

@@ -78,7 +78,16 @@ class WorkflowConfigurationTests(unittest.TestCase):
         job = workflow.split("  pvt-native-import:\n", 1)[1]
         self.assertIn("runs-on: xcode-27", job)
         self.assertIn("ref: ${{ env.EXPECTED_HEAD }}", job)
-        self.assertIn("--expected-head", job)
+        self.assertIn("--expected-harness-head", job)
+        self.assertIn("--expected-product-head", job)
+        self.assertIn("PRODUCT_SOURCE_SHA: 8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a", job)
+        self.assertIn("path: harness-source", job)
+        self.assertIn("path: product-source", job)
+        self.assertIn("rust-src-dir: product-source", job)
+        self.assertIn("readiness_control.py", job)
+        self.assertNotIn("needs:", job, "control and product must execute in the same job")
+        self.assertIn("github.event.repository.private == false", job)
+        self.assertIn("github.event.repository.visibility == 'public'", job)
         self.assertIn("--execute-owned-simulator", job)
         self.assertNotIn("continue-on-error", job)
         self.assertNotIn("|| true", job)
@@ -89,6 +98,10 @@ class WorkflowConfigurationTests(unittest.TestCase):
         for name in ("synthetic-motion.jpg", "synthetic.mp4", "capture.pvt/image.heic",
                      "readback/resource-0.bin", "PVTReadback.app/Info.plist", "share-results.xcresult/Info.plist"):
             self.assertFalse(self.uploaded("research.yml", prefix + name))
+        control_prefix = "${{ runner.temp }}/pvt-readiness-control/control-owned/"
+        self.assertTrue(self.uploaded("research.yml", control_prefix + "result.json"))
+        self.assertTrue(self.uploaded("research.yml", control_prefix + "control-listapps.stdout"))
+        self.assertFalse(self.uploaded("research.yml", control_prefix + "capture.pvt/image.heic"))
 
     @staticmethod
     def workflow(name: str) -> str:

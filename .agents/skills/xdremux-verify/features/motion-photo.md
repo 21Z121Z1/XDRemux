@@ -145,8 +145,21 @@ finally:
 This recipe proves the exercised binary's portable conversion and structural pair validation. It does not decode the pair in Apple frameworks, import it into Photos, prove all source codecs, test interrupted publication, or establish final-HEAD acceptance. For broader Motion Photo changes, use the existing `scripts/validation/check_rust_motion_photo_real_fixtures.sh` and the owning negative tests. Do not weaken a failed journey for a missing encoder or dependency.
 
 For direct PVT package admission, the `pvt-native-import` job in `research.yml`
-runs `scripts/apple/pvt_native_import/check_native_import.py` on the free macOS
-runner. It builds the exact source CLI and generates geometric media. It first
+runs one same-job control through `readiness_control.py` on the public repository's
+existing standard `xcode-27` runner. Separate checkouts bind the exact harness
+head and product `8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a`. Product owner trees and
+all original probe files must match before native effects. The control uses the
+pinned selector/runtime support table, boots one owned simulator with a180s
+bootstatus budget, and submits exactly one20s `listapps` request. Its reply must
+parse as a bundle dictionary. Shutdown/delete target only that control UUID;
+one device-list response and absent host device directory must confirm cleanup.
+Any failed precheck or uncertain cleanup stops without running the product.
+This preflight may warm CoreSimulator; it is not a cold-start repair or proof of
+a fresh VM. Control and product are sequential calls inside one job, not `needs`.
+
+Only after a successful cleaned control, the unchanged pinned
+`scripts/apple/pvt_native_import/check_native_import.py` runs once. It builds
+the pinned source CLI and generates geometric media. Within that probe it first
 compiles a cold SDK canary (240 seconds) and the actual reader (120 seconds)
 before creating or booting a simulator. Cold module setup retains toolchain/SDK
 identity and ten-second snapshots of only its owned compiler process group;
