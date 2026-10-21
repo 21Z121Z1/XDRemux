@@ -22,7 +22,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    private func report() {
+    nonisolated private func report() {
         let arguments = CommandLine.arguments
         let phase = arguments.firstIndex(of: "--phase").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil } ?? "after"
         var report: [String: Any] = ["phase": phase, "read_only_photokit": true,
@@ -120,7 +120,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         report["resources"] = resources
     }
 
-    private func export(_ resource: PHAssetResource, to url: URL) throws {
+    nonisolated private func export(_ resource: PHAssetResource, to url: URL) throws {
         guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw failure("export file unavailable") }
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
@@ -144,7 +144,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         if let error { throw error }
     }
 
-    private func failure(_ message: String) -> NSError {
+    nonisolated private func failure(_ message: String) -> NSError {
         NSError(domain: "PVTReadback", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 }
