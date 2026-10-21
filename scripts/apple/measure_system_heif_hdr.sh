@@ -31,13 +31,11 @@ XDREMUX_SYSTEM_GAIN_MAP_REPORT="$report" \
 test -s "$heic"
 test -s "$report"
 
-(
-  cd "$research_root"
-  python3 consumer-model/harness/run_tone_sweep.py \
-    "$out_dir/tone" \
-    "$heic" \
-    --tones -1 0 1
-)
+python3 "$repo_root/scripts/apple/check_style_tone_response.py" \
+  --run-consumer "$research_root" \
+  --out "$out_dir/tone" \
+  --photos "$heic" \
+  --tones -1 0 1
 
 python3 "$repo_root/scripts/apple/score_system_hdr_tone.py" \
   "$out_dir/tone" \

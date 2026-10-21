@@ -194,6 +194,8 @@ jobs:
           echo "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"
 
       - name: Test tone measurement failure handling
+        env:
+          RESEARCH_ROOT: ${{ github.workspace }}/consumer-research
         run: python3 -m unittest tests.test_style_tone_response -v
 
       - uses: actions-rust-lang/setup-rust-toolchain@v2
@@ -287,6 +289,11 @@ jobs:
           path: consumer-research
           persist-credentials: false
 
+      - name: Test System tone measurement failure handling
+        env:
+          RESEARCH_ROOT: ${{ github.workspace }}/consumer-research
+        run: python3 -m unittest tests.test_style_tone_response -v
+
       - name: Encode one fixture and score the three-tone sweep
         shell: bash
         env:
@@ -318,3 +325,5 @@ jobs:
             artifacts/system-heif-hdr-measurement/host.txt
             artifacts/system-heif-hdr-measurement/lhdr-v1-01.system-hdr.json
             artifacts/system-heif-hdr-measurement/tone-shape.json
+            artifacts/system-heif-hdr-measurement/tone/consumer-run.json
+            artifacts/system-heif-hdr-measurement/tone/diagnostics/*.log

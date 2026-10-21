@@ -55,7 +55,9 @@ class WorkflowConfigurationTests(unittest.TestCase):
         for path in ("${{ runner.temp }}/styles-version-native.json",
                      "artifacts/tone-response/report/tone-response.json",
                      "artifacts/tone-response/asymmetry/asymmetry.json",
-                     "artifacts/system-heif-hdr-measurement/tone-shape.json"):
+                     "artifacts/system-heif-hdr-measurement/tone-shape.json",
+                     "artifacts/system-heif-hdr-measurement/tone/consumer-run.json",
+                     "artifacts/system-heif-hdr-measurement/tone/diagnostics/consumer.stderr.log"):
             with self.subTest(path=path):
                 self.assertTrue(self.uploaded("research.yml", path))
         for path in ("${{ runner.temp }}/styles-photos-import/styles-v15.heic",
@@ -64,7 +66,10 @@ class WorkflowConfigurationTests(unittest.TestCase):
                      "artifacts/tone-response/xdremux/photo/tone-0/renderer-0/_outputImageTexture.bin",
                      "artifacts/tone-response/xdremux/photo/pixels.json",
                      "artifacts/system-heif-hdr-measurement/lhdr-v1-01.system.heic",
-                     "artifacts/system-heif-hdr-measurement/tone/photo/pixels.f32"):
+                     "artifacts/system-heif-hdr-measurement/tone/photo/pixels.f32",
+                     "artifacts/system-heif-hdr-measurement/tone/photo/tone-0/renderer-0/trace.json",
+                     "artifacts/system-heif-hdr-measurement/tone/photo/tone-0/facts.json",
+                     "artifacts/system-heif-hdr-measurement/tone/consumer-compat/heif_dump.py"):
             with self.subTest(path=path):
                 self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
 

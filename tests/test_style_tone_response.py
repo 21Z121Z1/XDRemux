@@ -4,6 +4,8 @@ import contextlib
 import hashlib
 import io
 import json
+import os
+import plistlib
 import struct
 import subprocess
 import sys
@@ -140,6 +142,11 @@ class StyleToneResponseTests(unittest.TestCase):
                               "rc=subprocess.call(['python3',str(Path.cwd()/'research/vm-native/extract_inputs.py'),sys.argv[2],str(out/'resources')])\n"
                               "assert rc==0\nassert Path(sys.argv[2]).is_absolute()\n"
                               f"rows=[{{'photo':'sample.xdremux','tone':t,'returncode':0,'components':3,'differing_components':0,'max_abs':0,'psnr_peak1_db':'inf'}} for t in {tone.TONES!r}]\n"
+                              "import numpy as np\n"
+                              "for row in rows:\n"
+                              " rd=out/'sample.xdremux'/('tone-%g'%row['tone'])/'renderer-0'; rd.mkdir(parents=True)\n"
+                              " np.array([.4,.4,.4,1],dtype='<f2').tofile(rd/'_outputImageTexture.bin')\n"
+                              " (rd/'trace.json').write_text(json.dumps({'process_status':0,'finish_status':0,'textures':{'_outputImageTexture':{'width':1,'height':1}}}))\n"
                               "(out/'tone-sweep.json').write_text(json.dumps(rows))\n")
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 receipt = tone.run_consumer(research, [Path("sample.xdremux.heic")], root / "out")
@@ -147,6 +154,89 @@ class StyleToneResponseTests(unittest.TestCase):
             self.assertEqual(receipt["returncode"], 0)
             self.assertEqual(parser.read_bytes(), before)
             self.assertEqual(receipt["parser_compatibility"]["original_source_sha256"], hashlib.sha256(before).hexdigest())
+
+    def test_three_tone_request_requires_complete_finite_native_measurements(self):
+        for mode in ("complete", "missing", "duplicate", "unexpected", "nonfinite", "missing-buffer", "components", "geometry"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as raw:
+                root = Path(raw)
+                research = root / "consumer"
+                self.install_parser(research)
+                script = research / "consumer-model/harness/run_tone_sweep.py"
+                script.parent.mkdir(parents=True)
+                script.write_text("from pathlib import Path\nimport json,sys,numpy as np\n"
+                                  f"mode={mode!r}\n"
+                                  "out=Path(sys.argv[1]); name=Path(sys.argv[2]).stem\n"
+                                  "tones=list(map(float,sys.argv[sys.argv.index('--tones')+1:])); rows=[]\n"
+                                  "for value in tones:\n"
+                                  " rd=out/name/('tone-%g'%value)/'renderer-0'; rd.mkdir(parents=True)\n"
+                                  " width=2 if mode=='geometry' and value==1 else 1\n"
+                                  " np.tile(np.array([float('inf') if mode=='nonfinite' else .4,.4,.4,1],dtype='<f2'),width).tofile(rd/'_outputImageTexture.bin')\n"
+                                  " (rd/'trace.json').write_text(json.dumps({'process_status':0,'finish_status':0,'textures':{'_outputImageTexture':{'width':width,'height':1}}}))\n"
+                                  " rows.append({'photo':name,'tone':value,'returncode':0,'components':6 if mode=='components' else 3,'differing_components':0,'max_abs':0,'psnr_peak1_db':'inf'})\n"
+                                  "if mode=='missing': rows.pop()\n"
+                                  "if mode=='duplicate': rows.append(rows[0])\n"
+                                  "if mode=='unexpected': rows.append(dict(rows[0],tone=.5))\n"
+                                  "if mode=='missing-buffer': (out/name/'tone-1/renderer-0/_outputImageTexture.bin').unlink()\n"
+                                  "(out/'tone-sweep.json').write_text(json.dumps(rows))\n")
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+                self.assertEqual(receipt["tones"], [-1., 0., 1.])
+                self.assertEqual(receipt["status"], "completed" if mode == "complete" else "failed", receipt)
+                self.assertEqual(len(list((root / "out/system").glob("tone-*"))), 3)
+        self.assertEqual(len(tone.TONES), 11)
+
+    def test_consumer_rejects_invalid_requested_tone_subsets_before_execution(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            for values in ((), (-1., 0., 0., 1.), (float("nan"),), (float("inf"),), (0.1,), (False,)):
+                with self.subTest(tones=values), self.assertRaisesRegex(ValueError, "unique subset"):
+                    tone.run_consumer(root, [Path("photo.heic")], root / "out", tones=values)
+            self.assertFalse((root / "out").exists())
+
+    @unittest.skipUnless(os.name == "posix", "executes the POSIX System measurement shell")
+    def test_system_shell_retains_the_consumer_first_fault_before_scoring(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            research = root / "consumer"
+            parser = self.install_parser(research)
+            script = research / "consumer-model/harness/run_tone_sweep.py"
+            script.parent.mkdir(parents=True)
+            script.write_text("from pathlib import Path\nimport json,sys\n"
+                              "out=Path(sys.argv[1]); name=Path(sys.argv[2]).stem; case=out/name; case.mkdir()\n"
+                              "(case/'extract.log').write_text('ValueError: System extraction first fault\\n')\n"
+                              "(out/'tone-sweep.json').write_text(json.dumps([{'photo':name,'error':'extract_inputs returncode 1'}]))\n")
+            executables = root / "bin"
+            executables.mkdir()
+            for name in ("sw_vers", "xcodebuild", "git"):
+                path = executables / name
+                path.write_text("#!/bin/sh\necho portable-test\n")
+                path.chmod(0o755)
+            cli = executables / "xdremux"
+            cli.write_text(f"#!{sys.executable}\nimport os,sys\nfrom pathlib import Path\n"
+                           "Path(sys.argv[sys.argv.index('--output')+1]).write_text('synthetic')\n"
+                           "Path(os.environ['XDREMUX_SYSTEM_GAIN_MAP_REPORT']).write_text('{}')\n")
+            cli.chmod(0o755)
+            python = executables / "python3"
+            repo = Path(__file__).resolve().parents[1]
+            python.write_text(f"#!{sys.executable}\nimport os,sys\nsys.path.insert(0,{str(repo)!r})\n"
+                              "from scripts.apple import check_style_tone_response as owner\n"
+                              f"owner.PINNED_HEIF_DUMP_SHA256={hashlib.sha256(parser.read_bytes()).hexdigest()!r}\n"
+                              "if sys.argv[1].endswith('check_style_tone_response.py'):\n"
+                              " sys.argv=sys.argv[1:]; sys.exit(owner.main())\n"
+                              f"os.execv({sys.executable!r},[{sys.executable!r},*sys.argv[1:]])\n")
+            python.chmod(0o755)
+            env = {**os.environ, "PATH": str(executables) + os.pathsep + os.environ["PATH"],
+                   "RESEARCH_ROOT": str(research), "SYSTEM_HDR_OUT": str(root / "out"),
+                   "XDREMUX_CLI": str(cli), "XDREMUX_APPLE_ADAPTER": "synthetic-adapter"}
+            result = subprocess.run(["bash", str(repo / "scripts/apple/measure_system_heif_hdr.sh")], env=env,
+                                    text=True, capture_output=True, timeout=20)
+            self.assertNotEqual(result.returncode, 0)
+            receipt = json.loads((root / "out/tone/consumer-run.json").read_text())
+            self.assertEqual(receipt["status"], "failed")
+            self.assertEqual(receipt["tones"], [-1., 0., 1.])
+            self.assertIn("System extraction first fault", result.stderr)
+            self.assertIn("System extraction first fault", (root / "out/tone/diagnostics/lhdr-v1-01.system-extract.log").read_text())
+            self.assertFalse((root / "out/tone-shape.json").exists())
 
     def metadata(self, resources, name):
         photo = resources / name
@@ -399,6 +489,105 @@ class StyleToneResponseTests(unittest.TestCase):
             self.assertEqual(receipt["status"], "failed")
             self.assertIsNotNone(receipt["returncode"])
             self.assertNotEqual(receipt["returncode"], 0)
+
+
+@unittest.skipUnless(os.environ.get("RESEARCH_ROOT"), "requires the pinned research checkout; no native frameworks needed")
+class PinnedExtractorIntegrationTests(unittest.TestCase):
+    SOURCES = {
+        "tools/heif_dump.py": "d65da02fb2ffadc334d4d00199d063d26bf7eb94",
+        "research/vm-native/extract_inputs.py": "9bd353c651a93c7479af2902cbe23057dae4f720",
+        "research/vm-native/heif_standalone.py": "42968e5aa336b80e5d2cafade45bb65256dc5a40",
+    }
+
+    def setUp(self):
+        self.work = tempfile.TemporaryDirectory()
+        self.addCleanup(self.work.cleanup)
+        self.root = Path(self.work.name)
+        self.research = self.root / "consumer"
+        self.originals = {}
+        for name, expected in self.SOURCES.items():
+            data = (Path(os.environ["RESEARCH_ROOT"]) / name).read_bytes()
+            self.assertEqual(hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest(), expected)
+            target = self.research / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            self.originals[target] = data
+
+    def tearDown(self):
+        for path, original in self.originals.items():
+            self.assertEqual(path.read_bytes(), original)
+
+    @staticmethod
+    def container(version=0, missing_linear=False):
+        def u16(value): return struct.pack(">H", value)
+        def u32(value): return struct.pack(">I", value)
+        def box(kind, data): return u32(len(data) + 8) + kind + data
+        def full(kind, data, v=0): return box(kind, bytes([v, 0, 0, 0]) + data)
+        payloads = [b"primary-coded-structure", plistlib.dumps({"0": 15, "1": b"key1", "3": b"gtc", "c": b"light-c", "d": b"light-d"}, fmt=plistlib.FMT_BINARY),
+                    b"linear-coded-structure", b"delta-coded-structure"]
+        infos = [full(b"infe", u16(i) + u16(0) + b"hvc1\0", 2) for i in (1, 3, 4)]
+        infos.insert(1, full(b"infe", u16(2) + u16(0) + b"uri style\0tag:apple.com,2023:photo:metadata:styles\0", 2))
+        iinf = full(b"iinf", (u16(4) if version == 0 else u32(4)) + b"".join(infos), version)
+        locations = b"\x44\0" + u16(4)
+        offset = 0
+        for index, payload in enumerate(payloads, 1):
+            locations += u16(index) + u16(1) + u16(0) + u16(1) + u32(offset) + u32(len(payload))
+            offset += len(payload)
+        properties = [full(b"auxC", b"tag:apple.com,2023:photo:aux:" + name + b"\0")
+                      for name in (b"linearthumbnail", b"styledeltamap")]
+        ipma = full(b"ipma", u32(2) + u16(3) + b"\1\1" + u16(4) + b"\1\2")
+        references = box(b"cdsc", u16(2) + u16(1) + u16(1))
+        for index in ((4,) if missing_linear else (3, 4)):
+            references += box(b"auxl", u16(index) + u16(1) + u16(1))
+        children = (full(b"pitm", u16(1)) + iinf + full(b"iloc", locations, 1)
+                    + box(b"iprp", box(b"ipco", b"".join(properties)) + ipma)
+                    + full(b"iref", references) + box(b"idat", b"".join(payloads)))
+        return box(b"ftyp", b"mif1\0\0\0\0mif1heic") + full(b"meta", children)
+
+    def extract(self, label, data, *, compat, conflict=None):
+        photo = self.root / (label + ".heic")
+        photo.write_bytes(data)
+        output = self.root / (label + "-resources")
+        script = self.research / "research/vm-native/extract_inputs.py"
+        if compat:
+            owner, _ = tone.prepare_consumer_compatibility(self.research, self.root / (label + "-owned"))
+            script = owner / "research/vm-native/extract_inputs.py"
+        env = os.environ.copy()
+        if conflict:
+            env["PYTHONPATH"] = str(conflict)
+        result = subprocess.run([sys.executable, str(script), str(photo), str(output)], cwd=self.root,
+                                env=env, capture_output=True, text=True, timeout=20)
+        self.assertEqual(photo.read_bytes(), data)
+        return result, output
+
+    def test_real_extractor_preserves_sibling_helper_import_and_direct_search_order(self):
+        conflict = self.root / "conflicting-path"
+        conflict.mkdir()
+        (conflict / "heif_standalone.py").write_text("raise RuntimeError('wrong external helper')\n")
+        direct, direct_output = self.extract("direct", self.container(), compat=False, conflict=conflict)
+        derived, derived_output = self.extract("derived", self.container(), compat=True, conflict=conflict)
+        self.assertEqual(direct.returncode, 0, direct.stderr)
+        self.assertEqual(derived.returncode, 0, derived.stderr)
+        for name in ("styles.plist", "linear.heic", "delta.heic", "key1.bin", "key3.bin", "keyc.bin", "keyd.bin"):
+            self.assertEqual((direct_output / name).read_bytes(), (derived_output / name).read_bytes())
+        (self.research / "heif_standalone.py").write_text("raise RuntimeError('original root helper priority')\n")
+        for compat in (False, True):
+            result, _ = self.extract(f"priority-{compat}", self.container(), compat=compat, conflict=conflict)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("original root helper priority", result.stderr)
+
+    def test_real_extractor_recovers_v1_and_keeps_missing_role_failure(self):
+        direct, _ = self.extract("v1-direct", self.container(1), compat=False)
+        recovered, resources = self.extract("v1-derived", self.container(1), compat=True)
+        self.assertNotEqual(direct.returncode, 0)
+        self.assertIn("expected one linked item, got 0", direct.stderr)
+        self.assertEqual(recovered.returncode, 0, recovered.stderr)
+        self.assertEqual(plistlib.loads((resources / "styles.plist").read_bytes())["0"], 15)
+        for compat in (False, True):
+            result, _ = self.extract(f"missing-{compat}", self.container(missing_linear=True), compat=compat)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("expected one linked item, got 0", result.stderr)
+            self.assertNotIn("ModuleNotFoundError", result.stderr)
 
 
 if __name__ == "__main__":

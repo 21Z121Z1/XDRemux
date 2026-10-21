@@ -108,6 +108,9 @@ def prepare_consumer_compatibility(research_root: Path, out_dir: Path) -> tuple[
         "spec=importlib.util.spec_from_file_location('tools.heif_dump',parser)\n"
         "module=importlib.util.module_from_spec(spec)\nsys.modules[spec.name]=module\n"
         "spec.loader.exec_module(module)\n"
+        # runpy does not install the original script's directory as sys.path[0].
+        # Its sibling heif_standalone import must retain direct-script order.
+        "sys.path.insert(0,str(root/'research/vm-native'))\n"
         "runpy.run_path(str(root/'research/vm-native/extract_inputs.py'),run_name='__main__')\n"
     )
     receipt["launcher_sha256"] = hashlib.sha256(extractor.read_bytes()).hexdigest()
@@ -118,14 +121,14 @@ def _finite_number(value) -> bool:
     return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
 
 
-def sweep_errors(rows: list[dict], photos: list[str]) -> list[str]:
+def sweep_errors(rows: list[dict], photos: list[str], tones: tuple[float, ...] = TONES) -> list[str]:
     errors = []
     seen = set()
     for row in rows:
         photo, tone = row.get("photo"), row.get("tone")
         if row.get("error") or type(row.get("returncode")) is not int or row["returncode"] != 0:
             errors.append(f"{photo} tone {tone}: {row.get('error') or 'renderer returncode ' + str(row.get('returncode'))}")
-        if photo not in photos or not _finite_number(tone) or tone not in TONES:
+        if photo not in photos or not _finite_number(tone) or tone not in tones:
             errors.append(f"unexpected or missing photo/tone in consumer row: {photo}, {tone}")
             continue
         pair = (photo, tone)
@@ -141,14 +144,19 @@ def sweep_errors(rows: list[dict], photos: list[str]) -> list[str]:
         if not _finite_number(psnr) and not (psnr == "inf" and row.get("max_abs") == 0):
             errors.append(f"{photo} tone {tone}: native/model PSNR missing or invalid")
     for photo in photos:
-        for tone in TONES:
+        for tone in tones:
             if (photo, tone) not in seen:
                 errors.append(f"missing consumer row: {photo} tone {tone}")
     return errors
 
 
-def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *, timeout: float = 3600) -> dict:
+def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *,
+                 tones: tuple[float, ...] = TONES, timeout: float = 3600) -> dict:
     """Run the pinned consumer unchanged, retaining text diagnostics before scoring."""
+    tones = tuple(tones)
+    if (not tones or any(not _finite_number(value) or value not in TONES for value in tones)
+            or len(set(tones)) != len(tones)):
+        raise ValueError("consumer tones must be a nonempty unique subset of the eleven measured tones")
     research_root, out_dir = research_root.resolve(), out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=False)
     diagnostics = out_dir / "diagnostics"
@@ -157,8 +165,8 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *, time
     names = [photo.stem for photo in photos]
     inputs = [photo if photo.is_absolute() else research_root / photo for photo in photos]
     command = [sys.executable, str(script), str(out_dir), *(str(photo) for photo in inputs),
-               "--tones", *(str(value) for value in TONES)]
-    receipt = {"status": "running", "photos": names, "tones": list(TONES), "command": command,
+               "--tones", *(str(value) for value in tones)]
+    receipt = {"status": "running", "photos": names, "tones": list(tones), "command": command,
                "returncode": None, "errors": [], "diagnostics": []}
     receipt_path = out_dir / "consumer-run.json"
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
@@ -188,7 +196,19 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *, time
                     raise
         if receipt["returncode"] != 0:
             receipt["errors"].append(f"consumer process exited {receipt['returncode']}")
-        receipt["errors"].extend(sweep_errors(read_sweep(out_dir / "tone-sweep.json"), names))
+        rows = read_sweep(out_dir / "tone-sweep.json")
+        receipt["errors"].extend(sweep_errors(rows, names, tones))
+        if not receipt["errors"]:
+            comparisons = {(row["photo"], row["tone"]): row for row in rows}
+            for name in names:
+                shape = None
+                for value in tones:
+                    image = load_native_rgb(out_dir / name / f"tone-{value:g}" / "renderer-0")
+                    if shape is not None and image.shape != shape:
+                        raise ValueError(f"{name} tone {value}: native render geometry differs")
+                    shape = image.shape
+                    if comparisons[name, value]["components"] != image.size:
+                        raise ValueError(f"{name} tone {value}: native/model component count differs from native texture")
         receipt["status"] = "failed" if receipt["errors"] else "completed"
     except Exception as error:
         receipt["status"] = "failed"
@@ -202,7 +222,7 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *, time
         logs = [("build", out_dir / "build.log")]
         for name in names:
             logs.append((f"{name}-extract", out_dir / name / "extract.log"))
-            logs.extend((f"{name}-tone-{tone:g}", out_dir / name / f"tone-{tone:g}.log") for tone in TONES)
+            logs.extend((f"{name}-tone-{tone:g}", out_dir / name / f"tone-{tone:g}.log") for tone in tones)
         for label, path in logs:
             if not path.is_file():
                 continue
@@ -235,7 +255,7 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *, time
                                            "omitted_native_facts_lines": omitted_facts})
         receipt["native_failures"] = []
         for name in names:
-            for tone in TONES:
+            for tone in tones:
                 facts_path = out_dir / name / f"tone-{tone:g}" / "facts.json"
                 if not facts_path.is_file():
                     continue
@@ -1015,6 +1035,7 @@ def main() -> int:
     parser.add_argument("--metadata", type=Path)
     parser.add_argument("--run-consumer", type=Path, metavar="RESEARCH_ROOT")
     parser.add_argument("--photos", nargs="+", type=Path)
+    parser.add_argument("--tones", nargs="+", type=float, help="Explicit consumer subset; default is all eleven tones")
     args = parser.parse_args()
     if args.self_test:
         self_test()
@@ -1023,9 +1044,12 @@ def main() -> int:
     if args.run_consumer:
         if not args.out or not args.photos:
             parser.error("--out and --photos are required with --run-consumer")
-        receipt = run_consumer(args.run_consumer, args.photos, args.out)
+        receipt = run_consumer(args.run_consumer, args.photos, args.out,
+                               tones=tuple(args.tones) if args.tones is not None else TONES)
         print(json.dumps(receipt, indent=2))
         return 0 if receipt["status"] == "completed" else 3
+    if args.tones is not None:
+        parser.error("--tones is only valid with --run-consumer")
     if args.compare:
         if not args.out:
             parser.error("--out is required with --compare")
