@@ -23,6 +23,24 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def print_console_receipt(work, report):
+    # Keep the first native failure inspectable when artifact transfer is not
+    # available. Only this owned probe's fixed text outputs are eligible.
+    print("PVT native receipt:\n" + json.dumps(report, indent=2, sort_keys=True))
+    for name in ('simctl-addmedia-help.stdout', 'compile-generator.stderr',
+                 'generate-synthetic.stderr', 'compile-reader.stderr',
+                 'grant-owned-photos.stderr', 'baseline.json',
+                 'direct-pvt-addmedia.stdout', 'direct-pvt-addmedia.stderr',
+                 'after.json', 'shutdown-owned.stderr', 'delete-owned.stderr'):
+        path = work / name
+        if not path.is_file() or path.is_symlink():
+            continue
+        content = path.read_text(errors='replace')
+        if len(content) > 12000:
+            content = content[:6000] + '\n[console excerpt; complete text retained in artifact]\n' + content[-6000:]
+        print(f"PVT diagnostic {name}:\n{content}")
+
+
 def observe_media_preservation(report, motion, package):
     # Observe success and failure before the owned simulator is cleaned up.
     if motion is not None:
@@ -311,6 +329,7 @@ def main():
             report['reason'] = 'owned simulator shutdown/delete failed; exact command receipts retained for cleanup'
         report['probe_driver_sha256'] = sha(Path(__file__))
         (work / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
+        print_console_receipt(work, report)
         print(json.dumps({'status': report['status'], 'report': str(work / 'result.json'), 'reason': report.get('reason')}))
     return 0 if report['status'].endswith('-pass') else 2
 

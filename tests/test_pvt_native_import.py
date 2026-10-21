@@ -3,6 +3,8 @@
 These checks do not execute or establish Apple native import.
 """
 import copy
+import contextlib
+import io
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +13,29 @@ from scripts.apple.pvt_native_import import check_native_import as probe
 
 
 class PVTNativeImportTests(unittest.TestCase):
+    def test_console_retains_native_rejection_and_only_fixed_text_diagnostics(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "direct-pvt-addmedia.stderr").write_text("native rejection: unsupported directory\n")
+            (root / "compile-reader.stderr").write_text("FIRST-ERROR" + "x" * 13000 + "LAST-ERROR")
+            (root / "media.jpg").write_bytes(b"never-print-media")
+            (root / "unexpected.stderr").write_text("not-an-allowed-diagnostic")
+            external = root / "external.txt"
+            external.write_text("never-follow-a-link")
+            (root / "after.json").symlink_to(external)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                probe.print_console_receipt(root, {"status": "blocked", "direct_import_exit_code": 2})
+            text = output.getvalue()
+            self.assertIn('"direct_import_exit_code": 2', text)
+            self.assertIn('"status": "blocked"', text)
+            self.assertIn("native rejection: unsupported directory\n", text)
+            self.assertIn("FIRST-ERROR", text)
+            self.assertIn("LAST-ERROR", text)
+            self.assertIn("complete text retained in artifact", text)
+            for forbidden in ("never-print-media", "not-an-allowed-diagnostic", "never-follow-a-link"):
+                self.assertNotIn(forbidden, text)
+
     def baseline_and_after(self):
         return ({"status": "baseline", "asset_identifiers": ["stock"]},
                 {"status": "readback-complete", "asset_identifiers": ["stock", "new"],
