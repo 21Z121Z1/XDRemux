@@ -1,0 +1,18 @@
+{
+  "source": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+  "failed_job": 119014935484,
+  "evidence": "7a561de-performance-attempt1-review.json",
+  "requested_scope": "Exactly one failed performance job, unchanged workflow/head/budgets/free tier",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "success": true
+    },
+    "isError": false
+  }
+}

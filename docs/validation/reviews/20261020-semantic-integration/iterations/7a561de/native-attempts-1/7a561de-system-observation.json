@@ -1,0 +1,53 @@
+{
+  "source": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+  "run": 39536719321,
+  "job": 119014935686,
+  "conclusion": "success",
+  "case_tests": "24 actual native-host Python regressions passed, including real/current/modeled stem rules and pinned full extractor integrations",
+  "native_rows": [
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 40094,
+      "max_abs": 0.005859375,
+      "psnr_peak1_db": 67.31545344735109
+    },
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 66931,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 63.98242993496426
+    }
+  ],
+  "score": {
+    "mean_luminance": {
+      "-1": 0.20243671579677794,
+      "0": 0.2879219098961844,
+      "1": 0.4011222002391386
+    },
+    "signed_luminance_at_minus_1": -0.08548519409940644,
+    "signed_luminance_at_plus_1": 0.1132002903429542,
+    "tone_changes_render": true,
+    "matches_earlier_asymmetric_shape": true
+  },
+  "log_sha256": "8913f268f9053ca3e3949e2d1cb31ec5a4d7c435522107d3f37be1a01523c24b",
+  "limits": [
+    "System three-tone actual rendering only; full Tone11 and Photos PVT sharing are separate.",
+    "Not physical Photos editing or wallpaper qualification."
+  ],
+  "captured_at": "2026-10-21T03:30:08.005037+00:00"
+}
