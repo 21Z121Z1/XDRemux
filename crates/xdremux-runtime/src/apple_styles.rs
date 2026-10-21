@@ -688,6 +688,10 @@ fn derive_style_scene(
     let pixel_count = width.checked_mul(height).ok_or_else(|| {
         RuntimeError::new("Photographic Styles source raster", "pixel count overflows")
     })?;
+    // This validated source has only256 possible channel codes. Reuse the
+    // exact scalar decoding result; retain the same f32 operations and HDR path.
+    let srgb8_to_linear: [f32; 256] =
+        std::array::from_fn(|code| srgb_decode(f32::from(code as u8) / 255.0));
     let mut full_sdr = Vec::with_capacity(pixel_count.saturating_mul(3));
     for y in 0..height {
         let source_row = y.checked_mul(raster.bytes_per_row).ok_or_else(|| {
@@ -708,7 +712,7 @@ fn derive_style_scene(
                     )
                 })?;
             for component in &raster.data[source_offset..source_offset + 3] {
-                full_sdr.push(srgb_decode(f32::from(*component) / 255.0));
+                full_sdr.push(srgb8_to_linear[usize::from(*component)]);
             }
         }
     }
@@ -1620,6 +1624,55 @@ mod tests {
             let actual =
                 u16::from_le_bytes([thumbnail.data[index * 2], thumbnail.data[index * 2 + 1]]);
             assert_eq!(actual, expected, "RGB index {index}");
+        }
+    }
+
+    #[test]
+    fn style_scene_preserves_every_rgb8_code_and_row_stride() {
+        let width = 256;
+        let stride = width * 3 + 7;
+        let mut pixels = vec![0x7f; stride * 2];
+        let mut expected = Vec::with_capacity(width * 2 * 3);
+        for row in 0..2 {
+            for code in 0_u8..=255 {
+                let channels = if row == 0 {
+                    [code, 255 - code, code.wrapping_add(31)]
+                } else {
+                    [code.wrapping_add(73), code, 255 - code]
+                };
+                let offset = row * stride + usize::from(code) * 3;
+                pixels[offset..offset + 3].copy_from_slice(&channels);
+                for channel in channels {
+                    // Preserve the original scalar operation at runtime, even
+                    // in optimized builds; do not constant-fold the reference.
+                    let encoded = std::hint::black_box(f32::from(channel) / 255.0);
+                    expected.push(if encoded <= 0.040_45 {
+                        encoded / 12.92
+                    } else {
+                        ((encoded + 0.055) / 1.055).powf(2.4)
+                    });
+                }
+            }
+        }
+        let base = Raster8::new(width as u32, 2, stride, RasterPixelFormat::Rgb8, pixels).unwrap();
+        let gain = Raster8::new(1, 1, 1, RasterPixelFormat::Mono8, vec![128]).unwrap();
+        let mut parameters = vec![0.0; 20];
+        parameters[0..3].fill(1.0);
+        parameters[4..7].fill(2.0);
+        parameters[7..10].fill(1.0);
+        parameters[16] = 1.0;
+        parameters[17] = 2.0;
+        parameters[18] = 2.0;
+        let scale = xdremux_hdr::resolve(&parameters, xdremux_hdr::ExtractionMode::Uhdr).unwrap();
+        let scene = derive_style_scene(&base, &gain, &scale, width as u32).unwrap();
+        assert_eq!((scene.width, scene.height), (width, 2));
+        assert_eq!(scene.base_rgb.len(), expected.len());
+        for (index, (actual, expected)) in scene.base_rgb.iter().zip(expected).enumerate() {
+            assert_eq!(
+                actual.to_bits(),
+                expected.to_bits(),
+                "RGB component {index}"
+            );
         }
     }
 

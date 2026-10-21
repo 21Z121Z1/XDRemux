@@ -108,6 +108,21 @@ jobs:
             tests.test_styles_revision_comparison \
             2>&1 | tee artifacts/performance/design-policy.log
 
+      - name: Require actual release RGB8 scene equivalence on the native host
+        shell: bash
+        run: |
+          cargo test --locked --release -p xdremux-runtime --lib \
+            apple_styles::tests::style_scene_preserves_every_rgb8_code_and_row_stride \
+            -- --exact --nocapture \
+            2>&1 | tee artifacts/performance/rgb8-scene-equivalence.log
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text = re.sub(r'\x1b\[[0-9;]*m', '', Path('artifacts/performance/rgb8-scene-equivalence.log').read_text())
+          assert 'test apple_styles::tests::style_scene_preserves_every_rgb8_code_and_row_stride ... ok' in text
+          assert '1 passed; 0 failed; 0 ignored;' in text, 'missing or skipped native RGB8 scene evidence'
+          PY
+
       - name: Measure representative end-to-end product workloads
         shell: bash
         run: |
