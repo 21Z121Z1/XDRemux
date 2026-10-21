@@ -746,14 +746,23 @@ final class XDRemuxViewModel {
     // PVT is opaque to the app. Never scan it or create output beneath it,
     // including when an ordinary-looking directory aliases a package.
     nonisolated private static func hasPVTPackageAncestor(_ url: URL) -> Bool {
-        for candidate in [url.standardizedFileURL, url.resolvingSymlinksInPath().standardizedFileURL] {
-            var parent = candidate.deletingLastPathComponent()
-            while parent.path != "/" {
-                if parent.pathExtension.lowercased() == "pvt" { return true }
-                let next = parent.deletingLastPathComponent()
-                guard next.path != parent.path else { break }
-                parent = next
+        func containsPackageComponent(_ path: URL) -> Bool {
+            path.pathComponents.contains { ($0 as NSString).pathExtension.lowercased() == "pvt" }
+        }
+        let path = url.standardizedFileURL
+        if containsPackageComponent(path.deletingLastPathComponent()) { return true }
+
+        // New output leaves may not exist. Resolve existing ancestors rather
+        // than depending on whole-path resolution through missing components.
+        var candidate = path
+        while candidate.path != "/" {
+            if pathEntryExists(candidate),
+               containsPackageComponent(candidate.resolvingSymlinksInPath().standardizedFileURL) {
+                return true
             }
+            let parent = candidate.deletingLastPathComponent()
+            guard parent.path != candidate.path else { break }
+            candidate = parent
         }
         return false
     }

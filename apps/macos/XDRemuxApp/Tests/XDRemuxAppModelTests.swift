@@ -503,11 +503,18 @@ struct XDRemuxAppModelTests {
 
     @MainActor
     private static func testExistingPVTPackagesAreNotScannedOrUsedAsOutputDirectories() async throws {
-        try await withCLI("printf '{\"items\": []}\\n'") { root in
+        try await withCLI("printf '%s\\n' \"$*\" >> \"$0.log\"\nprintf '{\"items\": []}\\n'") { root in
+            let commandLog = root.appendingPathComponent("xdremux-test-cli.log")
+            try Data("sentinel\n".utf8).write(to: commandLog)
             let package = root.appendingPathComponent("existing.PVT", isDirectory: true)
             try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
             let member = package.appendingPathComponent("member.heic")
             try Data("unchanged-member".utf8).write(to: member)
+            let interior = package.appendingPathComponent("interior", isDirectory: true)
+            try FileManager.default.createDirectory(at: interior, withIntermediateDirectories: true)
+            let interiorMember = interior.appendingPathComponent("inside.heic")
+            try Data("unchanged-interior-member".utf8).write(to: interiorMember)
+            let originalMembers = try FileManager.default.contentsOfDirectory(atPath: package.path).sorted()
             let scanner = XDRemuxViewModel()
             _ = await scanner.importFiles(from: [package, member, root])
             try expect(scanner.queue.isEmpty, "directory discovery must treat PVT as an opaque package")
@@ -516,19 +523,53 @@ struct XDRemuxAppModelTests {
             try writeFile(input)
             let alias = root.appendingPathComponent("package-alias")
             try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: package)
+            let interiorAlias = root.appendingPathComponent("interior-alias")
+            try FileManager.default.createSymbolicLink(at: interiorAlias, withDestinationURL: interior)
+            let chainAlias = root.appendingPathComponent("chain-alias")
+            try FileManager.default.createSymbolicLink(at: chainAlias, withDestinationURL: interiorAlias)
+            let directories: [(String, URL, URL)] = [
+                ("direct-package", package, package),
+                ("direct-missing-child", package.appendingPathComponent("nested"), package),
+                ("alias-package", alias, alias),
+                ("alias-missing-child", alias.appendingPathComponent("missing"), alias),
+                ("alias-missing-multilevel", alias.appendingPathComponent("missing/deeper/still-missing"), alias),
+                ("alias-interior", interiorAlias, interiorAlias),
+                ("alias-interior-missing-multilevel", interiorAlias.appendingPathComponent("missing/deeper"), interiorAlias),
+                ("alias-chain-missing-multilevel", chainAlias.appendingPathComponent("missing/deeper"), chainAlias),
+            ]
+            _ = await scanner.importFiles(from: [alias, interiorAlias, chainAlias, interiorAlias.appendingPathComponent("inside.heic")])
+            try expect(scanner.queue.isEmpty, "aliases to a package or its interior must not expose package members as inputs")
+            let callsBeforeOutputChecks = try Data(contentsOf: commandLog)
             for format in LivePhotoOutput.allCases {
-                for outputDirectory in [package, package.appendingPathComponent("nested"), alias] {
-                    let model = XDRemuxViewModel()
-                    model.config.livePhotoOutput = format
-                    model.config.outputDirectory = outputDirectory
-                    model.queue = [ConversionQueueItem(inputURL: input, outputURL: input, assetType: .livePhoto)]
-                    _ = model.markOutputCollisionsForTesting()
-                    try expect(model.queue[0].outputPlanStatus == .existingPackage && !model.canStart, "both pair and PVT outputs must not add members inside an existing package")
-                    try expect((try? XDRemuxViewModel.prepareOutputForConversionForTesting(inputURL: input, outputURL: model.queue[0].outputURL, skipExisting: true)) == nil, "execution preparation must reject package descendants as well as planning")
+                for skip in [true, false] {
+                    for (name, outputDirectory, existingRoot) in directories {
+                        let model = XDRemuxViewModel()
+                        model.config.livePhotoOutput = format
+                        model.config.skipExisting = skip
+                        model.config.outputDirectory = outputDirectory
+                        model.queue = [ConversionQueueItem(inputURL: input, outputURL: input, assetType: .livePhoto)]
+                        _ = model.markOutputCollisionsForTesting()
+                        let output = model.queue[0].outputURL
+                        let context = "case=\(name), format=\(format.rawValue), skip=\(skip), directory=\(outputDirectory.path), existingRoot=\(existingRoot.path), resolvedRoot=\(existingRoot.resolvingSymlinksInPath().path), resolvedDirectory=\(outputDirectory.resolvingSymlinksInPath().path), output=\(output.path), resolvedOutput=\(output.resolvingSymlinksInPath().path), plan=\(model.queue[0].outputPlanStatus.rawValue), status=\(model.queue[0].status.rawValue), canStart=\(model.canStart)"
+                        print("PVT package boundary: \(context)")
+                        try expect(model.queue[0].outputPlanStatus == .existingPackage && !model.canStart, "both pair and PVT outputs must not add members inside an existing package: \(context)")
+                        try expect((try? XDRemuxViewModel.prepareOutputForConversionForTesting(inputURL: input, outputURL: output, skipExisting: skip)) == nil, "execution preparation must reject package descendants as well as planning: \(context)")
+                        model.startConversion()
+                        try expect(!model.isBusy && model.queue[0].status == .failed, "blocked package rows must not start conversion: \(context)")
+                        try expect(try Data(contentsOf: commandLog) == callsBeforeOutputChecks, "blocked planning, preparation and start must not invoke CLI validate or convert: \(context)")
+                        try expect(try Data(contentsOf: input) == Data(repeating: 0x41, count: 16), "package protection must preserve the queued source: \(context)")
+                    }
                 }
             }
-            try expect(try FileManager.default.contentsOfDirectory(atPath: package.path) == ["member.heic"], "discovery and output planning must preserve the complete package")
+            let commands = try String(contentsOf: commandLog, encoding: .utf8).split(separator: "\n")
+            try expect(!commands.contains { ["validate", "convert"].contains(String($0.split(separator: " ").first ?? "")) }, "package discovery may classify inputs but must never validate or convert blocked outputs")
+            try expect(try FileManager.default.contentsOfDirectory(atPath: package.path).sorted() == originalMembers, "discovery and output planning must preserve the complete package")
+            try expect(try FileManager.default.contentsOfDirectory(atPath: interior.path) == ["inside.heic"], "package aliases must not add nested members")
             try expect(try Data(contentsOf: member) == Data("unchanged-member".utf8), "discovery and output planning must preserve its original media bytes")
+            try expect(try Data(contentsOf: interiorMember) == Data("unchanged-interior-member".utf8), "interior aliases must preserve original media bytes")
+            for (link, target) in [(alias, package), (interiorAlias, interior), (chainAlias, interiorAlias)] {
+                try expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == target.path, "package protection must preserve aliases: \(link.path)")
+            }
         }
     }
 
