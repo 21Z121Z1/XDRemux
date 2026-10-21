@@ -1,0 +1,96 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "clone",
+        "--no-checkout",
+        "--no-hardlinks",
+        "--",
+        "/tmp/tmpjt0onh3_/source",
+        "/tmp/xdremux-stage-retained-6fev1f9p/reference-source"
+      ],
+      "cwd": "/tmp/tmpjt0onh3_/source",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/tmp/tmpjt0onh3_/out/commands/000.stdout",
+      "stderr_path": "/tmp/tmpjt0onh3_/out/commands/000.stderr",
+      "owned_process_group": 2492,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.007468400999641744
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+        "checkout",
+        "--detach",
+        "e6b391dfcc85e739cc567ba603c12db0b6c0a69d"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/tmp/tmpjt0onh3_/out/commands/001.stdout",
+      "stderr_path": "/tmp/tmpjt0onh3_/out/commands/001.stderr",
+      "owned_process_group": 2495,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0034013340000456083
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/tmp/tmpjt0onh3_/out/commands/002.stdout",
+      "stderr_path": "/tmp/tmpjt0onh3_/out/commands/002.stderr",
+      "owned_process_group": 2496,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001342531999853236
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/tmp/tmpjt0onh3_/out/commands/003.stdout",
+      "stderr_path": "/tmp/tmpjt0onh3_/out/commands/003.stderr",
+      "owned_process_group": 2497,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0012948700000379176
+    }
+  ],
+  "owned_workspace": {
+    "path": "/tmp/xdremux-stage-retained-6fev1f9p",
+    "retained": true,
+    "deletion_attempted": false,
+    "shared_worktree_registry_touched": false,
+    "reason": "retained by design on success, failure or interrupt; manual review required"
+  },
+  "reference_clone": {
+    "path": "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+    "head": "e6b391dfcc85e739cc567ba603c12db0b6c0a69d",
+    "retained": true
+  }
+}

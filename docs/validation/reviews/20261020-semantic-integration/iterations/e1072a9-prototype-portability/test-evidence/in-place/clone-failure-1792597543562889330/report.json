@@ -1,0 +1,96 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "clone",
+        "--no-checkout",
+        "--no-hardlinks",
+        "--",
+        "/tmp/tmp06m69fbu/source",
+        "/tmp/xdremux-stage-retained-yyogu487/reference-source"
+      ],
+      "cwd": "/tmp/tmp06m69fbu/source",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/tmp/tmp06m69fbu/out/commands/000.stdout",
+      "stderr_path": "/tmp/tmp06m69fbu/out/commands/000.stderr",
+      "owned_process_group": 2398,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.007534354000199528
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+        "checkout",
+        "--detach",
+        "4144782556c536464f4c5ec63cd60ec891665368"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/tmp/tmp06m69fbu/out/commands/001.stdout",
+      "stderr_path": "/tmp/tmp06m69fbu/out/commands/001.stderr",
+      "owned_process_group": 2401,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.004589875999954529
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/tmp/tmp06m69fbu/out/commands/002.stdout",
+      "stderr_path": "/tmp/tmp06m69fbu/out/commands/002.stderr",
+      "owned_process_group": 2402,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014168100001370476
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/tmp/tmp06m69fbu/out/commands/003.stdout",
+      "stderr_path": "/tmp/tmp06m69fbu/out/commands/003.stderr",
+      "owned_process_group": 2403,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.001489060000039899
+    }
+  ],
+  "owned_workspace": {
+    "path": "/tmp/xdremux-stage-retained-yyogu487",
+    "retained": true,
+    "deletion_attempted": false,
+    "shared_worktree_registry_touched": false,
+    "reason": "retained by design on success, failure or interrupt; manual review required"
+  },
+  "reference_clone": {
+    "path": "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+    "head": "4144782556c536464f4c5ec63cd60ec891665368",
+    "retained": true
+  }
+}

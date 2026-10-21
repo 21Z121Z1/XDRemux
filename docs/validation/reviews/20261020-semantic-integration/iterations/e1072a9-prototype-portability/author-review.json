@@ -1,0 +1,49 @@
+{
+  "review": "Author review; not independent/macOS validation",
+  "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "operation_enabled": false,
+  "findings": [
+    {
+      "priority": "P1",
+      "disposition": "Act on",
+      "problem": "Owner executed before fixed-source identity checks; mutable candidate Rust read",
+      "change": "Bounded root/SHA/gitdir/clean checks before fixed-blob execution, repeated checks, pre-execution identity/hash checkpoint; fixed Rust blob",
+      "evidence": "IdentityTests including dirty/wrong root/SHA, mid-read writer and late drift"
+    },
+    {
+      "priority": "P1",
+      "disposition": "Act on",
+      "problem": "Overall alarm did not bound finally Git/worktree/Popen cleanup",
+      "change": "Independent retained clone replaces shared-worktree path; no remove/reset/rmtree; per-command deadlines and independent bounded kill/reap, uncertain start/reap states",
+      "evidence": "LifecycleTests: actual timeout/nonzero/SIGINT/alarm; injected KeyboardInterrupt/reap/start uncertainty; actual failed clone/build fixture"
+    },
+    {
+      "priority": "P2",
+      "disposition": "Act on",
+      "problem": "Tests depended on absolute audit/workspace locations and non-Darwin assertion",
+      "change": "Adjacent fixed source snapshots, explicit checkout argument, isolated Git fixtures, platform skips, relocated non-Git bundle",
+      "evidence": "21 tests in-place plus21 relocated; portable-verification.json"
+    },
+    {
+      "priority": "P2",
+      "disposition": "Act on",
+      "problem": "Dispatch-tool absence and incomplete historical gh read could be misread as Actions write rejection",
+      "change": "Separate callable-tool absence from server outcome; historical receipt gap explicit; no retry/POST/alternate artifact route",
+      "evidence": "execution-capability-note.json"
+    },
+    {
+      "priority": "limitation",
+      "disposition": "Noted",
+      "problem": "Different raster/gain_raster release scopes and nested log overhead confound pure algorithm attribution",
+      "change": "Broad-operation interpretation only; no stage result or optimization claimed",
+      "evidence": "README.en.md interpretation section"
+    }
+  ],
+  "native_status": {
+    "portable_tests": "21+21 on Linux Python3.12",
+    "rust_swift_compile": "not executed",
+    "macos_stage_run": "not executed",
+    "stage_cost_result": "not obtained"
+  },
+  "history": "New suite added with correction; no pre-fix failing execution captured. Earlier intermediate portable checks remain local audit records, not final-code acceptance."
+}

@@ -1,0 +1,24 @@
+{
+  "scope": "Evidence correction only; no API execution or native experiment this turn",
+  "workflow_dispatch": {
+    "callable_tool_found": false,
+    "server_request_attempted": false,
+    "server_rejection_observed": false
+  },
+  "historical_gh_read": {
+    "claim_in_v24": "A harmless gh API read returned Forbidden",
+    "complete_endpoint_exit_code_stderr_receipt_retained_in_v24": false,
+    "independently_verified_from_archived_machine_receipt": false,
+    "limitation": "The retained narrative is insufficient to establish an Actions write denial; no current retry performed."
+  },
+  "actions_write_denied": {
+    "supported_by_retained_evidence": false
+  },
+  "artifact403": {
+    "new_download_attempted": false,
+    "alternate_route_attempted": false
+  },
+  "new_pvt_or_performance_experiment": false,
+  "product_head": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "operation_enabled": false
+}

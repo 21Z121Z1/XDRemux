@@ -1,0 +1,465 @@
+{
+  "scope": "Linux/POSIX portable fixtures only; no native execution",
+  "receipts": [
+    {
+      "receipt": "test-evidence/in-place/alarm-1792597543637666049/report.json",
+      "status": "timed-out",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "timed-out",
+          "exit_code": null,
+          "duration_seconds": 0.08143503499968574,
+          "cleanup_status": "confirmed",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "confirmed",
+            "signal": "SIGKILL to this command session only",
+            "leader_exit_code": -9,
+            "process_group_absent": true,
+            "duration_seconds": 0.0011346820001563174
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/in-place/clone-failure-1792597543562889330/report.json",
+      "status": "simulated build failure; independent clone retained",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "git",
+            "clone",
+            "--no-checkout",
+            "--no-hardlinks",
+            "--",
+            "/tmp/tmp06m69fbu/source",
+            "/tmp/xdremux-stage-retained-yyogu487/reference-source"
+          ],
+          "status": "exited",
+          "exit_code": 0,
+          "duration_seconds": 0.007534354000199528,
+          "cleanup_status": "confirmed",
+          "termination": null
+        },
+        {
+          "argv": [
+            "git",
+            "-C",
+            "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+            "checkout",
+            "--detach",
+            "4144782556c536464f4c5ec63cd60ec891665368"
+          ],
+          "status": "exited",
+          "exit_code": 0,
+          "duration_seconds": 0.004589875999954529,
+          "cleanup_status": "confirmed",
+          "termination": null
+        },
+        {
+          "argv": [
+            "git",
+            "-C",
+            "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+            "rev-parse",
+            "HEAD"
+          ],
+          "status": "exited",
+          "exit_code": 0,
+          "duration_seconds": 0.0014168100001370476,
+          "cleanup_status": "confirmed",
+          "termination": null
+        },
+        {
+          "argv": [
+            "git",
+            "-C",
+            "/tmp/xdremux-stage-retained-yyogu487/reference-source",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          ],
+          "status": "exited",
+          "exit_code": 0,
+          "duration_seconds": 0.001489060000039899,
+          "cleanup_status": "confirmed",
+          "termination": null
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/in-place/failure-1792597544287728470/report.json",
+      "status": "failed",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import sys; print(\"first error\",file=sys.stderr); sys.exit(7)"
+          ],
+          "status": "exited",
+          "exit_code": 7,
+          "duration_seconds": 0.01570949799997834,
+          "cleanup_status": "confirmed",
+          "termination": null
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/in-place/interrupt-1792597544388705661/report.json",
+      "status": "interrupted",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "interrupted",
+          "exit_code": null,
+          "duration_seconds": 0.005606327999885252,
+          "cleanup_status": "confirmed",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "confirmed",
+            "signal": "SIGKILL to this command session only",
+            "leader_exit_code": -9,
+            "process_group_absent": true,
+            "duration_seconds": 0.0010994529998242797
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/in-place/keyboard-1792597544025138853/report.json",
+      "status": "interrupted",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "interrupted",
+          "exit_code": null,
+          "duration_seconds": 0.0017450850000386708,
+          "cleanup_status": "confirmed",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "confirmed",
+            "signal": "SIGKILL to this command session only",
+            "leader_exit_code": -9,
+            "process_group_absent": true,
+            "duration_seconds": 0.0011144860000058543
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/in-place/timeout-1792597544121455658/report.json",
+      "status": "timed-out",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "timed-out",
+          "exit_code": null,
+          "duration_seconds": 0.0820008030000281,
+          "cleanup_status": "confirmed",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "confirmed",
+            "signal": "SIGKILL to this command session only",
+            "leader_exit_code": -9,
+            "process_group_absent": true,
+            "duration_seconds": 0.0011171690002811374
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/in-place/uncertain-1792597543851680013/report.json",
+      "status": "timed-out",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "timed-out",
+          "exit_code": null,
+          "duration_seconds": 0.081038604999776,
+          "cleanup_status": "uncertain",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "uncertain",
+            "signal": "SIGKILL to this command session only",
+            "reap_error": "TimeoutExpired: Command 'injected wait-result uncertainty' timed out after 0.15 seconds",
+            "process_group_absent": false,
+            "duration_seconds": 2.725200010900153e-05
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/relocated/alarm-1792597544770730491/report.json",
+      "status": "timed-out",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "timed-out",
+          "exit_code": null,
+          "duration_seconds": 0.0816372809999848,
+          "cleanup_status": "confirmed",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "confirmed",
+            "signal": "SIGKILL to this command session only",
+            "leader_exit_code": -9,
+            "process_group_absent": true,
+            "duration_seconds": 0.001194296999983635
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/relocated/clone-failure-1792597544701887092/report.json",
+      "status": "simulated build failure; independent clone retained",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "git",
+            "clone",
+            "--no-checkout",
+            "--no-hardlinks",
+            "--",
+            "/tmp/tmpjt0onh3_/source",
+            "/tmp/xdremux-stage-retained-6fev1f9p/reference-source"
+          ],
+          "status": "exited",
+          "exit_code": 0,
+          "duration_seconds": 0.007468400999641744,
+          "cleanup_status": "confirmed",
+          "termination": null
+        },
+        {
+          "argv": [
+            "git",
+            "-C",
+            "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+            "checkout",
+            "--detach",
+            "e6b391dfcc85e739cc567ba603c12db0b6c0a69d"
+          ],
+          "status": "exited",
+          "exit_code": 0,
+          "duration_seconds": 0.0034013340000456083,
+          "cleanup_status": "confirmed",
+          "termination": null
+        },
+        {
+          "argv": [
+            "git",
+            "-C",
+            "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+            "rev-parse",
+            "HEAD"
+          ],
+          "status": "exited",
+          "exit_code": 0,
+          "duration_seconds": 0.001342531999853236,
+          "cleanup_status": "confirmed",
+          "termination": null
+        },
+        {
+          "argv": [
+            "git",
+            "-C",
+            "/tmp/xdremux-stage-retained-6fev1f9p/reference-source",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all"
+          ],
+          "status": "exited",
+          "exit_code": 0,
+          "duration_seconds": 0.0012948700000379176,
+          "cleanup_status": "confirmed",
+          "termination": null
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/relocated/failure-1792597545436939027/report.json",
+      "status": "failed",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import sys; print(\"first error\",file=sys.stderr); sys.exit(7)"
+          ],
+          "status": "exited",
+          "exit_code": 7,
+          "duration_seconds": 0.00935141600029965,
+          "cleanup_status": "confirmed",
+          "termination": null
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/relocated/interrupt-1792597545530262822/report.json",
+      "status": "interrupted",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "interrupted",
+          "exit_code": null,
+          "duration_seconds": 0.002085799000269617,
+          "cleanup_status": "confirmed",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "confirmed",
+            "signal": "SIGKILL to this command session only",
+            "leader_exit_code": -9,
+            "process_group_absent": true,
+            "duration_seconds": 0.0011355780002304527
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/relocated/keyboard-1792597545153599926/report.json",
+      "status": "interrupted",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "interrupted",
+          "exit_code": null,
+          "duration_seconds": 0.0017305329997725494,
+          "cleanup_status": "confirmed",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "confirmed",
+            "signal": "SIGKILL to this command session only",
+            "leader_exit_code": -9,
+            "process_group_absent": true,
+            "duration_seconds": 0.0011155770002915233
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/relocated/timeout-1792597545250305219/report.json",
+      "status": "timed-out",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "timed-out",
+          "exit_code": null,
+          "duration_seconds": 0.0823140880002029,
+          "cleanup_status": "confirmed",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "confirmed",
+            "signal": "SIGKILL to this command session only",
+            "leader_exit_code": -9,
+            "process_group_absent": true,
+            "duration_seconds": 0.0011751380002351652
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "test-evidence/relocated/uncertain-1792597544955034853/report.json",
+      "status": "timed-out",
+      "native_executed": false,
+      "retained": true,
+      "deletion_attempted": false,
+      "commands": [
+        {
+          "argv": [
+            "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+            "-c",
+            "import time; time.sleep(60)"
+          ],
+          "status": "timed-out",
+          "exit_code": null,
+          "duration_seconds": 0.08122286200023154,
+          "cleanup_status": "uncertain",
+          "termination": {
+            "budget_seconds": 0.15,
+            "status": "uncertain",
+            "signal": "SIGKILL to this command session only",
+            "reap_error": "TimeoutExpired: Command 'injected wait-result uncertainty' timed out after 0.15 seconds",
+            "process_group_absent": false,
+            "duration_seconds": 3.3970999993471196e-05
+          }
+        }
+      ]
+    }
+  ]
+}

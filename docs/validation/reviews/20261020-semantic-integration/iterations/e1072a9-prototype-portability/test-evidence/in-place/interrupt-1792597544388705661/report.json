@@ -1,0 +1,42 @@
+{
+  "status": "interrupted",
+  "experiment": "portable lifecycle fault injection",
+  "native_executed": false,
+  "commands": [
+    {
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-c",
+        "import time; time.sleep(60)"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-8e61uab5",
+      "budget_seconds": 10,
+      "status": "interrupted",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-prototype-portability/test-evidence/in-place/interrupt-1792597544388705661/commands/000.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-prototype-portability/test-evidence/in-place/interrupt-1792597544388705661/commands/000.stderr",
+      "owned_process_group": 2465,
+      "error_type": "Interrupted",
+      "error": "received signal 2",
+      "termination": {
+        "budget_seconds": 0.15,
+        "status": "confirmed",
+        "signal": "SIGKILL to this command session only",
+        "leader_exit_code": -9,
+        "process_group_absent": true,
+        "duration_seconds": 0.0010994529998242797
+      },
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.005606327999885252
+    }
+  ],
+  "owned_workspace": {
+    "path": "/tmp/xdremux-stage-retained-8e61uab5",
+    "retained": true,
+    "deletion_attempted": false,
+    "shared_worktree_registry_touched": false,
+    "reason": "retained by design on success, failure or interrupt; manual review required"
+  },
+  "error_type": "Interrupted",
+  "retained_note_sha256": "8f8058c41630051a1317aa6e358a4cd1ce966aff2230a93d2335c6d6668f2940",
+  "process_cleanup_uncertain": false
+}

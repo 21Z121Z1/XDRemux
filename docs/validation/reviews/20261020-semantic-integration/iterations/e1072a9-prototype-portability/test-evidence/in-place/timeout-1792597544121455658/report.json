@@ -1,0 +1,42 @@
+{
+  "status": "timed-out",
+  "experiment": "portable lifecycle fault injection",
+  "native_executed": false,
+  "commands": [
+    {
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-c",
+        "import time; time.sleep(60)"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-hbs2p9tb",
+      "budget_seconds": 0.08,
+      "status": "timed-out",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-prototype-portability/test-evidence/in-place/timeout-1792597544121455658/commands/000.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-prototype-portability/test-evidence/in-place/timeout-1792597544121455658/commands/000.stderr",
+      "owned_process_group": 2461,
+      "error_type": "TimeoutExpired",
+      "error": "Command '['/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3', '-c', 'import time; time.sleep(60)']' timed out after 0.08 seconds",
+      "termination": {
+        "budget_seconds": 0.15,
+        "status": "confirmed",
+        "signal": "SIGKILL to this command session only",
+        "leader_exit_code": -9,
+        "process_group_absent": true,
+        "duration_seconds": 0.0011171690002811374
+      },
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0820008030000281
+    }
+  ],
+  "owned_workspace": {
+    "path": "/tmp/xdremux-stage-retained-hbs2p9tb",
+    "retained": true,
+    "deletion_attempted": false,
+    "shared_worktree_registry_touched": false,
+    "reason": "retained by design on success, failure or interrupt; manual review required"
+  },
+  "error_type": "TimeoutExpired",
+  "retained_note_sha256": "8f8058c41630051a1317aa6e358a4cd1ce966aff2230a93d2335c6d6668f2940",
+  "process_cleanup_uncertain": false
+}

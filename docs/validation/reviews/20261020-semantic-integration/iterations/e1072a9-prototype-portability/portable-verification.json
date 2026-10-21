@@ -1,0 +1,58 @@
+{
+  "host": "Linux-6.18.55-x86_64-with-glibc2.41",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "native_compilation_executed": false,
+  "macos_stage_execution": false,
+  "stage_cost_result_obtained": false,
+  "runs": [
+    {
+      "name": "in-place",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-prototype-portability",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-prototype-portability",
+      "exit_code": 0,
+      "tests": 21,
+      "stdout": "in-place.stdout.log",
+      "stderr": "in-place.stderr.log",
+      "relocated_non_git_bundle": false
+    },
+    {
+      "name": "relocated",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "/tmp/XDRemux stage moved 2_fq6qef/\u72ec\u7acb\u76ee\u5f55 with spaces",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "cwd": "/tmp/XDRemux stage moved 2_fq6qef",
+      "exit_code": 0,
+      "tests": 21,
+      "stdout": "relocated.stdout.log",
+      "stderr": "relocated.stderr.log",
+      "relocated_non_git_bundle": true
+    }
+  ],
+  "bundle_sha256": {
+    "bounded_stage_lifecycle.py": "00abc59a689176c3e1607bd2d6c9e60b8e1d6d1f6bc466a3e914462c305ea6b6",
+    "e107-stage-attribution-prototype.py": "c4a3bf872648454d6b7742bcf284a4cbdce1b766f8e3572b64846fedae3a1fa1",
+    "test_e107_stage_prototype.py": "21d973cfdd967ec38967fe143b871fdd3dbb0e00ce57aca245addc96dbf69391",
+    "fixture-provenance.json": "645d781e6764161e472e2abc1fbf3acecbdc98027d662da5cee4a9dd793c92bd",
+    "fixtures/baseline-apple-styles.rs": "6129f27b69334cdbafa040e1ef98c974fc5bd02025bb2b63e4f98489e19d1908",
+    "fixtures/candidate-apple-styles.rs": "7549f71c5baa63dcffc1f255f2747e0e122a9cf603b2745fce1fad3d65e42d5d"
+  },
+  "passed": true
+}

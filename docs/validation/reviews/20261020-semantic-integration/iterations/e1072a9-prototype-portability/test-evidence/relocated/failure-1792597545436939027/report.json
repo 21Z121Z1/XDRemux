@@ -1,0 +1,34 @@
+{
+  "status": "failed",
+  "experiment": "portable lifecycle fault injection",
+  "native_executed": false,
+  "commands": [
+    {
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-c",
+        "import sys; print(\"first error\",file=sys.stderr); sys.exit(7)"
+      ],
+      "cwd": "/tmp/xdremux-stage-retained-v9w__dge",
+      "budget_seconds": 0.08,
+      "status": "exited",
+      "stdout_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-prototype-portability/test-evidence/relocated/failure-1792597545436939027/commands/000.stdout",
+      "stderr_path": "/workspace/XDRemux-review-evidence/docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-prototype-portability/test-evidence/relocated/failure-1792597545436939027/commands/000.stderr",
+      "owned_process_group": 2557,
+      "exit_code": 7,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.00935141600029965
+    }
+  ],
+  "owned_workspace": {
+    "path": "/tmp/xdremux-stage-retained-v9w__dge",
+    "retained": true,
+    "deletion_attempted": false,
+    "shared_worktree_registry_touched": false,
+    "reason": "retained by design on success, failure or interrupt; manual review required"
+  },
+  "error_type": "CalledProcessError",
+  "retained_note_sha256": "8f8058c41630051a1317aa6e358a4cd1ce966aff2230a93d2335c6d6668f2940",
+  "process_cleanup_uncertain": false
+}
