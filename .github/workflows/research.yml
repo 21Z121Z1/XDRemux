@@ -327,3 +327,42 @@ jobs:
             artifacts/system-heif-hdr-measurement/tone-shape.json
             artifacts/system-heif-hdr-measurement/tone/consumer-run.json
             artifacts/system-heif-hdr-measurement/tone/diagnostics/*.log
+
+  pvt-native-import:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+      - name: Install the portable HEVC provider
+        run: |
+          brew install libheif
+          echo "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Import the complete synthetic PVT into one owned simulator
+        run: |
+          python3 scripts/apple/pvt_native_import/check_native_import.py \
+            --repo "$GITHUB_WORKSPACE" \
+            --cli "$CARGO_TARGET_DIR/debug/xdremux" \
+            --expected-head "$EXPECTED_HEAD" \
+            --output-root "$RUNNER_TEMP/pvt-native-import" \
+            --execute-owned-simulator
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: pvt-native-import-${{ env.EXPECTED_HEAD }}
+          path: |
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/result.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/baseline.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/after.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/*.stdout
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/*.stderr
+          if-no-files-found: warn
+          retention-days: 1

@@ -73,6 +73,23 @@ class WorkflowConfigurationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertFalse(self.uploaded("research.yml", path), "only scored reports may leave the runner")
 
+    def test_pvt_native_import_uses_an_owned_simulator_and_keeps_only_receipts(self):
+        workflow = self.workflow("research.yml")
+        job = workflow.split("  pvt-native-import:\n", 1)[1]
+        self.assertIn("runs-on: xcode-27", job)
+        self.assertIn("ref: ${{ env.EXPECTED_HEAD }}", job)
+        self.assertIn("--expected-head", job)
+        self.assertIn("--execute-owned-simulator", job)
+        self.assertNotIn("continue-on-error", job)
+        self.assertNotIn("|| true", job)
+        self.assertNotRegex(job, r"runs-on: .*-(?:large|xlarge)")
+        prefix = "${{ runner.temp }}/pvt-native-import/pvt-native-owned/"
+        for name in ("result.json", "baseline.json", "after.json", "direct-pvt-addmedia.stderr"):
+            self.assertTrue(self.uploaded("research.yml", prefix + name))
+        for name in ("synthetic-motion.jpg", "synthetic.mp4", "capture.pvt/image.heic",
+                     "readback/resource-0.bin", "PVTReadback.app/Info.plist"):
+            self.assertFalse(self.uploaded("research.yml", prefix + name))
+
     @staticmethod
     def workflow(name: str) -> str:
         return (WORKFLOW_ROOT / name).read_text(encoding="utf-8")

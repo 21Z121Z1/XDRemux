@@ -143,3 +143,13 @@ finally:
 ## Gotchas
 
 This recipe proves the exercised binary's portable conversion and structural pair validation. It does not decode the pair in Apple frameworks, import it into Photos, prove all source codecs, test interrupted publication, or establish final-HEAD acceptance. For broader Motion Photo changes, use the existing `scripts/validation/check_rust_motion_photo_real_fixtures.sh` and the owning negative tests. Do not weaken a failed journey for a missing encoder or dependency.
+
+For direct PVT package admission, the `pvt-native-import` job in `research.yml`
+runs `scripts/apple/pvt_native_import/check_native_import.py` on the free macOS
+runner. It builds the exact source CLI, generates geometric media and passes
+the whole package once to a newly created simulator. Read-only PhotoKit then
+checks the added asset, Live Photo subtype, original resources, identifiers,
+cover time and hashes. Only text receipts leave the runner. Missing runtimes,
+unsupported package import, permissions, readback or cleanup failures remain
+non-PASS results. Member import is never substituted. A simulator result does
+not prove physical Photos editing or dynamic wallpaper eligibility.
