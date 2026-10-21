@@ -365,6 +365,7 @@ jobs:
             ${{ runner.temp }}/pvt-native-import/pvt-native-*/share.json
             ${{ runner.temp }}/pvt-native-import/pvt-native-*/share-transfer.json
             ${{ runner.temp }}/pvt-native-import/pvt-native-*/share-types.json
+            ${{ runner.temp }}/pvt-native-import/pvt-native-*/*.processes.json
             ${{ runner.temp }}/pvt-native-import/pvt-native-*/*.stdout
             ${{ runner.temp }}/pvt-native-import/pvt-native-*/*.stderr
           if-no-files-found: warn

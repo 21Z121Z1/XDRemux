@@ -25,20 +25,18 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout):
-    """Stop this invocation's XCTest group as soon as missing Save is observed.
-
-    xcodebuild can remain alive after a failed UI test has already finished.
-    The marker is emitted only after all package representations were checked;
-    it is a failed native precondition, never a successful import result.
-    """
+def run_owned_process(command, cwd, stdout_path, stderr_path, *, timeout, stop_marker=None, diagnostic_path=None):
+    """Bound only this invocation's compiler/XCTest session and retain progress."""
     started = time.monotonic()
     facts = {}
+    snapshots = []
+    next_snapshot = 0.
     with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
         process = subprocess.Popen(command, cwd=cwd, stdout=stdout, stderr=stderr, start_new_session=True)
+        facts['owned_process_group'] = process.pid
         try:
             while True:
-                if b'PVT_SHARE_UI_BLOCKED:' in stdout_path.read_bytes():
+                if stop_marker and stop_marker in stdout_path.read_bytes():
                     facts['outcome'] = 'native-save-activity-unavailable'
                     break
                 if process.poll() is not None:
@@ -46,9 +44,29 @@ def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout):
                 if time.monotonic() - started >= timeout:
                     facts['outcome'] = 'uncertain-after-timeout'
                     break
+                if diagnostic_path and time.monotonic() - started >= next_snapshot:
+                    snapshot = {'elapsed_seconds': time.monotonic() - started, 'processes': []}
+                    try:
+                        # No argv/environment collection: retain only this
+                        # private group's compiler names, CPU and lifecycle.
+                        observed = subprocess.run(['ps', '-axo', 'pid=,ppid=,pgid=,stat=,etime=,time=,pcpu=,comm='],
+                                                  capture_output=True, text=True, timeout=5)
+                        for line in observed.stdout.splitlines():
+                            fields = line.split(None, 7)
+                            if len(fields) == 8 and int(fields[2]) == process.pid:
+                                snapshot['processes'].append(dict(zip(
+                                    ('pid', 'ppid', 'pgid', 'state', 'elapsed', 'cpu_time', 'cpu_percent', 'command'),
+                                    [*map(int, fields[:3]), *fields[3:]])))
+                        if observed.returncode:
+                            snapshot['error'] = observed.stderr[-1000:]
+                    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+                        snapshot['error'] = str(error)
+                    snapshots.append(snapshot)
+                    diagnostic_path.write_text(json.dumps(snapshots, indent=2) + '\n')
+                    next_snapshot = time.monotonic() - started + 10
                 time.sleep(.1)
         finally:
-            # The new session belongs solely to this xcodebuild invocation.
+            # The new session belongs solely to this invocation.
             # Never kill by executable name or touch another simulator/worker.
             if process.poll() is None or facts.get('outcome'):
                 try:
@@ -70,12 +88,23 @@ def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout):
     return facts
 
 
+def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout):
+    # Missing Save is a failed native precondition, never import success.
+    facts = run_owned_process(command, cwd, stdout_path, stderr_path, timeout=timeout,
+                              stop_marker=b'PVT_SHARE_UI_BLOCKED:')
+    facts['ui_observations'] = [{'phase': phase, 'save_candidates': int(count)} for phase, count in re.findall(
+        r'PVT_SHARE_UI_OBSERVATION: phase=(share(?:-control|-url)?) save_candidates=(\d+)',
+        stdout_path.read_text(errors='replace'))]
+    return facts
+
+
 def print_console_receipt(work, report):
     # Keep the first native failure inspectable when artifact transfer is not
     # available. Only this owned probe's fixed text outputs are eligible.
     print("PVT native receipt:\n" + json.dumps(report, indent=2, sort_keys=True))
     for name in ('compile-generator.stderr', 'generate-synthetic.stderr',
                  'compile-sdk-canary.stderr', 'compile-reader.stderr',
+                 'compile-sdk-canary.processes.json', 'compile-reader.processes.json',
                  'grant-owned-photos.stderr', 'baseline.json',
                  'build-share-ui.stderr', 'test-share-ui.stdout', 'test-share-ui.stderr',
                  'share.json', 'share-transfer.json', 'share-types.json',
@@ -240,7 +269,18 @@ def main():
         report['commands'].append(record)
         started = time.monotonic()
         try:
-            result = subprocess.run(record['argv'], cwd=args.repo, capture_output=True, timeout=timeout)
+            if name in ('compile-sdk-canary', 'compile-reader'):
+                progress = work / (name + '.processes.json')
+                record['progress_file'] = progress.name
+                record['timeout_seconds'] = timeout
+                record.update(run_owned_process(record['argv'], args.repo, work / (name + '.stdout'),
+                                                work / (name + '.stderr'), timeout=timeout, diagnostic_path=progress))
+                if record.get('outcome'):
+                    raise Blocked(f'{name}: {record["outcome"]}; compiler process stages and stdout/stderr retained')
+                result = subprocess.CompletedProcess(record['argv'], record['exit_code'],
+                    (work / (name + '.stdout')).read_bytes(), (work / (name + '.stderr')).read_bytes())
+            else:
+                result = subprocess.run(record['argv'], cwd=args.repo, capture_output=True, timeout=timeout)
             (work / (name + '.stdout')).write_bytes(result.stdout)
             (work / (name + '.stderr')).write_bytes(result.stderr)
             record['exit_code'] = result.returncode
@@ -291,6 +331,7 @@ def main():
             run('simulator-sdk-path', ['xcrun', '--sdk', 'iphonesimulator', '--show-sdk-path'])
             raise Blocked('native probe requires macOS')
         run('xcode-version', ['xcodebuild', '-version'])
+        run('swift-version', ['xcrun', '--sdk', 'iphonesimulator', 'swiftc', '--version'])
         run('macos-version', ['sw_vers'])
         privacy = run('simctl-privacy-help', ['xcrun', 'simctl', 'help', 'privacy'], required=False)
         help_text = (privacy.stdout + privacy.stderr).decode(errors='replace')
@@ -338,12 +379,6 @@ def main():
         bundle = 'org.xdremux.audit.PVTReadback.u' + token
         report['probe_bundle_id'] = bundle
         report['owned_device_name'] = 'pvt-audit-' + token
-        result = run('create-owned-simulator', ['xcrun', 'simctl', 'create', 'pvt-audit-' + token, device, runtime])
-        owned_udid = str(uuid.UUID(result.stdout.decode().strip())).upper()
-        report['owned_udid'] = owned_udid
-        (work / 'owned-simulator.json').write_text(json.dumps({'udid': owned_udid, 'name': 'pvt-audit-' + token, 'bundle': bundle}))
-        run('boot-owned-simulator', ['xcrun', 'simctl', 'boot', owned_udid])
-        run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
         app = work / 'PVTReadback.app'
         app.mkdir()
         (app / 'Info.plist').write_bytes(plistlib.dumps(reader_info(bundle)))
@@ -357,12 +392,21 @@ def main():
                            '-module-cache-path', work / 'sdk-module-cache',
                            '-Xfrontend', '-debug-time-function-bodies',
                            '-Xfrontend', '-warn-long-function-bodies=500']
-        run('compile-sdk-canary', [*compile_command, source / 'SDKCompileProbe.swift', '-o', work / 'sdk-canary'], timeout=120)
+        # Compile before boot: cold SDK imports should not compete with an
+        # idle simulator. Only cold module preparation gets a240s ceiling;
+        # actual reader120s and UI180s remain separate bounded operations.
+        run('compile-sdk-canary', [*compile_command, source / 'SDKCompileProbe.swift', '-o', work / 'sdk-canary'], timeout=240)
         run('compile-reader', [*compile_command, source / 'ReadbackCore.swift', source / 'PVTReadback.swift',
                                '-o', app / 'PVTReadback'], timeout=120)
         run('sign-owned-reader', ['codesign', '--force', '--sign', '-', app])
         report['reader_binary_sha256'] = sha(app / 'PVTReadback')
         report['reader_info_sha256'] = sha(app / 'Info.plist')
+        result = run('create-owned-simulator', ['xcrun', 'simctl', 'create', 'pvt-audit-' + token, device, runtime])
+        owned_udid = str(uuid.UUID(result.stdout.decode().strip())).upper()
+        report['owned_udid'] = owned_udid
+        (work / 'owned-simulator.json').write_text(json.dumps({'udid': owned_udid, 'name': 'pvt-audit-' + token, 'bundle': bundle}))
+        run('boot-owned-simulator', ['xcrun', 'simctl', 'boot', owned_udid])
+        run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
         run('install-owned-reader', ['xcrun', 'simctl', 'install', owned_udid, app])
         # Only the exact created UDID and installed bundle; no host TCC/SQLite.
         run('grant-owned-photos', ['xcrun', 'simctl', 'privacy', owned_udid, 'grant', 'photos', bundle])

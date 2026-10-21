@@ -147,7 +147,10 @@ This recipe proves the exercised binary's portable conversion and structural pai
 For direct PVT package admission, the `pvt-native-import` job in `research.yml`
 runs `scripts/apple/pvt_native_import/check_native_import.py` on the free macOS
 runner. It builds the exact source CLI and generates geometric media. It first
-compiles a cold SDK canary and the actual reader separately, installs only its
+compiles a cold SDK canary (240 seconds) and the actual reader (120 seconds)
+before creating or booting a simulator. Cold module setup retains toolchain/SDK
+identity and ten-second snapshots of only its owned compiler process group;
+timeout stops that group and remains non-PASS. It then installs only its
 own app and establishes a read-only PhotoKit baseline. It transports the whole
 validated directory unchanged into that app. A synthetic `UIImage` control
 checks save-action availability without saving it. The probe then offers the

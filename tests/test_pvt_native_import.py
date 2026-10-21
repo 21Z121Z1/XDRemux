@@ -3,8 +3,11 @@
 These checks do not execute or establish Apple native import.
 """
 import copy
+import ast
 import contextlib
 import io
+import inspect
+import json
 import os
 import plistlib
 from pathlib import Path
@@ -17,6 +20,31 @@ from scripts.apple.pvt_native_import import check_native_import as probe
 
 
 class PVTNativeImportTests(unittest.TestCase):
+    def test_cold_sdk_and_reader_compile_before_creating_or_booting_a_simulator(self):
+        calls = {node.args[0].value: node for node in ast.walk(ast.parse(inspect.getsource(probe.main)))
+                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'run'
+                 and node.args and isinstance(node.args[0], ast.Constant)}
+        self.assertLess(calls['compile-sdk-canary'].lineno, calls['create-owned-simulator'].lineno)
+        self.assertLess(calls['compile-reader'].lineno, calls['create-owned-simulator'].lineno)
+        for name, budget in [('compile-sdk-canary', 240), ('compile-reader', 120)]:
+            self.assertEqual(next(k.value.value for k in calls[name].keywords if k.arg == 'timeout'), budget)
+
+    @unittest.skipUnless(os.name == 'posix', 'native compile uses POSIX process ownership')
+    def test_cold_compile_timeout_keeps_owned_process_stage_and_stops_its_group(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            result = probe.run_owned_process([sys.executable, '-c', 'import time; time.sleep(30)'],
+                                            root, root / 'compile.stdout', root / 'compile.stderr', timeout=.3,
+                                            diagnostic_path=root / 'compile.processes.json')
+            self.assertEqual(result['outcome'], 'uncertain-after-timeout')
+            self.assertTrue(result['owned_process_group_stopped'])
+            snapshots = json.loads((root / 'compile.processes.json').read_text())
+            self.assertGreaterEqual(len(snapshots), 1)
+            self.assertTrue(any(row['pid'] == result['owned_process_group']
+                                for snapshot in snapshots for row in snapshot.get('processes', [])))
+            self.assertTrue(all(row['pgid'] == result['owned_process_group']
+                                for snapshot in snapshots for row in snapshot.get('processes', [])))
+
     @unittest.skipUnless(os.name == 'posix', 'owned simulator runner uses POSIX process groups')
     def test_missing_native_activity_stops_only_its_owned_ui_process_without_waiting_for_timeout(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -24,13 +52,17 @@ class PVTNativeImportTests(unittest.TestCase):
             started = time.monotonic()
             result = probe.run_share_ui(
                 [sys.executable, '-u', '-c',
-                 'import time; print("PVT_SHARE_UI_BLOCKED: no Photos save action", flush=True); time.sleep(30)'],
+                 'import time; print("PVT_SHARE_UI_OBSERVATION: phase=share-control save_candidates=1"); '
+                 'print("PVT_SHARE_UI_OBSERVATION: phase=share-url save_candidates=0"); '
+                 'print("PVT_SHARE_UI_BLOCKED: no Photos save action", flush=True); time.sleep(30)'],
                 root, root / 'ui.stdout', root / 'ui.stderr', timeout=5)
             self.assertLess(time.monotonic() - started, 3)
             self.assertEqual(result['outcome'], 'native-save-activity-unavailable')
             self.assertIn('PVT_SHARE_UI_BLOCKED:', (root / 'ui.stdout').read_text())
             self.assertIsNotNone(result['exit_code'])
             self.assertIs(result['owned_process_group_stopped'], True)
+            self.assertEqual(result['ui_observations'], [{'phase': 'share-control', 'save_candidates': 1},
+                                                        {'phase': 'share-url', 'save_candidates': 0}])
 
     @unittest.skipUnless(os.name == 'posix', 'owned simulator runner uses POSIX process groups')
     def test_ui_timeout_and_normal_exit_remain_distinct_from_native_activity_absence(self):
