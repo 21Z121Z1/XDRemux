@@ -100,19 +100,23 @@ try:
     assert type(version) is str and version == "1"
     package_validation = json.loads(run("validate-pvt", [cli, "validate", package, "--json"]))
     assert package_validation["valid"] is True and package_validation["kind"] == "live-photo"
+    package_details = package_validation["details"]["value"]
+    assert package_details["content_identifier"]
     unwrapped = work / "unwrapped"
     unwrapped.mkdir()
     report["pvt_outputs"] = []
     for name in ("converted-pvt.heic", "converted-pvt.mov"):
+        shutil.copyfile(package / name, unwrapped / name)
+    for name in ("converted-pvt.heic", "converted-pvt.mov"):
         member = package / name
         copy = unwrapped / name
-        shutil.copyfile(member, copy)
         assert member.read_bytes() == copy.read_bytes(), "PVT round-trip media bytes changed"
         validation = json.loads(run(f"validate-unwrapped-{member.suffix[1:]}",
                                     [cli, "validate", copy, "--json"]))
         assert validation["valid"] is True and validation["kind"] == "live-photo"
-        assert validation["content_identifier"] == package_validation["content_identifier"]
-        assert validation["still_time_seconds"] == package_validation["still_time_seconds"]
+        details = validation["details"]["value"]
+        assert details["content_identifier"] == package_details["content_identifier"]
+        assert details["still_time_seconds"] == package_details["still_time_seconds"]
         report["pvt_outputs"].append({"name": name, "bytes": member.stat().st_size,
                                       "sha256": digest(member)})
     before_duplicate = {path.name: digest(path) for path in package.iterdir()}
