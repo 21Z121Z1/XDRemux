@@ -1,0 +1,44 @@
+test_service_failure_diagnostics_do_not_need_the_stalled_device_spawn_service (tests.test_pvt_simulator_install.SimulatorInstallTests.test_service_failure_diagnostics_do_not_need_the_stalled_device_spawn_service) ... FAIL
+test_host_observations_are_bounded_owned_facts_not_application_readiness (tests.test_pvt_simulator_install.SimulatorInstallTests.test_host_observations_are_bounded_owned_facts_not_application_readiness) ... ERROR
+test_host_diagnostic_failures_do_not_replace_the_original_service_failure (tests.test_pvt_simulator_install.SimulatorInstallTests.test_host_diagnostic_failures_do_not_replace_the_original_service_failure) ... ERROR
+test_host_diagnostics_refuse_foreign_identity_and_file_aliases (tests.test_pvt_simulator_install.SimulatorInstallTests.test_host_diagnostics_refuse_foreign_identity_and_file_aliases) ... ERROR
+
+======================================================================
+ERROR: test_host_observations_are_bounded_owned_facts_not_application_readiness (tests.test_pvt_simulator_install.SimulatorInstallTests.test_host_observations_are_bounded_owned_facts_not_application_readiness)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 139, in test_host_observations_are_bounded_owned_facts_not_application_readiness
+    facts = probe.capture_host_simulator_diagnostics(model.run, model.udid, model.work, model.report)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'capture_host_simulator_diagnostics'
+
+======================================================================
+ERROR: test_host_diagnostic_failures_do_not_replace_the_original_service_failure (tests.test_pvt_simulator_install.SimulatorInstallTests.test_host_diagnostic_failures_do_not_replace_the_original_service_failure)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 165, in test_host_diagnostic_failures_do_not_replace_the_original_service_failure
+    facts = model.report['host_simulator_diagnostics']
+            ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'host_simulator_diagnostics'
+
+======================================================================
+ERROR: test_host_diagnostics_refuse_foreign_identity_and_file_aliases (tests.test_pvt_simulator_install.SimulatorInstallTests.test_host_diagnostics_refuse_foreign_identity_and_file_aliases)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 174, in test_host_diagnostics_refuse_foreign_identity_and_file_aliases
+    probe.capture_host_simulator_diagnostics(model.run, '00000000-0000-0000-0000-000000000000', model.work, model.report)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'capture_host_simulator_diagnostics'
+
+======================================================================
+FAIL: test_service_failure_diagnostics_do_not_need_the_stalled_device_spawn_service (tests.test_pvt_simulator_install.SimulatorInstallTests.test_service_failure_diagnostics_do_not_need_the_stalled_device_spawn_service)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_simulator_install.py", line 122, in test_service_failure_diagnostics_do_not_need_the_stalled_device_spawn_service
+    self.assertFalse(any(c['argv'][:3] == ['xcrun', 'simctl', 'spawn'] for c in model.report['commands']))
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.008s
+
+FAILED (failures=1, errors=3)

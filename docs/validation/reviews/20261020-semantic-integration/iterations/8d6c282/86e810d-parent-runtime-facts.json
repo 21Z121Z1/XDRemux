@@ -1,0 +1,36 @@
+{
+  "source_attribution": "Parent independently read and verified the existing12325600964 artifact on2026-10-21 06:31UTC; raw bytes not materialized locally and no403 bypass/retry.",
+  "artifact_id": 12325600964,
+  "artifact_bytes": 32102,
+  "artifact_sha256": "0c3757b660baecef5fff137f63dd5e744544bc9f6a6b0a17954d959e431836de",
+  "runtime": {
+    "version": "27.0",
+    "build": "24A434",
+    "available": true,
+    "architectures": [
+      "arm64"
+    ],
+    "supported_device_types_count": 62,
+    "iPhone11_explicitly_supported": true,
+    "json_bytes": 28645,
+    "json_sha256": "3a78fd2c8338af5d9200b19bf091b9cc18ebdda7b6527dffc0486901b08d3789"
+  },
+  "device_type": {
+    "identifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-11",
+    "model": "iPhone12,1",
+    "min_runtime": "13.0.0",
+    "max_runtime": "65535.255.255",
+    "json_bytes": 64797,
+    "json_sha256": "6b6d956e9853c76332d92e40ce26508b562fd18566519bbba2f807d01f2d3286"
+  },
+  "host": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "architecture": "arm64",
+    "xcode": "27.0",
+    "xcode_build": "27A266a",
+    "swift": "6.4",
+    "simulator_sdk": "27.0"
+  },
+  "conclusion": "Existing metadata does not support an incompatible-device explanation; host service state remains unknown. No selection change made."
+}

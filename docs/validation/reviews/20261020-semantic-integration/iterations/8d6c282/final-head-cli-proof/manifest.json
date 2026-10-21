@@ -1,0 +1,44 @@
+{
+  "feature": "motion-photo",
+  "passed": true,
+  "binary": "/workspace/XDRemux-integration/target/debug/xdremux",
+  "build_binding": "existing binary; current source build not established",
+  "exact_head_acceptance": false,
+  "proof": "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-proof-jl43dn5n",
+  "scratch": "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-u7is4fon",
+  "source_head": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "source_status": "",
+  "source_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "binary_sha256": "b943bc8e7b26c96d023084e8cda2e7dcb476db65a286a418318f9e642669508d",
+  "fixture_manifest_sha256": "5305ac5709e27710ef08f689e38b99214f09213288aa522567d199dbd2e86291",
+  "source_fixture": "motion-photo/samsung/heif-ultrahdr-01.heic",
+  "source_sha256_before": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
+  "outputs": [
+    {
+      "name": "converted.heic",
+      "bytes": 1245467,
+      "sha256": "f6fa3a414d9e2c3c74ab425c352eec84469a9a74f873455712d1f25de6e8d6f3"
+    },
+    {
+      "name": "converted.mov",
+      "bytes": 3953044,
+      "sha256": "9fd9a9072093884d55ad35c120a4277af5cbbdccea3d3ec6a443601f07bbe2ea"
+    }
+  ],
+  "pvt_outputs": [
+    {
+      "name": "converted-pvt.heic",
+      "bytes": 1245467,
+      "sha256": "ae994568482a37fc5b1c00c17b2169b10464045149cfa4dacb7ea5434069a8da"
+    },
+    {
+      "name": "converted-pvt.mov",
+      "bytes": 3953044,
+      "sha256": "203ac65b6a98d877ccb13712d6f18752d8a96bdb563aa49a20bb3e69ce9bdbde"
+    }
+  ],
+  "pvt_no_clobber": true,
+  "pvt_native_acceptance": "not exercised; structure is not Photos import or wallpaper",
+  "source_sha256_after": "06eb244bc69ae464bd7b0a60b769f4fc3429dc543451481f5331586a7536b8d0",
+  "cleanup_completed": true
+}

@@ -1,0 +1,16 @@
+{
+  "source": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "tree": "24128c312feb507a95672c168c43bb1b0c07c805",
+  "base": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "review": "author review, not independent/native acceptance",
+  "files": {
+    ".agents/skills/xdremux-verify/features/motion-photo.md": "290e5c15d16f4581783ed8d2c2e5d408a0ece24a90c705e3197ab1a727eb319e",
+    "scripts/apple/pvt_native_import/check_native_import.py": "a549744429ac698c0fa8e42bc9cee83677bc054c282315add984615bb6ff83bb",
+    "tests/test_pvt_simulator_install.py": "1fc0a51af9eb21ba0dd6be18b8cf7baed34940a90402da955deac0af60995d0f"
+  },
+  "decision": "Observe before changing product or lifecycle; preserve actual readiness, one-install/reconciliation, all media/Live asset assertions, device selection and thresholds. Host ps/vm fixed read-only5s calls, owned metadata/log nofollow and64KiB reads, ownUUID hostlog5s with owned client-group cleanup; diagnostic failure retains original state. No global daemon/reset/permission change.",
+  "portable": "Four before-fix tests:1 actual wrong diagnostic-route failure and3 missing new capability errors; not a native service reproducer.30 focused pass. First312 aggregate predates final CPU/VM fields; final clean-head gate is separate. One supplemental test command named an absent module and failed before that module ran; corrected focused/all/gate records supersede it, no product failure hidden.",
+  "native": "86existing20 checks19green1inventoryfailure retained. New head needs actual host observation; no recovered service or PVT import claim.",
+  "metadata": "Parent-verified86artifact explicitly supports iPhone11 on27; no incompatible-device theory or download403 retry.",
+  "recorded_at": "2026-10-21T06:49:27.761207+00:00"
+}

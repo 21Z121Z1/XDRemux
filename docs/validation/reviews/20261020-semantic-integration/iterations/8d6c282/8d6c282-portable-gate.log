@@ -1,0 +1,6 @@
+PASS [static] rust-format (1.454s)
+PASS [regression] all-portable-python-regressions (21.021s)
+PASS [functional] build-current-cli (0.135s)
+PASS [functional] real-cli-pair-and-pvt-conversion-roundtrip-and-no-clobber (3.378s)
+PASS completion gate for 8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a
+receipt: /workspace/xdremux-audit/8d6c282-portable-receipt.json

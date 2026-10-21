@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "scope": "Only bounded host-side diagnostic observations for the demonstrated86e810d installation-service failure, compared with86e810dfb52cbe2516d816bc0ac11b94de84d0e7. Preserve all three20s readiness requests, single120s installation/reconciliation, exact package/singleLive/resource/ID/cover/hash checks and cleanup. Replace only the hung simctl-spawn logger with bounded host process/VM/device-file/logd observations; no device selection, product Rust/Swift/App/Cargo/workflow or budget change. Four local checks bind all312 Python regressions, format, current CLI and real pair/PVT/no-clobber. Portable model/host-file tests do not establish actual native service recovery or import. Reuse unchanged native86 receipts only for those bytes; new source native results remain separate.",
+  "checks": [
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300,
+      "env": {
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3",
+        "RESEARCH_ROOT": "/workspace/xdremux-audit/tone-pinned-checkout"
+      }
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "real-cli-pair-and-pvt-conversion-roundtrip-and-no-clobber",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    }
+  ]
+}
