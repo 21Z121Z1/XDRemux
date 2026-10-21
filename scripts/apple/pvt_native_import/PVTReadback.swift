@@ -17,6 +17,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     private let statusLabel = UILabel()
+    private var sharePhase = "share"
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
@@ -29,7 +30,8 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
         let arguments = CommandLine.arguments
         let index = arguments.firstIndex(of: "--phase")
         let phase = index.flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil } ?? "after"
-        if phase == "share" {
+        if ["share", "share-control", "share-url"].contains(phase) {
+            sharePhase = phase
             let button = UIButton(type: .system)
             button.setTitle("Share PVT", for: .normal)
             button.accessibilityIdentifier = "share-pvt"
@@ -58,12 +60,57 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
             return
         }
         let identifier = UTType.livePhoto.identifier
+        // A previous availability control must not supply a later callback's
+        // input receipt if the provider was never asked for its representation.
+        let transfer = ReadbackCore.documents.appendingPathComponent("share-transfer.json")
+        do {
+            if FileManager.default.fileExists(atPath: transfer.path) { try FileManager.default.removeItem(at: transfer) }
+        } catch {
+            finishShare(activity: nil, completed: false, error: error)
+            return
+        }
+        do {
+            let values = try package.resourceValues(forKeys: [.contentTypeKey, .isPackageKey, .isDirectoryKey])
+            var facts: [String: Any] = ["live_photo_type": identifier,
+                                       "live_photo_conforms_to_image": UTType.livePhoto.conforms(to: .image),
+                                       "live_photo_conforms_to_package": UTType.livePhoto.conforms(to: .package),
+                                       "package_is_directory": values.isDirectory == true,
+                                       "package_is_package": values.isPackage == true,
+                                       "contents_provider_registered_types": NSItemProvider(contentsOf: package)?.registeredTypeIdentifiers ?? []]
+            facts["extension_type"] = UTType(filenameExtension: "pvt")?.identifier ?? "<not-declared>"
+            facts["url_content_type"] = values.contentType?.identifier ?? "<not-declared>"
+            try ReadbackCore.write(facts, phase: "share-types")
+        } catch {
+            finishShare(activity: nil, completed: false, error: error)
+            return
+        }
+        if sharePhase == "share-control" {
+            guard let image = UIImage(contentsOfFile: ReadbackCore.documents.appendingPathComponent("control.jpg").path) else {
+                finishShare(activity: nil, completed: false, error: ReadbackCore.failure("synthetic control missing"))
+                return
+            }
+            // Availability control only: XCTest never selects an activity here.
+            present(UIActivityViewController(activityItems: [image], applicationActivities: nil))
+            return
+        }
+        if sharePhase == "share-url" {
+            do {
+                let facts: [String: Any] = ["representation": "whole-package-url", "share_phase": "share-url", "whole_package_url": package.path,
+                                           "is_in_place": false, "member_sha256": try ReadbackCore.packageHashes(package)]
+                try ReadbackCore.write(facts, phase: "share-transfer")
+            } catch {
+                finishShare(activity: nil, completed: false, error: error)
+                return
+            }
+            present(UIActivityViewController(activityItems: [package], applicationActivities: nil))
+            return
+        }
         let provider = NSItemProvider()
         provider.suggestedName = "capture.pvt"
         provider.registerFileRepresentation(forTypeIdentifier: identifier, fileOptions: [], visibility: .all) { completion in
             do {
                 let hashes = try ReadbackCore.packageHashes(package)
-                let facts: [String: Any] = ["type_identifier": identifier, "whole_package_url": package.path,
+                let facts: [String: Any] = ["type_identifier": identifier, "share_phase": "share", "whole_package_url": package.path,
                                            "representation": "file", "is_in_place": false,
                                            "member_sha256": hashes]
                 try ReadbackCore.write(facts, phase: "share-transfer")
@@ -72,7 +119,10 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
             return nil
         }
         let configuration = UIActivityItemsConfiguration(itemProviders: [provider])
-        let activity = UIActivityViewController(activityItemsConfiguration: configuration)
+        present(UIActivityViewController(activityItemsConfiguration: configuration))
+    }
+
+    private func present(_ activity: UIActivityViewController) {
         activity.completionWithItemsHandler = { [weak self] type, completed, _, error in
             self?.finishShare(activity: type, completed: completed, error: error)
         }
@@ -81,6 +131,7 @@ final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func finishShare(activity: UIActivity.ActivityType?, completed: Bool, error: Error?) {
         var facts: [String: Any] = ["status": completed ? "completed" : "not-completed",
+                                   "share_phase": sharePhase,
                                    "activity_completed": completed,
                                    "is_save_to_camera_roll": activity == .saveToCameraRoll]
         if let activity { facts["activity_type"] = activity.rawValue }

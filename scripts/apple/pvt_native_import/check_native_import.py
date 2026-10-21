@@ -2,11 +2,13 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import platform
 import plistlib
 import re
 import shutil
+import signal
 import struct
 import subprocess
 import sys
@@ -23,6 +25,51 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout):
+    """Stop this invocation's XCTest group as soon as missing Save is observed.
+
+    xcodebuild can remain alive after a failed UI test has already finished.
+    The marker is emitted only after all package representations were checked;
+    it is a failed native precondition, never a successful import result.
+    """
+    started = time.monotonic()
+    facts = {}
+    with stdout_path.open('wb') as stdout, stderr_path.open('wb') as stderr:
+        process = subprocess.Popen(command, cwd=cwd, stdout=stdout, stderr=stderr, start_new_session=True)
+        try:
+            while True:
+                if b'PVT_SHARE_UI_BLOCKED:' in stdout_path.read_bytes():
+                    facts['outcome'] = 'native-save-activity-unavailable'
+                    break
+                if process.poll() is not None:
+                    break
+                if time.monotonic() - started >= timeout:
+                    facts['outcome'] = 'uncertain-after-timeout'
+                    break
+                time.sleep(.1)
+        finally:
+            # The new session belongs solely to this xcodebuild invocation.
+            # Never kill by executable name or touch another simulator/worker.
+            if process.poll() is None or facts.get('outcome'):
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait(timeout=5)
+                facts['owned_process_group_stopped'] = True
+            facts['exit_code'] = process.wait()
+    facts['duration_seconds'] = time.monotonic() - started
+    return facts
+
+
 def print_console_receipt(work, report):
     # Keep the first native failure inspectable when artifact transfer is not
     # available. Only this owned probe's fixed text outputs are eligible.
@@ -31,7 +78,7 @@ def print_console_receipt(work, report):
                  'compile-sdk-canary.stderr', 'compile-reader.stderr',
                  'grant-owned-photos.stderr', 'baseline.json',
                  'build-share-ui.stderr', 'test-share-ui.stdout', 'test-share-ui.stderr',
-                 'share.json', 'share-transfer.json',
+                 'share.json', 'share-transfer.json', 'share-types.json',
                  'after.json', 'shutdown-owned.stderr', 'delete-owned.stderr'):
         path = work / name
         if not path.is_file() or path.is_symlink():
@@ -138,11 +185,15 @@ def check_share_receipt(shared, transfer, package, expected_members):
             or shared.get('is_save_to_camera_roll') is not True):
         raise Blocked('native Photos save activity did not complete; no admission assumed')
     native_url = Path(transfer.get('whole_package_url', ''))
-    if (transfer.get('type_identifier') != 'com.apple.live-photo'
-            or transfer.get('representation') != 'file' or transfer.get('is_in_place') is not False
+    representation = transfer.get('representation')
+    phase = transfer.get('share_phase')
+    valid_representation = (representation == 'file' and phase == 'share' and transfer.get('type_identifier') == 'com.apple.live-photo'
+                            or representation == 'whole-package-url' and phase == 'share-url')
+    if (not valid_representation or transfer.get('is_in_place') is not False
+            or shared.get('share_phase') != phase
             or not native_url.is_absolute() or native_url.name != package.name
             or transfer.get('member_sha256') != expected_members):
-        raise Blocked('system share did not request the exact whole PVT file representation')
+        raise Blocked('system share did not receive the exact whole PVT input')
 
 
 def reader_info(bundle):
@@ -174,7 +225,7 @@ def main():
     report = {'status': 'pending-native-execution', 'work': str(work), 'host_system': platform.system(),
               'host_architecture': platform.machine(), 'host_version': platform.mac_ver()[0],
               'commands': [], 'direct_package_import_only': True, 'media_uploaded': False,
-              'native_route': 'iOS Simulator system Photos save activity; whole live-photo file representation',
+              'native_route': 'iOS Simulator system Photos save activity; whole package URL or live-photo file representation',
               'not_exercised': ['macOS Photos library import', 'physical-device Photos or wallpaper'],
               'known_unsupported_route_not_repeated': 'simctl addmedia rejects PVT directories (NSPOSIXErrorDomain22)',
               'probe_source_sha256': {str(path.relative_to(source)): sha(path) for path in source.rglob('*')
@@ -328,6 +379,8 @@ def main():
         if before_share != expected_members:
             raise Blocked('whole-package transport changed source bytes before sharing')
         report['transported_package_sha256_before_share'] = before_share
+        # Activity availability control only: never save this still to Photos.
+        shutil.copy2(work / 'synthetic.jpg', container / 'Documents/control.jpg')
         project = prepare_share_tests(source, work, bundle)
         report['ui_test_source_sha256'] = sha(project.parent / 'PVTShareUITests.swift')
         ui_command = ['xcodebuild', '-project', project, '-scheme', 'PVTShareUITests',
@@ -336,12 +389,29 @@ def main():
         run('build-share-ui', [*ui_command, 'build-for-testing'], timeout=300)
         report['native_share_ui_test_invoked'] = True
         try:
-            run('test-share-ui', [*ui_command, '-resultBundlePath', work / 'share-results.xcresult',
-                                 '-only-testing:PVTShareUITests/PVTShareUITests/testWholePackageSystemShare',
-                                 'test-without-building'], timeout=180)
+            command = list(map(str, [*ui_command, '-resultBundlePath', work / 'share-results.xcresult',
+                                    '-parallel-testing-enabled', 'NO',
+                                    '-only-testing:PVTShareUITests/PVTShareUITests/testWholePackageSystemShare',
+                                    'test-without-building']))
+            record = {'name': 'test-share-ui', 'argv': command}
+            report['commands'].append(record)
+            record.update(run_share_ui(command, args.repo, work / 'test-share-ui.stdout',
+                                       work / 'test-share-ui.stderr', timeout=180))
+            if record.get('outcome') == 'native-save-activity-unavailable':
+                try:
+                    after = read_report('after', bundle)
+                    report['unavailable_save_asset_delta'] = {
+                        'added': sorted(set(after.get('asset_identifiers', [])) - set(baseline['asset_identifiers'])),
+                        'removed': sorted(set(baseline['asset_identifiers']) - set(after.get('asset_identifiers', []))),
+                        'readback_status': after.get('status')}
+                except Blocked as error:
+                    report['unavailable_save_readback_error'] = str(error)
+                raise Blocked('whole-package URL and live-photo provider expose no identifiable Photos save activity; native import remains unaccepted')
+            if record.get('outcome') or record['exit_code']:
+                raise Blocked('test-share-ui: ' + record.get('outcome', 'exit ' + str(record['exit_code'])))
         finally:
             # Retain native callbacks on UI failure as well as success.
-            for phase in ('share', 'share-transfer'):
+            for phase in ('share', 'share-transfer', 'share-types'):
                 path = container / 'Documents' / (phase + '.json')
                 if path.is_file() and not path.is_symlink():
                     shutil.copy2(path, work / (phase + '.json'))
@@ -354,7 +424,8 @@ def main():
         if report['transported_package_sha256_after_share'] != expected_members:
             raise Blocked('native sharing changed the transported package bytes')
         report['system_save_activity_completed'] = True
-        report['whole_pvt_representation_requested'] = True
+        report['whole_pvt_input_representation'] = transfer['representation']
+        report['whole_pvt_representation_requested'] = transfer['representation'] == 'file'
         after = read_report('after', bundle)
         added = set(after.get('asset_identifiers', [])) - set(baseline['asset_identifiers'])
         report['single_live_asset_admission_verified'] = (len(added) == 1 and after.get('asset_local_identifier') in added and after.get('photo_live') is True)

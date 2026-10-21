@@ -5,15 +5,45 @@ These checks do not execute or establish Apple native import.
 import copy
 import contextlib
 import io
+import os
 import plistlib
 from pathlib import Path
 import tempfile
+import sys
+import time
 import unittest
 
 from scripts.apple.pvt_native_import import check_native_import as probe
 
 
 class PVTNativeImportTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'posix', 'owned simulator runner uses POSIX process groups')
+    def test_missing_native_activity_stops_only_its_owned_ui_process_without_waiting_for_timeout(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            started = time.monotonic()
+            result = probe.run_share_ui(
+                [sys.executable, '-u', '-c',
+                 'import time; print("PVT_SHARE_UI_BLOCKED: no Photos save action", flush=True); time.sleep(30)'],
+                root, root / 'ui.stdout', root / 'ui.stderr', timeout=5)
+            self.assertLess(time.monotonic() - started, 3)
+            self.assertEqual(result['outcome'], 'native-save-activity-unavailable')
+            self.assertIn('PVT_SHARE_UI_BLOCKED:', (root / 'ui.stdout').read_text())
+            self.assertIsNotNone(result['exit_code'])
+            self.assertIs(result['owned_process_group_stopped'], True)
+
+    @unittest.skipUnless(os.name == 'posix', 'owned simulator runner uses POSIX process groups')
+    def test_ui_timeout_and_normal_exit_remain_distinct_from_native_activity_absence(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            result = probe.run_share_ui([sys.executable, '-c', 'import time; time.sleep(30)'],
+                                        root, root / 'timeout.stdout', root / 'timeout.stderr', timeout=.2)
+            self.assertEqual(result['outcome'], 'uncertain-after-timeout')
+            result = probe.run_share_ui([sys.executable, '-c', 'print("native test finished")'],
+                                        root, root / 'exit.stdout', root / 'exit.stderr', timeout=5)
+            self.assertEqual(result['exit_code'], 0)
+            self.assertNotIn('outcome', result)
+
     def test_installed_app_declares_the_scene_configuration_required_by_current_sdk(self):
         bundle = "org.xdremux.audit.PVTReadback.u" + "a" * 32
         info = plistlib.loads(plistlib.dumps(probe.reader_info(bundle)))
@@ -48,10 +78,10 @@ class PVTNativeImportTests(unittest.TestCase):
                 self.assertNotIn(forbidden, text)
 
     def test_share_completion_requires_the_whole_current_package_file_promise(self):
-        shared = {"status": "completed", "activity_completed": True, "is_save_to_camera_roll": True}
+        shared = {"status": "completed", "activity_completed": True, "is_save_to_camera_roll": True, "share_phase": "share"}
         package = Path("/owned/container/Documents/capture.pvt")
         hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
-        transfer = {"type_identifier": "com.apple.live-photo", "representation": "file",
+        transfer = {"type_identifier": "com.apple.live-photo", "representation": "file", "share_phase": "share",
                     "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes}
         probe.check_share_receipt(shared, transfer, package, hashes)
         for mutation in ({}, {"type_identifier": "public.jpeg"}, {"representation": "data"},
@@ -64,6 +94,18 @@ class PVTNativeImportTests(unittest.TestCase):
         for changed in ({**shared, "activity_completed": False}, {**shared, "is_save_to_camera_roll": False}):
             with self.assertRaises(probe.Blocked):
                 probe.check_share_receipt(changed, transfer, package, hashes)
+        # URL input has no provider-load callback: it is an offered whole URL,
+        # and still requires the same independent single-asset readback.
+        url_transfer = {**transfer, "representation": "whole-package-url", "type_identifier": "public.directory", "share_phase": "share-url"}
+        url_shared = {**shared, "share_phase": "share-url"}
+        probe.check_share_receipt(url_shared, url_transfer, package, hashes)
+        for mutation in ({"whole_package_url": str(package / 'capture.mov')},
+                         {"member_sha256": {"capture.mov": "movie"}},
+                         {"representation": "resource-list"}, {"is_in_place": True}, {"share_phase": "share"}):
+            with self.assertRaises(probe.Blocked):
+                probe.check_share_receipt(url_shared, {**url_transfer, **mutation}, package, hashes)
+        with self.assertRaises(probe.Blocked):
+            probe.check_share_receipt(shared, url_transfer, package, hashes)
         # A completed share callback remains distinct from library admission.
         baseline, after = self.baseline_and_after()
         after["photo_live"] = False
