@@ -1,0 +1,14 @@
+{
+  "source": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "run": 39551734257,
+  "job": 119062245472,
+  "conclusion": "success",
+  "architecture": "arm64",
+  "minimum_product_macos": "27",
+  "executed_contract": "Exact-head pinned dependency/build/archive and extracted package outside checkout with clean system-only process environment; real conversions and output validation required by smoke_macos.py.",
+  "log_sha256": "ee900d0bbff3d7274c66ba3e2ce818a469953e56a79f52a1a78dab0003920499",
+  "limits": [
+    "The full relocated JSON/artifact was not independently materialized locally; this observation is based on the successful named native job steps, retained console log and inspected exact-head smoke contract.",
+    "Native feature acceptance, whole-PVT Photos admission and wallpaper are separate."
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "operation_enabled": false,
+  "approval": "Direction approved; final merge/delete execution NOT approved.",
+  "captured_at": "2026-10-21T05:43:19.935350+00:00",
+  "repository": "21Z121Z1/XDRemux",
+  "candidate": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "tree": "0997860e6554abedc9999d5ea63ca7936df2e144",
+  "main_before": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "exact_heads_before": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "backup_manifest": "all-37-backup-manifest.json",
+  "source_reviewed": [
+    {
+      "pr": 58,
+      "branch": "codex/liblivephoto-consumer-20261004",
+      "exact_head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "ancestor_of_candidate": true,
+      "planned_handling": "Preserve in ordinary merge71 ancestry, inspect GitHub indirect merged state; do not claim this old head CI passed."
+    },
+    {
+      "pr": 69,
+      "branch": "cursor/portrait-heic-orientation-4765",
+      "exact_head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "ancestor_of_candidate": true,
+      "planned_handling": "Preserve in ordinary merge71 ancestry, inspect GitHub indirect merged state; do not claim this old head CI passed."
+    },
+    {
+      "pr": 65,
+      "branch": "feat/styles-hdr-first-linear-thumbnail-20261015",
+      "exact_head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "ancestor_of_candidate": true,
+      "planned_handling": "Preserve in ordinary merge71 ancestry, inspect GitHub indirect merged state; do not claim this old head CI passed."
+    },
+    {
+      "pr": 68,
+      "branch": "cursor/full-res-linear-hdr-e174",
+      "exact_head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "ancestor_of_candidate": true,
+      "planned_handling": "Preserve in ordinary merge71 ancestry, inspect GitHub indirect merged state; do not claim this old head CI passed."
+    }
+  ],
+  "ordered_steps": [
+    {
+      "step": 1,
+      "action": "Refresh all heads/current writers, candidate clean status, default rules21932863, required strict status checks, CodeQL errors/high and review threads; require every final candidate gate complete.",
+      "blocking_now": "New86 actual inventory/install-state/whole-PVT UI/readback and exact-head/full native gates pending.392 help metadata probe timed out before real coordinator; removed rather than extended/retried. Current in-flight392 native checks finish before source advancement."
+    },
+    {
+      "step": 2,
+      "action": "Refresh exact persistent-tag restore receipt, validate9heads and original4tip ancestry, submit concrete final batch to parent for execution review.",
+      "blocking_now": "Parent has not approved final merge/delete."
+    },
+    {
+      "step": 3,
+      "action": "After explicit execution approval mark only71 ready, ordinary merge71 using expected-head SHA. No squash/rebase/bypass/protection edits.",
+      "expected_head": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7"
+    },
+    {
+      "step": 4,
+      "action": "Observe actual merge commit M, parents [oldMain,H], tree==H tree, original4head ancestry; fetch resulting M and persist/restoration-validate M backup before any manual cleanup. Inspect71/original4 actual merged states and automatic deletion; stop if any unexpected head movement or contradictory PR status.",
+      "blocking_now": "M does not exist yet."
+    },
+    {
+      "step": 5,
+      "action": "Form exact observed remaining non-main ref deletion set. Require each actual OID equal the reviewed inventory or stop; every deleting tip must have exact durable restored backup. Submit fresh M+remaining-set+guard hashes/hooksPath/permissions to parent.",
+      "blocking_now": "Remaining set and post-merge rule state cannot be known before step4."
+    },
+    {
+      "step": 6,
+      "action": "After cleanup approval execute one atomic remote deletion push of only the exact remaining approved set with disabled-template guard properly pinned and no active preexisting hook. Keep tags and main. Fail closed if hook state/config/advertised OIDs differ. Never force or alter global safety/protection."
+    },
+    {
+      "step": 7,
+      "action": "Verify remote heads contains onlymain atM and all originalheads still recoverable. Refresh local worktree inventory and dirty-file recovery, retain physical worktrees/media, detach owned integration worktree, create/check localmain tracking origin/main then normally delete only merged localwork/integrate refs after review; reverify onlymain localhead."
+    }
+  ],
+  "local_inventory": "4275f0f-local-worktree-inventory.json",
+  "local_dirty_recovery": "4275f0f-local-dirty-recovery.json",
+  "guard_state": "v8template100644/NOTAPPROVED; not activated; hooksPath/permissions require fresh review.",
+  "forbidden": "No merge/delete now; no upstream/releases/force push/paid resources/protection/global security changes.",
+  "outcome": "Plan only; no cleanup or merge operation executed.",
+  "native_source": "86 changes only deletion of redundant mandatory help probes and structural external-call regression. Product/workflows unchanged. Complete original media, one-Live-asset/resources/ID/cover/hash assertions remain. No old-source test is relabeled as new-head acceptance.",
+  "evidence_binding": "Pinned by immutablev18 evidence commit and SHA256SUMS; publication receipt identifies it. No merge/delete execution approval."
+}

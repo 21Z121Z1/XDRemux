@@ -1,0 +1,11 @@
+{
+  "observed_at": "2026-10-21 06:05:44 UTC",
+  "state": "open",
+  "draft": true,
+  "merged": false,
+  "head": "integrate/semantic-review-20261020",
+  "head_sha": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "base": "main",
+  "base_sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "mergeable": true
+}

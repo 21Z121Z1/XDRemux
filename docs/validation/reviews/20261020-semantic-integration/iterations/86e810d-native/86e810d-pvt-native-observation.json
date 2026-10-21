@@ -1,0 +1,226 @@
+{
+  "source": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "run": 39551734230,
+  "job": 119062245441,
+  "conclusion": "failure",
+  "probe_status": "blocked",
+  "reason": "owned simulator app-inventory service did not become readable; no installation attempted",
+  "native_setup": {
+    "compile-sdk-canary": {
+      "argv": [
+        "xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "swiftc",
+        "-swift-version",
+        "5",
+        "-parse-as-library",
+        "-target",
+        "arm64-apple-ios17.0-simulator",
+        "-sdk",
+        "/Applications/Xcode_27.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator27.0.sdk",
+        "-module-cache-path",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-xejcq1n_/sdk-module-cache",
+        "-Xfrontend",
+        "-debug-time-function-bodies",
+        "-Xfrontend",
+        "-warn-long-function-bodies=500",
+        "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/SDKCompileProbe.swift",
+        "-o",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-xejcq1n_/sdk-canary"
+      ],
+      "duration_seconds": 5.142739750000004,
+      "exit_code": 0,
+      "name": "compile-sdk-canary",
+      "owned_process_group": 3655,
+      "progress_file": "compile-sdk-canary.processes.json",
+      "timeout_seconds": 240
+    },
+    "compile-reader": {
+      "argv": [
+        "xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "swiftc",
+        "-swift-version",
+        "5",
+        "-parse-as-library",
+        "-target",
+        "arm64-apple-ios17.0-simulator",
+        "-sdk",
+        "/Applications/Xcode_27.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator27.0.sdk",
+        "-module-cache-path",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-xejcq1n_/sdk-module-cache",
+        "-Xfrontend",
+        "-debug-time-function-bodies",
+        "-Xfrontend",
+        "-warn-long-function-bodies=500",
+        "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift",
+        "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift",
+        "-o",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-xejcq1n_/PVTReadback.app/PVTReadback"
+      ],
+      "duration_seconds": 1.0356102920000012,
+      "exit_code": 0,
+      "name": "compile-reader",
+      "owned_process_group": 3683,
+      "progress_file": "compile-reader.processes.json",
+      "timeout_seconds": 120
+    },
+    "boot-owned-simulator": {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "boot",
+        "26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE"
+      ],
+      "duration_seconds": 4.995640167000005,
+      "exit_code": 0,
+      "name": "boot-owned-simulator"
+    },
+    "boot-owned-status": {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "bootstatus",
+        "26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE",
+        "-b"
+      ],
+      "duration_seconds": 88.87680704099998,
+      "exit_code": 0,
+      "name": "boot-owned-status"
+    },
+    "install-readiness-1": {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "listapps",
+        "26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE"
+      ],
+      "duration_seconds": 25.751213209000014,
+      "error": "Command '['xcrun', 'simctl', 'listapps', '26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE']' timed out after 20 seconds",
+      "name": "install-readiness-1",
+      "outcome": "uncertain-after-timeout"
+    },
+    "install-readiness-2": {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "listapps",
+        "26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE"
+      ],
+      "duration_seconds": 20.961898582999993,
+      "error": "Command '['xcrun', 'simctl', 'listapps', '26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE']' timed out after 20 seconds",
+      "name": "install-readiness-2",
+      "outcome": "uncertain-after-timeout"
+    },
+    "install-readiness-3": {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "listapps",
+        "26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE"
+      ],
+      "duration_seconds": 21.980539792000002,
+      "error": "Command '['xcrun', 'simctl', 'listapps', '26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE']' timed out after 20 seconds",
+      "name": "install-readiness-3",
+      "outcome": "uncertain-after-timeout"
+    },
+    "install-service-log": {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "spawn",
+        "26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE",
+        "log",
+        "show",
+        "--last",
+        "2m",
+        "--style",
+        "compact",
+        "--predicate",
+        "process == \"installd\" OR process == \"installcoordinationd\" OR process == \"mobile_installation_proxy\""
+      ],
+      "duration_seconds": 15.683837874999995,
+      "error": "Command '['xcrun', 'simctl', 'spawn', '26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE', 'log', 'show', '--last', '2m', '--style', 'compact', '--predicate', 'process == \"installd\" OR process == \"installcoordinationd\" OR process == \"mobile_installation_proxy\"']' timed out after 15 seconds",
+      "name": "install-service-log",
+      "outcome": "uncertain-after-timeout"
+    },
+    "shutdown-owned": {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "shutdown",
+        "26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE"
+      ],
+      "duration_seconds": 27.553841207999994,
+      "exit_code": 0,
+      "name": "shutdown-owned"
+    },
+    "delete-owned": {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "delete",
+        "26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE"
+      ],
+      "duration_seconds": 2.7716265829999998,
+      "exit_code": 0,
+      "name": "delete-owned"
+    }
+  },
+  "reader_installation": {
+    "install_attempts": 0,
+    "install_timeout_seconds": 120,
+    "observations": [
+      {
+        "attempt": 1,
+        "error": "install-readiness-1: Command '['xcrun', 'simctl', 'listapps', '26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE']' timed out after 20 seconds",
+        "phase": "inventory",
+        "state": "unknown"
+      },
+      {
+        "attempt": 2,
+        "error": "install-readiness-2: Command '['xcrun', 'simctl', 'listapps', '26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE']' timed out after 20 seconds",
+        "phase": "inventory",
+        "state": "unknown"
+      },
+      {
+        "attempt": 3,
+        "error": "install-readiness-3: Command '['xcrun', 'simctl', 'listapps', '26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE']' timed out after 20 seconds",
+        "phase": "inventory",
+        "state": "unknown"
+      }
+    ],
+    "readiness_attempt_limit": 3,
+    "reconcile_attempt_limit": 3,
+    "service_log_error": "install-service-log: Command '['xcrun', 'simctl', 'spawn', '26B376F7-EEDB-4885-8CC7-F4C78E5C5FAE', 'log', 'show', '--last', '2m', '--style', 'compact', '--predicate', 'process == \"installd\" OR process == \"installcoordinationd\" OR process == \"mobile_installation_proxy\"']' timed out after 15 seconds",
+    "status": "installation-service-not-ready"
+  },
+  "selected_runtime": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+  "selected_device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-11",
+  "input_and_package_unchanged": true,
+  "owned_simulator_cleanup": "completed",
+  "never_reached": [
+    "installation",
+    "Photos authorization",
+    "baseline",
+    "three whole-package sharing paths",
+    "independent Live asset/resources/IDs/cover/hash readback"
+  ],
+  "artifact": {
+    "id": 12325600964,
+    "bytes": 32102,
+    "api_digest": "sha256:0c3757b660baecef5fff137f63dd5e744544bc9f6a6b0a17954d959e431836de",
+    "local_bytes_verified": false,
+    "local_read": "Connector returned a reusable file reference; supported signed-URL download in the execution environment failed with proxy Tunnel connection failed:403 Forbidden. No bypass/retry used."
+  },
+  "log_sha256": "ab69f87a414253ae83facb42590e4f3d26870c4f74b0a62eaa4f88a8846cf93e",
+  "limits": [
+    "No Apple media rejection or Photos admission inferred from the service-query timeouts.",
+    "No new source change, rerun, second installation or timeout increase based on this result.",
+    "This head did not reach the installed-container reconciliation branch; behavioral model tests are separate.",
+    "Runtime/device compatibility uses the existing min/max selection. iPhone11 selection alone does not prove incompatibility; raw runtime/devicetype inventory is retained in the small artifact, not independently materialized locally.",
+    "Physical Photos, macOS Photos and wallpaper remain untested."
+  ]
+}

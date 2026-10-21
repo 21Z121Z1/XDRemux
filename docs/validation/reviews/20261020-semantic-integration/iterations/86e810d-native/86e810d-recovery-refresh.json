@@ -1,0 +1,22 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "source": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "captured_at": "2026-10-21T06:21:15.357049+00:00",
+  "remote_heads_match_manifest": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "remote_backup_ref_count": 37,
+  "all_commit_tree_matches": true,
+  "non_shallow_independent_restore": true,
+  "full_strict_fsck_exit": 0,
+  "manifest": "all-37-backup-manifest.json",
+  "limits": "Fresh read-only equality/integrity check of the already independently fetched/restored remote refs. No merge/delete approval or execution; native checks are separate."
+}

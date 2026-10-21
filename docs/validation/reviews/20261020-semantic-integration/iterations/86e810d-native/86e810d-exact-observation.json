@@ -1,0 +1,104 @@
+{
+  "source": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "run": 39551734268,
+  "job": 119062388120,
+  "conclusion": "success",
+  "checks": [
+    {
+      "kind": "static",
+      "name": "rust-workspace-lock",
+      "duration_seconds": 0.053,
+      "passed": true
+    },
+    {
+      "kind": "static",
+      "name": "rust-workspace-format",
+      "duration_seconds": 0.754,
+      "passed": true
+    },
+    {
+      "kind": "static",
+      "name": "rust-workspace-clippy",
+      "duration_seconds": 7.799,
+      "passed": true
+    },
+    {
+      "kind": "regression",
+      "name": "rust-workspace-tests",
+      "duration_seconds": 248.635,
+      "passed": true
+    },
+    {
+      "kind": "functional",
+      "name": "canonical-rust-cli-entrypoint",
+      "duration_seconds": 5.99,
+      "passed": true
+    },
+    {
+      "kind": "functional",
+      "name": "apple-capability-adapter-handshake",
+      "duration_seconds": 81.479,
+      "passed": true
+    },
+    {
+      "kind": "functional",
+      "name": "rust-driven-apple-portrait-cli",
+      "duration_seconds": 18.002,
+      "passed": true
+    },
+    {
+      "kind": "functional",
+      "name": "rust-driven-oppo-native-portrait-cli",
+      "duration_seconds": 32.546,
+      "passed": true
+    },
+    {
+      "kind": "integration",
+      "name": "rust-driven-apple-styles-consumer",
+      "duration_seconds": 371.797,
+      "passed": true
+    },
+    {
+      "kind": "integration",
+      "name": "rust-native-texture-and-app-switch",
+      "duration_seconds": 554.19,
+      "passed": true
+    },
+    {
+      "kind": "integration",
+      "name": "rust-component-conformance",
+      "duration_seconds": 9.402,
+      "passed": true
+    },
+    {
+      "kind": "integration",
+      "name": "engine-plan-vectors",
+      "duration_seconds": 1.108,
+      "passed": true
+    },
+    {
+      "kind": "functional",
+      "name": "rust-motion-photo-real-fixtures",
+      "duration_seconds": 182.734,
+      "passed": true
+    },
+    {
+      "kind": "regression",
+      "name": "repository-policy-regressions",
+      "duration_seconds": 13.542,
+      "passed": true
+    }
+  ],
+  "exact_head_receipt_verified_by_ci": true,
+  "log_sha256": "6e03847c45e0a1ec86feacd2c8202d702fbe9fba957231652fa3aae206358fe5",
+  "artifact": {
+    "id": 12324833703,
+    "bytes": 17300,
+    "reported_sha256": "acc5b3a05ccb03f786bc6f9149cddbbc529920603528e4db57f225196f85ba6c",
+    "local_bytes_verified": false
+  },
+  "limits": [
+    "14 actual native completion subchecks and receipt-verifier success are observed in the console. The full receipt artifact is not independently materialized locally.",
+    "Separate Photos whole-PVT gate remains failed; exact-head success does not override it."
+  ]
+}
