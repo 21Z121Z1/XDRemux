@@ -1,0 +1,284 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-21T04:31:29.267956+00:00",
+  "restore": "all35 remote refs fetched; every exact commit/tree checked; non-shallow and full strict fsck exit0",
+  "recovery_refs": [
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/candidate/pr58-6ae70b2",
+      "head": "6ae70b2b2ffcdc258808cceb5ae8263b2150073c",
+      "tree": "f46af7f3edc11a275b29b745af4328e7e7ebcb5e",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/candidate/pr58-8263637",
+      "head": "8263637fa9cb94c34c01892af80a4ecc97f48275",
+      "tree": "dc732f9c449536649e52b58d337c13c28092ffa2",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/candidate/pr69-01ccece",
+      "head": "01cceceb3c94636df7d7857707970c3888635bd4",
+      "tree": "caa6df8f539fe1b2a39f76b81808b9de519506ee",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/candidate/pr69-6458e3d",
+      "head": "6458e3d2c7a6da3ae378b867377047bd8a59595e",
+      "tree": "07772237825199fb852ca889fde53799879ce880",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004",
+      "head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "tree": "1e77bb34ff295dbbc7db7696f58fc6f5c9a9fa67",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174",
+      "head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "tree": "f3bd36cecfee7b58b1c5eda81b1d933ee94c74a9",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765",
+      "head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "tree": "a0ce850dcaccc02eca9d805fa218ba832f6d6141",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924",
+      "head": "c6d307af662ed516f6e3994c039513359cb98610",
+      "tree": "b8fa7f38160334e24efd6b61c0195e23bfc6e028",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015",
+      "head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "tree": "da1df94a3638f61732c6dfbacd9f94bd20699f99",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/000e74b",
+      "head": "000e74b329d7f4f37a60da3523ccec1887e29469",
+      "tree": "f738fcbdd67254195e3933d749a53c6cec57b47b",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/04c09aa",
+      "head": "04c09aac1b0cabdbd412ab10d071f74120b7bff6",
+      "tree": "5322b3668d626ef6704091993948b548338db49e",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/04c56bd",
+      "head": "04c56bda6740212861b4c24907f15bb870e2e997",
+      "tree": "d41d1649a1afd1db45b3b1c81d39337d9ab9b0c2",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/0a2c7c9",
+      "head": "0a2c7c94765a6fd52a83331d66b74f26259d1141",
+      "tree": "f8d3a07de6745a3279517bb83e84b5fb6bd3eba2",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/1286910",
+      "head": "12869100ffcda70636adc21e42ab2c4204b9d932",
+      "tree": "35dd877cca8daafc7b35137c1c91cc5aff776eb0",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/1b2c07d",
+      "head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "tree": "53fc1b202711f2554bc6af0f70b880920c932392",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/3cac5e9",
+      "head": "3cac5e934a68a26200f77607603cbf4a84b20da3",
+      "tree": "9177e3dd07caa36a7995ff8a83dc8e7a7d78448a",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/4275f0f",
+      "head": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+      "tree": "236dc69996b39c5aee08044b154c269aaf7ea68d",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/4b04fb3",
+      "head": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+      "tree": "a02a3e8fe5533af5aea10b7a10b56ab797b79022",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/711213c",
+      "head": "711213c808cf75d58e3f5b1ebc0b5d5b1567e051",
+      "tree": "580de1437a6106adbea2c361a45e8011f60d24d4",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/7a561de",
+      "head": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+      "tree": "602f0859d36dce377b13e1653645ee2b727a775f",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/8dbe01d",
+      "head": "8dbe01daf0c3d4d44b670360bd9054ef54552da1",
+      "tree": "6ec4f69da7c2b84dc51e6da9789db8cda849a450",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/91c3ab4",
+      "head": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+      "tree": "56d4dcfd50b29defb99d9d6f3afe0e50c144116b",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/9ece161",
+      "head": "9ece161d653186939aa749eee49906e7d2d77e68",
+      "tree": "5c1bb512e52c4a7412bb9971de08656d66f24ff2",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/ab37567",
+      "head": "ab3756746b6482da704f921de207fb12c5bc86a6",
+      "tree": "a486a44c54b8f84bcc6e39e1d5f5a42bcfa817f6",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/af223f0",
+      "head": "af223f00856b31756559a70ad59abb5af0bdb462",
+      "tree": "3ae746a69fb1896718dba40ae5b8bb6f7526762f",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/b049b7a",
+      "head": "b049b7a4bf41934bacf93514e5899567a54000ca",
+      "tree": "18f2e6a808ca4cbae66f8ac7e64e1824cce985f9",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/b0ed573",
+      "head": "b0ed57350fb17923726f4301d39a71bb05fcd12d",
+      "tree": "41216cd4ee1925c4b6820131ee0047438d0993fa",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/ba2b169",
+      "head": "ba2b16918164b8700b57c0bdbaccec7fac5bf9c7",
+      "tree": "6d1b7005a8096c20e8b89c7b9ed59dccb1e70daa",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/c379aa7",
+      "head": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+      "tree": "f618057269722e87be12636b46f5292c5e0d3baf",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/c484046",
+      "head": "c484046c24d50dd34e12cf95c5fbd7b71654be3c",
+      "tree": "fef93cb99533f92e8d9e1297c6da85b5bda1a29f",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/f9a419a",
+      "head": "f9a419aa4eeb33214e2dfac2205719e6cb97d598",
+      "tree": "02cda5ccb3daead965e35aba121bcc624a4cd63a",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/integration/fc3f04d",
+      "head": "fc3f04db604e8d7f72a9dbe1305c5a9829472327",
+      "tree": "30658a3a63fb3ebb1907b2555f9b0678e9d98711",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/main",
+      "head": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "tree": "c552b5b725c91aadb40926699063898b2225f1e8",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/research/texture-native-20261019",
+      "head": "18340989590d451f5676924feb03c70baa503e1a",
+      "tree": "4b4ce423a0873c4ff5d4d355cc5b09f1e17fb214",
+      "restored_commit_matches_remote": true
+    },
+    {
+      "ref": "refs/tags/backup/semantic-review-20261020/research/texture-style",
+      "head": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "tree": "26667fc62ab59e888a5f83eedab4cd69f69fd344",
+      "restored_commit_matches_remote": true
+    }
+  ],
+  "branch_coverage": [
+    {
+      "branch": "refs/heads/codex/liblivephoto-consumer-20261004",
+      "head": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/codex/liblivephoto-consumer-20261004"
+      ]
+    },
+    {
+      "branch": "refs/heads/cursor/full-res-linear-hdr-e174",
+      "head": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/cursor/full-res-linear-hdr-e174"
+      ]
+    },
+    {
+      "branch": "refs/heads/cursor/portrait-heic-orientation-4765",
+      "head": "7952d0b19c6b47738cc0722acae57465a243186f",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/cursor/portrait-heic-orientation-4765"
+      ]
+    },
+    {
+      "branch": "refs/heads/feat/rust-cli-distribution-i18n-20260924",
+      "head": "c6d307af662ed516f6e3994c039513359cb98610",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/feat/rust-cli-distribution-i18n-20260924"
+      ]
+    },
+    {
+      "branch": "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015",
+      "head": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/feat/styles-hdr-first-linear-thumbnail-20261015"
+      ]
+    },
+    {
+      "branch": "refs/heads/integrate/semantic-review-20261020",
+      "head": "af223f00856b31756559a70ad59abb5af0bdb462",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/integration/af223f0"
+      ]
+    },
+    {
+      "branch": "refs/heads/main",
+      "head": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/main"
+      ]
+    },
+    {
+      "branch": "refs/heads/research/texture-native-20261019",
+      "head": "18340989590d451f5676924feb03c70baa503e1a",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/research/texture-native-20261019"
+      ]
+    },
+    {
+      "branch": "refs/heads/research/texture-style",
+      "head": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+      "backup_refs": [
+        "refs/tags/backup/semantic-review-20261020/research/texture-style"
+      ]
+    }
+  ],
+  "source": "af223f00856b31756559a70ad59abb5af0bdb462",
+  "merge_delete": "not approved or executed"
+}

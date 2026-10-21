@@ -1,0 +1,46 @@
+{
+  "source": "af223f00856b31756559a70ad59abb5af0bdb462",
+  "tree": "3ae746a69fb1896718dba40ae5b8bb6f7526762f",
+  "base": "04c56bda6740212861b4c24907f15bb870e2e997",
+  "review_kind": "author review, not native execution",
+  "files": {
+    ".agents/skills/xdremux-verify/features/motion-photo.md": "0fde8f7cc2715899531c11eedd522be7d6790d0b16d2d6dc3d9426ab230b8549",
+    ".github/workflows/performance.yml": "1685ccc53a64b88fc4194542a84d58ada113a71ec226a3dec59198093322f3e4",
+    ".github/workflows/research.yml": "4324f308e484489a202042c4c0e5fdd5e44cf7fb0984e056eb54b18b097f00bc",
+    "crates/xdremux-runtime/src/apple_styles.rs": "7549f71c5baa63dcffc1f255f2747e0e122a9cf603b2745fce1fad3d65e42d5d",
+    "scripts/apple/pvt_native_import/check_native_import.py": "07c8a5a0bea4e513cef82f0c7ec1258e3c704eecd8a44b7ba06225d4203c956f",
+    "tests/test_pvt_native_import.py": "20fcf432c98c9ae2a4fe489bc3a058734615c259e1f3d890d7a68f9a63561828"
+  },
+  "accepted_findings": [
+    {
+      "priority": "P1 validation setup",
+      "evidence": "04c unchanged cold SDK canary timed out122.340s under120s;7a same canary previously90.617s. No reader/authorization/baseline/UI ran. Empty stderr is not SDK incompatibility or Photos rejection.",
+      "action": "Compile/sign before creating/booting simulator; cold module import240s ceiling, actual reader120s unchanged, UI180s unchanged. Stage/CPU snapshots only of private process group every10s, preserve stdout/stderr and Swift/Xcode/SDK identity; stop owned session on timeout."
+    },
+    {
+      "priority": "P2 evidence observability",
+      "evidence": "Bounded console excerpt can omit middle control counts in full UI tree.",
+      "action": "Parse actual UI phase/count lines into compact command receipt, preserve full stdout; never infer native admission from it."
+    },
+    {
+      "priority": "P2 performance",
+      "evidence": "04c first run Styles12.130s median>11.732s; relative+13.6064%, no rerun. Repeated full-resolution RGB8 scalar decode has only256 possible inputs. Audit copied-function kernel: all256 and150994944 real decoded components bit equal; medians1.809729/0.310565s Linux.",
+      "action": "Compute256 exact scalar f32 results once per conversion, index by validated u8. No transfer equation, HDR order/sample/precision or validation change. Actual native release consumer must match runtime scalar reference bitwise for all256 inRGB, row padding and channel permutations, exactly1unskipped test; unchanged E2E gate and interleaved comparator."
+    }
+  ],
+  "regressions": [
+    "pvt-cold-setup-before-fix.log: actual old order assertion failed, new owned-process API absent (not falsely claimed old native reproduction)",
+    "35 focused checks pass",
+    "297 all Python checks pass",
+    "owned timeout retains ps phase and confirms group stop; existing missing-Save vs timeout vs successful-exit distinctions retained"
+  ],
+  "media_and_admission_assertions": "unchanged: source/package bytes, completed exact Photos activity, phase-bound whole package, single added Live asset, original resources/ID/cover/hash and cleanup; no decomposed PhotoKit import",
+  "outside_source_prototype": "RGB8 lookup now proposed in candidate after Linux kernel proof; native release consumer and E2E performance are mandatory pending evidence, no ARM64 speedup/whole-gap attribution claim.",
+  "product_diff": [
+    ".github/workflows/performance.yml",
+    "crates/xdremux-runtime/src/apple_styles.rs"
+  ],
+  "native_gap": "new accurate source native setup/UI/Photos and full final gates pending",
+  "captured_at": "2026-10-21T04:27:35.721809+00:00",
+  "portable_gap": "Apple Styles runtime module is cfg(macos): attempted Linux consumer command ran0 tests, not baseline acceptance. Preserve zero log and demonstrated native guard rejection. Existing native prior source proofs do not accept this optimization."
+}

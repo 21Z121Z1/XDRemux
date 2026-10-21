@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "scope": "Final integration portable verification at04c56bd: inherited HDR/LivePhoto/PVT source-preserving Rust semantics and App policy, plus bounded native whole-PVT representation controls. New code records real SDK extension/URL/item-provider types, compares UIImage availability without saving it, whole-package URL and explicit live-photo file provider, accepts at most one unambiguous Photos save callback matched to its exact input phase, then requires independent one-Live-asset/resource/identifier/cover/hash readback. Missing actions remain non-PASS and stop only the owned XCTest process group. Local checks include all295 Python tests and actual current CLI pair/PVT roundtrip/no-clobber. Linux Rust excludes two explicitly named repeated JPEG CLI encodes; full arm64/macOS27 CI retains them. Portable results do not establish native Swift/UI/Photos behavior or remove failed prior native/performance evidence. Native product files and budgets are unchanged from7a; no merge/delete authorization. Final128 changes only cold SDK setup: compile/sign before simulator creation/boot, cold module preparation bounded240s with ten-second private-process CPU/stage snapshots and owned-session timeout cleanup, reader remains120s and UI180s. Swift/Xcode/SDK identity and compact UI availability facts retained. All297 Python checks required. Media, one-Live-asset/resource/ID/cover/hash, no-clobber and native admission assertions unchanged. Local SDR8 lookup prototype is audit-only, not in product source or these algorithms. Finalaf223 replaces repeated scalar RGB8 sRGB decode only with a256-entry array computed using the same f32 function. All validation/HDR order, sampling, transfer math, source bit depth and native paths remain. Native release actual-consumer test covers every8bit code in allRGB channels plus padded rows and rejects zero/skipped tests. Linux Apple module is cfg-excluded: the attempted consumer command ran0 and is NOT a pass. Linux standalone copied-function prototype compared all256 codes and150994944 real decoded fixture components bit-for-bit, showing kernel median1.809729->0.310565s; this is not native or E2E attribution. Full final native release/Styles/System/Tone/App/Photos/performance gates remain pending.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "workspace-all-target-regressions-with-two-recorded-jpeg-cli-exclusions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--skip",
+        "live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media",
+        "--skip",
+        "convert_command_executes_full_rust_jpeg_ultrahdr_live_photo_pipeline"
+      ],
+      "timeout_seconds": 1800,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300,
+      "env": {
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3",
+        "RESEARCH_ROOT": "/workspace/xdremux-audit/tone-pinned-checkout"
+      }
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "real-cli-pair-and-pvt-conversion-roundtrip-and-no-clobber",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    }
+  ]
+}

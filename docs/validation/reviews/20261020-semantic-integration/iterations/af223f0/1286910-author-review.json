@@ -1,0 +1,35 @@
+{
+  "source": "12869100ffcda70636adc21e42ab2c4204b9d932",
+  "tree": "35dd877cca8daafc7b35137c1c91cc5aff776eb0",
+  "base": "04c56bda6740212861b4c24907f15bb870e2e997",
+  "review_kind": "author review, not native execution",
+  "files": {
+    ".agents/skills/xdremux-verify/features/motion-photo.md": "0fde8f7cc2715899531c11eedd522be7d6790d0b16d2d6dc3d9426ab230b8549",
+    ".github/workflows/research.yml": "4324f308e484489a202042c4c0e5fdd5e44cf7fb0984e056eb54b18b097f00bc",
+    "scripts/apple/pvt_native_import/check_native_import.py": "07c8a5a0bea4e513cef82f0c7ec1258e3c704eecd8a44b7ba06225d4203c956f",
+    "tests/test_pvt_native_import.py": "20fcf432c98c9ae2a4fe489bc3a058734615c259e1f3d890d7a68f9a63561828"
+  },
+  "accepted_findings": [
+    {
+      "priority": "P1 validation setup",
+      "evidence": "04c unchanged cold SDK canary timed out122.340s under120s;7a same canary previously90.617s. No reader/authorization/baseline/UI ran. Empty stderr is not SDK incompatibility or Photos rejection.",
+      "action": "Compile/sign before creating/booting simulator; cold module import240s ceiling, actual reader120s unchanged, UI180s unchanged. Stage/CPU snapshots only of private process group every10s, preserve stdout/stderr and Swift/Xcode/SDK identity; stop owned session on timeout."
+    },
+    {
+      "priority": "P2 evidence observability",
+      "evidence": "Bounded console excerpt can omit middle control counts in full UI tree.",
+      "action": "Parse actual UI phase/count lines into compact command receipt, preserve full stdout; never infer native admission from it."
+    }
+  ],
+  "regressions": [
+    "pvt-cold-setup-before-fix.log: actual old order assertion failed, new owned-process API absent (not falsely claimed old native reproduction)",
+    "35 focused checks pass",
+    "297 all Python checks pass",
+    "owned timeout retains ps phase and confirms group stop; existing missing-Save vs timeout vs successful-exit distinctions retained"
+  ],
+  "media_and_admission_assertions": "unchanged: source/package bytes, completed exact Photos activity, phase-bound whole package, single added Live asset, original resources/ID/cover/hash and cleanup; no decomposed PhotoKit import",
+  "outside_source_prototype": "SDR8 LUT audit-only, not adopted. Exhaustive256 and actual150994944 components bit-identical; Linux kernel median1.809729->0.310565s. No native/E2E or whole-gap causal attribution.",
+  "product_diff": [],
+  "native_gap": "new accurate source native setup/UI/Photos and full final gates pending",
+  "captured_at": "2026-10-21T04:17:49.681865+00:00"
+}

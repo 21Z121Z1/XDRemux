@@ -1,0 +1,210 @@
+{
+  "source": "04c56bda6740212861b4c24907f15bb870e2e997",
+  "run": 39541436160,
+  "job": 119029842168,
+  "attempt": 1,
+  "conclusion": "failure",
+  "absolute_styles_budget_lines": [
+    "  apple-styles median_wall_seconds: observed=12.130s reference=8.691s budget=11.732s",
+    "  apple-styles p95_wall_seconds: observed=14.774s reference=11.412s budget=15.406s",
+    "  apple-styles max_peak_rss_mib: observed=1084.109MiB reference=1089.094MiB budget=1361.367MiB"
+  ],
+  "interleaved_result": {
+    "distinct_revisions": true,
+    "diagnostic_only": true,
+    "summary": {
+      "baseline": {
+        "median_wall_seconds": 9.302206749999982,
+        "median_user_seconds": 9.68,
+        "median_sys_seconds": 0.73,
+        "max_peak_rss_bytes": 1142079488
+      },
+      "candidate": {
+        "median_wall_seconds": 10.567903457999932,
+        "median_user_seconds": 10.91,
+        "median_sys_seconds": 0.73,
+        "max_peak_rss_bytes": 1136640000
+      },
+      "candidate_over_baseline_median": 1.1360641342442699
+    },
+    "candidate_profile": {
+      "arm": "candidate",
+      "status": "validated",
+      "logs": "candidate-profile",
+      "outside_budget_and_comparison_samples": true,
+      "limits": "One candidate-only diagnostic conversion; no baseline stage comparison. The two scene detail spans overlap scene_derivation; do not add them to stage totals.",
+      "wall_seconds": 10.701595084000019,
+      "time_real_seconds": 10.68,
+      "user_seconds": 10.92,
+      "sys_seconds": 0.77,
+      "peak_rss_bytes": 1136558080,
+      "output_bytes": 2894706,
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.0063765
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.0308385
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 2.242536708
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.255603375
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.773820625
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.125370292
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.18980875
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.226210166
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.40246975
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.236911333
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.001807792
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001451917
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 2.9680945
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.012346417
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.006600041
+        }
+      ]
+    }
+  },
+  "arms": {
+    "arms": {
+      "baseline": {
+        "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "tracked_status": "",
+        "cli": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-9czn0rpz/reference-cargo-target/release/xdremux",
+          "sha256": "4f774a7262f35fcb1c55d2672ff81f33caf5dc1fdc7cb675199a5aef74e9a1c7",
+          "bytes": 4944448
+        },
+        "adapter": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-9czn0rpz/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "62d32aac5df15242273d1725d3d56287aa60a244085965a74acd65b0a3675efe",
+          "bytes": 805352
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "--package-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-9czn0rpz/reference-source",
+            "--scratch-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-9czn0rpz/reference-swift-scratch",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "reference-cargo-features.log",
+          "sha256": "c0a59fb361c3c6d67fdecd969f4159a7d8646b1a0c8c832a94ee61ba4fdf2ca8",
+          "source_path_normalized_sha256": "dfd23f0509793a5a6d2531f09545bb2e5ce29fa6915180da8ef4f520023f6e87"
+        }
+      },
+      "candidate": {
+        "sha": "04c56bda6740212861b4c24907f15bb870e2e997",
+        "tracked_status": "",
+        "cli": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/target/release/xdremux",
+          "sha256": "d9bc92d92c1070789b581f8f649def35d170e9da70ad7fec4196e98dd70cd579",
+          "bytes": 4919136
+        },
+        "adapter": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/.build/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "d78ee2d5ed7ece698e1b0497edbcf31d787da6d740e1689cd98f2989ecabe4da",
+          "bytes": 884216
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "build_owner": "performance.yml existing candidate release build",
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "candidate-cargo-features.log",
+          "sha256": "14613cdb763acd78878f2f6499b0f4221309b7029efc52dffda84b5f390e9931",
+          "source_path_normalized_sha256": "f1e4c9d6dc0064d69aeae23a62d1ed0dc3e4910a8a908fb67546097b76541753"
+        }
+      }
+    }
+  },
+  "log_sha256": "403a27a1bdb7ab478399bcc87da967a68faa0e02e69a16603f5cbdd8bc8ecbb6",
+  "decision": "No rerun requested. Relative13.6064% cost persists. Candidate code remains byte-equivalent to7a product. Audit-only RGB8 decode lookup prototype has exhaustive+real-fixture bit equivalence and Linux kernel speedup; any adoption requires actual consumer bit checks in release on native host and unchanged end-to-end budget."
+}

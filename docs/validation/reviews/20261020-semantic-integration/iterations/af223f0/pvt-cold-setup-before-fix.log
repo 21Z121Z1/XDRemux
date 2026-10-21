@@ -1,0 +1,24 @@
+test_cold_sdk_and_reader_compile_before_creating_or_booting_a_simulator (tests.test_pvt_native_import.PVTNativeImportTests.test_cold_sdk_and_reader_compile_before_creating_or_booting_a_simulator) ... FAIL
+test_cold_compile_timeout_keeps_owned_process_stage_and_stops_its_group (tests.test_pvt_native_import.PVTNativeImportTests.test_cold_compile_timeout_keeps_owned_process_stage_and_stops_its_group) ... ERROR
+
+======================================================================
+ERROR: test_cold_compile_timeout_keeps_owned_process_stage_and_stops_its_group (tests.test_pvt_native_import.PVTNativeImportTests.test_cold_compile_timeout_keeps_owned_process_stage_and_stops_its_group)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_native_import.py", line 36, in test_cold_compile_timeout_keeps_owned_process_stage_and_stops_its_group
+    result = probe.run_owned_process([sys.executable, '-c', 'import time; time.sleep(30)'],
+             ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.pvt_native_import.check_native_import' has no attribute 'run_owned_process'
+
+======================================================================
+FAIL: test_cold_sdk_and_reader_compile_before_creating_or_booting_a_simulator (tests.test_pvt_native_import.PVTNativeImportTests.test_cold_sdk_and_reader_compile_before_creating_or_booting_a_simulator)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_native_import.py", line 27, in test_cold_sdk_and_reader_compile_before_creating_or_booting_a_simulator
+    self.assertLess(calls['compile-sdk-canary'].lineno, calls['create-owned-simulator'].lineno)
+AssertionError: 150 not less than 131
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.016s
+
+FAILED (failures=1, errors=1)

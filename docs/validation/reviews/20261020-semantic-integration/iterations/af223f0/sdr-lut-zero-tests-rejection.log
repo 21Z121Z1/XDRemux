@@ -1,0 +1,1 @@
+Expected rejection: Linux cfg(target_os=macos) ran0 actual scene tests. Native release guard fails closed, not counted as passing scalar/consumer evidence.

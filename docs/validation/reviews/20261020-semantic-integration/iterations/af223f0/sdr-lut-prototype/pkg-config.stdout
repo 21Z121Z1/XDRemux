@@ -1,0 +1,1 @@
+-I/tmp/xdremux-toolchain/heif-dev/usr/include/x86_64-linux-gnu -I/tmp/xdremux-toolchain/heif-dev/usr/include/webp -L/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu -lheif 

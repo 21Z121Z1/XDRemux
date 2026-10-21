@@ -1,0 +1,80 @@
+   Compiling xdremux-runtime v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.46s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_runtime-13cdd1a86493a97b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 36 filtered out; finished in 0.00s
+
+     Running tests/apple_adapter.rs (target/debug/deps/apple_adapter-775ae1679834712d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/apple_portrait_rend.rs (target/debug/deps/apple_portrait_rend-921b6c1522c9bf5c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cinematic_envelope.rs (target/debug/deps/cinematic_envelope-9e80ba28f71c29de)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/live_photo_fixture.rs (target/debug/deps/live_photo_fixture-1de568722002b765)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/live_photo_jpeg_fixtures.rs (target/debug/deps/live_photo_jpeg_fixtures-e4086a43acfceec1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/live_photo_negative.rs (target/debug/deps/live_photo_negative-e6cfc91eeb4a2481)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/oppo_compat_fixture.rs (target/debug/deps/oppo_compat_fixture-e5793b666cddcd83)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/oppo_tail_fixture.rs (target/debug/deps/oppo_tail_fixture-26b2f7f4120e0705)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/private_fixture.rs (target/debug/deps/private_fixture-c091e3d5f6eea486)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/source_detection_fixtures.rs (target/debug/deps/source_detection_fixtures-2965c6a8c3356553)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/synthetic_uhdr.rs (target/debug/deps/synthetic_uhdr-6d6e948dd5432047)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/system_heif_hdr.rs (target/debug/deps/system_heif_hdr-64109942ff63fab5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,115 @@
+{
+  "source": "04c56bda6740212861b4c24907f15bb870e2e997",
+  "source_path": "crates/xdremux-runtime/src/apple_styles.rs",
+  "source_file_sha256": "19ae41e8060d871d81fff9759192cdb1bfffb8164a52616177e0687eb9082eac",
+  "copied_function": "fn srgb_decode(value: f32) -> f32 {\n    if value <= 0.040_45 {\n        value / 12.92\n    } else {\n        ((value + 0.055) / 1.055).powf(2.4)\n    }\n}",
+  "fixture": "fixtures/proxdr/oppo/find-x9-ultra/uhdr-hr-01.heic",
+  "fixture_sha256": "115e5a782be83ae66b4aa862fc556207be5d99e424fd6aea1e03b7267a926cc4",
+  "decoded": {
+    "width": 8192,
+    "height": 6144,
+    "source_stride": 24576,
+    "packed_components": 150994944,
+    "ignore_transforms": true
+  },
+  "decoded_rgb8_sha256": "b934979dc03620e23e275143562e67ba698f3dbf462cb832d0c6e7abc57a1d42",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1\n",
+  "kernel": {
+    "all_256_bit_differences": 0,
+    "real_component_count": 150994944,
+    "real_bit_differences": 0,
+    "samples": [
+      {
+        "iteration": 0,
+        "arm": "baseline",
+        "seconds": 4.144845125
+      },
+      {
+        "iteration": 0,
+        "arm": "lookup",
+        "seconds": 2.187272445
+      },
+      {
+        "iteration": 1,
+        "arm": "lookup",
+        "seconds": 0.446858999
+      },
+      {
+        "iteration": 1,
+        "arm": "baseline",
+        "seconds": 4.777738919
+      },
+      {
+        "iteration": 2,
+        "arm": "baseline",
+        "seconds": 3.63576416
+      },
+      {
+        "iteration": 2,
+        "arm": "lookup",
+        "seconds": 0.314099858
+      },
+      {
+        "iteration": 3,
+        "arm": "lookup",
+        "seconds": 0.307030018
+      },
+      {
+        "iteration": 3,
+        "arm": "baseline",
+        "seconds": 1.6447959170000002
+      },
+      {
+        "iteration": 4,
+        "arm": "baseline",
+        "seconds": 1.974662129
+      },
+      {
+        "iteration": 4,
+        "arm": "lookup",
+        "seconds": 0.29860965
+      },
+      {
+        "iteration": 5,
+        "arm": "lookup",
+        "seconds": 0.352386065
+      },
+      {
+        "iteration": 5,
+        "arm": "baseline",
+        "seconds": 1.636078278
+      },
+      {
+        "iteration": 6,
+        "arm": "baseline",
+        "seconds": 1.5253393370000001
+      },
+      {
+        "iteration": 6,
+        "arm": "lookup",
+        "seconds": 0.277007467
+      },
+      {
+        "iteration": 7,
+        "arm": "lookup",
+        "seconds": 0.301375451
+      },
+      {
+        "iteration": 7,
+        "arm": "baseline",
+        "seconds": 1.521570721
+      }
+    ]
+  },
+  "medians": {
+    "baseline": 1.809729023,
+    "lookup": 0.310564938
+  },
+  "lookup_over_baseline": 0.17160853036725598,
+  "scope": "Linux x86_64 standalone kernel only, not runtime row/pixel validation or E2E conversion. Table initialization and output allocation included, deallocation excluded. One warmup/arm;8alternating-order samples/arm.",
+  "limits": [
+    "No arm64/macOS timing, native conversion, or whole-gap attribution.",
+    "No product changes adopted or budget/validation changes.",
+    "RGB8 decoded locally from exact public fixture; no source media/decoded pixels in public artifacts."
+  ]
+}
