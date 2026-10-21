@@ -1,0 +1,14 @@
+{
+  "source": "392009ad9d6e1974ff154fe1705536da3c6265c3",
+  "run": 39549377978,
+  "job": 119054825290,
+  "conclusion": "failure",
+  "first_error": "simctl-install-help: Command '['xcrun', 'simctl', 'help', 'install']' timed out after 15 seconds",
+  "reader_installation_started": false,
+  "photos_stages": "not reached; no installation coordinator/authorization/baseline/UI/readback executed",
+  "source_unchanged": true,
+  "package_unchanged": true,
+  "cleanup": "completed",
+  "log_sha256": "a155a2b4d7874413c2cda31cc2f5effbd1ca6894b4fffe69fb4ec4f950077770",
+  "interpretation": "Mandatory help metadata probe was an unnecessary new gate introduced by this author. Its timeout does not evaluate installation readiness or Photos package admission. Remove it rather than increasing its timeout or retrying the old run."
+}

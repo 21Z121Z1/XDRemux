@@ -1,0 +1,110 @@
+{
+  "base_commit": "392009ad9d6e1974ff154fe1705536da3c6265c3",
+  "base_revision": "392009ad9d6e1974ff154fe1705536da3c6265c3",
+  "builtins": {
+    "diff_check_passed": true,
+    "final_tracked_tree_clean": true,
+    "head_unchanged": true,
+    "initial_tracked_tree_clean": true
+  },
+  "changed_files": [
+    "scripts/apple/pvt_native_import/check_native_import.py",
+    "tests/test_pvt_native_import.py"
+  ],
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "duration_seconds": 0.934,
+      "finished_at": "2026-10-21T05:40:39.741958+00:00",
+      "kind": "static",
+      "name": "rust-format",
+      "passed": true,
+      "return_code": 0,
+      "started_at": "2026-10-21T05:40:38.808046+00:00",
+      "stderr_tail": "",
+      "stdout_tail": "",
+      "timed_out": false,
+      "timeout_seconds": 120
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "duration_seconds": 20.827,
+      "finished_at": "2026-10-21T05:41:00.568788+00:00",
+      "kind": "regression",
+      "name": "all-portable-python-regressions",
+      "passed": true,
+      "return_code": 0,
+      "started_at": "2026-10-21T05:40:39.742146+00:00",
+      "stderr_tail": "texture_research_probe.TextureResearchProbeTests.test_crop_requires_finite_positive_area_within_image) ... ok\ntest_existing_logs_are_never_overwritten (tests.test_texture_research_probe.TextureResearchProbeTests.test_existing_logs_are_never_overwritten) ... ok\ntest_failed_case_does_not_erase_or_skip_remainder_of_matrix (tests.test_texture_research_probe.TextureResearchProbeTests.test_failed_case_does_not_erase_or_skip_remainder_of_matrix) ... ok\ntest_fresh_output_never_reuses_existing_directory_or_symlink (tests.test_texture_research_probe.TextureResearchProbeTests.test_fresh_output_never_reuses_existing_directory_or_symlink) ... ok\ntest_historical_matrix_retains_types_not_product_claims (tests.test_texture_research_probe.TextureResearchProbeTests.test_historical_matrix_retains_types_not_product_claims) ... ok\ntest_invalid_request_does_not_build_or_create_output (tests.test_texture_research_probe.TextureResearchProbeTests.test_invalid_request_does_not_build_or_create_output) ... texture-style research: case/crop options apply only to the person matrix\nok\ntest_invalid_timeout_or_case_cannot_create_log_paths (tests.test_texture_research_probe.TextureResearchProbeTests.test_invalid_timeout_or_case_cannot_create_log_paths) ... ok\ntest_launch_error_is_not_a_success_or_an_erased_case (tests.test_texture_research_probe.TextureResearchProbeTests.test_launch_error_is_not_a_success_or_an_erased_case) ... ok\ntest_nonfinite_report_does_not_replace_last_complete_report (tests.test_texture_research_probe.TextureResearchProbeTests.test_nonfinite_report_does_not_replace_last_complete_report) ... ok\ntest_process_failure_preserves_exact_logs (tests.test_texture_research_probe.TextureResearchProbeTests.test_process_failure_preserves_exact_logs) ... ok\ntest_timeout_is_a_failure_with_preserved_logs (tests.test_texture_research_probe.TextureResearchProbeTests.test_timeout_is_a_failure_with_preserved_logs) ... ok\ntest_all_zero_mask_and_optional_offset (tests.test_texture_sparse_lowering.TextureSparseLoweringTests.test_all_zero_mask_and_optional_offset) ... ok\ntest_block_coordinates_and_c_order_match_scalar_definition (tests.test_texture_sparse_lowering.TextureSparseLoweringTests.test_block_coordinates_and_c_order_match_scalar_definition) ... ok\ntest_invalid_shapes_types_counts_values_and_overflow_are_explicit (tests.test_texture_sparse_lowering.TextureSparseLoweringTests.test_invalid_shapes_types_counts_values_and_overflow_are_explicit) ... ok\ntest_nonzero_offset_never_materializes_masked_out_entries (tests.test_texture_sparse_lowering.TextureSparseLoweringTests.test_nonzero_offset_never_materializes_masked_out_entries) ... ok\ntest_binary_labels_are_length_checked (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_binary_labels_are_length_checked) ... ok\ntest_candidate_state_resources_have_native_byte_lengths (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_candidate_state_resources_have_native_byte_lengths) ... ok\ntest_consumer_quadratic_proxy_identity_is_neutral (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_consumer_quadratic_proxy_identity_is_neutral) ... ok\ntest_gain_map_features_use_linear_gain_ratio_contract (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_gain_map_features_use_linear_gain_ratio_contract) ... ok\ntest_metadata_has_explicit_missing_value_mask (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_metadata_has_explicit_missing_value_mask) ... ok\ntest_model_forward_has_complete_finite_state_contract (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_model_forward_has_complete_finite_state_contract) ... ok\ntest_multimodal_zero_mask_is_identical_to_missing_sidecars (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_multimodal_zero_mask_is_identical_to_missing_sidecars) ... ok\ntest_optional_modality_manifest_is_content_addressed (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_optional_modality_manifest_is_content_addressed) ... ok\ntest_primary_features_are_finite_and_single_image_only (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_primary_features_are_finite_and_single_image_only) ... ok\ntest_published_coreml_package_has_recorded_file_identities (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_published_coreml_package_has_recorded_file_identities) ... ok\ntest_warm_start_migrates_stem_but_keeps_target_statistics (tests.test_universal_photographic_style_training.UniversalPhotographicStyleTrainingTests.test_warm_start_migrates_stem_but_keeps_target_statistics) ... ok\ntest_all_eight_no_clobber_controls_are_mandatory (tests.test_video_style_diagnostics.VideoStyleDiagnosticsTests.test_all_eight_no_clobber_controls_are_mandatory) ... ok\ntest_audio_and_stream_timing_failures_are_not_misattributed (tests.test_video_style_diagnostics.VideoStyleDiagnosticsTests.test_audio_and_stream_timing_failures_are_not_misattributed) ... ok\ntest_cli_emits_failed_json_and_unsuccessful_status (tests.test_video_style_diagnostics.VideoStyleDiagnosticsTests.test_cli_emits_failed_json_and_unsuccessful_status) ... ok\ntest_failed_prerequisite_is_not_successful_malformed_control (tests.test_video_style_diagnostics.VideoStyleDiagnosticsTests.test_failed_prerequisite_is_not_successful_malformed_control) ... ok\ntest_failure_keeps_hashes_without_retaining_or_publishing_media (tests.test_video_style_diagnostics.VideoStyleDiagnosticsTests.test_failure_keeps_hashes_without_retaining_or_publishing_media) ... ok\ntest_final_packet_duration_records_track_index_and_exact_rationals (tests.test_video_style_diagnostics.VideoStyleDiagnosticsTests.test_final_packet_duration_records_track_index_and_exact_rationals) ... ok\ntest_matrix_keeps_all_codecs_and_hypotheses_after_first_failure (tests.test_video_style_diagnostics.VideoStyleDiagnosticsTests.test_matrix_keeps_all_codecs_and_hypotheses_after_first_failure) ... ok\ntest_terminal_empty_marker_coverage_is_mandatory (tests.test_video_style_diagnostics.VideoStyleDiagnosticsTests.test_terminal_empty_marker_coverage_is_mandatory) ... ok\ntest_complete_packet_parity_accepts_time_base_rescaling (tests.test_video_style_research.VideoStyleResearchTests.test_complete_packet_parity_accepts_time_base_rescaling) ... ok\ntest_existing_destination_and_source_never_replaced (tests.test_video_style_research.VideoStyleResearchTests.test_existing_destination_and_source_never_replaced) ... ok\ntest_failures_after_first_frame_are_not_hidden (tests.test_video_style_research.VideoStyleResearchTests.test_failures_after_first_frame_are_not_hidden) ... ok\ntest_invalid_native_or_packet_results_are_not_published (tests.test_video_style_research.VideoStyleResearchTests.test_invalid_native_or_packet_results_are_not_published) ... ok\ntest_success_publishes_once_and_racing_destination_is_not_clobbered (tests.test_video_style_research.VideoStyleResearchTests.test_success_publishes_once_and_racing_destination_is_not_clobbered) ... ok\ntest_unknown_tracks_chapters_and_missing_timing_fail_closed (tests.test_video_style_research.VideoStyleResearchTests.test_unknown_tracks_chapters_and_missing_timing_fail_closed) ... ok\ntest_build_inputs_require_regression_and_functional_evidence (tests.validation.test_agent_completion_gate.CompletionGateTests.test_build_inputs_require_regression_and_functional_evidence) ... ok\ntest_changed_paths_are_nul_delimited_not_display_quoted (tests.validation.test_agent_completion_gate.CompletionGateTests.test_changed_paths_are_nul_delimited_not_display_quoted) ... ok\ntest_deleted_rust_source_requires_functional_evidence (tests.validation.test_agent_completion_gate.CompletionGateTests.test_deleted_rust_source_requires_functional_evidence) ... ok\ntest_dirty_status_preserves_leading_columns_and_embedded_newlines (tests.validation.test_agent_completion_gate.CompletionGateTests.test_dirty_status_preserves_leading_columns_and_embedded_newlines) ... ok\ntest_distribution_documentation_does_not_require_product_evidence (tests.validation.test_agent_completion_gate.CompletionGateTests.test_distribution_documentation_does_not_require_product_evidence) ... ok\ntest_docs_change_passes_and_receipt_verifies (tests.validation.test_agent_completion_gate.CompletionGateTests.test_docs_change_passes_and_receipt_verifies) ... ok\ntest_failed_check_writes_failed_receipt (tests.validation.test_agent_completion_gate.CompletionGateTests.test_failed_check_writes_failed_receipt) ... ok\ntest_moves_account_for_both_ownership_endpoints (tests.validation.test_agent_completion_gate.CompletionGateTests.test_moves_account_for_both_ownership_endpoints) ... ok\ntest_new_commit_invalidates_existing_receipt (tests.validation.test_agent_completion_gate.CompletionGateTests.test_new_commit_invalidates_existing_receipt) ... ok\ntest_non_utf8_tree_path_bytes_are_preserved_without_checkout (tests.validation.test_agent_completion_gate.CompletionGateTests.test_non_utf8_tree_path_bytes_are_preserved_without_checkout) ... ok\ntest_production_change_passes_with_regression_and_functional_checks (tests.validation.test_agent_completion_gate.CompletionGateTests.test_production_change_passes_with_regression_and_functional_checks) ... ok\ntest_production_change_requires_functional_evidence (tests.validation.test_agent_completion_gate.CompletionGateTests.test_production_change_requires_functional_evidence) ... ok\ntest_research_rust_is_source_not_product (tests.validation.test_agent_completion_gate.CompletionGateTests.test_research_rust_is_source_not_product) ... ok\ntest_rust_product_requires_regression_and_functional_evidence (tests.validation.test_agent_completion_gate.CompletionGateTests.test_rust_product_requires_regression_and_functional_evidence) ... ok\ntest_source_change_requires_regression_check (tests.validation.test_agent_completion_gate.CompletionGateTests.test_source_change_requires_regression_check) ... ok\ntest_active_document_links_resolve_with_exact_case (tests.validation.test_repository_layout.RepositoryLayoutTests.test_active_document_links_resolve_with_exact_case) ... ok\ntest_app_model_launcher_resolves_project_root_after_relocation (tests.validation.test_repository_layout.RepositoryLayoutTests.test_app_model_launcher_resolves_project_root_after_relocation) ... ok\ntest_current_commands_do_not_use_pre_migration_test_paths (tests.validation.test_repository_layout.RepositoryLayoutTests.test_current_commands_do_not_use_pre_migration_test_paths) ... ok\ntest_local_scratch_and_non_fixture_media_remain_ignored (tests.validation.test_repository_layout.RepositoryLayoutTests.test_local_scratch_and_non_fixture_media_remain_ignored) ... ok\ntest_new_research_tools_and_public_fixtures_are_not_ignored (tests.validation.test_repository_layout.RepositoryLayoutTests.test_new_research_tools_and_public_fixtures_are_not_ignored) ... ok\ntest_paths_do_not_collide_on_case_insensitive_filesystems (tests.validation.test_repository_layout.RepositoryLayoutTests.test_paths_do_not_collide_on_case_insensitive_filesystems) ... ok\ntest_shell_entrypoints_parse (tests.validation.test_repository_layout.RepositoryLayoutTests.test_shell_entrypoints_parse) ... ok\ntest_support_code_has_one_documented_owner (tests.validation.test_repository_layout.RepositoryLayoutTests.test_support_code_has_one_documented_owner) ... ok\ntest_validation_builds_resolve_the_manifest_outside_repository_cwd (tests.validation.test_repository_layout.RepositoryLayoutTests.test_validation_builds_resolve_the_manifest_outside_repository_cwd) ... ok\ntest_workflow_and_script_references_use_exact_tracked_case (tests.validation.test_repository_layout.RepositoryLayoutTests.test_workflow_and_script_references_use_exact_tracked_case) ... ok\ntest_completion_gate_has_the_required_exact_head_check_context (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_completion_gate_has_the_required_exact_head_check_context) ... ok\ntest_completion_gate_owns_repository_policy_regressions (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_completion_gate_owns_repository_policy_regressions) ... ok\ntest_completion_gate_pr_trigger_is_always_on_without_paths (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_completion_gate_pr_trigger_is_always_on_without_paths) ... ok\ntest_macos_packages_share_portability_owner_and_require_relocated_runtime (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_macos_packages_share_portability_owner_and_require_relocated_runtime) ... ok\ntest_manual_evidence_runs_are_read_only_and_accept_no_inputs (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_manual_evidence_runs_are_read_only_and_accept_no_inputs) ... ok\ntest_native_research_failure_artifacts_are_not_a_success_waiver (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_native_research_failure_artifacts_are_not_a_success_waiver) ... ok\ntest_oriented_imageio_readback_uses_the_product_exact_head (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_oriented_imageio_readback_uses_the_product_exact_head) ... ok\ntest_performance_workflow_does_not_duplicate_completion (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_performance_workflow_does_not_duplicate_completion) ... ok\ntest_portability_and_fixtures_test_the_requested_exact_head (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_portability_and_fixtures_test_the_requested_exact_head) ... ok\ntest_product_uploads_keep_receipts_without_media_or_pixel_dictionaries (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_product_uploads_keep_receipts_without_media_or_pixel_dictionaries) ... ok\ntest_push_path_filters_remain_present (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_push_path_filters_remain_present) ... ok\ntest_pvt_native_import_uses_an_owned_simulator_and_keeps_only_receipts (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_pvt_native_import_uses_an_owned_simulator_and_keeps_only_receipts) ... ok\ntest_required_workflow_pushes_are_main_only (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_required_workflow_pushes_are_main_only) ... ok\ntest_research_evidence_is_read_only_exact_head_and_separate (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_evidence_is_read_only_exact_head_and_separate) ... ok\ntest_research_uploads_keep_scores_without_photos_or_render_buffers (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_research_uploads_keep_scores_without_photos_or_render_buffers) ... ok\ntest_rust_cli_workflow_is_portability_only (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_rust_cli_workflow_is_portability_only) ... ok\ntest_style_tone_sweep_is_read_only_and_pins_the_published_harness (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_style_tone_sweep_is_read_only_and_pins_the_published_harness) ... ok\ntest_system_heif_hdr_api_probe_is_read_only (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_system_heif_hdr_api_probe_is_read_only) ... ok\ntest_workflow_set_stays_minimal (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_workflow_set_stays_minimal) ... ok\ntest_workflows_with_new_concurrency_policy_have_the_shared_group (tests.validation.test_workflow_configuration.WorkflowConfigurationTests.test_workflows_with_new_concurrency_policy_have_the_shared_group) ... ok\n\n----------------------------------------------------------------------\nRan 308 tests in 17.828s\n\nOK\n",
+      "stdout_tail": "{\"calibration\": {\"key1MAE\": 0.0007999977096915245, \"syntheticResponseRMSE8\": 29.707056045532227, \"unstyledMAE\": 0.11684704571962357}, \"epoch\": 1, \"trainingLoss\": 0.031429413706064224}\n{\"calibration\": {\"key1MAE\": 0.0005999962450005114, \"syntheticResponseRMSE8\": 29.780298233032227, \"unstyledMAE\": 0.11704706400632858}, \"epoch\": 2, \"trainingLoss\": 0.029849400743842125}\n{\"calibration\": {\"key1MAE\": 0.10748685151338577, \"syntheticResponseRMSE8\": 55.034427642822266, \"unstyledMAE\": 0.2254941463470459}, \"epoch\": 1, \"trainingLoss\": 0.8737101554870605}\n",
+      "timed_out": false,
+      "timeout_seconds": 300
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "duration_seconds": 0.093,
+      "finished_at": "2026-10-21T05:41:00.662309+00:00",
+      "kind": "functional",
+      "name": "build-current-cli",
+      "passed": true,
+      "return_code": 0,
+      "started_at": "2026-10-21T05:41:00.568878+00:00",
+      "stderr_tail": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s\n",
+      "stdout_tail": "",
+      "timed_out": false,
+      "timeout_seconds": 600
+    },
+    {
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "duration_seconds": 4.752,
+      "finished_at": "2026-10-21T05:41:05.414715+00:00",
+      "kind": "functional",
+      "name": "real-cli-pair-and-pvt-conversion-roundtrip-and-no-clobber",
+      "passed": true,
+      "return_code": 0,
+      "started_at": "2026-10-21T05:41:00.662348+00:00",
+      "stderr_tail": "",
+      "stdout_tail": "Retained proof: /workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-proof-17zsr_q6\n",
+      "timed_out": false,
+      "timeout_seconds": 600
+    }
+  ],
+  "diff_check_output": "",
+  "final_tracked_status": [],
+  "generated_at": "2026-10-21T05:41:05.426742+00:00",
+  "head_commit": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "initial_tracked_status": [],
+  "passed": true,
+  "policy": {
+    "production_changed": false,
+    "source_changed": true
+  },
+  "repository": "/workspace/XDRemux-integration",
+  "schema_version": 1,
+  "scope": "Only removal of redundant mandatory install/listapps CLI help probes plus an external native-call policy regression, compared with392009ad9d6e1974ff154fe1705536da3c6265c3. Actual392 PVT first error was help install15s timeout before the coordinator; no actual installation, authorization, baseline or UI was reached. Use the real inventory response as the readiness observation, not successful printing of help. Preserve all one-install/reconcile/ownership/media/one-Live-asset/resource/ID/cover/hash assertions and all budgets. Product Rust/Swift/App/Cargo/workflow bytes are unchanged. The four scoped local checks include all308 Python tests, format, current CLI and real pair/PVT roundtrip/no-clobber; model/AST checks do not establish native installation. Do not repeat unchanged full Rust/clippy work locally; accurate new native CI remains required."
+}

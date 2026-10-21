@@ -1,0 +1,14 @@
+test_installation_is_not_gated_on_redundant_cli_help_probes (tests.test_pvt_native_import.PVTNativeImportTests.test_installation_is_not_gated_on_redundant_cli_help_probes) ... FAIL
+
+======================================================================
+FAIL: test_installation_is_not_gated_on_redundant_cli_help_probes (tests.test_pvt_native_import.PVTNativeImportTests.test_installation_is_not_gated_on_redundant_cli_help_probes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_pvt_native_import.py", line 31, in test_installation_is_not_gated_on_redundant_cli_help_probes
+    self.assertNotIn(argv[:4], [['xcrun', 'simctl', 'help', 'install'],
+AssertionError: ['xcrun', 'simctl', 'help', 'install'] unexpectedly found in [['xcrun', 'simctl', 'help', 'install'], ['xcrun', 'simctl', 'help', 'listapps']]
+
+----------------------------------------------------------------------
+Ran 1 test in 0.020s
+
+FAILED (failures=1)

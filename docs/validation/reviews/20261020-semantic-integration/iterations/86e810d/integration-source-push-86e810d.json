@@ -1,0 +1,32 @@
+{
+  "captured_at": "2026-10-21T05:49:22.228892+00:00",
+  "source": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "before": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "392009ad9d6e1974ff154fe1705536da3c6265c3",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "after": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7"
+  },
+  "push_exit": 0,
+  "target_observed_at_requested_head": true,
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/86e810d",
+  "portable_gate": "4/4 scoped PASS; positional verify exit0; unchanged product paths, prior native receipts retained",
+  "native_ci": "Current392 performance/release, App and Tone finished naturally before source advancement: absolute9.196/9.472 pass, relative33.1235% remains; actual App30/32 and Tone88 pass.392 PVT failed at redundant help install15s before any real coordinator.86 removes both help metadata prerequisites; no timeouts or media/admission assertions relaxed, no old job rerun. New86 native actual inventory/single-install/reconciliation/PVT and exact-head gates pending.",
+  "merge_delete": "not executed"
+}

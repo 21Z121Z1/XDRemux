@@ -1,0 +1,411 @@
+{
+  "binary_sha256": "2d4c1542e937ce57c9905347d6e6af08ffea4c054fe442974bd0351eea8f2c0c",
+  "cleanup_status": "completed",
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "duration_seconds": 0.010698915999910241,
+      "exit_code": 0,
+      "name": "head"
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "duration_seconds": 0.6338782500001798,
+      "exit_code": 0,
+      "name": "source-status"
+    },
+    {
+      "argv": [
+        "xcodebuild",
+        "-version"
+      ],
+      "duration_seconds": 0.17653850000010607,
+      "exit_code": 0,
+      "name": "xcode-version"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "swiftc",
+        "--version"
+      ],
+      "duration_seconds": 3.5474442909999198,
+      "exit_code": 0,
+      "name": "swift-version"
+    },
+    {
+      "argv": [
+        "sw_vers"
+      ],
+      "duration_seconds": 0.022209833999795592,
+      "exit_code": 0,
+      "name": "macos-version"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "help",
+        "privacy"
+      ],
+      "duration_seconds": 3.4940593329999956,
+      "exit_code": 0,
+      "name": "simctl-privacy-help"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "list",
+        "runtimes",
+        "--json"
+      ],
+      "duration_seconds": 0.3852270419999968,
+      "exit_code": 0,
+      "name": "simctl-runtimes"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "list",
+        "devicetypes",
+        "--json"
+      ],
+      "duration_seconds": 0.4454881670001214,
+      "exit_code": 0,
+      "name": "simctl-device-types"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "--show-sdk-path"
+      ],
+      "duration_seconds": 0.014764167000066664,
+      "exit_code": 0,
+      "name": "simulator-sdk-path"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "--show-sdk-version"
+      ],
+      "duration_seconds": 1.727116541999976,
+      "exit_code": 0,
+      "name": "simulator-sdk-version"
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli",
+        "--message-format=json-render-diagnostics"
+      ],
+      "duration_seconds": 14.782842416999983,
+      "exit_code": 0,
+      "name": "build-current-cli"
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "duration_seconds": 0.15732487499985837,
+      "exit_code": 0,
+      "name": "built-source-status"
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "duration_seconds": 0.014348749999953725,
+      "exit_code": 0,
+      "name": "built-head"
+    },
+    {
+      "argv": [
+        "/Users/runner/work/XDRemux/XDRemux/target/debug/xdremux",
+        "--version"
+      ],
+      "duration_seconds": 0.08051225000008344,
+      "exit_code": 0,
+      "name": "cli-version"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "--sdk",
+        "macosx",
+        "swiftc",
+        "-swift-version",
+        "5",
+        "-parse-as-library",
+        "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift",
+        "-o",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/generate-synthetic"
+      ],
+      "duration_seconds": 13.018160874999921,
+      "exit_code": 0,
+      "name": "compile-generator"
+    },
+    {
+      "argv": [
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/generate-synthetic",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp"
+      ],
+      "duration_seconds": 0.9219669580002119,
+      "exit_code": 0,
+      "name": "generate-synthetic"
+    },
+    {
+      "argv": [
+        "/Users/runner/work/XDRemux/XDRemux/target/debug/xdremux",
+        "inspect",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/synthetic-motion.jpg",
+        "--json"
+      ],
+      "duration_seconds": 0.02229091599997446,
+      "exit_code": 0,
+      "name": "cli-inspect"
+    },
+    {
+      "argv": [
+        "/Users/runner/work/XDRemux/XDRemux/target/debug/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/synthetic-motion.jpg",
+        "--output",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/capture.pvt",
+        "--live-photo-output",
+        "pvt"
+      ],
+      "duration_seconds": 0.09740349999992759,
+      "exit_code": 0,
+      "name": "cli-convert-pvt"
+    },
+    {
+      "argv": [
+        "/Users/runner/work/XDRemux/XDRemux/target/debug/xdremux",
+        "validate",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/capture.pvt",
+        "--json"
+      ],
+      "duration_seconds": 0.024874666999949113,
+      "exit_code": 0,
+      "name": "cli-validate-pvt"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "swiftc",
+        "-swift-version",
+        "5",
+        "-parse-as-library",
+        "-target",
+        "arm64-apple-ios17.0-simulator",
+        "-sdk",
+        "/Applications/Xcode_27.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator27.0.sdk",
+        "-module-cache-path",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/sdk-module-cache",
+        "-Xfrontend",
+        "-debug-time-function-bodies",
+        "-Xfrontend",
+        "-warn-long-function-bodies=500",
+        "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/SDKCompileProbe.swift",
+        "-o",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/sdk-canary"
+      ],
+      "duration_seconds": 11.518280917000084,
+      "exit_code": 0,
+      "name": "compile-sdk-canary",
+      "owned_process_group": 51148,
+      "progress_file": "compile-sdk-canary.processes.json",
+      "timeout_seconds": 240
+    },
+    {
+      "argv": [
+        "xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "swiftc",
+        "-swift-version",
+        "5",
+        "-parse-as-library",
+        "-target",
+        "arm64-apple-ios17.0-simulator",
+        "-sdk",
+        "/Applications/Xcode_27.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator27.0.sdk",
+        "-module-cache-path",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/sdk-module-cache",
+        "-Xfrontend",
+        "-debug-time-function-bodies",
+        "-Xfrontend",
+        "-warn-long-function-bodies=500",
+        "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/ReadbackCore.swift",
+        "/Users/runner/work/XDRemux/XDRemux/scripts/apple/pvt_native_import/PVTReadback.swift",
+        "-o",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/PVTReadback.app/PVTReadback"
+      ],
+      "duration_seconds": 2.6955151669999395,
+      "exit_code": 0,
+      "name": "compile-reader",
+      "owned_process_group": 51190,
+      "progress_file": "compile-reader.processes.json",
+      "timeout_seconds": 120
+    },
+    {
+      "argv": [
+        "codesign",
+        "--force",
+        "--sign",
+        "-",
+        "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp/PVTReadback.app"
+      ],
+      "duration_seconds": 0.06962079199979598,
+      "exit_code": 0,
+      "name": "sign-owned-reader"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "create",
+        "pvt-audit-103946b14a2f42edad13418271637c1d",
+        "com.apple.CoreSimulator.SimDeviceType.iPhone-11",
+        "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
+      ],
+      "duration_seconds": 1.1815306659998441,
+      "exit_code": 0,
+      "name": "create-owned-simulator"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "boot",
+        "5C8D22BE-E61C-4519-A65A-6DCEA642511D"
+      ],
+      "duration_seconds": 3.347247000000152,
+      "exit_code": 0,
+      "name": "boot-owned-simulator"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "bootstatus",
+        "5C8D22BE-E61C-4519-A65A-6DCEA642511D",
+        "-b"
+      ],
+      "duration_seconds": 162.67625333299998,
+      "exit_code": 0,
+      "name": "boot-owned-status"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "help",
+        "install"
+      ],
+      "duration_seconds": 24.68113004199995,
+      "error": "Command '['xcrun', 'simctl', 'help', 'install']' timed out after 15 seconds",
+      "name": "simctl-install-help",
+      "outcome": "uncertain-after-timeout"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "shutdown",
+        "5C8D22BE-E61C-4519-A65A-6DCEA642511D"
+      ],
+      "duration_seconds": 17.354225791999852,
+      "exit_code": 0,
+      "name": "shutdown-owned"
+    },
+    {
+      "argv": [
+        "xcrun",
+        "simctl",
+        "delete",
+        "5C8D22BE-E61C-4519-A65A-6DCEA642511D"
+      ],
+      "duration_seconds": 16.699632084000314,
+      "exit_code": 0,
+      "name": "delete-owned"
+    }
+  ],
+  "delete-owned-exit": 0,
+  "direct_package_import_only": true,
+  "expected_identifier": "95B922ED-E1F1-4B41-ADF2-2E8F50039BCA",
+  "head": "392009ad9d6e1974ff154fe1705536da3c6265c3",
+  "host_architecture": "arm64",
+  "host_system": "Darwin",
+  "host_version": "27.0.1",
+  "known_unsupported_route_not_repeated": "simctl addmedia rejects PVT directories (NSPOSIXErrorDomain22)",
+  "media_uploaded": false,
+  "native_route": "iOS Simulator system Photos save activity; whole package URL or live-photo file representation",
+  "native_validation_status_before_cleanup": "blocked",
+  "not_exercised": [
+    "macOS Photos library import",
+    "physical-device Photos or wallpaper"
+  ],
+  "official_owned_photos_grant_available": true,
+  "owned_device_name": "pvt-audit-103946b14a2f42edad13418271637c1d",
+  "owned_udid": "5C8D22BE-E61C-4519-A65A-6DCEA642511D",
+  "package_bytes_unchanged": true,
+  "package_sha256_after_import": {
+    "capture.heic": "59553d479fa7e15c8f15fd123e815626e12d7fc724d1d25046bd77f4dee0adb5",
+    "capture.mov": "2c86309d78483b415b2cb4e852051125960f557ef312cdc228d0c3b35d4d3fe0",
+    "metadata.plist": "32c70976fd8a5f305a573568b9d7dae31cf6f7c1817d9ee7ebe70ada5b5c3f01"
+  },
+  "package_sha256_before_import": {
+    "capture.heic": "59553d479fa7e15c8f15fd123e815626e12d7fc724d1d25046bd77f4dee0adb5",
+    "capture.mov": "2c86309d78483b415b2cb4e852051125960f557ef312cdc228d0c3b35d4d3fe0",
+    "metadata.plist": "32c70976fd8a5f305a573568b9d7dae31cf6f7c1817d9ee7ebe70ada5b5c3f01"
+  },
+  "probe_bundle_id": "org.xdremux.audit.PVTReadback.u103946b14a2f42edad13418271637c1d",
+  "probe_driver_sha256": "86941932c7c776585f79451d935b9f44af187260be208d17f12132b0dfb561fd",
+  "probe_source_sha256": {
+    "GenerateSyntheticMotion.swift": "cbe70fa1c368ac68ca7fad627c7e5fa90999256453d9b341bcd7898119f6aab7",
+    "PVTReadback.swift": "448015deca5a48ac875150c27c6ecfae57cb089a4c85930ba51ffb970687e9c3",
+    "PVTShareTests.xcodeproj/project.pbxproj": "4896e4aad65e8253d713f325ee9ab865cff06b7324fc094cf0e12456c5b55d51",
+    "PVTShareTests.xcodeproj/xcshareddata/xcschemes/PVTShareUITests.xcscheme": "d892eccefe9e4897f0e0f29e8ab600e8a7004ea2fccb9b0bc93894e973a6bd54",
+    "PVTShareUITests.swift.in": "8723fce01a0e0aeb5c34ceb5caa22cea425bfe4e31ddd06e14298606185a3ffc",
+    "ReadbackCore.swift": "89a53303f9697de32563f530ad332e2fdd6b3e90e2b2ab4f65523bdcfa9aa3f2",
+    "SDKCompileProbe.swift": "fc53b5705a0f30b538e3092f833a130616a8b0e939fd88a3fc0d9c138f71f6ed"
+  },
+  "reader_binary_sha256": "2c87db2788c7ee52a753a9d08ea29d0f5417eba57feaca8cddfab505053f9a27",
+  "reader_info_sha256": "e03f6f05b3a98fe6fb4f8344647bb42feea42b613959235c9f079bb12cc753f0",
+  "reason": "simctl-install-help: Command '['xcrun', 'simctl', 'help', 'install']' timed out after 15 seconds",
+  "selected_device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-11",
+  "selected_runtime": "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+  "shutdown-owned-exit": 0,
+  "status": "blocked",
+  "synthetic_input_sha256": "2a47f1ace3a008c98aa85b45673c3b93c1d08b4b556a09653836ac6c84c88ae8",
+  "synthetic_input_sha256_after": "2a47f1ace3a008c98aa85b45673c3b93c1d08b4b556a09653836ac6c84c88ae8",
+  "synthetic_input_unchanged": true,
+  "work": "/Users/runner/work/_temp/pvt-native-import/pvt-native-_2vpgblp"
+}

@@ -1,0 +1,20 @@
+{
+  "source": "86e810dfb52cbe2516d816bc0ac11b94de84d0e7",
+  "tree": "0997860e6554abedc9999d5ea63ca7936df2e144",
+  "base": "392009ad9d6e1974ff154fe1705536da3c6265c3",
+  "review_kind": "author review",
+  "files": {
+    "scripts/apple/pvt_native_import/check_native_import.py": "1f5479989a41918d191f42ec2322afea5ca49e09dc75b623aee137a0e9f53efe",
+    "tests/test_pvt_native_import.py": "ccdb520e00c2450930f4e85e13f06dc18a67a4be31dca7570e625a28157f5419"
+  },
+  "finding": {
+    "priority": "P1 unnecessary setup gate",
+    "actual_native_error": "392 simctl help install timed out15s before install_owned_reader was called; this gate was introduced by the author. The real inventory, installation, authorization/baseline/UI were not exercised.",
+    "fix": "Remove both redundant install/listapps help calls. Use actual bounded inventory replies as readiness facts; no timeout increase, no old-job rerun. Existing single-install/readback/ownership/media and native Photos assertions unchanged."
+  },
+  "structural_regression": "Actual previous-source mandatory help call fails the native external-call policy check; after deletion46focused checks pass. AST policy is structural evidence, not native execution.",
+  "local_gate": "4scoped checks, all308Python, format,currentCLI and actual pair/PVT roundtrip/no-clobber at exact committed source; no repetition of unchanged full Rust/clippy",
+  "product_workflow_diff": [],
+  "native_gap": "Real coordinator still requires current-head native execution; no install or Photos acceptance inferred from help failure or model/AST checks.",
+  "captured_at": "2026-10-21T05:43:19.935058+00:00"
+}

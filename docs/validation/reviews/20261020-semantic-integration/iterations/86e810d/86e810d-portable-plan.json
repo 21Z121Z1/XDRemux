@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "scope": "Only removal of redundant mandatory install/listapps CLI help probes plus an external native-call policy regression, compared with392009ad9d6e1974ff154fe1705536da3c6265c3. Actual392 PVT first error was help install15s timeout before the coordinator; no actual installation, authorization, baseline or UI was reached. Use the real inventory response as the readiness observation, not successful printing of help. Preserve all one-install/reconcile/ownership/media/one-Live-asset/resource/ID/cover/hash assertions and all budgets. Product Rust/Swift/App/Cargo/workflow bytes are unchanged. The four scoped local checks include all308 Python tests, format, current CLI and real pair/PVT roundtrip/no-clobber; model/AST checks do not establish native installation. Do not repeat unchanged full Rust/clippy work locally; accurate new native CI remains required.",
+  "checks": [
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300,
+      "env": {
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3",
+        "RESEARCH_ROOT": "/workspace/xdremux-audit/tone-pinned-checkout"
+      }
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "real-cli-pair-and-pvt-conversion-roundtrip-and-no-clobber",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    }
+  ]
+}
