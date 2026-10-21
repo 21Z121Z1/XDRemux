@@ -1,11 +1,13 @@
 """Portable installation state tests; these do not run an Apple simulator."""
 import json
+import os
 from pathlib import Path
 import plistlib
 import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scripts.apple.pvt_native_import import check_native_import as probe
 
@@ -31,6 +33,9 @@ class SimulatorInstallModel:
         self.data.mkdir()
 
     def run(self, name, argv, **kwargs):
+        if str(argv[0]) == '/usr/bin/log':
+            self.report['commands'].append({'name': name, 'argv': list(map(str, argv)), 'exit_code': 0})
+            return subprocess.CompletedProcess(argv, 0, b'', b'')
         argv = list(map(str, argv)); action = argv[2]
         record = {'name': name, 'argv': argv}; self.report['commands'].append(record)
         self._result = subprocess.CompletedProcess(argv, 0, b'', b'')
@@ -69,8 +74,10 @@ class SimulatorInstallModel:
         assert argv[3] == self.udid and argv[4] == self.bundle
 
     def install(self):
-        return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
-                                          self.work, self.report, pause=lambda _: None)
+        with patch.object(probe.Path, 'home', return_value=self.root), patch.object(
+                probe.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, b'', b'')):
+            return probe.install_owned_reader(self.run, self.udid, self.bundle, self.staged,
+                                              self.work, self.report, pause=lambda _: None)
 
 
 class SimulatorInstallTests(unittest.TestCase):
@@ -105,6 +112,84 @@ class SimulatorInstallTests(unittest.TestCase):
             with self.assertRaises(probe.Blocked): model.install()
             self.assertEqual(model.installs, 0)
             self.assertEqual(sum(c['argv'][2] == 'listapps' for c in model.report['commands']), 3)
+
+    def test_service_failure_diagnostics_do_not_need_the_stalled_device_spawn_service(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = SimulatorInstallModel(Path(raw), ready=False)
+            with self.assertRaisesRegex(probe.Blocked, 'app-inventory service'):
+                model.install()
+            self.assertEqual(model.installs, 0)
+            self.assertEqual(model.report['reader_installation']['status'], 'installation-service-not-ready')
+            self.assertFalse(any(c['argv'][:3] == ['xcrun', 'simctl', 'spawn'] for c in model.report['commands']))
+            self.assertTrue(any(c['argv'][:2] == ['/usr/bin/log', 'show'] for c in model.report['commands']))
+            self.assertEqual(model.report['host_simulator_diagnostics']['owned_udid'], model.udid)
+
+    @unittest.skipUnless(os.name == 'posix', 'CoreSimulator host-file reads require POSIX descriptors')
+    def test_host_observations_are_bounded_owned_facts_not_application_readiness(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = SimulatorInstallModel(Path(raw))
+            device = model.root / 'Library/Developer/CoreSimulator/Devices' / model.udid
+            device.mkdir(parents=True)
+            (device / 'device.plist').write_bytes(plistlib.dumps(
+                {'UDID': model.udid, 'state': 3, 'runtime': 'runtime-under-test', 'private_other_field': 'never-copy-this'}))
+            log = model.root / 'Library/Logs/CoreSimulator' / model.udid / 'system.log'
+            log.parent.mkdir(parents=True)
+            log.write_bytes(b'DISCARDED-PREFIX' + b'x' * 70000 + b'LAST-ERROR')
+            processes = b'42 1 42 S 00:20 00:01 3.0 1234 /Apple/CoreSimulatorService\n43 1 43 S 00:20 00:01 0.0 500 /private/unrelated-secret\n'
+            def host_query(argv, **kwargs):
+                output = processes if argv[0] == '/bin/ps' else (
+                    b'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 100.\nPages active: 200.\n')
+                return subprocess.CompletedProcess(argv, 0, output, b'')
+            with patch.object(probe.Path, 'home', return_value=model.root), patch.object(
+                    probe.subprocess, 'run', side_effect=host_query):
+                facts = probe.capture_host_simulator_diagnostics(model.run, model.udid, model.report)
+            self.assertEqual(facts['device']['state'], 3)
+            self.assertEqual(facts['processes'][0]['command'], 'CoreSimulatorService')
+            self.assertEqual(len(facts['processes']), 1)
+            self.assertEqual(facts['processes'][0]['rss_kib'], 1234)
+            self.assertEqual(facts['memory'], {'query_exit_code': 0, 'page_size_bytes': 16384,
+                                              'page_counts': {'Pages free': 100, 'Pages active': 200}})
+            self.assertTrue(facts['system_log']['truncated'])
+            self.assertLessEqual(len(facts['system_log']['text'].encode()), 65536)
+            self.assertTrue(facts['system_log']['text'].endswith('LAST-ERROR'))
+            text = json.dumps(facts)
+            for private in ('DISCARDED-PREFIX', 'never-copy-this', 'unrelated-secret'):
+                self.assertNotIn(private, text)
+            self.assertEqual(model.installs, 0)
+            self.assertNotIn('installed-verified', text)
+
+    def test_host_diagnostic_failures_do_not_replace_the_original_service_failure(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = SimulatorInstallModel(Path(raw), ready=False)
+            original = model.run
+            def run(name, argv, **kwargs):
+                if str(argv[0]) == '/usr/bin/log':
+                    raise probe.Blocked('host log client timeout')
+                return original(name, argv, **kwargs)
+            with patch.object(probe.Path, 'home', return_value=model.root), patch.object(
+                    probe.subprocess, 'run', side_effect=subprocess.TimeoutExpired(['ps'], 5)):
+                with self.assertRaisesRegex(probe.Blocked, 'app-inventory service'):
+                    probe.install_owned_reader(run, model.udid, model.bundle, model.staged,
+                                               model.work, model.report, pause=lambda _: None)
+            facts = model.report['host_simulator_diagnostics']
+            self.assertIn('process_error', facts)
+            self.assertIn('host_log_error', facts)
+            self.assertEqual(model.installs, 0)
+
+    @unittest.skipUnless(os.name == 'posix', 'CoreSimulator host-file reads require POSIX descriptors')
+    def test_host_diagnostics_refuse_foreign_identity_and_file_aliases(self):
+        with tempfile.TemporaryDirectory() as raw:
+            model = SimulatorInstallModel(Path(raw))
+            with self.assertRaises(probe.Blocked):
+                probe.capture_host_simulator_diagnostics(model.run, '00000000-0000-0000-0000-000000000000', model.report)
+            external = model.root / 'external'; external.write_text('never-read-foreign-log')
+            log = model.root / 'Library/Logs/CoreSimulator' / model.udid / 'system.log'
+            log.parent.mkdir(parents=True); log.symlink_to(external)
+            with patch.object(probe.Path, 'home', return_value=model.root), patch.object(
+                    probe.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, b'', b'')):
+                facts = probe.capture_host_simulator_diagnostics(model.run, model.udid, model.report)
+            self.assertIn('error', facts['system_log'])
+            self.assertNotIn('never-read-foreign-log', json.dumps(facts))
 
     def test_existing_correct_install_is_verified_before_any_new_mutation(self):
         with tempfile.TemporaryDirectory() as raw:

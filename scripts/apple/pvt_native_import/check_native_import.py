@@ -9,6 +9,7 @@ import plistlib
 import re
 import shutil
 import signal
+import stat
 import struct
 import subprocess
 import sys
@@ -98,6 +99,100 @@ def run_share_ui(command, cwd, stdout_path, stderr_path, *, timeout):
     return facts
 
 
+def capture_host_simulator_diagnostics(run, owned_udid, report):
+    """Observe an unresponsive owned device without its simctl spawn service.
+
+    These host facts never establish installation or Photos readiness.
+    """
+    if str(uuid.UUID(owned_udid)).upper() != owned_udid or report.get('owned_udid') != owned_udid:
+        raise Blocked('host diagnostics target is not the simulator created by this invocation')
+    facts = {'owned_udid': owned_udid, 'processes': [],
+             'process_scope': 'selected host service names; per-process device ownership is not inferred',
+             'scope': 'read-only host observations; device/service readiness remains unproven'}
+    report['host_simulator_diagnostics'] = facts
+    home = Path.home().resolve(strict=True)
+    try:
+        facts['host_load_average'] = list(os.getloadavg())
+    except (OSError, AttributeError) as error:
+        facts['host_load_error'] = str(error)
+
+    def read_owned(relative, *, tail=False):
+        # Walk under the canonical home with no-follow directory descriptors.
+        # A symlink/pipe must not turn diagnostics into an unrelated read/hang.
+        directory = os.open(home, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            for component in relative.parts[:-1]:
+                child = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+                os.close(directory)
+                directory = child
+            fd = os.open(relative.name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=directory)
+            with os.fdopen(fd, 'rb') as stream:
+                info = os.fstat(stream.fileno())
+                size = info.st_size
+                if not stat.S_ISREG(info.st_mode) or (not tail and size > 65536):
+                    raise ValueError('host diagnostic is not a bounded regular file')
+                if tail:
+                    stream.seek(max(0, size - 65536))
+                data = stream.read(65536)
+                return data, {'bytes_total': size, 'bytes_read': len(data), 'truncated': size > len(data)}
+        finally:
+            os.close(directory)
+
+    try:
+        data, _ = read_owned(Path('Library/Developer/CoreSimulator/Devices') / owned_udid / 'device.plist')
+        device = plistlib.loads(data)
+        if not isinstance(device, dict) or device.get('UDID', '').upper() != owned_udid:
+            raise ValueError('host device plist identity does not match the owned UUID')
+        facts['device'] = {key: device[key] for key in ('UDID', 'name', 'state', 'runtime', 'deviceType', 'isDeleted')
+                           if type(device.get(key)) in (str, int, bool)}
+    except (OSError, ValueError, AttributeError) as error:
+        facts['device_error'] = str(error)
+    try:
+        data, metadata = read_owned(Path('Library/Logs/CoreSimulator') / owned_udid / 'system.log', tail=True)
+        facts['system_log'] = {**metadata, 'text': data.decode(errors='replace')}
+    except (OSError, ValueError, AttributeError) as error:
+        facts['system_log'] = {'error': str(error)}
+    try:
+        observed = subprocess.run(['/bin/ps', '-ww', '-axo', 'pid=,ppid=,pgid=,stat=,etime=,time=,pcpu=,rss=,comm='],
+                                  capture_output=True, timeout=5)
+        facts['process_query_exit_code'] = observed.returncode
+        relevant = {'CoreSimulatorService', 'com.apple.CoreSimulator.CoreSimulatorService',
+                    'SimulatorTrampoline', 'launchd_sim', 'simdiskimaged',
+                    'SpringBoard', 'backboardd', 'installd', 'installcoordinationd'}
+        for line in observed.stdout.decode(errors='replace').splitlines():
+            fields = line.split(None, 8)
+            if len(fields) == 9 and Path(fields[-1]).name in relevant:
+                facts['processes'].append(dict(zip(
+                    ('pid', 'ppid', 'pgid', 'state', 'elapsed', 'cpu_time', 'cpu_percent', 'rss_kib', 'command'),
+                    [*map(int, fields[:3]), *fields[3:7], int(fields[7]), Path(fields[-1]).name])))
+                if len(facts['processes']) == 64:
+                    facts['process_list_truncated'] = True
+                    break
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        facts['process_error'] = str(error)
+    try:
+        memory = subprocess.run(['/usr/bin/vm_stat'], capture_output=True, timeout=5)
+        text = memory.stdout.decode(errors='replace')
+        page_size = re.search(r'page size of (\d+) bytes', text)
+        facts['memory'] = {'query_exit_code': memory.returncode,
+                           'page_size_bytes': int(page_size[1]) if page_size else None,
+                           'page_counts': {key: int(value) for key, value in re.findall(
+                               r'(?m)^(Pages (?:free|active|inactive|speculative|wired down|occupied by compressor)):\s+(\d+)\.', text)}}
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        facts['memory_error'] = str(error)
+    try:
+        # Host logd is independent of the device's hung spawn/install services.
+        # Restrict messages to this exact UUID; never dump global logs/env/argv.
+        result = run('host-simulator-log', ['/usr/bin/log', 'show', '--last', '2m', '--style', 'compact',
+                     '--predicate', '(process == "CoreSimulatorService" OR process == "com.apple.CoreSimulator.CoreSimulatorService") '
+                                    f'AND eventMessage CONTAINS[c] "{owned_udid}"'],
+                     timeout=5, required=False)
+        facts['host_log_exit_code'] = result.returncode
+    except Blocked as error:
+        facts['host_log_error'] = str(error)
+    return facts
+
+
 def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=time.sleep):
     """Install at most once; reconcile registered bytes after a client timeout.
 
@@ -118,14 +213,10 @@ def install_owned_reader(run, owned_udid, bundle, app, work, report, *, pause=ti
 
     def fail(status, reason):
         facts['status'] = status
-        # Read only this disposable simulator's installation-service log.
         try:
-            run('install-service-log', ['xcrun', 'simctl', 'spawn', owned_udid, 'log', 'show',
-                '--last', '2m', '--style', 'compact', '--predicate',
-                'process == "installd" OR process == "installcoordinationd" OR process == "mobile_installation_proxy"'],
-                timeout=15, required=False)
-        except Blocked as error:
-            facts['service_log_error'] = str(error)
+            capture_host_simulator_diagnostics(run, owned_udid, report)
+        except (Blocked, OSError, ValueError) as error:
+            facts['host_diagnostic_error'] = str(error)
         raise Blocked(reason)
 
     def inventory(attempt):
@@ -249,7 +340,7 @@ def print_console_receipt(work, report):
                  'compile-sdk-canary.processes.json', 'compile-reader.processes.json',
                  'boot-owned-simulator.stdout', 'boot-owned-status.stdout',
                  'install-owned-reader.stdout', 'install-owned-reader.stderr', 'install-owned-reader.processes.json',
-                 'install-service-log.stdout', 'install-service-log.stderr',
+                 'host-simulator-log.stdout', 'host-simulator-log.stderr',
                  'grant-owned-photos.stderr', 'baseline.json',
                  'build-share-ui.stderr', 'test-share-ui.stdout', 'test-share-ui.stderr',
                  'share.json', 'share-transfer.json', 'share-types.json',
@@ -414,9 +505,10 @@ def main():
         report['commands'].append(record)
         started = time.monotonic()
         try:
-            if name in ('compile-sdk-canary', 'compile-reader', 'install-owned-reader'):
-                progress = work / (name + '.processes.json')
-                record['progress_file'] = progress.name
+            if name in ('compile-sdk-canary', 'compile-reader', 'install-owned-reader', 'host-simulator-log'):
+                progress = None if name == 'host-simulator-log' else work / (name + '.processes.json')
+                if progress:
+                    record['progress_file'] = progress.name
                 record['timeout_seconds'] = timeout
                 record.update(run_owned_process(record['argv'], args.repo, work / (name + '.stdout'),
                                                 work / (name + '.stderr'), timeout=timeout, diagnostic_path=progress))
@@ -487,6 +579,13 @@ def main():
         runtime, device = select_device(runtime_data, types_data)
         report['selected_runtime'] = runtime
         report['selected_device_type'] = device
+        selected_runtime = next(item for item in runtime_data['runtimes'] if item.get('identifier') == runtime)
+        selected_device = next(item for item in types_data['devicetypes'] if item.get('identifier') == device)
+        report['selected_runtime_facts'] = {key: value for key, value in selected_runtime.items()
+                                           if key in ('identifier', 'version', 'buildversion', 'isAvailable', 'supportedArchitectures', 'supportedDeviceTypes')}
+        report['selected_device_type_facts'] = {key: value for key, value in selected_device.items()
+                                               if key in ('identifier', 'name', 'productFamily', 'modelIdentifier', 'minRuntimeVersion',
+                                                          'maxRuntimeVersion', 'minRuntimeVersionString', 'maxRuntimeVersionString')}
         sdk_result = run('simulator-sdk-path', ['xcrun', '--sdk', 'iphonesimulator', '--show-sdk-path'], required=False)
         sdk = sdk_result.stdout.decode().strip() if sdk_result.returncode == 0 else None
         run('simulator-sdk-version', ['xcrun', '--sdk', 'iphonesimulator', '--show-sdk-version'], required=False)

@@ -156,8 +156,17 @@ probe submits at most one 120-second install and checks registration, app/data
 containers, bundle identity and the installed executable hash. A client timeout
 stays recorded; only independently verified matching installed bytes allow
 continuation. Unknown state is observed with bounded reads, never a second
-install. Installation-service logs remain scoped to the owned simulator. It
-then establishes a read-only PhotoKit baseline. It transports the whole
+install. On installation-service failure, diagnostics use the host rather
+than the unresponsive device's `simctl spawn`: five-second process and VM queries
+retain selected CoreSimulator service names/states/CPU/RSS and host page counts.
+These snapshots do not establish a cause or per-process device ownership.
+Owned device metadata and a
+64KiB device-log tail use no-follow bounded regular-file reads, and a
+five-second host log query filters the exact owned UUID. Diagnostic failure
+retains the original service failure; host boot/process facts do not prove
+application readiness. Runtime/type capability facts remain available in the
+receipt without changing device selection. It then establishes a read-only
+PhotoKit baseline. It transports the whole
 validated directory unchanged into that app. A synthetic `UIImage` control
 checks save-action availability without saving it. The probe then offers the
 whole directory URL and, if no save action exists, an explicit
