@@ -1,0 +1,41 @@
+{
+  "source": "7a561de9b2c6573caabae80642ba01d99e07e05f",
+  "tree": "602f0859d36dce377b13e1653645ee2b727a775f",
+  "base": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+  "captured_at": "2026-10-21T03:11:40.437701+00:00",
+  "review_kind": "Author review. Prior frozen independent App/HEIF reviews and negative performance prototype are attributed separately in v12. Native Swift/UI for this new probe not yet executed.",
+  "files": {
+    ".agents/skills/xdremux-verify/features/motion-photo.md": "682e47e9c86b2f21a139910b4c291b329c5245e1e0532a183fb308deb7b33fa7",
+    ".github/workflows/research.yml": "735e70c176a40167a2230a3405186b0698ef929d8f7fb5395b1f420c58e3ca46",
+    "scripts/apple/check_style_tone_response.py": "7a21108f5c4753b9a5c17bef0751fc430d3137adde91f28aac77f655a4b38a53",
+    "scripts/apple/pvt_native_import/PVTReadback.swift": "41df51c40ed8d126403d45ef1d550f9415258929360b3c6efbf61b26ffafecd1",
+    "scripts/apple/pvt_native_import/PVTShareTests.xcodeproj/project.pbxproj": "4896e4aad65e8253d713f325ee9ab865cff06b7324fc094cf0e12456c5b55d51",
+    "scripts/apple/pvt_native_import/PVTShareTests.xcodeproj/xcshareddata/xcschemes/PVTShareUITests.xcscheme": "d892eccefe9e4897f0e0f29e8ab600e8a7004ea2fccb9b0bc93894e973a6bd54",
+    "scripts/apple/pvt_native_import/PVTShareUITests.swift.in": "52b1c88cb9f0851cd1436d5b1642b195c53754e5821a27a571860c534000e33e",
+    "scripts/apple/pvt_native_import/ReadbackCore.swift": "89a53303f9697de32563f530ad332e2fdd6b3e90e2b2ab4f65523bdcfa9aa3f2",
+    "scripts/apple/pvt_native_import/SDKCompileProbe.swift": "fc53b5705a0f30b538e3092f833a130616a8b0e939fd88a3fc0d9c138f71f6ed",
+    "scripts/apple/pvt_native_import/check_native_import.py": "11fcff35630b9e3e57c1b735314603471f98403587ad2a29bdd6a396545af008",
+    "tests/test_pvt_native_import.py": "acd48ffb1b453b6f718c8938b794b5c5802ed58664a14113c9db8e24f94f11d6",
+    "tests/test_style_tone_response.py": "869823fa5aa42349763fb6f9c0ca9cc43cfe3022b6a87d030631f42b5238c5f7",
+    "tests/validation/test_workflow_configuration.py": "868adf072fc089c2afbf0f9a8c5f5a5cc4018a2b9d51fa7c25c87c95e7603152"
+  },
+  "product_crates_and_app_unchanged_from_native_passed_4275": true,
+  "checks": {
+    "final_head": "Clean7/7 PASS and positional verify exit0; all293 Python including actual pinned-source integration; real pair/PVT conversion roundtrip and no-clobber.",
+    "focused": "55 PASS; plist artifact scene declaration, protocol/project binding and real pinned consumer included.",
+    "native": "New source automatic native/App/System/Tone/performance/PVT core and packaging checks pending.",
+    "limits": "Native iOS share test is not macOS Photos, physical-device editing or wallpaper acceptance."
+  },
+  "concrete_changes": [
+    "Respect actual per-interpreter case stems, reject actual reserved names and resolved-parent escape, record Python executable/version; legitimate new-version leading-dot names use complete finite stub data.",
+    "Retain existing native PVT receipt/fixed text diagnostics in console plus complete artifacts; no media/xcresult upload.",
+    "Use a whole com.apple.live-photo file promise and one system Photos save activity in an exact owned simulator/app; require native requested package member hashes and independent real PhotoKit one-asset/resources/ID/cover/original-byte readback.",
+    "Split native reader functions/JSON assignments; separately cap cold SDK canary and real-reader compilation at120s with timings. Known unsupported simctl directory call removed.",
+    "Declare scene manifest and UIWindowSceneDelegate for latest SDK; confirmed Apple WWDC26 requirement; no source media algorithm or product App change."
+  ],
+  "not_changed": [
+    "Original source resource graphs, HDR/gain map/color/bit-depth, native Texture/Styles producer, numerical budgets and default pair/PVT option semantics.",
+    "No source normalization/re-encoding/pair fallback in the sharing probe; no PHAssetCreationRequest or performChanges.",
+    "No merge/delete/security/protection/publishing/paid resource/upstream operation."
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "operation": "Update existing draft PR71 body for source4275/v12",
+  "write_result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "number": 71,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "draft": true,
+      "body": "This draft integrates the four feature PRs, preserves native Texture/Styles production and original media facts, and adds optional true-directory PVT output. Complete product delivery is arm64/macOS27; cross-platform Rust core checks remain. **Merge and branch deletion await final native acceptance and parent review.**\n\nChanges:\n- Preserve HDR/gain-map resource relationships, coded/display transforms, RGB16/Main10 values, original primary/video samples and typed native skin carriers. Reject unknown or ambiguous auxiliary graphs.\n- Require completed native GPU/edit-state receipts and real source-derived Styles data. Reconstruct HDR before linear-light reduction and retain the inverse fit.\n- Publish pairs/PVT without replacing existing output, retain recoverable complete stages after partial failure, and protect source aliases and opaque packages in CLI, batch checkpoints and App.\n- Keep photo+video as the default. Optional PVT contains a validated HEIC/MOV pair and string-version metadata.plist; wrapping adds no encoding. App delegates to the same Rust option.\n- Port localization without changing JSON, exit codes or user paths. Pin package dependencies, audit the complete dylib closure and validate relocated arm64 conversion outside the checkout.\n- Use one owned complete-data consumer for System's three tones and the full eleven-tone sweep. Preserve original pinned extractor/helper imports; reject missing native data and owned namespace collisions.\n- Repair App planning/preparation through existing ancestor aliases. The32 named cases preserve package/source bytes and prohibit blocked CLI conversion. Add a direct whole-PVT native import job using synthetic media, one disposable simulator and read-only native asset/resource/ID/cover verification.\n- Adapt pinned pstack instruction skills to existing implementation and verification owners; no Cursor bootstrap or new generic framework.\n\nCurrent source **4275f0f7992617a9e84e0929608de784ce5a5d14**, tree **236dc69996b39c5aee08044b154c269aaf7ea68d**.\n\nValidation:\n- Current clean committed-head Linux gate7/7 PASS: all289 Python tests including actual original pinned extractor integration, workspace fmt/clippy/regressions, current CLI build and real pair/PVT roundtrip/no-clobber. The Rust command explicitly excludes two repeated JPEG CLI encodes; full native product CI retains them.\n- Preceding91 native System rendered all3 tones; main Tone completed88 real comparisons. Its unchanged absolute Styles budget passed at median9.786s/p9510.045s. Three-platform core, relocated arm64 package, real ProXDR and exact-head also passed.\n- Preceding91 App built both targets but failed the existing-PVT model assertion. It did not pass all30 model calls. The shared boundary is repaired with32 diagnosed cases; full current-source App acceptance remains required.\n- Preceding91 same-runner candidate/main ratio1.16490 and user9.12/7.91s remain a relative cost. The isolated HDR immutable-validation prototype preserved bytes/errors but showed no wall-time speedup, so it was not adopted. No numerical threshold was relaxed.\n- [Current product/App](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720300), [System/Tone/PVT](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720307), [performance](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720351), [core/package](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720286), [exact-head](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720315) and [real ProXDR](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720329) are newly queued/running, not final passes.\n- Direct PVT native import is unverified. The sole import input is the whole directory; unpacked-member import/PhotoKit pair creation cannot count. Runtime/SDK/permission/import/readback failures must remain specific non-PASS receipts. No physical Photos editing, wallpaper or lost historical sample equivalence is claimed.\n\n[Fixed v12 evidence and28-ref recovery](https://github.com/21Z121Z1/XDRemux/blob/cbc059983674c6e6e3309604ab7c789f6712629a/docs/validation/reviews/20261020-semantic-integration/iterations/4275f0f/README.en.md) includes all final portable receipts, actual91 native results/App failure, the new probe boundaries, negative prototype, and complete independent recovery logs. All28 persistent source refs have exact commit/tree, non-shallow full strict fsck0, covering all9 remote heads. Source push changed only this branch.\n\nAfter final gates and parent review, use one ordinary merge commit of#71 retaining #58/#69/#65/#68 heads as ancestors, inspect actual indirect merged states and automatic deletion, then approve the exact remaining cleanup set. No merge/delete, force push, release, upstream write, paid/billing or protection/security change occurred. Public evidence contains selected text/code/hashes; media and decoded pixels remain local.\n",
+      "title": "Complete HDR/Live Photo semantics, optional PVT output and arm64 macOS packaging",
+      "base": "main",
+      "base_sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "head": "integrate/semantic-review-20261020",
+      "head_sha": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+      "head_repo_id": 1221397436,
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "merge_commit_sha": "56584d3bef22587a62101b2b481482291f1c477a",
+      "user": {
+        "login": "21Z121Z1",
+        "name": "21Z121Z1",
+        "email": null,
+        "avatar_url": "https://avatars.githubusercontent.com/u/89170834?v=4",
+        "id": 89170834
+      },
+      "requested_reviewers": null,
+      "requested_team_reviewers": null,
+      "diff": null,
+      "comments": null,
+      "created_at": "2026-10-20T19:09:18Z",
+      "updated_at": "2026-10-21T01:43:23Z",
+      "closed_at": null,
+      "merged_at": null,
+      "commits": 78,
+      "changed_files": 181,
+      "additions": 20952,
+      "deletions": 8623,
+      "display_url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "display_title": "Complete HDR/Live Photo semantics, optional PVT output and arm64 macOS packaging"
+    },
+    "isError": false
+  },
+  "readback": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "number": 71,
+      "state": "open",
+      "merged": false,
+      "mergeable": true,
+      "draft": true,
+      "body": "This draft integrates the four feature PRs, preserves native Texture/Styles production and original media facts, and adds optional true-directory PVT output. Complete product delivery is arm64/macOS27; cross-platform Rust core checks remain. **Merge and branch deletion await final native acceptance and parent review.**\n\nChanges:\n- Preserve HDR/gain-map resource relationships, coded/display transforms, RGB16/Main10 values, original primary/video samples and typed native skin carriers. Reject unknown or ambiguous auxiliary graphs.\n- Require completed native GPU/edit-state receipts and real source-derived Styles data. Reconstruct HDR before linear-light reduction and retain the inverse fit.\n- Publish pairs/PVT without replacing existing output, retain recoverable complete stages after partial failure, and protect source aliases and opaque packages in CLI, batch checkpoints and App.\n- Keep photo+video as the default. Optional PVT contains a validated HEIC/MOV pair and string-version metadata.plist; wrapping adds no encoding. App delegates to the same Rust option.\n- Port localization without changing JSON, exit codes or user paths. Pin package dependencies, audit the complete dylib closure and validate relocated arm64 conversion outside the checkout.\n- Use one owned complete-data consumer for System's three tones and the full eleven-tone sweep. Preserve original pinned extractor/helper imports; reject missing native data and owned namespace collisions.\n- Repair App planning/preparation through existing ancestor aliases. The32 named cases preserve package/source bytes and prohibit blocked CLI conversion. Add a direct whole-PVT native import job using synthetic media, one disposable simulator and read-only native asset/resource/ID/cover verification.\n- Adapt pinned pstack instruction skills to existing implementation and verification owners; no Cursor bootstrap or new generic framework.\n\nCurrent source **4275f0f7992617a9e84e0929608de784ce5a5d14**, tree **236dc69996b39c5aee08044b154c269aaf7ea68d**.\n\nValidation:\n- Current clean committed-head Linux gate7/7 PASS: all289 Python tests including actual original pinned extractor integration, workspace fmt/clippy/regressions, current CLI build and real pair/PVT roundtrip/no-clobber. The Rust command explicitly excludes two repeated JPEG CLI encodes; full native product CI retains them.\n- Preceding91 native System rendered all3 tones; main Tone completed88 real comparisons. Its unchanged absolute Styles budget passed at median9.786s/p9510.045s. Three-platform core, relocated arm64 package, real ProXDR and exact-head also passed.\n- Preceding91 App built both targets but failed the existing-PVT model assertion. It did not pass all30 model calls. The shared boundary is repaired with32 diagnosed cases; full current-source App acceptance remains required.\n- Preceding91 same-runner candidate/main ratio1.16490 and user9.12/7.91s remain a relative cost. The isolated HDR immutable-validation prototype preserved bytes/errors but showed no wall-time speedup, so it was not adopted. No numerical threshold was relaxed.\n- [Current product/App](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720300), [System/Tone/PVT](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720307), [performance](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720351), [core/package](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720286), [exact-head](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720315) and [real ProXDR](https://github.com/21Z121Z1/XDRemux/actions/runs/39528720329) are newly queued/running, not final passes.\n- Direct PVT native import is unverified. The sole import input is the whole directory; unpacked-member import/PhotoKit pair creation cannot count. Runtime/SDK/permission/import/readback failures must remain specific non-PASS receipts. No physical Photos editing, wallpaper or lost historical sample equivalence is claimed.\n\n[Fixed v12 evidence and28-ref recovery](https://github.com/21Z121Z1/XDRemux/blob/cbc059983674c6e6e3309604ab7c789f6712629a/docs/validation/reviews/20261020-semantic-integration/iterations/4275f0f/README.en.md) includes all final portable receipts, actual91 native results/App failure, the new probe boundaries, negative prototype, and complete independent recovery logs. All28 persistent source refs have exact commit/tree, non-shallow full strict fsck0, covering all9 remote heads. Source push changed only this branch.\n\nAfter final gates and parent review, use one ordinary merge commit of#71 retaining #58/#69/#65/#68 heads as ancestors, inspect actual indirect merged states and automatic deletion, then approve the exact remaining cleanup set. No merge/delete, force push, release, upstream write, paid/billing or protection/security change occurred. Public evidence contains selected text/code/hashes; media and decoded pixels remain local.\n",
+      "title": "Complete HDR/Live Photo semantics, optional PVT output and arm64 macOS packaging",
+      "base": "main",
+      "base_sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "head": "integrate/semantic-review-20261020",
+      "head_sha": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+      "head_repo_id": 1221397436,
+      "head_repo_full_name": "21Z121Z1/XDRemux",
+      "merge_commit_sha": "56584d3bef22587a62101b2b481482291f1c477a",
+      "user": {
+        "login": "21Z121Z1",
+        "name": "21Z121Z1",
+        "email": null,
+        "avatar_url": "https://avatars.githubusercontent.com/u/89170834?v=4",
+        "id": 89170834
+      },
+      "requested_reviewers": null,
+      "requested_team_reviewers": null,
+      "diff": null,
+      "comments": null,
+      "created_at": "2026-10-20T19:09:18Z",
+      "updated_at": "2026-10-21T01:43:23Z",
+      "closed_at": null,
+      "merged_at": null,
+      "commits": 78,
+      "changed_files": 181,
+      "additions": 20952,
+      "deletions": 8623,
+      "display_url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+      "display_title": "Complete HDR/Live Photo semantics, optional PVT output and arm64 macOS packaging"
+    },
+    "isError": false
+  },
+  "verified": true
+}

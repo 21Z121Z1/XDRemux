@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "scope": "Committed integration delta: optional PVT CLI/App intent and directory publication, package opacity/provenance/alias protection, typed Texture native carrier selection, pinned Tone consumer iinf compatibility. Linux covers all workspace targets except two explicitly excluded repeated JPEG CLI encodes; native macOS27 product CI must execute the complete suite, App build/30 model calls, System HEIF, Tone data, absolute performance and relocated arm64 package. No Photos import/wallpaper or Windows execution claim from this receipt. Opt-in profiling now separately measures HDR reconstruction and linear area reduction inside scene_derivation; these overlapping diagnostic spans do not alter formal samples, algorithms, absolute budgets or native success requirements. New committed delta: filesystem identity and byte-preserving PVT resume regression; one shared owned System/Tone native consumer boundary; original pinned extractor and sibling-helper import/search-order integration. This Linux run supplies exact original pinned files through RESEARCH_ROOT and does not claim native rendering or App execution. Final delta04 adds direct whole-package native PVT import via one owned simulator with synthetic source generation, baseline/delta PhotoKit readback, resource identifiers/cover/hash validation, exact cleanup and non-PASS missing-capability outcomes; portable tests cover only these boundaries. Tone source-name collisions and parent escapes reject before launching upstream. Native Swift/import remain unverified by this Linux gate. Audit-only HDR validation-hoisting experiment showed no wall speedup and is NOT adopted; product HDR algorithms/assertions are unchanged. Final4275 adds the shared existing-ancestor PVT planning/preparation guard, 32 named native App cases with no blocked CLI invocation/source and package preservation, and explicit background readback worker isolation. Linux architecture tests and a filesystem model are structural evidence only; both Xcode builds, all30 registered App model calls and actual direct whole-PVT import/readback still require this final source on macOS27/arm64. Final3cac corrects a cross-version test expectation: newer pathlib keeps all-dot filename prefixes as safe case names. Retain real empty/current/parent/reserved/duplicate rejection, verify resolved case parent containment, record interpreter executable/version, and drive complete finite stub data for accepted names across actual-host and explicitly modeled legacy/modern rules. Original marker proves launch only, not a real directory escape. Actual Python3.15/native consumption remains CI evidence. Finalb0ed adds fixed-name, bounded CI console copies of existing native PVT receipt and critical native stderr while retaining full text artifacts. A new negative check excludes media, unrelated files and symlink diagnostics. Old4275 whole-directory native import returned nonzero; no Photos import or cleanup/readback success is inferred from an inaccessible artifact. No package/import/media algorithm changes. Final9ece replaces the known unsupported simctl directory route with a whole live-photo NSItemProvider file representation and native system Photos-save UI test on one owned simulator. Split readback/cold SDK compile retains120s per compile, records timings and stops before sharing if setup fails. Complete package transport/native file-promise hashes, save callback and independent PhotoKit one-asset/resources/ID/cover/export hashes are required. No PhotoKit pair creation or unpacked-media fallback. Only simulator sharing is attempted; macOS Photos library selection and physical devices remain separate gaps. Linux protocol tests do not establish native compile/UI/import.",
+  "checks": [
+    {
+      "name": "locked-workspace",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "rust-format",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "timeout_seconds": 120,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "rust-workspace-clippy",
+      "kind": "static",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--deny",
+        "warnings"
+      ],
+      "timeout_seconds": 1200,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "workspace-all-target-regressions-with-two-recorded-jpeg-cli-exclusions",
+      "kind": "regression",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "--skip",
+        "live_photo_batch_reports_direct_conversion_omissions_and_preserves_source_media",
+        "--skip",
+        "convert_command_executes_full_rust_jpeg_ultrahdr_live_photo_pipeline"
+      ],
+      "timeout_seconds": 1800,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "all-portable-python-regressions",
+      "kind": "regression",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        ".",
+        "-v"
+      ],
+      "timeout_seconds": 300,
+      "env": {
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3",
+        "RESEARCH_ROOT": "/workspace/xdremux-audit/tone-pinned-checkout"
+      }
+    },
+    {
+      "name": "build-current-cli",
+      "kind": "functional",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "xdremux-cli"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "CARGO_TARGET_DIR": "/workspace/XDRemux-integration/target",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    },
+    {
+      "name": "real-cli-pair-and-pvt-conversion-roundtrip-and-no-clobber",
+      "kind": "functional",
+      "command": [
+        "python3",
+        "/workspace/xdremux-audit/verify-current-cli.py"
+      ],
+      "timeout_seconds": 600,
+      "env": {
+        "XDREMUX_VERIFY_CLI": "/workspace/XDRemux-integration/target/debug/xdremux",
+        "TMPDIR": "/workspace/xdremux-audit/python-tmp-4b04fb3"
+      }
+    }
+  ]
+}

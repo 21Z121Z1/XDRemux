@@ -1,0 +1,9 @@
+PASS [static] locked-workspace (0.032s)
+PASS [static] rust-format (0.943s)
+PASS [static] rust-workspace-clippy (0.216s)
+PASS [regression] workspace-all-target-regressions-with-two-recorded-jpeg-cli-exclusions (208.999s)
+PASS [regression] all-portable-python-regressions (21.919s)
+PASS [functional] build-current-cli (0.205s)
+PASS [functional] real-cli-pair-and-pvt-conversion-roundtrip-and-no-clobber (3.617s)
+PASS completion gate for 3cac5e934a68a26200f77607603cbf4a84b20da3
+receipt: /workspace/xdremux-audit/3cac5e9-portable-receipt.json

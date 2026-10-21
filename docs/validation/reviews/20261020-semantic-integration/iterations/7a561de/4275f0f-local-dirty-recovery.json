@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-10-21T01:42:50.576034+00:00",
+  "local_dirty_worktree": "/workspace/xdremux-audit/style-fit-accumulation-prototype/candidate-source",
+  "base": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+  "base_ancestor_of_durable_final": true,
+  "file": "crates/xdremux-engine/src/apple_photographic_styles.rs",
+  "durable_ref": "refs/tags/backup/semantic-review-20261020/integration/4275f0f",
+  "restored_file_sha256": "b1f58170b7bc6504eb7e1957c481bb8cd6d32e91ccfbbbca5ee0213cb615cc81",
+  "current_dirty_file_sha256": "b1f58170b7bc6504eb7e1957c481bb8cd6d32e91ccfbbbca5ee0213cb615cc81",
+  "byte_exact_equivalent": true,
+  "patch_sha256": "31be7f073e7ac635492d010910121789faa33e8c69f3b01b91e226b4207aa358",
+  "outcome": "Only local tracked delta already incorporated byte-exact in final source; all28 strict restore proves persistent recovery. No dirty file reset, worktree removal or branch deletion performed. Ignored builds/media left alone."
+}

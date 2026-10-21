@@ -1,0 +1,121 @@
+{
+  "source": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+  "run": 39528720351,
+  "job": 118989380709,
+  "conclusion": "success",
+  "absolute_styles": {
+    "median": {
+      "seconds": 9.227,
+      "reference": 8.691,
+      "budget": 11.732
+    },
+    "p95": {
+      "seconds": 9.588,
+      "reference": 11.412,
+      "budget": 15.406
+    }
+  },
+  "same_runner_comparison": {
+    "distinct_revisions": true,
+    "diagnostic_only": true,
+    "summary": {
+      "baseline": {
+        "median_wall_seconds": 7.9021091249999245,
+        "median_user_seconds": 7.9,
+        "median_sys_seconds": 0.55,
+        "max_peak_rss_bytes": 1141555200
+      },
+      "candidate": {
+        "median_wall_seconds": 9.323697875000107,
+        "median_user_seconds": 9.1,
+        "median_sys_seconds": 0.7,
+        "max_peak_rss_bytes": 1137213440
+      },
+      "candidate_over_baseline_median": 1.1798999137461539
+    },
+    "candidate_profile": {
+      "arm": "candidate",
+      "status": "validated",
+      "logs": "candidate-profile",
+      "outside_budget_and_comparison_samples": true,
+      "limits": "One candidate-only diagnostic conversion; no baseline stage comparison. The two scene detail spans overlap scene_derivation; do not add them to stage totals.",
+      "wall_seconds": 9.16915604199994,
+      "time_real_seconds": 9.16,
+      "user_seconds": 9.02,
+      "sys_seconds": 0.56,
+      "peak_rss_bytes": 1137049600,
+      "output_bytes": 2894706,
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.005873
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.128914375
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 2.037189333
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.273412542
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.687929792
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.103643291
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.077720708
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.17268575
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.366053917
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.195178334
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.0017475
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001046666
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 2.797009334
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.010662
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.004023417
+        }
+      ]
+    }
+  },
+  "log_sha256": "651fcd74e02c8e8ef20aa9c20fce15b0a44ac617ca674eaa604c9ec959e9bc9a",
+  "captured_at": "2026-10-21T02:09:42.559252+00:00",
+  "limits": [
+    "Source4275 only; not a final b0ed check.",
+    "Relative median ratio1.1798999137461539, user7.9/9.1s remains; no sole host/commit attribution.",
+    "Candidate-only nested phase spans are not baseline stage deltas.",
+    "Negative isolated immutable-validation prototype is not adopted; no budgets or numeric algorithms changed."
+  ]
+}

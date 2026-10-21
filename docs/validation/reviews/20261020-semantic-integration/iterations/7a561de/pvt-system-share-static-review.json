@@ -1,0 +1,19 @@
+{
+  "captured_at": "2026-10-21T02:37:29.252438+00:00",
+  "review": "Author review of isolated system Photos-share prototype; native SDK/UI execution is not available on Linux.",
+  "new_route": "NSItemProvider file representation com.apple.live-photo, whole current PVT with complete member hashes; one exact owned-bundle XCUITest SaveToCameraRoll action; separate actual PhotoKit asset/resource/ID/cover/hash readback.",
+  "removed_route": "No simctl addmedia execution; its known directory-unsupported result is retained in previous-source evidence.",
+  "setup": "Split readback into small native functions with explicit JSON assignments; separate cold SDK canary and actual reader, both120s limits, function timing and command duration receipts. No timeout or assertions relaxed.",
+  "privacy": "Only generated geometric media and a newly created owned simulator. Per-app official Photos grant only that app. No host Photos/TCC, SQLite, pair-creation API, external share destination or result-bundle/media upload.",
+  "portable": "54 focused tests PASS; two new protocol/project-binding cases; scheme XML parses. Xcode project/Swift/UI remain unexecuted until nativeCI.",
+  "files": {
+    "scripts/apple/pvt_native_import/GenerateSyntheticMotion.swift": "cbe70fa1c368ac68ca7fad627c7e5fa90999256453d9b341bcd7898119f6aab7",
+    "scripts/apple/pvt_native_import/SDKCompileProbe.swift": "fc53b5705a0f30b538e3092f833a130616a8b0e939fd88a3fc0d9c138f71f6ed",
+    "scripts/apple/pvt_native_import/ReadbackCore.swift": "89a53303f9697de32563f530ad332e2fdd6b3e90e2b2ab4f65523bdcfa9aa3f2",
+    "scripts/apple/pvt_native_import/check_native_import.py": "6d97dec951b0669aab3bee397e7db7ad50ac494f112fc8012807d649a8892a4f",
+    "scripts/apple/pvt_native_import/PVTReadback.swift": "eba20b61af6f51444a3cfec8fe59faeddc0158d1e4f1c319c863dd15183fde62",
+    "scripts/apple/pvt_native_import/PVTShareUITests.swift.in": "52b1c88cb9f0851cd1436d5b1642b195c53754e5821a27a571860c534000e33e",
+    "scripts/apple/pvt_native_import/PVTShareTests.xcodeproj/project.pbxproj": "4896e4aad65e8253d713f325ee9ab865cff06b7324fc094cf0e12456c5b55d51",
+    "scripts/apple/pvt_native_import/PVTShareTests.xcodeproj/xcshareddata/xcschemes/PVTShareUITests.xcscheme": "d892eccefe9e4897f0e0f29e8ab600e8a7004ea2fccb9b0bc93894e973a6bd54"
+  }
+}

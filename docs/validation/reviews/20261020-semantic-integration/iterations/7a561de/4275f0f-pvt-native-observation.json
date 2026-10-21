@@ -1,0 +1,73 @@
+{
+  "source": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+  "run": 39528720307,
+  "job": 118989380411,
+  "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39528720307/job/118989380411",
+  "conclusion": "failure",
+  "probe_status": "blocked",
+  "job_step_exit": 2,
+  "reason": "native whole-directory PVT import rejected; no pair fallback attempted",
+  "observed_at": "2026-10-21T02:03:16Z",
+  "log_sha256": "134021cf1a144afc3ec3ac01933ecfbd0b415a981c4a522ba49a06d995f6f871",
+  "artifact": {
+    "id": 12314434768,
+    "name": "pvt-native-import-4275f0f7992617a9e84e0929608de784ce5a5d14",
+    "files": 51,
+    "bytes": 26942,
+    "zip_sha256_from_upload_log": "488507d0887c6709b2e8a58cebd17ea59d0a6028f79c43bef4af08f596bfb3a2",
+    "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39528720307/artifacts/12314434768",
+    "contents_locally_verified": false
+  },
+  "retrieval_attempts": [
+    {
+      "method": "GitHub download_workflow_artifact",
+      "outcome": "succeeded; reusable file reference returned; not a local executor path"
+    },
+    {
+      "method": "executor HTTPS signed transfer",
+      "outcome": "proxy CONNECT403; ZIP bytes not read"
+    },
+    {
+      "method": "supported Library prepare_materialize with exact new artifact file_id",
+      "outcome": "succeeded but workspace_path=null; only signed transfer returned; no local file"
+    },
+    {
+      "method": "gh run download for exact current repository/artifact",
+      "outcome": "Forbidden reading artifact listing; exit1; no artifact locally extracted"
+    }
+  ],
+  "not_observed": [
+    "Root did not locally read the ZIP; details above are attributed to parent verified inspection.",
+    "No Photos save-activity or package admission attempt occurred in this old probe."
+  ],
+  "limits": [
+    "Actual complete directory import was attempted and rejected by this route; no successful Photos import claimed.",
+    "No unpacked import/PhotoKit creation fallback was attempted.",
+    "A native simctl directory rejection does not alone prove all macOS Photos direct import paths unsupported or identify a package-format bug.",
+    "No network-policy/proxy/authentication bypass, host Photos/TCC change or unsupported Library retry.",
+    "Final share prototype uses a new system-save entrance and scene-aware setup; it does not repeat unsupported simctl directory import."
+  ],
+  "captured_at": "2026-10-21T02:11:08.811477+00:00",
+  "parent_verified_observations": {
+    "provenance": "Parent independently downloaded and read the exact artifact12314434768; its SHA256 matches the upload log. Root executor signed transfer/gh reads remained blocked.",
+    "simctl_addmedia_exit": 133,
+    "native_error": {
+      "outer_domain": "CoreSimulator.LaunchdSimError",
+      "outer_code": 133,
+      "inner_domain": "NSPOSIXErrorDomain",
+      "inner_code": 22,
+      "message": "File type unsupported"
+    },
+    "scope": "The simctl addmedia directory entrance rejects this type; Photos/system sharing acceptance is not decided.",
+    "reader_compile_timeout_seconds": 120,
+    "baseline_and_photokit_readback_established": false,
+    "synthetic_generation_cli_conversion_structure_validation_exitcodes": [
+      0,
+      0,
+      0
+    ],
+    "original_media_package_hashes_unchanged": true,
+    "owned_simulator_cleanup": "succeeded",
+    "reported_in": "Trusted parent delegation before quota reset; no exact message timestamp supplied."
+  }
+}

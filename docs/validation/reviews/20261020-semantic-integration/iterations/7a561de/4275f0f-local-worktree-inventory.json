@@ -1,0 +1,60 @@
+{
+  "captured_at": "2026-10-21T01:42:26.208493+00:00",
+  "action": "Read-only local worktree inventory; no branch deletion or worktree cleanup.",
+  "worktrees": [
+    {
+      "path": "/workspace/XDRemux",
+      "head": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+      "branch": "refs/heads/work",
+      "tracked_status": "",
+      "untracked_names": []
+    },
+    {
+      "path": "/workspace/XDRemux-integration",
+      "head": "4275f0f7992617a9e84e0929608de784ce5a5d14",
+      "branch": "refs/heads/integrate/semantic-review-20261020",
+      "tracked_status": "",
+      "untracked_names": []
+    },
+    {
+      "path": "/workspace/XDRemux-pr58-candidate",
+      "head": "6ae70b2b2ffcdc258808cceb5ae8263b2150073c",
+      "branch": null,
+      "tracked_status": "",
+      "untracked_names": []
+    },
+    {
+      "path": "/workspace/XDRemux-pr69-candidate",
+      "head": "6458e3d2c7a6da3ae378b867377047bd8a59595e",
+      "branch": null,
+      "tracked_status": "",
+      "untracked_names": []
+    },
+    {
+      "path": "/workspace/XDRemux-review-evidence",
+      "head": "cbc059983674c6e6e3309604ab7c789f6712629a",
+      "branch": null,
+      "tracked_status": "",
+      "untracked_names": []
+    },
+    {
+      "path": "/workspace/xdremux-audit/style-fit-accumulation-prototype/baseline-source",
+      "head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "branch": null,
+      "tracked_status": "",
+      "untracked_names": []
+    },
+    {
+      "path": "/workspace/xdremux-audit/style-fit-accumulation-prototype/candidate-source",
+      "head": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+      "branch": null,
+      "tracked_status": "M crates/xdremux-engine/src/apple_photographic_styles.rs",
+      "untracked_names": [],
+      "tracked_patch": "local-worktree-candidate-source-tracked.patch",
+      "tracked_patch_sha256": "31be7f073e7ac635492d010910121789faa33e8c69f3b01b91e226b4207aa358",
+      "changed_files_equal_final_integration": {
+        "crates/xdremux-engine/src/apple_photographic_styles.rs": true
+      }
+    }
+  ]
+}

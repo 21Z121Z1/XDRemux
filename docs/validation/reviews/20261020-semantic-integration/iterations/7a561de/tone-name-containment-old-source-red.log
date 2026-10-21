@@ -1,0 +1,19 @@
+test_consumer_case_names_preserve_namespace_across_stem_versions (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_case_names_preserve_namespace_across_stem_versions) ... 
+  test_consumer_case_names_preserve_namespace_across_stem_versions (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_case_names_preserve_namespace_across_stem_versions) (name='escape.heic', stem='../outside', parser='EscapingCasePath', python='3.12.14') ... FAIL
+
+======================================================================
+FAIL: test_consumer_case_names_preserve_namespace_across_stem_versions (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_case_names_preserve_namespace_across_stem_versions) (name='escape.heic', stem='../outside', parser='EscapingCasePath', python='3.12.14')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 215, in test_consumer_case_names_preserve_namespace_across_stem_versions
+    self.assertEqual(receipt["status"], "failed")
+AssertionError: 'completed' != 'failed'
+- completed
++ failed
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.548s
+
+FAILED (failures=1)
+Expected baseline RED verified: modeled parent case escapes owned output containment; other stem semantics cases pass. Not an ordinary Path reachability or real Python3.15 execution claim.
