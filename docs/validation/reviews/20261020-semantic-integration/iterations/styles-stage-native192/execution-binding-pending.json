@@ -1,0 +1,29 @@
+{
+  "run_id": 39644162258,
+  "job_id": 119375231267,
+  "run_attempt": 1,
+  "dispatch_actor": "parent via supported GitHub Run workflow UI",
+  "reviewed_entrypoint_sha": "33bbe860ad6b1777839753a738ec17d3f9229b61",
+  "product_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "harness_sha": "1a1698e47e008b688cf5c3fc492dfc307b04ae1a",
+  "request_inputs": {
+    "mode": "styles-stage-attribution",
+    "reviewed_entrypoint_sha": "33bbe860ad6b1777839753a738ec17d3f9229b61"
+  },
+  "input_evidence": "Parent trusted dispatch confirmation plus job if guards; raw GitHub event inputs still need runtime validation evidence",
+  "observed_jobs": {
+    "styles-stage-diagnostic": "in_progress",
+    "rust-performance": "skipped"
+  },
+  "repeated_dispatches_here": 0,
+  "reruns_here": 0,
+  "operation_enabled": false,
+  "e107_formal_gates": "18 success / 2 failure unchanged; diagnostic not a budget pass",
+  "pending": [
+    "Terminal job logs",
+    "Fixed source/host/fresh binary receipts",
+    "Validated same-host samples",
+    "Text artifact verification",
+    "No performance cause inferred"
+  ]
+}

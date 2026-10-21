@@ -1,0 +1,10 @@
+{
+  "artifact_id": 12367047255,
+  "method": "Supported connector file reference GET, first attempt for this new artifact",
+  "endpoint": "oaiusercontent file reference, query omitted",
+  "expected_bytes": 355356,
+  "expected_sha256": "46e9002136410ab4b0e79f636b702660cb1243a224fa1bdfd1bc9fff511768fd",
+  "captured_at": "2026-10-21T17:38:53.872593+00:00",
+  "status": "failed-no-retry",
+  "error_type": "URLError"
+}

@@ -1,0 +1,16 @@
+{
+  "artifact_id": 12367047255,
+  "file_id_from_supported_connector": "file_00000000908881f59252ae0ff7a92bb8",
+  "attempted_action": "One local urllib.request.urlopen GET of the connector's returned reusable file download URL, timeout=30 seconds",
+  "endpoint_host": "sdmntprcentralus.oaiusercontent.com",
+  "endpoint_query": "Signed query deliberately omitted",
+  "recorder_exit_code": 0,
+  "request_result": "URLError caught; no archive bytes or verified hash; recorder success does not mean acquisition success",
+  "underlying_reason_retained": false,
+  "http_denial_established": false,
+  "local_zip_exists": false,
+  "retry_or_alternate_route": false,
+  "setup_artifact_local_get_attempts": 0,
+  "inputs_evidence": "Trusted parent UI confirmation; server selected guarded diagnostic job; the fixed successful driver validates the actual event inputs before builds. REST run metadata itself does not expose raw workflow_dispatch inputs.",
+  "still_needed": "Supported authorized readback of this new text artifact, complete fresh-build/feature/byte/export receipt validation"
+}

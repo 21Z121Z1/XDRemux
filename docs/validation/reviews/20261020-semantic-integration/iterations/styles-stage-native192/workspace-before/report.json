@@ -1,0 +1,217 @@
+{
+  "status": "passed",
+  "operation_enabled": false,
+  "native_experiments_started_here": 0,
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/000.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/000.stderr",
+      "owned_process_group": 4561,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0014799230011703912
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/001.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/001.stderr",
+      "owned_process_group": 4562,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0034507149994169595
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-integration",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/workspace/XDRemux-integration",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/002.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/002.stderr",
+      "owned_process_group": 4563,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0013777490003121784
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-integration",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/workspace/XDRemux-integration",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/003.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/003.stderr",
+      "owned_process_group": 4564,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0034092330006387783
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-style-diagnostic-entrypoint",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/workspace/XDRemux-style-diagnostic-entrypoint",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/004.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/004.stderr",
+      "owned_process_group": 4565,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0013591000006272225
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-style-diagnostic-entrypoint",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/workspace/XDRemux-style-diagnostic-entrypoint",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/005.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/005.stderr",
+      "owned_process_group": 4566,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0035255880011391127
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-review-evidence",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/workspace/XDRemux-review-evidence",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/006.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/006.stderr",
+      "owned_process_group": 4567,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0013951440014352556
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/XDRemux-review-evidence",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/workspace/XDRemux-review-evidence",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/007.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/007.stderr",
+      "owned_process_group": 4568,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.007820462000381667
+    },
+    {
+      "argv": [
+        "git",
+        "ls-remote",
+        "origin",
+        "refs/heads/*",
+        "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "refs/tags/review/semantic-integration-20261020-evidence-v28"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/008.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/008.stderr",
+      "owned_process_group": 4574,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 2.117726780999874
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/xdremux-audit/style-fit-accumulation-prototype/candidate-source",
+        "diff",
+        "--binary"
+      ],
+      "cwd": "/workspace/XDRemux",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/workspace/xdremux-audit/native192/workspace-before/commands/009.stdout",
+      "stderr_path": "/workspace/xdremux-audit/native192/workspace-before/commands/009.stderr",
+      "owned_process_group": 4578,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.003598256998884608
+    }
+  ],
+  "remote_refs": {
+    "refs/heads/codex/liblivephoto-consumer-20261004": "0688ea7d6270df52cc5968e2c36dd016f13bd31b",
+    "refs/heads/cursor/full-res-linear-hdr-e174": "1f29e3cdc1b8fd49d56718ceecf96b8de80ec817",
+    "refs/heads/cursor/portrait-heic-orientation-4765": "7952d0b19c6b47738cc0722acae57465a243186f",
+    "refs/heads/feat/rust-cli-distribution-i18n-20260924": "c6d307af662ed516f6e3994c039513359cb98610",
+    "refs/heads/feat/styles-hdr-first-linear-thumbnail-20261015": "bc4d54753f18905dbe73f595a06a6eaf21aaa014",
+    "refs/heads/integrate/semantic-review-20261020": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "refs/heads/main": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "refs/heads/research/texture-native-20261019": "18340989590d451f5676924feb03c70baa503e1a",
+    "refs/heads/research/texture-style": "f8fcf2067c506e87665e9ea113324db1a57d4cf7",
+    "refs/tags/review/semantic-integration-20261020-evidence-v28": "aeffd22a6d2651b84be03bc56791a3aa67acef89",
+    "refs/tags/review/styles-stage-diagnostic-20261021-v1": "33bbe860ad6b1777839753a738ec17d3f9229b61"
+  },
+  "dirty_file_sha256": "b1f58170b7bc6504eb7e1957c481bb8cd6d32e91ccfbbbca5ee0213cb615cc81",
+  "dirty_patch_sha256": "31be7f073e7ac635492d010910121789faa33e8c69f3b01b91e226b4207aa358"
+}

@@ -1,0 +1,42 @@
+{
+  "artifacts": [
+    {
+      "id": 12367436245,
+      "name": "styles-stage-setup-33bbe860ad6b1777839753a738ec17d3f9229b61-1",
+      "size_in_bytes": 337,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12367436245",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12367436245/zip",
+      "expired": false,
+      "created_at": "2026-10-21T17:37:39Z",
+      "expires_at": "2026-10-22T17:37:38Z",
+      "updated_at": "2026-10-21T17:37:39Z",
+      "digest": "sha256:e4761bda8fedbdc9ee643b87b4e8c14f456bb3e3d222426c76414e172b3f1f0b",
+      "workflow_run": {
+        "id": 39644162258,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "review/styles-stage-diagnostic-20261021-v1",
+        "head_sha": "33bbe860ad6b1777839753a738ec17d3f9229b61"
+      }
+    },
+    {
+      "id": 12367047255,
+      "name": "styles-stage-diagnostic-33bbe860ad6b1777839753a738ec17d3f9229b61-1",
+      "size_in_bytes": 355356,
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12367047255",
+      "archive_download_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/artifacts/12367047255/zip",
+      "expired": false,
+      "created_at": "2026-10-21T17:37:38Z",
+      "expires_at": "2026-10-22T17:37:37Z",
+      "updated_at": "2026-10-21T17:37:38Z",
+      "digest": "sha256:46e9002136410ab4b0e79f636b702660cb1243a224fa1bdfd1bc9fff511768fd",
+      "workflow_run": {
+        "id": 39644162258,
+        "repository_id": 1221397436,
+        "head_repository_id": 1221397436,
+        "head_branch": "review/styles-stage-diagnostic-20261021-v1",
+        "head_sha": "33bbe860ad6b1777839753a738ec17d3f9229b61"
+      }
+    }
+  ]
+}

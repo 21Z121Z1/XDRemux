@@ -1,0 +1,156 @@
+{
+  "total_count": 2,
+  "jobs": [
+    {
+      "id": 119375231267,
+      "run_id": 39644162258,
+      "workflow_name": "XDRemux Rust Performance and Design",
+      "head_branch": "review/styles-stage-diagnostic-20261021-v1",
+      "run_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39644162258",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOSM0LvM8AAAAby1F5Iw",
+      "head_sha": "33bbe860ad6b1777839753a738ec17d3f9229b61",
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/jobs/119375231267",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39644162258/job/119375231267",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-21T17:28:55Z",
+      "started_at": "2026-10-21T17:28:57Z",
+      "completed_at": "2026-10-21T17:37:44Z",
+      "name": "styles-stage-diagnostic",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-21T17:28:58Z",
+          "completed_at": "2026-10-21T17:28:59Z"
+        },
+        {
+          "name": "Preserve an initial receipt even if checkout fails",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-21T17:28:59Z",
+          "completed_at": "2026-10-21T17:28:59Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-21T17:28:59Z",
+          "completed_at": "2026-10-21T17:29:08Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-21T17:29:08Z",
+          "completed_at": "2026-10-21T17:29:19Z"
+        },
+        {
+          "name": "Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-21T17:29:19Z",
+          "completed_at": "2026-10-21T17:29:28Z"
+        },
+        {
+          "name": "Run only the pinned Styles diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-21T17:29:28Z",
+          "completed_at": "2026-10-21T17:37:36Z"
+        },
+        {
+          "name": "Upload only owned text evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-21T17:37:36Z",
+          "completed_at": "2026-10-21T17:37:38Z"
+        },
+        {
+          "name": "Preserve the initial partial receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-21T17:37:38Z",
+          "completed_at": "2026-10-21T17:37:39Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-21T17:37:39Z",
+          "completed_at": "2026-10-21T17:37:40Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-21T17:37:40Z",
+          "completed_at": "2026-10-21T17:37:40Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v7",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-21T17:37:40Z",
+          "completed_at": "2026-10-21T17:37:41Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-21T17:37:41Z",
+          "completed_at": "2026-10-21T17:37:41Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/21Z121Z1/XDRemux/check-runs/119375231267",
+      "labels": [
+        "xcode-27"
+      ],
+      "runner_id": 1000026571,
+      "runner_name": "GitHub Actions 1000026571",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 119375233078,
+      "run_id": 39644162258,
+      "workflow_name": "XDRemux Rust Performance and Design",
+      "head_branch": "review/styles-stage-diagnostic-20261021-v1",
+      "run_url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/runs/39644162258",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOSM0LvM8AAAAby1GANg",
+      "head_sha": "33bbe860ad6b1777839753a738ec17d3f9229b61",
+      "url": "https://api.github.com/repos/21Z121Z1/XDRemux/actions/jobs/119375233078",
+      "html_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39644162258/job/119375233078",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-10-21T17:28:55Z",
+      "started_at": "2026-10-21T17:28:55Z",
+      "completed_at": "2026-10-21T17:28:54Z",
+      "name": "rust-performance",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/21Z121Z1/XDRemux/check-runs/119375233078",
+      "labels": [
+        "xcode-27"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}

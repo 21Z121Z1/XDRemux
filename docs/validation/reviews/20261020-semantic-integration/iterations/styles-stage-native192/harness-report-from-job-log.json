@@ -1,0 +1,2332 @@
+{
+  "status": "completed-with-retained-workspace",
+  "diagnostic_only": true,
+  "absolute_gate_unchanged": true,
+  "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "baseline": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "samples": [
+    {
+      "ordinal": 0,
+      "arm": "baseline",
+      "warmup": true,
+      "iteration": 0,
+      "status": "validated",
+      "logs": "00-baseline",
+      "output_sha256": "f43eaf52b881057a5a51e388ef929c03f669702e832d16f2f1888430e1fc0eeb",
+      "output_bytes": 2949503,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006566916
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.113537709
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 6.354464792
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.4063785
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 0.284415917
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.601827292
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.067613334
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.602071667
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.010052584
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.002052542
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 5.61310725
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.014061
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.010702542
+        }
+      ],
+      "time_real_seconds": 17.35,
+      "user_seconds": 11.35,
+      "sys_seconds": 3.88,
+      "peak_rss_bytes": 1049526272,
+      "common_span_sum_seconds": 17.086852045,
+      "outside_spans_seconds": 0.2631479550000009
+    },
+    {
+      "ordinal": 1,
+      "arm": "candidate",
+      "warmup": true,
+      "iteration": 0,
+      "status": "validated",
+      "logs": "01-candidate",
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "output_bytes": 2894706,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.010898375
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.181475917
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 4.204915875
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.371722459
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 1.004445
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.141234458
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.374476458
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.633162042
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.436889459
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.52215225
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.002707917
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.006105791
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 4.540604041
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.035738959
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.014394375
+        }
+      ],
+      "time_real_seconds": 15.66,
+      "user_seconds": 12.63,
+      "sys_seconds": 2.43,
+      "peak_rss_bytes": 1135902720,
+      "common_span_sum_seconds": 15.335243918,
+      "outside_spans_seconds": 0.3247560820000004
+    },
+    {
+      "ordinal": 2,
+      "arm": "baseline",
+      "warmup": false,
+      "iteration": 0,
+      "status": "validated",
+      "logs": "02-baseline",
+      "output_sha256": "b8184dbf61f0daab4747364058ca56e0e4893d0d5b4e4b327618fe8f873d0fd4",
+      "output_bytes": 2949503,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.007936625
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.428407416
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 4.127099583
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.371532375
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 0.223821959
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.239400834
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.071178792
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.270268417
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.002101792
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.0013665
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 3.915028333
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.015381459
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.009501208
+        }
+      ],
+      "time_real_seconds": 12.82,
+      "user_seconds": 11.51,
+      "sys_seconds": 1.8,
+      "peak_rss_bytes": 1141047296,
+      "common_span_sum_seconds": 12.683025293,
+      "outside_spans_seconds": 0.13697470700000025
+    },
+    {
+      "ordinal": 3,
+      "arm": "candidate",
+      "warmup": false,
+      "iteration": 0,
+      "status": "validated",
+      "logs": "03-candidate",
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "output_bytes": 2894706,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.008868334
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.310004459
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.563241042
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.343870875
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.915807375
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.165140208
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.317221542
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.332131125
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.438302708
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.31616625
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.004488958
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.006597791
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 4.219481834
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.026121458
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.015545458
+        }
+      ],
+      "time_real_seconds": 14.08,
+      "user_seconds": 12.67,
+      "sys_seconds": 1.8,
+      "peak_rss_bytes": 1135886336,
+      "common_span_sum_seconds": 13.902041834,
+      "outside_spans_seconds": 0.1779581659999998
+    },
+    {
+      "ordinal": 4,
+      "arm": "candidate",
+      "warmup": false,
+      "iteration": 1,
+      "status": "validated",
+      "logs": "04-candidate",
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "output_bytes": 2894706,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006688416
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.6088405
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.211880583
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.303496292
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.916151959
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.130061042
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.212277083
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.286038667
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.406472208
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.315386583
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.003463291
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.003346625
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 4.686484416
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.025665166
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.008766
+        }
+      ],
+      "time_real_seconds": 14.37,
+      "user_seconds": 12.37,
+      "sys_seconds": 2.21,
+      "peak_rss_bytes": 1097760768,
+      "common_span_sum_seconds": 14.07880583,
+      "outside_spans_seconds": 0.2911941699999989
+    },
+    {
+      "ordinal": 5,
+      "arm": "baseline",
+      "warmup": false,
+      "iteration": 1,
+      "status": "validated",
+      "logs": "05-baseline",
+      "output_sha256": "b8184dbf61f0daab4747364058ca56e0e4893d0d5b4e4b327618fe8f873d0fd4",
+      "output_bytes": 2949503,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.009406708
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.540679959
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.269690083
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.256735334
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 0.180806917
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.217887958
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.076584917
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.255301666
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.002765833
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.002732583
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 3.785702541
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.011896583
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.0103885
+        }
+      ],
+      "time_real_seconds": 11.81,
+      "user_seconds": 10.7,
+      "sys_seconds": 1.4,
+      "peak_rss_bytes": 1141080064,
+      "common_span_sum_seconds": 11.620579582,
+      "outside_spans_seconds": 0.18942041800000098
+    },
+    {
+      "ordinal": 6,
+      "arm": "baseline",
+      "warmup": false,
+      "iteration": 2,
+      "status": "validated",
+      "logs": "06-baseline",
+      "output_sha256": "b8184dbf61f0daab4747364058ca56e0e4893d0d5b4e4b327618fe8f873d0fd4",
+      "output_bytes": 2949503,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006105083
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.596180542
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 2.80344425
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.260232666
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 0.176646333
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.183975709
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.082400208
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.282840791
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.003628125
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.006179334
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 3.584953583
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.012944834
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.005471459
+        }
+      ],
+      "time_real_seconds": 10.12,
+      "user_seconds": 9.02,
+      "sys_seconds": 1.07,
+      "peak_rss_bytes": 1140932608,
+      "common_span_sum_seconds": 10.005002917,
+      "outside_spans_seconds": 0.11499708299999867
+    },
+    {
+      "ordinal": 7,
+      "arm": "candidate",
+      "warmup": false,
+      "iteration": 2,
+      "status": "validated",
+      "logs": "07-candidate",
+      "output_sha256": "fc519b4bf5a5d883dfdd6008a31fe55a8d63a1bcc7fb5eef630465112910fe73",
+      "output_bytes": 2894706,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006266584
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.505958292
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.284635333
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.311004709
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.783973708
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.123313
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.028652458
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.28639275
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.396717
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.289856625
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.003659208
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.004770917
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 3.821498
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.014182292
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.004866542
+        }
+      ],
+      "time_real_seconds": 12.07,
+      "user_seconds": 10.69,
+      "sys_seconds": 1.68,
+      "peak_rss_bytes": 1136492544,
+      "common_span_sum_seconds": 11.95846071,
+      "outside_spans_seconds": 0.11153928999999962
+    },
+    {
+      "ordinal": 8,
+      "arm": "candidate",
+      "warmup": false,
+      "iteration": 3,
+      "status": "validated",
+      "logs": "08-candidate",
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "output_bytes": 2894706,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006202958
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.604967292
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.754145375
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.296742625
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.751367292
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.126567625
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.011345416
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.312628459
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.393910458
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.283167
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.001940458
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.003356208
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 3.41139125
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.02684625
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.006943417
+        }
+      ],
+      "time_real_seconds": 12.22,
+      "user_seconds": 10.9,
+      "sys_seconds": 1.82,
+      "peak_rss_bytes": 1136410624,
+      "common_span_sum_seconds": 12.113587166,
+      "outside_spans_seconds": 0.10641283400000034
+    },
+    {
+      "ordinal": 9,
+      "arm": "baseline",
+      "warmup": false,
+      "iteration": 3,
+      "status": "validated",
+      "logs": "09-baseline",
+      "output_sha256": "f43eaf52b881057a5a51e388ef929c03f669702e832d16f2f1888430e1fc0eeb",
+      "output_bytes": 2949503,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006791042
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.339016375
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 2.8778105
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.246245958
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 0.167712417
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.194597125
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.07200425
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.233966334
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.002164583
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001581667
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 2.870200166
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.014845292
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.008942792
+        }
+      ],
+      "time_real_seconds": 9.16,
+      "user_seconds": 8.53,
+      "sys_seconds": 1.2,
+      "peak_rss_bytes": 1140932608,
+      "common_span_sum_seconds": 9.035878501,
+      "outside_spans_seconds": 0.12412149900000102
+    },
+    {
+      "ordinal": 10,
+      "arm": "baseline",
+      "warmup": false,
+      "iteration": 4,
+      "status": "validated",
+      "logs": "10-baseline",
+      "output_sha256": "f43eaf52b881057a5a51e388ef929c03f669702e832d16f2f1888430e1fc0eeb",
+      "output_bytes": 2949503,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006415792
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.816630417
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 2.753146459
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.244951375
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 0.169688583
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.274571792
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.073629334
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.287858083
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.002249791
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.002571875
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 3.356672417
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.016105292
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.005977583
+        }
+      ],
+      "time_real_seconds": 10.13,
+      "user_seconds": 9.86,
+      "sys_seconds": 1.11,
+      "peak_rss_bytes": 1141014528,
+      "common_span_sum_seconds": 10.010468793,
+      "outside_spans_seconds": 0.11953120700000142
+    },
+    {
+      "ordinal": 11,
+      "arm": "candidate",
+      "warmup": false,
+      "iteration": 4,
+      "status": "validated",
+      "logs": "11-candidate",
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "output_bytes": 2894706,
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.0070225
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.670262125
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.223789666
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.295622458
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.815169583
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.11624525
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.141381834
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.26444375
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.407568333
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.258096583
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.00234
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001595041
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 2.926577625
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.0115055
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.009071
+        }
+      ],
+      "time_real_seconds": 11.34,
+      "user_seconds": 10.55,
+      "sys_seconds": 1.59,
+      "peak_rss_bytes": 1136328704,
+      "common_span_sum_seconds": 11.219276415,
+      "outside_spans_seconds": 0.12072358500000036
+    }
+  ],
+  "limits": [
+    "Portable lifecycle tests are not macOS compilation/execution or stage results.",
+    "Only broad operations are comparable: raster/gain-raster release points differ.",
+    "Nested logging overhead differs; scene delta is not pure algorithm cost.",
+    "Do not add overlapping spans or stage medians as E2E attribution.",
+    "All owned clones, targets and sample media are retained outside text evidence.",
+    "SIGKILL/host loss may leave only the last checkpoint; no cleanup success assumed."
+  ],
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/000.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/000.stderr",
+      "owned_process_group": 16357,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.010166875000095388
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--show-toplevel"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/001.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/001.stderr",
+      "owned_process_group": 16358,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.018061207999949147
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/002.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/002.stderr",
+      "owned_process_group": 16359,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.027063875000067128
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/003.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/003.stderr",
+      "owned_process_group": 16360,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.0189599159999716
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--absolute-git-dir"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/004.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/004.stderr",
+      "owned_process_group": 16361,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.00946766699996715
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "show",
+        "e1072a90e31b12861dfe8b9cf25e07ce75c17c44:scripts/performance/compare_apple_styles_revisions.py"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/005.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/005.stderr",
+      "owned_process_group": 16362,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.011119791999931294
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "show",
+        "e1072a90e31b12861dfe8b9cf25e07ce75c17c44:crates/xdremux-runtime/src/apple_styles.rs"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/006.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/006.stderr",
+      "owned_process_group": 16363,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.010994458000027407
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/007.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/007.stderr",
+      "owned_process_group": 16364,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.009846208999988448
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--show-toplevel"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/008.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/008.stderr",
+      "owned_process_group": 16365,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.008627625000031003
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/009.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/009.stderr",
+      "owned_process_group": 16366,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.02305712500003665
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/010.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/010.stderr",
+      "owned_process_group": 16367,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.022531375000085063
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--absolute-git-dir"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/011.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/011.stderr",
+      "owned_process_group": 16368,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.01517333399999643
+    },
+    {
+      "argv": [
+        "sw_vers"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/012.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/012.stderr",
+      "owned_process_group": 16369,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.01760575000002973
+    },
+    {
+      "argv": [
+        "uname",
+        "-m"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/013.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/013.stderr",
+      "owned_process_group": 16370,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.004453749999925094
+    },
+    {
+      "argv": [
+        "xcodebuild",
+        "-version"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/014.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/014.stderr",
+      "owned_process_group": 16371,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.14700091600002452
+    },
+    {
+      "argv": [
+        "rustc",
+        "--version"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/015.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/015.stderr",
+      "owned_process_group": 16372,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.25952891700001146
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/016.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/016.stderr",
+      "owned_process_group": 16373,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.009614166999995177
+    },
+    {
+      "argv": [
+        "git",
+        "clone",
+        "--no-checkout",
+        "--no-hardlinks",
+        "--",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/017.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/017.stderr",
+      "owned_process_group": 16374,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 1.0441317910000407
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/018.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/018.stderr",
+      "owned_process_group": 16378,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.014886959000023126
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "checkout",
+        "--detach",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/019.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/019.stderr",
+      "owned_process_group": 16379,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 1.9001517909999848
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/020.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/020.stderr",
+      "owned_process_group": 16382,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.05476120799994533
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/021.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/021.stderr",
+      "owned_process_group": 16383,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.29077941699995336
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--release"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 1800,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/reference-rust-build.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 16385,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 107.122936375
+    },
+    {
+      "argv": [
+        "swift",
+        "build",
+        "--package-path",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "--scratch-path",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-swift-scratch",
+        "-c",
+        "release",
+        "--product",
+        "xdremux-apple-adapter"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 1800,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/reference-swift-build.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 21632,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 22.492467124999962
+    },
+    {
+      "argv": [
+        "swift",
+        "build",
+        "--package-path",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "--scratch-path",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-swift-scratch",
+        "-c",
+        "release",
+        "--show-bin-path"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/024.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/024.stderr",
+      "owned_process_group": 22374,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 1.1849087089999557
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "status",
+        "--porcelain=v1"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/025.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/025.stderr",
+      "owned_process_group": 22573,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.03903458299998874
+    },
+    {
+      "argv": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--workspace",
+        "--edges",
+        "features"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 120,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/reference-cargo-features.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 22574,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.37087545800000044
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "show",
+        "89d806c8aec961a7991eb3e6d6e2b1370aed8791:crates/xdremux-runtime/src/apple_styles.rs"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/027.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/027.stderr",
+      "owned_process_group": 22575,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.014512707999983832
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "diff",
+        "--binary"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/028.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/028.stderr",
+      "owned_process_group": 22576,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.014868416000012985
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--release",
+        "-p",
+        "xdremux-cli"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 1800,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/instrumented-baseline-build.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 22577,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 11.257506999999919
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/030.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/030.stderr",
+      "owned_process_group": 22883,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.01834341599999334
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/00-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/00-baseline/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/00-baseline/stderr.log",
+      "owned_process_group": 22890,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 17.360473833000015
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/01-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/01-candidate/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/01-candidate/stderr.log",
+      "owned_process_group": 23504,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 15.678564208000012
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/02-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/02-baseline/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/02-baseline/stderr.log",
+      "owned_process_group": 23903,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 12.838338791999945
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/03-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/03-candidate/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/03-candidate/stderr.log",
+      "owned_process_group": 24273,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 14.09608824999998
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/04-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/04-candidate/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/04-candidate/stderr.log",
+      "owned_process_group": 24651,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 14.390521416999945
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/05-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/05-baseline/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/05-baseline/stderr.log",
+      "owned_process_group": 25038,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 11.832655499999987
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/06-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/06-baseline/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/06-baseline/stderr.log",
+      "owned_process_group": 25532,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 10.132630124999991
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/07-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/07-candidate/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/07-candidate/stderr.log",
+      "owned_process_group": 25886,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 12.084403208000026
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/08-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/08-candidate/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/08-candidate/stderr.log",
+      "owned_process_group": 26251,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 12.23032462499998
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/09-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/09-baseline/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/09-baseline/stderr.log",
+      "owned_process_group": 26616,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 9.166074541999933
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/10-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/10-baseline/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/10-baseline/stderr.log",
+      "owned_process_group": 26970,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 10.14377304200002
+    },
+    {
+      "argv": [
+        "/usr/bin/time",
+        "-l",
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "convert",
+        "--input",
+        "/Users/runner/work/XDRemux/XDRemux/product-source/fixtures/proxdr/oppo/find-x9-ultra/uhdr-portrait-01.heic",
+        "--output",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/11-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 1200,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/11-candidate/stdout.log",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/11-candidate/stderr.log",
+      "owned_process_group": 27317,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 11.356173790999947
+    },
+    {
+      "argv": [
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/00-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/00-baseline/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27667,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.3640822909999315
+    },
+    {
+      "argv": [
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/01-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/01-candidate/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27671,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.39558858399993824
+    },
+    {
+      "argv": [
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/02-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/02-baseline/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27673,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.3663193749999891
+    },
+    {
+      "argv": [
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/03-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/03-candidate/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27675,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.3546331669999745
+    },
+    {
+      "argv": [
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/04-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/04-candidate/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27678,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.4755563329999859
+    },
+    {
+      "argv": [
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/05-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/05-baseline/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27680,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.4388002079999751
+    },
+    {
+      "argv": [
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/06-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/06-baseline/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27683,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.43240758399997503
+    },
+    {
+      "argv": [
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/07-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/07-candidate/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27707,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.539333332999945
+    },
+    {
+      "argv": [
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/08-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/08-candidate/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27735,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.4930583330000218
+    },
+    {
+      "argv": [
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/09-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/09-baseline/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27771,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.440046499999994
+    },
+    {
+      "argv": [
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/10-baseline/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/10-baseline/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27805,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.39996575000009216
+    },
+    {
+      "argv": [
+        "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+        "validate",
+        "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/11-candidate/styles.heic",
+        "--apple-styles"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 300,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/11-candidate/validate.log",
+      "stderr_path": "external stream",
+      "owned_process_group": 27838,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.4058687499999678
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-path",
+        "objects"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/055.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/055.stderr",
+      "owned_process_group": 27872,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.03643087500006459
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--show-toplevel"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/056.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/056.stderr",
+      "owned_process_group": 27878,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.008968582999955288
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/057.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/057.stderr",
+      "owned_process_group": 27879,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.009647832999917227
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/058.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/058.stderr",
+      "owned_process_group": 27880,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.038814000000002125
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/Users/runner/work/XDRemux/XDRemux/product-source",
+        "rev-parse",
+        "--absolute-git-dir"
+      ],
+      "cwd": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "budget_seconds": 30,
+      "status": "exited",
+      "stdout_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/059.stdout",
+      "stderr_path": "/Users/runner/work/_temp/styles-stage-raw-ttclyo4i/harness/commands/059.stderr",
+      "owned_process_group": 27881,
+      "exit_code": 0,
+      "process_group_absent": true,
+      "cleanup_status": "confirmed",
+      "duration_seconds": 0.008330249999971784
+    }
+  ],
+  "owner_execution_attempted": true,
+  "owner_execution_completed": true,
+  "object_store_checks": [
+    {
+      "role": "candidate-before-owner",
+      "source": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "status": "no borrowing metadata",
+      "object_directory": "/Users/runner/work/XDRemux/XDRemux/product-source/.git/objects",
+      "alternate_metadata": []
+    },
+    {
+      "role": "candidate-before-owner",
+      "source": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "status": "no borrowing metadata",
+      "object_directory": "/Users/runner/work/XDRemux/XDRemux/product-source/.git/objects",
+      "alternate_metadata": []
+    },
+    {
+      "role": "source-before-clone",
+      "source": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "status": "no borrowing metadata",
+      "object_directory": "/Users/runner/work/XDRemux/XDRemux/product-source/.git/objects",
+      "alternate_metadata": []
+    },
+    {
+      "role": "retained-clone-before-checkout",
+      "source": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+      "status": "no borrowing metadata",
+      "object_directory": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source/.git/objects",
+      "alternate_metadata": []
+    },
+    {
+      "role": "candidate-before-owner",
+      "source": "/Users/runner/work/XDRemux/XDRemux/product-source",
+      "status": "no borrowing metadata",
+      "object_directory": "/Users/runner/work/XDRemux/XDRemux/product-source/.git/objects",
+      "alternate_metadata": []
+    }
+  ],
+  "source_identity": {
+    "path": "/Users/runner/work/XDRemux/XDRemux/product-source",
+    "head": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "git_directory": "/Users/runner/work/XDRemux/XDRemux/product-source/.git",
+    "tracked_and_untracked_status": ""
+  },
+  "fixed_source_hashes": {
+    "owner_sha256": "93241f8e1c2af8ee9e2615e68f5ae9497a180dac4824f69a74d5596f229f162f",
+    "candidate_rust_sha256": "7549f71c5baa63dcffc1f255f2747e0e122a9cf603b2745fce1fad3d65e42d5d"
+  },
+  "candidate": {
+    "sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "cli": {
+      "path": "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+      "sha256": "c4eab27ad5fa792f2ac5e9ebc82c3e312a69ae1923dcc61bc25102bc8db7a84b",
+      "bytes": 4915344
+    },
+    "adapter": {
+      "path": "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/swift-scratch/out/Products/Release/xdremux-apple-adapter",
+      "sha256": "f50c7c11d2ddf5f36b394e273373252e87b0328b4d99d2a26db573bd11d06e04",
+      "bytes": 884824
+    }
+  },
+  "host": {
+    "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434",
+    "uname -m": "arm64",
+    "xcodebuild -version": "Xcode 27.0\nBuild version 27A266a",
+    "rustc --version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
+  },
+  "owned_workspace": {
+    "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl",
+    "retained": true,
+    "deletion_attempted": false,
+    "shared_worktree_registry_touched": false,
+    "reason": "retained by design on success, failure or interrupt; manual review required"
+  },
+  "reference_clone": {
+    "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source",
+    "head": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "retained": true
+  },
+  "unmodified_baseline_build": {
+    "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "tracked_status": "",
+    "cli": {
+      "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+      "sha256": "bfde935302e4995082ba8869323e00bd77ead4120651e6ed9c5d0b66e3fab711",
+      "bytes": 4942240
+    },
+    "adapter": {
+      "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+      "sha256": "55ef46a8d1233126ddcd3be029f4c955134f1f9712c6d964b42414c7ba4317e5",
+      "bytes": 805448
+    },
+    "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+    "feature_graph": {
+      "command": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--workspace",
+        "--edges",
+        "features"
+      ],
+      "log": "reference-cargo-features.log",
+      "sha256": "d512b4964379b36c879d1e1e38ede210e41f9f67756b29a777244b37c153f050",
+      "source_path_normalized_sha256": "285f5d159af5a7ec1c815648b59e50577e2458e1ba3fa770a8d16ea63a64b869"
+    }
+  },
+  "instrumentation_source_backup": {
+    "file": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-source/crates/xdremux-runtime/src/apple_styles.rs",
+    "backup": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/pre-timers-jh0vimjf/source.rs",
+    "status": "patched file created exclusively; original retained"
+  },
+  "instrumentation": {
+    "original_sha256": "6129f27b69334cdbafa040e1ef98c974fc5bd02025bb2b63e4f98489e19d1908",
+    "instrumented_sha256": "065c95ac4560dcc54b4e95db502b7f4f2646148b82770bc4f69958125f2af448",
+    "removed_insertions_restore_exact_original": true,
+    "common_stages": [
+      "source_analysis",
+      "base_conversion",
+      "semantic_production",
+      "resource_decode",
+      "scene_derivation",
+      "thumbnail_encode",
+      "key1_fit",
+      "style_metadata",
+      "native_style_properties",
+      "style_assembly",
+      "texture_generation",
+      "final_validation",
+      "publication"
+    ],
+    "baseline_scene_boundary": "legacy downsample plus scene derivation",
+    "candidate_scene_boundary": "full-resolution HDR reconstruction plus linear area reduction; nested details excluded from totals"
+  },
+  "instrumented_baseline": {
+    "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+    "tracked_status": "M crates/xdremux-runtime/src/apple_styles.rs",
+    "cli": {
+      "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-cargo-target/release/xdremux",
+      "sha256": "2213c0bb0787ff47bf0614ca23a40edcf2b807a4f478f62c092347d1acfe10b0",
+      "bytes": 4944016
+    },
+    "adapter": {
+      "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-stage-retained-ifuv6htl/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+      "sha256": "55ef46a8d1233126ddcd3be029f4c955134f1f9712c6d964b42414c7ba4317e5",
+      "bytes": 805448
+    },
+    "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+    "feature_graph": {
+      "command": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--workspace",
+        "--edges",
+        "features"
+      ],
+      "log": "reference-cargo-features.log",
+      "sha256": "d512b4964379b36c879d1e1e38ede210e41f9f67756b29a777244b37c153f050",
+      "source_path_normalized_sha256": "285f5d159af5a7ec1c815648b59e50577e2458e1ba3fa770a8d16ea63a64b869"
+    },
+    "instrumented": true
+  },
+  "stage_comparison": {
+    "source_analysis": {
+      "baseline_seconds": 0.006791042,
+      "candidate_seconds": 0.006688416,
+      "candidate_minus_baseline_seconds": -0.00010262599999999976
+    },
+    "base_conversion": {
+      "baseline_seconds": 2.816630417,
+      "candidate_seconds": 2.670262125,
+      "candidate_minus_baseline_seconds": -0.146368292
+    },
+    "semantic_production": {
+      "baseline_seconds": 2.8778105,
+      "candidate_seconds": 3.284635333,
+      "candidate_minus_baseline_seconds": 0.4068248330000004
+    },
+    "resource_decode": {
+      "baseline_seconds": 0.256735334,
+      "candidate_seconds": 0.303496292,
+      "candidate_minus_baseline_seconds": 0.04676095800000002
+    },
+    "scene_derivation": {
+      "baseline_seconds": 0.176646333,
+      "candidate_seconds": 1.141381834,
+      "candidate_minus_baseline_seconds": 0.9647355009999999
+    },
+    "thumbnail_encode": {
+      "baseline_seconds": 0.217887958,
+      "candidate_seconds": 0.28639275,
+      "candidate_minus_baseline_seconds": 0.06850479199999998
+    },
+    "key1_fit": {
+      "baseline_seconds": 0.073629334,
+      "candidate_seconds": 0.406472208,
+      "candidate_minus_baseline_seconds": 0.332842874
+    },
+    "style_metadata": {
+      "baseline_seconds": 0.270268417,
+      "candidate_seconds": 0.289856625,
+      "candidate_minus_baseline_seconds": 0.019588207999999996
+    },
+    "native_style_properties": {
+      "baseline_seconds": 0.002249791,
+      "candidate_seconds": 0.003463291,
+      "candidate_minus_baseline_seconds": 0.0012134999999999997
+    },
+    "style_assembly": {
+      "baseline_seconds": 0.002571875,
+      "candidate_seconds": 0.003356208,
+      "candidate_minus_baseline_seconds": 0.0007843329999999999
+    },
+    "texture_generation": {
+      "baseline_seconds": 3.584953583,
+      "candidate_seconds": 3.821498,
+      "candidate_minus_baseline_seconds": 0.23654441700000017
+    },
+    "final_validation": {
+      "baseline_seconds": 0.014845292,
+      "candidate_seconds": 0.025665166,
+      "candidate_minus_baseline_seconds": 0.010819874
+    },
+    "publication": {
+      "baseline_seconds": 0.008942792,
+      "candidate_seconds": 0.008766,
+      "candidate_minus_baseline_seconds": -0.00017679200000000027
+    }
+  },
+  "process_cleanup_uncertain": false
+}

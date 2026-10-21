@@ -1,0 +1,242 @@
+{
+  "source": "Parsed complete harness JSON printed in terminal job log; archive bytes/fresh-build feature graph not yet materialized",
+  "run": 39644162258,
+  "job": 119375231267,
+  "instrumented_baseline": true,
+  "formal_budget": "unchanged, not executed by this diagnostic",
+  "samples": {
+    "baseline": {
+      "samples": [
+        {
+          "ordinal": 2,
+          "iteration": 0,
+          "time_real_seconds": 12.82,
+          "user_seconds": 11.51,
+          "sys_seconds": 1.8,
+          "peak_rss_bytes": 1141047296,
+          "output_sha256": "b8184dbf61f0daab4747364058ca56e0e4893d0d5b4e4b327618fe8f873d0fd4",
+          "output_bytes": 2949503
+        },
+        {
+          "ordinal": 5,
+          "iteration": 1,
+          "time_real_seconds": 11.81,
+          "user_seconds": 10.7,
+          "sys_seconds": 1.4,
+          "peak_rss_bytes": 1141080064,
+          "output_sha256": "b8184dbf61f0daab4747364058ca56e0e4893d0d5b4e4b327618fe8f873d0fd4",
+          "output_bytes": 2949503
+        },
+        {
+          "ordinal": 6,
+          "iteration": 2,
+          "time_real_seconds": 10.12,
+          "user_seconds": 9.02,
+          "sys_seconds": 1.07,
+          "peak_rss_bytes": 1140932608,
+          "output_sha256": "b8184dbf61f0daab4747364058ca56e0e4893d0d5b4e4b327618fe8f873d0fd4",
+          "output_bytes": 2949503
+        },
+        {
+          "ordinal": 9,
+          "iteration": 3,
+          "time_real_seconds": 9.16,
+          "user_seconds": 8.53,
+          "sys_seconds": 1.2,
+          "peak_rss_bytes": 1140932608,
+          "output_sha256": "f43eaf52b881057a5a51e388ef929c03f669702e832d16f2f1888430e1fc0eeb",
+          "output_bytes": 2949503
+        },
+        {
+          "ordinal": 10,
+          "iteration": 4,
+          "time_real_seconds": 10.13,
+          "user_seconds": 9.86,
+          "sys_seconds": 1.11,
+          "peak_rss_bytes": 1141014528,
+          "output_sha256": "f43eaf52b881057a5a51e388ef929c03f669702e832d16f2f1888430e1fc0eeb",
+          "output_bytes": 2949503
+        }
+      ],
+      "medians": {
+        "time_real_seconds": 10.13,
+        "user_seconds": 9.86,
+        "sys_seconds": 1.2,
+        "peak_rss_bytes": 1141014528
+      },
+      "common_stages": {
+        "source_analysis": 0.006791042,
+        "base_conversion": 2.816630417,
+        "semantic_production": 2.8778105,
+        "resource_decode": 0.256735334,
+        "scene_derivation": 0.176646333,
+        "thumbnail_encode": 0.217887958,
+        "key1_fit": 0.073629334,
+        "style_metadata": 0.270268417,
+        "native_style_properties": 0.002249791,
+        "style_assembly": 0.002571875,
+        "texture_generation": 3.584953583,
+        "final_validation": 0.014845292,
+        "publication": 0.008942792
+      }
+    },
+    "candidate": {
+      "samples": [
+        {
+          "ordinal": 3,
+          "iteration": 0,
+          "time_real_seconds": 14.08,
+          "user_seconds": 12.67,
+          "sys_seconds": 1.8,
+          "peak_rss_bytes": 1135886336,
+          "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+          "output_bytes": 2894706
+        },
+        {
+          "ordinal": 4,
+          "iteration": 1,
+          "time_real_seconds": 14.37,
+          "user_seconds": 12.37,
+          "sys_seconds": 2.21,
+          "peak_rss_bytes": 1097760768,
+          "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+          "output_bytes": 2894706
+        },
+        {
+          "ordinal": 7,
+          "iteration": 2,
+          "time_real_seconds": 12.07,
+          "user_seconds": 10.69,
+          "sys_seconds": 1.68,
+          "peak_rss_bytes": 1136492544,
+          "output_sha256": "fc519b4bf5a5d883dfdd6008a31fe55a8d63a1bcc7fb5eef630465112910fe73",
+          "output_bytes": 2894706
+        },
+        {
+          "ordinal": 8,
+          "iteration": 3,
+          "time_real_seconds": 12.22,
+          "user_seconds": 10.9,
+          "sys_seconds": 1.82,
+          "peak_rss_bytes": 1136410624,
+          "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+          "output_bytes": 2894706
+        },
+        {
+          "ordinal": 11,
+          "iteration": 4,
+          "time_real_seconds": 11.34,
+          "user_seconds": 10.55,
+          "sys_seconds": 1.59,
+          "peak_rss_bytes": 1136328704,
+          "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+          "output_bytes": 2894706
+        }
+      ],
+      "medians": {
+        "time_real_seconds": 12.22,
+        "user_seconds": 10.9,
+        "sys_seconds": 1.8,
+        "peak_rss_bytes": 1136328704
+      },
+      "common_stages": {
+        "source_analysis": 0.006688416,
+        "base_conversion": 2.670262125,
+        "semantic_production": 3.284635333,
+        "resource_decode": 0.303496292,
+        "scene_hdr_reconstruction": 0.815169583,
+        "scene_linear_area_reduction": 0.126567625,
+        "scene_derivation": 1.141381834,
+        "thumbnail_encode": 0.28639275,
+        "key1_fit": 0.406472208,
+        "style_metadata": 0.289856625,
+        "native_style_properties": 0.003463291,
+        "style_assembly": 0.003356208,
+        "texture_generation": 3.821498,
+        "final_validation": 0.025665166,
+        "publication": 0.008766
+      }
+    }
+  },
+  "same_host_instrumented_e2e_delta_seconds": 2.09,
+  "same_host_instrumented_e2e_relative_percent": 20.631786771964467,
+  "stage_comparison": {
+    "source_analysis": {
+      "baseline_seconds": 0.006791042,
+      "candidate_seconds": 0.006688416,
+      "candidate_minus_baseline_seconds": -0.00010262599999999976
+    },
+    "base_conversion": {
+      "baseline_seconds": 2.816630417,
+      "candidate_seconds": 2.670262125,
+      "candidate_minus_baseline_seconds": -0.146368292
+    },
+    "semantic_production": {
+      "baseline_seconds": 2.8778105,
+      "candidate_seconds": 3.284635333,
+      "candidate_minus_baseline_seconds": 0.4068248330000004
+    },
+    "resource_decode": {
+      "baseline_seconds": 0.256735334,
+      "candidate_seconds": 0.303496292,
+      "candidate_minus_baseline_seconds": 0.04676095800000002
+    },
+    "scene_derivation": {
+      "baseline_seconds": 0.176646333,
+      "candidate_seconds": 1.141381834,
+      "candidate_minus_baseline_seconds": 0.9647355009999999
+    },
+    "thumbnail_encode": {
+      "baseline_seconds": 0.217887958,
+      "candidate_seconds": 0.28639275,
+      "candidate_minus_baseline_seconds": 0.06850479199999998
+    },
+    "key1_fit": {
+      "baseline_seconds": 0.073629334,
+      "candidate_seconds": 0.406472208,
+      "candidate_minus_baseline_seconds": 0.332842874
+    },
+    "style_metadata": {
+      "baseline_seconds": 0.270268417,
+      "candidate_seconds": 0.289856625,
+      "candidate_minus_baseline_seconds": 0.019588207999999996
+    },
+    "native_style_properties": {
+      "baseline_seconds": 0.002249791,
+      "candidate_seconds": 0.003463291,
+      "candidate_minus_baseline_seconds": 0.0012134999999999997
+    },
+    "style_assembly": {
+      "baseline_seconds": 0.002571875,
+      "candidate_seconds": 0.003356208,
+      "candidate_minus_baseline_seconds": 0.0007843329999999999
+    },
+    "texture_generation": {
+      "baseline_seconds": 3.584953583,
+      "candidate_seconds": 3.821498,
+      "candidate_minus_baseline_seconds": 0.23654441700000017
+    },
+    "final_validation": {
+      "baseline_seconds": 0.014845292,
+      "candidate_seconds": 0.025665166,
+      "candidate_minus_baseline_seconds": 0.010819874
+    },
+    "publication": {
+      "baseline_seconds": 0.008942792,
+      "candidate_seconds": 0.008766,
+      "candidate_minus_baseline_seconds": -0.00017679200000000027
+    }
+  },
+  "limits": [
+    "Portable lifecycle tests are not macOS compilation/execution or stage results.",
+    "Only broad operations are comparable: raster/gain-raster release points differ.",
+    "Nested logging overhead differs; scene delta is not pure algorithm cost.",
+    "Do not add overlapping spans or stage medians as E2E attribution.",
+    "All owned clones, targets and sample media are retained outside text evidence.",
+    "SIGKILL/host loss may leave only the last checkpoint; no cleanup success assumed."
+  ],
+  "fixed_product_file_bytes_verified": {
+    "owner_sha256": "93241f8e1c2af8ee9e2615e68f5ae9497a180dac4824f69a74d5596f229f162f",
+    "candidate_rust_sha256": "7549f71c5baa63dcffc1f255f2747e0e122a9cf603b2745fce1fad3d65e42d5d"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "status": "proposed-not-executed",
+  "operation_enabled": false,
+  "requires_parent_review_before_native_execution": true,
+  "first_blocker": {
+    "action": "Read and hash the new text artifact through supported authorized access",
+    "target_artifact": 12367047255,
+    "bytes": 355356,
+    "expected_archive_sha256_from_api": "46e9002136410ab4b0e79f636b702660cb1243a224fa1bdfd1bc9fff511768fd",
+    "local_materialization": "URLError; underlying reason omitted by initial receipt; no 403/permissions-denial assertion",
+    "retry_here": false
+  },
+  "observed_priority": [
+    {
+      "operation": "scene_derivation",
+      "baseline_seconds": 0.176646333,
+      "candidate_seconds": 1.141381834,
+      "interpretation": "Broad operation, includes differing source sizes/release points and nested log cost; not pure algorithm cost"
+    },
+    {
+      "operation": "scene_hdr_reconstruction",
+      "candidate_seconds": 0.815169583,
+      "interpretation": "Nested candidate-only span; focus for a discriminating prototype, not added to parent span"
+    },
+    {
+      "operation": "key1_fit",
+      "baseline_seconds": 0.073629334,
+      "candidate_seconds": 0.406472208,
+      "interpretation": "Local revert semantics differ; current e107 already includes the earlier safe accumulation rewrite, so do not reapply the retained dirty old prototype"
+    },
+    {
+      "operation": "semantic_production / texture_generation",
+      "interpretation": "Native broad-operation deltas are observations in five samples, not a proven algorithm regression"
+    }
+  ],
+  "next_small_prototype": {
+    "owner": "crates/xdremux-hdr/src/scene_linear.rs: reconstruct_scene_linear_hdr / apply_iso_gain_sample",
+    "demonstrated_source_fact": "The whole-image entry validates immutable application channels and weight, then public apply_iso_gain_sample validates the same facts for every component.",
+    "hypothesis": "A private validated kernel may avoid repeated validation work; compiler hoisting and actual savings are unknown. No optimization claim yet.",
+    "shape": "Keep public scalar API validation; use one private boundary/kernel for already validated whole-image calls. Do not add a general framework.",
+    "must_preserve": [
+      "Code-domain bilinear interpolation before nonlinear gain",
+      "Per-channel gamma/offsets, exact f64 operation order and final f32 result",
+      "Full-resolution HDR reconstruction before linear-light area reduction",
+      "Public invalid-input behavior and reconstructed nonfinite/f32 overflow rejection",
+      "All orientation, source-media, native Styles and Tone assertions"
+    ],
+    "verification": "Differential f32 bit/error comparisons across mono/RGB, padded strides, scale ratios, fractional interpolated codes, gamma/weight extremes, offsets and overflow; then one parent-approved same-host isolated native comparison with exact new source/binary receipts. Retain unchanged absolute gate and all failures.",
+    "stop_condition": "Discard if compiler already removes cost or differential behavior changes. Do not use LUT approximation for continuously interpolated gain codes, global/identity key1 replacement, reduced precision or weaker assertions."
+  },
+  "prohibited_followups": [
+    "No dispatch/rerun from this session",
+    "No new PVT experiment",
+    "No source head/main update to trigger ordinary CI",
+    "No threshold, budget, runner class, security or permission change",
+    "No merge or branch deletion"
+  ],
+  "data_limits": [
+    "Portable lifecycle tests are not macOS compilation/execution or stage results.",
+    "Only broad operations are comparable: raster/gain-raster release points differ.",
+    "Nested logging overhead differs; scene delta is not pure algorithm cost.",
+    "Do not add overlapping spans or stage medians as E2E attribution.",
+    "All owned clones, targets and sample media are retained outside text evidence.",
+    "SIGKILL/host loss may leave only the last checkpoint; no cleanup success assumed."
+  ]
+}

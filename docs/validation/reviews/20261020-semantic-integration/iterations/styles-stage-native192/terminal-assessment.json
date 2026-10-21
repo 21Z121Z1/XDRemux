@@ -1,0 +1,70 @@
+{
+  "run_id": 39644162258,
+  "job_id": 119375231267,
+  "run_attempt": 1,
+  "run_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39644162258",
+  "entrypoint_sha": "33bbe860ad6b1777839753a738ec17d3f9229b61",
+  "entrypoint_tree": "bfd8a388308c0e3b6e3e59a6065abb54247e37cc",
+  "product_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "harness_sha": "1a1698e47e008b688cf5c3fc492dfc307b04ae1a",
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "legacy_performance_job": "skipped",
+  "new_pvt_jobs": 0,
+  "dispatches_this_session": 0,
+  "reruns_this_session": 0,
+  "parent_ui_dispatches": 1,
+  "native_evidence_source": "Complete harness JSON printed in independently fetched terminal job log",
+  "harness_status": "completed-with-retained-workspace",
+  "validated_samples": 12,
+  "measured_samples_per_arm": 5,
+  "warmups_per_arm": 1,
+  "host": {
+    "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434",
+    "uname -m": "arm64",
+    "xcodebuild -version": "Xcode 27.0\nBuild version 27A266a",
+    "rustc --version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
+  },
+  "fresh_path_candidate_binary_facts": {
+    "sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "cli": {
+      "path": "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/cargo-target/release/xdremux",
+      "sha256": "c4eab27ad5fa792f2ac5e9ebc82c3e312a69ae1923dcc61bc25102bc8db7a84b",
+      "bytes": 4915344
+    },
+    "adapter": {
+      "path": "/Users/runner/work/_temp/xdremux-styles-fresh-build-ng4yt_5s/swift-scratch/out/Products/Release/xdremux-apple-adapter",
+      "sha256": "f50c7c11d2ddf5f36b394e273373252e87b0328b4d99d2a26db573bd11d06e04",
+      "bytes": 884824
+    }
+  },
+  "measured_instrumented_e2e": {
+    "baseline_median_seconds": 10.13,
+    "candidate_median_seconds": 12.22,
+    "relative_percent": 20.631786771964467
+  },
+  "harness_commands": {
+    "count": 60,
+    "all_exit_zero": true,
+    "all_owned_process_groups_absent": true,
+    "cleanup_uncertain": false
+  },
+  "verified_fixed_source_file_hashes": {
+    "owner_sha256": "93241f8e1c2af8ee9e2615e68f5ae9497a180dac4824f69a74d5596f229f162f",
+    "candidate_rust_sha256": "7549f71c5baa63dcffc1f255f2747e0e122a9cf603b2745fce1fad3d65e42d5d"
+  },
+  "artifact_acquisition": "Connector returned a reusable new artifact file reference; first local materialization GET raised URLError. No ZIP bytes obtained; no retry/alternate route. Underlying reason was not retained, so HTTP denial/proxy403 is not established.",
+  "still_unread_artifact_receipts": [
+    "driver.json with preparation duration and complete execution context",
+    "candidate-build.json with actual fresh build commands/environment/feature graph/lipo facts",
+    "Three complete checkout actual-file manifests plus post-build/final byte checks",
+    "Export manifest and per-member text hashes",
+    "Raw individual sample stderr/validate logs"
+  ],
+  "evidence_limit": "Native sampled report is real; full independent artifact/fresh-build audit remains incomplete. No performance fix or root-cause proof.",
+  "prior_e107_formal_gates": "18 success / 2 failure unchanged; no product budget rerun",
+  "operation_enabled": false,
+  "product_changes": [],
+  "merges": [],
+  "deletions": []
+}

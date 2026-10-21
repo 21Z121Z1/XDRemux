@@ -1,0 +1,19 @@
+{
+  "context": "Job still in progress; first read-only log attempt, no alternate path or repeated live request",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:f9c11322-701e-00f5-3b82-6103db000000\nTime:2026-10-21T17:33:51.1162691Z</Message></Error>"
+      }
+    ],
+    "structuredContent": {
+      "error": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:f9c11322-701e-00f5-3b82-6103db000000\nTime:2026-10-21T17:33:51.1162691Z</Message></Error>",
+      "error_code": "NOT_FOUND",
+      "error_data": {
+        "error_str": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:f9c11322-701e-00f5-3b82-6103db000000\nTime:2026-10-21T17:33:51.1162691Z</Message></Error>"
+      }
+    },
+    "isError": true
+  }
+}
