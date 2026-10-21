@@ -137,12 +137,8 @@ pub fn apply_iso_gain_sample(
     channel: &IsoGainChannel,
     weight: f64,
 ) -> Result<f64> {
-    if !sdr_linear.is_finite() || !gain_code.is_finite() {
-        return Err(HdrError::invalid(
-            "gain map application",
-            "SDR sample and gain code must be finite",
-        ));
-    }
+    // The public scalar entry keeps its sample -> channel -> weight error order.
+    validate_gain_sample(sdr_linear, gain_code)?;
     validate_channel(channel)?;
     if !weight.is_finite() || !(0.0..=1.0).contains(&weight) {
         return Err(HdrError::invalid(
@@ -150,6 +146,28 @@ pub fn apply_iso_gain_sample(
             "application weight must be finite and within 0 through 1",
         ));
     }
+    apply_iso_gain_sample_validated_parameters(sdr_linear, gain_code, channel, weight)
+}
+
+fn validate_gain_sample(sdr_linear: f64, gain_code: f64) -> Result<()> {
+    if !sdr_linear.is_finite() || !gain_code.is_finite() {
+        return Err(HdrError::invalid(
+            "gain map application",
+            "SDR sample and gain code must be finite",
+        ));
+    }
+    Ok(())
+}
+
+/// Both callers validate the immutable channel/weight before this kernel.
+/// Sample and result checks remain per invocation; the f64 math stays exact.
+fn apply_iso_gain_sample_validated_parameters(
+    sdr_linear: f64,
+    gain_code: f64,
+    channel: &IsoGainChannel,
+    weight: f64,
+) -> Result<f64> {
+    validate_gain_sample(sdr_linear, gain_code)?;
     let code = gain_code.clamp(0.0, 1.0);
     let shaped = if channel.gamma == 1.0 {
         code
@@ -170,8 +188,8 @@ pub fn apply_iso_gain_sample(
 
 /// Reconstruct scene-linear HDR at the SDR image's resolution.
 ///
-/// Each base pixel samples the gain map bilinearly in code space, then
-/// [`apply_iso_gain_sample`] runs. The gain map is not resized as a linear
+/// Each base pixel samples the gain map bilinearly in code space, then uses
+/// [`apply_iso_gain_sample`]'s formula. The gain map is not resized as a linear
 /// gain, and the SDR image is not resized before the gain is applied.
 pub fn reconstruct_scene_linear_hdr(
     sdr: &SceneLinearRgb,
@@ -199,7 +217,9 @@ pub fn reconstruct_scene_linear_hdr(
             let source = (y * sdr.width + x) * 3;
             for (component, sample) in sdr.samples[source..source + 3].iter().enumerate() {
                 let code = sample_gain_code(gain_map, x, y, sdr.width, sdr.height, component);
-                let hdr = apply_iso_gain_sample(
+                // Application validation above covers these unchanged borrows
+                // for the whole image; only sample/result checks belong here.
+                let hdr = apply_iso_gain_sample_validated_parameters(
                     f64::from(*sample),
                     code,
                     &application.channels[component],
@@ -450,6 +470,43 @@ fn sample_gain_code(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validated_parameter_kernel_still_checks_each_sample_and_result() {
+        let channel = IsoGainChannel {
+            minimum_log2: 0.0,
+            maximum_log2: 0.0,
+            gamma: 1.0,
+            base_offset: 0.0,
+            alternate_offset: 0.0,
+        };
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let expected = HdrError::invalid(
+                "gain map application",
+                "SDR sample and gain code must be finite",
+            );
+            assert_eq!(
+                apply_iso_gain_sample_validated_parameters(invalid, 0.5, &channel, 1.0),
+                Err(expected.clone()),
+            );
+            assert_eq!(
+                apply_iso_gain_sample_validated_parameters(0.5, invalid, &channel, 1.0),
+                Err(expected),
+            );
+        }
+        let overflow = IsoGainChannel {
+            minimum_log2: 1024.0,
+            maximum_log2: 1024.0,
+            ..channel
+        };
+        assert_eq!(
+            apply_iso_gain_sample_validated_parameters(1.0, 1.0, &overflow, 1.0),
+            Err(HdrError::invalid(
+                "gain map application",
+                "reconstructed HDR sample is non-finite",
+            )),
+        );
+    }
 
     fn channel(gamma: f64, base_offset: f64, alternate_offset: f64) -> IsoGainChannel {
         IsoGainChannel {

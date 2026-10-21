@@ -1,0 +1,10 @@
+{
+  "source_commit": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "source_path": "crates/xdremux-hdr/src/scene_linear.rs",
+  "source_git_blob": "85fd50705e7d3675e012b9dc637194872c067067",
+  "source_sha256": "30957d371778ed8d2d44533ebea161fa08a40c8ce95a7a42e54d0211fd6679b2",
+  "oracle_file": "scene_linear_e1072a9.rs",
+  "transformation": "Exact source byte prefix before the first #[cfg(test)]\\nmod tests marker; no edits or new kernel imports",
+  "prefix_bytes": 16424,
+  "oracle_sha256": "a795cd6d0f9f85ce9d8bff9f3911926d455fa4b316cc361d28f16edfb1843053"
+}
