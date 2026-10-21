@@ -6,11 +6,21 @@ import UniformTypeIdentifiers
 // is no PhotoKit creation request, resource-list import or PHLivePhoto assembly.
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
+    func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: "PVT audit", sessionRole: session.role)
+        configuration.delegateClass = PVTSceneDelegate.self
+        return configuration
+    }
+}
+
+final class PVTSceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     private let statusLabel = UILabel()
 
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        let window = UIWindow(frame: UIScreen.main.bounds)
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
+        guard let windowScene = scene as? UIWindowScene else { return }
+        let window = UIWindow(windowScene: windowScene)
         let controller = UIViewController()
         controller.view.backgroundColor = .white
         window.rootViewController = controller
@@ -38,7 +48,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                 catch { NSLog("PVT_READBACK_REPORT_WRITE_FAILED: %@", String(describing: error)) }
             }
         }
-        return true
     }
 
     @objc private func sharePackage() {

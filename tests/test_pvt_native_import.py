@@ -5,6 +5,7 @@ These checks do not execute or establish Apple native import.
 import copy
 import contextlib
 import io
+import plistlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,6 +14,16 @@ from scripts.apple.pvt_native_import import check_native_import as probe
 
 
 class PVTNativeImportTests(unittest.TestCase):
+    def test_installed_app_declares_the_scene_configuration_required_by_current_sdk(self):
+        bundle = "org.xdremux.audit.PVTReadback.u" + "a" * 32
+        info = plistlib.loads(plistlib.dumps(probe.reader_info(bundle)))
+        self.assertEqual(info["CFBundleIdentifier"], bundle)
+        self.assertEqual(info["CFBundleExecutable"], "PVTReadback")
+        scenes = info["UIApplicationSceneManifest"]
+        self.assertIs(scenes["UIApplicationSupportsMultipleScenes"], False)
+        self.assertEqual(scenes["UISceneConfigurations"]["UIWindowSceneSessionRoleApplication"],
+                         [{"UISceneConfigurationName": "PVT audit"}])
+
     def test_console_retains_native_rejection_and_only_fixed_text_diagnostics(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

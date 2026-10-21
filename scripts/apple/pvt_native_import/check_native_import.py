@@ -145,6 +145,18 @@ def check_share_receipt(shared, transfer, package, expected_members):
         raise Blocked('system share did not request the exact whole PVT file representation')
 
 
+def reader_info(bundle):
+    return {'CFBundleIdentifier': bundle, 'CFBundleExecutable': 'PVTReadback', 'CFBundleName': 'PVTReadback',
+            'CFBundlePackageType': 'APPL', 'CFBundleVersion': '1', 'CFBundleShortVersionString': '1.0',
+            'MinimumOSVersion': '17.0', 'LSRequiresIPhoneOS': True, 'UILaunchScreen': {},
+            'CFBundleSupportedPlatforms': ['iPhoneSimulator'], 'UIDeviceFamily': [1],
+            'UIApplicationSceneManifest': {'UIApplicationSupportsMultipleScenes': False,
+                'UISceneConfigurations': {'UIWindowSceneSessionRoleApplication': [
+                    {'UISceneConfigurationName': 'PVT audit'}]}},
+            'NSPhotoLibraryUsageDescription': 'Read and verify synthetic media in this disposable audit simulator.',
+            'NSPhotoLibraryAddUsageDescription': 'Save only the synthetic whole PVT through the system activity in this disposable simulator.'}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--repo', type=Path, required=True)
@@ -283,13 +295,7 @@ def main():
         run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
         app = work / 'PVTReadback.app'
         app.mkdir()
-        info = {'CFBundleIdentifier': bundle, 'CFBundleExecutable': 'PVTReadback', 'CFBundleName': 'PVTReadback',
-                'CFBundlePackageType': 'APPL', 'CFBundleVersion': '1', 'CFBundleShortVersionString': '1.0',
-                'MinimumOSVersion': '17.0', 'LSRequiresIPhoneOS': True, 'UILaunchScreen': {},
-                'CFBundleSupportedPlatforms': ['iPhoneSimulator'], 'UIDeviceFamily': [1],
-                'NSPhotoLibraryUsageDescription': 'Read and verify synthetic media in this disposable audit simulator.',
-                'NSPhotoLibraryAddUsageDescription': 'Save only the synthetic whole PVT through the system activity in this disposable simulator.'}
-        (app / 'Info.plist').write_bytes(plistlib.dumps(info))
+        (app / 'Info.plist').write_bytes(plistlib.dumps(reader_info(bundle)))
         if not privacy_available or not sdk:
             raise Blocked('documented owned photos grant or simulator SDK unavailable; no alternate permission setup')
         architecture = platform.machine()
