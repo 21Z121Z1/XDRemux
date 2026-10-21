@@ -42,16 +42,28 @@ on:
       - "scripts/performance/check_performance_budget.py"
       - ".github/workflows/performance.yml"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Normal budget checks or the pinned diagnostic
+        type: choice
+        required: true
+        default: standard
+        options: [standard, styles-stage-attribution]
+      reviewed_entrypoint_sha:
+        description: Full reviewed entrypoint commit; required for diagnostics
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
-concurrency:
-  group: xdremux-performance-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   rust-performance:
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.mode == 'standard') && github.ref != 'refs/tags/review/styles-stage-diagnostic-20261021-v1' }}
+    concurrency:
+      group: xdremux-performance-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     runs-on: xcode-27
     timeout-minutes: 120
     steps:
@@ -297,3 +309,81 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           path: artifacts/performance/
+
+  styles-stage-diagnostic:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'styles-stage-attribution' && github.repository == '21Z121Z1/XDRemux' && github.ref == 'refs/tags/review/styles-stage-diagnostic-20261021-v1' && inputs.reviewed_entrypoint_sha == github.sha && github.event.repository.visibility == 'public' && github.event.repository.private == false }}
+    runs-on: xcode-27
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    concurrency:
+      group: xdremux-styles-stage-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+      cancel-in-progress: false
+    steps:
+      - name: Preserve an initial receipt even if checkout fails
+        id: initial
+        shell: bash
+        run: |
+          python3 - <<'PYINIT'
+          import json, os
+          from pathlib import Path
+          out = Path(os.environ['RUNNER_TEMP']) / ('styles-stage-initial-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT'])
+          out.mkdir(exist_ok=False)
+          data = {'status': 'checkout-not-complete', 'product': 'e1072a90e31b12861dfe8b9cf25e07ce75c17c44', 'harness': '1a1698e47e008b688cf5c3fc492dfc307b04ae1a', 'entrypoint': os.environ['GITHUB_SHA'], 'native_execution_claimed': False}
+          (out / 'initial-status.json').write_text(json.dumps(data, indent=2) + '\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('receipt_ready=true\n')
+          PYINIT
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic-control
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: e1072a90e31b12861dfe8b9cf25e07ce75c17c44
+          path: product-source
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: 1a1698e47e008b688cf5c3fc492dfc307b04ae1a
+          path: reviewed-harness
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run only the pinned Styles diagnostic
+        id: diagnostic
+        timeout-minutes: 110
+        shell: bash
+        env:
+          REVIEWED_ENTRYPOINT_SHA: ${{ inputs.reviewed_entrypoint_sha }}
+        run: |
+          python3 diagnostic-control/scripts/performance/run_pinned_styles_diagnostic.py \
+            --control-source "$GITHUB_WORKSPACE/diagnostic-control" \
+            --product-source "$GITHUB_WORKSPACE/product-source" \
+            --harness-source "$GITHUB_WORKSPACE/reviewed-harness" \
+            --expected-control-sha "$REVIEWED_ENTRYPOINT_SHA" \
+            --artifact-dir "$RUNNER_TEMP/styles-stage-text-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+      - name: Upload only owned text evidence
+        timeout-minutes: 5
+        if: ${{ always() && steps.diagnostic.outputs.artifact_ready == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: styles-stage-diagnostic-${{ github.sha }}-${{ github.run_attempt }}
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: false
+          path: |
+            ${{ runner.temp }}/styles-stage-text-${{ github.run_id }}-${{ github.run_attempt }}/*.json
+            ${{ runner.temp }}/styles-stage-text-${{ github.run_id }}-${{ github.run_attempt }}/*.log
+
+      - name: Preserve the initial partial receipt
+        timeout-minutes: 5
+        if: ${{ always() && steps.initial.outputs.receipt_ready == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: styles-stage-setup-${{ github.sha }}-${{ github.run_attempt }}
+          retention-days: 1
+          if-no-files-found: error
+          path: ${{ runner.temp }}/styles-stage-initial-${{ github.run_id }}-${{ github.run_attempt }}/initial-status.json
