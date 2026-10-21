@@ -1,0 +1,62 @@
+{
+  "entrypoint": {
+    "sha": "33bbe860ad6b1777839753a738ec17d3f9229b61",
+    "tree": "bfd8a388308c0e3b6e3e59a6065abb54247e37cc",
+    "ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+    "parent": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44"
+  },
+  "harness": {
+    "sha": "1a1698e47e008b688cf5c3fc492dfc307b04ae1a",
+    "source": "../e1072a9-clone-object-independence/",
+    "modified": false
+  },
+  "product": {
+    "sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+    "tree": "209f1b5abc6faed76b65ebf8fcd093f9973465fa",
+    "modified": false
+  },
+  "prior_terminal_evidence": {
+    "sha": "dd000439d5bd9efe8dd907c5e04a22cdecfedce9",
+    "local_path": "../e1072a9-terminal/README.en.md"
+  },
+  "checks": {
+    "committed_head_portable_tests": 65,
+    "static_mode_cases": 14,
+    "native_builds": 0,
+    "native_measurements": 0,
+    "dispatches": 0,
+    "reruns": 0,
+    "new_prs": 0
+  },
+  "prior_product_gates": "20 terminal:18 success/2 failure; no old gate relabeled as this entrypoint result",
+  "performance": {
+    "run": 39567065898,
+    "job": 119111773150,
+    "status": "failed-preserved",
+    "median": 14.458,
+    "median_limit": 11.732,
+    "p95": 16.156,
+    "p95_limit": 15.406,
+    "same_host_main": 12.434200333,
+    "same_host_candidate": 14.704374375,
+    "relative_percent": 18.2574993
+  },
+  "pvt": {
+    "run": 39567065919,
+    "job": 119111773529,
+    "status": "environment-control-failed-preserved",
+    "product_probe_invocations": 0,
+    "cleanup_status": "uncertain",
+    "new_probe": false,
+    "photos_acceptance": "not tested"
+  },
+  "native_boundaries": [
+    "No macOS compilation or execution of this entrypoint",
+    "No new PVT experiment",
+    "No comparison stage results or root-cause claim",
+    "No server dispatch schema validation or artifact upload execution"
+  ],
+  "operation_enabled": false,
+  "merged": false,
+  "deleted_branches": []
+}

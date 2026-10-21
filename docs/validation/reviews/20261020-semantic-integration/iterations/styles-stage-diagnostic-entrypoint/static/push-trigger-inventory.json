@@ -1,0 +1,132 @@
+{
+  "ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+  "eligible_repository_push_workflows": [],
+  "workflows": [
+    {
+      "file": "ci.yml",
+      "sha256": "10aede687263806d24db82bf3e320b293d828f299c5e732d58dc049e650feead",
+      "push": {
+        "branches": [
+          "main"
+        ],
+        "paths-ignore": [
+          "**/*.md"
+        ]
+      }
+    },
+    {
+      "file": "completion-gate.yml",
+      "sha256": "950cc1a06b6117c57a0582da4c2b891bd40588a5219264ba78a2657f5b12c458",
+      "push": {
+        "branches": [
+          "main"
+        ]
+      }
+    },
+    {
+      "file": "performance.yml",
+      "sha256": "3eceee8d607e07e270cb08323a588bb748a36580e82a3b0c0a677909c23c4564",
+      "push": {
+        "branches": [
+          "main"
+        ],
+        "paths": [
+          "Cargo.toml",
+          "Cargo.lock",
+          "crates/**",
+          "Sources/XDRemuxAppleAdapter/**",
+          "Sources/XDTextureNative/**",
+          "Package.swift",
+          "benchmarks/macos26-arm64-product-baseline.json",
+          "benchmarks/macos27-arm64-product-baseline.json",
+          "tests/test_performance_design.py",
+          "tests/test_performance_budget.py",
+          "scripts/performance/benchmark_rust_product.py",
+          "scripts/performance/compare_apple_styles_revisions.py",
+          "tests/test_styles_revision_comparison.py",
+          "scripts/performance/benchmark_apple_videotoolbox_primitive.py",
+          "scripts/performance/characterize_apple_adapter_launches.py",
+          "scripts/performance/check_performance_budget.py",
+          ".github/workflows/performance.yml"
+        ]
+      }
+    },
+    {
+      "file": "research.yml",
+      "sha256": "c47c17e67dbe0d17d4ac9841dcb6fc04719d76521bc6f3bac879ab746ca88485",
+      "push": {
+        "branches": [
+          "main"
+        ],
+        "paths": [
+          "research/**",
+          "fixtures/proxdr/**",
+          "Sources/XDRemuxAppleAdapter/**",
+          "crates/**",
+          "xdremux_py/**",
+          "tests/**",
+          "scripts/**",
+          ".gitignore",
+          "pyproject.toml",
+          ".github/workflows/research.yml"
+        ]
+      }
+    },
+    {
+      "file": "rust-cli-core.yml",
+      "sha256": "9d924df281996c904b197170c9ef3d302f8fbb270b4b297d291d3e9c4944c38e",
+      "push": {
+        "branches": [
+          "main"
+        ],
+        "paths": [
+          "Cargo.toml",
+          "Cargo.lock",
+          "Package.swift",
+          "Sources/**",
+          "scripts/distribution/**",
+          "tests/test_macos_distribution.py",
+          "crates/xdremux-classification/**",
+          "crates/xdremux-cli/**",
+          "crates/xdremux-runtime/**",
+          "crates/xdremux-source/**",
+          "crates/xdremux-engine/**",
+          "crates/xdremux-codec/**",
+          "crates/xdremux-heif/**",
+          "crates/xdremux-hdr/**",
+          "crates/xdremux-metadata/**",
+          "crates/xdremux-format/**",
+          "crates/xdremux-container/**",
+          "crates/xdremux-motion-photo/**",
+          ".github/workflows/rust-cli-core.yml"
+        ]
+      }
+    },
+    {
+      "file": "rust-proxdr-real-fixtures.yml",
+      "sha256": "1e64a7533dba7a703e5fad3331bdbdd22e0f76f89c3eeae818905ec8b6f58353",
+      "push": {
+        "branches": [
+          "main"
+        ],
+        "paths": [
+          "Cargo.toml",
+          "Cargo.lock",
+          "crates/xdremux-cli/**",
+          "crates/xdremux-runtime/**",
+          "crates/xdremux-source/**",
+          "crates/xdremux-engine/**",
+          "crates/xdremux-codec/**",
+          "crates/xdremux-heif/**",
+          "crates/xdremux-hdr/**",
+          "crates/xdremux-metadata/**",
+          "crates/xdremux-format/**",
+          "crates/xdremux-container/**",
+          "fixtures/SHA256SUMS",
+          "fixtures/proxdr/**",
+          ".github/workflows/rust-proxdr-real-fixtures.yml"
+        ]
+      }
+    }
+  ]
+}

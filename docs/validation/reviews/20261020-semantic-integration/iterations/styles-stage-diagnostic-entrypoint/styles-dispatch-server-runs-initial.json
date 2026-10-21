@@ -1,0 +1,9 @@
+{
+  "captured_at": "2026-10-21T17:12:27.724Z",
+  "query": "GET /repos/21Z121Z1/XDRemux/actions/runs?head_sha=33bbe860ad6b1777839753a738ec17d3f9229b61&per_page=100",
+  "response": {
+    "total_count": 0,
+    "workflow_runs": []
+  },
+  "scope": "All events by exact commit query; unlike fetch_commit_workflow_runs wrapper, not restricted to PR events. Point-in-time observation, not indefinite guarantee."
+}

@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-10-21T17:09:56.624Z",
+  "url": "https://api.github.com/repos/21Z121Z1/XDRemux",
+  "fields": {
+    "id": 1221397436,
+    "full_name": "21Z121Z1/XDRemux",
+    "private": false,
+    "visibility": "public",
+    "default_branch": "main",
+    "delete_branch_on_merge": true
+  },
+  "scope": "read-only repository metadata; no runner allocation or setting mutation"
+}

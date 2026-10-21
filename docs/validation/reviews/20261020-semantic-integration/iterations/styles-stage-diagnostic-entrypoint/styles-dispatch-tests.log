@@ -1,0 +1,30 @@
+test_actual_tracked_bytes_detect_assume_unchanged_modification (tests.test_styles_diagnostic_entrypoint.BoundaryTests.test_actual_tracked_bytes_detect_assume_unchanged_modification) ... ok
+test_export_allowlist_excludes_media_clone_and_stdout_dumps (tests.test_styles_diagnostic_entrypoint.BoundaryTests.test_export_allowlist_excludes_media_clone_and_stdout_dumps) ... ok
+test_export_withholds_secrets_binary_and_symlink_while_retaining_partial_text (tests.test_styles_diagnostic_entrypoint.BoundaryTests.test_export_withholds_secrets_binary_and_symlink_while_retaining_partial_text) ... ok
+test_fresh_directories_refuse_reuse_and_reviewed_bytes_refuse_mutation (tests.test_styles_diagnostic_entrypoint.BoundaryTests.test_fresh_directories_refuse_reuse_and_reviewed_bytes_refuse_mutation) ... ok
+test_real_driver_entry_refuses_host_before_checkout_build_or_harness (tests.test_styles_diagnostic_entrypoint.BoundaryTests.test_real_driver_entry_refuses_host_before_checkout_build_or_harness) ... ok
+test_request_rejects_wrong_event_private_repo_ref_or_sha (tests.test_styles_diagnostic_entrypoint.BoundaryTests.test_request_rejects_wrong_event_private_repo_ref_or_sha) ... ok
+test_all_repository_push_workflows_exclude_tags (tests.test_styles_diagnostic_entrypoint.WorkflowTests.test_all_repository_push_workflows_exclude_tags) ... ERROR
+test_deadlines_and_flat_text_upload_boundary (tests.test_styles_diagnostic_entrypoint.WorkflowTests.test_deadlines_and_flat_text_upload_boundary) ... ok
+test_diagnostic_has_only_fixed_checkouts_read_permissions_and_independent_concurrency (tests.test_styles_diagnostic_entrypoint.WorkflowTests.test_diagnostic_has_only_fixed_checkouts_read_permissions_and_independent_concurrency) ... ok
+test_event_mode_matrix_uses_actual_workflow_expressions (tests.test_styles_diagnostic_entrypoint.WorkflowTests.test_event_mode_matrix_uses_actual_workflow_expressions) ... ok
+test_normal_job_steps_budget_and_other_triggers_are_unchanged (tests.test_styles_diagnostic_entrypoint.WorkflowTests.test_normal_job_steps_budget_and_other_triggers_are_unchanged) ... ok
+
+======================================================================
+ERROR: test_all_repository_push_workflows_exclude_tags (tests.test_styles_diagnostic_entrypoint.WorkflowTests.test_all_repository_push_workflows_exclude_tags)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-style-diagnostic-entrypoint/tests/test_styles_diagnostic_entrypoint.py", line 146, in test_all_repository_push_workflows_exclude_tags
+    (Path(output) / 'push-trigger-inventory.json').write_text(json.dumps({'ref': d.REVIEW_REF, 'eligible_repository_push_workflows': [], 'workflows': rows}, indent=2) + '\n')
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1047, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/workspace/xdremux-audit/styles-dispatch-static/push-trigger-inventory.json'
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.099s
+
+FAILED (errors=1)

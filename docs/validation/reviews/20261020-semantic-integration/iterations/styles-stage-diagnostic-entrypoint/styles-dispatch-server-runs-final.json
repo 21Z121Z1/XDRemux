@@ -1,0 +1,9 @@
+{
+  "captured_at": "2026-10-21T17:15:00.415Z",
+  "query": "GET /repos/21Z121Z1/XDRemux/actions/runs?head_sha=33bbe860ad6b1777839753a738ec17d3f9229b61&per_page=100",
+  "response": {
+    "total_count": 0,
+    "workflow_runs": []
+  },
+  "scope": "Second all-event exact-commit observation after publication; no dispatch or rerun requested."
+}

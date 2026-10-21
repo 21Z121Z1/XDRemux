@@ -1,0 +1,47 @@
+{
+  "commit": "33bbe860ad6b1777839753a738ec17d3f9229b61",
+  "tree": "bfd8a388308c0e3b6e3e59a6065abb54247e37cc",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-m",
+    "unittest",
+    "tests.test_styles_diagnostic_entrypoint",
+    "tests.test_performance_design",
+    "tests.test_performance_budget",
+    "tests.test_styles_revision_comparison",
+    "tests.validation.test_workflow_configuration",
+    "-v"
+  ],
+  "exit_code": 0,
+  "tests": 65,
+  "duration_seconds": 0.9739877330002855,
+  "captured_at": "2026-10-21T17:10:20.617096+00:00",
+  "scope": "Portable/static expression, ownership/export, modeled build receipt, real Linux refusal and existing performance/workflow checks; no Cargo, Swift, macOS, Actions dispatch or upload execution",
+  "log_sha256": "4711e6d639c73dcfa9297b22f37e1eeae0326bc22170264911fc1ae8e96c8321",
+  "changed_files": [
+    {
+      "path": ".github/workflows/performance.yml",
+      "sha256": "3eceee8d607e07e270cb08323a588bb748a36580e82a3b0c0a677909c23c4564"
+    },
+    {
+      "path": "docs/validation/styles-stage-diagnostic.en.md",
+      "sha256": "6e6c51ab585e8c83050f0fe450a9a85737d4f70c9adce2fa2e57b070b4b0ae33"
+    },
+    {
+      "path": "docs/validation/styles-stage-diagnostic.md",
+      "sha256": "e56096f79814f6524c2a21abcc39e351d45abc8efb154256c037b4735ad964c2"
+    },
+    {
+      "path": "scripts/performance/run_pinned_styles_diagnostic.py",
+      "sha256": "e0dd427e57c907a55251a7e5d8f4eb9f4243cd25915ae9808a25cc743fcaa76f"
+    },
+    {
+      "path": "tests/fixtures/performance-e107.yml",
+      "sha256": "1685ccc53a64b88fc4194542a84d58ada113a71ec226a3dec59198093322f3e4"
+    },
+    {
+      "path": "tests/test_styles_diagnostic_entrypoint.py",
+      "sha256": "45984682f1565d94c3ab14abb9faf244eccf63998dac1e1ee7e557d06c6edba5"
+    }
+  ]
+}

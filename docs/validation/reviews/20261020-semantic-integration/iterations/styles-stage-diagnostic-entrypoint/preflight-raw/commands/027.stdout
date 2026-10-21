@@ -1,0 +1,32 @@
+worktree /workspace/XDRemux
+HEAD 89d806c8aec961a7991eb3e6d6e2b1370aed8791
+branch refs/heads/work
+
+worktree /workspace/XDRemux-integration
+HEAD e1072a90e31b12861dfe8b9cf25e07ce75c17c44
+branch refs/heads/integrate/semantic-review-20261020
+
+worktree /workspace/XDRemux-pr58-candidate
+HEAD 6ae70b2b2ffcdc258808cceb5ae8263b2150073c
+detached
+
+worktree /workspace/XDRemux-pr69-candidate
+HEAD 6458e3d2c7a6da3ae378b867377047bd8a59595e
+detached
+
+worktree /workspace/XDRemux-review-evidence
+HEAD 35562b9b5ed2c3c7901c7740edaf0317d0f76014
+detached
+
+worktree /workspace/XDRemux-style-diagnostic-entrypoint
+HEAD 33bbe860ad6b1777839753a738ec17d3f9229b61
+detached
+
+worktree /workspace/xdremux-audit/style-fit-accumulation-prototype/baseline-source
+HEAD 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97
+detached
+
+worktree /workspace/xdremux-audit/style-fit-accumulation-prototype/candidate-source
+HEAD 1b2c07da2cb2b0c89c64ca546148fe5d68d75a97
+detached
+

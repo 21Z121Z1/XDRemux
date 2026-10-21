@@ -1,0 +1,215 @@
+{
+  "scope": "Static expression subset, not GitHub execution; path filters assumed matched",
+  "cases": [
+    {
+      "case": "reviewed-diagnostic",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": true
+    },
+    {
+      "case": "push-main",
+      "context": {
+        "github.event_name": "push",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/heads/main",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": true,
+      "diagnostic_job": false
+    },
+    {
+      "case": "ordinary-pr",
+      "context": {
+        "github.event_name": "pull_request",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/pull/71/merge",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": true,
+      "diagnostic_job": false
+    },
+    {
+      "case": "tag-push-job-guard",
+      "context": {
+        "github.event_name": "push",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "standard-dispatch-main",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "standard",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/heads/main",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": true,
+      "diagnostic_job": false
+    },
+    {
+      "case": "standard-on-review-tag",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "standard",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "unknown-mode",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "unknown",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "missing-mode",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "missing-reviewed-sha",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "different-reviewed-sha",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "wrong-ref",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/heads/main",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "other-repository",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "somebody/else",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "public",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "private-event",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "private",
+        "github.event.repository.private": true
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    },
+    {
+      "case": "missing-public-proof",
+      "context": {
+        "github.event_name": "workflow_dispatch",
+        "inputs.mode": "styles-stage-attribution",
+        "github.repository": "21Z121Z1/XDRemux",
+        "github.ref": "refs/tags/review/styles-stage-diagnostic-20261021-v1",
+        "github.sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs.reviewed_entrypoint_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "github.event.repository.visibility": "",
+        "github.event.repository.private": false
+      },
+      "legacy_job": false,
+      "diagnostic_job": false
+    }
+  ]
+}

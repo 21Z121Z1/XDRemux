@@ -1,0 +1,24 @@
+{
+  "fixed_blob_checks": [
+    {
+      "source": "1a1698e47e008b688cf5c3fc492dfc307b04ae1a",
+      "path": "docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/bounded_stage_lifecycle.py",
+      "sha256": "787b499bbd580d26a88a3cf991bfc4c728ba7f362d0120a5a54a834045d8f7b3",
+      "bytes": 15696,
+      "matches_literal_pin": true
+    },
+    {
+      "source": "1a1698e47e008b688cf5c3fc492dfc307b04ae1a",
+      "path": "docs/validation/reviews/20261020-semantic-integration/iterations/e1072a9-clone-object-independence/e107-stage-attribution-prototype.py",
+      "sha256": "c4a3bf872648454d6b7742bcf284a4cbdce1b766f8e3572b64846fedae3a1fa1",
+      "bytes": 14592,
+      "matches_literal_pin": true
+    },
+    {
+      "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+      "path": ".github/workflows/performance.yml",
+      "sha256": "1685ccc53a64b88fc4194542a84d58ada113a71ec226a3dec59198093322f3e4",
+      "matches_fixture": true
+    }
+  ]
+}

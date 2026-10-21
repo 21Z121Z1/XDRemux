@@ -1,0 +1,25 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "workflow": ".github/workflows/performance.yml",
+  "workflow_id_for_api": "performance.yml",
+  "method_if_later_authorized": "POST /repos/21Z121Z1/XDRemux/actions/workflows/performance.yml/dispatches",
+  "request_body": {
+    "ref": "review/styles-stage-diagnostic-20261021-v1",
+    "inputs": {
+      "mode": "styles-stage-attribution",
+      "reviewed_entrypoint_sha": "33bbe860ad6b1777839753a738ec17d3f9229b61"
+    }
+  },
+  "entrypoint": "33bbe860ad6b1777839753a738ec17d3f9229b61",
+  "tree": "bfd8a388308c0e3b6e3e59a6065abb54247e37cc",
+  "product_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "harness_sha": "1a1698e47e008b688cf5c3fc492dfc307b04ae1a",
+  "status": "prepared-not-submitted",
+  "execution_requested": false,
+  "operation_enabled": false,
+  "pr71_source_unchanged": true,
+  "runner": "existing standard public xcode-27 arm64 configuration",
+  "runtime_requirements": "Actual Darwin arm64, macOS27, Xcode27, macOS SDK27; contents: read; no billing/security change",
+  "tools": "No workflow-dispatch action exposed in this session; no POST attempted, no server write denial established",
+  "pending_parent_execution_review": true
+}

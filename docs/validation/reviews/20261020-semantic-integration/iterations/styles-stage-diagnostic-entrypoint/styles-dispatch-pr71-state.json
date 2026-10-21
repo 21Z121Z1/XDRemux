@@ -1,0 +1,12 @@
+{
+  "captured_at": "2026-10-21T17:12:27.092Z",
+  "url": "https://github.com/21Z121Z1/XDRemux/pull/71",
+  "number": 71,
+  "state": "open",
+  "merged": false,
+  "draft": true,
+  "base_sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+  "head_sha": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "head": "integrate/semantic-review-20261020",
+  "base": "main"
+}
