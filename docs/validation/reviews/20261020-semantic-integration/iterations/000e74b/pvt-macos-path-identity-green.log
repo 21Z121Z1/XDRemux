@@ -1,0 +1,16 @@
+   Compiling xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.35s
+     Running tests/live_photo_pvt.rs (target/debug/deps/live_photo_pvt-ca9888bc67095057)
+
+running 8 tests
+test a_pvt_destination_cannot_disguise_pair_output_or_replace_unknown_entries ... ok
+test categorization_keeps_packages_opaque_and_cannot_publish_inside_one ... ok
+test input_scanning_prunes_packages_and_output_planning_preserves_unknown_package_members ... ok
+test mixed_batch_pvt_keeps_ordinary_hdr_semantics_and_publishes_motion_as_a_package ... ok
+test pvt_conversion_and_validation_publish_a_real_directory_and_preserve_source ... ok
+test relative_output_from_a_package_working_directory_cannot_mutate_it ... ok
+test pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs ... ok
+test unknown_valid_packages_are_never_adopted_and_same_stems_get_distinct_outputs ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.04s
+

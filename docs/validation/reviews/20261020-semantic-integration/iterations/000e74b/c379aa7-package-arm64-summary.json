@@ -1,0 +1,92 @@
+{
+  "source": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+  "job_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39514720882/job/118944009391",
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1
+    },
+    {
+      "name": "Run actions/checkout@v7",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2
+    },
+    {
+      "name": "Verify exact checked-out head",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3
+    },
+    {
+      "name": "Run actions/setup-python@v7",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4
+    },
+    {
+      "name": "Run actions-rust-lang/setup-rust-toolchain@v2",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 5
+    },
+    {
+      "name": "Install build tools and check portable packaging contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 6
+    },
+    {
+      "name": "Build checksum-pinned native dependencies",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 7
+    },
+    {
+      "name": "Build and archive the current Rust CLI and complete Apple adapter",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8
+    },
+    {
+      "name": "Run the extracted package outside the checkout with only system environment",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9
+    },
+    {
+      "name": "Run actions/upload-artifact@v7",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 10
+    },
+    {
+      "name": "Post Run actions-rust-lang/setup-rust-toolchain@v2",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 18
+    },
+    {
+      "name": "Post Run actions/setup-python@v7",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 19
+    },
+    {
+      "name": "Post Run actions/checkout@v7",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 20
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 21
+    }
+  ],
+  "scope": "arm64/macOS27 package; exact source, checksum-pinned native build, both Swift native targets and extracted real conversion outside checkout executed. This observation predates PVT implementation; no independently downloaded archive bytes or Photos/wallpaper pass is claimed.",
+  "raw_log_sha256": "493c15d23627efb1abd0c0c6aa2dce6430f0fc1a98df3872105bfe9ff0f359b2"
+}

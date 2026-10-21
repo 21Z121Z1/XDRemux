@@ -1,0 +1,83 @@
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.28s
+     Running unittests src/lib.rs (target/debug/deps/xdremux_heif-29224bef42d11615)
+
+running 61 tests
+test canonical::tests::altr_group_encodes_tmap_before_primary ... ok
+test canonical::tests::consumer_iref_replaces_gain_auxl_with_primary_and_tmap_targets ... ok
+test data_information::tests::dinf_contains_one_self_contained_url_reference ... ok
+test canonical::tests::essential_normalization_changes_only_requested_associations ... ok
+test direct::tests::accepts_explicit_chroma_and_bit_depth_profiles ... ok
+test direct::tests::grid_payload_uses_large_dimension_form_only_when_required ... ok
+test direct::tests::rejects_bad_tile_geometry_before_parsing_source ... ok
+test direct::tests::rejects_codec_channel_mismatch_before_parsing_source ... ok
+test native::tests::assembly_rejects_empty_metadata_before_parsing_source ... ok
+test orientation::tests::coded_aspect_accepts_an_integer_scale_and_rejects_a_transpose ... ok
+test orientation::tests::odd_irot_swaps_display_dimensions ... ok
+test direct::tests::both_gain_map_assemblers_preserve_mirror_rotation_order ... ok
+test semantic::tests::alpha_merge_preserves_source_auxiliary_instead_of_importing_reencoded_alpha ... ok
+test semantic::tests::alpha_primary_only_and_premultiplied_relationships_preserve_transform_order ... ok
+test semantic::tests::alpha_subtype_diagnostic_distinguishes_uri_and_byte_mismatches_without_dumping_them ... ok
+test semantic::tests::alpha_subtype_diagnostic_reports_bounded_structure_for_invalid_resource_graph ... ok
+test semantic::tests::alpha_assembly_rejects_unknown_missing_ambiguous_or_conflicting_pairs ... ok
+test semantic::tests::alpha_subtype_passthrough_readback_rejects_changed_returned_auxiliary_bytes ... ok
+test semantic::tests::alpha_subtype_passthrough_rejects_changed_metadata_or_unknown_identity ... ok
+test semantic::tests::alpha_subtype_passthrough_rejects_property_changes_on_other_resources ... ok
+test semantic::tests::alpha_transplant_preserves_source_payload_codec_and_tile_order ... ok
+test semantic::tests::alpha_subtype_passthrough_preserves_complete_source_metadata_and_coded_resources ... ok
+test semantic::tests::auxiliary_identity_rejects_duplicate_alpha_item_records ... ok
+test semantic::tests::auxiliary_identity_rejects_unhandled_alpha_tile_outgoing_references ... ok
+test semantic::tests::auxiliary_identity_rejects_unknown_semantic_role_even_with_matching_descriptors ... ok
+test semantic::tests::auxiliary_identity_transplant_rejects_unpaired_unknown_source_auxiliary ... ok
+test semantic::tests::merge_direct_hdr_imports_three_described_semantics_without_importing_gain ... ok
+test semantic::tests::semantic_assembly_rejects_ambiguous_auxiliary_and_descriptor_edges ... ok
+test semantic::tests::semantic_assembly_rejects_ambiguous_or_incomplete_hdr_graphs ... ok
+test semantic::tests::semantic_assembly_rejects_unknown_auxiliary_instead_of_dropping_it ... ok
+test semantic::tests::semantic_descriptors_must_cover_each_image_once_even_when_counts_match ... ok
+test semantic::tests::semantic_merge_rejects_ambiguous_source_gain_map_graph ... ok
+test semantic::tests::transplant_direct_hdr_keeps_gain_out_of_three_semantic_roles ... ok
+test semantic::tests::transplant_identifies_gain_map_by_relationship_with_reversed_tmap_targets ... ok
+test semantic::tests::transplant_preserves_multi_tile_grid_payload_order_and_semantics ... ok
+test semantic::tests::unclassified_auxiliary_failure_diagnostic_reports_roles_and_edges_without_media ... ok
+test styles::tests::appends_rust_resources_and_preserves_source_mdat_prefix ... ok
+test styles::tests::derives_primary_color_from_grid_components_when_grid_has_geometry_only ... ok
+test styles::tests::direct_gain_map_styles_assembly_preserves_source_resources_and_color ... ok
+test styles::tests::direct_gain_map_styles_assembly_rejects_invalid_codec_precision_or_color ... ok
+test styles::tests::direct_gain_map_styles_assembly_rejects_invalid_derived_relationships ... ok
+test styles::tests::display_oriented_style_item_is_rejected ... ok
+test styles::tests::rejects_a_second_style_metadata_item ... ok
+test styles::tests::rejects_non_binary_style_metadata_before_parsing_source ... ok
+test styles::tests::rotated_primary_reuses_its_irot_on_coded_style_items ... ok
+test styles::tests::style_items_preserve_primary_mirror_rotation_order ... ok
+test texture::tests::a_role_label_cannot_replace_a_missing_native_codec_or_distinct_instance ... ok
+test texture::tests::appends_measured_masks_without_changing_original_payloads ... ok
+test texture::tests::native_skin_carrier_failure_reports_bounded_roles_and_references_without_opaque_bytes ... ok
+test texture::tests::native_skin_carrier_is_selected_among_alpha_without_changing_source_hdr_resources ... ok
+test texture::tests::native_skin_carrier_rejects_malformed_or_ambiguous_auxc_properties ... ok
+test texture::tests::native_skin_carrier_rejects_unknown_ambiguous_or_overlapping_auxiliary_graphs ... ok
+test validation::tests::accepts_mono_420_422_444_and_ten_bit_profiles ... ok
+test validation::tests::accepts_valid_tiled_gain_map_graph ... ok
+test validation::tests::direct_gain_map_rejects_incomplete_ambiguous_or_conflicting_resources ... ok
+test validation::tests::direct_gain_map_reports_its_actual_coded_resource_and_precision ... ok
+test validation::tests::rejects_grid_tile_count_mismatch ... ok
+test validation::tests::rejects_idat_extent_past_storage ... ok
+test validation::tests::rejects_pixi_hvcc_channel_mismatch ... ok
+test validation::tests::rejects_tmap_reference_to_unknown_gain_map ... ok
+test semantic::tests::auxiliary_graph_diagnostic_bounds_unknown_and_malformed_properties ... ok
+
+test result: ok. 61 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/fail_closed.rs (target/debug/deps/fail_closed-4cff4075cdb70a94)
+
+running 2 tests
+test structurally_incomplete_source_is_rejected ... ok
+test malformed_source_fails_closed_after_validating_spec ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/heif_conformance.rs (target/debug/examples/heif_conformance-19f57805e666b9f0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

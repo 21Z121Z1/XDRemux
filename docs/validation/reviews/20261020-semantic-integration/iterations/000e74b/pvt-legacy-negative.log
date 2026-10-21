@@ -1,0 +1,15 @@
+    Blocking waiting for file lock on build directory
+   Compiling xdremux-heif v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-heif)
+   Compiling xdremux-runtime v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.99s
+     Running tests/live_photo_negative.rs (target/debug/deps/live_photo_negative-e6cfc91eeb4a2481)
+
+running 5 tests
+test conversion_preserves_a_source_directory_with_a_temporary_looking_name ... ok
+test second_member_failure_retains_partial_movie_and_complete_staged_pair ... ok
+test known_timestamp_without_video_samples_is_rejected_before_publication ... ok
+test known_timestamp_without_video_track_is_rejected_before_publication ... ok
+test sef_fallback_hdr_without_mapped_gain_map_is_rejected_before_publication ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 8.27s
+

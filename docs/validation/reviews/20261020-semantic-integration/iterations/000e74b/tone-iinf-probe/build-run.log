@@ -1,0 +1,9 @@
+     Locking 1 package to highest Rust 1.99.1 compatible version
+   Compiling liblivephoto-format v0.1.0 (https://github.com/21Z121Z1/LibLivePhoto?rev=794ab552596db0f66095600d23cf7937a631b9ec#794ab552)
+   Compiling xdremux-format v0.1.0 (/workspace/xdremux-audit/tone-iinf-probe/crates/xdremux-format)
+   Compiling xdremux-heif v0.1.0 (/workspace/xdremux-audit/tone-iinf-probe/crates/xdremux-heif)
+   Compiling xdremux-tone-iinf-probe v0.0.0 (/workspace/xdremux-audit/tone-iinf-probe)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.58s
+     Running `/tmp/xdremux-tone-iinf-probe-target/debug/xdremux-tone-iinf-probe /workspace/xdremux-audit/tone-iinf-probe/outputs`
+before: product items=2, cdsc_from2_to1=true, original_style_payload_bytes=24
+after: product items=3, cdsc_from2_to1=true, original_style_payload_bytes=24

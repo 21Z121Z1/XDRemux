@@ -1,0 +1,16 @@
+{
+  "command": "validate",
+  "details": {
+    "kind": "live-photo",
+    "value": {
+      "content_identifier": "4FC4DCD0-8AF8-46E6-84B7-DC508B21AAFA",
+      "image": "/tmp/xdremux-verify-work-og9tswdf/converted-pvt.pvt/converted-pvt.heic",
+      "input": "/tmp/xdremux-verify-work-og9tswdf/converted-pvt.pvt",
+      "still_time_seconds": 1.540401,
+      "video": "/tmp/xdremux-verify-work-og9tswdf/converted-pvt.pvt/converted-pvt.mov"
+    }
+  },
+  "kind": "live-photo",
+  "schema_version": 1,
+  "valid": true
+}

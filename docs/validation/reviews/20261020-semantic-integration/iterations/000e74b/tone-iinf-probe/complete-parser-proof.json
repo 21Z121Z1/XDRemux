@@ -1,0 +1,52 @@
+{
+  "original_parser": "/workspace/xdremux-audit/tone-pinned-heif-dump.py",
+  "compatibility": {
+    "name": "iinf-v1-u32-count",
+    "upstream_revision": "37dd551a949047ed14580efa0c0a2556922791b5",
+    "original_source_sha256": "24ef91b177d6346fb3952036e8e2b770c4491c7aad5bea85244a768794336e10",
+    "original_git_blob_sha1": "d65da02fb2ffadc334d4d00199d063d26bf7eb94",
+    "patch_sha256": "c530cb377a50b1d7553e5633ec1f9a6eb148af2f1e366148814556de82a5c633",
+    "patched_source_sha256": "72a70eeed36098b6acd72677129db190839c4216c35a0f992202bfc1345a099c",
+    "scope": "Owned extraction launcher; fixed upstream files and media bytes remain unchanged."
+  },
+  "cases": {
+    "before": {
+      "path": "/workspace/xdremux-audit/tone-iinf-probe/outputs/before.heic",
+      "sha256": "afa9b2b29c9694352a80c1c18a875587c0439a028a227f5902f409fa34600cbd",
+      "fixed_original": {
+        "iinf_version": 0,
+        "infe_items": 2,
+        "linked_styles": 1,
+        "styles_payload_sha256": "539818dcc368fd093ffdc5c520c93f5aa80383305106f8c79fefab6e517331d5",
+        "original_cdsc_present": true
+      },
+      "production_adapter": {
+        "iinf_version": 0,
+        "infe_items": 2,
+        "linked_styles": 1,
+        "styles_payload_sha256": "539818dcc368fd093ffdc5c520c93f5aa80383305106f8c79fefab6e517331d5",
+        "original_cdsc_present": true
+      }
+    },
+    "after": {
+      "path": "/workspace/xdremux-audit/tone-iinf-probe/outputs/after.heic",
+      "sha256": "65b7af74eefd440771de603681d442030a0fc865ed8b0c973713b872104cce47",
+      "fixed_original": {
+        "iinf_version": 1,
+        "infe_items": 0,
+        "linked_styles": 0,
+        "styles_payload_sha256": null,
+        "original_cdsc_present": true
+      },
+      "production_adapter": {
+        "iinf_version": 1,
+        "infe_items": 3,
+        "linked_styles": 1,
+        "styles_payload_sha256": "539818dcc368fd093ffdc5c520c93f5aa80383305106f8c79fefab6e517331d5",
+        "original_cdsc_present": true
+      }
+    }
+  },
+  "original_source_unchanged": true,
+  "original_source_sha256_after": "24ef91b177d6346fb3952036e8e2b770c4491c7aad5bea85244a768794336e10"
+}

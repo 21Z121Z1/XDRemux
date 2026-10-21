@@ -1,0 +1,58 @@
+{
+  "head": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+  "binding": "uncommitted frozen Rust files; root must run committed exact-head gate",
+  "owned_source_hashes": {
+    "Cargo.lock": "056160dda971be254be247896d1aec466f99dda646e88ba44cd0bc163a34f242",
+    "crates/xdremux-engine/src/lib.rs": "89a119fefdfdf6aa1a28a4ac4654f845ff6fa1e9c7ad2fd7b130463226e8792d",
+    "crates/xdremux-runtime/Cargo.toml": "7c4e8523b28d379416b4cd56b9c2f2a1dcfeade1c0f310440fbeb81c49ac986c",
+    "crates/xdremux-runtime/src/batch.rs": "e258a5ccf239ed334224aab3bb8214c3534838c3089c0f4aaa10ea8e385dff19",
+    "crates/xdremux-runtime/src/batch_checkpoint.rs": "05402eaa61319b3e69097ffed52336c09a56f5653f37f481ea7d05130339480f",
+    "crates/xdremux-runtime/src/categorize.rs": "20e07405da712f449bc02c68b94426aa0733db392136a9e84a7a640479803ba9",
+    "crates/xdremux-runtime/src/lib.rs": "c4e7feb791162c956d4a9b3ae4cfe7401dd13f3338962ac10c309e9b596c15ab",
+    "crates/xdremux-runtime/src/live_photo.rs": "823b082890282287ed115772b6abd96e8d2f1dee34ca839708334f21d88affe1",
+    "crates/xdremux-runtime/src/live_photo_package.rs": "a206cc7d5c4284f242ffd12ae517a65cc4b9af32186fa43392bd60afb4c1582c",
+    "crates/xdremux-runtime/src/validation.rs": "50736d428a5069a5420098890a18b97fdaa333792e6975aac26decf575139b92",
+    "crates/xdremux-cli/src/categorize.rs": "8940ba8d5f4cfd9d3bb1b087646ca3ce06eafeab7316700110ed0717e2603ea8",
+    "crates/xdremux-cli/src/i18n.rs": "59b8e71dbd56bf4ec55de61e66111244d650f458499b6e32d04ec389c50820f3",
+    "crates/xdremux-cli/src/lib.rs": "da3a2d39500f6c89c1d2cb87053b4fa6f382a97ca28d29d6e4b282f745897a3c",
+    "crates/xdremux-cli/src/validate.rs": "9cdbccba5d6c3bf1cb853d448a2213c9c95e758ff8cc3a777679aa3f1905c50a",
+    "crates/xdremux-cli/tests/i18n.rs": "5ffde04f995ece411918e97045608b20953db5299908c853a2c0e09b4f0815ce",
+    "crates/xdremux-cli/tests/live_photo_pvt.rs": "52469f1d8464c66c0ca2d79b4232cc2cc53615497a70403ee11fa4544bd7dc3d"
+  },
+  "evidence_sha256": {
+    "pvt-cli-red.log": "e449981f3b9fef3895373ea73e5bdf89f8713d05784c9b3a1e4303dad0b06be0",
+    "pvt-categorize-red.log": "39e5e2f0b99b93f32108de92b1b7c19cfc926ba2f7bdadbfdd956f37aeb8eba5",
+    "pvt-cwd-red.log": "7753c2b1610c3e13af03573125891b4bbcdb9997004af000eb21a648033232fe",
+    "pvt-core-green.log": "516cdd5fc25eb70fd342604d222a64536610a0ac57ad1ce81bfb1d5fe2644138",
+    "pvt-cli-final-green.log": "2a09b78ee6996168473b9c21b747164ce3e8e6a62c66948c15f9706607f25e43",
+    "pvt-cli-regression-green.log": "19a6ebe36c5473ae6c99fabf451e626401a3d5aab18f1d7b6539d846576fb7be",
+    "pvt-legacy-negative.log": "c4f25dec5e9c943b2a697965cb800673fb394f2fc506b132ab34c0e12700922c",
+    "pvt-clippy.log": "ca9773c60cfb55f9d96563310f9a856b67ca1945f2ef4f8c2ca6e7e194d989ec",
+    "pvt-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pvt-bound-build.json": "f1aa1c9637e768ebde806bc12a58b2d11e1255a41236afa5b033437e57ef9bf4",
+    "pvt-real-cli-final.log": "12732d92bad23ef898cb5622d6fec4c72e9327930fa131916217f22d24a08ce8"
+  },
+  "os_process_manifest": "/workspace/xdremux-audit/pvt-cli-proof-t6crm39t/manifest.json",
+  "os_process_manifest_sha256": "9303e1cdc74987f19266eb35064a3e2d4d4a2ffeae7ac7fdb20707a78593be5a",
+  "binary_sha256": "a1df49511eea37af489f97d219da83b690666200712e883025be031556a740f0",
+  "all_owned_hashes_match_process_build": true,
+  "results": {
+    "engine_unit": 94,
+    "runtime_unit": 36,
+    "selected_cli_tests": 56,
+    "legacy_negative": 5,
+    "excluded_cli_slow_jpeg_tests": 2,
+    "excluded_legacy_sdr_jpeg_test": 1,
+    "os_process_case_groups": 5,
+    "clippy": "PASS",
+    "fmt": "PASS",
+    "diff_check": "PASS"
+  },
+  "limits": [
+    "macOS PVT publication backend inspected, not executed on this host",
+    "Photos import and dynamic wallpaper not tested",
+    "Windows publisher intentionally unsupported; Windows negative cfg not executed on Linux",
+    "single-directory exclusive rename is not power-loss durability or defense against an external writer modifying a published package",
+    "full initial CLI run intentionally stopped with SIGTERM during repeated ColorOS JPEG encoding; it is not a PASS receipt"
+  ]
+}

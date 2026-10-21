@@ -1,0 +1,14 @@
+{
+  "source": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+  "observed_utc": "2026-10-21T00:03:13Z",
+  "jobs": [],
+  "scope": "Completed automatic c379 native observation; predates PVT/Texture repair. Product App and exact-head passed, System HEIF and Tone failed. No failed job is reclassified as PASS.",
+  "raw_logs": {
+    "c379aa7-performance-job118944009773.log": "cf606bd0b81a2e25f921f161b4386bd5d3c2a4b7c91a5498d9505ee358dd7035",
+    "c379aa7-tone-job118944009628.log": "1a00f4b33655f2e4aad1912bd2f3e56719204c90c58db76402c38dae4d8acfaf",
+    "c379aa7-package-arm64-job118944009391.log": "493c15d23627efb1abd0c0c6aa2dce6430f0fc1a98df3872105bfe9ff0f359b2",
+    "c379aa7-exact-job118944008894.log": "70bbfd9f2f65179a210902b05abed1b73cfe378b65faaffbba4a475d4a21a04b",
+    "c379aa7-system-job118944009782.log": "2b54a1ca5f257345b42516d2009c93b73e47363d850ccb989ebc4a6a646f55e7",
+    "c379aa7-product-job118944009099.log": "a860aa5615398d87b1dcb94cce56908e79697fd6aa066bf60cc513852f0627a8"
+  }
+}

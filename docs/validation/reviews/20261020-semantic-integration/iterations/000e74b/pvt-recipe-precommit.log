@@ -1,0 +1,8 @@
+Retained proof: /tmp/xdremux-verify-proof-c2zxhp3t
+Traceback (most recent call last):
+  File "/workspace/xdremux-audit/verify-current-cli.py", line 90, in <module>
+    validation = json.loads(run(f"validate-unwrapped-{member.suffix[1:]}",
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/xdremux-audit/verify-current-cli.py", line 40, in run
+    raise RuntimeError(f"{name} failed with exit {result.returncode}; see {proof}")
+RuntimeError: validate-unwrapped-heic failed with exit 1; see /tmp/xdremux-verify-proof-c2zxhp3t

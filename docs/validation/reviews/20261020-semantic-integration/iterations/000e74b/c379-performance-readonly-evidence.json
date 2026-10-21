@@ -1,0 +1,758 @@
+{
+  "4b": {
+    "raw_log": "4b-performance-job118919126778.log",
+    "raw_sha256": "d0d5d49772c938f3be82190afa9a42007849d3a2ee1923bdf960f2b2801fa34f",
+    "arms": {
+      "baseline": {
+        "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "tracked_status": "",
+        "cli": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-ffool_kg/reference-cargo-target/release/xdremux",
+          "sha256": "4f774a7262f35fcb1c55d2672ff81f33caf5dc1fdc7cb675199a5aef74e9a1c7",
+          "bytes": 4944448
+        },
+        "adapter": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-ffool_kg/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "e6b7bfccb7425a48360ba9f23dada86bc70136a240a3da948918b9ad5b817760",
+          "bytes": 805352
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "--package-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-ffool_kg/reference-source",
+            "--scratch-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-ffool_kg/reference-swift-scratch",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "reference-cargo-features.log",
+          "sha256": "670db16c5012b9cd4955743f774e620f5661227d005f6e62ededc8875572285a",
+          "source_path_normalized_sha256": "dfd23f0509793a5a6d2531f09545bb2e5ce29fa6915180da8ef4f520023f6e87"
+        }
+      },
+      "candidate": {
+        "sha": "4b04fb3168cdc9bf8f54d7755db94fd3677eebb6",
+        "tracked_status": "",
+        "cli": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/target/release/xdremux",
+          "sha256": "de04eb78762f27a89c98d9909301abb96d2e292fd693c842db4b597f7feb5a08",
+          "bytes": 4824256
+        },
+        "adapter": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/.build/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "e1f3ba99d64a99e4650ec79ca7fac253098319abad65bf4f0303ecf06d62936c",
+          "bytes": 884696
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "build_owner": "performance.yml existing candidate release build",
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "candidate-cargo-features.log",
+          "sha256": "e0b607823f770cdacdc5d1589e4ea5996a0c0499dffd05755ca353e931518d2c",
+          "source_path_normalized_sha256": "f86fe060cf4f7a668a03444fb1a042f6008245266c0547847d1501a3ea8b7e94"
+        }
+      }
+    },
+    "distinct_revisions": true,
+    "diagnostic_only": true,
+    "summary": {
+      "baseline": {
+        "median_wall_seconds": 7.912647375000006,
+        "median_user_seconds": 7.88,
+        "median_sys_seconds": 0.53,
+        "max_peak_rss_bytes": 1141325824
+      },
+      "candidate": {
+        "median_wall_seconds": 9.14378150000016,
+        "median_user_seconds": 8.99,
+        "median_sys_seconds": 0.55,
+        "max_peak_rss_bytes": 1136525312
+      },
+      "candidate_over_baseline_median": 1.1555906723317304
+    },
+    "candidate_profile": {
+      "arm": "candidate",
+      "status": "validated",
+      "logs": "candidate-profile",
+      "outside_budget_and_comparison_samples": true,
+      "limits": "One candidate-only diagnostic conversion; no baseline stage comparison.",
+      "wall_seconds": 9.289624458999924,
+      "time_real_seconds": 9.27,
+      "user_seconds": 9.03,
+      "sys_seconds": 0.6,
+      "peak_rss_bytes": 1136508928,
+      "output_bytes": 2894706,
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.005752208
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.3268115
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 2.031061833
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.225590625
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.011503709
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.172149
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.366360958
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.200476667
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.001432709
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001085625
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 2.818307083
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.010616208
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.003082666
+        }
+      ]
+    },
+    "samples": [
+      {
+        "arm": "baseline",
+        "iteration": 0,
+        "ordinal": 0,
+        "peak_rss_bytes": 1141145600,
+        "sys_seconds": 0.6,
+        "time_real_seconds": 8.26,
+        "user_seconds": 7.93,
+        "wall_seconds": 8.271992875000024,
+        "warmup": true
+      },
+      {
+        "arm": "candidate",
+        "iteration": 0,
+        "ordinal": 1,
+        "peak_rss_bytes": 1136410624,
+        "sys_seconds": 0.59,
+        "time_real_seconds": 9.21,
+        "user_seconds": 9.01,
+        "wall_seconds": 9.222277916999928,
+        "warmup": true
+      },
+      {
+        "arm": "baseline",
+        "iteration": 0,
+        "ordinal": 2,
+        "peak_rss_bytes": 1141260288,
+        "sys_seconds": 0.53,
+        "time_real_seconds": 7.95,
+        "user_seconds": 7.89,
+        "wall_seconds": 7.96782816599989,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 0,
+        "ordinal": 3,
+        "peak_rss_bytes": 1136508928,
+        "sys_seconds": 0.55,
+        "time_real_seconds": 9.09,
+        "user_seconds": 8.99,
+        "wall_seconds": 9.116349499999842,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 1,
+        "ordinal": 4,
+        "peak_rss_bytes": 1136492544,
+        "sys_seconds": 0.55,
+        "time_real_seconds": 9.14,
+        "user_seconds": 8.99,
+        "wall_seconds": 9.146821499999987,
+        "warmup": false
+      },
+      {
+        "arm": "baseline",
+        "iteration": 1,
+        "ordinal": 5,
+        "peak_rss_bytes": 1141129216,
+        "sys_seconds": 0.53,
+        "time_real_seconds": 7.79,
+        "user_seconds": 7.81,
+        "wall_seconds": 7.816690499999822,
+        "warmup": false
+      },
+      {
+        "arm": "baseline",
+        "iteration": 2,
+        "ordinal": 6,
+        "peak_rss_bytes": 1141260288,
+        "sys_seconds": 0.54,
+        "time_real_seconds": 7.95,
+        "user_seconds": 7.91,
+        "wall_seconds": 7.9724659590001465,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 2,
+        "ordinal": 7,
+        "peak_rss_bytes": 1136525312,
+        "sys_seconds": 0.55,
+        "time_real_seconds": 9.11,
+        "user_seconds": 8.99,
+        "wall_seconds": 9.115034666999918,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 3,
+        "ordinal": 8,
+        "peak_rss_bytes": 1136410624,
+        "sys_seconds": 0.57,
+        "time_real_seconds": 9.36,
+        "user_seconds": 9.01,
+        "wall_seconds": 9.386986834000027,
+        "warmup": false
+      },
+      {
+        "arm": "baseline",
+        "iteration": 3,
+        "ordinal": 9,
+        "peak_rss_bytes": 1141325824,
+        "sys_seconds": 0.54,
+        "time_real_seconds": 7.84,
+        "user_seconds": 7.82,
+        "wall_seconds": 7.861883499999976,
+        "warmup": false
+      },
+      {
+        "arm": "baseline",
+        "iteration": 4,
+        "ordinal": 10,
+        "peak_rss_bytes": 1141227520,
+        "sys_seconds": 0.52,
+        "time_real_seconds": 7.89,
+        "user_seconds": 7.88,
+        "wall_seconds": 7.912647375000006,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 4,
+        "ordinal": 11,
+        "peak_rss_bytes": 1136459776,
+        "sys_seconds": 0.56,
+        "time_real_seconds": 9.14,
+        "user_seconds": 8.99,
+        "wall_seconds": 9.14378150000016,
+        "warmup": false
+      }
+    ],
+    "absolute_cases": {
+      "hdr-lhdr-mono400": {
+        "median": 1.377,
+        "p95": 1.406,
+        "max_rss_mib": 49.7
+      },
+      "hdr-uhdr-rgb444": {
+        "median": 6.797,
+        "p95": 6.863,
+        "max_rss_mib": 115.7
+      },
+      "oppo-compatible-lhdr-rgb420": {
+        "median": 1.505,
+        "p95": 1.952,
+        "max_rss_mib": 64.8
+      },
+      "oppo-compatible-uhdr-rgb420": {
+        "median": 5.872,
+        "p95": 5.889,
+        "max_rss_mib": 111.8
+      },
+      "motion-jpeg": {
+        "median": 6.17,
+        "p95": 6.584,
+        "max_rss_mib": 314.2
+      },
+      "motion-heif": {
+        "median": 0.075,
+        "p95": 0.076,
+        "max_rss_mib": 25.7
+      },
+      "batch-3": {
+        "median": 16.044,
+        "p95": 16.494,
+        "max_rss_mib": 246.8
+      },
+      "apple-portrait": {
+        "median": 3.2,
+        "p95": 3.242,
+        "max_rss_mib": 896.5
+      },
+      "apple-styles": {
+        "median": 9.142,
+        "p95": 9.334,
+        "max_rss_mib": 1083.9
+      }
+    }
+  },
+  "c379": {
+    "raw_log": "c379aa7-performance-job118944009773.log",
+    "raw_sha256": "cf606bd0b81a2e25f921f161b4386bd5d3c2a4b7c91a5498d9505ee358dd7035",
+    "arms": {
+      "baseline": {
+        "sha": "89d806c8aec961a7991eb3e6d6e2b1370aed8791",
+        "tracked_status": "",
+        "cli": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-i9ttnj90/reference-cargo-target/release/xdremux",
+          "sha256": "4f774a7262f35fcb1c55d2672ff81f33caf5dc1fdc7cb675199a5aef74e9a1c7",
+          "bytes": 4944448
+        },
+        "adapter": {
+          "path": "/private/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-i9ttnj90/reference-swift-scratch/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "c430e41a881b02a5fad27b459ec9642fd546a04d3ebc77db2735db314dd12ecc",
+          "bytes": 805352
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "--package-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-i9ttnj90/reference-source",
+            "--scratch-path",
+            "/var/folders/5n/5t77mfb93jd7q8v9s6f0dn0m0000gn/T/xdremux-styles-compare-i9ttnj90/reference-swift-scratch",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "reference-cargo-features.log",
+          "sha256": "e8ec8a232ee677b57270f5ce886ac7fc02cfc0e4137a997a84ab677b3f5c290a",
+          "source_path_normalized_sha256": "dfd23f0509793a5a6d2531f09545bb2e5ce29fa6915180da8ef4f520023f6e87"
+        }
+      },
+      "candidate": {
+        "sha": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+        "tracked_status": "",
+        "cli": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/target/release/xdremux",
+          "sha256": "a1edb0372e994665f439683ef253f5a9ac4ff186b7cd214cf16294376a17bfa4",
+          "bytes": 4823968
+        },
+        "adapter": {
+          "path": "/Users/runner/work/XDRemux/XDRemux/.build/out/Products/Release/xdremux-apple-adapter",
+          "sha256": "d78ee2d5ed7ece698e1b0497edbcf31d787da6d740e1689cd98f2989ecabe4da",
+          "bytes": 884216
+        },
+        "fixture_sha256": "32a2c5df1d3ca14e64d24ad291bc68067edcaaec6a7f9fc760d331bbd6576cbc",
+        "build_commands": [
+          [
+            "cargo",
+            "build",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--release"
+          ],
+          [
+            "swift",
+            "build",
+            "-c",
+            "release",
+            "--product",
+            "xdremux-apple-adapter"
+          ]
+        ],
+        "build_owner": "performance.yml existing candidate release build",
+        "feature_graph": {
+          "command": [
+            "cargo",
+            "tree",
+            "--locked",
+            "--workspace",
+            "--edges",
+            "features"
+          ],
+          "log": "candidate-cargo-features.log",
+          "sha256": "e0b607823f770cdacdc5d1589e4ea5996a0c0499dffd05755ca353e931518d2c",
+          "source_path_normalized_sha256": "f86fe060cf4f7a668a03444fb1a042f6008245266c0547847d1501a3ea8b7e94"
+        }
+      }
+    },
+    "distinct_revisions": true,
+    "diagnostic_only": true,
+    "summary": {
+      "baseline": {
+        "median_wall_seconds": 12.175516625,
+        "median_user_seconds": 11.09,
+        "median_sys_seconds": 1.68,
+        "max_peak_rss_bytes": 1140948992
+      },
+      "candidate": {
+        "median_wall_seconds": 14.176074833000257,
+        "median_user_seconds": 12.76,
+        "median_sys_seconds": 2.02,
+        "max_peak_rss_bytes": 1136689152
+      },
+      "candidate_over_baseline_median": 1.1643099237277956
+    },
+    "candidate_profile": {
+      "arm": "candidate",
+      "status": "validated",
+      "logs": "candidate-profile",
+      "outside_budget_and_comparison_samples": true,
+      "limits": "One candidate-only diagnostic conversion; no baseline stage comparison.",
+      "wall_seconds": 14.505146791999778,
+      "time_real_seconds": 14.48,
+      "user_seconds": 12.8,
+      "sys_seconds": 2.17,
+      "peak_rss_bytes": 1136721920,
+      "output_bytes": 2894706,
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006599875
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.00859775
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.800640833
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.402163625
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.819928584
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.400405
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.457362417
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.30900625
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.0050195
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001836083
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 4.113587333
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.018905958
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.010447042
+        }
+      ]
+    },
+    "samples": [
+      {
+        "arm": "baseline",
+        "iteration": 0,
+        "ordinal": 0,
+        "peak_rss_bytes": 1140867072,
+        "sys_seconds": 2.0,
+        "time_real_seconds": 13.06,
+        "user_seconds": 11.45,
+        "wall_seconds": 13.072483499999862,
+        "warmup": true
+      },
+      {
+        "arm": "candidate",
+        "iteration": 0,
+        "ordinal": 1,
+        "peak_rss_bytes": 1136623616,
+        "sys_seconds": 1.84,
+        "time_real_seconds": 15.23,
+        "user_seconds": 13.28,
+        "wall_seconds": 15.240963833000023,
+        "warmup": true
+      },
+      {
+        "arm": "baseline",
+        "iteration": 0,
+        "ordinal": 2,
+        "peak_rss_bytes": 1140899840,
+        "sys_seconds": 1.86,
+        "time_real_seconds": 12.03,
+        "user_seconds": 11.09,
+        "wall_seconds": 12.048701084000186,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 0,
+        "ordinal": 3,
+        "peak_rss_bytes": 1136574464,
+        "sys_seconds": 2.02,
+        "time_real_seconds": 13.86,
+        "user_seconds": 12.75,
+        "wall_seconds": 13.869192040999906,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 1,
+        "ordinal": 4,
+        "peak_rss_bytes": 1136558080,
+        "sys_seconds": 2.02,
+        "time_real_seconds": 14.46,
+        "user_seconds": 13.03,
+        "wall_seconds": 14.485899375000145,
+        "warmup": false
+      },
+      {
+        "arm": "baseline",
+        "iteration": 1,
+        "ordinal": 5,
+        "peak_rss_bytes": 1140948992,
+        "sys_seconds": 1.68,
+        "time_real_seconds": 12.16,
+        "user_seconds": 11.11,
+        "wall_seconds": 12.175516625,
+        "warmup": false
+      },
+      {
+        "arm": "baseline",
+        "iteration": 2,
+        "ordinal": 6,
+        "peak_rss_bytes": 1140867072,
+        "sys_seconds": 1.58,
+        "time_real_seconds": 12.35,
+        "user_seconds": 10.76,
+        "wall_seconds": 12.370295625000153,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 2,
+        "ordinal": 7,
+        "peak_rss_bytes": 1136640000,
+        "sys_seconds": 2.11,
+        "time_real_seconds": 14.67,
+        "user_seconds": 13.0,
+        "wall_seconds": 14.679341958999885,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 3,
+        "ordinal": 8,
+        "peak_rss_bytes": 1136689152,
+        "sys_seconds": 1.68,
+        "time_real_seconds": 13.78,
+        "user_seconds": 12.59,
+        "wall_seconds": 13.794027625000126,
+        "warmup": false
+      },
+      {
+        "arm": "baseline",
+        "iteration": 3,
+        "ordinal": 9,
+        "peak_rss_bytes": 1140785152,
+        "sys_seconds": 2.03,
+        "time_real_seconds": 12.74,
+        "user_seconds": 11.44,
+        "wall_seconds": 12.765066250000018,
+        "warmup": false
+      },
+      {
+        "arm": "baseline",
+        "iteration": 4,
+        "ordinal": 10,
+        "peak_rss_bytes": 1140834304,
+        "sys_seconds": 1.61,
+        "time_real_seconds": 12.03,
+        "user_seconds": 11.03,
+        "wall_seconds": 12.065248291999978,
+        "warmup": false
+      },
+      {
+        "arm": "candidate",
+        "iteration": 4,
+        "ordinal": 11,
+        "peak_rss_bytes": 1136558080,
+        "sys_seconds": 1.61,
+        "time_real_seconds": 14.15,
+        "user_seconds": 12.76,
+        "wall_seconds": 14.176074833000257,
+        "warmup": false
+      }
+    ],
+    "absolute_cases": {
+      "hdr-lhdr-mono400": {
+        "median": 2.09,
+        "p95": 3.127,
+        "max_rss_mib": 53.8
+      },
+      "hdr-uhdr-rgb444": {
+        "median": 9.897,
+        "p95": 11.131,
+        "max_rss_mib": 115.6
+      },
+      "oppo-compatible-lhdr-rgb420": {
+        "median": 2.134,
+        "p95": 2.264,
+        "max_rss_mib": 64.8
+      },
+      "oppo-compatible-uhdr-rgb420": {
+        "median": 8.334,
+        "p95": 8.585,
+        "max_rss_mib": 111.7
+      },
+      "motion-jpeg": {
+        "median": 9.419,
+        "p95": 9.522,
+        "max_rss_mib": 314.2
+      },
+      "motion-heif": {
+        "median": 0.107,
+        "p95": 0.112,
+        "max_rss_mib": 25.6
+      },
+      "batch-3": {
+        "median": 22.353,
+        "p95": 22.871,
+        "max_rss_mib": 248.5
+      },
+      "apple-portrait": {
+        "median": 4.682,
+        "p95": 5.288,
+        "max_rss_mib": 896.4
+      },
+      "apple-styles": {
+        "median": 12.829,
+        "p95": 13.5,
+        "max_rss_mib": 1084.1
+      }
+    }
+  },
+  "descriptive_comparison": {
+    "cross_run_scale": {
+      "baseline": {
+        "median_wall_seconds": 1.5387412136510117,
+        "median_user_seconds": 1.4073604060913705,
+        "median_sys_seconds": 3.1698113207547167
+      },
+      "candidate": {
+        "median_wall_seconds": 1.5503514419061752,
+        "median_user_seconds": 1.4193548387096773,
+        "median_sys_seconds": 3.6727272727272724
+      }
+    },
+    "gap_ratio_change_percentage_points": 0.871925139606522,
+    "gap_ratio_relative_change": 0.007545276718504246,
+    "new_candidate_minus_old_ratio_times_new_baseline_seconds": 0.106161390330346,
+    "limits": "Descriptive arithmetic only; two independent jobs and five samples per arm do not isolate mechanism or justify a gate adjustment."
+  }
+}

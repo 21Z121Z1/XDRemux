@@ -1,0 +1,519 @@
+diff --git a/apps/macos/XDRemuxApp/Sources/AppModels.swift b/apps/macos/XDRemuxApp/Sources/AppModels.swift
+index 8795feb..3668d71 100644
+--- a/apps/macos/XDRemuxApp/Sources/AppModels.swift
++++ b/apps/macos/XDRemuxApp/Sources/AppModels.swift
+@@ -12,6 +12,7 @@ struct ConversionConfig: Sendable, Equatable {
+     var categorizeOutputByCaptureMode = false
+     var applePhotographicStyles = false
+     var applePortrait = false
++    var livePhotoOutput: LivePhotoOutput = .pair
+ 
+     var appleFeaturesEnabled: Bool {
+         applePhotographicStyles || applePortrait
+@@ -27,6 +28,13 @@ struct ConversionConfig: Sendable, Equatable {
+     }
+ }
+ 
++enum LivePhotoOutput: String, CaseIterable, Identifiable, Sendable, Hashable {
++    case pair
++    case pvt
++
++    var id: String { rawValue }
++}
++
+ enum PhotoAssetType: String, CaseIterable, Identifiable, Sendable, Equatable {
+     case staticPhoto = "static-photo"
+     case livePhoto = "live-photo"
+diff --git a/apps/macos/XDRemuxApp/Sources/AppStrings.swift b/apps/macos/XDRemuxApp/Sources/AppStrings.swift
+index c7821ff..bf5ef57 100644
+--- a/apps/macos/XDRemuxApp/Sources/AppStrings.swift
++++ b/apps/macos/XDRemuxApp/Sources/AppStrings.swift
+@@ -30,6 +30,7 @@ enum AppStrings {
+     static let outputPlanOverwritesInput = "输出会覆盖已导入的原始文件"
+     static let outputPlanInputMissing = "源文件不存在"
+     static let outputPlanParentIsFile = "输出目录位置是文件"
++    static let outputPlanExistingPackage = "已有 PVT 文件包，需选择新路径"
+ 
+     static let statConverted = "成功"
+     static let statSkipped = "已跳过"
+@@ -68,7 +69,11 @@ enum AppStrings {
+     static let applePortraitHelp = "使用 OPPO 景深数据与当前照片的 Vision person、skin、hair、teeth、glasses 分割结果生成 Apple 人像辅助项目。非人像照片仍可单独输出摄影风格。"
+     static let appleFeaturesOppoIncompatibleHelp = "Apple 输出与 OPPO 相册兼容层互斥；先关闭 OPPO 相册兼容格式。"
+     static let skipExisting = "跳过已有有效输出"
+-    static let skipExistingHelp = "仅跳过 Rust 已验证满足当前功能的输出；Portrait 和 OPPO 兼容输出会重新转换。"
++    static let skipExistingHelp = "仅跳过 Rust 已验证满足当前功能的输出；Portrait 和 OPPO 兼容输出会重新转换。PVT 文件包不自动复用。"
++    static let livePhotoOutputTitle = "实况照片输出"
++    static let livePhotoOutputPair = "照片 + 视频文件对"
++    static let livePhotoOutputPvt = "PVT 文件包"
++    static let livePhotoOutputHelp = "选择实况照片的封装方式。PVT 为目录包，封装不额外重编码；动态墙纸可用性尚未验证。"
+     static let categorizeOutput = "按拍摄模式分类输出"
+     static let categorizeOutputHelp = "根据源照片的 OPPO UserComment，将转换结果写入普通拍照、大师模式、专业模式、人像等子目录；无法可靠识别的文件保留在输出根目录。"
+     static let concurrentJobs = "并发任务"
+diff --git a/apps/macos/XDRemuxApp/Sources/ContentView.swift b/apps/macos/XDRemuxApp/Sources/ContentView.swift
+index 8a864ff..13820c0 100644
+--- a/apps/macos/XDRemuxApp/Sources/ContentView.swift
++++ b/apps/macos/XDRemuxApp/Sources/ContentView.swift
+@@ -883,6 +883,15 @@ private struct SettingsView: View {
+                         : AppStrings.applePortraitHelp
+                 )
+ 
++                Picker(AppStrings.livePhotoOutputTitle, selection: $viewModel.config.livePhotoOutput) {
++                    Text(AppStrings.livePhotoOutputPair).tag(LivePhotoOutput.pair)
++                    Text(AppStrings.livePhotoOutputPvt).tag(LivePhotoOutput.pvt)
++                }
++                .onChange(of: viewModel.config.livePhotoOutput) {
++                    viewModel.refreshOutputURLsForPendingItems()
++                }
++                SettingExplanation(AppStrings.livePhotoOutputHelp)
++
+                 Toggle(AppStrings.skipExisting, isOn: $viewModel.config.skipExisting)
+                     .onChange(of: viewModel.config.skipExisting) {
+                         viewModel.refreshOutputURLsForPendingItems()
+@@ -1034,6 +1043,7 @@ private extension OutputPlanStatus {
+         case .overwritesInput: return AppStrings.outputPlanOverwritesInput
+         case .inputMissing: return AppStrings.outputPlanInputMissing
+         case .outputParentIsFile: return AppStrings.outputPlanParentIsFile
++        case .existingPackage: return AppStrings.outputPlanExistingPackage
+         }
+     }
+ 
+@@ -1045,7 +1055,7 @@ private extension OutputPlanStatus {
+             return .orange
+         case .skipsExistingValidOutput:
+             return .secondary
+-        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile:
++        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage:
+             return .red
+         }
+     }
+diff --git a/apps/macos/XDRemuxApp/Sources/RustCLIClient.swift b/apps/macos/XDRemuxApp/Sources/RustCLIClient.swift
+index 2c7aa6a..35bd391 100644
+--- a/apps/macos/XDRemuxApp/Sources/RustCLIClient.swift
++++ b/apps/macos/XDRemuxApp/Sources/RustCLIClient.swift
+@@ -102,6 +102,9 @@ enum RustCLIClient {
+     }
+ 
+     static func isValidOutput(_ outputURL: URL, config: ConversionConfig = ConversionConfig()) -> Bool {
++        // This predicate authorizes app reuse, not just structural validity.
++        // The app has no durable source provenance for an existing package.
++        guard outputURL.pathExtension.lowercased() != "pvt" else { return false }
+         guard FileManager.default.fileExists(atPath: outputURL.path) else { return false }
+         // Rust has no output validator for these intents yet. Generic HDR
+         // validation cannot establish that their requested resources survived.
+@@ -191,16 +194,18 @@ enum RustCLIClient {
+             )
+         }
+ 
+-        if config.applePhotographicStyles {
+-            return ["--apple-styles"]
+-        }
+-        if config.applePortrait {
+-            return ["--apple-portrait"]
++        var arguments: [String] = []
++        if config.livePhotoOutput != .pair {
++            arguments.append(contentsOf: ["--live-photo-output", config.livePhotoOutput.rawValue])
+         }
+-        if config.oppoGalleryCompatibilityEnabled {
+-            return ["--oppo-compatible"]
++        if config.applePhotographicStyles {
++            arguments.append("--apple-styles")
++        } else if config.applePortrait {
++            arguments.append("--apple-portrait")
++        } else if config.oppoGalleryCompatibilityEnabled {
++            arguments.append("--oppo-compatible")
+         }
+-        return []
++        return arguments
+     }
+ 
+     private static func run(
+diff --git a/apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift b/apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift
+index 5d502e0..8ca02b2 100644
+--- a/apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift
++++ b/apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift
+@@ -48,10 +48,11 @@ enum OutputPlanStatus: String, Sendable, Equatable {
+     case overwritesInput
+     case inputMissing
+     case outputParentIsFile
++    case existingPackage
+ 
+     var blocksConversion: Bool {
+         switch self {
+-        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile:
++        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage:
+             return true
+         case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
+             return false
+@@ -642,9 +643,6 @@ final class XDRemuxViewModel {
+                 guard fileKeys(item.outputURL).isDisjoint(with: protectedInputKeys) else {
+                     throw RustCLIClient.ClientError.unsupportedConfiguration("输出路径会覆盖已导入的原始文件：\(item.outputURL.path)")
+                 }
+-                if config.skipExisting, AppConversionEngine.isValidOutput(item.outputURL, config: config) {
+-                    return QueueWorkResult(id: item.id, status: .skippedExisting, errorMessage: nil, finishedAt: Date())
+-                }
+                 let disposition = try prepareOutputForConversion(
+                     inputURL: item.inputURL,
+                     outputURL: item.outputURL,
+@@ -681,6 +679,9 @@ final class XDRemuxViewModel {
+         let fileManager = FileManager.default
+ 
+         for url in urls {
++            guard url.pathExtension.lowercased() != "pvt",
++                  url.resolvingSymlinksInPath().pathExtension.lowercased() != "pvt",
++                  !hasPVTPackageAncestor(url) else { continue }
+             var isDirectory: ObjCBool = false
+             if fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+                 if isDirectory.boolValue {
+@@ -689,8 +690,12 @@ final class XDRemuxViewModel {
+                         includingPropertiesForKeys: [.isRegularFileKey],
+                         options: [.skipsHiddenFiles]
+                     ) {
+-                        for case let fileURL as URL in enumerator where fileURL.pathExtension.lowercased() == "heic" {
+-                            heicURLs.append(fileURL)
++                        for case let fileURL as URL in enumerator {
++                            if fileURL.pathExtension.lowercased() == "pvt" {
++                                enumerator.skipDescendants()
++                            } else if fileURL.pathExtension.lowercased() == "heic", !hasPVTPackageAncestor(fileURL) {
++                                heicURLs.append(fileURL)
++                            }
+                         }
+                     }
+                 } else if url.pathExtension.lowercased() == "heic" {
+@@ -708,6 +713,7 @@ final class XDRemuxViewModel {
+         captureMode: OppoCaptureMode?,
+         assetType: PhotoAssetType
+     ) -> URL {
++        let packageOutput = assetType == .livePhoto && config.livePhotoOutput == .pvt
+         let categoryComponents = config.categorizeOutputByCaptureMode
+             ? [assetType.folderName, captureMode?.folderName ?? PhotoFolderProjection.unclassifiedFolderName]
+             : []
+@@ -720,13 +726,42 @@ final class XDRemuxViewModel {
+ 
+         if let outputDirectory = config.outputDirectory {
+             return projectedDirectory(from: outputDirectory)
+-                .appendingPathComponent(inputURL.lastPathComponent)
++                .appendingPathComponent(
++                    packageOutput ? inputURL.deletingPathExtension().lastPathComponent + ".pvt" : inputURL.lastPathComponent,
++                    isDirectory: packageOutput
++                )
+         }
+ 
+         let suffix = config.fileNameSuffix.isEmpty ? "_iso" : config.fileNameSuffix
+         let stem = inputURL.deletingPathExtension().lastPathComponent
+         let parent = projectedDirectory(from: inputURL.deletingLastPathComponent())
+-        return parent.appendingPathComponent("\(stem)\(suffix).heic")
++        return parent.appendingPathComponent("\(stem)\(suffix).\(packageOutput ? "pvt" : "heic")", isDirectory: packageOutput)
++    }
++
++    nonisolated private static func pathEntryExists(_ url: URL) -> Bool {
++        FileManager.default.fileExists(atPath: url.path)
++            || (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
++    }
++
++    // PVT is opaque to the app. Never scan it or create output beneath it,
++    // including when an ordinary-looking directory aliases a package.
++    nonisolated private static func hasPVTPackageAncestor(_ url: URL) -> Bool {
++        for candidate in [url.standardizedFileURL, url.resolvingSymlinksInPath().standardizedFileURL] {
++            var parent = candidate.deletingLastPathComponent()
++            while parent.path != "/" {
++                if parent.pathExtension.lowercased() == "pvt" { return true }
++                let next = parent.deletingLastPathComponent()
++                guard next.path != parent.path else { break }
++                parent = next
++            }
++        }
++        return false
++    }
++
++    nonisolated private static func packageBlocksOutput(_ outputURL: URL) -> Bool {
++        let namesPackage = outputURL.pathExtension.lowercased() == "pvt"
++            || outputURL.resolvingSymlinksInPath().pathExtension.lowercased() == "pvt"
++        return hasPVTPackageAncestor(outputURL) || (namesPackage && pathEntryExists(outputURL))
+     }
+ 
+     nonisolated private static func pathKey(_ url: URL) -> String {
+@@ -756,6 +791,7 @@ final class XDRemuxViewModel {
+         guard fileManager.fileExists(atPath: inputURL.path) else {
+             return .inputMissing
+         }
++        if packageBlocksOutput(outputURL) { return .existingPackage }
+ 
+         let parentURL = outputURL.deletingLastPathComponent()
+         var isDirectory: ObjCBool = false
+@@ -783,6 +819,8 @@ final class XDRemuxViewModel {
+             return "输入文件不存在: \(item.inputURL.path)"
+         case .outputParentIsFile:
+             return "输出目录位置是文件，无法写入: \(item.outputURL.deletingLastPathComponent().path)"
++        case .existingPackage:
++            return "已有 PVT 包不能复用、替换或添加成员，请选择新的输出路径：\(item.outputURL.path)"
+         case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
+             return ""
+         }
+@@ -794,6 +832,9 @@ final class XDRemuxViewModel {
+         config: ConversionConfig
+     ) throws -> OutputPreparationDisposition {
+         let fileManager = FileManager.default
++        if packageBlocksOutput(outputURL) {
++            throw RustCLIClient.ClientError.unsupportedConfiguration("不能复用、替换或向已有 PVT 包内写入，请选择新的输出路径。")
++        }
+         guard pathKey(inputURL) != pathKey(outputURL) else {
+             return .ready
+         }
+diff --git a/apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift b/apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift
+index 53a2170..4288a2e 100644
+--- a/apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift
++++ b/apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift
+@@ -61,6 +61,11 @@ struct XDRemuxAppModelTests {
+         try await testCategorizedConversionCreatesDirectories()
+         try await testExistingOutputReplacementPreservesFailureAndSuccess()
+         try await testExistingMotionPhotoOutputIsNeverReplacedAsOneFile()
++        try testLivePhotoOutputArgumentsAndMixedQueuePlans()
++        try await testPVTChoiceReachesRustWithoutChangingOrdinaryOutput()
++        try await testExistingPVTDestinationsAreNeverAdoptedOrReplaced()
++        try await testExistingPVTPackagesAreNotScannedOrUsedAsOutputDirectories()
++        try await testPVTPreviewUsesSourceImage()
+         print("XDRemuxAppModelTests passed")
+     }
+ 
+@@ -303,6 +308,230 @@ struct XDRemuxAppModelTests {
+         }
+     }
+ 
++    @MainActor
++    private static func testLivePhotoOutputArgumentsAndMixedQueuePlans() throws {
++        var config = ConversionConfig()
++        try expect(config.livePhotoOutput == .pair, "Live Photo output should default to the existing file pair")
++        try expect(try RustCLIClient.productArgumentsForTesting(config: config) == [], "default CLI arguments must remain empty")
++        config.livePhotoOutput = .pvt
++        try expect(try RustCLIClient.productArgumentsForTesting(config: config) == ["--live-photo-output", "pvt"], "PVT should forward the typed Rust container option")
++        config.applePhotographicStyles = true
++        try expect(try RustCLIClient.productArgumentsForTesting(config: config) == ["--live-photo-output", "pvt", "--apple-styles"], "container selection must preserve other explicit product intents")
++
++        let root = try makeTempDirectory("pvt-plans")
++        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
++        let motion = root.appendingPathComponent("motion.heic")
++        let ordinary = root.appendingPathComponent("ordinary.heic")
++        try writeFile(motion)
++        try writeFile(ordinary)
++        let model = XDRemuxViewModel()
++        model.config.livePhotoOutput = .pvt
++        model.queue = [ConversionQueueItem(inputURL: motion, outputURL: motion, assetType: .livePhoto),
++                       ConversionQueueItem(inputURL: ordinary, outputURL: ordinary)]
++        model.refreshOutputURLsForPendingItems()
++        try expect(model.queue.map(\.outputURL.lastPathComponent) == ["motion_iso.pvt", "ordinary_iso.heic"], "only Rust-classified Live Photos should plan a PVT directory")
++        model.config.outputDirectory = root.appendingPathComponent("output")
++        model.config.categorizeOutputByCaptureMode = true
++        model.refreshOutputURLsForPendingItems()
++        try expect(model.queue[0].outputURL == root.appendingPathComponent("output/实况照片/未分类/motion.pvt", isDirectory: true), "PVT should retain the existing asset/mode folder projection")
++        try expect(model.queue[1].outputURL == root.appendingPathComponent("output/静态照片/未分类/ordinary.heic"), "mixed ordinary HDR should retain its HEIC path")
++        model.config.livePhotoOutput = .pair
++        model.refreshOutputURLsForPendingItems()
++        try expect(model.queue[0].outputURL.pathExtension == "heic", "switching pending rows back to pair should refresh their output paths")
++    }
++
++    @MainActor
++    private static func testPVTChoiceReachesRustWithoutChangingOrdinaryOutput() async throws {
++        try await withCLI(#"""
++        [ "$1" = convert ] || exit 64
++        printf '%s\n' "$@" >> "$0.log"
++        shift
++        output=''
++        format=pair
++        while [ "$#" -gt 0 ]; do
++            case "$1" in
++                --output) output="$2"; shift 2 ;;
++                --live-photo-output) format="$2"; shift 2 ;;
++                *) shift ;;
++            esac
++        done
++        [ "$format" = pvt ] || exit 65
++        case "$output" in
++            *.pvt) mkdir "$output"; printf 'rust-owned-package' > "$output/fixture-marker" ;;
++            *.heic) printf 'ordinary-hdr' > "$output" ;;
++            *) exit 66 ;;
++        esac
++        """#) { root in
++            let motion = root.appendingPathComponent("motion source.heic")
++            let ordinary = root.appendingPathComponent("ordinary source.heic")
++            try writeFile(motion)
++            try writeFile(ordinary)
++            let model = XDRemuxViewModel()
++            model.config.outputDirectory = root.appendingPathComponent("mixed outputs")
++            model.config.livePhotoOutput = .pvt
++            model.config.maxConcurrentJobs = 1
++            model.queue = [ConversionQueueItem(inputURL: motion, outputURL: motion, assetType: .livePhoto),
++                           ConversionQueueItem(inputURL: ordinary, outputURL: ordinary)]
++            try await runConversion(model)
++            try expect(model.queue.allSatisfy { $0.status == .converted }, "the app should launch the same Rust intent for a mixed queue")
++            try expect(model.queue[0].outputURL.lastPathComponent == "motion source.pvt", "the output/reveal URL should be the outer package")
++            try expect(model.queue[1].outputURL.lastPathComponent == "ordinary source.heic", "the ordinary result must remain HEIC")
++            try expect(try Data(contentsOf: model.queue[0].outputURL.appendingPathComponent("fixture-marker")) == Data("rust-owned-package".utf8), "only Rust's process should supply package contents")
++            try expect(try Data(contentsOf: ordinary) == Data(repeating: 0x41, count: 16), "ordinary queued originals must survive")
++            try expect(try Data(contentsOf: motion) == Data(repeating: 0x41, count: 16), "Motion Photo queued originals must survive")
++            let calls = try String(contentsOf: root.appendingPathComponent("xdremux-test-cli.log"), encoding: .utf8)
++            try expect(calls.components(separatedBy: "--live-photo-output\npvt").count == 3, "both calls should forward PVT selection without splitting user paths")
++        }
++    }
++
++    @MainActor
++    private static func testExistingPVTDestinationsAreNeverAdoptedOrReplaced() async throws {
++        try await withCLI("printf '%s\\n' \"$*\" >> \"$0.log\"") { root in
++            let input = root.appendingPathComponent("motion.heic")
++            try writeFile(input)
++            for skip in [true, false] {
++                for kind in ["file", "directory", "symlink", "symlink-directory", "dangling"] {
++                    let directory = root.appendingPathComponent("\(skip)-\(kind)")
++                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
++                    let output = directory.appendingPathComponent("motion.pvt")
++                    let target = directory.appendingPathComponent("target")
++                    if kind == "directory" {
++                        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
++                        try Data("keep-member".utf8).write(to: output.appendingPathComponent("member.heic"))
++                    } else if kind == "symlink-directory" {
++                        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
++                        try Data("keep-target-member".utf8).write(to: target.appendingPathComponent("member.heic"))
++                        try FileManager.default.createSymbolicLink(at: output, withDestinationURL: target)
++                    } else if kind == "symlink" || kind == "dangling" {
++                        if kind == "symlink" { try Data("keep-target".utf8).write(to: target) }
++                        try FileManager.default.createSymbolicLink(at: output, withDestinationURL: target)
++                    } else {
++                        try Data("keep-file".utf8).write(to: output)
++                    }
++                    let model = XDRemuxViewModel()
++                    model.config.outputDirectory = directory
++                    model.config.livePhotoOutput = .pvt
++                    model.config.skipExisting = skip
++                    model.queue = [ConversionQueueItem(inputURL: input, outputURL: output, assetType: .livePhoto)]
++                    try expect(!RustCLIClient.isValidOutput(output, config: model.config), "a successful generic validate cannot authorize PVT reuse without durable provenance")
++                    try expect((try? XDRemuxViewModel.prepareOutputForConversionForTesting(inputURL: input, outputURL: output, skipExisting: skip)) == nil, "preparation must reject every existing PVT entry")
++                    _ = model.markOutputCollisionsForTesting()
++                    try expect(model.queue[0].outputPlanStatus == .existingPackage && !model.canStart, "an existing PVT must block both skip and replacement")
++                    if kind == "directory" {
++                        try expect(try FileManager.default.contentsOfDirectory(atPath: output.path) == ["member.heic"], "an existing package must keep its member set")
++                        try expect(try Data(contentsOf: output.appendingPathComponent("member.heic")) == Data("keep-member".utf8), "existing member bytes must survive")
++                    } else if kind == "symlink-directory" {
++                        try expect(try FileManager.default.destinationOfSymbolicLink(atPath: output.path) == target.path, "directory aliases must survive")
++                        try expect(try FileManager.default.contentsOfDirectory(atPath: target.path) == ["member.heic"], "aliased package members must survive")
++                        try expect(try Data(contentsOf: target.appendingPathComponent("member.heic")) == Data("keep-target-member".utf8), "aliased package bytes must survive")
++                    } else if kind == "symlink" || kind == "dangling" {
++                        try expect(try FileManager.default.destinationOfSymbolicLink(atPath: output.path) == target.path, "existing and dangling links must survive")
++                        if kind == "symlink" { try expect(try Data(contentsOf: target) == Data("keep-target".utf8), "link targets must survive") }
++                    } else {
++                        try expect(try Data(contentsOf: output) == Data("keep-file".utf8), "existing file bytes must survive")
++                    }
++                }
++            }
++            for skip in [true, false] {
++                let directory = root.appendingPathComponent("ordinary-name-alias-\(skip)")
++                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
++                let package = directory.appendingPathComponent("existing.pvt", isDirectory: true)
++                try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
++                let member = package.appendingPathComponent("member.heic")
++                try Data("keep-aliased-package".utf8).write(to: member)
++                let ordinaryInput = root.appendingPathComponent("foo.heic")
++                try writeFile(ordinaryInput)
++                let output = directory.appendingPathComponent("foo.heic")
++                try FileManager.default.createSymbolicLink(at: output, withDestinationURL: package)
++                let model = XDRemuxViewModel()
++                model.config.outputDirectory = directory
++                model.config.livePhotoOutput = .pvt
++                model.config.skipExisting = skip
++                model.queue = [ConversionQueueItem(inputURL: ordinaryInput, outputURL: output)]
++                try expect((try? XDRemuxViewModel.prepareOutputForConversionForTesting(inputURL: ordinaryInput, outputURL: output, skipExisting: skip)) == nil, "an ordinary output name resolving directly to PVT must never enter reuse or replacement")
++                _ = model.markOutputCollisionsForTesting()
++                try expect(model.queue[0].outputURL.pathExtension == "heic", "ordinary rows should retain HEIC naming even when that name is an unsafe alias")
++                try expect(model.queue[0].outputPlanStatus == .existingPackage && !model.canStart, "the resolved current node must block a package alias for both skip settings")
++                try expect(try FileManager.default.destinationOfSymbolicLink(atPath: output.path) == package.path, "the ordinary-name output link must survive")
++                try expect(try FileManager.default.contentsOfDirectory(atPath: package.path) == ["member.heic"], "ordinary-name aliases cannot change the package member set")
++                try expect(try Data(contentsOf: member) == Data("keep-aliased-package".utf8), "ordinary-name aliases cannot change package member bytes")
++                try expect(try Data(contentsOf: ordinaryInput) == Data(repeating: 0x41, count: 16), "ordinary-name package aliases cannot change the queued original")
++            }
++            let aliasDirectory = root.appendingPathComponent("queued-input-alias")
++            try FileManager.default.createDirectory(at: aliasDirectory, withIntermediateDirectories: true)
++            let otherInput = root.appendingPathComponent("other-original.heic")
++            try writeFile(otherInput, bytes: 32)
++            let alias = aliasDirectory.appendingPathComponent("motion.pvt")
++            try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: otherInput)
++            let aliases = XDRemuxViewModel()
++            aliases.config.outputDirectory = aliasDirectory
++            aliases.config.livePhotoOutput = .pvt
++            aliases.queue = [ConversionQueueItem(inputURL: input, outputURL: alias, assetType: .livePhoto),
++                             ConversionQueueItem(inputURL: otherInput, outputURL: otherInput)]
++            _ = aliases.markOutputCollisionsForTesting()
++            try expect(aliases.queue[0].outputPlanStatus == .overwritesInput, "PVT aliases must retain queued-original identity protection")
++            try expect(try Data(contentsOf: otherInput) == Data(repeating: 0x41, count: 32), "an output alias cannot modify another queued original")
++            try expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("xdremux-test-cli.log").path), "blocked PVT entries should never reach validate or convert")
++            try expect(try Data(contentsOf: input) == Data(repeating: 0x41, count: 16), "planning and preparation must preserve the queued original")
++        }
++    }
++
++    @MainActor
++    private static func testPVTPreviewUsesSourceImage() async throws {
++        let root = try makeTempDirectory("pvt-preview")
++        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
++        let icon = URL(fileURLWithPath: "apps/macos/XDRemuxApp/Assets.xcassets/AppIcon.appiconset/icon_32x32.png")
++        let input = root.appendingPathComponent("motion.heic")
++        try FileManager.default.copyItem(at: icon, to: input)
++        let output = root.appendingPathComponent("motion.pvt", isDirectory: true)
++        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
++        let item = ConversionQueueItem(inputURL: input, outputURL: output, status: .converted, assetType: .livePhoto)
++        let model = XDRemuxViewModel()
++        model.queue = [item]
++        model.loadThumbnailIfNeeded(for: item)
++        let clock = ContinuousClock()
++        let deadline = clock.now.advanced(by: .seconds(5))
++        while model.thumbnailStatus(for: item.id) == .loading, clock.now < deadline {
++            try await Task.sleep(for: .milliseconds(10))
++        }
++        guard case .ready = model.thumbnailStatus(for: item.id) else {
++            throw TestFailure.assertion("PVT preview must read the source image rather than the opaque output directory")
++        }
++        try expect(model.queue[0].outputURL == output, "Finder reveal should retain the outer package URL")
++        try expect(try FileManager.default.contentsOfDirectory(atPath: output.path).isEmpty, "preview must not populate or modify the package")
++    }
++
++    @MainActor
++    private static func testExistingPVTPackagesAreNotScannedOrUsedAsOutputDirectories() async throws {
++        try await withCLI("printf '{\"items\": []}\\n'") { root in
++            let package = root.appendingPathComponent("existing.PVT", isDirectory: true)
++            try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
++            let member = package.appendingPathComponent("member.heic")
++            try Data("unchanged-member".utf8).write(to: member)
++            let scanner = XDRemuxViewModel()
++            _ = await scanner.importFiles(from: [package, member, root])
++            try expect(scanner.queue.isEmpty, "directory discovery must treat PVT as an opaque package")
++
++            let input = root.appendingPathComponent("source.heic")
++            try writeFile(input)
++            let alias = root.appendingPathComponent("package-alias")
++            try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: package)
++            for format in LivePhotoOutput.allCases {
++                for outputDirectory in [package, package.appendingPathComponent("nested"), alias] {
++                    let model = XDRemuxViewModel()
++                    model.config.livePhotoOutput = format
++                    model.config.outputDirectory = outputDirectory
++                    model.queue = [ConversionQueueItem(inputURL: input, outputURL: input, assetType: .livePhoto)]
++                    _ = model.markOutputCollisionsForTesting()
++                    try expect(model.queue[0].outputPlanStatus == .existingPackage && !model.canStart, "both pair and PVT outputs must not add members inside an existing package")
++                    try expect((try? XDRemuxViewModel.prepareOutputForConversionForTesting(inputURL: input, outputURL: model.queue[0].outputURL, skipExisting: true)) == nil, "execution preparation must reject package descendants as well as planning")
++                }
++            }
++            try expect(try FileManager.default.contentsOfDirectory(atPath: package.path) == ["member.heic"], "discovery and output planning must preserve the complete package")
++            try expect(try Data(contentsOf: member) == Data("unchanged-member".utf8), "discovery and output planning must preserve its original media bytes")
++        }
++    }
++
+     @MainActor
+     private static func testConversionCategorizationUsesAssetTypeAndModeDirectories() async throws {
+         let root = try makeTempDirectory("conversion-categorize")
+@@ -662,6 +891,10 @@ struct XDRemuxAppModelTests {
+         try expect(AppStrings.oppoGalleryCompatibilityHelp.contains("Rust"), "OPPO setting should name the canonical product owner")
+         try expect(AppStrings.outputPlanOverwriteExisting.contains("覆盖"), "overwrite plan copy should make replacement explicit")
+         try expect(AppStrings.previewUnavailable.contains("预览"), "thumbnail failure copy should name preview behavior")
++        try expect(AppStrings.livePhotoOutputTitle == "实况照片输出", "container selection should name Live Photo output")
++        try expect(AppStrings.livePhotoOutputPair == "照片 + 视频文件对", "pair label should name both members")
++        try expect(AppStrings.livePhotoOutputPvt == "PVT 文件包", "PVT label should identify a package")
++        try expect(AppStrings.livePhotoOutputHelp == "选择实况照片的封装方式。PVT 为目录包，封装不额外重编码；动态墙纸可用性尚未验证。", "container help must preserve the packaging and unverified wallpaper boundary")
+     }
+ 
+     @MainActor

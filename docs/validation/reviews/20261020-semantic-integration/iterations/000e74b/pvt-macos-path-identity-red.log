@@ -1,0 +1,24 @@
+   Compiling xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.36s
+     Running tests/live_photo_pvt.rs (target/debug/deps/live_photo_pvt-ca9888bc67095057)
+
+running 1 test
+test pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs ... FAILED
+
+failures:
+
+---- pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs stdout ----
+
+thread 'pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs' (177361) panicked at crates/xdremux-cli/tests/live_photo_pvt.rs:113:5:
+assertion `left == right` failed
+  left: Array [String("/tmp/.tmpHqPXdJ/actual-output-parent/out/source.xdremux.pvt")]
+ right: Array [String("/tmp/.tmpHqPXdJ/output-parent-alias/out/source.xdremux.pvt")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 3.99s
+
+error: test failed, to rerun pass `-p xdremux-cli --test live_photo_pvt`

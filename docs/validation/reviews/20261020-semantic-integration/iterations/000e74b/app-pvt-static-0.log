@@ -1,0 +1,11 @@
+test_app_and_model_tools_have_no_swift_product_dependencies (tests.test_app_architecture.SwiftAppArchitectureTests.test_app_and_model_tools_have_no_swift_product_dependencies) ... ok
+test_app_build_bundles_the_rust_product_and_adapter (tests.test_app_architecture.SwiftAppArchitectureTests.test_app_build_bundles_the_rust_product_and_adapter) ... ok
+test_app_uses_rust_cli_without_swift_conversion_engines (tests.test_app_architecture.SwiftAppArchitectureTests.test_app_uses_rust_cli_without_swift_conversion_engines) ... ok
+test_categorization_ui_uses_rust_cli_receipts (tests.test_app_architecture.SwiftAppArchitectureTests.test_categorization_ui_uses_rust_cli_receipts) ... ok
+test_ci_runs_architecture_and_app_model_checks (tests.test_app_architecture.SwiftAppArchitectureTests.test_ci_runs_architecture_and_app_model_checks) ... ok
+test_complete_native_product_targets_arm64_and_macos_27 (tests.test_app_architecture.SwiftAppArchitectureTests.test_complete_native_product_targets_arm64_and_macos_27) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.005s
+
+OK

@@ -1,0 +1,62 @@
+{
+  "scope": "App PVT presentation/preservation; resolved-current-node alias repair",
+  "timestamp_utc": "2026-10-20T23:53:07.609992+00:00",
+  "head": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+  "dirty_status": " M Cargo.lock\n M README.en.md\n M README.md\n M apps/macos/XDRemuxApp/Sources/AppModels.swift\n M apps/macos/XDRemuxApp/Sources/AppStrings.swift\n M apps/macos/XDRemuxApp/Sources/ContentView.swift\n M apps/macos/XDRemuxApp/Sources/RustCLIClient.swift\n M apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift\n M apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift\n M crates/xdremux-cli/src/i18n.rs\n M crates/xdremux-cli/src/lib.rs\n M crates/xdremux-cli/src/validate.rs\n M crates/xdremux-cli/tests/i18n.rs\n M crates/xdremux-engine/src/lib.rs\n M crates/xdremux-runtime/Cargo.toml\n M crates/xdremux-runtime/src/batch.rs\n M crates/xdremux-runtime/src/batch_checkpoint.rs\n M crates/xdremux-runtime/src/lib.rs\n M crates/xdremux-runtime/src/live_photo.rs\n M crates/xdremux-runtime/src/validation.rs\n M docs/architecture.en.md\n M docs/architecture.md\n M docs/cli.en.md\n M docs/cli.md\n M docs/liblivephoto-integration.en.md\n M docs/liblivephoto-integration.md\n?? crates/xdremux-cli/tests/live_photo_pvt.rs\n?? crates/xdremux-runtime/src/live_photo_package.rs\n",
+  "host": "Linux",
+  "swift": null,
+  "xcodebuild": null,
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tests.test_app_architecture",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log": "/workspace/xdremux-audit/app-pvt-static-0.log"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "apps/macos/XDRemuxApp/Sources/AppModels.swift",
+        "apps/macos/XDRemuxApp/Sources/AppStrings.swift",
+        "apps/macos/XDRemuxApp/Sources/ContentView.swift",
+        "apps/macos/XDRemuxApp/Sources/RustCLIClient.swift",
+        "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift",
+        "apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift"
+      ],
+      "exit_code": 0,
+      "log": "/workspace/xdremux-audit/app-pvt-static-1.log"
+    }
+  ],
+  "source_sha256": {
+    "apps/macos/XDRemuxApp/Sources/AppModels.swift": "14328ed8ffbdbeaa0ff8c5247279c7d47ccf35c9d907c07251a85a9caf2ba78a",
+    "apps/macos/XDRemuxApp/Sources/AppStrings.swift": "4c459735e245c741dc8427b5fcf72a0378e175164c9d2ab2f50ce627900d105d",
+    "apps/macos/XDRemuxApp/Sources/ContentView.swift": "00be916a6784472604d08234b2f21e5af505f15a26507c43b2af0e6d5cf7a193",
+    "apps/macos/XDRemuxApp/Sources/RustCLIClient.swift": "dba62e22a3f49559b4a8a2e4376b9c5eeb63f7d82504169e0d8c12afaaf3d8c3",
+    "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift": "7de21ea86929dfcc4173fd234b15e11e42d5ab296c80514dee933c01cac390cc",
+    "apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift": "ce8757d01dcf57c03bda99cea18767b0eb9cd1cdf7f243bd79acf9c1ec199b31"
+  },
+  "model_inventory": {
+    "old_model_tests_retained": 25,
+    "current_model_tests": 30,
+    "new_model_tests": [
+      "testExistingPVTDestinationsAreNeverAdoptedOrReplaced",
+      "testExistingPVTPackagesAreNotScannedOrUsedAsOutputDirectories",
+      "testLivePhotoOutputArgumentsAndMixedQueuePlans",
+      "testPVTChoiceReachesRustWithoutChangingOrdinaryOutput",
+      "testPVTPreviewUsesSourceImage"
+    ],
+    "all_registered_in_custom_main": true,
+    "native_tests_executed": false,
+    "additional_alias_subcases": "ordinary foo.heic symlink to existing.pvt, skip true and false"
+  },
+  "native_build_or_model_tests_executed": false,
+  "committed_head_receipt": false
+}

@@ -1,0 +1,42 @@
+test_iinf_adapter_accepts_v0_and_v1_counts_and_rejects_incomplete_data (tests.test_style_tone_response.StyleToneResponseTests.test_iinf_adapter_accepts_v0_and_v1_counts_and_rejects_incomplete_data) ... ERROR
+test_iinf_adapter_rejects_an_unexpected_source_hash (tests.test_style_tone_response.StyleToneResponseTests.test_iinf_adapter_rejects_an_unexpected_source_hash) ... ERROR
+test_consumer_routes_extraction_through_the_owned_adapter (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_routes_extraction_through_the_owned_adapter) ... FAIL
+
+======================================================================
+ERROR: test_iinf_adapter_accepts_v0_and_v1_counts_and_rejects_incomplete_data (tests.test_style_tone_response.StyleToneResponseTests.test_iinf_adapter_accepts_v0_and_v1_counts_and_rejects_incomplete_data)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 89, in test_iinf_adapter_accepts_v0_and_v1_counts_and_rejects_incomplete_data
+    module, receipt = self.parser_module(research)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 79, in parser_module
+    source, receipt = tone.patched_iinf_parser(research / "tools/heif_dump.py")
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.check_style_tone_response' has no attribute 'patched_iinf_parser'
+
+======================================================================
+ERROR: test_iinf_adapter_rejects_an_unexpected_source_hash (tests.test_style_tone_response.StyleToneResponseTests.test_iinf_adapter_rejects_an_unexpected_source_hash)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 111, in test_iinf_adapter_rejects_an_unexpected_source_hash
+    self.parser_module(root)
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 79, in parser_module
+    source, receipt = tone.patched_iinf_parser(research / "tools/heif_dump.py")
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'scripts.apple.check_style_tone_response' has no attribute 'patched_iinf_parser'
+
+======================================================================
+FAIL: test_consumer_routes_extraction_through_the_owned_adapter (tests.test_style_tone_response.StyleToneResponseTests.test_consumer_routes_extraction_through_the_owned_adapter)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 135, in test_consumer_routes_extraction_through_the_owned_adapter
+    self.assertEqual(receipt["status"], "completed", receipt)
+AssertionError: 'failed' != 'completed'
+- failed
++ completed
+ : {'status': 'failed', 'photos': ['sample.xdremux'], 'tones': [-1.0, -0.75, -0.5, -0.35, -0.15, 0.0, 0.15, 0.35, 0.5, 0.75, 1.0], 'command': ['/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3', '/tmp/tmps1d65w58/consumer/consumer-model/harness/run_tone_sweep.py', '/tmp/tmps1d65w58/out', 'sample.xdremux.heic', '--tones', '-1.0', '-0.75', '-0.5', '-0.35', '-0.15', '0.0', '0.15', '0.35', '0.5', '0.75', '1.0'], 'returncode': 1, 'errors': ['consumer process exited 1', 'consumer sweep receipt missing: /tmp/tmps1d65w58/out/tone-sweep.json'], 'diagnostics': [], 'consumer_script_sha256': '1fd3003918f67fb5eb9614c2787f85130a5adbc6a67cb22812b3535729555307', 'wall_seconds': 0.11659921899990877, 'native_failures': []}
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.130s
+
+FAILED (failures=1, errors=2)

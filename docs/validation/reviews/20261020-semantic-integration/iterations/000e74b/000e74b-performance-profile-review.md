@@ -1,0 +1,11 @@
+# Styles performance: narrower next observation
+
+c379's absolute workload remains failed: median 12.829s exceeds 11.732s. Its paired diagnostic is main12.175517s versus candidate14.176075s, not an alternative acceptance budget. The separately retained read-only review shows a shared cross-job slowdown and an older candidate/main gap; its mechanism is not isolated. Initial load is not proof of host contention. No threshold, baseline, sample count or failure status is changed.
+
+The new HVC1 appender invocation lies inside a 1.836ms assembly stage, while source validation also exists inside other stages. It is incorrect to describe all validation cost as 1.836ms or attribute the whole overage to that new call. The 1.820s scene stage still combines HDR reconstruction, two linear area reductions and subsequent scene work; existing profiles cannot distinguish them.
+
+Commit `000e74b329d7f4f37a60da3523ccec1887e29469` reuses the existing opt-in timer to emit `scene_hdr_reconstruction` and `scene_linear_area_reduction`. Both are nested within `scene_derivation` and must not be added to coarse stage totals. Only the existing extra candidate profile enables the timer. Formal workload and interleaved samples continue to remove inherited profiling and call the actual adapter directly. No gain application, interpolation, floating-point order, resize footprint, solver, metadata, output validation or publication operation changes.
+
+The complete/unique/finite profile parser now requires these details in the fixed default benchmark journey. Existing failure receipts still retain valid prefixes and actual process/CPU/RSS facts. The profile report explicitly records overlapping spans. The 31 focused comparator/design/budget tests passed; the final clean-head Python run is the retained aggregate evidence. Linux does not compile or execute this macOS-only transaction, and no new native timing is claimed here.
+
+The next automatic new-head performance job must still pass the unchanged absolute gate. If it fails, the existing candidate-only profile will separate reconstruction from area reduction; it still cannot establish a baseline stage comparison or alone justify an arithmetic approximation. The c379 failed receipt remains part of the review.

@@ -1,0 +1,10 @@
+{
+  "operation": "Update title and body of existing XDRemux PR71 with current c379 source and fixed v9 evidence links",
+  "target": "https://github.com/21Z121Z1/XDRemux/pull/71",
+  "tool": "github_update_pull_request",
+  "result": "isError=true; full error detail was not retained by the orchestration wrapper",
+  "observed_outcome": "subsequent get_pr_info confirms old title/body and c379 head; metadata write did not execute",
+  "automatic_approval_rejection": "unknown; not asserted",
+  "retry": "not attempted; independent implementation/CI/evidence continued",
+  "observed_at": "2026-10-20T23:28:50.757238+00:00"
+}

@@ -1,0 +1,107 @@
+{
+  "source": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+  "job_url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39514720891/job/118944009773",
+  "conclusion": "FAIL",
+  "raw_log_sha256": "cf606bd0b81a2e25f921f161b4386bd5d3c2a4b7c91a5498d9505ee358dd7035",
+  "budget": {
+    "styles_median_seconds": 12.829,
+    "median_limit_seconds": 11.732,
+    "styles_p95_seconds": 13.5,
+    "p95_limit_seconds": 15.406,
+    "styles_max_rss_mib": 1084.094,
+    "launches": 1
+  },
+  "comparison": {
+    "distinct_revisions": true,
+    "diagnostic_only": true,
+    "summary": {
+      "baseline": {
+        "median_wall_seconds": 12.175516625,
+        "median_user_seconds": 11.09,
+        "median_sys_seconds": 1.68,
+        "max_peak_rss_bytes": 1140948992
+      },
+      "candidate": {
+        "median_wall_seconds": 14.176074833000257,
+        "median_user_seconds": 12.76,
+        "median_sys_seconds": 2.02,
+        "max_peak_rss_bytes": 1136689152
+      },
+      "candidate_over_baseline_median": 1.1643099237277956
+    },
+    "candidate_profile": {
+      "arm": "candidate",
+      "status": "validated",
+      "logs": "candidate-profile",
+      "outside_budget_and_comparison_samples": true,
+      "limits": "One candidate-only diagnostic conversion; no baseline stage comparison.",
+      "wall_seconds": 14.505146791999778,
+      "time_real_seconds": 14.48,
+      "user_seconds": 12.8,
+      "sys_seconds": 2.17,
+      "peak_rss_bytes": 1136721920,
+      "output_bytes": 2894706,
+      "output_sha256": "41b854e57e8954cc04465ee57b195554de8932a0b2af63e4dc3e346f401bb493",
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006599875
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 3.00859775
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.800640833
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.402163625
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.819928584
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.400405
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.457362417
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.30900625
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.0050195
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001836083
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 4.113587333
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.018905958
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.010447042
+        }
+      ]
+    }
+  },
+  "limits": [
+    "actual absolute budget failed; not relabeled noise or passed",
+    "same-runner relative main/candidate cost retained",
+    "candidate-only stage profile does not compare stages to main",
+    "old4b/newc379 different-run observations cannot establish exclusive root cause"
+  ]
+}

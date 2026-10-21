@@ -1,0 +1,40 @@
+{
+  "source_observed": "000e74b329d7f4f37a60da3523ccec1887e29469",
+  "observed_utc": "2026-10-21T00:36:55.207105+00:00",
+  "failures": [
+    {
+      "job": 118965588298,
+      "run": 39521326082,
+      "fault": "PVT resume raw path equality: /private/var versus /var refers to same existing destination",
+      "passed_before_failure": 7,
+      "failed_tests": 1,
+      "repair": "local commit7c7773adcee497a078d64f043f48798581962ff8; real symlink-alias RED on Linux, canonical filesystem identity and every member-byte preservation, all8 PVT tests GREEN; not pushed or natively accepted"
+    },
+    {
+      "job": 118965588063,
+      "run": 39521326078,
+      "fault": "Actual System HEIF fixture conversion now succeeds, then scorer finds0 tone -1 renders. Old measure script directly calls pinned sweep and bypasses owned consumer adapter. Internal extractor first stderr was not exported by this old path; not invented.",
+      "repair": "in progress: reuse same guarded consumer boundary and preserve real failure receipts/filtered stderr, retain strict3-tone native data and score"
+    },
+    {
+      "job": 118965588509,
+      "run": 39521326078,
+      "fault": "All5 Apple reference extractors fail importing heif_standalone because owned runpy launcher did not preserve original script directory on sys.path",
+      "repair": "in progress: exact pinned extractor/helper integration positives/negatives, correct direct-script import behavior, no upstream mutation"
+    },
+    {
+      "job": 118965588272,
+      "run": 39521326147,
+      "fault": "Canonical Rust product tests fail at same PVT path assertion; App build and model steps17/18 explicitly skipped",
+      "repair": "new repaired source must rerun native builds and all30 model calls; no App pass claimed"
+    }
+  ],
+  "performance": "still running; do not push a new source and cancel its observations",
+  "raw_log_sha256": {
+    "000e74b-system-job118965588063.log": "5be63f7062bd8d11431ee2928bf99f111623fad4ff857beaed083e4b667d5acb",
+    "000e74b-macos-portability-job118965588298.log": "cdb11b4d0fed35aa02847feac39678931b04db0ad820ce8b92e4f500e4d1071a",
+    "000e74b-tone-job118965588509.log": "cfd77868d9f7d8c09d5f6c39e9a8da678f46676ab33318a755a437514fa8f46e"
+  },
+  "native_final_acceptance": false,
+  "merge_delete": "not approved or executed"
+}

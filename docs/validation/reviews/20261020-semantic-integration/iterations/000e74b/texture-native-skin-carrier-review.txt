@@ -1,0 +1,86 @@
+Frozen scope
+Only crates/xdremux-heif/src/texture.rs and semantic.rs were edited by this agent.
+texture.rs SHA256: 32fc7756a246ef03c7efcc39a944bc603c9a7f3cd421442869822408300fb939
+semantic.rs SHA256: e035e1239f52f389572cb4de935c5af74403416c223d9c6e31c291ec641cad7b
+Patch SHA256: 5e068fcf2a066e7c0f8b25e38e69ed9f2bb223c076dddc46a89d3354fce5d5ac
+The final source bytes match those used for the final GREEN, clippy and format checks.
+Final focused evidence ran on c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5 plus concurrent authorized dirty owners.
+Root subsequently committed other owners; observed freeze HEAD is 530f3ef1d2901a5380bd38a1d23d733752e655fe.
+The two frozen HEIF files are the only remaining dirty paths. This is not a clean-head/full-workspace receipt.
+No stage, commit, push, dispatch, media upload or external write was performed by this agent.
+
+Actual native observation / producer evidence
+c379aa7-system-job118944009782.log:837 reports at 2026-10-20T23:49:28.5277660Z:
+Rust Texture graph: invalid HEIF: codec must contain exactly one native auxiliary mask.
+Old texture.rs selected every auxl->[codec primary] as a mask without inspecting auxC.
+Sources/XDTextureNative/infer.m:218-234 explicitly encodes each measured L8 mask using ImageIO's
+SemanticSegmentationSkinMatte carrier and reads that recognized auxiliary back.
+prepare.m:22-31 creates an SDR/sRGB RGBA8 working PNG; infer.m uses its CGImage as the codec primary.
+Additional codec alpha is a supported inference from that producer path, not a measured fact from the c379 log.
+No original native codec graph or media payload was available locally or uploaded.
+
+Implementation and unchanged contracts
+Texture identifies exactly one native 2019 skin auxC carrier with empty subtype and one unambiguous primary auxl.
+It separately recognizes at most one known HEVC/MIAF alpha background graph belonging to the disposable codec
+primary. That alpha's subtype remains opaque; no SEI is decoded or inferred from a length/envelope label.
+Neither temporary codec primary nor its alpha is imported as a Texture mask. The original product source is
+separate and all its resources remain preserved.
+Unknown/empty auxC roles, malformed version/flags/termination, nonempty skin subtype, multiple skin/alpha,
+duplicate auxl or item records, foreign primary attachments, unresolved references, derived hvc1, missing/local
+payload violations and overlapping primary/alpha/mask graphs fail closed; the exactly-one mask invariant remains.
+The existing codec importer's index-zero no-property handling remains compatible.
+semantic.rs changes only three helper visibilities to pub(crate): auxiliary_type_bytes, is_alpha_type,
+and coded_image_items. The third signature is rustfmt-wrapped; no implementation or existing call changed.
+Texture actually reuses all three strict helpers; semantic alpha/subtype and reversed-tmap contracts are unchanged.
+The existing native skin-to-final-Texture-role mapping, FSINC version, native hair metadata copy, SDK/producer
+operations, capture/tuning facts, Texture property limit, final native readback and runtime publication gates
+were not changed.
+
+Bounded diagnosis
+Failures retain codec primary/item IDs, known hvc1/grid/mime labels, fixed skin/alpha/unknown auxC role labels,
+subtype lengths and reference IDs. Auxiliary roots are shown before other codec image items.
+Limits are 16 resources, 32 reference entries and 8 targets per reference, with omission markers.
+No unknown URI, subtype bytes, media, metadata, path or capture value is included.
+The privacy regression uses SECRET sentinel strings and an oversized graph; diagnostic length stays under 8192.
+
+Behavioral evidence
+RED command: cargo test --locked -p xdremux-heif --lib native_skin_carrier -- --nocapture
+texture-native-skin-carrier-red.log, exit101, SHA256:
+1b4ad1e46e462ae4794a64de52a1fd2fefb869528e2bee9488e72f192e9770c8
+Both actual intended failures were observed: skin+alpha rejected by old untyped count, and alpha-only accepted
+as a mask by old code. A preliminary fixture compile error was corrected before this retained actual RED run.
+
+GREEN command: cargo test --locked -p xdremux-heif --all-targets
+texture-native-skin-carrier-green.log, exit0: 61 unit + 2 fail-closed integration tests; example target 0 tests.
+SHA256: d7837cdf1b3ef0a2aaa7b1aad5d51fe6050a0535ca83a4441de36265b68606f9
+Public assembler coverage includes direct/GRID skin masks, direct/GRID codec primary, both known alpha URIs,
+opaque codec-alpha subtype, strict negative graph/property cases, and bounded diagnostic privacy.
+The independent source-preservation regression starts with source alpha + direct ISO gain + tmap resources,
+uses validate_gain_map_structure before/after, and compares every original payload, raw associated property,
+essential flag/order and reference prefix. It checks imported GRID coded payload order explicitly.
+Synthetic compressed bytes are not decoded; this does not claim native codec or end-to-end consumer success.
+
+CLIPPY command: cargo clippy --locked -p xdremux-heif --all-targets -- --deny warnings
+texture-native-skin-carrier-clippy.log, exit0/1.09s, SHA256:
+8116eaa2a6ac9dfe455506dddb2afb88d0ae45cbec19d183cebc5b71c727f4c9
+The temporary texture.rs collapsible_if warning reported during concurrent PVT work was fixed.
+FORMAT: rustfmt --edition 2021 --check crates/xdremux-heif/src/texture.rs crates/xdremux-heif/src/semantic.rs
+texture-native-skin-carrier-rustfmt.log, exit0, empty-log SHA256:
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+DIFF: git diff --check on those two files, exit0.
+
+Cargo environment from /workspace/XDRemux-integration:
+CARGO_TARGET_DIR=/workspace/XDRemux-integration/target
+RUSTUP_HOME=/tmp/xdremux-toolchain/rustup CARGO_HOME=/tmp/xdremux-toolchain/cargo
+PATH=/tmp/xdremux-toolchain/cargo/bin:$PATH
+PKG_CONFIG_PATH=/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu/pkgconfig
+LIBHEIF_PLUGIN_PATH=/tmp/xdremux-toolchain/heif-dev/usr/lib/x86_64-linux-gnu/libheif/plugins
+CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2
+
+Author review / remaining acceptance
+The scoped implementation is frozen and ready for root's exact-scope commit; root reported no blocking production
+review finding. No further source edits or tests are pending from this agent.
+The original c379 codec's extra auxiliary identity remains unobserved. A new committed SHA must run the real
+System HEIF Styles/Texture fixture and full native output consumer gates. If it fails, the new bounded codec
+summary can establish actual roles/relationships without media. Root owns clean-head workspace, native,
+performance and publication acceptance. Existing successful jobs for c379 do not validate this new patch.

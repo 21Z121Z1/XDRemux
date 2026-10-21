@@ -1,0 +1,17 @@
+[package]
+name = "xdremux-tone-iinf-probe"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+members = ["crates/xdremux-format", "crates/xdremux-heif"]
+
+[workspace.package]
+edition = "2024"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+xdremux-format = { path = "crates/xdremux-format" }
+xdremux-heif = { path = "crates/xdremux-heif" }

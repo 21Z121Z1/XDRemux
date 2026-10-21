@@ -1,0 +1,7 @@
+{
+  "command": "validate",
+  "error": "Live Photo pair validation: still declares an Apple ContentIdentifier but sibling movie is missing: /tmp/xdremux-verify-work-og9tswdf/unwrapped/converted-pvt.mov",
+  "input": "/tmp/xdremux-verify-work-og9tswdf/unwrapped/converted-pvt.heic",
+  "schema_version": 1,
+  "valid": false
+}

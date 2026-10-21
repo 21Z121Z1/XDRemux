@@ -1,0 +1,10 @@
+{
+  "repository": "21Z121Z1/XDRemux",
+  "captured_at": "2026-10-21T00:14:15.012928+00:00",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/711213c",
+  "head": "711213c808cf75d58e3f5b1ebc0b5d5b1567e051",
+  "tree": "580de1437a6106adbea2c361a45e8011f60d24d4",
+  "restore": "remote fetched; exact commit/tree matched; full fsck exit0",
+  "restore_log": "integration-restore-711213c.log",
+  "validation": "frozen scoped Rust/CLI/App/HEIF evidence; not final clean-head acceptance. Source PR branch remains c379; Tone compatibility repair in progress. No merge/delete."
+}

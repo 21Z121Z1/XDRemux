@@ -1,0 +1,3 @@
+ M .agents/skills/xdremux-verify/features/motion-photo.md
+ M crates/xdremux-heif/src/semantic.rs
+ M crates/xdremux-heif/src/texture.rs

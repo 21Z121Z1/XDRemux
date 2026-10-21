@@ -1,0 +1,16 @@
+{
+  "command": "validate",
+  "details": {
+    "kind": "live-photo",
+    "value": {
+      "content_identifier": "E7418863-B1EE-4296-8CD5-E319F4C7911B",
+      "image": "/tmp/xdremux-verify-work-og9tswdf/converted.heic",
+      "input": "/tmp/xdremux-verify-work-og9tswdf/converted.mov",
+      "still_time_seconds": 1.540401,
+      "video": "/tmp/xdremux-verify-work-og9tswdf/converted.mov"
+    }
+  },
+  "kind": "live-photo",
+  "schema_version": 1,
+  "valid": true
+}

@@ -1,0 +1,22 @@
+{
+  "state": "FROZEN_FOR_PARENT_REVIEW_UNCOMMITTED",
+  "revision": "resolved-current-node alias repair",
+  "native_build_or_model_tests_executed": false,
+  "head": "c379aa7c4d1f6fcad8d2893837ee20e4ae7dd1d5",
+  "source_sha256": {
+    "apps/macos/XDRemuxApp/Sources/AppModels.swift": "14328ed8ffbdbeaa0ff8c5247279c7d47ccf35c9d907c07251a85a9caf2ba78a",
+    "apps/macos/XDRemuxApp/Sources/AppStrings.swift": "4c459735e245c741dc8427b5fcf72a0378e175164c9d2ab2f50ce627900d105d",
+    "apps/macos/XDRemuxApp/Sources/ContentView.swift": "00be916a6784472604d08234b2f21e5af505f15a26507c43b2af0e6d5cf7a193",
+    "apps/macos/XDRemuxApp/Sources/RustCLIClient.swift": "dba62e22a3f49559b4a8a2e4376b9c5eeb63f7d82504169e0d8c12afaaf3d8c3",
+    "apps/macos/XDRemuxApp/Sources/XDRemuxViewModel.swift": "7de21ea86929dfcc4173fd234b15e11e42d5ab296c80514dee933c01cac390cc",
+    "apps/macos/XDRemuxApp/Tests/XDRemuxAppModelTests.swift": "ce8757d01dcf57c03bda99cea18767b0eb9cd1cdf7f243bd79acf9c1ec199b31"
+  },
+  "artifact_sha256": {
+    "app-pvt-verification.json": "4c8c0cc382b98fa8ccd10d1542a0c1aa78137259d9bb4c3f5978c209bdb81c0e",
+    "app-pvt-static-0.log": "5376282d1790dd9c1d3dae7873eccda4c9da35b1985dbd9236dc5533ab9e0c55",
+    "app-pvt-static-1.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "app-pvt-model-test-inventory.json": "f990347253b497d31d2adaaa98954893a8b87b86270f3bb658a67e80308f9c8d",
+    "app-pvt-change.patch": "4a23bb44e80cbcedbf29dfb245214c01e8d9d4ce62fb02c848d40350f2967c5a",
+    "app-pvt-review.md": "21b664405a67d5606cdf2f8202f70007ef4313cdc4fb965f30ef743e4479db13"
+  }
+}

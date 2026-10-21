@@ -1,0 +1,138 @@
+[
+  {
+    "name": "source-head",
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "source-status",
+    "command": [
+      "git",
+      "status",
+      "--porcelain"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "source-diff",
+    "command": [
+      "git",
+      "diff",
+      "HEAD",
+      "--binary"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "help",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "--help"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "inspect",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "inspect",
+      "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "convert",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "convert",
+      "--input",
+      "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+      "--output",
+      "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-r4o75_17/converted.heic"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "validate-still",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "validate",
+      "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-r4o75_17/converted.heic",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "validate-movie",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "validate",
+      "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-r4o75_17/converted.mov",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "convert-pvt",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "convert",
+      "--input",
+      "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+      "--output",
+      "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-r4o75_17/converted-pvt.pvt",
+      "--live-photo-output",
+      "pvt"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "validate-pvt",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "validate",
+      "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-r4o75_17/converted-pvt.pvt",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "validate-unwrapped-heic",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "validate",
+      "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-r4o75_17/unwrapped/converted-pvt.heic",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "validate-unwrapped-mov",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "validate",
+      "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-r4o75_17/unwrapped/converted-pvt.mov",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "duplicate-pvt",
+    "command": [
+      "/workspace/XDRemux-integration/target/debug/xdremux",
+      "convert",
+      "--input",
+      "/workspace/XDRemux-integration/fixtures/motion-photo/samsung/heif-ultrahdr-01.heic",
+      "--output",
+      "/workspace/xdremux-audit/python-tmp-4b04fb3/xdremux-verify-work-r4o75_17/converted-pvt.pvt",
+      "--live-photo-output",
+      "pvt"
+    ],
+    "exit_code": 1
+  }
+]

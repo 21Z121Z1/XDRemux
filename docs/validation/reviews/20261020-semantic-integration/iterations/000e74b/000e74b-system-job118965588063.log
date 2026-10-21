@@ -1,0 +1,1032 @@
+﻿2026-10-21T00:26:29.6589590Z Current runner version: '2.338.0'
+2026-10-21T00:26:29.6638370Z ##[group]Runner Image Provisioner
+2026-10-21T00:26:29.6640450Z Hosted Compute Agent
+2026-10-21T00:26:29.6641810Z Version: 20261006.597
+2026-10-21T00:26:29.6643050Z Commit: c696a59e4a9ffbc6a6203385bd1b2a10e87b1c9c
+2026-10-21T00:26:29.6644340Z Build Date: 2026-10-06T21:39:28Z
+2026-10-21T00:26:29.6645510Z Worker ID: {03056f62-e068-4cf4-af17-2842a5d04bc4}
+2026-10-21T00:26:29.6646730Z Region: westus
+2026-10-21T00:26:29.6647980Z Cloud: MacCloud
+2026-10-21T00:26:29.6649200Z ##[endgroup]
+2026-10-21T00:26:29.6652880Z ##[group]Operating System
+2026-10-21T00:26:29.6654260Z macOS
+2026-10-21T00:26:29.6655820Z 27.0.1
+2026-10-21T00:26:29.6656900Z 26A434
+2026-10-21T00:26:29.6658050Z ##[endgroup]
+2026-10-21T00:26:29.6659160Z ##[group]Runner Image
+2026-10-21T00:26:29.6660230Z Image: xcode-27-arm64
+2026-10-21T00:26:29.6661210Z Version: 20261012.0260.1
+2026-10-21T00:26:29.6664070Z Included Software: https://github.com/actions/runner-images/blob/xcode-27-arm64/20261012.0260/images/macos/xcode-27-arm64-Readme.md
+2026-10-21T00:26:29.6667360Z Image Release: https://github.com/actions/runner-images/releases/tag/xcode-27-arm64%2F20261012.0260
+2026-10-21T00:26:29.6669470Z ##[endgroup]
+2026-10-21T00:26:29.6672120Z ##[group]GITHUB_TOKEN Permissions
+2026-10-21T00:26:29.6677730Z Contents: read
+2026-10-21T00:26:29.6678780Z Metadata: read
+2026-10-21T00:26:29.6680240Z ##[endgroup]
+2026-10-21T00:26:29.6684790Z Secret source: Actions
+2026-10-21T00:26:29.6686540Z Cache mode: write
+2026-10-21T00:26:29.6688180Z Prepare workflow directory
+2026-10-21T00:26:29.7019710Z Prepare all required actions
+2026-10-21T00:26:29.7078600Z Getting action download info
+2026-10-21T00:26:30.1888450Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-10-21T00:26:30.5623280Z Download action repository 'actions-rust-lang/setup-rust-toolchain@v2' (SHA:ecabd13d1c56bd1345c230e542e9144811ad706f)
+2026-10-21T00:26:30.9668880Z Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+2026-10-21T00:26:31.6129740Z Getting action download info
+2026-10-21T00:26:31.7267500Z Download action repository 'Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6' (SHA:6323deb102c322ba6fcbdcafc7e3dddab59af2b6)
+2026-10-21T00:26:32.2723090Z Complete job name: system-heif-hdr-api
+2026-10-21T00:26:32.3408660Z ##[group]Run actions/checkout@v7
+2026-10-21T00:26:32.3409820Z with:
+2026-10-21T00:26:32.3410220Z   ref: 000e74b329d7f4f37a60da3523ccec1887e29469
+2026-10-21T00:26:32.3410700Z   persist-credentials: false
+2026-10-21T00:26:32.3411110Z   repository: 21Z121Z1/XDRemux
+2026-10-21T00:26:32.3414370Z   token: ***
+2026-10-21T00:26:32.3414720Z   ssh-strict: true
+2026-10-21T00:26:32.3415080Z   ssh-user: git
+2026-10-21T00:26:32.3415420Z   clean: true
+2026-10-21T00:26:32.3415780Z   sparse-checkout-cone-mode: true
+2026-10-21T00:26:32.3416190Z   fetch-depth: 1
+2026-10-21T00:26:32.3416540Z   fetch-tags: false
+2026-10-21T00:26:32.3416900Z   show-progress: true
+2026-10-21T00:26:32.3417590Z   lfs: false
+2026-10-21T00:26:32.3417950Z   submodules: false
+2026-10-21T00:26:32.3418300Z   set-safe-directory: true
+2026-10-21T00:26:32.3418710Z   allow-unsafe-pr-checkout: false
+2026-10-21T00:26:32.3419400Z ##[endgroup]
+2026-10-21T00:26:32.9493720Z Syncing repository: 21Z121Z1/XDRemux
+2026-10-21T00:26:32.9496160Z ##[group]Getting Git version info
+2026-10-21T00:26:32.9574090Z Working directory is '/Users/runner/work/XDRemux/XDRemux'
+2026-10-21T00:26:32.9578200Z [command]/opt/homebrew/bin/git version
+2026-10-21T00:26:33.0046420Z git version 2.56.0
+2026-10-21T00:26:33.0085670Z ##[endgroup]
+2026-10-21T00:26:33.0110720Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/60cae4b0-a74a-4e36-88a7-5808c27bb304/.gitconfig'
+2026-10-21T00:26:33.0117810Z Temporarily overriding HOME='/Users/runner/work/_temp/60cae4b0-a74a-4e36-88a7-5808c27bb304' before making global git config changes
+2026-10-21T00:26:33.0125790Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T00:26:33.0132870Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-21T00:26:33.0287700Z Deleting the contents of '/Users/runner/work/XDRemux/XDRemux'
+2026-10-21T00:26:33.0293440Z ##[group]Determining repository object format
+2026-10-21T00:26:33.0298890Z ##[endgroup]
+2026-10-21T00:26:33.0302790Z ##[group]Initializing the repository
+2026-10-21T00:26:33.0307890Z [command]/opt/homebrew/bin/git init /Users/runner/work/XDRemux/XDRemux
+2026-10-21T00:26:33.0649590Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-21T00:26:33.0672930Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-21T00:26:33.0680760Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-21T00:26:33.0699950Z hint: call:
+2026-10-21T00:26:33.0705190Z hint:
+2026-10-21T00:26:33.0713980Z hint: 	git config --global init.defaultBranch <name>
+2026-10-21T00:26:33.0715790Z hint:
+2026-10-21T00:26:33.0718310Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-21T00:26:33.0720600Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-21T00:26:33.0823590Z hint:
+2026-10-21T00:26:33.0868650Z hint: 	git branch -m <name>
+2026-10-21T00:26:33.0870010Z hint:
+2026-10-21T00:26:33.0871340Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-21T00:26:33.0974600Z Initialized empty Git repository in /Users/runner/work/XDRemux/XDRemux/.git/
+2026-10-21T00:26:33.1009220Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/XDRemux
+2026-10-21T00:26:33.1053370Z ##[endgroup]
+2026-10-21T00:26:33.1054900Z ##[group]Disabling automatic garbage collection
+2026-10-21T00:26:33.1056850Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-21T00:26:33.1060550Z ##[endgroup]
+2026-10-21T00:26:33.1063970Z ##[group]Setting up auth
+2026-10-21T00:26:33.1067460Z Removing SSH command configuration
+2026-10-21T00:26:33.1139560Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T00:26:33.1147120Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T00:26:33.2682260Z Removing HTTP extra header
+2026-10-21T00:26:33.2690370Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T00:26:33.2783220Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T00:26:33.4002820Z Removing includeIf entries pointing to credentials config files
+2026-10-21T00:26:33.4004770Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T00:26:33.4096000Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T00:26:33.5342410Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-21T00:26:33.5442550Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path /Users/runner/work/_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config
+2026-10-21T00:26:33.5526530Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config
+2026-10-21T00:26:33.5609500Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config
+2026-10-21T00:26:33.5690140Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config
+2026-10-21T00:26:33.5803800Z ##[endgroup]
+2026-10-21T00:26:33.5805040Z ##[group]Fetching the repository
+2026-10-21T00:26:33.5813320Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 000e74b329d7f4f37a60da3523ccec1887e29469
+2026-10-21T00:26:39.4558450Z From https://github.com/21Z121Z1/XDRemux
+2026-10-21T00:26:39.4561370Z  * branch            000e74b329d7f4f37a60da3523ccec1887e29469 -> FETCH_HEAD
+2026-10-21T00:26:39.4579840Z [command]/opt/homebrew/bin/git rev-parse --verify --quiet 000e74b329d7f4f37a60da3523ccec1887e29469^{object}
+2026-10-21T00:26:39.4699810Z 000e74b329d7f4f37a60da3523ccec1887e29469
+2026-10-21T00:26:39.4707890Z ##[endgroup]
+2026-10-21T00:26:39.4709430Z ##[group]Determining the checkout info
+2026-10-21T00:26:39.4711440Z ##[endgroup]
+2026-10-21T00:26:39.4718390Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-21T00:26:39.4842390Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-21T00:26:39.4941280Z ##[group]Checking out the ref
+2026-10-21T00:26:39.4944070Z [command]/opt/homebrew/bin/git checkout --progress --force 000e74b329d7f4f37a60da3523ccec1887e29469
+2026-10-21T00:26:40.5316760Z HEAD is now at 000e74b Separate HDR reconstruction and area reduction in opt-in Styles profiles
+2026-10-21T00:26:40.5949990Z ##[endgroup]
+2026-10-21T00:26:40.6287240Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-21T00:26:40.6399910Z 000e74b329d7f4f37a60da3523ccec1887e29469
+2026-10-21T00:26:40.6712950Z ##[group]Removing auth
+2026-10-21T00:26:40.6812930Z Removing SSH command configuration
+2026-10-21T00:26:40.6913460Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T00:26:40.7225440Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T00:26:40.8423610Z Removing HTTP extra header
+2026-10-21T00:26:40.8427160Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T00:26:40.8592940Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T00:26:41.0197450Z Removing includeIf entries pointing to credentials config files
+2026-10-21T00:26:41.0199840Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T00:26:41.0286360Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-21T00:26:41.0287700Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-21T00:26:41.0289170Z includeif.gitdir:/github/workspace/.git.path
+2026-10-21T00:26:41.0290120Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-21T00:26:41.0297910Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path
+2026-10-21T00:26:41.0384610Z /Users/runner/work/_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config
+2026-10-21T00:26:41.0399930Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git.path \/Users\/runner\/work\/_temp\/git\-credentials\-615684b8\-0b63\-4dce\-9bbb\-cb070e0b0487\.config
+2026-10-21T00:26:41.0536610Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path
+2026-10-21T00:26:41.0695760Z /Users/runner/work/_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config
+2026-10-21T00:26:41.0719460Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/.git/worktrees/*.path \/Users\/runner\/work\/_temp\/git\-credentials\-615684b8\-0b63\-4dce\-9bbb\-cb070e0b0487\.config
+2026-10-21T00:26:41.0827450Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-10-21T00:26:41.0917510Z /github/runner_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config
+2026-10-21T00:26:41.0921950Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-615684b8\-0b63\-4dce\-9bbb\-cb070e0b0487\.config
+2026-10-21T00:26:41.1088240Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-21T00:26:41.1159690Z /github/runner_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config
+2026-10-21T00:26:41.1184240Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-615684b8\-0b63\-4dce\-9bbb\-cb070e0b0487\.config
+2026-10-21T00:26:41.1280840Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T00:26:41.2493500Z Removing credentials config '/Users/runner/work/_temp/git-credentials-615684b8-0b63-4dce-9bbb-cb070e0b0487.config'
+2026-10-21T00:26:41.2510260Z ##[endgroup]
+2026-10-21T00:26:41.2878670Z ##[group]Run bash scripts/apple/probe_system_heif_hdr_api.sh "$GITHUB_WORKSPACE/artifacts/system-heif-hdr-api"
+2026-10-21T00:26:41.2879990Z [36;1mbash scripts/apple/probe_system_heif_hdr_api.sh "$GITHUB_WORKSPACE/artifacts/system-heif-hdr-api"[0m
+2026-10-21T00:26:41.2992200Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:26:41.2995840Z ##[endgroup]
+2026-10-21T00:26:47.2085050Z matched 5952 header lines
+2026-10-21T00:27:11.9184780Z compiled 34 candidate symbols
+2026-10-21T00:27:12.0220850Z methods writeHEIF10RepresentationOfImage, writeHEIFRepresentationOfImage, writeJPEGRepresentationOfImage, writeOpenEXRRepresentationOfImage, writePNGRepresentationOfImage, writeTIFFRepresentationOfImage
+2026-10-21T00:27:12.0629230Z ##[group]Run brew install libheif
+2026-10-21T00:27:12.0631440Z [36;1mbrew install libheif[0m
+2026-10-21T00:27:12.0632920Z [36;1mecho "PKG_CONFIG_PATH=$(brew --prefix libheif)/lib/pkgconfig" >> "$GITHUB_ENV"[0m
+2026-10-21T00:27:12.0634160Z [36;1mpython3 -m venv "$RUNNER_TEMP/tone-venv"[0m
+2026-10-21T00:27:12.0639330Z [36;1m"$RUNNER_TEMP/tone-venv/bin/python" -m pip install numpy pillow[0m
+2026-10-21T00:27:12.0640800Z [36;1mecho "$RUNNER_TEMP/tone-venv/bin" >> "$GITHUB_PATH"[0m
+2026-10-21T00:27:12.0720820Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:12.0721370Z ##[endgroup]
+2026-10-21T00:27:15.9448650Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-21T00:27:15.9482940Z ✔︎ Bottle Manifest libheif (1.23.6)
+2026-10-21T00:27:16.1202490Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-21T00:27:16.1203000Z libheif 1.23.6
+2026-10-21T00:27:16.1206730Z [34m==>[0m [1mWould install 4 dependencies for libheif:[0m
+2026-10-21T00:27:16.1207380Z libvmaf
+2026-10-21T00:27:16.1207620Z aom
+2026-10-21T00:27:16.1207920Z libde265
+2026-10-21T00:27:16.1209180Z x265
+2026-10-21T00:27:16.2710740Z [32m==>[0m [1mFetching downloads for: [32mlibheif[39m[0m
+2026-10-21T00:27:16.4663530Z ✔︎ Bottle Manifest libvmaf (3.2.1)
+2026-10-21T00:27:16.5051090Z ✔︎ Bottle Manifest aom (3.15.2)
+2026-10-21T00:27:16.5161150Z ✔︎ Bottle Manifest libde265 (1.1.3)
+2026-10-21T00:27:16.7441490Z ✔︎ Bottle Manifest x265 (4.3)
+2026-10-21T00:27:19.1112920Z ✔︎ Bottle libheif (1.23.6)
+2026-10-21T00:27:19.1315080Z ✔︎ Bottle aom (3.15.2)
+2026-10-21T00:27:19.1381470Z ✔︎ Bottle libvmaf (3.2.1)
+2026-10-21T00:27:19.2108550Z ✔︎ Bottle x265 (4.3)
+2026-10-21T00:27:19.2527460Z ✔︎ Bottle libde265 (1.1.3)
+2026-10-21T00:27:19.3127970Z [32m==>[0m [1mInstalling dependencies for libheif:[0m [32mlibvmaf[39m, [32maom[39m, [32mlibde265[39m and [32mx265[39m[0m
+2026-10-21T00:27:19.3131240Z [32m==>[0m [1mInstalling libheif dependency: [32mlibvmaf[39m (3.2.1)[0m
+2026-10-21T00:27:19.3220910Z [34m==>[0m [1mPouring libvmaf--3.2.1.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:27:20.7470200Z 🍺  /opt/homebrew/Cellar/libvmaf/3.2.1: 243 files, 8.2MB
+2026-10-21T00:27:20.7482060Z [32m==>[0m [1mInstalling libheif dependency: [32maom[39m (3.15.2)[0m
+2026-10-21T00:27:20.7847510Z [34m==>[0m [1mPouring aom--3.15.2.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:27:22.0316000Z 🍺  /opt/homebrew/Cellar/aom/3.15.2: 30 files, 11.3MB
+2026-10-21T00:27:22.0319330Z [32m==>[0m [1mInstalling libheif dependency: [32mlibde265[39m (1.1.3)[0m
+2026-10-21T00:27:22.0358190Z [34m==>[0m [1mPouring libde265--1.1.3.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:27:23.1665220Z 🍺  /opt/homebrew/Cellar/libde265/1.1.3: 18 files, 436.6KB
+2026-10-21T00:27:23.1667470Z [32m==>[0m [1mInstalling libheif dependency: [32mx265[39m (4.3)[0m
+2026-10-21T00:27:23.1701740Z [34m==>[0m [1mPouring x265--4.3.arm64_golden_gate.bottle.1.tar.gz[0m
+2026-10-21T00:27:24.4318690Z 🍺  /opt/homebrew/Cellar/x265/4.3: 12 files, 17.3MB
+2026-10-21T00:27:24.4321730Z [32m==>[0m [1mInstalling [32mlibheif[39m[0m
+2026-10-21T00:27:24.4324160Z [34m==>[0m [1mPouring libheif--1.23.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:27:25.7858690Z 🍺  /opt/homebrew/Cellar/libheif/1.23.6: 53 files, 9.1MB
+2026-10-21T00:27:25.7863500Z [32m==>[0m [1mCaveats[0m
+2026-10-21T00:27:25.7864670Z [34m==>[0m [1mlibheif[0m
+2026-10-21T00:27:25.7865290Z Additional codecs can be enabled by `brew install libheif-plugins`
+2026-10-21T00:27:30.7769590Z Collecting numpy
+2026-10-21T00:27:30.8761590Z   Downloading numpy-2.5.4-cp315-cp315-macosx_14_0_arm64.whl.metadata (6.6 kB)
+2026-10-21T00:27:31.0482270Z Collecting pillow
+2026-10-21T00:27:31.0747300Z   Downloading pillow-13.0.0-cp315-cp315-macosx_11_0_arm64.whl.metadata (9.1 kB)
+2026-10-21T00:27:31.1116180Z Downloading numpy-2.5.4-cp315-cp315-macosx_14_0_arm64.whl (5.5 MB)
+2026-10-21T00:27:31.2957650Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.5/5.5 MB 39.6 MB/s  0:00:00
+2026-10-21T00:27:31.3337070Z Downloading pillow-13.0.0-cp315-cp315-macosx_11_0_arm64.whl (4.9 MB)
+2026-10-21T00:27:31.4083490Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.9/4.9 MB 64.6 MB/s  0:00:00
+2026-10-21T00:27:31.4484210Z Installing collected packages: pillow, numpy
+2026-10-21T00:27:35.0181330Z 
+2026-10-21T00:27:35.0450820Z 
+2026-10-21T00:27:35.0451410Z Successfully installed numpy-2.5.4 pillow-13.0.0
+2026-10-21T00:27:35.0554710Z [notice] A new release of pip is available: 26.2.1 -> 26.2.2
+2026-10-21T00:27:35.0657410Z [notice] To update, run: /Users/runner/work/_temp/tone-venv/bin/python -m pip install --upgrade pip
+2026-10-21T00:27:35.2967920Z ##[group]Run actions-rust-lang/setup-rust-toolchain@v2
+2026-10-21T00:27:35.2968290Z with:
+2026-10-21T00:27:35.2968440Z   toolchain: stable
+2026-10-21T00:27:35.2968590Z   build-warnings: deny
+2026-10-21T00:27:35.2968780Z   cache: true
+2026-10-21T00:27:35.2969030Z   cache-on-failure: true
+2026-10-21T00:27:35.2969260Z   cache-bin: true
+2026-10-21T00:27:35.2969500Z   cache-provider: github
+2026-10-21T00:27:35.2969780Z   cache-all-crates: false
+2026-10-21T00:27:35.2969960Z   cache-workspace-crates: false
+2026-10-21T00:27:35.2970270Z   cache-save-if: true
+2026-10-21T00:27:35.2970420Z   cache-targets: true
+2026-10-21T00:27:35.2970610Z   matcher: true
+2026-10-21T00:27:35.2970760Z   override: true
+2026-10-21T00:27:35.2970890Z env:
+2026-10-21T00:27:35.2971070Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:35.2971320Z ##[endgroup]
+2026-10-21T00:27:35.3044220Z ##[start-action display=Unbork mac;id=__actions-rust-lang_setup-rust-toolchain.__run]
+2026-10-21T00:27:35.3113930Z ##[group]Run brew install bash
+2026-10-21T00:27:35.3114190Z [36;1mbrew install bash[0m
+2026-10-21T00:27:35.3208730Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:35.3209010Z env:
+2026-10-21T00:27:35.3209880Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:35.3210190Z ##[endgroup]
+2026-10-21T00:27:37.2161270Z [32m==>[0m [1mDownloading bottle manifests[0m
+2026-10-21T00:27:37.2263780Z ✔︎ Bottle Manifest bash (5.3.20)
+2026-10-21T00:27:37.3067630Z [34m==>[0m [1mWould install 1 formula:[0m
+2026-10-21T00:27:37.3168940Z bash 5.3.20
+2026-10-21T00:27:37.3178740Z [32m==>[0m [1mFetching downloads for: [32mbash[39m[0m
+2026-10-21T00:27:37.3274520Z [34m==>[0m [1mWould install 1 dependency for bash:[0m
+2026-10-21T00:27:37.3375820Z ncurses
+2026-10-21T00:27:37.5735070Z ✔︎ Bottle Manifest ncurses (6.6)
+2026-10-21T00:27:39.0555550Z ✔︎ Bottle bash (5.3.20)
+2026-10-21T00:27:39.6664020Z ✔︎ Bottle ncurses (6.6)
+2026-10-21T00:27:39.6781790Z [32m==>[0m [1mInstalling bash dependency: [32mncurses[39m (6.6)[0m
+2026-10-21T00:27:39.6802140Z [34m==>[0m [1mPouring ncurses--6.6.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:27:41.6816290Z 🍺  /opt/homebrew/Cellar/ncurses/6.6: 4,086 files, 10.3MB
+2026-10-21T00:27:41.6824700Z [32m==>[0m [1mInstalling [32mbash[39m[0m
+2026-10-21T00:27:41.6825930Z [34m==>[0m [1mPouring bash--5.3.20.arm64_golden_gate.bottle.tar.gz[0m
+2026-10-21T00:27:42.8702410Z 🍺  /opt/homebrew/Cellar/bash/5.3.20: 172 files, 13.1MB
+2026-10-21T00:27:42.8708500Z [32m==>[0m [1mCaveats[0m
+2026-10-21T00:27:42.8708850Z [34m==>[0m [1mbash[0m
+2026-10-21T00:27:42.8709450Z DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/lib/bash:/opt/local/lib/bash:/usr/pkg/lib/bash:/opt/pkg/lib/bash:.
+2026-10-21T00:27:42.8801980Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=7575]
+2026-10-21T00:27:42.8828070Z ##[start-action display=Run : construct rustup command line;id=__actions-rust-lang_setup-rust-toolchain.flags]
+2026-10-21T00:27:42.8905280Z ##[group]Run : construct rustup command line
+2026-10-21T00:27:42.8905570Z [36;1m: construct rustup command line[0m
+2026-10-21T00:27:42.8905990Z [36;1mecho "targets=$(for t in ${_srt_targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:27:42.8906550Z [36;1mecho "components=$(for c in ${_srt_components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:27:42.8906950Z [36;1mecho "downgrade=" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:27:42.8920600Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:42.8920910Z env:
+2026-10-21T00:27:42.8921120Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:42.8921370Z   _srt_targets: 
+2026-10-21T00:27:42.8921540Z   _srt_components: 
+2026-10-21T00:27:42.8921700Z ##[endgroup]
+2026-10-21T00:27:42.9368230Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.flags;outcome=success;conclusion=success;duration_ms=53]
+2026-10-21T00:27:42.9372590Z ##[start-action display=Setting Environment Variables;id=__actions-rust-lang_setup-rust-toolchain.__run_2]
+2026-10-21T00:27:42.9393080Z ##[group]Run if [[ ! -v CARGO_INCREMENTAL ]]; then
+2026-10-21T00:27:42.9393440Z [36;1mif [[ ! -v CARGO_INCREMENTAL ]]; then[0m
+2026-10-21T00:27:42.9393700Z [36;1m  echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV[0m
+2026-10-21T00:27:42.9393940Z [36;1mfi[0m
+2026-10-21T00:27:42.9394130Z [36;1mif [[ ! -v CARGO_PROFILE_DEV_DEBUG ]]; then[0m
+2026-10-21T00:27:42.9394430Z [36;1m  echo "CARGO_PROFILE_DEV_DEBUG=0" >> $GITHUB_ENV[0m
+2026-10-21T00:27:42.9394690Z [36;1mfi[0m
+2026-10-21T00:27:42.9394860Z [36;1mif [[ ! -v CARGO_TERM_COLOR ]]; then[0m
+2026-10-21T00:27:42.9395130Z [36;1m  echo "CARGO_TERM_COLOR=always" >> $GITHUB_ENV[0m
+2026-10-21T00:27:42.9395360Z [36;1mfi[0m
+2026-10-21T00:27:42.9395540Z [36;1mif [[ ! -v RUST_BACKTRACE ]]; then[0m
+2026-10-21T00:27:42.9395800Z [36;1m  echo "RUST_BACKTRACE=short" >> $GITHUB_ENV[0m
+2026-10-21T00:27:42.9396040Z [36;1mfi[0m
+2026-10-21T00:27:42.9396250Z [36;1mif [[ ( ! -v RUSTFLAGS ) && $_srt_NEW_RUSTFLAGS != "" ]]; then[0m
+2026-10-21T00:27:42.9396600Z [36;1m  echo "RUSTFLAGS=$_srt_NEW_RUSTFLAGS" >> $GITHUB_ENV[0m
+2026-10-21T00:27:42.9397280Z [36;1mfi[0m
+2026-10-21T00:27:42.9397550Z [36;1mif [[ ( ! -v CARGO_BUILD_WARNINGS ) && $_srt_CARGO_BUILD_WARNINGS != "" ]]; then[0m
+2026-10-21T00:27:42.9397990Z [36;1m  echo "CARGO_BUILD_WARNINGS=$_srt_CARGO_BUILD_WARNINGS" >> $GITHUB_ENV[0m
+2026-10-21T00:27:42.9398290Z [36;1mfi[0m
+2026-10-21T00:27:42.9398480Z [36;1m# Enable faster sparse index on nightly[0m
+2026-10-21T00:27:42.9398780Z [36;1m# The value is ignored on stable and causes no problems[0m
+2026-10-21T00:27:42.9399220Z [36;1m# https://internals.rust-lang.org/t/call-for-testing-cargo-sparse-registry/16862[0m
+2026-10-21T00:27:42.9399640Z [36;1mif [[ ! -v CARGO_UNSTABLE_SPARSE_REGISTRY ]]; then[0m
+2026-10-21T00:27:42.9399970Z [36;1m  echo "CARGO_UNSTABLE_SPARSE_REGISTRY=true" >> $GITHUB_ENV[0m
+2026-10-21T00:27:42.9400240Z [36;1mfi[0m
+2026-10-21T00:27:42.9400440Z [36;1mif [[ ! -v CARGO_REGISTRIES_CRATES_IO_PROTOCOL ]]; then[0m
+2026-10-21T00:27:42.9400830Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse" >> $GITHUB_ENV[0m
+2026-10-21T00:27:42.9401110Z [36;1mfi[0m
+2026-10-21T00:27:42.9413690Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:42.9413970Z env:
+2026-10-21T00:27:42.9414190Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:42.9414580Z   _srt_NEW_RUSTFLAGS: 
+2026-10-21T00:27:42.9414850Z   _srt_CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:27:42.9415040Z ##[endgroup]
+2026-10-21T00:27:42.9768190Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_2;outcome=success;conclusion=success;duration_ms=39]
+2026-10-21T00:27:42.9771950Z ##[start-action display=Install Rust Problem Matcher;id=__actions-rust-lang_setup-rust-toolchain.__run_3]
+2026-10-21T00:27:42.9801030Z ##[group]Run echo "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"
+2026-10-21T00:27:42.9801840Z [36;1mecho "::add-matcher::/Users/runner/work/_actions/actions-rust-lang/setup-rust-toolchain/v2/rust.json"[0m
+2026-10-21T00:27:42.9818850Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:42.9819220Z env:
+2026-10-21T00:27:42.9819530Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:42.9819900Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:27:42.9820090Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:27:42.9820330Z   CARGO_TERM_COLOR: always
+2026-10-21T00:27:42.9820530Z   RUST_BACKTRACE: short
+2026-10-21T00:27:42.9820770Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:27:42.9821230Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:27:42.9821570Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:27:42.9821880Z ##[endgroup]
+2026-10-21T00:27:43.0233900Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_3;outcome=success;conclusion=success;duration_ms=46]
+2026-10-21T00:27:43.0237670Z ##[start-action display=Install rustup, if needed;id=__actions-rust-lang_setup-rust-toolchain.__run_4]
+2026-10-21T00:27:43.0259080Z ##[group]Run if ! command -v rustup &> /dev/null ; then
+2026-10-21T00:27:43.0259440Z [36;1mif ! command -v rustup &> /dev/null ; then[0m
+2026-10-21T00:27:43.0260090Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" | sh -s -- --default-toolchain none -y[0m
+2026-10-21T00:27:43.0260570Z [36;1m[0m
+2026-10-21T00:27:43.0260860Z [36;1m  # Resolve the correct CARGO_HOME path depending on OS[0m
+2026-10-21T00:27:43.0261240Z [36;1m  if [[ "$RUNNER_OS" == "Windows" ]]; then[0m
+2026-10-21T00:27:43.0261650Z [36;1m    echo "${CARGO_HOME:-$USERPROFILE/.cargo}/bin" | sed 's|/|\\|g' >> $GITHUB_PATH[0m
+2026-10-21T00:27:43.0262050Z [36;1m  else[0m
+2026-10-21T00:27:43.0262280Z [36;1m    echo "${CARGO_HOME:-$HOME/.cargo}/bin" >> $GITHUB_PATH[0m
+2026-10-21T00:27:43.0262560Z [36;1m  fi[0m
+2026-10-21T00:27:43.0262710Z [36;1mfi[0m
+2026-10-21T00:27:43.0277950Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:43.0278670Z env:
+2026-10-21T00:27:43.0278930Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:43.0279230Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:27:43.0279470Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:27:43.0279670Z   CARGO_TERM_COLOR: always
+2026-10-21T00:27:43.0279850Z   RUST_BACKTRACE: short
+2026-10-21T00:27:43.0280030Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:27:43.0280230Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:27:43.0280470Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:27:43.0280710Z   RUNNER_OS: macOS
+2026-10-21T00:27:43.0280930Z ##[endgroup]
+2026-10-21T00:27:43.0620070Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=38]
+2026-10-21T00:27:43.0624050Z ##[start-action display=rustup toolchain install stable;id=__actions-rust-lang_setup-rust-toolchain.__run_5]
+2026-10-21T00:27:43.0645250Z ##[group]Run # Check if value is set
+2026-10-21T00:27:43.0645550Z [36;1m# Check if value is set[0m
+2026-10-21T00:27:43.0645890Z [36;1mif [[ -n "$_srt_rust_src_dir" ]][0m
+2026-10-21T00:27:43.0646120Z [36;1mthen[0m
+2026-10-21T00:27:43.0646390Z [36;1m  # If value is set the directory must exist[0m
+2026-10-21T00:27:43.0646700Z [36;1m  if [[ -d "$_srt_rust_src_dir" ]][0m
+2026-10-21T00:27:43.0646970Z [36;1m  then[0m
+2026-10-21T00:27:43.0647130Z [36;1m    cd "$_srt_rust_src_dir"[0m
+2026-10-21T00:27:43.0647330Z [36;1m  else[0m
+2026-10-21T00:27:43.0647600Z [36;1m    echo "'rust-src-dir' does not point to an existing directory" >&2[0m
+2026-10-21T00:27:43.0648070Z [36;1m    echo "The value of 'rust-src-dir' is: ${_srt_rust_src_dir}" >&2[0m
+2026-10-21T00:27:43.0648420Z [36;1m    exit 1[0m
+2026-10-21T00:27:43.0648610Z [36;1m  fi[0m
+2026-10-21T00:27:43.0648780Z [36;1mfi[0m
+2026-10-21T00:27:43.0649060Z [36;1mif [[ -z "$_srt_toolchain" && ( -f "rust-toolchain" || -f "rust-toolchain.toml") ]][0m
+2026-10-21T00:27:43.0649450Z [36;1mthen[0m
+2026-10-21T00:27:43.0649700Z [36;1m  # Install the toolchain as specified in the file[0m
+2026-10-21T00:27:43.0650130Z [36;1m  # rustup show is the old way that implicitly installed a toolchain[0m
+2026-10-21T00:27:43.0650600Z [36;1m  # rustup toolchain install is the new explicit way[0m
+2026-10-21T00:27:43.0651050Z [36;1m  # https://github.com/rust-lang/rustup/issues/3635#issuecomment-2343511297[0m
+2026-10-21T00:27:43.0651470Z [36;1m  rustup show active-toolchain || rustup toolchain install[0m
+2026-10-21T00:27:43.0651780Z [36;1m  if [[ -n $_srt_components ]]; then[0m
+2026-10-21T00:27:43.0652060Z [36;1m    rustup component add ${_srt_components//,/ }[0m
+2026-10-21T00:27:43.0652330Z [36;1m  fi[0m
+2026-10-21T00:27:43.0652550Z [36;1m  if [[ -n $_srt_targets ]]; then[0m
+2026-10-21T00:27:43.0653230Z [36;1m    rustup target add ${_srt_targets//,/ }[0m
+2026-10-21T00:27:43.0653570Z [36;1m  fi[0m
+2026-10-21T00:27:43.0653740Z [36;1melse[0m
+2026-10-21T00:27:43.0653900Z [36;1m  if [[ -z "$_srt_toolchain" ]][0m
+2026-10-21T00:27:43.0654110Z [36;1m  then[0m
+2026-10-21T00:27:43.0654280Z [36;1m    _srt_toolchain=stable[0m
+2026-10-21T00:27:43.0654490Z [36;1m  fi[0m
+2026-10-21T00:27:43.0654860Z [36;1m  rustup toolchain install ${_srt_toolchain//,/ }  --profile minimal --no-self-update[0m
+2026-10-21T00:27:43.0655270Z [36;1m  # Take the last element from the list[0m
+2026-10-21T00:27:43.0655520Z [36;1m  if [[ "$_srt_override" == "true" ]][0m
+2026-10-21T00:27:43.0655750Z [36;1m  then[0m
+2026-10-21T00:27:43.0655970Z [36;1m    rustup override set ${_srt_toolchain//*,/ }[0m
+2026-10-21T00:27:43.0656210Z [36;1m  fi[0m
+2026-10-21T00:27:43.0656360Z [36;1mfi[0m
+2026-10-21T00:27:43.0670650Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:43.0670960Z env:
+2026-10-21T00:27:43.0671230Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:43.0671540Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:27:43.0671730Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:27:43.0671930Z   CARGO_TERM_COLOR: always
+2026-10-21T00:27:43.0672380Z   RUST_BACKTRACE: short
+2026-10-21T00:27:43.0672590Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:27:43.0672810Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:27:43.0673090Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:27:43.0673340Z   _srt_toolchain: stable
+2026-10-21T00:27:43.0673540Z   _srt_targets: 
+2026-10-21T00:27:43.0673690Z   _srt_components: 
+2026-10-21T00:27:43.0673850Z   _srt_override: true
+2026-10-21T00:27:43.0674020Z   _srt_rust_src_dir: 
+2026-10-21T00:27:43.0674230Z ##[endgroup]
+2026-10-21T00:27:43.4160230Z info: syncing channel updates for stable-aarch64-apple-darwin
+2026-10-21T00:27:43.5397220Z info: latest update on 2026-10-15 for version 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-21T00:27:43.5500400Z info: removing previous version of component clippy
+2026-10-21T00:27:43.5533310Z info: removing previous version of component rustfmt
+2026-10-21T00:27:43.5553470Z info: removing previous version of component cargo
+2026-10-21T00:27:43.5630320Z info: removing previous version of component rust-std
+2026-10-21T00:27:43.5733360Z info: removing previous version of component rustc
+2026-10-21T00:27:43.5824460Z info: downloading 5 components
+2026-10-21T00:27:50.9796840Z 
+2026-10-21T00:27:51.0408560Z   stable-aarch64-apple-darwin updated - rustc 1.99.1 (58cf8f9c3 2026-10-13) (from rustc 1.99.0 (b940084d7 2026-09-28))
+2026-10-21T00:27:51.0412500Z info: self-update is disabled for this build of rustup
+2026-10-21T00:27:51.0413540Z 
+2026-10-21T00:27:51.0458070Z info: any updates to rustup will need to be fetched with your system package manager
+2026-10-21T00:27:51.0770930Z info: override toolchain for /Users/runner/work/XDRemux/XDRemux set to stable-aarch64-apple-darwin
+2026-10-21T00:27:51.0949980Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=8032]
+2026-10-21T00:27:51.0959040Z ##[start-action display=Print installed versions;id=__actions-rust-lang_setup-rust-toolchain.versions]
+2026-10-21T00:27:51.1016540Z ##[group]Run echo "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT
+2026-10-21T00:27:51.1017400Z [36;1mecho "rustc-version=$(rustc --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:27:51.1017800Z [36;1m_srt_VERBOSE=$(rustc --version --verbose)[0m
+2026-10-21T00:27:51.1018030Z [36;1mecho "$_srt_VERBOSE"[0m
+2026-10-21T00:27:51.1018350Z [36;1mecho "cargo-version=$(cargo --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:27:51.1018770Z [36;1mcargo --version --verbose[0m
+2026-10-21T00:27:51.1019110Z [36;1mecho "rustup-version=$(rustup --version)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:27:51.1019600Z [36;1mrustup --version[0m
+2026-10-21T00:27:51.1019890Z [36;1m[0m
+2026-10-21T00:27:51.1020850Z [36;1m_srt_DATE=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+2026-10-21T00:27:51.1021540Z [36;1m_srt_HASH=$(echo "$_srt_VERBOSE" | sed -ne 's/^commit-hash: //p')[0m
+2026-10-21T00:27:51.1021990Z [36;1mecho "cachekey=$(echo $_srt_DATE$_srt_HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+2026-10-21T00:27:51.1043070Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:51.1043410Z env:
+2026-10-21T00:27:51.1043780Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:51.1044110Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:27:51.1044340Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:27:51.1044570Z   CARGO_TERM_COLOR: always
+2026-10-21T00:27:51.1044740Z   RUST_BACKTRACE: short
+2026-10-21T00:27:51.1045050Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:27:51.1045260Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:27:51.1045600Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:27:51.1045870Z ##[endgroup]
+2026-10-21T00:27:51.2589250Z rustc 1.99.1 (58cf8f9c3 2026-10-13)
+2026-10-21T00:27:51.2589890Z binary: rustc
+2026-10-21T00:27:51.2590230Z commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T00:27:51.2590630Z commit-date: 2026-10-13
+2026-10-21T00:27:51.2590970Z host: aarch64-apple-darwin
+2026-10-21T00:27:51.2591310Z release: 1.99.1
+2026-10-21T00:27:51.2592220Z LLVM version: 23.1.1
+2026-10-21T00:27:51.3080830Z cargo 1.99.1 (5f94df478 2026-08-27)
+2026-10-21T00:27:51.3082500Z release: 1.99.1
+2026-10-21T00:27:51.3084140Z commit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e
+2026-10-21T00:27:51.3084790Z commit-date: 2026-08-27
+2026-10-21T00:27:51.3085230Z host: aarch64-apple-darwin
+2026-10-21T00:27:51.3085640Z libgit2: 1.9.6 (sys:0.21.0 vendored)
+2026-10-21T00:27:51.3086290Z libcurl: 8.7.1 (sys:0.4.90+curl-8.21.0 system ssl:(SecureTransport) LibreSSL/3.3.6)
+2026-10-21T00:27:51.3087050Z ssl: OpenSSL 3.6.3 9 Jun 2026
+2026-10-21T00:27:51.3089010Z os: Mac OS 27.0.1 [64-bit]
+2026-10-21T00:27:51.3199900Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-21T00:27:51.3550250Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-21T00:27:51.3692840Z info: This is the version for the rustup toolchain manager, not the rustc compiler.
+2026-10-21T00:27:51.3693520Z rustup 1.29.0 (2026-03-05)
+2026-10-21T00:27:51.3978920Z info: the currently active `rustc` version is `rustc 1.99.1 (58cf8f9c3 2026-10-13)`
+2026-10-21T00:27:51.4102080Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.versions;outcome=success;conclusion=success;duration_ms=314]
+2026-10-21T00:27:51.4104670Z ##[start-action display=Downgrade registry access protocol when needed;id=__actions-rust-lang_setup-rust-toolchain.__run_6]
+2026-10-21T00:27:51.4129320Z ##[group]Run # Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T00:27:51.4129950Z [36;1m# Not all versions support setting CARGO_REGISTRIES_CRATES_IO_PROTOCOL[0m
+2026-10-21T00:27:51.4130500Z [36;1m# On versions 1.66, 1.67, and 1.68.0-nightly the value "sparse" is still unstable.[0m
+2026-10-21T00:27:51.4131120Z [36;1m# https://github.com/dtolnay/rust-toolchain/pull/69#discussion_r1107268108[0m
+2026-10-21T00:27:51.4131710Z [36;1m# If we detect an incompatible value, set it to "git" which is always supported.[0m
+2026-10-21T00:27:51.4132440Z [36;1mif [[ "rustc 1.99.1 (58cf8f9c3 2026-10-13)" =~ ^rustc\ (1\.6[67]\.|1\.68\.0-nightly) && "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL}" == "sparse" ]]; then[0m
+2026-10-21T00:27:51.4133180Z [36;1m  echo "Downgrade cargo registry protocol to git"[0m
+2026-10-21T00:27:51.4133610Z [36;1m  echo "CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git" >> $GITHUB_ENV[0m
+2026-10-21T00:27:51.4134030Z [36;1mfi[0m
+2026-10-21T00:27:51.4147190Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:51.4147520Z env:
+2026-10-21T00:27:51.4147880Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:51.4148270Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:27:51.4148540Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:27:51.4149390Z   CARGO_TERM_COLOR: always
+2026-10-21T00:27:51.4149820Z   RUST_BACKTRACE: short
+2026-10-21T00:27:51.4150060Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:27:51.4150460Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:27:51.4150800Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:27:51.4151210Z ##[endgroup]
+2026-10-21T00:27:51.4506430Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=40]
+2026-10-21T00:27:51.4509180Z ##[start-action display=Setup Rust Caching;id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache]
+2026-10-21T00:27:51.4581170Z ##[group]Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+2026-10-21T00:27:51.4581520Z with:
+2026-10-21T00:27:51.4581660Z   cache-on-failure: true
+2026-10-21T00:27:51.4581850Z   cache-bin: true
+2026-10-21T00:27:51.4582080Z   cache-provider: github
+2026-10-21T00:27:51.4582290Z   cache-all-crates: false
+2026-10-21T00:27:51.4582490Z   cache-workspace-crates: false
+2026-10-21T00:27:51.4582760Z   cache-targets: true
+2026-10-21T00:27:51.4582900Z   save-if: true
+2026-10-21T00:27:51.4583090Z   prefix-key: v0-rust
+2026-10-21T00:27:51.4583270Z   add-job-id-key: true
+2026-10-21T00:27:51.4583470Z   add-rust-environment-hash-key: true
+2026-10-21T00:27:51.4584020Z   lookup-only: false
+2026-10-21T00:27:51.4584200Z   cmd-format: {0}
+2026-10-21T00:27:51.4584360Z env:
+2026-10-21T00:27:51.4584620Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:51.4584900Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:27:51.4585060Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:27:51.4585260Z   CARGO_TERM_COLOR: always
+2026-10-21T00:27:51.4585430Z   RUST_BACKTRACE: short
+2026-10-21T00:27:51.4585610Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:27:51.4585810Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:27:51.4586130Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:27:51.4586400Z ##[endgroup]
+2026-10-21T00:27:52.3829040Z ##[group]Cache Configuration
+2026-10-21T00:27:52.3833710Z Cache Provider:
+2026-10-21T00:27:52.3834190Z     github
+2026-10-21T00:27:52.3834630Z Workspaces:
+2026-10-21T00:27:52.3835050Z     /Users/runner/work/XDRemux/XDRemux
+2026-10-21T00:27:52.3835760Z Cache Paths:
+2026-10-21T00:27:52.3836280Z     /Users/runner/.cargo/bin
+2026-10-21T00:27:52.3842750Z     /Users/runner/.cargo/.crates.toml
+2026-10-21T00:27:52.3843260Z     /Users/runner/.cargo/.crates2.json
+2026-10-21T00:27:52.3843970Z     /Users/runner/.cargo/registry
+2026-10-21T00:27:52.3844470Z     /Users/runner/.cargo/git
+2026-10-21T00:27:52.3845070Z     /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T00:27:52.3845490Z Restore Key:
+2026-10-21T00:27:52.3846120Z     v0-rust-system-heif-hdr-api-Darwin-arm64-e85a7fdf
+2026-10-21T00:27:52.3848150Z Cache Key:
+2026-10-21T00:27:52.3848670Z     v0-rust-system-heif-hdr-api-Darwin-arm64-e85a7fdf-1d3ccc71
+2026-10-21T00:27:52.3849410Z .. Prefix:
+2026-10-21T00:27:52.3849970Z   - v0-rust-system-heif-hdr-api-Darwin-arm64
+2026-10-21T00:27:52.3851070Z .. Environment considered:
+2026-10-21T00:27:52.3851390Z   - Rust Versions:
+2026-10-21T00:27:52.3851770Z     - 1.99.1 aarch64-apple-darwin 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T00:27:52.3852210Z   - CARGO_BUILD_WARNINGS
+2026-10-21T00:27:52.3852500Z   - CARGO_INCREMENTAL
+2026-10-21T00:27:52.3852830Z   - CARGO_PROFILE_DEV_DEBUG
+2026-10-21T00:27:52.3853210Z   - CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T00:27:52.3853580Z   - CARGO_TERM_COLOR
+2026-10-21T00:27:52.3853950Z   - CARGO_UNSTABLE_SPARSE_REGISTRY
+2026-10-21T00:27:52.3854320Z   - RUST_BACKTRACE
+2026-10-21T00:27:52.3854580Z .. Lockfiles considered:
+2026-10-21T00:27:52.3854840Z   - /Users/runner/work/XDRemux/XDRemux/Cargo.lock
+2026-10-21T00:27:52.3855390Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification/Cargo.toml
+2026-10-21T00:27:52.3855980Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli/Cargo.toml
+2026-10-21T00:27:52.3856420Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec/Cargo.toml
+2026-10-21T00:27:52.3857380Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-container/Cargo.toml
+2026-10-21T00:27:52.3857920Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine/Cargo.toml
+2026-10-21T00:27:52.3858330Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-format/Cargo.toml
+2026-10-21T00:27:52.3858870Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr/Cargo.toml
+2026-10-21T00:27:52.3859330Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif/Cargo.toml
+2026-10-21T00:27:52.3859830Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata/Cargo.toml
+2026-10-21T00:27:52.3861210Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo/Cargo.toml
+2026-10-21T00:27:52.3861660Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime/Cargo.toml
+2026-10-21T00:27:52.3862170Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-source/Cargo.toml
+2026-10-21T00:27:52.3862790Z ##[endgroup]
+2026-10-21T00:27:52.3862890Z 
+2026-10-21T00:27:52.3862970Z ... Restoring cache ...
+2026-10-21T00:27:52.6657670Z Cache hit for restore-key: v0-rust-system-heif-hdr-api-Darwin-arm64-e85a7fdf-acff7af5
+2026-10-21T00:27:53.9431570Z Received 0 of 74001248 (0.0%), 0.0 MBs/sec
+2026-10-21T00:27:54.9511900Z Received 62914560 of 74001248 (85.0%), 29.9 MBs/sec
+2026-10-21T00:27:55.1014180Z Received 74001248 of 74001248 (100.0%), 32.7 MBs/sec
+2026-10-21T00:27:55.1042960Z Cache Size: ~71 MB (74001248 B)
+2026-10-21T00:27:55.1132500Z [command]/opt/homebrew/bin/gtar -xf /Users/runner/work/_temp/7d5bd435-2269-44eb-b09e-65eee29d78b4/cache.tzst -P -C /Users/runner/work/XDRemux/XDRemux --delay-directory-restore --use-compress-program unzstd
+2026-10-21T00:27:56.1247700Z Cache restored successfully
+2026-10-21T00:27:56.1261300Z Restored from cache key "v0-rust-system-heif-hdr-api-Darwin-arm64-e85a7fdf-acff7af5" full match: false.
+2026-10-21T00:27:56.1371120Z ##[end-action id=__actions-rust-lang_setup-rust-toolchain.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=4686]
+2026-10-21T00:27:56.1455920Z ##[group]Run cargo build --locked -p xdremux-cli
+2026-10-21T00:27:56.1456290Z [36;1mcargo build --locked -p xdremux-cli[0m
+2026-10-21T00:27:56.1456680Z [36;1mswift build --product xdremux-apple-adapter[0m
+2026-10-21T00:27:56.1456990Z [36;1mtest -x target/debug/xdremux[0m
+2026-10-21T00:27:56.1457380Z [36;1mtest -x "$(swift build --show-bin-path)/xdremux-apple-adapter"[0m
+2026-10-21T00:27:56.1476000Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:27:56.1476310Z env:
+2026-10-21T00:27:56.1476550Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:27:56.1476820Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:27:56.1477070Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:27:56.1477290Z   CARGO_TERM_COLOR: always
+2026-10-21T00:27:56.1477480Z   RUST_BACKTRACE: short
+2026-10-21T00:27:56.1477700Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:27:56.1477960Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:27:56.1478240Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:27:56.1478500Z   CACHE_ON_FAILURE: true
+2026-10-21T00:27:56.1478670Z ##[endgroup]
+2026-10-21T00:27:56.3712450Z [1m[92m    Updating[0m crates.io index
+2026-10-21T00:27:57.4811520Z [1m[92m   Compiling[0m xdremux-format v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-format)
+2026-10-21T00:27:57.4842530Z [1m[92m   Compiling[0m xdremux-motion-photo v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo)
+2026-10-21T00:27:57.4849420Z [1m[92m   Compiling[0m xdremux-container v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-container)
+2026-10-21T00:27:57.8316120Z [1m[92m   Compiling[0m xdremux-engine v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine)
+2026-10-21T00:27:57.8418640Z [1m[92m   Compiling[0m xdremux-heif v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif)
+2026-10-21T00:27:58.3196100Z [1m[92m   Compiling[0m xdremux-source v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-source)
+2026-10-21T00:27:58.4926200Z [1m[92m   Compiling[0m xdremux-metadata v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata)
+2026-10-21T00:27:59.1481100Z [1m[92m   Compiling[0m xdremux-codec v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec)
+2026-10-21T00:27:59.2642080Z [1m[92m   Compiling[0m xdremux-classification v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification)
+2026-10-21T00:27:59.7371100Z [1m[92m   Compiling[0m xdremux-hdr v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr)
+2026-10-21T00:27:59.8587550Z [1m[92m   Compiling[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-21T00:28:01.2519910Z [1m[92m   Compiling[0m xdremux-cli v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli)
+2026-10-21T00:28:03.6573750Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 7.41s
+2026-10-21T00:28:10.9663910Z Building for debugging...
+2026-10-21T00:28:10.9665260Z [Constructing description]
+2026-10-21T00:28:11.2724380Z [Planning deferred tasks]
+2026-10-21T00:28:11.3724150Z [27 / 44]
+2026-10-21T00:28:20.5376840Z [31 / 45] XDTextureNative
+2026-10-21T00:28:20.7845250Z [32 / 95]
+2026-10-21T00:28:20.9261580Z [37 / 95]
+2026-10-21T00:28:21.0341840Z [40 / 95] XDTextureNative
+2026-10-21T00:28:21.1921880Z [44 / 177]
+2026-10-21T00:28:21.3262860Z [48 / 177]
+2026-10-21T00:28:21.4374120Z [52 / 177]
+2026-10-21T00:28:21.5805650Z [53 / 177]
+2026-10-21T00:28:21.7295890Z [59 / 177]
+2026-10-21T00:28:21.8532030Z [61 / 177]
+2026-10-21T00:28:21.9577510Z [65 / 186]
+2026-10-21T00:28:22.1103120Z [70 / 186]
+2026-10-21T00:28:22.2411030Z [73 / 186]
+2026-10-21T00:28:22.4032410Z [75 / 186]
+2026-10-21T00:28:22.6502740Z [76 / 186]
+2026-10-21T00:28:22.7708840Z [79 / 186]
+2026-10-21T00:28:22.9411610Z [83 / 186]
+2026-10-21T00:28:23.0496190Z [85 / 186]
+2026-10-21T00:28:23.1573430Z [92 / 186]
+2026-10-21T00:28:23.2653350Z [97 / 186]
+2026-10-21T00:28:23.3695330Z [101 / 186]
+2026-10-21T00:28:23.5063080Z [104 / 186]
+2026-10-21T00:28:23.6229510Z [105 / 186]
+2026-10-21T00:28:23.7756380Z [107 / 186]
+2026-10-21T00:28:23.9040820Z [109 / 186]
+2026-10-21T00:28:24.0497440Z [111 / 186]
+2026-10-21T00:28:24.1521870Z [114 / 186]
+2026-10-21T00:28:24.2646760Z [116 / 186]
+2026-10-21T00:28:24.5671040Z [118 / 186]
+2026-10-21T00:28:24.9095720Z [120 / 186]
+2026-10-21T00:28:25.2471780Z [121 / 186]
+2026-10-21T00:28:25.7242610Z [122 / 186]
+2026-10-21T00:28:25.9436470Z [127 / 186]
+2026-10-21T00:28:26.2365230Z [128 / 186]
+2026-10-21T00:28:26.4114920Z [129 / 186]
+2026-10-21T00:28:26.5509940Z [131 / 186]
+2026-10-21T00:28:26.6516980Z [132 / 186]
+2026-10-21T00:28:26.8663300Z [135 / 186]
+2026-10-21T00:28:27.0441820Z [138 / 186]
+2026-10-21T00:28:27.1447010Z [140 / 186]
+2026-10-21T00:28:27.2741390Z [142 / 186]
+2026-10-21T00:28:27.4790270Z [144 / 186]
+2026-10-21T00:28:27.6548070Z [145 / 186]
+2026-10-21T00:28:27.7675960Z [146 / 186]
+2026-10-21T00:28:27.8949370Z [149 / 186]
+2026-10-21T00:28:28.0095930Z [152 / 186]
+2026-10-21T00:28:28.2067680Z [153 / 186]
+2026-10-21T00:28:28.4017360Z [155 / 186]
+2026-10-21T00:28:28.6328730Z [156 / 186]
+2026-10-21T00:28:28.7496090Z [157 / 186]
+2026-10-21T00:28:28.8927390Z [158 / 186]
+2026-10-21T00:28:29.0689780Z [160 / 186]
+2026-10-21T00:28:29.1719880Z [162 / 186]
+2026-10-21T00:28:29.2996730Z [165 / 186]
+2026-10-21T00:28:29.4143100Z [168 / 186]
+2026-10-21T00:28:29.5528670Z [169 / 186]
+2026-10-21T00:28:29.8065580Z [171 / 186] XDTextureNative
+2026-10-21T00:28:29.9380570Z [173 / 186] XDTextureNative
+2026-10-21T00:28:30.0885410Z [176 / 186] xdremux-apple-adapter-product
+2026-10-21T00:28:30.4552150Z [1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:581:40: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T00:28:30.4556250Z [178 / 186] XDTextureNative
+2026-10-21T00:28:30.4603630Z   581 |     for (AVAssetTrack *track in [asset tracksWithMediaType:AVMediaTypeVideo]) {[0m
+2026-10-21T00:28:30.4604550Z       | [0;1;32m                                       ^
+2026-10-21T00:28:30.4605990Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T00:28:30.4607600Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T00:28:30.4614530Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T00:28:30.4618060Z       | [0;1;32m^
+2026-10-21T00:28:30.4636350Z [0m[1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:601:40: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T00:28:30.4639280Z   601 |     for (AVAssetTrack *track in [asset tracksWithMediaType:AVMediaTypeAudio]) {[0m
+2026-10-21T00:28:30.4640220Z       | [0;1;32m                                       ^
+2026-10-21T00:28:30.4641080Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T00:28:30.4644680Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T00:28:30.4646890Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T00:28:30.4647590Z       | [0;1;32m^
+2026-10-21T00:28:30.4651160Z [0m[1m/Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:844:43: [0m[0;1;35mwarning: [0m[1m'tracksWithMediaType:' is deprecated: first deprecated in macOS 15.0 - Use loadTracksWithMediaType:completionHandler: instead [-Wdeprecated-declarations][0m
+2026-10-21T00:28:30.4654130Z   844 |         AVAssetTrack *videoTrack = [asset tracksWithMediaType:AVMediaTypeVideo].firstObject;[0m
+2026-10-21T00:28:30.4668010Z       | [0;1;32m                                          ^
+2026-10-21T00:28:30.4696340Z [0mIn module 'AVFoundation' imported from /Users/runner/work/XDRemux/XDRemux/Sources/XDCinematicNative/cinematic_envelope.m:3:
+2026-10-21T00:28:30.4699010Z [1m/Applications/Xcode_27.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AVFoundation.framework/Headers/AVAsset.h:191:1: [0m[0;1;36mnote: [0m'tracksWithMediaType:' has been explicitly marked deprecated here[0m
+2026-10-21T00:28:30.4701720Z   191 | - (NSArray<AVAssetTrack *> *)tracksWithMediaType:(AVMediaType)mediaType[0m
+2026-10-21T00:28:30.4702450Z       | [0;1;32m^
+2026-10-21T00:28:30.4702970Z [0m3 warnings generated.
+2026-10-21T00:28:30.5701430Z [180 / 186] xdremux-apple-adapter-product
+2026-10-21T00:28:33.7652210Z [182 / 186] xdremux-apple-adapter-product
+2026-10-21T00:28:37.4713150Z [184 / 186] xdremux-apple-adapter-product
+2026-10-21T00:28:37.6697040Z Build complete! (27.07 sec)
+2026-10-21T00:28:38.9409990Z ##[group]Run adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+2026-10-21T00:28:38.9411860Z [36;1madapter="$(swift build --show-bin-path)/xdremux-apple-adapter"[0m
+2026-10-21T00:28:38.9413140Z [36;1mXDREMUX_APPLE_ADAPTER_TEST_EXECUTABLE="$adapter" \[0m
+2026-10-21T00:28:38.9414480Z [36;1m  cargo test --locked -p xdremux-runtime --test system_heif_hdr -- --nocapture[0m
+2026-10-21T00:28:38.9522940Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:28:38.9523260Z env:
+2026-10-21T00:28:38.9523600Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:28:38.9523920Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:28:38.9524140Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:28:38.9524350Z   CARGO_TERM_COLOR: always
+2026-10-21T00:28:38.9524610Z   RUST_BACKTRACE: short
+2026-10-21T00:28:38.9524940Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:28:38.9525230Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:28:38.9525930Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:28:38.9526290Z   CACHE_ON_FAILURE: true
+2026-10-21T00:28:38.9526500Z ##[endgroup]
+2026-10-21T00:28:40.6765280Z [1m[92m   Compiling[0m xdremux-engine v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine)
+2026-10-21T00:28:40.6770080Z [1m[92m   Compiling[0m xdremux-source v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-source)
+2026-10-21T00:28:40.6772410Z [1m[92m   Compiling[0m xdremux-classification v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification)
+2026-10-21T00:28:42.2590610Z [1m[92m   Compiling[0m xdremux-codec v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec)
+2026-10-21T00:28:42.6547880Z [1m[92m   Compiling[0m xdremux-runtime v0.1.0 (/Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime)
+2026-10-21T00:28:46.1462300Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 5.90s
+2026-10-21T00:28:46.1519010Z [1m[92m     Running[0m tests/system_heif_hdr.rs (target/debug/deps/system_heif_hdr-f78e0dcfaf0fc955)
+2026-10-21T00:28:46.2369540Z 
+2026-10-21T00:28:46.2369900Z running 1 test
+2026-10-21T00:28:47.2144730Z test system_encoder_round_trips_a_small_linear_hdr_pair ... ok
+2026-10-21T00:28:47.2145560Z 
+2026-10-21T00:28:47.2147320Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+2026-10-21T00:28:47.2148850Z 
+2026-10-21T00:28:47.2497080Z ##[group]Run actions/checkout@v7
+2026-10-21T00:28:47.2497420Z with:
+2026-10-21T00:28:47.2497780Z   repository: 21Z121Z1/Photographic_Style_Research
+2026-10-21T00:28:47.2498260Z   ref: 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T00:28:47.2498620Z   path: consumer-research
+2026-10-21T00:28:47.2498940Z   persist-credentials: false
+2026-10-21T00:28:47.2501800Z   token: ***
+2026-10-21T00:28:47.2502150Z   ssh-strict: true
+2026-10-21T00:28:47.2502630Z   ssh-user: git
+2026-10-21T00:28:47.2502880Z   clean: true
+2026-10-21T00:28:47.2503220Z   sparse-checkout-cone-mode: true
+2026-10-21T00:28:47.2503560Z   fetch-depth: 1
+2026-10-21T00:28:47.2503800Z   fetch-tags: false
+2026-10-21T00:28:47.2504090Z   show-progress: true
+2026-10-21T00:28:47.2504370Z   lfs: false
+2026-10-21T00:28:47.2504670Z   submodules: false
+2026-10-21T00:28:47.2504960Z   set-safe-directory: true
+2026-10-21T00:28:47.2505220Z   allow-unsafe-pr-checkout: false
+2026-10-21T00:28:47.2505600Z env:
+2026-10-21T00:28:47.2506070Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:28:47.2506580Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:28:47.2506810Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:28:47.2507130Z   CARGO_TERM_COLOR: always
+2026-10-21T00:28:47.2507420Z   RUST_BACKTRACE: short
+2026-10-21T00:28:47.2507890Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:28:47.2508280Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:28:47.2508820Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:28:47.2509230Z   CACHE_ON_FAILURE: true
+2026-10-21T00:28:47.2509780Z ##[endgroup]
+2026-10-21T00:28:47.6849860Z Syncing repository: 21Z121Z1/Photographic_Style_Research
+2026-10-21T00:28:47.6851110Z ##[group]Getting Git version info
+2026-10-21T00:28:47.6851620Z Working directory is '/Users/runner/work/XDRemux/XDRemux/consumer-research'
+2026-10-21T00:28:47.6891640Z [command]/opt/homebrew/bin/git version
+2026-10-21T00:28:47.7192000Z git version 2.56.0
+2026-10-21T00:28:47.7210330Z ##[endgroup]
+2026-10-21T00:28:47.7217190Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/fe1346f3-65f1-4b4f-98b7-209fa1b54fa9/.gitconfig'
+2026-10-21T00:28:47.7229480Z Temporarily overriding HOME='/Users/runner/work/_temp/fe1346f3-65f1-4b4f-98b7-209fa1b54fa9' before making global git config changes
+2026-10-21T00:28:47.7232850Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T00:28:47.7234080Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T00:28:47.7391430Z ##[group]Determining repository object format
+2026-10-21T00:28:47.7392530Z ##[endgroup]
+2026-10-21T00:28:47.7393020Z ##[group]Initializing the repository
+2026-10-21T00:28:47.7399180Z [command]/opt/homebrew/bin/git init /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T00:28:47.7633810Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-21T00:28:47.7634630Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-21T00:28:47.7635320Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-21T00:28:47.7635750Z hint: call:
+2026-10-21T00:28:47.7635970Z hint:
+2026-10-21T00:28:47.7636270Z hint: 	git config --global init.defaultBranch <name>
+2026-10-21T00:28:47.7636670Z hint:
+2026-10-21T00:28:47.7637000Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-21T00:28:47.7637530Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-21T00:28:47.7637910Z hint:
+2026-10-21T00:28:47.7638400Z hint: 	git branch -m <name>
+2026-10-21T00:28:47.7639470Z hint:
+2026-10-21T00:28:47.7639850Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-21T00:28:47.7640690Z Initialized empty Git repository in /Users/runner/work/XDRemux/XDRemux/consumer-research/.git/
+2026-10-21T00:28:47.7657940Z [command]/opt/homebrew/bin/git remote add origin https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-21T00:28:47.7790960Z ##[endgroup]
+2026-10-21T00:28:47.7791550Z ##[group]Disabling automatic garbage collection
+2026-10-21T00:28:47.7798670Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-21T00:28:47.7897050Z ##[endgroup]
+2026-10-21T00:28:47.7897450Z ##[group]Setting up auth
+2026-10-21T00:28:47.7898770Z Removing SSH command configuration
+2026-10-21T00:28:47.7902640Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T00:28:47.7988370Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T00:28:47.9362280Z Removing HTTP extra header
+2026-10-21T00:28:47.9390730Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T00:28:47.9489060Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T00:28:48.1255430Z Removing includeIf entries pointing to credentials config files
+2026-10-21T00:28:48.1267530Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T00:28:48.1411670Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T00:28:48.3249150Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-21T00:28:48.3563860Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path /Users/runner/work/_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config
+2026-10-21T00:28:48.3780620Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path /Users/runner/work/_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config
+2026-10-21T00:28:48.3931980Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/consumer-research/.git.path /github/runner_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config
+2026-10-21T00:28:48.4083220Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path /github/runner_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config
+2026-10-21T00:28:48.4171010Z ##[endgroup]
+2026-10-21T00:28:48.4171570Z ##[group]Fetching the repository
+2026-10-21T00:28:48.4177370Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T00:28:49.6920730Z From https://github.com/21Z121Z1/Photographic_Style_Research
+2026-10-21T00:28:49.6921360Z  * branch            37dd551a949047ed14580efa0c0a2556922791b5 -> FETCH_HEAD
+2026-10-21T00:28:49.6931920Z [command]/opt/homebrew/bin/git rev-parse --verify --quiet 37dd551a949047ed14580efa0c0a2556922791b5^{object}
+2026-10-21T00:28:49.7014900Z 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T00:28:49.7019100Z ##[endgroup]
+2026-10-21T00:28:49.7019600Z ##[group]Determining the checkout info
+2026-10-21T00:28:49.7019930Z ##[endgroup]
+2026-10-21T00:28:49.7023050Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-21T00:28:49.7119160Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-21T00:28:49.7192550Z ##[group]Checking out the ref
+2026-10-21T00:28:49.7204020Z [command]/opt/homebrew/bin/git checkout --progress --force 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T00:28:49.8647010Z HEAD is now at 37dd551 consumer-model README: cite C35 line
+2026-10-21T00:28:49.8662740Z ##[endgroup]
+2026-10-21T00:28:49.8765160Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-21T00:28:49.8844500Z 37dd551a949047ed14580efa0c0a2556922791b5
+2026-10-21T00:28:49.8853470Z ##[group]Removing auth
+2026-10-21T00:28:49.8853720Z Removing SSH command configuration
+2026-10-21T00:28:49.8856990Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T00:28:49.8945480Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T00:28:50.0071920Z Removing HTTP extra header
+2026-10-21T00:28:50.0072790Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T00:28:50.0158740Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T00:28:50.1490090Z Removing includeIf entries pointing to credentials config files
+2026-10-21T00:28:50.1493680Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T00:28:50.1605230Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path
+2026-10-21T00:28:50.1606840Z includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path
+2026-10-21T00:28:50.1607770Z includeif.gitdir:/github/workspace/consumer-research/.git.path
+2026-10-21T00:28:50.1609360Z includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path
+2026-10-21T00:28:50.1624360Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path
+2026-10-21T00:28:50.1721190Z /Users/runner/work/_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config
+2026-10-21T00:28:50.1731240Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git.path \/Users\/runner\/work\/_temp\/git\-credentials\-01d36522\-2788\-49cd\-8cf1\-067927f50dfb\.config
+2026-10-21T00:28:50.1872760Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path
+2026-10-21T00:28:50.1971540Z /Users/runner/work/_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config
+2026-10-21T00:28:50.1983090Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/Users/runner/work/XDRemux/XDRemux/consumer-research/.git/worktrees/*.path \/Users\/runner\/work\/_temp\/git\-credentials\-01d36522\-2788\-49cd\-8cf1\-067927f50dfb\.config
+2026-10-21T00:28:50.2117710Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/consumer-research/.git.path
+2026-10-21T00:28:50.2239990Z /github/runner_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config
+2026-10-21T00:28:50.2253650Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/consumer-research/.git.path \/github\/runner_temp\/git\-credentials\-01d36522\-2788\-49cd\-8cf1\-067927f50dfb\.config
+2026-10-21T00:28:50.2357460Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path
+2026-10-21T00:28:50.2487670Z /github/runner_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config
+2026-10-21T00:28:50.2498720Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/consumer-research/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-01d36522\-2788\-49cd\-8cf1\-067927f50dfb\.config
+2026-10-21T00:28:50.2706220Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T00:28:50.4289710Z Removing credentials config '/Users/runner/work/_temp/git-credentials-01d36522-2788-49cd-8cf1-067927f50dfb.config'
+2026-10-21T00:28:50.4290740Z ##[endgroup]
+2026-10-21T00:28:50.4513030Z ##[group]Run adapter="$(swift build --show-bin-path)/xdremux-apple-adapter"
+2026-10-21T00:28:50.4514300Z [36;1madapter="$(swift build --show-bin-path)/xdremux-apple-adapter"[0m
+2026-10-21T00:28:50.4515170Z [36;1mXDREMUX_APPLE_ADAPTER="$adapter" \[0m
+2026-10-21T00:28:50.4515890Z [36;1m  bash scripts/apple/measure_system_heif_hdr.sh[0m
+2026-10-21T00:28:50.4564760Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-21T00:28:50.4565140Z env:
+2026-10-21T00:28:50.4565380Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:28:50.4565680Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:28:50.4565890Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:28:50.4566120Z   CARGO_TERM_COLOR: always
+2026-10-21T00:28:50.4566330Z   RUST_BACKTRACE: short
+2026-10-21T00:28:50.4566560Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:28:50.4566790Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:28:50.4567090Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:28:50.4567400Z   CACHE_ON_FAILURE: true
+2026-10-21T00:28:50.4567720Z   RESEARCH_ROOT: /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T00:28:50.4568250Z   SYSTEM_HDR_OUT: /Users/runner/work/XDRemux/XDRemux/artifacts/system-heif-hdr-measurement
+2026-10-21T00:28:50.4568780Z   XDREMUX_CLI: /Users/runner/work/XDRemux/XDRemux/target/debug/xdremux
+2026-10-21T00:28:50.4569060Z ##[endgroup]
+2026-10-21T00:29:19.6873830Z converted: /Users/runner/work/XDRemux/XDRemux/fixtures/proxdr/oppo/find-x6-pro/lhdr-v1-01.heic -> /Users/runner/work/XDRemux/XDRemux/artifacts/system-heif-hdr-measurement/lhdr-v1-01.system.heic
+2026-10-21T00:29:22.3473740Z Traceback (most recent call last):
+2026-10-21T00:29:22.3488200Z   File "/Users/runner/work/XDRemux/XDRemux/scripts/apple/score_system_hdr_tone.py", line 64, in <module>
+2026-10-21T00:29:22.3500200Z     main()
+2026-10-21T00:29:22.3500450Z     ~~~~^^
+2026-10-21T00:29:22.3502280Z   File "/Users/runner/work/XDRemux/XDRemux/scripts/apple/score_system_hdr_tone.py", line 42, in main
+2026-10-21T00:29:22.3503040Z     images = {tone: load_native_rgb(renderer_for(root, tone)) for tone in (-1.0, 0.0, 1.0)}
+2026-10-21T00:29:22.3503540Z                                     ~~~~~~~~~~~~^^^^^^^^^^^^
+2026-10-21T00:29:22.3504730Z   File "/Users/runner/work/XDRemux/XDRemux/scripts/apple/score_system_hdr_tone.py", line 35, in renderer_for
+2026-10-21T00:29:22.3505480Z     raise ValueError(f"{root}: expected one tone {tone:g} render, found {len(matches)}")
+2026-10-21T00:29:22.3506980Z ValueError: /Users/runner/work/XDRemux/XDRemux/artifacts/system-heif-hdr-measurement/tone: expected one tone -1 render, found 0
+2026-10-21T00:29:22.3784090Z ##[error]Process completed with exit code 1.
+2026-10-21T00:29:22.4039800Z ##[group]Run actions/upload-artifact@v7
+2026-10-21T00:29:22.4040310Z with:
+2026-10-21T00:29:22.4040610Z   name: system-heif-hdr-api
+2026-10-21T00:29:22.4041030Z   if-no-files-found: warn
+2026-10-21T00:29:22.4041400Z   retention-days: 1
+2026-10-21T00:29:22.4041640Z   path: artifacts/system-heif-hdr-api/
+2026-10-21T00:29:22.4041980Z   compression-level: 6
+2026-10-21T00:29:22.4042350Z   overwrite: false
+2026-10-21T00:29:22.4042580Z   include-hidden-files: false
+2026-10-21T00:29:22.4042970Z   archive: true
+2026-10-21T00:29:22.4043180Z env:
+2026-10-21T00:29:22.4043510Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:29:22.4044020Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:29:22.4044310Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:29:22.4044730Z   CARGO_TERM_COLOR: always
+2026-10-21T00:29:22.4045120Z   RUST_BACKTRACE: short
+2026-10-21T00:29:22.4045440Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:29:22.4046500Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:29:22.4046970Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:29:22.4047330Z   CACHE_ON_FAILURE: true
+2026-10-21T00:29:22.4047630Z ##[endgroup]
+2026-10-21T00:29:23.0423080Z With the provided path, there will be 71 files uploaded
+2026-10-21T00:29:23.0424570Z Artifact name is valid!
+2026-10-21T00:29:23.0424860Z Root directory input is valid!
+2026-10-21T00:29:23.4540590Z Uploading artifact: system-heif-hdr-api.zip
+2026-10-21T00:29:23.4604090Z Beginning upload of artifact content to blob storage
+2026-10-21T00:29:24.1898380Z Uploaded bytes 107052
+2026-10-21T00:29:24.2585290Z Finished uploading artifact content to blob storage!
+2026-10-21T00:29:24.2586350Z SHA256 digest of uploaded artifact is 690e1d3941ca00a786c808cb891025901694eb1d7b6ecbf7b84b0da2049b399e
+2026-10-21T00:29:24.2588440Z Finalizing artifact upload
+2026-10-21T00:29:24.6394480Z Artifact system-heif-hdr-api successfully finalized. Artifact ID 12310429863
+2026-10-21T00:29:24.6395320Z Artifact system-heif-hdr-api has been successfully uploaded! Final size is 107052 bytes. Artifact ID is 12310429863
+2026-10-21T00:29:24.6513390Z Artifact download URL: https://github.com/21Z121Z1/XDRemux/actions/runs/39521326078/artifacts/12310429863
+2026-10-21T00:29:24.7321640Z ##[group]Run actions/upload-artifact@v7
+2026-10-21T00:29:24.7322020Z with:
+2026-10-21T00:29:24.7322250Z   name: system-heif-hdr-measurement
+2026-10-21T00:29:24.7322530Z   if-no-files-found: warn
+2026-10-21T00:29:24.7322750Z   retention-days: 1
+2026-10-21T00:29:24.7323720Z   path: artifacts/system-heif-hdr-measurement/host.txt
+artifacts/system-heif-hdr-measurement/lhdr-v1-01.system-hdr.json
+artifacts/system-heif-hdr-measurement/tone-shape.json
+
+2026-10-21T00:29:24.7324450Z   compression-level: 6
+2026-10-21T00:29:24.7324740Z   overwrite: false
+2026-10-21T00:29:24.7324990Z   include-hidden-files: false
+2026-10-21T00:29:24.7325320Z   archive: true
+2026-10-21T00:29:24.7325650Z env:
+2026-10-21T00:29:24.7326130Z   PKG_CONFIG_PATH: /opt/homebrew/opt/libheif/lib/pkgconfig
+2026-10-21T00:29:24.7326600Z   CARGO_INCREMENTAL: 0
+2026-10-21T00:29:24.7326800Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-10-21T00:29:24.7327050Z   CARGO_TERM_COLOR: always
+2026-10-21T00:29:24.7327360Z   RUST_BACKTRACE: short
+2026-10-21T00:29:24.7327680Z   CARGO_BUILD_WARNINGS: deny
+2026-10-21T00:29:24.7328060Z   CARGO_UNSTABLE_SPARSE_REGISTRY: true
+2026-10-21T00:29:24.7328400Z   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+2026-10-21T00:29:24.7328680Z   CACHE_ON_FAILURE: true
+2026-10-21T00:29:24.7328870Z ##[endgroup]
+2026-10-21T00:29:24.9985810Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-10-21T00:29:24.9989980Z The least common ancestor is /Users/runner/work/XDRemux/XDRemux/artifacts/system-heif-hdr-measurement. This will be the root directory of the artifact
+2026-10-21T00:29:24.9999680Z With the provided path, there will be 2 files uploaded
+2026-10-21T00:29:25.0004510Z Artifact name is valid!
+2026-10-21T00:29:25.0005070Z Root directory input is valid!
+2026-10-21T00:29:25.4182720Z Uploading artifact: system-heif-hdr-measurement.zip
+2026-10-21T00:29:25.4211640Z Beginning upload of artifact content to blob storage
+2026-10-21T00:29:25.7166610Z Uploaded bytes 1051
+2026-10-21T00:29:25.7882820Z Finished uploading artifact content to blob storage!
+2026-10-21T00:29:25.7884330Z SHA256 digest of uploaded artifact is 212709c962621c4942af2f575b2928f0df7eec3f41bc48a4096e41ebc16f9ed1
+2026-10-21T00:29:25.7885490Z Finalizing artifact upload
+2026-10-21T00:29:26.1834460Z Artifact system-heif-hdr-measurement successfully finalized. Artifact ID 12310714524
+2026-10-21T00:29:26.1836210Z Artifact system-heif-hdr-measurement has been successfully uploaded! Final size is 1051 bytes. Artifact ID is 12310714524
+2026-10-21T00:29:26.1844140Z Artifact download URL: https://github.com/21Z121Z1/XDRemux/actions/runs/39521326078/artifacts/12310714524
+2026-10-21T00:29:26.2076810Z Post job cleanup.
+2026-10-21T00:29:26.3330690Z [command]/opt/homebrew/bin/git version
+2026-10-21T00:29:26.3569770Z git version 2.56.0
+2026-10-21T00:29:26.3588950Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/2172fded-1bdd-401b-861e-0f03d023078a/.gitconfig'
+2026-10-21T00:29:26.3600630Z Temporarily overriding HOME='/Users/runner/work/_temp/2172fded-1bdd-401b-861e-0f03d023078a' before making global git config changes
+2026-10-21T00:29:26.3602750Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T00:29:26.3604320Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux/consumer-research
+2026-10-21T00:29:26.3735810Z Removing SSH command configuration
+2026-10-21T00:29:26.3740710Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T00:29:26.3834200Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T00:29:26.4767820Z Removing HTTP extra header
+2026-10-21T00:29:26.4776520Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T00:29:26.4878230Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T00:29:26.5880320Z Removing includeIf entries pointing to credentials config files
+2026-10-21T00:29:26.5885440Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T00:29:26.5954860Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T00:29:26.7179920Z Post job cleanup.
+2026-10-21T00:29:26.7185500Z ##[start-action display=Setup Rust Caching;id=__6e680c96-136f-4646-b298-d6d1dc5542b4.__Swatinem_rust-cache]
+2026-10-21T00:29:26.7253930Z Post job cleanup.
+2026-10-21T00:29:26.8935080Z ##[group]Cache Configuration
+2026-10-21T00:29:26.8936280Z Cache Provider:
+2026-10-21T00:29:26.8936940Z     github
+2026-10-21T00:29:26.8937530Z Workspaces:
+2026-10-21T00:29:26.8938200Z     /Users/runner/work/XDRemux/XDRemux
+2026-10-21T00:29:26.8939270Z Cache Paths:
+2026-10-21T00:29:26.8939860Z     /Users/runner/.cargo/bin
+2026-10-21T00:29:26.8940540Z     /Users/runner/.cargo/.crates.toml
+2026-10-21T00:29:26.8941290Z     /Users/runner/.cargo/.crates2.json
+2026-10-21T00:29:26.8942190Z     /Users/runner/.cargo/registry
+2026-10-21T00:29:26.8942810Z     /Users/runner/.cargo/git
+2026-10-21T00:29:26.8943520Z     /Users/runner/work/XDRemux/XDRemux/target
+2026-10-21T00:29:26.8944230Z Restore Key:
+2026-10-21T00:29:26.8944980Z     v0-rust-system-heif-hdr-api-Darwin-arm64-e85a7fdf
+2026-10-21T00:29:26.8945720Z Cache Key:
+2026-10-21T00:29:26.8946440Z     v0-rust-system-heif-hdr-api-Darwin-arm64-e85a7fdf-1d3ccc71
+2026-10-21T00:29:26.8947320Z .. Prefix:
+2026-10-21T00:29:26.8947910Z   - v0-rust-system-heif-hdr-api-Darwin-arm64
+2026-10-21T00:29:26.8948610Z .. Environment considered:
+2026-10-21T00:29:26.8949180Z   - Rust Versions:
+2026-10-21T00:29:26.8949960Z     - 1.99.1 aarch64-apple-darwin 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-21T00:29:26.8950830Z   - CARGO_BUILD_WARNINGS
+2026-10-21T00:29:26.8951410Z   - CARGO_INCREMENTAL
+2026-10-21T00:29:26.8951950Z   - CARGO_PROFILE_DEV_DEBUG
+2026-10-21T00:29:26.8952580Z   - CARGO_REGISTRIES_CRATES_IO_PROTOCOL
+2026-10-21T00:29:26.8953250Z   - CARGO_TERM_COLOR
+2026-10-21T00:29:26.8953950Z   - CARGO_UNSTABLE_SPARSE_REGISTRY
+2026-10-21T00:29:26.8954570Z   - RUST_BACKTRACE
+2026-10-21T00:29:26.8955160Z .. Lockfiles considered:
+2026-10-21T00:29:26.8955860Z   - /Users/runner/work/XDRemux/XDRemux/Cargo.lock
+2026-10-21T00:29:26.8956970Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-classification/Cargo.toml
+2026-10-21T00:29:26.8958230Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-cli/Cargo.toml
+2026-10-21T00:29:26.8961250Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-codec/Cargo.toml
+2026-10-21T00:29:26.8962480Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-container/Cargo.toml
+2026-10-21T00:29:26.8963770Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-engine/Cargo.toml
+2026-10-21T00:29:26.8964930Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-format/Cargo.toml
+2026-10-21T00:29:26.8966150Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-hdr/Cargo.toml
+2026-10-21T00:29:26.8966900Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-heif/Cargo.toml
+2026-10-21T00:29:26.8968400Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-metadata/Cargo.toml
+2026-10-21T00:29:26.8969860Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-motion-photo/Cargo.toml
+2026-10-21T00:29:26.8971190Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-runtime/Cargo.toml
+2026-10-21T00:29:26.8972350Z   - /Users/runner/work/XDRemux/XDRemux/crates/xdremux-source/Cargo.toml
+2026-10-21T00:29:26.8973810Z ##[endgroup]
+2026-10-21T00:29:26.8974140Z 
+2026-10-21T00:29:29.2916490Z ... Cleaning /Users/runner/work/XDRemux/XDRemux/target ...
+2026-10-21T00:29:29.3512740Z ... Cleaning cargo registry (cache-all-crates: false) ...
+2026-10-21T00:29:30.0004000Z ... Cleaning cargo/bin ...
+2026-10-21T00:29:30.0007660Z ... Cleaning cargo git cache ...
+2026-10-21T00:29:30.0017400Z ... Saving cache ...
+2026-10-21T00:29:30.1016580Z [command]/opt/homebrew/bin/gtar --posix -cf cache.tzst --exclude cache.tzst -P -C /Users/runner/work/XDRemux/XDRemux --files-from manifest.txt --delay-directory-restore --use-compress-program zstdmt
+2026-10-21T00:29:32.9881180Z Sent 14024704 of 74008112 (19.0%), 13.4 MBs/sec
+2026-10-21T00:29:33.9912420Z Sent 71892992 of 74008112 (97.1%), 34.2 MBs/sec
+2026-10-21T00:29:34.8389850Z Sent 74008112 of 74008112 (100.0%), 24.8 MBs/sec
+2026-10-21T00:29:35.1510300Z ##[end-action id=__6e680c96-136f-4646-b298-d6d1dc5542b4.__Swatinem_rust-cache;outcome=success;conclusion=success;duration_ms=8432]
+2026-10-21T00:29:35.1769400Z Post job cleanup.
+2026-10-21T00:29:35.6119060Z [command]/opt/homebrew/bin/git version
+2026-10-21T00:29:35.6461120Z git version 2.56.0
+2026-10-21T00:29:35.6518140Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/2bce4d62-ce3a-40a6-bdf3-c31335bf6c8a/.gitconfig'
+2026-10-21T00:29:35.6541640Z Temporarily overriding HOME='/Users/runner/work/_temp/2bce4d62-ce3a-40a6-bdf3-c31335bf6c8a' before making global git config changes
+2026-10-21T00:29:35.6543130Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-21T00:29:35.6546040Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/XDRemux/XDRemux
+2026-10-21T00:29:35.6992660Z Removing SSH command configuration
+2026-10-21T00:29:35.7057670Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-21T00:29:35.7078510Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-21T00:29:35.9586380Z Removing HTTP extra header
+2026-10-21T00:29:35.9598480Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-21T00:29:35.9683840Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-21T00:29:36.2057190Z Removing includeIf entries pointing to credentials config files
+2026-10-21T00:29:36.2067620Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-21T00:29:36.2185840Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-21T00:29:36.4941260Z Cleaning up orphan processes

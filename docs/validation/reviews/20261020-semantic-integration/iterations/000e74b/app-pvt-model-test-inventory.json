@@ -1,0 +1,14 @@
+{
+  "old_model_tests_retained": 25,
+  "current_model_tests": 30,
+  "new_model_tests": [
+    "testExistingPVTDestinationsAreNeverAdoptedOrReplaced",
+    "testExistingPVTPackagesAreNotScannedOrUsedAsOutputDirectories",
+    "testLivePhotoOutputArgumentsAndMixedQueuePlans",
+    "testPVTChoiceReachesRustWithoutChangingOrdinaryOutput",
+    "testPVTPreviewUsesSourceImage"
+  ],
+  "all_registered_in_custom_main": true,
+  "native_tests_executed": false,
+  "additional_alias_subcases": "ordinary foo.heic symlink to existing.pvt, skip true and false"
+}

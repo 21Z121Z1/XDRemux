@@ -1,0 +1,44 @@
+   Compiling xdremux-cli v0.1.0 (/workspace/XDRemux-integration/crates/xdremux-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.71s
+     Running tests/live_photo_pvt.rs (target/debug/deps/live_photo_pvt-068f20055a02aee1)
+
+running 3 tests
+test a_pvt_destination_cannot_disguise_pair_output_or_replace_unknown_entries ... ok
+test pvt_conversion_and_validation_publish_a_real_directory_and_preserve_source ... FAILED
+test pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs ... FAILED
+
+failures:
+
+---- pvt_conversion_and_validation_publish_a_real_directory_and_preserve_source stdout ----
+
+thread 'pvt_conversion_and_validation_publish_a_real_directory_and_preserve_source' (141509) panicked at crates/xdremux-cli/tests/live_photo_pvt.rs:44:5:
+assertion `left == right` failed: error: unexpected argument '--live-photo-output' found
+
+Usage: xdremux convert --input <INPUT> --output <OUTPUT>
+
+For more information, try '--help'.
+
+  left: 2
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs stdout ----
+
+thread 'pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs' (141508) panicked at crates/xdremux-cli/tests/live_photo_pvt.rs:89:9:
+assertion `left == right` failed: error: unexpected argument '--live-photo-output' found
+
+Usage: xdremux batch --input <FILE> --output-dir <DIR>
+
+For more information, try '--help'.
+
+  left: 2
+ right: 0
+
+
+failures:
+    pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs
+    pvt_conversion_and_validation_publish_a_real_directory_and_preserve_source
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p xdremux-cli --test live_photo_pvt`
