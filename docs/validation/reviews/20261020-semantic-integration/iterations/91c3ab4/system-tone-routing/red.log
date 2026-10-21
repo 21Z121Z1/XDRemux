@@ -1,0 +1,140 @@
+test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) ... 
+  test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='complete') ... ERROR
+  test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='missing') ... ERROR
+  test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='duplicate') ... ERROR
+  test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='unexpected') ... ERROR
+  test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='nonfinite') ... ERROR
+  test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='missing-buffer') ... ERROR
+  test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='components') ... ERROR
+  test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='geometry') ... ERROR
+test_system_shell_retains_the_consumer_first_fault_before_scoring (tests.test_style_tone_response.StyleToneResponseTests.test_system_shell_retains_the_consumer_first_fault_before_scoring) ... ERROR
+test_real_extractor_preserves_sibling_helper_import_and_direct_search_order (tests.test_style_tone_response.PinnedExtractorIntegrationTests.test_real_extractor_preserves_sibling_helper_import_and_direct_search_order) ... FAIL
+test_real_extractor_recovers_v1_and_keeps_missing_role_failure (tests.test_style_tone_response.PinnedExtractorIntegrationTests.test_real_extractor_recovers_v1_and_keeps_missing_role_failure) ... FAIL
+
+======================================================================
+ERROR: test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='complete')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 182, in test_three_tone_request_requires_complete_finite_native_measurements
+    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: run_consumer() got an unexpected keyword argument 'tones'
+
+======================================================================
+ERROR: test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='missing')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 182, in test_three_tone_request_requires_complete_finite_native_measurements
+    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: run_consumer() got an unexpected keyword argument 'tones'
+
+======================================================================
+ERROR: test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='duplicate')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 182, in test_three_tone_request_requires_complete_finite_native_measurements
+    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: run_consumer() got an unexpected keyword argument 'tones'
+
+======================================================================
+ERROR: test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='unexpected')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 182, in test_three_tone_request_requires_complete_finite_native_measurements
+    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: run_consumer() got an unexpected keyword argument 'tones'
+
+======================================================================
+ERROR: test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='nonfinite')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 182, in test_three_tone_request_requires_complete_finite_native_measurements
+    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: run_consumer() got an unexpected keyword argument 'tones'
+
+======================================================================
+ERROR: test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='missing-buffer')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 182, in test_three_tone_request_requires_complete_finite_native_measurements
+    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: run_consumer() got an unexpected keyword argument 'tones'
+
+======================================================================
+ERROR: test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='components')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 182, in test_three_tone_request_requires_complete_finite_native_measurements
+    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: run_consumer() got an unexpected keyword argument 'tones'
+
+======================================================================
+ERROR: test_three_tone_request_requires_complete_finite_native_measurements (tests.test_style_tone_response.StyleToneResponseTests.test_three_tone_request_requires_complete_finite_native_measurements) (mode='geometry')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 182, in test_three_tone_request_requires_complete_finite_native_measurements
+    receipt = tone.run_consumer(research, [Path("system.heic")], root / "out", tones=(-1., 0., 1.))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: run_consumer() got an unexpected keyword argument 'tones'
+
+======================================================================
+ERROR: test_system_shell_retains_the_consumer_first_fault_before_scoring (tests.test_style_tone_response.StyleToneResponseTests.test_system_shell_retains_the_consumer_first_fault_before_scoring)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 226, in test_system_shell_retains_the_consumer_first_fault_before_scoring
+    receipt = json.loads((root / "out/tone/consumer-run.json").read_text())
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1027, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1013, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmp9e2_bwus/out/tone/consumer-run.json'
+
+======================================================================
+FAIL: test_real_extractor_preserves_sibling_helper_import_and_direct_search_order (tests.test_style_tone_response.PinnedExtractorIntegrationTests.test_real_extractor_preserves_sibling_helper_import_and_direct_search_order)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 562, in test_real_extractor_preserves_sibling_helper_import_and_direct_search_order
+    self.assertEqual(derived.returncode, 0, derived.stderr)
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/tmp/tmpiq_2adue/derived-owned/consumer-compat/research/vm-native/extract_inputs.py", line 14, in <module>
+    runpy.run_path(str(root/'research/vm-native/extract_inputs.py'),run_name='__main__')
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "/tmp/tmpiq_2adue/consumer/research/vm-native/extract_inputs.py", line 8, in <module>
+    from heif_standalone import standalone
+  File "/tmp/tmpiq_2adue/conflicting-path/heif_standalone.py", line 1, in <module>
+    raise RuntimeError('wrong external helper')
+RuntimeError: wrong external helper
+
+
+======================================================================
+FAIL: test_real_extractor_recovers_v1_and_keeps_missing_role_failure (tests.test_style_tone_response.PinnedExtractorIntegrationTests.test_real_extractor_recovers_v1_and_keeps_missing_role_failure)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/XDRemux-integration/tests/test_style_tone_response.py", line 576, in test_real_extractor_recovers_v1_and_keeps_missing_role_failure
+    self.assertEqual(recovered.returncode, 0, recovered.stderr)
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/tmp/tmp1_h414hn/v1-derived-owned/consumer-compat/research/vm-native/extract_inputs.py", line 14, in <module>
+    runpy.run_path(str(root/'research/vm-native/extract_inputs.py'),run_name='__main__')
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "/tmp/tmp1_h414hn/consumer/research/vm-native/extract_inputs.py", line 8, in <module>
+    from heif_standalone import standalone
+ModuleNotFoundError: No module named 'heif_standalone'
+
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.594s
+
+FAILED (failures=2, errors=9)

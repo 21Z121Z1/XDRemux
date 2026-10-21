@@ -1,0 +1,118 @@
+{
+  "source": "000e74b329d7f4f37a60da3523ccec1887e29469",
+  "run": 39521326241,
+  "job": 118965588781,
+  "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39521326241/job/118965588781",
+  "conclusion": "success",
+  "absolute_styles": {
+    "median_seconds": 9.582,
+    "median_budget_seconds": 11.732,
+    "p95_seconds": 12.168,
+    "p95_budget_seconds": 15.406,
+    "max_rss_mib": 1083.922,
+    "rss_budget_mib": 1361.367
+  },
+  "same_runner_comparison": {
+    "distinct_revisions": true,
+    "diagnostic_only": true,
+    "summary": {
+      "baseline": {
+        "median_wall_seconds": 11.353105290999792,
+        "median_user_seconds": 10.58,
+        "median_sys_seconds": 1.2,
+        "max_peak_rss_bytes": 1141440512
+      },
+      "candidate": {
+        "median_wall_seconds": 12.86168083299981,
+        "median_user_seconds": 11.86,
+        "median_sys_seconds": 2.05,
+        "max_peak_rss_bytes": 1136590848
+      },
+      "candidate_over_baseline_median": 1.1328777901140354
+    },
+    "candidate_profile": {
+      "arm": "candidate",
+      "status": "validated",
+      "logs": "candidate-profile",
+      "outside_budget_and_comparison_samples": true,
+      "limits": "One candidate-only diagnostic conversion; no baseline stage comparison. The two scene detail spans overlap scene_derivation; do not add them to stage totals.",
+      "wall_seconds": 11.359681792000174,
+      "time_real_seconds": 11.35,
+      "user_seconds": 10.59,
+      "sys_seconds": 1.36,
+      "peak_rss_bytes": 1136377856,
+      "output_bytes": 2894706,
+      "output_sha256": "fc519b4bf5a5d883dfdd6008a31fe55a8d63a1bcc7fb5eef630465112910fe73",
+      "stages": [
+        {
+          "stage": "source_analysis",
+          "wall_seconds": 0.006927417
+        },
+        {
+          "stage": "base_conversion",
+          "wall_seconds": 2.494362417
+        },
+        {
+          "stage": "semantic_production",
+          "wall_seconds": 3.114291083
+        },
+        {
+          "stage": "resource_decode",
+          "wall_seconds": 0.252895917
+        },
+        {
+          "stage": "scene_hdr_reconstruction",
+          "wall_seconds": 0.75285325
+        },
+        {
+          "stage": "scene_linear_area_reduction",
+          "wall_seconds": 0.118936125
+        },
+        {
+          "stage": "scene_derivation",
+          "wall_seconds": 1.173499791
+        },
+        {
+          "stage": "thumbnail_encode",
+          "wall_seconds": 0.269240167
+        },
+        {
+          "stage": "key1_fit",
+          "wall_seconds": 0.410995959
+        },
+        {
+          "stage": "style_metadata",
+          "wall_seconds": 0.250573375
+        },
+        {
+          "stage": "native_style_properties",
+          "wall_seconds": 0.001849708
+        },
+        {
+          "stage": "style_assembly",
+          "wall_seconds": 0.001563833
+        },
+        {
+          "stage": "texture_generation",
+          "wall_seconds": 3.230712792
+        },
+        {
+          "stage": "final_validation",
+          "wall_seconds": 0.012675958
+        },
+        {
+          "stage": "publication",
+          "wall_seconds": 0.005683375
+        }
+      ]
+    }
+  },
+  "limits": [
+    "The absolute gate passed without budget changes.",
+    "The interleaved candidate/main median ratio is diagnostic and remains 1.1328777901140354; the user CPU medians differ by 1.28 seconds.",
+    "Candidate-only stages do not identify a corresponding baseline stage cost or establish causality.",
+    "HDR reconstruction and linear reduction spans overlap scene_derivation and must not be summed with it.",
+    "No source code optimization, hardware-device or final-91c3ab4 pass is established by this receipt."
+  ],
+  "captured_at": "2026-10-21T00:44:54.819679+00:00"
+}

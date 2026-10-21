@@ -1,0 +1,57 @@
+{
+  "source": "91c3ab45310adb05d5e9e3a3d1c23e1345542b06",
+  "tree": "56d4dcfd50b29defb99d9d6f3afe0e50c144116b",
+  "review_kind": "Author review of six-file final delta; prior independent PVT/App/HEIF reviews remain separately frozen in v10. No additional independent reviewer or native execution claimed.",
+  "captured_at": "2026-10-21T00:46:02.010218+00:00",
+  "base": "000e74b329d7f4f37a60da3523ccec1887e29469",
+  "files": {
+    ".github/workflows/research.yml": "4de441a2bfc8dde8df15a92889088e0e3ff9085f04d5ccaa7c9642292a728768",
+    "crates/xdremux-cli/tests/live_photo_pvt.rs": "59fa7ac58e3c6080221d2f5d4dae1dbba0534842a97f901b24106ac697dbdcd2",
+    "scripts/apple/check_style_tone_response.py": "e2d45ed365576a52e346d2ef7159aa89049c75451a9d8b20367cf96a584a24b3",
+    "scripts/apple/measure_system_heif_hdr.sh": "048d716fa1f9d8ec8c46a149941507b1a01ab7f0a2c2a2a0c3e91f67ac96ee7a",
+    "tests/test_style_tone_response.py": "374b5da3643eb94c48c2fd03b2967c994ac5a3387af67ea0233d02b8c7e75366",
+    "tests/validation/test_workflow_configuration.py": "74460491b6ba4942a7f37fc5f34c3d8e457af08dbbbac2ebef85ce8daf1c3a10"
+  },
+  "findings": [
+    {
+      "severity": "P1",
+      "classification": "Act on",
+      "trigger": "Original pinned extract_inputs.py imports sibling heif_standalone under owned runpy launcher.",
+      "consequence": "All five real Apple references fail before native render.",
+      "repair": "Install original script directory before runpy; preserve extractor root insertion and original search order.",
+      "evidence": "system-tone-routing/red.log and green.log; original full extractor/helper/parser Git blob identities; real direct-versus-launcher integration."
+    },
+    {
+      "severity": "P1",
+      "classification": "Act on",
+      "trigger": "System measurement bypasses compatibility owner and raw sweep returns no requested textures.",
+      "consequence": "Scoring cannot consume real product tone -1 output and old stderr is missing.",
+      "repair": "Use the same owned consumer with exactly three requested tones; require complete finite native data and geometry/component agreement before completed receipt; preserve first stderr through allowed text diagnostics.",
+      "evidence": "000 actual System first-fault log and POSIX shell regression; actual native success not yet established."
+    },
+    {
+      "severity": "P2",
+      "classification": "Act on",
+      "trigger": "Successful PVT checkpoint canonicalizes /var through /private/var, or a real output symlink alias.",
+      "consequence": "Test rejects the same existing filesystem object before App steps run.",
+      "repair": "Compare canonical filesystem identity while checking all package member bytes before/after resume; retain initial pair, source, provenance, tamper and status assertions.",
+      "evidence": "Actual Linux symlink RED then 8 PVT tests GREEN; no product JSON or checkpoint semantics changed."
+    },
+    {
+      "severity": "P2",
+      "classification": "Consider",
+      "trigger": "000 same-runner five-pair comparison candidate/main medians 12.861680833/11.353105291.",
+      "consequence": "13.29 percent relative wall and 1.28 second median user CPU cost persists despite absolute gate pass.",
+      "repair": "No speculative optimization or numerical/threshold change. Preserve actual stage detail and residual attribution gap.",
+      "evidence": "000e74b-performance-review.json and complete job log. Candidate-only HDR reconstruction .752853s and linear reduction .118936s overlap scene 1.173500s; they are not baseline stage deltas."
+    }
+  ],
+  "checks": {
+    "focused": "42 PASS/no skips from actual pinned-source root; self-test, bash syntax and diff check pass.",
+    "final_head": "7/7 PASS and positional verify exit0; all280 Python tests executed with real pinned-source integration.",
+    "native": "Next source-head App30, System, Tone, performance and relocated arm64 package remain required.",
+    "device": "No current Photos PVT import, dynamic wallpaper or device UI pass."
+  },
+  "scope": "No product/native/HEIF algorithm, numerical gate, protection, cleanup activation or upstream change in final six-file delta.",
+  "portable_receipt_sha256": "cf6a267250da4d1506b2f09e11b845fed5786cf808316b44f95c1547b0d09b91"
+}
