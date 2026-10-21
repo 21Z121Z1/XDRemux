@@ -71,7 +71,11 @@ fn pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs() {
     let source = root.path().join("source.heic");
     let original = fs::read(fixture()).unwrap();
     fs::write(&source, &original).unwrap();
-    let output = root.path().join("out");
+    let actual = root.path().join("actual-output-parent");
+    fs::create_dir(&actual).unwrap();
+    let alias = root.path().join("output-parent-alias");
+    std::os::unix::fs::symlink(&actual, &alias).unwrap();
+    let output = alias.join("out");
     let batch = |format: &str, resume: bool| {
         let mut args = vec![
             "batch".as_ref(),
@@ -104,11 +108,27 @@ fn pvt_batch_resumes_only_its_recorded_container_and_keeps_pair_outputs() {
     let package = PathBuf::from(pvt_paths[0].as_str().unwrap());
     assert_eq!(package.extension().unwrap(), "pvt");
     assert!(package.is_dir());
+    let package_bytes = || {
+        fs::read_dir(&package)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                (entry.file_name(), fs::read(entry.path()).unwrap())
+            })
+            .collect::<std::collections::BTreeMap<_, _>>()
+    };
+    let before_resume = package_bytes();
     let reused = batch("pvt", true);
     assert_eq!(reused["successes"][0]["status"], "skipped-existing");
+    let reused_paths = reused["successes"][0]["outputs"].as_array().unwrap();
+    assert_eq!(reused_paths.len(), 1);
     assert_eq!(
-        reused["successes"][0]["outputs"],
-        pvt["successes"][0]["outputs"]
+        fs::canonicalize(reused_paths[0].as_str().unwrap()).unwrap(),
+        fs::canonicalize(&package).unwrap()
+    );
+    assert!(
+        package_bytes() == before_resume,
+        "resume changed package bytes"
     );
     let metadata = package.join("metadata.plist");
     let tampered = b"<plist version=\"1.0\"><dict><key>PFVideoComplementMetadataVersionKey</key><integer>1</integer></dict></plist>";
