@@ -167,6 +167,7 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *,
     command = [sys.executable, str(script), str(out_dir), *(str(photo) for photo in inputs),
                "--tones", *(str(value) for value in tones)]
     receipt = {"status": "running", "photos": names, "tones": list(tones), "command": command,
+               "python_executable": sys.executable, "python_version": sys.version,
                "returncode": None, "errors": [], "diagnostics": []}
     receipt_path = out_dir / "consumer-run.json"
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
@@ -174,7 +175,8 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *,
     try:
         reserved = {"", ".", "..", "diagnostics", "consumer-compat", "build.log",
                     "tone-sweep.json", "consumer-run.json"}
-        if not names or len(set(names)) != len(names) or any(name in reserved for name in names):
+        if (not names or len(set(names)) != len(names) or any(name in reserved for name in names)
+                or any((out_dir / name).resolve().parent != out_dir for name in names)):
             raise ValueError("consumer photos must have distinct safe stems outside owned output names")
         receipt["consumer_script_sha256"] = hashlib.sha256(script.read_bytes()).hexdigest()
         working_directory, receipt["parser_compatibility"] = prepare_consumer_compatibility(research_root, out_dir)

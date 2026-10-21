@@ -3,6 +3,7 @@ from pathlib import Path
 import contextlib
 import hashlib
 import io
+import itertools
 import json
 import os
 import plistlib
@@ -155,27 +156,66 @@ class StyleToneResponseTests(unittest.TestCase):
             self.assertEqual(parser.read_bytes(), before)
             self.assertEqual(receipt["parser_compatibility"]["original_source_sha256"], hashlib.sha256(before).hexdigest())
 
-    def test_consumer_rejects_unsafe_or_owned_case_names_before_launch(self):
-        for name in ("", "..heic", "...heic", "diagnostics.heic", "consumer-compat.heic",
-                     "build.log.heic", "tone-sweep.json.heic", "consumer-run.json.heic"):
-            with self.subTest(name=name), tempfile.TemporaryDirectory() as raw:
+    def test_consumer_case_names_preserve_namespace_across_stem_versions(self):
+        # Exercise both documented pathlib rules on every host, in addition to
+        # the real local interpreter. These fixtures do not execute Python3.15.
+        class LeadingDotsPath(type(Path())):
+            @property
+            def stem(self):
+                prefix = self.name.rsplit(".", 1)[0]
+                return prefix if prefix.lstrip(".") else self.name
+
+        class LegacyStemPath(type(Path())):
+            @property
+            def stem(self):
+                index = self.name.rfind(".")
+                return self.name[:index] if 0 < index < len(self.name) - 1 else self.name
+
+        class EscapingCasePath(type(Path())):
+            @property
+            def stem(self):
+                return "../outside"
+
+        names = ("", ".", "..", "..heic", "...heic", "diagnostics.heic", "consumer-compat.heic",
+                 "build.log.heic", "tone-sweep.json.heic", "consumer-run.json.heic")
+        cases = [*itertools.product(names, (Path, LeadingDotsPath, LegacyStemPath)),
+                 ("escape.heic", EscapingCasePath)]
+        for name, path_type in cases:
+            photo = path_type(name)
+            component = photo.stem
+            safe_leading_dots = name in {"..heic", "...heic"} and component in {"..heic", "...heic"}
+            with self.subTest(name=name, stem=component, parser=path_type.__name__, python=sys.version.split()[0]), tempfile.TemporaryDirectory() as raw:
                 root = Path(raw)
                 research = root / "consumer"
                 self.install_parser(research)
                 script = research / "consumer-model/harness/run_tone_sweep.py"
                 script.parent.mkdir(parents=True)
-                # A real child marks its launch outside the consumer-owned root.
-                # Rejected case names must never reach any upstream process.
-                script.write_text("from pathlib import Path\nimport sys\n"
+                # The stub's case is an explicit fixture for that interpreter
+                # rule. It returns complete finite output for accepted names;
+                # a marker alone cannot prove admission, pairing or escape.
+                script.write_text("from pathlib import Path\nimport sys,json,numpy as np\n"
                                   "out=Path(sys.argv[1])\n"
                                   "(out.parent/'upstream-launched').write_text('launched')\n"
-                                  "(out/'tone-sweep.json').write_text('[]')\n")
+                                  f"case={component!r}\n"
+                                  "rd=out/case/'tone-0'/'renderer-0'; rd.mkdir(parents=True)\n"
+                                  "np.array([.4,.4,.4,1],dtype='<f2').tofile(rd/'_outputImageTexture.bin')\n"
+                                  "(rd/'trace.json').write_text(json.dumps({'process_status':0,'finish_status':0,'textures':{'_outputImageTexture':{'width':1,'height':1}}}))\n"
+                                  "rows=[{'photo':case,'tone':0,'returncode':0,'components':3,'differing_components':0,'max_abs':0,'psnr_peak1_db':'inf'}]\n"
+                                  "(out/'tone-sweep.json').write_text(json.dumps(rows))\n")
                 with contextlib.redirect_stderr(io.StringIO()):
-                    receipt = tone.run_consumer(research, [Path(name)], root / "out", tones=(0.,))
-                self.assertEqual(receipt["status"], "failed")
-                self.assertFalse((root / "upstream-launched").exists())
-                self.assertIsNone(receipt["returncode"])
-                self.assertFalse((root / "out/consumer-compat").exists())
+                    receipt = tone.run_consumer(research, [photo], root / "out", tones=(0.,))
+                if safe_leading_dots:
+                    self.assertEqual(receipt["status"], "completed", receipt)
+                    self.assertEqual(receipt["returncode"], 0)
+                    case_directory = root / "out" / component
+                    self.assertTrue((case_directory / "tone-0/renderer-0/_outputImageTexture.bin").is_file())
+                    self.assertEqual(case_directory.resolve().parent, (root / "out").resolve())
+                    self.assertEqual(receipt["photos"], [component])
+                else:
+                    self.assertEqual(receipt["status"], "failed")
+                    self.assertFalse((root / "upstream-launched").exists())
+                    self.assertIsNone(receipt["returncode"])
+                    self.assertFalse((root / "out/consumer-compat").exists())
 
     def test_three_tone_request_requires_complete_finite_native_measurements(self):
         for mode in ("complete", "missing", "duplicate", "unexpected", "nonfinite", "missing-buffer", "components", "geometry"):
