@@ -1,19 +1,153 @@
 """Behavioral checks for complete native Tone measurements and failure receipts."""
 from pathlib import Path
 import contextlib
+import hashlib
 import io
 import json
+import struct
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
+from unittest import mock
 
 import numpy as np
 
 from scripts.apple import check_style_tone_response as tone
 
 
+# Exact pinned parse_iinf body, with small executable fixture helpers. The
+# separate audit also drives the complete pinned parser on real Rust output.
+PARSER_FIXTURE = '''from typing import Any
+def _read_fullbox(data, offset):
+    return data[offset], 0, offset + 4
+def _u16(data, offset):
+    return int.from_bytes(data[offset:offset+2], "big")
+def _u32(data, offset):
+    return int.from_bytes(data[offset:offset+4], "big")
+def iter_boxes(data, pos, end):
+    boxes = []
+    while pos + 8 <= end:
+        size = _u32(data, pos)
+        box = {"type": data[pos+4:pos+8].decode(), "offset": pos, "size": size, "payload_offset": pos+8}
+        if size < 8 or pos + size > end:
+            box["parse_error"] = "invalid box size"
+            boxes.append(box)
+            break
+        boxes.append(box)
+        pos += size
+    return boxes
+def parse_infe(data, box):
+    return {"item_id": _u32(data, box["payload_offset"])}
+def parse_iinf(data: bytes, box_info: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    version, _flags, pos = _read_fullbox(data, box_info["payload_offset"])
+    end = box_info["payload_offset"] + box_info["payload_size"]
+    if version in (0, 1):
+        if pos + 2 > end:
+            return {}
+        entry_count = _u16(data, pos)
+        pos += 2
+    else:
+        if pos + 4 > end:
+            return {}
+        entry_count = _u32(data, pos)
+        pos += 4
+    items: dict[str, dict[str, Any]] = {}
+    for child in iter_boxes(data, pos, end)[:entry_count]:
+        if child["type"] != "infe":
+            continue
+        item = parse_infe(data, child)
+        item_id = item.get("item_id")
+        if item_id is not None:
+            items[str(item_id)] = item
+    return items
+'''
+
+
 class StyleToneResponseTests(unittest.TestCase):
+    def install_parser(self, research):
+        path = research / "tools/heif_dump.py"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(PARSER_FIXTURE)
+        patch = mock.patch.object(tone, "PINNED_HEIF_DUMP_SHA256", hashlib.sha256(path.read_bytes()).hexdigest(), create=True)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return path
+
+    def parser_module(self, research):
+        source, receipt = tone.patched_iinf_parser(research / "tools/heif_dump.py")
+        module = types.ModuleType("patched_parser_fixture")
+        exec(compile(source, "patched-fixture", "exec"), module.__dict__)
+        return module, receipt
+
+    def test_iinf_adapter_accepts_v0_and_v1_counts_and_rejects_incomplete_data(self):
+        with tempfile.TemporaryDirectory() as raw:
+            research = Path(raw)
+            path = self.install_parser(research)
+            original = path.read_bytes()
+            module, receipt = self.parser_module(research)
+            child = struct.pack(">I4sI", 12, b"infe", 7)
+            for version, count in ((0, b"\0\1"), (1, b"\0\0\0\1")):
+                data = bytes([version, 0, 0, 0]) + count + child
+                self.assertEqual(module.parse_iinf(data, {"payload_offset": 0, "payload_size": len(data)}), {"7": {"item_id": 7}})
+            for data in (b"\0\0\0", b"\0\0\0\0\0", b"\1\0\0\0\0\1",
+                         b"\2\0\0\0\0\0\0\1" + child,
+                         b"\1\0\0\0\0\0\0\1", b"\1\0\0\0\0\0\0\2" + child,
+                         b"\1\0\0\0\0\0\0\1" + child + b"x",
+                         b"\1\0\0\0\0\0\0\1" + struct.pack(">I4sI", 13, b"infe", 7)):
+                with self.subTest(data=data.hex()), self.assertRaises(ValueError):
+                    module.parse_iinf(data, {"payload_offset": 0, "payload_size": len(data)})
+            self.assertEqual(path.read_bytes(), original)
+            self.assertEqual(receipt["original_source_sha256"], hashlib.sha256(original).hexdigest())
+            self.assertEqual(len(receipt["patch_sha256"]), 64)
+
+    def test_iinf_adapter_rejects_an_unexpected_source_hash(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            path = self.install_parser(root)
+            path.write_text(path.read_text() + "# changed upstream\n")
+            with self.assertRaisesRegex(ValueError, "hash"):
+                self.parser_module(root)
+            script = root / "consumer-model/harness/run_tone_sweep.py"
+            script.parent.mkdir(parents=True)
+            marker = root / "consumer-ran"
+            script.write_text(f"from pathlib import Path\nPath({str(marker)!r}).touch()\n")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                receipt = tone.run_consumer(root, [Path("sample.heic")], root / "out")
+            self.assertEqual(receipt["status"], "failed")
+            self.assertIsNone(receipt["returncode"])
+            self.assertIn("hash", json.dumps(receipt["errors"]))
+            self.assertFalse(marker.exists())
+            self.assertEqual(json.loads((root / "out/consumer-run.json").read_text())["status"], "failed")
+
+    def test_consumer_routes_extraction_through_the_owned_adapter(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            research = root / "consumer"
+            parser = self.install_parser(research)
+            before = parser.read_bytes()
+            extractor = research / "research/vm-native/extract_inputs.py"
+            extractor.parent.mkdir(parents=True)
+            data = b"\1\0\0\0\0\0\0\1" + struct.pack(">I4sI", 12, b"infe", 7)
+            extractor.write_text("from tools.heif_dump import parse_iinf\n"
+                                 f"data={data!r}\n"
+                                 "assert len(parse_iinf(data,{'payload_offset':0,'payload_size':len(data)}))==1\n")
+            script = research / "consumer-model/harness/run_tone_sweep.py"
+            script.parent.mkdir(parents=True)
+            script.write_text("from pathlib import Path\nimport json,subprocess,sys\n"
+                              "out=Path(sys.argv[1])\n"
+                              "rc=subprocess.call(['python3',str(Path.cwd()/'research/vm-native/extract_inputs.py'),sys.argv[2],str(out/'resources')])\n"
+                              "assert rc==0\nassert Path(sys.argv[2]).is_absolute()\n"
+                              f"rows=[{{'photo':'sample.xdremux','tone':t,'returncode':0,'components':3,'differing_components':0,'max_abs':0,'psnr_peak1_db':'inf'}} for t in {tone.TONES!r}]\n"
+                              "(out/'tone-sweep.json').write_text(json.dumps(rows))\n")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                receipt = tone.run_consumer(research, [Path("sample.xdremux.heic")], root / "out")
+            self.assertEqual(receipt["status"], "completed", receipt)
+            self.assertEqual(receipt["returncode"], 0)
+            self.assertEqual(parser.read_bytes(), before)
+            self.assertEqual(receipt["parser_compatibility"]["original_source_sha256"], hashlib.sha256(before).hexdigest())
+
     def metadata(self, resources, name):
         photo = resources / name
         photo.mkdir(parents=True)
@@ -187,6 +321,7 @@ class StyleToneResponseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             research = root / "consumer"
+            self.install_parser(research)
             script = research / "consumer-model/harness/run_tone_sweep.py"
             script.parent.mkdir(parents=True)
             script.write_text("from pathlib import Path\nimport json,sys\n"
@@ -208,6 +343,7 @@ class StyleToneResponseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             research = root / "consumer"
+            self.install_parser(research)
             script = research / "consumer-model/harness/run_tone_sweep.py"
             script.parent.mkdir(parents=True)
             script.write_text("import sys\nprint('consumer started')\nprint('native tool failed first',file=sys.stderr)\nsys.exit(7)\n")
@@ -222,6 +358,7 @@ class StyleToneResponseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             research = root / "consumer"
+            self.install_parser(research)
             script = research / "consumer-model/harness/run_tone_sweep.py"
             script.parent.mkdir(parents=True)
             script.write_text("from pathlib import Path\nimport json,sys\n"
@@ -253,6 +390,7 @@ class StyleToneResponseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             research = root / "consumer"
+            self.install_parser(research)
             script = research / "consumer-model/harness/run_tone_sweep.py"
             script.parent.mkdir(parents=True)
             script.write_text("import time\ntime.sleep(30)\n")

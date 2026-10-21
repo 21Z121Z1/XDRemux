@@ -28,6 +28,90 @@ import numpy as np
 Y_WEIGHTS = np.array([0.22897456, 0.69173852, 0.07928691], dtype=np.float64)
 TONES = (-1.0, -0.75, -0.5, -0.35, -0.15, 0.0, 0.15, 0.35, 0.5, 0.75, 1.0)
 STEP_EPSILON = 1e-4
+PINNED_RESEARCH_REVISION = "37dd551a949047ed14580efa0c0a2556922791b5"
+PINNED_HEIF_DUMP_SHA256 = "24ef91b177d6346fb3952036e8e2b770c4491c7aad5bea85244a768794336e10"
+# The fixed research parser reads iinf v1's u32 count as u16. Apply these
+# checked replacements only to its parse_iinf function; keep its other parsers.
+IINF_COMPAT_PATCHES = (
+    ('    version, _flags, pos = _read_fullbox(data, box_info["payload_offset"])\n'
+     '    end = box_info["payload_offset"] + box_info["payload_size"]\n',
+     '    start = box_info["payload_offset"]\n'
+     '    end = start + box_info["payload_size"]\n'
+     '    if start < 0 or end > len(data) or end - start < 4:\n'
+     '        raise ValueError("truncated iinf header")\n'
+     '    version, _flags, pos = _read_fullbox(data, start)\n'
+     '    if version not in (0, 1):\n'
+     '        raise ValueError("unsupported iinf version")\n'),
+    ('    if version in (0, 1):\n', '    if version == 0:\n'),
+    ('        if pos + 2 > end:\n            return {}\n',
+     '        if pos + 2 > end:\n            raise ValueError("truncated iinf count")\n'),
+    ('        if pos + 4 > end:\n            return {}\n',
+     '        if pos + 4 > end:\n            raise ValueError("truncated iinf count")\n'),
+    ('    for child in iter_boxes(data, pos, end)[:entry_count]:\n',
+     '    children = iter_boxes(data, pos, end)\n'
+     '    if (len(children) != entry_count\n'
+     '            or any(child.get("parse_error") or child["type"] != "infe" for child in children)\n'
+     '            or pos + sum(child["size"] for child in children) != end):\n'
+     '        raise ValueError("incomplete iinf entries")\n'
+     '    for child in children:\n'),
+    ('    return items\n',
+     '    if len(items) != entry_count:\n'
+     '        raise ValueError("missing or duplicate iinf item IDs")\n'
+     '    return items\n'),
+)
+
+
+def patched_iinf_parser(path: Path) -> tuple[bytes, dict]:
+    original = path.read_bytes()
+    source_hash = hashlib.sha256(original).hexdigest()
+    if source_hash != PINNED_HEIF_DUMP_SHA256:
+        raise ValueError("pinned consumer HEIF parser source hash differs")
+    source = original.decode("utf-8")
+    start = source.index("def parse_iinf(")
+    end = source.index("\ndef parse_iloc(", start) if "\ndef parse_iloc(" in source[start:] else len(source)
+    function = source[start:end]
+    for before, after in IINF_COMPAT_PATCHES:
+        if function.count(before) != 1:
+            raise ValueError("pinned consumer iinf patch context differs")
+        function = function.replace(before, after, 1)
+    patched = (source[:start] + function + source[end:]).encode("utf-8")
+    return patched, {
+        "name": "iinf-v1-u32-count", "upstream_revision": PINNED_RESEARCH_REVISION,
+        "original_source_sha256": source_hash,
+        "original_git_blob_sha1": hashlib.sha1(b"blob " + str(len(original)).encode() + b"\0" + original).hexdigest(),
+        "patch_sha256": hashlib.sha256(json.dumps(IINF_COMPAT_PATCHES, separators=(",", ":")).encode()).hexdigest(),
+        "patched_source_sha256": hashlib.sha256(patched).hexdigest(),
+        "scope": "Owned extraction launcher; fixed upstream files and media bytes remain unchanged.",
+    }
+
+
+def prepare_consumer_compatibility(research_root: Path, out_dir: Path) -> tuple[Path, dict]:
+    original = research_root / "tools/heif_dump.py"
+    patched, receipt = patched_iinf_parser(original)
+    owned = out_dir / "consumer-compat"
+    extractor = owned / "research/vm-native/extract_inputs.py"
+    extractor.parent.mkdir(parents=True)
+    parser = owned / "heif_dump.py"
+    parser.write_bytes(patched)
+    # run_tone_sweep uses cwd only to locate the extractor; its native renderer
+    # and Metal model remain at their fixed original paths. The launcher loads
+    # this one derived parser before executing the original extractor unchanged.
+    extractor.write_text(
+        "import hashlib,importlib.util,runpy,sys\n"
+        "from pathlib import Path\n"
+        f"root=Path({str(research_root)!r})\nparser=Path({str(parser)!r})\n"
+        f"if hashlib.sha256((root/'tools/heif_dump.py').read_bytes()).hexdigest()!={receipt['original_source_sha256']!r}:\n"
+        "    raise ValueError('original parser hash changed before extraction')\n"
+        f"if hashlib.sha256(parser.read_bytes()).hexdigest()!={receipt['patched_source_sha256']!r}:\n"
+        "    raise ValueError('derived parser hash changed before extraction')\n"
+        "sys.path.insert(0,str(root))\n"
+        "spec=importlib.util.spec_from_file_location('tools.heif_dump',parser)\n"
+        "module=importlib.util.module_from_spec(spec)\nsys.modules[spec.name]=module\n"
+        "spec.loader.exec_module(module)\n"
+        "runpy.run_path(str(root/'research/vm-native/extract_inputs.py'),run_name='__main__')\n"
+    )
+    receipt["launcher_sha256"] = hashlib.sha256(extractor.read_bytes()).hexdigest()
+    return owned, receipt
 
 
 def _finite_number(value) -> bool:
@@ -71,7 +155,8 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *, time
     diagnostics.mkdir()
     script = research_root / "consumer-model/harness/run_tone_sweep.py"
     names = [photo.stem for photo in photos]
-    command = [sys.executable, str(script), str(out_dir), *(str(photo) for photo in photos),
+    inputs = [photo if photo.is_absolute() else research_root / photo for photo in photos]
+    command = [sys.executable, str(script), str(out_dir), *(str(photo) for photo in inputs),
                "--tones", *(str(value) for value in TONES)]
     receipt = {"status": "running", "photos": names, "tones": list(TONES), "command": command,
                "returncode": None, "errors": [], "diagnostics": []}
@@ -82,8 +167,11 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *, time
         if not names or len(set(names)) != len(names):
             raise ValueError("consumer photos must have distinct nonempty stems")
         receipt["consumer_script_sha256"] = hashlib.sha256(script.read_bytes()).hexdigest()
+        working_directory, receipt["parser_compatibility"] = prepare_consumer_compatibility(research_root, out_dir)
+        receipt["working_directory"] = str(working_directory)
+        receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
         with (diagnostics / "consumer.stdout.log").open("w") as stdout, (diagnostics / "consumer.stderr.log").open("w") as stderr:
-            with subprocess.Popen(command, cwd=research_root, stdout=stdout, stderr=stderr,
+            with subprocess.Popen(command, cwd=working_directory, stdout=stdout, stderr=stderr,
                                   start_new_session=os.name == "posix") as child:
                 try:
                     receipt["returncode"] = child.wait(timeout=timeout)
