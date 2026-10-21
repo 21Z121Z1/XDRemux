@@ -1,0 +1,29 @@
+import XCTest
+
+// Only the exact bundle installed by this probe in its owned simulator.
+final class PVTShareUITests: XCTestCase {
+    func testWholePackageSystemShare() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication(bundleIdentifier: "@@BUNDLE_ID@@")
+        app.launchArguments = ["--phase", "share"]
+        app.launch()
+        let share = app.buttons["share-pvt"]
+        XCTAssertTrue(share.waitForExistence(timeout: 20), "owned PVT share app did not launch")
+        share.tap()
+        let predicate = NSPredicate(format: "identifier == %@ OR label IN %@",
+                                    "com.apple.UIKit.activity.SaveToCameraRoll",
+                                    ["Save Image", "Save Live Photo", "Save to Photos"])
+        let candidates = app.buttons.matching(predicate)
+        XCTAssertTrue(candidates.firstMatch.waitForExistence(timeout: 20),
+                      "Could not identify Photos save action (locator or capability). UI: \(app.debugDescription)")
+        XCTAssertEqual(candidates.count, 1, "Ambiguous Photos save activities: \(app.debugDescription)")
+        print("PVT_SHARE_NATIVE_ACTIVITY: \(candidates.firstMatch.debugDescription)")
+        candidates.firstMatch.tap()
+        let result = app.staticTexts["share-result"]
+        let completed = NSPredicate(format: "label == %@", "completed")
+        expectation(for: completed, evaluatedWith: result)
+        waitForExpectations(timeout: 45)
+        print("PVT_SHARE_SYSTEM_COMPLETED; library admission still requires independent readback")
+        app.terminate()
+    }
+}

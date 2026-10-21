@@ -84,10 +84,10 @@ class WorkflowConfigurationTests(unittest.TestCase):
         self.assertNotIn("|| true", job)
         self.assertNotRegex(job, r"runs-on: .*-(?:large|xlarge)")
         prefix = "${{ runner.temp }}/pvt-native-import/pvt-native-owned/"
-        for name in ("result.json", "baseline.json", "after.json", "direct-pvt-addmedia.stderr"):
+        for name in ("result.json", "baseline.json", "after.json", "share.json", "share-transfer.json", "test-share-ui.stderr"):
             self.assertTrue(self.uploaded("research.yml", prefix + name))
         for name in ("synthetic-motion.jpg", "synthetic.mp4", "capture.pvt/image.heic",
-                     "readback/resource-0.bin", "PVTReadback.app/Info.plist"):
+                     "readback/resource-0.bin", "PVTReadback.app/Info.plist", "share-results.xcresult/Info.plist"):
             self.assertFalse(self.uploaded("research.yml", prefix + name))
 
     @staticmethod

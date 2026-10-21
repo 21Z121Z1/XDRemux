@@ -16,7 +16,7 @@ class PVTNativeImportTests(unittest.TestCase):
     def test_console_retains_native_rejection_and_only_fixed_text_diagnostics(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
-            (root / "direct-pvt-addmedia.stderr").write_text("native rejection: unsupported directory\n")
+            (root / "test-share-ui.stderr").write_text("native rejection: unsupported directory\n")
             (root / "compile-reader.stderr").write_text("FIRST-ERROR" + "x" * 13000 + "LAST-ERROR")
             (root / "media.jpg").write_bytes(b"never-print-media")
             (root / "unexpected.stderr").write_text("not-an-allowed-diagnostic")
@@ -35,6 +35,44 @@ class PVTNativeImportTests(unittest.TestCase):
             self.assertIn("complete text retained in artifact", text)
             for forbidden in ("never-print-media", "not-an-allowed-diagnostic", "never-follow-a-link"):
                 self.assertNotIn(forbidden, text)
+
+    def test_share_completion_requires_the_whole_current_package_file_promise(self):
+        shared = {"status": "completed", "activity_completed": True, "is_save_to_camera_roll": True}
+        package = Path("/owned/container/Documents/capture.pvt")
+        hashes = {"capture.heic": "still", "capture.mov": "movie", "metadata.plist": "metadata"}
+        transfer = {"type_identifier": "com.apple.live-photo", "representation": "file",
+                    "is_in_place": False, "whole_package_url": str(package), "member_sha256": hashes}
+        probe.check_share_receipt(shared, transfer, package, hashes)
+        for mutation in ({}, {"type_identifier": "public.jpeg"}, {"representation": "data"},
+                         {"is_in_place": True}, {"whole_package_url": str(package / "capture.heic")},
+                         {"member_sha256": {"capture.heic": "still"}}):
+            with self.subTest(mutation=mutation):
+                changed = {} if not mutation else {**transfer, **mutation}
+                with self.assertRaises(probe.Blocked):
+                    probe.check_share_receipt(shared, changed, package, hashes)
+        for changed in ({**shared, "activity_completed": False}, {**shared, "is_save_to_camera_roll": False}):
+            with self.assertRaises(probe.Blocked):
+                probe.check_share_receipt(changed, transfer, package, hashes)
+        # A completed share callback remains distinct from library admission.
+        baseline, after = self.baseline_and_after()
+        after["photo_live"] = False
+        with self.assertRaises(probe.Blocked):
+            self.check(baseline, after)
+
+    def test_ui_project_is_bound_only_to_the_created_probe_bundle(self):
+        source = Path(probe.__file__).parent
+        with tempfile.TemporaryDirectory() as raw:
+            work = Path(raw)
+            bundle = "org.xdremux.audit.PVTReadback.u" + "a" * 32
+            project = probe.prepare_share_tests(source, work, bundle)
+            code = (project.parent / "PVTShareUITests.swift").read_text()
+            self.assertIn('XCUIApplication(bundleIdentifier: "' + bundle + '")', code)
+            self.assertNotIn("@@BUNDLE_ID@@", code)
+            self.assertTrue((project / "project.pbxproj").is_file())
+            self.assertTrue((project / "xcshareddata/xcschemes/PVTShareUITests.xcscheme").is_file())
+        with tempfile.TemporaryDirectory() as raw:
+            with self.assertRaises(probe.Blocked):
+                probe.prepare_share_tests(source, Path(raw), "com.apple.mobileslideshow")
 
     def baseline_and_after(self):
         return ({"status": "baseline", "asset_identifiers": ["stock"]},
@@ -137,6 +175,8 @@ class PVTNativeImportTests(unittest.TestCase):
         self.assertEqual(probe.select_device(runtimes, types), ("com.apple.iOS-27-0", "phone"))
         with self.assertRaises(probe.Blocked):
             probe.select_device({"runtimes": []}, types)
+        with self.assertRaises(probe.Blocked):
+            probe.select_device({"runtimes": [{"isAvailable": True, "identifier": "com.apple.iOS-16-0", "version": "16.0"}]}, types)
         with self.assertRaises(probe.Blocked):
             probe.select_device(runtimes, {"devicetypes": []})
 

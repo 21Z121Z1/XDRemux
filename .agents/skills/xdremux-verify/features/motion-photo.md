@@ -146,10 +146,18 @@ This recipe proves the exercised binary's portable conversion and structural pai
 
 For direct PVT package admission, the `pvt-native-import` job in `research.yml`
 runs `scripts/apple/pvt_native_import/check_native_import.py` on the free macOS
-runner. It builds the exact source CLI, generates geometric media and passes
-the whole package once to a newly created simulator. Read-only PhotoKit then
-checks the added asset, Live Photo subtype, original resources, identifiers,
-cover time and hashes. Only text receipts leave the runner. Missing runtimes,
-unsupported package import, permissions, readback or cleanup failures remain
-non-PASS results. Member import is never substituted. A simulator result does
-not prove physical Photos editing or dynamic wallpaper eligibility.
+runner. It builds the exact source CLI and generates geometric media. It first
+compiles a cold SDK canary and the actual reader separately, installs only its
+own app and establishes a read-only PhotoKit baseline. It transports the whole
+validated directory unchanged into that app and offers it as a
+`com.apple.live-photo` file representation to the system Photos save activity.
+XCUITest selects only that activity inside the exact created simulator. The
+system callback, requested whole-package hashes and independent PhotoKit
+asset/resource/identifier/cover/hash readback are all required. A UI callback
+alone is not admission. The known unsupported `simctl addmedia` directory route
+is not repeated; decomposed-member import and PhotoKit pair creation are not
+substitutes. Only fixed text receipts leave the runner; media and UI result
+bundles stay local. Missing runtime, SDK, permission, save-action locator,
+native acceptance, readback or cleanup remains non-PASS. This probes the iOS
+simulator sharing path, not macOS Photos library selection, physical-device
+Photos editing or dynamic wallpaper eligibility.

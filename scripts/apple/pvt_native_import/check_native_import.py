@@ -1,4 +1,4 @@
-"""Verify direct PVT import in one disposable simulator; never use host Photos."""
+"""Drive whole-PVT system sharing in one owned simulator; never use host Photos."""
 import argparse
 import hashlib
 import json
@@ -27,10 +27,11 @@ def print_console_receipt(work, report):
     # Keep the first native failure inspectable when artifact transfer is not
     # available. Only this owned probe's fixed text outputs are eligible.
     print("PVT native receipt:\n" + json.dumps(report, indent=2, sort_keys=True))
-    for name in ('simctl-addmedia-help.stdout', 'compile-generator.stderr',
-                 'generate-synthetic.stderr', 'compile-reader.stderr',
+    for name in ('compile-generator.stderr', 'generate-synthetic.stderr',
+                 'compile-sdk-canary.stderr', 'compile-reader.stderr',
                  'grant-owned-photos.stderr', 'baseline.json',
-                 'direct-pvt-addmedia.stdout', 'direct-pvt-addmedia.stderr',
+                 'build-share-ui.stderr', 'test-share-ui.stdout', 'test-share-ui.stderr',
+                 'share.json', 'share-transfer.json',
                  'after.json', 'shutdown-owned.stderr', 'delete-owned.stderr'):
         path = work / name
         if not path.is_file() or path.is_symlink():
@@ -82,7 +83,7 @@ def wrap_motion_photo(jpeg, movie):
 
 def select_device(runtimes, types):
     candidates = [item for item in runtimes['runtimes'] if item.get('isAvailable') is True
-                  and '.iOS-' in item.get('identifier', '')]
+                  and '.iOS-' in item.get('identifier', '') and int(item['version'].split('.')[0]) >= 17]
     candidates.sort(key=lambda item: tuple(int(x) for x in item['version'].split('.')), reverse=True)
     for runtime in candidates:
         parts = [int(x) for x in runtime['version'].split('.')]
@@ -119,6 +120,31 @@ def check_readback(baseline, after, expected_id, expected_hashes, cover_seconds)
             'original_resource_hashes_match': matches, 'original_resource_bytes_match': all(matches.values())}
 
 
+def prepare_share_tests(source, work, bundle):
+    if not re.fullmatch(r'org\.xdremux\.audit\.PVTReadback\.u[0-9a-f]{32}', bundle):
+        raise Blocked('share test bundle does not belong to this probe')
+    target = work / 'share-tests'
+    target.mkdir()
+    shutil.copytree(source / 'PVTShareTests.xcodeproj', target / 'PVTShareTests.xcodeproj')
+    template = (source / 'PVTShareUITests.swift.in').read_text()
+    if template.count('@@BUNDLE_ID@@') != 1:
+        raise Blocked('share UI test bundle binding is not singular')
+    (target / 'PVTShareUITests.swift').write_text(template.replace('@@BUNDLE_ID@@', bundle))
+    return target / 'PVTShareTests.xcodeproj'
+
+
+def check_share_receipt(shared, transfer, package, expected_members):
+    if (shared.get('status') != 'completed' or shared.get('activity_completed') is not True
+            or shared.get('is_save_to_camera_roll') is not True):
+        raise Blocked('native Photos save activity did not complete; no admission assumed')
+    native_url = Path(transfer.get('whole_package_url', ''))
+    if (transfer.get('type_identifier') != 'com.apple.live-photo'
+            or transfer.get('representation') != 'file' or transfer.get('is_in_place') is not False
+            or not native_url.is_absolute() or native_url.name != package.name
+            or transfer.get('member_sha256') != expected_members):
+        raise Blocked('system share did not request the exact whole PVT file representation')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--repo', type=Path, required=True)
@@ -134,8 +160,14 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='pvt-native-', dir=args.output_root))
     report = {'status': 'pending-native-execution', 'work': str(work), 'host_system': platform.system(),
+              'host_architecture': platform.machine(), 'host_version': platform.mac_ver()[0],
               'commands': [], 'direct_package_import_only': True, 'media_uploaded': False,
-              'probe_source_sha256': {path.name: sha(path) for path in source.glob('*.swift')}}
+              'native_route': 'iOS Simulator system Photos save activity; whole live-photo file representation',
+              'not_exercised': ['macOS Photos library import', 'physical-device Photos or wallpaper'],
+              'known_unsupported_route_not_repeated': 'simctl addmedia rejects PVT directories (NSPOSIXErrorDomain22)',
+              'probe_source_sha256': {str(path.relative_to(source)): sha(path) for path in source.rglob('*')
+                                      if path.is_file() and (path.name.endswith(('.swift', '.swift.in', '.xcscheme'))
+                                                             or path.name == 'project.pbxproj')}}
     owned_udid = None
     motion = None
     package = None
@@ -143,6 +175,7 @@ def main():
     def run(name, command, *, timeout=60, required=True):
         record = {'name': name, 'argv': list(map(str, command))}
         report['commands'].append(record)
+        started = time.monotonic()
         try:
             result = subprocess.run(record['argv'], cwd=args.repo, capture_output=True, timeout=timeout)
             (work / (name + '.stdout')).write_bytes(result.stdout)
@@ -158,12 +191,18 @@ def main():
                 (work / (name + '.stdout')).write_bytes(error.stdout or b'')
                 (work / (name + '.stderr')).write_bytes(error.stderr or b'')
             raise Blocked(f'{name}: {error}') from error
+        finally:
+            record['duration_seconds'] = time.monotonic() - started
 
-    def read_report(phase, bundle):
-        run('launch-' + phase, ['xcrun', 'simctl', 'launch', owned_udid, bundle, '--phase', phase])
+    def app_container(phase, bundle):
         container = Path(run('container-' + phase, ['xcrun', 'simctl', 'get_app_container', owned_udid, bundle, 'data']).stdout.decode().strip())
         if not container.is_absolute() or owned_udid.lower() not in {part.lower() for part in container.parts}:
             raise Blocked('reader container path is not within the owned simulator')
+        return container
+
+    def read_report(phase, bundle):
+        run('launch-' + phase, ['xcrun', 'simctl', 'launch', owned_udid, bundle, '--phase', phase])
+        container = app_container(phase, bundle)
         deadline = time.monotonic() + 45
         path = container / 'Documents' / (phase + '.json')
         while not path.is_file() and time.monotonic() < deadline:
@@ -186,10 +225,10 @@ def main():
             raise Blocked('expected committed HEAD and clean checkout are required')
         if platform.system() != 'Darwin':
             # Retain the actual missing-tool error, not a synthetic native success.
-            run('simctl-addmedia-help', ['xcrun', 'simctl', 'help', 'addmedia'])
+            run('simulator-sdk-path', ['xcrun', '--sdk', 'iphonesimulator', '--show-sdk-path'])
             raise Blocked('native probe requires macOS')
         run('xcode-version', ['xcodebuild', '-version'])
-        run('simctl-addmedia-help', ['xcrun', 'simctl', 'help', 'addmedia'])
+        run('macos-version', ['sw_vers'])
         privacy = run('simctl-privacy-help', ['xcrun', 'simctl', 'help', 'privacy'], required=False)
         help_text = (privacy.stdout + privacy.stderr).decode(errors='replace')
         privacy_available = privacy.returncode == 0 and bool(re.search(r'\bgrant\b', help_text)) and bool(re.search(r'\bphotos\b', help_text))
@@ -248,38 +287,68 @@ def main():
                 'CFBundlePackageType': 'APPL', 'CFBundleVersion': '1', 'CFBundleShortVersionString': '1.0',
                 'MinimumOSVersion': '17.0', 'LSRequiresIPhoneOS': True, 'UILaunchScreen': {},
                 'CFBundleSupportedPlatforms': ['iPhoneSimulator'], 'UIDeviceFamily': [1],
-                'NSPhotoLibraryUsageDescription': 'Read only the synthetic media in this disposable audit simulator.'}
+                'NSPhotoLibraryUsageDescription': 'Read and verify synthetic media in this disposable audit simulator.',
+                'NSPhotoLibraryAddUsageDescription': 'Save only the synthetic whole PVT through the system activity in this disposable simulator.'}
         (app / 'Info.plist').write_bytes(plistlib.dumps(info))
-        baseline = None
+        if not privacy_available or not sdk:
+            raise Blocked('documented owned photos grant or simulator SDK unavailable; no alternate permission setup')
+        architecture = platform.machine()
+        if architecture != 'arm64':
+            raise Blocked('complete native PVT probe requires the arm64 product runner')
+        compile_command = ['xcrun', '--sdk', 'iphonesimulator', 'swiftc', '-swift-version', '5', '-parse-as-library',
+                           '-target', architecture + '-apple-ios17.0-simulator', '-sdk', sdk,
+                           '-module-cache-path', work / 'sdk-module-cache',
+                           '-Xfrontend', '-debug-time-function-bodies',
+                           '-Xfrontend', '-warn-long-function-bodies=500']
+        run('compile-sdk-canary', [*compile_command, source / 'SDKCompileProbe.swift', '-o', work / 'sdk-canary'], timeout=120)
+        run('compile-reader', [*compile_command, source / 'ReadbackCore.swift', source / 'PVTReadback.swift',
+                               '-o', app / 'PVTReadback'], timeout=120)
+        run('sign-owned-reader', ['codesign', '--force', '--sign', '-', app])
+        report['reader_binary_sha256'] = sha(app / 'PVTReadback')
+        report['reader_info_sha256'] = sha(app / 'Info.plist')
+        run('install-owned-reader', ['xcrun', 'simctl', 'install', owned_udid, app])
+        # Only the exact created UDID and installed bundle; no host TCC/SQLite.
+        run('grant-owned-photos', ['xcrun', 'simctl', 'privacy', owned_udid, 'grant', 'photos', bundle])
+        baseline = read_report('baseline', bundle)
+        if baseline.get('status') != 'baseline' or not isinstance(baseline.get('asset_identifiers'), list):
+            raise Blocked('owned simulator did not provide an authorized baseline identifier set')
+        container = app_container('share', bundle)
+        transported = container / 'Documents/capture.pvt'
+        # Transport the complete validated directory unchanged. No resource
+        # list is passed to PhotoKit, and no new pair is created by this probe.
+        shutil.copytree(package, transported)
+        expected_members = report['package_sha256_before_import']
+        before_share = {path.name: sha(path) for path in transported.iterdir()}
+        if before_share != expected_members:
+            raise Blocked('whole-package transport changed source bytes before sharing')
+        report['transported_package_sha256_before_share'] = before_share
+        project = prepare_share_tests(source, work, bundle)
+        report['ui_test_source_sha256'] = sha(project.parent / 'PVTShareUITests.swift')
+        ui_command = ['xcodebuild', '-project', project, '-scheme', 'PVTShareUITests',
+                      '-destination', 'id=' + owned_udid, '-derivedDataPath', work / 'ui-build',
+                      'CODE_SIGNING_ALLOWED=NO', 'PRODUCT_BUNDLE_IDENTIFIER=' + bundle + '.uitests']
+        run('build-share-ui', [*ui_command, 'build-for-testing'], timeout=300)
+        report['native_share_ui_test_invoked'] = True
         try:
-            if not privacy_available or not sdk:
-                raise Blocked('documented owned photos grant or simulator SDK unavailable; no alternate permission setup')
-            architecture = platform.machine()
-            if architecture not in ('arm64', 'x86_64'):
-                raise Blocked('unrecognized simulator host architecture')
-            run('compile-reader', ['xcrun', '--sdk', 'iphonesimulator', 'swiftc', '-swift-version', '5', '-parse-as-library',
-                                  '-target', architecture + '-apple-ios17.0-simulator', '-sdk', sdk,
-                                  source / 'PVTReadback.swift', '-o', app / 'PVTReadback'], timeout=120)
-            run('sign-owned-reader', ['codesign', '--force', '--sign', '-', app])
-            run('install-owned-reader', ['xcrun', 'simctl', 'install', owned_udid, app])
-            # Explicitly authorized setup, only this created UDID and installed bundle.
-            # Never host TCC, SQLite, globally selected simulator, or unrelated app IDs.
-            run('grant-owned-photos', ['xcrun', 'simctl', 'privacy', owned_udid, 'grant', 'photos', bundle])
-            baseline = read_report('baseline', bundle)
-            if baseline.get('status') != 'baseline' or not isinstance(baseline.get('asset_identifiers'), list):
-                raise Blocked('owned simulator did not provide an authorized baseline identifier set')
-        except Blocked as error:
-            report['readback_setup_blocked'] = str(error)
-            baseline = None
-        # The sole import call: exactly the complete directory, no child paths.
-        report['direct_import_attempted'] = True
-        result = run('direct-pvt-addmedia', ['xcrun', 'simctl', 'addmedia', owned_udid, package], timeout=90, required=False)
-        report['direct_import_exit_code'] = result.returncode
-        if result.returncode:
-            raise Blocked('native whole-directory PVT import rejected; no pair fallback attempted')
-        report['direct_import_command_succeeded'] = True
-        if baseline is None:
-            raise Blocked('whole-directory addmedia exited zero; asset admission remains unconfirmed because readback setup failed')
+            run('test-share-ui', [*ui_command, '-resultBundlePath', work / 'share-results.xcresult',
+                                 '-only-testing:PVTShareUITests/PVTShareUITests/testWholePackageSystemShare',
+                                 'test-without-building'], timeout=180)
+        finally:
+            # Retain native callbacks on UI failure as well as success.
+            for phase in ('share', 'share-transfer'):
+                path = container / 'Documents' / (phase + '.json')
+                if path.is_file() and not path.is_symlink():
+                    shutil.copy2(path, work / (phase + '.json'))
+            report['transported_package_sha256_after_share'] = {
+                path.name: sha(path) if path.is_file() and not path.is_symlink() else '<non-regular-entry>'
+                for path in transported.iterdir()} if transported.is_dir() and not transported.is_symlink() else None
+        shared = json.loads((work / 'share.json').read_text())
+        transfer = json.loads((work / 'share-transfer.json').read_text())
+        check_share_receipt(shared, transfer, transported, expected_members)
+        if report['transported_package_sha256_after_share'] != expected_members:
+            raise Blocked('native sharing changed the transported package bytes')
+        report['system_save_activity_completed'] = True
+        report['whole_pvt_representation_requested'] = True
         after = read_report('after', bundle)
         added = set(after.get('asset_identifiers', [])) - set(baseline['asset_identifiers'])
         report['single_live_asset_admission_verified'] = (len(added) == 1 and after.get('asset_local_identifier') in added and after.get('photo_live') is True)

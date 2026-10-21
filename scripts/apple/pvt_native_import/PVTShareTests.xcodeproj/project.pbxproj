@@ -1,0 +1,48 @@
+// !$*UTF8*$!
+{
+ archiveVersion = 1;
+ classes = {};
+ objectVersion = 56;
+ objects = {
+  A00000000000000000000001 = {isa = PBXBuildFile; fileRef = A00000000000000000000002; };
+  A00000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PVTShareUITests.swift; sourceTree = "<group>"; };
+  A00000000000000000000003 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PVTShareUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+  A00000000000000000000004 = {isa = PBXGroup; children = (A00000000000000000000002, A00000000000000000000005); sourceTree = "<group>"; };
+  A00000000000000000000005 = {isa = PBXGroup; children = (A00000000000000000000003); name = Products; sourceTree = "<group>"; };
+  A00000000000000000000006 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
+  A00000000000000000000007 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+  A00000000000000000000008 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+  A00000000000000000000009 = {
+   isa = PBXNativeTarget; buildConfigurationList = A0000000000000000000000A;
+   buildPhases = (A00000000000000000000006, A00000000000000000000007, A00000000000000000000008);
+   buildRules = (); dependencies = (); name = PVTShareUITests;
+   productName = PVTShareUITests; productReference = A00000000000000000000003;
+   productType = "com.apple.product-type.bundle.ui-testing";
+  };
+  A0000000000000000000000A = {isa = XCConfigurationList; buildConfigurations = (A0000000000000000000000B); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+  A0000000000000000000000B = {
+   isa = XCBuildConfiguration; name = Debug;
+   buildSettings = {
+    CODE_SIGNING_ALLOWED = NO; GENERATE_INFOPLIST_FILE = YES;
+    IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+    LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks");
+    PRODUCT_BUNDLE_IDENTIFIER = "org.xdremux.audit.PVTShareUITests";
+    PRODUCT_NAME = "$(TARGET_NAME)";
+    SDKROOT = iphonesimulator; SUPPORTED_PLATFORMS = iphonesimulator;
+    SWIFT_VERSION = 5.0; SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+    TARGETED_DEVICE_FAMILY = 1; TEST_TARGET_NAME = ""; TEST_HOST = "";
+   };
+  };
+  A0000000000000000000000C = {
+   isa = PBXProject; attributes = {LastUpgradeCheck = 2700; };
+   buildConfigurationList = A0000000000000000000000D;
+   compatibilityVersion = "Xcode 14.0"; developmentRegion = en;
+   hasScannedForEncodings = 0; knownRegions = (en, Base);
+   mainGroup = A00000000000000000000004; productRefGroup = A00000000000000000000005;
+   projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000009);
+  };
+  A0000000000000000000000D = {isa = XCConfigurationList; buildConfigurations = (A0000000000000000000000E); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+  A0000000000000000000000E = {isa = XCBuildConfiguration; name = Debug; buildSettings = {CLANG_ENABLE_MODULES = YES; }; };
+ };
+ rootObject = A0000000000000000000000C;
+}
