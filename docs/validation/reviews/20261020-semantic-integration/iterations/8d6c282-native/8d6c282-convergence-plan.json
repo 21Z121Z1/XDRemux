@@ -2,7 +2,7 @@
   "schema_version": 1,
   "operation_enabled": false,
   "approval": "Direction approved; final merge/delete execution NOT approved.",
-  "captured_at": "2026-10-21T07:19:25.615311+00:00",
+  "captured_at": "2026-10-21T07:39:34.894108+00:00",
   "repository": "21Z121Z1/XDRemux",
   "candidate": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
   "tree": "24128c312feb507a95672c168c43bb1b0c07c805",
@@ -84,12 +84,12 @@
       "action": "Verify remote heads contains onlymain atM and all originalheads still recoverable. Refresh local worktree inventory and dirty-file recovery, retain physical worktrees/media, detach owned integration worktree, create/check localmain tracking origin/main then normally delete only merged localwork/integrate refs after review; reverify onlymain localhead."
     }
   ],
-  "local_inventory": "4275f0f-local-worktree-inventory.json",
-  "local_dirty_recovery": "4275f0f-local-dirty-recovery.json",
+  "local_inventory": "8d6c282-local-worktree-inventory.json",
+  "local_dirty_recovery": "8d6c282-local-dirty-recovery.json",
   "guard_state": "v8template100644/NOTAPPROVED; not activated; hooksPath/permissions require fresh review.",
   "forbidden": "No merge/delete now; no upstream/releases/force push/paid resources/protection/global security changes.",
   "outcome": "Plan only; no cleanup or merge operation executed.",
   "native_source": "Current8d6 exact14/App30and32/Tone88/System3/package/native-release/absolute-performance checks passed at exact source. PVT failed at readiness, install0. Relative Styles cost+12.3091% remains; old+13.0422/+33.1235 and every attempt preserved.",
-  "evidence_binding": "Immutablev21 current-head native dossier plus38ref exact restoration and fresh fsck/equality. No parent execution approval, no merge or cleanup.",
-  "latest_evidence_note": "Bounded host diagnostics only; old86native19success/1inventoryfailure retained. Runtime metadata parent-verified supports selected iPhone11. New native actual observation pending, no service recovery/import or cross-runner performance improvement claim. All38 refs/9heads independently restored before any merge/delete consideration."
+  "evidence_binding": "Corrected persistent review revision of the exact8d6terminal dossier; publication receipt identifies commit/tree/index. Operation remains disabled; no parent merge/delete approval.",
+  "latest_evidence_note": "Exact8d6all20checks terminal19success/1PVTinventoryfailure; current bounded host diagnostics executed. Device metadata and VM facts read; host ps/logd also timed out. Installation0, no grant/baseline/complete-package sharing/readback. Runtime explicitly supports selected iPhone11.38refs/9heads and dirty patch reconstruction verified. No service recovery, Photos rejection/admission or cross-runner performance improvement claim. Same-job readiness control is authorized but not yet executed."
 }
