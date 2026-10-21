@@ -1,0 +1,40 @@
+{
+  "source": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "run": 39557962421,
+  "job": 119082111552,
+  "conclusion": "success",
+  "native_rows": [
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": -1.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 40094,
+      "max_abs": 0.005859375,
+      "psnr_peak1_db": 67.31545344735109
+    },
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": 0.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 0,
+      "max_abs": 0.0,
+      "psnr_peak1_db": "inf"
+    },
+    {
+      "photo": "lhdr-v1-01.system",
+      "tone": 1.0,
+      "returncode": 0,
+      "components": 168960,
+      "differing_components": 66931,
+      "max_abs": 0.00634765625,
+      "psnr_peak1_db": 63.98242993496426
+    }
+  ],
+  "synthetic_hdr_roundtrip": "1 passed; 0 failed; 0 ignored;",
+  "log_sha256": "3b6d686517664ef86b6aa676a1bd1d3bd5b3e94c3bb116e837314ff61e921fb1",
+  "limits": [
+    "Actual System HEIF render data only; full Tone, PVT Photos admission/readback, physical device and wallpaper are separate."
+  ]
+}

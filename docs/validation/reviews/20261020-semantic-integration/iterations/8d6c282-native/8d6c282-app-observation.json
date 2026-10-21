@@ -1,0 +1,249 @@
+{
+  "source": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "run": 39557962447,
+  "job": 119082110843,
+  "conclusion": "success",
+  "url": "https://github.com/21Z121Z1/XDRemux/actions/runs/39557962447/job/119082110843",
+  "app_builds": [
+    "XDRemuxApp Debug",
+    "XDRemuxAppModelTests Debug"
+  ],
+  "model_harness": "Actual XDRemuxAppModelTests passed sentinel after all30 registered calls.",
+  "registered_model_calls": [
+    "testImportDiscoversHEICFilesAndDeduplicates",
+    "testConversionCategorizationUsesAssetTypeAndModeDirectories",
+    "testCategorizationPreviewCopyAndDuplicateRerun",
+    "testCategorizationDefaultsToEachSourceDirectory",
+    "testCategorizationCancellationKeepsCancelledState",
+    "testImportedRowsStartWithEmptyThumbnailState",
+    "testOutputCollisionsAreMarkedBeforeConversion",
+    "testOutputPlanFlagsInvalidExistingOutputAsOverwriteRisk",
+    "testOutputParentFileBlocksConversionBeforeWorkStarts",
+    "testPreparingOutputKeepsInvalidExistingFileUntilConversionSucceeds",
+    "testThumbnailRendererProducesBoundedPNGData",
+    "testEffectiveConcurrencyRespectsMemoryAndUserLimit",
+    "testQueueStatusCountsMatchAllTerminalStates",
+    "testClearCompletedAndRetryFailedKeepQueuePredictable",
+    "testThumbnailResultOnlyAppliesToExistingMatchingQueueItem",
+    "testUserFacingCopyUsesClearConversionTerms",
+    "testProductPolicyDefaults",
+    "testSimplifiedProductSwitches",
+    "testIndependentAppleFeatureConfiguration",
+    "testCLIClientDrainsBothPipesWhileRunning",
+    "testSkipRequiresValidationForTheRequestedFeature",
+    "testOutputCannotOverwriteQueuedInputsOrAliases",
+    "testCategorizedConversionCreatesDirectories",
+    "testExistingOutputReplacementPreservesFailureAndSuccess",
+    "testExistingMotionPhotoOutputIsNeverReplacedAsOneFile",
+    "testLivePhotoOutputArgumentsAndMixedQueuePlans",
+    "testPVTChoiceReachesRustWithoutChangingOrdinaryOutput",
+    "testExistingPVTDestinationsAreNeverAdoptedOrReplaced",
+    "testExistingPVTPackagesAreNotScannedOrUsedAsOutputDirectories",
+    "testPVTPreviewUsesSourceImage"
+  ],
+  "native_pvt_matrix": [
+    {
+      "case": "direct-package",
+      "format": "pair",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "direct-missing-child",
+      "format": "pair",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-package",
+      "format": "pair",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-missing-child",
+      "format": "pair",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-missing-multilevel",
+      "format": "pair",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-interior",
+      "format": "pair",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-interior-missing-multilevel",
+      "format": "pair",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-chain-missing-multilevel",
+      "format": "pair",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "direct-package",
+      "format": "pair",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "direct-missing-child",
+      "format": "pair",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-package",
+      "format": "pair",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-missing-child",
+      "format": "pair",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-missing-multilevel",
+      "format": "pair",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-interior",
+      "format": "pair",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-interior-missing-multilevel",
+      "format": "pair",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-chain-missing-multilevel",
+      "format": "pair",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "direct-package",
+      "format": "pvt",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "direct-missing-child",
+      "format": "pvt",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-package",
+      "format": "pvt",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-missing-child",
+      "format": "pvt",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-missing-multilevel",
+      "format": "pvt",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-interior",
+      "format": "pvt",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-interior-missing-multilevel",
+      "format": "pvt",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "alias-chain-missing-multilevel",
+      "format": "pvt",
+      "skip": "true",
+      "blocked": true
+    },
+    {
+      "case": "direct-package",
+      "format": "pvt",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "direct-missing-child",
+      "format": "pvt",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-package",
+      "format": "pvt",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-missing-child",
+      "format": "pvt",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-missing-multilevel",
+      "format": "pvt",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-interior",
+      "format": "pvt",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-interior-missing-multilevel",
+      "format": "pvt",
+      "skip": "false",
+      "blocked": true
+    },
+    {
+      "case": "alias-chain-missing-multilevel",
+      "format": "pvt",
+      "skip": "false",
+      "blocked": true
+    }
+  ],
+  "darwin_resolution_observation": "Existing alias roots resolve inside existing.PVT, but nonexistent multilevel full paths still contain alias components in resolvedDirectory/resolvedOutput. All32 are blocked by the shared existing-ancestor guard.",
+  "source_and_package_assertions": "No CLI validate/convert on blocked paths; source bytes, complete package member sets/bytes and alias destinations checked by the executed regression.",
+  "texture_transactions": "5native transactions plus real CLI, batch and App bridge passed before model stage.",
+  "log_sha256": "fa89c8579cd445ecb05a71245d5a8eb32f605ef65649b90ee3e328394f1704e3",
+  "limits": [
+    "Actual8d6native product/App30/32case evidence only; whole PVT installation/UI/Photos admission/readback is separate."
+  ],
+  "captured_at": "2026-10-21T07:17:47.568301+00:00",
+  "model_harness_source_sha256": "91081e08ee5c415a48f6a561ddcd9cb6109a0b19ed2ce616b24ed9b5e7bca18f",
+  "model_call_count_checked_from_actual_main": 30,
+  "rgb8_consumer": "Actual macOS debug consumer test passed; native release equivalence is separate current performance job."
+}

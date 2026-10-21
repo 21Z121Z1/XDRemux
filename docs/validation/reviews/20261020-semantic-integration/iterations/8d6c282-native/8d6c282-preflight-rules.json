@@ -1,0 +1,81 @@
+{
+  "observed_at": "2026-10-21 07:19:05 UTC",
+  "ruleset": {
+    "id": 21932863,
+    "name": "XDRemux default branch protection",
+    "target": "branch",
+    "source_type": "Repository",
+    "source": "21Z121Z1/XDRemux",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "exclude": [],
+        "include": [
+          "~DEFAULT_BRANCH"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": false,
+          "required_reviewers": [],
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true,
+          "require_extra_approval_for_unattributed_changes": true,
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "exact-head"
+            }
+          ]
+        }
+      },
+      {
+        "type": "code_scanning",
+        "parameters": {
+          "code_scanning_tools": [
+            {
+              "tool": "CodeQL",
+              "security_alerts_threshold": "high_or_higher",
+              "alerts_threshold": "errors"
+            }
+          ]
+        }
+      }
+    ],
+    "node_id": "RRS_lACqUmVwb3NpdG9yec5IzQu8zgFOqz8",
+    "created_at": "2026-08-31T07:05:46.756-07:00",
+    "updated_at": "2026-08-31T07:19:19.183-07:00",
+    "bypass_actors": [],
+    "current_user_can_bypass": "never",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/21Z121Z1/XDRemux/rulesets/21932863"
+      },
+      "html": {
+        "href": "https://github.com/21Z121Z1/XDRemux/rules/21932863"
+      }
+    }
+  }
+}

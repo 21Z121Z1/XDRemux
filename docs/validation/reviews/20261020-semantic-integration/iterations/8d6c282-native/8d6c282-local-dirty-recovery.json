@@ -1,0 +1,13 @@
+{
+  "source": "8d6c2823f015f06ca28d35ef80e4b3e7e2a4971a",
+  "backup_ref": "refs/tags/backup/semantic-review-20261020/integration/8d6c282",
+  "dirty_worktree": "/workspace/xdremux-audit/style-fit-accumulation-prototype/candidate-source",
+  "dirty_base": "1b2c07da2cb2b0c89c64ca546148fe5d68d75a97",
+  "file": "crates/xdremux-engine/src/apple_photographic_styles.rs",
+  "file_sha256": "b1f58170b7bc6504eb7e1957c481bb8cd6d32e91ccfbbbca5ee0213cb615cc81",
+  "recorded_worktree_patch_sha256": "31be7f073e7ac635492d010910121789faa33e8c69f3b01b91e226b4207aa358",
+  "reconstructed_from_durable_tag_patch_sha256": "31be7f073e7ac635492d010910121789faa33e8c69f3b01b91e226b4207aa358",
+  "patch_bytes_match": true,
+  "base_is_ancestor_of_durable_tip": true,
+  "effect": "No local modifications overwritten or removed. Complete uncommitted file bytes equal the durable tag blob; its base commit is retained in the tag ancestry."
+}
