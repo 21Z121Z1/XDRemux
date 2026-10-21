@@ -39,6 +39,12 @@ const STYLE_DELTA_COLUMNS_PORTRAIT: u32 = 5;
 
 // Opt-in diagnostics contain fixed stage labels and elapsed time only. Keep
 // stdout and the native adapter protocol unchanged.
+fn profile_start() -> Option<Instant> {
+    std::env::var("XDREMUX_STYLES_PROFILE")
+        .is_ok_and(|value| value == "1")
+        .then(Instant::now)
+}
+
 fn profile_stage(profile: &mut Option<Instant>, stage: &'static str) {
     if let Some(started) = profile {
         eprintln!(
@@ -111,9 +117,7 @@ pub(crate) fn convert_file(
     source: &[u8],
     output: impl AsRef<Path>,
 ) -> Result<PhotographicStylesFileReceipt> {
-    let mut profile = std::env::var("XDREMUX_STYLES_PROFILE")
-        .is_ok_and(|value| value == "1")
-        .then(Instant::now);
+    let mut profile = profile_start();
     let output = output.as_ref();
     let parent = publication_parent(output);
     if !parent.is_dir() {
@@ -719,6 +723,7 @@ fn derive_style_scene(
         RasterPixelFormat::Mono8 => 1,
         RasterPixelFormat::Rgb8 => 3,
     };
+    let mut reconstruction_profile = profile_start();
     let full_hdr = reconstruct_scene_linear_hdr(
         &full_sdr,
         GainMapCodes {
@@ -738,6 +743,7 @@ fn derive_style_scene(
         &application,
     )
     .map_err(|error| RuntimeError::external("Photographic Styles source Gain Map", error))?;
+    profile_stage(&mut reconstruction_profile, "scene_hdr_reconstruction");
     let gain_map_maximum_stops = scale
         .per_channel_gain_map_max
         .iter()
@@ -785,10 +791,12 @@ fn derive_style_scene_from_linear_images(
 ) -> Result<StyleSceneRasters> {
     // Thumbnail reduction happens only after the gain is applied at the base
     // resolution. Both images use the same linear-light area footprint.
+    let mut reduction_profile = profile_start();
     let base_image = area_resize_linear_rgb(full_sdr, maximum_edge)
         .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
     let hdr_image = area_resize_linear_rgb(full_hdr, maximum_edge)
         .map_err(|error| RuntimeError::external("Photographic Styles Linear Thumbnail", error))?;
+    profile_stage(&mut reduction_profile, "scene_linear_area_reduction");
     if base_image.width != hdr_image.width
         || base_image.height != hdr_image.height
         || base_image.samples.len() != hdr_image.samples.len()
