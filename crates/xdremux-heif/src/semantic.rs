@@ -454,7 +454,7 @@ fn semantic_items(
     Ok((scaffold_tmap, images, metadata))
 }
 
-fn auxiliary_type_bytes<'a>(
+pub(crate) fn auxiliary_type_bytes<'a>(
     data: &'a [u8],
     property: &PropertyInfo,
 ) -> Result<(&'a [u8], &'a [u8])> {
@@ -476,7 +476,7 @@ fn auxiliary_type_bytes<'a>(
     Ok((&bytes[..end], &bytes[end + 1..]))
 }
 
-fn is_alpha_type(uri: &[u8]) -> bool {
+pub(crate) fn is_alpha_type(uri: &[u8]) -> bool {
     // HEIF/MIAF identifiers consumed as alpha by libheif's auxl reader:
     // https://github.com/strukturag/libheif/blob/364905fc9841bdda229e0ae2c5fda13b5fc98d1a/libheif/context.cc#L861
     matches!(
@@ -1930,7 +1930,11 @@ fn item_is_type(meta: &ParsedMeta, item_id: u32, item_type: FourCC) -> bool {
         .any(|item| item.item_id == item_id && item.item_type == Some(item_type))
 }
 
-fn coded_image_items(meta: &ParsedMeta, image_id: u32, context: &str) -> Result<Vec<u32>> {
+pub(crate) fn coded_image_items(
+    meta: &ParsedMeta,
+    image_id: u32,
+    context: &str,
+) -> Result<Vec<u32>> {
     let targets = match item_info(meta, image_id, context)?.item_type {
         Some(HVC1) => vec![image_id],
         Some(GRID) => dimg_targets(meta, image_id, context)?,
