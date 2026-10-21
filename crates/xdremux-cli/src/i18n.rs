@@ -106,7 +106,9 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         (_, "lang") => "终端显示语言（en 或 zh-CN）；JSON 始终保持不变。",
         ("convert", "input") => "输入 ProXDR、Motion Photo，或搭配 --apple-cinematic 的普通视频。",
         ("inspect", "input") => "输入 ProXDR HEIC 或支持的 Motion Photo。",
-        ("validate", "input") => "ISO HDR HEIC/HEIF，或 Apple Live Photo 文件对中的一个资源。",
+        ("validate", "input") => {
+            "ISO HDR HEIC/HEIF、Apple Live Photo 文件对中的一个资源，或 PVT 目录。"
+        }
         ("categorize", "inputs") => "输入图像或目录；可重复指定多个路径，目录会递归查找。",
         (_, "inputs") => "输入文件；可重复指定多个文件。",
         (_, "input_dirs") => {
@@ -116,6 +118,9 @@ fn description(command: &str, id: &str) -> Option<&'static str> {
         ("validate", "json") => "输出一个稳定的机器可读验证文档。",
         (_, "json") => "输出一个稳定的 JSON 回执，而不是终端进度信息。",
         (_, "oppo_compatible") => "转换 ProXDR 静态照片时保留 OPPO 相册兼容性。",
+        (_, "live_photo_output") => {
+            "实况照片封装：pair（默认文件对）或 pvt 目录包；其他资源保持原格式。"
+        }
         (_, "apple_portrait") => "利用 Vision 语义保留完整的 Apple Portrait 编辑资源。",
         (_, "apple_portrait_oppo") => {
             "使用 OPPO 景深及已有遮罩，不使用 Vision；人像效果受限（macOS）。"

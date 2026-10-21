@@ -48,10 +48,11 @@ enum OutputPlanStatus: String, Sendable, Equatable {
     case overwritesInput
     case inputMissing
     case outputParentIsFile
+    case existingPackage
 
     var blocksConversion: Bool {
         switch self {
-        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile:
+        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage:
             return true
         case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
             return false
@@ -642,9 +643,6 @@ final class XDRemuxViewModel {
                 guard fileKeys(item.outputURL).isDisjoint(with: protectedInputKeys) else {
                     throw RustCLIClient.ClientError.unsupportedConfiguration("输出路径会覆盖已导入的原始文件：\(item.outputURL.path)")
                 }
-                if config.skipExisting, AppConversionEngine.isValidOutput(item.outputURL, config: config) {
-                    return QueueWorkResult(id: item.id, status: .skippedExisting, errorMessage: nil, finishedAt: Date())
-                }
                 let disposition = try prepareOutputForConversion(
                     inputURL: item.inputURL,
                     outputURL: item.outputURL,
@@ -681,6 +679,9 @@ final class XDRemuxViewModel {
         let fileManager = FileManager.default
 
         for url in urls {
+            guard url.pathExtension.lowercased() != "pvt",
+                  url.resolvingSymlinksInPath().pathExtension.lowercased() != "pvt",
+                  !hasPVTPackageAncestor(url) else { continue }
             var isDirectory: ObjCBool = false
             if fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) {
                 if isDirectory.boolValue {
@@ -689,8 +690,12 @@ final class XDRemuxViewModel {
                         includingPropertiesForKeys: [.isRegularFileKey],
                         options: [.skipsHiddenFiles]
                     ) {
-                        for case let fileURL as URL in enumerator where fileURL.pathExtension.lowercased() == "heic" {
-                            heicURLs.append(fileURL)
+                        for case let fileURL as URL in enumerator {
+                            if fileURL.pathExtension.lowercased() == "pvt" {
+                                enumerator.skipDescendants()
+                            } else if fileURL.pathExtension.lowercased() == "heic", !hasPVTPackageAncestor(fileURL) {
+                                heicURLs.append(fileURL)
+                            }
                         }
                     }
                 } else if url.pathExtension.lowercased() == "heic" {
@@ -708,6 +713,7 @@ final class XDRemuxViewModel {
         captureMode: OppoCaptureMode?,
         assetType: PhotoAssetType
     ) -> URL {
+        let packageOutput = assetType == .livePhoto && config.livePhotoOutput == .pvt
         let categoryComponents = config.categorizeOutputByCaptureMode
             ? [assetType.folderName, captureMode?.folderName ?? PhotoFolderProjection.unclassifiedFolderName]
             : []
@@ -720,13 +726,42 @@ final class XDRemuxViewModel {
 
         if let outputDirectory = config.outputDirectory {
             return projectedDirectory(from: outputDirectory)
-                .appendingPathComponent(inputURL.lastPathComponent)
+                .appendingPathComponent(
+                    packageOutput ? inputURL.deletingPathExtension().lastPathComponent + ".pvt" : inputURL.lastPathComponent,
+                    isDirectory: packageOutput
+                )
         }
 
         let suffix = config.fileNameSuffix.isEmpty ? "_iso" : config.fileNameSuffix
         let stem = inputURL.deletingPathExtension().lastPathComponent
         let parent = projectedDirectory(from: inputURL.deletingLastPathComponent())
-        return parent.appendingPathComponent("\(stem)\(suffix).heic")
+        return parent.appendingPathComponent("\(stem)\(suffix).\(packageOutput ? "pvt" : "heic")", isDirectory: packageOutput)
+    }
+
+    nonisolated private static func pathEntryExists(_ url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.path)
+            || (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
+    }
+
+    // PVT is opaque to the app. Never scan it or create output beneath it,
+    // including when an ordinary-looking directory aliases a package.
+    nonisolated private static func hasPVTPackageAncestor(_ url: URL) -> Bool {
+        for candidate in [url.standardizedFileURL, url.resolvingSymlinksInPath().standardizedFileURL] {
+            var parent = candidate.deletingLastPathComponent()
+            while parent.path != "/" {
+                if parent.pathExtension.lowercased() == "pvt" { return true }
+                let next = parent.deletingLastPathComponent()
+                guard next.path != parent.path else { break }
+                parent = next
+            }
+        }
+        return false
+    }
+
+    nonisolated private static func packageBlocksOutput(_ outputURL: URL) -> Bool {
+        let namesPackage = outputURL.pathExtension.lowercased() == "pvt"
+            || outputURL.resolvingSymlinksInPath().pathExtension.lowercased() == "pvt"
+        return hasPVTPackageAncestor(outputURL) || (namesPackage && pathEntryExists(outputURL))
     }
 
     nonisolated private static func pathKey(_ url: URL) -> String {
@@ -756,6 +791,7 @@ final class XDRemuxViewModel {
         guard fileManager.fileExists(atPath: inputURL.path) else {
             return .inputMissing
         }
+        if packageBlocksOutput(outputURL) { return .existingPackage }
 
         let parentURL = outputURL.deletingLastPathComponent()
         var isDirectory: ObjCBool = false
@@ -783,6 +819,8 @@ final class XDRemuxViewModel {
             return "输入文件不存在: \(item.inputURL.path)"
         case .outputParentIsFile:
             return "输出目录位置是文件，无法写入: \(item.outputURL.deletingLastPathComponent().path)"
+        case .existingPackage:
+            return "已有 PVT 包不能复用、替换或添加成员，请选择新的输出路径：\(item.outputURL.path)"
         case .ready, .willOverwriteExisting, .skipsExistingValidOutput:
             return ""
         }
@@ -794,6 +832,9 @@ final class XDRemuxViewModel {
         config: ConversionConfig
     ) throws -> OutputPreparationDisposition {
         let fileManager = FileManager.default
+        if packageBlocksOutput(outputURL) {
+            throw RustCLIClient.ClientError.unsupportedConfiguration("不能复用、替换或向已有 PVT 包内写入，请选择新的输出路径。")
+        }
         guard pathKey(inputURL) != pathKey(outputURL) else {
             return .ready
         }

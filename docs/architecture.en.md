@@ -64,7 +64,7 @@ The implementation tries to preserve source compressed image data when the selec
 
 ### Live Photo
 
-The normal Live Photo path publishes an HEIC/HEIF still and a MOV with a shared asset identifier.
+The default Live Photo path publishes an HEIC/HEIF still and a MOV with a shared asset identifier. The typed `LivePhotoOutput` intent optionally wraps that same validated pair in a real PVT directory; it does not cross a codec/remux boundary again. Rust owns its bounded package layout, validation and publication. The App forwards the choice and displays the planned container.
 
 The converter maps the resolved source cover time to Apple `still-image-time`.
 
@@ -74,13 +74,26 @@ The still writer preserves the source Gain Map when one is present and the outpu
 
 ### Publication
 
-Live Photo conversion succeeds only after both final members are published. It writes a validated, synced pair into its own private staging directory, then claims the MOV name before the still name using atomic no-clobber hard links. Existing final entries and unrelated files or directories are never replaced or deleted. Cooperating writers share the MOV claim, including `.heic` and `.heif` outputs with the same stem.
+With the default pair output, Live Photo conversion succeeds only after both final members are published. It writes a validated, synced pair into its own private staging directory, then claims the MOV name before the still name using atomic no-clobber hard links. Existing final entries and unrelated files or directories are never replaced or deleted. Cooperating writers share the MOV claim, including `.heic` and `.heif` outputs with the same stem.
 
 Two filesystem names are not a system-atomic transaction. If the second link fails, conversion returns an error identifying the partial MOV and retains the complete staged pair for explicit recovery. The staged `capture.heic` can be checked with `xdremux validate`; inspect both final entries before moving either member. Reconciliation only checks destinations: unknown partial or invalid pairs are preserved and rejected. Stale-looking names do not establish ownership.
 
 Publication requires same-filesystem hard-link support. Unsupported filesystems fail closed with the original I/O error; FAT/exFAT support is not claimed. This protocol cannot prevent an external writer from actively replacing final entries. Synced staging files do not establish directory-entry durability after power loss.
 
-Batch reuse requires source provenance. A valid pair with unknown lineage is not accepted as the output of an unrelated input.
+PVT publication writes the validated media and fixed XML version plist into an
+operation-owned private directory. A platform exclusive directory rename claims
+the single final package path without replacing even an empty existing directory.
+The deletion guard is disarmed before moving the directory, so it never cleans
+a later entry at the old staging pathname. A publication failure retains the
+complete package and reports its recovery path. macOS/Linux backends fail closed
+when exclusive rename is unavailable; other core platforms can read/validate the
+supported layout but do not silently use a replacing publisher. No directory
+power-loss durability or Photos/wallpaper acceptance is inferred.
+
+Batch reuse requires source provenance and matching container identity. A valid
+pair or package with unknown lineage is not accepted as the output of an
+unrelated input. The App has no durable source checkpoint for packages and
+therefore does not automatically adopt an existing PVT.
 
 ## Current technical documents
 

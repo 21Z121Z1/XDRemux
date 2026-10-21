@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::thread;
 
-use xdremux_engine::ConversionRequest;
+use xdremux_engine::{ConversionRequest, LivePhotoOutput};
 use xdremux_motion_photo::{Input, MotionPhoto, ParseOptions};
 use xdremux_source::{probe_bytes, SourceAsset};
 
@@ -38,6 +38,7 @@ pub struct BatchPlanOptions {
     pub reuse_existing: bool,
     pub categorize_output: bool,
     pub cinematic_output: bool,
+    pub live_photo_output: LivePhotoOutput,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,6 +148,7 @@ impl BatchReceipt {
 }
 
 fn create_output_parent(path: &Path) -> Result<()> {
+    crate::live_photo_package::validate_output_parent(path)?;
     let Some(parent) = path.parent() else {
         return Ok(());
     };
@@ -180,7 +182,13 @@ fn publish_new_batch_output(
         .map_err(|error| RuntimeError::external("batch no-clobber publication", error.error))
 }
 
-fn output_candidate(input: &Path, parent: &Path, suffix: u32, cinematic: bool) -> Result<PathBuf> {
+fn output_candidate(
+    input: &Path,
+    parent: &Path,
+    suffix: u32,
+    cinematic: bool,
+    pvt: bool,
+) -> Result<PathBuf> {
     let stem = input.file_stem().ok_or_else(|| {
         RuntimeError::new(
             "batch planning",
@@ -192,7 +200,13 @@ fn output_candidate(input: &Path, parent: &Path, suffix: u32, cinematic: bool) -
     if suffix > 1 {
         name.push(format!(" ({suffix})"));
     }
-    name.push(if cinematic { ".mov" } else { ".heic" });
+    name.push(if cinematic {
+        ".mov"
+    } else if pvt {
+        ".pvt"
+    } else {
+        ".heic"
+    });
     Ok(parent.join(name))
 }
 
@@ -200,6 +214,7 @@ fn reusable_planned_output(
     checkpoint: &MotionPhotoCheckpoint,
     input: &Path,
     parent: &Path,
+    format: LivePhotoOutput,
 ) -> Result<Option<PathBuf>> {
     let signature = source_signature_path(input)?;
     let Some(prior) = checkpoint.reusable_item(input, &signature)? else {
@@ -208,11 +223,15 @@ fn reusable_planned_output(
     if prior.video != prior.image.with_extension("mov") {
         return Ok(None);
     }
-    let desired_parent = canonical_or_absolute(parent)?;
-    if prior.image.parent() != Some(desired_parent.as_path()) {
+    if prior.package.is_some() != (format == LivePhotoOutput::Pvt) {
         return Ok(None);
     }
-    Ok(Some(prior.image))
+    let output = prior.package.as_deref().unwrap_or(&prior.image);
+    let desired_parent = canonical_or_absolute(parent)?;
+    if output.parent() != Some(desired_parent.as_path()) {
+        return Ok(None);
+    }
+    Ok(Some(output.to_path_buf()))
 }
 
 /// Plan all batch outputs before the first conversion write.
@@ -243,6 +262,14 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
     let mut items = Vec::with_capacity(inputs.len());
 
     for input in inputs {
+        let pvt = options.live_photo_output == LivePhotoOutput::Pvt
+            && xdremux_source::inspect_path(input)
+                .is_ok_and(|value| matches!(value.asset, SourceAsset::MotionPhoto { .. }));
+        let format = if pvt {
+            LivePhotoOutput::Pvt
+        } else {
+            LivePhotoOutput::Pair
+        };
         let mut parent = match options.output_dir.as_deref() {
             Some(directory) => directory.to_path_buf(),
             None => input
@@ -254,14 +281,19 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
         if options.categorize_output {
             parent.push(classification_relative_directory(input)?);
         }
+        crate::live_photo_package::validate_output_parent(&parent.join("planned-output"))?;
 
         if let Some(prior) = checkpoint
             .as_ref()
-            .map(|state| reusable_planned_output(state, input, &parent))
+            .map(|state| reusable_planned_output(state, input, &parent, format))
             .transpose()?
             .flatten()
         {
-            let companion = prior.with_extension("mov");
+            let companion = if pvt {
+                prior.clone()
+            } else {
+                prior.with_extension("mov")
+            };
             if prior == *input || reserved.contains(&prior) || reserved.contains(&companion) {
                 return Err(RuntimeError::new(
                     "batch resume planning",
@@ -280,8 +312,13 @@ pub fn plan_batch_items(inputs: &[PathBuf], options: &BatchPlanOptions) -> Resul
 
         let mut suffix = 1_u32;
         let output = loop {
-            let candidate = output_candidate(input, &parent, suffix, options.cinematic_output)?;
-            let companion = candidate.with_extension("mov");
+            let candidate =
+                output_candidate(input, &parent, suffix, options.cinematic_output, pvt)?;
+            let companion = if pvt {
+                candidate.clone()
+            } else {
+                candidate.with_extension("mov")
+            };
             if candidate != *input
                 && !reserved.contains(&candidate)
                 && !reserved.contains(&companion)
@@ -333,6 +370,7 @@ struct BatchCheckpointEvent {
     source: PathBuf,
     image: PathBuf,
     video: PathBuf,
+    package: Option<PathBuf>,
     signature: SourceSignature,
     outcome: OwnedCheckpointOutcome,
 }
@@ -363,6 +401,7 @@ impl BatchCheckpointEvent {
             &self.image,
             &self.video,
             &self.signature,
+            self.package.as_deref(),
             outcome,
         )
     }
@@ -456,22 +495,46 @@ fn process_batch_item_with_options(
         match asset {
             SourceAsset::MotionPhoto { .. } => {
                 let signature = source_signature(&item.input, &source)?;
-                let output_video = item.output.with_extension("mov");
-
+                let package = (request.live_photo_output == LivePhotoOutput::Pvt)
+                    .then(|| item.output.clone());
+                let (output_image, output_video) = if package.is_some() {
+                    let members = crate::live_photo_package::planned_members(&item.output)?;
+                    (members.image, members.video)
+                } else {
+                    (item.output.clone(), item.output.with_extension("mov"))
+                };
+                let output_paths = || match &package {
+                    Some(path) => vec![path.clone()],
+                    None => vec![output_image.clone(), output_video.clone()],
+                };
+                let exists = fs::symlink_metadata(&item.output).is_ok()
+                    || (package.is_none() && fs::symlink_metadata(&output_video).is_ok());
                 if reuse_existing {
                     if let Some(prior) = checkpoint.reusable_item(&item.input, &signature)? {
-                        if prior.image == canonical_or_absolute(&item.output)?
+                        if prior.image == canonical_or_absolute(&output_image)?
                             && prior.video == canonical_or_absolute(&output_video)?
+                            && prior.package
+                                == package.as_deref().map(canonical_or_absolute).transpose()?
                         {
-                            if pair_matches_identifier(
-                                &item.output,
-                                &output_video,
-                                &prior.asset_identifier,
-                            ) {
+                            let layout_matches = package.is_none()
+                                || crate::live_photo_package::read_members(&item.output).is_ok_and(
+                                    |members| {
+                                        members.image == output_image
+                                            && members.video == output_video
+                                    },
+                                );
+                            if layout_matches
+                                && pair_matches_identifier(
+                                    &output_image,
+                                    &output_video,
+                                    &prior.asset_identifier,
+                                )
+                            {
                                 checkpoint_event = Some(BatchCheckpointEvent {
                                     source: item.input.clone(),
-                                    image: item.output.clone(),
+                                    image: output_image.clone(),
                                     video: output_video.clone(),
+                                    package: package.clone(),
                                     signature,
                                     outcome: OwnedCheckpointOutcome::SkippedExisting(
                                         prior.asset_identifier,
@@ -479,30 +542,26 @@ fn process_batch_item_with_options(
                                 });
                                 return Ok(BatchSuccess {
                                     input: item.input.clone(),
-                                    outputs: vec![item.output.clone(), output_video],
+                                    outputs: output_paths(),
                                     kind: BatchAssetKind::LivePhoto,
                                     disposition: BatchSuccessDisposition::SkippedExisting,
                                     omitted_resource_count: None,
                                 });
                             }
-                            if item.output.exists() || output_video.exists() {
-                                return Err(RuntimeError::new(
-                                    "batch resume provenance",
-                                    "checkpoint matches the source, but the existing HEIC/MOV pair no longer matches its recorded asset identifier; refusing to overwrite",
-                                ));
+                            if exists {
+                                return Err(RuntimeError::new("batch resume provenance",
+                                    "checkpoint matches the source, but the existing Live Photo output no longer matches its recorded container and asset identifier; refusing to overwrite"));
                             }
                         }
                     }
-                    if item.output.exists() || output_video.exists() {
-                        return Err(RuntimeError::new(
-                            "batch resume provenance",
-                            "existing Live Photo output has no matching source provenance; refusing to reuse or overwrite",
-                        ));
+                    if exists {
+                        return Err(RuntimeError::new("batch resume provenance",
+                            "existing Live Photo output has no matching source provenance; refusing to reuse or overwrite"));
                     }
-                } else if item.output.exists() || output_video.exists() {
+                } else if exists {
                     return Err(RuntimeError::new(
                         "batch output",
-                        "output HEIC/MOV pair already exists; refusing to overwrite",
+                        "Live Photo output already exists; refusing to overwrite",
                     ));
                 }
 
@@ -518,6 +577,7 @@ fn process_batch_item_with_options(
                             source: item.input.clone(),
                             image: converted.image.clone(),
                             video: converted.video.clone(),
+                            package: converted.package.clone(),
                             signature,
                             outcome: OwnedCheckpointOutcome::Success(
                                 converted.content_identifier.clone(),
@@ -525,7 +585,7 @@ fn process_batch_item_with_options(
                         });
                         Ok(BatchSuccess {
                             input: item.input.clone(),
-                            outputs: vec![converted.image, converted.video],
+                            outputs: converted.output_paths(),
                             kind: BatchAssetKind::LivePhoto,
                             disposition: BatchSuccessDisposition::Converted,
                             omitted_resource_count,
@@ -534,8 +594,9 @@ fn process_batch_item_with_options(
                     Err(error) => {
                         checkpoint_event = Some(BatchCheckpointEvent {
                             source: item.input.clone(),
-                            image: item.output.clone(),
+                            image: output_image,
                             video: output_video,
+                            package,
                             signature,
                             outcome: OwnedCheckpointOutcome::Failure(error.to_string()),
                         });
@@ -544,6 +605,7 @@ fn process_batch_item_with_options(
                 }
             }
             SourceAsset::ProXdr { .. } => {
+                crate::validate_still_output_path(&item.output)?;
                 if item.output.exists() {
                     return Err(RuntimeError::new(
                         "batch output",

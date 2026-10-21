@@ -8,7 +8,8 @@ use xdremux_codec::{
     RasterPixelFormat, ZuneJpegProvider,
 };
 use xdremux_engine::{
-    GainMapChannels, GainMapCodecLayout, GainMapEncodeProfile, GainMapTileEncoder, RasterDecoder,
+    GainMapChannels, GainMapCodecLayout, GainMapEncodeProfile, GainMapTileEncoder, LivePhotoOutput,
+    RasterDecoder,
 };
 use xdremux_format::{jpeg_icc_profile, jpeg_image_end, probe_jpeg_frame_profile, ChromaSampling};
 use xdremux_heif::{
@@ -35,6 +36,7 @@ use crate::{Result, RuntimeError};
 pub struct LivePhotoFileReceipt {
     pub image: PathBuf,
     pub video: PathBuf,
+    pub package: Option<PathBuf>,
     pub content_identifier: String,
     pub still_time_seconds: f64,
     pub presentation: MediaTime,
@@ -46,6 +48,13 @@ pub struct LivePhotoFileReceipt {
 }
 
 impl LivePhotoFileReceipt {
+    pub fn output_paths(&self) -> Vec<PathBuf> {
+        match &self.package {
+            Some(package) => vec![package.clone()],
+            None => vec![self.image.clone(), self.video.clone()],
+        }
+    }
+
     pub fn omitted_resource_count(&self) -> usize {
         self.conversion_report
             .resources
@@ -71,7 +80,7 @@ fn generate_content_identifier() -> String {
     Uuid::new_v4().hyphenated().to_string().to_ascii_uppercase()
 }
 
-fn write_synced_new(path: &Path, data: &[u8]) -> Result<()> {
+pub(crate) fn write_synced_new(path: &Path, data: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -457,6 +466,7 @@ pub(crate) fn convert_motion_photo_file(
     source: &[u8],
     input: &Path,
     output_image: &Path,
+    format: LivePhotoOutput,
 ) -> Result<LivePhotoFileReceipt> {
     let photo = MotionPhoto::parse(Input::SingleFile(source), ParseOptions::compatible())
         .map_err(|error| RuntimeError::external("Motion Photo analysis", error))?;
@@ -465,14 +475,20 @@ pub(crate) fn convert_motion_photo_file(
         .map_err(|error| RuntimeError::external("Motion Photo validation", error))?;
     let asset = photo.asset();
 
+    crate::live_photo_package::validate_output_parent(output_image)?;
     let extension = output_image
         .extension()
         .and_then(|value| value.to_str())
         .unwrap_or_default();
-    if !extension.eq_ignore_ascii_case("heic") && !extension.eq_ignore_ascii_case("heif") {
+    if match format {
+        LivePhotoOutput::Pair => {
+            !extension.eq_ignore_ascii_case("heic") && !extension.eq_ignore_ascii_case("heif")
+        }
+        LivePhotoOutput::Pvt => !extension.eq_ignore_ascii_case("pvt"),
+    } {
         return Err(RuntimeError::new(
             "Live Photo output",
-            "still output must use .heic or .heif",
+            "pair output must use .heic/.heif; PVT output must use .pvt",
         ));
     }
     if output_image == input {
@@ -482,10 +498,12 @@ pub(crate) fn convert_motion_photo_file(
         ));
     }
     let output_video = companion_video_path(output_image);
-    if output_image.exists() || output_video.exists() {
+    if fs::symlink_metadata(output_image).is_ok()
+        || (format == LivePhotoOutput::Pair && fs::symlink_metadata(&output_video).is_ok())
+    {
         return Err(RuntimeError::new(
             "Live Photo output",
-            "output HEIC/MOV pair already exists; refusing to overwrite unknown provenance",
+            "output already exists; refusing to overwrite unknown provenance",
         ));
     }
 
@@ -579,34 +597,45 @@ pub(crate) fn convert_motion_photo_file(
 
     let conversion_report =
         product_conversion_report(&photo, &content_identifier, still.had_gain_map)?;
-    let staging = tempfile::Builder::new()
-        .prefix(".xdremux-live-photo-")
-        .tempdir_in(parent)
-        .map_err(|error| RuntimeError::external("Live Photo staging directory", error))?;
-    let temporary_image = staging.path().join("capture.heic");
-    let temporary_video = staging.path().join("capture.mov");
-    write_synced_new(&temporary_image, &still.bytes)?;
-    write_synced_new(&temporary_video, &movie)?;
-    if let Err(error) = publish_live_photo_pair(
-        &temporary_image,
-        &temporary_video,
-        output_image,
-        &output_video,
-    ) {
-        let retained = error.partial_output().is_some().then(|| staging.keep());
-        let mut error = RuntimeError::external("Live Photo pair publication", error);
-        if let Some(directory) = retained {
-            error.detail.push_str(&format!(
+    let (image_path, video_path, package) = if format == LivePhotoOutput::Pvt {
+        let members = crate::live_photo_package::publish_pair(&pair, output_image)?;
+        (
+            members.image,
+            members.video,
+            Some(output_image.to_path_buf()),
+        )
+    } else {
+        let staging = tempfile::Builder::new()
+            .prefix(".xdremux-live-photo-")
+            .tempdir_in(parent)
+            .map_err(|error| RuntimeError::external("Live Photo staging directory", error))?;
+        let temporary_image = staging.path().join("capture.heic");
+        let temporary_video = staging.path().join("capture.mov");
+        write_synced_new(&temporary_image, &still.bytes)?;
+        write_synced_new(&temporary_video, &movie)?;
+        if let Err(error) = publish_live_photo_pair(
+            &temporary_image,
+            &temporary_video,
+            output_image,
+            &output_video,
+        ) {
+            let retained = error.partial_output().is_some().then(|| staging.keep());
+            let mut error = RuntimeError::external("Live Photo pair publication", error);
+            if let Some(directory) = retained {
+                error.detail.push_str(&format!(
                 "; complete staged pair retained at {}; inspect both final entries before explicit recovery",
                 directory.display()
             ));
+            }
+            return Err(error);
         }
-        return Err(error);
-    }
+        (output_image.to_path_buf(), output_video, None)
+    };
 
     Ok(LivePhotoFileReceipt {
-        image: output_image.to_path_buf(),
-        video: output_video,
+        image: image_path,
+        video: video_path,
+        package,
         content_identifier,
         still_time_seconds,
         presentation,

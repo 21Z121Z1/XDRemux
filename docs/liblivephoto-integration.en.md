@@ -32,6 +32,15 @@ existing product fallback selects a position and marks the receipt as inferred.
 Apple on-disk geometry accepts explicit caller values. The existing OPPO matrix
 and stabilization policy remains in XDRemux; it is not a format-library default.
 
+Optional PVT is a local runtime container around an already validated Apple
+pair. It writes one real directory with unchanged media and a bounded XML plist,
+using exclusive directory publication. LibLivePhoto still owns media parsing,
+pairing identity and exact presentation time; no second MOV/HEIF parser, second
+identity or extra codec/remux operation is introduced. The default pair remains
+unchanged. See [CLI packaging](cli.en.md#optional-pvt-packaging) and
+[publication](architecture.en.md#publication) for no-clobber/recovery limits.
+Package structure does not prove Photos import or dynamic wallpaper support.
+
 JPEG and Gain Map encoding remain product operations. The Live Photo receipt
 reports exact presentation, encoded movie payload comparisons, metadata rewrites,
 reencoding requirements, generated identity and resources omitted from the pair.

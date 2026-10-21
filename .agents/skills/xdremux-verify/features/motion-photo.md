@@ -1,6 +1,6 @@
 # Motion Photo conversion
 
-Convert a versioned Samsung HEIF Motion Photo into a new HEIC/MOV Live Photo pair and validate each member through the public CLI. This path avoids re-encoding a large JPEG fixture.
+Convert a versioned Samsung HEIF Motion Photo into a new HEIC/MOV Live Photo pair and an optional PVT directory, then validate their media through the public CLI. This path avoids re-encoding a large JPEG fixture.
 
 ## Sub-features
 
@@ -8,10 +8,11 @@ Convert a versioned Samsung HEIF Motion Photo into a new HEIC/MOV Live Photo pai
 - Publish both members at a fresh shared basename.
 - Validate the still and movie through separate public invocations.
 - Preserve the original fixture and retain proof after scratch cleanup.
+- Select optional PVT output, validate its directory/plist and members, unwrap byte-identical media, and reject a duplicate destination without changing it.
 
 ## How to get to it (user POV)
 
-Run `xdremux convert --input <source.heic> --output <new.heic>`, then `xdremux validate <new.heic> --json` and `xdremux validate <new.mov> --json`. Batch is a separate entry point described in the feature index.
+Run `xdremux convert --input <source.heic> --output <new.heic>`, then `xdremux validate <new.heic> --json` and `xdremux validate <new.mov> --json`. Select `--live-photo-output pvt --output <new.pvt>` for a package and validate that directory. Batch is a separate entry point described in the feature index.
 
 ## Driving it with the Rust CLI
 
@@ -23,6 +24,7 @@ Run this standard-library recipe. It writes only two new temporary directories, 
 import hashlib
 import json
 import os
+import plistlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -41,7 +43,7 @@ report = {"feature": "motion-photo", "passed": False,
           "binary": str(cli),
           "build_binding": "existing binary; current source build not established",
           "exact_head_acceptance": False, "proof": str(proof), "scratch": str(work)}
-def run(name, arguments):
+def run(name, arguments, expected_exit=0):
     try:
         result = subprocess.run([str(arg) for arg in arguments], cwd=root,
                                 capture_output=True, timeout=180)
@@ -57,7 +59,7 @@ def run(name, arguments):
     commands.append({"name": name, "command": [str(arg) for arg in arguments],
                      "exit_code": result.returncode})
     (proof / "commands.json").write_text(json.dumps(commands, indent=2) + "\n")
-    if result.returncode:
+    if result.returncode != expected_exit:
         raise RuntimeError(f"{name} failed with exit {result.returncode}; see {proof}")
     return result.stdout
 try:
@@ -87,6 +89,38 @@ try:
         assert validation["valid"] is True and validation["kind"] == "live-photo"
         report["outputs"].append({"name": output.name, "bytes": output.stat().st_size,
                                   "sha256": digest(output)})
+    package = work / "converted-pvt.pvt"
+    run("convert-pvt", [cli, "convert", "--input", source, "--output", package,
+                        "--live-photo-output", "pvt"])
+    assert package.is_dir()
+    assert {path.name for path in package.iterdir()} == {
+        "converted-pvt.heic", "converted-pvt.mov", "metadata.plist"}
+    metadata = plistlib.loads((package / "metadata.plist").read_bytes())
+    version = metadata["PFVideoComplementMetadataVersionKey"]
+    assert type(version) is str and version == "1"
+    package_validation = json.loads(run("validate-pvt", [cli, "validate", package, "--json"]))
+    assert package_validation["valid"] is True and package_validation["kind"] == "live-photo"
+    unwrapped = work / "unwrapped"
+    unwrapped.mkdir()
+    report["pvt_outputs"] = []
+    for name in ("converted-pvt.heic", "converted-pvt.mov"):
+        member = package / name
+        copy = unwrapped / name
+        shutil.copyfile(member, copy)
+        assert member.read_bytes() == copy.read_bytes(), "PVT round-trip media bytes changed"
+        validation = json.loads(run(f"validate-unwrapped-{member.suffix[1:]}",
+                                    [cli, "validate", copy, "--json"]))
+        assert validation["valid"] is True and validation["kind"] == "live-photo"
+        assert validation["content_identifier"] == package_validation["content_identifier"]
+        assert validation["still_time_seconds"] == package_validation["still_time_seconds"]
+        report["pvt_outputs"].append({"name": name, "bytes": member.stat().st_size,
+                                      "sha256": digest(member)})
+    before_duplicate = {path.name: digest(path) for path in package.iterdir()}
+    run("duplicate-pvt", [cli, "convert", "--input", source, "--output", package,
+                          "--live-photo-output", "pvt"], expected_exit=1)
+    assert {path.name: digest(path) for path in package.iterdir()} == before_duplicate
+    report["pvt_no_clobber"] = True
+    report["pvt_native_acceptance"] = "not exercised; structure is not Photos import or wallpaper"
     report["source_sha256_after"] = digest(source)
     assert report["source_sha256_after"] == report["source_sha256_before"]
     assert digest(cli) == report["binary_sha256"], "binary changed during verification"

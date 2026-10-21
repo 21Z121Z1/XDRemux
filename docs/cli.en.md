@@ -58,6 +58,45 @@ xdremux convert --input IMG_001.jpg
 
 XDRemux detects the Motion Photo automatically and publishes a matching HEIC + MOV Live Photo pair. Motion Photos are never converted in place. When no output is supplied, XDRemux chooses a new name that does not collide with an existing HEIC or MOV companion.
 
+### Optional PVT packaging
+
+`--live-photo-output pair|pvt` selects the Live Photo container on `convert`
+and `batch`. The default remains the HEIC/HEIF + MOV pair. For a package:
+
+```bash
+xdremux convert --input IMG_001.heic --output capture.pvt --live-photo-output pvt
+xdremux validate capture.pvt --json
+```
+
+PVT is a real directory containing `capture.heic`, `capture.mov` and
+`metadata.plist`, whose `PFVideoComplementMetadataVersionKey` is the string
+`"1"`. Packaging keeps the already generated and validated pair bytes, pairing
+identifier and cover time; it performs no additional image encode or MOV remux.
+The underlying conversion can still generate pairing metadata or re-encode a
+still when its existing media policy requires it. Vendor-resource omissions
+remain reported; PVT does not make the conversion lossless.
+
+An explicit PVT destination must end in `.pvt`; an existing file, directory or
+symlink is preserved and rejected. Publishing uses one atomic exclusive
+directory rename on supported macOS/Linux filesystems; unsupported platforms
+or filesystems fail without an overwriting fallback. A failed publication may
+retain the complete staged package and reports its path for explicit recovery.
+This is not a claim of power-loss durability. A ZIP renamed `.pvt` is rejected.
+
+The choice affects Motion Photo items only. Ordinary HDR stills keep their
+normal output, including in a mixed batch; they cannot write disguised HEIF to
+an explicit `.pvt` destination. Batch JSON lists the package directory as one
+output. Resume requires a matching source checkpoint and container; an old
+flat pair or an unrelated valid package cannot satisfy a PVT request.
+
+Package output and validation are supported; `convert`, `batch` and `categorize` do not treat an existing PVT or its members as a new source. Directory discovery skips complete PVT directories, and output/checkpoint writers refuse to write inside an existing package, including through an alias.
+
+The App exposes the same output choice and delegates creation to Rust. It
+preserves existing packages instead of adopting them based only on structural
+validation. Current package tests do not establish Photos import or dynamic
+wallpaper support. The unavailable historical sample and its prior import
+feedback are separate evidence from this implementation.
+
 ### OPPO Gallery compatibility
 
 When the output must remain compatible with OPPO Gallery, use one product-level switch:
@@ -120,6 +159,7 @@ Common options:
 | `--resume` | Reuse completed work only when source provenance still matches. |
 | `--skip-existing` | Reuse an existing result only when provenance and output identity both match. |
 | `--categorize` | Publish converted assets directly into classification folders. |
+| `--live-photo-output` | Choose flat Live Photo members (default) or a real PVT directory. |
 | `--oppo-compatible` | Request OPPO Gallery compatible output for ProXDR still items. |
 | `--apple-portrait` | Request the complete Portrait resource set on macOS. |
 | `--apple-portrait-oppo` | Use OPPO depth and available masks with reduced effects on macOS. |
@@ -157,7 +197,7 @@ xdremux validate output.heic
 xdremux validate output.heic --json
 ```
 
-`validate` automatically recognizes and validates either ISO HDR HEIF or a Live Photo pair. It is suitable for independent post-conversion checks in scripts and CI.
+`validate` automatically recognizes and validates ISO HDR HEIF, a Live Photo pair or the supported three-member PVT directory. Package validation checks the XML string-version plist, regular unambiguous members and the existing Live Photo identity/media/timing contract. Missing, nested, symlinked, duplicate or malformed members are rejected without changing them. This is structural validation, not Photos import. It is suitable for independent post-conversion checks in scripts and CI.
 
 ## Cinematic video intent (macOS)
 

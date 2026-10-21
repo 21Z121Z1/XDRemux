@@ -115,10 +115,31 @@ impl AppleFeatureRequest {
     }
 }
 
+/// Container choice for Live Photos; ordinary still/video policy is unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LivePhotoOutput {
+    #[default]
+    Pair,
+    Pvt,
+}
+
+impl std::str::FromStr for LivePhotoOutput {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "pair" => Ok(Self::Pair),
+            "pvt" => Ok(Self::Pvt),
+            _ => Err("Live Photo output must be pair or pvt"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ConversionRequest {
     pub output: OutputIntent,
     pub apple_features: AppleFeatureRequest,
+    pub live_photo_output: LivePhotoOutput,
 }
 
 impl ConversionRequest {
@@ -129,6 +150,7 @@ impl ConversionRequest {
     pub const fn oppo_gallery_compatible() -> Self {
         Self {
             output: OutputIntent::OppoGallery,
+            live_photo_output: LivePhotoOutput::Pair,
             apple_features: AppleFeatureRequest {
                 photographic_styles: false,
                 portrait: false,
@@ -536,6 +558,7 @@ mod tests {
             let request = ConversionRequest {
                 output: OutputIntent::OppoGallery,
                 apple_features,
+                ..ConversionRequest::default()
             };
             assert_eq!(
                 plan_conversion(&analysis, request, &capabilities),

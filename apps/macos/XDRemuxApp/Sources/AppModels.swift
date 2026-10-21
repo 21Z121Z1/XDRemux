@@ -12,6 +12,7 @@ struct ConversionConfig: Sendable, Equatable {
     var categorizeOutputByCaptureMode = false
     var applePhotographicStyles = false
     var applePortrait = false
+    var livePhotoOutput: LivePhotoOutput = .pair
 
     var appleFeaturesEnabled: Bool {
         applePhotographicStyles || applePortrait
@@ -25,6 +26,13 @@ struct ConversionConfig: Sendable, Equatable {
             }
         }
     }
+}
+
+enum LivePhotoOutput: String, CaseIterable, Identifiable, Sendable, Hashable {
+    case pair
+    case pvt
+
+    var id: String { rawValue }
 }
 
 enum PhotoAssetType: String, CaseIterable, Identifiable, Sendable, Equatable {

@@ -102,6 +102,9 @@ enum RustCLIClient {
     }
 
     static func isValidOutput(_ outputURL: URL, config: ConversionConfig = ConversionConfig()) -> Bool {
+        // This predicate authorizes app reuse, not just structural validity.
+        // The app has no durable source provenance for an existing package.
+        guard outputURL.pathExtension.lowercased() != "pvt" else { return false }
         guard FileManager.default.fileExists(atPath: outputURL.path) else { return false }
         // Rust has no output validator for these intents yet. Generic HDR
         // validation cannot establish that their requested resources survived.
@@ -191,16 +194,18 @@ enum RustCLIClient {
             )
         }
 
+        var arguments: [String] = []
+        if config.livePhotoOutput != .pair {
+            arguments.append(contentsOf: ["--live-photo-output", config.livePhotoOutput.rawValue])
+        }
         if config.applePhotographicStyles {
-            return ["--apple-styles"]
+            arguments.append("--apple-styles")
+        } else if config.applePortrait {
+            arguments.append("--apple-portrait")
+        } else if config.oppoGalleryCompatibilityEnabled {
+            arguments.append("--oppo-compatible")
         }
-        if config.applePortrait {
-            return ["--apple-portrait"]
-        }
-        if config.oppoGalleryCompatibilityEnabled {
-            return ["--oppo-compatible"]
-        }
-        return []
+        return arguments
     }
 
     private static func run(

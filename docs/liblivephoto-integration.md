@@ -24,6 +24,12 @@ runtime 保留已知的整数和 timescale 时间，不再把已知 XMP 时间�
 源时间未知时，现有产品 fallback 选择一个位置，并在回执中标记为推断。
 Apple 几何元数据接收显式调用者值。OPPO 矩阵和防抖策略仍归 XDRemux 所有。
 
+可选 PVT 是 runtime 对已验证 Apple pair 的本地容器：用排他目录发布写入真实目录、
+保持媒体字节不变并附带有界 XML plist。媒体解析、配对 identity 和精确时间仍归
+LibLivePhoto，不新增 MOV/HEIF parser、第二个 identity 或额外 codec/remux。
+默认 pair 不变；安全及恢复边界见 [CLI 封装](cli.md#可选-pvt-封装)和
+[发布契约](architecture.md#发布)。包结构通过不等于 Photos 导入或动态墙纸通过。
+
 JPEG 和 Gain Map 编码属于产品操作。回执报告精确时间、视频 payload 字节比较、
 元数据改写、重编码需求、新 identity 以及未进入 pair 的资源。CLI 报告资源遗漏。
 原片保持完整。产品 pair 转换不承诺完整 vendor 资源保留或无损。

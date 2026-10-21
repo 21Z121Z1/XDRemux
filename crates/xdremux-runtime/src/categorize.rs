@@ -598,6 +598,7 @@ impl PortableRuntime {
         dry_run: bool,
     ) -> Result<CategorizeReceipt> {
         let output_root = output_root.as_ref();
+        crate::live_photo_package::validate_output_parent(&output_root.join("planned-output"))?;
         let prepared = prepare_categorization(inputs)?;
         let existing = collect_existing_destinations(output_root)?;
         let plan = plan_photo_assets(

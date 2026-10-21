@@ -55,6 +55,37 @@ xdremux convert --input IMG_001.jpg
 
 XDRemux 会自动识别 Motion Photo，并发布匹配的 HEIC + MOV Live Photo pair。Motion Photo 不做原位转换；未指定输出时会选择不会与现有 HEIC/MOV 冲突的新文件名。
 
+### 可选 PVT 封装
+
+`convert` 和 `batch` 的 `--live-photo-output pair|pvt` 选择实况照片容器，默认仍为
+HEIC/HEIF + MOV 文件对。包输出示例：
+
+```bash
+xdremux convert --input IMG_001.heic --output capture.pvt --live-photo-output pvt
+xdremux validate capture.pvt --json
+```
+
+PVT 是真实目录，包含 `capture.heic`、`capture.mov` 和 `metadata.plist`；
+`PFVideoComplementMetadataVersionKey` 的值是字符串 `"1"`。封装保留已生成且已验证
+pair 的完整字节、配对标识和封面时间，不额外编码照片或重封装 MOV。原有媒体转换策略
+仍可能生成配对元数据或按需重编码照片；厂商资源遗漏继续报告，PVT 不等于无损转换。
+
+显式包目标必须以 `.pvt` 结尾；已有文件、目录或 symlink 均保留并拒绝覆盖。
+支持的 macOS/Linux 文件系统使用一次原子排他目录 rename 发布；平台或文件系统不支持时
+报错，不回退到覆盖式 rename。发布失败可能保留完整 staging 包并报告路径供显式恢复，
+不承诺断电持久性。将 ZIP 改名为 `.pvt` 会被拒绝。
+
+该选择只影响 Motion Photo。混合 batch 中普通 HDR 照片保持原有输出，不能把 HEIF
+伪装写到显式 `.pvt` 目标。batch JSON 将包目录列为一个输出；复用需要来源 checkpoint
+及容器一致，旧文件对或来源未知的有效包均不能替代当前 PVT 请求。
+
+本轮支持包输出和验证，`convert`、`batch` 和 `categorize` 不将已有 PVT 或其成员当作新源；目录扫描跳过整个包，
+输出和 checkpoint 写入也拒绝向已有包内部写入，包括通过别名访问的路径。
+
+App 提供同一选择并交给 Rust 创建；仅结构有效不足以接管已有包，已有包保持不变。
+当前结构测试不证明 Photos 导入或动态墙纸可用；不可访问的历史样本和先前导入反馈
+与本次实现分别列证据。
+
 ### OPPO 相册兼容
 
 需要输出继续面向 OPPO Gallery 时，只使用一个产品级开关：
@@ -113,6 +144,7 @@ xdremux batch \
 | `--resume` | 依据 source provenance 恢复已完成工作。 |
 | `--skip-existing` | 只在 provenance 与输出身份都匹配时复用已有结果。 |
 | `--categorize` | 转换后直接按分类目录发布。 |
+| `--live-photo-output` | 选择默认实况照片文件对或真实 PVT 目录包。 |
 | `--oppo-compatible` | 对批次中的 ProXDR 静态照片请求 OPPO Gallery 兼容输出。 |
 | `--apple-portrait` | 在 macOS 上请求完整人像资源集。 |
 | `--apple-portrait-oppo` | 在 macOS 上使用 OPPO 深度和有效蒙版，人像效果降级。 |
@@ -150,7 +182,7 @@ xdremux validate output.heic
 xdremux validate output.heic --json
 ```
 
-`validate` 自动识别并验证 ISO HDR HEIF 或 Live Photo pair，适合脚本和 CI 在转换后做独立检查。
+`validate` 自动识别并验证 ISO HDR HEIF、Live Photo pair 或支持的三成员 PVT 目录。包验证检查 XML 字符串版本 plist、无歧义的普通成员文件及现有配对标识、媒体和时间契约；缺失、嵌套、symlink、重复或损坏成员会被拒绝且保持原样。这是结构验证，不是 Photos 导入验收，适合脚本和 CI 的独立转换后检查。
 
 ## 电影效果视频意图（macOS）
 

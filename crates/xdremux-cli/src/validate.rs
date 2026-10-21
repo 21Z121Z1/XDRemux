@@ -10,7 +10,7 @@ const VALIDATE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Args)]
 pub(crate) struct ValidateArgs {
-    /// ISO HDR HEIC/HEIF or one resource of an Apple Live Photo pair.
+    /// ISO HDR HEIC/HEIF, an Apple Live Photo pair member, or a PVT directory.
     #[arg(value_name = "INPUT")]
     input: PathBuf,
     /// Emit one stable machine-readable validation document.

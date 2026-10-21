@@ -13,7 +13,8 @@ XDRemux 将支持的厂商 HDR 照片转换为 ISO/TS 21496-1 HDR HEIC，并把�
 | 输入 / 意图 | 结果 |
 | --- | --- |
 | ProXDR 照片 | ISO/TS 21496-1 HDR HEIC |
-| 支持的 Motion Photo | Apple Live Photo HEIC + MOV |
+| 支持的 Motion Photo | 默认 Apple Live Photo HEIC + MOV |
+| `--live-photo-output pvt` | 包含已验证 pair 的可选真实 PVT 目录包 |
 | `--oppo-compatible` | 面向 OPPO 相册的 ProXDR 输出 |
 | `categorize` / `batch --categorize` | 按资产类型和拍摄模式分类 |
 | `inspect` / `validate` | 检查源文件和独立验证输出 |

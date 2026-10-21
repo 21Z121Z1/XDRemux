@@ -929,6 +929,8 @@ version = "0.1.0"
 dependencies = [
  "atomic-write-file",
  "jpeg-encoder",
+ "quick-xml",
+ "rustix",
  "ruzstd",
  "serde",
  "serde_json",

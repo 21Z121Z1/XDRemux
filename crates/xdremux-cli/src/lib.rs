@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use clap::{error::ErrorKind, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use i18n::{message, Language};
 use serde_json::json;
-use xdremux_engine::{AppleFeatureRequest, ConversionRequest};
+use xdremux_engine::{AppleFeatureRequest, ConversionRequest, LivePhotoOutput};
 use xdremux_runtime::{
     motion_photo_checkpoint_path, plan_batch_items, ApplePortraitSemanticProfile, BatchAssetKind,
     BatchExecutionOptions, BatchPlanOptions, BatchSuccessDisposition, PortableRuntime,
@@ -73,6 +73,9 @@ struct InspectArgs {
 
 #[derive(Debug, Args, Default)]
 struct ProductConversionArgs {
+    /// Live Photo container: pair (default) or pvt directory; other assets keep their format.
+    #[arg(long, default_value = "pair", value_name = "pair|pvt")]
+    live_photo_output: LivePhotoOutput,
     /// Preserve compatibility with OPPO Gallery when converting ProXDR still images.
     #[arg(long, conflicts_with_all = ["apple_portrait", "apple_portrait_oppo", "apple_styles", "apple_cinematic"])]
     oppo_compatible: bool,
@@ -98,7 +101,7 @@ struct ProductConversionArgs {
 
 impl ProductConversionArgs {
     fn request(&self) -> ConversionRequest {
-        if self.oppo_compatible {
+        let mut request = if self.oppo_compatible {
             ConversionRequest::oppo_gallery_compatible()
         } else if self.apple_portrait || self.apple_portrait_oppo {
             ConversionRequest {
@@ -126,7 +129,9 @@ impl ProductConversionArgs {
             }
         } else {
             ConversionRequest::default()
-        }
+        };
+        request.live_photo_output = self.live_photo_output;
+        request
     }
 
     fn cinematic_options(&self) -> xdremux_runtime::CinematicEnvelopeOptions {
@@ -464,8 +469,12 @@ fn run_inspect(
     0
 }
 
-fn default_motion_photo_output(input: &Path) -> PathBuf {
-    let base = input.with_extension("heic");
+fn default_motion_photo_output(input: &Path, format: LivePhotoOutput) -> PathBuf {
+    let extension = match format {
+        LivePhotoOutput::Pair => "heic",
+        LivePhotoOutput::Pvt => "pvt",
+    };
+    let base = input.with_extension(extension);
     let mut sequence = 1_u32;
     loop {
         let candidate = if sequence == 1 {
@@ -475,7 +484,7 @@ fn default_motion_photo_output(input: &Path) -> PathBuf {
                 .file_stem()
                 .and_then(|value| value.to_str())
                 .unwrap_or("capture");
-            base.with_file_name(format!("{stem} ({sequence}).heic"))
+            base.with_file_name(format!("{stem} ({sequence}).{extension}"))
         };
         if candidate != input && !candidate.exists() && !candidate.with_extension("mov").exists() {
             return candidate;
@@ -529,6 +538,14 @@ fn run_convert(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> u8 {
+    if let Err(error) = reject_package_input(&arguments.input) {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            message!(language, "error: {error}", "错误：{error}")
+        );
+        return 1;
+    }
     if arguments.product.apple_cinematic {
         let options = arguments.product.cinematic_options();
         let output = arguments.output.unwrap_or_else(|| {
@@ -594,7 +611,8 @@ fn run_convert(
                 let _ = writeln!(stderr, "{}", message!(language, "error: Apple Portrait and Photographic Styles intents apply to ProXDR still inputs and cannot be combined with Motion Photo conversion", "错误：Apple Portrait 和 Photographic Styles 仅适用于 ProXDR 静态照片，不能与 Motion Photo 转换组合使用"));
                 return 1;
             }
-            let output = output.unwrap_or_else(|| default_motion_photo_output(&input));
+            let output = output
+                .unwrap_or_else(|| default_motion_photo_output(&input, request.live_photo_output));
             match runtime.convert_motion_photo_file_with_request(&source, &input, &output, request)
             {
                 Ok(receipt) => {
@@ -604,6 +622,22 @@ fn run_convert(
                             stdout,
                             "{}", message!(language, "note: {omitted} source resources remain only in the original input", "提示：{omitted} 项源资源仅保留在原始输入中")
                         );
+                    }
+                    if let Some(package) = &receipt.package {
+                        return match writeln!(
+                            stdout,
+                            "{}",
+                            message!(
+                                language,
+                                "converted: {} -> {}",
+                                "已转换：{} -> {}",
+                                input.display(),
+                                package.display()
+                            )
+                        ) {
+                            Ok(()) => 0,
+                            Err(_) => 1,
+                        };
                     }
                     writeln!(
                         stdout,
@@ -629,6 +663,16 @@ fn run_convert(
             }
         }
         SourceAsset::ProXdr { .. } => {
+            if let Some(path) = &output {
+                if let Err(error) = xdremux_runtime::validate_still_output_path(path) {
+                    let _ = writeln!(
+                        stderr,
+                        "{}",
+                        message!(language, "error: {error}", "错误：{error}")
+                    );
+                    return 1;
+                }
+            }
             let output = output.unwrap_or_else(|| input.clone());
             if apple_portrait {
                 #[cfg(target_os = "macos")]
@@ -971,7 +1015,12 @@ fn discover_directory(
                 )
             })?;
             let path = entry.path();
-            if is_hidden_batch_artifact(&path) {
+            if is_hidden_batch_artifact(&path)
+                || (file_type.is_dir()
+                    && path
+                        .extension()
+                        .is_some_and(|value| value.eq_ignore_ascii_case("pvt")))
+            {
                 continue;
             }
             if file_type.is_file() {
@@ -995,6 +1044,7 @@ fn discover_batch_inputs(arguments: &BatchArgs) -> Result<Vec<PathBuf>, String> 
 
     let mut inputs = Vec::new();
     for path in &arguments.inputs {
+        reject_package_input(path)?;
         if !path.is_file() {
             return Err(format!("input file not found: {}", path.display()));
         }
@@ -1002,6 +1052,7 @@ fn discover_batch_inputs(arguments: &BatchArgs) -> Result<Vec<PathBuf>, String> 
     }
 
     for directory in &arguments.input_dirs {
+        reject_package_input(directory)?;
         if !directory.is_dir() {
             return Err(format!(
                 "input directory not found: {}",
@@ -1030,6 +1081,23 @@ fn discover_batch_inputs(arguments: &BatchArgs) -> Result<Vec<PathBuf>, String> 
         return Err("batch discovery found no supported input files".to_owned());
     }
     Ok(unique)
+}
+
+fn reject_package_input(path: &Path) -> Result<(), String> {
+    let in_package = |path: &Path| {
+        path.ancestors().any(|ancestor| {
+            ancestor
+                .extension()
+                .is_some_and(|value| value.eq_ignore_ascii_case("pvt"))
+        })
+    };
+    if in_package(path) || fs::canonicalize(path).is_ok_and(|path| in_package(&path)) {
+        return Err(format!(
+            "PVT packages are output/validation containers, not conversion inputs: {}",
+            path.display()
+        ));
+    }
+    Ok(())
 }
 
 fn batch_kind_name(kind: BatchAssetKind) -> &'static str {
@@ -1104,6 +1172,7 @@ fn run_batch(
         reuse_existing,
         categorize_output: arguments.categorize,
         cinematic_output: arguments.product.apple_cinematic,
+        live_photo_output: arguments.product.live_photo_output,
     };
     let items = match plan_batch_items(&inputs, &plan_options) {
         Ok(items) => items,

@@ -13,7 +13,8 @@ The complete Mac product targets Apple silicon (`arm64`) and macOS 27. The Rust 
 | Input / intent | Result |
 | --- | --- |
 | ProXDR photo | ISO/TS 21496-1 HDR HEIC |
-| Supported Motion Photo | Apple Live Photo HEIC + MOV |
+| Supported Motion Photo | Apple Live Photo HEIC + MOV (default) |
+| `--live-photo-output pvt` | Optional real PVT directory containing the validated pair |
 | `--oppo-compatible` | ProXDR output intended for OPPO Gallery |
 | `categorize` / `batch --categorize` | Asset-type and capture-mode folders |
 | `inspect` / `validate` | Source inspection and independent output validation |

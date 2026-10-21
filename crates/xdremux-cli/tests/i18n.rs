@@ -58,6 +58,12 @@ fn every_help_page_supports_both_languages() {
             assert!(help.contains("--lang"));
             assert!(help.contains("--help"));
             if name == "convert" || name == "batch" {
+                assert!(help.contains("--live-photo-output"));
+                assert!(help.contains(if language == "en" {
+                    "pvt directory"
+                } else {
+                    "pvt 目录包"
+                }));
                 assert!(help.contains("--apple-styles"));
                 assert!(help.contains("--apple-cinematic"));
                 assert!(help.contains("--focal-length-35mm"));
@@ -150,6 +156,49 @@ fn json_inspection_and_validation_failure_are_byte_identical() {
         let json: serde_json::Value = serde_json::from_slice(&english.stdout).unwrap();
         assert_eq!(json["schema_version"], 1);
     }
+}
+
+#[test]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn pvt_validation_json_preserves_package_and_member_paths_in_both_languages() {
+    let scratch = Scratch::new();
+    let input = fixture();
+    let output = scratch.0.path().join("实况 capture.pvt");
+    let conversion = run(
+        &[
+            OsStr::new("convert"),
+            OsStr::new("--input"),
+            input.as_os_str(),
+            OsStr::new("--output"),
+            output.as_os_str(),
+            OsStr::new("--live-photo-output"),
+            OsStr::new("pvt"),
+        ],
+        &[("XDREMUX_LANG", "zh-CN")],
+    );
+    assert!(conversion.status.success(), "{conversion:?}");
+    assert!(String::from_utf8(conversion.stdout)
+        .unwrap()
+        .contains(&output.display().to_string()));
+    let validation = [
+        OsStr::new("validate"),
+        output.as_os_str(),
+        OsStr::new("--json"),
+    ];
+    let english = run(&validation, &[("XDREMUX_LANG", "en")]);
+    let chinese = run(&validation, &[("XDREMUX_LANG", "zh-CN")]);
+    assert!(english.status.success(), "{english:?}");
+    assert!(chinese.status.success(), "{chinese:?}");
+    assert_eq!(english.stdout, chinese.stdout);
+    let report: serde_json::Value = serde_json::from_slice(&english.stdout).unwrap();
+    assert_eq!(report["schema_version"], 1);
+    assert_eq!(report["kind"], "live-photo");
+    assert_eq!(
+        report["details"]["value"]["input"],
+        output.to_str().unwrap()
+    );
+    assert!(Path::new(report["details"]["value"]["image"].as_str().unwrap()).starts_with(&output));
+    assert!(Path::new(report["details"]["value"]["video"].as_str().unwrap()).starts_with(&output));
 }
 #[test]
 fn successful_batch_validation_and_categorization_json_are_locale_independent() {

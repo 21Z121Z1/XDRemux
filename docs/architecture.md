@@ -63,7 +63,7 @@ Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](
 
 ### Live Photo
 
-正常 Live Photo 链路发布共享同一个 asset identifier 的 HEIC/HEIF 静态照片和 MOV。
+默认 Live Photo 链路发布共享 asset identifier 的 HEIC/HEIF 照片和 MOV。强类型 `LivePhotoOutput` 可将同一已验证 pair 包装为真实 PVT 目录，不再次跨越 codec/remux 边界。Rust 负责有界包结构、验证及发布，App 只转交选择并展示计划容器。
 
 转换器把解析得到的源封面时间映射为 Apple `still-image-time`。
 
@@ -73,13 +73,20 @@ Motion Photo 和普通 HDR 使用不同的输出安全规则。见 [CLI 参考](
 
 ### 发布
 
-Live Photo 只有在两个最终成员都发布后才算转换成功。转换先在自己独占的 staging 目录写入并同步已验证的完整 pair，再通过原子的 no-clobber 硬链接先占用 MOV 名称、后发布静态照片。已有最终路径及无关文件、目录不会被替换或删除。协作 writer 共享 MOV 占用，同 stem 的 `.heic` 与 `.heif` 也不例外。
+默认 pair 输出只有在两个最终成员都发布后才算转换成功。转换先在自己独占的 staging 目录写入并同步已验证的完整 pair，再通过原子的 no-clobber 硬链接先占用 MOV 名称、后发布静态照片。已有最终路径及无关文件、目录不会被替换或删除。协作 writer 共享 MOV 占用，同 stem 的 `.heic` 与 `.heif` 也不例外。
 
 两个文件名不是系统原子事务。第二个链接失败时，转换返回带 partial MOV 路径的错误，并保留完整 staging pair 供显式恢复。可对 staging 内的 `capture.heic` 执行 `xdremux validate`；移动资源前先检查两个最终路径。reconcile 只检查目标，未知 partial 或无效 pair 均保留并拒绝；名称像旧临时文件并不能证明删除所有权。
 
 发布要求同一文件系统支持硬链接。不支持时保留原始 I/O 错误并拒绝，不宣称 FAT/exFAT 支持。此协议无法阻止外部 writer 主动替换最终路径。staging 文件已同步不等于断电后目录项具有持久性保证。
 
-batch 复用要求 source provenance。来源未知的有效 pair 不能被接受为无关输入的输出。
+PVT 在 operation-owned 私有目录写入已验证媒体和固定 XML 版本 plist，然后用平台排他
+目录 rename 占用单一最终包路径，即使已有空目录也不替换。移动前解除旧 staging 路径的
+删除所有权，不会清理后来出现在旧路径的条目；发布失败保留完整包并报告恢复路径。
+macOS/Linux 后端缺少排他 rename 时拒绝；其他核心平台可读取/验证支持的包结构，
+不使用覆盖式发布回退。不据此宣称目录断电持久性、Photos 或墙纸通过。
+
+batch 复用要求 source provenance 和容器身份一致。来源未知的有效 pair 或包不能被
+接受为无关输入的输出。App 没有包来源的持久 checkpoint，因此不会自动接管已有 PVT。
 
 ## 当前技术文档
 

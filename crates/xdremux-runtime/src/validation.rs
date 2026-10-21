@@ -167,6 +167,13 @@ fn companion_still_path(video: &Path) -> Result<PathBuf> {
 }
 
 pub fn validate_media_file(input: &Path) -> Result<ValidationReport> {
+    if input
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("pvt"))
+    {
+        let members = crate::live_photo_package::read_members(input)?;
+        return validate_live_photo_pair(input, &members.image, &members.video, None);
+    }
     if !input.is_file() {
         return Err(RuntimeError::new(
             "media validation",

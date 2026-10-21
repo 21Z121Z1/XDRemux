@@ -114,7 +114,13 @@ fn discover_directory(
                 )
             })?;
             let path = entry.path();
-            if file_type.is_symlink() || is_hidden(&path) {
+            if file_type.is_symlink()
+                || is_hidden(&path)
+                || (file_type.is_dir()
+                    && path
+                        .extension()
+                        .is_some_and(|value| value.eq_ignore_ascii_case("pvt")))
+            {
                 continue;
             }
             if file_type.is_file() {
@@ -150,6 +156,7 @@ fn discover_inputs(arguments: &CategorizeArgs) -> Result<Vec<PathBuf>, String> {
 
     let mut collected = Vec::new();
     for input in &arguments.inputs {
+        super::reject_package_input(input)?;
         let metadata = fs::symlink_metadata(input)
             .map_err(|error| format!("input not found {}: {error}", input.display()))?;
         if metadata.file_type().is_symlink() {

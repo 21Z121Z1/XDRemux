@@ -883,6 +883,15 @@ private struct SettingsView: View {
                         : AppStrings.applePortraitHelp
                 )
 
+                Picker(AppStrings.livePhotoOutputTitle, selection: $viewModel.config.livePhotoOutput) {
+                    Text(AppStrings.livePhotoOutputPair).tag(LivePhotoOutput.pair)
+                    Text(AppStrings.livePhotoOutputPvt).tag(LivePhotoOutput.pvt)
+                }
+                .onChange(of: viewModel.config.livePhotoOutput) {
+                    viewModel.refreshOutputURLsForPendingItems()
+                }
+                SettingExplanation(AppStrings.livePhotoOutputHelp)
+
                 Toggle(AppStrings.skipExisting, isOn: $viewModel.config.skipExisting)
                     .onChange(of: viewModel.config.skipExisting) {
                         viewModel.refreshOutputURLsForPendingItems()
@@ -1034,6 +1043,7 @@ private extension OutputPlanStatus {
         case .overwritesInput: return AppStrings.outputPlanOverwritesInput
         case .inputMissing: return AppStrings.outputPlanInputMissing
         case .outputParentIsFile: return AppStrings.outputPlanParentIsFile
+        case .existingPackage: return AppStrings.outputPlanExistingPackage
         }
     }
 
@@ -1045,7 +1055,7 @@ private extension OutputPlanStatus {
             return .orange
         case .skipsExistingValidOutput:
             return .secondary
-        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile:
+        case .duplicateOutput, .overwritesInput, .inputMissing, .outputParentIsFile, .existingPackage:
             return .red
         }
     }
