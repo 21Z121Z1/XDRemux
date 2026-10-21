@@ -552,8 +552,6 @@ def main():
         (work / 'owned-simulator.json').write_text(json.dumps({'udid': owned_udid, 'name': 'pvt-audit-' + token, 'bundle': bundle}))
         run('boot-owned-simulator', ['xcrun', 'simctl', 'boot', owned_udid])
         run('boot-owned-status', ['xcrun', 'simctl', 'bootstatus', owned_udid, '-b'], timeout=180)
-        run('simctl-install-help', ['xcrun', 'simctl', 'help', 'install'], timeout=15)
-        run('simctl-listapps-help', ['xcrun', 'simctl', 'help', 'listapps'], timeout=15)
         install_owned_reader(run, owned_udid, bundle, app, work, report)
         # Only the exact created UDID and installed bundle; no host TCC/SQLite.
         run('grant-owned-photos', ['xcrun', 'simctl', 'privacy', owned_udid, 'grant', 'photos', bundle])

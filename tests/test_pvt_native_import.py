@@ -20,6 +20,17 @@ from scripts.apple.pvt_native_import import check_native_import as probe
 
 
 class PVTNativeImportTests(unittest.TestCase):
+    def test_installation_is_not_gated_on_redundant_cli_help_probes(self):
+        # Native service replies are the readiness contract. Merely printing
+        # usage must not block those requests (observed15s native help timeout).
+        tree = ast.parse(Path(probe.__file__).read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or len(node.args) < 2 or not isinstance(node.args[1], ast.List):
+                continue
+            argv = [item.value if isinstance(item, ast.Constant) else None for item in node.args[1].elts]
+            self.assertNotIn(argv[:4], [['xcrun', 'simctl', 'help', 'install'],
+                                       ['xcrun', 'simctl', 'help', 'listapps']])
+
     def test_cold_sdk_and_reader_compile_before_creating_or_booting_a_simulator(self):
         calls = {node.args[0].value: node for node in ast.walk(ast.parse(inspect.getsource(probe.main)))
                  if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'run'
