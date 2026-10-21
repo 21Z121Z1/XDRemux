@@ -155,6 +155,28 @@ class StyleToneResponseTests(unittest.TestCase):
             self.assertEqual(parser.read_bytes(), before)
             self.assertEqual(receipt["parser_compatibility"]["original_source_sha256"], hashlib.sha256(before).hexdigest())
 
+    def test_consumer_rejects_unsafe_or_owned_case_names_before_launch(self):
+        for name in ("", "..heic", "...heic", "diagnostics.heic", "consumer-compat.heic",
+                     "build.log.heic", "tone-sweep.json.heic", "consumer-run.json.heic"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as raw:
+                root = Path(raw)
+                research = root / "consumer"
+                self.install_parser(research)
+                script = research / "consumer-model/harness/run_tone_sweep.py"
+                script.parent.mkdir(parents=True)
+                # A real child marks its launch outside the consumer-owned root.
+                # Rejected case names must never reach any upstream process.
+                script.write_text("from pathlib import Path\nimport sys\n"
+                                  "out=Path(sys.argv[1])\n"
+                                  "(out.parent/'upstream-launched').write_text('launched')\n"
+                                  "(out/'tone-sweep.json').write_text('[]')\n")
+                with contextlib.redirect_stderr(io.StringIO()):
+                    receipt = tone.run_consumer(research, [Path(name)], root / "out", tones=(0.,))
+                self.assertEqual(receipt["status"], "failed")
+                self.assertFalse((root / "upstream-launched").exists())
+                self.assertIsNone(receipt["returncode"])
+                self.assertFalse((root / "out/consumer-compat").exists())
+
     def test_three_tone_request_requires_complete_finite_native_measurements(self):
         for mode in ("complete", "missing", "duplicate", "unexpected", "nonfinite", "missing-buffer", "components", "geometry"):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as raw:

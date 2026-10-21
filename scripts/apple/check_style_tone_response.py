@@ -172,8 +172,10 @@ def run_consumer(research_root: Path, photos: list[Path], out_dir: Path, *,
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
     started = time.monotonic()
     try:
-        if not names or len(set(names)) != len(names):
-            raise ValueError("consumer photos must have distinct nonempty stems")
+        reserved = {"", ".", "..", "diagnostics", "consumer-compat", "build.log",
+                    "tone-sweep.json", "consumer-run.json"}
+        if not names or len(set(names)) != len(names) or any(name in reserved for name in names):
+            raise ValueError("consumer photos must have distinct safe stems outside owned output names")
         receipt["consumer_script_sha256"] = hashlib.sha256(script.read_bytes()).hexdigest()
         working_directory, receipt["parser_compatibility"] = prepare_consumer_compatibility(research_root, out_dir)
         receipt["working_directory"] = str(working_directory)
