@@ -1,0 +1,71 @@
+$ /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3 /workspace/xdremux-audit/publish-evidence-source.py --version v26 --source e1072a90e31b12861dfe8b9cf25e07ce75c17c44 --head 1a1698e47e008b688cf5c3fc492dfc307b04ae1a --tree ab487dafe6f6567726b9a2166172052cf8fe347f --files 1996 --index-sha256 38d18c295d3a23acb29c71927c6cc2e9560623bfe5fc473bfa86fc21a6b82b18
+cwd=/workspace/XDRemux
+stdout:
+{
+  "evidence": "1a1698e47e008b688cf5c3fc492dfc307b04ae1a",
+  "tree": "ab487dafe6f6567726b9a2166172052cf8fe347f",
+  "tag": "refs/tags/review/semantic-integration-20261020-evidence-v26",
+  "source": "e1072a90e31b12861dfe8b9cf25e07ce75c17c44",
+  "files": 1996,
+  "index_sha256": "38d18c295d3a23acb29c71927c6cc2e9560623bfe5fc473bfa86fc21a6b82b18",
+  "restore": "remote commit/tree exact; non-shallow full strict fsck exit0",
+  "captured_at": "2026-10-21T16:13:38.645360+00:00"
+}
+
+stderr:
+
+exit=0
+
+$ git -C /workspace/xdremux-audit/restore-test.git rev-parse --path-format=absolute --git-path objects
+cwd=/workspace/xdremux-audit/restore-test.git
+stdout:
+/workspace/xdremux-audit/restore-test.git/objects
+
+stderr:
+
+exit=0
+
+$ git ls-remote https://github.com/21Z121Z1/XDRemux.git refs/tags/review/semantic-integration-20261020-evidence-v26
+cwd=/workspace/xdremux-audit/v26-publication-raw
+stdout:
+1a1698e47e008b688cf5c3fc492dfc307b04ae1a	refs/tags/review/semantic-integration-20261020-evidence-v26
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git rev-parse 'refs/tags/review/semantic-integration-20261020-evidence-v26^{commit}'
+cwd=/workspace/xdremux-audit/v26-publication-raw
+stdout:
+1a1698e47e008b688cf5c3fc492dfc307b04ae1a
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git rev-parse 'refs/tags/review/semantic-integration-20261020-evidence-v26^{tree}'
+cwd=/workspace/xdremux-audit/v26-publication-raw
+stdout:
+ab487dafe6f6567726b9a2166172052cf8fe347f
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git rev-parse --is-shallow-repository
+cwd=/workspace/xdremux-audit/v26-publication-raw
+stdout:
+false
+
+stderr:
+
+exit=0
+
+$ git --git-dir=/workspace/xdremux-audit/restore-test.git fsck --full --strict --no-dangling
+cwd=/workspace/xdremux-audit/v26-publication-raw
+stdout:
+
+stderr:
+notice: HEAD points to an unborn branch (master)
+
+exit=0
