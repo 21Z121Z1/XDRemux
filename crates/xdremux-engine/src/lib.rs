@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 mod style_reconstruction;
 pub use style_reconstruction::{
-    plan_style_reconstruction, StyleReconstructionPlan, STYLE_RECONSTRUCTION_METADATA_VERSIONS,
+    plan_style_display, plan_style_reconstruction, StyleDisplayPlan, StyleReconstructionPlan,
+    STYLE_RECONSTRUCTION_METADATA_VERSIONS,
 };
 
 mod apple;

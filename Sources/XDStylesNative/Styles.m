@@ -196,6 +196,20 @@ static NSDictionary *Encode(NSDictionary *request) {
     return @{@"schema_version":@2,@"readback":facts};
 }
 
+static NSDictionary *DecodeMatte(NSDictionary *request) {
+    NSString *path=request[@"input_path"],*output=request[@"output_path"];
+    size_t w=[request[@"width"]unsignedIntegerValue],h=[request[@"height"]unsignedIntegerValue];
+    Require(w>0&&h>0&&w<=32768&&h<=32768&&w*h<=100000000,@"Invalid matte output geometry");
+    CIImage *image=[CIImage imageWithContentsOfURL:[NSURL fileURLWithPath:path] options:@{kCIImageApplyOrientationProperty:@NO,kCIImageColorSpace:NSNull.null}];
+    Require(image!=nil,@"Cannot decode linked matte");
+    CIContext *context=[CIContext contextWithOptions:@{kCIContextWorkingColorSpace:NSNull.null,kCIContextOutputColorSpace:NSNull.null}];
+    NSMutableData *data=[NSMutableData dataWithLength:w*h*4];
+    [context render:Canvas(image,CGSizeMake(w,h)) toBitmap:data.mutableBytes rowBytes:w*4 bounds:CGRectMake(0,0,w,h) format:kCIFormatRf colorSpace:NULL];
+    float *pixels=data.mutableBytes;size_t nonzero=0;for(size_t i=0;i<w*h;i++){Require(isfinite(pixels[i]),@"Nonfinite matte");pixels[i]=fminf(fmaxf(pixels[i],0),1);nonzero+=pixels[i]>0;}
+    NSError *error=nil;Require([data writeToFile:output options:NSDataWritingAtomic error:&error],error.description?:@"Matte pixel write failed");
+    return @{@"schema_version":@2,@"width":@(w),@"height":@(h),@"positive_pixels":@(nonzero),@"orientation_applied":@NO,@"color_managed":@NO};
+}
+
 static NSDictionary *Readback(NSDictionary *request) {
     NSString *dir=request[@"output_path"],*path=request[@"input_path"];
     CGSize size=CGSizeMake([request[@"width"] doubleValue],[request[@"height"] doubleValue]);
@@ -206,7 +220,7 @@ static NSDictionary *Readback(NSDictionary *request) {
         options:@{kCIImageApplyOrientationProperty:@NO,kCIImageExpandToHDR:@YES}];
     NSDictionary *expanded=Render(Canvas(hdr,size),context,linear,[dir stringByAppendingPathComponent:@"published_hdr.f32"]);
     CGColorSpaceRelease(linear);
-    return @{@"schema_version":@2,@"sdr":sdr,@"hdr":expanded};
+    return @{@"schema_version":@2,@"sdr":sdr,@"hdr":expanded,@"hdr_content_headroom":@(hdr.contentHeadroom)};
 }
 
 NSDictionary *XDStylesPerform(NSDictionary *request, NSError **error) {
@@ -216,6 +230,7 @@ NSDictionary *XDStylesPerform(NSDictionary *request, NSError **error) {
     @try {
         if([request[@"operation"] isEqualToString:@"styles-decode-reverse"]) result=Decode(request);
         else if([request[@"operation"] isEqualToString:@"styles-readback"]) result=Readback(request);
+        else if([request[@"operation"] isEqualToString:@"styles-decode-matte"]) result=DecodeMatte(request);
         else result=Encode(request);
     } @catch(NSException *exception) {
         failure=[NSError errorWithDomain:@"XDStylesNative" code:1 userInfo:@{NSLocalizedDescriptionKey:exception.reason ?: exception.name}];

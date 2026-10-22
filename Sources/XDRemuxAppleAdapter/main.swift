@@ -636,7 +636,7 @@ private func encodedResponse(for input: Data) throws -> Data {
         fail("unsupported apple adapter schema_version \(request.schemaVersion)")
     }
 
-    if ["styles-decode-reverse", "styles-encode-linear", "styles-readback"].contains(request.operation) {
+    if ["styles-decode-reverse", "styles-encode-linear", "styles-readback", "styles-decode-matte"].contains(request.operation) {
         let object = try JSONSerialization.jsonObject(with: input) as! [String: Any]
         var nativeError: NSError?
         guard let result = XDStylesPerform(object, &nativeError) else {

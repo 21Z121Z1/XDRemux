@@ -31,6 +31,20 @@ xdremux reconstruct-styles \
 | `globalToneCurveData.bin` | 原生解析器提供的色调曲线节点。 |
 | `lightMapData.bin`、`linearLightMapData.bin` | 原生解析器提供的两张光照数据。 |
 
+## 单独的 HDR 显示目标
+
+使用 `--display-headroom 2`、`4` 或 `8`，可从重建的场景参考 R 生成显示目标 H。此时目录名为 `<source-stem>.display-<headroom>x.reconstructed`，增加 `display_linear.exr`，`hdr.heic` 承载 H。默认命令仍将 R 写入 `hdr.heic`。
+
+```bash
+xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed --display-headroom 8
+```
+
+显示路径采用独立的中间调、皮肤亮度和对立色度方法，不提供苹果 Tone/Color 编辑坐标或二维调色盘。它从 R/SDR 的正亮度样本确定一个全局曝光比例，执行明确的压缩 `R * exposure * h / (h + Y(R * exposure))`，再除以 `h` 后应用有界算子。R 不会先被裁入编辑器的标称范围。颜色阶段参考同一照片扩展线性 SDR 的相对对立色度，保持影调阶段输出的亮度，并在该亮度下压缩色域。这些是本实现的明确选择，不代表完整复现苹果正向渲染器。
+
+权重来自关联到主图的 2026 semantic-person 和旧版 2019 skin 遮罩。没有 semantic-person 时，可使用关联的 2018 Portrait Effects Matte，并明确记录为前景代理。缺失遮罩使用零权重；存在歧义则失败。天空和新版 skin 资源不会被静默替代。适配器不应用色彩管理或方向，在主图存储坐标中解码遮罩。引导图是本实现的面积亮度／对数高斯引导，不是苹果统计或引导滤波的复现。
+
+报告记录系数、实际遮罩角色／URI／ID／哈希、曝光、有限且有界的浮点目标，以及原生 headroom 和回读。声明的显示容量与最大局部增益分别表达。HEVC 量化可能超出浮点界限、产生接近黑色的负值，或改变中间 headroom 的亮度。原生回读和 SDR 完全保留不能证明真实 HDR 观看质量。保留原图细节和纹理元数据，不重新运行纹理渲染器。机制和证据边界见[影调与颜色方法](research/styles-tonal-color-methods.md)。
+
 EXR 像素使用显示方向。重建计算使用存储方向，以保持辅助资源与压缩 SDR 对齐。EXR 编码器可能使用半精度，报告记录实际回读误差。
 
 已有输出目录不会被替换。同一输出目录下重复的输入文件主名会明确报错。报告最后写入。调用失败时只删除本次创建的目录，原照片始终只读。

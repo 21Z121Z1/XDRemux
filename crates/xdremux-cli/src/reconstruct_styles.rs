@@ -14,6 +14,18 @@ pub(super) struct ReconstructStylesArgs {
     /// Limit processing and Gain Map long edge; zero uses native pixels. SDR always retains source resolution.
     #[arg(long, default_value_t = 0, value_name = "PIXELS")]
     max_edge: u32,
+    /// Render a separate HDR display target using decomposed tonal and color methods at 2x, 4x or 8x.
+    #[arg(long, value_parser = parse_display_headroom, value_name = "MULTIPLIER")]
+    display_headroom: Option<u32>,
+}
+
+fn parse_display_headroom(value: &str) -> Result<u32, String> {
+    match value {
+        "2" => Ok(2),
+        "4" => Ok(4),
+        "8" => Ok(8),
+        _ => Err("expected 2, 4 or 8".into()),
+    }
 }
 
 pub(super) fn run(
@@ -44,9 +56,12 @@ pub(super) fn run(
         for input in &args.inputs {
             let stem = input.file_stem().unwrap_or_default();
             let mut name = stem.to_os_string();
+            if let Some(h) = args.display_headroom {
+                name.push(format!(".display-{h}x"));
+            }
             name.push(".reconstructed");
             let output = args.output_dir.join(name);
-            match xdremux_runtime::reconstruct_styles_hdr(&adapter,input,&output,args.max_edge) {
+            match xdremux_runtime::reconstruct_styles_hdr_with_display(&adapter,input,&output,args.max_edge,args.display_headroom) {
                 Ok(report)=>results.push(serde_json::json!({"input":input,"output":output,"status":"success","report":report})),
                 Err(e)=>{
                     failures+=1;
@@ -91,6 +106,38 @@ mod tests {
         };
         assert_eq!(args.inputs.len(), 2);
         assert_eq!(args.max_edge, 1024);
+        assert_eq!(args.display_headroom, None);
         assert_eq!(args.output_dir, std::path::PathBuf::from("results"));
+    }
+    #[test]
+    fn public_command_selects_a_display_outcome_without_editor_axes() {
+        for h in ["2", "4", "8"] {
+            let parsed = crate::Cli::try_parse_from([
+                "xdremux",
+                "reconstruct-styles",
+                "--input",
+                "source.heic",
+                "--output-dir",
+                "out",
+                "--display-headroom",
+                h,
+            ])
+            .unwrap();
+            let crate::RootCommand::ReconstructStyles(args) = parsed.command else {
+                panic!("wrong command")
+            };
+            assert_eq!(args.display_headroom, Some(h.parse().unwrap()));
+        }
+        assert!(crate::Cli::try_parse_from([
+            "xdremux",
+            "reconstruct-styles",
+            "--input",
+            "source.heic",
+            "--output-dir",
+            "out",
+            "--display-headroom",
+            "3"
+        ])
+        .is_err());
     }
 }

@@ -6,19 +6,21 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use xdremux_codec::{GainMapTileEncodeRequest, LibHeifProvider, Raster8, RasterPixelFormat};
 use xdremux_engine::{
-    plan_style_reconstruction, GainMapCodecLayout, GainMapTileEncoder,
+    plan_style_display, plan_style_reconstruction, GainMapCodecLayout, GainMapTileEncoder,
     STYLE_RECONSTRUCTION_METADATA_VERSIONS,
 };
 use xdremux_format::ChromaSampling;
 use xdremux_hdr::{
-    display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene, LinearPixel,
+    display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene, render_styles_display,
+    DisplayMethods, LinearPixel,
 };
 use xdremux_heif::{
-    assemble_iso_gain_map_heif, extract_style_reconstruction_resources, primary_image_signature,
-    validate_gain_map_structure, DirectHevcGainMap, GainMapChannels, GainMapEncodeProfile,
-    GainMapTile, IsoGainMapAssembly,
+    assemble_iso_gain_map_heif, extract_style_display_mattes,
+    extract_style_reconstruction_resources, primary_image_signature, validate_gain_map_structure,
+    DirectHevcGainMap, GainMapChannels, GainMapEncodeProfile, GainMapTile, IsoGainMapAssembly,
+    StyleDisplayMatte,
 };
-use xdremux_metadata::make_scene_gain_map_metadata;
+use xdremux_metadata::{make_scene_gain_map_metadata, make_scene_gain_map_metadata_with_capacity};
 
 use crate::apple_adapter::AppleAdapterClient;
 use crate::{Result, RuntimeError};
@@ -94,6 +96,47 @@ fn hash_file(path: &Path) -> Result<String> {
     }
     Ok(hash.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
+
+fn hdr_transport_metrics(target: &[LinearPixel], actual: &[LinearPixel]) -> Result<Value> {
+    let mut errors = Vec::new();
+    let mut negative = 0usize;
+    let mut nonpositive = 0usize;
+    let mut maximum = f32::NEG_INFINITY;
+    let mut rgb_sum = 0f64;
+    let mut rgb_max = 0f32;
+    for (a, b) in target.iter().zip(actual) {
+        let ya = display_p3_luminance(a);
+        let yb = display_p3_luminance(b);
+        nonpositive += usize::from(yb <= 0.);
+        for c in 0..3 {
+            negative += usize::from(b[c] < 0.);
+            maximum = maximum.max(b[c]);
+            let e = (a[c] - b[c]).abs();
+            rgb_sum += e as f64;
+            rgb_max = rgb_max.max(e);
+        }
+        if ya > 1e-4 {
+            errors.push((yb.max(1e-8) / ya).log2().abs());
+        }
+    }
+    if errors.is_empty() {
+        return Err(error(
+            "no positive HDR target pixels for transport measurement",
+        ));
+    }
+    errors.sort_by(f32::total_cmp);
+    let mean = errors.iter().map(|v| *v as f64).sum::<f64>() / errors.len() as f64;
+    let index = (errors.len() - 1) as f64 * 0.99;
+    let lo = index.floor() as usize;
+    let hi = index.ceil() as usize;
+    let p99 = errors[lo] as f64 + (errors[hi] - errors[lo]) as f64 * (index - lo as f64);
+    Ok(
+        json!({"mean_abs_ev":mean,"p99_abs_ev":p99,"max_abs_ev":errors.last(),"pixels":errors.len(),
+        "decoded_negative_rgb_components":negative,"decoded_nonpositive_y_pixels":nonpositive,"decoded_max_rgb":maximum,
+        "mean_abs_rgb":rgb_sum/(target.len()*3)as f64,"max_abs_rgb":rgb_max,"nonfinite_rgb_components":0,
+        "ev_valid_rule":"targetY>1e-4; decoded nonpositiveY counted and floored at1e-8, never silently excluded"}),
+    )
+}
 fn encode(
     client: &AppleAdapterClient,
     pixels: &Path,
@@ -139,6 +182,7 @@ fn encode(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn hdr_gain_map(
     client: &AppleAdapterClient,
     source: &[u8],
@@ -147,6 +191,7 @@ fn hdr_gain_map(
     output: &Path,
     work: &Path,
     size: (usize, usize),
+    display_headroom: Option<u32>,
 ) -> Result<Value> {
     let (w, h) = size;
     let map = make_scene_gain_map(sdr, target, w, h)
@@ -183,9 +228,23 @@ fn hdr_gain_map(
             height: t.height,
         })
         .collect::<Vec<_>>();
-    let (tmap, xmp) =
+    let metadata = if let Some(h) = display_headroom {
+        if target
+            .iter()
+            .any(|p| p[..3].iter().any(|v| *v > h as f32 + 2e-6))
+        {
+            return Err(error("display target exceeds declared headroom"));
+        }
+        make_scene_gain_map_metadata_with_capacity(
+            map.min_ev as f64,
+            map.max_ev as f64,
+            map.offset as f64,
+            (h as f64).log2(),
+        )
+    } else {
         make_scene_gain_map_metadata(map.min_ev as f64, map.max_ev as f64, map.offset as f64)
-            .map_err(|e| RuntimeError::external("scene Gain Map metadata", e))?;
+    };
+    let (tmap, xmp) = metadata.map_err(|e| RuntimeError::external("scene Gain Map metadata", e))?;
     let bytes = assemble_iso_gain_map_heif(
         source,
         &IsoGainMapAssembly {
@@ -220,7 +279,17 @@ fn hdr_gain_map(
         ));
     }
     fs::write(output, &bytes).map_err(io)?;
-    client.styles_primitive(&json!({"schema_version":2,"operation":"styles-readback","input_path":output,"output_path":work,"width":w,"height":h}))?;
+    let consumer=client.styles_primitive(&json!({"schema_version":2,"operation":"styles-readback","input_path":output,"output_path":work,"width":w,"height":h}))?;
+    if let Some(h) = display_headroom {
+        if consumer["hdr_content_headroom"]
+            .as_f64()
+            .is_none_or(|v| (v - h as f64).abs() > 1e-5)
+        {
+            return Err(error(
+                "native consumer headroom differs from display target",
+            ));
+        }
+    }
     let published_sdr = read_pixels(&work.join("published_sdr.f32"), w * h)?;
     let sdr_max = published_sdr
         .iter()
@@ -231,18 +300,10 @@ fn hdr_gain_map(
         return Err(error(format!("SDR consumer readback changed by {sdr_max}")));
     }
     let hdr = read_pixels(&work.join("published_hdr.f32"), w * h)?;
-    let mut residuals = Vec::new();
-    for (a, b) in target.iter().zip(&hdr) {
-        let ya = display_p3_luminance(a);
-        let yb = display_p3_luminance(b);
-        if ya > 1e-4 && yb > 1e-4 {
-            residuals.push((ya / yb).log2().abs());
-        }
-    }
-    if residuals.is_empty() {
-        return Err(error("published Gain Map did not expand to HDR"));
-    }
-    let mae = residuals.iter().map(|v| *v as f64).sum::<f64>() / residuals.len() as f64;
+    let transport = hdr_transport_metrics(target, &hdr)?;
+    let mae = transport["mean_abs_ev"]
+        .as_f64()
+        .ok_or_else(|| error("invalid transport metrics"))?;
     if mae > 0.15 {
         return Err(error(format!(
             "published HDR differs from scene target by {mae:.6} EV"
@@ -251,8 +312,42 @@ fn hdr_gain_map(
     Ok(
         json!({"sha256":hash_file(output)?,"compressed_sdr_preserved":true,"sdr_readback_max_rgb_error":sdr_max,
         "hdr_target_mae_ev":mae,"gain_min_ev":map.min_ev,"gain_max_ev":map.max_ev,"offset":map.offset,
-        "clipped_negative_channel_fraction":map.clipped_negative_fraction,"gain_map_width":w,"gain_map_height":h,"gain_map_channels":3}),
+        "clipped_negative_channel_fraction":map.clipped_negative_fraction,"gain_map_width":w,"gain_map_height":h,"gain_map_channels":3,
+        "consumer_content_headroom":consumer["hdr_content_headroom"],"transport":transport}),
     )
+}
+
+fn display_matte(
+    client: &AppleAdapterClient,
+    matte: Option<StyleDisplayMatte>,
+    dir: &Path,
+    name: &str,
+    w: usize,
+    h: usize,
+) -> Result<(Vec<f32>, Value)> {
+    let Some(matte) = matte else {
+        return Ok((
+            vec![0.; w * h],
+            json!({"role":name,"status":"missing-explicit-zero"}),
+        ));
+    };
+    let input = dir.join(format!("{name}.heic"));
+    let output = dir.join(format!("{name}.f32"));
+    fs::write(&input, &matte.heif).map_err(io)?;
+    let native=client.styles_primitive(&json!({"schema_version":2,"operation":"styles-decode-matte","input_path":input,"output_path":output,"width":w,"height":h}))?;
+    let bytes = fs::read(&output).map_err(io)?;
+    if bytes.len() != w * h * 4 {
+        return Err(error("matte geometry mismatch"));
+    }
+    let pixels = bytes
+        .chunks_exact(4)
+        .map(|v| f32::from_le_bytes(v.try_into().unwrap()))
+        .collect();
+    Ok((
+        pixels,
+        json!({"role":name,"item_id":matte.item_id,"uri":matte.uri,"foreground_proxy":matte.foreground_proxy,
+        "standalone_sha256":hash_file(&input)?,"pixels_sha256":hash_file(&output)?,"native":native}),
+    ))
 }
 
 /// Create a new, manifest-last output bundle. Existing files/directories are
@@ -263,7 +358,23 @@ pub fn reconstruct_styles_hdr(
     output: &Path,
     max_edge: u32,
 ) -> Result<Value> {
+    reconstruct_styles_hdr_with_display(adapter, input, output, max_edge, None)
+}
+
+/// Optional display rendering uses independently callable methods on R, not
+/// a native output ratio or Apple's editor parameter system.
+pub fn reconstruct_styles_hdr_with_display(
+    adapter: &Path,
+    input: &Path,
+    output: &Path,
+    max_edge: u32,
+    display_headroom: Option<u32>,
+) -> Result<Value> {
     let plan = plan_style_reconstruction(max_edge).map_err(error)?;
+    let display_plan = display_headroom
+        .map(plan_style_display)
+        .transpose()
+        .map_err(error)?;
     let input = fs::canonicalize(input).map_err(io)?;
     let source = fs::read(&input).map_err(io)?;
     let source_hash = Sha256::digest(&source)
@@ -326,14 +437,68 @@ pub fn reconstruct_styles_hdr(
             orientation,
             &reconstructed.pixels,
         )?;
+        let mut display_pixels = None;
+        let mut display_facts = Value::Null;
+        if let Some(display) = display_plan {
+            let (skin, foreground) = extract_style_display_mattes(&source)
+                .map_err(|e| RuntimeError::external("same-photo semantic masks", e))?;
+            let (skin, skin_facts) = display_matte(&client, skin, dir, "skin", w, h)?;
+            let (foreground, foreground_facts) =
+                display_matte(&client, foreground, dir, "foreground", w, h)?;
+            let [mb, mf, ab, ask, sb, sh, cg, fp] = display.methods;
+            let result = render_styles_display(
+                &reconstructed.pixels,
+                &sdr,
+                &skin,
+                &foreground,
+                w,
+                h,
+                display.headroom,
+                DisplayMethods {
+                    mids_background: mb,
+                    mids_foreground: mf,
+                    anchor_background: ab,
+                    anchor_skin: ask,
+                    skin_brightness: sb,
+                    skin_highlight: sh,
+                    chroma_gain: cg,
+                    foreground_chroma_protection: fp,
+                },
+            )
+            .map_err(|e| RuntimeError::external("independent HDR methods", e))?;
+            display_facts = json!({"algorithm":"decomposed-tonal-opponent-chroma-v1","headroom":display.headroom,
+                "exposure_ev":result.exposure_ev,"target_max_rgb":result.maximum_rgb,"methods":{
+                    "mids_background":mb,"mids_foreground":mf,"anchor_background":ab,"anchor_skin":ask,
+                    "skin_brightness":sb,"skin_highlight":sh,"chroma_gain":cg,"foreground_chroma_protection":fp},
+                "masks":[skin_facts,foreground_facts],"runtime_raw_inputs":0,"native_editor_parameters_used":false,"native_output_ratio_used":false,
+                "working_domain":"explicit component-linear Display P3; global headroom normalization for bounded leaves",
+                "guide":"own area-luminance log Gaussian sigma2 at long edge up to1024; not native guide equivalence",
+                "color":"extended source SDR relative opponent chroma, fixed post-tone luminance and gamut fit",
+                "texture":"source detail and original texture metadata retained; texture renderer not rerun",
+                "physical_HDR_visual_acceptance":false});
+            let path = dir.join("display.f32");
+            write_pixels(&path, &result.pixels)?;
+            let encoded = encode(
+                &client,
+                &path,
+                &output.join("display_linear.exr"),
+                dir,
+                (w, h),
+                orientation,
+                &result.pixels,
+            )?;
+            display_facts["exr"] = encoded;
+            display_pixels = Some(result.pixels);
+        }
         let heic = hdr_gain_map(
             &client,
             &source,
             &sdr,
-            &reconstructed.pixels,
+            display_pixels.as_deref().unwrap_or(&reconstructed.pixels),
             &output.join("hdr.heic"),
             dir,
             (w, h),
+            display_headroom,
         )?;
         let reverse = encode(
             &client,
@@ -360,7 +525,7 @@ pub fn reconstruct_styles_hdr(
                 "guidance_valid_fraction":reconstructed.guidance_valid_fraction,"limited_fraction":reconstructed.limited_fraction,
                 "runtime_raw_inputs":0,"transfer":"measured native Apple Log exponential inverse","absolute_nit_calibration":false},
             "sdr_policy":"original compressed primary and its colour/geometry properties preserved; only HDR Gain Map changes appearance",
-            "outputs":{"scene_linear.exr":scene,"hdr.heic":heic,"unstyled.exr":reverse},
+            "outputs":{"scene_linear.exr":scene,"hdr.heic":heic,"unstyled.exr":reverse},"display":display_facts,
             "limitations":["Approximate relative scene luminance; not complete capture ISP inversion or RAW recovery.",
                 "Private Apple ABI and embedded resource support are checked at runtime; unknown versions fail closed.",
                 "Clipped colour and detail absent from the encoded primary cannot be restored.",
@@ -382,6 +547,16 @@ pub fn reconstruct_styles_hdr(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn negative_consumer_luminance_remains_in_hdr_error_tails() {
+        let result =
+            hdr_transport_metrics(&[[1., 1., 1., 1.]], &[[-0.01, -0.01, -0.01, 1.]]).unwrap();
+        assert_eq!(result["pixels"], 1);
+        assert_eq!(result["decoded_negative_rgb_components"], 3);
+        assert_eq!(result["decoded_nonpositive_y_pixels"], 1);
+        assert!(result["mean_abs_ev"].as_f64().unwrap() > 20.);
+    }
 
     #[test]
     fn native_reverse_uses_source_coefficients_and_is_repeatable() {

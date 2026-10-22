@@ -13,6 +13,80 @@ const LINEAR_URI: &[u8] = b"tag:apple.com,2023:photo:aux:linearthumbnail\0";
 const DELTA_URI: &[u8] = b"tag:apple.com,2023:photo:aux:styledeltamap\0";
 
 #[derive(Debug)]
+pub struct StyleDisplayMatte {
+    pub item_id: u32,
+    pub uri: &'static str,
+    pub foreground_proxy: bool,
+    pub heif: Vec<u8>,
+}
+
+fn exact_auxiliary_uri(source: &[u8], range: std::ops::Range<usize>, uri: &[u8]) -> bool {
+    let Ok(boxes) = parse_boxes(source, range) else {
+        return false;
+    };
+    let Some(property) = boxes.first() else {
+        return false;
+    };
+    let Some(payload) = source.get(property.data_start + 4..property.data_end) else {
+        return false;
+    };
+    payload.split(|b| *b == 0).next() == Some(uri.strip_suffix(&[0]).unwrap_or(uri))
+}
+
+/// Exact, primary-linked roles. Legacy portrait is an explicitly declared
+/// foreground proxy; sky and newer skin variants are never implicit aliases.
+pub fn extract_style_display_mattes(
+    source: &[u8],
+) -> Result<(Option<StyleDisplayMatte>, Option<StyleDisplayMatte>)> {
+    let roots = parse_boxes(source, 0..source.len())?;
+    let mut metas = roots.iter().filter(|b| b.kind == FourCC::new(*b"meta"));
+    let root = metas
+        .next()
+        .ok_or_else(|| invalid("missing HEIF meta box"))?;
+    if metas.next().is_some() {
+        return Err(invalid("ambiguous HEIF meta box"));
+    }
+    let meta = parse_meta_box(source, root)?;
+    let children = parse_boxes(source, root.data_start + 4..root.data_end)?;
+    let hdlr = children
+        .iter()
+        .find(|b| b.kind == FourCC::new(*b"hdlr"))
+        .ok_or_else(|| invalid("missing HEIF handler"))?;
+    let select = |uri: &'static str, proxy: bool| -> Result<Option<StyleDisplayMatte>> {
+        let mut terminated = uri.as_bytes().to_vec();
+        terminated.push(0);
+        let mut ids = meta.ipma.entries.iter().filter_map(|entry| {
+            let matches = entry.associations.iter().any(|a| {
+                meta.properties.iter().any(|p| {
+                    p.index == u32::from(a.property_index)
+                        && p.kind == FourCC::new(*b"auxC")
+                        && exact_auxiliary_uri(source, p.box_range.clone(), &terminated)
+                })
+            });
+            (matches && linked(&meta, entry.item_id, b"auxl")).then_some(entry.item_id)
+        });
+        let Some(id) = ids.next() else {
+            return Ok(None);
+        };
+        if ids.next().is_some() {
+            return Err(invalid(format!("ambiguous primary-linked matte {uri}")));
+        }
+        Ok(Some(StyleDisplayMatte {
+            item_id: id,
+            uri,
+            foreground_proxy: proxy,
+            heif: standalone_auxiliary(source, &meta, id, &source[hdlr.box_range()])?,
+        }))
+    };
+    let skin = select("urn:com:apple:photo:2019:aux:semanticskinmatte", false)?;
+    let foreground = match select("tag:apple.com,2026:photo:aux:semanticpersonmatte", false)? {
+        Some(m) => Some(m),
+        None => select("urn:com:apple:photo:2018:aux:portraiteffectsmatte", true)?,
+    };
+    Ok((skin, foreground))
+}
+
+#[derive(Debug)]
 pub struct StyleReconstructionResources {
     pub metadata: Vec<u8>,
     /// Standalone auxiliary image graph, with original coded bytes and colour
@@ -273,6 +347,9 @@ mod tests {
     use super::*;
     use xdremux_format::isobmff::{IpmaAssociation, IpmaEntry, IrefEntry};
     fn fixture() -> Vec<u8> {
+        fixture_with_auxiliaries(LINEAR_URI, DELTA_URI)
+    }
+    fn fixture_with_auxiliaries(first: &[u8], second: &[u8]) -> Vec<u8> {
         let cc = |s: &[u8; 4]| FourCC::new(*s);
         let mut metadata = 4u16.to_be_bytes().to_vec();
         metadata.extend([0, 0]);
@@ -285,8 +362,8 @@ mod tests {
             make_full_box(cc(b"infe"), 2, 1, &metadata).unwrap(),
         ];
         let mut props = xdremux_format::isobmff::make_ispe_box(2, 2).unwrap();
-        props.extend(make_full_box(cc(b"auxC"), 0, 0, LINEAR_URI).unwrap());
-        props.extend(make_full_box(cc(b"auxC"), 0, 0, DELTA_URI).unwrap());
+        props.extend(make_full_box(cc(b"auxC"), 0, 0, first).unwrap());
+        props.extend(make_full_box(cc(b"auxC"), 0, 0, second).unwrap());
         let entries = (1..=3)
             .map(|id| IpmaEntry {
                 item_id: id,
@@ -391,6 +468,43 @@ mod tests {
                 .all(|a| a.property_index == 1));
         }
         assert!(!primary_image_signature(&source).unwrap().is_empty());
+    }
+    #[test]
+    fn unrelated_auxiliaries_are_not_person_or_skin_aliases() {
+        let source = fixture_with_auxiliaries(
+            b"urn:com:apple:photo:2019:aux:semanticskymatte\0",
+            b"tag:apple.com,2026:photo:aux:semanticskinmatte\0",
+        );
+        let (skin, foreground) = extract_style_display_mattes(&source).unwrap();
+        assert!(skin.is_none() && foreground.is_none());
+        let source = fixture_with_auxiliaries(
+            b"vendor:tag:apple.com,2026:photo:aux:semanticpersonmatte\0",
+            b"vendor:urn:com:apple:photo:2019:aux:semanticskinmatte\0",
+        );
+        let (skin, foreground) = extract_style_display_mattes(&source).unwrap();
+        assert!(skin.is_none() && foreground.is_none());
+    }
+    #[test]
+    fn selects_linked_person_and_skin_without_crossing_roles() {
+        let person = b"tag:apple.com,2026:photo:aux:semanticpersonmatte\0";
+        let skin = b"urn:com:apple:photo:2019:aux:semanticskinmatte\0";
+        let source = fixture_with_auxiliaries(person, skin);
+        let (s, f) = extract_style_display_mattes(&source).unwrap();
+        assert_eq!(s.unwrap().item_id, 3);
+        assert_eq!(f.as_ref().unwrap().item_id, 2);
+        assert!(!f.unwrap().foreground_proxy);
+        let source = fixture_with_auxiliaries(
+            b"urn:com:apple:photo:2018:aux:portraiteffectsmatte\0",
+            person,
+        );
+        let (_, f) = extract_style_display_mattes(&source).unwrap();
+        assert_eq!(f.unwrap().item_id, 3);
+        let source = fixture_with_auxiliaries(person, person);
+        assert!(extract_style_display_mattes(&source).is_err());
+        let source =
+            fixture_with_auxiliaries(b"urn:com:apple:photo:2018:aux:portraiteffectsmatte\0", skin);
+        let (_, f) = extract_style_display_mattes(&source).unwrap();
+        assert!(f.unwrap().foreground_proxy);
     }
     #[test]
     fn rejects_missing_links_and_truncated_resources() {

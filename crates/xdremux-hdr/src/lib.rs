@@ -1,10 +1,14 @@
 #![forbid(unsafe_code)]
 
+mod display_methods;
 mod edr;
 mod error;
 mod gainmap;
 mod info;
 mod scene_reconstruction;
+pub use display_methods::{
+    render_display_pixel, render_styles_display, DisplayMethods, DisplayTarget,
+};
 pub use scene_reconstruction::{
     display_p3_luminance, make_scene_gain_map, reconstruct_relative_scene,
     styles_thumbnail_to_linear, LinearPixel, SceneGainMap, SceneReconstruction,

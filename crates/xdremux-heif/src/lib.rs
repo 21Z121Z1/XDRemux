@@ -21,7 +21,8 @@ pub use error::{HeifError, Result};
 pub use native::IsoGainMapAssembly;
 pub use semantic::{merge_apple_semantic_auxiliary_heif, transplant_apple_semantic_auxiliary_heif};
 pub use style_reconstruction::{
-    extract_style_reconstruction_resources, primary_image_signature, StyleReconstructionResources,
+    extract_style_display_mattes, extract_style_reconstruction_resources, primary_image_signature,
+    StyleDisplayMatte, StyleReconstructionResources,
 };
 pub use styles::{assemble_photographic_styles_heif, PhotographicStylesAssembly};
 pub use validation::{validate_gain_map_structure, GainMapStructure};

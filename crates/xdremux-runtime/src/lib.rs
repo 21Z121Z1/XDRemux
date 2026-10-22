@@ -14,7 +14,7 @@ mod oppo_tail;
 mod style_reconstruction;
 mod validation;
 #[cfg(target_os = "macos")]
-pub use style_reconstruction::reconstruct_styles_hdr;
+pub use style_reconstruction::{reconstruct_styles_hdr, reconstruct_styles_hdr_with_display};
 
 #[cfg(target_os = "macos")]
 pub use apple_adapter::AppleStylePropertiesFacts;

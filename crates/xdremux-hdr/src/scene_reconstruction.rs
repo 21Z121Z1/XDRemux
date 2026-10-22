@@ -98,7 +98,13 @@ fn checked_raster(pixels: &[LinearPixel], w: usize, h: usize) -> Result<()> {
 
 // Area averages, including partial pixel coverage, avoid sampling aliases when
 // the full-resolution image and auxiliary image do not have integer ratios.
-fn area_luminance(pixels: &[LinearPixel], w: usize, h: usize, tw: usize, th: usize) -> Vec<f32> {
+pub(super) fn area_luminance(
+    pixels: &[LinearPixel],
+    w: usize,
+    h: usize,
+    tw: usize,
+    th: usize,
+) -> Vec<f32> {
     let mut values = vec![0.; tw * th];
     for ty in 0..th {
         let y0 = ty as f64 * h as f64 / th as f64;

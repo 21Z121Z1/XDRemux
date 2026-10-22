@@ -3,7 +3,9 @@
 mod apple_portrait;
 mod error;
 mod scene_gain_map;
-pub use scene_gain_map::make_scene_gain_map_metadata;
+pub use scene_gain_map::{
+    make_scene_gain_map_metadata, make_scene_gain_map_metadata_with_capacity,
+};
 pub mod iso21496;
 pub mod oppo;
 mod oppo_heif;

@@ -7,6 +7,16 @@ pub fn make_scene_gain_map_metadata(
     max_ev: f64,
     offset: f64,
 ) -> Result<(Vec<u8>, Vec<u8>)> {
+    make_scene_gain_map_metadata_with_capacity(min_ev, max_ev, offset, max_ev.max(1.))
+}
+
+/// Display capacity and local pixel gain are independent quantities.
+pub fn make_scene_gain_map_metadata_with_capacity(
+    min_ev: f64,
+    max_ev: f64,
+    offset: f64,
+    capacity: f64,
+) -> Result<(Vec<u8>, Vec<u8>)> {
     if !min_ev.is_finite()
         || !max_ev.is_finite()
         || !offset.is_finite()
@@ -16,13 +26,14 @@ pub fn make_scene_gain_map_metadata(
         || min_ev < -16.
         || max_ev > 16.
         || offset < 0.
+        || !capacity.is_finite()
+        || !(1. ..=16.).contains(&capacity)
     {
         return Err(MetadataError::invalid(
             "scene Gain Map metadata",
             "invalid signed gain range or offset",
         ));
     }
-    let capacity = max_ev.max(1.);
     let values = [0., capacity, min_ev, max_ev, 1., offset, offset];
     let mut tmap = vec![0, 0, 0, 0, 0, 0x40];
     for value in values {
@@ -50,5 +61,18 @@ mod tests {
             .unwrap()
             .contains("GainMapMin=\"-3.00000000\""));
         assert!(make_scene_gain_map_metadata(1., 6., 0.).is_err());
+    }
+    #[test]
+    fn display_capacity_is_not_the_largest_local_gain() {
+        let (bytes, xmp) =
+            make_scene_gain_map_metadata_with_capacity(-4., 7., 1. / 64., 3.).unwrap();
+        assert_eq!(
+            i32::from_be_bytes(bytes[14..18].try_into().unwrap()),
+            3_000_000
+        );
+        assert!(String::from_utf8(xmp)
+            .unwrap()
+            .contains("HDRCapacityMax=\"3.00000000\""));
+        assert!(make_scene_gain_map_metadata_with_capacity(-4., 7., 1. / 64., f64::NAN).is_err());
     }
 }

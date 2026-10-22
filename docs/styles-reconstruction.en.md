@@ -31,6 +31,20 @@ Each source gets a new `<source-stem>.reconstructed` directory:
 | `globalToneCurveData.bin` | Native decoded tone-curve nodes, when the native parser supplies them. |
 | `lightMapData.bin`, `linearLightMapData.bin` | Native decoded illumination buffers, when available. |
 
+## Separate HDR display target
+
+Use `--display-headroom 2`, `4`, or `8` to render a display target H from the reconstructed scene reference R. This creates `<source-stem>.display-<headroom>x.reconstructed`, adds `display_linear.exr`, and puts H in `hdr.heic`. The default command continues to put R in `hdr.heic`.
+
+```bash
+xdremux reconstruct-styles --input original.HEIC --output-dir reconstructed --display-headroom 8
+```
+
+The display path uses independent midtone, skin-brightness and opponent-chroma methods. It does not expose Apple's Tone/Color editor coordinates or a two-dimensional palette. It selects one global exposure from positive R/SDR samples, applies the declared rolloff `R * exposure * h / (h + Y(R * exposure))`, and normalizes by `h` before bounded leaves. R is not clipped to the editor's nominal range. The color stage anchors relative opponent chroma to the same photo's extended-linear SDR, preserves the post-tone luminance, and fits the display gamut at that luminance. These are explicit pipeline choices, not a claim of complete Apple forward-renderer equivalence.
+
+Linked 2026 semantic-person and legacy 2019 skin mattes supply weights. If semantic-person is absent, a linked 2018 Portrait Effects Matte may supply an explicitly reported foreground proxy. Missing masks produce zero weights; ambiguous masks fail. Sky and newer skin variants are never silently substituted. The adapter decodes these masks without color management or orientation, in the primary's storage geometry. The guide is this implementation's area-luminance/log-Gaussian guide, not a reproduction of Apple's statistics or guided filter.
+
+The report records the coefficients, actual mask roles/URIs/IDs/hashes, exposure, finite bounded float target, and native headroom/readback. The declared display capacity is independent of the largest local gain. HEVC quantization can overshoot the float bound, introduce near-black negative values, and change intermediate-headroom luminance. Native readback and exact SDR preservation do not establish physical HDR viewing quality. Source texture/detail and original texture metadata remain; the texture renderer is not rerun. See [tonal and color methods](research/styles-tonal-color-methods.en.md) for the mechanism and evidence boundaries.
+
 EXR pixels have the displayed orientation. The reconstruction works in storage orientation so that auxiliary data and compressed SDR remain aligned. The EXR writer can use half precision. The report records its measured readback error.
 
 Existing bundles are never replaced. Duplicate source stems in one output directory produce an explicit failure. The report is written last. A failed invocation removes only the new directory it reserved. Source photos are read-only.
